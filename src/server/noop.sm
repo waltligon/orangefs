@@ -12,7 +12,8 @@
 
 #include "pvfs2-server.h"
 
-static int noop_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int noop_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -44,8 +45,10 @@ machine pvfs2_noop_sm(prelude, final_response, cleanup)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int noop_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int noop_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(s_op));
 }
 

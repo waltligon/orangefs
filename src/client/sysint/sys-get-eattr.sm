@@ -22,9 +22,9 @@ extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
 static int get_eattr_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int get_eattr_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int get_eattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
@@ -145,9 +145,10 @@ PVFS_error PVFS_sys_geteattr(
     return PVFS_sys_geteattr_list(ref, credentials, 1, key_p, &resp_p);
 }
 
-static int get_eattr_setup_msgpair(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
+static int get_eattr_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     int i;
 
@@ -195,9 +196,10 @@ static int get_eattr_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int get_eattr_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static int get_eattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"get_eattr state: get_eattr_cleanup\n");
     /* free the array malloc'd above */

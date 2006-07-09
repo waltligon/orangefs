@@ -54,29 +54,29 @@ enum
 };
 
 static int getattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_read_symlink_target(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_get_dirdata_handle(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_get_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_interpret_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_get_dir_hint(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_interpret_dir_hint(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_read_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_read_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_setup_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int getattr_setup_op(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -209,8 +209,9 @@ machine pvfs2_get_attr_sm(
  * function.  This mask can be augmented in some of the other states.
  */
 static int getattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = NULL;
 
     js_p->error_code = 0;
@@ -419,8 +420,9 @@ static int getattr_verify_attribs(
 }
 
 static int getattr_read_symlink_target(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t i;
 
@@ -466,8 +468,9 @@ static int getattr_read_symlink_target(
 
 
 static int getattr_read_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     int dfile_count = 0;
     job_id_t i;
@@ -556,8 +559,9 @@ static int getattr_read_metafile_datafile_handles_if_required(
 }
 
 static int getattr_read_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -616,8 +620,10 @@ static int getattr_read_metafile_distribution_if_required(
     return ret;
 }
 
-static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
+static int getattr_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
 
     if(js_p->error_code > 0)
@@ -734,9 +740,10 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     return 1;
 }
 
-static int getattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static int getattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     if(s_op->val_a)
     {
         if(s_op->val_a[NUM_DFILES_KEY].buffer)
@@ -762,8 +769,9 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 }
 
 static int getattr_setup_op(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     s_op->u.getattr.handle = s_op->req->u.getattr.handle;
     s_op->u.getattr.fs_id = s_op->req->u.getattr.fs_id;
     s_op->u.getattr.attrmask = s_op->req->u.getattr.attrmask;
@@ -773,8 +781,9 @@ static int getattr_setup_op(
 }
 
 static int getattr_get_dirdata_handle(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
 
@@ -799,8 +808,9 @@ static int getattr_get_dirdata_handle(
 }
         
 static int getattr_get_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
 
@@ -829,8 +839,9 @@ static int getattr_get_dirent_count(
 }
 
 static int getattr_interpret_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     switch(js_p->error_code)
     {
         case -TROVE_ENOENT:
@@ -852,8 +863,9 @@ static int getattr_interpret_dirent_count(
 }
 
 static int getattr_get_dir_hint(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret, i;
     job_id_t tmp_id;
 
@@ -955,9 +967,9 @@ static int getattr_get_dir_hint(
 }
 
 static int getattr_interpret_dir_hint(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     if(js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
         /* if we failed to get any of the keys, and the error code is due to

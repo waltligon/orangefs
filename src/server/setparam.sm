@@ -17,9 +17,9 @@
 #include "pvfs2-internal.h"
 
 static int setparam_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int setparam_work(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int check_fs_id(PVFS_fs_id fs_id);
 
@@ -63,8 +63,10 @@ machine pvfs2_setparam_sm(
  *
  * actually does the "work" involved in setting a runtime server parameter
  */
-static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
+static int setparam_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -1, tmp_on = 0, old_event_on = 0;
     job_id_t tmp_id;
     uint64_t tmp_mask = 0;
@@ -179,8 +181,10 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int setparam_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int setparam_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_SERVER_DEBUG, " - setparam returning %d\n",
                  js_p->error_code);
     return(server_state_machine_complete(s_op));

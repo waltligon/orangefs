@@ -37,25 +37,25 @@ enum
 };
 
 static int mkdir_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mkdir_msg_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mkdir_msg_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mkdir_crdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mkdir_crdirent_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mkdir_seteattr_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mkdir_seteattr_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mkdir_delete_handle_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mkdir_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mkdir_parent_getattr_inspect(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int mkdir_msg_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -284,9 +284,10 @@ PVFS_error PVFS_sys_mkdir(
 
 /****************************************************************/
 
-static int mkdir_init(PINT_client_sm *sm_p,
-                      job_status_s *js_p)
+static int mkdir_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: init\n");
@@ -363,9 +364,10 @@ static int mkdir_delete_handle_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
-                                   job_status_s *js_p)
+static int mkdir_msg_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -412,18 +414,20 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int mkdir_msg_failure(PINT_client_sm *sm_p,
-                             job_status_s *js_p)
+static int mkdir_msg_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_msg_failure\n");
     return 1;
 }
 
-static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-                                        job_status_s *js_p)
+static int mkdir_crdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -469,9 +473,10 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int mkdir_crdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
+static int mkdir_crdirent_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: crdirent_failure\n");
@@ -480,9 +485,10 @@ static int mkdir_crdirent_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int mkdir_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
-                                             job_status_s *js_p)
+static int mkdir_delete_handle_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t metafile_server_addr;
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -522,9 +528,10 @@ static int mkdir_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int mkdir_cleanup(PINT_client_sm *sm_p,
-                         job_status_s *js_p)
+static int mkdir_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: cleanup\n");
 
     if(sm_p->u.mkdir.val_array)
@@ -590,8 +597,9 @@ static int mkdir_cleanup(PINT_client_sm *sm_p,
  *  the mkdir in any way
  */
 static int mkdir_parent_getattr_inspect(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: parent_getattr_inspect\n");
@@ -616,8 +624,9 @@ static int mkdir_parent_getattr_inspect(
 }
 
 static int mkdir_seteattr_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int eattr_count = 0;
     int cur_index = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -751,8 +760,9 @@ static int mkdir_seteattr_setup_msgpair(
 }
 
 static int mkdir_seteattr_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_seteattr_failure\n");

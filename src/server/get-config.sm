@@ -14,8 +14,10 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 
-static int getconfig_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p);
+static int getconfig_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static int getconfig_init(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -67,8 +69,10 @@ machine pvfs2_get_config_sm(prelude, init, final_response, cleanup)
  *           
  */
 
-static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p)
+static int getconfig_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     struct server_configuration_s *user_opts = get_server_config_struct();
     assert(user_opts);
 
@@ -105,8 +109,10 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p)
  *           response structure
  */
 
-static int getconfig_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int getconfig_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(s_op));
 }
 

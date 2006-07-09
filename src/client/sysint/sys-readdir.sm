@@ -28,13 +28,13 @@
 extern job_context_id pint_client_sm_context;
 
 static int readdir_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int readdir_msg_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int readdir_msg_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int readdir_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int readdir_msg_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -190,9 +190,10 @@ PVFS_error PVFS_sys_readdir(
 
 /****************************************************************/
 
-static int readdir_init(PINT_client_sm *sm_p,
-                        job_status_s *js_p)
+static int readdir_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: init\n");
 
     PINT_SM_GETATTR_STATE_FILL(
@@ -207,9 +208,10 @@ static int readdir_init(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
-                                     job_status_s *js_p)
+static int readdir_msg_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -320,17 +322,19 @@ static int readdir_msg_comp_fn(void *v_p,
     return 0;
 }
 
-static int readdir_msg_failure(PINT_client_sm *sm_p,
-                               job_status_s *js_p)
+static int readdir_msg_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "readdir state: readdir_msg_failure\n");
     return 1;
 }
 
-static int readdir_cleanup(PINT_client_sm *sm_p,
-                           job_status_s *js_p)
+static int readdir_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: cleanup\n");
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

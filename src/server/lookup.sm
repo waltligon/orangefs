@@ -27,19 +27,19 @@ enum
 };
 
 static int lookup_init(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_read_object_metadata(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_verify_object_metadata(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_read_directory_entry(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_read_directory_entry_handle(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_setup_resp(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -136,8 +136,10 @@ machine pvfs2_lookup_sm(
  * s_op->resp.u.lookup_path.handle_array.
  *
  */
-static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
+static int lookup_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
 
     /* fill in the lookup portion of the PINT_server_op */
@@ -199,8 +201,9 @@ static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
  * Posts the keyval read to trove.
  */
 static int lookup_read_object_metadata(
-    PINT_server_op *s_op, job_status_s* js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     PVFS_handle handle = PVFS_HANDLE_NULL;
@@ -249,8 +252,9 @@ static int lookup_read_object_metadata(
  * immediately.
  */
 static int lookup_verify_object_metadata(
-    PINT_server_op *s_op, job_status_s* js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
@@ -361,8 +365,9 @@ static int lookup_verify_object_metadata(
  * Posts the keyval read to trove.
  */
 static int lookup_read_directory_entry_handle(
-    PINT_server_op *s_op, job_status_s* js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_handle handle = PVFS_HANDLE_NULL;
     job_id_t j_id;
@@ -403,8 +408,9 @@ static int lookup_read_directory_entry_handle(
  * look up the current segment and obtain its handle.
  */
 static int lookup_read_directory_entry(
-    PINT_server_op *s_op, job_status_s* js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
 
@@ -437,8 +443,10 @@ static int lookup_read_directory_entry(
 }
 
 
-static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
+static int lookup_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
 
     /*
       NOTE: we may have handle_count N with attr_count N-1 in the case
@@ -500,8 +508,10 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
  *   s_op->resp.u.lookup_path.handle_array)
  * - the server operation structure itself
  */
-static int lookup_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int lookup_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     if (s_op->resp.u.lookup_path.handle_array)
     {
         free(s_op->resp.u.lookup_path.handle_array);

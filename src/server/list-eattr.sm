@@ -26,13 +26,13 @@
 #include "pint-util.h"
 
 static int listeattr_setup_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int listeattr_list_eattrib(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int listeattr_check_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int listeattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -91,8 +91,10 @@ machine pvfs2_list_eattr_sm(
  * listeattr_setup_resp()
  * Set up the response - allocate needed resources
  */
-static int listeattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
+static int listeattr_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int i, tsz;
     gossip_debug(GOSSIP_LISTEATTR_DEBUG, "listeattr requesting %d keys\n",
             s_op->req->u.listeattr.nkey);
@@ -136,8 +138,9 @@ static int listeattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
  * Here is where the eattrib get listed.
  */
 static int listeattr_list_eattrib(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -188,8 +191,10 @@ static void print_string(char *buffer, size_t length)
  * will translate it so that it appears in the "system.pvfs2." name
  * space on the client side.
  */
-static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
+static int listeattr_check_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int num_found = 0;
     int i = 0;
     char* tmp_buffer = NULL;
@@ -275,8 +280,10 @@ static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
 /* listeattr_cleanup()
  * free resources alloc'd by state machine
  */
-static int listeattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static int listeattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     if (s_op->resp.u.listeattr.key)
         free(s_op->resp.u.listeattr.key);
     if (s_op->u.eattr.buffer)

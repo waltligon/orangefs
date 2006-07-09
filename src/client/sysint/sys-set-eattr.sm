@@ -22,9 +22,9 @@ extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
 static int set_eattr_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int set_eattr_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int set_eattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
@@ -146,13 +146,11 @@ PVFS_error PVFS_sys_seteattr(
 }
 
 
-static int set_eattr_setup_msgpair(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
+static int set_eattr_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"get_eattr state: set_eattr_setup_msgpair\n");
 
     PINT_SERVREQ_SETEATTR_FILL(
             sm_p->msgpair.req,
@@ -185,11 +183,10 @@ static int set_eattr_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int set_eattr_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static int set_eattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"get_eattr state: set_eattr_cleanup\n");
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code  = js_p->error_code;
     PINT_SET_OP_COMPLETE;
 

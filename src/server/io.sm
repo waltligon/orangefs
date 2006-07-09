@@ -20,15 +20,15 @@
 #include "pvfs2-internal.h"
 
 static int io_send_ack(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int io_send_completion_ack(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int io_start_flow(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int io_release(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int io_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -108,8 +108,10 @@ machine pvfs2_io_sm(
  *           send either positive or negative acknowledgements.
  *           
  */
-static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
+static int io_send_ack(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -157,8 +159,10 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
  *           carry out the data transfer
  *           
  */
-static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
+static int io_start_flow(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -258,8 +262,10 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
  *
  * Synopsis: releases the operation from the scheduler
  */
-static int io_release(PINT_server_op *s_op, job_status_s *js_p)
+static int io_release(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t i;
 
@@ -287,8 +293,10 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
  * Synopsis: free up any buffers associated with the operation,
  *           including any encoded or decoded protocol structures
  */
-static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static int io_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
@@ -336,8 +344,9 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
  *           
  */
 static int io_send_completion_ack(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();

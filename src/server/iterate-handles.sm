@@ -13,9 +13,12 @@
 #include "pvfs2-server.h"
 #include "server-config.h"
 
-static int iterate_handles_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int iterate_handles_do_work(PINT_server_op *s_op, job_status_s* js_p);
-static int iterate_handles_fill_resp(PINT_server_op *s_op, job_status_s* js_p);
+static int iterate_handles_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static int iterate_handles_do_work(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static int iterate_handles_fill_resp(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -59,8 +62,10 @@ machine pvfs2_iterate_handles_sm(prelude, do_work, fill_resp, final_response, cl
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int iterate_handles_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int iterate_handles_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     if(s_op->resp.u.mgmt_iterate_handles.handle_array)
 	free(s_op->resp.u.mgmt_iterate_handles.handle_array);
 
@@ -72,8 +77,10 @@ static int iterate_handles_cleanup(PINT_server_op *s_op, job_status_s* js_p)
  *
  * actually performs work necessary to retrieve handles
  */
-static int iterate_handles_do_work(PINT_server_op *s_op, job_status_s* js_p)
+static int iterate_handles_do_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
     /* allocate memory to hold handles */
@@ -108,8 +115,10 @@ static int iterate_handles_do_work(PINT_server_op *s_op, job_status_s* js_p)
  *
  * gathers results from job status for response
  */
-static int iterate_handles_fill_resp(PINT_server_op *s_op, job_status_s* js_p)
+static int iterate_handles_fill_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     if(js_p->error_code != 0)
     {
 	/* propigate error and let final_response handle it */

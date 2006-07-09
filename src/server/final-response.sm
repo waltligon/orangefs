@@ -30,11 +30,11 @@
  */
 
 static int final_response_release(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int final_response_send_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int final_response_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static void PINT_gossip_err_server_resp(
     struct PVFS_server_resp *resp);
@@ -72,8 +72,9 @@ nested machine pvfs2_final_response_sm(
  * releases the operation from the request scheduler
  */
 static int final_response_release(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
 
@@ -111,8 +112,9 @@ static int final_response_release(
  * encodes and sends a response to the client
  */
 static int final_response_send_resp(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -156,8 +158,10 @@ static int final_response_send_resp(
  * cleans up resources allocated while in this nested machine.  Right now 
  * that just means releasing the encoding of the response
  */
-static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static int final_response_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 

@@ -15,11 +15,11 @@
 #include "pvfs2-internal.h"
 
 static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mgmt_remove_dirent(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mgmt_remove_dirent_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -68,8 +68,9 @@ machine pvfs2_mgmt_remove_dirent_sm(
 %%
 
 static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -102,8 +103,9 @@ static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
 }
 
 static int mgmt_remove_dirent(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -137,8 +139,9 @@ static int mgmt_remove_dirent(
 }
 
 static int mgmt_remove_dirent_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(s_op));
 }
 

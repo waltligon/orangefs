@@ -20,17 +20,17 @@ enum
 };
 
 static int setattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int setattr_setobj_attribs(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int setattr_write_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int setattr_write_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int setattr_write_symlink_target_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int setattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -105,8 +105,9 @@ machine pvfs2_set_attr_sm(
 %%
 
 static int setattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL, *req_a_p = NULL;
 
     a_p = &s_op->attr;
@@ -251,8 +252,10 @@ static int setattr_verify_attribs(
     return 1;
 }
 
-static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
+static int setattr_setobj_attribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
     PVFS_object_attr *a_p = NULL;
@@ -335,8 +338,9 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
 }
 
 static int setattr_write_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = 0, dfile_count = 0;
     job_id_t j_id;
 
@@ -386,8 +390,9 @@ static int setattr_write_metafile_datafile_handles_if_required(
 }
 
 static int setattr_write_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -440,8 +445,9 @@ static int setattr_write_metafile_distribution_if_required(
 }
 
 static int setattr_write_symlink_target_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -498,8 +504,10 @@ static int setattr_write_symlink_target_if_required(
  * Synopsis: free memory and return
  *           
  */
-static int setattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static int setattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     if(s_op->free_val)
     {
         free(s_op->val.buffer);

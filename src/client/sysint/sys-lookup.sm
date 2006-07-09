@@ -49,23 +49,23 @@ enum
 
 /* state function prototypes */
 static int lookup_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_segment_lookup_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_segment_lookup_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_segment_verify_attr_present(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_segment_check_attr_type(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_segment_handle_relative_link(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_segment_handle_absolute_link(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_context_check_completion(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int lookup_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int lookup_segment_lookup_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -584,9 +584,10 @@ PVFS_error PVFS_sys_lookup(
 
 /****************************************************************/
 
-static int lookup_init(PINT_client_sm *sm_p,
-		       job_status_s *js_p)
+static int lookup_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_init\n");
 
     assert(js_p->error_code == 0);
@@ -602,9 +603,10 @@ static int lookup_init(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
-                                            job_status_s *js_p)
+static int lookup_segment_lookup_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
@@ -664,17 +666,19 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int lookup_segment_lookup_failure(PINT_client_sm *sm_p,
-                                         job_status_s *js_p)
+static int lookup_segment_lookup_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_failure\n");
     return 1;
 }
 
-static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
-                                              job_status_s *js_p)
+static int lookup_segment_verify_attr_present(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -725,9 +729,10 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
-                                          job_status_s *js_p)
+static int lookup_segment_check_attr_type(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
@@ -793,9 +798,10 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
-                                               job_status_s *js_p)
+static int lookup_segment_handle_relative_link(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *relative_symlink_target = NULL;
@@ -845,9 +851,10 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
-                                               job_status_s *js_p)
+static int lookup_segment_handle_absolute_link(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *absolute_symlink_target = NULL;
@@ -900,9 +907,10 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int lookup_context_check_completion(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
+static int lookup_context_check_completion(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref last_resolved_refn;
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
@@ -994,9 +1002,10 @@ static int lookup_context_check_completion(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int lookup_cleanup(PINT_client_sm *sm_p,
-                          job_status_s *js_p)
+static int lookup_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int i = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_cleanup\n");

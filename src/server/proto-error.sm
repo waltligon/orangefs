@@ -13,8 +13,10 @@
 #include "pvfs2-server.h"
 #include "server-config.h"
 
-static int proto_error_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p);
+static int proto_error_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static int proto_error_init(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -39,8 +41,10 @@ machine pvfs2_proto_error_sm(init, cleanup)
  *
  * encode and send a response indicating a protocol error
  */
-static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
+static int proto_error_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -90,8 +94,10 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int proto_error_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int proto_error_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(s_op));
 }
 

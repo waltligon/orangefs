@@ -37,29 +37,29 @@ enum
 
 /* state function prototypes */
 static int create_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_dspace_create_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_dspace_create_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_datafiles_setup_msgpair_array(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_datafiles_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_setattr_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_setattr_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_crdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_crdirent_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_delete_handles_setup_msgpair_array(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int create_parent_getattr_inspect(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 /* completion function prototypes */
 static int create_create_comp_fn(
@@ -396,9 +396,10 @@ PVFS_error PVFS_sys_create(
 
 /****************************************************************/
 
-static int create_init(PINT_client_sm *sm_p,
-		       job_status_s *js_p)
+static int create_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: init\n");
@@ -544,9 +545,10 @@ static int create_delete_handles_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
-                                              job_status_s *js_p)
+static int create_dspace_create_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -602,9 +604,10 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int create_dspace_create_failure(PINT_client_sm *sm_p,
-					job_status_s *js_p)
+static int create_dspace_create_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     sm_p->u.create.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -612,9 +615,10 @@ static int create_dspace_create_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
-                                                job_status_s *js_p)
+static int create_datafiles_setup_msgpair_array(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     struct server_configuration_s *server_config = NULL;
     int server_type;
@@ -722,9 +726,10 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int create_datafiles_failure(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static int create_datafiles_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     sm_p->u.create.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -732,9 +737,10 @@ static int create_datafiles_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
-                                        job_status_s *js_p)
+static int create_setattr_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -781,9 +787,10 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int create_setattr_failure(PINT_client_sm *sm_p,
-                                  job_status_s *js_p)
+static int create_setattr_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     sm_p->u.create.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -791,9 +798,10 @@ static int create_setattr_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p)
+static int create_crdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -834,9 +842,10 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int create_crdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
+static int create_crdirent_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
 
     sm_p->u.create.stored_error_code = js_p->error_code;
@@ -851,8 +860,9 @@ static int create_crdirent_failure(PINT_client_sm *sm_p,
 
 /* delete the newly created meta and data handles */
 static int create_delete_handles_setup_msgpair_array(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0, actual_count = 0;
     PVFS_BMI_addr_t metafile_server_addr;
 
@@ -957,9 +967,10 @@ static int create_delete_handles_setup_msgpair_array(
     return 1;
 }
 
-static int create_cleanup(PINT_client_sm *sm_p,
-                          job_status_s *js_p)
+static int create_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref metafile_ref;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
@@ -1040,8 +1051,9 @@ static int create_cleanup(PINT_client_sm *sm_p,
  *  the file creation in any way
  */
 static int create_parent_getattr_inspect(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
     int num_dfiles_requested_override = 0;
     PINT_dist *current_dist; 

@@ -20,9 +20,9 @@
 #endif
 
 static int statfs_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int statfs_do_statfs(
-    PINT_server_op *s_op, job_status_s* js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -63,8 +63,10 @@ machine pvfs2_statfs_sm(
  *
  * issue the trove call to retrieve fs statistics
  */
-static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
+static int statfs_do_statfs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     TROVE_context_id tmp_context;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -147,8 +149,10 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int statfs_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int statfs_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(s_op));
 }
 

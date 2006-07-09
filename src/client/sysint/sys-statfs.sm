@@ -30,7 +30,7 @@ extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
 static int sys_statfs_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 
 %%
@@ -185,16 +185,15 @@ PVFS_error PVFS_sys_statfs(
     return error;
 }
 
-static int sys_statfs_cleanup(PINT_client_sm *sm_p,
-                                          job_status_s *js_p)
+static int sys_statfs_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int i;
     int num_io_servers = 0;
     PVFS_size min_bytes_available = 0;
     PVFS_size min_bytes_total = 0;
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "statfs state: cleanup\n");
-
     sm_p->error_code = js_p->error_code;
 
     /* aggregate statistics down into one statfs structure */

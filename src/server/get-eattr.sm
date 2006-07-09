@@ -26,13 +26,13 @@
 #include "pint-util.h"
 
 static int geteattr_setup_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int geteattr_read_eattrib(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int geteattr_check_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int geteattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -91,8 +91,10 @@ machine pvfs2_get_eattr_sm(
  * geteattr_setup_resp()
  * Set up the response - allocate needed resources
  */
-static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
+static int geteattr_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int i, tsz;
     char reserved_prefix[] = "system.pvfs2.";
     int reserved_prefix_len = strlen("system.pvfs2.");
@@ -193,8 +195,9 @@ static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
  * Here is where the eattrib get read.  Not much to this.
  */
 static int geteattr_read_eattrib(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -223,8 +226,10 @@ static int geteattr_read_eattrib(
  * geteattr_check_resp()
  * Check the response - handle any errors
  */
-static int geteattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
+static int geteattr_check_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int k;
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr returning %d values\n",
             s_op->resp.u.geteattr.nkey);
@@ -252,8 +257,10 @@ static int geteattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
 /* geteattr_cleanup()
  * free resources alloc'd by state machine
  */
-static int geteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static int geteattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     if (s_op->resp.u.geteattr.val)
         free(s_op->resp.u.geteattr.val);
     if (s_op->resp.u.geteattr.err)

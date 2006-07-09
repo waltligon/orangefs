@@ -39,35 +39,35 @@ enum
 };
 
 static int rename_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_lookups_setup_msgpair_array(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_lookups_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_crdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_rmdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_rmdirent_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_chdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_chdirent_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_check_for_remove(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_warn_user_to_run_fsck(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_generic_timer(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_crdirent_retry_or_fail(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_rmdirent_retry_or_fail(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int rename_getattr_src_interpret(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int rename_lookups_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -391,10 +391,10 @@ PVFS_error PVFS_sys_rename(
 
 /****************************************************************/
 
-static int rename_init(PINT_client_sm *sm_p,
-		       job_status_s *js_p)
+static int rename_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: init\n");
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
 
     assert(js_p->error_code == 0);
 
@@ -544,13 +544,11 @@ static int rename_chdirent_comp_fn(
     return 0;
 }
 
-static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
-                                              job_status_s *js_p)
+static int rename_lookups_setup_msgpair_array(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_lookups_setup_msgpair_array\n");
 
     js_p->error_code = 0;
 
@@ -600,12 +598,10 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int rename_lookups_failure(PINT_client_sm *sm_p,
-                                  job_status_s *js_p)
+static int rename_lookups_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: rename_lookups_failure\n");
-
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     if (sm_p->msgarray)
     {
         free(sm_p->msgarray);
@@ -614,14 +610,12 @@ static int rename_lookups_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p)
+static int rename_crdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_crdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -662,14 +656,12 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p)
+static int rename_rmdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_rmdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -717,11 +709,10 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int rename_rmdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
+static int rename_rmdirent_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: rmdirent_failure\n");
-
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     /*
       in the normal case of failure (i.e. rmdirent_index == 0), we
       need to rmdirent the previously created new dirent we've just
@@ -747,15 +738,13 @@ static int rename_rmdirent_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p)
+static int rename_chdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr *attr = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_chdirent_setup_msgpair\n");
 
     /* look at the result of the dest getattr and make sure everything looks
      * ok before we continue
@@ -847,19 +836,17 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int rename_chdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
+static int rename_chdirent_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: chdirent_failure\n");
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     return 1;
 }
 
-static int rename_check_for_remove(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
+static int rename_check_for_remove(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: check for remove\n");
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
 
     js_p->error_code = 0;
 
@@ -876,10 +863,9 @@ static int rename_check_for_remove(PINT_client_sm *sm_p,
 }
 
 static int rename_warn_user_to_run_fsck(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: warn user to run fsck\n");
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
 
     gossip_err("WARNING: PVFS_sys_rename() encountered an error which "
                "may lead to inconsistent state.\n");
@@ -888,11 +874,10 @@ static int rename_warn_user_to_run_fsck(
     return 1;
 }
 
-static int rename_cleanup(PINT_client_sm *sm_p,
-                          job_status_s *js_p)
+static int rename_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: cleanup\n");
-
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code = (sm_p->u.rename.stored_error_code ?
                         sm_p->u.rename.stored_error_code :
                         js_p->error_code);
@@ -914,13 +899,12 @@ static int rename_cleanup(PINT_client_sm *sm_p,
     return 0;
 }
 
-static int rename_generic_timer(PINT_client_sm *sm_p,
-                                job_status_s *js_p)
+static int rename_generic_timer(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: generic_timer\n");
 
     ret = job_req_sched_post_timer(
 	sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
@@ -929,11 +913,10 @@ static int rename_generic_timer(PINT_client_sm *sm_p,
     return ret;
 }
 
-static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
-                                         job_status_s *js_p)
+static int rename_crdirent_retry_or_fail(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: crdirent_retry_or_fail\n");
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
@@ -959,11 +942,10 @@ static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
-                                         job_status_s *js_p)
+static int rename_rmdirent_retry_or_fail(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: rmdirent_retry_or_fail\n");
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
@@ -992,19 +974,15 @@ static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 }
 
 static int rename_getattr_src_interpret(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: getattr_src_interpret\n");
 
     attr = &sm_p->getattr.attr;
     assert(attr);
 
     sm_p->u.rename.types[0] = attr->objtype;
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename src type: %d\n", attr->objtype);
 
      /* setup for destination getattr */
     sm_p->object_ref = sm_p->u.rename.refns[1];

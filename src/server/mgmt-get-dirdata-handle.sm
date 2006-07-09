@@ -15,11 +15,11 @@
 #include "pvfs2-internal.h"
 
 static int mgmt_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mgmt_get_dirdata_handle_setup_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int mgmt_get_dirdata_handle_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -68,8 +68,9 @@ machine pvfs2_mgmt_get_dirdata_handle_sm(
 %%
 
 static int mgmt_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -102,8 +103,9 @@ static int mgmt_get_dirdata_handle_from_parent(
 }
 
 static int mgmt_get_dirdata_handle_setup_resp(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
         s_op->resp.u.mgmt_get_dirdata_handle.handle =
@@ -126,8 +128,9 @@ static int mgmt_get_dirdata_handle_setup_resp(
 }
 
 static int mgmt_get_dirdata_handle_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(s_op));
 }
 

@@ -16,11 +16,11 @@
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 static int seteattr_verify_eattribs(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int seteattr_setobj_eattribs(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int seteattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -71,8 +71,9 @@ machine pvfs2_set_eattr_sm(
  * It also prints debugging information.
  */
 static int seteattr_verify_eattribs(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL;
     int i;
     char reserved_prefix[] = "system.pvfs2.";
@@ -130,8 +131,9 @@ static int seteattr_verify_eattribs(
  *  (TROVE_NOOVERWRITE, TROVE_ONLYOVERWRITE)
  */
 static int seteattr_setobj_eattribs(
-        PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     PVFS_ds_flags trove_flags = 0;
     job_id_t j_id;
@@ -186,8 +188,10 @@ static int seteattr_setobj_eattribs(
  * Synopsis: free memory and return
  *           
  */
-static int seteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static int seteattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
     /* do I need to free memory from decoding key and val?*/
     return(server_state_machine_complete(s_op));
 }

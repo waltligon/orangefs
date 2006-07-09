@@ -51,21 +51,21 @@ enum
 };
 
 static int remove_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int remove_rmdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int remove_generic_timer(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int remove_rmdirent_retry_or_fail(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int remove_crdirent_retry_or_fail(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int remove_crdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int remove_check_error_code(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int remove_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int remove_rmdirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
@@ -265,18 +265,20 @@ PVFS_error PVFS_sys_remove(
 
 /****************************************************************/
 
-static int remove_init(PINT_client_sm *sm_p,
-		       job_status_s *js_p)
+static int remove_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: init\n");
 
     assert(js_p->error_code == 0);
     return 1;
 }
 
-static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p)
+static int remove_rmdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -321,9 +323,10 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p)
+static int remove_crdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -412,8 +415,9 @@ static int remove_crdirent_comp_fn(
 }
 
 static int remove_check_error_code(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     char buf[64] = {0};
 
     PVFS_strerror_r(js_p->error_code, buf, 64);
@@ -439,8 +443,10 @@ static int remove_check_error_code(
     return 1;
 }
 
-static int remove_cleanup(PINT_client_sm *sm_p, job_status_s *js_p)
+static int remove_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: cleanup\n");
 
     sm_p->error_code = (sm_p->u.remove.stored_error_code ?
@@ -463,9 +469,10 @@ static int remove_cleanup(PINT_client_sm *sm_p, job_status_s *js_p)
     return 0;
 }
 
-static int remove_generic_timer(PINT_client_sm *sm_p,
-                                job_status_s *js_p)
+static int remove_generic_timer(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
@@ -478,9 +485,10 @@ static int remove_generic_timer(PINT_client_sm *sm_p,
     return ret;
 }
 
-static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
-                                         job_status_s *js_p)
+static int remove_crdirent_retry_or_fail(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_retry_or_fail\n");
 
@@ -516,9 +524,10 @@ static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
 }
 
 
-static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
-                                         job_status_s *js_p)
+static int remove_rmdirent_retry_or_fail(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: rmdirent_retry_or_fail\n");
 
