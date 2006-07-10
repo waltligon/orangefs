@@ -559,7 +559,7 @@ struct super_block* pvfs2_get_sb(
     pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                 new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-    ret = service_operation(new_op, "pvfs2_get_sb", 0, 0);
+    ret = service_operation(new_op, "pvfs2_get_sb", 0);
 
     pvfs2_print("%s: mount got return value of %d\n", __func__, ret);
     if (ret)
