@@ -32,7 +32,6 @@
 #include "PINT-reqproto-encode.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pvfs2-server.h"
-#define PINT_OP_STATE PINT_server_op
 #include "state-machine.h"
 #include "mkspace.h"
 #include "server-config.h"
@@ -612,8 +611,12 @@ int main(int argc, char **argv)
                     smcb, &server_job_status_array[i]);
                 if (ret < 0)
                 {
+                    struct PINT_server_op *s_op;
                     PVFS_perror_gossip("Error: server_state_machine_start", ret);
-                    free(smcb->frame_stack[smcb->framebaseptr]->unexp_bmi_buff.buffer);
+                    
+                    s_op = (struct PINT_server_op *)PINT_sm_frame(smcb,
+                            PINT_FRAME_CURRENT);
+                    free(s_op->unexp_bmi_buff.buffer);
                     /* TODO: tell BMI to drop this address? */
                     /* set return code to zero to allow server to continue
                      * processing 
@@ -1652,10 +1655,13 @@ static int server_post_unexpected_recv(job_status_s *js_p)
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     struct PINT_smcb *smcb = NULL;
+    struct PINT_server_op *s_op;
 
     if (js_p)
     {
-        PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP, server_op_state_get_machine);
+        PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP,
+                sizeof(struct PINT_server_op), server_op_state_get_machine);
+        s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
         /*
           TODO: Consider the optimization of enabling immediate
@@ -1665,7 +1671,7 @@ static int server_post_unexpected_recv(job_status_s *js_p)
           note: unexp_bmi_buff is really a struct that describes an
           unexpected message (it is an output parameter).
         */
-        ret = job_bmi_unexp(&smcb->unexp_bmi_buff, smcb, 0,
+        ret = job_bmi_unexp(&s_op->unexp_bmi_buff, smcb, 0,
                             js_p, &j_id, JOB_NO_IMMED_COMPLETE,
                             server_job_context);
         if (ret < 0)
@@ -1688,7 +1694,7 @@ static int server_state_machine_start(
     PINT_smcb *smcb,
     job_status_s *js_p)
 {
-    PINT_server_op *s_op = smcb->frame_stack[smcb->framebaseptr];
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_id_gen_t tmp_id;
 
@@ -1724,9 +1730,8 @@ static int server_state_machine_start(
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
     s_op->tag  = s_op->unexp_bmi_buff.tag;
-    smcb->server_opcurrent_state = PINT_state_machine_locate(s_op);
 
-    if (!smcb->current_state)
+    if (!PINT_state_machine_locate(smcb))
     {
         gossip_err("Error: server does not implement request type: %d\n",
                    (int)s_op->req->op);
@@ -1747,22 +1752,21 @@ static int server_state_machine_start(
  */
 int server_state_machine_alloc_noreq(
     enum PVFS_server_op op,
-    PINT_smcb **new_op)
+    struct PINT_smcb **new_op)
 {
     int ret = -PVFS_EINVAL;
 
     if (new_op)
     {
-        PINT_smcb_alloc(new_op, op, server_op_state_get_machine);
+        PINT_smcb_alloc(new_op, op, 
+                sizeof(struct PINT_server_op), server_op_state_get_machine);
 
         /* find the state machine for this op type */
-        (*new_op)->current_state = PINT_state_machine_locate(*new_op);
-
-        if (!((*new_op)->current_state))
+        if (!PINT_state_machine_locate(*new_op))
         {
             gossip_lerr("Error: failed to start state machine "
                         "of op type %x\n", op);
-            PINT_State_frame_free(new_op);
+            PINT_smcb_free(new_op);
             return -PVFS_ENOSYS;
         }
         ret = 0;
@@ -1781,9 +1785,9 @@ int server_state_machine_alloc_noreq(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int server_state_machine_start_noreq(PINT_smcb *smcb)
+int server_state_machine_start_noreq(struct PINT_smcb *smcb)
 {
-    struct PINT_server_op *new_op = smcb->frame_stack[smcb->framebaseptr];
+    struct PINT_server_op *new_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_status_s tmp_status;
 
@@ -1825,9 +1829,8 @@ int server_state_machine_start_noreq(PINT_smcb *smcb)
  */
 int server_state_machine_complete(PINT_smcb *smcb)
 {
-    PINT_server_op *s_op = smcb->frame_stack[smcb->framebaseptr];
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
-    int i;
     
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);

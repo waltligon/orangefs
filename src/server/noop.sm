@@ -48,8 +48,8 @@ machine pvfs2_noop_sm(prelude, final_response, cleanup)
 static int noop_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
-    return(server_state_machine_complete(s_op));
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    return(server_state_machine_complete(smcb));
 }
 
 

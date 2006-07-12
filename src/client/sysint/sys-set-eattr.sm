@@ -149,7 +149,7 @@ PVFS_error PVFS_sys_seteattr(
 static int set_eattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
     PINT_SERVREQ_SETEATTR_FILL(
@@ -186,7 +186,7 @@ static int set_eattr_setup_msgpair(
 static int set_eattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code  = js_p->error_code;
     PINT_SET_OP_COMPLETE;
 

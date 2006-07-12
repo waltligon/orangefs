@@ -111,7 +111,7 @@ machine pvfs2_io_sm(
 static int io_send_ack(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -162,7 +162,7 @@ static int io_send_ack(
 static int io_start_flow(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -265,7 +265,7 @@ static int io_start_flow(
 static int io_release(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t i;
 
@@ -296,7 +296,7 @@ static int io_release(
 static int io_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
@@ -322,7 +322,7 @@ static int io_cleanup(
      */
     BMI_set_info(s_op->addr, BMI_DEC_ADDR_REF, NULL);
 
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*
@@ -346,7 +346,7 @@ static int io_cleanup(
 static int io_send_completion_ack(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();

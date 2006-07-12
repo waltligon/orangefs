@@ -155,7 +155,7 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
 static int mgmt_get_dirdata_handle_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     assert(js_p->error_code == 0);
     return 1;
 }
@@ -163,7 +163,7 @@ static int mgmt_get_dirdata_handle_init(
 static int mgmt_get_dirdata_handle_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -223,7 +223,7 @@ static int mgmt_get_dirdata_handle_comp_fn(
 static int mgmt_get_dirdata_handle_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     sm_p->error_code = js_p->error_code;
 

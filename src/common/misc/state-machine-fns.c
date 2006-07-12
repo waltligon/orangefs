@@ -7,6 +7,7 @@
 #ifndef __STATE_MACHINE_FNS_H
 #define __STATE_MACHINE_FNS_H
 
+#include <string.h>
 #include <assert.h>
 
 #include "gossip.h"
@@ -89,10 +90,9 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
    call.  Calls that function.  Once that function is called, this one exits
    and we go back to pvfs2-server.c's while loop.
  */
-int PINT_state_machine_next(struct PINT_smcb *smbc, job_status_s *r)
+int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 {
     int code_val = r->error_code;       /* temp to hold the return code */
-    int retval;            /* temp to hold return value of state action */
     union PINT_state_array_values *loc; /* temp pointer into state memory */
 
     do {
@@ -131,7 +131,7 @@ int PINT_state_machine_next(struct PINT_smcb *smbc, job_status_s *r)
 	 * see if the selected return value is a STATE_RETURN */
 	if (loc->flag == SM_RETURN)
 	{
-	    smcb->current_state = PINT_pop_state(s);
+	    smcb->current_state = PINT_pop_state(smcb);
 	    smcb->current_state += 1; /* skip state flags */
 	}
     } while (loc->flag == SM_RETURN);
@@ -170,7 +170,7 @@ int PINT_state_machine_next(struct PINT_smcb *smbc, job_status_s *r)
              specified in smcb->op in order to start a state machine's
              execution.
  */
-union PINT_state_array_values *PINT_state_machine_locate(struct PINT_smcb *smcb)
+int PINT_state_machine_locate(struct PINT_smcb *smcb)
 {
     union PINT_state_array_values *current_tmp;
     struct PINT_state_machine_s *op_sm;
@@ -179,10 +179,10 @@ union PINT_state_array_values *PINT_state_machine_locate(struct PINT_smcb *smcb)
     if (!smcb || smcb->op < 0)
     {
 	gossip_err("State machine requested not valid\n");
-	return NULL;
+	return 0;
     }
     /* this is a the usage dependant routine to look up the SM */
-    op_sm = (*smcb->op_state_get_machine)(smcb->op);
+    op_sm = (*smcb->op_get_state_machine)(smcb->op);
     if (op_sm != NULL)
     {
 	current_tmp = op_sm->state_machine;
@@ -199,14 +199,15 @@ union PINT_state_array_values *PINT_state_machine_locate(struct PINT_smcb *smcb)
             current_tmp += 2;
 	}
 
-	/* this returns a pointer to a "PINT_state_array_values"
+	/* this sets a pointer to a "PINT_state_array_values"
 	 * structure, whose state_action member is the function to call.
 	 */
-	return current_tmp + 1;
+        smcb->current_state = current_tmp + 1;
+	return 1; /* indicates successful locate */
     }
 
     gossip_err("State machine not found for operation %d\n",smcb->op);
-    return NULL;
+    return 0; /* indicates failed to locate */
 }
 
 /* Function: PINT_smcb_alloc
@@ -215,9 +216,10 @@ union PINT_state_array_values *PINT_state_machine_locate(struct PINT_smcb *smcb)
    Synopsis: this allocates an smcb struct, including its frame stack
              and sets the op code so you can start the state machine
  */
-void PINT_smcb_alloc(
+int PINT_smcb_alloc(
         struct PINT_smcb **smcb,
         int op,
+        int frame_size,
         struct PINT_state_machine_s *(*getmach)(int))
 {
     *smcb = (struct PINT_smcb *)malloc(sizeof(struct PINT_smcb));
@@ -226,15 +228,15 @@ void PINT_smcb_alloc(
         return -PVFS_ENOMEM;
     }
     memset(*smcb, 0, sizeof(struct PINT_smcb));
-    (*smcb)->frame_stack[0] =
-            (struct PINT_smcb *)malloc(sizeof(struct PINT_OP_STATE));
+    (*smcb)->frame_stack[0] = (PINT_op_state *)malloc(frame_size);
     if (!((*smcb)->frame_stack[0]))
     {
         return -PVFS_ENOMEM;
     }
-    memset((*smcb)->frame_stack[0], 0, sizeof(struct PINT_OP_STATE));
+    memset((*smcb)->frame_stack[0], 0, frame_size);
     (*smcb)->op = op;
-    (*smcb)->op_state_get_machine = getmach;
+    (*smcb)->op_get_state_machine = getmach;
+    return 0; /* success */
 }
 
 /* Function: PINT_smcb_free
@@ -245,6 +247,7 @@ void PINT_smcb_alloc(
  */
 void PINT_smcb_free(struct PINT_smcb **smcb)
 {
+    int i;
     if (smcb)
     {
         if (*smcb)
@@ -259,11 +262,10 @@ void PINT_smcb_free(struct PINT_smcb **smcb)
     }
 }
 
-/* Function: PINT_smcb_free
+/* Function: PINT_pop_state
    Params: pointer to an smcb pointer
-   Returns: nothing, but sets the pointer to NULL
-   Synopsis: this frees an smcb struct, including its frame stack
-             and anything on the frame stack
+   Returns: 
+   Synopsis: 
  */
 union PINT_state_array_values *PINT_pop_state(struct PINT_smcb *smcb)
 {
@@ -272,11 +274,10 @@ union PINT_state_array_values *PINT_pop_state(struct PINT_smcb *smcb)
     return smcb->state_stack[--smcb->stackptr];
 }
 
-/* Function: PINT_smcb_free
+/* Function: PINT_push_state
    Params: pointer to an smcb pointer
-   Returns: nothing, but sets the pointer to NULL
-   Synopsis: this frees an smcb struct, including its frame stack
-             and anything on the frame stack
+   Returns: 
+   Synopsis: 
  */
 void PINT_push_state(struct PINT_smcb *smcb,
 				   union PINT_state_array_values *p)
@@ -286,14 +287,14 @@ void PINT_push_state(struct PINT_smcb *smcb,
     smcb->state_stack[smcb->stackptr++] = p;
 }
 
-struct PINT_server_op *PINT_frame_server(struct PINT_smcb *smcb, int index)
+/* Function: PINT_frame
+   Params: 
+   Returns: 
+   Synopsis: 
+ */
+PINT_op_state *PINT_sm_frame(struct PINT_smcb *smcb, int index)
 {
-    return &smcb->framestack[smcb->framebase + index].s;
-}
-
-struct PINT_client_sm *PINT_frame_client(struct PINT_smcb *smcb, int index)
-{
-    return &smcb->framestack[smcb->framebase + index].c;
+    return &smcb->frame_stack[smcb->framebaseptr + index];
 }
 
 /*

@@ -81,7 +81,7 @@ machine pvfs2_create_sm(
 static int create_create(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t i;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -111,7 +111,7 @@ static int create_create(
 static int create_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
 	gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
@@ -171,8 +171,8 @@ static int create_setup_resp(
 static int create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
-    return(server_state_machine_complete(s_op));
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    return(server_state_machine_complete(smcb));
 }
 
 

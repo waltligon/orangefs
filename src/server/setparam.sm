@@ -66,7 +66,7 @@ machine pvfs2_setparam_sm(
 static int setparam_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1, tmp_on = 0, old_event_on = 0;
     job_id_t tmp_id;
     uint64_t tmp_mask = 0;
@@ -184,10 +184,10 @@ static int setparam_work(
 static int setparam_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_SERVER_DEBUG, " - setparam returning %d\n",
                  js_p->error_code);
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /* check_fs_id()

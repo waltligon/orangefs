@@ -67,7 +67,7 @@ machine pvfs2_truncate_sm(
 static int truncate_resize(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -82,15 +82,15 @@ static int truncate_resize(
 static int truncate_check_error(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return 1;
 }
 
 static int truncate_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
-    return (server_state_machine_complete(s_op));
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    return (server_state_machine_complete(smcb));
 }
 
 /*

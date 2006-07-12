@@ -268,7 +268,7 @@ PVFS_error PVFS_sys_remove(
 static int remove_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: init\n");
 
     assert(js_p->error_code == 0);
@@ -278,7 +278,7 @@ static int remove_init(
 static int remove_rmdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -326,7 +326,7 @@ static int remove_rmdirent_setup_msgpair(
 static int remove_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -417,7 +417,7 @@ static int remove_crdirent_comp_fn(
 static int remove_check_error_code(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char buf[64] = {0};
 
     PVFS_strerror_r(js_p->error_code, buf, 64);
@@ -446,7 +446,7 @@ static int remove_check_error_code(
 static int remove_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: cleanup\n");
 
     sm_p->error_code = (sm_p->u.remove.stored_error_code ?
@@ -472,7 +472,7 @@ static int remove_cleanup(
 static int remove_generic_timer(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
@@ -488,7 +488,7 @@ static int remove_generic_timer(
 static int remove_crdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_retry_or_fail\n");
 
@@ -527,7 +527,7 @@ static int remove_crdirent_retry_or_fail(
 static int remove_rmdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: rmdirent_retry_or_fail\n");
 

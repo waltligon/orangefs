@@ -94,7 +94,7 @@ machine pvfs2_list_eattr_sm(
 static int listeattr_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i, tsz;
     gossip_debug(GOSSIP_LISTEATTR_DEBUG, "listeattr requesting %d keys\n",
             s_op->req->u.listeattr.nkey);
@@ -140,7 +140,7 @@ static int listeattr_setup_resp(
 static int listeattr_list_eattrib(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -194,7 +194,7 @@ static void print_string(char *buffer, size_t length)
 static int listeattr_check_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int num_found = 0;
     int i = 0;
     char* tmp_buffer = NULL;
@@ -283,7 +283,7 @@ static int listeattr_check_resp(
 static int listeattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (s_op->resp.u.listeattr.key)
         free(s_op->resp.u.listeattr.key);
     if (s_op->u.eattr.buffer)

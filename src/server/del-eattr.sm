@@ -76,7 +76,7 @@ machine pvfs2_del_eattr_sm(
 static int deleattr_verify_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL;
 
     a_p = &s_op->attr;
@@ -147,7 +147,7 @@ static int deleattr_verify_eattribs(
 static int deleattr_delobj_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -202,7 +202,7 @@ static int deleattr_delobj_eattribs(
 static int deleattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(
         GOSSIP_DELEATTR_DEBUG,
         "keybuf %p keylen %d\n",

@@ -394,7 +394,7 @@ PVFS_error PVFS_sys_rename(
 static int rename_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     assert(js_p->error_code == 0);
 
@@ -547,7 +547,7 @@ static int rename_chdirent_comp_fn(
 static int rename_lookups_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
 
     js_p->error_code = 0;
@@ -601,7 +601,7 @@ static int rename_lookups_setup_msgpair_array(
 static int rename_lookups_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (sm_p->msgarray)
     {
         free(sm_p->msgarray);
@@ -613,7 +613,7 @@ static int rename_lookups_failure(
 static int rename_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -659,7 +659,7 @@ static int rename_crdirent_setup_msgpair(
 static int rename_rmdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -712,7 +712,7 @@ static int rename_rmdirent_setup_msgpair(
 static int rename_rmdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /*
       in the normal case of failure (i.e. rmdirent_index == 0), we
       need to rmdirent the previously created new dirent we've just
@@ -741,7 +741,7 @@ static int rename_rmdirent_failure(
 static int rename_chdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr *attr = NULL;
@@ -839,14 +839,14 @@ static int rename_chdirent_setup_msgpair(
 static int rename_chdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return 1;
 }
 
 static int rename_check_for_remove(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     js_p->error_code = 0;
 
@@ -865,7 +865,7 @@ static int rename_check_for_remove(
 static int rename_warn_user_to_run_fsck(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_err("WARNING: PVFS_sys_rename() encountered an error which "
                "may lead to inconsistent state.\n");
@@ -877,7 +877,7 @@ static int rename_warn_user_to_run_fsck(
 static int rename_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code = (sm_p->u.rename.stored_error_code ?
                         sm_p->u.rename.stored_error_code :
                         js_p->error_code);
@@ -902,7 +902,7 @@ static int rename_cleanup(
 static int rename_generic_timer(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
@@ -916,7 +916,7 @@ static int rename_generic_timer(
 static int rename_crdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
@@ -945,7 +945,7 @@ static int rename_crdirent_retry_or_fail(
 static int rename_rmdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
@@ -976,7 +976,7 @@ static int rename_rmdirent_retry_or_fail(
 static int rename_getattr_src_interpret(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
 
     attr = &sm_p->getattr.attr;

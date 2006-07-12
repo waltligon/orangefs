@@ -141,7 +141,7 @@ nested machine pvfs2_client_remove_helper_sm(
 static int remove_getattr_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
@@ -154,7 +154,7 @@ static int remove_getattr_init(
 static int remove_getattr_analyze_results(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
     attr = &sm_p->getattr.attr;
     assert(attr);
@@ -200,7 +200,7 @@ static int remove_getattr_analyze_results(
 static int remove_datafile_remove_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr = NULL;
@@ -263,7 +263,7 @@ static int remove_datafile_remove_setup_msgpair(
 static int remove_object_remove_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -299,7 +299,7 @@ static int remove_object_remove_setup_msgpair(
 static int remove_datafile_remove_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_err("Error: failed removing one or more datafiles associated with the meta handle %llu\n", llu(sm_p->object_ref.handle));
     HANDLE_REMOVE_ERROR("datafile_remove_failure");
     return 1;
@@ -308,7 +308,7 @@ static int remove_datafile_remove_failure(
 static int remove_object_remove_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: "
                  "object_remove_failure\n");
     /*
@@ -331,7 +331,7 @@ static int remove_object_remove_failure(
 static int remove_helper_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

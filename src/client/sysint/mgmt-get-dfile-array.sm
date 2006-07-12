@@ -140,7 +140,7 @@ PVFS_error PVFS_mgmt_get_dfile_array(
 static int mgmt_get_dfile_array_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,

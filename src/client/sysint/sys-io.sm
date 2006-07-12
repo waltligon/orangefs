@@ -378,7 +378,7 @@ PVFS_error PVFS_sys_io(
 static int io_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", sm_p);
@@ -416,7 +416,7 @@ static int io_init(
 static int io_datafile_setup_msgpairs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
     int target_datafile_count = 0;
@@ -590,7 +590,7 @@ exit:
 static int io_datafile_post_msgpairs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     unsigned long status_user_tag = 0;
     int must_loop_encodings = 0;
@@ -841,7 +841,7 @@ static int
 io_datafile_post_msgpairs_retry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* give up if beyond retry limit */
     ++sm_p->u.io.retry_count;
     if (sm_p->u.io.retry_count > sm_p->msgarray_params.retry_limit) {
@@ -868,7 +868,7 @@ io_datafile_post_msgpairs_retry(
 static int io_datafile_complete_operations(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, index = 0, i;
     unsigned long status_user_tag = (unsigned long)
         js_p->status_user_tag;
@@ -1138,7 +1138,7 @@ static int io_datafile_complete_operations(
 static int io_analyze_results(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr;
 
@@ -1468,7 +1468,7 @@ static int io_analyze_size_results(
      * the datafiles (the actual EOF).
      */
     
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_offset eof = 0;
     PVFS_offset eor;
     PVFS_offset filereq_ub_offset;
@@ -1549,7 +1549,7 @@ error_exit:
 static int io_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) io state: io_cleanup\n", sm_p);
 

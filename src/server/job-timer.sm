@@ -48,7 +48,7 @@ machine pvfs2_job_timer_sm(do_work, error)
 static int job_timer_error(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_err("Error: stopping server job timer.\n");
 
     return(server_state_machine_complete(s_op));
@@ -62,7 +62,7 @@ static int job_timer_error(
 static int job_timer_do_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
 

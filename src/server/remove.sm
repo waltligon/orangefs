@@ -194,7 +194,7 @@ machine pvfs2_remove_sm(
 static int remove_check_object_type(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->attr.objtype == PVFS_TYPE_DATAFILE)
     {
 	/* it must be a datafile, transition to try reading datafile 
@@ -223,7 +223,7 @@ static int remove_check_object_type(
 static int remove_verify_object_metadata(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p;
 
     a_p = &s_op->attr;
@@ -253,7 +253,7 @@ static int remove_verify_object_metadata(
 static int remove_read_dirdata_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t j_id;
 
@@ -285,7 +285,7 @@ static int remove_read_dirdata_handle(
 static int remove_get_dirent_count(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
 
@@ -314,7 +314,7 @@ static int remove_get_dirent_count(
 static int remove_check_dirdata_entries(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
         if (s_op->u.remove.keyval_handle_info.count > 0)
@@ -350,7 +350,7 @@ static int remove_check_dirdata_entries(
 static int remove_remove_dirdata_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -384,7 +384,7 @@ static int remove_remove_dirdata_dspace(
 static int remove_remove_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -414,13 +414,14 @@ static int remove_remove_dspace(
 static int remove_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    return(server_state_machine_complete(smcb));
 }
 
 static int remove_setup_work(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->u.remove.handle = s_op->req->u.remove.handle;
     s_op->u.remove.fs_id = s_op->req->u.remove.fs_id;
     js_p->error_code = 0;

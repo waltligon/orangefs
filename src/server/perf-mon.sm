@@ -69,7 +69,7 @@ machine pvfs2_perf_mon_sm(prelude, do_work, final_response, cleanup)
 static int perf_mon_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->resp.u.mgmt_perf_mon.perf_array)
 	free(s_op->resp.u.mgmt_perf_mon.perf_array);
 
@@ -83,7 +83,7 @@ static int perf_mon_cleanup(
 static int perf_mon_do_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct timeval tv;
     int i;
     int valid_count = 0;

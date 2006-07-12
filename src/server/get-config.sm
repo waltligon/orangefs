@@ -72,7 +72,7 @@ machine pvfs2_get_config_sm(prelude, init, final_response, cleanup)
 static int getconfig_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct server_configuration_s *user_opts = get_server_config_struct();
     assert(user_opts);
 
@@ -112,8 +112,8 @@ static int getconfig_init(
 static int getconfig_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
-    return(server_state_machine_complete(s_op));
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    return(server_state_machine_complete(smcb));
 }
 
 

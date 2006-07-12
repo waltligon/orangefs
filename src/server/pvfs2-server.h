@@ -30,6 +30,7 @@
 #include "PINT-reqproto-encode.h"
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
+#include "state-machine.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already
  * defined; this allows us to get the dependencies right for
@@ -488,13 +489,13 @@ extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 struct server_configuration_s *get_server_config_struct(void);
 
 /* exported state machine resource reclamation function */
-int server_state_machine_complete(PINT_server_op *s_op);
+int server_state_machine_complete(PINT_smcb *smcb);
 
 /* starts state machines not associated with an incoming request */
 int server_state_machine_alloc_noreq(
-    enum PVFS_server_op op, PINT_server_op** new_op);
+    enum PVFS_server_op op, struct PINT_smcb ** new_op);
 int server_state_machine_start_noreq(
-    PINT_server_op *new_op);
+    struct PINT_smcb *new_op);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #if 0
@@ -503,10 +504,9 @@ int server_state_machine_start_noreq(
     ((_op <= PVFS_MAX_SERVER_OP) ? (PINT_server_req_table[_op].sm) : NULL)
 #endif
 
-#include "state-machine.h"
 #include "pvfs2-internal.h"
 
-struct PINT_stage_machine_s *server_op_state_get_machine(int);
+struct PINT_state_machine_s *server_op_state_get_machine(int);
 
 #endif /* __SM_CHECK_DEP */ 
 #endif /* __PVFS_SERVER_H */

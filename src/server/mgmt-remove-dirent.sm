@@ -70,7 +70,7 @@ machine pvfs2_mgmt_remove_dirent_sm(
 static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -105,7 +105,7 @@ static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
 static int mgmt_remove_dirent(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -141,7 +141,7 @@ static int mgmt_remove_dirent(
 static int mgmt_remove_dirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(s_op));
 }
 

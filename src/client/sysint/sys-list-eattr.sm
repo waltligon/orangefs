@@ -135,7 +135,7 @@ PVFS_error PVFS_sys_listeattr(
 static int list_eattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     int i;
 
@@ -184,7 +184,7 @@ static int list_eattr_setup_msgpair(
 static int list_eattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"list_eattr state: list_eattr_cleanup\n");
     /* free the array malloc'd above */

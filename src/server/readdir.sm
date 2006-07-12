@@ -97,7 +97,7 @@ machine pvfs2_readdir_sm(
 static int readdir_verify_directory_metadata(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = &s_op->attr;
 
     js_p->error_code = 0;
@@ -122,7 +122,7 @@ static int readdir_verify_directory_metadata(
 static int readdir_read_dirdata_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -153,7 +153,7 @@ static int readdir_read_dirdata_handle(
 static int readdir_iterate_on_entries(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     int j = 0, memory_size = 0, kv_array_size = 0;
     char *memory_buffer = NULL;
@@ -234,7 +234,7 @@ static int readdir_iterate_on_entries(
 static int readdir_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == STATE_ENOTDIR)
     {
 	gossip_debug(GOSSIP_READDIR_DEBUG,
@@ -267,7 +267,7 @@ static int readdir_setup_resp(
 static int readdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (s_op->key_a)
     {
         free(s_op->key_a);
@@ -275,7 +275,7 @@ static int readdir_cleanup(
         s_op->val_a = NULL;
         s_op->resp.u.readdir.dirent_array = NULL;
     }
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

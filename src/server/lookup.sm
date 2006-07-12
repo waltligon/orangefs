@@ -139,7 +139,7 @@ machine pvfs2_lookup_sm(
 static int lookup_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
 
     /* fill in the lookup portion of the PINT_server_op */
@@ -203,7 +203,7 @@ static int lookup_init(
 static int lookup_read_object_metadata(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     PVFS_handle handle = PVFS_HANDLE_NULL;
@@ -254,7 +254,7 @@ static int lookup_read_object_metadata(
 static int lookup_verify_object_metadata(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
@@ -367,7 +367,7 @@ static int lookup_verify_object_metadata(
 static int lookup_read_directory_entry_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_handle handle = PVFS_HANDLE_NULL;
     job_id_t j_id;
@@ -410,7 +410,7 @@ static int lookup_read_directory_entry_handle(
 static int lookup_read_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
 
@@ -446,7 +446,7 @@ static int lookup_read_directory_entry(
 static int lookup_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /*
       NOTE: we may have handle_count N with attr_count N-1 in the case
@@ -511,7 +511,7 @@ static int lookup_setup_resp(
 static int lookup_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (s_op->resp.u.lookup_path.handle_array)
     {
         free(s_op->resp.u.lookup_path.handle_array);
@@ -523,7 +523,7 @@ static int lookup_cleanup(
         free(s_op->u.lookup.ds_attr_array);
         s_op->u.lookup.ds_attr_array = NULL;
     }
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

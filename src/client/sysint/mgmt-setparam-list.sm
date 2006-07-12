@@ -180,7 +180,7 @@ PVFS_error PVFS_mgmt_setparam_list(
 static int mgmt_setparam_list_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -228,7 +228,7 @@ static int mgmt_setparam_list_setup_msgpair(
 static int mgmt_setparam_list_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0, errct = 0;
     PVFS_error error = js_p->error_code;
 

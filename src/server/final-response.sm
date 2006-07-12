@@ -74,7 +74,7 @@ nested machine pvfs2_final_response_sm(
 static int final_response_release(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
 
@@ -114,7 +114,7 @@ static int final_response_release(
 static int final_response_send_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -161,7 +161,7 @@ static int final_response_send_resp(
 static int final_response_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 

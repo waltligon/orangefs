@@ -8,6 +8,10 @@
 #define __STATE_MACHINE_H
 
 #include <state-machine-values.h>
+#if 0
+#include <client-state-machine.h>
+#include <pvfs2-server.h>
+#endif
 
 /* STATE-MACHINE.H
  *
@@ -39,20 +43,17 @@
 
 #include "job.h"
 
-/* Op State - this is the user-specific (client or server) information
- * that must be maintained for each running state machine - if new
- * "users" are created the need to be added to this union
+/* op_state - this is the user-specific (client or server) information
+ * that must be maintained for each running state machine.
+ * This is an opaque type that cannot be dereferenced by the state
+ * machine driver code.
  */
-union PINT_OP_STATE
-{
-    struct PINT_server_op s; /* server specific fields */
-    struct PINT_client_sm c; /* client specific fields */
-};
+typedef void PINT_op_state;
 
 /* State machine control block - one per running instance of a state
  * machine
  */
-struct PINT_smcb
+typedef struct PINT_smcb
 {
     /* state machine execution variables */
     int stackptr;
@@ -60,7 +61,7 @@ struct PINT_smcb
     int framestackptr;
     union PINT_state_array_values *current_state;
     union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
-    union PINT_OP_STATE *frame_stack[PINT_FRAME_STACK_SIZE];
+    PINT_op_state *frame_stack[PINT_FRAME_STACK_SIZE];
     /* usage specific routinet to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int);
     /* state machine context and control variables */
@@ -69,7 +70,7 @@ struct PINT_smcb
     int op_complete; /* indicates operation is complete */
     int op_cancelled; /* indicates operation is cancelled */
     void *user_ptr; /* external user pointer */
-};
+} PINT_smcb;
 
 #define PINT_SET_OP_COMPLETE do{__SMCB->op_complete = 1;} while (0)
 
@@ -84,9 +85,7 @@ union PINT_state_array_values
     const char *state_name;
     struct PINT_state_machine_s *parent_machine;
     /* are they still needed?? */
-    int (*state_action)(struct PINT_smcb *,
-                        union PINT_OP_STATE *,
-                        job_status_s *);
+    int (*state_action)(struct PINT_smcb *, job_status_s *);
     int return_value;
     int flag;
     struct PINT_state_machine_s *nested_machine;
@@ -109,8 +108,8 @@ enum {
 #define SM_NESTED_STATE 1
 
 /* Prototypes for functions provided by user */
-int PINT_state_machine_start(union PINT_OP_STATE *, job_status_s *ret);
-int PINT_state_machine_complete(union PINT_OP_STATE *);
+int PINT_state_machine_start(PINT_op_state *, job_status_s *ret);
+int PINT_state_machine_complete(PINT_op_state *);
 
 /* This macro returns the state machine string of the current machine.
  * We assume the first 6 characters of every state machine name are "pvfs2_".
@@ -126,11 +125,16 @@ int PINT_state_machine_complete(union PINT_OP_STATE *);
 int PINT_state_machine_halt(void);
 int PINT_state_machine_next(struct PINT_smcb *,job_status_s *);
 int PINT_state_machine_invoke(struct PINT_smcb *, job_status_s *);
-union PINT_state_array_values *PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
-void PINT_smcb_alloc(struct PINT_smcb **, int);
+int PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
+int PINT_smcb_alloc(struct PINT_smcb **, int, int,
+        struct PINT_state_machine_s *(*getmach)(int));
 void PINT_smcb_free(struct PINT_smcb **);
 union PINT_state_array_values *PINT_pop_state(struct PINT_smcb *);
 void PINT_push_state(struct PINT_smcb *, union PINT_state_array_values *);
+PINT_op_state *PINT_sm_frame(struct PINT_smcb *, int);
+
+/* This macro is used in calls to PINT_sm_fram() */
+#define PINT_FRAME_CURRENT 0
 
 /*
  * Local variables:

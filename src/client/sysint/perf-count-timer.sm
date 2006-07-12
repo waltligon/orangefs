@@ -49,7 +49,7 @@ machine pvfs2_client_perf_count_timer_sm(do_work, error)
 static int perf_count_timer_error(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "perf timer state: perf_count_timer_error\n");
     gossip_err("Error: stopping client perf timer.\n");
@@ -65,7 +65,7 @@ static int perf_count_timer_error(
 static int perf_count_timer_do_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     uint64_t current_mask = 0;
     int current_debug_on = 0;

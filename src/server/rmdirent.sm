@@ -115,7 +115,7 @@ machine pvfs2_rmdirent_sm(
 static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -169,7 +169,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
 static int rmdirent_remove_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -220,7 +220,7 @@ static int rmdirent_remove_directory_entry(
 static int rmdirent_check_for_req_dir_update(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if ((js_p->error_code == 0) &&
         (s_op->u.rmdirent.dir_attr_update_required))
     {
@@ -232,7 +232,7 @@ static int rmdirent_check_for_req_dir_update(
 static int rmdirent_update_directory_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
@@ -311,7 +311,7 @@ static int rmdirent_update_directory_attr(
 static int rmdirent_remove_directory_entry_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     switch (js_p->error_code)
     {
 	case -TROVE_ENOENT:
@@ -328,7 +328,7 @@ static int rmdirent_remove_directory_entry_failure(
 static int rmdirent_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* Set the handle if it was removed */
     if(js_p->error_code == 0)
     {
@@ -357,8 +357,8 @@ static int rmdirent_setup_resp(
 static int rmdirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
-    return(server_state_machine_complete(s_op));
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    return(server_state_machine_complete(smcb));
 }
 
 /*

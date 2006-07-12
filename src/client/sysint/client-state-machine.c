@@ -16,8 +16,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 
-#include "client-state-machine.h"
-#include "state-machine-fns.h"
+#include "state-machine.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
@@ -157,7 +156,7 @@ static PVFS_error completion_list_retrieve_completed(
 
 static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 {
-    PINT_sm_client *sm_p = smcb->frame_stack[smcb->framebaseptr];
+    PINT_sm_client *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /*
       NOTE: if the I/O cancellation has properly completed, the
       cancelled contextual jobs within that I/O operation will be
@@ -326,8 +325,7 @@ PVFS_error PINT_client_state_machine_post(
         return ret;
     }
 
-    smcb->current_state = PINT_state_machine_locate(smcb);
-    if(!smcb->current_state)
+    if(!PINT_state_machine_locate(smcb))
     {
        gossip_lerr("ERROR: Unrecognized sysint operation!\n");
        return  ret;
@@ -385,14 +383,15 @@ PVFS_error PINT_sys_dev_unexp(
         return -PVFS_EINVAL;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED, client_op_state_get_machine);
+    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+            sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (!smcb)
     {
         return -PVFS_ENOMEM;
     }
     smcb->user_ptr = user_ptr;
     smcb->op_complete = 0;
-    smcb->frame_stack[smcb->framebaseptr]->cred_p = NULL;
+    PINT_sm_frame(smcb, PINT_FRAME_CURRENT)->cred_p = NULL;
 
     memset(jstat, 0, sizeof(job_status_s));
     ret = job_dev_unexp(info, (void *)smcb, 0, jstat, &id,
@@ -429,7 +428,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
 	/* if we can't find it, it may have already completed */
         return 0;
     }
-    sm_p = smcb->frame_stack[smcb->framebaseptr];
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (!sm_p)
     {
 	/* if we can't find it, it may have already completed */
@@ -570,7 +569,7 @@ PVFS_error PINT_client_state_machine_test(
 
     if (smcb->op_complete)
     {
-        *error_code = smcb->frame_stack[smcb->framebaseptr]->error_code;
+        *error_code = PINT_sm_frame(smcb, PINT_FRAME_CURRENT)->error_code;
         conditional_remove_sm_if_in_completion_list(smcb);
         return 0;
     }
@@ -627,7 +626,7 @@ PVFS_error PINT_client_state_machine_test(
 
     if (smcb->op_complete)
     {
-        *error_code = smcb->frame_stack[smcb->framebaseptr]->error_code;
+        *error_code = PINT_sm_frame(smcb, PINT_FRAME_CURRENT)->error_code;
         conditional_remove_sm_if_in_completion_list(smcb);
     }
     return 0;
@@ -793,8 +792,8 @@ PVFS_error PINT_client_wait_internal(
 void PVFS_sys_release(PVFS_sys_op_id op_id)
 {
     PINT_smcb *smcb = (PINT_client_sm *)id_gen_safe_lookup(op_id);
-    PVFS_credentials *cred_p =
-            smcb->frame_stack[smcb->framebaseptr]->cred_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_credentials *cred_p = sm_p->cred_p;
     if (smcb)
     {
         PINT_id_gen_safe_unregister(op_id);
@@ -802,7 +801,7 @@ void PVFS_sys_release(PVFS_sys_op_id op_id)
         if (smcb->op && cred_p)
         {
             PVFS_util_release_credentials(cred_p);
-            smcb->frame_stack[smcb->framebaseptr]->cred_p = NULL;
+            sm_p->cred_p = NULL;
         }
 
         PINT_smcb_free(&smcb);

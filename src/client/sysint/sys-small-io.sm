@@ -83,7 +83,7 @@ nested machine pvfs2_client_small_io_sm(
 static int small_io_setup_msgpairs(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
     int i = 0;
     int ret;
@@ -323,7 +323,7 @@ static int small_io_completion_fn(void * user_args,
 static int small_io_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_msgpairarray_destroy(sm_p->msgarray);
     sm_p->msgarray = NULL;
     sm_p->msgarray_count = 0;

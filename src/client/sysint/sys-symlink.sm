@@ -280,7 +280,7 @@ PVFS_error PVFS_sys_symlink(
 static int symlink_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 1;
     job_id_t tmp_id;
 
@@ -376,7 +376,7 @@ static int symlink_delete_handle_comp_fn(void *v_p,
 static int symlink_dspace_create_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -422,7 +422,7 @@ static int symlink_dspace_create_setup_msgpair(
 static int symlink_dspace_create_failure(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->u.sym.stored_error_code = js_p->error_code;
 
     return 1;
@@ -431,7 +431,7 @@ static int symlink_dspace_create_failure(
 static int symlink_crdirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -472,7 +472,7 @@ static int symlink_crdirent_setup_msgpair(
 static int symlink_crdirent_failure(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->u.sym.stored_error_code = js_p->error_code;
 
     PVFS_perror_gossip("crdirent failure", js_p->error_code);
@@ -482,7 +482,7 @@ static int symlink_crdirent_failure(
 static int symlink_setattr_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -531,7 +531,7 @@ static int symlink_setattr_setup_msgpair(
 static int symlink_setattr_failure(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->u.sym.stored_error_code = js_p->error_code;
 
     return 1;
@@ -540,7 +540,7 @@ static int symlink_setattr_failure(
 static int symlink_delete_handle_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -577,7 +577,7 @@ static int symlink_delete_handle_setup_msgpair(
 static int symlink_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_frame_client(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref symlink_ref;
 
     PVFS_util_release_sys_attr(&sm_p->u.sym.sys_attr);

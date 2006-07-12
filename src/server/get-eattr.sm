@@ -94,7 +94,7 @@ machine pvfs2_get_eattr_sm(
 static int geteattr_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i, tsz;
     char reserved_prefix[] = "system.pvfs2.";
     int reserved_prefix_len = strlen("system.pvfs2.");
@@ -197,7 +197,7 @@ static int geteattr_setup_resp(
 static int geteattr_read_eattrib(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -229,7 +229,7 @@ static int geteattr_read_eattrib(
 static int geteattr_check_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int k;
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr returning %d values\n",
             s_op->resp.u.geteattr.nkey);
@@ -260,7 +260,7 @@ static int geteattr_check_resp(
 static int geteattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (s_op->resp.u.geteattr.val)
         free(s_op->resp.u.geteattr.val);
     if (s_op->resp.u.geteattr.err)

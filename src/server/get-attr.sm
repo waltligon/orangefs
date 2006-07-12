@@ -211,7 +211,7 @@ machine pvfs2_get_attr_sm(
 static int getattr_verify_attribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = NULL;
 
     js_p->error_code = 0;
@@ -422,7 +422,7 @@ static int getattr_verify_attribs(
 static int getattr_read_symlink_target(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t i;
 
@@ -470,7 +470,7 @@ static int getattr_read_symlink_target(
 static int getattr_read_metafile_datafile_handles_if_required(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     int dfile_count = 0;
     job_id_t i;
@@ -561,7 +561,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
 static int getattr_read_metafile_distribution_if_required(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -623,7 +623,7 @@ static int getattr_read_metafile_distribution_if_required(
 static int getattr_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
 
     if(js_p->error_code > 0)
@@ -743,7 +743,7 @@ static int getattr_setup_resp(
 static int getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->val_a)
     {
         if(s_op->val_a[NUM_DFILES_KEY].buffer)
@@ -765,13 +765,13 @@ static int getattr_cleanup(
     }
 
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 static int getattr_setup_op(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->u.getattr.handle = s_op->req->u.getattr.handle;
     s_op->u.getattr.fs_id = s_op->req->u.getattr.fs_id;
     s_op->u.getattr.attrmask = s_op->req->u.getattr.attrmask;
@@ -783,7 +783,7 @@ static int getattr_setup_op(
 static int getattr_get_dirdata_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
 
@@ -810,7 +810,7 @@ static int getattr_get_dirdata_handle(
 static int getattr_get_dirent_count(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
 
@@ -841,7 +841,7 @@ static int getattr_get_dirent_count(
 static int getattr_interpret_dirent_count(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     switch(js_p->error_code)
     {
         case -TROVE_ENOENT:
@@ -865,7 +865,7 @@ static int getattr_interpret_dirent_count(
 static int getattr_get_dir_hint(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret, i;
     job_id_t tmp_id;
 
@@ -969,7 +969,7 @@ static int getattr_get_dir_hint(
 static int getattr_interpret_dir_hint(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
         /* if we failed to get any of the keys, and the error code is due to

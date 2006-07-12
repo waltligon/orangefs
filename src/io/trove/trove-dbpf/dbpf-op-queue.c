@@ -317,7 +317,7 @@ int dbpf_queue_or_service(
     TROVE_ds_flags flags,
     TROVE_op_id *out_op_id_p)
 {
-    DB * dbp;
+    DB * dbp = NULL;
     int ret;
 
     if(flags & TROVE_IMMEDIATE_COMPLETION)

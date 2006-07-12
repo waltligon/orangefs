@@ -130,7 +130,7 @@ machine pvfs2_crdirent_sm(
 static int crdirent_validate(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
 
     if ((s_op->u.crdirent.name == NULL) ||
@@ -208,7 +208,7 @@ static int crdirent_validate(
 static int crdirent_read_directory_entry_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -240,7 +240,7 @@ static int crdirent_read_directory_entry_handle(
 static int validation_object_type_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: validation_object_"
                  "type_failure called\n");
 
@@ -268,7 +268,7 @@ static int validation_object_type_failure(
 static int crdirent_write_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
     TROVE_ds_flags keyval_flags;
@@ -336,7 +336,7 @@ static int crdirent_write_directory_entry(
 static int crdirent_check_for_req_dir_update(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if ((js_p->error_code == 0) &&
         (s_op->u.crdirent.dir_attr_update_required))
     {
@@ -348,7 +348,7 @@ static int crdirent_check_for_req_dir_update(
 static int crdirent_update_directory_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
@@ -415,8 +415,8 @@ static int crdirent_update_directory_attr(
 static int crdirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
-    return(server_state_machine_complete(s_op));
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    return(server_state_machine_complete(smcb));
 }
 
 /* crdirent_setup_op()
@@ -428,7 +428,7 @@ static int crdirent_cleanup(
 static int crdirent_setup_op(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %llu\n",
         s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
 

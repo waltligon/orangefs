@@ -71,7 +71,7 @@ machine pvfs2_small_io_sm(
 static int small_io_start_job(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
     PINT_Request_state * file_req_state;
@@ -223,7 +223,7 @@ static int small_io_start_job(
 static int small_io_check_size(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ)
     {
         if(s_op->resp.u.small_io.result_size !=
@@ -242,7 +242,7 @@ static int small_io_check_size(
 static int small_io_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
        s_op->resp.u.small_io.buffer)
     {
@@ -250,7 +250,7 @@ static int small_io_cleanup(
                     s_op->req->u.small_io.total_bytes, BMI_SEND);
     }
 
-    return server_state_machine_complete(s_op);
+    return server_state_machine_complete(smcb);
 }
 
 /*

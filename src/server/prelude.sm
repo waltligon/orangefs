@@ -68,7 +68,7 @@ nested machine pvfs2_prelude_sm(
 static int prelude_req_sched(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -108,7 +108,7 @@ static int prelude_req_sched(
 static int prelude_getattr_if_needed(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, readonly_flag = 0;
     PVFS_handle target_handle = PVFS_HANDLE_NULL;
     PVFS_fs_id target_fs_id = PVFS_FS_ID_NULL;
@@ -170,7 +170,7 @@ static int prelude_getattr_if_needed(
 static int prelude_perm_check(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *obj_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 

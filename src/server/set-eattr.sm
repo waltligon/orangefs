@@ -73,7 +73,7 @@ machine pvfs2_set_eattr_sm(
 static int seteattr_verify_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL;
     int i;
     char reserved_prefix[] = "system.pvfs2.";
@@ -133,7 +133,7 @@ static int seteattr_verify_eattribs(
 static int seteattr_setobj_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     PVFS_ds_flags trove_flags = 0;
     job_id_t j_id;
@@ -191,7 +191,7 @@ static int seteattr_setobj_eattribs(
 static int seteattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_frame_server(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* do I need to free memory from decoding key and val?*/
     return(server_state_machine_complete(s_op));
 }
