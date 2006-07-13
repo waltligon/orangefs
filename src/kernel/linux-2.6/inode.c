@@ -30,139 +30,27 @@ extern struct file_operations pvfs2_dir_operations;
 extern int debug;
 
 
-/** Read page-sized blocks from file.  This code is only used in the mmap
- *  path.
- *
- *  \note Current implementation ignores max_blocks parameter and always
- *        reads exactly one block.  Because the only time this function
- *        seems to be called is from pvfs2_get_block(), this appears to be
- *        ok.
- */
-static int pvfs2_get_blocks(
-    struct inode *inode,
-    sector_t lblock,
-    unsigned long max_blocks,
-    struct buffer_head *bh_result,
-    int create)
+static int read_one_page(struct page *page)
 {
-    int ret = -EIO;
-    uint32_t max_block = 0;
+    void *page_data;
+    int ret, max_block;
     ssize_t bytes_read = 0;
-    struct page *page = NULL;
-    void *page_data = NULL;
-    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-
-    /*
-      We're faking our inode block size to be PAGE_CACHE_SIZE
-      to play nicely with the page cache.
-
-      In some reality, inode->i_blksize != PAGE_CACHE_SIZE and
-      inode->i_blkbits != PAGE_CACHE_SHIFT
-    */
+    struct inode *inode = page->mapping->host;
     const uint32_t blocksize = PAGE_CACHE_SIZE;  /* inode->i_blksize */
     const uint32_t blockbits = PAGE_CACHE_SHIFT; /* inode->i_blkbits */
 
-    /* check assumption before continuing */
-    if (max_blocks != 1) {
-	pvfs2_error("pvfs2_get_blocks called with invalid max_blocks (%lu)\n",
-		    max_blocks);
-    }
-
-    pvfs2_print("pvfs2_get_blocks called for lblock %lu\n",
-                (unsigned long)lblock);
-
-    /*
-      this is a quick workaround for the case when a sequence
-      of sequential blocks are needed to be read, but the
-      operation that issued it was cancelled by a signal.
-      if we detect a sequential pattern of failures, don't
-      even bother issuing the upcall since that's way more
-      expensive to do and it will also fail due to the signal
-      raised.
-
-      the first failure will have the failed block as lblock-1,
-      but the mpage code (the caller) tries twice in a row, so the
-      second time, the failed block index will be == to lblock.
-
-      NOTE: the easiest way to test this is to run a program
-      from a pvfs2 volume and ctrl-c it before it's fully
-      read into memory.
-    */
-    if ((pvfs2_inode->last_failed_block_index_read > 0) &&
-        ((pvfs2_inode->last_failed_block_index_read == (lblock - 1)) ||
-         (pvfs2_inode->last_failed_block_index_read == lblock)))
-    {
-        pvfs2_print("pvfs2: skipping get_block on index %d due "
-                    "to previous failure.\n", (int)lblock);
-        pvfs2_inode->last_failed_block_index_read = lblock;
-        /*
-          NOTE: we don't need to worry about cleaning up the
-          mmap_ra_cache in userspace from here because on I/O
-          failure, the pvfs2-client-core will be restarted
-        */
-        return -EIO;
-    }
-
-    page = bh_result->b_page;
+    pvfs2_print("pvfs2_readpage called with page %p\n",page);
     page_data = pvfs2_kmap(page);
 
-    /*
-      NOTE: this unsafely *assumes* that the size stored in the inode
-      is accurate.
-
-      make sure we're not looking for a page block past the end of
-      this file;
-    */
     max_block = ((inode->i_size / blocksize) + 1);
+
     if (page->index < max_block)
     {
         loff_t blockptr_offset =
             (((loff_t)page->index) << blockbits);
-
-        /*
-          NOTE: This is conceptually backwards.  we could be
-          implementing the file_read as generic_file_read and doing
-          the actual i/o here (via readpage).  There are *no* plans to
-          do this.
-
-          The main reason it's not like that now is because of the
-          mismatch of page cache size and the inode blocksize that
-          we're using.  It's more efficient in the general case to use
-          the larger blocksize (~4M rather than ~4K) for reading &
-          writing (via pvfs2_inode_read/pvfs2_file_write).  For now it
-          seems that this call can *only* handle reads of
-          PAGE_CACHE_SIZE blocks, which is terribly slow for us.
-
-          set the readahead size to be the entire file size so that
-          subsequent calls have the opportunity to be userspace read
-          cache hits; any readahead data the client pulls in is
-          flushed (both from userspace and the page cache) on vfs file
-          close
-
-	  ALSO NOTE: This call actually only reads one PAGE_CACHE_SIZE
-	  block (blocksize), even though we might have been asked to
-	  read more than that. -- RobR
-        */
         bytes_read = pvfs2_inode_read(
-            inode, page_data, blocksize, &blockptr_offset, 0,
-            inode->i_size);
-
-        if (bytes_read < 0)
-        {
-            pvfs2_print("pvfs2_get_blocks: failed to read page block %d\n",
-                        (int)page->index);
-            pvfs2_inode->last_failed_block_index_read = page->index;
-        }
-        else
-        {
-            pvfs2_print("pvfs2_get_blocks: read %d bytes | offset is %d | "
-                        "cur_block is %d | max_block is %d\n",
-                        (int)bytes_read, (int)blockptr_offset,
-                        (int)page->index, (int)max_block);
-            pvfs2_inode->last_failed_block_index_read = 0;
-        }
+            inode, page_data, blocksize, &blockptr_offset, 0, inode->i_size);
     }
-
     /* only zero remaining unread portions of the page data */
     if (bytes_read > 0)
     {
@@ -172,11 +60,8 @@ static int pvfs2_get_blocks(
     {
         memset(page_data, 0, blocksize);
     }
-
     /* takes care of potential aliasing */
     flush_dcache_page(page);
-    pvfs2_kunmap(page);
-
     if (bytes_read < 0)
     {
         ret = bytes_read;
@@ -189,44 +74,19 @@ static int pvfs2_get_blocks(
         {
             ClearPageError(page);
         }
-
-        bh_result->b_data = page_data;
-        bh_result->b_size = bytes_read;
-
-#ifdef PVFS2_LINUX_KERNEL_2_4
-        set_bit(BH_Mapped, &(bh_result)->b_state);
-        mark_buffer_uptodate(bh_result, 1);
-        bh_result->b_blocknr = lblock;
-#else
-        map_bh(bh_result, inode->i_sb, lblock);
-        set_buffer_uptodate(bh_result);
-#endif
         ret = 0;
     }
+    pvfs2_kunmap(page);
+    /* unlock the page after the ->readpage() routine completes */
+    unlock_page(page);
     return ret;
 }
 
-/** Passes request for a block on to pvfs2_get_blocks()
- */
-static int pvfs2_get_block(
-    struct inode *ip,
-    get_block_block_type lblock,
-    struct buffer_head *bh_result,
-    int create)
-{
-    pvfs2_print("pvfs2_get_block called with block %lu\n",
-                (unsigned long)lblock);
-    return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
-}
-
-/** Passes request for a page on to pvfs2_get_block()
- */
 static int pvfs2_readpage(
     struct file *file,
     struct page *page)
 {
-    pvfs2_print("pvfs2_readpage called with page %p\n",page);
-    return pvfs2_kernel_readpage(page, pvfs2_get_block);
+    return read_one_page(page);
 }
 
 #ifndef PVFS2_LINUX_KERNEL_2_4
@@ -236,8 +96,25 @@ static int pvfs2_readpages(
     struct list_head *pages,
     unsigned nr_pages)
 {
+    int page_idx;
+    int ret;
+
     pvfs2_print("pvfs2_readpages called\n");
-    return mpage_readpages(mapping, pages, nr_pages, pvfs2_get_block);
+
+    for (page_idx = 0; page_idx < nr_pages; page_idx++)
+    {
+        struct page *page;
+        page = list_entry(pages->prev, struct page, lru);
+        list_del(&page->lru);
+        if (!add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
+            ret = read_one_page(page);
+        }
+        else {
+            page_cache_release(page);
+        }
+    }
+    BUG_ON(!list_empty(pages));
+    return 0;
 }
 
 #ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
@@ -266,7 +143,6 @@ static int pvfs2_releasepage(struct page *page, gfp_t foo)
 #endif
 {
     pvfs2_print("pvfs2_releasepage called on page %p\n", page);
-    try_to_free_buffers(page);
     return 0;
 }
 
