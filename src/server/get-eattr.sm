@@ -267,7 +267,7 @@ static int geteattr_cleanup(
         free(s_op->resp.u.geteattr.err);
     if (s_op->u.eattr.buffer)
         free(s_op->u.eattr.buffer);
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

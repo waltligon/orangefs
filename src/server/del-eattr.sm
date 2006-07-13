@@ -208,7 +208,7 @@ static int deleattr_cleanup(
         "keybuf %p keylen %d\n",
         s_op->req->u.deleattr.key.buffer, s_op->req->u.deleattr.key.buffer_sz);
 
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

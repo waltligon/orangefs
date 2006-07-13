@@ -69,7 +69,7 @@ static int iterate_handles_cleanup(
     if(s_op->resp.u.mgmt_iterate_handles.handle_array)
 	free(s_op->resp.u.mgmt_iterate_handles.handle_array);
 
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 

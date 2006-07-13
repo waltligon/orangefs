@@ -17,6 +17,7 @@
 #include "PINT-reqproto-encode.h"
 
 #include "state-machine.h"
+#include "client-state-machine.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
@@ -148,7 +149,7 @@ static PVFS_error completion_list_retrieve_completed(
     /* clean up and adjust the list and it's book keeping */
     s_completion_list_index = new_list_index;
     memcpy(s_completion_list, tmp_completion_list,
-           (MAX_RETURNED_JOBS * sizeof(smcb *)));
+           (MAX_RETURNED_JOBS * sizeof(struct PINT_smcb *)));
     
     gen_mutex_unlock(&s_completion_list_mutex);
     return 0;
@@ -156,7 +157,7 @@ static PVFS_error completion_list_retrieve_completed(
 
 static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 {
-    PINT_sm_client *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /*
       NOTE: if the I/O cancellation has properly completed, the
       cancelled contextual jobs within that I/O operation will be
@@ -374,6 +375,7 @@ PVFS_error PINT_sys_dev_unexp(
     PVFS_error ret = -PVFS_EINVAL;
     job_id_t id;
     PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
 
     CLIENT_SM_INIT_ONCE();
 
@@ -391,7 +393,8 @@ PVFS_error PINT_sys_dev_unexp(
     }
     smcb->user_ptr = user_ptr;
     smcb->op_complete = 0;
-    PINT_sm_frame(smcb, PINT_FRAME_CURRENT)->cred_p = NULL;
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p->cred_p = NULL;
 
     memset(jstat, 0, sizeof(job_status_s));
     ret = job_dev_unexp(info, (void *)smcb, 0, jstat, &id,
@@ -418,7 +421,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     int i = 0;
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
-    PINT_sm_client *sm_p = NULL;
+    PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_client_io_cancel called\n");
 
@@ -543,6 +546,7 @@ PVFS_error PINT_client_state_machine_test(
     int i = 0, job_count = 0;
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb, *tmp_smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
     job_id_t job_id_array[MAX_RETURNED_JOBS];
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
@@ -569,7 +573,8 @@ PVFS_error PINT_client_state_machine_test(
 
     if (smcb->op_complete)
     {
-        *error_code = PINT_sm_frame(smcb, PINT_FRAME_CURRENT)->error_code;
+        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+        *error_code = sm_p->error_code;
         conditional_remove_sm_if_in_completion_list(smcb);
         return 0;
     }
@@ -626,7 +631,8 @@ PVFS_error PINT_client_state_machine_test(
 
     if (smcb->op_complete)
     {
-        *error_code = PINT_sm_frame(smcb, PINT_FRAME_CURRENT)->error_code;
+        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+        *error_code = sm_p->error_code;
         conditional_remove_sm_if_in_completion_list(smcb);
     }
     return 0;
@@ -761,7 +767,7 @@ PVFS_error PINT_client_wait_internal(
 
     if (in_op_str && out_error && in_class_str)
     {
-        smcb = (PINT_smcb *)id_gen_safe_lookup(op_id);
+        smcb = (PINT_smcb *)PINT_id_gen_safe_lookup(op_id);
         assert(smcb);
 
         do
@@ -791,7 +797,7 @@ PVFS_error PINT_client_wait_internal(
  */
 void PVFS_sys_release(PVFS_sys_op_id op_id)
 {
-    PINT_smcb *smcb = (PINT_client_sm *)id_gen_safe_lookup(op_id);
+    PINT_smcb *smcb = (PINT_smcb *)PINT_id_gen_safe_lookup(op_id);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_credentials *cred_p = sm_p->cred_p;
     if (smcb)
@@ -810,12 +816,13 @@ void PVFS_sys_release(PVFS_sys_op_id op_id)
 
 void PVFS_mgmt_release(PVFS_mgmt_op_id op_id)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);
-    if (sm_p)
+    PINT_smcb *smcb = PINT_id_gen_safe_lookup(op_id);
+    if (smcb)
     {
+        PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         PINT_id_gen_safe_unregister(op_id);
 
-        if (sm_p->op && sm_p->cred_p)
+        if (smcb->op && sm_p->cred_p)
         {
             PVFS_util_release_credentials(sm_p->cred_p);
             sm_p->cred_p = NULL;

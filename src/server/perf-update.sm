@@ -53,7 +53,7 @@ static int perf_update_error(
 
     PINT_perf_finalize(PINT_server_pc);
 
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /* perf_update_do_work()

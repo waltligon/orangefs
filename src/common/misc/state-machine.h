@@ -8,10 +8,7 @@
 #define __STATE_MACHINE_H
 
 #include <state-machine-values.h>
-#if 0
-#include <client-state-machine.h>
-#include <pvfs2-server.h>
-#endif
+#include "job.h"
 
 /* STATE-MACHINE.H
  *
@@ -41,7 +38,6 @@
  * function.  See src/server/server-state-machine.c for examples.
  */
 
-#include "job.h"
 
 /* op_state - this is the user-specific (client or server) information
  * that must be maintained for each running state machine.

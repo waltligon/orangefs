@@ -26,6 +26,7 @@
 #include "id-generator.h"
 #include "msgpairarray.h"
 #include "pint-sysint-utils.h"
+#include "state-machine.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
@@ -135,10 +136,7 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
     PVFS_handle *dirdata_handle;
 };
 
-typedef struct
-{
-
-typedef struct
+typedef struct PINT_client_io_ctx
 {
     /* the index of the current context (in the context array) */
     int index;
@@ -528,23 +526,23 @@ typedef struct PINT_client_sm
 } PINT_client_sm;
 
 /* sysint post/test functions */
-int PINT_client_state_machine_post(
-    PINT_client_sm *sm_p,
+PVFS_error PINT_client_state_machine_post(
+    PINT_smcb *smcb,
     int pvfs_sys_op,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
-int PINT_sys_dev_unexp(
+PVFS_error PINT_sys_dev_unexp(
     struct PINT_dev_unexp_info *info,
     job_status_s *jstat,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
-int PINT_client_state_machine_test(
+PVFS_error PINT_client_state_machine_test(
     PVFS_sys_op_id op_id,
     int *error_code);
 
-int PINT_client_state_machine_testsome(
+PVFS_error PINT_client_state_machine_testsome(
     PVFS_sys_op_id *op_id_array,
     int *op_count, /* in/out */
     void **user_ptr_array,
@@ -738,6 +736,13 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_handle_sm;
 extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
+/**/
+extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
+extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
+extern struct PINT_state_machine_s pvfs2_client_perf_count_timer;
+extern struct PINT_state_machine_s pvfs2_client_job_timer;
+extern struct PINT_state_machine_s pvfs2_fs_add_sm;
 
 
 /* nested state machines (helpers) */

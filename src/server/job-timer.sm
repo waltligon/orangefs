@@ -51,7 +51,7 @@ static int job_timer_error(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_err("Error: stopping server job timer.\n");
 
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /* job_timer_do_work()

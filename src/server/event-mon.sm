@@ -62,7 +62,7 @@ static int event_mon_cleanup(
     if(s_op->resp.u.mgmt_event_mon.event_array)
 	free(s_op->resp.u.mgmt_event_mon.event_array);
 
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /* event_mon_do_work()

@@ -73,7 +73,7 @@ static int perf_mon_cleanup(
     if(s_op->resp.u.mgmt_perf_mon.perf_array)
 	free(s_op->resp.u.mgmt_perf_mon.perf_array);
 
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /* perf_mon_do_work()

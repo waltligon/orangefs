@@ -288,7 +288,7 @@ static int listeattr_cleanup(
         free(s_op->resp.u.listeattr.key);
     if (s_op->u.eattr.buffer)
         free(s_op->u.eattr.buffer);
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

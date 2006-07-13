@@ -228,12 +228,15 @@ int PINT_smcb_alloc(
         return -PVFS_ENOMEM;
     }
     memset(*smcb, 0, sizeof(struct PINT_smcb));
-    (*smcb)->frame_stack[0] = (PINT_op_state *)malloc(frame_size);
-    if (!((*smcb)->frame_stack[0]))
+    if (frame_size > 0)
     {
-        return -PVFS_ENOMEM;
+        (*smcb)->frame_stack[0] = (PINT_op_state *)malloc(frame_size);
+        if (!((*smcb)->frame_stack[0]))
+        {
+            return -PVFS_ENOMEM;
+        }
+        memset((*smcb)->frame_stack[0], 0, frame_size);
     }
-    memset((*smcb)->frame_stack[0], 0, frame_size);
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
     return 0; /* success */
