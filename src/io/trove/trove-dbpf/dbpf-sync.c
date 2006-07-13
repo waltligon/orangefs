@@ -9,7 +9,8 @@
 #include "pint-perf-counter.h"
 #include "dbpf-sync.h"
 
-enum s_sync_context_e{
+enum s_sync_context_e
+{
 
     COALESCE_CONTEXT_KEYVAL,
     COALESCE_CONTEXT_DSPACE,
@@ -51,7 +52,6 @@ static int dbpf_sync_db(
 
 static int dbpf_sync_get_object_sync_context(enum dbpf_op_type type)
 {
-    assert(DBPF_OP_IS_KEYVAL(type) || DBPF_OP_IS_DSPACE(type));
 
     if(! DBPF_OP_DOES_SYNC(type))
     {
