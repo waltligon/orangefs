@@ -274,7 +274,7 @@ int dbpf_op_init_queued_or_immediate(
     TROVE_context_id context_id,
     struct dbpf_op **op_pp)
 {
-    if(flags & TROVE_IMMEDIATE_COMPLETION)
+    if(coll_p->immediate_completion)
     {
         DBPF_OP_INIT(*op_p,
                      op_type,
@@ -314,12 +314,12 @@ int dbpf_op_init_queued_or_immediate(
 int dbpf_queue_or_service(
     struct dbpf_op *op_p,
     dbpf_queued_op_t *q_op_p,
-    TROVE_ds_flags flags,
+    struct dbpf_collection *coll_p,
     TROVE_op_id *out_op_id_p)
 {
     int ret;
 
-    if(flags & TROVE_IMMEDIATE_COMPLETION &&
+    if( coll_p->immediate_completion &&
        (DBPF_OP_IS_KEYVAL(op_p->type) || DBPF_OP_IS_DSPACE(op_p->type)))
     {
         DB * dbp;

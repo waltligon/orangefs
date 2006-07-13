@@ -146,8 +146,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         s_op->req->u.rmdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.rmdirent.fs_id),
+        0,
         NULL,
         s_op,
         0,
@@ -170,7 +169,6 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
 {
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
     TROVE_ds_flags flags;
 
     /* set up key and structure for keyval remove */
@@ -184,15 +182,8 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
                  "object (handle = %llu)\n", s_op->req->u.rmdirent.entry,
                  llu(s_op->u.rmdirent.dirdata_handle));
 
-    /* get the flags from the config file, such as immediate completion
-     * or sync coalescing.
-     */
-    flags = PINT_config_get_trove_meta_flags(
-        user_opts, s_op->req->u.rmdirent.fs_id);
-
-    /* get the sync flag from the config file */
-    flags |= PINT_config_get_trove_sync_meta(
-        user_opts, s_op->req->u.rmdirent.fs_id);
+    /* set the sync flag */
+    flags = TROVE_SYNC;
 
     /* Also keep track of the keyval entries removed on this handle.  Because
      * we're doing a remove, this should decrement the count.
@@ -234,7 +225,6 @@ static int rmdirent_update_directory_attr(
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
     {
@@ -280,10 +270,7 @@ static int rmdirent_update_directory_attr(
     ret = job_trove_dspace_setattr(
         s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.parent_handle,
         ds_attr, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.rmdirent.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.rmdirent.fs_id),
+        TROVE_SYNC,
         s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;

@@ -22,6 +22,7 @@
 #include <string.h>
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
+#include "pvfs2-internal.h"
 #include "job.h"
 #include "bmi.h"
 #include "src/server/request-scheduler/request-scheduler.h"
@@ -275,12 +276,10 @@ struct PINT_server_io_op
     flow_descriptor* flow_d;
 };
 
-#define SMALL_IO_MAX_REGIONS 64
-
 struct PINT_server_small_io_op
 {
-    PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
-    PVFS_size sizes[SMALL_IO_MAX_REGIONS];
+    PVFS_offset offsets[IO_MAX_REGIONS];
+    PVFS_size sizes[IO_MAX_REGIONS];
     PVFS_size result_bytes;
 };
 

@@ -214,7 +214,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     op_p->u.k_read.key = key_p;
     op_p->u.k_read.val = val_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
@@ -339,7 +339,7 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
@@ -423,10 +423,11 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     ret = op_p->coll_p->keyval_db->put(
         op_p->coll_p->keyval_db, NULL, &key, &data, dbflags);
     /* Either a put error or key already exists */
-    if (ret != 0)
+    if (ret != 0 )
     {
-        op_p->coll_p->keyval_db->err(
-            op_p->coll_p->keyval_db, ret, "DB->put");
+        /*op_p->coll_p->keyval_db->err(
+            op_p->coll_p->keyval_db, ret, "DB->put keyval write");
+	*/
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
@@ -535,7 +536,7 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
@@ -627,7 +628,7 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
     op_p->u.k_iterate.position_p = position_p;
     op_p->u.k_iterate.count_p = inout_count_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 /* dbpf_keyval_iterate_op_svc()
@@ -770,7 +771,7 @@ static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
     op_p->u.k_iterate_keys.position_p = position_p;
     op_p->u.k_iterate_keys.count_p = inout_count_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 /* dbpf_keyval_iterate_keys_op_svc()
@@ -899,7 +900,7 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     op_p->u.k_read_list.err_array = err_array;
     op_p->u.k_read_list.count = count;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
@@ -1002,7 +1003,7 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
@@ -1082,7 +1083,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         if (ret != 0)
         {
             op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->put");
+                op_p->coll_p->keyval_db, ret, "DB->put keyval write list");
             ret = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         }
@@ -1165,7 +1166,7 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
         return ret;
     }
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
@@ -1656,7 +1657,7 @@ static int dbpf_keyval_get_handle_info(
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
@@ -1775,7 +1776,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         if(ret != 0)
         {
             op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->put");
+                op_p->coll_p->keyval_db, ret, "DB->put keyval handle info ops");
             return -dbpf_db_error_to_trove_error(ret);
         }
     }

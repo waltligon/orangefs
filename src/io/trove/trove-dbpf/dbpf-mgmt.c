@@ -38,6 +38,7 @@
 #include "gossip.h"
 #include "dbpf-open-cache.h"
 #include "pint-util.h"
+#include "dbpf-sync.h"
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
@@ -288,7 +289,11 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
                                    void *parameter)
 {
     int ret = -TROVE_EINVAL;
-
+	struct dbpf_collection* coll;
+	coll = dbpf_collection_find_registered(coll_id);
+	
+	assert(coll);
+	
     switch(option)
     {
         case TROVE_COLLECTION_HANDLE_RANGES:
@@ -320,13 +325,21 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
             gen_mutex_unlock(&dbpf_attr_cache_mutex);
             break;
         case TROVE_COLLECTION_COALESCING_HIGH_WATERMARK:
-            dbpf_queued_op_set_sync_high_watermark(*(int *)parameter);
+            dbpf_queued_op_set_sync_high_watermark(*(int *)parameter, coll);
             ret = 0;
             break;
         case TROVE_COLLECTION_COALESCING_LOW_WATERMARK:
-            dbpf_queued_op_set_sync_low_watermark(*(int *)parameter);
+            dbpf_queued_op_set_sync_low_watermark(*(int *)parameter, coll);
             ret = 0;
             break;
+		case TROVE_COLLECTION_META_SYNC_MODE:
+            dbpf_queued_op_set_sync_mode(*(int *)parameter, coll);
+            ret = 0;
+            break;
+        case TROVE_COLLECTION_IMMEDIATE_COMPLETION:
+        	coll->immediate_completion = *(int *)parameter;
+        	ret = 0;
+        	break;
     }
     return ret;
 }
@@ -1215,6 +1228,7 @@ static int dbpf_collection_lookup(char *collname,
                                   void *user_ptr,
                                   TROVE_op_id *out_op_id_p)
 {
+	gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_lookup of coll: %s\n", collname);
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -1396,6 +1410,15 @@ static int dbpf_collection_lookup(char *collname,
     }
 
     coll_p->next_p = NULL;
+    
+    /*
+     * Initialize defaults to ensure working
+     */
+    coll_p->c_high_watermark = 10;
+    coll_p->c_low_watermark = 1;
+    coll_p->meta_sync_enabled = 1; /* MUST be 1 !*/
+    
+    
     dbpf_collection_register(coll_p);
     *out_coll_id_p = coll_p->coll_id;
     return 1;

@@ -157,8 +157,7 @@ static int chdirent_verify_parent_metadata_and_read_directory_entry_handle(
         s_op->req->u.chdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.chdirent.fs_id),
+        0,
         NULL,
         s_op,
         0,
@@ -190,8 +189,7 @@ static int chdirent_read_directory_entry(PINT_server_op *s_op,
         s_op->u.chdirent.dirdata_handle,
         &s_op->key,
         &s_op->val,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.chdirent.fs_id),
+        0,
         NULL,
         s_op,
         0,
@@ -223,7 +221,6 @@ static int chdirent_change_directory_entry(PINT_server_op *s_op,
 {
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     js_p->error_code = 0;
 
@@ -252,10 +249,8 @@ static int chdirent_change_directory_entry(PINT_server_op *s_op,
     ret = job_trove_keyval_write(
         s_op->req->u.chdirent.fs_id, s_op->u.chdirent.dirdata_handle,
         &s_op->key, &s_op->val, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.crdirent.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.crdirent.fs_id),
+        TROVE_SYNC |
+        0,
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
     if (s_op->req->u.chdirent.parent_atime ||
@@ -286,7 +281,6 @@ static int chdirent_update_directory_attr(
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
     {
@@ -332,10 +326,8 @@ static int chdirent_update_directory_attr(
     ret = job_trove_dspace_setattr(
         s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.parent_handle,
         ds_attr, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.chdirent.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.chdirent.fs_id),
+        TROVE_SYNC |
+        0,
         s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;

@@ -191,6 +191,14 @@ struct dbpf_collection
 
     /* used by dbpf_collection.c calls to maintain list of collections */
     struct dbpf_collection *next_p;
+    
+    int c_low_watermark;
+    int c_high_watermark;
+    int meta_sync_enabled;
+    /*
+     * If this option is on we don't queue ops or use threads.
+     */
+    int immediate_completion;
 };
 
 /* Structure stored as data in collections database with collection

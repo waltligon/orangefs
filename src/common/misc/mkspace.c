@@ -615,7 +615,7 @@ int pvfs2_mkspace(
         mkspace_print(verbose, "info: adding lost+found directory to "
                       "the root directory.\n");
     }
-
+    	
     if (trove_context != -1)
     {
         trove_close_context(coll_id, trove_context);

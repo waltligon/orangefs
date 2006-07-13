@@ -149,8 +149,7 @@ static int listeattr_list_eattrib(
         s_op->req->u.listeattr.token,
         s_op->resp.u.listeattr.key,
         s_op->req->u.listeattr.nkey,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.listeattr.fs_id),
+        0,
         NULL,
         s_op,
         0,

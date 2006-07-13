@@ -135,7 +135,6 @@ static int seteattr_setobj_eattribs(
     int ret = 0;
     PVFS_ds_flags trove_flags = 0;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     gossip_debug(
         GOSSIP_SETEATTR_DEBUG,
@@ -152,11 +151,7 @@ static int seteattr_setobj_eattribs(
     {
         trove_flags = TROVE_ONLYOVERWRITE;
     }
-    trove_flags |= 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.seteattr.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.seteattr.fs_id);
+    trove_flags |= TROVE_SYNC;
 
     ret = job_trove_keyval_write_list(
         s_op->req->u.seteattr.fs_id,

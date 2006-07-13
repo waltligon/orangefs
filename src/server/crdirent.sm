@@ -223,8 +223,7 @@ static int crdirent_read_directory_entry_handle(
         s_op->u.crdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->u.crdirent.fs_id),
+        0,
         NULL,
         s_op,
         0,
@@ -290,15 +289,7 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
                  s_op->u.crdirent.name, llu(s_op->u.crdirent.new_handle),
                  llu(s_op->u.crdirent.dirent_handle));
 
-    /* get the flags from the config file, such as immediate completion
-     * or sync coalescing. 
-     */
-    keyval_flags = PINT_config_get_trove_meta_flags(
-        get_server_config_struct(), s_op->u.crdirent.fs_id);
-    
-    /* here we add the sync flag if its specified in the config file */
-    keyval_flags |= PINT_config_get_trove_sync_meta(
-        get_server_config_struct(), s_op->u.crdirent.fs_id);
+    keyval_flags = TROVE_SYNC;
         
     /* Specify that we want an error returned if the entry already exists.
      * This allows us to return an EEXIST error back to the client
@@ -348,7 +339,6 @@ static int crdirent_update_directory_attr(
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
     {
@@ -397,10 +387,7 @@ static int crdirent_update_directory_attr(
     ret = job_trove_dspace_setattr(
         s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.parent_handle,
         ds_attr, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.crdirent.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.crdirent.fs_id),
+        TROVE_SYNC,
         s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;
