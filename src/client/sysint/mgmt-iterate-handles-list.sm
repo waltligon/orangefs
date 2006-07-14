@@ -313,5 +313,5 @@ static int iterate_handles_list_comp_fn(void *v_p,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 expandtab
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
