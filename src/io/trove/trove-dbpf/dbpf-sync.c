@@ -11,11 +11,9 @@
 
 enum s_sync_context_e
 {
-
-    COALESCE_CONTEXT_KEYVAL,
-    COALESCE_CONTEXT_DSPACE,
-    COALESCE_CONTEXT_LAST,
-    COALESCE_CONTEXT_NEVER_SYNC
+    COALESCE_CONTEXT_KEYVAL = 0,
+    COALESCE_CONTEXT_DSPACE = 1,
+    COALESCE_CONTEXT_LAST = 2
 };
 
 static dbpf_sync_context_t 
@@ -52,12 +50,8 @@ static int dbpf_sync_db(
 
 static int dbpf_sync_get_object_sync_context(enum dbpf_op_type type)
 {
+    assert(DBPF_OP_IS_KEYVAL(type) || DBPF_OP_IS_DSPACE(type));
 
-    if(! DBPF_OP_DOES_SYNC(type))
-    {
-        return COALESCE_CONTEXT_NEVER_SYNC;	
-    }
-    
     if(DBPF_OP_IS_KEYVAL(type))
     {
         return COALESCE_CONTEXT_KEYVAL;
@@ -108,14 +102,14 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
     DB * dbp = NULL;
     dbpf_sync_context_t * sync_context;
     dbpf_queued_op_t *ready_op;
-    enum s_sync_context_e sync_context_type = 
+    int sync_context_type = 
         dbpf_sync_get_object_sync_context(qop_p->op.type);
     struct dbpf_collection* coll = qop_p->op.coll_p;
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: sync_coalesce called\n");
 
-    assert(sync_context_type != COALESCE_CONTEXT_NEVER_SYNC);
+    assert(DBPF_OP_DOES_SYNC(qop_p->op.type));
 
     if ( ! (qop_p->op.flags & TROVE_SYNC) ) {
         /*
@@ -130,8 +124,6 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
      */
     sync_context = & sync_array[sync_context_type][qop_p->op.context_id];
 
-    assert(sync_context_type == COALESCE_CONTEXT_DSPACE ||
-           sync_context_type == COALESCE_CONTEXT_KEYVAL);
     if( sync_context_type == COALESCE_CONTEXT_DSPACE )
     {
         dbp = qop_p->op.coll_p->ds_db;
@@ -252,7 +244,7 @@ int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: enqueue called\n");
 
-    if ( sync_context_type == COALESCE_CONTEXT_NEVER_SYNC )
+    if (!DBPF_OP_DOES_SYNC(qop_p->op.type))
     { 
         return 0;
     } 
@@ -289,7 +281,7 @@ int dbpf_sync_coalesce_dequeue(
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: dequeue called\n");
 
-    if ( sync_context_type == COALESCE_CONTEXT_NEVER_SYNC )
+    if (!DBPF_OP_DOES_SYNC(qop_p->op.type))
     { 
         return 0;
     } 
