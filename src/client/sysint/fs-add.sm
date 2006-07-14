@@ -153,7 +153,7 @@ PVFS_error PVFS_isys_fs_add(
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_FS_ADD, op_id, user_ptr);
+        smcb, PVFS_SYS_FS_ADD, op_id, user_ptr);
 }
 
 int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)

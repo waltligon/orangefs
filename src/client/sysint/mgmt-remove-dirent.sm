@@ -114,7 +114,7 @@ PVFS_error PVFS_imgmt_remove_dirent(
         parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_REMOVE_DIRENT, op_id, user_ptr);
+        smcb, PVFS_MGMT_REMOVE_DIRENT, op_id, user_ptr);
 }
 
 /** Remove a specific directory entry.

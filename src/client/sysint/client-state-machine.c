@@ -107,6 +107,7 @@ static PVFS_error completion_list_retrieve_completed(
     int i = 0, new_list_index = 0;
     PINT_smcb *smcb = NULL;
     PINT_smcb *tmp_completion_list[MAX_RETURNED_JOBS] = {NULL};
+    PINT_client_sm *sm_p;
 
     assert(op_id_array);
     assert(error_code_array);
@@ -125,19 +126,20 @@ static PVFS_error completion_list_retrieve_completed(
 
         smcb = s_completion_list[i];
         assert(smcb);
+        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
         if (i < limit)
         {
-            op_id_array[i] = smcb->sys_op_id;
-            error_code_array[i] = smcb->error_code;
+            op_id_array[i] = sm_p->sys_op_id;
+            error_code_array[i] = sm_p->error_code;
 
             if (user_ptr_array)
             {
-                user_ptr_array[i] = (void *)smcb->user_ptr;
+                user_ptr_array[i] = (void *)sm_p->user_ptr;
             }
             s_completion_list[i] = NULL;
 
-            PINT_sys_release(smcb->sys_op_id);
+            PINT_sys_release(sm_p->sys_op_id);
         }
         else
         {
@@ -299,6 +301,7 @@ PVFS_error PINT_client_state_machine_post(
 {
     PVFS_error ret = -PVFS_EINVAL;
     job_status_s js;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
 #if 0
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -315,7 +318,7 @@ PVFS_error PINT_client_state_machine_post(
     memset(&js, 0, sizeof(js));
 
     /* save operation type; mark operation as unfinished */
-    smcb->user_ptr = user_ptr;
+    sm_p->user_ptr = user_ptr;
     smcb->op = pvfs_sys_op;
     smcb->op_complete = 0;
 
@@ -335,7 +338,7 @@ PVFS_error PINT_client_state_machine_post(
     if (op_id)
     {
         ret = PINT_id_gen_safe_register(op_id, (void *)smcb);
-        smcb->sys_op_id = *op_id;
+        sm_p->sys_op_id = *op_id;
     }
 
     /*
@@ -391,9 +394,9 @@ PVFS_error PINT_sys_dev_unexp(
     {
         return -PVFS_ENOMEM;
     }
-    smcb->user_ptr = user_ptr;
-    smcb->op_complete = 0;
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p->user_ptr = user_ptr;
+    smcb->op_complete = 0;
     sm_p->cred_p = NULL;
 
     memset(jstat, 0, sizeof(job_status_s));
@@ -407,7 +410,7 @@ PVFS_error PINT_sys_dev_unexp(
     else
     {
         ret = PINT_id_gen_safe_register(op_id, (void *)smcb);
-        smcb->sys_op_id = *op_id;
+        sm_p->sys_op_id = *op_id;
     }
     return ret;
 }
@@ -764,11 +767,13 @@ PVFS_error PINT_client_wait_internal(
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p;
 
     if (in_op_str && out_error && in_class_str)
     {
         smcb = (PINT_smcb *)PINT_id_gen_safe_lookup(op_id);
         assert(smcb);
+        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
         do
         {
@@ -787,7 +792,7 @@ PVFS_error PINT_client_wait_internal(
         }
         else
         {
-            *out_error = smcb->error_code;
+            *out_error = sm_p->error_code;
         }
     }
     return ret;

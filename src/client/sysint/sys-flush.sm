@@ -123,7 +123,7 @@ PVFS_error PVFS_isys_flush(
         0);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_FLUSH, op_id, user_ptr);
+        smcb, PVFS_SYS_FLUSH, op_id, user_ptr);
 }
 
 /** Flush file data to storage on servers.

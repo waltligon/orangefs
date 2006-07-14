@@ -95,7 +95,7 @@ PVFS_error PVFS_imgmt_get_dfile_array(
         0);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_GET_DFILE_ARRAY, op_id, user_ptr);
+        smcb, PVFS_MGMT_GET_DFILE_ARRAY, op_id, user_ptr);
 }
 
 /** Obtain the list of handles of datafiles associated with a given file.

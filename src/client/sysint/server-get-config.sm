@@ -147,7 +147,7 @@ int PINT_server_get_config(
     sm_p->u.get_config.config = config;
 
     ret = PINT_client_state_machine_post(
-        sm_p, PVFS_SERVER_GET_CONFIG, &op_id, NULL);
+        smcb, PVFS_SERVER_GET_CONFIG, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PINT_client_state_machine_post call", ret);
@@ -248,7 +248,7 @@ static int server_parse_config(
 static int server_get_config_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *smcb = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_BMI_addr_t serv_addr;

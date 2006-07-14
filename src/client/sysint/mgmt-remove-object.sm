@@ -113,7 +113,7 @@ PVFS_error PVFS_imgmt_remove_object(
                  "PINT_client_state_machine_post()\n");
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_REMOVE_OBJECT, op_id, user_ptr);
+        smcb, PVFS_MGMT_REMOVE_OBJECT, op_id, user_ptr);
 }
 
 /** Remove a specific file system object.

@@ -137,7 +137,7 @@ PVFS_error PVFS_imgmt_statfs_list(
     }
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_STATFS_LIST, op_id, user_ptr);
+        smcb, PVFS_MGMT_STATFS_LIST, op_id, user_ptr);
 }
 
 /** Obtain file system statistics from a list of servers.

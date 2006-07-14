@@ -226,7 +226,7 @@ PVFS_error PVFS_isys_remove(
      */
     
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_REMOVE, op_id, user_ptr);
+        smcb, PVFS_SYS_REMOVE, op_id, user_ptr);
 }
 
 /** Remove an object and its directory entry.

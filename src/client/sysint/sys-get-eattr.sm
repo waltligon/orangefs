@@ -95,7 +95,7 @@ PVFS_error PVFS_isys_geteattr_list(
     sm_p->object_ref = ref;
 
     return PINT_client_state_machine_post(
-            sm_p, PVFS_SYS_GETEATTR, op_id, user_ptr);
+            smcb, PVFS_SYS_GETEATTR, op_id, user_ptr);
 }
 
 PVFS_error PVFS_sys_geteattr_list(

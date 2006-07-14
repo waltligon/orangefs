@@ -147,7 +147,7 @@ PVFS_error PVFS_isys_setattr(
                  ref.fs_id);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_SETATTR, op_id, user_ptr);
+        smcb, PVFS_SYS_SETATTR, op_id, user_ptr);
 }
 
 /**  Modify the attributes of a single object.

@@ -344,7 +344,7 @@ PVFS_error PVFS_isys_rename(
         llu(new_parent_ref.handle), new_parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_RENAME, op_id, user_ptr);
+        smcb, PVFS_SYS_RENAME, op_id, user_ptr);
 }
 
 /** Rename an object.

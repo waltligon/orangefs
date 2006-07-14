@@ -128,7 +128,7 @@ PVFS_error PVFS_isys_truncate(
         0);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_TRUNCATE, op_id, user_ptr);
+        smcb, PVFS_SYS_TRUNCATE, op_id, user_ptr);
 }
 
 PVFS_error PVFS_sys_truncate(

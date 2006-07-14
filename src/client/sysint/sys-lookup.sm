@@ -494,7 +494,7 @@ PVFS_error PVFS_isys_ref_lookup(
                  relative_pathname, llu(parent.handle));
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_LOOKUP, op_id, user_ptr);
+        smcb, PVFS_SYS_LOOKUP, op_id, user_ptr);
 }
 
 /** Dereference a path string relative to a parent directory.

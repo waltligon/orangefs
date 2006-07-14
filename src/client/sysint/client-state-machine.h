@@ -458,10 +458,10 @@ typedef struct PINT_client_sm
     /* indicates when the operation has been cancelled */
     int op_cancelled;
 
+#endif
     /* used internally by client-state-machine.c */
     PVFS_sys_op_id sys_op_id;
     void *user_ptr;
-#endif
 
     /* stores the final operation error code on operation exit */
     PVFS_error error_code;

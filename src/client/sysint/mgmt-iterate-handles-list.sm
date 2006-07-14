@@ -116,7 +116,7 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
     }
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_ITERATE_HANDLES_LIST, op_id, user_ptr);
+        smcb, PVFS_MGMT_ITERATE_HANDLES_LIST, op_id, user_ptr);
 }
 
 /** Obtain a list of handles in use on a collection of servers.

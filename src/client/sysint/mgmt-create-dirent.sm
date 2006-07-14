@@ -116,7 +116,7 @@ PVFS_error PVFS_imgmt_create_dirent(
         parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_CREATE_DIRENT, op_id, user_ptr);
+        smcb, PVFS_MGMT_CREATE_DIRENT, op_id, user_ptr);
 }
 
 /** Create a directory entry pointing to a specific object.

@@ -115,7 +115,7 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
         "dir %llu,%d\n", llu(parent_ref.handle), parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_GET_DIRDATA_HANDLE, op_id, user_ptr);
+        smcb, PVFS_MGMT_GET_DIRDATA_HANDLE, op_id, user_ptr);
 }
 
 /** Obtain handle for dirdata object for a specific directory.
