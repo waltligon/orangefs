@@ -140,7 +140,7 @@ static int is_root_handle_in_my_range(
 static const configoption_t options[] =
 {
     /* 
-     * Specifies a string identifier for the pvfs2 server that is to be
+     * Specifies a string identifier for the pvfs server that is to be
      * run on this host.  The format of this string is:
      *
      * {transport}://{hostname}:{port}
@@ -153,7 +153,7 @@ static const configoption_t options[] =
      */
     {"HostID",ARG_STR, get_pvfs_server_id,NULL,CTX_GLOBAL,NULL},
     
-    /* Specifies the local path for the pvfs2 server to use as storage space.
+    /* Specifies the local path for the pvfs server to use as storage space.
      * Example:
      *
      * /tmp/pvfs.storage
@@ -162,7 +162,7 @@ static const configoption_t options[] =
 
     /* Specifies the beginning of the Defaults context.  Options specified
      * within the Defaults context are used as default values over all the
-     * pvfs2 server specific config files.
+     * pvfs server specific config files.
      */
     {"<Defaults>",ARG_NONE, enter_defaults_context,NULL,CTX_GLOBAL,NULL},
 
@@ -172,7 +172,7 @@ static const configoption_t options[] =
 
 #ifdef USE_TRUSTED
     /* Specifies the beginning of the Security context. Options specified 
-     * within the Security context are used to dictate whether the pvfs2
+     * within the Security context are used to dictate whether the pvfs
      * servers will accept or handle file-system requests.
      * This section is optional and does not need to be specified.
      */
@@ -236,7 +236,7 @@ static const configoption_t options[] =
     {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALIASES,NULL},
 
     /* Specifies the beginning of a Filesystem context.  This groups
-     * options specific to a filesystem.  A pvfs2 server may manage
+     * options specific to a filesystem.  A pvfs server may manage
      * more than one filesystem, so a config file may have more than
      * one Filesystem context, each defining the parameters of a different
      * Filesystem.
@@ -307,7 +307,7 @@ static const configoption_t options[] =
     {"</Distribution>",ARG_NONE, exit_distribution_context,NULL,
         CTX_DISTRIBUTION,NULL},
 
-    /* As logical files are created in pvfs2, the data files and meta files
+    /* As logical files are created in pvfs, the data files and meta files
      * that represent them are given filesystem unique handle values.  The
      * user can specify a range of values (or set of ranges) 
      * to be allocated to data files and meta files for a particular server,
@@ -316,7 +316,7 @@ static const configoption_t options[] =
      * pvfs2-genconfig script determine the best ranges to specify.
      *
      * This option specifies a range of handle values that can be used for 
-     * a particular pvfs2 server in a particular context (meta handles
+     * a particular pvfs server in a particular context (meta handles
      * or data handles).  The DataHandleRanges and MetaHandleRanges contexts
      * should contain one or more Range options.  The format is:
      *
@@ -349,7 +349,7 @@ static const configoption_t options[] =
      * Where {handle value} is a positive integer no greater than 
      * 18446744073709551615 (UIN64_MAX).
      *
-     * In general its best to let the pvfs2-genconfig script specify a
+     * In general its best to let the pvfs-genconfig script specify a
      * RootHandle value for the filesystem.
      */
     {"RootHandle",ARG_STR, get_root_handle,NULL,
@@ -362,7 +362,7 @@ static const configoption_t options[] =
     {"Name",ARG_STR, get_name,NULL,
         CTX_FILESYSTEM|CTX_DISTRIBUTION,NULL},
 
-    /* A pvfs2 server may manage more than one filesystem, and so a
+    /* A pvfs server may manage more than one filesystem, and so a
      * unique identifier is used to represent each one.  
      * This option specifies such an ID (sometimes called a 'collection
      * id') for the filesystem it is defined in.  
@@ -374,19 +374,19 @@ static const configoption_t options[] =
     {"ID",ARG_INT, get_filesystem_collid,NULL,
         CTX_FILESYSTEM,NULL},
 
-    /* The gossip interface in pvfs2 allows users to specify different
-     * levels of logging for the pvfs2 server.  The output of these
+    /* The gossip interface in pvfs allows users to specify different
+     * levels of logging for the pvfs server.  The output of these
      * different log levels is written to a file, which is specified in
      * this option.  The value of the option must be the path pointing to a 
      * file with valid write permissions.  The Logfile option can be
-     * specified for all the pvfs2 servers in the Defaults context or for
+     * specified for all the pvfs servers in the Defaults context or for
      * a particular server in the Global context.
      */
     {"LogFile",ARG_STR, get_logfile,NULL,
         CTX_DEFAULTS|CTX_GLOBAL,"/tmp/pvfs2-server.log"},
 
-    /* The gossip interface in pvfs2 allows users to specify different
-     * levels of logging for the pvfs2 server.  This option sets that level for
+    /* The gossip interface in pvfs allows users to specify different
+     * levels of logging for the pvfs server.  This option sets that level for
      * either all servers (by being defined in the Defaults context) or for
      * a particular server by defining it in the Global context.  Possible
      * values for event logging are:
@@ -404,7 +404,7 @@ static const configoption_t options[] =
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
         CTX_DEFAULTS|CTX_GLOBAL,"none,"},
 
-    /* At startup each pvfs2 server allocates space for a set number
+    /* At startup each pvfs server allocates space for a set number
      * of incoming requests to prevent the allocation delay at the beginning
      * of each unexpected request.  This parameter specifies the number
      * of requests for which to allocate space.
@@ -416,14 +416,32 @@ static const configoption_t options[] =
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_GLOBAL,"50"},
 
-	/*
-	 * TCP socket buffer size.
-	 */
+     /* Current implementations of TCP on most systems use a window
+      * size that is too small for almost all uses of pvfs.  
+      * We recommend administators
+      * should consider tuning the linux kernel maximum send and
+      * receive buffer sizes via the /proc settings.  The
+      * <a href="http://www.psc.edu/networking/projects/tcptune/#Linux">
+      * PSC tcp tuning section for linux</a> has good information
+      * on how to do this.  
+      *
+      * The <i>TCPBufferSend</i> and
+      * <i>TCPBufferReceive</i> options allows setting the tcp window
+      * sizes for the pvfs clients and servers, if using the
+      * system wide settings is unacceptable.  The values should be
+      * large enough to hold the full bandwidth delay product (BDP)
+      * of the network.  Note that setting these values disables
+      * tcp autotuning.  See the
+      * <a href="http://www.psc.edu/networking/projects/tcptune/#options">
+      * PSC networking options</a> for details.
+      */
      {"TCPBufferSend",ARG_INT, get_tcp_buffer_send,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL,"65535"},
-     {"TCPBufferReceive",ARG_INT, get_tcp_buffer_receive,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL,"131071"},
+         CTX_DEFAULTS|CTX_GLOBAL,"0"},
 
+     /* See the <a href="#TCPBufferSend">TCPBufferSend</a> option.
+      */
+      {"TCPBufferReceive",ARG_INT, get_tcp_buffer_receive,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL,"0"},
 
      /* Specifies the timeout value in seconds for BMI jobs on the server.
       */
@@ -457,7 +475,7 @@ static const configoption_t options[] =
 
      /* This specifies the frequency (in milliseconds) 
       * that performance monitor should be updated
-      * when the pvfs2 server is running in admin mode.
+      * when the pvfs server is running in admin mode.
       *
       * Can be set in either Default or Global contexts.
       */
@@ -476,7 +494,7 @@ static const configoption_t options[] =
      *
      * BMIModules bmi_tcp,bmi_ib
      *
-     * Note that only the bmi modules compiled into pvfs2 should be
+     * Note that only the bmi modules compiled into pvfs should be
      * specified in this list.  The BMIModules option can be specified
      * in either the Defaults or Global contexts.
      */
@@ -491,7 +509,7 @@ static const configoption_t options[] =
      * default and only available flow for production use.
      *
      * flowproto_bmi_cache - A flow module that enables the use of the NCAC
-     * (network-centric adaptive cache) in the pvfs2 server.  Since the NCAC
+     * (network-centric adaptive cache) in the pvfs server.  Since the NCAC
      * is currently disable and unsupported, this module exists as a proof
      * of concept only.
      *

@@ -677,6 +677,19 @@ int BMI_tcp_set_info(int option,
             tcp_method_params.listen_addr->method_data)->socket);
 #endif
        break;
+    /*
+     * Used after changing buffer sizes to force the connection to
+     * the server used for the config to close so it can be reopened
+     * with the new buffer sizes as the rest of the future server
+     * connections will be.
+     */
+    case BMI_TCP_CLOSE_SOCKET: {
+        struct method_addr *map = inout_parameter;
+        if (tcp_socket_collection_p)
+            BMI_socket_collection_remove(tcp_socket_collection_p, map);
+        ret = tcp_shutdown_addr(map);
+        break;
+    }
     case BMI_FORCEFUL_CANCEL_MODE:
 	forceful_cancel_mode = 1;
 	ret = 0;
