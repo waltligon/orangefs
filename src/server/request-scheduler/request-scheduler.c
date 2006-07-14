@@ -595,6 +595,43 @@ int PINT_req_sched_post(
                 ret = 0;
             }
         }
+        else if((in_request->op == PVFS_SERV_CRDIRENT ||
+                in_request->op == PVFS_SERV_RMDIRENT) &&
+                next_element->state == REQ_SCHEDULED &&
+                last_element->state == REQ_SCHEDULED)
+        {
+            /* possible dirent optimization: see if all scheduled ops for this
+             * handle are for crdirent or rmdirent.  
+             * If so, we can allow another concurrent
+             * dirent request to proceed 
+             */
+            tmp_flag = 0;
+            qlist_for_each(iterator, &tmp_list->req_list)
+            {
+                tmp_element2 = qlist_entry(iterator, struct req_sched_element,
+                    list_link);
+                if(tmp_element2->req_ptr->op != PVFS_SERV_CRDIRENT && 
+                   tmp_element2->req_ptr->op != PVFS_SERV_RMDIRENT)
+                {
+                    tmp_flag = 1;
+                    break;
+                }
+            }
+
+            if(!tmp_flag)
+            {
+                tmp_element->state = REQ_SCHEDULED;
+                ret = 1;
+                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
+                             "concurrent dirent op, handle: %llu\n", 
+                             llu(handle));
+            }
+            else
+            {
+                tmp_element->state = REQ_QUEUED;
+                ret = 0;
+            }
+        }
 	else
 	{
 	    tmp_element->state = REQ_QUEUED;
