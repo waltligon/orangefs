@@ -59,7 +59,7 @@ static int io_cleanup(
 /* Helper functions local to sys-io.sm. */
 
 static inline int io_complete_context_send_or_recv(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    PINT_smcb *smcb, job_status_s *js_p);
 
 static inline int io_decode_ack_response(
     PINT_client_io_ctx *cur_ctx,
@@ -261,6 +261,7 @@ PVFS_error PVFS_isys_io(
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     struct filesystem_configuration_s* cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
@@ -301,12 +302,13 @@ PVFS_error PVFS_isys_io(
         return 1; 
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+             sizeof(struct PINT_client_sm), client_op_state_get_machine);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
@@ -400,7 +402,7 @@ static int io_init(
         io_datafile_index_array_destroy(sm_p);
         io_contexts_destroy(sm_p);
 
-        if (sm_p->op_cancelled)
+        if (smcb->op_cancelled)
         {
             js_p->error_code = -PVFS_ECANCEL;
             return 1;
@@ -426,7 +428,7 @@ static int io_datafile_setup_msgpairs(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_datafile_setup_msgpairs\n", sm_p);
 
-    if (sm_p->op_cancelled)
+    if (smcb->op_cancelled)
     {
         js_p->error_code = -PVFS_ECANCEL;
         goto exit;
@@ -599,7 +601,7 @@ static int io_datafile_post_msgpairs(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io_datafile_post_msgpairs "
                  "state: post (%d message(s))\n", sm_p->u.io.datafile_count);
 
-    if (sm_p->op_cancelled)
+    if (smcb->op_cancelled)
     {
         js_p->error_code = -PVFS_ECANCEL;
         return 1;
@@ -897,7 +899,7 @@ static int io_datafile_complete_operations(
          */
         if (sm_p->u.io.msgpair_completion_count)
         {
-            ret = io_complete_context_send_or_recv(sm_p, js_p);
+            ret = io_complete_context_send_or_recv(smcb, js_p);
             if (ret < 0) {
                 /* problem */
                 PVFS_perror_gossip(
@@ -1097,7 +1099,7 @@ static int io_datafile_complete_operations(
     if (sm_p->u.io.msgpair_completion_count
      || sm_p->u.io.flow_completion_count
      || sm_p->u.io.write_ack_completion_count) {
-        if (sm_p->op_cancelled)
+        if (smcb->op_cancelled)
             gossip_debug(GOSSIP_IO_DEBUG, "detected I/O cancellation with "
                          "%d flows and %d write acks pending\n",
                          sm_p->u.io.flow_completion_count,
@@ -1122,14 +1124,14 @@ static int io_datafile_complete_operations(
         if (!cur_ctx->msg_send_has_been_posted)
             break;
     }
-    if (i < sm_p->u.io.datafile_count && !sm_p->op_cancelled) {
+    if (i < sm_p->u.io.datafile_count && !smcb->op_cancelled) {
         gossip_debug(GOSSIP_IO_DEBUG,
           "*** %s: some msgpairs to repost\n", __func__);
         js_p->error_code = IO_RETRY;
     } else {
         gossip_debug(GOSSIP_IO_DEBUG, "*** all operations %s "
                      "(msgpairs, flows, write acks)\n",
-                     (sm_p->op_cancelled ? "cancelled" : "completed"));
+                     (smcb->op_cancelled ? "cancelled" : "completed"));
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
     }
     return 1;
@@ -1159,10 +1161,10 @@ static int io_analyze_results(
 
         if (ret == 0)
         {
-            ret = (sm_p->op_cancelled ? -PVFS_ECANCEL : -PVFS_EIO);
+            ret = (smcb->op_cancelled ? -PVFS_ECANCEL : -PVFS_EIO);
         }
     }
-    else if (!sm_p->op_cancelled)
+    else if (!smcb->op_cancelled)
     {
         /*
          * look through all the contexts for errors, saving the first
@@ -1220,7 +1222,7 @@ static int io_analyze_results(
         {
             char buf[64] = {0};
 
-            ret = (sm_p->op_cancelled ? -PVFS_ECANCEL :
+            ret = (smcb->op_cancelled ? -PVFS_ECANCEL :
                    sm_p->u.io.stored_error_code);
 
             PVFS_strerror_r(ret, buf, 64);
@@ -1230,7 +1232,7 @@ static int io_analyze_results(
     }
     else
     {
-        ret = (sm_p->op_cancelled ? -PVFS_ECANCEL : -PVFS_EIO);
+        ret = (smcb->op_cancelled ? -PVFS_ECANCEL : -PVFS_EIO);
     }
 
     /* be sure there are no jobs still laying around */
@@ -1248,7 +1250,7 @@ static int io_analyze_results(
          (ret == -ECONNRESET) || (ret == -PVFS_EPROTO)) &&
         (sm_p->u.io.retry_count < sm_p->msgarray_params.retry_limit))
     {
-        assert(!sm_p->op_cancelled);
+        assert(!smcb->op_cancelled);
 
         sm_p->u.io.stored_error_code = 0;
         sm_p->u.io.total_size = 0;  /* start from the beginning again */
@@ -1807,19 +1809,20 @@ static inline int io_post_write_ack_recv(
   and -PVFS_error on failure
 */
 static inline int io_complete_context_send_or_recv(
-    PINT_client_sm *sm_p,
+    PINT_smcb *smcb,
     job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, index = 0;
     unsigned long status_user_tag = 0;
     PINT_client_io_ctx *cur_ctx = NULL;
     PINT_sm_msgpair_state *msg = NULL;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_IO_DEBUG,
                  "- complete_context_send_or_recv called\n");
 
-    assert(sm_p && js_p);
-    assert(sm_p->op == PVFS_SYS_IO);
+    assert(smcb && js_p);
+    assert(smcb->op == PVFS_SYS_IO);
 
     status_user_tag = (unsigned long)js_p->status_user_tag;
 

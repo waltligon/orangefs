@@ -79,6 +79,7 @@ PVFS_error PVFS_imgmt_perf_mon_list(
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,

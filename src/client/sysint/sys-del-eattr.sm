@@ -65,6 +65,7 @@ PVFS_error PVFS_isys_deleattr(
         void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_isys_del_eattr entered\n");
@@ -76,12 +77,13 @@ PVFS_error PVFS_isys_deleattr(
 	return ret;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+             sizeof(struct PINT_client_sm), client_op_state_get_machine);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);

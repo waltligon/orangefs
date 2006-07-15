@@ -139,7 +139,7 @@ static PVFS_error completion_list_retrieve_completed(
             }
             s_completion_list[i] = NULL;
 
-            PINT_sys_release(sm_p->sys_op_id);
+            PVFS_sys_release(sm_p->sys_op_id);
         }
         else
         {
@@ -247,9 +247,9 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
     case PVFS_SERVER_GET_CONFIG :
         return &pvfs2_server_get_config_sm;
     case PVFS_CLIENT_JOB_TIMER :
-        return &pvfs2_client_job_timer;
+        return &pvfs2_client_job_timer_sm;
     case PVFS_CLIENT_PERF_COUNT_TIMER :
-        return &pvfs2_client_perf_count_timer;
+        return &pvfs2_client_perf_count_timer_sm;
     default:
         /* now check range for sys functions */
         if (op <= PVFS_OP_SYS_MAXVAL)
@@ -273,13 +273,13 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
   calls yourself.
 
   calling semantics: the non-blocking calls (i.e. PVFS_isys_* or
-  PVFS_imgmt_* calls) allocate the state machine pointer (sm_p) used
+  PVFS_imgmt_* calls) allocate the state machine control block (smcb) used
   for each operation.  the blocking calls DO NOT allocate this, but
   call the non-blocking method (which does allocate it) and waits for
   completion.  On completion, the blocking call frees the state
-  machine pointer (via PINT_sys_release).  the blocking calls only
+  machine control block (via PVFS_sys_release).  the blocking calls only
   ever call the test() function, which does not free the state machine
-  pointer on completion.
+  control block on completion.
 
   the testsome() function frees the state machine pointers allocated
   from the non-blocking calls on completion because any caller of
@@ -346,10 +346,12 @@ PVFS_error PINT_client_state_machine_post(
       immediate completions
     */
     ret = PINT_state_machine_invoke(smcb, &js);
-    while(ret == 1)
+    while(ret == SM_ACTION_COMPLETE) /* ret == 1 */
     {
         ret = PINT_state_machine_next(smcb, &js);
     }
+
+    /* else ret == SM_ACTION_DEFERED */
 
     if (smcb->op_complete)
     {
@@ -608,9 +610,9 @@ PVFS_error PINT_client_state_machine_test(
                 ret = PINT_state_machine_next(
                     tmp_smcb, &job_status_array[i]);
 
-            } while (ret == 1);
+            } while (ret == SM_ACTION_COMPLETE); /* ret == 1*/
 
-            assert(ret == 0);
+            assert(ret == SM_ACTION_DEFERED); /* ret == 0 */
         }
 
         /* make sure we don't return internally cancelled I/O jobs */

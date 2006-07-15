@@ -614,8 +614,7 @@ int main(int argc, char **argv)
                     struct PINT_server_op *s_op;
                     PVFS_perror_gossip("Error: server_state_machine_start", ret);
                     
-                    s_op = (struct PINT_server_op *)PINT_sm_frame(smcb,
-                            PINT_FRAME_CURRENT);
+                    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
                     free(s_op->unexp_bmi_buff.buffer);
                     /* TODO: tell BMI to drop this address? */
                     /* set return code to zero to allow server to continue
@@ -639,17 +638,19 @@ int main(int argc, char **argv)
              * (ret == 1).  While the job continues to complete
              * immediately, we continue to service it.
              */
-            while (ret == 1)
+            while (ret == SM_ACTION_COMPLETE) /* ret == 1 */
             {
                 ret = PINT_state_machine_next(
                     smcb, &server_job_status_array[i]);
             }
 
-            if (ret < 0)
+            if (SM_ACTION_ISERR(ret)) /* ret < 0 */
             {
                 PVFS_perror_gossip("Error: state machine processing error", ret);
                 ret = 0;
             }
+
+            /* else ret == SM_ACTION_DEFERED */
 
             if (unexpected_msg)
             {

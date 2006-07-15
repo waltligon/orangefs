@@ -199,6 +199,7 @@ PVFS_error PVFS_isys_mkdir(
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_mkdir entered\n");

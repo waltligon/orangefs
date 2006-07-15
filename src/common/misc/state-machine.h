@@ -94,6 +94,18 @@ struct PINT_state_machine_s
     union PINT_state_array_values *state_machine;
 };
 
+/* All state action functions return this type which controls state
+ * machine action
+ */
+typedef enum {
+    SM_ACTION_COMPLETE = 1,
+    SM_ACTION_DEFERED = 0,
+    SM_ERROR = -1             /* this is a catastrophic error */
+} PINT_sm_action;
+
+#define SM_ACTION_ISERR(ret) ((ret)<0)
+
+/* what is this type? */
 enum {
     JMP_NOT_READY = 99,
     DEFAULT_ERROR = -1,

@@ -54,7 +54,7 @@ static int perf_count_timer_error(
                  "perf timer state: perf_count_timer_error\n");
     gossip_err("Error: stopping client perf timer.\n");
 
-    sm_p->op_complete = 1;
+    PINT_SET_OP_COMPLETE;
     return 0;
 }
 

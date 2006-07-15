@@ -26,6 +26,7 @@
 #include "id-generator.h"
 #include "msgpairarray.h"
 #include "pint-sysint-utils.h"
+#include "pint-perf-counter.h"
 #include "state-machine.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
@@ -92,6 +93,8 @@ struct PINT_client_mkdir_sm
     char *object_name;              /* input parameter  */
     PVFS_sysresp_mkdir *mkdir_resp; /* in/out parameter */
     PVFS_sys_attr sys_attr;         /* input parameter  */
+    PVFS_ds_keyval *key_array;
+    PVFS_ds_keyval *val_array;
 
     int retry_count;
     int stored_error_code;
@@ -713,14 +716,17 @@ extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
+extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_client_rename_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
+extern struct PINT_state_machine_s pvfs2_client_perf_count_timer_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
@@ -736,18 +742,15 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_handle_sm;
 extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
-/**/
 extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
-extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
-extern struct PINT_state_machine_s pvfs2_client_perf_count_timer;
-extern struct PINT_state_machine_s pvfs2_client_job_timer;
 extern struct PINT_state_machine_s pvfs2_fs_add_sm;
-
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_nested_sm;
+extern struct PINT_state_machine_s pvfs2_server_get_config_nested_sm;
 
 #include "state-machine.h"
 
