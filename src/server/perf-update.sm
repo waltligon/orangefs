@@ -15,9 +15,9 @@
 #include "pint-perf-counter.h"
 #include "server-config.h"
 
-static int perf_update_do_work(
+static PINT_sm_action perf_update_do_work(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int perf_update_error(
+static PINT_sm_action perf_update_error(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
@@ -45,10 +45,9 @@ machine pvfs2_perf_update_sm(do_work, error)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int perf_update_error(
+static PINT_sm_action perf_update_error(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_err("Error: stopping server performance monitoring.\n");
 
     PINT_perf_finalize(PINT_server_pc);
@@ -61,7 +60,7 @@ static int perf_update_error(
  * resets counters, updates metrices, etc- this is intended to be called
  * repeatedly on a regular interval
  */
-static int perf_update_do_work(
+static PINT_sm_action perf_update_do_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

@@ -59,23 +59,23 @@ enum
     STATE_TYPE_DATAFILE = 2,
 };
 
-static int remove_check_object_type(
+static PINT_sm_action remove_check_object_type(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_verify_object_metadata(
+static PINT_sm_action remove_verify_object_metadata(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_cleanup(
+static PINT_sm_action remove_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_remove_dspace(
+static PINT_sm_action remove_remove_dspace(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_read_dirdata_handle(
+static PINT_sm_action remove_read_dirdata_handle(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_get_dirent_count(
+static PINT_sm_action remove_get_dirent_count(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_check_dirdata_entries(
+static PINT_sm_action remove_check_dirdata_entries(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_remove_dirdata_dspace(
+static PINT_sm_action remove_remove_dirdata_dspace(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_setup_work(
+static PINT_sm_action remove_setup_work(
     struct PINT_smcb *smcb, job_status_s *js_p);
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -191,7 +191,7 @@ machine pvfs2_remove_sm(
  * retrive object attributes earlier
  *
  */
-static int remove_check_object_type(
+static PINT_sm_action remove_check_object_type(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -201,11 +201,11 @@ static int remove_check_object_type(
 	 * attribs with dspace_getattr()
 	 */
 	js_p->error_code = STATE_TYPE_DATAFILE;
-	return(1);
+	return SM_ACTION_COMPLETE;
     }
 
     js_p->error_code = 0;
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -220,7 +220,7 @@ static int remove_check_object_type(
  * Note: errors from the previous state are redirected elsewhere, so
  * we know that we have metadata if we make it here.
  */
-static int remove_verify_object_metadata(
+static PINT_sm_action remove_verify_object_metadata(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -247,10 +247,10 @@ static int remove_verify_object_metadata(
             "dirdata object before removing directory itself.\n");
     }
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_read_dirdata_handle(
+static PINT_sm_action remove_read_dirdata_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -282,7 +282,7 @@ static int remove_read_dirdata_handle(
     return ret;
 }
 
-static int remove_get_dirent_count(
+static PINT_sm_action remove_get_dirent_count(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -291,7 +291,7 @@ static int remove_get_dirent_count(
 
     if (js_p->error_code)
     {
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
 
@@ -311,7 +311,7 @@ static int remove_get_dirent_count(
     return ret;
 }
 
-static int remove_check_dirdata_entries(
+static PINT_sm_action remove_check_dirdata_entries(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -338,7 +338,7 @@ static int remove_check_dirdata_entries(
 
     /* setup position for next state (remove[_dirdata]_keyvals) */
     s_op->u.remove.pos = PVFS_ITERATE_START;
-     return 1;
+     return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -347,7 +347,7 @@ static int remove_check_dirdata_entries(
  * Remove the dirdata dspace using the handle that we ready in the
  * read_dirdata_handle state.
  */
-static int remove_remove_dirdata_dspace(
+static PINT_sm_action remove_remove_dirdata_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -381,7 +381,7 @@ static int remove_remove_dirdata_dspace(
  * Remove the dspace using the handle from the incoming request
  * (which was verified in previous states).
  */
-static int remove_remove_dspace(
+static PINT_sm_action remove_remove_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -411,21 +411,20 @@ static int remove_remove_dspace(
  * Free all memory associated with this request and return 0, indicating
  * we're done processing.
  */
-static int remove_cleanup(
+static PINT_sm_action remove_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(smcb));
 }
 
-static int remove_setup_work(
+static PINT_sm_action remove_setup_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->u.remove.handle = s_op->req->u.remove.handle;
     s_op->u.remove.fs_id = s_op->req->u.remove.fs_id;
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 

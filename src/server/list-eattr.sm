@@ -25,13 +25,13 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 
-static int listeattr_setup_resp(
+static PINT_sm_action listeattr_setup_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int listeattr_list_eattrib(
+static PINT_sm_action listeattr_list_eattrib(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int listeattr_check_resp(
+static PINT_sm_action listeattr_check_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int listeattr_cleanup(
+static PINT_sm_action listeattr_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -91,7 +91,7 @@ machine pvfs2_list_eattr_sm(
  * listeattr_setup_resp()
  * Set up the response - allocate needed resources
  */
-static int listeattr_setup_resp(
+static PINT_sm_action listeattr_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -106,7 +106,7 @@ static int listeattr_setup_resp(
     if (!s_op->resp.u.listeattr.key)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     s_op->resp.u.listeattr.nkey = s_op->req->u.listeattr.nkey;
@@ -118,7 +118,7 @@ static int listeattr_setup_resp(
         s_op->resp.u.listeattr.nkey = 0;
         free (s_op->resp.u.listeattr.key);
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
     gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr buffer size %d bytes\n",
             tsz);
@@ -130,14 +130,14 @@ static int listeattr_setup_resp(
             (char *)s_op->u.eattr.buffer + tsz;
         tsz += s_op->req->u.listeattr.keysz[i];
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
  * listeattr_list_eattrib()
  * Here is where the eattrib get listed.
  */
-static int listeattr_list_eattrib(
+static PINT_sm_action listeattr_list_eattrib(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -191,7 +191,7 @@ static void print_string(char *buffer, size_t length)
  * will translate it so that it appears in the "system.pvfs2." name
  * space on the client side.
  */
-static int listeattr_check_resp(
+static PINT_sm_action listeattr_check_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -207,7 +207,7 @@ static int listeattr_check_resp(
     {
         s_op->resp.u.listeattr.token = js_p->count;
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* how many entries did we find that we can process? */
@@ -224,14 +224,14 @@ static int listeattr_check_resp(
     {
         /* there aren't any extended attr's; go ahead and return */
         js_p->error_code = 0;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
   
     tmp_buffer = (char*)malloc(PVFS_REQ_LIMIT_KEY_LEN);
     if(!tmp_buffer)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     /* iterate through the keys that we found */
@@ -253,7 +253,7 @@ static int listeattr_check_resp(
                  */
                 free(tmp_buffer);
                 js_p->error_code = -PVFS_EMSGSIZE;
-                return(1);
+                return SM_ACTION_COMPLETE;
             }
 
             /* add a prefix onto the key and adjust sizes accordingly */
@@ -274,13 +274,13 @@ static int listeattr_check_resp(
 
     free(tmp_buffer);
     js_p->error_code = 0;
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 /* listeattr_cleanup()
  * free resources alloc'd by state machine
  */
-static int listeattr_cleanup(
+static PINT_sm_action listeattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

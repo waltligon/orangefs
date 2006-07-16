@@ -14,11 +14,11 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-static int mgmt_get_dirdata_handle_from_parent(
+static PINT_sm_action mgmt_get_dirdata_handle_from_parent(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mgmt_get_dirdata_handle_setup_resp(
+static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mgmt_get_dirdata_handle_cleanup(
+static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -102,7 +102,7 @@ static int mgmt_get_dirdata_handle_from_parent(
     return ret;
 }
 
-static int mgmt_get_dirdata_handle_setup_resp(
+static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -124,13 +124,12 @@ static int mgmt_get_dirdata_handle_setup_resp(
                      "handle from parent %llu\n",
                      llu(s_op->req->u.mgmt_get_dirdata_handle.handle));
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_get_dirdata_handle_cleanup(
+static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(smcb));
 }
 

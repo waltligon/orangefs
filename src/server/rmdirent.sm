@@ -19,19 +19,19 @@ enum
     UPDATE_DIR_ATTR_REQUIRED = 133
 };
 
-static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
+static PINT_sm_action rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rmdirent_cleanup(
+static PINT_sm_action rmdirent_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rmdirent_remove_directory_entry(
+static PINT_sm_action rmdirent_remove_directory_entry(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rmdirent_check_for_req_dir_update(
+static PINT_sm_action rmdirent_check_for_req_dir_update(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rmdirent_update_directory_attr(
+static PINT_sm_action rmdirent_update_directory_attr(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rmdirent_remove_directory_entry_failure(
+static PINT_sm_action rmdirent_remove_directory_entry_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rmdirent_setup_resp(
+static PINT_sm_action rmdirent_setup_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -217,7 +217,7 @@ static int rmdirent_remove_directory_entry(
     return ret;
 }
 
-static int rmdirent_check_for_req_dir_update(
+static PINT_sm_action rmdirent_check_for_req_dir_update(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -226,10 +226,10 @@ static int rmdirent_check_for_req_dir_update(
     {
         js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rmdirent_update_directory_attr(
+static PINT_sm_action rmdirent_update_directory_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -244,7 +244,7 @@ static int rmdirent_update_directory_attr(
     {
         PVFS_perror_gossip("previous keyval remove failed",
                            js_p->error_code);
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
@@ -308,10 +308,9 @@ static int rmdirent_update_directory_attr(
  * This state always returns 1, and it allows another function to
  * handle actually returning the error value.
  */
-static int rmdirent_remove_directory_entry_failure(
+static PINT_sm_action rmdirent_remove_directory_entry_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     switch (js_p->error_code)
     {
 	case -TROVE_ENOENT:
@@ -322,10 +321,10 @@ static int rmdirent_remove_directory_entry_failure(
 	    break;
     }
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rmdirent_setup_resp(
+static PINT_sm_action rmdirent_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -351,13 +350,12 @@ static int rmdirent_setup_resp(
      * we found it, so that later states can use it to set the resp.status
      * field.
      */
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
-static int rmdirent_cleanup(
+static PINT_sm_action rmdirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(smcb));
 }
 

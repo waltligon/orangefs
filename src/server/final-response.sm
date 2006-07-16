@@ -29,11 +29,11 @@
  *   stored in s_op->scheduled_id
  */
 
-static int final_response_release(
+static PINT_sm_action final_response_release(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int final_response_send_resp(
+static PINT_sm_action final_response_send_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int final_response_cleanup(
+static PINT_sm_action final_response_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static void PINT_gossip_err_server_resp(
@@ -71,7 +71,7 @@ nested machine pvfs2_final_response_sm(
  *
  * releases the operation from the request scheduler
  */
-static int final_response_release(
+static PINT_sm_action final_response_release(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -96,7 +96,7 @@ static int final_response_release(
     if (!s_op->scheduled_id)
     {
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     ret = job_req_sched_release(
@@ -111,7 +111,7 @@ static int final_response_release(
  *
  * encodes and sends a response to the client
  */
-static int final_response_send_resp(
+static PINT_sm_action final_response_send_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -139,7 +139,7 @@ static int final_response_send_resp(
         PINT_gossip_err_server_resp(&s_op->resp);
 
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* send the response */
@@ -158,7 +158,7 @@ static int final_response_send_resp(
  * cleans up resources allocated while in this nested machine.  Right now 
  * that just means releasing the encoding of the response
  */
-static int final_response_cleanup(
+static PINT_sm_action final_response_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -177,7 +177,7 @@ static int final_response_cleanup(
     BMI_set_info(s_op->addr, BMI_DEC_ADDR_REF, NULL);
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static __req_resp_type_desc_t s_req_resp_type_map[

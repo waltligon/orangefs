@@ -22,9 +22,9 @@
 extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
-static int mgmt_iterate_handles_list_setup_msgpair(
+static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mgmt_iterate_handles_list_cleanup(
+static PINT_sm_action mgmt_iterate_handles_list_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int iterate_handles_list_comp_fn(
@@ -165,7 +165,7 @@ PVFS_error PVFS_mgmt_iterate_handles_list(
     return error;
 }
 
-static int mgmt_iterate_handles_list_setup_msgpair(
+static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -211,10 +211,10 @@ static int mgmt_iterate_handles_list_setup_msgpair(
 
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_iterate_handles_list_cleanup(
+static PINT_sm_action mgmt_iterate_handles_list_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -257,7 +257,7 @@ static int mgmt_iterate_handles_list_cleanup(
     sm_p->error_code  = error;
     PINT_SET_OP_COMPLETE;
 
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 static int iterate_handles_list_comp_fn(void *v_p,

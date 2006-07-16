@@ -25,15 +25,15 @@ enum
     FLUSH_BSTREAM = 5
 };
 
-static int flush_check_type(
+static PINT_sm_action flush_check_type(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int flush_keyval_flush(
+static PINT_sm_action flush_keyval_flush(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int flush_bstream_flush(
+static PINT_sm_action flush_bstream_flush(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int flush_cleanup(
+static PINT_sm_action flush_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int flush_check_error(
+static PINT_sm_action flush_check_error(
     struct PINT_smcb *smcb, job_status_s *js_p);
 void flush_init_state_machine(void);
 
@@ -103,7 +103,7 @@ machine pvfs2_flush_sm(
 
 %%
 
-static int flush_check_type(
+static PINT_sm_action flush_check_type(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -117,7 +117,7 @@ static int flush_check_type(
     {
         js_p->error_code = FLUSH_BSTREAM;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -133,7 +133,7 @@ static int flush_check_type(
  * Synopsys: send a keyval flush request to storage
  *
  */
-static int flush_keyval_flush(
+static PINT_sm_action flush_keyval_flush(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -157,7 +157,7 @@ static int flush_keyval_flush(
     return ret;
 }
 
-static int flush_check_error(
+static PINT_sm_action flush_check_error(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -169,7 +169,7 @@ static int flush_check_error(
         gossip_err("failed to flush handle %llu: %s\n",
                    llu(s_op->req->u.flush.handle), buf);
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -185,7 +185,7 @@ static int flush_check_error(
  * Synopsys: send a bstream flush request to storage
  *
  */
-static int flush_bstream_flush(
+static PINT_sm_action flush_bstream_flush(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -208,10 +208,9 @@ static int flush_bstream_flush(
     return ret;
 }
 	    
-static int flush_cleanup(
+static PINT_sm_action flush_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(smcb));
 }
 

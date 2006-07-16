@@ -14,11 +14,11 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 
-static int truncate_resize(
+static PINT_sm_action truncate_resize(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int truncate_check_error(
+static PINT_sm_action truncate_check_error(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int truncate_cleanup(
+static PINT_sm_action truncate_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
@@ -64,7 +64,7 @@ machine pvfs2_truncate_sm(
 
 %%
 
-static int truncate_resize(
+static PINT_sm_action truncate_resize(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -79,17 +79,15 @@ static int truncate_resize(
     return ret;
 }
 
-static int truncate_check_error(
+static PINT_sm_action truncate_check_error(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int truncate_cleanup(
+static PINT_sm_action truncate_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return (server_state_machine_complete(smcb));
 }
 

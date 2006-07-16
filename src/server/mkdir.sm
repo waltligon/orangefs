@@ -14,19 +14,19 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
-static int mkdir_create(
+static PINT_sm_action mkdir_create(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_setattrib(
+static PINT_sm_action mkdir_setattrib(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_create_dirdata_dspace(
+static PINT_sm_action mkdir_create_dirdata_dspace(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_write_dirdata_handle(
+static PINT_sm_action mkdir_write_dirdata_handle(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_cleanup(
+static PINT_sm_action mkdir_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_error(
+static PINT_sm_action mkdir_error(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_prep_sm(
+static PINT_sm_action mkdir_prep_sm(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -128,7 +128,7 @@ machine pvfs2_mkdir_sm(
  * NOTE: returned handle will pop out in js_p->handle (the job status
  * struct).
  */
-static int mkdir_create(
+static PINT_sm_action mkdir_create(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -169,7 +169,7 @@ static int mkdir_create(
  * Synopsis: 
  *           
  */
-static int mkdir_setattrib(
+static PINT_sm_action mkdir_setattrib(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -202,7 +202,7 @@ static int mkdir_setattrib(
     return ret;
 }
 
-static int mkdir_create_dirdata_dspace(
+static PINT_sm_action mkdir_create_dirdata_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -240,7 +240,7 @@ static int mkdir_create_dirdata_dspace(
     return ret;
 }
 
-static int mkdir_write_dirdata_handle(
+static PINT_sm_action mkdir_write_dirdata_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -249,7 +249,7 @@ static int mkdir_write_dirdata_handle(
 
     if (js_p->error_code)
     {
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
 
@@ -283,7 +283,7 @@ static int mkdir_write_dirdata_handle(
     return ret;
 }
 
-static int mkdir_error(
+static PINT_sm_action mkdir_error(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -293,7 +293,7 @@ static int mkdir_error(
     {
         js_p->error_code = -PVFS_EINVAL;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -307,14 +307,13 @@ static int mkdir_error(
  * Synopsis: free memory and return
  *           
  */
-static int mkdir_cleanup(
+static PINT_sm_action mkdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(smcb));
 }
 
-static int mkdir_prep_sm(
+static PINT_sm_action mkdir_prep_sm(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -330,7 +329,7 @@ static int mkdir_prep_sm(
     if (a_p->objtype != PVFS_TYPE_DIRECTORY)
     {
         js_p->error_code = -PVFS_EINVAL;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " attrs to write: [owner = %d, "
@@ -342,7 +341,7 @@ static int mkdir_prep_sm(
     PVFS_object_attr_to_ds_attr(a_p, ds_attr);
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*

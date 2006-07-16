@@ -29,11 +29,11 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int mgmt_get_dirdata_handle_init(
+static PINT_sm_action mgmt_get_dirdata_handle_init(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mgmt_get_dirdata_handle_setup_msgpair(
+static PINT_sm_action mgmt_get_dirdata_handle_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mgmt_get_dirdata_handle_cleanup(
+static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int mgmt_get_dirdata_handle_comp_fn(
@@ -157,9 +157,8 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
 static int mgmt_get_dirdata_handle_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     assert(js_p->error_code == 0);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int mgmt_get_dirdata_handle_setup_msgpair(
@@ -196,7 +195,7 @@ static int mgmt_get_dirdata_handle_setup_msgpair(
         gossip_err("Failed to map server address\n");
 	js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int mgmt_get_dirdata_handle_comp_fn(
@@ -222,7 +221,7 @@ static int mgmt_get_dirdata_handle_comp_fn(
     return resp_p->status;
 }
 
-static int mgmt_get_dirdata_handle_cleanup(
+static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -230,7 +229,7 @@ static int mgmt_get_dirdata_handle_cleanup(
     sm_p->error_code = js_p->error_code;
 
     PINT_SET_OP_COMPLETE;
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 /*

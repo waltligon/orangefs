@@ -21,9 +21,9 @@
 extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
-static int list_eattr_setup_msgpair(
+static PINT_sm_action list_eattr_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int list_eattr_cleanup(
+static PINT_sm_action list_eattr_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 static int list_eattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
@@ -134,7 +134,7 @@ PVFS_error PVFS_sys_listeattr(
     return error;
 }
 
-static int list_eattr_setup_msgpair(
+static PINT_sm_action list_eattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -180,10 +180,10 @@ static int list_eattr_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = 0;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int list_eattr_cleanup(
+static PINT_sm_action list_eattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -194,7 +194,7 @@ static int list_eattr_cleanup(
     sm_p->error_code  = js_p->error_code;
     PINT_SET_OP_COMPLETE;
 
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 static int list_eattr_comp_fn(

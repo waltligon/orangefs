@@ -27,9 +27,9 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int mgmt_noop_setup_msgpair(
+static PINT_sm_action mgmt_noop_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mgmt_noop_cleanup(
+static PINT_sm_action mgmt_noop_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
@@ -128,7 +128,7 @@ PVFS_error PVFS_mgmt_noop(
     return error;
 }
 
-static int mgmt_noop_setup_msgpair(
+static PINT_sm_action mgmt_noop_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -141,10 +141,10 @@ static int mgmt_noop_setup_msgpair(
     sm_p->msgarray_count = 1;
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_noop_cleanup(
+static PINT_sm_action mgmt_noop_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -152,7 +152,7 @@ static int mgmt_noop_cleanup(
 
     PINT_SET_OP_COMPLETE;
     sm_p->error_code = js_p->error_code;
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 /*

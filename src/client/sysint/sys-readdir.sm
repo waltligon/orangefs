@@ -27,13 +27,13 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int readdir_init(
+static PINT_sm_action readdir_init(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int readdir_msg_setup_msgpair(
+static PINT_sm_action readdir_msg_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int readdir_msg_failure(
+static PINT_sm_action readdir_msg_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int readdir_cleanup(
+static PINT_sm_action readdir_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int readdir_msg_comp_fn(
@@ -192,7 +192,7 @@ PVFS_error PVFS_sys_readdir(
 
 /****************************************************************/
 
-static int readdir_init(
+static PINT_sm_action readdir_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -207,10 +207,10 @@ static int readdir_init(
     
     assert(js_p->error_code == 0);
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int readdir_msg_setup_msgpair(
+static PINT_sm_action readdir_msg_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -222,7 +222,7 @@ static int readdir_msg_setup_msgpair(
 
     if (js_p->error_code)
     {
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
 
@@ -259,7 +259,7 @@ static int readdir_msg_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int readdir_msg_comp_fn(void *v_p,
@@ -324,16 +324,15 @@ static int readdir_msg_comp_fn(void *v_p,
     return 0;
 }
 
-static int readdir_msg_failure(
+static PINT_sm_action readdir_msg_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "readdir state: readdir_msg_failure\n");
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int readdir_cleanup(
+static PINT_sm_action readdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -350,7 +349,7 @@ static int readdir_cleanup(
                  sm_p->error_code);
 
     PINT_SET_OP_COMPLETE;
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 /*

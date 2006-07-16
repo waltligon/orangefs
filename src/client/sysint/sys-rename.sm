@@ -38,35 +38,35 @@ enum
     RENAME_RMDIRENT_RETRY
 };
 
-static int rename_init(
+static PINT_sm_action rename_init(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_lookups_setup_msgpair_array(
+static PINT_sm_action rename_lookups_setup_msgpair_array(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_lookups_failure(
+static PINT_sm_action rename_lookups_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_crdirent_setup_msgpair(
+static PINT_sm_action rename_crdirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_rmdirent_setup_msgpair(
+static PINT_sm_action rename_rmdirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_rmdirent_failure(
+static PINT_sm_action rename_rmdirent_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_chdirent_setup_msgpair(
+static PINT_sm_action rename_chdirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_chdirent_failure(
+static PINT_sm_action rename_chdirent_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_check_for_remove(
+static PINT_sm_action rename_check_for_remove(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_warn_user_to_run_fsck(
+static PINT_sm_action rename_warn_user_to_run_fsck(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_cleanup(
+static PINT_sm_action rename_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_generic_timer(
+static PINT_sm_action rename_generic_timer(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_crdirent_retry_or_fail(
+static PINT_sm_action rename_crdirent_retry_or_fail(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_rmdirent_retry_or_fail(
+static PINT_sm_action rename_rmdirent_retry_or_fail(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int rename_getattr_src_interpret(
+static PINT_sm_action rename_getattr_src_interpret(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int rename_lookups_comp_fn(
@@ -393,14 +393,12 @@ PVFS_error PVFS_sys_rename(
 
 /****************************************************************/
 
-static int rename_init(
+static PINT_sm_action rename_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
     assert(js_p->error_code == 0);
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int rename_lookups_comp_fn(
@@ -546,7 +544,7 @@ static int rename_chdirent_comp_fn(
     return 0;
 }
 
-static int rename_lookups_setup_msgpair_array(
+static PINT_sm_action rename_lookups_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -597,10 +595,10 @@ static int rename_lookups_setup_msgpair_array(
             break;
         }
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_lookups_failure(
+static PINT_sm_action rename_lookups_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -609,10 +607,10 @@ static int rename_lookups_failure(
         free(sm_p->msgarray);
         sm_p->msgarray = NULL;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_crdirent_setup_msgpair(
+static PINT_sm_action rename_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -655,10 +653,10 @@ static int rename_crdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_rmdirent_setup_msgpair(
+static PINT_sm_action rename_rmdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -708,10 +706,10 @@ static int rename_rmdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_rmdirent_failure(
+static PINT_sm_action rename_rmdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -737,10 +735,10 @@ static int rename_rmdirent_failure(
             GOSSIP_CLIENT_DEBUG, "failed to clean up created dirent!\n");
 	/* leave error code untouched, fall to next state */
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_chdirent_setup_msgpair(
+static PINT_sm_action rename_chdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -772,7 +770,7 @@ static int rename_chdirent_setup_msgpair(
     if(attr->objtype == PVFS_TYPE_DIRECTORY && attr->u.dir.dirent_count != 0)
     {
         js_p->error_code = -PVFS_ENOTEMPTY;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
     
     /* do the types match? */
@@ -781,23 +779,23 @@ static int rename_chdirent_setup_msgpair(
         if(sm_p->u.rename.types[1] == PVFS_TYPE_DIRECTORY)
         {
             js_p->error_code = -PVFS_EISDIR;
-            return(1);
+            return SM_ACTION_COMPLETE;
         }
         if(sm_p->u.rename.types[1] == PVFS_TYPE_DIRECTORY)
         {
             js_p->error_code = -PVFS_ENOTDIR;
-            return(1);
+            return SM_ACTION_COMPLETE;
         }
         /* TODO: what about other cases? */
         js_p->error_code = -PVFS_EINVAL;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     /* do the fsid's match? */
     if(sm_p->u.rename.refns[0].fs_id != sm_p->u.rename.refns[1].fs_id)
     {
         js_p->error_code = -PVFS_ENODEV;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     js_p->error_code = 0;
@@ -835,17 +833,16 @@ static int rename_chdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_chdirent_failure(
+static PINT_sm_action rename_chdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_check_for_remove(
+static PINT_sm_action rename_check_for_remove(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -861,22 +858,20 @@ static int rename_check_for_remove(
     sm_p->object_ref.handle = sm_p->u.rename.old_dirent_handle;
     sm_p->object_ref.fs_id = sm_p->u.rename.parent_refns[1].fs_id;
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_warn_user_to_run_fsck(
+static PINT_sm_action rename_warn_user_to_run_fsck(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
     gossip_err("WARNING: PVFS_sys_rename() encountered an error which "
                "may lead to inconsistent state.\n");
     gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_cleanup(
+static PINT_sm_action rename_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -898,10 +893,10 @@ static int rename_cleanup(
 	free(sm_p->msgarray);
         sm_p->msgarray = NULL;
     }
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
-static int rename_generic_timer(
+static PINT_sm_action rename_generic_timer(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -915,7 +910,7 @@ static int rename_generic_timer(
     return ret;
 }
 
-static int rename_crdirent_retry_or_fail(
+static PINT_sm_action rename_crdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -926,7 +921,7 @@ static int rename_crdirent_retry_or_fail(
     {
 	sm_p->u.rename.retry_count++;
 	js_p->error_code = RENAME_CRDIRENT_RETRY;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_EEXIST) &&
@@ -937,14 +932,14 @@ static int rename_crdirent_retry_or_fail(
 	 * problem along the way
 	 */
 	js_p->error_code = 0;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     /* let other errors fall through to next state */
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_rmdirent_retry_or_fail(
+static PINT_sm_action rename_rmdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -955,7 +950,7 @@ static int rename_rmdirent_retry_or_fail(
     {
 	sm_p->u.rename.retry_count++;
 	js_p->error_code = RENAME_RMDIRENT_RETRY;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_ENOENT) &&
@@ -968,14 +963,14 @@ static int rename_rmdirent_retry_or_fail(
 	 * it go without warning.
 	 */
 	js_p->error_code = 0;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     /* let other errors fall through to next state */
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rename_getattr_src_interpret(
+static PINT_sm_action rename_getattr_src_interpret(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1000,7 +995,7 @@ static int rename_getattr_src_interpret(
                                PVFS_TYPE_NONE,
                                PINT_SM_GETATTR_BYPASS_CACHE);
     js_p->error_code = 0;
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 /*

@@ -19,23 +19,23 @@ enum
     UPDATE_DIR_ATTR_REQUIRED = 135
 };
 
-static int chdirent_verify_parent_metadata_and_read_directory_entry_handle(
+static PINT_sm_action chdirent_verify_parent_metadata_and_read_directory_entry_handle(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int chdirent_cleanup(
+static PINT_sm_action chdirent_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int chdirent_change_directory_entry(
+static PINT_sm_action chdirent_change_directory_entry(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int chdirent_check_for_req_dir_update(
+static PINT_sm_action chdirent_check_for_req_dir_update(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int chdirent_update_directory_attr(
+static PINT_sm_action chdirent_update_directory_attr(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int chdirent_read_directory_entry(
+static PINT_sm_action chdirent_read_directory_entry(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int chdirent_read_directory_entry_failure(
+static PINT_sm_action chdirent_read_directory_entry_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int chdirent_change_directory_entry_failure(
+static PINT_sm_action chdirent_change_directory_entry_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int chdirent_setup_resp(
+static PINT_sm_action chdirent_setup_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -129,7 +129,7 @@ machine pvfs2_chdirent_sm(
 
 %%
 
-static int chdirent_verify_parent_metadata_and_read_directory_entry_handle(
+static PINT_sm_action chdirent_verify_parent_metadata_and_read_directory_entry_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -170,7 +170,7 @@ static int chdirent_verify_parent_metadata_and_read_directory_entry_handle(
     return ret;
 }
 
-static int chdirent_read_directory_entry(
+static PINT_sm_action chdirent_read_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -204,10 +204,9 @@ static int chdirent_read_directory_entry(
     return ret;
 }
 
-static int chdirent_read_directory_entry_failure(
+static PINT_sm_action chdirent_read_directory_entry_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     switch (js_p->error_code)
     {
 	case -TROVE_ENOENT:
@@ -218,10 +217,10 @@ static int chdirent_read_directory_entry_failure(
                        "unexpected error %d\n", js_p->error_code);
 	    break;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int chdirent_change_directory_entry(
+static PINT_sm_action chdirent_change_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -271,7 +270,7 @@ static int chdirent_change_directory_entry(
     return ret;
 }
 
-static int chdirent_check_for_req_dir_update(
+static PINT_sm_action chdirent_check_for_req_dir_update(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -280,10 +279,10 @@ static int chdirent_check_for_req_dir_update(
     {
         js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int chdirent_update_directory_attr(
+static PINT_sm_action chdirent_update_directory_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -298,7 +297,7 @@ static int chdirent_update_directory_attr(
     {
         PVFS_perror_gossip("previous keyval write failed",
                            js_p->error_code);
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
@@ -347,10 +346,9 @@ static int chdirent_update_directory_attr(
     return ret;
 }
 
-static int chdirent_change_directory_entry_failure(
+static PINT_sm_action chdirent_change_directory_entry_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     assert(js_p->error_code != -TROVE_ENOENT);
 	    
     switch (js_p->error_code)
@@ -362,10 +360,10 @@ static int chdirent_change_directory_entry_failure(
 	    break;
     }
     gossip_err("unexpected error %d\n", js_p->error_code);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int chdirent_setup_resp(
+static PINT_sm_action chdirent_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -383,13 +381,12 @@ static int chdirent_setup_resp(
     {
 	gossip_debug(GOSSIP_SERVER_DEBUG, "  sending error response\n");
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int chdirent_cleanup(
+static PINT_sm_action chdirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(smcb));
 }
 

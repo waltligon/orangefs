@@ -14,9 +14,9 @@
 #include "pvfs2-server.h"
 #include "pint-event.h"
 
-static int event_mon_cleanup(
+static PINT_sm_action event_mon_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int event_mon_do_work(
+static PINT_sm_action event_mon_do_work(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
@@ -55,7 +55,7 @@ machine pvfs2_event_mon_sm(prelude, do_work, final_response, cleanup)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int event_mon_cleanup(
+static PINT_sm_action event_mon_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -69,7 +69,7 @@ static int event_mon_cleanup(
  *
  * gathers statistics and builds response
  */
-static int event_mon_do_work(
+static PINT_sm_action event_mon_do_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -80,7 +80,7 @@ static int event_mon_do_work(
     if(!s_op->resp.u.mgmt_event_mon.event_array)
     {
 	js_p->error_code = -PVFS_ENOMEM;
-	return(1);
+	return SM_ACTION_COMPLETE;
     }
 
     s_op->resp.u.mgmt_event_mon.event_count = 
@@ -91,7 +91,7 @@ static int event_mon_do_work(
 	s_op->req->u.mgmt_event_mon.event_count);
 
     js_p->error_code = 0;
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 

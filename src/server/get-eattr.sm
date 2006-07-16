@@ -25,13 +25,13 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 
-static int geteattr_setup_resp(
+static PINT_sm_action geteattr_setup_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int geteattr_read_eattrib(
+static PINT_sm_action geteattr_read_eattrib(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int geteattr_check_resp(
+static PINT_sm_action geteattr_check_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int geteattr_cleanup(
+static PINT_sm_action geteattr_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -91,7 +91,7 @@ machine pvfs2_get_eattr_sm(
  * geteattr_setup_resp()
  * Set up the response - allocate needed resources
  */
-static int geteattr_setup_resp(
+static PINT_sm_action geteattr_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -111,7 +111,7 @@ static int geteattr_setup_resp(
     if(!tmp_buffer)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     /* iterate through the keys and see if they fall into valid name spaces */
@@ -122,7 +122,7 @@ static int geteattr_setup_resp(
             /* not prefixed: treat this as if the key does not exist */
             free(tmp_buffer);
             js_p->error_code = -PVFS_ENOENT;
-            return(1);
+            return SM_ACTION_COMPLETE;
         }
 
         /* look for keys in the special "system.pvfs2." prefix and strip the
@@ -138,7 +138,7 @@ static int geteattr_setup_resp(
             {
                 free(tmp_buffer);
                 js_p->error_code = -PVFS_ENOENT;
-                return(1);
+                return SM_ACTION_COMPLETE;
             }
             tmp_len = strlen(tmp_buffer) + 1;
             memcpy(s_op->req->u.geteattr.key[i].buffer, tmp_buffer, tmp_len);
@@ -152,7 +152,7 @@ static int geteattr_setup_resp(
     {
         free(tmp_buffer);
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.geteattr.err =
         malloc(s_op->req->u.geteattr.nkey*sizeof(PVFS_error));
@@ -161,7 +161,7 @@ static int geteattr_setup_resp(
         free(s_op->resp.u.geteattr.val);
         free(tmp_buffer);
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
     for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
@@ -174,7 +174,7 @@ static int geteattr_setup_resp(
         free (s_op->resp.u.geteattr.err);
         free(tmp_buffer);
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr buffer size %d bytes\n",
             tsz);
@@ -187,14 +187,14 @@ static int geteattr_setup_resp(
         tsz += s_op->req->u.geteattr.valsz[i];
     }
     free(tmp_buffer);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
  * geteattr_read_eattrib()
  * Here is where the eattrib get read.  Not much to this.
  */
-static int geteattr_read_eattrib(
+static PINT_sm_action geteattr_read_eattrib(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -226,7 +226,7 @@ static int geteattr_read_eattrib(
  * geteattr_check_resp()
  * Check the response - handle any errors
  */
-static int geteattr_check_resp(
+static PINT_sm_action geteattr_check_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -251,13 +251,13 @@ static int geteattr_check_resp(
             s_op->resp.u.geteattr.val[k].buffer_sz = 0;
         }
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /* geteattr_cleanup()
  * free resources alloc'd by state machine
  */
-static int geteattr_cleanup(
+static PINT_sm_action geteattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

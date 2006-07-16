@@ -19,17 +19,17 @@ enum
     STATE_SYMLINK = 8
 };
 
-static int setattr_cleanup(
+static PINT_sm_action setattr_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int setattr_setobj_attribs(
+static PINT_sm_action setattr_setobj_attribs(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int setattr_write_metafile_datafile_handles_if_required(
+static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int setattr_write_metafile_distribution_if_required(
+static PINT_sm_action setattr_write_metafile_distribution_if_required(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int setattr_write_symlink_target_if_required(
+static PINT_sm_action setattr_write_symlink_target_if_required(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int setattr_verify_attribs(
+static PINT_sm_action setattr_verify_attribs(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -104,7 +104,7 @@ machine pvfs2_set_attr_sm(
 
 %%
 
-static int setattr_verify_attribs(
+static PINT_sm_action setattr_verify_attribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -137,7 +137,7 @@ static int setattr_verify_attribs(
 
         /* set an error to bail out of set-attr processing */
         js_p->error_code = -PVFS_EACCES;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     else if(!req_a_p->objtype)
     {
@@ -249,10 +249,10 @@ static int setattr_verify_attribs(
 
         js_p->error_code = -PVFS_EACCES;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int setattr_setobj_attribs(
+static PINT_sm_action setattr_setobj_attribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -298,7 +298,7 @@ static int setattr_setobj_attribs(
         if(dspace_a_p->perms != 0 && dspace_a_p->perms != a_p->perms)
         {
             js_p->error_code = -PVFS_EPERM;
-            return(1);
+            return SM_ACTION_COMPLETE;
         }
     }
 
@@ -337,7 +337,7 @@ static int setattr_setobj_attribs(
     return ret;
 }
 
-static int setattr_write_metafile_datafile_handles_if_required(
+static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -356,7 +356,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
         gossip_err("The requested dfile count of %d is invalid; "
                    "aborting operation.\n", dfile_count);
         js_p->error_code = -PVFS_EOVERFLOW;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* set up key and value structure for keyval write */
@@ -389,7 +389,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
     return ret;
 }
 
-static int setattr_write_metafile_distribution_if_required(
+static PINT_sm_action setattr_write_metafile_distribution_if_required(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -403,7 +403,7 @@ static int setattr_write_metafile_distribution_if_required(
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "skipping distribution write\n");
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* set up key and value structure for keyval write */
@@ -420,7 +420,7 @@ static int setattr_write_metafile_distribution_if_required(
     if(!s_op->val.buffer)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     s_op->free_val = 1;
     
@@ -444,7 +444,7 @@ static int setattr_write_metafile_distribution_if_required(
     return ret;
 }
 
-static int setattr_write_symlink_target_if_required(
+static PINT_sm_action setattr_write_symlink_target_if_required(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -458,7 +458,7 @@ static int setattr_write_symlink_target_if_required(
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "skipping symlink target write\n");
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     assert(s_op->req->u.setattr.attr.u.sym.target_path_len > 0);
@@ -504,7 +504,7 @@ static int setattr_write_symlink_target_if_required(
  * Synopsis: free memory and return
  *           
  */
-static int setattr_cleanup(
+static PINT_sm_action setattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

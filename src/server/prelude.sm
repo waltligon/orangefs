@@ -23,11 +23,11 @@
  * - post the request to the request scheduler
  * - check permissions
  */
-static int prelude_req_sched(
+static PINT_sm_action prelude_req_sched(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int prelude_perm_check(
+static PINT_sm_action prelude_perm_check(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int prelude_getattr_if_needed(
+static PINT_sm_action prelude_getattr_if_needed(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -65,7 +65,7 @@ nested machine pvfs2_prelude_sm(
  *
  * posts a request scheduler job
  */
-static int prelude_req_sched(
+static PINT_sm_action prelude_req_sched(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -105,7 +105,7 @@ static int prelude_req_sched(
  * reads basic attributes of target object, if there is a particular
  * target object for the operation
  */
-static int prelude_getattr_if_needed(
+static PINT_sm_action prelude_getattr_if_needed(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -133,7 +133,7 @@ static int prelude_getattr_if_needed(
                      ret, llu(target_handle));
 
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* if the handle is 0, that indicates that the request does not
@@ -143,7 +143,7 @@ static int prelude_getattr_if_needed(
     if (target_handle == PVFS_HANDLE_NULL)
     {
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* all other operations fall to this point and read basic
@@ -167,7 +167,7 @@ static int prelude_getattr_if_needed(
  * permission checking, it will be replaced by a couple of states that
  * actually perform this task later
  */
-static int prelude_perm_check(
+static PINT_sm_action prelude_perm_check(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -211,7 +211,7 @@ static int prelude_perm_check(
     if (js_p->error_code)
     {
         js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     gossip_debug(
@@ -309,7 +309,7 @@ static int prelude_perm_check(
 	s_op,
         PINT_map_server_op_to_string(s_op->req->op),
 	js_p->error_code);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*

@@ -25,9 +25,9 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int mgmt_event_mon_list_setup_msgpair(
+static PINT_sm_action mgmt_event_mon_list_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mgmt_event_mon_list_cleanup(
+static PINT_sm_action mgmt_event_mon_list_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 /* completion function prototypes */
@@ -157,7 +157,7 @@ PVFS_error PVFS_mgmt_event_mon_list(
     return error;
 }
 
-static int mgmt_event_mon_list_setup_msgpair(
+static PINT_sm_action mgmt_event_mon_list_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -184,10 +184,10 @@ static int mgmt_event_mon_list_setup_msgpair(
         msg_p->comp_fn = event_mon_list_comp_fn;
         msg_p->svr_addr = sm_p->u.event_mon_list.addr_array[i];
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_event_mon_list_cleanup(
+static PINT_sm_action mgmt_event_mon_list_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -230,7 +230,7 @@ static int mgmt_event_mon_list_cleanup(
     sm_p->error_code  = error;
     PINT_SET_OP_COMPLETE;
 
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 static int event_mon_list_comp_fn(void* v_p,

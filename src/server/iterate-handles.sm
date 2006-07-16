@@ -13,11 +13,11 @@
 #include "pvfs2-server.h"
 #include "server-config.h"
 
-static int iterate_handles_cleanup(
+static PINT_sm_action iterate_handles_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int iterate_handles_do_work(
+static PINT_sm_action iterate_handles_do_work(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int iterate_handles_fill_resp(
+static PINT_sm_action iterate_handles_fill_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
@@ -62,7 +62,7 @@ machine pvfs2_iterate_handles_sm(prelude, do_work, fill_resp, final_response, cl
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int iterate_handles_cleanup(
+static PINT_sm_action iterate_handles_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -77,7 +77,7 @@ static int iterate_handles_cleanup(
  *
  * actually performs work necessary to retrieve handles
  */
-static int iterate_handles_do_work(
+static PINT_sm_action iterate_handles_do_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -90,7 +90,7 @@ static int iterate_handles_do_work(
     if(!s_op->resp.u.mgmt_iterate_handles.handle_array)
     {
 	js_p->error_code = -PVFS_ENOMEM;
-	return(1);
+	return SM_ACTION_COMPLETE;
     }
     
     s_op->resp.u.mgmt_iterate_handles.position
@@ -115,20 +115,20 @@ static int iterate_handles_do_work(
  *
  * gathers results from job status for response
  */
-static int iterate_handles_fill_resp(
+static PINT_sm_action iterate_handles_fill_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(js_p->error_code != 0)
     {
 	/* propigate error and let final_response handle it */
-	return(1);
+	return SM_ACTION_COMPLETE;
     }
 
     s_op->resp.u.mgmt_iterate_handles.handle_count = js_p->count;
     s_op->resp.u.mgmt_iterate_handles.position = js_p->position;
 
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 /*

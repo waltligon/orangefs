@@ -9,6 +9,7 @@
 
 #include <state-machine-values.h>
 #include "job.h"
+#include "msgpairarray.h"
 
 /* STATE-MACHINE.H
  *

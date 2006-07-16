@@ -50,21 +50,21 @@ enum
     RETURN_STORED_ERROR_CODE
 };
 
-static int remove_init(
+static PINT_sm_action remove_init(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_rmdirent_setup_msgpair(
+static PINT_sm_action remove_rmdirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_generic_timer(
+static PINT_sm_action remove_generic_timer(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_rmdirent_retry_or_fail(
+static PINT_sm_action remove_rmdirent_retry_or_fail(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_crdirent_retry_or_fail(
+static PINT_sm_action remove_crdirent_retry_or_fail(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_crdirent_setup_msgpair(
+static PINT_sm_action remove_crdirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_check_error_code(
+static PINT_sm_action remove_check_error_code(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int remove_cleanup(
+static PINT_sm_action remove_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int remove_rmdirent_comp_fn(
@@ -267,17 +267,16 @@ PVFS_error PVFS_sys_remove(
 
 /****************************************************************/
 
-static int remove_init(
+static PINT_sm_action remove_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: init\n");
 
     assert(js_p->error_code == 0);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_rmdirent_setup_msgpair(
+static PINT_sm_action remove_rmdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -322,10 +321,10 @@ static int remove_rmdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_crdirent_setup_msgpair(
+static PINT_sm_action remove_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -372,7 +371,7 @@ static int remove_crdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int remove_rmdirent_comp_fn(
@@ -416,7 +415,7 @@ static int remove_crdirent_comp_fn(
     return resp_p->status;
 }
 
-static int remove_check_error_code(
+static PINT_sm_action remove_check_error_code(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -442,10 +441,10 @@ static int remove_check_error_code(
             js_p->error_code = RETURN_STORED_ERROR_CODE;
             break;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_cleanup(
+static PINT_sm_action remove_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -468,10 +467,10 @@ static int remove_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
-static int remove_generic_timer(
+static PINT_sm_action remove_generic_timer(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -487,7 +486,7 @@ static int remove_generic_timer(
     return ret;
 }
 
-static int remove_crdirent_retry_or_fail(
+static PINT_sm_action remove_crdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -500,7 +499,7 @@ static int remove_crdirent_retry_or_fail(
     {
 	sm_p->u.remove.retry_count++;
 	js_p->error_code = CRDIRENT_RETRY;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_EEXIST) &&
@@ -511,7 +510,7 @@ static int remove_crdirent_retry_or_fail(
 	 * problem along the way
 	 */
 	js_p->error_code = 0;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     sm_p->u.remove.stored_error_code = js_p->error_code;
@@ -522,11 +521,11 @@ static int remove_crdirent_retry_or_fail(
     PVFS_perror_gossip("crdirent", js_p->error_code);
 
     PRINT_REMOVE_WARNING();
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 
-static int remove_rmdirent_retry_or_fail(
+static PINT_sm_action remove_rmdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -539,7 +538,7 @@ static int remove_rmdirent_retry_or_fail(
     {
 	sm_p->u.remove.retry_count++;
 	js_p->error_code = RMDIRENT_RETRY;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_ENOENT) &&
@@ -558,11 +557,11 @@ static int remove_rmdirent_retry_or_fail(
 
         PRINT_REMOVE_WARNING();
         js_p->error_code = -PVFS_ENOENT;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* other errors are preserved and passed along to the next state */
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*

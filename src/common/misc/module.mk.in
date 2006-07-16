@@ -11,8 +11,8 @@ LIBSRC += $(DIR)/server-config.c \
 	  $(DIR)/pint-perf-counter.c \
 	  $(DIR)/pint-event.c \
 	  $(DIR)/pint-cached-config.c \
-	  $(DIR)/msgpairarray.c \
 	  $(DIR)/pint-util.c \
+	  $(DIR)/msgpairarray.c \
 	  $(DIR)/realpath.c \
 	  $(DIR)/tcache.c \
 	  $(DIR)/state-machine-fns.c
@@ -26,7 +26,6 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/pint-perf-counter.c \
 	     $(DIR)/pint-event.c \
 	     $(DIR)/pint-cached-config.c \
-	     $(DIR)/msgpairarray.c \
 	     $(DIR)/pint-util.c \
 	     $(DIR)/tcache.c \
 		  $(DIR)/state-machine-fns.c

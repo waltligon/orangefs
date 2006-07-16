@@ -28,11 +28,11 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int truncate_datafile_setup_msgpairarray(
+static PINT_sm_action truncate_datafile_setup_msgpairarray(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int truncate_datafile_failure(
+static PINT_sm_action truncate_datafile_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int truncate_cleanup(
+static PINT_sm_action truncate_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 %% 
@@ -166,7 +166,7 @@ PVFS_error PVFS_sys_truncate(
 
 /** Resize a file.
  */
-static int truncate_datafile_setup_msgpairarray(
+static PINT_sm_action truncate_datafile_setup_msgpairarray(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -193,7 +193,7 @@ static int truncate_datafile_setup_msgpairarray(
     if (!sm_p->msgarray)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* Initialize the file data struct */
@@ -248,17 +248,16 @@ static int truncate_datafile_setup_msgpairarray(
         gossip_err("Error: failed to resolve server addresses.\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int truncate_datafile_failure(
+static PINT_sm_action truncate_datafile_failure(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int truncate_cleanup(
+static PINT_sm_action truncate_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -282,7 +281,7 @@ static int truncate_cleanup(
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SET_OP_COMPLETE;
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 /*

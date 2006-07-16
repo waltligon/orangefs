@@ -36,25 +36,25 @@ enum
     MKDIR_SKIP_EATTR = 181
 };
 
-static int mkdir_init(
+static PINT_sm_action mkdir_init(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_msg_setup_msgpair(
+static PINT_sm_action mkdir_msg_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_msg_failure(
+static PINT_sm_action mkdir_msg_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_crdirent_setup_msgpair(
+static PINT_sm_action mkdir_crdirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_crdirent_failure(
+static PINT_sm_action mkdir_crdirent_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_seteattr_setup_msgpair(
+static PINT_sm_action mkdir_seteattr_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_seteattr_failure(
+static PINT_sm_action mkdir_seteattr_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_delete_handle_setup_msgpair(
+static PINT_sm_action mkdir_delete_handle_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_cleanup(
+static PINT_sm_action mkdir_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int mkdir_parent_getattr_inspect(
+static PINT_sm_action mkdir_parent_getattr_inspect(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int mkdir_msg_comp_fn(
@@ -285,7 +285,7 @@ PVFS_error PVFS_sys_mkdir(
 
 /****************************************************************/
 
-static int mkdir_init(
+static PINT_sm_action mkdir_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -312,7 +312,7 @@ static int mkdir_init(
         PVFS_TYPE_DIRECTORY,
         0);
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int mkdir_msg_comp_fn(void *v_p,
@@ -365,7 +365,7 @@ static int mkdir_delete_handle_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-static int mkdir_msg_setup_msgpair(
+static PINT_sm_action mkdir_msg_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -396,7 +396,7 @@ static int mkdir_msg_setup_msgpair(
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_SERVREQ_MKDIR_FILL(
@@ -412,20 +412,20 @@ static int mkdir_msg_setup_msgpair(
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mkdir_msg_failure(
+static PINT_sm_action mkdir_msg_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_msg_failure\n");
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mkdir_crdirent_setup_msgpair(
+static PINT_sm_action mkdir_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -471,10 +471,10 @@ static int mkdir_crdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mkdir_crdirent_failure(
+static PINT_sm_action mkdir_crdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -483,10 +483,10 @@ static int mkdir_crdirent_failure(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: crdirent_failure\n");
 
     PVFS_perror_gossip("mkdir crdirent failed", js_p->error_code);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mkdir_delete_handle_setup_msgpair(
+static PINT_sm_action mkdir_delete_handle_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -509,7 +509,7 @@ static int mkdir_delete_handle_setup_msgpair(
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_SERVREQ_REMOVE_FILL(
@@ -526,10 +526,10 @@ static int mkdir_delete_handle_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
                  "directory handle %llu\n", llu(msg_p->handle));
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mkdir_cleanup(
+static PINT_sm_action mkdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -582,7 +582,7 @@ static int mkdir_cleanup(
                      "(attempt number %d)\n", sm_p->u.mkdir.retry_count);
 
         js_p->error_code = MKDIR_RETRY;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     else
     {
@@ -591,13 +591,13 @@ static int mkdir_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 /** looks at the attributes of the parent directory and decides if it impacts
  *  the mkdir in any way
  */
-static int mkdir_parent_getattr_inspect(
+static PINT_sm_action mkdir_parent_getattr_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -621,10 +621,10 @@ static int mkdir_parent_getattr_inspect(
         /* note that permission checking is left to server even in this case */
     }
 
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
-static int mkdir_seteattr_setup_msgpair(
+static PINT_sm_action mkdir_seteattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -642,7 +642,7 @@ static int mkdir_seteattr_setup_msgpair(
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: skipping seteattr\n");
         js_p->error_code = MKDIR_SKIP_EATTR;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     /* count how many hints we acquired */
@@ -657,7 +657,7 @@ static int mkdir_seteattr_setup_msgpair(
     {
         /* nothing to inherit */
         js_p->error_code = MKDIR_SKIP_EATTR;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     sm_p->u.mkdir.key_array = (PVFS_ds_keyval*)calloc(eattr_count,
@@ -665,7 +665,7 @@ static int mkdir_seteattr_setup_msgpair(
     if(!sm_p->u.mkdir.key_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     sm_p->u.mkdir.val_array = (PVFS_ds_keyval*)calloc(eattr_count,
@@ -673,7 +673,7 @@ static int mkdir_seteattr_setup_msgpair(
     if(!sm_p->u.mkdir.val_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     if(sm_p->getattr.attr.u.dir.hint.dfile_count > 0)
@@ -687,7 +687,7 @@ static int mkdir_seteattr_setup_msgpair(
         if(!sm_p->u.mkdir.val_array[cur_index].buffer)
         {
             js_p->error_code = -PVFS_ENOMEM;
-            return(1);
+            return SM_ACTION_COMPLETE;
         }
         snprintf((char*)sm_p->u.mkdir.val_array[cur_index].buffer,
             16, "%d", sm_p->getattr.attr.u.dir.hint.dfile_count);
@@ -757,10 +757,10 @@ static int mkdir_seteattr_setup_msgpair(
     {
         js_p->error_code = 0;
     }
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
-static int mkdir_seteattr_failure(
+static PINT_sm_action mkdir_seteattr_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -769,7 +769,7 @@ static int mkdir_seteattr_failure(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_seteattr_failure\n");
 
     PVFS_perror_gossip("mkdir seteattr failed", js_p->error_code);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*

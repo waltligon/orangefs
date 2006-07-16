@@ -27,13 +27,13 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int setattr_init(
+static PINT_sm_action setattr_init(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int setattr_msg_setup_msgpair(
+static PINT_sm_action setattr_msg_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int setattr_msg_failure(
+static PINT_sm_action setattr_msg_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int setattr_cleanup(
+static PINT_sm_action setattr_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int setattr_msg_comp_fn(
@@ -186,12 +186,11 @@ PVFS_error PVFS_sys_setattr(
 
 /****************************************************************/
 
-static int setattr_init(
+static PINT_sm_action setattr_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     assert(js_p->error_code == 0);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int setattr_msg_comp_fn(void *v_p,
@@ -204,7 +203,7 @@ static int setattr_msg_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-static int setattr_msg_setup_msgpair(
+static PINT_sm_action setattr_msg_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -249,18 +248,17 @@ static int setattr_msg_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int setattr_msg_failure(
+static PINT_sm_action setattr_msg_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     assert(js_p->error_code != 0);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int setattr_cleanup(
+static PINT_sm_action setattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -283,7 +281,7 @@ static int setattr_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 /*

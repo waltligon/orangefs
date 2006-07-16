@@ -479,18 +479,16 @@ typedef struct PINT_client_sm
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
 
-    /* msgpair scratch space used within msgpairarray substatemachine */
-    /* if you have only a single msg pair you may point sm_p->msgarray */
-    /* at this.  Otherwise leave it alone */
-    PINT_sm_msgpair_state msgpair;
-
     /* msgpair array ptr used when operations can be performed
      * concurrently.  this must be allocated within the upper-level
      * state machine and is used with the msgpairarray sm.
+     * If you have a single msgpair, use the msgpair working space
+     * and pint msgarray at it.
      */
-    int msgarray_count;
-    PINT_sm_msgpair_state *msgarray;
+    int msgarray_count; /* number of msgpairs in array */
+    PINT_sm_msgpair_state *msgarray; /* array of msgpairs to process */
     PINT_sm_msgpair_params msgarray_params;
+    PINT_sm_msgpair_state msgpair; /* working space for a single msgpair */
 
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;

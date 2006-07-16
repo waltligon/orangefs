@@ -22,15 +22,15 @@ enum
     STATE_ENOTDIR = 7
 };
 
-static int readdir_cleanup(
+static PINT_sm_action readdir_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int readdir_read_dirdata_handle(
+static PINT_sm_action readdir_read_dirdata_handle(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int readdir_iterate_on_entries(
+static PINT_sm_action readdir_iterate_on_entries(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int readdir_verify_directory_metadata(
+static PINT_sm_action readdir_verify_directory_metadata(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int readdir_setup_resp(
+static PINT_sm_action readdir_setup_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -94,7 +94,7 @@ machine pvfs2_readdir_sm(
 
 %%
 
-static int readdir_verify_directory_metadata(
+static PINT_sm_action readdir_verify_directory_metadata(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -116,10 +116,10 @@ static int readdir_verify_directory_metadata(
     }
 
     s_op->u.readdir.directory_version = (uint64_t)attr->mtime;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int readdir_read_dirdata_handle(
+static PINT_sm_action readdir_read_dirdata_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -150,7 +150,7 @@ static int readdir_read_dirdata_handle(
     return ret;
 }
 
-static int readdir_iterate_on_entries(
+static PINT_sm_action readdir_iterate_on_entries(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -166,13 +166,13 @@ static int readdir_iterate_on_entries(
     if (s_op->req->u.readdir.dirent_count == 0)
     {
 	js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     if (s_op->req->u.readdir.dirent_count > PVFS_REQ_LIMIT_DIRENT_COUNT)
     {
         js_p->error_code = -PVFS_EINVAL;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /*
@@ -191,7 +191,7 @@ static int readdir_iterate_on_entries(
     if (!memory_buffer)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* set up all the pointers into the one big buffer */
@@ -231,7 +231,7 @@ static int readdir_iterate_on_entries(
     return ret;
 }
 
-static int readdir_setup_resp(
+static PINT_sm_action readdir_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -241,12 +241,12 @@ static int readdir_setup_resp(
 		     "  handle didn't refer to a directory\n");
 
 	js_p->error_code = -PVFS_EINVAL;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
     else if(js_p->error_code != 0)
     {
         PVFS_perror_gossip("readdir_setup_resp failed: ", js_p->error_code);
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     s_op->resp.u.readdir.directory_version =
@@ -261,10 +261,10 @@ static int readdir_setup_resp(
      */
     s_op->resp.u.readdir.token = js_p->position;
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int readdir_cleanup(
+static PINT_sm_action readdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

@@ -15,11 +15,11 @@
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
-static int seteattr_verify_eattribs(
+static PINT_sm_action seteattr_verify_eattribs(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int seteattr_setobj_eattribs(
+static PINT_sm_action seteattr_setobj_eattribs(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int seteattr_cleanup(
+static PINT_sm_action seteattr_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
@@ -98,7 +98,7 @@ static int seteattr_verify_eattribs(
         {
             /* emulating return code seen on ext3 */
             js_p->error_code = -PVFS_EOPNOTSUPP;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
 
         /* don't allow anyone to set things in the system.pvfs2 name space */
@@ -107,12 +107,12 @@ static int seteattr_verify_eattribs(
         {
             /* what error code make sense here? */
             js_p->error_code = -PVFS_EINVAL;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
     }
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -191,7 +191,6 @@ static int seteattr_setobj_eattribs(
 static int seteattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* do I need to free memory from decoding key and val?*/
     return(server_state_machine_complete(smcb));
 }
@@ -205,4 +204,3 @@ static int seteattr_cleanup(
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
-

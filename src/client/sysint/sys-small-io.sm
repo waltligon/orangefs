@@ -32,7 +32,7 @@
  * to be initialized already.
  */
 
-static int small_io_setup_msgpairs(
+static PINT_sm_action small_io_setup_msgpairs(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int small_io_cleanup(
@@ -80,7 +80,7 @@ nested machine pvfs2_client_small_io_sm(
  * message.  The sys-io state machine checks for possible 'small i/o' cases
  * and routes to the small i/o state actions in case.
  */
-static int small_io_setup_msgpairs(
+static PINT_sm_action small_io_setup_msgpairs(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -100,7 +100,7 @@ static int small_io_setup_msgpairs(
     if(ret < 0)
     {
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     sm_p->msgarray_count = sm_p->u.io.datafile_count;
 
@@ -155,7 +155,7 @@ static int small_io_setup_msgpairs(
                 js_p->error_code = ret;
                 PINT_free_request_state(file_req_state);
                 PINT_free_request_state(mem_req_state);
-                return 1;
+                return SM_ACTION_COMPLETE;
             }
 
             regions = result.segs;
@@ -195,12 +195,12 @@ static int small_io_setup_msgpairs(
         {
             gossip_err("Failed to map meta server address\n");
             js_p->error_code = ret;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
     }
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /**
@@ -328,7 +328,7 @@ static int small_io_cleanup(
     sm_p->msgarray = NULL;
     sm_p->msgarray_count = 0;
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*

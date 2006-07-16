@@ -48,23 +48,23 @@ enum
 };
 
 /* state function prototypes */
-static int lookup_init(
+static PINT_sm_action lookup_init(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int lookup_segment_lookup_setup_msgpair(
+static PINT_sm_action lookup_segment_lookup_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int lookup_segment_lookup_failure(
+static PINT_sm_action lookup_segment_lookup_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int lookup_segment_verify_attr_present(
+static PINT_sm_action lookup_segment_verify_attr_present(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int lookup_segment_check_attr_type(
+static PINT_sm_action lookup_segment_check_attr_type(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int lookup_segment_handle_relative_link(
+static PINT_sm_action lookup_segment_handle_relative_link(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int lookup_segment_handle_absolute_link(
+static PINT_sm_action lookup_segment_handle_absolute_link(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int lookup_context_check_completion(
+static PINT_sm_action lookup_context_check_completion(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int lookup_cleanup(
+static PINT_sm_action lookup_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int lookup_segment_lookup_comp_fn(
@@ -586,7 +586,7 @@ PVFS_error PVFS_sys_lookup(
 
 /****************************************************************/
 
-static int lookup_init(
+static PINT_sm_action lookup_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -602,10 +602,10 @@ static int lookup_init(
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup: ncache fast path!\n");
         js_p->error_code = LOOKUP_NCACHE_HIT_FASTPATH;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_lookup_setup_msgpair(
+static PINT_sm_action lookup_segment_lookup_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -665,19 +665,18 @@ static int lookup_segment_lookup_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_lookup_failure(
+static PINT_sm_action lookup_segment_lookup_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_failure\n");
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_verify_attr_present(
+static PINT_sm_action lookup_segment_verify_attr_present(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -728,10 +727,10 @@ static int lookup_segment_verify_attr_present(
         /* otherwise, continue to next state */
         js_p->error_code = 0;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_check_attr_type(
+static PINT_sm_action lookup_segment_check_attr_type(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -797,10 +796,10 @@ static int lookup_segment_check_attr_type(
                          "type %d\n", cur_seg->seg_attr.objtype);
             js_p->error_code = -PVFS_EINVAL;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_handle_relative_link(
+static PINT_sm_action lookup_segment_handle_relative_link(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -831,7 +830,7 @@ static int lookup_segment_handle_relative_link(
     if (sm_p->u.lookup.current_context > (MAX_LOOKUP_CONTEXTS - 1))
     {
         js_p->error_code = -PVFS_EMLINK;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /*
@@ -850,10 +849,10 @@ static int lookup_segment_handle_relative_link(
     {
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_handle_absolute_link(
+static PINT_sm_action lookup_segment_handle_absolute_link(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -883,7 +882,7 @@ static int lookup_segment_handle_absolute_link(
     if (sm_p->u.lookup.current_context > (MAX_LOOKUP_CONTEXTS - 1))
     {
         js_p->error_code = -PVFS_EMLINK;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /*
@@ -906,10 +905,10 @@ static int lookup_segment_handle_absolute_link(
     {
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_context_check_completion(
+static PINT_sm_action lookup_context_check_completion(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -954,7 +953,7 @@ static int lookup_context_check_completion(
             sm_p->u.lookup.lookup_resp->ref =
                 cur_ctx->ctx_resolved_refn;
             js_p->error_code = 0;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
         else
         {
@@ -1001,10 +1000,10 @@ static int lookup_context_check_completion(
     }
 
     js_p->error_code = LOOKUP_CONTINUE;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_cleanup(
+static PINT_sm_action lookup_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1061,7 +1060,7 @@ static int lookup_cleanup(
 
     /* mark operation as complete */
     PINT_SET_OP_COMPLETE;
-    return 0;
+    return SM_ACTION_DEFERED;
 }
 
 static int lookup_segment_lookup_comp_fn(

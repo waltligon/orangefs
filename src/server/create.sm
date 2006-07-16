@@ -13,11 +13,11 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-static int create_cleanup(
+static PINT_sm_action create_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int create_create(
+static PINT_sm_action create_create(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int create_setup_resp(
+static PINT_sm_action create_setup_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
@@ -149,7 +149,7 @@ static int create_setup_resp(
     /* NOTE: we _deliberately_ leave the error_code unchanged so that it
      * can be used by the next state.
      */
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 
@@ -171,7 +171,6 @@ static int create_setup_resp(
 static int create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return(server_state_machine_complete(smcb));
 }
 

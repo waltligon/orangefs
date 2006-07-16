@@ -15,9 +15,9 @@
 #include "pvfs2-server.h"
 #include "pint-perf-counter.h"
 
-static int perf_mon_cleanup(
+static PINT_sm_action perf_mon_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int perf_mon_do_work(
+static PINT_sm_action perf_mon_do_work(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 static uint64_t* static_start_time_array_ms = NULL;
@@ -66,7 +66,7 @@ machine pvfs2_perf_mon_sm(prelude, do_work, final_response, cleanup)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int perf_mon_cleanup(
+static PINT_sm_action perf_mon_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -80,7 +80,7 @@ static int perf_mon_cleanup(
  *
  * gathers statistics and builds response
  */
-static int perf_mon_do_work(
+static PINT_sm_action perf_mon_do_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -94,7 +94,7 @@ static int perf_mon_do_work(
 #ifdef __PVFS2_DISABLE_PERF_COUNTERS__
     gossip_err("Error: perf_mon request received, but perf counters are disabled.\n");
     js_p->error_code = -PVFS_ENOSYS;
-    return(1);
+    return SM_ACTION_COMPLETE;
 #endif
 
     /* allocate memory to hold statistics */
@@ -104,7 +104,7 @@ static int perf_mon_do_work(
     if(!s_op->resp.u.mgmt_perf_mon.perf_array)
     {
 	js_p->error_code = -PVFS_ENOMEM;
-	return(1);
+	return SM_ACTION_COMPLETE;
     }
 
     /* fill in some of the response */
@@ -125,7 +125,7 @@ static int perf_mon_do_work(
         free(s_op->resp.u.mgmt_perf_mon.perf_array);
         s_op->resp.u.mgmt_perf_mon.perf_array = NULL;
         js_p->error_code = ret;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_perf_retrieve(PINT_server_pc,
@@ -217,7 +217,7 @@ static int perf_mon_do_work(
     }
 
     js_p->error_code = 0;
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 /* reallocate_static_arrays()

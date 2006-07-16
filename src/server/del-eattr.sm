@@ -13,11 +13,11 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-util.h"
 
-static int deleattr_cleanup(
+static PINT_sm_action deleattr_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int deleattr_delobj_eattribs(
+static PINT_sm_action deleattr_delobj_eattribs(
     struct PINT_smcb *smcb, job_status_s *js_p);
-static int deleattr_verify_eattribs(
+static PINT_sm_action deleattr_verify_eattribs(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -73,7 +73,7 @@ machine pvfs2_del_eattr_sm(
  * extended attributes on certain object types if we want.  We might
  * want to prevent access to standard metadata keys.
  */
-static int deleattr_verify_eattribs(
+static PINT_sm_action deleattr_verify_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -137,14 +137,14 @@ static int deleattr_verify_eattribs(
         return -PVFS_EINVAL;
     }
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
  * This is where the actual extended attrib gets written.
  * Not much to this, its pretty straight-forward.
  */
-static int deleattr_delobj_eattribs(
+static PINT_sm_action deleattr_delobj_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -199,7 +199,7 @@ static int deleattr_delobj_eattribs(
  * Synopsis: free memory and return
  *           
  */
-static int deleattr_cleanup(
+static PINT_sm_action deleattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
