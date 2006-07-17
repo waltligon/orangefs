@@ -1759,13 +1759,20 @@ int server_state_machine_alloc_noreq(
 
     if (new_op)
     {
-        PINT_smcb_alloc(new_op, op, 
+        ret = PINT_smcb_alloc(new_op, op, 
                 sizeof(struct PINT_server_op), server_op_state_get_machine);
+        if (ret < 0)
+        {
+            gossip_lerr("Error: failed to allocate SMCB "
+                        "of op type %x\n", op);
+            PINT_smcb_free(new_op);
+            return -PVFS_ENOSYS;
+        }
 
         /* find the state machine for this op type */
         if (!PINT_state_machine_locate(*new_op))
         {
-            gossip_lerr("Error: failed to start state machine "
+            gossip_lerr("Error: failed to locate state machine function "
                         "of op type %x\n", op);
             PINT_smcb_free(new_op);
             return -PVFS_ENOSYS;

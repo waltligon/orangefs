@@ -161,7 +161,7 @@ static PINT_sm_action chdirent_verify_parent_metadata_and_read_directory_entry_h
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->req->u.chdirent.fs_id),
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
@@ -195,7 +195,7 @@ static PINT_sm_action chdirent_read_directory_entry(
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->req->u.chdirent.fs_id),
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &j_id,
@@ -259,7 +259,7 @@ static PINT_sm_action chdirent_change_directory_entry(
             user_opts, s_op->req->u.crdirent.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.crdirent.fs_id),
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     if (s_op->req->u.chdirent.parent_atime ||
         s_op->req->u.chdirent.parent_mtime ||
@@ -341,7 +341,7 @@ static PINT_sm_action chdirent_update_directory_attr(
             user_opts, s_op->req->u.chdirent.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.chdirent.fs_id),
-        s_op, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }

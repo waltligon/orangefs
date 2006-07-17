@@ -59,6 +59,14 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
     const char * state_name;
     const char * machine_name;
 
+    if (!smcb || !smcb->current_state || !smcb->current_state->state_action)
+    {
+        gossip_err("SM invoke called in invalid smcb\n");
+        return -1;
+    }
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "SM invoke smcb %p op %d\n", smcb, smcb->op);
+
     state_name = PINT_state_machine_current_state_name(smcb);
     machine_name = PINT_state_machine_current_machine_name(smcb);
 
@@ -95,6 +103,13 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
     int code_val = r->error_code;       /* temp to hold the return code */
     union PINT_state_array_values *loc; /* temp pointer into state memory */
 
+    if (!smcb && !smcb->current_state)
+    {
+        gossip_err("SM next called on invald smcb\n");
+        return -1;
+    }
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "SM next smcb %p op %d\n",smcb,smcb->op);
     do {
 	/* skip over the current state action to get to the return code list */
 	loc = smcb->current_state + 1;
@@ -176,11 +191,13 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
     struct PINT_state_machine_s *op_sm;
 
     /* check for valid inputs */
-    if (!smcb || smcb->op < 0)
+    if (!smcb || smcb->op < 0 || !smcb->op_get_state_machine)
     {
 	gossip_err("State machine requested not valid\n");
 	return 0;
     }
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "SM locate smcb %p op %d\n",smcb,smcb->op);
     /* this is a the usage dependant routine to look up the SM */
     op_sm = (*smcb->op_get_state_machine)(smcb->op);
     if (op_sm != NULL)
@@ -239,6 +256,8 @@ int PINT_smcb_alloc(
     }
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "SM allocate smcb %p op %d\n",*smcb,op);
     return 0; /* success */
 }
 
@@ -259,6 +278,8 @@ void PINT_smcb_free(struct PINT_smcb **smcb)
                 if ((*smcb)->frame_stack[i])
                     /* DO we really want to do this??? */
                     free((*smcb)->frame_stack[i]);
+            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                    "SM free smcb %p op %d\n",*smcb,(*smcb)->op);
             free(*smcb);
         }
         (*smcb) = (struct PINT_smcb *)0;

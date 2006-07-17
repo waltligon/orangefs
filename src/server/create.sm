@@ -95,7 +95,7 @@ static int create_create(
             user_opts, s_op->req->u.create.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.create.fs_id),
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
