@@ -7,6 +7,7 @@
 #ifndef __STATE_MACHINE_FNS_H
 #define __STATE_MACHINE_FNS_H
 
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
@@ -275,9 +276,16 @@ void PINT_smcb_free(struct PINT_smcb **smcb)
         if (*smcb)
         {
             for (i = 0; i < PINT_FRAME_STACK_SIZE; i++)
+            {
+                fprintf(stderr,"smb_free i = %d\n",i);
                 if ((*smcb)->frame_stack[i])
+                {
+                    fprintf(stderr,"smb_free frame = %p\n",
+                            (*smcb)->frame_stack[i]);
                     /* DO we really want to do this??? */
                     free((*smcb)->frame_stack[i]);
+                }
+            }
             gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
                     "SM free smcb %p op %d\n",*smcb,(*smcb)->op);
             free(*smcb);
