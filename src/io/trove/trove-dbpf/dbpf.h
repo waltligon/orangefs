@@ -404,10 +404,7 @@ enum dbpf_op_type
 #define DBPF_OP_IS_DSPACE(__type) (__type >= DSPACE_CREATE)
 
 #define DBPF_OP_DOES_SYNC(__op)    \
-    (__op == BSTREAM_WRITE_AT   || \
-     __op == BSTREAM_RESIZE     || \
-     __op == BSTREAM_WRITE_LIST || \
-     __op == KEYVAL_WRITE       || \
+    (__op == KEYVAL_WRITE       || \
      __op == KEYVAL_REMOVE_KEY  || \
      __op == KEYVAL_WRITE_LIST  || \
      __op == DSPACE_CREATE      || \

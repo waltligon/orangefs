@@ -105,6 +105,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
     int sync_context_type = 
         dbpf_sync_get_object_sync_context(qop_p->op.type);
     struct dbpf_collection* coll = qop_p->op.coll_p;
+    int cid = qop_p->op.context_id;
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: sync_coalesce called\n");
@@ -122,7 +123,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
     /*
      * Now we now that this particular op is modifying
      */
-    sync_context = & sync_array[sync_context_type][qop_p->op.context_id];
+    sync_context = & sync_array[sync_context_type][cid];
 
     if( sync_context_type == COALESCE_CONTEXT_DSPACE )
     {
@@ -187,10 +188,10 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
         ret = dbpf_sync_db(dbp, sync_context_type, sync_context);
 
         gen_mutex_lock(
-            dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
+            dbpf_completion_queue_array_mutex[cid]);
 
         dbpf_op_queue_add(
-            dbpf_completion_queue_array[qop_p->op.context_id], qop_p);
+            dbpf_completion_queue_array[cid], qop_p);
         gen_mutex_lock(&qop_p->mutex);
         qop_p->op.state = OP_COMPLETED;
         qop_p->state = 0;
@@ -205,7 +206,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
             ready_op = dbpf_op_queue_shownext(sync_context->sync_queue);
             dbpf_op_queue_remove(ready_op);
             dbpf_op_queue_add(
-                dbpf_completion_queue_array[qop_p->op.context_id], 
+                dbpf_completion_queue_array[cid], 
                 ready_op);
             gen_mutex_lock(&ready_op->mutex);
             ready_op->op.state = OP_COMPLETED;
@@ -216,7 +217,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
         sync_context->coalesce_counter = 0;
         pthread_cond_signal(&dbpf_op_completed_cond);
         gen_mutex_unlock(
-            dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
+            dbpf_completion_queue_array_mutex[cid]);
         ret = 1;
     }
     else
