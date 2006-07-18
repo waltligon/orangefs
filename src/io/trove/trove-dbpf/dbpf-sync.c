@@ -239,8 +239,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
 int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
 {
     dbpf_sync_context_t * sync_context;
-
-    int sync_context_type = dbpf_sync_get_object_sync_context(qop_p->op.type);
+    int sync_context_type;
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: enqueue called\n");
@@ -249,6 +248,8 @@ int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
     { 
         return 0;
     } 
+
+    sync_context_type = dbpf_sync_get_object_sync_context(qop_p->op.type);
 
     sync_context = & sync_array[sync_context_type][qop_p->op.context_id];
 
