@@ -223,7 +223,8 @@ static int get_eattr_comp_fn(
 {
     int j = 0;
     int ret = 0;
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"get_eattr completion fn: get_eattr_comp_fn\n");

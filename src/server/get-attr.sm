@@ -460,7 +460,7 @@ static PINT_sm_action getattr_read_symlink_target(
         &(s_op->key), &(s_op->val), 
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->u.getattr.fs_id), 
-        NULL, s_op, 0, js_p,
+        NULL, smcb, 0, js_p,
         &i, server_job_context);
 
     return ret;
@@ -552,7 +552,7 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
         &s_op->key, &s_op->val, 
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->u.getattr.fs_id), 
-        NULL, s_op, 0, js_p,
+        NULL, smcb, 0, js_p,
         &i, server_job_context);
 
     return ret;
@@ -615,7 +615,7 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
             get_server_config_struct(),
             s_op->u.getattr.fs_id), 
         NULL,
-        s_op, 0, js_p, &i, server_job_context);
+        smcb, 0, js_p, &i, server_job_context);
 
     return ret;
 }
@@ -798,7 +798,7 @@ static PINT_sm_action getattr_get_dirdata_handle(
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->u.getattr.fs_id),
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &tmp_id,
@@ -829,7 +829,7 @@ static PINT_sm_action getattr_get_dirent_count(
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->u.getattr.fs_id),
         &s_op->u.getattr.keyval_handle_info,
-        s_op,
+        smcb,
         0,
         js_p,
         &tmp_id,
@@ -960,7 +960,7 @@ static PINT_sm_action getattr_get_dir_hint(
         s_op->req->u.getattr.fs_id, 
         s_op->req->u.getattr.handle,
         s_op->key_a, s_op->val_a, s_op->u.getattr.err_array, NUM_SPECIAL_KEYS,
-        0, NULL, s_op, 0, js_p, &tmp_id,
+        0, NULL, smcb, 0, js_p, &tmp_id,
         server_job_context);
 
     return ret;

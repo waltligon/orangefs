@@ -147,7 +147,7 @@ static PINT_sm_action flush_keyval_flush(
         s_op->req->u.flush.fs_id,
         s_op->req->u.flush.handle,
         s_op->req->u.flush.flags,
-        s_op,
+        smcb,
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->req->u.flush.fs_id),
         js_p,
@@ -199,7 +199,7 @@ static PINT_sm_action flush_bstream_flush(
         s_op->req->u.flush.fs_id,
         s_op->req->u.flush.handle,
         s_op->req->u.flush.flags,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,

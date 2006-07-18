@@ -319,7 +319,8 @@ static int mkdir_msg_comp_fn(void *v_p,
                              struct PVFS_server_resp *resp_p,
                              int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr attr;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_msg_comp_fn\n");

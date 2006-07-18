@@ -70,7 +70,8 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     PINT_smcb *smcb = NULL;
     uint64_t debug_mask = 0;
 
-    PINT_smcb_alloc(&smcb, 0, 0, NULL);
+    PINT_smcb_alloc(&smcb, PVFS_CLIENT_JOB_TIMER,
+            sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if(!smcb)
     {
 	return(-PVFS_ENOMEM);

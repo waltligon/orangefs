@@ -79,7 +79,7 @@ static PINT_sm_action proto_error_init(
 			    s_op->tag,
 			    s_op->encoded.buffer_type,
 			    0,
-			    s_op,
+			    smcb,
 			    0,
 			    js_p,
 			    &tmp_id,

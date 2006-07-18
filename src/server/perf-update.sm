@@ -63,7 +63,6 @@ static PINT_sm_action perf_update_error(
 static PINT_sm_action perf_update_do_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     uint64_t current_mask = 0;
     int current_debug_on = 0;

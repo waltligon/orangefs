@@ -230,7 +230,7 @@ static PINT_sm_action lookup_read_object_metadata(
 
     /* get the dspace attributes/metadata */
     ret = job_trove_dspace_getattr(
-        s_op->req->u.lookup_path.fs_id, handle, s_op, ds_attr,
+        s_op->req->u.lookup_path.fs_id, handle, smcb, ds_attr,
         0, js_p, &j_id, server_job_context);
 
     return ret;
@@ -396,7 +396,7 @@ static PINT_sm_action lookup_read_directory_entry_handle(
         s_op->req->u.lookup_path.fs_id, handle, &s_op->key, &s_op->val,
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->req->u.lookup_path.fs_id), 
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -436,7 +436,7 @@ static PINT_sm_action lookup_read_directory_entry(
         &s_op->key, &s_op->val, 
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->req->u.lookup_path.fs_id), 
-        NULL, s_op, 0, js_p, &j_id,
+        NULL, smcb, 0, js_p, &j_id,
         server_job_context);
 
     return ret;

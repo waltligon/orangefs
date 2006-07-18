@@ -168,7 +168,7 @@ static int seteattr_setobj_eattribs(
         s_op->req->u.seteattr.nkey,
         trove_flags,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &j_id,

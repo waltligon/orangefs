@@ -253,14 +253,22 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
     default:
         /* now check range for sys functions */
         if (op <= PVFS_OP_SYS_MAXVAL)
+        {
             return PINT_client_sm_sys_table[op-1].sm;
+        }
         else
+        {
             /* now checjk range for mgmt functions */
             if (op <= PVFS_OP_MGMT_MAXVAL)
+            {
                 return PINT_client_sm_mgmt_table[op-PVFS_OP_SYS_MAXVAL-1].sm;
+            }
             else
+            {
                 /* otherwise its out of range */
                 return NULL;
+            }
+        }
     }
 }
 

@@ -276,7 +276,7 @@ static PINT_sm_action remove_read_dirdata_handle(
         &s_op->key, &s_op->val, 
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->u.remove.fs_id), 
-        NULL, s_op, 0, js_p,
+        NULL, smcb, 0, js_p,
         &j_id, server_job_context);
 
     return ret;
@@ -302,7 +302,7 @@ static PINT_sm_action remove_get_dirent_count(
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->u.remove.fs_id),
         &s_op->u.remove.keyval_handle_info,
-        s_op,
+        smcb,
         0,
         js_p,
         &tmp_id,
@@ -366,7 +366,7 @@ static PINT_sm_action remove_remove_dirdata_dspace(
             user_opts, s_op->u.remove.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->u.remove.fs_id),
-        s_op,
+        smcb,
         0,
         js_p,
         &j_id,
@@ -399,7 +399,7 @@ static PINT_sm_action remove_remove_dspace(
             user_opts, s_op->u.remove.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->u.remove.fs_id), 
-        s_op, 0, js_p,
+        smcb, 0, js_p,
         &j_id, server_job_context);
 
     return ret;

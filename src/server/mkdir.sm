@@ -152,7 +152,7 @@ static PINT_sm_action mkdir_create(
             user_opts, s_op->u.mkdir.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->u.mkdir.fs_id), 
-        s_op, 0, js_p, &i,
+        smcb, 0, js_p, &i,
         server_job_context);
 
     return ret;
@@ -197,7 +197,7 @@ static PINT_sm_action mkdir_setattrib(
             user_opts, s_op->u.mkdir.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->u.mkdir.fs_id),
-        s_op, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -231,7 +231,7 @@ static PINT_sm_action mkdir_create_dirdata_dspace(
             user_opts, s_op->u.mkdir.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->u.mkdir.fs_id),
-        s_op, 0, js_p, &i,
+        smcb, 0, js_p, &i,
         server_job_context);
 
     free(extent_array.extent_array);
@@ -278,7 +278,7 @@ static PINT_sm_action mkdir_write_dirdata_handle(
         &s_op->key, &s_op->val, 
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->u.mkdir.fs_id),
-        NULL, s_op, 0, js_p, &i, server_job_context);
+        NULL, smcb, 0, js_p, &i, server_job_context);
 
     return ret;
 }

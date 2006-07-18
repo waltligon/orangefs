@@ -93,7 +93,7 @@ static PINT_sm_action prelude_req_sched(
         s_op->resp.u.mgmt_setparam.old_value = PINT_req_sched_get_mode();
     }
     
-    ret = job_req_sched_post(s_op->req, 0, s_op, 0, js_p,
+    ret = job_req_sched_post(s_op->req, 0, smcb, 0, js_p,
                              &(s_op->scheduled_id), server_job_context);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
@@ -155,7 +155,7 @@ static PINT_sm_action prelude_getattr_if_needed(
                  "for handle %llu\n", llu(target_handle));
 
     ret = job_trove_dspace_getattr(
-        target_fs_id, target_handle, s_op, &(s_op->ds_attr),
+        target_fs_id, target_handle, smcb, &(s_op->ds_attr),
         0, js_p, &tmp_id, server_job_context);
 
     return ret;

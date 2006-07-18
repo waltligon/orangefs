@@ -296,7 +296,8 @@ static PINT_sm_action mgmt_setparam_list_cleanup(
 static int collect_old_values_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int j;
 
     if ((sm_p->msgarray[i].op_status == 0) &&
@@ -336,7 +337,8 @@ static int root_check_comp_fn(
 {
     int j = 0;
     int owners = 0;
-    PINT_client_sm* sm_p = (PINT_client_sm*)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /*
       store the op_status before it's overwritten with the return

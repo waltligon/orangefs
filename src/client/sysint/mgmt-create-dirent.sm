@@ -215,7 +215,8 @@ static int mgmt_create_dirent_setup_msgpair(
 static int mgmt_create_dirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
 

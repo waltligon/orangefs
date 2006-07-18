@@ -379,7 +379,8 @@ static int remove_rmdirent_comp_fn(
     struct PVFS_server_resp *resp_p,
     int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT);
 
@@ -480,7 +481,7 @@ static PINT_sm_action remove_generic_timer(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: generic_timer\n");
 
     ret = job_req_sched_post_timer(
-	sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
+	sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
 	pint_client_sm_context);
 
     return ret;

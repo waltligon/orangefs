@@ -265,7 +265,8 @@ static int iterate_handles_list_comp_fn(void *v_p,
 					int i)
 {
     int j = 0;
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* if this particular request was successful, then collect info from 
      * response

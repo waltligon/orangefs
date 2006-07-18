@@ -67,10 +67,10 @@ static inline int io_decode_ack_response(
     struct PVFS_server_resp **resp);
 
 static inline int io_post_flow(
-    PINT_client_sm *sm_p, PINT_client_io_ctx *cur_ctx);
+    PINT_smcb *smcb, PINT_client_io_ctx *cur_ctx);
 
 static inline int io_post_write_ack_recv(
-    PINT_client_sm * sm_p, PINT_client_io_ctx * cur_ctx);
+    PINT_smcb *smcb, PINT_client_io_ctx * cur_ctx);
 
 static inline int io_process_context_recv(
     PINT_client_sm *sm_p, job_status_s *js_p, PINT_client_io_ctx **out_ctx);
@@ -699,7 +699,7 @@ static PINT_sm_action io_datafile_post_msgpairs(
         server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
         ret = job_bmi_recv(
             msg->svr_addr, msg->encoded_resp_p, msg->max_resp_sz,
-            cur_ctx->session_tag, BMI_PRE_ALLOC, sm_p, status_user_tag,
+            cur_ctx->session_tag, BMI_PRE_ALLOC, smcb, status_user_tag,
             &msg->recv_status, &msg->recv_id, pint_client_sm_context,
             server_config->client_job_bmi_timeout);
         PINT_put_server_config_struct(server_config);
@@ -774,7 +774,7 @@ static PINT_sm_action io_datafile_post_msgpairs(
             msg->encoded_req.dest, msg->encoded_req.buffer_list,
             msg->encoded_req.size_list, msg->encoded_req.list_count,
             msg->encoded_req.total_size, cur_ctx->session_tag,
-            msg->encoded_req.buffer_type, 1, sm_p, status_user_tag,
+            msg->encoded_req.buffer_type, 1, smcb, status_user_tag,
             &msg->send_status, &msg->send_id, pint_client_sm_context,
             server_config->client_job_bmi_timeout);
         PINT_put_server_config_struct(server_config);
@@ -949,7 +949,7 @@ static PINT_sm_action io_datafile_complete_operations(
         /* for now we wait to post the flow until we get back
          * the response from the server for both reads and writes
          */
-        ret = io_post_flow(sm_p, cur_ctx);
+        ret = io_post_flow(smcb, cur_ctx);
         if(ret < 0)
         {
             char buf[64] = {0};
@@ -971,7 +971,7 @@ static PINT_sm_action io_datafile_complete_operations(
 
         if(sm_p->u.io.io_type == PVFS_IO_WRITE)
         {
-            ret = io_post_write_ack_recv(sm_p, cur_ctx);
+            ret = io_post_write_ack_recv(smcb, cur_ctx);
             if(ret < 0)
             {
                 PVFS_perror_gossip("Post of write-ack recv failed", ret);
@@ -1643,9 +1643,10 @@ static inline int io_decode_ack_response(
  * in the case of reads).
  */
 static inline int io_post_flow(
-    PINT_client_sm *sm_p,
+    PINT_smcb *smcb,
     PINT_client_io_ctx *cur_ctx)
 {
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     PVFS_object_attr *attr = NULL;
     struct server_configuration_s *server_config = NULL;
@@ -1716,7 +1717,7 @@ static inline int io_post_flow(
 
     server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
     ret = job_flow(
-        &cur_ctx->flow_desc, sm_p, status_user_tag,
+        &cur_ctx->flow_desc, smcb, status_user_tag,
         &cur_ctx->flow_status, &cur_ctx->flow_job_id,
         pint_client_sm_context,
         server_config->client_job_flow_timeout);
@@ -1747,9 +1748,10 @@ static inline int io_post_flow(
 }
 
 static inline int io_post_write_ack_recv(
-    PINT_client_sm * sm_p,
+    PINT_smcb *smcb,
     PINT_client_io_ctx * cur_ctx)
 {
+    PINT_client_sm * sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     unsigned long status_user_tag;
 
@@ -1786,7 +1788,7 @@ static inline int io_post_write_ack_recv(
     ret = job_bmi_recv(
         cur_ctx->msg.svr_addr, cur_ctx->write_ack.encoded_resp_p,
         cur_ctx->write_ack.max_resp_sz, cur_ctx->session_tag,
-        BMI_PRE_ALLOC, sm_p, status_user_tag,
+        BMI_PRE_ALLOC, smcb, status_user_tag,
         &cur_ctx->write_ack.recv_status, &cur_ctx->write_ack.recv_id,
         pint_client_sm_context, JOB_TIMEOUT_INF);
 

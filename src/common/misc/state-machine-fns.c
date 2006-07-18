@@ -7,7 +7,6 @@
 #ifndef __STATE_MACHINE_FNS_H
 #define __STATE_MACHINE_FNS_H
 
-#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
@@ -66,7 +65,7 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
         return -1;
     }
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "SM invoke smcb %p op %d\n", smcb, smcb->op);
+            "SM invoke smcb %p op %d\n",smcb,(smcb)->op);
 
     state_name = PINT_state_machine_current_state_name(smcb);
     machine_name = PINT_state_machine_current_machine_name(smcb);
@@ -110,7 +109,7 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
         return -1;
     }
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "SM next smcb %p op %d\n",smcb,smcb->op);
+            "SM next smcb %p op %d\n",smcb,(smcb)->op);
     do {
 	/* skip over the current state action to get to the return code list */
 	loc = smcb->current_state + 1;
@@ -198,7 +197,7 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
 	return 0;
     }
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "SM locate smcb %p op %d\n",smcb,smcb->op);
+            "SM locate smcb %p op %d\n",smcb,(smcb)->op);
     /* this is a the usage dependant routine to look up the SM */
     op_sm = (*smcb->op_get_state_machine)(smcb->op);
     if (op_sm != NULL)
@@ -258,7 +257,7 @@ int PINT_smcb_alloc(
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "SM allocate smcb %p op %d\n",*smcb,op);
+            "SM allocate smcb %p op %d\n",*smcb,(*smcb)->op);
     return 0; /* success */
 }
 
@@ -275,19 +274,16 @@ void PINT_smcb_free(struct PINT_smcb **smcb)
     {
         if (*smcb)
         {
+            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                     "SM free smcb %p op %d\n",*smcb,(*smcb)->op);
             for (i = 0; i < PINT_FRAME_STACK_SIZE; i++)
             {
-                fprintf(stderr,"smb_free i = %d\n",i);
                 if ((*smcb)->frame_stack[i])
                 {
-                    fprintf(stderr,"smb_free frame = %p\n",
-                            (*smcb)->frame_stack[i]);
                     /* DO we really want to do this??? */
                     free((*smcb)->frame_stack[i]);
                 }
             }
-            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                    "SM free smcb %p op %d\n",*smcb,(*smcb)->op);
             free(*smcb);
         }
         (*smcb) = (struct PINT_smcb *)0;
@@ -326,7 +322,7 @@ void PINT_push_state(struct PINT_smcb *smcb,
  */
 PINT_op_state *PINT_sm_frame(struct PINT_smcb *smcb, int index)
 {
-    return &smcb->frame_stack[smcb->framebaseptr + index];
+    return smcb->frame_stack[smcb->framebaseptr + index];
 }
 
 /*

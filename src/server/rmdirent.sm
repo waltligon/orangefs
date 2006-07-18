@@ -150,7 +150,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->req->u.rmdirent.fs_id),
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
@@ -206,7 +206,7 @@ static int rmdirent_remove_directory_entry(
         &s_op->key, 
         &s_op->val,
         flags,
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     if (s_op->req->u.rmdirent.parent_atime ||
         s_op->req->u.rmdirent.parent_mtime ||
@@ -288,7 +288,7 @@ static PINT_sm_action rmdirent_update_directory_attr(
             user_opts, s_op->req->u.rmdirent.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.rmdirent.fs_id),
-        s_op, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }

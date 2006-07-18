@@ -77,7 +77,7 @@ static PINT_sm_action mgmt_remove_dspace(
             user_opts, s_op->req->u.mgmt_remove_object.fs_id) |
         PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.mgmt_remove_object.fs_id),
-        s_op,
+        smcb,
         0,
         js_p,
         &j_id,

@@ -96,7 +96,7 @@ static int mgmt_get_dirdata_handle_from_parent(
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), 
             s_op->req->u.mgmt_get_dirdata_handle.fs_id), 
-        NULL, s_op, 0, js_p, &i,
+        NULL, smcb, 0, js_p, &i,
         server_job_context);
 
     return ret;

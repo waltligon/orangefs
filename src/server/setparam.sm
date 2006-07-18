@@ -105,7 +105,7 @@ static PINT_sm_action setparam_work(
                 s_op->req->u.mgmt_setparam.fs_id, tmp_handle,
                 PINT_config_get_trove_meta_flags(
                     get_server_config_struct(), s_op->req->u.mgmt_setparam.fs_id), 
-                s_op, 0, js_p, &tmp_id, server_job_context);
+                smcb, 0, js_p, &tmp_id, server_job_context);
             return(ret);
         case PVFS_SERV_PARAM_EVENT_ON:
             ret = 0;

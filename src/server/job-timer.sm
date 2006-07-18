@@ -61,7 +61,6 @@ static PINT_sm_action job_timer_error(
 static PINT_sm_action job_timer_do_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
 
@@ -79,7 +78,7 @@ static PINT_sm_action job_timer_do_work(
 	
     /* post another timer */
     return(job_req_sched_post_timer(1000,
-	s_op,
+	smcb,
 	0,
 	js_p,
 	&tmp_id,

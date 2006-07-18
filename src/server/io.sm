@@ -135,7 +135,7 @@ static int io_send_ack(
     err = job_bmi_send_list(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size,
-        s_op->tag, s_op->encoded.buffer_type, 0, s_op, 0, js_p,
+        s_op->tag, s_op->encoded.buffer_type, 0, smcb, 0, js_p,
         &tmp_id, server_job_context, user_opts->server_job_bmi_timeout);
 
     return err;
@@ -241,7 +241,7 @@ static PINT_sm_action io_start_flow(
         return SM_ACTION_COMPLETE;
     }
 
-    err = job_flow(s_op->u.io.flow_d, s_op, 0, js_p, &tmp_id,
+    err = job_flow(s_op->u.io.flow_d, smcb, 0, js_p, &tmp_id,
                    server_job_context, user_opts->server_job_flow_timeout);
 
     return err;
@@ -274,7 +274,7 @@ static PINT_sm_action io_release(
       was scheduled in the first place)
     */
     ret = job_req_sched_release(
-        s_op->scheduled_id, s_op, 0, js_p, &i, server_job_context);
+        s_op->scheduled_id, smcb, 0, js_p, &i, server_job_context);
     return ret;
 }
 
@@ -389,7 +389,7 @@ static PINT_sm_action io_send_completion_ack(
     err = job_bmi_send_list(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
-        s_op->encoded.buffer_type, 0, s_op, 0, js_p, &tmp_id,
+        s_op->encoded.buffer_type, 0, smcb, 0, js_p, &tmp_id,
         server_job_context, user_opts->server_job_bmi_timeout);
 
     return err;
