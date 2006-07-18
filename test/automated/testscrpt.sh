@@ -18,11 +18,6 @@ export CVS_TAG="${CVS_TAG:-HEAD}"
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
-
-#SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/sysint-tests.d
-#VFS_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d
-#MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
-
 SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/sysint-tests.d
 VFS_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
@@ -30,18 +25,15 @@ REPORT_LOG=${PVFS2_DEST}/alltests.log
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
-SYSINT_SCRIPTS=$(cd `dirname $0`; pwd)/sysint-tests.d
-VFS_SCRIPTS=$(cd `dirname $0`; pwd)/vfs-tests.d
-MPIIO_DRIVER=$(cd `dirname $0`; pwd)/testscrpt-mpi.sh
 #SYSINT_SCRIPTS=$(cd `dirname $0`; pwd)/sysint-tests.d
 #VFS_SCRIPTS=$(cd `dirname $0`; pwd)/vfs-tests.d
-#MPIIO_DRIVER=$(cd `dirname $0`; pwd)/testscrpt-mpi.sh
+MPIIO_DRIVER=$(cd `dirname $0`; pwd)/testscrpt-mpi.sh
 
 TESTNAME="`hostname -s`-nightly"
 
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="gil lain localhost"
+VFS_HOSTS="gil lain"
 
 
 # takes one argument: a tag or branch in CVS
@@ -120,15 +112,11 @@ setup_pvfs2() {
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid \
 			-f fs.conf $server_conf
-		valgrind --log-file=${PVFS2_DEST}/valgrind-server \
-		--trace-children=yes --leak-check=yes \
-		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server -d\
+		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid  \
-			fs.conf $server_conf &
-		sleep 5
+			fs.conf $server_conf
 	done
 
-	sleep 30 # give valgrind a chance to start the backgrounded servers
 	echo "tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
