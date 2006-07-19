@@ -828,7 +828,7 @@ static PINT_sm_action io_datafile_post_msgpairs(
     if (sm_p->u.io.msgpair_completion_count
      || sm_p->u.io.flow_completion_count
      || sm_p->u.io.write_ack_completion_count)
-        return SM_ACTION_DEFERED;  /* means go find another machine to run */
+        return SM_ACTION_DEFERRED;  /* means go find another machine to run */
     else {
         js_p->error_code = IO_RETRY;
         return SM_ACTION_COMPLETE;  /* means look at error_code and run my machine again */
@@ -914,7 +914,7 @@ static PINT_sm_action io_datafile_complete_operations(
                 /* If send had problem, BMI will apparently ensure that the
                  * recv will fail too, so handle the retry stuff there.
                  */
-                return SM_ACTION_DEFERED;
+                return SM_ACTION_DEFERRED;
             } else {
                 /* is a recv */
                 assert(ret == IO_RECV_COMPLETED);
@@ -1093,7 +1093,7 @@ static PINT_sm_action io_datafile_complete_operations(
   check_next_step:
 
     /*
-     * If something is pending, return SM_ACTION_DEFERED to let SM find the next thing
+     * If something is pending, return SM_ACTION_DEFERRED to let SM find the next thing
      * to do.
      */
     if (sm_p->u.io.msgpair_completion_count
@@ -1110,7 +1110,7 @@ static PINT_sm_action io_datafile_complete_operations(
                          sm_p->u.io.flow_completion_count,
                          sm_p->u.io.write_ack_completion_count,
                          sm_p->u.io.msgpair_completion_count);
-        return SM_ACTION_DEFERED;
+        return SM_ACTION_DEFERRED;
     }
 
     /*
@@ -1579,7 +1579,7 @@ static PINT_sm_action io_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 static inline int io_decode_ack_response(

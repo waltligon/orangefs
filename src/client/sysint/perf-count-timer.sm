@@ -54,7 +54,7 @@ static PINT_sm_action perf_count_timer_error(
     gossip_err("Error: stopping client perf timer.\n");
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 /* perf_count_timer_do_work()

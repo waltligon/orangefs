@@ -1051,7 +1051,7 @@ static PINT_sm_action create_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 /** looks at the attributes of the parent directory and decides if it impacts

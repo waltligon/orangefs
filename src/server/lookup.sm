@@ -157,7 +157,7 @@ static PINT_sm_action lookup_init(
                    "sending error response\n",
 		   s_op->req->u.lookup_path.path);
 	js_p->error_code = -PVFS_ENOTDIR;
-        return SM_ACTION_DEFERED;
+        return SM_ACTION_DEFERRED;
     }
 
     /* allocate the internal ds_attr_array */

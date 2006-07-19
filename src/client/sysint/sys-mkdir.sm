@@ -592,7 +592,7 @@ static PINT_sm_action mkdir_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 /** looks at the attributes of the parent directory and decides if it impacts

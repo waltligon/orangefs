@@ -225,7 +225,7 @@ static PINT_sm_action mgmt_remove_cleanup(
     sm_p->error_code = js_p->error_code;
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 /*

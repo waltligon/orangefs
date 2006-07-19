@@ -359,7 +359,7 @@ PVFS_error PINT_client_state_machine_post(
         ret = PINT_state_machine_next(smcb, &js);
     }
 
-    /* else ret == SM_ACTION_DEFERED */
+    /* else ret == SM_ACTION_DEFERRED */
 
     if (smcb->op_complete)
     {
@@ -620,7 +620,7 @@ PVFS_error PINT_client_state_machine_test(
 
             } while (ret == SM_ACTION_COMPLETE); /* ret == 1*/
 
-            assert(ret == SM_ACTION_DEFERED); /* ret == 0 */
+            assert(ret == SM_ACTION_DEFERRED); /* ret == 0 */
         }
 
         /* make sure we don't return internally cancelled I/O jobs */

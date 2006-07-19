@@ -152,7 +152,7 @@ static PINT_sm_action mgmt_noop_cleanup(
 
     PINT_SET_OP_COMPLETE;
     sm_p->error_code = js_p->error_code;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 /*

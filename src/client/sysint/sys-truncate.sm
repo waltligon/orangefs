@@ -281,7 +281,7 @@ static PINT_sm_action truncate_cleanup(
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 /*

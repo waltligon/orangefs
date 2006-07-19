@@ -1060,7 +1060,7 @@ static PINT_sm_action lookup_cleanup(
 
     /* mark operation as complete */
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 static int lookup_segment_lookup_comp_fn(

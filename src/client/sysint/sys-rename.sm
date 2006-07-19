@@ -896,7 +896,7 @@ static PINT_sm_action rename_cleanup(
 	free(sm_p->msgarray);
         sm_p->msgarray = NULL;
     }
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 static PINT_sm_action rename_generic_timer(

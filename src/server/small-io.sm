@@ -91,7 +91,7 @@ static PINT_sm_action small_io_start_job(
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
        s_op->ds_attr.b_size == 0)
     {
-        /* nothing to read.  return SM_ACTION_DEFERED */
+        /* nothing to read.  return SM_ACTION_DEFERRED */
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }

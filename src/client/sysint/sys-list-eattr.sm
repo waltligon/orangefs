@@ -194,7 +194,7 @@ static PINT_sm_action list_eattr_cleanup(
     sm_p->error_code  = js_p->error_code;
     PINT_SET_OP_COMPLETE;
 
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 static int list_eattr_comp_fn(

@@ -245,7 +245,7 @@ static PINT_sm_action mgmt_perf_mon_list_cleanup(
     sm_p->error_code  = error;
     PINT_SET_OP_COMPLETE;
 
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 static int perf_mon_list_comp_fn(void* v_p,

@@ -629,7 +629,7 @@ static PINT_sm_action symlink_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 /*

@@ -213,7 +213,7 @@ static PINT_sm_action get_eattr_cleanup(
     }
     PINT_SET_OP_COMPLETE;
 
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 static int get_eattr_comp_fn(

@@ -468,7 +468,7 @@ static PINT_sm_action remove_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 static PINT_sm_action remove_generic_timer(
