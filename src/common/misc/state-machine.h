@@ -39,14 +39,6 @@
  * function.  See src/server/server-state-machine.c for examples.
  */
 
-
-/* op_state - this is the user-specific (client or server) information
- * that must be maintained for each running state machine.
- * This is an opaque type that cannot be dereferenced by the state
- * machine driver code.
- */
-typedef void PINT_op_state;
-
 /* State machine control block - one per running instance of a state
  * machine
  */
@@ -58,7 +50,7 @@ typedef struct PINT_smcb
     int framestackptr;
     union PINT_state_array_values *current_state;
     union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
-    PINT_op_state *frame_stack[PINT_FRAME_STACK_SIZE];
+    void *frame_stack[PINT_FRAME_STACK_SIZE];
     /* usage specific routinet to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int);
     /* state machine context and control variables */
@@ -100,7 +92,7 @@ struct PINT_state_machine_s
  */
 typedef enum {
     SM_ACTION_COMPLETE = 1,
-    SM_ACTION_DEFERED = 0,
+    SM_ACTION_DEFERRED = 0,
     SM_ERROR = -1             /* this is a catastrophic error */
 } PINT_sm_action;
 
@@ -117,8 +109,8 @@ enum {
 #define SM_NESTED_STATE 1
 
 /* Prototypes for functions provided by user */
-int PINT_state_machine_start(PINT_op_state *, job_status_s *ret);
-int PINT_state_machine_complete(PINT_op_state *);
+int PINT_state_machine_start(void *, job_status_s *ret);
+int PINT_state_machine_complete(void *);
 
 /* This macro returns the state machine string of the current machine.
  * We assume the first 6 characters of every state machine name are "pvfs2_".
@@ -140,7 +132,7 @@ int PINT_smcb_alloc(struct PINT_smcb **, int, int,
 void PINT_smcb_free(struct PINT_smcb **);
 union PINT_state_array_values *PINT_pop_state(struct PINT_smcb *);
 void PINT_push_state(struct PINT_smcb *, union PINT_state_array_values *);
-PINT_op_state *PINT_sm_frame(struct PINT_smcb *, int);
+void *PINT_sm_frame(struct PINT_smcb *, int);
 
 /* This macro is used in calls to PINT_sm_fram() */
 #define PINT_FRAME_CURRENT 0

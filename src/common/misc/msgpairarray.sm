@@ -400,7 +400,7 @@ static PINT_sm_action msgpairarray_post(
     /* we are still waiting on operations to complete, next state
      * transition will handle them
      */
-    return SM_ACTION_DEFERED;
+    return SM_ACTION_DEFERRED;
 }
 
 static PINT_sm_action msgpairarray_post_retry(
@@ -475,7 +475,7 @@ static PINT_sm_action msgpairarray_complete(
     /* decrement comp_ct until all operations have completed */
     if (--sm_p->msgarray_params.comp_ct > 0)
     {
-        return SM_ACTION_DEFERED;
+        return SM_ACTION_DEFERRED;
     }
 
     assert(sm_p->msgarray_params.comp_ct == 0);

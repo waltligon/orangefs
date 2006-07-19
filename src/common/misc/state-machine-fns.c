@@ -152,7 +152,7 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
     } while (loc->flag == SM_RETURN);
 
     smcb->current_state = loc->next_state;
-    smcb->current_state += 2;
+    smcb->current_state += 2;  /* skip state name and parent SM ref */
 
 
     /* To do nested states, we check to see if the next state is
@@ -161,11 +161,10 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
     while (smcb->current_state->flag == SM_JUMP)
     {
 	PINT_push_state(smcb, smcb->current_state);
-	smcb->current_state += 1; /* skip state flag; now we point to the state
-			  	   * machine */
+	smcb->current_state += 1; /* skip state flag; now we point to the SM */
 
 	smcb->current_state = smcb->current_state->nested_machine->state_machine;
-        smcb->current_state += 2;
+        smcb->current_state += 2;  /* skip state name a parent SM ref */
     }
 
     /* skip over the flag so that we point to the function for the next
@@ -247,7 +246,7 @@ int PINT_smcb_alloc(
     memset(*smcb, 0, sizeof(struct PINT_smcb));
     if (frame_size > 0)
     {
-        (*smcb)->frame_stack[0] = (PINT_op_state *)malloc(frame_size);
+        (*smcb)->frame_stack[0] = malloc(frame_size);
         if (!((*smcb)->frame_stack[0]))
         {
             return -PVFS_ENOMEM;
@@ -315,14 +314,89 @@ void PINT_push_state(struct PINT_smcb *smcb,
     smcb->state_stack[smcb->stackptr++] = p;
 }
 
-/* Function: PINT_frame
+/* Function: PINT_sm_frame
+   Params: pointer to smcb, stack index
+   Returns: pointer to frame
+   Synopsis: returns a frame off of the frame stack
+ */
+void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
+{
+    return smcb->frame_stack[smcb->framebaseptr + index];
+}
+
+/* Function: PINT_sm_push_frame
+   Params: pointer to smcb, void pointer for new frame
+   Returns: 
+   Synopsis: pushes a new frame pointer onto the frame_stack
+ */
+void PINT_sm_push_frame(struct PINT_smcb *smcb, void *frame_p)
+ {
+    assert(smcb->framestackptr < PINT_FRAME_STACK_SIZE);
+
+    smcb->frame_stack[smcb->framestackptr++] = frame_p;
+ }
+
+/* Function: PINT_sm_set
+   Params: pointer to smcb
+   Returns: 
+   Synopsis: This moves the framebaseptr up to the stop of the frame_stack
+ */
+void PINT_sm_set_frame(struct PINT_smcb *smcb)
+{
+    assert(smcb->framestackptr >= 0);
+
+    if (smcb->framestackptr == 0)
+        smcb->framebaseptr = 0;
+    else
+        smcb->framebaseptr = smcb->framestackptr-1;
+}
+
+/* Function: PINT_sm_pop_frame
+   Params: pointer to an smcb pointer
+   Returns: frame pointer
+   Synopsis: pops a frame pointer from the frame_stack and returns it
+ */
+void *PINT_sm_pop_frame(struct PINT_smcb *smcb)
+{
+    assert(smcb->framestackptr > smcb->framebaseptr);
+
+    return smcb->frame_stack[smcb->framebaseptr + --smcb->framestackptr];
+}
+
+/* Function: DUMMY FUNCTION
    Params: 
    Returns: 
    Synopsis: 
  */
-PINT_op_state *PINT_sm_frame(struct PINT_smcb *smcb, int index)
+union PINT_state_array_values  *PINT_sm_something(void)
 {
-    return smcb->frame_stack[smcb->framebaseptr + index];
+    return NULL;
+}
+
+/* Function: PINT_sm_start_child_frames
+   Params: pointer to an smcb pointer
+   Returns: 
+   Synopsis: This starts all the enw child SMs based on the frame_stack
+ */
+void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
+{
+    int i;
+    struct PINT_smcb *new_sm;
+    job_status_s *r;
+
+    assert(smcb);
+
+    for(i = smcb->framebaseptr; i < smcb->framebaseptr; i++)
+    {
+        /* allocate smcb */
+        PINT_smcb_alloc(&new_sm, smcb->op, 0, NULL);
+        /* assign frame */
+        PINT_sm_push_frame(new_sm, smcb->frame_stack[i]);
+        /* locate SM to run */
+        new_sm->current_state = PINT_sm_something();
+        /* invoke SM */
+        PINT_state_machine_invoke(new_sm, r);
+    }
 }
 
 /*
