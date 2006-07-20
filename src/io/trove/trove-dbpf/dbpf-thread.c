@@ -206,11 +206,15 @@ void *dbpf_thread_function(void *ptr)
     dbpf_queued_op_t *cur_op = NULL;
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\" started\n",thread_type);
 
-    while(dbpf_threads_running)
+    while(1)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\" ITERATING\n",thread_type);
         /* check if we any have ops to service in our work queue */
         gen_mutex_lock(work_queue_mutex);
+        if (! dbpf_threads_running){
+            gen_mutex_unlock(work_queue_mutex);
+            break;
+        }        
         op_queued_empty = dbpf_op_queue_empty(work_queue);
 
         if (op_queued_empty)
@@ -221,7 +225,7 @@ void *dbpf_thread_function(void *ptr)
                                          work_queue_mutex);
             if (! dbpf_threads_running){
                 gen_mutex_unlock(work_queue_mutex);
-                continue;
+                break;
             }
         }
         gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\" fetching new element\n",thread_type);
@@ -243,7 +247,7 @@ void *dbpf_thread_function(void *ptr)
                      "SERVICE ROUTINE (%s) *****\n",
                      dbpf_op_type_to_str(cur_op->op.type));
                                
-        if ( DBPF_OP_MODIFIYING_META_OP(cur_op->op.type) ){
+        if ( DBPF_OP_MODIFYING_META_OP(cur_op->op.type) ){
             if ( ret == DBPF_OP_COMPLETE ) 
             {
                 ret = dbpf_sync_coalesce(cur_op, 1, 0);

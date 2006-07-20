@@ -425,7 +425,7 @@ enum dbpf_op_type
 #define DBPF_OP_IS_KEYVAL(__type) (__type >= KEYVAL_READ && __type < DSPACE_CREATE)
 #define DBPF_OP_IS_DSPACE(__type) (__type >= DSPACE_CREATE)
 
-#define DBPF_OP_MODIFIYING_META_OP(__op)    \
+#define DBPF_OP_MODIFYING_META_OP(__op)    \
     (__op == KEYVAL_WRITE       || \
      __op == KEYVAL_REMOVE_KEY  || \
      __op == KEYVAL_WRITE_LIST  || \

@@ -246,7 +246,7 @@ int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
     dbpf_sync_context_t * sync_context;
     enum s_sync_context_e sync_context_type;
 
-    if (!DBPF_OP_MODIFIYING_META_OP(qop_p->op.type))
+    if (!DBPF_OP_MODIFYING_META_OP(qop_p->op.type))
     { 
         return 0;
     } 
@@ -284,7 +284,7 @@ int dbpf_sync_coalesce_dequeue(
     dbpf_sync_context_t * sync_context;
     enum s_sync_context_e sync_context_type;
 
-    if (!DBPF_OP_MODIFIYING_META_OP(qop_p->op.type))
+    if (!DBPF_OP_MODIFYING_META_OP(qop_p->op.type))
     { 
         return 0;
     } 

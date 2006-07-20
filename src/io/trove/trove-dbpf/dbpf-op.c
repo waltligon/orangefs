@@ -15,7 +15,7 @@
 enum operation_queue_type dbpf_op_queue_get_queue_type(enum dbpf_op_type type){
     if ( DBPF_OP_IS_BSTREAM(type) )
         return OP_QUEUE_IO;
-    if ( DBPF_OP_MODIFIYING_META_OP(type) )
+    if ( DBPF_OP_MODIFYING_META_OP(type) )
         return OP_QUEUE_META_WRITE;
     return OP_QUEUE_META_READ;
 }
