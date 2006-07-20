@@ -45,6 +45,13 @@ enum
     TROVE_DIR,
 };
 
+
+enum trove_meta_sync_mode{
+    TROVE_SYNC_MODE_NONE,
+    TROVE_SYNC_MODE,
+    TROVE_TRANS_MODE
+};
+
 /* TROVE_ds_flags */
 /* TROVE operation flags */
 enum

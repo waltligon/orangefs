@@ -355,6 +355,47 @@ int PINT_encode_calc_max_size(
     return(ret);
 }
 
+static char PVFS_server_op_name[][35]={
+    "PVFS_SERV_INVALID",
+    "PVFS_SERV_CREATE",
+    "PVFS_SERV_REMOVE",
+    "PVFS_SERV_IO",
+    "PVFS_SERV_GETATTR",
+    "PVFS_SERV_SETATTR",
+    "PVFS_SERV_LOOKUP_PATH",
+    "PVFS_SERV_CRDIRENT",
+    "PVFS_SERV_RMDIRENT",
+    "PVFS_SERV_CHDIRENT",
+    "PVFS_SERV_TRUNCATE",
+    "PVFS_SERV_MKDIR",
+    "PVFS_SERV_READDIR",
+    "PVFS_SERV_GETCONFIG",
+    "PVFS_SERV_WRITE_COMPLETION",
+    "PVFS_SERV_FLUSH",
+    "PVFS_SERV_MGMT_SETPARAM",
+    "PVFS_SERV_MGMT_NOOP",
+    "PVFS_SERV_STATFS",
+    "PVFS_SERV_PERF_UPDATE",
+    "PVFS_SERV_MGMT_PERF_MON",
+    "PVFS_SERV_MGMT_ITERATE_HANDLES",
+    "PVFS_SERV_MGMT_DSPACE_INFO_LIST",
+    "PVFS_SERV_MGMT_EVENT_MON",
+    "PVFS_SERV_MGMT_REMOVE_OBJECT",
+    "PVFS_SERV_MGMT_REMOVE_DIRENT",
+    "PVFS_SERV_MGMT_GET_DIRDATA_HANDLE",
+    "PVFS_SERV_JOB_TIMER",
+    "PVFS_SERV_PROTO_ERROR",
+    "PVFS_SERV_GETEATTR",
+    "PVFS_SERV_SETEATTR",
+    "PVFS_SERV_DELEATTR",
+    "PVFS_SERV_LISTEATTR",
+    "PVFS_SERV_SMALL_IO"
+};
+
+char * server_op_to_str(enum PVFS_server_op sop){
+    return PVFS_server_op_name[sop];
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4

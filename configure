@@ -309,7 +309,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_CFLAGS DB_LIB NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX GM_HOME BUILD_GM BUILD_IB IB_INCDIR IB_LIBDIR BUILD_OPENIB OPENIB_INCDIR OPENIB_LIBDIR SERVER_LDFLAGS BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_CFLAGS DB_LIB HAVE_TROVE_TRANSACTION_SUPPORT NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX GM_HOME BUILD_GM BUILD_IB IB_INCDIR IB_LIBDIR BUILD_OPENIB OPENIB_INCDIR OPENIB_LIBDIR SERVER_LDFLAGS BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -5681,7 +5681,7 @@ fi;
 
 MISC_TROVE_FLAGS=""
 if test $use_aio_thcb = 1 ; then
-	MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+       MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
 fi
 
 
@@ -9297,6 +9297,99 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
+        echo "$as_me:$LINENO: checking for db transaction support" >&5
+echo $ECHO_N "checking for db transaction support... $ECHO_C" >&6
+
+
+    CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"
+    LIBS="${oldlibs} -ldb -lpthread"
+    if test "$cross_compiling" = yes; then
+  echo "$as_me:$LINENO: result: cross-compiling" >&5
+echo "${ECHO_T}cross-compiling" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <db.h>
+    #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD | DB_INIT_TXN )
+    int main(){
+            int ret;
+            DB_ENV *dbenv = NULL;
+            DB *db_p = NULL;
+            ret = db_env_create(&dbenv, 0);
+            if (ret != 0)
+{
+              return 1;
+}
+            if (db_create(&db_p, dbenv, 0) != 0)
+{
+              return 1;
+}
+            ret = dbenv->open(dbenv, ".", COLL_ENV_FLAGS, 0);
+            if(ret != 0)
+{
+              return 1;
+}
+
+            if (db_p->open(db_p,
+                NULL,
+                "tmp",
+                NULL,
+                DB_BTREE,
+                DB_CREATE | DB_AUTO_COMMIT,
+                0777) != 0)
+{
+              return 1;
+}
+
+            db_p->close(db_p, 0);
+
+            dbenv->dbremove(dbenv, NULL,
+                            "", "tmp", 0);
+            dbenv->remove(dbenv, ".", DB_FORCE);
+            dbenv->close(dbenv, 0);
+
+            return 0;
+}
+
+_ACEOF
+rm -f conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_TROVE_TRANSACTION_SUPPORT 1
+_ACEOF
+
+    echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+    HAVE_TROVE_TRANSACTION_SUPPORT=1
+
+
+else
+  echo "$as_me: program exited with status $ac_status" >&5
+echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+( exit $ac_status )
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+fi
+rm -f core *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+fi
+
+    LIBS="${oldlibs}"
     CFLAGS="$oldcflags"
 
 else
@@ -9961,6 +10054,99 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
+        echo "$as_me:$LINENO: checking for db transaction support" >&5
+echo $ECHO_N "checking for db transaction support... $ECHO_C" >&6
+
+
+    CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"
+    LIBS="${oldlibs} -ldb -lpthread"
+    if test "$cross_compiling" = yes; then
+  echo "$as_me:$LINENO: result: cross-compiling" >&5
+echo "${ECHO_T}cross-compiling" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <db.h>
+    #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD | DB_INIT_TXN )
+    int main(){
+            int ret;
+            DB_ENV *dbenv = NULL;
+            DB *db_p = NULL;
+            ret = db_env_create(&dbenv, 0);
+            if (ret != 0)
+{
+              return 1;
+}
+            if (db_create(&db_p, dbenv, 0) != 0)
+{
+              return 1;
+}
+            ret = dbenv->open(dbenv, ".", COLL_ENV_FLAGS, 0);
+            if(ret != 0)
+{
+              return 1;
+}
+
+            if (db_p->open(db_p,
+                NULL,
+                "tmp",
+                NULL,
+                DB_BTREE,
+                DB_CREATE | DB_AUTO_COMMIT,
+                0777) != 0)
+{
+              return 1;
+}
+
+            db_p->close(db_p, 0);
+
+            dbenv->dbremove(dbenv, NULL,
+                            "", "tmp", 0);
+            dbenv->remove(dbenv, ".", DB_FORCE);
+            dbenv->close(dbenv, 0);
+
+            return 0;
+}
+
+_ACEOF
+rm -f conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_TROVE_TRANSACTION_SUPPORT 1
+_ACEOF
+
+    echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+    HAVE_TROVE_TRANSACTION_SUPPORT=1
+
+
+else
+  echo "$as_me: program exited with status $ac_status" >&5
+echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+( exit $ac_status )
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+fi
+rm -f core *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+fi
+
+    LIBS="${oldlibs}"
     CFLAGS="$oldcflags"
 
 fi;
@@ -12133,8 +12319,6 @@ fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
-
-
 # getmntent is in -lsun on Irix 4, -lseq on Dynix/PTX, -lgen on Unixware.
 echo "$as_me:$LINENO: checking for getmntent in -lsun" >&5
 echo $ECHO_N "checking for getmntent in -lsun... $ECHO_C" >&6
@@ -13999,6 +14183,7 @@ s,@INTELC@,$INTELC,;t t
 s,@GNUC@,$GNUC,;t t
 s,@DB_CFLAGS@,$DB_CFLAGS,;t t
 s,@DB_LIB@,$DB_LIB,;t t
+s,@HAVE_TROVE_TRANSACTION_SUPPORT@,$HAVE_TROVE_TRANSACTION_SUPPORT,;t t
 s,@NEEDS_LIBRT@,$NEEDS_LIBRT,;t t
 s,@TARGET_OS_DARWIN@,$TARGET_OS_DARWIN,;t t
 s,@TARGET_OS_LINUX@,$TARGET_OS_LINUX,;t t
@@ -14547,6 +14732,14 @@ echo "${ECHO_T}PVFS2 configured for aio threaded callbacks       :  no" >&6
 else
    echo "$as_me:$LINENO: result: PVFS2 configured for aio threaded callbacks       : yes" >&5
 echo "${ECHO_T}PVFS2 configured for aio threaded callbacks       : yes" >&6
+fi
+
+if test "x$HAVE_TROVE_TRANSACTION_SUPPORT" = "x" ; then
+   echo "$as_me:$LINENO: result: PVFS2 configured with TROVE transaction support   :  no" >&5
+echo "${ECHO_T}PVFS2 configured with TROVE transaction support   :  no" >&6
+else
+   echo "$as_me:$LINENO: result: PVFS2 configured with TROVE transaction support   : yes" >&5
+echo "${ECHO_T}PVFS2 configured with TROVE transaction support   : yes" >&6
 fi
 
 if test "x$LINUX_KERNEL_SRC" = "x" ; then

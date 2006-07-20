@@ -76,6 +76,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "sm", GOSSIP_STATE_MACHINE_DEBUG },
     { "keyval", GOSSIP_DBPF_KEYVAL_DEBUG },
     { "coalesce", GOSSIP_DBPF_COALESCE_DEBUG },
+    { "performance", GOSSIP_PERFORMANCE_DEBUG },
     { "verbose",  (__DEBUG_ALL & ~GOSSIP_PERFCOUNTER_DEBUG)},
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }

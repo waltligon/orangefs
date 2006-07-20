@@ -112,6 +112,40 @@ enum PVFS_server_mode PINT_req_sched_get_mode(void)
     return(current_mode);
 }
 
+void print_req_scheduler_queues(struct req_sched_list *list);
+
+void print_req_scheduler_queues(struct req_sched_list *list){
+    struct req_sched_element *tmp_element;
+    struct qlist_head *iterator;
+    
+    int debug_on;
+    uint64_t mask;
+    gossip_get_debug_mask(&debug_on, &mask);
+    if ( debug_on && (mask & GOSSIP_REQ_SCHED_DEBUG) ){
+    
+        const char stateNames[][24]= {
+            "REQ_QUEUED",
+            "REQ_SCHEDULED",
+            "REQ_READY_TO_SCHEDULE",
+            "REQ_TIMING"  
+        };    
+    
+    gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED QUEUE for handle %llu: \n",
+        list->handle);
+    qlist_for_each(iterator, &list->req_list)
+            {
+                tmp_element = qlist_entry(iterator, struct req_sched_element,
+                    list_link);
+                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, 
+                     "\tsched_ptr: %p op_ptr: %p - %s - type: %s\n",
+                      tmp_element, & tmp_element->req_ptr->op, 
+                      stateNames[tmp_element->state], 
+                      server_op_to_str(tmp_element->req_ptr->op));
+                      
+            }
+    }
+}
+
 /* setup and teardown */
 
 /** Initializes the request scheduler.  Must be called before any other
@@ -515,7 +549,9 @@ int PINT_req_sched_post(
     /* return 1 if the list is empty before we add this entry */
     ret = qlist_empty(&(tmp_list->req_list));
     if (ret == 1)
-	tmp_element->state = REQ_SCHEDULED;
+    {
+	   tmp_element->state = REQ_SCHEDULED;
+    }
     else
     {
         /* check queue to see if we can apply any optimizations */
@@ -617,7 +653,7 @@ int PINT_req_sched_post(
                     break;
                 }
             }
-
+/*
             if(!tmp_flag)
             {
                 tmp_element->state = REQ_SCHEDULED;
@@ -628,9 +664,10 @@ int PINT_req_sched_post(
             }
             else
             {
+*/            
                 tmp_element->state = REQ_QUEUED;
                 ret = 0;
-            }
+/*            }*/
         }
 	else
 	{
@@ -638,22 +675,30 @@ int PINT_req_sched_post(
 	    ret = 0;
 	}
     }
+    
+    /*
+    tmp_element->state = REQ_SCHEDULED;
+    ret = 1;
+    */
 
     /* add this element to the list */
     tmp_element->list_head = tmp_list;
     qlist_add_tail(&(tmp_element->list_link), &(tmp_list->req_list));
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		 "REQ SCHED POSTING, handle: %llu, queue_element: %p\n",
-		 llu(handle), tmp_element);
+		 "REQ SCHED POSTING, handle: %llu, queue_element: %p - type: %s\n",
+		 llu(handle), tmp_element, server_op_to_str(in_request->op));
 
     if (ret == 1)
     {
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED SCHEDULING, "
-                     "handle: %llu, queue_element: %p\n",
-		     llu(handle), tmp_element);
+                     "handle: %llu, queue_element: %p - type: %s\n",
+		     llu(handle), tmp_element, server_op_to_str(in_request->op));
     }
     sched_count++;
+    
+    print_req_scheduler_queues(tmp_list);
+    
     return (ret);
 }
 
@@ -975,13 +1020,14 @@ int PINT_req_sched_release(
                     }
                 }
 	    }
+        print_req_scheduler_queues(tmp_list);
 	}
 	sched_count--;
     }
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		 "REQ SCHED RELEASING, handle: %llu, queue_element: %p\n",
-		 llu(tmp_element->handle), tmp_element);
+		 "REQ SCHED RELEASING, handle: %llu, queue_element: %p - type: %s\n",
+		 llu(tmp_element->handle), tmp_element, server_op_to_str(tmp_element->req_ptr->op));
 
     /* destroy the released request element */
     free(tmp_element);
@@ -1042,9 +1088,10 @@ int PINT_req_sched_test(
 	}
 	*out_count_p = 1;
 	*out_status = 0;
-	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED SCHEDULING, "
-                     "handle: %llu, queue_element: %p\n",
-                     llu(tmp_element->handle), tmp_element);
+	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED TEST SCHEDULING, "
+                     "handle: %llu, queue_element: %p - type: %s\n",
+                     llu(tmp_element->handle), tmp_element, 
+                     server_op_to_str(tmp_element->req_ptr->op));
 
 	/* if this is a mode change, then transition now */
 	if ((tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM) &&
@@ -1143,9 +1190,9 @@ int PINT_req_sched_testsome(
 	    out_status_array[*inout_count_p] = 0;
 	    (*inout_count_p)++;
 	    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-			 "REQ SCHED SCHEDULING, handle: %llu, "
-                         "queue_element: %p\n",
-			 llu(tmp_element->handle), tmp_element);
+			 "REQ SCHED TESTSOME SCHEDULING, handle: %llu, "
+                         "queue_element: %p - type: %s\n",
+			 llu(tmp_element->handle), tmp_element, server_op_to_str(tmp_element->req_ptr->op));
 	    /* if this is a mode change, then transition now */
 	    if(tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM &&
 		tmp_element->req_ptr->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE)

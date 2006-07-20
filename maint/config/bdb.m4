@@ -217,5 +217,63 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_DEFINE(HAVE_DB_BUFFER_SMALL, 1, [Define if db library has DB_BUFFER_SMALL error]),
     AC_MSG_RESULT(no))
 
-    CFLAGS="$oldcflags"    
+    dnl Test to check for transaction support (autocommit) to Env open and DB open
+    AC_MSG_CHECKING(for db transaction support)
+
+    
+    CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"
+    LIBS="${oldlibs} -ldb -lpthread"
+    AC_TRY_RUN(
+    #include <db.h>
+    #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD | DB_INIT_TXN )
+    int main(){
+            int ret;
+            DB_ENV *dbenv = NULL;
+            DB *db_p = NULL;
+            ret = db_env_create(&dbenv, 0);
+            if (ret != 0)
+{
+              return 1;
+}
+            if (db_create(&db_p, dbenv, 0) != 0)
+{
+              return 1;
+}
+            ret = dbenv->open(dbenv, ".", COLL_ENV_FLAGS, 0);
+            if(ret != 0)
+{
+              return 1;
+}
+            
+            if (db_p->open(db_p,
+                NULL,
+                "tmp",
+                NULL,
+                DB_BTREE,
+                DB_CREATE | DB_AUTO_COMMIT,
+                0777) != 0)
+{
+              return 1;
+}
+    
+            db_p->close(db_p, 0);
+    
+            dbenv->dbremove(dbenv, NULL,
+                            "", "tmp", 0);
+            dbenv->remove(dbenv, ".", DB_FORCE);
+            dbenv->close(dbenv, 0);
+    
+            return 0;
+}
+    ,
+    AC_DEFINE(HAVE_TROVE_TRANSACTION_SUPPORT, 1, [Trove Transaction support available])
+    AC_MSG_RESULT(yes)
+    HAVE_TROVE_TRANSACTION_SUPPORT=1
+    AC_SUBST(HAVE_TROVE_TRANSACTION_SUPPORT)
+    ,
+    [AC_MSG_RESULT(no)],
+    [AC_MSG_RESULT(cross-compiling)])
+    
+    LIBS="${oldlibs}"
+    CFLAGS="$oldcflags"
 ])

@@ -11,9 +11,7 @@
 #include "src/common/llist/llist.h"
 #include "src/common/gossip/gossip.h"
 
-#ifdef __PVFS2_TROVE_SUPPORT__
 #include "trove.h"
-#endif
 
 enum
 {
@@ -79,7 +77,7 @@ typedef struct filesystem_configuration_s
     char *attr_cache_keywords;
     int attr_cache_size;
     int attr_cache_max_num_elems;
-    int trove_sync_meta;
+    enum trove_meta_sync_mode trove_sync_meta;
     int trove_sync_data;
     int immediate_completion;
     int coalescing_high_watermark;

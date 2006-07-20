@@ -80,6 +80,11 @@ enum PVFS_server_op
 #define PVFS_MAX_SERVER_OP 34
 
 /*
+ * For debugging purpose, currently the mapping is in PINT.reqproto-encode.c
+ */
+char * server_op_to_str(enum PVFS_server_op sop);
+
+/*
  * These ops must always work, even if the server is in admin mode.
  */
 #define PVFS_SERV_IS_MGMT_OP(x) \

@@ -316,7 +316,7 @@ dnl broken glibc.
 
 MISC_TROVE_FLAGS=""
 if test $use_aio_thcb = 1 ; then
-	MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+       MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
 fi
 AC_SUBST(MISC_TROVE_FLAGS)
 
@@ -912,8 +912,6 @@ AC_TRY_COMPILE([
 )
 
 
-
-
 dnl check for getmntent(), special test
 AC_FUNC_GETMNTENT
 
@@ -1061,6 +1059,12 @@ if test "x$MISC_TROVE_FLAGS" = "x" ; then
    AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       :  no])
 else
    AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       : yes])
+fi
+
+if test "x$HAVE_TROVE_TRANSACTION_SUPPORT" = "x" ; then
+   AC_MSG_RESULT([PVFS2 configured with TROVE transaction support   :  no])
+else
+   AC_MSG_RESULT([PVFS2 configured with TROVE transaction support   : yes])
 fi
 
 if test "x$LINUX_KERNEL_SRC" = "x" ; then

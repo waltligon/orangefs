@@ -30,16 +30,24 @@ extern "C" {
 #define TROVE_DB_DIRTY_READ             0
 #endif /* HAVE_DB_DIRTY_READ */
 
-#ifdef __PVFS2_TROVE_THREADED__
-#define TROVE_DB_THREAD DB_THREAD
+
+#ifdef HAVE_TROVE_TRANSACTION_SUPPORT
+#define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD | DB_INIT_TXN)
 #else
-#define TROVE_DB_THREAD         0
-#endif /* __PVFS2_TROVE_THREADED__ */
+#define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
+#endif
 
 #define TROVE_DB_MODE                                                 0644
 #define TROVE_DB_TYPE                                             DB_BTREE
-#define TROVE_DB_OPEN_FLAGS        (TROVE_DB_DIRTY_READ | TROVE_DB_THREAD)
-#define TROVE_DB_CREATE_FLAGS            (DB_CREATE | TROVE_DB_OPEN_FLAGS)
+
+#ifdef HAVE_TROVE_TRANSACTION_SUPPORT
+#define TROVE_DB_OPEN_TXN DB_AUTO_COMMIT
+#else
+#define TROVE_DB_OPEN_TXN 0
+#endif
+
+#define TROVE_DB_OPEN_FLAGS              (TROVE_DB_DIRTY_READ | DB_THREAD)
+#define TROVE_DB_CREATE_FLAGS            (DB_CREATE | TROVE_DB_OPEN_FLAGS | TROVE_DB_OPEN_TXN)
 
 /*
   for more efficient host filesystem accesses, we have a simple
@@ -74,16 +82,8 @@ extern "C" {
 do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"
-#define DBPF_GET_STO_ATTRIB_DBNAME(__buf, __path_max, __stoname)         \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%s", __stoname, STO_ATTRIB_DBNAME);   \
-} while (0)
 
 #define COLLECTIONS_DBNAME "collections.db"
-#define DBPF_GET_COLLECTIONS_DBNAME(__buf, __path_max, __stoname)        \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%s", __stoname, COLLECTIONS_DBNAME);  \
-} while (0)
 
 #define DBPF_GET_COLL_DIRNAME(__buf, __path_max, __stoname, __collid)    \
 do {                                                                     \
@@ -118,6 +118,27 @@ do {                                                                     \
         snprintf(__buf, __path_max, "/%s/%08x/%s",               \
                  __stoname, __collid, STRANDED_BSTREAM_DIRNAME); \
     } while(0)
+
+#define SHADOW_REMOVE_BSTREAM_DIRNAME "removable-bstreams"
+#define DBPF_GET_SHADOW_REMOVE_BSTREAM_DIRNAME(                  \
+        __buf, __path_max, __stoname )                           \
+do {                                                             \
+    snprintf(__buf, __path_max,                                  \
+        "/%s/%s",                                                \
+        __stoname,                                               \
+       SHADOW_REMOVE_BSTREAM_DIRNAME);                           \
+} while(0)
+
+#define DBPF_GET_SHADOW_REMOVE_BSTREAM_FILENAME(                 \
+        __buf, __path_max, __stoname, __collid, __handle, __rand)\
+do {                                                             \
+    snprintf(__buf, __path_max,                                  \
+        "/%s/%s/%08x_%.8llu_%08llx.%d",                          \
+        __stoname, SHADOW_REMOVE_BSTREAM_DIRNAME, __collid,      \
+       llu(DBPF_BSTREAM_GET_BUCKET(__handle, __collid)),         \
+       llu(__handle), __rand);            \
+} while(0)
+        
 
 /* arguments are: buf, path_max, stoname, collid, handle */
 #define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __stoname, __cid, __handle)  \
@@ -170,6 +191,7 @@ struct dbpf_storage
     TROVE_ds_flags flags;
     int refct;
     char *name;
+    DB_ENV * env;
     DB *sto_attr_db;
     DB *coll_db;
 };
@@ -194,7 +216,7 @@ struct dbpf_collection
     
     int c_low_watermark;
     int c_high_watermark;
-    int meta_sync_enabled;
+    int meta_sync_mode;
     /*
      * If this option is on we don't queue ops or use threads.
      */
@@ -403,13 +425,14 @@ enum dbpf_op_type
 #define DBPF_OP_IS_KEYVAL(__type) (__type >= KEYVAL_READ && __type < DSPACE_CREATE)
 #define DBPF_OP_IS_DSPACE(__type) (__type >= DSPACE_CREATE)
 
-#define DBPF_OP_DOES_SYNC(__op)    \
+#define DBPF_OP_MODIFIYING_META_OP(__op)    \
     (__op == KEYVAL_WRITE       || \
      __op == KEYVAL_REMOVE_KEY  || \
      __op == KEYVAL_WRITE_LIST  || \
      __op == DSPACE_CREATE      || \
      __op == DSPACE_REMOVE      || \
      __op == DSPACE_SETATTR)
+
 
 /*
   a function useful for debugging that returns a human readable
@@ -426,24 +449,27 @@ enum dbpf_op_state
     OP_COMPLETED,
     OP_DEQUEUED,
     OP_CANCELED,
-    OP_INTERNALLY_DELAYED,
-    OP_SYNC_QUEUED
+    OP_INTERNALLY_DELAYED
 };
 
 #define DBPF_OP_CONTINUE 0
 #define DBPF_OP_COMPLETE 1
-#define DBPF_OP_NEEDS_SYNC 2
 
 /* Used to store parameters for queued operations */
 struct dbpf_op
 {
     enum dbpf_op_type type;
     enum dbpf_op_state state;
+    
+    gen_mutex_t state_mutex;
+    
     TROVE_handle handle;
     TROVE_op_id id;
+    
     struct dbpf_collection *coll_p;
     int (*svc_fn)(struct dbpf_op *op);
     void *user_ptr;
+    
     TROVE_ds_flags flags;
     TROVE_context_id context_id;
     union
@@ -488,9 +514,11 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 #define DBPF_READ   read
 #define DBPF_CLOSE  close
 #define DBPF_UNLINK unlink
-#define DBPF_SYNC   fsync
+#define DBPF_SYNC   fdatasync
 #define DBPF_RESIZE ftruncate
 #define DBPF_FSTAT  fstat
+#define DBPF_RENAME rename
+#define DBPF_MKDIR  mkdir
 
 #define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret)  \
 do {                                                      \
@@ -514,7 +542,8 @@ do {                                                      \
 #define DBPF_ERROR_SYNC_IF_NECESSARY(dbpf_op_ptr, fd)    \
 do {                                                     \
     int tmp_ret, tmp_errno;                              \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)                 \
+    if ((dbpf_op_ptr->flags & TROVE_SYNC) &&                  \
+      dbpf_op_ptr->coll_p->meta_sync_mode == TROVE_SYNC_MODE )\
     {                                                    \
         if ((tmp_ret = DBPF_SYNC(fd)) != 0)              \
         {                                                \
@@ -535,7 +564,8 @@ do {                                                     \
 do {                                                          \
     int tmp_ret;                                              \
     ret = 0;                                                  \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)                      \
+    if ((dbpf_op_ptr->flags & TROVE_SYNC) &&                  \
+      dbpf_op_ptr->coll_p->meta_sync_mode == TROVE_SYNC_MODE )\
     {                                                         \
         if ((tmp_ret = db_ptr->sync(db_ptr, 0)) != 0)         \
         {                                                     \

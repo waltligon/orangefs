@@ -584,7 +584,8 @@ static const configoption_t options[] =
      * synchronization with every metadata write.  This can greatly improve
      * performance.  In general, this value should probably be set to yes,
      * otherwise metadata transaction could be lost in the event of server
-     * failover.
+     * failover. Available is also the mode trans in which real db transactions 
+     * are done.
      */
     {"TroveSyncMeta",ARG_STR, get_trove_sync_meta, NULL, 
         CTX_STORAGEHINTS,"yes"},
@@ -1439,15 +1440,23 @@ DOTCONF_CB(get_trove_sync_meta)
 
     if(strcasecmp(cmd->data.str, "yes") == 0)
     {
-        fs_conf->trove_sync_meta = TROVE_SYNC;
+        fs_conf->trove_sync_meta = TROVE_SYNC_MODE;
     }
+    else if(strcasecmp(cmd->data.str, "trans") == 0)
+    {
+#ifdef HAVE_TROVE_TRANSACTION_SUPPORT
+        fs_conf->trove_sync_meta = TROVE_TRANS_MODE;
+#else
+        return("Trove transaction mode is not available with this db library.\n");
+#endif
+    }    
     else if(strcasecmp(cmd->data.str, "no") == 0)
     {
-        fs_conf->trove_sync_meta = 0;
+        fs_conf->trove_sync_meta = TROVE_SYNC_MODE_NONE;
     }
     else
     {
-        return("TroveSyncMeta value must be 'yes' or 'no'.\n");
+        return("TroveSyncMeta value must be 'yes', 'no' or 'trans'.\n");
     }
 #ifndef HAVE_DB_DIRTY_READ
     if (fs_conf->trove_sync_meta != TROVE_SYNC)

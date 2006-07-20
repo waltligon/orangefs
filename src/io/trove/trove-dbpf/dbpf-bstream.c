@@ -33,7 +33,6 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 #define DBPF_MAX_IOS_IN_PROGRESS  16
 static int s_dbpf_ios_in_progress = 0;
-static dbpf_op_queue_p s_dbpf_io_ready_queue = NULL;
 static gen_mutex_t s_dbpf_io_mutex = GEN_MUTEX_INITIALIZER;
 
 static int issue_or_delay_io_operation(
@@ -77,8 +76,10 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
 #include "dbpf-thread.h"
 #include "pvfs2-internal.h"
 
+
+
+static dbpf_op_queue_s * s_dbpf_io_ready_queue = NULL;
 extern pthread_cond_t dbpf_op_completed_cond;
-extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 static void aio_progress_notification(union sigval sig)
@@ -87,7 +88,6 @@ static void aio_progress_notification(union sigval sig)
     struct dbpf_op *op_p = NULL;
     int ret, i, aiocb_inuse_count, state = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
-    gen_mutex_t *context_mutex = NULL;
 
     cur_op = (dbpf_queued_op_t *)sig.sival_ptr;
     assert(cur_op);
@@ -102,9 +102,7 @@ static void aio_progress_notification(union sigval sig)
     aiocb_p = op_p->u.b_rw_list.aiocb_array;
     assert(aiocb_p);
 
-    gen_mutex_lock(&cur_op->mutex);
-    state = cur_op->op.state;
-    gen_mutex_unlock(&cur_op->mutex);
+    state = dbpf_op_get_status(cur_op);
 
     assert(state != OP_COMPLETED);
 
@@ -168,8 +166,7 @@ static void aio_progress_notification(union sigval sig)
         gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
                      "(state is %s)\n", list_proc_state_strings[op_p->u.b_rw_list.list_proc_state]);
 
-        /* this is a macro defined in dbpf-thread.h */
-        move_op_to_completion_queue(
+        dbpf_move_op_to_completion_queue(
             cur_op, ret,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
 
@@ -266,7 +263,7 @@ static void start_delayed_ops_if_any(int dec_first)
 
     if (!dbpf_op_queue_empty(s_dbpf_io_ready_queue))
     {
-        cur_op = dbpf_op_queue_shownext(s_dbpf_io_ready_queue);
+        cur_op = dbpf_op_pop_front_nolock(s_dbpf_io_ready_queue);
         assert(cur_op);
 #ifndef __PVFS2_TROVE_AIO_THREADED__
         assert(cur_op->op.state == OP_INTERNALLY_DELAYED);
@@ -275,7 +272,6 @@ static void start_delayed_ops_if_any(int dec_first)
                (cur_op->op.type == BSTREAM_READ_LIST) ||
                (cur_op->op.type == BSTREAM_WRITE_AT) ||
                (cur_op->op.type == BSTREAM_WRITE_LIST));
-        dbpf_op_queue_remove(cur_op);
 
         assert(s_dbpf_ios_in_progress <
                (DBPF_MAX_IOS_IN_PROGRESS + 1));
@@ -388,9 +384,7 @@ static int issue_or_delay_io_operation(
           started automatically (internally) on completion of other
           I/O operations
         */
-        gen_mutex_lock(&cur_op->mutex);
-        cur_op->op.state = OP_INTERNALLY_DELAYED;
-        gen_mutex_unlock(&cur_op->mutex);
+        dbpf_op_change_status(cur_op, OP_INTERNALLY_DELAYED);
 #endif
 
         gossip_debug(GOSSIP_TROVE_DEBUG, "delayed I/O operation %p "
@@ -480,7 +474,7 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
     q_op_p->op.u.b_read_at.size = *inout_size_p;
     q_op_p->op.u.b_read_at.buffer = buffer;
 
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p, & dbpf_op_queue[OP_QUEUE_IO]);
 
     return 0;
 }
@@ -572,7 +566,7 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
     q_op_p->op.u.b_write_at.size = *inout_size_p;
     q_op_p->op.u.b_write_at.buffer = buffer;
 
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p, & dbpf_op_queue[OP_QUEUE_IO]);
 
     return 0;
 }
@@ -659,7 +653,7 @@ static int dbpf_bstream_flush(TROVE_coll_id coll_id,
                         flags,
                         context_id);
     
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p, & dbpf_op_queue[OP_QUEUE_IO]);
     return 0;
 }
 
@@ -731,7 +725,7 @@ static int dbpf_bstream_resize(TROVE_coll_id coll_id,
     /* initialize the op-specific members */
     q_op_p->op.u.b_resize.size = *inout_size_p;
 
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p, & dbpf_op_queue[OP_QUEUE_IO]);
 
     return 0;
 }
@@ -1093,11 +1087,9 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
         op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
     }
 
-    gen_mutex_lock(&q_op_p->mutex);
-    q_op_p->op.state = OP_IN_SERVICE;
-    gen_mutex_unlock(&q_op_p->mutex);
+    dbpf_op_change_status(q_op_p, OP_IN_SERVICE);
 
-    id_gen_fast_register(&q_op_p->op.id, q_op_p);
+    id_gen_safe_register(&q_op_p->op.id, q_op_p);
     *out_op_id_p = q_op_p->op.id;
 
     ret = issue_or_delay_io_operation(

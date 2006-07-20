@@ -19,7 +19,6 @@ enum s_sync_context_e
 static dbpf_sync_context_t 
     sync_array[COALESCE_CONTEXT_LAST][TROVE_MAX_CONTEXTS];
 
-extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 extern pthread_cond_t dbpf_op_completed_cond;
 
@@ -91,25 +90,32 @@ void dbpf_sync_context_destroy(int context_index)
     {
         gen_mutex_lock(sync_array[c][context_index].mutex);
         gen_mutex_destroy(sync_array[c][context_index].mutex);
-        dbpf_op_queue_cleanup(sync_array[c][context_index].sync_queue);
+        dbpf_op_queue_cleanup_nolock(sync_array[c][context_index].sync_queue);
     }
 }
 
-int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
-{
-
+int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int enqueue_possible, 
+    int ret_state)
+{   
     int ret = 0;
     DB * dbp = NULL;
     dbpf_sync_context_t * sync_context;
     dbpf_queued_op_t *ready_op;
-    int sync_context_type;
+    enum s_sync_context_e sync_context_type;
     struct dbpf_collection* coll = qop_p->op.coll_p;
-    int cid = qop_p->op.context_id;
-
-    assert(DBPF_OP_DOES_SYNC(qop_p->op.type));
+    TROVE_context_id cid;
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: sync_coalesce called\n");
+
+    /*
+     * Todo coalesce better in transaction mode
+     */
+    if ( coll->meta_sync_mode == TROVE_TRANS_MODE )
+    {
+        dbpf_move_op_to_completion_queue(qop_p, ret_state, OP_COMPLETED);
+        return 0;
+    }
 
     sync_context_type = dbpf_sync_get_object_sync_context(qop_p->op.type);
 
@@ -117,9 +123,11 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
         /*
          * No sync needed at all
          */
-        ret = dbpf_queued_op_complete(qop_p, 0, OP_COMPLETED);
+        dbpf_move_op_to_completion_queue(qop_p, ret_state, OP_COMPLETED);
         return 0;
     }
+    
+    cid = qop_p->op.context_id; 
 
     /*
      * Now we now that this particular op is modifying
@@ -135,10 +143,10 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
         dbp = qop_p->op.coll_p->keyval_db;
     }
 
-    if ( ! coll->meta_sync_enabled )
+    if ( coll->meta_sync_mode == TROVE_SYNC_MODE_NONE )
     {
 
-        ret = dbpf_queued_op_complete(qop_p, 0, OP_COMPLETED);
+        dbpf_move_op_to_completion_queue(qop_p, ret_state, OP_COMPLETED);
         /*
          * Sync periodical if count < lw or if lw = 0 and count > hw 
          */
@@ -173,8 +181,8 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
      * coalesync. 
      */
     gen_mutex_lock(sync_context->mutex);
-    if( (sync_context->sync_counter < coll->c_low_watermark) ||
-        ( coll->c_high_watermark > 0 && 
+    if( sync_context->sync_counter < coll->c_low_watermark 
+        || ( coll->c_high_watermark > 0 && 
           sync_context->coalesce_counter >= coll->c_high_watermark ) )
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
@@ -183,43 +191,39 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
                      sync_context->coalesce_counter,
                      sync_context->sync_counter);
 
-        /* sync this operation.  We don't want to use SYNC_IF_NECESSARY
+        /* 
+         * sync this operation.  We don't want to use SYNC_IF_NECESSARY
+         * sync if enqueue is not possible or something is in the queue
          */
-
         ret = dbpf_sync_db(dbp, sync_context_type, sync_context);
 
         gen_mutex_lock(
             dbpf_completion_queue_array_mutex[cid]);
 
-        dbpf_op_queue_add(
-            dbpf_completion_queue_array[cid], qop_p);
-        gen_mutex_lock(&qop_p->mutex);
-        qop_p->op.state = OP_COMPLETED;
-        qop_p->state = 0;
-        gen_mutex_unlock(&qop_p->mutex);
-
+        assert(
+            sync_context->coalesce_counter == sync_context->sync_queue->elems);
 
         /* move remaining ops in queue with ready-to-be-synced state
          * to completion queue
          */
         while(!dbpf_op_queue_empty(sync_context->sync_queue))
         {
-            ready_op = dbpf_op_queue_shownext(sync_context->sync_queue);
-            dbpf_op_queue_remove(ready_op);
-            dbpf_op_queue_add(
-                dbpf_completion_queue_array[cid], 
-                ready_op);
-            gen_mutex_lock(&ready_op->mutex);
-            ready_op->op.state = OP_COMPLETED;
-            ready_op->state = 0;
-            gen_mutex_unlock(&ready_op->mutex);
+            ready_op = dbpf_op_pop_front_nolock(sync_context->sync_queue);
+            dbpf_move_op_to_completion_queue_nolock(ready_op, 0, OP_COMPLETED);
         }
+        
+        dbpf_move_op_to_completion_queue_nolock(qop_p, ret_state, OP_COMPLETED);
 
         sync_context->coalesce_counter = 0;
-        pthread_cond_signal(&dbpf_op_completed_cond);
+        
+        pthread_cond_signal(& dbpf_op_completed_cond);
         gen_mutex_unlock(
             dbpf_completion_queue_array_mutex[cid]);
         ret = 1;
+    }
+    else if (! enqueue_possible)
+    {
+        dbpf_move_op_to_completion_queue(qop_p, ret_state, OP_COMPLETED);
     }
     else
     {
@@ -240,9 +244,9 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
 int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
 {
     dbpf_sync_context_t * sync_context;
-    int sync_context_type;
+    enum s_sync_context_e sync_context_type;
 
-    if (!DBPF_OP_DOES_SYNC(qop_p->op.type))
+    if (!DBPF_OP_MODIFIYING_META_OP(qop_p->op.type))
     { 
         return 0;
     } 
@@ -278,9 +282,9 @@ int dbpf_sync_coalesce_dequeue(
     dbpf_queued_op_t *qop_p)
 {
     dbpf_sync_context_t * sync_context;
-    int sync_context_type;
+    enum s_sync_context_e sync_context_type;
 
-    if (!DBPF_OP_DOES_SYNC(qop_p->op.type))
+    if (!DBPF_OP_MODIFIYING_META_OP(qop_p->op.type))
     { 
         return 0;
     } 
@@ -321,15 +325,6 @@ void dbpf_queued_op_set_sync_low_watermark(
     int low, struct dbpf_collection* coll)
 {
     coll->c_low_watermark = low;
-}
-
-void dbpf_queued_op_set_sync_mode(int enabled, struct dbpf_collection* coll)
-{
-    /*
-     * Right now we don't have to check if there are operations queued in the
-     * coalesync queue, because the mode is set on startup...
-     */
-    coll->meta_sync_enabled = enabled;
 }
 
 /*

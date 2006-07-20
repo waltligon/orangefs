@@ -30,19 +30,14 @@
 #include "dbpf-attr-cache.h"
 #include "dbpf-open-cache.h"
 
-#ifdef __PVFS2_TROVE_THREADED__
 #include <pthread.h>
 #include "dbpf-thread.h"
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
 extern pthread_cond_t dbpf_op_completed_cond;
-extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
-#else
-extern struct qlist_head dbpf_op_queue;
-extern gen_mutex_t dbpf_op_queue_mutex;
-#endif
+
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
 int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
@@ -316,7 +311,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
                     1, PINT_PERF_SUB);
 
     *op_p->u.d_create.out_handle_p = new_handle;
-    return DBPF_OP_NEEDS_SYNC;
+    return DBPF_OP_COMPLETE;
 
 return_error:
     if (new_handle != TROVE_HANDLE_NULL)
@@ -401,10 +396,19 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     dbpf_attr_cache_remove(ref);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
-    /* remove bstream if it exists.  Not a fatal
+    /* move bstream if it exists to removable-bstreams. Not a fatal
      * error if this fails (may not have ever been created)
      */
     ret = dbpf_open_cache_remove(op_p->coll_p->coll_id, op_p->handle);
+
+    /*
+     * Notify deletion thread that we have something to do.
+     */
+    if (ret == 0){
+        gen_mutex_lock(& dbpf_op_queue_mutex[OP_QUEUE_BACKGROUND_FILE_REMOVAL]);
+        pthread_cond_signal(& dbpf_op_incoming_cond[OP_QUEUE_BACKGROUND_FILE_REMOVAL]);
+        gen_mutex_unlock(& dbpf_op_queue_mutex[OP_QUEUE_BACKGROUND_FILE_REMOVAL]);
+    }
 
     /* remove the keyval entries for this handle if any exist.
      * this way seems a bit messy to me, i.e. we're operating
@@ -440,7 +444,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 
     /* return handle to free list */
     trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
-    return DBPF_OP_NEEDS_SYNC;
+    return DBPF_OP_COMPLETE;
 
 return_error:
     return ret;
@@ -890,7 +894,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
-    return DBPF_OP_NEEDS_SYNC;
+    return DBPF_OP_COMPLETE;
     
 return_error:
     return ret;
@@ -967,61 +971,73 @@ return_error:
     return ret;
 }
 
-/*
-  FIXME: it's possible to have a non-threaded version of this, but
-  it's not implemented right now
-*/
 static int dbpf_dspace_cancel(
     TROVE_coll_id coll_id,
     TROVE_op_id id,
     TROVE_context_id context_id)
 {
     int ret = -TROVE_ENOSYS;
-#ifdef __PVFS2_TROVE_THREADED__
-    int state = 0;
+    enum dbpf_op_state state = OP_UNITIALIZED;
     gen_mutex_t *context_mutex = NULL;
     dbpf_queued_op_t *cur_op = NULL;
-#endif
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called for "
                  "id %llu.\n", llu(id));
 
-#ifdef __PVFS2_TROVE_THREADED__
-
     assert(dbpf_completion_queue_array[context_id]);
     context_mutex = dbpf_completion_queue_array_mutex[context_id];
     assert(context_mutex);
-    cur_op = id_gen_fast_lookup(id);
+    
+    /*
+     * Protect against removal from completion queue while we read state
+     * cases:
+     *  1) op is completed or canceled => finish
+     *  2) op is pending in a op_queue => find out which queue => cancel op
+     *  3) op is serviced => finish, we cannot do anything.
+     */
+    gen_mutex_lock(context_mutex);
+    cur_op = id_gen_safe_lookup(id);
     if (cur_op == NULL)
     {
+        gen_mutex_unlock(context_mutex);
         gossip_err("Invalid operation to test against\n");
         return -TROVE_EINVAL;
     }
 
-    /* check the state of the current op to see if it's completed */
-    gen_mutex_lock(&cur_op->mutex);
-    state = cur_op->op.state;
-    gen_mutex_unlock(&cur_op->mutex);
-
-    gossip_debug(GOSSIP_TROVE_DEBUG, "got cur_op %p\n", cur_op);
-
+    state = dbpf_op_get_status(cur_op);
+    
     switch(state)
     {
         case OP_QUEUED:
         {
+            enum dbpf_op_type type = cur_op->queue_type; 
+            /*
+             * Another thread might draw the object from the pending queue while we
+             * are here so we have to double check to avoid this case !
+             */
             gossip_debug(GOSSIP_TROVE_DEBUG,
                          "op %p is queued: handling\n", cur_op);
-
-            /* dequeue and complete the op in canceled state */
-            cur_op->op.state = OP_IN_SERVICE;
-            dbpf_queued_op_put_and_dequeue(cur_op);
-            assert(cur_op->op.state == OP_DEQUEUED);
-
-            /* this is a macro defined in dbpf-thread.h */
-            move_op_to_completion_queue(cur_op, 0, OP_CANCELED);
-
-            gossip_debug(
-                GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
+                         
+            gen_mutex_lock(& dbpf_op_queue_mutex[ type ] );
+            state = dbpf_op_get_status(cur_op);
+            if ( state == OP_QUEUED ){
+                /*
+                 * Now we are sure that the object is still pending !
+                 * dequeue and complete the op in canceled state 
+                 */
+                dbpf_op_queue_remove(cur_op);    
+                dbpf_move_op_to_completion_queue_nolock(cur_op, 0, OP_CANCELED);
+                gossip_debug(
+                    GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);          
+                pthread_cond_signal(& dbpf_op_completed_cond);
+                       
+            }else{
+                gossip_debug(
+                    GOSSIP_TROVE_DEBUG, "op %p could not be canceled, is drawn"
+                    " from pending queue\n", cur_op);
+            }
+            gen_mutex_unlock(& dbpf_op_queue_mutex[ type ] );
+            
             ret = 0;
         }
         break;
@@ -1066,8 +1082,10 @@ static int dbpf_dspace_cancel(
         default:
             gossip_err("Invalid dbpf_op state found (%d)\n", state);
             assert(0);
-    }
-#endif
+    }    
+    
+    gen_mutex_unlock(context_mutex);
+
     return ret;
 }
 
@@ -1096,17 +1114,14 @@ static int dbpf_dspace_test(
 {
     int ret = -TROVE_EINVAL;
     dbpf_queued_op_t *cur_op = NULL;
-#ifdef __PVFS2_TROVE_THREADED__
-    int state = 0;
+    enum dbpf_op_state state = 0;
     gen_mutex_t *context_mutex = NULL;
-#endif
 
     *out_count_p = 0;
-#ifdef __PVFS2_TROVE_THREADED__
     assert(dbpf_completion_queue_array[context_id]);
     context_mutex = dbpf_completion_queue_array_mutex[context_id];
     assert(context_mutex);
-    cur_op = id_gen_fast_lookup(id);
+    cur_op = id_gen_safe_lookup(id);
     if (cur_op == NULL)
     {
         gossip_err("Invalid operation to test against\n");
@@ -1116,9 +1131,7 @@ static int dbpf_dspace_test(
     gen_mutex_lock(context_mutex);
 
     /* check the state of the current op to see if it's completed */
-    gen_mutex_lock(&cur_op->mutex);
-    state = cur_op->op.state;
-    gen_mutex_unlock(&cur_op->mutex);
+    state = dbpf_op_get_status(cur_op);
 
     /* if the op is not completed, wait for up to max_idle_time_ms */
     if ((state != OP_COMPLETED) && (state != OP_CANCELED))
@@ -1148,9 +1161,7 @@ static int dbpf_dspace_test(
         else
         {
             /* some op completed, check if it's the one we're testing */
-            gen_mutex_lock(&cur_op->mutex);
-            state = cur_op->op.state;
-            gen_mutex_unlock(&cur_op->mutex);
+            state = dbpf_op_get_status(cur_op);
 
             if ((state == OP_COMPLETED) || (state == OP_CANCELED))
             {
@@ -1184,53 +1195,6 @@ static int dbpf_dspace_test(
   op_not_completed:
     gen_mutex_unlock(context_mutex);
     return 0;
-
-#else
-
-    /* map to queued operation */
-    ret = dbpf_queued_op_try_get(id, &cur_op);
-    switch (ret)
-    {
-        case DBPF_QUEUED_OP_INVALID:
-            return -TROVE_EINVAL;
-        case DBPF_QUEUED_OP_BUSY:
-            *out_count_p = 0;
-            return 0;
-        case DBPF_QUEUED_OP_SUCCESS:
-            break;
-    }
-    
-    ret = cur_op->op.svc_fn(&(cur_op->op));
-
-    if (ret != 0)
-    {
-        /* operation is done and we are telling the caller;
-         * ok to pull off queue now.
-         *
-         * returns error code from operation in region pointed
-         * to by state_p.
-         */
-        *out_count_p = 1;
-
-        *state_p = (ret == 1) ? 0 : ret;
-
-        if (returned_user_ptr_p != NULL)
-        {
-            *returned_user_ptr_p = cur_op->op.user_ptr;
-        }
-
-        organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
-        dbpf_queued_op_put_and_dequeue(cur_op);
-        dbpf_queued_op_free(cur_op);
-        return 1;
-    }
-
-    dbpf_queued_op_put(cur_op, 0);
-    gossip_debug(GOSSIP_TROVE_DEBUG,
-                 "dbpf_dspace_test returning no progress.\n");
-    usleep((max_idle_time_ms * 1000));
-    return 0;
-#endif
 }
 
 static int dbpf_dspace_testcontext(
@@ -1244,7 +1208,6 @@ static int dbpf_dspace_testcontext(
 {
     int ret = 0;
     dbpf_queued_op_t *cur_op = NULL;
-#ifdef __PVFS2_TROVE_THREADED__
     int out_count = 0, limit = *inout_count_p;
     gen_mutex_t *context_mutex = NULL;
     void **user_ptr_p = NULL;
@@ -1301,12 +1264,9 @@ static int dbpf_dspace_testcontext(
     while(!dbpf_op_queue_empty(dbpf_completion_queue_array[context_id]) &&
           (out_count < limit))
     {
-        cur_op = dbpf_op_queue_shownext(
+        cur_op = dbpf_op_pop_front_nolock(
             dbpf_completion_queue_array[context_id]);
         assert(cur_op);
-
-        /* pull the op out of the context specific completion queue */
-        dbpf_op_queue_remove(cur_op);
 
         state_array[out_count] = cur_op->state;
 
@@ -1326,38 +1286,6 @@ static int dbpf_dspace_testcontext(
 
     *inout_count_p = out_count;
     ret = 0;
-#else
-    /*
-      without threads, we're going to just test the
-      first operation we can get our hands on in the
-      operation queue.  so we grab the trove id of the
-      next op from the op queue and test it for
-      completion here.
-    */
-    gen_mutex_lock(&dbpf_op_queue_mutex);
-    cur_op = dbpf_op_queue_shownext(&dbpf_op_queue);
-    gen_mutex_unlock(&dbpf_op_queue_mutex);
-
-    if (cur_op)
-    {
-        ret = dbpf_dspace_test(
-            coll_id, cur_op->op.id, context_id, inout_count_p, NULL,
-            &(user_ptr_array[0]), &(state_array[0]), max_idle_time_ms);
-        if (ret == 1)
-        {
-            ds_id_array[0] = cur_op->op.id;
-        }
-    }
-    else
-    {
-        /*
-          if there's no op to service, just return after wasting time
-          away for now
-        */
-        *inout_count_p = 0;
-        usleep((max_idle_time_ms * 1000));
-    }
-#endif
     return ret;
 }
 
@@ -1381,8 +1309,8 @@ static int dbpf_dspace_testsome(
     int max_idle_time_ms)
 {
     int i = 0, out_count = 0, ret = 0;
-#ifdef __PVFS2_TROVE_THREADED__
-    int state = 0, wait = 0;
+    enum dbpf_op_state state = OP_UNITIALIZED;
+    int wait = 0;
     dbpf_queued_op_t *cur_op = NULL;
     gen_mutex_t *context_mutex = NULL;
     void **returned_user_ptr_p = NULL;
@@ -1394,13 +1322,11 @@ static int dbpf_dspace_testsome(
 
     gen_mutex_lock(context_mutex);
   scan_for_completed_ops:
-#endif
 
     assert(inout_count_p);
     for (i = 0; i < *inout_count_p; i++)
     {
-#ifdef __PVFS2_TROVE_THREADED__
-        cur_op = id_gen_fast_lookup(ds_id_array[i]);
+        cur_op = id_gen_safe_lookup(ds_id_array[i]);
         if (cur_op == NULL)
         {
             gen_mutex_unlock(context_mutex);
@@ -1409,9 +1335,7 @@ static int dbpf_dspace_testsome(
         }
 
         /* check the state of the current op to see if it's completed */
-        gen_mutex_lock(&cur_op->mutex);
-        state = cur_op->op.state;
-        gen_mutex_unlock(&cur_op->mutex);
+        state = dbpf_op_get_status(cur_op);
 
         if ((state == OP_COMPLETED) || (state == OP_CANCELED))
         {
@@ -1433,20 +1357,6 @@ static int dbpf_dspace_testsome(
         }
         ret = (((state == OP_COMPLETED) ||
                 (state == OP_CANCELED)) ? 1 : 0);
-#else
-        int tmp_count = 0;
-
-        ret = dbpf_dspace_test(
-            coll_id,
-            ds_id_array[i],
-            context_id,
-            &tmp_count,
-            &vtag_array[i],
-            ((returned_user_ptr_array != NULL) ?
-             &returned_user_ptr_array[out_count] : NULL),
-            &state_array[out_count],
-            max_idle_time_ms);
-#endif
         if (ret != 0)
         {
             /* operation is done and we are telling the caller;
@@ -1457,7 +1367,6 @@ static int dbpf_dspace_testsome(
         }
     }
 
-#ifdef __PVFS2_TROVE_THREADED__
     /* if no op completed, wait for up to max_idle_time_ms */
     if ((wait == 0) && (out_count == 0) && (max_idle_time_ms > 0))
     {
@@ -1494,7 +1403,6 @@ static int dbpf_dspace_testsome(
     }
 
     gen_mutex_unlock(context_mutex);
-#endif
 
     *inout_count_p = out_count;
     return ((out_count > 0) ? 1 : 0);

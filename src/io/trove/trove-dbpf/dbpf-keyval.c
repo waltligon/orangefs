@@ -476,7 +476,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
-    ret = DBPF_OP_NEEDS_SYNC;
+    ret = DBPF_OP_COMPLETE;
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
 
@@ -563,7 +563,7 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    ret = DBPF_OP_NEEDS_SYNC;
+    ret = DBPF_OP_COMPLETE;
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
 
@@ -1123,7 +1123,7 @@ or if there is no associated cache_elem for this key
         gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
 
-    ret = DBPF_OP_NEEDS_SYNC;
+    ret = DBPF_OP_COMPLETE;
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
 
