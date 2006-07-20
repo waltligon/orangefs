@@ -653,7 +653,7 @@ int PINT_req_sched_post(
                     break;
                 }
             }
-/*
+            
             if(!tmp_flag)
             {
                 tmp_element->state = REQ_SCHEDULED;
@@ -664,10 +664,10 @@ int PINT_req_sched_post(
             }
             else
             {
-*/            
+            
                 tmp_element->state = REQ_QUEUED;
                 ret = 0;
-/*            }*/
+            }
         }
 	else
 	{
@@ -676,10 +676,8 @@ int PINT_req_sched_post(
 	}
     }
     
-    /*
     tmp_element->state = REQ_SCHEDULED;
     ret = 1;
-    */
 
     /* add this element to the list */
     tmp_element->list_head = tmp_list;
@@ -1020,7 +1018,6 @@ int PINT_req_sched_release(
                     }
                 }
 	    }
-        print_req_scheduler_queues(tmp_list);
 	}
 	sched_count--;
     }

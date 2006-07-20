@@ -30,6 +30,8 @@ void dbpf_move_op_to_completion_queue(dbpf_queued_op_t *cur_op,
     TROVE_ds_state ret_state, enum dbpf_op_state end_state){
     TROVE_context_id cid = cur_op->op.context_id;
     gen_mutex_t * context_mutex = dbpf_completion_queue_array_mutex[cid];
+    
+    gen_mutex_lock(context_mutex);
     dbpf_move_op_to_completion_queue_nolock(cur_op, ret_state, end_state);
 
     /* wake up one waiting thread, if any */
