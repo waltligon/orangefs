@@ -529,7 +529,6 @@ typedef struct PINT_client_sm
 /* sysint post/test functions */
 PVFS_error PINT_client_state_machine_post(
     PINT_smcb *smcb,
-    int pvfs_sys_op,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 

@@ -98,7 +98,7 @@ PVFS_error PVFS_imgmt_create_dirent(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_CREATE_DIRENT,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -118,7 +118,7 @@ PVFS_error PVFS_imgmt_create_dirent(
         parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_MGMT_CREATE_DIRENT, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Create a directory entry pointing to a specific object.

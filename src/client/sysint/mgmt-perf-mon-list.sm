@@ -120,7 +120,7 @@ PVFS_error PVFS_imgmt_perf_mon_list(
     }
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_MGMT_PERF_MON_LIST, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Obtain performance statistics from a list of servers.

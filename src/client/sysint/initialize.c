@@ -70,16 +70,6 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     PINT_smcb *smcb = NULL;
     uint64_t debug_mask = 0;
 
-    PINT_smcb_alloc(&smcb, PVFS_CLIENT_JOB_TIMER,
-            sizeof(struct PINT_client_sm), client_op_state_get_machine);
-    if(!smcb)
-    {
-	return(-PVFS_ENOMEM);
-    }
-
-    /* keep track of this pointer for freeing on finalize */
-    g_smcb = smcb;
-
     gossip_enable_stderr();
 
     debug_mask_str = getenv("PVFS2_DEBUGMASK");
@@ -201,13 +191,22 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         goto error_exit;
     }
 
-    ret = PINT_client_state_machine_post(
-        smcb, PVFS_CLIENT_JOB_TIMER, NULL, NULL);
+    /* start job timer */
+    PINT_smcb_alloc(&smcb, PVFS_CLIENT_JOB_TIMER,
+            sizeof(struct PINT_client_sm), client_op_state_get_machine);
+    if(!smcb)
+    {
+	return(-PVFS_ENOMEM);
+    }
+
+    ret = PINT_client_state_machine_post(smcb, NULL, NULL);
     if (ret < 0)
     {
 	gossip_lerr("Error posting job timer.\n");
 	goto error_exit;
     }
+    /* keep track of this pointer for freeing on finalize */
+    g_smcb = smcb;
 
     return 0;
 

@@ -1712,11 +1712,11 @@ static int server_state_machine_start(
          * response that gives a helpful error on client side even
          * though we can't interpret what the client was asking for
          */
-        smcb->op = PVFS_SERV_PROTO_ERROR;
+        ret = PINT_smcb_set_op(smcb, PVFS_SERV_PROTO_ERROR);
     }
     else if (ret == 0)
     {
-        smcb->op = s_op->req->op;
+        ret = PINT_smcb_set_op(smcb, s_op->req->op);
     }
     else
     {
@@ -1732,7 +1732,7 @@ static int server_state_machine_start(
     s_op->addr = s_op->unexp_bmi_buff.addr;
     s_op->tag  = s_op->unexp_bmi_buff.tag;
 
-    if (!PINT_state_machine_locate(smcb))
+    if (!ret)
     {
         gossip_err("Error: server does not implement request type: %d\n",
                    (int)s_op->req->op);
@@ -1740,8 +1740,8 @@ static int server_state_machine_start(
         return -PVFS_ENOSYS;
     }
 
-    s_op->resp.op = smcb->op;
-    return PINT_state_machine_invoke(smcb, js_p);
+    s_op->resp.op = s_op->req->op;
+    return PINT_state_machine_start(smcb, js_p);
 }
 
 /* server_state_machine_alloc_noreq()
@@ -1908,10 +1908,22 @@ static int parse_port_from_host_id(char* host_id)
  */
 struct PINT_state_machine_s *server_op_state_get_machine(int op)
 {
-    if (op <= PVFS_MAX_SERVER_OP)
-        return PINT_server_req_table[op].sm;
-    else
-        return NULL;
+    switch (op)
+    {
+    case BMI_UNEXPECTED_OP :
+        {
+            return &pvfs2_void_sm;
+            break;
+        }
+    default :
+        {
+            if (op <= PVFS_MAX_SERVER_OP)
+                return PINT_server_req_table[op].sm;
+            else
+                return NULL;
+            break;
+        }
+    }
 }
 
 /*

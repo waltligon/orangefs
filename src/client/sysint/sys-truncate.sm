@@ -109,7 +109,7 @@ PVFS_error PVFS_isys_truncate(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_isys_truncate entered with %lld\n", lld(size));
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_TRUNCATE,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -130,7 +130,7 @@ PVFS_error PVFS_isys_truncate(
         0);
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_TRUNCATE, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 PVFS_error PVFS_sys_truncate(

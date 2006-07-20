@@ -245,7 +245,7 @@ PVFS_error PVFS_isys_mkdir(
                  llu(parent_ref.handle), parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_MKDIR, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Create a new directory.

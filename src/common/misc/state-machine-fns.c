@@ -87,7 +87,28 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
                  machine_name,
                  state_name,
                  r->error_code);
+
+    /* process return value */
+    switch (retval)
+    {
+    case SM_ACTION_COMPLETE :
+    case SM_ACTION_DEFERRED :
+        return retval;
+    default :
+        /* error */
+        break;
+    }
+
     return retval;
+}
+
+int PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
+{
+    int ret;
+    ret = PINT_state_machine_invoke(smcb, r);
+    if (ret == SM_ACTION_COMPLETE)
+        ret = PINT_state_machine_next(smcb, r);
+    return ret;
 }
 
 /* Function: PINT_state_machine_next()
@@ -95,13 +116,13 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
    Returns:   return value of state action
 
    Synopsis: Runs through a list of return values to find the next function to
-   call.  Calls that function.  Once that function is called, this one exits
-   and we go back to pvfs2-server.c's while loop.
+   call.  Calls that function.  If that function returned COMPLETED loop
+   and repeat.
  */
 int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 {
-    int code_val = r->error_code;       /* temp to hold the return code */
     union PINT_state_array_values *loc; /* temp pointer into state memory */
+    int ret;                            /* holes state action return code */
 
     if (!smcb && !smcb->current_state)
     {
@@ -110,70 +131,85 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
     }
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
             "SM next smcb %p op %d\n",smcb,(smcb)->op);
+    /* loop while returns COMPLETED */
     do {
-	/* skip over the current state action to get to the return code list */
-	loc = smcb->current_state + 1;
+        /* loop while returning from nested SM */
+        do {
+	    /* skip over the current state action to
+             * get to the return code list
+             */
+	    loc = smcb->current_state + 1;
+    
+	    /* for each entry in the state machine table there is a return
+	    * code followed by a next state pointer to the new state.
+	    * This loops through each entry, checking for a match on the
+	    * return address, and then sets the new current_state and calls
+	    * the new state action function */
+	    while (loc->return_value != r->error_code &&
+	            loc->return_value != DEFAULT_ERROR) 
+	    {
+	        /* each entry has a return value followed by a next state
+	        * pointer, so we increment by two.
+	        */
+	        loc += 2;
+	    }
 
-	/* for each entry in the state machine table there is a return
-	 * code followed by a next state pointer to the new state.
-	 * This loops through each entry, checking for a match on the
-	 * return address, and then sets the new current_state and calls
-	 * the new state action function */
-	while (loc->return_value != code_val &&
-	       loc->return_value != DEFAULT_ERROR) 
-	{
-	    /* each entry has a return value followed by a next state
-	     * pointer, so we increment by two.
-	     */
-	    loc += 2;
-	}
+	    /* skip over the return code to get to the pointer for the
+	    * next state
+	    */
+	    loc += 1;
 
-	/* skip over the return code to get to the pointer for the
-	 * next state
-	 */
-	loc += 1;
+	    /* its not legal to actually reach a termination point; preceding
+	    * function should have completed state machine.
+	    */
+	    if(loc->flag == SM_TERMINATE)
+	    {
+	        gossip_err("Error: state machine using an"
+                        " invalid termination path.\n");
+	        return(-PVFS_EINVAL);
+	    }
 
-	/* its not legal to actually reach a termination point; preceding
-	 * function should have completed state machine.
-	 */
-	if(loc->flag == SM_TERMINATE)
-	{
-	    gossip_err("Error: state machine using an invalid termination path.\n");
-	    return(-PVFS_EINVAL);
-	}
+	    /* Update the server_op struct to reflect the new location
+	    * see if the selected return value is a STATE_RETURN */
+	    if (loc->flag == SM_RETURN)
+	    {
+	        smcb->current_state = PINT_pop_state(smcb);
+                /* skip state flags */
+	        smcb->current_state += 1;
+	    }
+        } while (loc->flag == SM_RETURN);
 
-	/* Update the server_op struct to reflect the new location
-	 * see if the selected return value is a STATE_RETURN */
-	if (loc->flag == SM_RETURN)
-	{
-	    smcb->current_state = PINT_pop_state(smcb);
-	    smcb->current_state += 1; /* skip state flags */
-	}
-    } while (loc->flag == SM_RETURN);
+        smcb->current_state = loc->next_state;
+        /* skip state name and parent SM ref */
+        smcb->current_state += 2;
 
-    smcb->current_state = loc->next_state;
-    smcb->current_state += 2;  /* skip state name and parent SM ref */
+        /* To do nested states, we check to see if the next state is
+        * a nested state machine, and if so we push the return state
+        * onto a stack */
+        while (smcb->current_state->flag == SM_JUMP)
+        {
+	    PINT_push_state(smcb, smcb->current_state);
 
+            /* skip state flag; now we point to the SM */
+	    smcb->current_state += 1;
 
-    /* To do nested states, we check to see if the next state is
-     * a nested state machine, and if so we push the return state
-     * onto a stack */
-    while (smcb->current_state->flag == SM_JUMP)
-    {
-	PINT_push_state(smcb, smcb->current_state);
-	smcb->current_state += 1; /* skip state flag; now we point to the SM */
+	    smcb->current_state =
+                    smcb->current_state->nested_machine->state_machine;
+            /* skip state name a parent SM ref */
+            smcb->current_state += 2;
+        }
 
-	smcb->current_state = smcb->current_state->nested_machine->state_machine;
-        smcb->current_state += 2;  /* skip state name a parent SM ref */
-    }
+        /* skip over the flag so that we point to the function for the next
+        * state.  then call it.
+        */
+        smcb->current_state += 1;
 
-    /* skip over the flag so that we point to the function for the next
-     * state.  then call it.
-     */
-    smcb->current_state += 1;
+        /* runs state_action and returns the return code */
+        ret = PINT_state_machine_invoke(smcb, r);
 
-    /* runs state_action and returns the return code */
-    return PINT_state_machine_invoke(smcb, r);
+    } while (ret == SM_ACTION_COMPLETE);
+
+    return ret;
 }
 
 /* Function: PINT_state_machine_locate(void)
@@ -202,6 +238,7 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
     if (op_sm != NULL)
     {
 	current_tmp = op_sm->state_machine;
+        /* skip SM name and parent */
         current_tmp += 2;
 	/* handle the case in which the first state points to a nested
 	 * machine, rather than a simple function
@@ -209,15 +246,18 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
 	while(current_tmp->flag == SM_JUMP)
 	{
 	    PINT_push_state(smcb, current_tmp);
+            /* skip state flag */
 	    current_tmp += 1;
 	    current_tmp = ((struct PINT_state_machine_s *)
                            current_tmp->nested_machine)->state_machine;
+            /* skip SM name and parent */
             current_tmp += 2;
 	}
 
 	/* this sets a pointer to a "PINT_state_array_values"
 	 * structure, whose state_action member is the function to call.
 	 */
+        /* skip state flag */
         smcb->current_state = current_tmp + 1;
 	return 1; /* indicates successful locate */
     }
@@ -226,8 +266,73 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
     return 0; /* indicates failed to locate */
 }
 
-/* Function: PINT_smcb_alloc
+/* Function: PINT_smcb_set_op
    Params: pointer to an smcb pointer, and an op code (int)
+   Returns: nothing
+   Synopsis: sets op on existing smcb and reruns locate if
+            we have a valid locate func
+ */
+int PINT_smcb_set_op(struct PINT_smcb *smcb, int op)
+{
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "SM set op smcb %p op %d\n",smcb,op);
+    smcb->op = op;
+    return PINT_state_machine_locate(smcb);
+}
+
+/* Function: PINT_smcb_op
+   Params: pointer to an smcb pointer
+   Returns: op (int)
+   Synopsis: returns the op currently set in the smcb
+ */
+int PINT_smcb_op(struct PINT_smcb *smcb)
+{
+    return smcb->op;
+}
+
+/* Function: PINT_smcb_set_complete
+   Params: pointer to an smcb pointer
+   Returns: nothing
+   Synopsis: sets op_complete on existing smcb
+ */
+void PINT_smcb_set_complete(struct PINT_smcb *smcb)
+{
+    smcb->op_complete = 1;
+}
+
+/* Function: PINT_smcb_complete
+   Params: pointer to an smcb pointer
+   Returns: op (int)
+   Synopsis: returns the op_complete currently set in the smcb
+ */
+int PINT_smcb_complete(struct PINT_smcb *smcb)
+{
+    return smcb->op_complete;
+}
+
+/* Function: PINT_smcb_set_cancelled
+   Params: pointer to an smcb pointer
+   Returns: nothing
+   Synopsis: sets op_cancelled on existing smcb
+ */
+void PINT_smcb_set_cancelled(struct PINT_smcb *smcb)
+{
+    smcb->op_cancelled = 1;
+}
+
+/* Function: PINT_smcb_cancelled
+   Params: pointer to an smcb pointer
+   Returns: op (int)
+   Synopsis: returns the op_cancelled currently set in the smcb
+ */
+int PINT_smcb_cancelled(struct PINT_smcb *smcb)
+{
+    return smcb->op_cancelled;
+}
+
+/* Function: PINT_smcb_alloc
+   Params: pointer to an smcb pointer, an op code (int), size of frame
+            (int), pinter to function to locate SM
    Returns: nothing, but fills in pointer argument
    Synopsis: this allocates an smcb struct, including its frame stack
              and sets the op code so you can start the state machine
@@ -243,6 +348,8 @@ int PINT_smcb_alloc(
     {
         return -PVFS_ENOMEM;
     }
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "SM allocate smcb %p op %d\n",*smcb,op);
     memset(*smcb, 0, sizeof(struct PINT_smcb));
     if (frame_size > 0)
     {
@@ -255,8 +362,8 @@ int PINT_smcb_alloc(
     }
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "SM allocate smcb %p op %d\n",*smcb,(*smcb)->op);
+    if (getmach)
+        PINT_state_machine_locate(*smcb);
     return 0; /* success */
 }
 
@@ -358,9 +465,14 @@ void PINT_sm_set_frame(struct PINT_smcb *smcb)
  */
 void *PINT_sm_pop_frame(struct PINT_smcb *smcb)
 {
+    int index;
+    void *frame;
     assert(smcb->framestackptr > smcb->framebaseptr);
 
-    return smcb->frame_stack[smcb->framebaseptr + --smcb->framestackptr];
+    index = --smcb->framestackptr;
+    frame = smcb->frame_stack[index];
+    smcb->frame_stack[index + 1] = NULL; /* so we won't free on smcb_free */
+    return frame;
 }
 
 /* Function: DUMMY FUNCTION

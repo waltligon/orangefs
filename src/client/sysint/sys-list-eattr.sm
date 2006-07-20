@@ -80,7 +80,7 @@ PVFS_error PVFS_isys_listeattr(
 	return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_LISTEATTR,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -97,7 +97,7 @@ PVFS_error PVFS_isys_listeattr(
     sm_p->object_ref = ref;
 
     return PINT_client_state_machine_post(
-            smcb, PVFS_SYS_LISTEATTR, op_id, user_ptr);
+            smcb,  op_id, user_ptr);
 }
 
 PVFS_error PVFS_sys_listeattr(

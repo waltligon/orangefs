@@ -109,7 +109,7 @@ enum {
 #define SM_NESTED_STATE 1
 
 /* Prototypes for functions provided by user */
-int PINT_state_machine_start(void *, job_status_s *ret);
+/* int PINT_state_machine_start(void *, job_status_s *ret); */
 int PINT_state_machine_complete(void *);
 
 /* This macro returns the state machine string of the current machine.
@@ -126,16 +126,29 @@ int PINT_state_machine_complete(void *);
 int PINT_state_machine_halt(void);
 int PINT_state_machine_next(struct PINT_smcb *,job_status_s *);
 int PINT_state_machine_invoke(struct PINT_smcb *, job_status_s *);
+int PINT_state_machine_start(struct PINT_smcb *, job_status_s *);
 int PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
+int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
+int PINT_smcb_op(struct PINT_smcb *smcb);
+void PINT_smcb_set_complete(struct PINT_smcb *smcb);
+int PINT_smcb_complete(struct PINT_smcb *smcb);
+void PINT_smcb_set_cancelled(struct PINT_smcb *smcb);
+int PINT_smcb_cancelled(struct PINT_smcb *smcb);
 int PINT_smcb_alloc(struct PINT_smcb **, int, int,
         struct PINT_state_machine_s *(*getmach)(int));
 void PINT_smcb_free(struct PINT_smcb **);
 union PINT_state_array_values *PINT_pop_state(struct PINT_smcb *);
 void PINT_push_state(struct PINT_smcb *, union PINT_state_array_values *);
 void *PINT_sm_frame(struct PINT_smcb *, int);
+void PINT_sm_push_frame(struct PINT_smcb *smcb, void *frame_p);
+void PINT_sm_set_frame(struct PINT_smcb *smcb);
+void *PINT_sm_pop_frame(struct PINT_smcb *smcb);
+void PINT_sm_start_child_frames(struct PINT_smcb *smcb);
 
 /* This macro is used in calls to PINT_sm_fram() */
 #define PINT_FRAME_CURRENT 0
+
+struct PINT_state_machine_s pvfs2_void_sm;
 
 /*
  * Local variables:

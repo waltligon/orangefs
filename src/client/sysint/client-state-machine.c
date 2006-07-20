@@ -250,6 +250,8 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
         return &pvfs2_client_job_timer_sm;
     case PVFS_CLIENT_PERF_COUNT_TIMER :
         return &pvfs2_client_perf_count_timer_sm;
+    case PVFS_DEV_UNEXPECTED :
+        return &pvfs2_void_sm;
     default:
         /* now check range for sys functions */
         if (op <= PVFS_OP_SYS_MAXVAL)
@@ -303,12 +305,12 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
  */
 PVFS_error PINT_client_state_machine_post(
     PINT_smcb *smcb,
-    int pvfs_sys_op,
     PVFS_sys_op_id *op_id,
     void *user_ptr /* in */)
 {
     PVFS_error ret = -PVFS_EINVAL;
     job_status_s js;
+    int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
 #if 0
@@ -327,20 +329,12 @@ PVFS_error PINT_client_state_machine_post(
 
     /* save operation type; mark operation as unfinished */
     sm_p->user_ptr = user_ptr;
-    smcb->op = pvfs_sys_op;
-    smcb->op_complete = 0;
 
-    if(smcb->op == PVFS_DEV_UNEXPECTED)
+    if(pvfs_sys_op == PVFS_DEV_UNEXPECTED)
     {
         gossip_err("FAILURE: You should be using PINT_sys_dev_unexp for "
                    "posting this type of operation!\n");
         return ret;
-    }
-
-    if(!PINT_state_machine_locate(smcb))
-    {
-       gossip_lerr("ERROR: Unrecognized sysint operation!\n");
-       return  ret;
     }
 
     if (op_id)
@@ -353,15 +347,11 @@ PVFS_error PINT_client_state_machine_post(
       start state machine and continue advancing while we're getting
       immediate completions
     */
-    ret = PINT_state_machine_invoke(smcb, &js);
-    while(ret == SM_ACTION_COMPLETE) /* ret == 1 */
-    {
-        ret = PINT_state_machine_next(smcb, &js);
-    }
+    ret = PINT_state_machine_start(smcb, &js);
 
     /* else ret == SM_ACTION_DEFERRED */
 
-    if (smcb->op_complete)
+    if (PINT_smcb_complete(smcb))
     {
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "Posted %s (immediate completion)\n",
@@ -406,7 +396,6 @@ PVFS_error PINT_sys_dev_unexp(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->user_ptr = user_ptr;
-    smcb->op_complete = 0;
     sm_p->cred_p = NULL;
 
     memset(jstat, 0, sizeof(job_status_s));
@@ -452,9 +441,9 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     }
 
     /* we can't cancel any arbitrary operation */
-    assert(smcb->op == PVFS_SYS_IO);
+    assert(PINT_smcb_op(smcb) == PVFS_SYS_IO);
 
-    if (smcb->op_complete)
+    if (PINT_smcb_complete(smcb))
     {
 	/* op already completed; nothing to cancel. */
         return 0;
@@ -464,7 +453,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     /* first, set a flag informing the sys_io state machine that the
      * operation has been cancelled so it doesn't post any new jobs 
      */
-    smcb->op_cancelled = 1;
+    PINT_smcb_set_cancelled(smcb);
 
     /*
       don't return an error if nothing is cancelled, because
@@ -584,7 +573,7 @@ PVFS_error PINT_client_state_machine_test(
         return ret;
     }
 
-    if (smcb->op_complete)
+    if (PINT_smcb_complete(smcb))
     {
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         *error_code = sm_p->error_code;
@@ -606,26 +595,22 @@ PVFS_error PINT_client_state_machine_test(
 	tmp_smcb = (PINT_smcb *)client_sm_p_array[i];
         assert(tmp_smcb);
 
-        if (tmp_smcb->op == PVFS_DEV_UNEXPECTED)
+        if (PINT_smcb_op(tmp_smcb) == PVFS_DEV_UNEXPECTED)
         {
-            tmp_smcb->op_complete = 1;
+            PINT_smcb_set_complete(tmp_smcb);
         }
 
-        if (!tmp_smcb->op_complete)
+        if (!PINT_smcb_complete(tmp_smcb))
         {
-            do
-            {
-                ret = PINT_state_machine_next(
-                    tmp_smcb, &job_status_array[i]);
-
-            } while (ret == SM_ACTION_COMPLETE); /* ret == 1*/
+            ret = PINT_state_machine_next(tmp_smcb, &job_status_array[i]);
 
             assert(ret == SM_ACTION_DEFERRED); /* ret == 0 */
         }
 
         /* make sure we don't return internally cancelled I/O jobs */
-        if ((tmp_smcb->op == PVFS_SYS_IO) && (tmp_smcb->op_cancelled) &&
-            (cancelled_io_jobs_are_pending(tmp_smcb)))
+        if ((PINT_smcb_op(tmp_smcb) == PVFS_SYS_IO) &&
+                (PINT_smcb_cancelled(tmp_smcb)) &&
+                (cancelled_io_jobs_are_pending(tmp_smcb)))
         {
             continue;
         }
@@ -635,14 +620,14 @@ PVFS_error PINT_client_state_machine_test(
           being tested here, we add it to our local completion list so
           that later calls to the sysint test/testsome can find it
         */
-        if ((tmp_smcb != smcb) && (tmp_smcb->op_complete == 1))
+        if ((tmp_smcb != smcb) && (PINT_smcb_complete(tmp_smcb)))
         {
             ret = add_sm_to_completion_list(tmp_smcb);
             assert(ret == 0);
         }
     }
 
-    if (smcb->op_complete)
+    if (PINT_smcb_complete(smcb))
     {
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         *error_code = sm_p->error_code;
@@ -720,30 +705,26 @@ PVFS_error PINT_client_state_machine_testsome(
           complete since if we see them at all in here, they're ready
           to be passed back to the caller
         */
-        if (smcb->op == PVFS_DEV_UNEXPECTED)
+        if (PINT_smcb_op(smcb) == PVFS_DEV_UNEXPECTED)
         {
-            smcb->op_complete = 1;
+            PINT_smcb_set_complete(smcb);
         }
 
-        if (!smcb->op_complete)
+        if (!PINT_smcb_complete(smcb))
         {
-            do
-            {
-                ret = PINT_state_machine_next(
-                    smcb, &job_status_array[i]);
-
-            } while (ret == 1);
+            ret = PINT_state_machine_next(smcb, &job_status_array[i]);
 
             /* (ret < 0) indicates a problem from the job system
              * itself; the return value of the underlying operation is
              * kept in the job status structure.
              */
-            assert(ret == 0);
+            assert(ret == SM_ACTION_DEFERRED);
         }
 
         /* make sure we don't return internally cancelled I/O jobs */
-        if ((smcb->op == PVFS_SYS_IO) && (smcb->op_cancelled) &&
-            (cancelled_io_jobs_are_pending(smcb)))
+        if ((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
+                (PINT_smcb_cancelled(smcb)) &&
+                (cancelled_io_jobs_are_pending(smcb)))
         {
             continue;
         }
@@ -754,7 +735,7 @@ PVFS_error PINT_client_state_machine_testsome(
           grab all completed operations when we're finished
           (i.e. outside of this loop).
         */
-        if (smcb->op_complete)
+        if (PINT_smcb_complete(smcb))
         {
             ret = add_sm_to_completion_list(smcb);
             assert(ret == 0);
@@ -794,7 +775,7 @@ PVFS_error PINT_client_wait_internal(
             */
             ret = PINT_client_state_machine_test(op_id, out_error);
 
-        } while (!smcb->op_complete && (ret == 0));
+        } while (!PINT_smcb_complete(smcb) && (ret == 0));
 
         if (ret)
         {
@@ -812,14 +793,14 @@ PVFS_error PINT_client_wait_internal(
  */
 void PVFS_sys_release(PVFS_sys_op_id op_id)
 {
-    PINT_smcb *smcb = (PINT_smcb *)PINT_id_gen_safe_lookup(op_id);
+    PINT_smcb *smcb = PINT_id_gen_safe_lookup(op_id);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_credentials *cred_p = sm_p->cred_p;
     if (smcb)
     {
         PINT_id_gen_safe_unregister(op_id);
 
-        if (smcb->op && cred_p)
+        if (PINT_smcb_op(smcb) && cred_p)
         {
             PVFS_util_release_credentials(cred_p);
             sm_p->cred_p = NULL;
@@ -829,21 +810,22 @@ void PVFS_sys_release(PVFS_sys_op_id op_id)
     }
 }
 
+/* why is this different??? */
 void PVFS_mgmt_release(PVFS_mgmt_op_id op_id)
 {
     PINT_smcb *smcb = PINT_id_gen_safe_lookup(op_id);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (smcb)
     {
-        PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         PINT_id_gen_safe_unregister(op_id);
 
-        if (smcb->op && sm_p->cred_p)
+        if (PINT_smcb_op(smcb) && sm_p->cred_p)
         {
             PVFS_util_release_credentials(sm_p->cred_p);
             sm_p->cred_p = NULL;
         }
 
-        free(sm_p);
+        PINT_smcb_free(&smcb);
     }
 }
 

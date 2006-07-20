@@ -124,7 +124,7 @@ int PINT_server_get_config(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "asked for fs name = %s\n",
                  mntent_p->pvfs_fs_name);
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SERVER_GET_CONFIG,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -148,8 +148,7 @@ int PINT_server_get_config(
     sm_p->u.get_config.mntent = mntent_p;
     sm_p->u.get_config.config = config;
 
-    ret = PINT_client_state_machine_post(
-        smcb, PVFS_SERVER_GET_CONFIG, &op_id, NULL);
+    ret = PINT_client_state_machine_post(smcb, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PINT_client_state_machine_post call", ret);

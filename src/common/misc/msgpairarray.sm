@@ -475,6 +475,9 @@ static PINT_sm_action msgpairarray_complete(
     /* decrement comp_ct until all operations have completed */
     if (--sm_p->msgarray_params.comp_ct > 0)
     {
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                 "  msgpairarray: %d operations remain\n",
+                sm_p->msgarray_params.comp_ct);
         return SM_ACTION_DEFERRED;
     }
 

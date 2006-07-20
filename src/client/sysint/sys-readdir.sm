@@ -128,7 +128,7 @@ PVFS_error PVFS_isys_readdir(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_READDIR,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -147,7 +147,7 @@ PVFS_error PVFS_isys_readdir(
                  "%llu on fs %d\n", llu(ref.handle), ref.fs_id);
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_READDIR, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Read entries from a directory.

@@ -75,7 +75,7 @@ PVFS_error PVFS_imgmt_noop(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_imgmt_noop entered\n");
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_NOOP,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (!smcb)
     {
@@ -93,7 +93,7 @@ PVFS_error PVFS_imgmt_noop(
                  "PINT_client_state_machine_post()\n");
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_MGMT_NOOP, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Send a no-op request to a specific server and receive response.

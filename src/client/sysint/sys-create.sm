@@ -270,7 +270,7 @@ PVFS_error PVFS_isys_create(
         return -PVFS_ENAMETOOLONG;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_CREATE,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -357,7 +357,7 @@ PVFS_error PVFS_isys_create(
         object_name, llu(parent_ref.handle), parent_ref.fs_id);
           
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_CREATE, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Create a file with a specified distribution.

@@ -71,7 +71,7 @@ PVFS_error PVFS_isys_statfs(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_isys_statfs entered\n");
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_STATFS,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -147,7 +147,7 @@ PVFS_error PVFS_isys_statfs(
     }
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_STATFS, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Obtain file system statistics.

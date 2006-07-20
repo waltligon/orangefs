@@ -119,7 +119,7 @@ PVFS_error PVFS_isys_fs_add(
     }
     mntent->the_pvfs_config_server = mntent->pvfs_config_servers[i];
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_FS_ADD,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -155,7 +155,7 @@ PVFS_error PVFS_isys_fs_add(
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_FS_ADD, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)

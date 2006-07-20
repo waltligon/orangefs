@@ -463,7 +463,7 @@ PVFS_error PVFS_isys_ref_lookup(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_LOOKUP,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -496,7 +496,7 @@ PVFS_error PVFS_isys_ref_lookup(
                  relative_pathname, llu(parent.handle));
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_LOOKUP, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Dereference a path string relative to a parent directory.

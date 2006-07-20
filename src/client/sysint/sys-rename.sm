@@ -309,7 +309,7 @@ PVFS_error PVFS_isys_rename(
         return -PVFS_ENAMETOOLONG;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_RENAME,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -346,7 +346,7 @@ PVFS_error PVFS_isys_rename(
         llu(new_parent_ref.handle), new_parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_RENAME, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Rename an object.

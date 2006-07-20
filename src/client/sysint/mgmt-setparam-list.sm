@@ -94,7 +94,7 @@ PVFS_error PVFS_imgmt_setparam_list(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_SETPARAM_LIST,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -133,7 +133,7 @@ PVFS_error PVFS_imgmt_setparam_list(
     }
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_MGMT_SETPARAM_LIST, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Set a run-time parameter on a list of servers.

@@ -89,7 +89,7 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
 	return -PVFS_EINVAL;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_ITERATE_HANDLES_LIST,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -118,7 +118,7 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
     }
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_MGMT_ITERATE_HANDLES_LIST, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Obtain a list of handles in use on a collection of servers.

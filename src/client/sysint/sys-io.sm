@@ -302,7 +302,7 @@ PVFS_error PVFS_isys_io(
         return 1; 
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_IO,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (smcb == NULL)
     {
@@ -330,7 +330,7 @@ PVFS_error PVFS_isys_io(
     sm_p->object_ref = ref;
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_IO, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Perform a read or write operation.

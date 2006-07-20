@@ -99,7 +99,7 @@ PVFS_error PVFS_isys_flush(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_FLUSH,
              sizeof(struct PINT_client_sm), client_op_state_get_machine);
     if (!smcb)
     {
@@ -125,7 +125,7 @@ PVFS_error PVFS_isys_flush(
         0);
 
     return PINT_client_state_machine_post(
-        smcb, PVFS_SYS_FLUSH, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Flush file data to storage on servers.
