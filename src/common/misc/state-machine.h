@@ -61,7 +61,7 @@ typedef struct PINT_smcb
     void *user_ptr; /* external user pointer */
 } PINT_smcb;
 
-#define PINT_SET_OP_COMPLETE do{smcb->op_complete = 1;} while (0)
+#define PINT_SET_OP_COMPLETE do{PINT_smcb_set_complete(smcb);} while (0)
 
 /* this union defines the possibles values for each word of the
    the state machine memory.  Properly formed state machine programs

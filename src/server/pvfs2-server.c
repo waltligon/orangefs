@@ -1860,7 +1860,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
     /* free the operation structure itself */
     PINT_smcb_free(&smcb);
 
-    return 0;
+    return SM_ACTION_COMPLETE;
 }
 
 struct server_configuration_s *get_server_config_struct(void)

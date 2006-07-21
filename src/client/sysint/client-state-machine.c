@@ -183,7 +183,7 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
         GOSSIP_IO_DEBUG, "(%p) cancelled_io_jobs_are_pending: %d "
         "remaining (op %s)\n", sm_p,
         sm_p->u.io.total_cancellations_remaining,
-        (smcb->op_complete ? "complete" : "NOT complete"));
+        (PINT_smcb_complete(smcb) ? "complete" : "NOT complete"));
 
     return (sm_p->u.io.total_cancellations_remaining != 0);
 }

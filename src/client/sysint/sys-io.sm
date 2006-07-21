@@ -402,7 +402,7 @@ static PINT_sm_action io_init(
         io_datafile_index_array_destroy(sm_p);
         io_contexts_destroy(sm_p);
 
-        if (smcb->op_cancelled)
+        if (PINT_smcb_cancelled(smcb))
         {
             js_p->error_code = -PVFS_ECANCEL;
             return SM_ACTION_COMPLETE;
@@ -428,7 +428,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_datafile_setup_msgpairs\n", sm_p);
 
-    if (smcb->op_cancelled)
+    if (PINT_smcb_cancelled(smcb))
     {
         js_p->error_code = -PVFS_ECANCEL;
         goto exit;
@@ -601,7 +601,7 @@ static PINT_sm_action io_datafile_post_msgpairs(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io_datafile_post_msgpairs "
                  "state: post (%d message(s))\n", sm_p->u.io.datafile_count);
 
-    if (smcb->op_cancelled)
+    if (PINT_smcb_cancelled(smcb))
     {
         js_p->error_code = -PVFS_ECANCEL;
         return SM_ACTION_COMPLETE;
@@ -1099,7 +1099,7 @@ static PINT_sm_action io_datafile_complete_operations(
     if (sm_p->u.io.msgpair_completion_count
      || sm_p->u.io.flow_completion_count
      || sm_p->u.io.write_ack_completion_count) {
-        if (smcb->op_cancelled)
+        if (PINT_smcb_cancelled(smcb))
             gossip_debug(GOSSIP_IO_DEBUG, "detected I/O cancellation with "
                          "%d flows and %d write acks pending\n",
                          sm_p->u.io.flow_completion_count,
@@ -1124,14 +1124,14 @@ static PINT_sm_action io_datafile_complete_operations(
         if (!cur_ctx->msg_send_has_been_posted)
             break;
     }
-    if (i < sm_p->u.io.datafile_count && !smcb->op_cancelled) {
+    if (i < sm_p->u.io.datafile_count && !PINT_smcb_cancelled(smcb)) {
         gossip_debug(GOSSIP_IO_DEBUG,
           "*** %s: some msgpairs to repost\n", __func__);
         js_p->error_code = IO_RETRY;
     } else {
         gossip_debug(GOSSIP_IO_DEBUG, "*** all operations %s "
                      "(msgpairs, flows, write acks)\n",
-                     (smcb->op_cancelled ? "cancelled" : "completed"));
+                     (PINT_smcb_cancelled(smcb) ? "cancelled" : "completed"));
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
     }
     return SM_ACTION_COMPLETE;
@@ -1161,10 +1161,10 @@ static PINT_sm_action io_analyze_results(
 
         if (ret == 0)
         {
-            ret = (smcb->op_cancelled ? -PVFS_ECANCEL : -PVFS_EIO);
+            ret = (PINT_smcb_cancelled(smcb) ? -PVFS_ECANCEL : -PVFS_EIO);
         }
     }
-    else if (!smcb->op_cancelled)
+    else if (!PINT_smcb_cancelled(smcb))
     {
         /*
          * look through all the contexts for errors, saving the first
@@ -1222,7 +1222,7 @@ static PINT_sm_action io_analyze_results(
         {
             char buf[64] = {0};
 
-            ret = (smcb->op_cancelled ? -PVFS_ECANCEL :
+            ret = (PINT_smcb_cancelled(smcb) ? -PVFS_ECANCEL :
                    sm_p->u.io.stored_error_code);
 
             PVFS_strerror_r(ret, buf, 64);
@@ -1232,7 +1232,7 @@ static PINT_sm_action io_analyze_results(
     }
     else
     {
-        ret = (smcb->op_cancelled ? -PVFS_ECANCEL : -PVFS_EIO);
+        ret = (PINT_smcb_cancelled(smcb) ? -PVFS_ECANCEL : -PVFS_EIO);
     }
 
     /* be sure there are no jobs still laying around */
@@ -1250,7 +1250,7 @@ static PINT_sm_action io_analyze_results(
          (ret == -ECONNRESET) || (ret == -PVFS_EPROTO)) &&
         (sm_p->u.io.retry_count < sm_p->msgarray_params.retry_limit))
     {
-        assert(!smcb->op_cancelled);
+        assert(!PINT_smcb_cancelled(smcb));
 
         sm_p->u.io.stored_error_code = 0;
         sm_p->u.io.total_size = 0;  /* start from the beginning again */
