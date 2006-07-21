@@ -41,7 +41,10 @@ extern "C" {
 #define TROVE_DB_TYPE                                             DB_BTREE
 
 #ifdef HAVE_TROVE_TRANSACTION_SUPPORT
-#define TROVE_DB_OPEN_TXN DB_AUTO_COMMIT
+/*
+ * DB_READ_UNCOMMITTED flag to avoid blocking read calls.
+ */
+#define TROVE_DB_OPEN_TXN ( DB_AUTO_COMMIT | DB_READ_UNCOMMITTED )
 #else
 #define TROVE_DB_OPEN_TXN 0
 #endif

@@ -599,7 +599,8 @@ static int dbpf_storage_create(char *stoname,
     }
     
     env = dbpf_getdb_env(storage_dirname, 0 , & error);
-    if (error){
+    if (error)
+    {
         return error;
     }
 
@@ -613,7 +614,8 @@ static int dbpf_storage_create(char *stoname,
     dbpf_putdb_env(env, storage_dirname);    
     if (ret != 0)
     {
-	   gossip_lerr("dbpf_storage_create: removing storage attribute database after failed create attempt");
+	   gossip_lerr("dbpf_storage_create: removing storage attribute database"
+        " after failed create attempt");
 	   unlink(sto_attrib_dbname);
        return ret;
     }
@@ -655,7 +657,8 @@ static int dbpf_storage_remove(char *stoname,
     
     DBPF_GET_STORAGE_DIRNAME(storage_dirname, PATH_MAX, stoname);  
     env = dbpf_getdb_env(storage_dirname, 0 , & error);
-    if (error){
+    if (error)
+    {
         return error;
     }
     
@@ -1575,7 +1578,8 @@ static struct dbpf_storage *dbpf_storage_lookup(
 
     
     sto_p->env = dbpf_getdb_env(sto_p->name, 0 , error_p);
-    if (*error_p){
+    if (*error_p)
+    {
         free(sto_p->name);
         free(sto_p);
         my_storage_p = NULL;
@@ -1884,9 +1888,8 @@ void dbpf_set_sync_mode(int mode, struct dbpf_collection* coll)
      * Right now we don't have to check if there are operations queued in the
      * coalesync queue, because the mode is set on startup...
      */
-    if (
-        coll->meta_sync_mode == TROVE_TRANS_MODE || mode == TROVE_TRANS_MODE   
-       ){
+    if (coll->meta_sync_mode == TROVE_TRANS_MODE || mode == TROVE_TRANS_MODE )
+       {
        int flag = (mode == TROVE_TRANS_MODE) ? TROVE_DB_OPEN_TXN : 0 ;
        int ret;
        char path_name[PATH_MAX] = {0};
@@ -1903,7 +1906,8 @@ void dbpf_set_sync_mode(int mode, struct dbpf_collection* coll)
                            my_storage_p->name, coll->coll_id);
         coll->keyval_db = dbpf_db_open(path_name, coll->coll_env, &ret, 
                                     & PINT_trove_dbpf_keyval_compare, flag);
-        if (coll->keyval_db == NULL){
+        if (coll->keyval_db == NULL)
+        {
             gossip_err("Could not change db flags %s !\n", db_strerror(ret));
             exit(1); 
         }

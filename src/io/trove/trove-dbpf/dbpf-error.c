@@ -24,18 +24,29 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value)
     {
         case 0:
             return 0;
-	case DB_NOTFOUND:
-	case DB_KEYEMPTY:
-	    return TROVE_ENOENT;
-	case DB_KEYEXIST:
-	    return TROVE_EEXIST;
-	case DB_LOCK_DEADLOCK:
-	    return TROVE_EDEADLK;
-	case DB_LOCK_NOTGRANTED:
-	    return TROVE_ENOLCK;
-	case DB_RUNRECOVERY:
-	    gossip_err("Error: DB_RUNRECOVERY encountered.\n");
-	    return TROVE_EIO;
+        case DB_VERSION_MISMATCH:
+            gossip_err("Error: DB_VERSION_MISMATCH encountered,"
+                " version of libdb is different from the libdb which created"
+                " the database environment. This should never happen!\n");
+            return TROVE_EIO;
+        case DB_OLD_VERSION:
+            gossip_err("Error: DB_OLD_VERSION encountered,"
+                " version of libdb is different from the libdb which created"
+                " the PVFS2 dbs. Run db_upgrade tool.\n");
+            return TROVE_EIO;
+    	case DB_NOTFOUND:
+    	case DB_KEYEMPTY:
+    	    return TROVE_ENOENT;
+    	case DB_KEYEXIST:
+    	    return TROVE_EEXIST;
+    	case DB_LOCK_DEADLOCK:
+    	    return TROVE_EDEADLK;
+    	case DB_LOCK_NOTGRANTED:
+    	    return TROVE_ENOLCK;
+    	case DB_RUNRECOVERY:
+    	    gossip_err("Error: DB_RUNRECOVERY encountered. Run" 
+                " db_recover manually.\n");
+    	    return TROVE_EIO;
     }
     return -4243; /* return some identifiable number */
 }

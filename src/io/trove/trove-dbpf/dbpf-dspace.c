@@ -404,10 +404,14 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     /*
      * Notify deletion thread that we have something to do.
      */
-    if (ret == 0){
-        gen_mutex_lock(& dbpf_op_queue_mutex[OP_QUEUE_BACKGROUND_FILE_REMOVAL]);
-        pthread_cond_signal(& dbpf_op_incoming_cond[OP_QUEUE_BACKGROUND_FILE_REMOVAL]);
-        gen_mutex_unlock(& dbpf_op_queue_mutex[OP_QUEUE_BACKGROUND_FILE_REMOVAL]);
+    if (ret == 0)
+    {
+        gen_mutex_lock(
+            & dbpf_op_queue_mutex[OP_QUEUE_BACKGROUND_FILE_REMOVAL]);
+        pthread_cond_signal(
+            & dbpf_op_incoming_cond[OP_QUEUE_BACKGROUND_FILE_REMOVAL]);
+        gen_mutex_unlock(
+            & dbpf_op_queue_mutex[OP_QUEUE_BACKGROUND_FILE_REMOVAL]);
     }
 
     /* remove the keyval entries for this handle if any exist.
@@ -1020,7 +1024,8 @@ static int dbpf_dspace_cancel(
                          
             gen_mutex_lock(& dbpf_op_queue_mutex[ type ] );
             state = dbpf_op_get_status(cur_op);
-            if ( state == OP_QUEUED ){
+            if ( state == OP_QUEUED )
+            {
                 /*
                  * Now we are sure that the object is still pending !
                  * dequeue and complete the op in canceled state 

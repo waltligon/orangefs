@@ -46,7 +46,8 @@ int dbpf_thread_initialize(void)
     pthread_cond_init(&dbpf_op_completed_cond, NULL);
     
     dbpf_threads_running = 1;
-    for(i=0; i < OP_QUEUE_LAST ; i++){
+    for(i=0; i < OP_QUEUE_LAST ; i++)
+    {
         pthread_cond_init(&dbpf_op_incoming_cond[i], NULL);
         dbpf_op_queue_init(& dbpf_op_queue[i]);
         gen_posix_mutex_init( & dbpf_op_queue_mutex[i]);
@@ -54,7 +55,8 @@ int dbpf_thread_initialize(void)
         if ( i == OP_QUEUE_BACKGROUND_FILE_REMOVAL )
         {
             ret = pthread_create(& dbpf_thread[i], NULL,
-                             dbpf_background_file_removal_thread_function, NULL);
+                             dbpf_background_file_removal_thread_function, 
+                              NULL);
         }
         else    
         {
@@ -79,7 +81,8 @@ int dbpf_thread_initialize(void)
 
 int dbpf_thread_finalize(void)
 {
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_finalize: start finalization\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_finalize: start"
+        " finalization\n");
     int ret = 0,i;
     if (! dbpf_threads_running)
         return 0;
@@ -87,13 +90,15 @@ int dbpf_thread_finalize(void)
     dbpf_threads_running = 0;
     
     /*send signals to wakeup threads:*/
-    for(i=0; i < OP_QUEUE_LAST ; i++){
+    for(i=0; i < OP_QUEUE_LAST ; i++)
+    {
         gen_mutex_lock(& dbpf_op_queue_mutex[i]);
         pthread_cond_signal(& dbpf_op_incoming_cond[i]);
         gen_mutex_unlock(& dbpf_op_queue_mutex[i]);
     }
     
-    for(i=0; i < OP_QUEUE_LAST ; i++){
+    for(i=0; i < OP_QUEUE_LAST ; i++)
+    {
         ret = pthread_join(dbpf_thread[i], NULL);
     }
 
@@ -103,13 +108,14 @@ int dbpf_thread_finalize(void)
 
 void *dbpf_background_file_removal_thread_function(void *ptr)
 {
-    const enum operation_queue_type queue_type = OP_QUEUE_BACKGROUND_FILE_REMOVAL;
     gen_mutex_t * work_queue_mutex;
     pthread_cond_t * queue_cond;
     int ret,i;
     char dirname[PATH_MAX];
     char filename[PATH_MAX];
     off_t file_pos_in_dir = 0;
+    const enum operation_queue_type queue_type = 
+        OP_QUEUE_BACKGROUND_FILE_REMOVAL;
     
     DIR * del_dir;
     struct dirent * dir_entry;
@@ -134,12 +140,14 @@ void *dbpf_background_file_removal_thread_function(void *ptr)
     ret = DBPF_MKDIR(dirname, 0755);
 
     /*
-     * Additionally check on startup if there are undeleted files and delete them 
+     * Additionally check on startup if there are undeleted files and delete 
+     * them 
      */
     
     del_dir = opendir(dirname); 
 
-    for(i=0; i < 3; i++){
+    for(i=0; i < 3; i++)
+    {
         dir_entry = readdir(del_dir);
         if ( dir_entry == NULL 
             || ( !( (strlen(dir_entry->d_name) == 1 
@@ -161,7 +169,8 @@ void *dbpf_background_file_removal_thread_function(void *ptr)
         seekdir(del_dir, file_pos_in_dir);
         dir_entry = readdir(del_dir);
         
-        if( dir_entry == NULL){
+        if( dir_entry == NULL)
+        {
             ret = pthread_cond_wait(queue_cond, work_queue_mutex);
             gen_mutex_unlock(work_queue_mutex);            
             continue;
@@ -175,7 +184,8 @@ void *dbpf_background_file_removal_thread_function(void *ptr)
             , filename);
 
         ret = DBPF_UNLINK(filename);
-        if ( ret < 0 ){
+        if ( ret < 0 )
+        {
             gossip_err("Error while deleting file %s: %s\n", filename, 
                 strerror(errno));
             break;
@@ -204,14 +214,17 @@ void *dbpf_thread_function(void *ptr)
 
     int op_queued_empty = 0, ret = 0;
     dbpf_queued_op_t *cur_op = NULL;
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\" started\n",thread_type);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\""
+        " started\n",thread_type);
 
     while(1)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\" ITERATING\n",thread_type);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\""
+            " ITERATING\n",thread_type);
         /* check if we any have ops to service in our work queue */
         gen_mutex_lock(work_queue_mutex);
-        if (! dbpf_threads_running){
+        if (! dbpf_threads_running)
+        {
             gen_mutex_unlock(work_queue_mutex);
             break;
         }        
@@ -219,16 +232,15 @@ void *dbpf_thread_function(void *ptr)
 
         if (op_queued_empty)
         {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\" QUEUE EMPTY\n",thread_type);
-            /* it is possible that the timing is so bad at startup that thread hang up...*/
+            gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\"" 
+                            "QUEUE EMPTY\n",thread_type);
             ret = pthread_cond_wait(queue_cond,
                                          work_queue_mutex);
-            if (! dbpf_threads_running){
-                gen_mutex_unlock(work_queue_mutex);
-                break;
-            }
+            gen_mutex_unlock(work_queue_mutex);
+            continue;
         }
-        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\" fetching new element\n",thread_type);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\""
+            " fetching new element\n",thread_type);
         cur_op = dbpf_op_pop_front_nolock(work_queue);
         dbpf_sync_coalesce_dequeue(cur_op);
 
@@ -247,7 +259,8 @@ void *dbpf_thread_function(void *ptr)
                      "SERVICE ROUTINE (%s) *****\n",
                      dbpf_op_type_to_str(cur_op->op.type));
                                
-        if ( DBPF_OP_MODIFYING_META_OP(cur_op->op.type) ){
+        if ( DBPF_OP_MODIFYING_META_OP(cur_op->op.type) )
+        {
             if ( ret == DBPF_OP_COMPLETE ) 
             {
                 ret = dbpf_sync_coalesce(cur_op, 1, 0);
@@ -279,7 +292,8 @@ void *dbpf_thread_function(void *ptr)
         }
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\" ending\n",thread_type);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\""
+        " ending\n",thread_type);
     return ptr;
 }
 

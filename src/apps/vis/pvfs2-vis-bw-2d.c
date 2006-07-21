@@ -109,8 +109,9 @@ static struct options* parse_args(int argc, char* argv[])
 
     /* create storage for the command line options */
     tmp_opts = (struct options*)malloc(sizeof(struct options));
-    if(!tmp_opts){
-	return(NULL);
+    if(!tmp_opts)
+    {
+	   return(NULL);
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
