@@ -37,59 +37,59 @@ int bench_args(
     /* look at command line arguments */
     while ((one_opt = getopt(argc, argv, flags)) != EOF)
     {
-	switch (one_opt)
-	{
-	case ('s'):
-	    ret = sscanf(optarg, "%d", &user_opts->num_servers);
-	    if (ret < 1)
-	    {
-		return -1;
-	    }
-	    break;
-	case ('l'):
-	    ret = sscanf(optarg, "%d", &user_opts->message_len);
-	    if (ret < 1)
-	    {
-		return -1;
-	    }
-	    break;
-	case ('L'):
-	    ret = sscanf(optarg, "%d", &user_opts->list_io_factor);
-	    if (ret < 1)
-	    {
-		return -1;
-	    }
-	    break;
-	case ('t'):
-	    ret = sscanf(optarg, "%d", &user_opts->total_len);
-	    if (ret < 1)
-	    {
-		return -1;
-	    }
-	    break;
-	case ('m'):
-	    got_method = 1;
-	    ret = sscanf(optarg, "%s", user_opts->method_name);
-	    if (ret < 1)
-	    {
-		return -1;
-	    }
-	    break;
-	case ('p'):
-	    user_opts->flags |= BMI_ALLOCATE_MEMORY;
-	    break;
-	case ('r'):
-	    user_opts->flags |= REUSE_BUFFERS;
-	    break;
-	default:
-	    break;
-	}
+        switch (one_opt)
+        {
+        case ('s'):
+            ret = sscanf(optarg, "%d", &user_opts->num_servers);
+            if (ret < 1)
+            {
+                return -1;
+            }
+            break;
+        case ('l'):
+            ret = sscanf(optarg, "%d", &user_opts->message_len);
+            if (ret < 1)
+            {
+                return -1;
+            }
+            break;
+        case ('L'):
+            ret = sscanf(optarg, "%d", &user_opts->list_io_factor);
+            if (ret < 1)
+            {
+                return -1;
+            }
+            break;
+        case ('t'):
+            ret = sscanf(optarg, "%d", &user_opts->total_len);
+            if (ret < 1)
+            {
+                return -1;
+            }
+            break;
+        case ('m'):
+            got_method = 1;
+            ret = sscanf(optarg, "%s", user_opts->method_name);
+            if (ret < 1)
+            {
+                return -1;
+            }
+            break;
+        case ('p'):
+            user_opts->flags |= BMI_ALLOCATE_MEMORY;
+            break;
+        case ('r'):
+            user_opts->flags |= REUSE_BUFFERS;
+            break;
+        default:
+            break;
+        }
     }
 
     if (!got_method)
     {
-	printf("Must specify method!\n");
-	return (-1);
+        printf("Must specify method!\n");
+        return (-1);
     }
 
     return (0);
@@ -101,11 +101,11 @@ void bench_args_dump(
     printf("Options:\n");
     if (opts->flags & REUSE_BUFFERS)
     {
-	printf("Reuse buffers.\n");
+        printf("Reuse buffers.\n");
     }
     if (opts->flags & BMI_ALLOCATE_MEMORY)
     {
-	printf("BMI allocate memory.\n");
+        printf("BMI allocate memory.\n");
     }
     printf("message length: %d\n", opts->message_len);
     printf("total length: %d\n", opts->total_len);

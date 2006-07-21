@@ -33,8 +33,8 @@ static int pvfs2_create(
 
     pvfs2_print("pvfs2_create: called\n");
 
-    inode = pvfs2_create_entry(
-        dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE, &ret);
+    inode =
+        pvfs2_create_entry(dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE, &ret);
 
     if (inode)
     {
@@ -67,33 +67,33 @@ static struct dentry *pvfs2_lookup(
     struct super_block *sb = NULL;
 
     /*
-      in theory we could skip a lookup here (if the intent is to
-      create) in order to avoid a potentially failed lookup, but
-      leaving it in can skip a valid lookup and try to create a file
-      that already exists (e.g. the vfs already handles checking for
-      -EEXIST on O_EXCL opens, which is broken if we skip this lookup
-      in the create path)
-    */
+       in theory we could skip a lookup here (if the intent is to
+       create) in order to avoid a potentially failed lookup, but
+       leaving it in can skip a valid lookup and try to create a file
+       that already exists (e.g. the vfs already handles checking for
+       -EEXIST on O_EXCL opens, which is broken if we skip this lookup
+       in the create path)
+     */
     pvfs2_print("pvfs2_lookup called on %s\n", dentry->d_name.name);
 
     if (dentry->d_name.len > PVFS2_NAME_LEN)
     {
-	return ERR_PTR(-ENAMETOOLONG);
+        return ERR_PTR(-ENAMETOOLONG);
     }
 
     new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
     if (!new_op)
     {
-	return NULL;
+        return NULL;
     }
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
     new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
 #else
     /*
-      if we're at a symlink, should we follow it? never attempt to
-      follow negative dentries
-    */
+       if we're at a symlink, should we follow it? never attempt to
+       follow negative dentries
+     */
     new_op->upcall.req.lookup.sym_follow =
         ((nd && (nd->flags & LOOKUP_FOLLOW) &&
           (dentry->d_inode != NULL)) ?
@@ -112,25 +112,23 @@ static struct dentry *pvfs2_lookup(
         {
             new_op->upcall.req.lookup.parent_refn.handle =
                 pvfs2_ino_to_handle(dir->i_ino);
-            new_op->upcall.req.lookup.parent_refn.fs_id =
-                PVFS2_SB(sb)->fs_id;
+            new_op->upcall.req.lookup.parent_refn.fs_id = PVFS2_SB(sb)->fs_id;
         }
     }
     else
     {
         /*
-          if no parent at all was provided, use the root
-          handle and file system id stored in the super
-          block for the specified dentry's inode
-        */
+           if no parent at all was provided, use the root
+           handle and file system id stored in the super
+           block for the specified dentry's inode
+         */
         sb = dentry->d_inode->i_sb;
-	new_op->upcall.req.lookup.parent_refn.handle =
-	    PVFS2_SB(sb)->root_handle;
-	new_op->upcall.req.lookup.parent_refn.fs_id =
-	    PVFS2_SB(sb)->fs_id;
+        new_op->upcall.req.lookup.parent_refn.handle =
+            PVFS2_SB(sb)->root_handle;
+        new_op->upcall.req.lookup.parent_refn.fs_id = PVFS2_SB(sb)->fs_id;
     }
     strncpy(new_op->upcall.req.lookup.d_name,
-	    dentry->d_name.name, PVFS2_NAME_LEN);
+            dentry->d_name.name, PVFS2_NAME_LEN);
 
     pvfs2_print("pvfs2_lookup: doing lookup on %s\n  under %llu,%d "
                 "(follow=%s)\n", new_op->upcall.req.lookup.d_name,
@@ -139,9 +137,8 @@ static struct dentry *pvfs2_lookup(
                 ((new_op->upcall.req.lookup.sym_follow ==
                   PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
 
-    ret = service_operation(
-        new_op, "pvfs2_lookup", 
-        get_interruptible_flag(dir));
+    ret = service_operation(new_op, "pvfs2_lookup",
+                            get_interruptible_flag(dir));
 
     pvfs2_print("Lookup Got %llu, fsid %d (ret=%d)\n",
                 llu(new_op->downcall.resp.lookup.refn.handle),
@@ -150,31 +147,32 @@ static struct dentry *pvfs2_lookup(
     /* lookup inode matching name (or add if not there) */
     if (ret > -1)
     {
-	inode = iget(sb, pvfs2_handle_to_ino(
-                         new_op->downcall.resp.lookup.refn.handle));
-	if (inode && !is_bad_inode(inode))
-	{
-	    found_pvfs2_inode = PVFS2_I(inode);
+        inode =
+            iget(sb,
+                 pvfs2_handle_to_ino(new_op->downcall.resp.lookup.refn.handle));
+        if (inode && !is_bad_inode(inode))
+        {
+            found_pvfs2_inode = PVFS2_I(inode);
 
-	    /* store the retrieved handle and fs_id */
-	    found_pvfs2_inode->refn = new_op->downcall.resp.lookup.refn;
+            /* store the retrieved handle and fs_id */
+            found_pvfs2_inode->refn = new_op->downcall.resp.lookup.refn;
 
-	    /* update dentry/inode pair into dcache */
-	    dentry->d_op = &pvfs2_dentry_operations;
+            /* update dentry/inode pair into dcache */
+            dentry->d_op = &pvfs2_dentry_operations;
 
             pvfs2_d_splice_alias(dentry, inode);
 
             pvfs2_print("Lookup success (inode ct = %d)\n",
-                        (int)atomic_read(&inode->i_count));
-	}
+                        (int) atomic_read(&inode->i_count));
+        }
         else if (inode && is_bad_inode(inode))
         {
             ret = -EACCES;
-	    found_pvfs2_inode = PVFS2_I(inode);
+            found_pvfs2_inode = PVFS2_I(inode);
             /* look for an error code, possibly set by pvfs2_read_inode(),
              * otherwise we have to guess EACCES 
              */
-            if(found_pvfs2_inode->error_code)
+            if (found_pvfs2_inode->error_code)
             {
                 ret = found_pvfs2_inode->error_code;
             }
@@ -182,32 +180,32 @@ static struct dentry *pvfs2_lookup(
             op_release(new_op);
             return ERR_PTR(ret);
         }
-	else
-	{
+        else
+        {
             op_release(new_op);
             pvfs2_print("Returning -EACCES\n");
             return ERR_PTR(-EACCES);
-	}
+        }
     }
 
     /*
-      if no inode was found, add a negative dentry to dcache anyway;
-      if we don't, we don't hold expected lookup semantics and we most
-      noticeably break during directory renames.
+       if no inode was found, add a negative dentry to dcache anyway;
+       if we don't, we don't hold expected lookup semantics and we most
+       noticeably break during directory renames.
 
-      however, if the operation failed or exited, do not add the
-      dentry (e.g. in the case that a touch is issued on a file that
-      already exists that was interrupted during this lookup -- no
-      need to add another negative dentry for an existing file)
-    */
+       however, if the operation failed or exited, do not add the
+       dentry (e.g. in the case that a touch is issued on a file that
+       already exists that was interrupted during this lookup -- no
+       need to add another negative dentry for an existing file)
+     */
     if (!inode && op_state_serviced(new_op))
     {
         /*
-          make sure to set the pvfs2 specific dentry operations for
-          the negative dentry that we're adding now so that a
-          potential future lookup of this cached negative dentry can
-          be properly revalidated.
-        */
+           make sure to set the pvfs2 specific dentry operations for
+           the negative dentry that we're adding now so that a
+           potential future lookup of this cached negative dentry can
+           be properly revalidated.
+         */
         pvfs2_print("pvfs2_lookup: Adding *negative* dentry %p\n  "
                     "for %s\n", dentry, dentry->d_name.name);
 
@@ -216,7 +214,7 @@ static struct dentry *pvfs2_lookup(
     }
 
     op_release(new_op);
-    if(ret != -ENOENT)
+    if (ret != -ENOENT)
     {
         return ERR_PTR(ret);
     }
@@ -251,11 +249,11 @@ static int pvfs2_unlink(
  * otherwise).  PVFS2 does not support hard links.
  */
 static int pvfs2_link(
-    struct dentry * old_dentry, 
-    struct inode * dir,
+    struct dentry *old_dentry,
+    struct inode *dir,
     struct dentry *dentry)
 {
-    return(-EOPNOTSUPP);
+    return (-EOPNOTSUPP);
 }
 
 /* pvfs2_mknod() is only implemented here to make sure that we return a
@@ -276,7 +274,7 @@ static int pvfs2_mknod(
     dev_t rdev)
 #endif
 {
-    return(-EOPNOTSUPP);
+    return (-EOPNOTSUPP);
 }
 
 static int pvfs2_symlink(
@@ -289,8 +287,9 @@ static int pvfs2_symlink(
 
     pvfs2_print("pvfs2_symlink: called\n");
 
-    inode = pvfs2_create_entry(
-        dir, dentry, symname, mode, PVFS2_VFS_OP_SYMLINK, &ret);
+    inode =
+        pvfs2_create_entry(dir, dentry, symname, mode, PVFS2_VFS_OP_SYMLINK,
+                           &ret);
 
     if (inode)
     {
@@ -308,8 +307,8 @@ static int pvfs2_mkdir(
     int ret = -EINVAL;
     struct inode *inode = NULL;
 
-    inode = pvfs2_create_entry(
-        dir, dentry, NULL, mode, PVFS2_VFS_OP_MKDIR, &ret);
+    inode =
+        pvfs2_create_entry(dir, dentry, NULL, mode, PVFS2_VFS_OP_MKDIR, &ret);
 
     if (inode)
     {
@@ -317,10 +316,10 @@ static int pvfs2_mkdir(
         /* NOTE: we have no good way to keep nlink consistent for directories
          * across clients; keep constant at 1  -Phil
          */
-	dir->i_nlink++;
+        dir->i_nlink++;
 #endif
         pvfs2_update_inode_time(dir);
-	ret = 0;
+        ret = 0;
     }
     return ret;
 }
@@ -335,12 +334,12 @@ static int pvfs2_rmdir(
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
     {
-        inode->i_nlink--; 
+        inode->i_nlink--;
 #if 0
         /* NOTE: we have no good way to keep nlink consistent for directories
          * across clients; keep constant at 1  -Phil
          */
-	dir->i_nlink--;
+        dir->i_nlink--;
 #endif
         pvfs2_update_inode_time(dir);
     }
@@ -372,8 +371,7 @@ static int pvfs2_rename(
     if (are_directories && (new_dir->i_nlink >= PVFS2_LINK_MAX))
     {
         pvfs2_error("pvfs2_rename: directory %s surpassed "
-                    "PVFS2_LINK_MAX\n",
-                    new_dentry->d_name.name);
+                    "PVFS2_LINK_MAX\n", new_dentry->d_name.name);
         return -EMLINK;
     }
 #endif
@@ -381,14 +379,14 @@ static int pvfs2_rename(
     new_op = op_alloc(PVFS2_VFS_OP_RENAME);
     if (!new_op)
     {
-	return ret;
+        return ret;
     }
 
     /*
-      if no handle/fs_id is available in the parent,
-      use the root handle/fs_id as specified by the
-      inode's corresponding superblock
-    */
+       if no handle/fs_id is available in the parent,
+       use the root handle/fs_id as specified by the
+       inode's corresponding superblock
+     */
     if (pvfs2_old_parent_inode->refn.handle &&
         pvfs2_old_parent_inode->refn.fs_id)
     {
@@ -399,9 +397,8 @@ static int pvfs2_rename(
     {
         sb = old_dir->i_sb;
         new_op->upcall.req.rename.old_parent_refn.handle =
-	    PVFS2_SB(sb)->root_handle;
-        new_op->upcall.req.rename.old_parent_refn.fs_id =
-	    PVFS2_SB(sb)->fs_id;
+            PVFS2_SB(sb)->root_handle;
+        new_op->upcall.req.rename.old_parent_refn.fs_id = PVFS2_SB(sb)->fs_id;
     }
 
     /* do the same for the new parent */
@@ -415,18 +412,16 @@ static int pvfs2_rename(
     {
         sb = new_dir->i_sb;
         new_op->upcall.req.rename.new_parent_refn.handle =
-	    PVFS2_SB(sb)->root_handle;
-        new_op->upcall.req.rename.new_parent_refn.fs_id =
-	    PVFS2_SB(sb)->fs_id;
+            PVFS2_SB(sb)->root_handle;
+        new_op->upcall.req.rename.new_parent_refn.fs_id = PVFS2_SB(sb)->fs_id;
     }
     strncpy(new_op->upcall.req.rename.d_old_name,
-	    old_dentry->d_name.name, PVFS2_NAME_LEN);
+            old_dentry->d_name.name, PVFS2_NAME_LEN);
     strncpy(new_op->upcall.req.rename.d_new_name,
-	    new_dentry->d_name.name, PVFS2_NAME_LEN);
+            new_dentry->d_name.name, PVFS2_NAME_LEN);
 
-    ret = service_operation(
-        new_op, "pvfs2_rename", 
-        get_interruptible_flag(old_dentry->d_inode));
+    ret = service_operation(new_op, "pvfs2_rename",
+                            get_interruptible_flag(old_dentry->d_inode));
 
     pvfs2_print("pvfs2_rename: got downcall status %d\n", ret);
 
@@ -466,25 +461,24 @@ static int pvfs2_rename(
 }
 
 /** PVFS2 implementation of VFS inode operations for directories */
-struct inode_operations pvfs2_dir_inode_operations =
-{
+struct inode_operations pvfs2_dir_inode_operations = {
 #ifdef PVFS2_LINUX_KERNEL_2_4
-    create : pvfs2_create,
-    lookup : pvfs2_lookup,
-    link : pvfs2_link,
-    unlink : pvfs2_unlink,
-    symlink : pvfs2_symlink,
-    mkdir : pvfs2_mkdir,
-    rmdir : pvfs2_rmdir,
-    mknod : pvfs2_mknod,
-    rename : pvfs2_rename,
-    setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate,
+  create:pvfs2_create,
+  lookup:pvfs2_lookup,
+  link:pvfs2_link,
+  unlink:pvfs2_unlink,
+  symlink:pvfs2_symlink,
+  mkdir:pvfs2_mkdir,
+  rmdir:pvfs2_rmdir,
+  mknod:pvfs2_mknod,
+  rename:pvfs2_rename,
+  setattr:pvfs2_setattr,
+  revalidate:pvfs2_revalidate,
 #ifdef HAVE_XATTR
-    getxattr: pvfs2_getxattr,
-    setxattr: pvfs2_setxattr,
-    removexattr: pvfs2_removexattr,
-    listxattr: pvfs2_listxattr,
+  getxattr:pvfs2_getxattr,
+  setxattr:pvfs2_setxattr,
+  removexattr:pvfs2_removexattr,
+  listxattr:pvfs2_listxattr,
 #endif
 #else
     .create = pvfs2_create,

@@ -34,10 +34,10 @@ int dbpf_bstream_listio_convert(
     int fd,
     int op_type,
     char **mem_offset_array,
-    TROVE_size *mem_size_array,
+    TROVE_size * mem_size_array,
     int mem_count,
-    TROVE_offset *stream_offset_array,
-    TROVE_size *stream_size_array,
+    TROVE_offset * stream_offset_array,
+    TROVE_size * stream_size_array,
     int stream_count,
     struct aiocb *aiocb_array,
     int *aiocb_count_p,
@@ -53,21 +53,21 @@ int dbpf_bstream_listio_convert(
 
     if (lio_state == NULL)
     {
-	mct = 0;
-	sct = 0;
-	cur_mem_size = mem_size_array[0];
-	cur_mem_off = mem_offset_array[0];
-	cur_stream_size = stream_size_array[0];
-	cur_stream_off = stream_offset_array[0];
+        mct = 0;
+        sct = 0;
+        cur_mem_size = mem_size_array[0];
+        cur_mem_off = mem_offset_array[0];
+        cur_stream_size = stream_size_array[0];
+        cur_stream_off = stream_offset_array[0];
     }
     else
     {
-	mct = lio_state->mem_ct;
-	sct = lio_state->stream_ct;
-	cur_mem_size = lio_state->cur_mem_size;
-	cur_mem_off = lio_state->cur_mem_off;
-	cur_stream_size = lio_state->cur_stream_size;
-	cur_stream_off = lio_state->cur_stream_off;
+        mct = lio_state->mem_ct;
+        sct = lio_state->stream_ct;
+        cur_mem_size = lio_state->cur_mem_size;
+        cur_mem_off = lio_state->cur_mem_off;
+        cur_stream_size = lio_state->cur_stream_size;
+        cur_stream_off = lio_state->cur_stream_off;
     }
     cur_aiocb_ptr = aiocb_array;
 
@@ -76,82 +76,82 @@ int dbpf_bstream_listio_convert(
     while (act < *aiocb_count_p)
     {
         assert(fd > 0);
-	cur_aiocb_ptr->aio_fildes = fd;
-	cur_aiocb_ptr->aio_offset = cur_stream_off;
-	cur_aiocb_ptr->aio_buf = cur_mem_off;
-	cur_aiocb_ptr->aio_reqprio = 0;
-	cur_aiocb_ptr->aio_lio_opcode = op_type;
-	cur_aiocb_ptr->aio_sigevent.sigev_notify = SIGEV_NONE;
+        cur_aiocb_ptr->aio_fildes = fd;
+        cur_aiocb_ptr->aio_offset = cur_stream_off;
+        cur_aiocb_ptr->aio_buf = cur_mem_off;
+        cur_aiocb_ptr->aio_reqprio = 0;
+        cur_aiocb_ptr->aio_lio_opcode = op_type;
+        cur_aiocb_ptr->aio_sigevent.sigev_notify = SIGEV_NONE;
 
         /*
-          determine if we're either out of memory (oom) regions, or
-          out of stream (oos) regions
-        */
+           determine if we're either out of memory (oom) regions, or
+           out of stream (oos) regions
+         */
         /* in many (all?) cases mem_count is 1, so oom will end up being 1 */
         oom = (((mct + 1) < mem_count) ? 0 : 1);
         oos = (((sct + 1) < stream_count) ? 0 : 1);
 
-	if (cur_mem_size == cur_stream_size)
+        if (cur_mem_size == cur_stream_size)
         {
-	    /* consume both mem and stream regions */
-	    cur_aiocb_ptr->aio_nbytes = cur_mem_size;
+            /* consume both mem and stream regions */
+            cur_aiocb_ptr->aio_nbytes = cur_mem_size;
 
             if (!oom)
             {
                 cur_mem_size = mem_size_array[++mct];
-                cur_mem_off  = mem_offset_array[mct];
+                cur_mem_off = mem_offset_array[mct];
             }
-	    else
-	    {
-		cur_mem_size = 0;
-	    }
+            else
+            {
+                cur_mem_size = 0;
+            }
             if (!oos)
             {
                 cur_stream_size = stream_size_array[++sct];
-                cur_stream_off  = stream_offset_array[sct];
+                cur_stream_off = stream_offset_array[sct];
             }
-	    else 
-	    {
-		cur_stream_size = 0;
-	    }
-	}
-	else if (cur_mem_size < cur_stream_size)
+            else
+            {
+                cur_stream_size = 0;
+            }
+        }
+        else if (cur_mem_size < cur_stream_size)
         {
-	    /* consume mem region and update stream region */
-	    cur_aiocb_ptr->aio_nbytes = cur_mem_size;
+            /* consume mem region and update stream region */
+            cur_aiocb_ptr->aio_nbytes = cur_mem_size;
 
-	    cur_stream_size -= cur_mem_size;
-	    cur_stream_off  += cur_mem_size;
+            cur_stream_size -= cur_mem_size;
+            cur_stream_off += cur_mem_size;
 
             if (!oom)
             {
                 cur_mem_size = mem_size_array[++mct];
-                cur_mem_off  = mem_offset_array[mct];
+                cur_mem_off = mem_offset_array[mct];
             }
-	    else
-	    {
-		cur_mem_size = 0;
-	    }
-	}
-	else /* cur_mem_size > cur_stream_size */
+            else
+            {
+                cur_mem_size = 0;
+            }
+        }
+        else    /* cur_mem_size > cur_stream_size */
         {
-	    /* consume stream region and update mem region */
-	    cur_aiocb_ptr->aio_nbytes = cur_stream_size;
+            /* consume stream region and update mem region */
+            cur_aiocb_ptr->aio_nbytes = cur_stream_size;
 
-	    cur_mem_size -= cur_stream_size;
-	    cur_mem_off  += cur_stream_size;
+            cur_mem_size -= cur_stream_size;
+            cur_mem_off += cur_stream_size;
 
             if (!oos)
             {
                 cur_stream_size = stream_size_array[++sct];
-                cur_stream_off  = stream_offset_array[sct];
+                cur_stream_off = stream_offset_array[sct];
             }
-	    else
-	    {
-		cur_stream_size = 0;
-	    }
-	}
-	cur_aiocb_ptr = &aiocb_array[++act];
+            else
+            {
+                cur_stream_size = 0;
+            }
+        }
+        cur_aiocb_ptr = &aiocb_array[++act];
 
         /* process until there are no bytes left in the current piece */
         if ((oom && cur_mem_size == 0) || (oos && cur_stream_size == 0))
@@ -166,25 +166,26 @@ int dbpf_bstream_listio_convert(
     /* until we've consumed everything we have, we're not finished */
     if (!oom || !oos)
     {
-	/* haven't processed all of list regions */
-	if (lio_state != NULL)
+        /* haven't processed all of list regions */
+        if (lio_state != NULL)
         {
             /* if we ran out of streams, increment mem_ct */
-	    lio_state->mem_ct = (!oos) ? mct : ++mct;
+            lio_state->mem_ct = (!oos) ? mct : ++mct;
             /* if we ran out of mems, increment stream_ct */
-	    lio_state->stream_ct = (!oom) ? sct : ++sct;
-	    lio_state->cur_mem_size = cur_mem_size;
-	    lio_state->cur_mem_off = cur_mem_off;
-	    lio_state->cur_stream_size = cur_stream_size;
-	    lio_state->cur_stream_off = cur_stream_off;
-	}
-	return 0;
+            lio_state->stream_ct = (!oom) ? sct : ++sct;
+            lio_state->cur_mem_size = cur_mem_size;
+            lio_state->cur_mem_off = cur_mem_off;
+            lio_state->cur_stream_size = cur_stream_size;
+            lio_state->cur_stream_off = cur_stream_off;
+        }
+        return 0;
     }
     return 1;
 }
 
 #if 0
-static void aiocb_print(struct aiocb *ptr)
+static void aiocb_print(
+    struct aiocb *ptr)
 {
     static char lio_write[] = "LIO_WRITE";
     static char lio_read[] = "LIO_READ";
@@ -194,15 +195,15 @@ static void aiocb_print(struct aiocb *ptr)
     char *opcode, *sigev;
 
     opcode = (ptr->aio_lio_opcode == LIO_WRITE) ? lio_write :
-	(ptr->aio_lio_opcode == LIO_READ) ? lio_read :
-	(ptr->aio_lio_opcode == LIO_NOP) ? lio_nop : invalid_value;
+        (ptr->aio_lio_opcode == LIO_READ) ? lio_read :
+        (ptr->aio_lio_opcode == LIO_NOP) ? lio_nop : invalid_value;
     sigev = ((ptr->aio_sigevent.sigev_notify == SIGEV_NONE) ?
              sigev_none : invalid_value);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "aio_fildes = %d, aio_offset = %d, "
                  "aio_buf = %n, aio_nbytes = %zu, aio_reqprio = %d, "
                  "aio_lio_opcode = %s, aio_sigevent.sigev_notify = %s\n",
-                 ptr->aio_fildes, (int)ptr->aio_offset,
+                 ptr->aio_fildes, (int) ptr->aio_offset,
                  ptr->aio_buf, ptr->aio_nbytes,
                  ptr->aio_reqprio, opcode, sigev);
 }

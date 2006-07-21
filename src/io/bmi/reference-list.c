@@ -31,7 +31,8 @@
  *
  * returns pointer to an empty list or NULL on failure.
  */
-ref_list_p ref_list_new(void)
+ref_list_p ref_list_new(
+    void)
 {
 
     ref_list_p tmp_list = NULL;
@@ -39,7 +40,7 @@ ref_list_p ref_list_new(void)
     tmp_list = (ref_list_p) malloc(sizeof(struct qlist_head));
     if (tmp_list)
     {
-	INIT_QLIST_HEAD(tmp_list);
+        INIT_QLIST_HEAD(tmp_list);
     }
     return (tmp_list);
 }
@@ -51,8 +52,9 @@ ref_list_p ref_list_new(void)
  *
  * no return value
  */
-void ref_list_add(ref_list_p rlp,
-		  ref_st_p rsp)
+void ref_list_add(
+    ref_list_p rlp,
+    ref_st_p rsp)
 {
     qlist_add(&(rsp->list_link), rlp);
 }
@@ -65,18 +67,19 @@ void ref_list_add(ref_list_p rlp,
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
-ref_st_p ref_list_search_addr(ref_list_p rlp,
-			      PVFS_BMI_addr_t my_addr)
+ref_st_p ref_list_search_addr(
+    ref_list_p rlp,
+    PVFS_BMI_addr_t my_addr)
 {
     ref_list_p tmp_link = NULL;
     ref_st_p tmp_entry = NULL;
 
     qlist_for_each(tmp_link, rlp)
     {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st,
-				list_link);
-	if (tmp_entry->bmi_addr == my_addr)
-	    return (tmp_entry);
+        tmp_entry = qlist_entry(tmp_link, struct ref_st,
+                                list_link);
+        if (tmp_entry->bmi_addr == my_addr)
+            return (tmp_entry);
     }
     return (NULL);
 }
@@ -90,17 +93,18 @@ ref_st_p ref_list_search_addr(ref_list_p rlp,
  *
  * returns a pointer to the structure on success, NULL on failure.
  */
-ref_st_p ref_list_search_method_addr(ref_list_p rlp,
-				     method_addr_p map)
+ref_st_p ref_list_search_method_addr(
+    ref_list_p rlp,
+    method_addr_p map)
 {
     ref_list_p tmp_link = NULL;
     ref_st_p tmp_entry = NULL;
 
     qlist_for_each(tmp_link, rlp)
     {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
-	if (tmp_entry->method_addr == map)
-	    return (tmp_entry);
+        tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
+        if (tmp_entry->method_addr == map)
+            return (tmp_entry);
     }
     return (NULL);
 }
@@ -113,18 +117,19 @@ ref_st_p ref_list_search_method_addr(ref_list_p rlp,
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
-ref_st_p ref_list_search_str(ref_list_p rlp,
-			     const char *idstring)
+ref_st_p ref_list_search_str(
+    ref_list_p rlp,
+    const char *idstring)
 {
     ref_list_p tmp_link = NULL;
     ref_st_p tmp_entry = NULL;
 
     qlist_for_each(tmp_link, rlp)
     {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st,
-				list_link);
-	if (tmp_entry->id_string && !strcmp(tmp_entry->id_string, idstring))
-	    return (tmp_entry);
+        tmp_entry = qlist_entry(tmp_link, struct ref_st,
+                                list_link);
+        if (tmp_entry->id_string && !strcmp(tmp_entry->id_string, idstring))
+            return (tmp_entry);
     }
     return (NULL);
 }
@@ -136,8 +141,9 @@ ref_st_p ref_list_search_str(ref_list_p rlp,
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
-ref_st_p ref_list_rem(ref_list_p rlp,
-		      PVFS_BMI_addr_t my_addr)
+ref_st_p ref_list_rem(
+    ref_list_p rlp,
+    PVFS_BMI_addr_t my_addr)
 {
     ref_list_p tmp_link = NULL;
     ref_list_p scratch = NULL;
@@ -145,12 +151,12 @@ ref_st_p ref_list_rem(ref_list_p rlp,
 
     qlist_for_each_safe(tmp_link, scratch, rlp)
     {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
-	if (tmp_entry->bmi_addr == my_addr)
-	{
-	    qlist_del(&tmp_entry->list_link);
-	    return (tmp_entry);
-	}
+        tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
+        if (tmp_entry->bmi_addr == my_addr)
+        {
+            qlist_del(&tmp_entry->list_link);
+            return (tmp_entry);
+        }
     }
     return (NULL);
 }
@@ -164,7 +170,8 @@ ref_st_p ref_list_rem(ref_list_p rlp,
  *
  * no return values
  */
-void ref_list_cleanup(ref_list_p rlp)
+void ref_list_cleanup(
+    ref_list_p rlp)
 {
     ref_list_p tmp_link = NULL;
     ref_list_p scratch = NULL;
@@ -172,8 +179,8 @@ void ref_list_cleanup(ref_list_p rlp)
 
     qlist_for_each_safe(tmp_link, scratch, rlp)
     {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st,
-				list_link);
+        tmp_entry = qlist_entry(tmp_link, struct ref_st,
+                                list_link);
         dealloc_ref_st(tmp_entry);
     }
 
@@ -188,7 +195,8 @@ void ref_list_cleanup(ref_list_p rlp)
  *
  * returns a pointer to the new structure on success, NULL on failure.
  */
-ref_st_p alloc_ref_st(void)
+ref_st_p alloc_ref_st(
+    void)
 {
 
     int ssize = sizeof(struct ref_st);
@@ -198,7 +206,7 @@ ref_st_p alloc_ref_st(void)
     new_ref = (ref_st_p) malloc(ssize);
     if (!new_ref)
     {
-	return (NULL);
+        return (NULL);
     }
 
     memset(new_ref, 0, ssize);
@@ -207,8 +215,8 @@ ref_st_p alloc_ref_st(void)
     ret = id_gen_safe_register(&(new_ref->bmi_addr), new_ref);
     if (ret < 0)
     {
-	dealloc_ref_st(new_ref);
-	return (NULL);
+        dealloc_ref_st(new_ref);
+        return (NULL);
     }
 
     return (new_ref);
@@ -222,23 +230,24 @@ ref_st_p alloc_ref_st(void)
  *
  * returns 0 on success, -1 on failure
  */
-void dealloc_ref_st(ref_st_p deadref)
+void dealloc_ref_st(
+    ref_st_p deadref)
 {
 
     if (!deadref)
     {
-	return;
+        return;
     }
 
     if (deadref->id_string)
     {
-	free(deadref->id_string);
+        free(deadref->id_string);
     }
 
     if (deadref->method_addr)
     {
-	deadref->interface->BMI_meth_set_info(BMI_DROP_ADDR,
-					      deadref->method_addr);
+        deadref->interface->BMI_meth_set_info(BMI_DROP_ADDR,
+                                              deadref->method_addr);
     }
 
     id_gen_safe_unregister(deadref->bmi_addr);

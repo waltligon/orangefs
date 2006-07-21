@@ -6,34 +6,36 @@
 
 pvfs_helper_t pvfs_helper;
 
-int initialize_sysint(void)
+int initialize_sysint(
+    void)
 {
     int ret = -1;
 
-    memset(&pvfs_helper,0,sizeof(pvfs_helper));
+    memset(&pvfs_helper, 0, sizeof(pvfs_helper));
 
     ret = PVFS_util_init_defaults();
-    if(ret < 0)
+    if (ret < 0)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return(ret);
+        PVFS_perror("PVFS_util_init_defaults", ret);
+        return (ret);
     }
 
     ret = PVFS_util_get_default_fsid(&pvfs_helper.fs_id);
-    if(ret < 0)
+    if (ret < 0)
     {
-	PVFS_perror("PVFS_util_get_default_fsid", ret);
-	return(ret);
+        PVFS_perror("PVFS_util_get_default_fsid", ret);
+        return (ret);
     }
 
     pvfs_helper.initialized = 1;
     pvfs_helper.num_test_files = NUM_TEST_FILES;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,"sysint intialized\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "sysint intialized\n");
     return 0;
 }
 
-int finalize_sysint(void)
+int finalize_sysint(
+    void)
 {
     int ret = PVFS_sys_finalize();
     pvfs_helper.initialized = 0;
@@ -47,7 +49,9 @@ int finalize_sysint(void)
  * returns:  0 on success; 
  *      -1 if a problem
  */
-int get_root(PVFS_fs_id fs_id, PVFS_object_ref *pinode_refn)
+int get_root(
+    PVFS_fs_id fs_id,
+    PVFS_object_ref * pinode_refn)
 {
     int ret = -1;
     PVFS_credentials credentials;
@@ -67,14 +71,15 @@ int get_root(PVFS_fs_id fs_id, PVFS_object_ref *pinode_refn)
         {
             printf("Lookup failed with errcode = %d\n", ret);
         }
-        memcpy(pinode_refn, &resp_look.ref,
-               sizeof(PVFS_object_ref));
+        memcpy(pinode_refn, &resp_look.ref, sizeof(PVFS_object_ref));
     }
     return ret;
 }
 
-int create_dir(PVFS_object_ref parent_refn, char *name,
-               PVFS_object_ref *out_refn)
+int create_dir(
+    PVFS_object_ref parent_refn,
+    char *name,
+    PVFS_object_ref * out_refn)
 {
     int ret = -1;
     PVFS_sys_attr attr;
@@ -88,13 +93,11 @@ int create_dir(PVFS_object_ref parent_refn, char *name,
 
     attr.owner = credentials.uid;
     attr.group = credentials.gid;
-    attr.atime = attr.mtime = attr.ctime = 
-	time(NULL);
+    attr.atime = attr.mtime = attr.ctime = time(NULL);
     attr.perms = (PVFS_U_WRITE | PVFS_U_READ);
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
-    ret = PVFS_sys_mkdir(name, parent_refn,
-                         attr, &credentials, &resp_mkdir);
+    ret = PVFS_sys_mkdir(name, parent_refn, attr, &credentials, &resp_mkdir);
     if (ret < 0)
     {
         printf("mkdir failed\n");
@@ -103,8 +106,7 @@ int create_dir(PVFS_object_ref parent_refn, char *name,
     if (out_refn)
     {
         memset(out_refn, 0, sizeof(PVFS_object_ref));
-        memcpy(out_refn, &resp_mkdir.ref,
-               sizeof(PVFS_object_ref));
+        memcpy(out_refn, &resp_mkdir.ref, sizeof(PVFS_object_ref));
     }
     return 0;
 }
@@ -115,7 +117,9 @@ int create_dir(PVFS_object_ref parent_refn, char *name,
  * returns 0 on success.
  *          -1 if some error happened.
  */
-int remove_file(PVFS_object_ref parent_refn, char *name)
+int remove_file(
+    PVFS_object_ref parent_refn,
+    char *name)
 {
     int ret = -1;
     PVFS_credentials credentials;
@@ -137,7 +141,9 @@ int remove_file(PVFS_object_ref parent_refn, char *name)
  * returns 0 on success.
  *          -1 if some error happened.
  */
-int remove_dir(PVFS_object_ref parent_refn, char *name)
+int remove_dir(
+    PVFS_object_ref parent_refn,
+    char *name)
 {
     return remove_file(parent_refn, name);
 }
@@ -148,8 +154,10 @@ int remove_dir(PVFS_object_ref parent_refn, char *name)
  * returns a handle to the new directory
  *          -1 if some error happened
  */
-int lookup_name(PVFS_object_ref pinode_refn, char *name,
-                PVFS_object_ref *out_refn)
+int lookup_name(
+    PVFS_object_ref pinode_refn,
+    char *name,
+    PVFS_object_ref * out_refn)
 {
     int ret = -1;
     PVFS_credentials credentials;
@@ -164,13 +172,12 @@ int lookup_name(PVFS_object_ref pinode_refn, char *name,
                           PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
-       printf("Lookup failed with errcode = %d\n", ret);
-       return(-1);
+        printf("Lookup failed with errcode = %d\n", ret);
+        return (-1);
     }
     if (out_refn)
     {
-        memcpy(out_refn, &resp_lookup.ref,
-               sizeof(PVFS_object_ref));
+        memcpy(out_refn, &resp_lookup.ref, sizeof(PVFS_object_ref));
     }
     return 0;
 }

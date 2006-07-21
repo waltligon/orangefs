@@ -11,10 +11,12 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
-int main(int argc,char **argv)
+int main(
+    int argc,
+    char **argv)
 {
     int ret = -1;
-    char *filename = (char *)0;
+    char *filename = (char *) 0;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_lookup resp_lk;
     PVFS_size trunc_size;
@@ -31,23 +33,23 @@ int main(int argc,char **argv)
     filename = argv[1];
 
     {
-    /* scanf format must match data size on both 32- and 64-bit machines */
-    unsigned long long ull;
-    sscanf(argv[2],"%lld",&ull);
-    trunc_size = ull;
+        /* scanf format must match data size on both 32- and 64-bit machines */
+        unsigned long long ull;
+        sscanf(argv[2], "%lld", &ull);
+        trunc_size = ull;
     }
 
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return (-1);
+        PVFS_perror("PVFS_util_init_defaults", ret);
+        return (-1);
     }
     ret = PVFS_util_get_default_fsid(&fs_id);
     if (ret < 0)
     {
-	PVFS_perror("PVFS_util_get_default_fsid", ret);
-	return (-1);
+        PVFS_perror("PVFS_util_get_default_fsid", ret);
+        return (-1);
     }
 
     /* lookup the root handle */
@@ -56,19 +58,19 @@ int main(int argc,char **argv)
                           &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
-	printf("Lookup failed with errcode = %d\n", ret);
-	return(-1);
+        printf("Lookup failed with errcode = %d\n", ret);
+        return (-1);
     }
 
-    memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
+    memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     PVFS_util_gen_credentials(&credentials);
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
-	printf("Lookup failed with errcode = %d\n", ret);
-	return(-1);
+        printf("Lookup failed with errcode = %d\n", ret);
+        return (-1);
     }
 
     size = trunc_size;
@@ -79,8 +81,8 @@ int main(int argc,char **argv)
     ret = PVFS_sys_truncate(pinode_refn, size, &credentials);
     if (ret < 0)
     {
-        printf("truncate failed with errcode = %d\n",ret);
-        return(-1);
+        printf("truncate failed with errcode = %d\n", ret);
+        return (-1);
     }
 
     printf("===================================\n");
@@ -94,7 +96,7 @@ int main(int argc,char **argv)
         return (-1);
     }
 
-    return(0);
+    return (0);
 }
 
 /*
@@ -105,4 +107,3 @@ int main(int argc,char **argv)
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-

@@ -14,14 +14,16 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
-int main(int argc,char **argv)
+int main(
+    int argc,
+    char **argv)
 {
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_getattr *resp_gattr = NULL;
     PVFS_object_ref pinode_refn;
     uint32_t attrmask;
     PVFS_fs_id fs_id;
-    char* name;
+    char *name;
     PVFS_credentials credentials;
     char *filename = NULL;
     int ret = -1;
@@ -30,7 +32,7 @@ int main(int argc,char **argv)
     if (argc == 2)
     {
         filename = malloc(strlen(argv[1]) + 1);
-        memcpy(filename, argv[1], strlen(argv[1]) +1 );
+        memcpy(filename, argv[1], strlen(argv[1]) + 1);
     }
     else
     {
@@ -41,14 +43,14 @@ int main(int argc,char **argv)
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return (-1);
+        PVFS_perror("PVFS_util_init_defaults", ret);
+        return (-1);
     }
     ret = PVFS_util_get_default_fsid(&fs_id);
     if (ret < 0)
     {
-	PVFS_perror("PVFS_util_get_default_fsid", ret);
-	return (-1);
+        PVFS_perror("PVFS_util_get_default_fsid", ret);
+        return (-1);
     }
 
     name = filename;
@@ -59,16 +61,16 @@ int main(int argc,char **argv)
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
-        return(-1);
+        return (-1);
     }
 
-    resp_gattr = (PVFS_sysresp_getattr *)malloc(sizeof(PVFS_sysresp_getattr));
+    resp_gattr = (PVFS_sysresp_getattr *) malloc(sizeof(PVFS_sysresp_getattr));
     if (resp_gattr == NULL)
     {
         printf("Error in malloc\n");
-        return(-1);
+        return (-1);
     }
-	
+
     pinode_refn.handle = resp_look.ref.handle;
     pinode_refn.fs_id = fs_id;
     attrmask = PVFS_ATTR_SYS_ALL;
@@ -77,15 +79,15 @@ int main(int argc,char **argv)
     if (ret < 0)
     {
         printf("getattr failed with errcode = %d\n", ret);
-        return(-1);
+        return (-1);
     }
 
-    r_atime = (time_t)resp_gattr->attr.atime;
-    r_mtime = (time_t)resp_gattr->attr.mtime;
-    r_ctime = (time_t)resp_gattr->attr.ctime;
+    r_atime = (time_t) resp_gattr->attr.atime;
+    r_mtime = (time_t) resp_gattr->attr.mtime;
+    r_ctime = (time_t) resp_gattr->attr.ctime;
 
     printf("Handle      : %llu\n", llu(pinode_refn.handle));
-    printf("FSID        : %d\n", (int)pinode_refn.fs_id);
+    printf("FSID        : %d\n", (int) pinode_refn.fs_id);
     printf("mask        : %d\n", resp_gattr->attr.mask);
     printf("uid         : %d\n", resp_gattr->attr.owner);
     printf("gid         : %d\n", resp_gattr->attr.group);
@@ -96,23 +98,22 @@ int main(int argc,char **argv)
     printf("file size   : %lld\n", lld(resp_gattr->attr.size));
     printf("handle type : ");
 
-    switch(resp_gattr->attr.objtype)
+    switch (resp_gattr->attr.objtype)
     {
-        case PVFS_TYPE_METAFILE:
-            printf("metafile\n");
-            break;
-        case PVFS_TYPE_DIRECTORY:
-            printf("directory\n");
-            break;
-        case PVFS_TYPE_SYMLINK:
-            printf("symlink\n");
-            printf("target      : %s\n",
-                   resp_gattr->attr.link_target);
-            free(resp_gattr->attr.link_target);
-            break;
-        default:
-            printf("unknown object type!\n");
-            break;
+    case PVFS_TYPE_METAFILE:
+        printf("metafile\n");
+        break;
+    case PVFS_TYPE_DIRECTORY:
+        printf("directory\n");
+        break;
+    case PVFS_TYPE_SYMLINK:
+        printf("symlink\n");
+        printf("target      : %s\n", resp_gattr->attr.link_target);
+        free(resp_gattr->attr.link_target);
+        break;
+    default:
+        printf("unknown object type!\n");
+        break;
     }
 
     ret = PVFS_sys_finalize();
@@ -125,5 +126,5 @@ int main(int argc,char **argv)
     free(resp_gattr);
     free(filename);
 
-    return(0);
+    return (0);
 }

@@ -56,11 +56,17 @@ static enum gossip_logstamp internal_logstamp = GOSSIP_LOGSTAMP_DEFAULT;
 /*****************************************************************
  * prototypes
  */
-static int gossip_disable_stderr(void);
-static int gossip_disable_file(void);
+static int gossip_disable_stderr(
+    void);
+static int gossip_disable_file(
+    void);
 
-static int gossip_debug_fp(FILE *fp, char prefix, const char *format, va_list ap, enum
-gossip_logstamp ts);
+static int gossip_debug_fp(
+    FILE * fp,
+    char prefix,
+    const char *format,
+    va_list ap,
+    enum gossip_logstamp ts);
 static int gossip_debug_syslog(
     char prefix,
     const char *format,
@@ -197,7 +203,7 @@ int gossip_disable(
  */
 int gossip_get_debug_mask(
     int *debug_on,
-    uint64_t *mask)
+    uint64_t * mask)
 {
     *debug_on = gossip_debug_on;
     *mask = gossip_debug_mask;
@@ -234,7 +240,7 @@ int gossip_set_logstamp(
     enum gossip_logstamp ts)
 {
     internal_logstamp = ts;
-    return(0);
+    return (0);
 }
 
 #ifndef __GNUC__
@@ -278,14 +284,13 @@ int __gossip_debug(
      */
 #ifndef __GNUC__
     /* exit quietly if we aren't meant to print */
-    if ((!gossip_debug_on) || !(gossip_debug_mask & mask) ||
-        (!gossip_facility))
+    if ((!gossip_debug_on) || !(gossip_debug_mask & mask) || (!gossip_facility))
     {
         return 0;
     }
 #endif
 
-    if(prefix == '?')
+    if (prefix == '?')
     {
         /* automatic prefix assignment */
         prefix = 'D';
@@ -300,7 +305,9 @@ int __gossip_debug(
         ret = gossip_debug_fp(stderr, prefix, format, ap, internal_logstamp);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(internal_log_file, prefix, format, ap, internal_logstamp);
+        ret =
+            gossip_debug_fp(internal_log_file, prefix, format, ap,
+                            internal_logstamp);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_debug_syslog(prefix, format, ap);
@@ -341,7 +348,9 @@ int gossip_err(
         ret = gossip_debug_fp(stderr, 'E', format, ap, internal_logstamp);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(internal_log_file, 'E', format, ap, internal_logstamp);
+        ret =
+            gossip_debug_fp(internal_log_file, 'E', format, ap,
+                            internal_logstamp);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_err_syslog(format, ap);
@@ -356,13 +365,14 @@ int gossip_err(
 }
 
 #ifdef GOSSIP_ENABLE_BACKTRACE
-    #ifndef GOSSIP_BACKTRACE_DEPTH
-    #define GOSSIP_BACKTRACE_DEPTH 12
-    #endif
+#ifndef GOSSIP_BACKTRACE_DEPTH
+#define GOSSIP_BACKTRACE_DEPTH 12
+#endif
 /** Prints out a dump of the current stack (excluding this function)
  *  using gossip_err.
  */
-void gossip_backtrace(void)
+void gossip_backtrace(
+    void)
 {
     void *trace[GOSSIP_BACKTRACE_DEPTH];
     char **messages = NULL;
@@ -370,7 +380,7 @@ void gossip_backtrace(void)
 
     trace_size = backtrace(trace, GOSSIP_BACKTRACE_DEPTH);
     messages = backtrace_symbols(trace, trace_size);
-    for(i = 1; i < trace_size; i++)
+    for (i = 1; i < trace_size; i++)
     {
         gossip_err("\t[bt] %s\n", messages[i]);
     }
@@ -421,8 +431,12 @@ static int gossip_debug_syslog(
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_debug_fp(FILE *fp, char prefix, 
-    const char *format, va_list ap, enum gossip_logstamp ts)
+static int gossip_debug_fp(
+    FILE * fp,
+    char prefix,
+    const char *format,
+    va_list ap,
+    enum gossip_logstamp ts)
 {
     char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
     int bsize = sizeof(buffer);
@@ -434,31 +448,31 @@ static int gossip_debug_fp(FILE *fp, char prefix,
     bptr += 3;
     bsize -= 3;
 
-    switch(ts)
+    switch (ts)
     {
-        case GOSSIP_LOGSTAMP_USEC:
-            gettimeofday(&tv, 0);
-            tp = tv.tv_sec;
-            strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
-            sprintf(bptr+8, ".%06ld] ", (long)tv.tv_usec);
-            bptr += 17;
-            bsize -= 17;
-            break;
-        case GOSSIP_LOGSTAMP_DATETIME:
-            gettimeofday(&tv, 0);
-            tp = tv.tv_sec;
-            strftime(bptr, 14, "%m/%d %H:%M] ", localtime(&tp));
-            bptr += 13;
-            bsize -= 13;
-            break;
-        case GOSSIP_LOGSTAMP_NONE:
-            bptr--;
-            sprintf(bptr, "] ");
-            bptr += 2;
-            bsize++;
-            break;
-        default:
-            break;
+    case GOSSIP_LOGSTAMP_USEC:
+        gettimeofday(&tv, 0);
+        tp = tv.tv_sec;
+        strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
+        sprintf(bptr + 8, ".%06ld] ", (long) tv.tv_usec);
+        bptr += 17;
+        bsize -= 17;
+        break;
+    case GOSSIP_LOGSTAMP_DATETIME:
+        gettimeofday(&tv, 0);
+        tp = tv.tv_sec;
+        strftime(bptr, 14, "%m/%d %H:%M] ", localtime(&tp));
+        bptr += 13;
+        bsize -= 13;
+        break;
+    case GOSSIP_LOGSTAMP_NONE:
+        bptr--;
+        sprintf(bptr, "] ");
+        bptr += 2;
+        bsize++;
+        break;
+    default:
+        break;
     }
 
     ret = vsnprintf(bptr, bsize, format, ap);

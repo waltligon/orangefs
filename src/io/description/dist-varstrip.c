@@ -2,7 +2,7 @@
  * (C) 2005 Tobias Eberle <tobias.eberle@gmx.de>
  *
  * See COPYING in top-level directory.
- */       
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,40 +16,40 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 
-static PVFS_offset logical_to_physical_offset(void* params,
-                                              PINT_request_file_data* fd,
-                                              PVFS_offset logical_offset)
+static PVFS_offset logical_to_physical_offset(
+    void *params,
+    PINT_request_file_data * fd,
+    PVFS_offset logical_offset)
 {
-    PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
+    PVFS_varstrip_params *varstrip_params = (PVFS_varstrip_params *) params;
     /* parse parameter */
     PINT_dist_strips *strips;
     uint32_t ui_count, ii, ui_stripe_nr;
     PVFS_size ui_stripe_size;
     int32_t server_nr = fd->server_nr;
-    
-    if (PINT_dist_strips_parse(
-            varstrip_params->strips, &strips, &ui_count) == -1)
+
+    if (PINT_dist_strips_parse(varstrip_params->strips, &strips, &ui_count) ==
+        -1)
     {
         return -1;
     }
-    
+
     /* stripe size */
-    ui_stripe_size = strips[ui_count - 1].offset + 
-        strips[ui_count - 1].size;
+    ui_stripe_size = strips[ui_count - 1].offset + strips[ui_count - 1].size;
     ui_stripe_nr = logical_offset / ui_stripe_size;
     /* search my strips */
-    for(ii = 0; ii < ui_count; ii++)
+    for (ii = 0; ii < ui_count; ii++)
     {
         if (strips[ii].server_nr == server_nr)
         {
-            if ((logical_offset >= (ui_stripe_nr * ui_stripe_size) + 
-                                   strips[ii].offset) &&
-                (logical_offset <= (ui_stripe_nr * ui_stripe_size) + 
-                                   strips[ii].offset + strips[ii].size - 1))
+            if ((logical_offset >= (ui_stripe_nr * ui_stripe_size) +
+                 strips[ii].offset) &&
+                (logical_offset <= (ui_stripe_nr * ui_stripe_size) +
+                 strips[ii].offset + strips[ii].size - 1))
             {
                 unsigned int jj;
                 PVFS_offset ui_offset_in_strips;
-                
+
                 /* get size of all strips in the stripe of this server */
                 /* and get the size of all strips of this server that are */
                 /* before the current Strips */
@@ -62,19 +62,18 @@ static PVFS_offset logical_to_physical_offset(void* params,
                         ui_size_of_all_my_strips_in_stripe += strips[jj].size;
                         if (jj < ii)
                         {
-                            ui_size_of_my_strips_before_current += 
+                            ui_size_of_my_strips_before_current +=
                                 strips[jj].size;
                         }
                     }
                 }
-                
-                ui_offset_in_strips = logical_offset - 
+
+                ui_offset_in_strips = logical_offset -
                     (ui_stripe_nr * ui_stripe_size) - strips[ii].offset;
-                
+
                 PINT_dist_strips_free_mem(&strips);
-                return ui_stripe_nr * ui_size_of_all_my_strips_in_stripe + 
-                       ui_size_of_my_strips_before_current + 
-                       ui_offset_in_strips;
+                return ui_stripe_nr * ui_size_of_all_my_strips_in_stripe +
+                    ui_size_of_my_strips_before_current + ui_offset_in_strips;
             }
         }
         /* try next */
@@ -89,9 +88,10 @@ static PVFS_offset logical_to_physical_offset(void* params,
     return 0;
 }
 
-static PVFS_offset physical_to_logical_offset(void* params,
-                                              PINT_request_file_data* fd,
-                                              PVFS_offset physical_offset)
+static PVFS_offset physical_to_logical_offset(
+    void *params,
+    PINT_request_file_data * fd,
+    PVFS_offset physical_offset)
 {
     /* parse parameter */
     PINT_dist_strips *strips;
@@ -101,14 +101,14 @@ static PVFS_offset physical_to_logical_offset(void* params,
     PVFS_offset ui_physical_offset_in_stripe;
     PVFS_offset ui_offset_in_stripe = 0;
 
-    PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
+    PVFS_varstrip_params *varstrip_params = (PVFS_varstrip_params *) params;
 
-    if (PINT_dist_strips_parse(
-            varstrip_params->strips, &strips, &ui_count) == -1)
+    if (PINT_dist_strips_parse(varstrip_params->strips, &strips, &ui_count) ==
+        -1)
     {
         return -1;
     }
-    
+
     /* to what stripe belongs that physical offset? */
     /* must get size of strips of this server in one stripe first */
     for (jj = 0; jj < ui_count; jj++)
@@ -122,19 +122,19 @@ static PVFS_offset physical_to_logical_offset(void* params,
 
     /* now get the Strips number in the 
      * stripe the physical offset belongs to */
-    ui_physical_offset_in_stripe = 
+    ui_physical_offset_in_stripe =
         physical_offset - ui_stripe_nr * ui_size_of_strips_in_stripe;
-    for(ii = 0; ii < ui_count; ii++)
+    for (ii = 0; ii < ui_count; ii++)
     {
         if (strips[ii].server_nr == server_nr)
         {
-            if (ui_physical_offset_in_stripe < 
+            if (ui_physical_offset_in_stripe <
                 ui_offset_in_stripe + strips[ii].size)
             {
                 /* found! */
-                PVFS_offset logical_offset = ui_stripe_nr * 
-                    (strips[ui_count - 1].offset + strips[ui_count - 1].size) + 
-                    strips[ii].offset + 
+                PVFS_offset logical_offset = ui_stripe_nr *
+                    (strips[ui_count - 1].offset + strips[ui_count - 1].size) +
+                    strips[ii].offset +
                     (ui_physical_offset_in_stripe - ui_offset_in_stripe);
                 PINT_dist_strips_free_mem(&strips);
                 return logical_offset;
@@ -153,11 +153,12 @@ static PVFS_offset physical_to_logical_offset(void* params,
     return -1;
 }
 
-static PVFS_offset next_mapped_offset(void* params,
-                                      PINT_request_file_data* fd,
-                                      PVFS_offset logical_offset)
+static PVFS_offset next_mapped_offset(
+    void *params,
+    PINT_request_file_data * fd,
+    PVFS_offset logical_offset)
 {
-    PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
+    PVFS_varstrip_params *varstrip_params = (PVFS_varstrip_params *) params;
     /* parse parameter */
     PINT_dist_strips *strips;
     unsigned int ui_count, ii, ui_stripe_nr;
@@ -165,25 +166,22 @@ static PVFS_offset next_mapped_offset(void* params,
     PVFS_size ui_stripe_size;
     PVFS_offset ui_offset_in_stripe;
 
-    if (PINT_dist_strips_parse(
-            varstrip_params->strips, &strips, &ui_count) == -1)
+    if (PINT_dist_strips_parse(varstrip_params->strips, &strips, &ui_count) ==
+        -1)
     {
         return -1;
     }
 
     /* get number of stripes */
-    ui_stripe_size = 
-        strips[ui_count - 1].offset +
-        strips[ui_count - 1].size;
+    ui_stripe_size = strips[ui_count - 1].offset + strips[ui_count - 1].size;
     ui_stripe_nr = logical_offset / ui_stripe_size;
 
     /* get offset in stripe */
-    ui_offset_in_stripe = 
-        logical_offset - (ui_stripe_nr * ui_stripe_size);
+    ui_offset_in_stripe = logical_offset - (ui_stripe_nr * ui_stripe_size);
 
     /* get Strips number */
     ii = 0;
-    for(ii = 0; ii < ui_count; ii++)
+    for (ii = 0; ii < ui_count; ii++)
     {
         if ((ui_offset_in_stripe >= strips[ii].offset) &&
             (ui_offset_in_stripe <= strips[ii].offset + strips[ii].size - 1))
@@ -207,7 +205,7 @@ static PVFS_offset next_mapped_offset(void* params,
             if (strips[jj].server_nr == server_nr)
             {
                 /* found! */
-                PVFS_offset ui_next_mapped_offset = 
+                PVFS_offset ui_next_mapped_offset =
                     ui_stripe_nr * ui_stripe_size + strips[jj].offset;
                 PINT_dist_strips_free_mem(&strips);
                 return ui_next_mapped_offset;
@@ -220,7 +218,7 @@ static PVFS_offset next_mapped_offset(void* params,
         {
             if (strips[jj].server_nr == server_nr)
             {
-                PVFS_offset ui_next_mapped_offset = 
+                PVFS_offset ui_next_mapped_offset =
                     ui_stripe_nr * ui_stripe_size + strips[jj].offset;
                 PINT_dist_strips_free_mem(&strips);
                 return ui_next_mapped_offset;
@@ -234,46 +232,45 @@ static PVFS_offset next_mapped_offset(void* params,
     return -1;
 }
 
-static PVFS_size contiguous_length(void* params,
-                                   PINT_request_file_data* fd,
-                                   PVFS_offset physical_offset)
+static PVFS_size contiguous_length(
+    void *params,
+    PINT_request_file_data * fd,
+    PVFS_offset physical_offset)
 {
-    PVFS_varstrip_params* varstrip_params;
+    PVFS_varstrip_params *varstrip_params;
     /* convert to a logical offset */
-     
+
     /* parse parameter */
     PINT_dist_strips *strips;
     PVFS_offset ui_offset_in_stripe, logical_offset;
     unsigned int ui_count, ii, ui_stripe_nr, ui_stripe_size;
 
-    logical_offset = physical_to_logical_offset(
-        params, fd, physical_offset);
-    
-    varstrip_params = (PVFS_varstrip_params*)params;
+    logical_offset = physical_to_logical_offset(params, fd, physical_offset);
 
-    if (PINT_dist_strips_parse(
-            varstrip_params->strips, &strips, &ui_count) == -1)
+    varstrip_params = (PVFS_varstrip_params *) params;
+
+    if (PINT_dist_strips_parse(varstrip_params->strips, &strips, &ui_count) ==
+        -1)
     {
         return -1;
     }
-    
+
     /* get number of stripes */
-    ui_stripe_size = strips[ui_count - 1].offset +
-        strips[ui_count - 1].size;
+    ui_stripe_size = strips[ui_count - 1].offset + strips[ui_count - 1].size;
     ui_stripe_nr = logical_offset / ui_stripe_size;
     /* get offset in stripe */
     ui_offset_in_stripe = logical_offset - (ui_stripe_nr * ui_stripe_size);
     /* get Strips */
-    for(ii = 0; ii < ui_count; ii++)
+    for (ii = 0; ii < ui_count; ii++)
     {
         if ((ui_offset_in_stripe >= strips[ii].offset) &&
             (ui_offset_in_stripe <= strips[ii].offset + strips[ii].size - 1))
         {
             /* found! */
-            PVFS_size ui_contiguous_length = strips[ii].offset + 
+            PVFS_size ui_contiguous_length = strips[ii].offset +
                 strips[ii].size - ui_offset_in_stripe;
             PINT_dist_strips_free_mem(&strips);
-            
+
             return ui_contiguous_length;
         }
     }
@@ -284,13 +281,14 @@ static PVFS_size contiguous_length(void* params,
     return 0;
 }
 
-static PVFS_size logical_file_size(void* params,
-                                   uint32_t server_ct,
-                                   PVFS_size *psizes)
+static PVFS_size logical_file_size(
+    void *params,
+    uint32_t server_ct,
+    PVFS_size * psizes)
 {
     PVFS_size ui_file_size = 0;
     uint32_t ii;
-    
+
     if (!psizes)
         return -1;
     for (ii = 0; ii < server_ct; ii++)
@@ -300,18 +298,19 @@ static PVFS_size logical_file_size(void* params,
     return ui_file_size;
 }
 
-static int get_num_dfiles(void* params,
-                          uint32_t num_servers_requested,
-                          uint32_t num_dfiles_requested)
+static int get_num_dfiles(
+    void *params,
+    uint32_t num_servers_requested,
+    uint32_t num_dfiles_requested)
 {
-    PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
+    PVFS_varstrip_params *varstrip_params = (PVFS_varstrip_params *) params;
     /* parse parameter */
     PINT_dist_strips *strips;
     unsigned int i_highest_data_file_number = 0;
     unsigned int ii, ui_count;
 
-    if (PINT_dist_strips_parse(
-            varstrip_params->strips, &strips, &ui_count) == -1)
+    if (PINT_dist_strips_parse(varstrip_params->strips, &strips, &ui_count) ==
+        -1)
     {
         /* error */
         return -1;
@@ -360,26 +359,29 @@ static int get_num_dfiles(void* params,
 /* its like the default one but assures that last character is \0
  * we need null terminated strings!
  */
-static int set_param(const char* dist_name, void* params,
-                    const char* param_name, void* value)
+static int set_param(
+    const char *dist_name,
+    void *params,
+    const char *param_name,
+    void *value)
 {
-    PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
+    PVFS_varstrip_params *varstrip_params = (PVFS_varstrip_params *) params;
     if (strcmp(param_name, "strips") == 0)
     {
-        if (strlen((char *)value) == 0)
+        if (strlen((char *) value) == 0)
         {
             gossip_err("ERROR: Parameter 'strips' empty!\n");
         }
         else
         {
-            if (strlen((char *)value) > 
+            if (strlen((char *) value) >
                 PVFS_DIST_VARSTRIP_MAX_STRIPS_STRING_LENGTH)
             {
                 gossip_err("ERROR: Parameter 'strips' too long!\n");
             }
             else
             {
-                strcpy(varstrip_params->strips, (char *)value);
+                strcpy(varstrip_params->strips, (char *) value);
             }
         }
     }
@@ -387,22 +389,27 @@ static int set_param(const char* dist_name, void* params,
 }
 
 
-static void encode_params(char **pptr, void* params)
+static void encode_params(
+    char **pptr,
+    void *params)
 {
-    PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
+    PVFS_varstrip_params *varstrip_params = (PVFS_varstrip_params *) params;
     encode_string(pptr, &varstrip_params->strips);
 }
 
-static void decode_params(char **pptr, void* params)
+static void decode_params(
+    char **pptr,
+    void *params)
 {
-    PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
+    PVFS_varstrip_params *varstrip_params = (PVFS_varstrip_params *) params;
     decode_here_string(pptr, varstrip_params->strips);
 }
 
-static void registration_init(void* params)
+static void registration_init(
+    void *params)
 {
     PINT_dist_register_param(PVFS_DIST_VARSTRIP_NAME, "strips",
-            PVFS_varstrip_params, strips);
+                             PVFS_varstrip_params, strips);
 }
 
 
@@ -423,8 +430,8 @@ static PINT_dist_methods varstrip_methods = {
 
 PINT_dist varstrip_dist = {
     .dist_name = PVFS_DIST_VARSTRIP_NAME,
-    .name_size = roundup8(PVFS_DIST_VARSTRIP_NAME_SIZE), /* name size */
-    .param_size = roundup8(sizeof(PVFS_varstrip_params)), /* param size */
+    .name_size = roundup8(PVFS_DIST_VARSTRIP_NAME_SIZE),        /* name size */
+    .param_size = roundup8(sizeof(PVFS_varstrip_params)),       /* param size */
     .params = &varstrip_params,
     .methods = &varstrip_methods
 };

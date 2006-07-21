@@ -33,7 +33,7 @@ typedef struct
 
     gen_mutex_t *server_config_mutex;
     struct server_configuration_s *server_config;
-    int ref_count; /* allows same config to be added multiple times */
+    int ref_count;              /* allows same config to be added multiple times */
 } server_config_t;
 
 static struct qhash_table *s_fsid_to_config_table = NULL;
@@ -46,8 +46,12 @@ static gen_mutex_t *s_server_config_mgr_mutex = NULL;
 */
 static int s_min_handle_recycle_timeout_in_sec = -1;
 
-static int hash_fsid(void *key, int table_size);
-static int hash_fsid_compare(void *key, struct qlist_head *link);
+static int hash_fsid(
+    void *key,
+    int table_size);
+static int hash_fsid_compare(
+    void *key,
+    struct qlist_head *link);
 
 #define SC_MGR_INITIALIZED() \
 (s_fsid_to_config_table && s_server_config_mgr_mutex)
@@ -65,14 +69,14 @@ do {                            \
     }                           \
 } while(0)
 
-int PINT_server_config_mgr_initialize(void)
+int PINT_server_config_mgr_initialize(
+    void)
 {
     int ret = 0;
 
     if (s_fsid_to_config_table == NULL)
     {
-        s_fsid_to_config_table =
-            qhash_init(hash_fsid_compare, hash_fsid, 17);
+        s_fsid_to_config_table = qhash_init(hash_fsid_compare, hash_fsid, 17);
         if (s_fsid_to_config_table)
         {
             s_server_config_mgr_mutex = gen_mutex_build();
@@ -95,7 +99,8 @@ int PINT_server_config_mgr_initialize(void)
     return ret;
 }
 
-int PINT_server_config_mgr_finalize(void)
+int PINT_server_config_mgr_finalize(
+    void)
 {
     int ret = -PVFS_EINVAL, i = 0;
     server_config_t *config = NULL;
@@ -110,12 +115,11 @@ int PINT_server_config_mgr_finalize(void)
         {
             do
             {
-                hash_link = qhash_search_and_remove_at_index(
-                    s_fsid_to_config_table, i);
+                hash_link =
+                    qhash_search_and_remove_at_index(s_fsid_to_config_table, i);
                 if (hash_link)
                 {
-                    config = qlist_entry(
-                        hash_link, server_config_t, hash_link);
+                    config = qlist_entry(hash_link, server_config_t, hash_link);
                     assert(config);
                     assert(config->server_config);
 
@@ -123,7 +127,7 @@ int PINT_server_config_mgr_finalize(void)
                     gen_mutex_destroy(config->server_config_mutex);
                     free(config);
                 }
-            } while(hash_link);
+            } while (hash_link);
         }
         qhash_finalize(s_fsid_to_config_table);
         s_fsid_to_config_table = NULL;
@@ -138,7 +142,8 @@ int PINT_server_config_mgr_finalize(void)
     return ret;
 }
 
-int PINT_server_config_mgr_reload_cached_config_interface(void)
+int PINT_server_config_mgr_reload_cached_config_interface(
+    void)
 {
     int ret = -PVFS_EINVAL, i = 0;
     server_config_t *config = NULL;
@@ -161,22 +166,21 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
         }
 
         /*
-          reset the min_handle_recycle_timeout_in_sec since it's going
-          to be re-determined at this point
-        */
+           reset the min_handle_recycle_timeout_in_sec since it's going
+           to be re-determined at this point
+         */
         s_min_handle_recycle_timeout_in_sec = -1;
 
         for (i = 0; i < s_fsid_to_config_table->table_size; i++)
         {
             qhash_for_each(hash_link, &s_fsid_to_config_table->array[i])
             {
-                config = qlist_entry(
-                    hash_link, server_config_t, hash_link);
+                config = qlist_entry(hash_link, server_config_t, hash_link);
                 assert(config);
                 assert(config->server_config);
 
-                assert(PINT_llist_count(
-                           config->server_config->file_systems) == 1);
+                assert(PINT_llist_count(config->server_config->file_systems) ==
+                       1);
 
                 cur = config->server_config->file_systems;
                 assert(cur);
@@ -202,8 +206,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                              "Reloading handle mappings for fs_id %d\n",
                              cur_fs->coll_id);
 
-                ret = PINT_handle_load_mapping(
-                    config->server_config, cur_fs);
+                ret = PINT_handle_load_mapping(config->server_config, cur_fs);
                 if (ret)
                 {
                     PVFS_perror("PINT_handle_load_mapping failed", ret);
@@ -245,10 +248,10 @@ int PINT_server_config_mgr_add_config(
             assert(config->server_config);
             config->ref_count++;
             gen_mutex_unlock(s_server_config_mgr_mutex);
-            return(0);
+            return (0);
         }
 
-        config = (server_config_t *)malloc(sizeof(server_config_t));
+        config = (server_config_t *) malloc(sizeof(server_config_t));
         if (!config)
         {
             ret = -PVFS_ENOMEM;
@@ -267,8 +270,7 @@ int PINT_server_config_mgr_add_config(
         config->fs_id = fs_id;
         config->ref_count = 1;
 
-        qhash_add(s_fsid_to_config_table, &fs_id,
-                  &config->hash_link);
+        qhash_add(s_fsid_to_config_table, &fs_id, &config->hash_link);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "\tmapped fs_id %d => "
                      "config %p\n", fs_id, config_s);
@@ -312,8 +314,7 @@ int PINT_server_config_mgr_remove_config(
         gen_mutex_lock(s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
-        hash_link = qhash_search(
-            s_fsid_to_config_table, &fs_id);
+        hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
         if (hash_link)
         {
             config = qlist_entry(hash_link, server_config_t, hash_link);
@@ -323,7 +324,7 @@ int PINT_server_config_mgr_remove_config(
 
             config->ref_count--;
 
-            if(config->ref_count == 0)
+            if (config->ref_count == 0)
             {
                 gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: "
                              "Removed config object %p with fs_id %d\n",
@@ -337,7 +338,7 @@ int PINT_server_config_mgr_remove_config(
                 PINT_config_release(config->server_config);
                 free(config->server_config);
 
-                if(gen_mutex_trylock(config->server_config_mutex) == EBUSY)
+                if (gen_mutex_trylock(config->server_config_mutex) == EBUSY)
                 {
                     gossip_err("FIXME: Destroying mutex that is in use!\n");
                 }
@@ -380,9 +381,9 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
             assert(config);
             assert(config->server_config);
 #if 0
-            gossip_debug(
-                GOSSIP_CLIENT_DEBUG, "server_config_mgr: LOCKING config "
-                "object %p with fs_id %d\n", config, fs_id);
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         "server_config_mgr: LOCKING config "
+                         "object %p with fs_id %d\n", config, fs_id);
 #endif
             gen_mutex_lock(config->server_config_mutex);
             ret = config->server_config;
@@ -403,7 +404,7 @@ void __PINT_server_config_mgr_put_config(
     if (SC_MGR_INITIALIZED() && config_s)
     {
         gen_mutex_lock(s_server_config_mgr_mutex);
-        SC_MGR_ASSERT_OK( );
+        SC_MGR_ASSERT_OK();
 
         cur = config_s->file_systems;
         assert(PINT_llist_count(config_s->file_systems) == 1);
@@ -411,17 +412,15 @@ void __PINT_server_config_mgr_put_config(
         cur_fs = PINT_llist_head(cur);
         assert(cur_fs);
 
-        hash_link = qhash_search(
-            s_fsid_to_config_table, &cur_fs->coll_id);
+        hash_link = qhash_search(s_fsid_to_config_table, &cur_fs->coll_id);
         if (hash_link)
         {
             config = qlist_entry(hash_link, server_config_t, hash_link);
             assert(config);
             assert(config->server_config);
 #if 0
-            gossip_debug(
-                GOSSIP_CLIENT_DEBUG, "server_config_mgr: "
-                "UNLOCKING config object %p\n", config);
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "server_config_mgr: "
+                         "UNLOCKING config object %p\n", config);
 #endif
             gen_mutex_unlock(config->server_config_mutex);
         }
@@ -429,21 +428,26 @@ void __PINT_server_config_mgr_put_config(
     }
 }
 
-int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void)
+int PINT_server_config_mgr_get_abs_min_handle_recycle_time(
+    void)
 {
     return s_min_handle_recycle_timeout_in_sec;
 }
 
-static int hash_fsid(void *key, int table_size)
+static int hash_fsid(
+    void *key,
+    int table_size)
 {
-    PVFS_fs_id fs_id = *((PVFS_fs_id *)key);
-    return (int)(fs_id % table_size);
+    PVFS_fs_id fs_id = *((PVFS_fs_id *) key);
+    return (int) (fs_id % table_size);
 }
 
-static int hash_fsid_compare(void *key, struct qlist_head *link)
+static int hash_fsid_compare(
+    void *key,
+    struct qlist_head *link)
 {
     server_config_t *config = NULL;
-    PVFS_fs_id fs_id = *((PVFS_fs_id *)key);
+    PVFS_fs_id fs_id = *((PVFS_fs_id *) key);
 
     config = qlist_entry(link, server_config_t, hash_link);
     assert(config);

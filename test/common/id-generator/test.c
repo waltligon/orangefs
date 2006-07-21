@@ -33,48 +33,55 @@
 
 typedef PVFS_id_gen_t example_handle;
 
-struct example_struct{
-	int x;
-	int y;
-	int z;
+struct example_struct
+{
+    int x;
+    int y;
+    int z;
 };
 
-int print_example(example_handle my_handle);
+int print_example(
+    example_handle my_handle);
 
-int main(int argc, char **argv)	{
+int main(
+    int argc,
+    char **argv)
+{
 
-	example_handle my_handle;
-	struct example_struct my_example;
+    example_handle my_handle;
+    struct example_struct my_example;
 
-	my_example.x = 1;
-	my_example.y = 2;
-	my_example.z = 3;
-	
-	id_gen_fast_register(&my_handle, &my_example);
-	if(my_handle == 0)
-	{
-		printf("register failed.\n");
-		exit(0);
-	}
+    my_example.x = 1;
+    my_example.y = 2;
+    my_example.z = 3;
 
-	print_example(my_handle);
+    id_gen_fast_register(&my_handle, &my_example);
+    if (my_handle == 0)
+    {
+        printf("register failed.\n");
+        exit(0);
+    }
 
-	return(0);
+    print_example(my_handle);
+
+    return (0);
 }
 
 
-int print_example(example_handle my_handle){
+int print_example(
+    example_handle my_handle)
+{
 
-	struct example_struct* foo;
+    struct example_struct *foo;
 
-	foo = id_gen_fast_lookup(my_handle);
-	if(!foo)
-	{
-		printf("lookup failed.\n");
-		exit(0);
-	}
+    foo = id_gen_fast_lookup(my_handle);
+    if (!foo)
+    {
+        printf("lookup failed.\n");
+        exit(0);
+    }
 
-	printf("%d, %d, %d.\n", foo->x, foo->y, foo->z);
-	
-	return(0);
+    printf("%d, %d, %d.\n", foo->x, foo->y, foo->z);
+
+    return (0);
 }

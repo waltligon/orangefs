@@ -34,13 +34,14 @@
  * dirname/filename
  *
  */
-int PINT_string_count_segments(char *pathname)
+int PINT_string_count_segments(
+    char *pathname)
 {
     int count = 0;
-    char *segp = (char *)0;
+    char *segp = (char *) 0;
     void *segstate;
 
-    while(!PINT_string_next_segment(pathname,&segp,&segstate))
+    while (!PINT_string_next_segment(pathname, &segp, &segstate))
     {
         count++;
     }
@@ -73,28 +74,31 @@ int PINT_string_count_segments(char *pathname)
  * pathname: foo          - out_base_dir: undefined - returns -1
  *
  */
-int PINT_get_base_dir(char *pathname, char *out_base_dir, int out_max_len)
+int PINT_get_base_dir(
+    char *pathname,
+    char *out_base_dir,
+    int out_max_len)
 {
     int ret = -1, len = 0;
     char *start, *end;
 
     if (pathname && out_base_dir && out_max_len)
     {
-        if ((strcmp(pathname,"/") == 0) || (pathname[0] != '/'))
+        if ((strcmp(pathname, "/") == 0) || (pathname[0] != '/'))
         {
             return ret;
         }
 
         start = pathname;
-        end = (char *)(pathname + strlen(pathname));
+        end = (char *) (pathname + strlen(pathname));
 
-        while(end && (end > start) && (*(--end) != '/'));
+        while (end && (end > start) && (*(--end) != '/'));
 
         /*
-          get rid of trailing slash unless we're handling
-          the case where parent is the root directory
-          (in root dir case, len == 1)
-        */
+           get rid of trailing slash unless we're handling
+           the case where parent is the root directory
+           (in root dir case, len == 1)
+         */
         len = ++end - start;
         if (len != 1)
         {
@@ -102,7 +106,7 @@ int PINT_get_base_dir(char *pathname, char *out_base_dir, int out_max_len)
         }
         if (len < out_max_len)
         {
-            memcpy(out_base_dir,start,len);
+            memcpy(out_base_dir, start, len);
             out_base_dir[len] = '\0';
             ret = 0;
         }
@@ -135,39 +139,48 @@ int PINT_get_base_dir(char *pathname, char *out_base_dir, int out_max_len)
  * Note that it is possible that *opaquep != NULL and still there are
  * no more segments; a trailing '/' could cause this, for example.
  */
-int PINT_string_next_segment(char *pathname,
-                             char **inout_segp,
-                             void **opaquep)
+int PINT_string_next_segment(
+    char *pathname,
+    char **inout_segp,
+    void **opaquep)
 {
-    char *ptr = (char *)0;
+    char *ptr = (char *) 0;
 
     /* initialize our starting position */
-    if (*inout_segp == NULL) {
-	ptr = pathname;
+    if (*inout_segp == NULL)
+    {
+        ptr = pathname;
     }
-    else if (*opaquep != NULL) {
-	/* replace the '/', point just past it */
-	ptr = (char *) *opaquep;
-	*ptr = '/';
-	ptr++;
+    else if (*opaquep != NULL)
+    {
+        /* replace the '/', point just past it */
+        ptr = (char *) *opaquep;
+        *ptr = '/';
+        ptr++;
     }
-    else return -1; /* NULL *opaquep indicates last segment returned last time */
+    else
+        return -1;      /* NULL *opaquep indicates last segment returned last time */
 
     /* at this point, the string is back in its original state */
 
     /* jump past separators */
-    while ((*ptr != '\0') && (*ptr == '/')) ptr++;
-    if (*ptr == '\0') return -1; /* all that was left was trailing '/'s */
+    while ((*ptr != '\0') && (*ptr == '/'))
+        ptr++;
+    if (*ptr == '\0')
+        return -1;      /* all that was left was trailing '/'s */
 
     *inout_segp = ptr;
 
     /* find next separator */
-    while ((*ptr != '\0') && (*ptr != '/')) ptr++;
-    if (*ptr == '\0') *opaquep = NULL; /* indicate last segment */
-    else {
-	/* terminate segment and save position of terminator */
-	*ptr = '\0';
-	*opaquep = ptr;
+    while ((*ptr != '\0') && (*ptr != '/'))
+        ptr++;
+    if (*ptr == '\0')
+        *opaquep = NULL;        /* indicate last segment */
+    else
+    {
+        /* terminate segment and save position of terminator */
+        *ptr = '\0';
+        *opaquep = ptr;
     }
     return 0;
 }
@@ -189,10 +202,10 @@ int PINT_string_next_segment(char *pathname,
  *  -1: something bad happened, possibly invalid arguments
  */
 int PINT_parse_handle_ranges(
-    char *range, 
-    PVFS_handle_extent *out_extent,
+    char *range,
+    PVFS_handle_extent * out_extent,
     int *status)
-{ 
+{
     char *p = NULL, *endchar = NULL;
 
     if (!out_extent || !status)
@@ -208,41 +221,45 @@ int PINT_parse_handle_ranges(
        its at all, strtoul() stores the original value of nptr in
        *endptr  (and  returns 0).  In particular, if *nptr is not
        `\0' but **endptr is `\0' on return, the entire string  is
-       valid.  */ 
+       valid.  */
     out_extent->first = out_extent->last =
 #ifdef HAVE_STRTOULL
-        (PVFS_handle)strtoull(p, &endchar, 0);
+        (PVFS_handle) strtoull(p, &endchar, 0);
 #else
-        (PVFS_handle)strtoul(p, &endchar, 0);
+        (PVFS_handle) strtoul(p, &endchar, 0);
 #endif
-    if ( p == endchar )  /* all done */
-	return 0; 
+    if (p == endchar)   /* all done */
+        return 0;
     /* strtoul eats leading space, but not trailing space.  take care of ws
      * between number and delimiter (- or ,) */
-    while (isspace(*endchar)) endchar++; 
-    
-    p = endchar+1; /* skip over the ',' or '-'*/
+    while (isspace(*endchar))
+        endchar++;
 
-    switch (*endchar) {
-	case '-': /* we got the first half of the range. grab 2nd half */
+    p = endchar + 1;    /* skip over the ',' or '-' */
+
+    switch (*endchar)
+    {
+    case '-':  /* we got the first half of the range. grab 2nd half */
 #ifdef HAVE_STRTOULL
-	    out_extent->last = (PVFS_handle)strtoull(p, &endchar, 0);
+        out_extent->last = (PVFS_handle) strtoull(p, &endchar, 0);
 #else
-	    out_extent->last = (PVFS_handle)strtoul(p, &endchar, 0);
+        out_extent->last = (PVFS_handle) strtoul(p, &endchar, 0);
 #endif
-	    /* again, skip trailing space ...*/
-	    while (isspace(*endchar)) endchar++;
-	    /* ... and the delimiter */ 
-	    if (*endchar == ',') endchar ++;
-	    /* 'status' tells us how far we are in the string */
-	    *status = ( endchar - range);
-	    break; 
-	case ',': /* end of a range */
-	case '\0': /* end of the whole string */
-	    *status = ( p - range );
-	    break;
-	default:
-	    return -1;
+        /* again, skip trailing space ... */
+        while (isspace(*endchar))
+            endchar++;
+        /* ... and the delimiter */
+        if (*endchar == ',')
+            endchar++;
+        /* 'status' tells us how far we are in the string */
+        *status = (endchar - range);
+        break;
+    case ',':  /* end of a range */
+    case '\0': /* end of the whole string */
+        *status = (p - range);
+        break;
+    default:
+        return -1;
     }
     return 1;
 }
@@ -276,17 +293,17 @@ int PINT_get_path_element(
     int out_max_len)
 {
     int count = -1;
-    char *segp = (char *)0;
+    char *segp = (char *) 0;
     void *segstate;
-    char local_pathname[PVFS_NAME_MAX] = {0};
+    char local_pathname[PVFS_NAME_MAX] = { 0 };
 
-    strncpy(local_pathname,pathname,PVFS_NAME_MAX);
+    strncpy(local_pathname, pathname, PVFS_NAME_MAX);
 
-    while(!PINT_string_next_segment(local_pathname,&segp,&segstate))
+    while (!PINT_string_next_segment(local_pathname, &segp, &segstate))
     {
         if (++count == segment_num)
         {
-            strncpy(out_segment,segp,(size_t)out_max_len);
+            strncpy(out_segment, segp, (size_t) out_max_len);
             break;
         }
     }
@@ -299,25 +316,28 @@ int PINT_get_path_element(
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_get_next_path(char *path, char **newpath, int skip)
+int PINT_get_next_path(
+    char *path,
+    char **newpath,
+    int skip)
 {
-    int pathlen=0, i=0, num_slashes_seen=0;
-    int delimiter1=0;
+    int pathlen = 0, i = 0, num_slashes_seen = 0;
+    int delimiter1 = 0;
 
     pathlen = strlen(path) + 1;
 
     /* find our starting point in the old path, it could be past multiple 
      * segments*/
-    for(i =0; i < pathlen; i++)
+    for (i = 0; i < pathlen; i++)
     {
-	if (path[i] == '/')
-	{
-	    num_slashes_seen++;
-	    if (num_slashes_seen > skip)
-	    {
-		break;
-	    }
-	}
+        if (path[i] == '/')
+        {
+            num_slashes_seen++;
+            if (num_slashes_seen > skip)
+            {
+                break;
+            }
+        }
     }
 
     delimiter1 = i;
@@ -331,9 +351,9 @@ int PINT_get_next_path(char *path, char **newpath, int skip)
     {
         return (-PVFS_ENOMEM);
     }
-    memcpy(*newpath, &path[delimiter1], pathlen - delimiter1 );
-    /* *newpath[pathlen - delimiter1 -1 ] = '\0';*/
-    return(0);
+    memcpy(*newpath, &path[delimiter1], pathlen - delimiter1);
+    /* *newpath[pathlen - delimiter1 -1 ] = '\0'; */
+    return (0);
 }
 
 /*
@@ -343,7 +363,9 @@ int PINT_get_next_path(char *path, char **newpath, int skip)
  *
  * returns the number of strings successfully parsed
  */
-int PINT_split_string_list(char ***tokens, const char *comma_list)
+int PINT_split_string_list(
+    char ***tokens,
+    const char *comma_list)
 {
 
     const char *holder = NULL;
@@ -354,22 +376,22 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
 
     if (!comma_list || !tokens)
     {
-	return (0);
+        return (0);
     }
 
     /* count how many commas we have first */
     holder = comma_list;
     while ((holder = index(holder, ',')))
     {
-	tokencount++;
-	holder++;
+        tokencount++;
+        holder++;
     }
 
     /* allocate pointers for each */
     *tokens = (char **) malloc(sizeof(char *) * tokencount);
     if (!(*tokens))
     {
-	return 0;
+        return 0;
     }
 
     /* copy out all of the tokenized strings */
@@ -377,19 +399,19 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
     end = comma_list + strlen(comma_list);
     for (i = 0; i < tokencount && holder; i++)
     {
-	holder2 = index(holder, ',');
-	if (!holder2)
-	{
-	    holder2 = end;
-	}
-	(*tokens)[i] = (char *) malloc((holder2 - holder) + 1);
-	if (!(*tokens)[i])
-	{
-	    goto failure;
-	}
-	strncpy((*tokens)[i], holder, (holder2 - holder));
-	(*tokens)[i][(holder2 - holder)] = '\0';
-	holder = holder2 + 1;
+        holder2 = index(holder, ',');
+        if (!holder2)
+        {
+            holder2 = end;
+        }
+        (*tokens)[i] = (char *) malloc((holder2 - holder) + 1);
+        if (!(*tokens)[i])
+        {
+            goto failure;
+        }
+        strncpy((*tokens)[i], holder, (holder2 - holder));
+        (*tokens)[i][(holder2 - holder)] = '\0';
+        holder = holder2 + 1;
 
     }
 
@@ -400,14 +422,14 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
     /* free up any memory we allocated if we failed */
     if (*tokens)
     {
-	for (i = 0; i < tokencount; i++)
-	{
-	    if ((*tokens)[i])
-	    {
-		free((*tokens)[i]);
-	    }
-	}
-	free(*tokens);
+        for (i = 0; i < tokencount; i++)
+        {
+            if ((*tokens)[i])
+            {
+                free((*tokens)[i]);
+            }
+        }
+        free(*tokens);
     }
     return (0);
 }
@@ -416,15 +438,17 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
  * 
  * Free the string list allocated by PINT_split_string_list()
  */
-void PINT_free_string_list(char ** list, int len)
+void PINT_free_string_list(
+    char **list,
+    int len)
 {
     int i = 0;
 
-    if(list)
+    if (list)
     {
-        for(; i < len; ++i)
+        for (; i < len; ++i)
         {
-            if(list[i])
+            if (list[i])
             {
                 free(list[i]);
             }
@@ -578,8 +602,7 @@ int PINT_remove_dir_prefix(
         if (strncmp(prefix, pathname, prefix_len) == 0)
         {
             /* apparent match; see if next element is a slash */
-            if ((pathname[prefix_len] != '/') &&
-                (pathname[prefix_len] != '\0'))
+            if ((pathname[prefix_len] != '/') && (pathname[prefix_len] != '\0'))
                 return (-PVFS_ENOENT);
 
             /* this was indeed a match */
@@ -612,7 +635,9 @@ int PINT_remove_dir_prefix(
     return (0);
 }
 
-char *PINT_merge_handle_range_strs(char *range1, char *range2)
+char *PINT_merge_handle_range_strs(
+    char *range1,
+    char *range2)
 {
     char *merged_range = NULL;
 
@@ -621,42 +646,45 @@ char *PINT_merge_handle_range_strs(char *range1, char *range2)
         int rlen1 = strlen(range1) * sizeof(char) + 1;
         int rlen2 = strlen(range2) * sizeof(char) + 1;
         /*
-          2 bytes bigger since we need a tz null and space for the
-          additionally inserted comma
-        */
-        merged_range = (char *)malloc(rlen1 + rlen2);
-        snprintf(merged_range, rlen1 + rlen2, "%s,%s",
-                 range1,range2);
+           2 bytes bigger since we need a tz null and space for the
+           additionally inserted comma
+         */
+        merged_range = (char *) malloc(rlen1 + rlen2);
+        snprintf(merged_range, rlen1 + rlen2, "%s,%s", range1, range2);
     }
     return merged_range;
 }
 
 #ifndef HAVE_STRNLEN
 /* a naive implementation of strnlen for systems w/o glibc */
-size_t strnlen(const char *s, size_t limit)
+size_t strnlen(
+    const char *s,
+    size_t limit)
 {
-   size_t len = 0;
-   while ((len < limit) && (*s++))
-     len++;
-   return len;
+    size_t len = 0;
+    while ((len < limit) && (*s++))
+        len++;
+    return len;
 }
 #endif
 
 #ifndef HAVE_STRSTR
 /* a custom implementation of strstr for systems w/o it */
-char *strstr(const char *haystack, const char *needle)
+char *strstr(
+    const char *haystack,
+    const char *needle)
 {
     char *ptr = NULL;
     int needle_len = 0;
     int remaining_len = 0;
 
-    ptr = (char *)haystack;
+    ptr = (char *) haystack;
     if (haystack && needle)
     {
         needle_len = strlen(needle);
         remaining_len = strlen(haystack);
 
-        while(ptr)
+        while (ptr)
         {
             if (*ptr == *needle)
             {
@@ -699,44 +727,46 @@ char *strstr(const char *haystack, const char *needle)
  * ab:23,bc:34 - returns nkey as 2, pkey <"ab", "bc">, pval<"23", "34">
  *
  */
-int PINT_split_keyvals(char *string, int *nkey, 
-        char ***pkey, char ***pval)
+int PINT_split_keyvals(
+    char *string,
+    int *nkey,
+    char ***pkey,
+    char ***pval)
 {
     char **key, **val, *ptr, *params;
     int nparams = 0, i;
 
-    if (string == NULL || nkey == NULL 
-            || pkey == NULL || pval == NULL)
+    if (string == NULL || nkey == NULL || pkey == NULL || pval == NULL)
     {
-      return -PVFS_EINVAL;
+        return -PVFS_EINVAL;
     }
     params = strdup(string);
     if (params == NULL)
     {
-      return -PVFS_ENOMEM;
+        return -PVFS_ENOMEM;
     }
     ptr = params;
     while (ptr)
     {
         if (*ptr != ',' || *ptr != '\0')
-                 nparams++;
+            nparams++;
         ptr++;
         ptr = strchr(ptr, ',');
     }
     if (nparams == 0)
     {
-      free(params);
-      return -PVFS_EINVAL;
+        free(params);
+        return -PVFS_EINVAL;
     }
     ptr = params;
     key = (char **) calloc(nparams, sizeof(char *));
     val = (char **) calloc(nparams, sizeof(char *));
-    if (key == NULL || val ==  NULL)
+    if (key == NULL || val == NULL)
     {
-      free(key);
-      free(val);
-      free(params);
-      return -PVFS_ENOMEM;
+        free(key);
+        free(val);
+        free(params);
+        return -PVFS_ENOMEM;
     }
     for (i = 0; i < nparams; i++)
     {
@@ -766,43 +796,45 @@ int PINT_split_keyvals(char *string, int *nkey,
     }
     if (i != nparams)
     {
-      free(key);
-      free(val);
-      free(params);
-      return -PVFS_EINVAL;
+        free(key);
+        free(val);
+        free(params);
+        return -PVFS_EINVAL;
     }
     else
     {
-      for (i = 0; i < nparams; i++)
-      {
-          char *ptr1, *ptr2;
-          ptr1 = strdup(key[i]);
-          ptr2 = strdup(val[i]);
-          if (ptr1 == NULL || ptr2 == NULL)
-              break;
-          if (strchr(ptr1, ':') || strchr(ptr2, ':'))
-              break;
-          key[i] = ptr1;
-          val[i] = ptr2;
-      }
-      if (i != nparams)
-      {
-          int j;
-          for (j = 0; j < i; j++)
-          {
-              if (key[j]) free(key[j]);
-              if (val[j]) free(val[j]);
-          }
-          free(key);
-          free(val);
-          free(params);
-          return -PVFS_EINVAL;
-      }
-      free(params);
-      *nkey = nparams;
-      *pkey = key;
-      *pval = val;
-      return 0;
+        for (i = 0; i < nparams; i++)
+        {
+            char *ptr1, *ptr2;
+            ptr1 = strdup(key[i]);
+            ptr2 = strdup(val[i]);
+            if (ptr1 == NULL || ptr2 == NULL)
+                break;
+            if (strchr(ptr1, ':') || strchr(ptr2, ':'))
+                break;
+            key[i] = ptr1;
+            val[i] = ptr2;
+        }
+        if (i != nparams)
+        {
+            int j;
+            for (j = 0; j < i; j++)
+            {
+                if (key[j])
+                    free(key[j]);
+                if (val[j])
+                    free(val[j]);
+            }
+            free(key);
+            free(val);
+            free(params);
+            return -PVFS_EINVAL;
+        }
+        free(params);
+        *nkey = nparams;
+        *pkey = key;
+        *pval = val;
+        return 0;
     }
 }
 
@@ -815,5 +847,3 @@ int PINT_split_keyvals(char *string, int *nkey,
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
-

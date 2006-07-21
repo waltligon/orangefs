@@ -15,52 +15,65 @@
 NCAC_dev_t NCAC_dev;
 struct inode *inode_arr[MAX_INODE_NUM];
 
-static inline void init_free_extent_list(int num);
-static inline void init_free_req_list(int num);
-static inline void init_cache_stack_list(void);
+static inline void init_free_extent_list(
+    int num);
+static inline void init_free_req_list(
+    int num);
+static inline void init_cache_stack_list(
+    void);
 
-unsigned long radix_get_value(const void *item);
+unsigned long radix_get_value(
+    const void *item);
 
 /* TODO: */
-static int extlog2(int extsize)
+static int extlog2(
+    int extsize)
 {
-	return 15;
+    return 15;
 }
 
 
 /* cache_init(): initiate cache. */
 
-int cache_init(NCAC_info_t *info)
+int cache_init(
+    NCAC_info_t * info)
 {
     int reqnum;
 
-    if ( info->max_req_num == -1 ) reqnum = MAX_DELT_REQ_NUM;
-    else reqnum = info->max_req_num;
+    if (info->max_req_num == -1)
+        reqnum = MAX_DELT_REQ_NUM;
+    else
+        reqnum = info->max_req_num;
 
-    NCAC_dev.free_req_src = (NCAC_req_t*) malloc(reqnum*sizeof(struct NCAC_req));
-    if ( NCAC_dev.free_req_src == NULL){
+    NCAC_dev.free_req_src =
+        (NCAC_req_t *) malloc(reqnum * sizeof(struct NCAC_req));
+    if (NCAC_dev.free_req_src == NULL)
+    {
         fprintf(stderr, "cache_init: cannot allocate request memory\n");
         return -ENOMEM;
     }
-    memset( NCAC_dev.free_req_src, 0, reqnum*sizeof(struct NCAC_req) );
+    memset(NCAC_dev.free_req_src, 0, reqnum * sizeof(struct NCAC_req));
     init_free_req_list(reqnum);
 
     NCAC_dev.extsize = info->extsize;
     NCAC_dev.extlog2 = extlog2(info->extsize);
 
     NCAC_dev.cachesize = info->cachesize;
-    NCAC_dev.cachemem  = (char *) info->cachespace;
-    if ( !info->cachespace )
+    NCAC_dev.cachemem = (char *) info->cachespace;
+    if (!info->cachespace)
     {
-         fprintf(stderr, "cache space is NULL\n");
+        fprintf(stderr, "cache space is NULL\n");
     }
 
     /* we expect extcnt is a power of two number */
-    NCAC_dev.extcnt = (NCAC_dev.cachesize/NCAC_dev.extsize);
+    NCAC_dev.extcnt = (NCAC_dev.cachesize / NCAC_dev.extsize);
 
-    NCAC_dev.free_extent_src = (struct extent *)malloc(NCAC_dev.extcnt*sizeof(struct extent) );
-    memset(NCAC_dev.free_extent_src, 0, NCAC_dev.extcnt*sizeof(struct extent) );
-    if ( NCAC_dev.free_extent_src == NULL){
+    NCAC_dev.free_extent_src =
+        (struct extent *) malloc(NCAC_dev.extcnt * sizeof(struct extent));
+    memset(NCAC_dev.free_extent_src, 0,
+           NCAC_dev.extcnt * sizeof(struct extent));
+    if (NCAC_dev.free_extent_src == NULL)
+    {
         fprintf(stderr, "cache_init: cannot allocate extent memory\n");
         return -ENOMEM;
     }
@@ -69,30 +82,33 @@ int cache_init(NCAC_info_t *info)
     init_cache_stack_list();
 
 
-    INIT_LIST_HEAD( &NCAC_dev.prepare_list);
-    INIT_LIST_HEAD( &NCAC_dev.bufcomp_list);
-    INIT_LIST_HEAD( &NCAC_dev.comp_list);
+    INIT_LIST_HEAD(&NCAC_dev.prepare_list);
+    INIT_LIST_HEAD(&NCAC_dev.bufcomp_list);
+    INIT_LIST_HEAD(&NCAC_dev.comp_list);
 
 
-    memset( inode_arr, 0, sizeof(struct inode*)*MAX_INODE_NUM );
+    memset(inode_arr, 0, sizeof(struct inode *) * MAX_INODE_NUM);
 
     NCAC_dev.get_value = radix_get_value;
-    NCAC_dev.max_b     = RADIX_MAX_BITS;
+    NCAC_dev.max_b = RADIX_MAX_BITS;
 
     fprintf(stderr, "CACHE SUMMARY:\n");
-    fprintf(stderr, "---- req num:%d\t	ext num: %ld\t\n", reqnum, NCAC_dev.extcnt);
+    fprintf(stderr, "---- req num:%d\t	ext num: %ld\t\n", reqnum,
+            NCAC_dev.extcnt);
 
     return 0;
 }
 
 
 /* for radix tree if linux radix tree is not used */
-unsigned long radix_get_value(const void *item)
+unsigned long radix_get_value(
+    const void *item)
 {
-    return ((struct extent *)item)->index;
+    return ((struct extent *) item)->index;
 }
 
-static inline void init_free_extent_list(int num)
+static inline void init_free_extent_list(
+    int num)
 {
     int i;
     struct extent *start;
@@ -104,19 +120,21 @@ static inline void init_free_extent_list(int num)
 
 
     head = &cache->free_extent_list;
-    INIT_LIST_HEAD( head );
+    INIT_LIST_HEAD(head);
 
-    for (i = 0; i < num; i++ ){
-        list_add_tail( &start[i].list, head );
+    for (i = 0; i < num; i++)
+    {
+        list_add_tail(&start[i].list, head);
         //DPRINT("%d: %p\n", i, start+i);
-        start[i].addr = NCAC_dev.cachemem+i*NCAC_dev.extsize;
+        start[i].addr = NCAC_dev.cachemem + i * NCAC_dev.extsize;
         start[i].ioreq = INVAL_IOREQ;
     }
     cache->nr_free = num;
     cache->nr_dirty = 0;
 }
 
-static inline void init_free_req_list(int num)
+static inline void init_free_req_list(
+    int num)
 {
     int i;
     struct NCAC_req *start;
@@ -126,7 +144,8 @@ static inline void init_free_req_list(int num)
     start = NCAC_dev.free_req_src;
 
     INIT_LIST_HEAD(head);
-    for (i = 0; i < num; i++ ){
+    for (i = 0; i < num; i++)
+    {
         list_add_tail(&start[i].list, head);
         //DPRINT("%d: %p\n", i, start+i);
 
@@ -134,18 +153,19 @@ static inline void init_free_req_list(int num)
         start[i].reserved_cbufcnt = 0;
     }
     NCAC_dev.free_req_num = num;
-	spin_lock_init(&NCAC_dev.req_list_lock);
-	
+    spin_lock_init(&NCAC_dev.req_list_lock);
+
 }
 
-static inline void init_cache_stack_list()
+static inline void init_cache_stack_list(
+    )
 {
     struct cache_stack *cache;
 
     cache = &NCAC_dev.cache_stack;
 
     cache->nr_active = cache->nr_inactive = 0;
-    INIT_LIST_HEAD( &cache->active_list);
-    INIT_LIST_HEAD( &cache->inactive_list);
-	spin_lock_init(&cache->lock);
+    INIT_LIST_HEAD(&cache->active_list);
+    INIT_LIST_HEAD(&cache->inactive_list);
+    spin_lock_init(&cache->lock);
 }

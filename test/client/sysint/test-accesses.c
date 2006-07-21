@@ -7,7 +7,7 @@
 #include "pvfs2.h"
 #include "pvfs2-sysint.h"
 
-#if PVFS2_SIZEOF_VOIDP == 32 
+#if PVFS2_SIZEOF_VOIDP == 32
 #  define llu(x) (x)
 #  define lld(x) (x)
 #  define SCANF_lld "%lld"
@@ -19,9 +19,11 @@
 #  error Unexpected sizeof(void*)
 #endif
 
-int main(int argc, char * argv[])
+int main(
+    int argc,
+    char *argv[])
 {
-    FILE * f;
+    FILE *f;
     int ret;
     PVFS_fs_id curfs;
     PVFS_Request file_req;
@@ -29,50 +31,53 @@ int main(int argc, char * argv[])
     int count;
     char line[255];
     int size;
-    PVFS_offset offset=0;
+    PVFS_offset offset = 0;
     PVFS_credentials creds;
     PVFS_sysresp_create create_resp;
     PVFS_sysresp_io io_resp;
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sys_attr attr;
-    const char * filename = "test-accesses-file";
+    const char *filename = "test-accesses-file";
     int j = 0, i = 0;
-    char * membuff;
+    char *membuff;
     char errormsg[255];
 
-    if(argc < 2)
+    if (argc < 2)
     {
-	fprintf(stderr, "test-accesses <sizes file>\n");
-	exit(1);
+        fprintf(stderr, "test-accesses <sizes file>\n");
+        exit(1);
     }
-    
-    f = fopen(argv[1], "r");
-    if(!f)
-    {
-	fprintf(stderr, "error opening file\n");
-	return errno;
-    }
-    
-    if(fgets(line, 255, f) == NULL)
-    {
-	fprintf(stderr, "error in file\n");
-	exit(1);
-    } 
 
-    if(sscanf(line, "%d", &count) < 1)
+    f = fopen(argv[1], "r");
+    if (!f)
     {
-	fprintf(stderr, "error in file\n");
-	exit(1);
+        fprintf(stderr, "error opening file\n");
+        return errno;
     }
-    
+
+    if (fgets(line, 255, f) == NULL)
+    {
+        fprintf(stderr, "error in file\n");
+        exit(1);
+    }
+
+    if (sscanf(line, "%d", &count) < 1)
+    {
+        fprintf(stderr, "error in file\n");
+        exit(1);
+    }
+
     ret = PVFS_util_init_defaults();
-    if(ret < 0) goto error;
+    if (ret < 0)
+        goto error;
 
     ret = PVFS_util_get_default_fsid(&curfs);
-    if(ret < 0) goto error;
+    if (ret < 0)
+        goto error;
 
     ret = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0);
-    if(ret < 0) goto error;
+    if (ret < 0)
+        goto error;
 
     PVFS_util_gen_credentials(&creds);
 
@@ -82,69 +87,64 @@ int main(int argc, char * argv[])
     attr.perms = 0644;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-    ret = PVFS_sys_create(
-	(char*)filename, 
-	lookup_resp.ref, attr, &creds, NULL, &create_resp);
-    if(ret < 0) goto error;
+    ret = PVFS_sys_create((char *) filename,
+                          lookup_resp.ref, attr, &creds, NULL, &create_resp);
+    if (ret < 0)
+        goto error;
 
-    for(; i < count; ++i)
+    for (; i < count; ++i)
     {
-	if(fgets(line, 255, f) == NULL)
-	{
-	    fprintf(stderr, "error in file\n");
-	    exit(1);
-	} 
+        if (fgets(line, 255, f) == NULL)
+        {
+            fprintf(stderr, "error in file\n");
+            exit(1);
+        }
 
-	if(sscanf(line, "%d", &size) < 1)
-	{
-	    fprintf(stderr, "error in file\n");
-	    exit(1);
-	}
+        if (sscanf(line, "%d", &size) < 1)
+        {
+            fprintf(stderr, "error in file\n");
+            exit(1);
+        }
 
-	membuff = malloc(size);
-	assert(membuff);
+        membuff = malloc(size);
+        assert(membuff);
 
-	for(j = 0; j < size; ++j)
-	{
-	    membuff[j] = j;
-	}
+        for (j = 0; j < size; ++j)
+        {
+            membuff[j] = j;
+        }
 
-	ret = PVFS_Request_contiguous(
-	    size, PVFS_BYTE, &file_req);
-	if(ret < 0) goto error;
+        ret = PVFS_Request_contiguous(size, PVFS_BYTE, &file_req);
+        if (ret < 0)
+            goto error;
 
-	ret = PVFS_Request_contiguous(
-	    size, PVFS_BYTE, &mem_req);
-	if(ret < 0) goto error;
+        ret = PVFS_Request_contiguous(size, PVFS_BYTE, &mem_req);
+        if (ret < 0)
+            goto error;
 
-	printf("Performing Write: offset: %llu, size: %d\n",
-	       llu(offset), size);
+        printf("Performing Write: offset: %llu, size: %d\n", llu(offset), size);
 
-	ret = PVFS_sys_io(
-	    create_resp.ref, file_req, offset, membuff, mem_req,
-	    &creds, &io_resp, PVFS_IO_WRITE);
-	if(ret < 0) goto error;
+        ret = PVFS_sys_io(create_resp.ref, file_req, offset, membuff, mem_req,
+                          &creds, &io_resp, PVFS_IO_WRITE);
+        if (ret < 0)
+            goto error;
 
-	printf("Write response: size: %llu\n", llu(io_resp.total_completed));
-	offset += size;
+        printf("Write response: size: %llu\n", llu(io_resp.total_completed));
+        offset += size;
 
-	PVFS_Request_free(&mem_req);
-	PVFS_Request_free(&file_req);
-	free(membuff);
+        PVFS_Request_free(&mem_req);
+        PVFS_Request_free(&file_req);
+        free(membuff);
     }
 
     return 0;
-error:
+  error:
 
     fclose(f);
 
-    PVFS_sys_remove(
-	(char*)filename,
-	lookup_resp.ref,
-	&creds);
+    PVFS_sys_remove((char *) filename, lookup_resp.ref, &creds);
 
     PVFS_perror_gossip(errormsg, ret);
     fprintf(stderr, "%s\n", errormsg);
     return PVFS_get_errno_mapping(ret);
 }
-

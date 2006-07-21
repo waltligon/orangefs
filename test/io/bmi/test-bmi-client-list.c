@@ -31,7 +31,7 @@
  */
 struct options
 {
-    char *hostid;		/* host identifier */
+    char *hostid;               /* host identifier */
 };
 
 #define MSG1_SIZE 1024
@@ -80,7 +80,7 @@ int main(
     user_opts = parse_args(argc, argv);
     if (!user_opts)
     {
-	return (-1);
+        return (-1);
     }
 
     /* set debugging stuff */
@@ -94,141 +94,141 @@ int main(
     len = cp - user_opts->hostid;
     strcpy(method, "bmi_");
     strncpy(method + 4, user_opts->hostid, len);
-    method[4+len] = '\0';
+    method[4 + len] = '\0';
 
     /* initialize local interface */
     ret = BMI_initialize(method, NULL, 0);
     if (ret < 0)
     {
-	errno = -ret;
-	perror("BMI_initialize");
-	return (-1);
+        errno = -ret;
+        perror("BMI_initialize");
+        return (-1);
     }
 
     ret = BMI_open_context(&context);
     if (ret < 0)
     {
-	errno = -ret;
-	perror("BMI_open_context()");
-	return (-1);
+        errno = -ret;
+        perror("BMI_open_context()");
+        return (-1);
     }
 
     /* get a bmi_addr for the server */
     ret = BMI_addr_lookup(&server_addr, user_opts->hostid);
     if (ret < 0)
     {
-	errno = -ret;
-	perror("BMI_addr_lookup");
-	return (-1);
+        errno = -ret;
+        perror("BMI_addr_lookup");
+        return (-1);
     }
 
     /* allocate a buffer for the initial request and ack */
     my_req = (struct server_request *) BMI_memalloc(server_addr,
-						    sizeof(struct
-							   server_request),
-						    BMI_SEND);
+                                                    sizeof(struct
+                                                           server_request),
+                                                    BMI_SEND);
     my_ack =
-	(struct server_ack *) BMI_memalloc(server_addr,
-					   sizeof(struct server_ack), BMI_RECV);
+        (struct server_ack *) BMI_memalloc(server_addr,
+                                           sizeof(struct server_ack), BMI_RECV);
     if (!my_req || !my_ack)
     {
-	fprintf(stderr, "BMI_memalloc failed.\n");
-	return (-1);
+        fprintf(stderr, "BMI_memalloc failed.\n");
+        return (-1);
     }
 
     my_req->size = MSG1_SIZE + MSG2_SIZE + MSG3_SIZE;
 
     /* send the initial request on its way */
     ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req,
-				  sizeof(struct server_request), BMI_PRE_ALLOC,
-				  0, in_test_user_ptr, context);
+                                  sizeof(struct server_request), BMI_PRE_ALLOC,
+                                  0, in_test_user_ptr, context);
     if (ret < 0)
     {
-	errno = -ret;
-	perror("BMI_post_send");
-	return (-1);
+        errno = -ret;
+        perror("BMI_post_send");
+        return (-1);
     }
     if (ret == 0)
     {
-	/* turning this into a blocking call for testing :) */
-	/* check for completion of request */
-	do
-	{
-	    ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
-			   &out_test_user_ptr, 10, context);
-	} while (ret == 0 && outcount == 0);
+        /* turning this into a blocking call for testing :) */
+        /* check for completion of request */
+        do
+        {
+            ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
+                           &out_test_user_ptr, 10, context);
+        } while (ret == 0 && outcount == 0);
 
-	if (ret < 0 || error_code != 0)
-	{
-	    fprintf(stderr, "Request send failed.\n");
-	    if (ret < 0)
-	    {
-		errno = -ret;
-		perror("BMI_test");
-	    }
-	    return (-1);
-	}
+        if (ret < 0 || error_code != 0)
+        {
+            fprintf(stderr, "Request send failed.\n");
+            if (ret < 0)
+            {
+                errno = -ret;
+                perror("BMI_test");
+            }
+            return (-1);
+        }
 
-	if (in_test_user_ptr != out_test_user_ptr)
-	{
-	    fprintf(stderr, "1st ptr failure.\n");
-	}
-	else
-	{
-	    fprintf(stderr, "1st ptr success.\n");
-	}
-	out_test_user_ptr = NULL;
+        if (in_test_user_ptr != out_test_user_ptr)
+        {
+            fprintf(stderr, "1st ptr failure.\n");
+        }
+        else
+        {
+            fprintf(stderr, "1st ptr success.\n");
+        }
+        out_test_user_ptr = NULL;
     }
 
     /* post a recv for the server acknowledgement */
     ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack,
-			sizeof(struct server_ack), &actual_size, BMI_PRE_ALLOC,
-			0, in_test_user_ptr, context);
+                        sizeof(struct server_ack), &actual_size, BMI_PRE_ALLOC,
+                        0, in_test_user_ptr, context);
     if (ret < 0)
     {
-	errno = -ret;
-	perror("BMI_post_recv");
-	return (-1);
+        errno = -ret;
+        perror("BMI_post_recv");
+        return (-1);
     }
     if (ret == 0)
     {
-	/* turning this into a blocking call for testing :) */
-	/* check for completion of ack recv */
-	do
-	{
-	    ret = BMI_test(client_ops[0], &outcount, &error_code,
-			   &actual_size, &out_test_user_ptr, 10, context);
-	} while (ret == 0 && outcount == 0);
+        /* turning this into a blocking call for testing :) */
+        /* check for completion of ack recv */
+        do
+        {
+            ret = BMI_test(client_ops[0], &outcount, &error_code,
+                           &actual_size, &out_test_user_ptr, 10, context);
+        } while (ret == 0 && outcount == 0);
 
-	if (ret < 0 || error_code != 0)
-	{
-	    fprintf(stderr, "Ack recv failed.\n");
-	    return (-1);
-	}
-	if (in_test_user_ptr != out_test_user_ptr)
-	{
-	    fprintf(stderr, "2nd ptr failure.\n");
-	}
-	else
-	{
-	    fprintf(stderr, "2nd ptr success.\n");
-	}
-	out_test_user_ptr = NULL;
+        if (ret < 0 || error_code != 0)
+        {
+            fprintf(stderr, "Ack recv failed.\n");
+            return (-1);
+        }
+        if (in_test_user_ptr != out_test_user_ptr)
+        {
+            fprintf(stderr, "2nd ptr failure.\n");
+        }
+        else
+        {
+            fprintf(stderr, "2nd ptr success.\n");
+        }
+        out_test_user_ptr = NULL;
     }
     else
     {
-	if (actual_size != sizeof(struct server_ack))
-	{
-	    printf("Short recv.\n");
-	    return (-1);
-	}
+        if (actual_size != sizeof(struct server_ack))
+        {
+            printf("Short recv.\n");
+            return (-1);
+        }
     }
 
     /* look at the ack */
     if (my_ack->status != 0)
     {
-	fprintf(stderr, "Request denied.\n");
-	return (-1);
+        fprintf(stderr, "Request denied.\n");
+        return (-1);
     }
 
     /* create 3 buffers to send */
@@ -237,8 +237,8 @@ int main(
     send_buffer3 = BMI_memalloc(server_addr, MSG3_SIZE, BMI_SEND);
     if (!send_buffer1 || !send_buffer2 || !send_buffer3)
     {
-	fprintf(stderr, "BMI_memalloc.\n");
-	return (-1);
+        fprintf(stderr, "BMI_memalloc.\n");
+        return (-1);
     }
     buffer_list[0] = send_buffer1;
     buffer_list[1] = send_buffer2;
@@ -249,54 +249,54 @@ int main(
 
     for (i = 0; i < (MSG1_SIZE / sizeof(int)); i++)
     {
-	((int *) send_buffer1)[i] = i;
+        ((int *) send_buffer1)[i] = i;
     }
     last = i;
     for (i = last; i < (last + (MSG2_SIZE / sizeof(int))); i++)
     {
-	((int *) send_buffer2)[i - last] = i;
+        ((int *) send_buffer2)[i - last] = i;
     }
     last = i;
     for (i = last; i < (last + (MSG3_SIZE / sizeof(int))); i++)
     {
-	((int *) send_buffer3)[i - last] = i;
+        ((int *) send_buffer3)[i - last] = i;
     }
 
     /* send the data payload on its way */
     ret = BMI_post_send_list(&(client_ops[0]), server_addr,
-			     (const void **) buffer_list, size_list, 3,
-			     (MSG1_SIZE + MSG2_SIZE + MSG3_SIZE),
-			     BMI_PRE_ALLOC, 0, in_test_user_ptr, context);
+                             (const void **) buffer_list, size_list, 3,
+                             (MSG1_SIZE + MSG2_SIZE + MSG3_SIZE),
+                             BMI_PRE_ALLOC, 0, in_test_user_ptr, context);
     if (ret < 0)
     {
-	errno = -ret;
-	perror("BMI_post_send");
-	return (-1);
+        errno = -ret;
+        perror("BMI_post_send");
+        return (-1);
     }
     if (ret == 0)
     {
-	/* turning this into a blocking call for testing :) */
-	/* check for completion of data payload send */
-	do
-	{
-	    ret = BMI_test(client_ops[0], &outcount, &error_code,
-			   &actual_size, &out_test_user_ptr, 10, context);
-	} while (ret == 0 && outcount == 0);
+        /* turning this into a blocking call for testing :) */
+        /* check for completion of data payload send */
+        do
+        {
+            ret = BMI_test(client_ops[0], &outcount, &error_code,
+                           &actual_size, &out_test_user_ptr, 10, context);
+        } while (ret == 0 && outcount == 0);
 
-	if (ret < 0 || error_code != 0)
-	{
-	    fprintf(stderr, "Data payload send failed.\n");
-	    return (-1);
-	}
-	if (in_test_user_ptr != out_test_user_ptr)
-	{
-	    fprintf(stderr, "3rd ptr failure.\n");
-	}
-	else
-	{
-	    fprintf(stderr, "3rd ptr success.\n");
-	}
-	out_test_user_ptr = NULL;
+        if (ret < 0 || error_code != 0)
+        {
+            fprintf(stderr, "Data payload send failed.\n");
+            return (-1);
+        }
+        if (in_test_user_ptr != out_test_user_ptr)
+        {
+            fprintf(stderr, "3rd ptr failure.\n");
+        }
+        else
+        {
+            fprintf(stderr, "3rd ptr success.\n");
+        }
+        out_test_user_ptr = NULL;
     }
 
     /* free up the message buffers */
@@ -311,9 +311,9 @@ int main(
     ret = BMI_finalize();
     if (ret < 0)
     {
-	errno = -ret;
-	perror("BMI_finalize");
-	return (-1);
+        errno = -ret;
+        perror("BMI_finalize");
+        return (-1);
     }
 
     /* turn off debugging stuff */
@@ -342,7 +342,7 @@ static struct options *parse_args(
     tmp_opts = (struct options *) malloc(sizeof(struct options));
     if (!tmp_opts)
     {
-	goto parse_args_error;
+        goto parse_args_error;
     }
 
     tmp_opts->hostid = NULL;
@@ -350,23 +350,24 @@ static struct options *parse_args(
     /* look at command line arguments */
     while ((one_opt = getopt(argc, argv, flags)) != EOF)
     {
-	switch (one_opt)
-	{
-	case ('h'):
-	    len = (strlen(optarg)) + 1;
-	    if ((tmp_opts->hostid = (char *) malloc(len)) == NULL)
-	    {
-		goto parse_args_error;
-	    }
-	    memcpy(tmp_opts->hostid, optarg, len);
-	    break;
-	default:
-	    break;
-	}
+        switch (one_opt)
+        {
+        case ('h'):
+            len = (strlen(optarg)) + 1;
+            if ((tmp_opts->hostid = (char *) malloc(len)) == NULL)
+            {
+                goto parse_args_error;
+            }
+            memcpy(tmp_opts->hostid, optarg, len);
+            break;
+        default:
+            break;
+        }
     }
 
     /* if we didn't get a host argument, fill in a default: */
-    if (tmp_opts->hostid == NULL) {
+    if (tmp_opts->hostid == NULL)
+    {
         len = (strlen(DEFAULT_HOSTID)) + 1;
         if ((tmp_opts->hostid = (char *) malloc(len)) == NULL)
         {
@@ -382,11 +383,11 @@ static struct options *parse_args(
     /* if an error occurs, just free everything and return NULL */
     if (tmp_opts)
     {
-	if (tmp_opts->hostid)
-	{
-	    free(tmp_opts->hostid);
-	}
-	free(tmp_opts);
+        if (tmp_opts->hostid)
+        {
+            free(tmp_opts->hostid);
+        }
+        free(tmp_opts);
     }
     return (NULL);
 }

@@ -13,11 +13,12 @@
 static int bufmap_init = 0;
 static struct page **bufmap_page_array = NULL;
 /* array to track usage of buffer descriptors */
-static int buffer_index_array[PVFS2_BUFMAP_DESC_COUNT] = {0};
+static int buffer_index_array[PVFS2_BUFMAP_DESC_COUNT] = { 0 };
 static spinlock_t buffer_index_lock = SPIN_LOCK_UNLOCKED;
 
 static struct pvfs_bufmap_desc desc_array[PVFS2_BUFMAP_DESC_COUNT];
-static DECLARE_WAIT_QUEUE_HEAD(bufmap_waitq);
+static DECLARE_WAIT_QUEUE_HEAD(
+    bufmap_waitq);
 
 /* pvfs_bufmap_initialize()
  *
@@ -25,7 +26,8 @@ static DECLARE_WAIT_QUEUE_HEAD(bufmap_waitq);
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
+int pvfs_bufmap_initialize(
+    struct PVFS_dev_map_desc *user_desc)
 {
     int ret = -EINVAL;
     int i = 0;
@@ -43,15 +45,15 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     /* sanity check alignment and size of buffer that caller wants to
      * work with
      */
-    if (PAGE_ALIGN((unsigned long)user_desc->ptr) != 
-        (unsigned long)user_desc->ptr)
+    if (PAGE_ALIGN((unsigned long) user_desc->ptr) !=
+        (unsigned long) user_desc->ptr)
     {
         pvfs2_error("pvfs2 error: memory alignment (front).\n");
         goto init_failure;
     }
 
-    if (PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->size)) != 
-        (unsigned long)(user_desc->ptr + user_desc->size))
+    if (PAGE_ALIGN(((unsigned long) user_desc->ptr + user_desc->size)) !=
+        (unsigned long) (user_desc->ptr + user_desc->size))
     {
         pvfs2_error("pvfs2 error: memory alignment (back).\n");
         goto init_failure;
@@ -59,21 +61,20 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
 
     if (user_desc->size != PVFS2_BUFMAP_TOTAL_SIZE)
     {
-        pvfs2_error("pvfs2 error: user provided an oddly "
-                    "sized buffer...\n");
+        pvfs2_error("pvfs2 error: user provided an oddly " "sized buffer...\n");
         goto init_failure;
     }
 
     if ((PVFS2_BUFMAP_DEFAULT_DESC_SIZE % PAGE_SIZE) != 0)
     {
-        pvfs2_error("pvfs2 error: bufmap size not page size "
-                    "divisible.\n");
+        pvfs2_error("pvfs2 error: bufmap size not page size " "divisible.\n");
         goto init_failure;
     }
 
     /* allocate storage to track our page mappings */
-    bufmap_page_array = (struct page **)kmalloc(
-        BUFMAP_PAGE_COUNT*sizeof(struct page *), PVFS2_BUFMAP_GFP_FLAGS);
+    bufmap_page_array =
+        (struct page **) kmalloc(BUFMAP_PAGE_COUNT * sizeof(struct page *),
+                                 PVFS2_BUFMAP_GFP_FLAGS);
     if (!bufmap_page_array)
     {
         ret = -ENOMEM;
@@ -83,9 +84,8 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     /* map the pages */
     down_read(&current->mm->mmap_sem);
 
-    ret = get_user_pages(
-        current, current->mm, (unsigned long)user_desc->ptr,
-        BUFMAP_PAGE_COUNT, 1, 0, bufmap_page_array, NULL);
+    ret = get_user_pages(current, current->mm, (unsigned long) user_desc->ptr,
+                         BUFMAP_PAGE_COUNT, 1, 0, bufmap_page_array, NULL);
 
     up_read(&current->mm->mmap_sem);
 
@@ -96,15 +96,15 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     }
 
     /*
-      in theory we could run with what we got, but I will just treat
-      it as an error for simplicity's sake right now
-    */
+       in theory we could run with what we got, but I will just treat
+       it as an error for simplicity's sake right now
+     */
     if (ret != BUFMAP_PAGE_COUNT)
     {
         pvfs2_error("pvfs2 error: asked for %d pages, only got %d.\n",
-                    (int)BUFMAP_PAGE_COUNT, ret);
+                    (int) BUFMAP_PAGE_COUNT, ret);
 
-        for(i = 0; i < ret; i++)
+        for (i = 0; i < ret; i++)
         {
             SetPageError(bufmap_page_array[i]);
             page_cache_release(bufmap_page_array[i]);
@@ -115,23 +115,23 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     }
 
     /*
-      ideally we want to get kernel space pointers for each page, but
-      we can't kmap that many pages at once if highmem is being used.
-      so instead, we just kmap/kunmap the page address each time the
-      kaddr is needed.  this loop used to kmap every page, but now it
-      only ensures every page is marked reserved (non-pageable) NOTE:
-      setting PageReserved in 2.6.x seems to cause more trouble than
-      it's worth.  in 2.4.x, marking the pages does what's expected
-      and doesn't try to swap out our pages
-    */
-    for(i = 0; i < BUFMAP_PAGE_COUNT; i++)
+       ideally we want to get kernel space pointers for each page, but
+       we can't kmap that many pages at once if highmem is being used.
+       so instead, we just kmap/kunmap the page address each time the
+       kaddr is needed.  this loop used to kmap every page, but now it
+       only ensures every page is marked reserved (non-pageable) NOTE:
+       setting PageReserved in 2.6.x seems to cause more trouble than
+       it's worth.  in 2.4.x, marking the pages does what's expected
+       and doesn't try to swap out our pages
+     */
+    for (i = 0; i < BUFMAP_PAGE_COUNT; i++)
     {
         flush_dcache_page(bufmap_page_array[i]);
         pvfs2_set_page_reserved(bufmap_page_array[i]);
     }
 
     /* build a list of available descriptors */
-    for(offset = 0, i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
+    for (offset = 0, i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
     {
         desc_array[i].page_array = &bufmap_page_array[offset];
         desc_array[i].array_count = PAGES_PER_DESC;
@@ -142,7 +142,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
 
     /* clear any previously used buffer indices */
     spin_lock(&buffer_index_lock);
-    for(i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
+    for (i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
     {
         buffer_index_array[i] = 0;
     }
@@ -165,7 +165,8 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
  *
  * no return value
  */
-void pvfs_bufmap_finalize(void)
+void pvfs_bufmap_finalize(
+    void)
 {
     int i = 0;
 
@@ -178,7 +179,7 @@ void pvfs_bufmap_finalize(void)
         return;
     }
 
-    for(i = 0; i < BUFMAP_PAGE_COUNT; i++)
+    for (i = 0; i < BUFMAP_PAGE_COUNT; i++)
     {
         pvfs2_clear_page_reserved(bufmap_page_array[i]);
         page_cache_release(bufmap_page_array[i]);
@@ -197,20 +198,21 @@ void pvfs_bufmap_finalize(void)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_get(int *buffer_index)
+int pvfs_bufmap_get(
+    int *buffer_index)
 {
     int ret = -1, i = 0;
     DECLARE_WAITQUEUE(my_wait, current);
 
     add_wait_queue_exclusive(&bufmap_waitq, &my_wait);
 
-    while(1)
+    while (1)
     {
         set_current_state(TASK_INTERRUPTIBLE);
 
         /* check for available desc */
         spin_lock(&buffer_index_lock);
-        for(i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
+        for (i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
         {
             if (buffer_index_array[i] == 0)
             {
@@ -230,8 +232,7 @@ int pvfs_bufmap_get(int *buffer_index)
 
         if (!signal_pending(current))
         {
-            int timeout = MSECS_TO_JIFFIES(
-                1000 * op_timeout_secs);
+            int timeout = MSECS_TO_JIFFIES(1000 * op_timeout_secs);
             if (!schedule_timeout(timeout))
             {
                 pvfs2_print("*** pvfs_bufmap_get timed out\n");
@@ -257,7 +258,8 @@ int pvfs_bufmap_get(int *buffer_index)
  *
  * no return value
  */
-void pvfs_bufmap_put(int buffer_index)
+void pvfs_bufmap_put(
+    int buffer_index)
 {
     /* put the desc back on the queue */
     spin_lock(&buffer_index_lock);
@@ -274,7 +276,10 @@ void pvfs_bufmap_put(int buffer_index)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
+int pvfs_bufmap_copy_to_user(
+    void __user * to,
+    int buffer_index,
+    int size)
 {
     int ret = 0, amt_copied = 0, amt_remaining = 0;
     int cur_copy_size = 0, index = 0;
@@ -287,13 +292,13 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
 
     if (bufmap_init == 0)
     {
-        pvfs2_error("pvfs2_bufmap_copy_to_user: not yet "
-                    "initialized.\n");
-        pvfs2_error("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        pvfs2_error("pvfs2_bufmap_copy_to_user: not yet " "initialized.\n");
+        pvfs2_error
+            ("pvfs2: please confirm that pvfs2-client daemon is running.\n");
         return -EIO;
     }
 
-    while(amt_copied < size)
+    while (amt_copied < size)
     {
         amt_remaining = (size - amt_copied);
         cur_copy_size =
@@ -317,7 +322,9 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
 }
 
 int pvfs_bufmap_copy_to_kernel(
-    void *to, int buffer_index, int size)
+    void *to,
+    int buffer_index,
+    int size)
 {
     int amt_copied = 0, amt_remaining = 0;
     int cur_copy_size = 0, index = 0;
@@ -329,13 +336,13 @@ int pvfs_bufmap_copy_to_kernel(
 
     if (bufmap_init == 0)
     {
-        pvfs2_error("pvfs2_bufmap_copy_to_kernel: not yet "
-                    "initialized.\n");
-        pvfs2_error("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        pvfs2_error("pvfs2_bufmap_copy_to_kernel: not yet " "initialized.\n");
+        pvfs2_error
+            ("pvfs2: please confirm that pvfs2-client daemon is running.\n");
         return -EIO;
     }
 
-    while(amt_copied < size)
+    while (amt_copied < size)
     {
         amt_remaining = (size - amt_copied);
         cur_copy_size =
@@ -359,7 +366,9 @@ int pvfs_bufmap_copy_to_kernel(
  * returns 0 on success, -errno on failure
  */
 int pvfs_bufmap_copy_from_user(
-    int buffer_index, void __user *from, int size)
+    int buffer_index,
+    void __user * from,
+    int size)
 {
     int ret = 0, amt_copied = 0, amt_remaining = 0;
     int cur_copy_size = 0, index = 0;
@@ -372,13 +381,13 @@ int pvfs_bufmap_copy_from_user(
 
     if (bufmap_init == 0)
     {
-        pvfs2_error("pvfs2_bufmap_copy_from_user: not yet "
-                    "initialized.\n");
-        pvfs2_error("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        pvfs2_error("pvfs2_bufmap_copy_from_user: not yet " "initialized.\n");
+        pvfs2_error
+            ("pvfs2: please confirm that pvfs2-client daemon is running.\n");
         return -EIO;
     }
 
-    while(amt_copied < size)
+    while (amt_copied < size)
     {
         amt_remaining = (size - amt_copied);
         cur_copy_size =
@@ -419,7 +428,7 @@ int pvfs_bufmap_copy_iovec_from_user(
     unsigned long nr_segs,
     int size)
 {
-    int ret = 0, amt_copied = 0; 
+    int ret = 0, amt_copied = 0;
     int cur_copy_size = 0, index = 0;
     void *to_kaddr = NULL;
     void __user *from_addr = NULL;
@@ -440,10 +449,11 @@ int pvfs_bufmap_copy_iovec_from_user(
      * copy the passed in iovec so that we can change some of its fields
      */
     copied_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+                                            PVFS2_BUFMAP_GFP_FLAGS);
     if (copied_iovec == NULL)
     {
-        pvfs2_error("pvfs2_bufmap_copy_iovec_from_user: failed allocating memory\n");
+        pvfs2_error
+            ("pvfs2_bufmap_copy_iovec_from_user: failed allocating memory\n");
         return -ENOMEM;
     }
     memcpy(copied_iovec, iov, nr_segs * sizeof(struct iovec));
@@ -457,8 +467,9 @@ int pvfs_bufmap_copy_iovec_from_user(
     }
     if (amt_copied != size)
     {
-        pvfs2_error("pvfs2_bufmap_copy_iovec_from_user: computed total (%d) is not equal to (%d)\n",
-                amt_copied, size);
+        pvfs2_error
+            ("pvfs2_bufmap_copy_iovec_from_user: computed total (%d) is not equal to (%d)\n",
+             amt_copied, size);
         kfree(copied_iovec);
         return -EINVAL;
     }
@@ -472,10 +483,10 @@ int pvfs_bufmap_copy_iovec_from_user(
      */
     while (amt_copied < size)
     {
-	struct iovec *iv = &copied_iovec[seg];
+        struct iovec *iv = &copied_iovec[seg];
         int inc_index = 0;
 
-        if (iv->iov_len < (PAGE_SIZE - page_offset)) 
+        if (iv->iov_len < (PAGE_SIZE - page_offset))
         {
             cur_copy_size = iv->iov_len;
             seg++;
@@ -489,7 +500,7 @@ int pvfs_bufmap_copy_iovec_from_user(
             from_addr = iv->iov_base;
             inc_index = 1;
         }
-        else 
+        else
         {
             cur_copy_size = (PAGE_SIZE - page_offset);
             from_addr = iv->iov_base;
@@ -501,8 +512,10 @@ int pvfs_bufmap_copy_iovec_from_user(
         ret = copy_from_user(to_kaddr + page_offset, from_addr, cur_copy_size);
         pvfs2_kunmap(to->page_array[index]);
 #if 0
-        pvfs2_print("pvfs2_bufmap_copy_iovec_from_user: copying from user %p to kernel %p %d bytes (to_kddr: %p,page_offset: %d)\n",
-                from_addr, to_kaddr + page_offset, cur_copy_size, to_kaddr, page_offset); 
+        pvfs2_print
+            ("pvfs2_bufmap_copy_iovec_from_user: copying from user %p to kernel %p %d bytes (to_kddr: %p,page_offset: %d)\n",
+             from_addr, to_kaddr + page_offset, cur_copy_size, to_kaddr,
+             page_offset);
 #endif
         if (ret)
         {
@@ -512,20 +525,23 @@ int pvfs_bufmap_copy_iovec_from_user(
         }
 
         amt_copied += cur_copy_size;
-        if (inc_index) {
+        if (inc_index)
+        {
             page_offset = 0;
             index++;
         }
-        else {
+        else
+        {
             page_offset += cur_copy_size;
         }
     }
     kfree(copied_iovec);
     if (amt_copied != size)
     {
-	pvfs2_error("Failed to copy all the data from user space [%d instead of %d]\n",
-                amt_copied, size);
-	return -EIO;
+        pvfs2_error
+            ("Failed to copy all the data from user space [%d instead of %d]\n",
+             amt_copied, size);
+        return -EIO;
     }
     return 0;
 }
@@ -564,10 +580,11 @@ int pvfs_bufmap_copy_to_user_iovec(
      * copy the passed in iovec so that we can change some of its fields
      */
     copied_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+                                            PVFS2_BUFMAP_GFP_FLAGS);
     if (copied_iovec == NULL)
     {
-        pvfs2_error("pvfs2_bufmap_copy_to_user_iovec: failed allocating memory\n");
+        pvfs2_error
+            ("pvfs2_bufmap_copy_to_user_iovec: failed allocating memory\n");
         return -ENOMEM;
     }
     memcpy(copied_iovec, iov, nr_segs * sizeof(struct iovec));
@@ -581,8 +598,9 @@ int pvfs_bufmap_copy_to_user_iovec(
     }
     if (amt_copied < size)
     {
-        pvfs2_error("pvfs2_bufmap_copy_to_user_iovec: computed total (%d) is less than (%d)\n",
-                amt_copied, size);
+        pvfs2_error
+            ("pvfs2_bufmap_copy_to_user_iovec: computed total (%d) is less than (%d)\n",
+             amt_copied, size);
         kfree(copied_iovec);
         return -EINVAL;
     }
@@ -597,7 +615,7 @@ int pvfs_bufmap_copy_to_user_iovec(
      */
     while (amt_copied < size)
     {
-	struct iovec *iv = &copied_iovec[seg];
+        struct iovec *iv = &copied_iovec[seg];
         int inc_index = 0;
 
         if (iv->iov_len < (PAGE_SIZE - page_offset))
@@ -614,20 +632,22 @@ int pvfs_bufmap_copy_to_user_iovec(
             to_addr = iv->iov_base;
             inc_index = 1;
         }
-        else 
+        else
         {
             cur_copy_size = (PAGE_SIZE - page_offset);
             to_addr = iv->iov_base;
             iv->iov_base += cur_copy_size;
-            iv->iov_len  -= cur_copy_size;
+            iv->iov_len -= cur_copy_size;
             inc_index = 1;
         }
         from_kaddr = pvfs2_kmap(from->page_array[index]);
         ret = copy_to_user(to_addr, from_kaddr + page_offset, cur_copy_size);
         pvfs2_kunmap(from->page_array[index]);
 #if 0
-        pvfs2_print("pvfs2_bufmap_copy_to_user_iovec: copying to user %p from kernel %p %d bytes (from_kaddr:%p, page_offset:%d)\n",
-                to_addr, from_kaddr + page_offset, cur_copy_size, from_kaddr, page_offset); 
+        pvfs2_print
+            ("pvfs2_bufmap_copy_to_user_iovec: copying to user %p from kernel %p %d bytes (from_kaddr:%p, page_offset:%d)\n",
+             to_addr, from_kaddr + page_offset, cur_copy_size, from_kaddr,
+             page_offset);
 #endif
         if (ret)
         {
@@ -637,11 +657,13 @@ int pvfs_bufmap_copy_to_user_iovec(
         }
 
         amt_copied += cur_copy_size;
-        if (inc_index) {
+        if (inc_index)
+        {
             page_offset = 0;
             index++;
         }
-        else {
+        else
+        {
             page_offset += cur_copy_size;
         }
     }
@@ -664,10 +686,10 @@ int pvfs_bufmap_copy_to_user_iovec(
  * -errno on failure
  */
 int pvfs_bufmap_copy_to_user_task(
-        struct task_struct *tsk,
-        void __user *to, 
-        int buffer_index,
-        int size)
+    struct task_struct *tsk,
+    void __user * to,
+    int buffer_index,
+    int size)
 {
     int ret = 0, amt_copied = 0, amt_remaining = 0;
     int cur_copy_size = 0, index = 0;
@@ -683,19 +705,18 @@ int pvfs_bufmap_copy_to_user_task(
     int inc_index = 0;
 
     pvfs2_print("pvfs_bufmap_copy_to_user_task: "
-            " PID: %d, to %p, from %p, index %d, "
-            " size %d\n", tsk->pid, to, from, buffer_index, size);
+                " PID: %d, to %p, from %p, index %d, "
+                " size %d\n", tsk->pid, to, from, buffer_index, size);
 
     if (bufmap_init == 0)
     {
-        pvfs2_error("pvfs2_bufmap_copy_to_user: not yet "
-                    "initialized.\n");
+        pvfs2_error("pvfs2_bufmap_copy_to_user: not yet " "initialized.\n");
         pvfs2_error("pvfs2: please confirm that pvfs2-client "
-                "daemon is running.\n");
+                    "daemon is running.\n");
         return -EIO;
     }
     mm = get_task_mm(tsk);
-    if (!mm) 
+    if (!mm)
     {
         return -EIO;
     }
@@ -705,15 +726,14 @@ int pvfs_bufmap_copy_to_user_task(
      * buffer, and make sure to do this one page at a time!
      */
     down_read(&mm->mmap_sem);
-    while(amt_copied < size)
+    while (amt_copied < size)
     {
         int bytes = 0;
 
-        ret = get_user_pages(tsk, mm, to_addr, 
-                1,/* count */
-                1,/* write */
-                1,/* force */
-                &page, &vma);
+        ret = get_user_pages(tsk, mm, to_addr, 1,       /* count */
+                             1, /* write */
+                             1, /* force */
+                             &page, &vma);
         if (ret <= 0)
             break;
         to_offset = to_addr & (PAGE_SIZE - 1);
@@ -728,20 +748,17 @@ int pvfs_bufmap_copy_to_user_task(
             bytes = (PAGE_SIZE - to_offset);
             inc_index = 1;
         }
-        else 
+        else
         {
             bytes = (PAGE_SIZE - from_offset);
             inc_index = 1;
         }
-        cur_copy_size =
-            amt_remaining > bytes 
-                  ? bytes : amt_remaining;
+        cur_copy_size = amt_remaining > bytes ? bytes : amt_remaining;
         maddr = pvfs2_kmap(page);
         from_kaddr = pvfs2_kmap(from->page_array[index]);
-        copy_to_user_page(vma, page, to_addr,
-             maddr + to_offset /* dst */, 
-             from_kaddr + from_offset, /* src */
-             cur_copy_size /* len */);
+        copy_to_user_page(vma, page, to_addr, maddr + to_offset /* dst */ ,
+                          from_kaddr + from_offset,     /* src */
+                          cur_copy_size /* len */ );
         set_page_dirty_lock(page);
         pvfs2_kunmap(from->page_array[index]);
         pvfs2_kunmap(page);
@@ -754,14 +771,14 @@ int pvfs_bufmap_copy_to_user_task(
             from_offset = 0;
             index++;
         }
-        else 
+        else
         {
             from_offset += cur_copy_size;
         }
     }
     up_read(&mm->mmap_sem);
     mmput(mm);
-    return (amt_copied < size) ? -EFAULT: amt_copied;
+    return (amt_copied < size) ? -EFAULT : amt_copied;
 }
 
 #endif

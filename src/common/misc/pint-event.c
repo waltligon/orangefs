@@ -21,7 +21,7 @@ int32_t PINT_event_api_mask = 0;
 int32_t PINT_event_op_mask = 0;
 
 /* global data structures for storing measurements */
-static struct PVFS_mgmt_event* ts_ring = NULL;
+static struct PVFS_mgmt_event *ts_ring = NULL;
 static int ts_head = 0;
 static int ts_tail = 0;
 static int ts_ring_size = 0;
@@ -42,7 +42,8 @@ int PINT_event_flow_start, PINT_event_flow_stop;
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_event_initialize(int ring_size)
+int PINT_event_initialize(
+    int ring_size)
 {
     gen_mutex_lock(&event_mutex);
 
@@ -56,7 +57,7 @@ int PINT_event_initialize(int ring_size)
     PINT_event_default_init(ring_size);
 
     gen_mutex_unlock(&event_mutex);
-    return(0);
+    return (0);
 }
 
 #if defined(HAVE_MPE)
@@ -64,7 +65,8 @@ int PINT_event_initialize(int ring_size)
  * PINT_event_mpe_init
  *   initialize the mpe profiling interface
  */
-int PINT_event_mpe_init(void)
+int PINT_event_mpe_init(
+    void)
 {
     MPI_Init(NULL, NULL);
     MPE_Init_log();
@@ -82,19 +84,20 @@ int PINT_event_mpe_init(void)
 
 
     MPE_Describe_state(PINT_event_job_start, PINT_event_job_stop, "Job", "red");
-    MPE_Describe_state(PINT_event_trove_rd_start, PINT_event_trove_rd_stop, 
-	    "Trove Read", "orange");
-    MPE_Describe_state(PINT_event_trove_wr_start, PINT_event_trove_wr_stop, 
-	    "Trove Write", "blue");
-    MPE_Describe_state(PINT_event_bmi_start, PINT_event_bmi_stop, 
-	    "BMI", "yellow");
-    MPE_Describe_state(PINT_event_flow_start, PINT_event_flow_stop, 
-	    "Flow", "green");
+    MPE_Describe_state(PINT_event_trove_rd_start, PINT_event_trove_rd_stop,
+                       "Trove Read", "orange");
+    MPE_Describe_state(PINT_event_trove_wr_start, PINT_event_trove_wr_stop,
+                       "Trove Write", "blue");
+    MPE_Describe_state(PINT_event_bmi_start, PINT_event_bmi_stop,
+                       "BMI", "yellow");
+    MPE_Describe_state(PINT_event_flow_start, PINT_event_flow_stop,
+                       "Flow", "green");
 
     return 0;
 }
 
-void PINT_event_mpe_finalize(void)
+void PINT_event_mpe_finalize(
+    void)
 {
     /* TODO: use mkstemp like pablo_finalize does */
     MPE_Finish_log("/tmp/pvfs2-server");
@@ -107,7 +110,8 @@ void PINT_event_mpe_finalize(void)
 /* PINT_event_pablo_init
  *   initialize the pablo trace library 
  */
-int PINT_event_pablo_init(void)
+int PINT_event_pablo_init(
+    void)
 {
     char tracefile[PATH_MAX];
     snprintf(tracefile, PATH_MAX, "/tmp/pvfs2-server.pablo.XXXXXX");
@@ -116,7 +120,8 @@ int PINT_event_pablo_init(void)
     return 0;
 }
 
-void PINT_event_pablo_finalize(void)
+void PINT_event_pablo_finalize(
+    void)
 {
     endTracing();
 }
@@ -124,30 +129,32 @@ void PINT_event_pablo_finalize(void)
 #endif
 
 
-int PINT_event_default_init(int ring_size)
+int PINT_event_default_init(
+    int ring_size)
 {
-    if(ts_ring != NULL)
+    if (ts_ring != NULL)
     {
-	gen_mutex_unlock(&event_mutex);
-	return(-PVFS_EALREADY);
+        gen_mutex_unlock(&event_mutex);
+        return (-PVFS_EALREADY);
     }
 
     /* give a reasonable ring buffer size to work with! */
-    if(ring_size < 4)
+    if (ring_size < 4)
     {
-	gen_mutex_unlock(&event_mutex);
-	return(-PVFS_EINVAL);
+        gen_mutex_unlock(&event_mutex);
+        return (-PVFS_EINVAL);
     }
 
     /* allocate a ring buffer for time stamped events */
-    ts_ring = (struct PVFS_mgmt_event*)malloc(ring_size
-	*sizeof(struct PVFS_mgmt_event));
-    if(!ts_ring)
+    ts_ring = (struct PVFS_mgmt_event *) malloc(ring_size
+                                                *
+                                                sizeof(struct PVFS_mgmt_event));
+    if (!ts_ring)
     {
-	gen_mutex_unlock(&event_mutex);
-	return(-PVFS_ENOMEM);
+        gen_mutex_unlock(&event_mutex);
+        return (-PVFS_ENOMEM);
     }
-    memset(ts_ring, 0, ring_size*sizeof(struct PVFS_mgmt_event));
+    memset(ts_ring, 0, ring_size * sizeof(struct PVFS_mgmt_event));
 
     ts_head = 0;
     ts_tail = 0;
@@ -156,12 +163,13 @@ int PINT_event_default_init(int ring_size)
     return 0;
 }
 
-void PINT_event_default_finalize(void)
+void PINT_event_default_finalize(
+    void)
 {
-    if(ts_ring == NULL)
+    if (ts_ring == NULL)
     {
-	gen_mutex_unlock(&event_mutex);
-	return;
+        gen_mutex_unlock(&event_mutex);
+        return;
     }
 
     free(ts_ring);
@@ -179,9 +187,10 @@ void PINT_event_default_finalize(void)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-void PINT_event_finalize(void)
+void PINT_event_finalize(
+    void)
 {
-    
+
     gen_mutex_lock(&event_mutex);
 #if defined(HAVE_PABLO)
     PINT_event_pablo_finalize();
@@ -203,7 +212,10 @@ void PINT_event_finalize(void)
  *
  * no return value
  */
-void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask)
+void PINT_event_set_masks(
+    int event_on,
+    int32_t api_mask,
+    int32_t op_mask)
 {
     gen_mutex_lock(&event_mutex);
 
@@ -222,7 +234,10 @@ void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask)
  *
  * no return value
  */
-void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask)
+void PINT_event_get_masks(
+    int *event_on,
+    int32_t * api_mask,
+    int32_t * op_mask)
 {
     gen_mutex_lock(&event_mutex);
 
@@ -240,11 +255,12 @@ void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-void __PINT_event_timestamp(enum PVFS_event_api api,
-			    int32_t operation,
-			    int64_t value,
-			    PVFS_id_gen_t id,
-			    int8_t flags)
+void __PINT_event_timestamp(
+    enum PVFS_event_api api,
+    int32_t operation,
+    int64_t value,
+    PVFS_id_gen_t id,
+    int8_t flags)
 {
     gen_mutex_lock(&event_mutex);
 
@@ -263,11 +279,12 @@ void __PINT_event_timestamp(enum PVFS_event_api api,
     return;
 }
 
-void __PINT_event_default(enum PVFS_event_api api,
-			  int32_t operation,
-			  int64_t value,
-			  PVFS_id_gen_t id,
-			  int8_t flags)
+void __PINT_event_default(
+    enum PVFS_event_api api,
+    int32_t operation,
+    int64_t value,
+    PVFS_id_gen_t id,
+    int8_t flags)
 {
     struct timeval tv;
 
@@ -284,53 +301,56 @@ void __PINT_event_default(enum PVFS_event_api api,
     ts_ring[ts_head].tv_usec = tv.tv_usec;
 
     /* update ring buffer positions */
-    ts_head = (ts_head+1)%ts_ring_size;
-    if(ts_head == ts_tail)
+    ts_head = (ts_head + 1) % ts_ring_size;
+    if (ts_head == ts_tail)
     {
-	ts_tail = (ts_tail+1)%ts_ring_size;
+        ts_tail = (ts_tail + 1) % ts_ring_size;
     }
 }
 
 #ifdef HAVE_PABLO
 /* enter a pablo trace into the log */
-void __PINT_event_pablo(enum PVFS_event_api api,
-			int32_t operation,
-			int64_t value,
-			PVFS_id_gen_t id,
-			int8_t flags)
+void __PINT_event_pablo(
+    enum PVFS_event_api api,
+    int32_t operation,
+    int64_t value,
+    PVFS_id_gen_t id,
+    int8_t flags)
 {
     /* TODO: this can all go once there is a nice "enum to string" function */
     char description[100];
-    switch(api) {
-	case PVFS_EVENT_API_BMI:
-	    sprintf(description, "bmi operation");
-	    break;
-	case PVFS_EVENT_API_JOB:
-	    sprintf(description, "job operation");
-	    break;
-	case PVFS_EVENT_API_TROVE:
-	    sprintf(description, "trove operation");
-	    break;
-        case PVFS_EVENT_API_ENCODE_REQ:
-        case PVFS_EVENT_API_ENCODE_RESP:
-        case PVFS_EVENT_API_DECODE_REQ:
-        case PVFS_EVENT_API_DECODE_RESP:
-        case PVFS_EVENT_API_SM:
+    switch (api)
+    {
+    case PVFS_EVENT_API_BMI:
+        sprintf(description, "bmi operation");
+        break;
+    case PVFS_EVENT_API_JOB:
+        sprintf(description, "job operation");
+        break;
+    case PVFS_EVENT_API_TROVE:
+        sprintf(description, "trove operation");
+        break;
+    case PVFS_EVENT_API_ENCODE_REQ:
+    case PVFS_EVENT_API_ENCODE_RESP:
+    case PVFS_EVENT_API_DECODE_REQ:
+    case PVFS_EVENT_API_DECODE_RESP:
+    case PVFS_EVENT_API_SM:
     }
 
     /* PVFS_EVENT_API_BMI, operation(SEND|RECV), value, id, FLAG (start|end) */
     /* our usage better maps to the "startTimeEvent/endTimeEvent" model */
-    switch(flags) {
-	case PVFS_EVENT_FLAG_START:
-	    startTimeEvent( ((api<<6)&(operation<<3)) );
-	    traceEvent( ( (api<<6) & (operation<<3) & flags), 
-		    description, strlen(description));
-	    break;
-	case PVFS_EVENT_FLAG_END:
-	    endTimeEvent( ((api<6)&(operation<3)) );
-	    break;
-	default:
-	    /* TODO: someone fed us bad flags */
+    switch (flags)
+    {
+    case PVFS_EVENT_FLAG_START:
+        startTimeEvent(((api << 6) & (operation << 3)));
+        traceEvent(((api << 6) & (operation << 3) & flags),
+                   description, strlen(description));
+        break;
+    case PVFS_EVENT_FLAG_END:
+        endTimeEvent(((api < 6) & (operation < 3)));
+        break;
+    default:
+        /* TODO: someone fed us bad flags */
     }
 
 
@@ -338,37 +358,48 @@ void __PINT_event_pablo(enum PVFS_event_api api,
 #endif
 
 #if defined(HAVE_MPE)
-void __PINT_event_mpe(enum PVFS_event_api api,
-		      int32_t operation,
-		      int64_t value,
-		      PVFS_id_gen_t id,
-		      int8_t flags)
+void __PINT_event_mpe(
+    enum PVFS_event_api api,
+    int32_t operation,
+    int64_t value,
+    PVFS_id_gen_t id,
+    int8_t flags)
 {
-    switch(api) {
-	case PVFS_EVENT_API_BMI:
-	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_bmi_start, 0, NULL);
-	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_bmi_stop, value, NULL);
-	    }
-	case PVFS_EVENT_API_JOB:
-	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_job_start, 0, NULL);
-	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_job_stop, value, NULL);
-	    }
-	case PVFS_EVENT_API_TROVE:
-	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_trove_wr_start, 0, NULL);
-	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_trove_wr_stop, value, NULL);
-	    }
-        case PVFS_EVENT_API_ENCODE_REQ:
-        case PVFS_EVENT_API_ENCODE_RESP:
-        case PVFS_EVENT_API_DECODE_REQ:
-        case PVFS_EVENT_API_DECODE_RESP:
-        case PVFS_EVENT_API_SM:
-            ; /* XXX: NEEDS SOMETHING */
+    switch (api)
+    {
+    case PVFS_EVENT_API_BMI:
+        if (flags & PVFS_EVENT_FLAG_START)
+        {
+            MPE_Log_event(PINT_event_bmi_start, 0, NULL);
+        }
+        else if (flags & PVFS_EVENT_FLAG_END)
+        {
+            MPE_Log_event(PINT_event_bmi_stop, value, NULL);
+        }
+    case PVFS_EVENT_API_JOB:
+        if (flags & PVFS_EVENT_FLAG_START)
+        {
+            MPE_Log_event(PINT_event_job_start, 0, NULL);
+        }
+        else if (flags & PVFS_EVENT_FLAG_END)
+        {
+            MPE_Log_event(PINT_event_job_stop, value, NULL);
+        }
+    case PVFS_EVENT_API_TROVE:
+        if (flags & PVFS_EVENT_FLAG_START)
+        {
+            MPE_Log_event(PINT_event_trove_wr_start, 0, NULL);
+        }
+        else if (flags & PVFS_EVENT_FLAG_END)
+        {
+            MPE_Log_event(PINT_event_trove_wr_stop, value, NULL);
+        }
+    case PVFS_EVENT_API_ENCODE_REQ:
+    case PVFS_EVENT_API_ENCODE_RESP:
+    case PVFS_EVENT_API_DECODE_REQ:
+    case PVFS_EVENT_API_DECODE_RESP:
+    case PVFS_EVENT_API_SM:
+        ;       /* XXX: NEEDS SOMETHING */
     }
 
 }
@@ -380,8 +411,9 @@ void __PINT_event_mpe(enum PVFS_event_api api,
  *
  * no return value
  */
-void PINT_event_retrieve(struct PVFS_mgmt_event* event_array,
-			 int count)
+void PINT_event_retrieve(
+    struct PVFS_mgmt_event *event_array,
+    int count)
 {
     int tmp_tail = ts_tail;
     int cur_index = 0;
@@ -390,19 +422,19 @@ void PINT_event_retrieve(struct PVFS_mgmt_event* event_array,
     gen_mutex_lock(&event_mutex);
 
     /* copy out any events from the ring buffer */
-    while(tmp_tail != ts_head && cur_index < count)
+    while (tmp_tail != ts_head && cur_index < count)
     {
-	event_array[cur_index] = ts_ring[tmp_tail];
-	tmp_tail = (tmp_tail+1)%ts_ring_size;
-	cur_index++;
+        event_array[cur_index] = ts_ring[tmp_tail];
+        tmp_tail = (tmp_tail + 1) % ts_ring_size;
+        cur_index++;
     }
 
     gen_mutex_unlock(&event_mutex);
 
     /* fill in remainder of array with invalid flag */
-    for(i=cur_index; i<count; i++)
+    for (i = cur_index; i < count; i++)
     {
-	event_array[i].flags = PVFS_EVENT_FLAG_INVALID;
+        event_array[i].flags = PVFS_EVENT_FLAG_INVALID;
     }
 
     return;

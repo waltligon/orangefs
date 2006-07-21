@@ -15,21 +15,23 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 
-int main(int argc, char **argv)
+int main(
+    int argc,
+    char **argv)
 {
     int ret = -1;
-    char str_buf[256] = {0};
-    char *filename = (char *)0;
+    char str_buf[256] = { 0 };
+    char *filename = (char *) 0;
     PVFS_fs_id cur_fs;
     PVFS_sysresp_create resp_create;
-    char* entry_name;
+    char *entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
 
     if (argc != 2)
     {
-        fprintf(stderr,"Usage: %s filename\n",argv[0]);
+        fprintf(stderr, "Usage: %s filename\n", argv[0]);
         return ret;
     }
     filename = argv[1];
@@ -37,25 +39,24 @@ int main(int argc, char **argv)
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return (-1);
+        PVFS_perror("PVFS_util_init_defaults", ret);
+        return (-1);
     }
     ret = PVFS_util_get_default_fsid(&cur_fs);
     if (ret < 0)
     {
-	PVFS_perror("PVFS_util_get_default_fsid", ret);
-	return (-1);
+        PVFS_perror("PVFS_util_get_default_fsid", ret);
+        return (-1);
     }
 
-    if (PINT_remove_base_dir(filename,str_buf,256))
+    if (PINT_remove_base_dir(filename, str_buf, 256))
     {
         if (filename[0] != '/')
         {
             printf("You forgot the leading '/'\n");
         }
-        printf("Cannot retrieve entry name for creation on %s\n",
-               filename);
-        return(-1);
+        printf("Cannot retrieve entry name for creation on %s\n", filename);
+        return (-1);
     }
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
@@ -66,15 +67,14 @@ int main(int argc, char **argv)
     attr.owner = credentials.uid;
     attr.group = credentials.gid;
     attr.perms = 1877;
-    attr.atime = attr.ctime = attr.mtime = 
-	time(NULL);
+    attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-    ret = PINT_lookup_parent(filename, cur_fs, &credentials, 
+    ret = PINT_lookup_parent(filename, cur_fs, &credentials,
                              &parent_refn.handle);
-    if(ret < 0)
+    if (ret < 0)
     {
-	PVFS_perror("PVFS_util_lookup_parent", ret);
-	return(-1);
+        PVFS_perror("PVFS_util_lookup_parent", ret);
+        return (-1);
     }
     parent_refn.fs_id = cur_fs;
 
@@ -86,12 +86,12 @@ int main(int argc, char **argv)
     if (ret < 0)
     {
         PVFS_perror("create failed with errcode", ret);
-        return(-1);
+        return (-1);
     }
-	
+
     // print the handle 
-    printf("--create--\n"); 
-    printf("Handle: %lld\n",lld(resp_create.ref.handle));
+    printf("--create--\n");
+    printf("Handle: %lld\n", lld(resp_create.ref.handle));
 
     ret = PVFS_sys_finalize();
     if (ret < 0)
@@ -100,5 +100,5 @@ int main(int argc, char **argv)
         return (-1);
     }
 
-    return(0);
+    return (0);
 }

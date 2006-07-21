@@ -112,38 +112,45 @@ typedef struct
     struct qlist_head link;
 } id_sync_mode_t;
 
-static QLIST_HEAD(s_id_sync_mode_list);
+static QLIST_HEAD(
+    s_id_sync_mode_list);
 static gen_mutex_t id_sync_mode_mutex = GEN_MUTEX_INITIALIZER;
 static TROVE_context_id global_trove_context = -1;
 
-static int get_data_sync_mode(TROVE_coll_id coll_id);
-static void bmi_recv_callback_fn(void *user_ptr,
-                                 PVFS_size actual_size,
-                                 PVFS_error error_code);
+static int get_data_sync_mode(
+    TROVE_coll_id coll_id);
+static void bmi_recv_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code);
 
-static int bmi_send_callback_fn(void *user_ptr,
-                                PVFS_size actual_size,
-                                PVFS_error error_code,
-                                int initial_call_flag);
-static void trove_read_callback_fn(void *user_ptr,
-                                   PVFS_error error_code);
-static void trove_write_callback_fn(void *user_ptr,
-                                    PVFS_error error_code);
+static int bmi_send_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code,
+    int initial_call_flag);
+static void trove_read_callback_fn(
+    void *user_ptr,
+    PVFS_error error_code);
+static void trove_write_callback_fn(
+    void *user_ptr,
+    PVFS_error error_code);
 
 /* wrappers that let us acquire locks or use return values in different
  * ways, depending on if the function is triggered from an external thread
  * or in a direct invocation
  */
-static inline void bmi_send_callback_wrapper(void *user_ptr,
-                                             PVFS_size actual_size,
-                                             PVFS_error error_code)
+static inline void bmi_send_callback_wrapper(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
-    struct fp_private_data *flow_data = 
-        PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
+    struct fp_private_data *flow_data =
+        PRIVATE_FLOW(((struct fp_queue_item *) user_ptr)->parent);
     gen_mutex_lock(flow_data->parent->flow_mutex);
 
     bmi_send_callback_fn(user_ptr, actual_size, error_code, 0);
-    if(flow_data->parent->state == FLOW_COMPLETE)
+    if (flow_data->parent->state == FLOW_COMPLETE)
     {
         gen_mutex_unlock(flow_data->parent->flow_mutex);
         FLOW_CLEANUP(flow_data);
@@ -154,15 +161,16 @@ static inline void bmi_send_callback_wrapper(void *user_ptr,
     }
 }
 
-static inline void bmi_recv_callback_wrapper(void *user_ptr,
-                                             PVFS_size actual_size,
-                                             PVFS_error error_code)
+static inline void bmi_recv_callback_wrapper(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
-    struct fp_private_data *flow_data = 
-        PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
+    struct fp_private_data *flow_data =
+        PRIVATE_FLOW(((struct fp_queue_item *) user_ptr)->parent);
     gen_mutex_lock(flow_data->parent->flow_mutex);
     bmi_recv_callback_fn(user_ptr, actual_size, error_code);
-    if(flow_data->parent->state == FLOW_COMPLETE)
+    if (flow_data->parent->state == FLOW_COMPLETE)
     {
         gen_mutex_unlock(flow_data->parent->flow_mutex);
         FLOW_CLEANUP(flow_data);
@@ -173,15 +181,15 @@ static inline void bmi_recv_callback_wrapper(void *user_ptr,
     }
 }
 
-static inline void trove_read_callback_wrapper(void *user_ptr,
-                                               PVFS_error error_code)
+static inline void trove_read_callback_wrapper(
+    void *user_ptr,
+    PVFS_error error_code)
 {
-    struct fp_private_data *flow_data = 
-        PRIVATE_FLOW(((struct
-        result_chain_entry*)user_ptr)->q_item->parent);
+    struct fp_private_data *flow_data =
+        PRIVATE_FLOW(((struct result_chain_entry *) user_ptr)->q_item->parent);
     gen_mutex_lock(flow_data->parent->flow_mutex);
     trove_read_callback_fn(user_ptr, error_code);
-    if(flow_data->parent->state == FLOW_COMPLETE)
+    if (flow_data->parent->state == FLOW_COMPLETE)
     {
         gen_mutex_unlock(flow_data->parent->flow_mutex);
         FLOW_CLEANUP(flow_data);
@@ -192,15 +200,15 @@ static inline void trove_read_callback_wrapper(void *user_ptr,
     }
 }
 
-static inline void trove_write_callback_wrapper(void *user_ptr,
-                                                PVFS_error error_code)
+static inline void trove_write_callback_wrapper(
+    void *user_ptr,
+    PVFS_error error_code)
 {
-    struct fp_private_data *flow_data = 
-        PRIVATE_FLOW(((struct
-                       result_chain_entry*)user_ptr)->q_item->parent);
+    struct fp_private_data *flow_data =
+        PRIVATE_FLOW(((struct result_chain_entry *) user_ptr)->q_item->parent);
     gen_mutex_lock(flow_data->parent->flow_mutex);
     trove_write_callback_fn(user_ptr, error_code);
-    if(flow_data->parent->state == FLOW_COMPLETE)
+    if (flow_data->parent->state == FLOW_COMPLETE)
     {
         gen_mutex_unlock(flow_data->parent->flow_mutex);
         FLOW_CLEANUP(flow_data);
@@ -212,26 +220,29 @@ static inline void trove_write_callback_wrapper(void *user_ptr,
 }
 
 #endif
-static void mem_to_bmi_callback_fn(void *user_ptr,
-                                   PVFS_size actual_size,
-                                   PVFS_error error_code);
-static void bmi_to_mem_callback_fn(void *user_ptr,
-                                   PVFS_size actual_size,
-                                   PVFS_error error_code);
+static void mem_to_bmi_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code);
+static void bmi_to_mem_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code);
 
 /* wrappers that let us acquire locks or use return values in different
  * ways, depending on if the function is triggered from an external thread
  * or in a direct invocation
  */
-static void mem_to_bmi_callback_wrapper(void *user_ptr,
-                                        PVFS_size actual_size,
-                                        PVFS_error error_code)
+static void mem_to_bmi_callback_wrapper(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
-    struct fp_private_data *flow_data = 
-        PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
+    struct fp_private_data *flow_data =
+        PRIVATE_FLOW(((struct fp_queue_item *) user_ptr)->parent);
     gen_mutex_lock(flow_data->parent->flow_mutex);
     mem_to_bmi_callback_fn(user_ptr, actual_size, error_code);
-    if(flow_data->parent->state == FLOW_COMPLETE)
+    if (flow_data->parent->state == FLOW_COMPLETE)
     {
         gen_mutex_unlock(flow_data->parent->flow_mutex);
         FLOW_CLEANUP(flow_data);
@@ -242,12 +253,13 @@ static void mem_to_bmi_callback_wrapper(void *user_ptr,
     }
 }
 
-static void bmi_to_mem_callback_wrapper(void *user_ptr,
-                                        PVFS_size actual_size,
-                                        PVFS_error error_code)
+static void bmi_to_mem_callback_wrapper(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
-    struct fp_private_data *flow_data = 
-        PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
+    struct fp_private_data *flow_data =
+        PRIVATE_FLOW(((struct fp_queue_item *) user_ptr)->parent);
 
     assert(flow_data);
     assert(flow_data->parent);
@@ -255,7 +267,7 @@ static void bmi_to_mem_callback_wrapper(void *user_ptr,
 
     gen_mutex_lock(flow_data->parent->flow_mutex);
     bmi_to_mem_callback_fn(user_ptr, actual_size, error_code);
-    if(flow_data->parent->state == FLOW_COMPLETE)
+    if (flow_data->parent->state == FLOW_COMPLETE)
     {
         gen_mutex_unlock(flow_data->parent->flow_mutex);
         FLOW_CLEANUP(flow_data);
@@ -267,21 +279,27 @@ static void bmi_to_mem_callback_wrapper(void *user_ptr,
 }
 
 /* interface prototypes */
-static int fp_multiqueue_initialize(int flowproto_id);
+static int fp_multiqueue_initialize(
+    int flowproto_id);
 
-static int fp_multiqueue_finalize(void);
+static int fp_multiqueue_finalize(
+    void);
 
-static int fp_multiqueue_getinfo(flow_descriptor  *flow_d,
-                                 int option,
-                                 void *parameter);
+static int fp_multiqueue_getinfo(
+    flow_descriptor * flow_d,
+    int option,
+    void *parameter);
 
-static int fp_multiqueue_setinfo(flow_descriptor *flow_d,
-                                 int option,
-                                 void *parameter);
+static int fp_multiqueue_setinfo(
+    flow_descriptor * flow_d,
+    int option,
+    void *parameter);
 
-static int fp_multiqueue_post(flow_descriptor *flow_d);
+static int fp_multiqueue_post(
+    flow_descriptor * flow_d);
 
-static int fp_multiqueue_cancel(flow_descriptor *flow_d);
+static int fp_multiqueue_cancel(
+    flow_descriptor * flow_d);
 
 static char fp_multiqueue_name[] = "flowproto_multiqueue";
 
@@ -301,26 +319,27 @@ struct flowproto_ops fp_multiqueue_ops = {
  *
  * returns 0 on succes, -PVFS_error on failure
  */
-int fp_multiqueue_initialize(int flowproto_id)
+int fp_multiqueue_initialize(
+    int flowproto_id)
 {
     int ret = -1;
 
     ret = PINT_thread_mgr_bmi_start();
-    if(ret < 0)
-        return(ret);
+    if (ret < 0)
+        return (ret);
     PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = PINT_thread_mgr_trove_start();
-    if(ret < 0)
+    if (ret < 0)
     {
         PINT_thread_mgr_bmi_stop();
-        return(ret);
+        return (ret);
     }
     PINT_thread_mgr_trove_getcontext(&global_trove_context);
 #endif
 
-    return(0);
+    return (0);
 }
 
 /* fp_multiqueue_finalize()
@@ -329,7 +348,8 @@ int fp_multiqueue_initialize(int flowproto_id)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int fp_multiqueue_finalize(void)
+int fp_multiqueue_finalize(
+    void)
 {
     PINT_thread_mgr_bmi_stop();
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -359,22 +379,23 @@ int fp_multiqueue_finalize(void)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int fp_multiqueue_getinfo(flow_descriptor *flow_d,
-                          int option,
-                          void *parameter)
+int fp_multiqueue_getinfo(
+    flow_descriptor * flow_d,
+    int option,
+    void *parameter)
 {
     int *type;
 
-    switch(option)
+    switch (option)
     {
-        case FLOWPROTO_TYPE_QUERY:
-            type = parameter;
-            if(*type == FLOWPROTO_MULTIQUEUE)
-                return(0);
-            else
-                return(-PVFS_ENOPROTOOPT);
-        default:
-            return(-PVFS_ENOSYS);
+    case FLOWPROTO_TYPE_QUERY:
+        type = parameter;
+        if (*type == FLOWPROTO_MULTIQUEUE)
+            return (0);
+        else
+            return (-PVFS_ENOPROTOOPT);
+    default:
+        return (-PVFS_ENOSYS);
     }
 }
 
@@ -384,31 +405,30 @@ int fp_multiqueue_getinfo(flow_descriptor *flow_d,
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int fp_multiqueue_setinfo(flow_descriptor *flow_d,
-                          int option,
-                          void *parameter)
+int fp_multiqueue_setinfo(
+    flow_descriptor * flow_d,
+    int option,
+    void *parameter)
 {
     int ret = -PVFS_ENOSYS;
 
-    switch(option)
+    switch (option)
     {
 #ifdef __PVFS2_TROVE_SUPPORT__
-        case FLOWPROTO_DATA_SYNC_MODE:
+    case FLOWPROTO_DATA_SYNC_MODE:
         {
             TROVE_coll_id coll_id = 0, sync_mode = 0;
             id_sync_mode_t *new_id_mode = NULL;
-            struct qlist_head* iterator = NULL;
-            struct qlist_head* scratch = NULL;
+            struct qlist_head *iterator = NULL;
+            struct qlist_head *scratch = NULL;
             id_sync_mode_t *tmp_mode = NULL;
 
             assert(parameter && strlen(parameter));
-            sscanf((const char *)parameter, "%d,%d",
-                   &coll_id, &sync_mode);
+            sscanf((const char *) parameter, "%d,%d", &coll_id, &sync_mode);
 
             ret = -ENOMEM;
 
-            new_id_mode = (id_sync_mode_t *)malloc(
-                sizeof(id_sync_mode_t));
+            new_id_mode = (id_sync_mode_t *) malloc(sizeof(id_sync_mode_t));
             if (new_id_mode)
             {
                 gen_mutex_lock(&id_sync_mode_mutex);
@@ -417,7 +437,7 @@ int fp_multiqueue_setinfo(flow_descriptor *flow_d,
                 {
                     tmp_mode = qlist_entry(iterator, id_sync_mode_t, link);
                     assert(tmp_mode);
-                    if(tmp_mode->coll_id == coll_id)
+                    if (tmp_mode->coll_id == coll_id)
                     {
                         qlist_del(&tmp_mode->link);
                     }
@@ -430,17 +450,16 @@ int fp_multiqueue_setinfo(flow_descriptor *flow_d,
                 qlist_add_tail(&new_id_mode->link, &s_id_sync_mode_list);
                 gen_mutex_unlock(&id_sync_mode_mutex);
 
-                gossip_debug(
-                    GOSSIP_FLOW_PROTO_DEBUG, "fp_multiqueue_setinfo: "
-                    "data sync mode on coll_id %d set to %d\n",
-                    coll_id, sync_mode);
+                gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "fp_multiqueue_setinfo: "
+                             "data sync mode on coll_id %d set to %d\n",
+                             coll_id, sync_mode);
                 ret = 0;
             }
         }
         break;
 #endif
-        default:
-            break;
+    default:
+        break;
     }
     return ret;
 }
@@ -451,29 +470,29 @@ int fp_multiqueue_setinfo(flow_descriptor *flow_d,
  *
  * returns 0 on success, 1 on immediate completion, -PVFS_error on failure
  */
-int fp_multiqueue_cancel(flow_descriptor  *flow_d)
+int fp_multiqueue_cancel(
+    flow_descriptor * flow_d)
 {
     struct fp_private_data *flow_data = PRIVATE_FLOW(flow_d);
 
     gossip_err("Flow proto cancel called on %p\n", flow_d);
     gen_mutex_lock(flow_data->parent->flow_mutex);
     /*
-      if the flow is already marked as complete, then there is nothing
-      to do
-    */
-    if(flow_d->state != FLOW_COMPLETE)
+       if the flow is already marked as complete, then there is nothing
+       to do
+     */
+    if (flow_d->state != FLOW_COMPLETE)
     {
         gossip_debug(GOSSIP_CANCEL_DEBUG,
-            "PINT_flow_cancel() called on active flow, %lld "
-                     "bytes transferred.\n",
-                     lld(flow_d->total_transferred));
+                     "PINT_flow_cancel() called on active flow, %lld "
+                     "bytes transferred.\n", lld(flow_d->total_transferred));
         assert(flow_d->state == FLOW_TRANSMITTING);
         handle_io_error(-PVFS_ECANCEL, NULL, flow_data);
-        if(flow_data->parent->state == FLOW_COMPLETE)
+        if (flow_data->parent->state == FLOW_COMPLETE)
         {
             gen_mutex_unlock(flow_data->parent->flow_mutex);
             FLOW_CLEANUP(flow_data);
-            return(0);
+            return (0);
         }
     }
     else
@@ -484,7 +503,7 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
     }
     gen_mutex_unlock(flow_data->parent->flow_mutex);
 
-    return(0);
+    return (0);
 }
 
 /* fp_multiqueue_post()
@@ -493,12 +512,13 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
  *
  * returns 0 on success, 1 on immediate completion, -PVFS_error on failure
  */
-int fp_multiqueue_post(flow_descriptor  *flow_d)
+int fp_multiqueue_post(
+    flow_descriptor * flow_d)
 {
     struct fp_private_data *flow_data = NULL;
     int i;
 
-    assert((flow_d->src.endpoint_id == BMI_ENDPOINT && 
+    assert((flow_d->src.endpoint_id == BMI_ENDPOINT &&
             flow_d->dest.endpoint_id == TROVE_ENDPOINT) ||
            (flow_d->src.endpoint_id == TROVE_ENDPOINT &&
             flow_d->dest.endpoint_id == BMI_ENDPOINT) ||
@@ -507,12 +527,12 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
            (flow_d->src.endpoint_id == BMI_ENDPOINT &&
             flow_d->dest.endpoint_id == MEM_ENDPOINT));
 
-    flow_data = (struct fp_private_data*)malloc(sizeof(struct
-        fp_private_data));
-    if(!flow_data)
-        return(-PVFS_ENOMEM);
+    flow_data = (struct fp_private_data *) malloc(sizeof(struct
+                                                         fp_private_data));
+    if (!flow_data)
+        return (-PVFS_ENOMEM);
     memset(flow_data, 0, sizeof(struct fp_private_data));
-    
+
     flow_d->flow_protocol_data = flow_data;
     flow_d->state = FLOW_TRANSMITTING;
     flow_data->parent = flow_d;
@@ -523,32 +543,33 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
      */
-    if(flow_d->file_req_offset)
+    if (flow_d->file_req_offset)
         PINT_REQUEST_STATE_SET_TARGET(flow_d->file_req_state,
-            flow_d->file_req_offset);
+                                      flow_d->file_req_offset);
 
     /* set boundaries on file datatype */
-    if(flow_d->aggregate_size > -1)
+    if (flow_d->aggregate_size > -1)
     {
         PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
-            flow_d->aggregate_size+flow_d->file_req_offset);
+                                     flow_d->aggregate_size +
+                                     flow_d->file_req_offset);
     }
     else
     {
         PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
-            flow_d->file_req_offset +
-            PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
+                                     flow_d->file_req_offset +
+                                     PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
     }
 
-    for(i=0; i<BUFFERS_PER_FLOW; i++)
+    for (i = 0; i < BUFFERS_PER_FLOW; i++)
     {
         flow_data->prealloc_array[i].parent = flow_d;
-        flow_data->prealloc_array[i].bmi_callback.data = 
+        flow_data->prealloc_array[i].bmi_callback.data =
             &(flow_data->prealloc_array[i]);
     }
 
     /* remaining setup depends on the endpoints we intend to use */
-    if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
+    if (flow_d->src.endpoint_id == BMI_ENDPOINT &&
         flow_d->dest.endpoint_id == MEM_ENDPOINT)
     {
         flow_data->prealloc_array[0].buffer = flow_d->dest.u.mem.buffer;
@@ -557,14 +578,14 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
         /* put all of the buffers on empty list, we don't really do any
          * queueing for this type of flow
          */
-        for(i=0; i<BUFFERS_PER_FLOW; i++)
+        for (i = 0; i < BUFFERS_PER_FLOW; i++)
         {
             qlist_add_tail(&flow_data->prealloc_array[i].list_link,
-                &flow_data->empty_list);
+                           &flow_data->empty_list);
         }
         gen_mutex_lock(flow_data->parent->flow_mutex);
         bmi_to_mem_callback_fn(&(flow_data->prealloc_array[0]), 0, 0);
-        if(flow_data->parent->state == FLOW_COMPLETE)
+        if (flow_data->parent->state == FLOW_COMPLETE)
         {
             gen_mutex_unlock(flow_data->parent->flow_mutex);
             FLOW_CLEANUP(flow_data);
@@ -574,8 +595,8 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
             gen_mutex_unlock(flow_data->parent->flow_mutex);
         }
     }
-    else if(flow_d->src.endpoint_id == MEM_ENDPOINT &&
-        flow_d->dest.endpoint_id == BMI_ENDPOINT)
+    else if (flow_d->src.endpoint_id == MEM_ENDPOINT &&
+             flow_d->dest.endpoint_id == BMI_ENDPOINT)
     {
         flow_data->prealloc_array[0].buffer = flow_d->src.u.mem.buffer;
         flow_data->prealloc_array[0].bmi_callback.fn =
@@ -583,14 +604,14 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
         /* put all of the buffers on empty list, we don't really do any
          * queueing for this type of flow
          */
-        for(i=0; i<BUFFERS_PER_FLOW; i++)
+        for (i = 0; i < BUFFERS_PER_FLOW; i++)
         {
             qlist_add_tail(&flow_data->prealloc_array[i].list_link,
-                &flow_data->empty_list);
+                           &flow_data->empty_list);
         }
         gen_mutex_lock(flow_data->parent->flow_mutex);
         mem_to_bmi_callback_fn(&(flow_data->prealloc_array[0]), 0, 0);
-        if(flow_data->parent->state == FLOW_COMPLETE)
+        if (flow_data->parent->state == FLOW_COMPLETE)
         {
             gen_mutex_unlock(flow_data->parent->flow_mutex);
             FLOW_CLEANUP(flow_data);
@@ -601,24 +622,24 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
         }
     }
 #ifdef __PVFS2_TROVE_SUPPORT__
-    else if(flow_d->src.endpoint_id == TROVE_ENDPOINT &&
-        flow_d->dest.endpoint_id == BMI_ENDPOINT)
+    else if (flow_d->src.endpoint_id == TROVE_ENDPOINT &&
+             flow_d->dest.endpoint_id == BMI_ENDPOINT)
     {
         flow_data->initial_posts = BUFFERS_PER_FLOW;
         gen_mutex_lock(flow_data->parent->flow_mutex);
-        for(i=0; i<BUFFERS_PER_FLOW; i++)
+        for (i = 0; i < BUFFERS_PER_FLOW; i++)
         {
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue forcing bmi_send_callback_fn.\n");
+                         "flowproto-multiqueue forcing bmi_send_callback_fn.\n");
 
             bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0, 1);
-            if(flow_data->dest_last_posted)
+            if (flow_data->dest_last_posted)
             {
                 flow_data->initial_posts = 0;
                 break;
             }
         }
-        if(flow_data->parent->state == FLOW_COMPLETE)
+        if (flow_data->parent->state == FLOW_COMPLETE)
         {
             gen_mutex_unlock(flow_data->parent->flow_mutex);
             FLOW_CLEANUP(flow_data);
@@ -628,26 +649,27 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
             gen_mutex_unlock(flow_data->parent->flow_mutex);
         }
     }
-    else if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
-        flow_d->dest.endpoint_id == TROVE_ENDPOINT)
+    else if (flow_d->src.endpoint_id == BMI_ENDPOINT &&
+             flow_d->dest.endpoint_id == TROVE_ENDPOINT)
     {
         /* only post one outstanding recv at a time; easier to manage */
         flow_data->initial_posts = 1;
 
         /* place remaining buffers on "empty" queue */
-        for(i=1; i<BUFFERS_PER_FLOW; i++)
+        for (i = 1; i < BUFFERS_PER_FLOW; i++)
         {
             qlist_add_tail(&flow_data->prealloc_array[i].list_link,
-                &flow_data->empty_list);
+                           &flow_data->empty_list);
         }
 
-        flow_data->prealloc_array[0].result_chain.q_item = 
+        flow_data->prealloc_array[0].result_chain.q_item =
             &flow_data->prealloc_array[0];
         gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-            "flowproto-multiqueue forcing trove_write_callback_fn.\n");
+                     "flowproto-multiqueue forcing trove_write_callback_fn.\n");
         gen_mutex_lock(flow_data->parent->flow_mutex);
-        trove_write_callback_fn(&(flow_data->prealloc_array[0].result_chain), 0);
-        if(flow_data->parent->state == FLOW_COMPLETE)
+        trove_write_callback_fn(&(flow_data->prealloc_array[0].result_chain),
+                                0);
+        if (flow_data->parent->state == FLOW_COMPLETE)
         {
             gen_mutex_unlock(flow_data->parent->flow_mutex);
             FLOW_CLEANUP(flow_data);
@@ -660,7 +682,7 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
 #endif
     else
     {
-        return(-ENOSYS);
+        return (-ENOSYS);
     }
 
     return (0);
@@ -673,9 +695,10 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
  * 
  * no return value
  */
-static void bmi_recv_callback_fn(void *user_ptr,
-                                 PVFS_size actual_size,
-                                 PVFS_error error_code)
+static void bmi_recv_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
     struct fp_queue_item *q_item = user_ptr;
     int ret;
@@ -688,12 +711,12 @@ static void bmi_recv_callback_fn(void *user_ptr,
     void *tmp_user_ptr;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue bmi_recv_callback_fn, error code: %d, flow: %p.\n",
-        error_code, flow_data->parent);
+                 "flowproto-multiqueue bmi_recv_callback_fn, error code: %d, flow: %p.\n",
+                 error_code, flow_data->parent);
 
     q_item->posted_id = 0;
 
-    if(error_code != 0 || flow_data->parent->error_code != 0)
+    if (error_code != 0 || flow_data->parent->error_code != 0)
     {
         handle_io_error(error_code, q_item, flow_data);
         return;
@@ -704,7 +727,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
     /* add to dest queue */
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
     result_tmp = &q_item->result_chain;
-    do{
+    do
+    {
         assert(result_tmp->result.bytes);
         result_tmp->q_item = q_item;
         result_tmp->trove_callback.data = result_tmp;
@@ -714,92 +738,90 @@ static void bmi_recv_callback_fn(void *user_ptr,
         tmp_user_ptr = result_tmp;
         assert(result_tmp->result.bytes);
 
-        ret = trove_bstream_write_list(
-            q_item->parent->dest.u.trove.coll_id,
-            q_item->parent->dest.u.trove.handle,
-            (char**)&result_tmp->buffer_offset,
-            &result_tmp->result.bytes,
-            1,
-            result_tmp->result.offset_array,
-            result_tmp->result.size_array,
-            result_tmp->result.segs,
-            &q_item->out_size,
-            get_data_sync_mode(q_item->parent->dest.u.trove.coll_id),
-            NULL,
-            &result_tmp->trove_callback,
-            global_trove_context,
-            &result_tmp->posted_id);
+        ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
+                                       q_item->parent->dest.u.trove.handle,
+                                       (char **) &result_tmp->buffer_offset,
+                                       &result_tmp->result.bytes,
+                                       1,
+                                       result_tmp->result.offset_array,
+                                       result_tmp->result.size_array,
+                                       result_tmp->result.segs,
+                                       &q_item->out_size,
+                                       get_data_sync_mode(q_item->parent->dest.
+                                                          u.trove.coll_id),
+                                       NULL, &result_tmp->trove_callback,
+                                       global_trove_context,
+                                       &result_tmp->posted_id);
 
         result_tmp = result_tmp->next;
 
-        if(ret < 0)
+        if (ret < 0)
         {
             handle_io_error(ret, q_item, flow_data);
             return;
         }
 
-        if(ret == 1)
+        if (ret == 1)
         {
             /* immediate completion; trigger callback ourselves */
             trove_write_callback_fn(tmp_user_ptr, 0);
         }
-    }while(result_tmp);
+    } while (result_tmp);
 
     /* do we need to repost another recv? */
 
-    if((!PINT_REQUEST_DONE(q_item->parent->file_req_state)) 
-        && qlist_empty(&flow_data->src_list) 
+    if ((!PINT_REQUEST_DONE(q_item->parent->file_req_state))
+        && qlist_empty(&flow_data->src_list)
         && !qlist_empty(&flow_data->empty_list))
     {
-        q_item = qlist_entry(flow_data->empty_list.next,
-            struct fp_queue_item, list_link);
+        q_item = qlist_entry(flow_data->empty_list.next, struct fp_queue_item,
+                             list_link);
         qlist_del(&q_item->list_link);
         qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 
-        if(!q_item->buffer)
+        if (!q_item->buffer)
         {
             /* if the q_item has not been used, allocate a buffer */
             q_item->buffer = BMI_memalloc(q_item->parent->src.u.bmi.address,
-                BUFFER_SIZE, BMI_RECV);
+                                          BUFFER_SIZE, BMI_RECV);
             /* TODO: error handling */
             assert(q_item->buffer);
             q_item->bmi_callback.fn = bmi_recv_callback_wrapper;
         }
-        
+
         result_tmp = &q_item->result_chain;
         old_result_tmp = result_tmp;
         tmp_buffer = q_item->buffer;
-        do{
+        do
+        {
             q_item->result_chain_count++;
-            if(!result_tmp)
+            if (!result_tmp)
             {
-                result_tmp = (struct result_chain_entry*)malloc(
-                    sizeof(struct result_chain_entry));
+                result_tmp =
+                    (struct result_chain_entry *)
+                    malloc(sizeof(struct result_chain_entry));
                 assert(result_tmp);
                 memset(result_tmp, 0, sizeof(struct result_chain_entry));
                 old_result_tmp->next = result_tmp;
             }
             /* process request */
-            result_tmp->result.offset_array = 
-                result_tmp->offset_list;
-            result_tmp->result.size_array = 
-                result_tmp->size_list;
+            result_tmp->result.offset_array = result_tmp->offset_list;
+            result_tmp->result.size_array = result_tmp->size_list;
             result_tmp->result.bytemax = BUFFER_SIZE - bytes_processed;
             result_tmp->result.bytes = 0;
             result_tmp->result.segmax = MAX_REGIONS;
             result_tmp->result.segs = 0;
             result_tmp->buffer_offset = tmp_buffer;
             ret = PINT_process_request(q_item->parent->file_req_state,
-                q_item->parent->mem_req_state,
-                &q_item->parent->file_data,
-                &result_tmp->result,
-                PINT_SERVER);
-            /* TODO: error handling */ 
+                                       q_item->parent->mem_req_state,
+                                       &q_item->parent->file_data,
+                                       &result_tmp->result, PINT_SERVER);
+            /* TODO: error handling */
             assert(ret >= 0);
 
-            if(result_tmp->result.bytes == 0)
+            if (result_tmp->result.bytes == 0)
             {
-                if(result_tmp != &q_item->result_chain)
+                if (result_tmp != &q_item->result_chain)
                 {
                     free(result_tmp);
                     old_result_tmp->next = NULL;
@@ -810,15 +832,17 @@ static void bmi_recv_callback_fn(void *user_ptr,
             {
                 old_result_tmp = result_tmp;
                 result_tmp = result_tmp->next;
-                tmp_buffer = (void*)((char*)tmp_buffer + old_result_tmp->result.bytes);
+                tmp_buffer =
+                    (void *) ((char *) tmp_buffer +
+                              old_result_tmp->result.bytes);
                 bytes_processed += old_result_tmp->result.bytes;
             }
-        }while(bytes_processed < BUFFER_SIZE && 
-            !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+        } while (bytes_processed < BUFFER_SIZE &&
+                 !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
         assert(bytes_processed <= BUFFER_SIZE);
-        if(bytes_processed == 0)
-        {        
+        if (bytes_processed == 0)
+        {
             qlist_del(&q_item->list_link);
             qlist_add_tail(&q_item->list_link, &flow_data->empty_list);
             return;
@@ -828,28 +852,27 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
         /* TODO: what if we recv less than expected? */
         ret = BMI_post_recv(&q_item->posted_id,
-            q_item->parent->src.u.bmi.address,
-            q_item->buffer,
-            BUFFER_SIZE,
-            &tmp_actual_size,
-            BMI_PRE_ALLOC,
-            q_item->parent->tag,
-            &q_item->bmi_callback,
-            global_bmi_context);
-        
-        if(ret < 0)
+                            q_item->parent->src.u.bmi.address,
+                            q_item->buffer,
+                            BUFFER_SIZE,
+                            &tmp_actual_size,
+                            BMI_PRE_ALLOC,
+                            q_item->parent->tag,
+                            &q_item->bmi_callback, global_bmi_context);
+
+        if (ret < 0)
         {
             handle_io_error(ret, q_item, flow_data);
             return;
         }
 
-        if(ret == 1)
+        if (ret == 1)
         {
             /* immediate completion; trigger callback ourselves */
             bmi_recv_callback_fn(q_item, tmp_actual_size, 0);
         }
     }
-        
+
     return;
 }
 
@@ -860,8 +883,9 @@ static void bmi_recv_callback_fn(void *user_ptr,
  *
  * no return value
  */
-static void trove_read_callback_fn(void *user_ptr,
-                                   PVFS_error error_code)
+static void trove_read_callback_fn(
+    void *user_ptr,
+    PVFS_error error_code)
 {
     int ret;
     struct result_chain_entry *result_tmp = user_ptr;
@@ -874,19 +898,19 @@ static void trove_read_callback_fn(void *user_ptr,
     q_item = result_tmp->q_item;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue trove_read_callback_fn, error_code: %d, flow: %p.\n",
-        error_code, flow_data->parent);
+                 "flowproto-multiqueue trove_read_callback_fn, error_code: %d, flow: %p.\n",
+                 error_code, flow_data->parent);
 
     result_tmp->posted_id = 0;
 
-    if(error_code != 0 || flow_data->parent->error_code != 0)
+    if (error_code != 0 || flow_data->parent->error_code != 0)
     {
         handle_io_error(error_code, q_item, flow_data);
         return;
     }
 
     /* don't do anything until the last read completes */
-    if(q_item->result_chain_count > 1)
+    if (q_item->result_chain_count > 1)
     {
         q_item->result_chain_count--;
         return;
@@ -898,68 +922,69 @@ static void trove_read_callback_fn(void *user_ptr,
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
     result_tmp = &q_item->result_chain;
-    do{
+    do
+    {
         old_result_tmp = result_tmp;
         result_tmp = result_tmp->next;
-        if(old_result_tmp != &q_item->result_chain)
+        if (old_result_tmp != &q_item->result_chain)
             free(old_result_tmp);
-    }while(result_tmp);
+    } while (result_tmp);
     q_item->result_chain.next = NULL;
     q_item->result_chain_count = 0;
 
     /* while we hold dest lock, look for next seq no. to send */
-    do{
+    do
+    {
         qlist_for_each(tmp_link, &flow_data->dest_list)
         {
             q_item = qlist_entry(tmp_link, struct fp_queue_item,
-                list_link);
-            if(q_item->seq == flow_data->next_seq_to_send)
+                                 list_link);
+            if (q_item->seq == flow_data->next_seq_to_send)
                 break;
         }
 
-        if(q_item->seq == flow_data->next_seq_to_send)
+        if (q_item->seq == flow_data->next_seq_to_send)
         {
             flow_data->dest_pending++;
             assert(q_item->buffer_used);
             ret = BMI_post_send(&q_item->posted_id,
-                q_item->parent->dest.u.bmi.address,
-                q_item->buffer,
-                q_item->buffer_used,
-                BMI_PRE_ALLOC,
-                q_item->parent->tag,
-                &q_item->bmi_callback,
-                global_bmi_context);
+                                q_item->parent->dest.u.bmi.address,
+                                q_item->buffer,
+                                q_item->buffer_used,
+                                BMI_PRE_ALLOC,
+                                q_item->parent->tag,
+                                &q_item->bmi_callback, global_bmi_context);
             flow_data->next_seq_to_send++;
-            if(q_item->last)
+            if (q_item->last)
                 flow_data->dest_last_posted = 1;
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "%s: (post send time) ini posts: %d, pending: %d, last: %d\n",
-                __func__,
-                flow_data->initial_posts, flow_data->dest_pending,
-                flow_data->dest_last_posted);
+                         "%s: (post send time) ini posts: %d, pending: %d, last: %d\n",
+                         __func__,
+                         flow_data->initial_posts, flow_data->dest_pending,
+                         flow_data->dest_last_posted);
         }
         else
         {
             ret = 0;
             done = 1;
-        }        
+        }
 
-        if(ret < 0)
+        if (ret < 0)
         {
             handle_io_error(ret, q_item, flow_data);
             return;
         }
 
-        if(ret == 1)
+        if (ret == 1)
         {
             /* immediate completion; trigger callback ourselves */
             ret = bmi_send_callback_fn(q_item, q_item->buffer_used, 0, 0);
             /* if that callback finished the flow, then return now */
-            if(ret == 1)
+            if (ret == 1)
                 return;
         }
     }
-    while(!done);
+    while (!done);
 
     return;
 }
@@ -970,10 +995,11 @@ static void trove_read_callback_fn(void *user_ptr,
  *
  * returns 1 if flow completes, 0 otherwise
  */
-static int bmi_send_callback_fn(void *user_ptr,
-                                PVFS_size actual_size,
-                                PVFS_error error_code,
-                                int initial_call_flag)
+static int bmi_send_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code,
+    int initial_call_flag)
 {
     struct fp_queue_item *q_item = user_ptr;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
@@ -985,77 +1011,72 @@ static int bmi_send_callback_fn(void *user_ptr,
     void *tmp_user_ptr = NULL;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue bmi_send_callback_fn, error_code: %d, "
-        "initial_call_flag: %d, flow: %p.\n", error_code, initial_call_flag,
-        flow_data->parent);
+                 "flowproto-multiqueue bmi_send_callback_fn, error_code: %d, "
+                 "initial_call_flag: %d, flow: %p.\n", error_code,
+                 initial_call_flag, flow_data->parent);
 
-    if(flow_data->parent->error_code != 0 && initial_call_flag)
+    if (flow_data->parent->error_code != 0 && initial_call_flag)
     {
         /* cleanup path already triggered, don't do anything more */
-        return(1);
+        return (1);
     }
 
     q_item->posted_id = 0;
 
-    if(error_code != 0 || flow_data->parent->error_code != 0)
+    if (error_code != 0 || flow_data->parent->error_code != 0)
     {
         handle_io_error(error_code, q_item, flow_data);
-        if(flow_data->parent->state == FLOW_COMPLETE)
-            return(1);
+        if (flow_data->parent->state == FLOW_COMPLETE)
+            return (1);
         else
-            return(0);
+            return (0);
     }
 
-    PINT_perf_count(PINT_server_pc,
-                    PINT_PERF_READ, 
-                    actual_size, 
-                    PINT_PERF_ADD);
+    PINT_perf_count(PINT_server_pc, PINT_PERF_READ, actual_size, PINT_PERF_ADD);
 
     flow_data->parent->total_transferred += actual_size;
 
-    if(initial_call_flag)
+    if (initial_call_flag)
         flow_data->initial_posts--;
     else
         flow_data->dest_pending--;
 
 #if 0
-    gossip_err(
-        "initial_posts: %d, dest_pending: %d, dest_last_posted: %d\n", 
-        flow_data->initial_posts, flow_data->dest_pending,
-        flow_data->dest_last_posted);
+    gossip_err("initial_posts: %d, dest_pending: %d, dest_last_posted: %d\n",
+               flow_data->initial_posts, flow_data->dest_pending,
+               flow_data->dest_last_posted);
 #endif
 
     /* if this was the last operation, then mark the flow as done */
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "(send callback time) ini posts: %d, pending: %d, last: %d, "
-        "src_list emtpy: %s\n",
-        flow_data->initial_posts, flow_data->dest_pending,
-        flow_data->dest_last_posted,
-        qlist_empty(&flow_data->src_list) ? "yes" : "no");
-    if(flow_data->initial_posts == 0 &&
-        flow_data->dest_pending == 0 && 
-        flow_data->dest_last_posted &&
-        qlist_empty(&flow_data->src_list))
+                 "(send callback time) ini posts: %d, pending: %d, last: %d, "
+                 "src_list emtpy: %s\n",
+                 flow_data->initial_posts, flow_data->dest_pending,
+                 flow_data->dest_last_posted,
+                 qlist_empty(&flow_data->src_list) ? "yes" : "no");
+    if (flow_data->initial_posts == 0 &&
+        flow_data->dest_pending == 0 &&
+        flow_data->dest_last_posted && qlist_empty(&flow_data->src_list))
     {
         /* we are in trouble if more than one callback function thinks that
          * it can trigger completion
          */
         assert(q_item->parent->state != FLOW_COMPLETE);
         q_item->parent->state = FLOW_COMPLETE;
-        return(1);
+        return (1);
     }
- 
+
     /* if we have finished request processing then there is no need to try
      * to continue
      */
-    if(flow_data->req_proc_done)
+    if (flow_data->req_proc_done)
     {
-        if(q_item->buffer)
+        if (q_item->buffer)
             qlist_del(&q_item->list_link);
-        return(0);
+        return (0);
     }
 
-    if(q_item->buffer)
+    if (q_item->buffer)
     {
         /* if this q_item has been used before, remove it from its 
          * current queue */
@@ -1065,7 +1086,7 @@ static int bmi_send_callback_fn(void *user_ptr,
     {
         /* if the q_item has not been used, allocate a buffer */
         q_item->buffer = BMI_memalloc(q_item->parent->dest.u.bmi.address,
-            BUFFER_SIZE, BMI_SEND);
+                                      BUFFER_SIZE, BMI_SEND);
         /* TODO: error handling */
         assert(q_item->buffer);
         q_item->bmi_callback.fn = bmi_send_callback_wrapper;
@@ -1078,37 +1099,36 @@ static int bmi_send_callback_fn(void *user_ptr,
     old_result_tmp = result_tmp;
     tmp_buffer = q_item->buffer;
     q_item->buffer_used = 0;
-    do{
+    do
+    {
         q_item->result_chain_count++;
-        if(!result_tmp)
+        if (!result_tmp)
         {
-            result_tmp = (struct result_chain_entry*)malloc(
-                sizeof(struct result_chain_entry));
+            result_tmp =
+                (struct result_chain_entry *)
+                malloc(sizeof(struct result_chain_entry));
             assert(result_tmp);
-            memset(result_tmp, 0 , sizeof(struct result_chain_entry));
+            memset(result_tmp, 0, sizeof(struct result_chain_entry));
             old_result_tmp->next = result_tmp;
         }
         /* process request */
-        result_tmp->result.offset_array = 
-            result_tmp->offset_list;
-        result_tmp->result.size_array = 
-            result_tmp->size_list;
+        result_tmp->result.offset_array = result_tmp->offset_list;
+        result_tmp->result.size_array = result_tmp->size_list;
         result_tmp->result.bytemax = BUFFER_SIZE - bytes_processed;
         result_tmp->result.bytes = 0;
         result_tmp->result.segmax = MAX_REGIONS;
         result_tmp->result.segs = 0;
         result_tmp->buffer_offset = tmp_buffer;
         ret = PINT_process_request(q_item->parent->file_req_state,
-            q_item->parent->mem_req_state,
-            &q_item->parent->file_data,
-            &result_tmp->result,
-            PINT_SERVER);
-        /* TODO: error handling */ 
+                                   q_item->parent->mem_req_state,
+                                   &q_item->parent->file_data,
+                                   &result_tmp->result, PINT_SERVER);
+        /* TODO: error handling */
         assert(ret >= 0);
 
-        if(result_tmp->result.bytes == 0)
+        if (result_tmp->result.bytes == 0)
         {
-            if(result_tmp != &q_item->result_chain)
+            if (result_tmp != &q_item->result_chain)
             {
                 free(result_tmp);
                 old_result_tmp->next = NULL;
@@ -1119,14 +1139,14 @@ static int bmi_send_callback_fn(void *user_ptr,
         {
             old_result_tmp = result_tmp;
             result_tmp = result_tmp->next;
-            tmp_buffer = (void*)
-                ((char*)tmp_buffer + old_result_tmp->result.bytes);
+            tmp_buffer = (void *)
+                ((char *) tmp_buffer + old_result_tmp->result.bytes);
             bytes_processed += old_result_tmp->result.bytes;
             q_item->buffer_used += old_result_tmp->result.bytes;
         }
 
-    }while(bytes_processed < BUFFER_SIZE && 
-        !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+    } while (bytes_processed < BUFFER_SIZE &&
+             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
     assert(bytes_processed <= BUFFER_SIZE);
 
@@ -1135,7 +1155,7 @@ static int bmi_send_callback_fn(void *user_ptr,
     flow_data->next_seq++;
 
     flow_data->total_bytes_processed += bytes_processed;
-    if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
+    if (PINT_REQUEST_DONE(q_item->parent->file_req_state))
     {
         q_item->last = 1;
         assert(flow_data->req_proc_done == 0);
@@ -1143,18 +1163,18 @@ static int bmi_send_callback_fn(void *user_ptr,
         /* special case, we never have a "last" operation when there
          * is no work to do, trigger manually
          */
-        if(flow_data->total_bytes_processed == 0)
+        if (flow_data->total_bytes_processed == 0)
             flow_data->dest_last_posted = 1;
     }
 
-    if(bytes_processed == 0)
-    {        
-        if(q_item->buffer)
+    if (bytes_processed == 0)
+    {
+        if (q_item->buffer)
         {
             qlist_del(&q_item->list_link);
         }
 
-        if(flow_data->dest_pending == 0 && qlist_empty(&flow_data->src_list))
+        if (flow_data->dest_pending == 0 && qlist_empty(&flow_data->src_list))
         {
             /* we know 2 things: 
              *
@@ -1165,7 +1185,7 @@ static int bmi_send_callback_fn(void *user_ptr,
              *
              * based on that we can complete the flow.
              */
-            gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
+            gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
                          "zero bytes processed.  no dests pending. "
                          "setting flow to done\n");
             assert(q_item->parent->state != FLOW_COMPLETE);
@@ -1196,7 +1216,8 @@ static int bmi_send_callback_fn(void *user_ptr,
     assert(q_item->buffer_used);
 
     result_tmp = &q_item->result_chain;
-    do{
+    do
+    {
         assert(q_item->buffer_used);
         assert(result_tmp->result.bytes);
         result_tmp->q_item = q_item;
@@ -1207,42 +1228,32 @@ static int bmi_send_callback_fn(void *user_ptr,
         tmp_user_ptr = result_tmp;
         assert(result_tmp->result.bytes);
 
-        ret = trove_bstream_read_list(
-            q_item->parent->src.u.trove.coll_id,
-            q_item->parent->src.u.trove.handle,
-            (char**)&result_tmp->buffer_offset,
-            &result_tmp->result.bytes,
-            1,
-            result_tmp->result.offset_array,
-            result_tmp->result.size_array,
-            result_tmp->result.segs,
-            &q_item->out_size,
-            0, /* get_data_sync_mode(
-                  q_item->parent->dest.u.trove.coll_id), */
-            NULL,
-            &result_tmp->trove_callback,
-            global_trove_context,
-            &result_tmp->posted_id);
+        ret = trove_bstream_read_list(q_item->parent->src.u.trove.coll_id, q_item->parent->src.u.trove.handle, (char **) &result_tmp->buffer_offset, &result_tmp->result.bytes, 1, result_tmp->result.offset_array, result_tmp->result.size_array, result_tmp->result.segs, &q_item->out_size, 0,       /* get_data_sync_mode(
+                                                                                                                                                                                                                                                                                                           q_item->parent->dest.u.trove.coll_id), */
+                                      NULL,
+                                      &result_tmp->trove_callback,
+                                      global_trove_context,
+                                      &result_tmp->posted_id);
 
         result_tmp = result_tmp->next;
 
-        if(ret < 0)
+        if (ret < 0)
         {
             handle_io_error(ret, q_item, flow_data);
-            if(flow_data->parent->state == FLOW_COMPLETE)
-                return(1);
+            if (flow_data->parent->state == FLOW_COMPLETE)
+                return (1);
             else
-                return(0);
+                return (0);
         }
 
-        if(ret == 1)
+        if (ret == 1)
         {
             /* immediate completion; trigger callback ourselves */
             trove_read_callback_fn(tmp_user_ptr, 0);
         }
-    }while(result_tmp);
+    } while (result_tmp);
 
-    return(0);
+    return (0);
 };
 
 /* trove_write_callback_fn()
@@ -1251,8 +1262,9 @@ static int bmi_send_callback_fn(void *user_ptr,
  *
  * no return value
  */
-static void trove_write_callback_fn(void *user_ptr,
-                           PVFS_error error_code)
+static void trove_write_callback_fn(
+    void *user_ptr,
+    PVFS_error error_code)
 {
     PVFS_size tmp_actual_size;
     int ret;
@@ -1263,44 +1275,42 @@ static void trove_write_callback_fn(void *user_ptr,
     void *tmp_buffer;
     PVFS_size bytes_processed = 0;
 
-    gossip_debug(
-        GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue trove_write_callback_fn, error_code: %d, flow: %p.\n",
-        error_code, flow_data->parent);
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+                 "flowproto-multiqueue trove_write_callback_fn, error_code: %d, flow: %p.\n",
+                 error_code, flow_data->parent);
 
     result_tmp->posted_id = 0;
 
-    if(error_code != 0 || flow_data->parent->error_code != 0)
+    if (error_code != 0 || flow_data->parent->error_code != 0)
     {
         handle_io_error(error_code, q_item, flow_data);
         return;
     }
 
     /* don't do anything until the last write completes */
-    if(q_item->result_chain_count > 1)
+    if (q_item->result_chain_count > 1)
     {
         q_item->result_chain_count--;
         return;
     }
 
     result_tmp = &q_item->result_chain;
-    do{
+    do
+    {
         q_item->parent->total_transferred += result_tmp->result.bytes;
-        PINT_perf_count(
-            PINT_server_pc,
-            PINT_PERF_WRITE, 
-            result_tmp->result.bytes,
-            PINT_PERF_ADD);
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_WRITE,
+                        result_tmp->result.bytes, PINT_PERF_ADD);
         old_result_tmp = result_tmp;
         result_tmp = result_tmp->next;
-        if(old_result_tmp != &q_item->result_chain)
+        if (old_result_tmp != &q_item->result_chain)
             free(old_result_tmp);
-    }while(result_tmp);
+    } while (result_tmp);
     q_item->result_chain.next = NULL;
     q_item->result_chain_count = 0;
 
     /* if this was the last operation, then mark the flow as done */
-    if(flow_data->parent->total_transferred ==
+    if (flow_data->parent->total_transferred ==
         flow_data->total_bytes_processed &&
         PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
@@ -1313,12 +1323,12 @@ static void trove_write_callback_fn(void *user_ptr,
     }
 
     /* if there are no more receives to post, just return */
-    if(PINT_REQUEST_DONE(flow_data->parent->file_req_state))
+    if (PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
         return;
     }
 
-    if(q_item->buffer)
+    if (q_item->buffer)
     {
         /* if this q_item has been used before, remove it from its 
          * current queue */
@@ -1328,7 +1338,7 @@ static void trove_write_callback_fn(void *user_ptr,
     {
         /* if the q_item has not been used, allocate a buffer */
         q_item->buffer = BMI_memalloc(q_item->parent->src.u.bmi.address,
-            BUFFER_SIZE, BMI_RECV);
+                                      BUFFER_SIZE, BMI_RECV);
         /* TODO: error handling */
         assert(q_item->buffer);
         q_item->bmi_callback.fn = bmi_recv_callback_wrapper;
@@ -1337,29 +1347,29 @@ static void trove_write_callback_fn(void *user_ptr,
     /* if src list is empty, then post new recv; otherwise just queue
      * in empty list
      */
-    if(qlist_empty(&flow_data->src_list))
+    if (qlist_empty(&flow_data->src_list))
     {
         /* ready to post new recv! */
         qlist_add_tail(&q_item->list_link, &flow_data->src_list);
-        
+
         result_tmp = &q_item->result_chain;
         old_result_tmp = result_tmp;
         tmp_buffer = q_item->buffer;
-        do{
+        do
+        {
             q_item->result_chain_count++;
-            if(!result_tmp)
+            if (!result_tmp)
             {
-                result_tmp = (struct result_chain_entry*)malloc(
-                    sizeof(struct result_chain_entry));
+                result_tmp =
+                    (struct result_chain_entry *)
+                    malloc(sizeof(struct result_chain_entry));
                 assert(result_tmp);
-                memset(result_tmp, 0 , sizeof(struct result_chain_entry));
+                memset(result_tmp, 0, sizeof(struct result_chain_entry));
                 old_result_tmp->next = result_tmp;
             }
             /* process request */
-            result_tmp->result.offset_array = 
-                result_tmp->offset_list;
-            result_tmp->result.size_array = 
-                result_tmp->size_list;
+            result_tmp->result.offset_array = result_tmp->offset_list;
+            result_tmp->result.size_array = result_tmp->size_list;
             result_tmp->result.bytemax = BUFFER_SIZE - bytes_processed;
             result_tmp->result.bytes = 0;
             result_tmp->result.segmax = MAX_REGIONS;
@@ -1367,16 +1377,15 @@ static void trove_write_callback_fn(void *user_ptr,
             result_tmp->buffer_offset = tmp_buffer;
             assert(!PINT_REQUEST_DONE(q_item->parent->file_req_state));
             ret = PINT_process_request(q_item->parent->file_req_state,
-                q_item->parent->mem_req_state,
-                &q_item->parent->file_data,
-                &result_tmp->result,
-                PINT_SERVER);
-            /* TODO: error handling */ 
+                                       q_item->parent->mem_req_state,
+                                       &q_item->parent->file_data,
+                                       &result_tmp->result, PINT_SERVER);
+            /* TODO: error handling */
             assert(ret >= 0);
 
-            if(result_tmp->result.bytes == 0)
+            if (result_tmp->result.bytes == 0)
             {
-                if(result_tmp != &q_item->result_chain)
+                if (result_tmp != &q_item->result_chain)
                 {
                     free(result_tmp);
                     old_result_tmp->next = NULL;
@@ -1387,20 +1396,20 @@ static void trove_write_callback_fn(void *user_ptr,
             {
                 old_result_tmp = result_tmp;
                 result_tmp = result_tmp->next;
-                tmp_buffer = (void*)
-                    ((char*)tmp_buffer + old_result_tmp->result.bytes);
+                tmp_buffer = (void *)
+                    ((char *) tmp_buffer + old_result_tmp->result.bytes);
                 bytes_processed += old_result_tmp->result.bytes;
             }
-        }while(bytes_processed < BUFFER_SIZE && 
-            !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+        } while (bytes_processed < BUFFER_SIZE &&
+                 !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
         assert(bytes_processed <= BUFFER_SIZE);
- 
+
         flow_data->total_bytes_processed += bytes_processed;
 
-        if(bytes_processed == 0)
-        {        
-            if(flow_data->parent->total_transferred ==
+        if (bytes_processed == 0)
+        {
+            if (flow_data->parent->total_transferred ==
                 flow_data->total_bytes_processed &&
                 PINT_REQUEST_DONE(flow_data->parent->file_req_state))
             {
@@ -1412,22 +1421,21 @@ static void trove_write_callback_fn(void *user_ptr,
 
         /* TODO: what if we recv less than expected? */
         ret = BMI_post_recv(&q_item->posted_id,
-            q_item->parent->src.u.bmi.address,
-            q_item->buffer,
-            BUFFER_SIZE,
-            &tmp_actual_size,
-            BMI_PRE_ALLOC,
-            q_item->parent->tag,
-            &q_item->bmi_callback,
-            global_bmi_context);
-        
-        if(ret < 0)
+                            q_item->parent->src.u.bmi.address,
+                            q_item->buffer,
+                            BUFFER_SIZE,
+                            &tmp_actual_size,
+                            BMI_PRE_ALLOC,
+                            q_item->parent->tag,
+                            &q_item->bmi_callback, global_bmi_context);
+
+        if (ret < 0)
         {
             handle_io_error(ret, q_item, flow_data);
             return;
         }
 
-        if(ret == 1)
+        if (ret == 1)
         {
             /* immediate completion; trigger callback ourselves */
             bmi_recv_callback_fn(q_item, tmp_actual_size, 0);
@@ -1435,8 +1443,7 @@ static void trove_write_callback_fn(void *user_ptr,
     }
     else
     {
-        qlist_add_tail(&q_item->list_link, 
-            &(flow_data->empty_list));
+        qlist_add_tail(&q_item->list_link, &(flow_data->empty_list));
     }
 
     return;
@@ -1449,74 +1456,75 @@ static void trove_write_callback_fn(void *user_ptr,
  *
  * no return value
  */
-static void cleanup_buffers(struct fp_private_data *flow_data)
+static void cleanup_buffers(
+    struct fp_private_data *flow_data)
 {
     int i;
     struct result_chain_entry *result_tmp;
     struct result_chain_entry *old_result_tmp;
 
-    if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
+    if (flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
         flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
     {
-        for(i=0; i<BUFFERS_PER_FLOW; i++)
+        for (i = 0; i < BUFFERS_PER_FLOW; i++)
         {
-            if(flow_data->prealloc_array[i].buffer)
+            if (flow_data->prealloc_array[i].buffer)
             {
                 BMI_memfree(flow_data->parent->src.u.bmi.address,
-                    flow_data->prealloc_array[i].buffer,
-                    BUFFER_SIZE,
-                    BMI_RECV);
+                            flow_data->prealloc_array[i].buffer,
+                            BUFFER_SIZE, BMI_RECV);
             }
             result_tmp = &(flow_data->prealloc_array[i].result_chain);
-            do{
+            do
+            {
                 old_result_tmp = result_tmp;
                 result_tmp = result_tmp->next;
-                if(old_result_tmp !=
+                if (old_result_tmp !=
                     &(flow_data->prealloc_array[i].result_chain))
                     free(old_result_tmp);
-            }while(result_tmp);
+            } while (result_tmp);
             flow_data->prealloc_array[i].result_chain.next = NULL;
         }
     }
-    else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
-        flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
+    else if (flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
+             flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
     {
-        for(i=0; i<BUFFERS_PER_FLOW; i++)
+        for (i = 0; i < BUFFERS_PER_FLOW; i++)
         {
-            if(flow_data->prealloc_array[i].buffer)
+            if (flow_data->prealloc_array[i].buffer)
             {
                 BMI_memfree(flow_data->parent->dest.u.bmi.address,
-                    flow_data->prealloc_array[i].buffer,
-                    BUFFER_SIZE,
-                    BMI_SEND);
+                            flow_data->prealloc_array[i].buffer,
+                            BUFFER_SIZE, BMI_SEND);
             }
             result_tmp = &(flow_data->prealloc_array[i].result_chain);
-            do{
+            do
+            {
                 old_result_tmp = result_tmp;
                 result_tmp = result_tmp->next;
-                if(old_result_tmp !=
+                if (old_result_tmp !=
                     &(flow_data->prealloc_array[i].result_chain))
                     free(old_result_tmp);
-            }while(result_tmp);
+            } while (result_tmp);
             flow_data->prealloc_array[i].result_chain.next = NULL;
         }
     }
-    else if(flow_data->parent->src.endpoint_id == MEM_ENDPOINT &&
-        flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
+    else if (flow_data->parent->src.endpoint_id == MEM_ENDPOINT &&
+             flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
     {
-        if(flow_data->intermediate)
+        if (flow_data->intermediate)
         {
             BMI_memfree(flow_data->parent->dest.u.bmi.address,
-                flow_data->intermediate, BUFFER_SIZE, BMI_SEND);
+                        flow_data->intermediate, BUFFER_SIZE, BMI_SEND);
         }
     }
-    else if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
-        flow_data->parent->dest.endpoint_id == MEM_ENDPOINT)
+    else if (flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
+             flow_data->parent->dest.endpoint_id == MEM_ENDPOINT)
     {
-        if(flow_data->intermediate)
+        if (flow_data->intermediate)
         {
             BMI_memfree(flow_data->parent->src.u.bmi.address,
-                flow_data->intermediate, BUFFER_SIZE, BMI_RECV);
+                        flow_data->intermediate, BUFFER_SIZE, BMI_RECV);
         }
     }
 }
@@ -1528,9 +1536,10 @@ static void cleanup_buffers(struct fp_private_data *flow_data)
  * 
  * no return value
  */
-static void mem_to_bmi_callback_fn(void *user_ptr,
-                                   PVFS_size actual_size,
-                                   PVFS_error error_code)
+static void mem_to_bmi_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
     struct fp_queue_item *q_item = user_ptr;
     int ret;
@@ -1541,12 +1550,12 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue mem_to_bmi_callback_fn, error_code: %d, flow: %p.\n",
-        error_code, flow_data->parent);
+                 "flowproto-multiqueue mem_to_bmi_callback_fn, error_code: %d, flow: %p.\n",
+                 error_code, flow_data->parent);
 
     q_item->posted_id = 0;
 
-    if(error_code != 0 || flow_data->parent->error_code != 0)
+    if (error_code != 0 || flow_data->parent->error_code != 0)
     {
         handle_io_error(error_code, q_item, flow_data);
         return;
@@ -1559,7 +1568,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     flow_data->parent->total_transferred += actual_size;
 
     /* are we done? */
-    if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
+    if (PINT_REQUEST_DONE(q_item->parent->file_req_state))
     {
         /* we are in trouble if more than one callback function thinks that
          * it can trigger completion
@@ -1570,44 +1579,41 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     }
 
     /* process request */
-    q_item->result_chain.result.offset_array = 
-        q_item->result_chain.offset_list;
-    q_item->result_chain.result.size_array = 
-        q_item->result_chain.size_list;
+    q_item->result_chain.result.offset_array = q_item->result_chain.offset_list;
+    q_item->result_chain.result.size_array = q_item->result_chain.size_list;
     q_item->result_chain.result.bytemax = BUFFER_SIZE;
     q_item->result_chain.result.bytes = 0;
     q_item->result_chain.result.segmax = MAX_REGIONS;
     q_item->result_chain.result.segs = 0;
     q_item->result_chain.buffer_offset = NULL;
     ret = PINT_process_request(q_item->parent->file_req_state,
-        q_item->parent->mem_req_state,
-        &q_item->parent->file_data,
-        &q_item->result_chain.result,
-        PINT_CLIENT);
+                               q_item->parent->mem_req_state,
+                               &q_item->parent->file_data,
+                               &q_item->result_chain.result, PINT_CLIENT);
 
-    /* TODO: error handling */ 
+    /* TODO: error handling */
     assert(ret >= 0);
 
     /* was MAX_REGIONS enough to satisfy this step? */
-    if(!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
+    if (!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
         q_item->result_chain.result.bytes < BUFFER_SIZE)
     {
         /* create an intermediate buffer */
-        if(!flow_data->intermediate)
+        if (!flow_data->intermediate)
         {
-            flow_data->intermediate = BMI_memalloc(
-                flow_data->parent->dest.u.bmi.address,
-                BUFFER_SIZE, BMI_SEND);
+            flow_data->intermediate =
+                BMI_memalloc(flow_data->parent->dest.u.bmi.address, BUFFER_SIZE,
+                             BMI_SEND);
             /* TODO: error handling */
             assert(flow_data->intermediate);
         }
 
         /* copy what we have so far into intermediate buffer */
-        for(i=0; i<q_item->result_chain.result.segs; i++)
+        for (i = 0; i < q_item->result_chain.result.segs; i++)
         {
-            src_ptr = ((char*)q_item->parent->src.u.mem.buffer + 
-                q_item->result_chain.offset_list[i]);
-            dest_ptr = ((char*)flow_data->intermediate + bytes_processed);
+            src_ptr = ((char *) q_item->parent->src.u.mem.buffer +
+                       q_item->result_chain.offset_list[i]);
+            dest_ptr = ((char *) flow_data->intermediate + bytes_processed);
             memcpy(dest_ptr, src_ptr, q_item->result_chain.size_list[i]);
             bytes_processed += q_item->result_chain.size_list[i];
         }
@@ -1622,26 +1628,26 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
             q_item->result_chain.buffer_offset = NULL;
             /* process ahead */
             ret = PINT_process_request(q_item->parent->file_req_state,
-                q_item->parent->mem_req_state,
-                &q_item->parent->file_data,
-                &q_item->result_chain.result,
-                PINT_CLIENT);
+                                       q_item->parent->mem_req_state,
+                                       &q_item->parent->file_data,
+                                       &q_item->result_chain.result,
+                                       PINT_CLIENT);
             /* TODO: error handling */
             assert(ret >= 0);
 
             /* copy what we have so far into intermediate buffer */
-            for(i=0; i<q_item->result_chain.result.segs; i++)
+            for (i = 0; i < q_item->result_chain.result.segs; i++)
             {
-                src_ptr = ((char*)q_item->parent->src.u.mem.buffer + 
-                    q_item->result_chain.offset_list[i]);
-                dest_ptr = ((char*)flow_data->intermediate + bytes_processed);
+                src_ptr = ((char *) q_item->parent->src.u.mem.buffer +
+                           q_item->result_chain.offset_list[i]);
+                dest_ptr = ((char *) flow_data->intermediate + bytes_processed);
                 memcpy(dest_ptr, src_ptr, q_item->result_chain.size_list[i]);
                 bytes_processed += q_item->result_chain.size_list[i];
             }
-        }while(bytes_processed < BUFFER_SIZE &&
-            !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+        } while (bytes_processed < BUFFER_SIZE &&
+                 !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
-        assert (bytes_processed <= BUFFER_SIZE);
+        assert(bytes_processed <= BUFFER_SIZE);
 
         /* setup for BMI operation */
         flow_data->tmp_buffer_list[0] = flow_data->intermediate;
@@ -1653,8 +1659,8 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     else
     {
         /* go ahead and return if there is nothing to do */
-        if(q_item->result_chain.result.bytes == 0)
-        {        
+        if (q_item->result_chain.result.bytes == 0)
+        {
             /* we are in trouble if more than one callback function thinks that
              * it can trigger completion
              */
@@ -1664,37 +1670,35 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         }
 
         /* convert offsets to memory addresses */
-        for(i=0; i<q_item->result_chain.result.segs; i++)
+        for (i = 0; i < q_item->result_chain.result.segs; i++)
         {
-            flow_data->tmp_buffer_list[i] = 
-                (char*)(q_item->result_chain.result.offset_array[i] +
-                (char *)q_item->buffer);
+            flow_data->tmp_buffer_list[i] =
+                (char *) (q_item->result_chain.result.offset_array[i] +
+                          (char *) q_item->buffer);
         }
     }
 
     assert(q_item->result_chain.result.bytes);
 
     ret = BMI_post_send_list(&q_item->posted_id,
-        q_item->parent->dest.u.bmi.address,
-        (const void**)flow_data->tmp_buffer_list,
-        q_item->result_chain.result.size_array,
-        q_item->result_chain.result.segs,
-        q_item->result_chain.result.bytes,
-        buffer_type,
-        q_item->parent->tag,
-        &q_item->bmi_callback,
-        global_bmi_context);
+                             q_item->parent->dest.u.bmi.address,
+                             (const void **) flow_data->tmp_buffer_list,
+                             q_item->result_chain.result.size_array,
+                             q_item->result_chain.result.segs,
+                             q_item->result_chain.result.bytes,
+                             buffer_type,
+                             q_item->parent->tag,
+                             &q_item->bmi_callback, global_bmi_context);
 
-    if(ret < 0)
+    if (ret < 0)
     {
         handle_io_error(ret, q_item, flow_data);
         return;
     }
 
-    if(ret == 1)
+    if (ret == 1)
     {
-        mem_to_bmi_callback_fn(q_item, 
-            q_item->result_chain.result.bytes, 0);
+        mem_to_bmi_callback_fn(q_item, q_item->result_chain.result.bytes, 0);
     }
 }
 
@@ -1706,9 +1710,10 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
  * 
  * no return value
  */
-static void bmi_to_mem_callback_fn(void *user_ptr,
-                                   PVFS_size actual_size,
-                                   PVFS_error error_code)
+static void bmi_to_mem_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
     struct fp_queue_item *q_item = user_ptr;
     int ret;
@@ -1724,12 +1729,12 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     PVFS_size region_size;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue bmi_to_mem_callback_fn, error_code: %d, flow: %p.\n",
-        error_code, flow_data->parent);
+                 "flowproto-multiqueue bmi_to_mem_callback_fn, error_code: %d, flow: %p.\n",
+                 error_code, flow_data->parent);
 
     q_item->posted_id = 0;
 
-    if(error_code != 0 || flow_data->parent->error_code != 0)
+    if (error_code != 0 || flow_data->parent->error_code != 0)
     {
         handle_io_error(error_code, q_item, flow_data);
         return;
@@ -1743,17 +1748,17 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 
     /* if this is the result of a receive into an intermediate buffer,
      * then we must copy out */
-    if(flow_data->tmp_buffer_list[0] == flow_data->intermediate &&
+    if (flow_data->tmp_buffer_list[0] == flow_data->intermediate &&
         flow_data->intermediate != NULL)
     {
         /* copy out what we have so far */
-        for(i=0; i<q_item->result_chain.result.segs; i++)
+        for (i = 0; i < q_item->result_chain.result.segs; i++)
         {
             region_size = q_item->result_chain.size_list[i];
-            src_ptr = (char*)((char *)flow_data->intermediate + 
-                bytes_processed);
-            dest_ptr = (char*)(q_item->result_chain.offset_list[i]
-                + (char *)q_item->parent->dest.u.mem.buffer);
+            src_ptr = (char *) ((char *) flow_data->intermediate +
+                                bytes_processed);
+            dest_ptr = (char *) (q_item->result_chain.offset_list[i]
+                                 + (char *) q_item->parent->dest.u.mem.buffer);
             memcpy(dest_ptr, src_ptr, region_size);
             bytes_processed += region_size;
         }
@@ -1768,31 +1773,33 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
             q_item->result_chain.buffer_offset = NULL;
             /* process ahead */
             ret = PINT_process_request(q_item->parent->file_req_state,
-                q_item->parent->mem_req_state,
-                &q_item->parent->file_data,
-                &q_item->result_chain.result,
-                PINT_CLIENT);
+                                       q_item->parent->mem_req_state,
+                                       &q_item->parent->file_data,
+                                       &q_item->result_chain.result,
+                                       PINT_CLIENT);
             /* TODO: error handling */
             assert(ret >= 0);
             /* copy out what we have so far */
-            for(i=0; i<q_item->result_chain.result.segs; i++)
+            for (i = 0; i < q_item->result_chain.result.segs; i++)
             {
                 region_size = q_item->result_chain.size_list[i];
-                src_ptr = (char*)((char *)flow_data->intermediate + 
-                    bytes_processed);
-                dest_ptr = (char*)(q_item->result_chain.offset_list[i]
-                    + (char *)q_item->parent->dest.u.mem.buffer);
+                src_ptr = (char *) ((char *) flow_data->intermediate +
+                                    bytes_processed);
+                dest_ptr = (char *) (q_item->result_chain.offset_list[i]
+                                     +
+                                     (char *) q_item->parent->dest.u.mem.
+                                     buffer);
                 memcpy(dest_ptr, src_ptr, region_size);
                 bytes_processed += region_size;
             }
-        }while(bytes_processed < BUFFER_SIZE &&
-            !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+        } while (bytes_processed < BUFFER_SIZE &&
+                 !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
         assert(bytes_processed <= BUFFER_SIZE);
     }
 
     /* are we done? */
-    if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
+    if (PINT_REQUEST_DONE(q_item->parent->file_req_state))
     {
         /* we are in trouble if more than one callback function thinks
          * that it can trigger completion
@@ -1803,33 +1810,30 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     }
 
     /* process request */
-    q_item->result_chain.result.offset_array = 
-        q_item->result_chain.offset_list;
-    q_item->result_chain.result.size_array = 
-        q_item->result_chain.size_list;
+    q_item->result_chain.result.offset_array = q_item->result_chain.offset_list;
+    q_item->result_chain.result.size_array = q_item->result_chain.size_list;
     q_item->result_chain.result.bytemax = BUFFER_SIZE;
     q_item->result_chain.result.bytes = 0;
     q_item->result_chain.result.segmax = MAX_REGIONS;
     q_item->result_chain.result.segs = 0;
     q_item->result_chain.buffer_offset = NULL;
     ret = PINT_process_request(q_item->parent->file_req_state,
-        q_item->parent->mem_req_state,
-        &q_item->parent->file_data,
-        &q_item->result_chain.result,
-        PINT_CLIENT);
-    /* TODO: error handling */ 
+                               q_item->parent->mem_req_state,
+                               &q_item->parent->file_data,
+                               &q_item->result_chain.result, PINT_CLIENT);
+    /* TODO: error handling */
     assert(ret >= 0);
 
     /* was MAX_REGIONS enough to satisfy this step? */
-    if(!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
+    if (!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
         q_item->result_chain.result.bytes < BUFFER_SIZE)
     {
         /* create an intermediate buffer */
-        if(!flow_data->intermediate)
+        if (!flow_data->intermediate)
         {
-            flow_data->intermediate = BMI_memalloc(
-                flow_data->parent->src.u.bmi.address,
-                BUFFER_SIZE, BMI_RECV);
+            flow_data->intermediate =
+                BMI_memalloc(flow_data->parent->src.u.bmi.address, BUFFER_SIZE,
+                             BMI_RECV);
             /* TODO: error handling */
             assert(flow_data->intermediate);
         }
@@ -1850,16 +1854,16 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         total_size = q_item->result_chain.result.bytes;
 
         /* convert offsets to memory addresses */
-        for(i=0; i<q_item->result_chain.result.segs; i++)
+        for (i = 0; i < q_item->result_chain.result.segs; i++)
         {
-            flow_data->tmp_buffer_list[i] = 
-                (void*)(q_item->result_chain.result.offset_array[i] +
-                (char *)q_item->buffer);
+            flow_data->tmp_buffer_list[i] =
+                (void *) (q_item->result_chain.result.offset_array[i] +
+                          (char *) q_item->buffer);
         }
 
         /* go ahead and return if there is nothing to do */
-        if(q_item->result_chain.result.bytes == 0)
-        {        
+        if (q_item->result_chain.result.bytes == 0)
+        {
             /* we are in trouble if more than one callback function
              * thinks that it can trigger completion
              */
@@ -1871,24 +1875,23 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 
     assert(total_size);
     ret = BMI_post_recv_list(&q_item->posted_id,
-        q_item->parent->src.u.bmi.address,
-        flow_data->tmp_buffer_list,
-        size_array,
-        segs,
-        total_size,
-        &tmp_actual_size,
-        buffer_type,
-        q_item->parent->tag,
-        &q_item->bmi_callback,
-        global_bmi_context);
+                             q_item->parent->src.u.bmi.address,
+                             flow_data->tmp_buffer_list,
+                             size_array,
+                             segs,
+                             total_size,
+                             &tmp_actual_size,
+                             buffer_type,
+                             q_item->parent->tag,
+                             &q_item->bmi_callback, global_bmi_context);
 
-    if(ret < 0)
+    if (ret < 0)
     {
         handle_io_error(ret, q_item, flow_data);
         return;
     }
 
-    if(ret == 1)
+    if (ret == 1)
     {
         bmi_to_mem_callback_fn(q_item, tmp_actual_size, 0);
     }
@@ -1913,19 +1916,20 @@ static void handle_io_error(
 {
     int ret;
 
-    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
-        "flowproto-multiqueue handle_io_error() called for flow %p.\n",
-        flow_data->parent);
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+                 "flowproto-multiqueue handle_io_error() called for flow %p.\n",
+                 flow_data->parent);
 
     /* is this the first error registered for this particular flow? */
-    if(flow_data->parent->error_code == 0)
+    if (flow_data->parent->error_code == 0)
     {
         enum flow_endpoint_type src, dest;
-    
-        gossip_err("Flow proto error cleanup started on %p, error_code: %d\n", flow_data->parent, error_code);
+
+        gossip_err("Flow proto error cleanup started on %p, error_code: %d\n",
+                   flow_data->parent, error_code);
 
         flow_data->parent->error_code = error_code;
-        if(q_item)
+        if (q_item)
         {
             qlist_del(&q_item->list_link);
         }
@@ -1939,14 +1943,16 @@ static void handle_io_error(
         {
             ret = cancel_pending_bmi(&flow_data->src_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d BMI-mem BMI ops.\n", ret);
+                         "flowproto-multiqueue canceling %d BMI-mem BMI ops.\n",
+                         ret);
             flow_data->cleanup_pending_count += ret;
         }
         else if (src == MEM_ENDPOINT && dest == BMI_ENDPOINT)
         {
             ret = cancel_pending_bmi(&flow_data->dest_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d mem-BMI BMI ops.\n", ret);
+                         "flowproto-multiqueue canceling %d mem-BMI BMI ops.\n",
+                         ret);
             flow_data->cleanup_pending_count += ret;
         }
         else if (src == TROVE_ENDPOINT && dest == BMI_ENDPOINT)
@@ -1954,21 +1960,25 @@ static void handle_io_error(
             ret = cancel_pending_trove(&flow_data->src_list);
             flow_data->cleanup_pending_count += ret;
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d trove-bmi Trove ops.\n", ret);
+                         "flowproto-multiqueue canceling %d trove-bmi Trove ops.\n",
+                         ret);
             ret = cancel_pending_bmi(&flow_data->dest_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d trove-bmi BMI ops.\n", ret);
+                         "flowproto-multiqueue canceling %d trove-bmi BMI ops.\n",
+                         ret);
             flow_data->cleanup_pending_count += ret;
         }
         else if (src == BMI_ENDPOINT && dest == TROVE_ENDPOINT)
         {
             ret = cancel_pending_bmi(&flow_data->src_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d bmi-trove BMI ops.\n", ret);
+                         "flowproto-multiqueue canceling %d bmi-trove BMI ops.\n",
+                         ret);
             flow_data->cleanup_pending_count += ret;
             ret = cancel_pending_trove(&flow_data->dest_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d bmi-trove Trove ops.\n", ret);
+                         "flowproto-multiqueue canceling %d bmi-trove Trove ops.\n",
+                         ret);
             flow_data->cleanup_pending_count += ret;
         }
         else
@@ -1976,23 +1986,24 @@ static void handle_io_error(
             /* impossible condition */
             assert(0);
         }
-        gossip_err("Flow proto %p canceling a total of %d BMI or Trove operations\n",
-            flow_data->parent, flow_data->cleanup_pending_count);
+        gossip_err
+            ("Flow proto %p canceling a total of %d BMI or Trove operations\n",
+             flow_data->parent, flow_data->cleanup_pending_count);
     }
     else
     {
         /* one of the previous cancels came through */
         flow_data->cleanup_pending_count--;
     }
-    
-    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
-        "flowproto-multiqueue handle_io_error() pending count: %d\n",
-        flow_data->cleanup_pending_count);
 
-    if(flow_data->cleanup_pending_count == 0)
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+                 "flowproto-multiqueue handle_io_error() pending count: %d\n",
+                 flow_data->cleanup_pending_count);
+
+    if (flow_data->cleanup_pending_count == 0)
     {
         gossip_err("Flow proto error cleanup finished %p, error_code: %d\n",
-            flow_data->parent, flow_data->parent->error_code);
+                   flow_data->parent, flow_data->parent->error_code);
 
         /* we are finished, make sure error is marked and state is set */
         assert(flow_data->parent->error_code);
@@ -2011,7 +2022,8 @@ static void handle_io_error(
  *
  * returns the number of operations that were canceled 
  */
-static int cancel_pending_bmi(struct qlist_head *list)
+static int cancel_pending_bmi(
+    struct qlist_head *list)
 {
     struct qlist_head *tmp_link;
     struct fp_queue_item *q_item = NULL;
@@ -2022,16 +2034,16 @@ static int cancel_pending_bmi(struct qlist_head *list)
     qlist_for_each(tmp_link, list)
     {
         q_item = qlist_entry(tmp_link, struct fp_queue_item,
-            list_link);
+                             list_link);
         /* skip anything that is in the queue but not actually posted */
-        if(q_item->posted_id)
+        if (q_item->posted_id)
         {
             count++;
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowprotocol cleanup: unposting BMI operation.\n");
+                         "flowprotocol cleanup: unposting BMI operation.\n");
             ret = PINT_thread_mgr_bmi_cancel(q_item->posted_id,
-                &q_item->bmi_callback);
-            if(ret < 0)
+                                             &q_item->bmi_callback);
+            if (ret < 0)
             {
                 gossip_err("WARNING: BMI thread mgr cancel failed, "
                            "proceeding anyway.\n");
@@ -2047,7 +2059,8 @@ static int cancel_pending_bmi(struct qlist_head *list)
  *
  * returns the number of operations that were canceled 
  */
-static int cancel_pending_trove(struct qlist_head *list)
+static int cancel_pending_trove(
+    struct qlist_head *list)
 {
     struct qlist_head *tmp_link;
     struct fp_queue_item *q_item = NULL;
@@ -2060,33 +2073,36 @@ static int cancel_pending_trove(struct qlist_head *list)
     qlist_for_each(tmp_link, list)
     {
         q_item = qlist_entry(tmp_link, struct fp_queue_item,
-            list_link);
+                             list_link);
 
         result_tmp = &q_item->result_chain;
-        do{
+        do
+        {
             old_result_tmp = result_tmp;
             result_tmp = result_tmp->next;
 
-            if(old_result_tmp->posted_id)
+            if (old_result_tmp->posted_id)
             {
                 count++;
-                ret = PINT_thread_mgr_trove_cancel(
-                    old_result_tmp->posted_id,
-                    q_item->parent->src.u.trove.coll_id,
-                    &old_result_tmp->trove_callback);
-                if(ret < 0)
+                ret = PINT_thread_mgr_trove_cancel(old_result_tmp->posted_id,
+                                                   q_item->parent->src.u.trove.
+                                                   coll_id,
+                                                   &old_result_tmp->
+                                                   trove_callback);
+                if (ret < 0)
                 {
                     gossip_err("WARNING: Trove thread mgr cancel "
                                "failed, proceeding anyway.\n");
                 }
             }
-        }while(result_tmp);
+        } while (result_tmp);
     }
     return (count);
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-static int get_data_sync_mode(TROVE_coll_id coll_id)
+static int get_data_sync_mode(
+    TROVE_coll_id coll_id)
 {
     int mode = TROVE_SYNC;
     id_sync_mode_t *cur_info = NULL;

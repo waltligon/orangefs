@@ -41,8 +41,8 @@ do { \
 extern PINT_encoding_table_values le_bytefield_table;
 int g_admin_mode = 0;
 
-static PINT_encoding_table_values *PINT_encoding_table[
-    ENCODING_TABLE_SIZE] = {NULL};
+static PINT_encoding_table_values *PINT_encoding_table[ENCODING_TABLE_SIZE] =
+    { NULL };
 
 /* PINT_encode_initialize()
  *
@@ -50,11 +50,12 @@ static PINT_encoding_table_values *PINT_encoding_table[
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_encode_initialize(void)
+int PINT_encode_initialize(
+    void)
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_initialize\n");
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "PINT_encode_initialize\n");
     if (ENCODING_IS_SUPPORTED(ENCODING_LE_BFIELD))
     {
         /* setup little endian bytefield encoding */
@@ -62,9 +63,9 @@ int PINT_encode_initialize(void)
         le_bytefield_table.init_fun();
 
         /* header prepended to all messages of this type */
-        *((int32_t*)&(le_bytefield_table.generic_header[0])) = 
+        *((int32_t *) & (le_bytefield_table.generic_header[0])) =
             htobmi32(PVFS2_PROTO_VERSION);
-        *((int32_t*)&(le_bytefield_table.generic_header[4])) = 
+        *((int32_t *) & (le_bytefield_table.generic_header[4])) =
             htobmi32(ENCODING_LE_BFIELD);
 
         le_bytefield_table.enc_type = ENCODING_LE_BFIELD;
@@ -79,9 +80,10 @@ int PINT_encode_initialize(void)
  *
  * no return value
  */
-void PINT_encode_finalize(void)
+void PINT_encode_finalize(
+    void)
 {
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_finalize\n");
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "PINT_encode_finalize\n");
     return;
 }
 
@@ -93,47 +95,49 @@ void PINT_encode_finalize(void)
  * 
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_encode(void* input_buffer,
-		enum PINT_encode_msg_type input_type,
-		struct PINT_encoded_msg* target_msg,
-		PVFS_BMI_addr_t target_addr,
-		enum PVFS_encoding_type enc_type)
+int PINT_encode(
+    void *input_buffer,
+    enum PINT_encode_msg_type input_type,
+    struct PINT_encoded_msg *target_msg,
+    PVFS_BMI_addr_t target_addr,
+    enum PVFS_encoding_type enc_type)
 {
     int ret = -PVFS_EINVAL;
     target_msg->dest = target_addr;
     target_msg->enc_type = enc_type;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode\n");
-    switch(enc_type)
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "PINT_encode\n");
+    switch (enc_type)
     {
-	case ENCODING_LE_BFIELD:
-	    if (input_type == PINT_ENCODE_REQ)
-	    {
-		struct PVFS_server_req* tmp_req = input_buffer;
-		ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_REQ,
-		    tmp_req->op, tmp_req);
-		ret =  PINT_encoding_table[enc_type]->op->encode_req(
-                    input_buffer, target_msg);
-		ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_REQ,
-		    tmp_req->op, tmp_req, target_msg->total_size);
-	    }
-	    else if (input_type == PINT_ENCODE_RESP)
-	    {
-		struct PVFS_server_resp* tmp_resp = input_buffer;
-		ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_RESP,
-		    tmp_resp->op, tmp_resp);
-		ret =  PINT_encoding_table[enc_type]->op->encode_resp(
-                    input_buffer, target_msg);
-		ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_RESP,
-		    tmp_resp->op, tmp_resp, target_msg->total_size);
-	    }
-	    break;
-	default:
-	    gossip_lerr("Error: encoding type not supported.\n");
-	    ret = -PVFS_EINVAL;
-	    break;
+    case ENCODING_LE_BFIELD:
+        if (input_type == PINT_ENCODE_REQ)
+        {
+            struct PVFS_server_req *tmp_req = input_buffer;
+            ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_REQ, tmp_req->op, tmp_req);
+            ret =
+                PINT_encoding_table[enc_type]->op->encode_req(input_buffer,
+                                                              target_msg);
+            ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_REQ, tmp_req->op, tmp_req,
+                              target_msg->total_size);
+        }
+        else if (input_type == PINT_ENCODE_RESP)
+        {
+            struct PVFS_server_resp *tmp_resp = input_buffer;
+            ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_RESP,
+                               tmp_resp->op, tmp_resp);
+            ret =
+                PINT_encoding_table[enc_type]->op->encode_resp(input_buffer,
+                                                               target_msg);
+            ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_RESP, tmp_resp->op,
+                              tmp_resp, target_msg->total_size);
+        }
+        break;
+    default:
+        gossip_lerr("Error: encoding type not supported.\n");
+        ret = -PVFS_EINVAL;
+        break;
     }
-    return(ret);
+    return (ret);
 }
 
 /* PINT_decode()
@@ -155,131 +159,131 @@ int PINT_encode(void* input_buffer,
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_decode(void* input_buffer,
-		enum PINT_encode_msg_type input_type,
-		struct PINT_decoded_msg* target_msg,
-		PVFS_BMI_addr_t target_addr,
-		PVFS_size size)
+int PINT_decode(
+    void *input_buffer,
+    enum PINT_encode_msg_type input_type,
+    struct PINT_decoded_msg *target_msg,
+    PVFS_BMI_addr_t target_addr,
+    PVFS_size size)
 {
-    int i=0;
-    char* buffer_index = (char*)input_buffer + PINT_ENC_GENERIC_HEADER_SIZE;
-    int size_index = (int)size - PINT_ENC_GENERIC_HEADER_SIZE;
-    char* enc_type_ptr = (char*)input_buffer + 4;
+    int i = 0;
+    char *buffer_index = (char *) input_buffer + PINT_ENC_GENERIC_HEADER_SIZE;
+    int size_index = (int) size - PINT_ENC_GENERIC_HEADER_SIZE;
+    char *enc_type_ptr = (char *) input_buffer + 4;
     int ret;
     int32_t enc_type_recved, proto_ver_recved;
     int proto_major_recved, proto_minor_recved;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_decode\n");
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "PINT_decode\n");
 
     /* sanity check size */
-    if(size < PINT_ENC_GENERIC_HEADER_SIZE)
+    if (size < PINT_ENC_GENERIC_HEADER_SIZE)
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Too small: message only %lld bytes.\n",
-	    lld(size));
-	return(-PVFS_EPROTO);
+        gossip_err("   Too small: message only %lld bytes.\n", lld(size));
+        return (-PVFS_EPROTO);
     }
-    
+
     /* pull the encoding type and protocol version out */
-    proto_ver_recved = (int)bmitoh32(*((int32_t*)input_buffer));
-    enc_type_recved = bmitoh32(*((int32_t*)enc_type_ptr));
+    proto_ver_recved = (int) bmitoh32(*((int32_t *) input_buffer));
+    enc_type_recved = bmitoh32(*((int32_t *) enc_type_ptr));
     proto_major_recved = proto_ver_recved / 1000;
-    proto_minor_recved = proto_ver_recved - (proto_major_recved*1000);
+    proto_minor_recved = proto_ver_recved - (proto_major_recved * 1000);
 
     /* check encoding type */
-    if(enc_type_recved != ENCODING_LE_BFIELD)
+    if (enc_type_recved != ENCODING_LE_BFIELD)
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Encoding type mismatch: received type %d when "
-	    "expecting %d.\n", (int)enc_type_recved, 
-	    ENCODING_LE_BFIELD);
-        return(-PVFS_EPROTONOSUPPORT);
+        gossip_err("   Encoding type mismatch: received type %d when "
+                   "expecting %d.\n", (int) enc_type_recved,
+                   ENCODING_LE_BFIELD);
+        return (-PVFS_EPROTONOSUPPORT);
     }
 
     /* check various protocol version possibilities */
-    if(proto_major_recved != PVFS2_PROTO_MAJOR)
+    if (proto_major_recved != PVFS2_PROTO_MAJOR)
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Protocol version mismatch: received major version %d when "
-	    "expecting %d.\n", (int)proto_major_recved,
-	    PVFS2_PROTO_MAJOR);
-	gossip_err("   Please verify your PVFS2 installation and make sure "
-	"that the version is\n   consistent.\n");
-        return(-PVFS_EPROTONOSUPPORT);
+        gossip_err
+            ("   Protocol version mismatch: received major version %d when "
+             "expecting %d.\n", (int) proto_major_recved, PVFS2_PROTO_MAJOR);
+        gossip_err("   Please verify your PVFS2 installation and make sure "
+                   "that the version is\n   consistent.\n");
+        return (-PVFS_EPROTONOSUPPORT);
     }
 
-    if((input_type == PINT_DECODE_REQ) && 
+    if ((input_type == PINT_DECODE_REQ) &&
         (proto_minor_recved > PVFS2_PROTO_MINOR))
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Protocol version mismatch: request has minor version %d when "
-	    "expecting %d or lower.\n", (int)proto_minor_recved,
-	    PVFS2_PROTO_MINOR);
+        gossip_err
+            ("   Protocol version mismatch: request has minor version %d when "
+             "expecting %d or lower.\n", (int) proto_minor_recved,
+             PVFS2_PROTO_MINOR);
         gossip_err("   Client is too new for server.\n");
-	gossip_err("   Please verify your PVFS2 installation and make sure "
-	"that the version is\n   consistent.\n");
-        return(-PVFS_EPROTONOSUPPORT);
+        gossip_err("   Please verify your PVFS2 installation and make sure "
+                   "that the version is\n   consistent.\n");
+        return (-PVFS_EPROTONOSUPPORT);
     }
 
-    if((input_type == PINT_DECODE_RESP) && 
+    if ((input_type == PINT_DECODE_RESP) &&
         (proto_minor_recved < PVFS2_PROTO_MINOR))
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Protocol version mismatch: request has minor version %d when "
-	    "expecting %d or higher.\n", (int)proto_minor_recved,
-	    PVFS2_PROTO_MINOR);
+        gossip_err
+            ("   Protocol version mismatch: request has minor version %d when "
+             "expecting %d or higher.\n", (int) proto_minor_recved,
+             PVFS2_PROTO_MINOR);
         gossip_err("   Server is too old for client.\n");
-	gossip_err("   Please verify your PVFS2 installation and make sure "
-	"that the version is\n   consistent.\n");
-        return(-PVFS_EPROTONOSUPPORT);
+        gossip_err("   Please verify your PVFS2 installation and make sure "
+                   "that the version is\n   consistent.\n");
+        return (-PVFS_EPROTONOSUPPORT);
     }
 
-    for(i=0; i<ENCODING_TABLE_SIZE; i++)
+    for (i = 0; i < ENCODING_TABLE_SIZE; i++)
     {
-	if(PINT_encoding_table[i] && (PINT_encoding_table[i]->enc_type
-            == enc_type_recved))
-       	{
-	    struct PVFS_server_req* tmp_req;
-	    struct PVFS_server_req* tmp_resp;
-	    target_msg->enc_type = enc_type_recved;
-	    if(input_type == PINT_DECODE_REQ)
-	    {
-		ENCODE_EVENT_START(PVFS_EVENT_API_DECODE_REQ,
-		    0, input_buffer);
-		ret = PINT_encoding_table[i]->op->decode_req(buffer_index,
-		    size_index,
-		    target_msg,
-		    target_addr);
-		tmp_req = target_msg->buffer;
-		ENCODE_EVENT_STOP(PVFS_EVENT_API_DECODE_REQ,
-		    tmp_req->op, input_buffer, size);
-		return(ret);
-	    }
-	    else if(input_type == PINT_DECODE_RESP)
-	    {
-		ENCODE_EVENT_START(PVFS_EVENT_API_DECODE_RESP,
-		    0, input_buffer);
-		ret = PINT_encoding_table[i]->op->decode_resp(buffer_index,
-		    size_index,
-		    target_msg,
-		    target_addr);
-		tmp_resp = target_msg->buffer;
-		ENCODE_EVENT_STOP(PVFS_EVENT_API_DECODE_RESP,
-		    tmp_resp->op, input_buffer, size);
-		return(ret);
-	    }
-	    else
-	    {
-		return(-PVFS_EINVAL);
-	    }
-	}
+        if (PINT_encoding_table[i] && (PINT_encoding_table[i]->enc_type
+                                       == enc_type_recved))
+        {
+            struct PVFS_server_req *tmp_req;
+            struct PVFS_server_req *tmp_resp;
+            target_msg->enc_type = enc_type_recved;
+            if (input_type == PINT_DECODE_REQ)
+            {
+                ENCODE_EVENT_START(PVFS_EVENT_API_DECODE_REQ, 0, input_buffer);
+                ret = PINT_encoding_table[i]->op->decode_req(buffer_index,
+                                                             size_index,
+                                                             target_msg,
+                                                             target_addr);
+                tmp_req = target_msg->buffer;
+                ENCODE_EVENT_STOP(PVFS_EVENT_API_DECODE_REQ,
+                                  tmp_req->op, input_buffer, size);
+                return (ret);
+            }
+            else if (input_type == PINT_DECODE_RESP)
+            {
+                ENCODE_EVENT_START(PVFS_EVENT_API_DECODE_RESP, 0, input_buffer);
+                ret = PINT_encoding_table[i]->op->decode_resp(buffer_index,
+                                                              size_index,
+                                                              target_msg,
+                                                              target_addr);
+                tmp_resp = target_msg->buffer;
+                ENCODE_EVENT_STOP(PVFS_EVENT_API_DECODE_RESP,
+                                  tmp_resp->op, input_buffer, size);
+                return (ret);
+            }
+            else
+            {
+                return (-PVFS_EINVAL);
+            }
+        }
     }
 
     gossip_err("Error: poorly formatted protocol message received.\n");
 
-    return(-PVFS_EPROTONOSUPPORT);
+    return (-PVFS_EPROTONOSUPPORT);
 }
-	
+
 /* PINT_encode_release()
  *
  * frees all resources associated with a message that has been
@@ -287,14 +291,15 @@ int PINT_decode(void* input_buffer,
  *
  * no return value
  */
-void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
-			 enum PINT_encode_msg_type input_type)
-{ 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_release\n");
+void PINT_encode_release(
+    struct PINT_encoded_msg *input_buffer,
+    enum PINT_encode_msg_type input_type)
+{
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "PINT_encode_release\n");
     if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
     {
-        PINT_encoding_table[input_buffer->enc_type]->op->encode_release(
-            input_buffer, input_type);
+        PINT_encoding_table[input_buffer->enc_type]->op->
+            encode_release(input_buffer, input_type);
     }
     else
     {
@@ -310,14 +315,15 @@ void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
  *
  * no return value
  */
-void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
-			 enum PINT_encode_msg_type input_type)
+void PINT_decode_release(
+    struct PINT_decoded_msg *input_buffer,
+    enum PINT_encode_msg_type input_type)
 {
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_decode_release\n");
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "PINT_decode_release\n");
     if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
     {
-        PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
-            input_buffer, input_type);
+        PINT_encoding_table[input_buffer->enc_type]->op->
+            decode_release(input_buffer, input_type);
     }
     else
     {
@@ -337,25 +343,25 @@ int PINT_encode_calc_max_size(
     enum PINT_encode_msg_type input_type,
     enum PVFS_server_op op_type,
     enum PVFS_encoding_type enc_type)
-{    
+{
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_calc_max_size\n");
-    switch(enc_type)
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "PINT_encode_calc_max_size\n");
+    switch (enc_type)
     {
-	case ENCODING_LE_BFIELD:
-	    ret = PINT_encoding_table[enc_type]->op->encode_calc_max_size
-		(input_type, op_type);
-	    break;
-	default:
-	    gossip_lerr("Error: encoding type not supported.\n");
-	    break;
+    case ENCODING_LE_BFIELD:
+        ret = PINT_encoding_table[enc_type]->op->encode_calc_max_size
+            (input_type, op_type);
+        break;
+    default:
+        gossip_lerr("Error: encoding type not supported.\n");
+        break;
     }
 
-    return(ret);
+    return (ret);
 }
 
-static char PVFS_server_op_name[][35]={
+static char PVFS_server_op_name[][35] = {
     "PVFS_SERV_INVALID",
     "PVFS_SERV_CREATE",
     "PVFS_SERV_REMOVE",
@@ -392,7 +398,9 @@ static char PVFS_server_op_name[][35]={
     "PVFS_SERV_SMALL_IO"
 };
 
-char * server_op_to_str(enum PVFS_server_op sop){
+char *server_op_to_str(
+    enum PVFS_server_op sop)
+{
     return PVFS_server_op_name[sop];
 }
 

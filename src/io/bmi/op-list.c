@@ -29,9 +29,11 @@
  * Function prototypes
  */
 
-static void gossip_print_op(method_op_p print_op);
-static int op_list_cmp_key(struct op_list_search_key *my_key,
-			   method_op_p my_op);
+static void gossip_print_op(
+    method_op_p print_op);
+static int op_list_cmp_key(
+    struct op_list_search_key *my_key,
+    method_op_p my_op);
 
 /***************************************************************
  * Visible functions
@@ -44,15 +46,16 @@ static int op_list_cmp_key(struct op_list_search_key *my_key,
  *
  * returns 0 on success, -errno on failure
  */
-void op_list_dump(op_list_p olp)
+void op_list_dump(
+    op_list_p olp)
 {
     op_list_p tmp_entry = NULL;
 
     gossip_err("op_list_dump():\n");
     qlist_for_each(tmp_entry, olp)
     {
-	gossip_print_op(qlist_entry(tmp_entry, struct method_op,
-				    op_list_entry));
+        gossip_print_op(qlist_entry(tmp_entry, struct method_op,
+                                    op_list_entry));
     }
 }
 
@@ -64,13 +67,14 @@ void op_list_dump(op_list_p olp)
  *
  * returns integer number of items on success, -errno on failure
  */
-int op_list_count(op_list_p olp)
+int op_list_count(
+    op_list_p olp)
 {
     int count = 0;
     op_list_p tmp_entry = NULL;
     qlist_for_each(tmp_entry, olp)
     {
-	count++;
+        count++;
     }
     return (count);
 }
@@ -83,14 +87,15 @@ int op_list_count(op_list_p olp)
  *
  * returns pointer to an empty list or NULL on failure.
  */
-op_list_p op_list_new(void)
+op_list_p op_list_new(
+    void)
 {
     struct qlist_head *tmp_op_list = NULL;
 
     tmp_op_list = (struct qlist_head *) malloc(sizeof(struct qlist_head));
     if (tmp_op_list)
     {
-	INIT_QLIST_HEAD(tmp_op_list);
+        INIT_QLIST_HEAD(tmp_op_list);
     }
 
     return (tmp_op_list);
@@ -103,8 +108,9 @@ op_list_p op_list_new(void)
  *
  * returns 0 on success, -1 on failure
  */
-void op_list_add(op_list_p olp,
-		 method_op_p oip)
+void op_list_add(
+    op_list_p olp,
+    method_op_p oip)
 {
     /* note we are adding to tail:
      * most modules will want to preserve FIFO ordering when searching
@@ -120,7 +126,8 @@ void op_list_add(op_list_p olp,
  *
  * no return values
  */
-void op_list_cleanup(op_list_p olp)
+void op_list_cleanup(
+    op_list_p olp)
 {
     op_list_p iterator = NULL;
     op_list_p scratch = NULL;
@@ -128,9 +135,9 @@ void op_list_cleanup(op_list_p olp)
 
     qlist_for_each_safe(iterator, scratch, olp)
     {
-	tmp_method_op = qlist_entry(iterator, struct method_op,
-				    op_list_entry);
-	dealloc_method_op(tmp_method_op);
+        tmp_method_op = qlist_entry(iterator, struct method_op,
+                                    op_list_entry);
+        dealloc_method_op(tmp_method_op);
     }
     free(olp);
     olp = NULL;
@@ -142,7 +149,8 @@ void op_list_cleanup(op_list_p olp)
  *
  * returns 1 if empty, 0 if items are present.
  */
-int op_list_empty(op_list_p olp)
+int op_list_empty(
+    op_list_p olp)
 {
     return (qlist_empty(olp));
 }
@@ -156,7 +164,8 @@ int op_list_empty(op_list_p olp)
  *
  * returns 0 on success, -errno on failure.
  */
-void op_list_remove(method_op_p oip)
+void op_list_remove(
+    method_op_p oip)
 {
     qlist_del(&(oip->op_list_entry));
 }
@@ -169,17 +178,18 @@ void op_list_remove(method_op_p oip)
  *
  * returns pointer to operation on success, NULL on failure.
  */
-method_op_p op_list_search(op_list_p olp,
-			   struct op_list_search_key *key)
+method_op_p op_list_search(
+    op_list_p olp,
+    struct op_list_search_key *key)
 {
     op_list_p tmp_entry = NULL;
     qlist_for_each(tmp_entry, olp)
     {
-	if (!(op_list_cmp_key(key, qlist_entry(tmp_entry, struct method_op,
-					       op_list_entry))))
-	{
-	    return (qlist_entry(tmp_entry, struct method_op, op_list_entry));
-	}
+        if (!(op_list_cmp_key(key, qlist_entry(tmp_entry, struct method_op,
+                                               op_list_entry))))
+        {
+            return (qlist_entry(tmp_entry, struct method_op, op_list_entry));
+        }
     }
     return (NULL);
 }
@@ -191,11 +201,12 @@ method_op_p op_list_search(op_list_p olp,
  *
  * returns pointer to method op on success, NULL on failure
  */
-method_op_p op_list_shownext(op_list_p olp)
+method_op_p op_list_shownext(
+    op_list_p olp)
 {
     if (olp->next == olp)
     {
-	return (NULL);
+        return (NULL);
     }
     return (qlist_entry(olp->next, struct method_op, op_list_entry));
 }
@@ -212,27 +223,29 @@ method_op_p op_list_shownext(op_list_p olp)
  *
  * returns 0 if match is found, 1 otherwise
  */
-static int op_list_cmp_key(struct op_list_search_key *my_key,
-			   method_op_p my_op)
+static int op_list_cmp_key(
+    struct op_list_search_key *my_key,
+    method_op_p my_op)
 {
 
     if (my_key->method_addr_yes && (my_key->method_addr != my_op->addr))
     {
-	return (1);
+        return (1);
     }
     if (my_key->msg_tag_yes && (my_key->msg_tag != my_op->msg_tag))
     {
-	return (1);
+        return (1);
     }
     if (my_key->op_id_yes && (my_key->op_id != my_op->op_id))
     {
-	return (1);
+        return (1);
     }
     return (0);
 }
 
 
-static void gossip_print_op(method_op_p print_op)
+static void gossip_print_op(
+    method_op_p print_op)
 {
 
     gossip_err("Operation:\n------------\n");

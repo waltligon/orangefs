@@ -29,7 +29,9 @@
  * @param fs_id the file system id
  * @returns 0 on success and an error code on failure
  */
-static int lookup(char *name, int fs_id)
+static int lookup(
+    char *name,
+    int fs_id)
 {
     int ret;
     PVFS_credentials credentials;
@@ -38,9 +40,8 @@ static int lookup(char *name, int fs_id)
     ret = -2;
 
     PVFS_util_gen_credentials(&credentials);
-    if ((ret = PVFS_sys_lookup(
-             fs_id, name, &credentials,
-             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+    if ((ret = PVFS_sys_lookup(fs_id, name, &credentials,
+                               &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
         return ret;
@@ -56,7 +57,9 @@ static int lookup(char *name, int fs_id)
  * @param fs_id the file system id
  * @returns 0 on success and an error code on failure
  */
-static int getattr(char *name, int fs_id)
+static int getattr(
+    char *name,
+    int fs_id)
 {
     int ret;
     PVFS_credentials credentials;
@@ -68,9 +71,8 @@ static int getattr(char *name, int fs_id)
     ret = -2;
 
     PVFS_util_gen_credentials(&credentials);
-    if ((ret = PVFS_sys_lookup(
-             fs_id, name, &credentials,
-             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+    if ((ret = PVFS_sys_lookup(fs_id, name, &credentials,
+                               &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
         return ret;
@@ -92,7 +94,9 @@ static int getattr(char *name, int fs_id)
  * @param fs_id the file system id
  * @returns 0 on success and an error code on failure
  */
-static int remove_file_dir(char *name, int fs_id)
+static int remove_file_dir(
+    char *name,
+    int fs_id)
 {
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
@@ -122,7 +126,9 @@ static int remove_file_dir(char *name, int fs_id)
  * @param fs_id the file system id
  * @returns 0 on success and an error code on failure
  */
-static int list_dir(char *test_dir, int fs_id)
+static int list_dir(
+    char *test_dir,
+    int fs_id)
 {
     int ret;
 
@@ -137,9 +143,8 @@ static int list_dir(char *test_dir, int fs_id)
 
     PVFS_util_gen_credentials(&credentials);
 
-    if ((ret = PVFS_sys_lookup(
-             fs_id, test_dir, &credentials,
-             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+    if ((ret = PVFS_sys_lookup(fs_id, test_dir, &credentials,
+                               &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
         return -1;
@@ -150,7 +155,7 @@ static int list_dir(char *test_dir, int fs_id)
     pvfs_dirent_incount = 1;
 
     ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-                             &credentials, &resp_readdir);
+                           &credentials, &resp_readdir);
 
     return ret;
 }
@@ -164,7 +169,10 @@ static int list_dir(char *test_dir, int fs_id)
  * @param fs_id the file system id
  * @returns 0 on success and an error code on failure
  */
-static int create_file(char *filename, char *directory, int fs_id)
+static int create_file(
+    char *filename,
+    char *directory,
+    int fs_id)
 {
     int ret;
     PVFS_sys_attr attr;
@@ -192,7 +200,7 @@ static int create_file(char *filename, char *directory, int fs_id)
 
     ret = PVFS_sys_create(filename, resp_look.ref,
                           attr, &credentials, NULL, &resp_create);
-   return ret;
+    return ret;
 }
 
 /**
@@ -203,7 +211,9 @@ static int create_file(char *filename, char *directory, int fs_id)
  * @param fs_id the file system id
  * @returns 0 on succes and error code on failure
  */
-static int create_dir2(char *name, int fs_id)
+static int create_dir2(
+    char *name,
+    int fs_id)
 {
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
@@ -214,9 +224,8 @@ static int create_dir2(char *name, int fs_id)
     PVFS_sysresp_lookup resp_lookup;
 
     PVFS_util_gen_credentials(&credentials);
-    if ((ret = PVFS_sys_lookup(
-             fs_id, "/", &credentials,
-             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+    if ((ret = PVFS_sys_lookup(fs_id, "/", &credentials,
+                               &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
         return -1;
@@ -227,8 +236,7 @@ static int create_dir2(char *name, int fs_id)
     attr.owner = credentials.uid;
     attr.group = credentials.gid;
     attr.perms = 1877;
-    attr.atime = attr.mtime = attr.ctime =
-	time(NULL);
+    attr.atime = attr.mtime = attr.ctime = time(NULL);
 
     ret = PVFS_sys_mkdir(name, parent_refn, attr, &credentials, &resp_mkdir);
     return ret;
@@ -238,10 +246,11 @@ static int create_dir2(char *name, int fs_id)
  * Parameters: comm - special pts communicator, rank - the rank of the process, buf -  * (not used), rawparams - configuration information to specify which function to test
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_concurrent_meta(MPI_Comm * comm __unused,
-		       int rank,
-		       char *buf __unused,
-		       void *rawparams)
+int test_concurrent_meta(
+    MPI_Comm * comm __unused,
+    int rank,
+    char *buf __unused,
+    void *rawparams)
 {
     int ret = -1;
     int fs_id, i;
@@ -259,132 +268,152 @@ int test_concurrent_meta(MPI_Comm * comm __unused,
     if (rank == 0)
     {
 
-	if (params->p1 >= 0)
-	{
-	    switch (params->p1)
-	    {
-	    case 0:
-		fprintf(stderr, "[test_concurrent_meta] repeatedly listing dirs while anotehr process adds/remove files/dirs %d\n", params->p2);
-		for(i = 0; i < 100; i++)
-		{
-		    ret = list_dir("/test_dir",fs_id);
-		    if(ret >= 0){
-			PVFS_perror("list_dir",ret);
-			//return ret;
-		    }
-		}
-		return 0;
-	    case 1:
-		fprintf(stderr,"[test_concurrent_meta] get attribs while removing\n");
-		for(i = 0; i < 100; i++)
-		{
-		    ret = getattr("/test_dir/test_file2",fs_id);
-		    if(ret < 0)
-		    {
-			PVFS_perror("getattr\n",ret);
-			//return ret;
-		    }
-		}
-		return 0;
-	    case 2:
-		fprintf(stderr,"[test_concurrent_meta] lookup files when created\n");
-		for(i = 0; i < 100; i++)
-		{
-		    ret = lookup("/test_dir/test_file3",fs_id);
-		    if(ret < 0)
-		    {
-			PVFS_perror("lookup\n",ret);
-			//return ret;
-		    }
-		}
-		return 0;
-	    case 3:
-		fprintf(stderr,"[test_concurrent_meta] lookup files when dir destyd\n");
-		for(i = 0; i < 100; i++)
-		{
-		    ret = lookup("/test_dir/test_file3",fs_id);
-		    if(ret < 0)
-		    {
-			PVFS_perror("lookup\n",ret);
-			//return ret;
-		    }
-		}
-		return 0;
-	    case 99:
-		fprintf(stderr,"[test_concurrent_meta] setup directory\n");
-		ret = create_dir2("test_dir",fs_id);
-		return ret;
-	    default:
-		fprintf(stderr, "Error: invalid param %d\n", params->p1);
-		return -2;
-	    }
-	}
+        if (params->p1 >= 0)
+        {
+            switch (params->p1)
+            {
+            case 0:
+                fprintf(stderr,
+                        "[test_concurrent_meta] repeatedly listing dirs while anotehr process adds/remove files/dirs %d\n",
+                        params->p2);
+                for (i = 0; i < 100; i++)
+                {
+                    ret = list_dir("/test_dir", fs_id);
+                    if (ret >= 0)
+                    {
+                        PVFS_perror("list_dir", ret);
+                        //return ret;
+                    }
+                }
+                return 0;
+            case 1:
+                fprintf(stderr,
+                        "[test_concurrent_meta] get attribs while removing\n");
+                for (i = 0; i < 100; i++)
+                {
+                    ret = getattr("/test_dir/test_file2", fs_id);
+                    if (ret < 0)
+                    {
+                        PVFS_perror("getattr\n", ret);
+                        //return ret;
+                    }
+                }
+                return 0;
+            case 2:
+                fprintf(stderr,
+                        "[test_concurrent_meta] lookup files when created\n");
+                for (i = 0; i < 100; i++)
+                {
+                    ret = lookup("/test_dir/test_file3", fs_id);
+                    if (ret < 0)
+                    {
+                        PVFS_perror("lookup\n", ret);
+                        //return ret;
+                    }
+                }
+                return 0;
+            case 3:
+                fprintf(stderr,
+                        "[test_concurrent_meta] lookup files when dir destyd\n");
+                for (i = 0; i < 100; i++)
+                {
+                    ret = lookup("/test_dir/test_file3", fs_id);
+                    if (ret < 0)
+                    {
+                        PVFS_perror("lookup\n", ret);
+                        //return ret;
+                    }
+                }
+                return 0;
+            case 99:
+                fprintf(stderr, "[test_concurrent_meta] setup directory\n");
+                ret = create_dir2("test_dir", fs_id);
+                return ret;
+            default:
+                fprintf(stderr, "Error: invalid param %d\n", params->p1);
+                return -2;
+            }
+        }
     }
 
     if (rank == 1)
     {
-	if (params->p1 >= 0)
-	{
-	    switch (params->p1)
-	    {
-	    case 0:
-		fprintf(stderr, "[test_concurrent_meta] repeatedly listing dirs while anotehr process adds/remove files/dirs %d\n", params->p2);
-		for(i = 0; i < 100; i++)
-		{
-		    ret = create_file("test_file","/test_dir",fs_id);
-		    if(ret >= 0){
-		    	PVFS_perror("create_file",ret);
-		    	return ret;
-		    }
-		    ret = remove_file_dir("/test_dir/test_file",fs_id);
-		    if(ret >= 0){
-			PVFS_perror("remove",ret);
-			return ret;
-		    }
-		}
-		return 0;
-	    case 1:
-		fprintf(stderr, "[test_concurrent_meta] repeatedly listing dirs while anotehr process adds/remove files/dirs %d\n", params->p2);
-		for(i = 0; i < 100; i++)
-		{
-		    ret = create_file("test_file2","/test_dir",fs_id);
-		    if(ret >= 0){
-		    	PVFS_perror("create_file",ret);
-		    	return ret;
-		    }
-		    ret = remove_file_dir("/test_dir/test_file2",fs_id);
-		    if(ret >= 0){
-			PVFS_perror("remove",ret);
-			return ret;
-		    }
-		}
-		return 0;
-	    case 2:
-		fprintf(stderr, "[test_concurrent_meta] repeat lookups %d\n", params->p2);
-		for(i = 0; i < 100; i++)
-		{
-		    ret = create_file("test_file3","/test_dir",fs_id);
-		    if(ret >= 0){
-		    	PVFS_perror("create_file",ret);
-		    	return ret;
-		    }
-		    ret = remove_file_dir("/test_dir/test_file3",fs_id);
-		    if(ret >= 0){
-			PVFS_perror("remove",ret);
-			return ret;
-		    }
-		}
-		return 0;
-	    case 3:
-		fprintf(stderr, "[test_concurrent_meta] repeat lookups on dir destyd %d\n", params->p2);
-		ret = remove_file_dir("/test_dir",fs_id);
-		if(ret >= 0){
-		    PVFS_perror("remove",ret);
-		    return ret;
-		}
-		return 0;
-	    }
-	}
+        if (params->p1 >= 0)
+        {
+            switch (params->p1)
+            {
+            case 0:
+                fprintf(stderr,
+                        "[test_concurrent_meta] repeatedly listing dirs while anotehr process adds/remove files/dirs %d\n",
+                        params->p2);
+                for (i = 0; i < 100; i++)
+                {
+                    ret = create_file("test_file", "/test_dir", fs_id);
+                    if (ret >= 0)
+                    {
+                        PVFS_perror("create_file", ret);
+                        return ret;
+                    }
+                    ret = remove_file_dir("/test_dir/test_file", fs_id);
+                    if (ret >= 0)
+                    {
+                        PVFS_perror("remove", ret);
+                        return ret;
+                    }
+                }
+                return 0;
+            case 1:
+                fprintf(stderr,
+                        "[test_concurrent_meta] repeatedly listing dirs while anotehr process adds/remove files/dirs %d\n",
+                        params->p2);
+                for (i = 0; i < 100; i++)
+                {
+                    ret = create_file("test_file2", "/test_dir", fs_id);
+                    if (ret >= 0)
+                    {
+                        PVFS_perror("create_file", ret);
+                        return ret;
+                    }
+                    ret = remove_file_dir("/test_dir/test_file2", fs_id);
+                    if (ret >= 0)
+                    {
+                        PVFS_perror("remove", ret);
+                        return ret;
+                    }
+                }
+                return 0;
+            case 2:
+                fprintf(stderr, "[test_concurrent_meta] repeat lookups %d\n",
+                        params->p2);
+                for (i = 0; i < 100; i++)
+                {
+                    ret = create_file("test_file3", "/test_dir", fs_id);
+                    if (ret >= 0)
+                    {
+                        PVFS_perror("create_file", ret);
+                        return ret;
+                    }
+                    ret = remove_file_dir("/test_dir/test_file3", fs_id);
+                    if (ret >= 0)
+                    {
+                        PVFS_perror("remove", ret);
+                        return ret;
+                    }
+                }
+                return 0;
+            case 3:
+                fprintf(stderr,
+                        "[test_concurrent_meta] repeat lookups on dir destyd %d\n",
+                        params->p2);
+                ret = remove_file_dir("/test_dir", fs_id);
+                if (ret >= 0)
+                {
+                    PVFS_perror("remove", ret);
+                    return ret;
+                }
+                return 0;
+            }
+        }
     }
 
 /*     finalize_sysint(); */

@@ -30,7 +30,7 @@
   in the server's fs.conf for this test to pass.
 */
 #define NUM_TEST_HANDLES              5
-static PVFS_handle test_handles[NUM_TEST_HANDLES] = {0};
+static PVFS_handle test_handles[NUM_TEST_HANDLES] = { 0 };
 static int test_handle_index = 0;
 
 /* allocated in client-state-machine.c */
@@ -39,98 +39,99 @@ extern job_context_id pint_client_sm_context;
 /* this is a test program that exercises the cached_config interface and
  * demonstrates how to use it.
  */
-int main(int argc, char **argv)	
+int main(
+    int argc,
+    char **argv)
 {
     int i = 0, j = 0, k = 0, n = 0, m = 0, num_file_systems = 0;
-    const PVFS_util_tab* tab;
+    const PVFS_util_tab *tab;
     struct server_configuration_s server_config;
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
-    int fs_ids[MAX_NUM_FS] = {0};
+    int fs_ids[MAX_NUM_FS] = { 0 };
     int num_meta_servers = 0, num_data_servers = 0;
     PVFS_BMI_addr_t addr, m_addr, d_addr[NUM_DATA_SERVERS_TO_QUERY];
-    char server_name[PVFS_MAX_SERVER_ADDR_LEN] = {0};
-    int test_handles_verified[NUM_TEST_HANDLES] = {0};
+    char server_name[PVFS_MAX_SERVER_ADDR_LEN] = { 0 };
+    int test_handles_verified[NUM_TEST_HANDLES] = { 0 };
     PVFS_handle_extent_array meta_handle_extent_array;
-    PVFS_handle_extent_array data_handle_extent_array[
-        NUM_DATA_SERVERS_TO_QUERY];
+    PVFS_handle_extent_array
+        data_handle_extent_array[NUM_DATA_SERVERS_TO_QUERY];
 
     tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
+    if (!tab)
     {
         fprintf(stderr, "PVFS_util_parse_pvfstab failure.\n");
-        return(-1);
+        return (-1);
     }
 
-    if (BMI_initialize("bmi_tcp",NULL,0))
+    if (BMI_initialize("bmi_tcp", NULL, 0))
     {
         fprintf(stderr, "BMI_initialize failure.\n");
-        return(-1);
+        return (-1);
     }
 
     if (PINT_encode_initialize())
     {
         fprintf(stderr, "PINT_encoded_initialize failure.\n");
-        return(-1);
+        return (-1);
     }
 
     if (job_initialize(0))
     {
         fprintf(stderr, "job_initialize failure.\n");
-        return(-1);
+        return (-1);
     }
 
     if (job_open_context(&pint_client_sm_context))
     {
         fprintf(stderr, "job_open_context failure.\n");
-        return(-1);
+        return (-1);
     }
 
     if (PINT_cached_config_initialize())
     {
         fprintf(stderr, "PINT_cached_config_initialize() failure.\n");
-        return(-1);
+        return (-1);
     }
 
-    memset(&server_config,0,sizeof(struct server_configuration_s));
-    for(i=0; i<tab->mntent_count; i++)
+    memset(&server_config, 0, sizeof(struct server_configuration_s));
+    for (i = 0; i < tab->mntent_count; i++)
     {
-	if (PINT_server_get_config(&server_config, &(tab->mntent_array[i])))
-	{
-	    fprintf(stderr, "PINT_server_get_config failure.\n");
-	    return(-1);
-	}
+        if (PINT_server_get_config(&server_config, &(tab->mntent_array[i])))
+        {
+            fprintf(stderr, "PINT_server_get_config failure.\n");
+            return (-1);
+        }
     }
 
     cur = server_config.file_systems;
-    while(cur)
+    while (cur)
     {
         cur_fs = PINT_llist_head(cur);
         if (!cur_fs)
         {
             break;
         }
-        printf("Loading mappings of filesystem %s\n",
-               cur_fs->file_system_name);
-        if (PINT_handle_load_mapping(&server_config,cur_fs))
+        printf("Loading mappings of filesystem %s\n", cur_fs->file_system_name);
+        if (PINT_handle_load_mapping(&server_config, cur_fs))
         {
             fprintf(stderr, "PINT_handle_load_mapping failure.\n");
-            return(-1);
+            return (-1);
         }
-        fs_ids[i++] = (int)cur_fs->coll_id;
+        fs_ids[i++] = (int) cur_fs->coll_id;
         cur = PINT_llist_next(cur);
     }
 
     num_file_systems = PINT_llist_count(server_config.file_systems);
-    for(i = 0; i < num_file_systems; i++)
+    for (i = 0; i < num_file_systems; i++)
     {
-        printf("\nOUTPUT OF TEST (filesystem ID is %d):\n",fs_ids[i]);
+        printf("\nOUTPUT OF TEST (filesystem ID is %d):\n", fs_ids[i]);
         printf("***************************************\n");
 
-        if (PINT_cached_config_get_num_meta(fs_ids[i],&num_meta_servers))
+        if (PINT_cached_config_get_num_meta(fs_ids[i], &num_meta_servers))
         {
             fprintf(stderr, "PINT_cached_config_get_num_meta failure.\n");
-            return(-1);
+            return (-1);
         }
         else
         {
@@ -138,33 +139,32 @@ int main(int argc, char **argv)
                    num_meta_servers);
         }
 
-        if (PINT_cached_config_get_num_io(fs_ids[i],&num_data_servers))
+        if (PINT_cached_config_get_num_io(fs_ids[i], &num_data_servers))
         {
             fprintf(stderr, "PINT_cached_config_get_num_io failure.\n");
-            return(-1);
+            return (-1);
         }
         else
         {
-            printf("Number of I/O servers available: %d\n",
-                   num_data_servers);
+            printf("Number of I/O servers available: %d\n", num_data_servers);
         }
 
         printf("\n");
-        for(j = 0; j < NUM_META_SERVERS_TO_QUERY; j++)
+        for (j = 0; j < NUM_META_SERVERS_TO_QUERY; j++)
         {
             if (PINT_cached_config_get_next_meta(&server_config,
-                                          fs_ids[i],
-                                          &m_addr,
-                                          &meta_handle_extent_array))
+                                                 fs_ids[i],
+                                                 &m_addr,
+                                                 &meta_handle_extent_array))
             {
                 fprintf(stderr, "PINT_cached_config_get_next_meta failure.\n");
-                return(-1);
+                return (-1);
             }
             else
             {
                 printf("\nNext meta server address  : %lu (%d meta ranges)\n",
-                       (long)m_addr, meta_handle_extent_array.extent_count);
-                for(n = 0; n < meta_handle_extent_array.extent_count; n++)
+                       (long) m_addr, meta_handle_extent_array.extent_count);
+                for (n = 0; n < meta_handle_extent_array.extent_count; n++)
                 {
                     printf("Meta server %d handle range: %llu-%llu\n", j,
                            llu(meta_handle_extent_array.extent_array[n].first),
@@ -174,26 +174,28 @@ int main(int argc, char **argv)
         }
 
         if (PINT_cached_config_get_next_io(&server_config, fs_ids[i],
-                                    NUM_DATA_SERVERS_TO_QUERY,
-                                    d_addr, data_handle_extent_array))
+                                           NUM_DATA_SERVERS_TO_QUERY,
+                                           d_addr, data_handle_extent_array))
         {
             fprintf(stderr, "PINT_cached_config_get_next_io failure.\n");
-            return(-1);
+            return (-1);
         }
         else
         {
             printf("\nAsked for %d I/O servers and got the following:\n",
                    NUM_DATA_SERVERS_TO_QUERY);
-            for(j = 0; j < NUM_DATA_SERVERS_TO_QUERY; j++)
+            for (j = 0; j < NUM_DATA_SERVERS_TO_QUERY; j++)
             {
                 printf("\nI/O server  %d address     : %lu "
-                       "(%d data ranges)\n",j,(long)d_addr[j],
+                       "(%d data ranges)\n", j, (long) d_addr[j],
                        data_handle_extent_array[j].extent_count);
-                for(n = 0; n < data_handle_extent_array[j].extent_count; n++)
+                for (n = 0; n < data_handle_extent_array[j].extent_count; n++)
                 {
                     printf("Data server %d handle range: %llu-%llu\n", n,
-                           llu(data_handle_extent_array[j].extent_array[n].first),
-                           llu(data_handle_extent_array[j].extent_array[n].last));
+                           llu(data_handle_extent_array[j].extent_array[n].
+                               first),
+                           llu(data_handle_extent_array[j].extent_array[n].
+                               last));
                     /* get some contrived test handles */
                     if (test_handle_index < NUM_TEST_HANDLES)
                     {
@@ -205,17 +207,17 @@ int main(int argc, char **argv)
         }
 
         printf("\n");
-        for(j = 0; j < NUM_TEST_HANDLES; j++)
+        for (j = 0; j < NUM_TEST_HANDLES; j++)
         {
             /*
-              make sure we can find the server name for the test handle,
-              regardless of which fs it's on
-            */
-            for(m = 0; m < num_file_systems; m++)
+               make sure we can find the server name for the test handle,
+               regardless of which fs it's on
+             */
+            for (m = 0; m < num_file_systems; m++)
             {
-                if (PINT_cached_config_get_server_name(
-                        server_name,PVFS_MAX_SERVER_ADDR_LEN,
-                        test_handles[j],fs_ids[m]) == 0)
+                if (PINT_cached_config_get_server_name
+                    (server_name, PVFS_MAX_SERVER_ADDR_LEN, test_handles[j],
+                     fs_ids[m]) == 0)
                 {
                     break;
                 }
@@ -223,23 +225,23 @@ int main(int argc, char **argv)
             if (m != num_file_systems)
             {
                 printf("Retrieved name of server managing handle "
-                       "%lld is %s\n",lld(test_handles[j]),server_name);
+                       "%lld is %s\n", lld(test_handles[j]), server_name);
                 test_handles_verified[j]++;
             }
             else
             {
                 printf("Error retrieving name of server managing handle "
-                       "%lld!\n",lld(test_handles[j]));
+                       "%lld!\n", lld(test_handles[j]));
             }
         }
 
         printf("\n");
-        for(j = 0; j < NUM_TEST_HANDLES; j++)
+        for (j = 0; j < NUM_TEST_HANDLES; j++)
         {
-            for(m = 0; m < num_file_systems; m++)
+            for (m = 0; m < num_file_systems; m++)
             {
-                if (PINT_cached_config_map_to_server(
-                        &addr,test_handles[j],fs_ids[m]) == 0)
+                if (PINT_cached_config_map_to_server
+                    (&addr, test_handles[j], fs_ids[m]) == 0)
                 {
                     continue;
                 }
@@ -251,10 +253,10 @@ int main(int argc, char **argv)
             else
             {
                 /*
-                  make sure the returned address is either a known
-                  meta or data server address
-                */
-                for(k = 0; k < NUM_TEST_HANDLES; k++)
+                   make sure the returned address is either a known
+                   meta or data server address
+                 */
+                for (k = 0; k < NUM_TEST_HANDLES; k++)
                 {
                     if (d_addr[k] == addr)
                     {
@@ -265,19 +267,19 @@ int main(int argc, char **argv)
                 {
                     printf("*** Failed to verify ability to map servers "
                            "to handles.\n");
-                    return(-1);
+                    return (-1);
                 }
                 else
                 {
                     printf("Retrieved address of server managing handle "
-                           "%lld is %lu\n",lld(test_handles[j]),(long)addr);
+                           "%lld is %lu\n", lld(test_handles[j]), (long) addr);
                     test_handles_verified[j]++;
                 }
             }
         }
 
         printf("\n");
-        for(j = 0; j < NUM_TEST_HANDLES; j++)
+        for (j = 0; j < NUM_TEST_HANDLES; j++)
         {
             if (test_handles_verified[j] != 2)
             {
@@ -287,13 +289,14 @@ int main(int argc, char **argv)
         }
         if (j == NUM_TEST_HANDLES)
         {
-            printf("Successfully verified ability to map servers to handles.\n");
+            printf
+                ("Successfully verified ability to map servers to handles.\n");
         }
         else
         {
             printf("** Failed to verify ability to map servers to handles.\n");
             printf("** Handle value %lld failed -- cannot be mapped.\n",
-                   lld(j ? test_handles[j-1] : test_handles[j]));
+                   lld(j ? test_handles[j - 1] : test_handles[j]));
             return -1;
         }
     }
@@ -301,10 +304,10 @@ int main(int argc, char **argv)
     if (PINT_cached_config_finalize())
     {
         fprintf(stderr, "PINT_cached_config_finalize() failure.\n");
-        return(-1);
+        return (-1);
     }
 
     job_finalize();
     BMI_finalize();
-    return(0);
+    return (0);
 }

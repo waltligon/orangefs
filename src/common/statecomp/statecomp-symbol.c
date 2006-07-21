@@ -16,7 +16,8 @@
 
 #include "statecomp-symbol.h"
 
-void *emalloc(unsigned int size);
+void *emalloc(
+    unsigned int size);
 
 /** hash table width */
 #define MAXHASH	311
@@ -26,53 +27,57 @@ static sym_ent_p symtab[MAXHASH];
 
 /** scramble a name (hopefully) uniformly to fit in a table
  */
-static unsigned int hash(char *name)
+static unsigned int hash(
+    char *name)
 {
     register unsigned int h = 0;
     while (*name)
     {
-	h <<= 4;
-	h ^= *name++;
+        h <<= 4;
+        h ^= *name++;
     }
-    return(h % MAXHASH);
+    return (h % MAXHASH);
 }
 
 /** enter a name into the symbol table
  */
-sym_ent_p symenter(char *name)
+sym_ent_p symenter(
+    char *name)
 {
     register sym_ent_p p;
     unsigned int h;
 
     /* create an entry and insert it at the front of the table */
     h = hash(name);
-    p = (sym_ent_p)emalloc(sizeof(sym_ent));
+    p = (sym_ent_p) emalloc(sizeof(sym_ent));
     p->name = name;
     p->next = symtab[h];
     symtab[h] = p;
 
-    return(p);
+    return (p);
 }
 
 /** lookup a symbol in the symbol table.  scans the symbol table and returns a
  *  pointer to the symbol table entry
  */
-sym_ent_p symlook(char *name)
+sym_ent_p symlook(
+    char *name)
 {
     register sym_ent_p p;
     unsigned int h;
     h = hash(name);
     for (p = symtab[h]; p != 0; p = p->next)
-	if (strcmp(p->name, name) == 0)
-	    break;
+        if (strcmp(p->name, name) == 0)
+            break;
 
-    return(p);
+    return (p);
 }
 
 /** initializes data structures prior to additions into symbol table.
  *  \note there is no matching finalize for the symbol table.
  */
-void init_symbol_table(void)
+void init_symbol_table(
+    void)
 {
     memset(symtab, 0, MAXHASH * sizeof(sym_ent_p));
 }

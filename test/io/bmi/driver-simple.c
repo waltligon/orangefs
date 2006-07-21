@@ -30,31 +30,31 @@ int main(
 
     /* start up benchmark environment */
     ret = bench_init(&opts, argc, argv, &num_clients, &world_rank, &comm,
-		     &bmi_peer_array, &mpi_peer_array, &context);
+                     &bmi_peer_array, &mpi_peer_array, &context);
     if (ret < 0)
     {
-	fprintf(stderr, "bench_init() failure.\n");
-	return (-1);
+        fprintf(stderr, "bench_init() failure.\n");
+        return (-1);
     }
 
     /* print some diagnostics */
     if (world_rank < opts.num_servers)
     {
-	printf("server: %d, talks to: \n", world_rank);
-	for (i = 0; i < num_clients; i++)
-	{
-	    printf("%d ", mpi_peer_array[i]);
-	}
-	printf("\n");
+        printf("server: %d, talks to: \n", world_rank);
+        for (i = 0; i < num_clients; i++)
+        {
+            printf("%d ", mpi_peer_array[i]);
+        }
+        printf("\n");
     }
     else
     {
-	printf("client: %d, talks to: \n", world_rank);
-	for (i = 0; i < opts.num_servers; i++)
-	{
-	    printf("%d ", mpi_peer_array[i]);
-	}
-	printf("\n");
+        printf("client: %d, talks to: \n", world_rank);
+        for (i = 0; i < opts.num_servers; i++)
+        {
+            printf("%d ", mpi_peer_array[i]);
+        }
+        printf("\n");
     }
 
     /* shutdown interfaces */

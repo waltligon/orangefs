@@ -15,7 +15,7 @@
   tests.
 */
 int test_pvfs_datatype_init(
-    MPI_Comm *mycomm __unused,
+    MPI_Comm * mycomm __unused,
     int myid,
     char *buf __unused,
     void *params)
@@ -25,7 +25,7 @@ int test_pvfs_datatype_init(
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_sysresp_create resp_cr;
-    generic_params *args = (generic_params *)params;
+    generic_params *args = (generic_params *) params;
     char filename[PVFS_NAME_MAX];
 
     debug_printf("test_pvfs_datatype_init called\n");
@@ -38,27 +38,26 @@ int test_pvfs_datatype_init(
     if (args && args->mode)
     {
         pvfs_helper.num_test_files = args->mode;
-        debug_printf("test_pvfs_datatype_init mode is %d\n",
-                     args->mode);
+        debug_printf("test_pvfs_datatype_init mode is %d\n", args->mode);
     }
 
     PVFS_util_gen_credentials(&credentials);
 
     /*
-      verify that all test files exist.  it's okay if they
-      don't exist as we'll try to create them.
+       verify that all test files exist.  it's okay if they
+       don't exist as we'll try to create them.
 
-      FIXME -- lookup failure
-        SHOULD ADJUST THIS AS DISCUSSED WITH PHIL
+       FIXME -- lookup failure
+       SHOULD ADJUST THIS AS DISCUSSED WITH PHIL
 
-      this test fails in the following cases:
-      - lookup fails for *any* reason
-      - create fails
-    */
-    for(i = 0; i < pvfs_helper.num_test_files; i++)
+       this test fails in the following cases:
+       - lookup fails for *any* reason
+       - create fails
+     */
+    for (i = 0; i < pvfs_helper.num_test_files; i++)
     {
-        snprintf(filename,PVFS_NAME_MAX,"%s%.5drank%d",
-                 TEST_FILE_PREFIX,i,myid);
+        snprintf(filename, PVFS_NAME_MAX, "%s%.5drank%d",
+                 TEST_FILE_PREFIX, i, myid);
 
         ret = PVFS_sys_lookup(pvfs_helper.fs_id,
                               filename, &credentials, &resp_lk,
@@ -83,17 +82,16 @@ int test_pvfs_datatype_init(
             attr.owner = credentials.uid;
             attr.group = credentials.gid;
             attr.perms = 1877;
-	    attr.atime = attr.mtime = attr.ctime = 
-		time(NULL);
+            attr.atime = attr.mtime = attr.ctime = time(NULL);
 
-            ret = PVFS_sys_create(&(filename[1]),resp_lk.ref,
+            ret = PVFS_sys_create(&(filename[1]), resp_lk.ref,
                                   attr, &credentials, NULL, &resp_cr);
             if ((ret < 0) || (!resp_cr.ref.handle))
             {
                 debug_printf("Error: PVFS_sys_create() failure.\n");
                 break;
             }
-            debug_printf("Created file %s\n",&(filename[1]));
+            debug_printf("Created file %s\n", &(filename[1]));
             debug_printf("Got handle %lld.\n", lld(resp_cr.ref.handle));
             num_test_files_ok++;
         }

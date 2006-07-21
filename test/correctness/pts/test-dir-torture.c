@@ -21,11 +21,12 @@
  * rank:    rank in the mpi process group 
  */
 
-static int recursive_create_dir(PVFS_handle handle,
-			 PVFS_fs_id fs_id,
-			 int depth,
-			 int ndirs,
-			 int rank)
+static int recursive_create_dir(
+    PVFS_handle handle,
+    PVFS_fs_id fs_id,
+    int depth,
+    int ndirs,
+    int rank)
 {
     int i;
     char name[PVFS_SEGMENT_MAX];
@@ -34,19 +35,19 @@ static int recursive_create_dir(PVFS_handle handle,
 
     /* base case: we've gone far enough */
     if (depth == 0)
-	return 0;
+        return 0;
 
     refn.handle = handle;
     refn.fs_id = fs_id;
 
     for (i = 0; i < ndirs; i++)
     {
-	snprintf(name, PVFS_SEGMENT_MAX, "depth=%d-rank=%d-iter=%d",
+        snprintf(name, PVFS_SEGMENT_MAX, "depth=%d-rank=%d-iter=%d",
                  depth, rank, i);
 
-	if (create_dir(refn, name, &out_refn) < 0)
+        if (create_dir(refn, name, &out_refn) < 0)
         {
-            fprintf(stderr, "Failed to create dir %s\n",name);
+            fprintf(stderr, "Failed to create dir %s\n", name);
             return -1;
         }
 
@@ -56,7 +57,7 @@ static int recursive_create_dir(PVFS_handle handle,
         if (remove_dir(refn, name) < 0)
         {
             fprintf(stderr, "Faild to remove dir %s.  This is a "
-                    "real error.\n",name);
+                    "real error.\n", name);
             return -1;
         }
     }
@@ -74,10 +75,11 @@ static int recursive_create_dir(PVFS_handle handle,
  * 	0:  	all went well
  * 	nonzero: errors encountered making one or more directories
  */
-int test_dir_torture(MPI_Comm * comm __unused,
-		     int rank,
-		     char *buf __unused,
-		     void *rawparams)
+int test_dir_torture(
+    MPI_Comm * comm __unused,
+    int rank,
+    char *buf __unused,
+    void *rawparams)
 {
     PVFS_fs_id fs_id;
     PVFS_object_ref root_refn;
@@ -94,9 +96,9 @@ int test_dir_torture(MPI_Comm * comm __unused,
     get_root(fs_id, &root_refn);
 
     /*
-      this will make n^n directories, so be careful
-      about running the test with mode=100
-    */
+       this will make n^n directories, so be careful
+       about running the test with mode=100
+     */
     nerrs = recursive_create_dir(root_refn.handle, root_refn.fs_id,
                                  myparams->mode, myparams->mode, rank);
 

@@ -14,7 +14,9 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
-int main(int argc,char **argv)
+int main(
+    int argc,
+    char **argv)
 {
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_readdir resp_readdir;
@@ -22,19 +24,19 @@ int main(int argc,char **argv)
     int max_dirents_returned = 25;
     char starting_point[256] = "/";
     PVFS_fs_id fs_id;
-    char* name;
+    char *name;
     PVFS_credentials credentials;
     PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
 
-    switch(argc)
+    switch (argc)
     {
-        case 3:
-            sscanf(argv[2], "%d", &max_dirents_returned);
-        case 2:
-            strncpy(starting_point, argv[1], 256);
-            break;
+    case 3:
+        sscanf(argv[2], "%d", &max_dirents_returned);
+    case 2:
+        strncpy(starting_point, argv[1], 256);
+        break;
     }
     printf("no more than %d dirents should be returned per "
            "iteration\n", max_dirents_returned);
@@ -42,14 +44,14 @@ int main(int argc,char **argv)
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return (-1);
+        PVFS_perror("PVFS_util_init_defaults", ret);
+        return (-1);
     }
     ret = PVFS_util_get_default_fsid(&fs_id);
     if (ret < 0)
     {
-	PVFS_perror("PVFS_util_get_default_fsid", ret);
-	return (-1);
+        PVFS_perror("PVFS_util_get_default_fsid", ret);
+        return (-1);
     }
 
 
@@ -74,39 +76,39 @@ int main(int argc,char **argv)
     token = 0;
     do
     {
-        memset(&resp_readdir,0,sizeof(PVFS_sysresp_readdir));
+        memset(&resp_readdir, 0, sizeof(PVFS_sysresp_readdir));
         ret = PVFS_sys_readdir(pinode_refn, (!token ? PVFS_READDIR_START :
-                                             token), pvfs_dirent_incount, 
+                                             token), pvfs_dirent_incount,
                                &credentials, &resp_readdir);
         if (ret < 0)
         {
             PVFS_perror_gossip("readdir failed", ret);
-            return(-1);
+            return (-1);
         }
 
-        for(i = 0; i < resp_readdir.pvfs_dirent_outcount; i++)
+        for (i = 0; i < resp_readdir.pvfs_dirent_outcount; i++)
         {
             printf("[%.8llu]: %s\n",
                    llu(resp_readdir.dirent_array[i].handle),
                    resp_readdir.dirent_array[i].d_name);
         }
         //token += resp_readdir.pvfs_dirent_outcount;
-		  token = resp_readdir.token;
+        token = resp_readdir.token;
 
-        /*allocated by the system interface*/
+        /*allocated by the system interface */
         if (resp_readdir.pvfs_dirent_outcount)
             free(resp_readdir.dirent_array);
 
         /*
-          if we got a short read, assume that we're finished
-          readding all dirents
-        */
+           if we got a short read, assume that we're finished
+           readding all dirents
+         */
         if (resp_readdir.pvfs_dirent_outcount < pvfs_dirent_incount)
         {
             break;
         }
 
-    } while(resp_readdir.pvfs_dirent_outcount != 0);
+    } while (resp_readdir.pvfs_dirent_outcount != 0);
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

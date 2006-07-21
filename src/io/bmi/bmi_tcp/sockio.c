@@ -36,13 +36,15 @@
 #define DEFAULT_MSG_FLAGS 0
 #endif
 
-int BMI_sockio_new_sock()
+int BMI_sockio_new_sock(
+    )
 {
-    return(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    return (socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
 }
 
-int BMI_sockio_bind_sock(int sockd,
-	      int service)
+int BMI_sockio_bind_sock(
+    int sockd,
+    int service)
 {
     struct sockaddr_in saddr;
 
@@ -53,80 +55,84 @@ int BMI_sockio_bind_sock(int sockd,
   bind_sock_restart:
     if (bind(sockd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0)
     {
-	if (errno == EINTR)
-	    goto bind_sock_restart;
-	return (-1);
+        if (errno == EINTR)
+            goto bind_sock_restart;
+        return (-1);
     }
     return (sockd);
 }
 
-int BMI_sockio_connect_sock(int sockd,
-		 const char *name,
-		 int service)
+int BMI_sockio_connect_sock(
+    int sockd,
+    const char *name,
+    int service)
 {
     struct sockaddr saddr;
     int ret;
 
     if ((ret = BMI_sockio_init_sock(&saddr, name, service)) != 0)
-	return (ret); /* converted to PVFS error code below */
+        return (ret);   /* converted to PVFS error code below */
   connect_sock_restart:
     if (connect(sockd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0)
     {
-	if (errno == EINTR)
-	    goto connect_sock_restart;
+        if (errno == EINTR)
+            goto connect_sock_restart;
         return (-PVFS_ERROR_CODE(errno));
     }
     return (sockd);
 }
 
 #ifdef HAVE_GETHOSTBYNAME
-static int conv_h_errno(int herr)
-{   
+static int conv_h_errno(
+    int herr)
+{
     switch (herr)
     {
-    case HOST_NOT_FOUND :
+    case HOST_NOT_FOUND:
         return BMI_EHOSTNTFD;
-    case NO_ADDRESS :
+    case NO_ADDRESS:
         return BMI_EADDRNTFD;
-    case NO_RECOVERY :
+    case NO_RECOVERY:
         return BMI_ENORECVR;
-    case TRY_AGAIN :
+    case TRY_AGAIN:
         return BMI_ETRYAGAIN;
-    default :
+    default:
         return herr;
     }
 }
 
 /* gethostbyname version */
-int BMI_sockio_init_sock(struct sockaddr *saddrp,
-			 const char *name,
-			 int service)
+int BMI_sockio_init_sock(
+    struct sockaddr *saddrp,
+    const char *name,
+    int service)
 {
     struct hostent *hep;
 
     bzero((char *) saddrp, sizeof(struct sockaddr_in));
     if (name == NULL)
     {
-	if ((hep = gethostbyname("localhost")) == NULL)
-	{
-	    return (-conv_h_errno(h_errno));
-	}
+        if ((hep = gethostbyname("localhost")) == NULL)
+        {
+            return (-conv_h_errno(h_errno));
+        }
     }
     else if ((hep = gethostbyname(name)) == NULL)
     {
-	return (-conv_h_errno(h_errno));
+        return (-conv_h_errno(h_errno));
     }
     ((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
     ((struct sockaddr_in *) saddrp)->sin_port = htons((u_short) service);
     bcopy(hep->h_addr, (char *) &(((struct sockaddr_in *) saddrp)->sin_addr),
-	  hep->h_length);
+          hep->h_length);
     return (0);
 }
 #else
 /* inet_aton version */
-int BMI_sockio_init_sock(struct sockaddr *saddrp,
-			 const char *name,
-			 int service)
+int BMI_sockio_init_sock(
+    struct sockaddr *saddrp,
+    const char *name,
+    int service)
 {
     int ret;
     struct in_addr addr;
@@ -134,19 +140,20 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
     bzero((char *) saddrp, sizeof(struct sockaddr_in));
     if (name == NULL)
     {
-	ret = inet_aton("127.0.0.1", &addr);
+        ret = inet_aton("127.0.0.1", &addr);
     }
     else
     {
-	ret = inet_aton(name, &addr);
+        ret = inet_aton(name, &addr);
     }
 
-    if (ret == 0) return -1;
+    if (ret == 0)
+        return -1;
 
     ((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
     ((struct sockaddr_in *) saddrp)->sin_port = htons((u_short) service);
     bcopy(&addr, (char *) &(((struct sockaddr_in *) saddrp)->sin_addr),
-	  sizeof(addr));
+          sizeof(addr));
 
     return 0;
 }
@@ -157,75 +164,77 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
 /* Returns -1 if it cannot get all len bytes
  * and the # of bytes received otherwise
  */
-int BMI_sockio_brecv(int s,
-	  void *buf,
-	  int len)
+int BMI_sockio_brecv(
+    int s,
+    void *buf,
+    int len)
 {
     int oldfl, ret, comp = len;
     int olderrno;
     oldfl = fcntl(s, F_GETFL, 0);
     if (oldfl & O_NONBLOCK)
-	fcntl(s, F_SETFL, oldfl & (~O_NONBLOCK));
+        fcntl(s, F_SETFL, oldfl & (~O_NONBLOCK));
 
     while (comp)
     {
       brecv_restart:
-	if ((ret = recv(s, (char *) buf, comp, DEFAULT_MSG_FLAGS)) < 0)
-	{
-	    if (errno == EINTR)
-		goto brecv_restart;
-	    olderrno = errno;
-	    fcntl(s, F_SETFL, oldfl|O_NONBLOCK);
-	    errno = olderrno;
-	    return (-1);
-	}
-	if (!ret)
-	{
-	    /* Note: this indicates a closed socket.  However, I don't
-	     * like this behavior, so we're going to return -1 w/an EPIPE
-	     * instead.
-	     */
-	    fcntl(s, F_SETFL, oldfl|O_NONBLOCK);
-	    errno = EPIPE;
-	    return (-1);
-	}
-	comp -= ret;
-	buf = (char *)buf + ret;
+        if ((ret = recv(s, (char *) buf, comp, DEFAULT_MSG_FLAGS)) < 0)
+        {
+            if (errno == EINTR)
+                goto brecv_restart;
+            olderrno = errno;
+            fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+            errno = olderrno;
+            return (-1);
+        }
+        if (!ret)
+        {
+            /* Note: this indicates a closed socket.  However, I don't
+             * like this behavior, so we're going to return -1 w/an EPIPE
+             * instead.
+             */
+            fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+            errno = EPIPE;
+            return (-1);
+        }
+        comp -= ret;
+        buf = (char *) buf + ret;
     }
-    fcntl(s, F_SETFL, oldfl|O_NONBLOCK);
+    fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
     return (len - comp);
 }
 
 /* nonblocking receive */
-int BMI_sockio_nbrecv(int s,
-	   void *buf,
-	   int len)
+int BMI_sockio_nbrecv(
+    int s,
+    void *buf,
+    int len)
 {
     int ret, comp = len;
 
     while (comp)
     {
       nbrecv_restart:
-	ret = recv(s, buf, comp, DEFAULT_MSG_FLAGS);
-	if (!ret)	/* socket closed */
-	{
-	    errno = EPIPE;
-	    return (-1);
-	}
-	if (ret == -1 && errno == EWOULDBLOCK)
-	{
-	    return (len - comp);	/* return amount completed */
-	}
-	if (ret == -1 && errno == EINTR)
-	{
-	    goto nbrecv_restart;
-	}
-	else if (ret == -1)
-	{
-	    return (-1);
-	}
-	comp -= ret;
-	buf = (char *)buf + ret;
+        ret = recv(s, buf, comp, DEFAULT_MSG_FLAGS);
+        if (!ret)       /* socket closed */
+        {
+            errno = EPIPE;
+            return (-1);
+        }
+        if (ret == -1 && errno == EWOULDBLOCK)
+        {
+            return (len - comp);        /* return amount completed */
+        }
+        if (ret == -1 && errno == EINTR)
+        {
+            goto nbrecv_restart;
+        }
+        else if (ret == -1)
+        {
+            return (-1);
+        }
+        comp -= ret;
+        buf = (char *) buf + ret;
     }
     return (len - comp);
 }
@@ -238,62 +247,66 @@ int BMI_sockio_nbrecv(int s,
  *
  * returns number of bytes available on succes, -1 on failure.
  */
-int BMI_sockio_nbpeek(int s, void* buf, int len)
+int BMI_sockio_nbpeek(
+    int s,
+    void *buf,
+    int len)
 {
     int ret, comp = len;
 
     while (comp)
     {
       nbpeek_restart:
-	ret = recv(s, buf, comp, (MSG_PEEK|DEFAULT_MSG_FLAGS));
-	if (!ret)	/* socket closed */
-	{
-	    errno = EPIPE;
-	    return (-1);
-	}
-	if (ret == -1 && errno == EWOULDBLOCK)
-	{
-	    return (len - comp);	/* return amount completed */
-	}
-	if (ret == -1 && errno == EINTR)
-	{
-	    goto nbpeek_restart;
-	}
-	else if (ret == -1)
-	{
-	    return (-1);
-	}
-	comp -= ret;
+        ret = recv(s, buf, comp, (MSG_PEEK | DEFAULT_MSG_FLAGS));
+        if (!ret)       /* socket closed */
+        {
+            errno = EPIPE;
+            return (-1);
+        }
+        if (ret == -1 && errno == EWOULDBLOCK)
+        {
+            return (len - comp);        /* return amount completed */
+        }
+        if (ret == -1 && errno == EINTR)
+        {
+            goto nbpeek_restart;
+        }
+        else if (ret == -1)
+        {
+            return (-1);
+        }
+        comp -= ret;
     }
     return (len - comp);
 }
 
 
 /* blocking send */
-int BMI_sockio_bsend(int s,
-	  void *buf,
-	  int len)
+int BMI_sockio_bsend(
+    int s,
+    void *buf,
+    int len)
 {
     int oldfl, ret, comp = len;
     int olderrno;
     oldfl = fcntl(s, F_GETFL, 0);
     if (oldfl & O_NONBLOCK)
-	fcntl(s, F_SETFL, oldfl & (~O_NONBLOCK));
+        fcntl(s, F_SETFL, oldfl & (~O_NONBLOCK));
 
     while (comp)
     {
       bsend_restart:
-	if ((ret = send(s, (char *) buf, comp, DEFAULT_MSG_FLAGS)) < 0)
-	{
-	    if (errno == EINTR)
-		goto bsend_restart;
-	    olderrno = errno;
-	    fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
-	    errno = olderrno;
-	    return (-1);
-	}
-	comp -= ret;
-	buf = (char *)buf + ret;
+        if ((ret = send(s, (char *) buf, comp, DEFAULT_MSG_FLAGS)) < 0)
+        {
+            if (errno == EINTR)
+                goto bsend_restart;
+            olderrno = errno;
+            fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+            errno = olderrno;
+            return (-1);
+        }
+        comp -= ret;
+        buf = (char *) buf + ret;
     }
     fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
     return (len - comp);
@@ -302,35 +315,37 @@ int BMI_sockio_bsend(int s,
 
 /* nonblocking send */
 /* should always return 0 when nothing gets done! */
-int BMI_sockio_nbsend(int s,
-	   void *buf,
-	   int len)
+int BMI_sockio_nbsend(
+    int s,
+    void *buf,
+    int len)
 {
     int ret, comp = len;
 
     while (comp)
     {
       nbsend_restart:
-	ret = send(s, (char *) buf, comp, DEFAULT_MSG_FLAGS);
-	if (ret == 0 || (ret == -1 && errno == EWOULDBLOCK))
-	    return (len - comp);	/* return amount completed */
-	if (ret == -1 && errno == EINTR)
-	{
-	    goto nbsend_restart;
-	}
-	else if (ret == -1)
-	    return (-1);
-	comp -= ret;
-	buf = (char *)buf + ret;
+        ret = send(s, (char *) buf, comp, DEFAULT_MSG_FLAGS);
+        if (ret == 0 || (ret == -1 && errno == EWOULDBLOCK))
+            return (len - comp);        /* return amount completed */
+        if (ret == -1 && errno == EINTR)
+        {
+            goto nbsend_restart;
+        }
+        else if (ret == -1)
+            return (-1);
+        comp -= ret;
+        buf = (char *) buf + ret;
     }
     return (len - comp);
 }
 
 /* nonblocking vector send */
-int BMI_sockio_nbvector(int s,
-	    struct iovec* vector,
-	    int count, 
-	    int recv_flag)
+int BMI_sockio_nbvector(
+    int s,
+    struct iovec *vector,
+    int count,
+    int recv_flag)
 {
     int ret;
 
@@ -342,22 +357,22 @@ int BMI_sockio_nbvector(int s,
     /* loop over if interrupted */
     do
     {
-	if(recv_flag)
-	{
-	    ret = readv(s, vector, count);
-	}
-	else
-	{
-	    ret = writev(s, vector, count);
-	}
-    }while(ret == -1 && errno == EINTR);
+        if (recv_flag)
+        {
+            ret = readv(s, vector, count);
+        }
+        else
+        {
+            ret = writev(s, vector, count);
+        }
+    } while (ret == -1 && errno == EINTR);
 
     /* return zero if can't do any work at all */
-    if(ret == -1 && errno == EWOULDBLOCK)
-	return(0);
+    if (ret == -1 && errno == EWOULDBLOCK)
+        return (0);
 
     /* if data transferred or an error */
-    return(ret);
+    return (ret);
 }
 
 #ifdef __USE_SENDFILE__
@@ -376,64 +391,68 @@ int BMI_sockio_nbvector(int s,
  *
  * Returns -1 on error, amount of data written to socket on success.
  */
-int BMI_sockio_nbsendfile(int s,
-	       int f,
-	       int off,
-	       int len)
+int BMI_sockio_nbsendfile(
+    int s,
+    int f,
+    int off,
+    int len)
 {
     int ret, comp = len, myoff;
 
     while (comp)
     {
       nbsendfile_restart:
-	myoff = off;
-	ret = sendfile(s, f, &myoff, comp);
-	if (ret == 0 || (ret == -1 && errno == EWOULDBLOCK))
-	    return (len - comp);	/* return amount completed */
-	if (ret == -1 && errno == EINTR)
-	{
-	    goto nbsendfile_restart;
-	}
-	else if (ret == -1)
-	    return (-1);
-	comp -= ret;
-	off += ret;
+        myoff = off;
+        ret = sendfile(s, f, &myoff, comp);
+        if (ret == 0 || (ret == -1 && errno == EWOULDBLOCK))
+            return (len - comp);        /* return amount completed */
+        if (ret == -1 && errno == EINTR)
+        {
+            goto nbsendfile_restart;
+        }
+        else if (ret == -1)
+            return (-1);
+        comp -= ret;
+        off += ret;
     }
     return (len - comp);
 }
 #endif
 
 /* routines to get and set socket options */
-int BMI_sockio_get_sockopt(int s,
-		int optname)
+int BMI_sockio_get_sockopt(
+    int s,
+    int optname)
 {
     int val;
     socklen_t len = sizeof(val);
 
     if (getsockopt(s, SOL_SOCKET, optname, &val, &len) == -1)
-	return (-1);
+        return (-1);
     else
-	return (val);
+        return (val);
 }
 
-int BMI_sockio_set_tcpopt(int s,
-	       int optname,
-	       int val)
+int BMI_sockio_set_tcpopt(
+    int s,
+    int optname,
+    int val)
 {
     if (setsockopt(s, IPPROTO_TCP, optname, &val, sizeof(val)) == -1)
-	return (-1);
+        return (-1);
     else
-	return (val);
+        return (val);
 }
 
-int BMI_sockio_set_sockopt(int s,
-		int optname,
-		int val)
+int BMI_sockio_set_sockopt(
+    int s,
+    int optname,
+    int val)
 {
     if (setsockopt(s, SOL_SOCKET, optname, &val, sizeof(val)) == -1)
-	return (-1);
+        return (-1);
     else
-	return (val);
+        return (val);
 }
 
 /*

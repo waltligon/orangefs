@@ -36,66 +36,66 @@ int bench_init(
     ret = MPI_Init(&argc, &argv);
     if (ret != MPI_SUCCESS)
     {
-	fprintf(stderr, "MPI_Init() failure.\n");
-	return (-1);
+        fprintf(stderr, "MPI_Init() failure.\n");
+        return (-1);
     }
 
     /* parse command line arguments */
     ret = bench_args(opts, argc, argv);
     if (ret < 0)
     {
-	fprintf(stderr, "bench_args() failure.\n");
-	return (-1);
+        fprintf(stderr, "bench_args() failure.\n");
+        return (-1);
     }
 
     /* setup MPI parameters */
     ret = bench_initialize_mpi_params(argc, argv, opts->num_servers,
-				      num_clients, world_rank, comm,
-				      local_proc_name);
+                                      num_clients, world_rank, comm,
+                                      local_proc_name);
     if (ret < 0)
     {
-	fprintf(stderr, "bench_initialize_mpi_params() failure.\n");
-	return (-1);
+        fprintf(stderr, "bench_initialize_mpi_params() failure.\n");
+        return (-1);
     }
 
     /* startup BMI interface */
     if (*world_rank < opts->num_servers)
     {
-	*bmi_peer_array =
-	    (PVFS_BMI_addr_t *) malloc((*num_clients) *
-				       sizeof(PVFS_BMI_addr_t));
-	*mpi_peer_array = (int *) malloc((*num_clients) * sizeof(int));
-	if (!(*bmi_peer_array) || !(*mpi_peer_array))
-	{
-	    return (-1);
-	}
-	for (i = 0; i < (*num_clients); i++)
-	{
-	    (*mpi_peer_array)[i] = i + opts->num_servers;
-	}
-	ret = bench_initialize_bmi_interface(opts->method_name,
-					     BMI_INIT_SERVER, context);
+        *bmi_peer_array =
+            (PVFS_BMI_addr_t *) malloc((*num_clients) *
+                                       sizeof(PVFS_BMI_addr_t));
+        *mpi_peer_array = (int *) malloc((*num_clients) * sizeof(int));
+        if (!(*bmi_peer_array) || !(*mpi_peer_array))
+        {
+            return (-1);
+        }
+        for (i = 0; i < (*num_clients); i++)
+        {
+            (*mpi_peer_array)[i] = i + opts->num_servers;
+        }
+        ret = bench_initialize_bmi_interface(opts->method_name,
+                                             BMI_INIT_SERVER, context);
     }
     else
     {
-	*bmi_peer_array =
-	    (PVFS_BMI_addr_t *) malloc(opts->num_servers *
-				       sizeof(PVFS_BMI_addr_t));
-	*mpi_peer_array = (int *) malloc(opts->num_servers * sizeof(int));
-	if (!(*bmi_peer_array) || !(*mpi_peer_array))
-	{
-	    return (-1);
-	}
-	for (i = 0; i < opts->num_servers; i++)
-	{
-	    (*mpi_peer_array)[i] = i;
-	}
-	ret = bench_initialize_bmi_interface(opts->method_name, 0, context);
+        *bmi_peer_array =
+            (PVFS_BMI_addr_t *) malloc(opts->num_servers *
+                                       sizeof(PVFS_BMI_addr_t));
+        *mpi_peer_array = (int *) malloc(opts->num_servers * sizeof(int));
+        if (!(*bmi_peer_array) || !(*mpi_peer_array))
+        {
+            return (-1);
+        }
+        for (i = 0; i < opts->num_servers; i++)
+        {
+            (*mpi_peer_array)[i] = i;
+        }
+        ret = bench_initialize_bmi_interface(opts->method_name, 0, context);
     }
     if (ret < 0)
     {
-	fprintf(stderr, "bench_initialize_bmi_interface() failure.\n");
-	return (-1);
+        fprintf(stderr, "bench_initialize_bmi_interface() failure.\n");
+        return (-1);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -103,23 +103,23 @@ int bench_init(
     /* gather BMI addresses */
     if (*world_rank < opts->num_servers)
     {
-	ret = bench_initialize_bmi_addresses_server(opts->num_servers,
-						    *num_clients,
-						    *bmi_peer_array,
-						    local_proc_name);
+        ret = bench_initialize_bmi_addresses_server(opts->num_servers,
+                                                    *num_clients,
+                                                    *bmi_peer_array,
+                                                    local_proc_name);
     }
     else
     {
-	ret = bench_initialize_bmi_addresses_client(opts->num_servers,
-						    *num_clients,
-						    *bmi_peer_array,
-						    opts->method_name,
-						    *context);
+        ret = bench_initialize_bmi_addresses_client(opts->num_servers,
+                                                    *num_clients,
+                                                    *bmi_peer_array,
+                                                    opts->method_name,
+                                                    *context);
     }
     if (ret < 0)
     {
-	fprintf(stderr, "bench_initialize_bmi_addresses() failure.\n");
-	return (-1);
+        fprintf(stderr, "bench_initialize_bmi_addresses() failure.\n");
+        return (-1);
     }
 
     return (0);
@@ -149,34 +149,34 @@ int bench_initialize_bmi_interface(
     /* build the local listening address */
     if (strcmp(method, "bmi_tcp") == 0)
     {
-	sprintf(local_address, "tcp://NULL:%d\n", BMI_TCP_PORT);
+        sprintf(local_address, "tcp://NULL:%d\n", BMI_TCP_PORT);
     }
     else if (strcmp(method, "bmi_gm") == 0)
     {
-	sprintf(local_address, "gm://NULL:%d\n", BMI_GM_PORT);
+        sprintf(local_address, "gm://NULL:%d\n", BMI_GM_PORT);
     }
     else if (strcmp(method, "bmi_ib") == 0)
     {
-	sprintf(local_address, "ib://NULL:%d\n", BMI_IB_PORT);
+        sprintf(local_address, "ib://NULL:%d\n", BMI_IB_PORT);
     }
     else
     {
-	fprintf(stderr, "Bad method: %s\n", method);
-	return (-1);
+        fprintf(stderr, "Bad method: %s\n", method);
+        return (-1);
     }
 
     if (flags & BMI_INIT_SERVER)
     {
-	ret = BMI_initialize(method, local_address, BMI_INIT_SERVER);
+        ret = BMI_initialize(method, local_address, BMI_INIT_SERVER);
     }
     else
     {
 
-	ret = BMI_initialize(method, NULL, 0);
+        ret = BMI_initialize(method, NULL, 0);
     }
     if (ret < 0)
     {
-	return (ret);
+        return (ret);
     }
 
     ret = BMI_open_context(context);
@@ -205,13 +205,13 @@ int bench_initialize_mpi_params(
     /* sanity check environment */
     if (numprocs < 2)
     {
-	fprintf(stderr, "bad number of procs.\n");
-	return (-1);
+        fprintf(stderr, "bad number of procs.\n");
+        return (-1);
     }
     if (num_servers > (numprocs - 1))
     {
-	fprintf(stderr, "bad number of servers.\n");
-	return (-1);
+        fprintf(stderr, "bad number of servers.\n");
+        return (-1);
     }
 
     *num_clients = numprocs - num_servers;
@@ -219,16 +219,16 @@ int bench_initialize_mpi_params(
     /* put half of procs in server group, other half in client group */
     if (*world_rank < num_servers)
     {
-	ret = MPI_Comm_split(MPI_COMM_WORLD, 0, 0, comm);
+        ret = MPI_Comm_split(MPI_COMM_WORLD, 0, 0, comm);
     }
     else
     {
-	ret = MPI_Comm_split(MPI_COMM_WORLD, 1, 0, comm);
+        ret = MPI_Comm_split(MPI_COMM_WORLD, 1, 0, comm);
     }
     if (ret != MPI_SUCCESS)
     {
-	fprintf(stderr, "MPI_Comm_spit() failure.\n");
-	return (-1);
+        fprintf(stderr, "MPI_Comm_spit() failure.\n");
+        return (-1);
     }
 
     /* record the name of this processor */
@@ -238,7 +238,7 @@ int bench_initialize_mpi_params(
     trunc_point = index(local_proc_name, '.');
     if (trunc_point)
     {
-	trunc_point[0] = '\0';
+        trunc_point[0] = '\0';
     }
 
     return (0);
@@ -258,12 +258,12 @@ int bench_initialize_bmi_addresses_server(
     /* send the name of the process to the clients */
     for (i = 0; i < num_clients; i++)
     {
-	ret = MPI_Send(local_proc_name, 256, MPI_BYTE, (num_servers + i), 0,
-		       MPI_COMM_WORLD);
-	if (ret != MPI_SUCCESS)
-	{
-	    return (-1);
-	}
+        ret = MPI_Send(local_proc_name, 256, MPI_BYTE, (num_servers + i), 0,
+                       MPI_COMM_WORLD);
+        if (ret != MPI_SUCCESS)
+        {
+            return (-1);
+        }
     }
 
     /* receive an unexpected message to acquire the BMI addresses and
@@ -271,16 +271,16 @@ int bench_initialize_bmi_addresses_server(
      */
     for (i = 0; i < num_clients; i++)
     {
-	do
-	{
-	    ret = BMI_testunexpected(1, &outcount, &this_info, 0);
-	} while (ret == 0 && outcount == 0);
-	if (ret < 0)
-	{
-	    return (-1);
-	}
-	client_array[i] = this_info.addr;
-	free(this_info.buffer);
+        do
+        {
+            ret = BMI_testunexpected(1, &outcount, &this_info, 0);
+        } while (ret == 0 && outcount == 0);
+        if (ret < 0)
+        {
+            return (-1);
+        }
+        client_array[i] = this_info.addr;
+        free(this_info.buffer);
     }
 
     return (0);
@@ -305,34 +305,34 @@ int bench_initialize_bmi_addresses_client(
     /* receive all of the process names of the servers */
     for (i = 0; i < num_servers; i++)
     {
-	ret = MPI_Recv(server_name, 256, MPI_BYTE, i, 0, MPI_COMM_WORLD,
-		       &status_foo);
-	if (ret != MPI_SUCCESS)
-	{
-	    return (-1);
-	}
-	/* convert process nams into BMI addresses and lookup */
-	if (strcmp(method_name, "bmi_tcp") == 0)
-	{
-	    sprintf(bmi_server_name, "tcp://%s:%d", server_name, BMI_TCP_PORT);
-	}
-	else if (strcmp(method_name, "bmi_gm") == 0)
-	{
-	    sprintf(bmi_server_name, "gm://%s:%d", server_name, BMI_GM_PORT);
-	}
-	else if (strcmp(method_name, "bmi_ib") == 0)
-	{
-	    sprintf(bmi_server_name, "ib://%s:%d", server_name, BMI_IB_PORT);
-	}
-	else
-	{
-	    return (-1);
-	}
-	ret = BMI_addr_lookup(&server_array[i], bmi_server_name);
-	if (ret < 0)
-	{
-	    return (-1);
-	}
+        ret = MPI_Recv(server_name, 256, MPI_BYTE, i, 0, MPI_COMM_WORLD,
+                       &status_foo);
+        if (ret != MPI_SUCCESS)
+        {
+            return (-1);
+        }
+        /* convert process nams into BMI addresses and lookup */
+        if (strcmp(method_name, "bmi_tcp") == 0)
+        {
+            sprintf(bmi_server_name, "tcp://%s:%d", server_name, BMI_TCP_PORT);
+        }
+        else if (strcmp(method_name, "bmi_gm") == 0)
+        {
+            sprintf(bmi_server_name, "gm://%s:%d", server_name, BMI_GM_PORT);
+        }
+        else if (strcmp(method_name, "bmi_ib") == 0)
+        {
+            sprintf(bmi_server_name, "ib://%s:%d", server_name, BMI_IB_PORT);
+        }
+        else
+        {
+            return (-1);
+        }
+        ret = BMI_addr_lookup(&server_array[i], bmi_server_name);
+        if (ret < 0)
+        {
+            return (-1);
+        }
     }
 
     /* send an unexpected message to servers to inform them of client
@@ -340,21 +340,21 @@ int bench_initialize_bmi_addresses_client(
      */
     for (i = 0; i < num_servers; i++)
     {
-	ret = BMI_post_sendunexpected(&bmi_id, server_array[i], &ret,
-				      sizeof(int), BMI_EXT_ALLOC, 0, NULL,
-				      context);
-	if (ret == 0)
-	{
-	    do
-	    {
-		ret = BMI_test(bmi_id, &outcount, &error_code,
-			       &actual_size, NULL, 0, context);
-	    } while (ret == 0 && outcount == 0);
-	}
-	if (ret < 0 || error_code != 0)
-	{
-	    return (-1);
-	}
+        ret = BMI_post_sendunexpected(&bmi_id, server_array[i], &ret,
+                                      sizeof(int), BMI_EXT_ALLOC, 0, NULL,
+                                      context);
+        if (ret == 0)
+        {
+            do
+            {
+                ret = BMI_test(bmi_id, &outcount, &error_code,
+                               &actual_size, NULL, 0, context);
+            } while (ret == 0 && outcount == 0);
+        }
+        if (ret < 0 || error_code != 0)
+        {
+            return (-1);
+        }
     }
 
     return (0);

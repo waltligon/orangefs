@@ -41,92 +41,111 @@ struct xattr_handler *pvfs2_xattr_handlers[] = {
     NULL
 };
 
-#else 
+#else
 
 /* prefix comparison function; taken from RedHat patched 2.4 kernel with
  * xattr support
  */
-static inline const char * pvfs2_strcmp_prefix(
-    const char *a, 
+static inline const char *pvfs2_strcmp_prefix(
+    const char *a,
     const char *a_prefix)
-{               
-    while (*a_prefix && *a == *a_prefix) {
-        a++;    
+{
+    while (*a_prefix && *a == *a_prefix)
+    {
+        a++;
         a_prefix++;
-    }       
+    }
     return *a_prefix ? NULL : a;
-}       
+}
 
 /* These routines are used only for the 2.4 kernel xattr callbacks or for early 2.6 kernels */
 
 /* All pointers are in kernel-space */
 #ifdef HAVE_SETXATTR_CONST_ARG
-int pvfs2_setxattr(struct dentry *dentry, const char *name,
-		const void *value, size_t size, int flags)
+int pvfs2_setxattr(
+    struct dentry *dentry,
+    const char *name,
+    const void *value,
+    size_t size,
+    int flags)
 #else
-int pvfs2_setxattr(struct dentry *dentry, const char *name,
-		void *value, size_t size, int flags)
+int pvfs2_setxattr(
+    struct dentry *dentry,
+    const char *name,
+    void *value,
+    size_t size,
+    int flags)
 #endif
 {
     struct inode *inode = dentry->d_inode;
-    const char* n;
+    const char *n;
     int ret = -EOPNOTSUPP;
 
-    if((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_TRUSTED_PREFIX)))
+    if ((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_TRUSTED_PREFIX)))
     {
         ret = pvfs2_xattr_set_trusted(inode, n, value, size, flags);
         goto out;
     }
     else if ((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_DEFAULT)) ||
-            (n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_ACCESS)))
+             (n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_ACCESS)))
     {
         /* If we don't support acl's dont bother calling setxattr */
-        if (get_acl_flag(inode) == 0) {
+        if (get_acl_flag(inode) == 0)
+        {
             ret = -EOPNOTSUPP;
             goto out;
         }
     }
     ret = pvfs2_xattr_set_default(inode, name, value, size, flags);
-out:
+  out:
     return ret;
 }
 
-ssize_t pvfs2_getxattr(struct dentry *dentry, const char *name,
-		         void *buffer, size_t size)
+ssize_t pvfs2_getxattr(
+    struct dentry * dentry,
+    const char *name,
+    void *buffer,
+    size_t size)
 {
     struct inode *inode = dentry->d_inode;
-    const char* n;
+    const char *n;
     int ret = -EOPNOTSUPP;
 
-    if((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_TRUSTED_PREFIX)))
+    if ((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_TRUSTED_PREFIX)))
     {
         ret = pvfs2_xattr_get_trusted(inode, n, buffer, size);
         goto out;
     }
     else if ((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_DEFAULT)) ||
-            (n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_ACCESS)))
+             (n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_ACCESS)))
     {
         /* If we don't support acl's dont bother calling getxattr */
-        if (get_acl_flag(inode) == 0) {
+        if (get_acl_flag(inode) == 0)
+        {
             ret = -EOPNOTSUPP;
             goto out;
         }
     }
     ret = pvfs2_xattr_get_default(inode, name, buffer, size);
 
-out:
+  out:
     return ret;
 }
 
 #endif
 
-ssize_t pvfs2_listxattr(struct dentry *dentry, char *buffer, size_t size)
+ssize_t pvfs2_listxattr(
+    struct dentry * dentry,
+    char *buffer,
+    size_t size)
 {
     struct inode *inode = dentry->d_inode;
     return pvfs2_inode_listxattr(inode, buffer, size);
 }
 
-int pvfs2_removexattr(struct dentry *dentry, const char *name)
+int pvfs2_removexattr(
+    struct dentry *dentry,
+    const char *name)
 {
     struct inode *inode = dentry->d_inode;
     return pvfs2_inode_removexattr(inode, NULL, name);

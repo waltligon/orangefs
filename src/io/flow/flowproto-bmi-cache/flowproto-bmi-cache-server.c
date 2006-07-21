@@ -24,7 +24,7 @@
 #include "ncac-interface.h"
 #include "internal.h"
 #include "pvfs2-internal.h"
-    
+
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 16
 
@@ -42,13 +42,13 @@
 #define NO_MUTEX_FLAG	0
 #define MUTEX_FLAG	1
 
- 	
+
 /* Noted by wuj: The flowproto-bmi-cache design has significant 
  * differences from the template "bmi-trove" design in handling 
  * buffers. These difference are reflected in the
  * data structure added and/or changed in fp_queue_item and other
  * related structures. 
- */ 
+ */
 
 struct pint_req_entry
 {
@@ -59,23 +59,23 @@ struct pint_req_entry
 
 struct cache_req_entry
 {
-	cache_request_t request;  /* cache request handle */
-	int 	errval;		/* error code */
-	int mem_cnt;			/* how many buffers */
+    cache_request_t request;    /* cache request handle */
+    int errval;                 /* error code */
+    int mem_cnt;                /* how many buffers */
 
-	/* buffer size array, array space provided by the cache */
-	PVFS_size *msize_list; 
+    /* buffer size array, array space provided by the cache */
+    PVFS_size *msize_list;
 
-	/* "total_size" is the sum of the size list */
-	PVFS_size total_size; 
+    /* "total_size" is the sum of the size list */
+    PVFS_size total_size;
 
-	/* buffer offset array, provided by the cache */
-	PVFS_offset **moff_list; 
+    /* buffer offset array, provided by the cache */
+    PVFS_offset **moff_list;
 
-	/* if this is not NULL, this buffer is supplied by the flow */
-	PVFS_offset *buffer;
+    /* if this is not NULL, this buffer is supplied by the flow */
+    PVFS_offset *buffer;
 
-	enum bmi_buffer_type buffer_type;
+    enum bmi_buffer_type buffer_type;
 };
 
 
@@ -83,22 +83,22 @@ struct cache_req_entry
  * A request --> a flow --> a list of fp_queue_items */
 struct fp_queue_item
 {
-	/* point to the flow descriptor */
-	flow_descriptor* 	parent;	
+    /* point to the flow descriptor */
+    flow_descriptor *parent;
 
-	/* PINT request information */
-	struct pint_req_entry 	pint_req; 
+    /* PINT request information */
+    struct pint_req_entry pint_req;
 
-	/* cache request information */
-	struct cache_req_entry 	cache_req; 
-	int int_state;
+    /* cache request information */
+    struct cache_req_entry cache_req;
+    int int_state;
 
-	/* flag to show whether the callbacks are set up */
-	int 	callback_setup;
-	struct PINT_thread_mgr_bmi_callback bmi_callback;
-	struct PINT_thread_mgr_trove_callback cache_callback;
+    /* flag to show whether the callbacks are set up */
+    int callback_setup;
+    struct PINT_thread_mgr_bmi_callback bmi_callback;
+    struct PINT_thread_mgr_trove_callback cache_callback;
 
-	struct qlist_head list_link;
+    struct qlist_head list_link;
 };
 
 /* fp_private_data is information specific to this flow protocol, stored
@@ -106,22 +106,22 @@ struct fp_queue_item
  */
 struct fp_private_data
 {
-	/* point to the flow descriptor */
-	flow_descriptor* parent;       
+    /* point to the flow descriptor */
+    flow_descriptor *parent;
 
-	/* PINT request done? */
-	int pint_request_done;	
-	
-	/* PINT request list */
-	struct qlist_head pint_req_list;
+    /* PINT request done? */
+    int pint_request_done;
 
-	/* requests completed on the cache side */ 
-	struct qlist_head cache_req_done_list;  
+    /* PINT request list */
+    struct qlist_head pint_req_list;
 
-	PVFS_size total_bytes_processed;
-	TROVE_context_id trove_context;
+    /* requests completed on the cache side */
+    struct qlist_head cache_req_done_list;
 
-	gen_mutex_t flow_mutex;
+    PVFS_size total_bytes_processed;
+    TROVE_context_id trove_context;
+
+    gen_mutex_t flow_mutex;
 };
 
 #define PRIVATE_FLOW(target_flow)\
@@ -132,63 +132,79 @@ static bmi_context_id global_bmi_context = -1;
 static TROVE_context_id global_trove_context = -1;
 
 
-static void bmi_recv_callback_fn(void *user_ptr,
-		         PVFS_size actual_size,
-		         PVFS_error error_code);
+static void bmi_recv_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code);
 
-static void bmi_send_callback_fn(void *user_ptr,
-		         PVFS_size actual_size,
-		         PVFS_error error_code);
+static void bmi_send_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code);
 
 #if 0
 /* the above function is a special case; we need to look at a return
  * value when we invoke it directly, so we use the following function
  * to trigger it from a callback
  */
-static void bmi_send_callback_wrapper(void *user_ptr,
-		         PVFS_size actual_size,
-		         PVFS_error error_code)
+static void bmi_send_callback_wrapper(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
     bmi_send_callback_fn(user_ptr, actual_size, error_code);
     return;
 };
 #endif
 
-static void cache_read_callback_fn(void *user_ptr,
-		           PVFS_error error_code);
+static void cache_read_callback_fn(
+    void *user_ptr,
+    PVFS_error error_code);
 
-static void cache_write_callback_fn(void *user_ptr,
-		           PVFS_error error_code);
+static void cache_write_callback_fn(
+    void *user_ptr,
+    PVFS_error error_code);
 
 /* protocol specific functions */
-static int  bmi_cache_request_init(struct fp_private_data *flow_data, 
-			int direction);
+static int bmi_cache_request_init(
+    struct fp_private_data *flow_data,
+    int direction);
 
-static int  bmi_cache_progress_check(struct flow_descriptor *flow_d, 
-			int wait_flag, 
-			int mutex_flag,
-			int direction);
+static int bmi_cache_progress_check(
+    struct flow_descriptor *flow_d,
+    int wait_flag,
+    int mutex_flag,
+    int direction);
 
 
-static int bmi_cache_check_cache_req(struct fp_queue_item *q_item); 
-static int bmi_cache_release_cache_src(struct fp_queue_item *q_item);
-static int bmi_cache_init_cache_req(struct fp_queue_item *qitem, int op);
+static int bmi_cache_check_cache_req(
+    struct fp_queue_item *q_item);
+static int bmi_cache_release_cache_src(
+    struct fp_queue_item *q_item);
+static int bmi_cache_init_cache_req(
+    struct fp_queue_item *qitem,
+    int op);
 
 
 /* interface prototypes */
-static int fp_bmi_cache_initialize(int flowproto_id);
+static int fp_bmi_cache_initialize(
+    int flowproto_id);
 
-static int fp_bmi_cache_finalize(void);
+static int fp_bmi_cache_finalize(
+    void);
 
-static int fp_bmi_cache_getinfo(flow_descriptor * flow_d,
-			       int option,
-			       void *parameter);
+static int fp_bmi_cache_getinfo(
+    flow_descriptor * flow_d,
+    int option,
+    void *parameter);
 
-static int fp_bmi_cache_setinfo(flow_descriptor * flow_d,
-			       int option,
-			       void *parameter);
+static int fp_bmi_cache_setinfo(
+    flow_descriptor * flow_d,
+    int option,
+    void *parameter);
 
-static int fp_bmi_cache_post(flow_descriptor * flow_d);
+static int fp_bmi_cache_post(
+    flow_descriptor * flow_d);
 
 
 static char fp_bmi_cache_name[] = "flowproto_bmi_cache";
@@ -205,7 +221,7 @@ struct flowproto_ops fp_bmi_cache_ops = {
 
 /* TODO: where we initialize cache. For the timebeing, I put it here. 
  * This should be changed later.
- */ 
+ */
 static int cache_initialized = 0;
 
 /* fp_bmi_cache_initialize()
@@ -214,16 +230,17 @@ static int cache_initialized = 0;
  *
  * returns 0 on succes, -PVFS_error on failure
  */
-int fp_bmi_cache_initialize(int flowproto_id)
+int fp_bmi_cache_initialize(
+    int flowproto_id)
 {
     int ret = -1;
 
     ret = PINT_thread_mgr_bmi_start();
-    if(ret < 0)
-	return(ret);
+    if (ret < 0)
+        return (ret);
     PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
 
-    return(0);
+    return (0);
 }
 
 /* fp_bmi_cache_finalize()
@@ -232,7 +249,8 @@ int fp_bmi_cache_initialize(int flowproto_id)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int fp_bmi_cache_finalize(void)
+int fp_bmi_cache_finalize(
+    void)
 {
     PINT_thread_mgr_bmi_stop();
     return (0);
@@ -244,22 +262,23 @@ int fp_bmi_cache_finalize(void)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int fp_bmi_cache_getinfo(flow_descriptor * flow_d,
-			       int option,
-			       void *parameter)
+int fp_bmi_cache_getinfo(
+    flow_descriptor * flow_d,
+    int option,
+    void *parameter)
 {
-    int* type;
+    int *type;
 
-    switch(option)
+    switch (option)
     {
-	case FLOWPROTO_TYPE_QUERY:
-	    type = parameter;
-	    if(*type == FLOWPROTO_BMI_CACHE)
-		return(0);
-	    else
-		return(-PVFS_ENOPROTOOPT);
-	default:
-	    return(-PVFS_ENOSYS);
+    case FLOWPROTO_TYPE_QUERY:
+        type = parameter;
+        if (*type == FLOWPROTO_BMI_CACHE)
+            return (0);
+        else
+            return (-PVFS_ENOPROTOOPT);
+    default:
+        return (-PVFS_ENOSYS);
     }
 }
 
@@ -269,9 +288,10 @@ int fp_bmi_cache_getinfo(flow_descriptor * flow_d,
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int fp_bmi_cache_setinfo(flow_descriptor * flow_d,
-			       int option,
-			       void *parameter)
+int fp_bmi_cache_setinfo(
+    flow_descriptor * flow_d,
+    int option,
+    void *parameter)
 {
     return (-PVFS_ENOSYS);
 }
@@ -282,185 +302,194 @@ int fp_bmi_cache_setinfo(flow_descriptor * flow_d,
  *
  * returns 0 on success, 1 on immediate completion, -PVFS_error on failure
  */
-int fp_bmi_cache_post(flow_descriptor * flow_d)
+int fp_bmi_cache_post(
+    flow_descriptor * flow_d)
 {
-	struct fp_private_data* flow_data = NULL;
-	NCAC_info_t info;
-	int ret;
+    struct fp_private_data *flow_data = NULL;
+    NCAC_info_t info;
+    int ret;
 
-	/* on the server side: only two possible types */
-	fprintf(stderr, "src.endpoint:%d, desc.endpoint:%d\n", flow_d->src.endpoint_id, flow_d->dest.endpoint_id);
+    /* on the server side: only two possible types */
+    fprintf(stderr, "src.endpoint:%d, desc.endpoint:%d\n",
+            flow_d->src.endpoint_id, flow_d->dest.endpoint_id);
 
-	assert( (flow_d->src.endpoint_id == BMI_ENDPOINT && 
-		flow_d->dest.endpoint_id == TROVE_ENDPOINT) ||
-		(flow_d->src.endpoint_id == TROVE_ENDPOINT &&
-		flow_d->dest.endpoint_id == BMI_ENDPOINT) );
+    assert((flow_d->src.endpoint_id == BMI_ENDPOINT &&
+            flow_d->dest.endpoint_id == TROVE_ENDPOINT) ||
+           (flow_d->src.endpoint_id == TROVE_ENDPOINT &&
+            flow_d->dest.endpoint_id == BMI_ENDPOINT));
 
-	/* TODO: seems not right here. coll_id --> trove_context id */
-	if ( !cache_initialized ) {
-		info.max_req_num = 1000;
-		info.extsize     = 32768;
-		info.cachesize   = 40*1048576;
-		info.cachespace = malloc(info.cachesize);
-		if (!info.cachespace) {
-			fprintf(stderr, "cannot allocate memory for the cache\n");
-			return(-PVFS_ENOMEM);
-		}
-		ret = trove_open_context(flow_d->dest.u.trove.coll_id, &global_trove_context);
-		if (ret < 0)
-		{
-			fprintf(stderr, "TROVE_open_context() failure.\n");
-			return (-1);
-		}
-		fprintf(stderr, "collid:%d, trove_context:%d\n", flow_d->dest.u.trove.coll_id, global_trove_context);
+    /* TODO: seems not right here. coll_id --> trove_context id */
+    if (!cache_initialized)
+    {
+        info.max_req_num = 1000;
+        info.extsize = 32768;
+        info.cachesize = 40 * 1048576;
+        info.cachespace = malloc(info.cachesize);
+        if (!info.cachespace)
+        {
+            fprintf(stderr, "cannot allocate memory for the cache\n");
+            return (-PVFS_ENOMEM);
+        }
+        ret =
+            trove_open_context(flow_d->dest.u.trove.coll_id,
+                               &global_trove_context);
+        if (ret < 0)
+        {
+            fprintf(stderr, "TROVE_open_context() failure.\n");
+            return (-1);
+        }
+        fprintf(stderr, "collid:%d, trove_context:%d\n",
+                flow_d->dest.u.trove.coll_id, global_trove_context);
 
-		ret = cache_init(&info);
-		if ( ret < 0 )
-		{
-			fprintf(stderr, "init cache error\n");
-			return ret;
-		}
+        ret = cache_init(&info);
+        if (ret < 0)
+        {
+            fprintf(stderr, "init cache error\n");
+            return ret;
+        }
 
-		cache_initialized = 1;
-		fprintf(stderr, "cache is initialized\n");
-	}
+        cache_initialized = 1;
+        fprintf(stderr, "cache is initialized\n");
+    }
 
-	flow_data = (struct fp_private_data*)malloc(sizeof(struct fp_private_data));
-	if(!flow_data)
-		return(-PVFS_ENOMEM);
-	memset(flow_data, 0, sizeof(struct fp_private_data));
+    flow_data =
+        (struct fp_private_data *) malloc(sizeof(struct fp_private_data));
+    if (!flow_data)
+        return (-PVFS_ENOMEM);
+    memset(flow_data, 0, sizeof(struct fp_private_data));
 
-	flow_d->flow_protocol_data = flow_data;
-	flow_d->state = FLOW_TRANSMITTING;
+    flow_d->flow_protocol_data = flow_data;
+    flow_d->state = FLOW_TRANSMITTING;
 
-	/* protocol specific fields */
-	flow_data->parent = flow_d;
-	INIT_QLIST_HEAD(&flow_data->pint_req_list);
-	flow_data->pint_request_done = 0;
-	INIT_QLIST_HEAD(&flow_data->cache_req_done_list);
+    /* protocol specific fields */
+    flow_data->parent = flow_d;
+    INIT_QLIST_HEAD(&flow_data->pint_req_list);
+    flow_data->pint_request_done = 0;
+    INIT_QLIST_HEAD(&flow_data->cache_req_done_list);
 
-	flow_data->trove_context = global_trove_context;
-	gen_mutex_init(&flow_data->flow_mutex);
+    flow_data->trove_context = global_trove_context;
+    gen_mutex_init(&flow_data->flow_mutex);
 
-	/* if a file datatype offset was specified, go ahead and skip ahead 
- 	 * before doing anything else
-	 */
-	if(flow_d->file_req_offset)
-		PINT_REQUEST_STATE_SET_TARGET(flow_d->file_req_state, 
-					flow_d->file_req_offset);
+    /* if a file datatype offset was specified, go ahead and skip ahead 
+     * before doing anything else
+     */
+    if (flow_d->file_req_offset)
+        PINT_REQUEST_STATE_SET_TARGET(flow_d->file_req_state,
+                                      flow_d->file_req_offset);
 
-	/* set boundaries on file datatype */
-	if(flow_d->aggregate_size > -1)
-	{
-		PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state, 
-			flow_d->aggregate_size+flow_d->file_req_offset);
-	}
-	else
-	{
-		PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
-					flow_d->file_req_offset +
-			PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
-	}
+    /* set boundaries on file datatype */
+    if (flow_d->aggregate_size > -1)
+    {
+        PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+                                     flow_d->aggregate_size +
+                                     flow_d->file_req_offset);
+    }
+    else
+    {
+        PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+                                     flow_d->file_req_offset +
+                                     PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
+    }
 
-	/* (1) init requests; (2) check progress; later all progress checks 
-	 * are driven by callbacks.
-	 */
+    /* (1) init requests; (2) check progress; later all progress checks 
+     * are driven by callbacks.
+     */
 
-	if( flow_d->src.endpoint_id == TROVE_ENDPOINT &&
-		flow_d->dest.endpoint_id == BMI_ENDPOINT )
-	{
-		/* CACHE --> BMI flow: read from cache, then send to the 
-		 * network. When the cache supports callback, the cache 
-		 * callback triggers BMI operations; the BMI callback triggers 
-		 * the release of cache resources. 
-		 * When the cache does not support callback, as in the current
-		 * implementation, we use the following progress method:
-		 * (1) wait for the completion of the first cache request;
-		 * (2) initiate the BMI send operation;
-		 * (3) in the BMI send callback function, we wait for the 
-		 *     completion of the next cache request;  
-		 * (4) goto step (2).
-		 */ 
+    if (flow_d->src.endpoint_id == TROVE_ENDPOINT &&
+        flow_d->dest.endpoint_id == BMI_ENDPOINT)
+    {
+        /* CACHE --> BMI flow: read from cache, then send to the 
+         * network. When the cache supports callback, the cache 
+         * callback triggers BMI operations; the BMI callback triggers 
+         * the release of cache resources. 
+         * When the cache does not support callback, as in the current
+         * implementation, we use the following progress method:
+         * (1) wait for the completion of the first cache request;
+         * (2) initiate the BMI send operation;
+         * (3) in the BMI send callback function, we wait for the 
+         *     completion of the next cache request;  
+         * (4) goto step (2).
+         */
 
-		ret = bmi_cache_request_init(flow_data, CACHE_TO_BMI);
-		if ( ret < 0 ) {
-			PVFS_perror_gossip("bmi_cache_request_init error: "
-                                           "error_code", ret);
-			return ret;
-		}
+        ret = bmi_cache_request_init(flow_data, CACHE_TO_BMI);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("bmi_cache_request_init error: "
+                               "error_code", ret);
+            return ret;
+        }
 
-		if ( ret == 1 ) { /* immediate completion */
-			return ret;
-		}
-		
-		/* check progress. MUTEX_FLAG is needed because possible
-		 * callbacks may happen at the same time.
-		 */
-		ret = bmi_cache_progress_check( flow_d, 
-						BLOCKING_FLAG,
-						MUTEX_FLAG,
-						CACHE_TO_BMI );
-		if ( ret < 0 )
-		{
-			PVFS_perror_gossip("bmi_cache_progress_check error: "
-                                           "error_code", ret);
-			return ret;
-		}
+        if (ret == 1)
+        {       /* immediate completion */
+            return ret;
+        }
 
-	}
-	else if( flow_d->src.endpoint_id == BMI_ENDPOINT &&
-			 flow_d->dest.endpoint_id == TROVE_ENDPOINT )
-	{
-		/* BMI--->CACHE flow: (1) init requests; (2) check progress;
-		 * later all progress checks are driven by callbacks;
-		 *   cache callbacks to indicate that data buffers are 
-		 *   available;
-		 *	then trigger BMI receive operations to receive data 
-		 * 	into the cache buffers;
-		 *	the BMI call back function will trigger releasing 
-		 *	cache buffers.
-		 * In the current implementation, cache does not provide 
-		 * callback (we will add it later), the progress of cache 
-		 * is checked in the BMI call back function. That means, in 
-		 * the BMI call back function, we release cache buffers for 
-		 * the previous queue item; then we see if the cache buffers 
-		 * are available for another queue item (polling with time 
-		 * idle), if yes, initiate BMI receive operations.
-		 */ 
+        /* check progress. MUTEX_FLAG is needed because possible
+         * callbacks may happen at the same time.
+         */
+        ret = bmi_cache_progress_check(flow_d,
+                                       BLOCKING_FLAG, MUTEX_FLAG, CACHE_TO_BMI);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("bmi_cache_progress_check error: "
+                               "error_code", ret);
+            return ret;
+        }
 
-		ret = bmi_cache_request_init(flow_data, BMI_TO_CACHE);
-		if ( ret < 0 ) {
-			PVFS_perror_gossip("bmi_cache_request_init error: "
-                                           "error_code", ret);
-			return ret;
-		}
+    }
+    else if (flow_d->src.endpoint_id == BMI_ENDPOINT &&
+             flow_d->dest.endpoint_id == TROVE_ENDPOINT)
+    {
+        /* BMI--->CACHE flow: (1) init requests; (2) check progress;
+         * later all progress checks are driven by callbacks;
+         *   cache callbacks to indicate that data buffers are 
+         *   available;
+         *      then trigger BMI receive operations to receive data 
+         *      into the cache buffers;
+         *      the BMI call back function will trigger releasing 
+         *      cache buffers.
+         * In the current implementation, cache does not provide 
+         * callback (we will add it later), the progress of cache 
+         * is checked in the BMI call back function. That means, in 
+         * the BMI call back function, we release cache buffers for 
+         * the previous queue item; then we see if the cache buffers 
+         * are available for another queue item (polling with time 
+         * idle), if yes, initiate BMI receive operations.
+         */
 
-		if ( ret == 1 ) { /* immediate completion */
-			return ret;
-		}
+        ret = bmi_cache_request_init(flow_data, BMI_TO_CACHE);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("bmi_cache_request_init error: "
+                               "error_code", ret);
+            return ret;
+        }
 
-		/* check progress. MUTEX_FLAG is needed because possible
-		 * callbacks may happen at the same time.
-		 */
+        if (ret == 1)
+        {       /* immediate completion */
+            return ret;
+        }
 
-		ret = bmi_cache_progress_check(flow_d, 
-					BLOCKING_FLAG, 
-					MUTEX_FLAG,
-					BMI_TO_CACHE);
-		if ( ret < 0 )
-		{
-			PVFS_perror_gossip("bmi_cache_progress_check error: "
-                                           "error_code", ret);
-			return ret;
-		}
+        /* check progress. MUTEX_FLAG is needed because possible
+         * callbacks may happen at the same time.
+         */
 
-	}
-	else
-	{
-		return(-ENOSYS);
-	}
+        ret = bmi_cache_progress_check(flow_d,
+                                       BLOCKING_FLAG, MUTEX_FLAG, BMI_TO_CACHE);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("bmi_cache_progress_check error: "
+                               "error_code", ret);
+            return ret;
+        }
 
-	return (0);
+    }
+    else
+    {
+        return (-ENOSYS);
+    }
+
+    return (0);
 }
 
 
@@ -471,103 +500,109 @@ int fp_bmi_cache_post(flow_descriptor * flow_d)
  * requests together. The direct purposes is to enable pipelining and to 
  * reduce buffer preasure.
  * return: 0: success;  <0 error; 1: complete;
- */ 
+ */
 
-int  bmi_cache_request_init(struct fp_private_data *flow_data, int direction)
+int bmi_cache_request_init(
+    struct fp_private_data *flow_data,
+    int direction)
 {
-	struct flow_descriptor *flow_d = flow_data->parent;
-	struct fp_queue_item *new_qitem = NULL;
-	struct pint_req_entry* pint_req = NULL;
-	PVFS_size bytes_processed = 0;
+    struct flow_descriptor *flow_d = flow_data->parent;
+    struct fp_queue_item *new_qitem = NULL;
+    struct pint_req_entry *pint_req = NULL;
+    PVFS_size bytes_processed = 0;
 
-	int ret;
+    int ret;
 
-	fprintf(stderr, "bmi_cache_request_init: enter\n");
+    fprintf(stderr, "bmi_cache_request_init: enter\n");
 
-	/* Handle a zero request. TODO: check whether this is right or not. */
-	if ( flow_d->file_data.fsize == 0 ) 
-	{
-		flow_d->state = FLOW_COMPLETE;
-		free(flow_data);
-		flow_d->release(flow_d);
-		flow_d->callback(flow_d);
-		fprintf(stderr, "bmi_cache_request_init: exit with return 1. zero request.\n");
-		return(1);
-	}
+    /* Handle a zero request. TODO: check whether this is right or not. */
+    if (flow_d->file_data.fsize == 0)
+    {
+        flow_d->state = FLOW_COMPLETE;
+        free(flow_data);
+        flow_d->release(flow_d);
+        flow_d->callback(flow_d);
+        fprintf(stderr,
+                "bmi_cache_request_init: exit with return 1. zero request.\n");
+        return (1);
+    }
 
-	/* get request information before launching cache request.
-	 * Basically, we need to know what the request is, including
-	 * file regions, each region offset, and each region length. 
-	 * A pipelining idea is included in the following steps:
-	 *    a large flow request ---> several requests with "MAX_REGIONS"
-	 *	   and "BUFFER_SIZE" ---> pint_req_list 
-	 * Later, we process each element in the pint_req_list:
-	 *  1) dequeue an element from the list;
-	 *	2) init cache request;
-	 *  3) drive BMI operations;
-	 *  4) enqueue the element into another list;
-	 * If all elements have been through the above steps,
-	 * the request is done.
-	 */
+    /* get request information before launching cache request.
+     * Basically, we need to know what the request is, including
+     * file regions, each region offset, and each region length. 
+     * A pipelining idea is included in the following steps:
+     *    a large flow request ---> several requests with "MAX_REGIONS"
+     *         and "BUFFER_SIZE" ---> pint_req_list 
+     * Later, we process each element in the pint_req_list:
+     *  1) dequeue an element from the list;
+     *      2) init cache request;
+     *  3) drive BMI operations;
+     *  4) enqueue the element into another list;
+     * If all elements have been through the above steps,
+     * the request is done.
+     */
 
-	assert ( flow_data->pint_request_done == 0 );
+    assert(flow_data->pint_request_done == 0);
 
-	/* get PINT_requests and initiate related cache requests */
-	do {
-		new_qitem = (struct fp_queue_item *)malloc(sizeof(struct fp_queue_item));
-		assert(new_qitem);
-		memset(new_qitem, 0 , sizeof(struct fp_queue_item));
+    /* get PINT_requests and initiate related cache requests */
+    do
+    {
+        new_qitem =
+            (struct fp_queue_item *) malloc(sizeof(struct fp_queue_item));
+        assert(new_qitem);
+        memset(new_qitem, 0, sizeof(struct fp_queue_item));
 
-		new_qitem->parent = flow_d;
-		
-		/* process request */
-		pint_req = & new_qitem->pint_req;
-		pint_req->result.offset_array = pint_req->offset_list;
-		pint_req->result.size_array = pint_req->size_list;
-		pint_req->result.bytemax = BUFFER_SIZE;
-		pint_req->result.bytes = 0;
-		pint_req->result.segmax = MAX_REGIONS;
-		pint_req->result.segs = 0;
+        new_qitem->parent = flow_d;
 
-		ret = PINT_process_request( flow_d->file_req_state,
-					flow_d->mem_req_state,
-					&flow_d->file_data,
-					&pint_req->result,
-					PINT_SERVER );
-		/* TODO: error handling */
-		assert(ret >= 0);
+        /* process request */
+        pint_req = &new_qitem->pint_req;
+        pint_req->result.offset_array = pint_req->offset_list;
+        pint_req->result.size_array = pint_req->size_list;
+        pint_req->result.bytemax = BUFFER_SIZE;
+        pint_req->result.bytes = 0;
+        pint_req->result.segmax = MAX_REGIONS;
+        pint_req->result.segs = 0;
 
-		/* submit the cache request */
-		ret = bmi_cache_init_cache_req(new_qitem, direction);
+        ret = PINT_process_request(flow_d->file_req_state,
+                                   flow_d->mem_req_state,
+                                   &flow_d->file_data,
+                                   &pint_req->result, PINT_SERVER);
+        /* TODO: error handling */
+        assert(ret >= 0);
 
-		/* TODO: error handling */
-		assert(ret >= 0);
+        /* submit the cache request */
+        ret = bmi_cache_init_cache_req(new_qitem, direction);
 
-		new_qitem->int_state = INT_REQ_PROCESSING;
+        /* TODO: error handling */
+        assert(ret >= 0);
 
-		/* immediate completion on the cache request */
-		if ( ret == 1 ) 
-		{
-			fprintf(stderr, "bmi_cache_init_cache_req: immediate completion\n");
-			new_qitem->int_state = INT_REQ_COMPLETE;
-		}
-		
-		/* put the request into the chain */
-		qlist_add_tail(&new_qitem->list_link, &flow_data->pint_req_list);
-		bytes_processed += pint_req->result.bytes;
+        new_qitem->int_state = INT_REQ_PROCESSING;
 
-   	} while( !PINT_REQUEST_DONE(flow_d->file_req_state) );
+        /* immediate completion on the cache request */
+        if (ret == 1)
+        {
+            fprintf(stderr, "bmi_cache_init_cache_req: immediate completion\n");
+            new_qitem->int_state = INT_REQ_COMPLETE;
+        }
 
-	
-	flow_data->pint_request_done = 1;
+        /* put the request into the chain */
+        qlist_add_tail(&new_qitem->list_link, &flow_data->pint_req_list);
+        bytes_processed += pint_req->result.bytes;
 
-	flow_data->total_bytes_processed = bytes_processed;
+    } while (!PINT_REQUEST_DONE(flow_d->file_req_state));
 
-	fprintf(stderr, "bmi_cache_request_init: exit with return 0 (bytes_processed=%lld)\n", lld(bytes_processed));
 
-	return 0;
+    flow_data->pint_request_done = 1;
 
-} /* end of bmi_cache_request_init() */
+    flow_data->total_bytes_processed = bytes_processed;
+
+    fprintf(stderr,
+            "bmi_cache_request_init: exit with return 0 (bytes_processed=%lld)\n",
+            lld(bytes_processed));
+
+    return 0;
+
+}       /* end of bmi_cache_request_init() */
 
 
 /* bmi_cache_progress_check(): 
@@ -586,126 +621,135 @@ int  bmi_cache_request_init(struct fp_private_data *flow_data, int direction)
  *      < 0: error
  */
 
-int bmi_cache_progress_check(struct flow_descriptor *flow_d, 
-			int wait_flag, 
-			int mutex_flag,
-			int direction)
+int bmi_cache_progress_check(
+    struct flow_descriptor *flow_d,
+    int wait_flag,
+    int mutex_flag,
+    int direction)
 {
-	struct fp_private_data *flow_data = PRIVATE_FLOW(flow_d);
-	struct fp_queue_item *q_item = NULL;
-	struct qlist_head *tmp_link = NULL;
-	int doneflag = 0;
-	int ret;
+    struct fp_private_data *flow_data = PRIVATE_FLOW(flow_d);
+    struct fp_queue_item *q_item = NULL;
+    struct qlist_head *tmp_link = NULL;
+    int doneflag = 0;
+    int ret;
 
-	assert ( flow_data->pint_request_done == 1 );
+    assert(flow_data->pint_request_done == 1);
 
-	if ( qlist_empty(&flow_data->pint_req_list) ) 
-		return 1; 
+    if (qlist_empty(&flow_data->pint_req_list))
+        return 1;
 
-	fprintf(stderr, "bmi_cache_progress_check: enter (direction:%d)\n", direction);
-	doneflag = 0;
+    fprintf(stderr, "bmi_cache_progress_check: enter (direction:%d)\n",
+            direction);
+    doneflag = 0;
 
-	if ( mutex_flag ) {
-		gen_mutex_lock(&flow_data->flow_mutex);
-	}
+    if (mutex_flag)
+    {
+        gen_mutex_lock(&flow_data->flow_mutex);
+    }
 
-check_again:
+  check_again:
 
-	qlist_for_each(tmp_link, &flow_data->pint_req_list)
-	{
-		q_item = qlist_entry(tmp_link, struct fp_queue_item, list_link);
+    qlist_for_each(tmp_link, &flow_data->pint_req_list)
+    {
+        q_item = qlist_entry(tmp_link, struct fp_queue_item,
+                             list_link);
 
-		if ( q_item->int_state == INT_REQ_INIT )
-		{
-			/* wrong state */
-			PVFS_perror_gossip("bmi_cache_progress_check error: "
-                                           "wrong internal state:error code", -1);
+        if (q_item->int_state == INT_REQ_INIT)
+        {
+            /* wrong state */
+            PVFS_perror_gossip("bmi_cache_progress_check error: "
+                               "wrong internal state:error code", -1);
 
-			if ( mutex_flag )
-				gen_mutex_unlock(&flow_data->flow_mutex);
+            if (mutex_flag)
+                gen_mutex_unlock(&flow_data->flow_mutex);
 
-			/* TODO: error code */
-			return -1;
-		}
+            /* TODO: error code */
+            return -1;
+        }
 
-		/* internal reuqest has been issued, but in processing */
-		if ( q_item->int_state == INT_REQ_PROCESSING ) 
-		{
-			/* check the cache request */
-			ret = bmi_cache_check_cache_req(q_item); 
+        /* internal reuqest has been issued, but in processing */
+        if (q_item->int_state == INT_REQ_PROCESSING)
+        {
+            /* check the cache request */
+            ret = bmi_cache_check_cache_req(q_item);
 
-			/* TODO: error handling */
-			if ( ret < 0 ) 
-			{
-				if ( mutex_flag ) 
-					gen_mutex_unlock(&flow_data->flow_mutex);
-				PVFS_perror_gossip("bmi_cache_progress_check error: check cache request error:error code", -1);
+            /* TODO: error handling */
+            if (ret < 0)
+            {
+                if (mutex_flag)
+                    gen_mutex_unlock(&flow_data->flow_mutex);
+                PVFS_perror_gossip
+                    ("bmi_cache_progress_check error: check cache request error:error code",
+                     -1);
 
-				return -1;
-			}
-	
-			if ( ret == 1 ) { 
-				q_item->int_state = INT_REQ_COMPLETE;
-			}
-		}
+                return -1;
+            }
 
-		/* internal reuqest has been finished, buffers are available 
-		 * for BMI operations.
-		 */
-		if ( q_item->int_state == INT_REQ_COMPLETE )
-		{
-			fprintf(stderr, "bmi_cache_progress_check: cache req done\n");
+            if (ret == 1)
+            {
+                q_item->int_state = INT_REQ_COMPLETE;
+            }
+        }
 
-			/* move the item from pint_req_list to cache_req_done_list */
-			qlist_del(&q_item->list_link);
-			qlist_add_tail(&q_item->list_link, &flow_data->cache_req_done_list);
+        /* internal reuqest has been finished, buffers are available 
+         * for BMI operations.
+         */
+        if (q_item->int_state == INT_REQ_COMPLETE)
+        {
+            fprintf(stderr, "bmi_cache_progress_check: cache req done\n");
 
-			if ( direction == BMI_TO_CACHE ) 
-			{
-				if ( mutex_flag )
-					gen_mutex_unlock(&flow_data->flow_mutex);
-				cache_write_callback_fn(q_item, 0);
+            /* move the item from pint_req_list to cache_req_done_list */
+            qlist_del(&q_item->list_link);
+            qlist_add_tail(&q_item->list_link, &flow_data->cache_req_done_list);
 
-				if ( mutex_flag )
-					gen_mutex_lock(&flow_data->flow_mutex);
-			} else
-			{
-				if ( mutex_flag )
-					gen_mutex_unlock(&flow_data->flow_mutex);
-				cache_read_callback_fn(q_item, 0);
+            if (direction == BMI_TO_CACHE)
+            {
+                if (mutex_flag)
+                    gen_mutex_unlock(&flow_data->flow_mutex);
+                cache_write_callback_fn(q_item, 0);
 
-				if ( mutex_flag )
-					gen_mutex_lock(&flow_data->flow_mutex);
-			}
-			doneflag = 1;
-		}
-		
-		if ( !q_item->callback_setup ) 
-		{
-			q_item->bmi_callback.fn = bmi_recv_callback_fn;
-			q_item->bmi_callback.data = q_item;
+                if (mutex_flag)
+                    gen_mutex_lock(&flow_data->flow_mutex);
+            }
+            else
+            {
+                if (mutex_flag)
+                    gen_mutex_unlock(&flow_data->flow_mutex);
+                cache_read_callback_fn(q_item, 0);
+
+                if (mutex_flag)
+                    gen_mutex_lock(&flow_data->flow_mutex);
+            }
+            doneflag = 1;
+        }
+
+        if (!q_item->callback_setup)
+        {
+            q_item->bmi_callback.fn = bmi_recv_callback_fn;
+            q_item->bmi_callback.data = q_item;
 #ifdef __CACHE_CALLBACK_SUPPORT__
-			q_item->cache_callback.fn = cache_write_callback_fn;
-			q_item->cache_callback.data = q_item;
+            q_item->cache_callback.fn = cache_write_callback_fn;
+            q_item->cache_callback.data = q_item;
 #else
-			q_item->cache_callback.fn = NULL;
-			q_item->cache_callback.data = NULL;
+            q_item->cache_callback.fn = NULL;
+            q_item->cache_callback.data = NULL;
 #endif
 
-			q_item->callback_setup = 1;
-		}
-		
-		if ( doneflag ) break;
-		
-	} /* qlist_for_each element request */
-	
-	if ( !doneflag && wait_flag == BLOCKING_FLAG )
-		goto check_again;
+            q_item->callback_setup = 1;
+        }
 
-	if ( mutex_flag )
-		gen_mutex_unlock(&flow_data->flow_mutex);
-	
-	return 0;
+        if (doneflag)
+            break;
+
+    }   /* qlist_for_each element request */
+
+    if (!doneflag && wait_flag == BLOCKING_FLAG)
+        goto check_again;
+
+    if (mutex_flag)
+        gen_mutex_unlock(&flow_data->flow_mutex);
+
+    return 0;
 }
 
 
@@ -719,98 +763,102 @@ check_again:
  * 
  * no return value
  */
-static void bmi_recv_callback_fn(void *user_ptr,
-		         PVFS_size actual_size,
-		         PVFS_error error_code)
+static void bmi_recv_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
-	struct fp_queue_item* q_item = user_ptr;
-	struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
-	struct flow_descriptor * flow_d = flow_data->parent;
+    struct fp_queue_item *q_item = user_ptr;
+    struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
+    struct flow_descriptor *flow_d = flow_data->parent;
 
-	struct qlist_head *tmp_link = NULL;
+    struct qlist_head *tmp_link = NULL;
 
-	int ret;
+    int ret;
 
-	/* TODO: error handling */
-	if(error_code != 0)
-	{
-		PVFS_perror_gossip("bmi_recv_callback_fn error_code", 
-					error_code);
-		assert(0);
-	}
+    /* TODO: error handling */
+    if (error_code != 0)
+    {
+        PVFS_perror_gossip("bmi_recv_callback_fn error_code", error_code);
+        assert(0);
+    }
 
-	gen_mutex_lock(&flow_data->flow_mutex);
+    gen_mutex_lock(&flow_data->flow_mutex);
 
-	/* remove from current queue */
-	qlist_del(&q_item->list_link);
+    /* remove from current queue */
+    qlist_del(&q_item->list_link);
 
-	/* WRONG: Add to another list for resource reclaim */
+    /* WRONG: Add to another list for resource reclaim */
 
-	flow_d->total_transferred += actual_size;
+    flow_d->total_transferred += actual_size;
 
 
-	/* release cache resource, since data has been received into 
-	 * the cache buffers 
-	 */
+    /* release cache resource, since data has been received into 
+     * the cache buffers 
+     */
 
-	ret = bmi_cache_release_cache_src(q_item);
+    ret = bmi_cache_release_cache_src(q_item);
 
-	/* TODO: error handling */
-	if ( ret < 0 ) {
-		PVFS_perror_gossip("bmi_recv_callback_fn: "
-                                   "error from  bmi_cache_release_cache_src:error_code", ret);
-		gen_mutex_unlock(&flow_data->flow_mutex);
-		return;
-	}
+    /* TODO: error handling */
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("bmi_recv_callback_fn: "
+                           "error from  bmi_cache_release_cache_src:error_code",
+                           ret);
+        gen_mutex_unlock(&flow_data->flow_mutex);
+        return;
+    }
 
-	/* when no callback support from the cache, we take advantage of 
-	 * the BMI callback to make progress. That is, in the BMI callback 
-	 * function, we wait for the completion of another request from 
-	 * the cache component, then initiate BMI recv function. All these 
-	 * are done in "bmi_cache_progress_check()" with BLOCKING_FLAG.
-	 * Be careful of "mutex" stuff. 
-	 */
+    /* when no callback support from the cache, we take advantage of 
+     * the BMI callback to make progress. That is, in the BMI callback 
+     * function, we wait for the completion of another request from 
+     * the cache component, then initiate BMI recv function. All these 
+     * are done in "bmi_cache_progress_check()" with BLOCKING_FLAG.
+     * Be careful of "mutex" stuff. 
+     */
 
-	/* no callback support from the cache */
-	if ( !q_item->cache_callback.fn )  
-	{
-		ret = bmi_cache_progress_check( flow_d, 
-						BLOCKING_FLAG, 
-						NO_MUTEX_FLAG,
-						BMI_TO_CACHE);
-		if ( ret < 0 )
-		{
-			PVFS_perror_gossip("bmi_recv_callback_fn: "
-                                           "error from bmi_cache_progress_check:error_code", ret);
-			gen_mutex_unlock(&flow_data->flow_mutex);
-			return;
-		}
-		/* the whole flow request is finished */
-		if ( ret == 1 ){
-			gen_mutex_unlock(&flow_data->flow_mutex);
+    /* no callback support from the cache */
+    if (!q_item->cache_callback.fn)
+    {
+        ret = bmi_cache_progress_check(flow_d,
+                                       BLOCKING_FLAG,
+                                       NO_MUTEX_FLAG, BMI_TO_CACHE);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("bmi_recv_callback_fn: "
+                               "error from bmi_cache_progress_check:error_code",
+                               ret);
+            gen_mutex_unlock(&flow_data->flow_mutex);
+            return;
+        }
+        /* the whole flow request is finished */
+        if (ret == 1)
+        {
+            gen_mutex_unlock(&flow_data->flow_mutex);
 
-			/* free fp_queue_item */
-			qlist_for_each(tmp_link, &flow_data->cache_req_done_list) 
-			{
-				q_item = qlist_entry(tmp_link, struct fp_queue_item, list_link);
-				qlist_del(&q_item->list_link);
-				free(q_item);
-				fprintf(stderr, "bmi_recv_callback_fn: free fp_queue_item\n");
-				
-			}
-			free(flow_data);
-			flow_d->state = FLOW_COMPLETE;
-			flow_d->release(flow_d);
-			flow_d->callback(flow_d);
-			fprintf(stderr, "bmi_recv_callback_fn: request is done\n");
-			return;
-		}
-	}
+            /* free fp_queue_item */
+            qlist_for_each(tmp_link, &flow_data->cache_req_done_list)
+            {
+                q_item = qlist_entry(tmp_link, struct fp_queue_item,
+                                     list_link);
+                qlist_del(&q_item->list_link);
+                free(q_item);
+                fprintf(stderr, "bmi_recv_callback_fn: free fp_queue_item\n");
 
-	gen_mutex_unlock(&flow_data->flow_mutex);
-	return;
+            }
+            free(flow_data);
+            flow_d->state = FLOW_COMPLETE;
+            flow_d->release(flow_d);
+            flow_d->callback(flow_d);
+            fprintf(stderr, "bmi_recv_callback_fn: request is done\n");
+            return;
+        }
+    }
+
+    gen_mutex_unlock(&flow_data->flow_mutex);
+    return;
 }
-	
+
 /* cache_write_callback_fn()
  *
  * function to be called upon completion of a cache write operation. 
@@ -820,79 +868,82 @@ static void bmi_recv_callback_fn(void *user_ptr,
  *
  * no return value
  */
-static void cache_write_callback_fn(void *user_ptr,
-		           PVFS_error error_code)
+static void cache_write_callback_fn(
+    void *user_ptr,
+    PVFS_error error_code)
 {
-	PVFS_size tmp_actual_size;
-	PVFS_size total_size;
-	int i;
+    PVFS_size tmp_actual_size;
+    PVFS_size total_size;
+    int i;
 
 #ifdef __CACHE_CALLBACK_SUPPORT__
-	struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
+    struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
 #endif
 
-	struct fp_queue_item* q_item = user_ptr;
-	int ret;
-	PVFS_id_gen_t bmi_reqid;
+    struct fp_queue_item *q_item = user_ptr;
+    int ret;
+    PVFS_id_gen_t bmi_reqid;
 
-	/* TODO: error handling */
-	assert(error_code == 0);
-	
-	fprintf(stderr, "cache_write_callback_fn: enter\n");
+    /* TODO: error handling */
+    assert(error_code == 0);
 
-	/* if cache supports callback, this function will called
-	 * independently. Otherwise, it is called inside of mutex.
-	 * Thus, there is no need holding mutex.
-	 */ 
+    fprintf(stderr, "cache_write_callback_fn: enter\n");
+
+    /* if cache supports callback, this function will called
+     * independently. Otherwise, it is called inside of mutex.
+     * Thus, there is no need holding mutex.
+     */
 #ifdef __CACHE_CALLBACK_SUPPORT__
-	gen_mutex_lock(&flow_data->flow_mutex);
+    gen_mutex_lock(&flow_data->flow_mutex);
 #endif
 
-	q_item->int_state = INT_REQ_COMPLETE;
+    q_item->int_state = INT_REQ_COMPLETE;
 
-	/* TODO: cache_req.total_size in the buffer code */
-	total_size = 0;
-	for ( i=0;  i<q_item->cache_req.mem_cnt; i++ ) {
-		total_size += q_item->cache_req.msize_list[i];
-		fprintf(stderr, "cache_write_callback_fn:recv buff [%d] len:%lld\n", i, lld(q_item->cache_req.msize_list[i]));
-		q_item->cache_req.total_size = total_size;
-	}
-	fprintf(stderr, "cache_write_callback_fn:to recv %lld\n", lld(q_item->cache_req.total_size));
+    /* TODO: cache_req.total_size in the buffer code */
+    total_size = 0;
+    for (i = 0; i < q_item->cache_req.mem_cnt; i++)
+    {
+        total_size += q_item->cache_req.msize_list[i];
+        fprintf(stderr, "cache_write_callback_fn:recv buff [%d] len:%lld\n", i,
+                lld(q_item->cache_req.msize_list[i]));
+        q_item->cache_req.total_size = total_size;
+    }
+    fprintf(stderr, "cache_write_callback_fn:to recv %lld\n",
+            lld(q_item->cache_req.total_size));
 
-	/* TODO: what if we recv less than expected? */
-	ret = BMI_post_recv_list(&bmi_reqid,
-		q_item->parent->src.u.bmi.address,
-		(void **)q_item->cache_req.moff_list,
-		q_item->cache_req.msize_list,
-		q_item->cache_req.mem_cnt,
-		q_item->cache_req.total_size,
-        	&tmp_actual_size,
-		q_item->cache_req.buffer_type,
-        	q_item->parent->tag,
-        	&q_item->bmi_callback,
-        	global_bmi_context);
+    /* TODO: what if we recv less than expected? */
+    ret = BMI_post_recv_list(&bmi_reqid,
+                             q_item->parent->src.u.bmi.address,
+                             (void **) q_item->cache_req.moff_list,
+                             q_item->cache_req.msize_list,
+                             q_item->cache_req.mem_cnt,
+                             q_item->cache_req.total_size,
+                             &tmp_actual_size,
+                             q_item->cache_req.buffer_type,
+                             q_item->parent->tag,
+                             &q_item->bmi_callback, global_bmi_context);
 
-	/* TODO: error handling */
-	assert(ret >= 0);
+    /* TODO: error handling */
+    assert(ret >= 0);
 
-	if(ret == 1)
-	{
+    if (ret == 1)
+    {
 #ifdef __CACHE_CALLBACK_SUPPORT__
-		gen_mutex_unlock(&flow_data->flow_mutex);
+        gen_mutex_unlock(&flow_data->flow_mutex);
 #endif
-		/* immediate completion; trigger callback ourselves */
-		bmi_recv_callback_fn(q_item, tmp_actual_size, 0);
-
-#ifdef __CACHE_CALLBACK_SUPPORT__
-		gen_mutex_lock(&flow_data->flow_mutex);
-#endif
-	}
+        /* immediate completion; trigger callback ourselves */
+        bmi_recv_callback_fn(q_item, tmp_actual_size, 0);
 
 #ifdef __CACHE_CALLBACK_SUPPORT__
-	gen_mutex_unlock(&flow_data->flow_mutex);
+        gen_mutex_lock(&flow_data->flow_mutex);
+#endif
+    }
+
+#ifdef __CACHE_CALLBACK_SUPPORT__
+    gen_mutex_unlock(&flow_data->flow_mutex);
 #endif
 
-	return;
+    return;
 };
 
 
@@ -910,62 +961,62 @@ static void cache_write_callback_fn(void *user_ptr,
  *
  * no return value
  */
-static void cache_read_callback_fn(void *user_ptr,
-		           PVFS_error error_code)
+static void cache_read_callback_fn(
+    void *user_ptr,
+    PVFS_error error_code)
 {
-	PVFS_size sent_size;
-	struct fp_queue_item* q_item = user_ptr;
+    PVFS_size sent_size;
+    struct fp_queue_item *q_item = user_ptr;
 
 #ifdef __CACHE_CALLBACK_SUPPORT
-	struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
+    struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
 #endif
 
-	PVFS_id_gen_t bmi_reqid;
-	int ret;
+    PVFS_id_gen_t bmi_reqid;
+    int ret;
 
-	/* TODO: error handling */
-	assert(error_code == 0);
+    /* TODO: error handling */
+    assert(error_code == 0);
 
 #ifdef __CACHE_CALLBACK_SUPPORT__
-	gen_mutex_lock(&flow_data->flow_mutex);
+    gen_mutex_lock(&flow_data->flow_mutex);
 #endif
 
-	q_item->int_state = INT_REQ_COMPLETE;
+    q_item->int_state = INT_REQ_COMPLETE;
 
-	ret = BMI_post_send_list(&bmi_reqid,
-		q_item->parent->dest.u.bmi.address,
-		(const void **)q_item->cache_req.moff_list,
-		q_item->cache_req.msize_list,
-		q_item->cache_req.mem_cnt,
-		q_item->cache_req.total_size,
-		q_item->cache_req.buffer_type,
-		q_item->parent->tag,
-		&q_item->bmi_callback,
-		global_bmi_context);
-		
-	/* TODO: error handling */
-	assert(ret >= 0);
+    ret = BMI_post_send_list(&bmi_reqid,
+                             q_item->parent->dest.u.bmi.address,
+                             (const void **) q_item->cache_req.moff_list,
+                             q_item->cache_req.msize_list,
+                             q_item->cache_req.mem_cnt,
+                             q_item->cache_req.total_size,
+                             q_item->cache_req.buffer_type,
+                             q_item->parent->tag,
+                             &q_item->bmi_callback, global_bmi_context);
 
-	if(ret == 1)
-	{
+    /* TODO: error handling */
+    assert(ret >= 0);
+
+    if (ret == 1)
+    {
 #ifdef __CACHE_CALLBACK_SUPPORT__
-		gen_mutex_unlock(&flow_data->flow_mutex);
+        gen_mutex_unlock(&flow_data->flow_mutex);
 #endif
 
-		/* immediate completion; trigger callback ourselves */
-		sent_size = q_item->cache_req.total_size;
-		bmi_send_callback_fn(q_item, sent_size, 0);
-
-#ifdef __CACHE_CALLBACK_SUPPORT__
-		gen_mutex_lock(&flow_data->flow_mutex);
-#endif
-	}
+        /* immediate completion; trigger callback ourselves */
+        sent_size = q_item->cache_req.total_size;
+        bmi_send_callback_fn(q_item, sent_size, 0);
 
 #ifdef __CACHE_CALLBACK_SUPPORT__
-	gen_mutex_unlock(&flow_data->flow_mutex);
+        gen_mutex_lock(&flow_data->flow_mutex);
+#endif
+    }
+
+#ifdef __CACHE_CALLBACK_SUPPORT__
+    gen_mutex_unlock(&flow_data->flow_mutex);
 #endif
 
-	return;
+    return;
 };
 
 /* bmi_send_callback_fn()
@@ -978,188 +1029,187 @@ static void cache_read_callback_fn(void *user_ptr,
  * 
  * no return value
  */
-static void bmi_send_callback_fn(void *user_ptr,
-		         PVFS_size actual_size,
-		         PVFS_error error_code)
+static void bmi_send_callback_fn(
+    void *user_ptr,
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
-	struct fp_queue_item* q_item = user_ptr;
-	struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
-	struct flow_descriptor * flow_d = flow_data->parent;
-	int ret;
+    struct fp_queue_item *q_item = user_ptr;
+    struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
+    struct flow_descriptor *flow_d = flow_data->parent;
+    int ret;
 
-	/* TODO: error handling */
-	if(error_code != 0)
-	{
-		PVFS_perror_gossip("bmi_send_callback_fn: error", error_code);
-		assert(0);
-	}
+    /* TODO: error handling */
+    if (error_code != 0)
+    {
+        PVFS_perror_gossip("bmi_send_callback_fn: error", error_code);
+        assert(0);
+    }
 
-	gen_mutex_lock(&flow_data->flow_mutex);
+    gen_mutex_lock(&flow_data->flow_mutex);
 
 
-	flow_d->total_transferred += actual_size;
+    flow_d->total_transferred += actual_size;
 
-	/* release cache resource */
+    /* release cache resource */
 
-	ret = bmi_cache_release_cache_src(q_item);
+    ret = bmi_cache_release_cache_src(q_item);
 
-	/* TODO: error handling */
-	if ( ret < 0 ) {
-		PVFS_perror_gossip("bmi_send_callback_fn: "
-                                   "from bmi_cache_release_cache_src:error_code", ret);
-		gen_mutex_unlock(&flow_data->flow_mutex);
-		return;
-	}
+    /* TODO: error handling */
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("bmi_send_callback_fn: "
+                           "from bmi_cache_release_cache_src:error_code", ret);
+        gen_mutex_unlock(&flow_data->flow_mutex);
+        return;
+    }
 
-	/* remove from current queue. q_item must be in the 
-	 * cache_req_done_list when coming here.  */
+    /* remove from current queue. q_item must be in the 
+     * cache_req_done_list when coming here.  */
 
-	qlist_del(&q_item->list_link);
+    qlist_del(&q_item->list_link);
 
-	/* when no callback support from the cache, we take advantage of 
-	 * the BMI callback to make progress. That is, in the BMI callback 
-	 * function, we wait for the completion of another request from 
-	 * the cache component, then initiate BMI send function. All these 
-	 * are done in "bmi_cache_progress_check()" with BLOCKING_FLAG.
-	 */
+    /* when no callback support from the cache, we take advantage of 
+     * the BMI callback to make progress. That is, in the BMI callback 
+     * function, we wait for the completion of another request from 
+     * the cache component, then initiate BMI send function. All these 
+     * are done in "bmi_cache_progress_check()" with BLOCKING_FLAG.
+     */
 
-	/* no callback support from the cache. */
-	if ( !q_item->cache_callback.fn )  
-	{
-		ret = bmi_cache_progress_check( flow_d, 
-						BLOCKING_FLAG, 
-						NO_MUTEX_FLAG,
-						CACHE_TO_BMI );
-		if ( ret < 0 )
-		{
-			PVFS_perror_gossip("bmi_send_callback_fn: "
-                                           "from bmi_cache_progress_check:error_code", ret);
-			gen_mutex_unlock(&flow_data->flow_mutex);
-			return;
-		}
-	}
+    /* no callback support from the cache. */
+    if (!q_item->cache_callback.fn)
+    {
+        ret = bmi_cache_progress_check(flow_d,
+                                       BLOCKING_FLAG,
+                                       NO_MUTEX_FLAG, CACHE_TO_BMI);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("bmi_send_callback_fn: "
+                               "from bmi_cache_progress_check:error_code", ret);
+            gen_mutex_unlock(&flow_data->flow_mutex);
+            return;
+        }
+    }
 
-	gen_mutex_unlock(&flow_data->flow_mutex);
+    gen_mutex_unlock(&flow_data->flow_mutex);
 
-	free(q_item);
+    free(q_item);
 
-	return;
+    return;
 }
 
-static int bmi_cache_check_cache_req(struct fp_queue_item *qitem) 
+static int bmi_cache_check_cache_req(
+    struct fp_queue_item *qitem)
 {
-	cache_reply_t reply;
-	int flag = 0;
-	int ret = -1;
-		
-	fprintf(stderr, "bmi_cache_check_cache_req:enter (req:%d\n", qitem->cache_req.request.internal_id);
+    cache_reply_t reply;
+    int flag = 0;
+    int ret = -1;
 
-	ret = cache_req_test( &(qitem->cache_req.request), &flag, &reply, NULL);
-	if ( ret < 0 ) 
-	{
-		PVFS_perror_gossip("bmi_cache_check_cache_req: "
-                        "error_code", ret);
-		return ret;
-	}
+    fprintf(stderr, "bmi_cache_check_cache_req:enter (req:%d\n",
+            qitem->cache_req.request.internal_id);
 
-	/* a request is finished. */
-	if ( flag )
-	{
-		qitem->cache_req.mem_cnt = reply.count;
-		qitem->cache_req.moff_list = (PVFS_offset **)reply.cbuf_offset_array;
-		qitem->cache_req.msize_list = reply.cbuf_size_array;
-		qitem->cache_req.errval = reply.errval;
+    ret = cache_req_test(&(qitem->cache_req.request), &flag, &reply, NULL);
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("bmi_cache_check_cache_req: " "error_code", ret);
+        return ret;
+    }
 
-		fprintf(stderr, "bmi_cache_check_cache_req:exit req done count %d\n", reply.count);
-		return 1;
-	}
-	fprintf(stderr, "bmi_cache_check_cache_req:exit req no done\n");
+    /* a request is finished. */
+    if (flag)
+    {
+        qitem->cache_req.mem_cnt = reply.count;
+        qitem->cache_req.moff_list = (PVFS_offset **) reply.cbuf_offset_array;
+        qitem->cache_req.msize_list = reply.cbuf_size_array;
+        qitem->cache_req.errval = reply.errval;
 
-	return 0;
+        fprintf(stderr, "bmi_cache_check_cache_req:exit req done count %d\n",
+                reply.count);
+        return 1;
+    }
+    fprintf(stderr, "bmi_cache_check_cache_req:exit req no done\n");
+
+    return 0;
 }
 
-static int bmi_cache_release_cache_src(struct fp_queue_item *qitem)
+static int bmi_cache_release_cache_src(
+    struct fp_queue_item *qitem)
 {
-	int ret;
-	
-	ret = cache_req_done( &(qitem->cache_req.request) );	
-	if ( ret < 0 ) 
-	{
-		PVFS_perror_gossip("bmi_cache_release_cache_src: "
-                        "error_code", ret);
-		return ret;
-	}
-	
-	return 0;
+    int ret;
+
+    ret = cache_req_done(&(qitem->cache_req.request));
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("bmi_cache_release_cache_src: " "error_code", ret);
+        return ret;
+    }
+
+    return 0;
 }
 
-static int bmi_cache_init_cache_req(struct fp_queue_item *qitem, int op )
+static int bmi_cache_init_cache_req(
+    struct fp_queue_item *qitem,
+    int op)
 {
-	int ret = 0;
-	cache_read_desc_t desc1;
-	cache_write_desc_t desc2;
-	cache_reply_t reply;
+    int ret = 0;
+    cache_read_desc_t desc1;
+    cache_write_desc_t desc2;
+    cache_reply_t reply;
 
-	if ( op == BMI_TO_CACHE )  /* write */
-	{
-		desc2.coll_id = qitem->parent->dest.u.trove.coll_id;
-		desc2.handle = qitem->parent->dest.u.trove.handle;
-		desc2.context_id = global_trove_context;
+    if (op == BMI_TO_CACHE)     /* write */
+    {
+        desc2.coll_id = qitem->parent->dest.u.trove.coll_id;
+        desc2.handle = qitem->parent->dest.u.trove.handle;
+        desc2.context_id = global_trove_context;
 
-		/* TODO: if we use intemediate buffer, change here */
-		desc2.buffer = NULL;
-		desc2.len = 0;
-		
-		desc2.stream_array_count  = qitem->pint_req.result.segs; 
-		desc2.stream_offset_array = qitem->pint_req.result.offset_array;
-		desc2.stream_size_array = qitem->pint_req.result.size_array;
+        /* TODO: if we use intemediate buffer, change here */
+        desc2.buffer = NULL;
+        desc2.len = 0;
 
-		ret = cache_write_post( &desc2, 
-					&qitem->cache_req.request, 
-					&reply,
-					NULL );
-		if ( ret < 0 ) 
-		{
-			PVFS_perror_gossip("bmi_cache_init_cache_req: "
-                                     "error_code", ret);
-		}
+        desc2.stream_array_count = qitem->pint_req.result.segs;
+        desc2.stream_offset_array = qitem->pint_req.result.offset_array;
+        desc2.stream_size_array = qitem->pint_req.result.size_array;
 
-	}
-	else /* read */
-	{
-		desc1.coll_id = qitem->parent->dest.u.trove.coll_id;
-		desc1.handle = qitem->parent->dest.u.trove.handle;
-		desc1.context_id = global_trove_context;
+        ret = cache_write_post(&desc2, &qitem->cache_req.request, &reply, NULL);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("bmi_cache_init_cache_req: " "error_code", ret);
+        }
 
-		/* TODO: if we use intemediate buffer, change here */
-		desc1.buffer = NULL;
-		desc1.len = 0;
-		
-		desc1.stream_array_count  = qitem->pint_req.result.segs; 
-		desc1.stream_offset_array = qitem->pint_req.result.offset_array;
-		desc1.stream_size_array = qitem->pint_req.result.size_array;
+    }
+    else        /* read */
+    {
+        desc1.coll_id = qitem->parent->dest.u.trove.coll_id;
+        desc1.handle = qitem->parent->dest.u.trove.handle;
+        desc1.context_id = global_trove_context;
 
-		ret = cache_read_post( &desc1, 
-					&qitem->cache_req.request, 
-					&reply,
-					NULL );
-		if ( ret < 0 ) 
-		{
-			PVFS_perror_gossip("bmi_cache_init_cache_req: "
-                                     "error_code", ret);
-		}
-	}
+        /* TODO: if we use intemediate buffer, change here */
+        desc1.buffer = NULL;
+        desc1.len = 0;
 
-	/* immediate completion */
-	if ( ret == 1 ) 
-	{
-		qitem->cache_req.mem_cnt = reply.count;
-		qitem->cache_req.moff_list = (PVFS_offset **)reply.cbuf_offset_array;
-		qitem->cache_req.msize_list = reply.cbuf_size_array;
-		qitem->cache_req.errval = reply.errval;
+        desc1.stream_array_count = qitem->pint_req.result.segs;
+        desc1.stream_offset_array = qitem->pint_req.result.offset_array;
+        desc1.stream_size_array = qitem->pint_req.result.size_array;
 
-		fprintf(stderr, "bmi_cache_init_cache_req: immediate completion mcnt:%d\n", reply.count);
-	}
+        ret = cache_read_post(&desc1, &qitem->cache_req.request, &reply, NULL);
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("bmi_cache_init_cache_req: " "error_code", ret);
+        }
+    }
 
-	return ret;
+    /* immediate completion */
+    if (ret == 1)
+    {
+        qitem->cache_req.mem_cnt = reply.count;
+        qitem->cache_req.moff_list = (PVFS_offset **) reply.cbuf_offset_array;
+        qitem->cache_req.msize_list = reply.cbuf_size_array;
+        qitem->cache_req.errval = reply.errval;
+
+        fprintf(stderr,
+                "bmi_cache_init_cache_req: immediate completion mcnt:%d\n",
+                reply.count);
+    }
+
+    return ret;
 }

@@ -25,7 +25,9 @@
 /**
  * Print out usage information
  */
-static void print_usage(int argc, char** argv)
+static void print_usage(
+    int argc,
+    char **argv)
 {
     printf("Usage: %s\n", argv[0]);
     return;
@@ -37,8 +39,9 @@ static void print_usage(int argc, char** argv)
  *
  * Currently implemented as a white space insensitive byte comparison.
  */
-static int compare_configs(const char* master_config,
-                           const char* config)
+static int compare_configs(
+    const char *master_config,
+    const char *config)
 {
     printf("Config: %s", master_config);
     printf("\n");
@@ -48,10 +51,11 @@ static int compare_configs(const char* master_config,
 /**
  * Populate the given config with the server's data
  */
-static int get_config(PVFS_BMI_addr_t* server_addr,
-                      struct PVFS_sys_mntent* mnt_entry,
-                      char** fs_config_buf,
-                      char** server_config_buf)
+static int get_config(
+    PVFS_BMI_addr_t * server_addr,
+    struct PVFS_sys_mntent *mnt_entry,
+    char **fs_config_buf,
+    char **server_config_buf)
 {
 #if 0
 /*
@@ -60,12 +64,12 @@ static int get_config(PVFS_BMI_addr_t* server_addr,
   'persist' the configs, or work it into the exposed api
 */
     int rc;
-    PINT_client_sm* sm_p = NULL;
+    PINT_client_sm *sm_p = NULL;
     PVFS_credentials creds;
 
     /* Retrieve credentials */
     PVFS_util_gen_credentials(&creds);
-    
+
     /* Initialize the state machine */
     sm_p = malloc(sizeof(*sm_p));
     memset(sm_p, 0, sizeof(*sm_p));
@@ -79,7 +83,7 @@ static int get_config(PVFS_BMI_addr_t* server_addr,
     rc = PINT_client_state_machine_post(sm_p, PVFS_SERVER_GET_CONFIG);
     while (!sm_p->op_complete && (0 == rc))
     {
-	rc = PINT_client_state_machine_test();
+        rc = PINT_client_state_machine_test();
     }
 
     if (0 != rc)
@@ -91,27 +95,27 @@ static int get_config(PVFS_BMI_addr_t* server_addr,
     /* Copy the strings into outbound params */
     *fs_config_buf = malloc(sm_p->u.get_config.fs_config_buf_size + 1);
     *server_config_buf = malloc(sm_p->u.get_config.server_config_buf_size + 1);
-    strncpy(*fs_config_buf,
-            sm_p->u.get_config.fs_config_buf,
+    strncpy(*fs_config_buf, sm_p->u.get_config.fs_config_buf,
             sm_p->u.get_config.fs_config_buf_size + 1);
-    strncpy(*server_config_buf,
-            sm_p->u.get_config.server_config_buf,
+    strncpy(*server_config_buf, sm_p->u.get_config.server_config_buf,
             sm_p->u.get_config.server_config_buf_size + 1);
 
     /* Free state machine resources */
     free(sm_p->u.get_config.fs_config_buf);
     free(sm_p->u.get_config.server_config_buf);
     free(sm_p);
-#endif    
-    return 0;        
+#endif
+    return 0;
 }
 
 /**
  * Main
  */
-int main(int argc, char **argv)
+int main(
+    int argc,
+    char **argv)
 {
-    const PVFS_util_tab* mnt;
+    const PVFS_util_tab *mnt;
     int rc;
 
     /* Ensure no arguments were passed */
@@ -120,7 +124,7 @@ int main(int argc, char **argv)
         print_usage(argc, argv);
         return -1;
     }
-    
+
     /* Initialize the PVFS System */
     rc = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if (0 != rc)
@@ -140,9 +144,9 @@ int main(int argc, char **argv)
         for (i = 0; i < num_mnt_entries; ++i)
         {
             PVFS_fs_id fs_id;
-            PVFS_BMI_addr_t* server_addrs;
+            PVFS_BMI_addr_t *server_addrs;
             int server_count;
-            char* master_fs_conf = 0;
+            char *master_fs_conf = 0;
             int j;
             PVFS_credentials creds;
 
@@ -156,8 +160,8 @@ int main(int argc, char **argv)
                 continue;
             }
             fs_id = mnt->mntent_array[i].fs_id;
-            
-            /* Retrieve the list of all servers for the fs id*/
+
+            /* Retrieve the list of all servers for the fs id */
             rc = PVFS_mgmt_count_servers(fs_id, &creds, PVFS_MGMT_IO_SERVER,
                                          &server_count);
 
@@ -174,17 +178,15 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Unable to retrieve array of server addrs.\n");
                 break;
             }
-            
+
             /* Get the server configs for each fs id */
             for (j = 0; j < server_count; j++)
             {
-                char* fs_config_buf = 0;
-                char* server_config_buf = 0;
-                
-                rc = get_config(server_addrs + j,
-                                mnt->mntent_array + i,
-                                &fs_config_buf,
-                                &server_config_buf);
+                char *fs_config_buf = 0;
+                char *server_config_buf = 0;
+
+                rc = get_config(server_addrs + j, mnt->mntent_array + i,
+                                &fs_config_buf, &server_config_buf);
 
                 if (0 != rc)
                 {
@@ -206,7 +208,7 @@ int main(int argc, char **argv)
                 }
             }
         }
-    }    
+    }
 
     printf("Check Complete.\n");
     return 0;

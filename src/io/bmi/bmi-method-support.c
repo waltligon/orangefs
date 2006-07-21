@@ -23,7 +23,8 @@
  *
  * returns a pointer to the new structure on success, NULL on failure.
  */
-method_op_p alloc_method_op(bmi_size_t payload_size)
+method_op_p alloc_method_op(
+    bmi_size_t payload_size)
 {
 
     /* we are going to allocate the full operation structure as a
@@ -37,23 +38,23 @@ method_op_p alloc_method_op(bmi_size_t payload_size)
     my_method_op = (method_op_p) malloc(ssize + payload_size);
     if (!my_method_op)
     {
-	return (NULL);
+        return (NULL);
     }
     memset(my_method_op, 0, (ssize + payload_size));
 
     if (id_gen_safe_register(&(my_method_op->op_id), my_method_op) < 0)
     {
-	free(my_method_op);
-	return (NULL);
+        free(my_method_op);
+        return (NULL);
     }
     my_method_op->error_code = 0;
     if (payload_size == 0)
     {
-	my_method_op->method_data = NULL;
+        my_method_op->method_data = NULL;
     }
     else
     {
-	my_method_op->method_data = (char *) my_method_op + ssize;
+        my_method_op->method_data = (char *) my_method_op + ssize;
     }
 
     return (my_method_op);
@@ -66,7 +67,8 @@ method_op_p alloc_method_op(bmi_size_t payload_size)
  * 
  * no return value
  */
-void dealloc_method_op(method_op_p op_p)
+void dealloc_method_op(
+    method_op_p op_p)
 {
     id_gen_safe_unregister(op_p->op_id);
     free(op_p);
@@ -84,8 +86,9 @@ void dealloc_method_op(method_op_p op_p)
  * Returns a pointer to an allocated method_addr struct on success,
  * NULL on failure.
  */
-struct method_addr *alloc_method_addr(int method_type,
-				      bmi_size_t payload_size)
+struct method_addr *alloc_method_addr(
+    int method_type,
+    bmi_size_t payload_size)
 {
 
     /* we are going to allocate the full address structure as a
@@ -99,7 +102,7 @@ struct method_addr *alloc_method_addr(int method_type,
     my_method_addr = (struct method_addr *) malloc(ssize + payload_size);
     if (!my_method_addr)
     {
-	return (NULL);
+        return (NULL);
     }
     memset(my_method_addr, 0, (ssize + payload_size));
     my_method_addr->method_type = method_type;
@@ -119,7 +122,8 @@ struct method_addr *alloc_method_addr(int method_type,
  * 
  * no return value
  */
-void dealloc_method_addr(method_addr_p my_method_addr)
+void dealloc_method_addr(
+    method_addr_p my_method_addr)
 {
     free(my_method_addr);
     my_method_addr = NULL;
@@ -140,8 +144,9 @@ void dealloc_method_addr(method_addr_p my_method_addr)
  * 
  * returns a pointer to the new string on success, NULL on failure.
  */
-char *string_key(const char *key,
-		 const char *id_string)
+char *string_key(
+    const char *key,
+    const char *id_string)
 {
 
     const char *holder = NULL;
@@ -154,7 +159,7 @@ char *string_key(const char *key,
 
     if ((!id_string) || (!key))
     {
-	return (NULL);
+        return (NULL);
     }
     keysize = strlen(key);
     strsize = strlen(id_string);
@@ -162,7 +167,7 @@ char *string_key(const char *key,
     /* create a new key of the form <key>:// */
     if ((newkey = (char *) malloc(keysize + 4)) == NULL)
     {
-	return (NULL);
+        return (NULL);
     }
     strcpy(newkey, key);
     strcat(newkey, "://");
@@ -173,31 +178,31 @@ char *string_key(const char *key,
     /* first match */
     if (holder)
     {
-	end = strpbrk(holder, ", \t\n");
-	if (end)
-	{
-	    end = end;	/* stop on terminator */
-	}
-	else
-	{
-	    end = id_string + strsize;	/* go to the end of the id string (\0) */
-	}
-	/* move holder so it doesn't include the opening key and deliminator */
-	holder = holder + keysize + 3;
+        end = strpbrk(holder, ", \t\n");
+        if (end)
+        {
+            end = end;  /* stop on terminator */
+        }
+        else
+        {
+            end = id_string + strsize;  /* go to the end of the id string (\0) */
+        }
+        /* move holder so it doesn't include the opening key and deliminator */
+        holder = holder + keysize + 3;
     }
     else
     {
-	/* no match */
-	free(newkey);
-	return (NULL);
+        /* no match */
+        free(newkey);
+        return (NULL);
     }
 
     /* figure out how long our substring is */
     retsize = (end - holder);
     if ((retstring = (char *) malloc(retsize + 1)) == NULL)
     {
-	free(newkey);
-	return (NULL);
+        free(newkey);
+        return (NULL);
     }
 
     /* copy it out */

@@ -8,50 +8,55 @@
 #include "pvfs2-bufmap.h"
 
 static int pvfs2_readlink(
-    struct dentry *dentry, char __user *buffer, int buflen)
+    struct dentry *dentry,
+    char __user * buffer,
+    int buflen)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
     pvfs2_print("pvfs2_readlink called on inode %d\n",
-                (int)dentry->d_inode->i_ino);
+                (int) dentry->d_inode->i_ino);
 
     /*
-      if we're getting called, the vfs has no doubt already done a
-      getattr, so we should always have the link_target string
-      available in the pvfs2_inode private data
-    */
+       if we're getting called, the vfs has no doubt already done a
+       getattr, so we should always have the link_target string
+       available in the pvfs2_inode private data
+     */
     return vfs_readlink(dentry, buffer, buflen, pvfs2_inode->link_target);
 }
 
 #ifdef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
-static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
+static int pvfs2_follow_link(
+    struct dentry *dentry,
+    struct nameidata *nd)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
     pvfs2_print("pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
-                (char *)dentry->d_name.name, pvfs2_inode->link_target);
+                (char *) dentry->d_name.name, pvfs2_inode->link_target);
 
     return vfs_follow_link(nd, pvfs2_inode->link_target);
 }
 #else
-static void *pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
+static void *pvfs2_follow_link(
+    struct dentry *dentry,
+    struct nameidata *nd)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
     pvfs2_print("pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
-                (char *)dentry->d_name.name, pvfs2_inode->link_target);
+                (char *) dentry->d_name.name, pvfs2_inode->link_target);
 
     return ERR_PTR(vfs_follow_link(nd, pvfs2_inode->link_target));
 }
 #endif
 
-struct inode_operations pvfs2_symlink_inode_operations =
-{
+struct inode_operations pvfs2_symlink_inode_operations = {
 #ifdef PVFS2_LINUX_KERNEL_2_4
-    readlink : pvfs2_readlink,
-    follow_link : pvfs2_follow_link,
-    setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate,
+  readlink:pvfs2_readlink,
+  follow_link:pvfs2_follow_link,
+  setattr:pvfs2_setattr,
+  revalidate:pvfs2_revalidate,
 #else
     .readlink = pvfs2_readlink,
     .follow_link = pvfs2_follow_link,

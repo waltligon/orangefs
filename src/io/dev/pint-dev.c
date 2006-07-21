@@ -31,7 +31,7 @@ static int setup_dev_entry(
 
 static int parse_devices(
     const char *targetfile,
-    const char *devname, 
+    const char *devname,
     int *majornum);
 
 static int pdev_fd = -1;
@@ -55,28 +55,28 @@ int PINT_dev_initialize(
     if ((getuid() != 0) && (geteuid() != 0))
     {
         gossip_err("Error: must be root to open pvfs2 device.\n");
-        return (-(PVFS_EPERM|PVFS_ERROR_DEV));
+        return (-(PVFS_EPERM | PVFS_ERROR_DEV));
     }
 
     /* setup /dev/ entry if needed */
     ret = setup_dev_entry(dev_name);
     if (ret < 0)
     {
-        return (-(PVFS_ENODEV|PVFS_ERROR_DEV));
+        return (-(PVFS_ENODEV | PVFS_ERROR_DEV));
     }
 
     /* try to open the device */
     pdev_fd = open(dev_name, (O_RDWR | O_NONBLOCK));
     if (pdev_fd < 0)
     {
-        switch(errno)
+        switch (errno)
         {
-            case EACCES:
-                return(-(PVFS_EPERM|PVFS_ERROR_DEV));
-            case ENOENT:
-                return(-(PVFS_ENOENT|PVFS_ERROR_DEV));
-            default:
-                return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+        case EACCES:
+            return (-(PVFS_EPERM | PVFS_ERROR_DEV));
+        case ENOENT:
+            return (-(PVFS_ENOENT | PVFS_ERROR_DEV));
+        default:
+            return (-(PVFS_ENODEV | PVFS_ERROR_DEV));
         }
     }
 
@@ -86,7 +86,7 @@ int PINT_dev_initialize(
     {
         gossip_err("Error: ioctl() PVFS_DEV_GET_MAGIC failure.\n");
         close(pdev_fd);
-        return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+        return (-(PVFS_ENODEV | PVFS_ERROR_DEV));
     }
 
     ret = ioctl(pdev_fd, PVFS_DEV_GET_MAX_UPSIZE, &pdev_max_upsize);
@@ -94,7 +94,7 @@ int PINT_dev_initialize(
     {
         gossip_err("Error: ioctl() PVFS_DEV_GET_MAX_UPSIZE failure.\n");
         close(pdev_fd);
-        return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+        return (-(PVFS_ENODEV | PVFS_ERROR_DEV));
     }
 
     ret = ioctl(pdev_fd, PVFS_DEV_GET_MAX_DOWNSIZE, &pdev_max_downsize);
@@ -102,7 +102,7 @@ int PINT_dev_initialize(
     {
         gossip_err("Error: ioctl() PVFS_DEV_GET_MAX_DOWNSIZE failure.\n");
         close(pdev_fd);
-        return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+        return (-(PVFS_ENODEV | PVFS_ERROR_DEV));
     }
     return 0;
 }
@@ -113,7 +113,8 @@ int PINT_dev_initialize(
  *
  * no return value
  */
-void PINT_dev_finalize(void)
+void PINT_dev_finalize(
+    void)
 {
     if (pdev_fd > -1)
     {
@@ -129,7 +130,9 @@ void PINT_dev_finalize(void)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
+int PINT_dev_get_mapped_region(
+    struct PVFS_dev_map_desc *desc,
+    int size)
 {
     int ret = -1;
     int page_count = 0;
@@ -139,19 +142,18 @@ int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
     /* we would like to use a memaligned region that is a multiple
      * of the system page size
      */
-    page_count = (int)(size / page_size);
+    page_count = (int) (size / page_size);
     if ((size % page_size) != 0)
     {
         page_count++;
     }
 
-    ptr = PINT_mem_aligned_alloc(
-        (page_count * page_size), page_size);
+    ptr = PINT_mem_aligned_alloc((page_count * page_size), page_size);
     if (!ptr)
     {
-        return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
+        return -(PVFS_ENOMEM | PVFS_ERROR_DEV);
     }
-    desc->ptr  = ptr;
+    desc->ptr = ptr;
     desc->size = (page_count * page_size);
 
     /* ioctl to ask driver to map pages */
@@ -159,7 +161,7 @@ int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
     if (ret < 0)
     {
         free(ptr);
-        return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
+        return -(PVFS_ENOMEM | PVFS_ERROR_DEV);
     }
     return 0;
 }
@@ -170,7 +172,8 @@ int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
  * kernel space.  MUST be called only after device is closed
  * (i.e. PINT_dev_finalize)
  */
-void PINT_dev_put_mapped_region(struct PVFS_dev_map_desc *desc)
+void PINT_dev_put_mapped_region(
+    struct PVFS_dev_map_desc *desc)
 {
     void *ptr = (void *) desc->ptr;
     assert(desc);
@@ -194,8 +197,7 @@ void *PINT_dev_get_mapped_buffer(
     return ((desc && ptr &&
              ((buffer_index > -1) &&
               (buffer_index < PVFS2_BUFMAP_DESC_COUNT))) ?
-            (ptr + (buffer_index * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)) :
-            NULL);
+            (ptr + (buffer_index * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)) : NULL);
 }
 
 
@@ -207,10 +209,10 @@ void *PINT_dev_get_mapped_buffer(
  * -PVFS_error on failure
  */
 int PINT_dev_test_unexpected(
-        int incount,
-        int *outcount,
-        struct PINT_dev_unexp_info *info_array,
-        int max_idle_time)
+    int incount,
+    int *outcount,
+    struct PINT_dev_unexp_info *info_array,
+    int max_idle_time)
 {
     int ret = -1, avail = -1, i = 0;
     struct pollfd pfd;
@@ -221,7 +223,7 @@ int PINT_dev_test_unexpected(
 
     /* prepare to read max upcall size (magic nr and tag included) */
     int read_size = pdev_max_upsize;
-    
+
     *outcount = 0;
 
     pfd.fd = pdev_fd;
@@ -230,10 +232,10 @@ int PINT_dev_test_unexpected(
     do
     {
         /*
-          poll to see if there is anything available on the device if
-          we were given a max_idle_time.  if the max_idle_time is 0,
-          skip the poll call and immediately try to read the device
-        */
+           poll to see if there is anything available on the device if
+           we were given a max_idle_time.  if the max_idle_time is 0,
+           skip the poll call and immediately try to read the device
+         */
         if (max_idle_time)
         {
             do
@@ -241,20 +243,20 @@ int PINT_dev_test_unexpected(
                 pfd.revents = 0;
                 avail = poll(&pfd, 1, max_idle_time);
 
-            } while((avail < 0) && (errno == EINTR));
+            } while ((avail < 0) && (errno == EINTR));
 
             if (avail < 0)
             {
-                switch(errno)
+                switch (errno)
                 {
-                    case EBADF:
-                        ret = -(PVFS_EBADF|PVFS_ERROR_DEV);
-                    case ENOMEM:
-                        ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
-                    case EFAULT:
-                        ret = -(PVFS_EFAULT|PVFS_ERROR_DEV);
-                    default:
-                        ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+                case EBADF:
+                    ret = -(PVFS_EBADF | PVFS_ERROR_DEV);
+                case ENOMEM:
+                    ret = -(PVFS_ENOMEM | PVFS_ERROR_DEV);
+                case EFAULT:
+                    ret = -(PVFS_EFAULT | PVFS_ERROR_DEV);
+                default:
+                    ret = -(PVFS_EIO | PVFS_ERROR_DEV);
                 }
                 goto dev_test_unexp_error;
             }
@@ -269,15 +271,15 @@ int PINT_dev_test_unexpected(
             {
                 if (pfd.revents & POLLNVAL)
                 {
-                    return -(PVFS_EBADF|PVFS_ERROR_DEV);
+                    return -(PVFS_EBADF | PVFS_ERROR_DEV);
                 }
                 continue;
             }
 
             /*
-              once we have data to read, set the idle time to zero
-              because we don't want to block on subsequent iterations
-            */
+               once we have data to read, set the idle time to zero
+               because we don't want to block on subsequent iterations
+             */
             max_idle_time = 0;
         }
 
@@ -285,7 +287,7 @@ int PINT_dev_test_unexpected(
         buffer = malloc(read_size);
         if (buffer == NULL)
         {
-            ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
+            ret = -(PVFS_ENOMEM | PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
 
@@ -293,19 +295,19 @@ int PINT_dev_test_unexpected(
         if (ret < 0)
         {
             /*
-              EAGAIN is an error we can ignore in non-blocking mode;
-              it just means that the device is emptied
-            */
+               EAGAIN is an error we can ignore in non-blocking mode;
+               it just means that the device is emptied
+             */
             if (errno == EAGAIN)
             {
                 goto safe_exit;
             }
-            ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+            ret = -(PVFS_EIO | PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
 
         if (ret == 0)
-        {   
+        {
             /* assume we are done and return */
           safe_exit:
             free(buffer);
@@ -318,51 +320,52 @@ int PINT_dev_test_unexpected(
             gossip_err("Error: short message from device "
                        "(got %d bytes).\n", ret);
 
-            ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+            ret = -(PVFS_EIO | PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
 
-        proto_ver = (int32_t*)buffer;
-        magic = (int32_t*)((unsigned long)buffer + sizeof(int32_t));
-        tag = (uint64_t*)((unsigned long)buffer + 2*sizeof(int32_t));
+        proto_ver = (int32_t *) buffer;
+        magic = (int32_t *) ((unsigned long) buffer + sizeof(int32_t));
+        tag = (uint64_t *) ((unsigned long) buffer + 2 * sizeof(int32_t));
 
-        if(*magic != pdev_magic)
+        if (*magic != pdev_magic)
         {
             gossip_err("Error: magic numbers do not match.\n");
-            ret = -(PVFS_EPROTO|PVFS_ERROR_DEV);
+            ret = -(PVFS_EPROTO | PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
-        if(*proto_ver != PVFS_KERNEL_PROTO_VERSION)
+        if (*proto_ver != PVFS_KERNEL_PROTO_VERSION)
         {
             gossip_err("Error: protocol versions do not match.\n");
-            gossip_err("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
-            ret = -(PVFS_EPROTO|PVFS_ERROR_DEV);
+            gossip_err
+                ("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
+            ret = -(PVFS_EPROTO | PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
 
         info_array[*outcount].size =
-            (ret - 2*sizeof(int32_t) - sizeof(uint64_t));
+            (ret - 2 * sizeof(int32_t) - sizeof(uint64_t));
 
         /* shift buffer up so caller doesn't see header info */
-        info_array[*outcount].buffer = (void*)
-            ((unsigned long)buffer + 2*sizeof(int32_t) + sizeof(uint64_t));
+        info_array[*outcount].buffer = (void *)
+            ((unsigned long) buffer + 2 * sizeof(int32_t) + sizeof(uint64_t));
         info_array[*outcount].tag = *tag;
 
         (*outcount)++;
 
         /*
-          keep going until we fill up the outcount or the device
-          empties
-        */
+           keep going until we fill up the outcount or the device
+           empties
+         */
 
-    } while((*outcount < incount) && avail);
+    } while ((*outcount < incount) && avail);
 
     return ((*outcount > 0) ? 1 : 0);
 
-dev_test_unexp_error:
+  dev_test_unexp_error:
 
     /* release resources we created up to this point */
-    for(i = 0; i < *outcount; i++)
+    for (i = 0; i < *outcount; i++)
     {
         if (buffer)
         {
@@ -381,7 +384,7 @@ dev_test_unexp_error:
  * returns 0 on success, -PVFS_error on failure
  */
 int PINT_dev_release_unexpected(
-        struct PINT_dev_unexp_info *info)
+    struct PINT_dev_unexp_info *info)
 {
     int ret = -PVFS_EINVAL;
     void *buffer = NULL;
@@ -389,8 +392,8 @@ int PINT_dev_release_unexpected(
     if (info && info->buffer)
     {
         /* index backwards header size off of the buffer before freeing */
-        buffer = (void*)((unsigned long)info->buffer - 2*sizeof(int32_t) - 
-                         sizeof(uint64_t));
+        buffer = (void *) ((unsigned long) info->buffer - 2 * sizeof(int32_t) -
+                           sizeof(uint64_t));
         free(buffer);
 
         ret = 0;
@@ -419,7 +422,7 @@ int PINT_dev_write_list(
     int i;
     int ret = -1;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
-    
+
     /* lets be reasonable about list size :) */
     /* two vecs are taken up by magic nr and tag */
     assert(list_count < 7);
@@ -427,12 +430,12 @@ int PINT_dev_write_list(
     /* even though we are ignoring the buffer_type for now, 
      * make sure that the caller set it to a sane value 
      */
-    assert(buffer_type == PINT_DEV_EXT_ALLOC || 
-        buffer_type == PINT_DEV_PRE_ALLOC);
+    assert(buffer_type == PINT_DEV_EXT_ALLOC ||
+           buffer_type == PINT_DEV_PRE_ALLOC);
 
     if (total_size > pdev_max_downsize)
     {
-        return(-(PVFS_EMSGSIZE|PVFS_ERROR_DEV));
+        return (-(PVFS_EMSGSIZE | PVFS_ERROR_DEV));
     }
 
     io_array[0].iov_base = &proto_ver;
@@ -442,16 +445,16 @@ int PINT_dev_write_list(
     io_array[2].iov_base = &tag;
     io_array[2].iov_len = sizeof(uint64_t);
 
-    for (i=0; i<list_count; i++)
+    for (i = 0; i < list_count; i++)
     {
-        io_array[i+3].iov_base = buffer_list[i];
-        io_array[i+3].iov_len = size_list[i];
+        io_array[i + 3].iov_base = buffer_list[i];
+        io_array[i + 3].iov_len = size_list[i];
         io_count++;
     }
 
     ret = writev(pdev_fd, io_array, io_count);
 
-    return ((ret < 0) ? -(PVFS_EIO|PVFS_ERROR_DEV) : 0);
+    return ((ret < 0) ? -(PVFS_EIO | PVFS_ERROR_DEV) : 0);
 }
 
 /* PINT_dev_remount()
@@ -461,7 +464,8 @@ int PINT_dev_write_list(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_dev_remount(void)
+int PINT_dev_remount(
+    void)
 {
     int ret = -PVFS_EINVAL;
 
@@ -483,13 +487,13 @@ int PINT_dev_remount(void)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_dev_write(void *buffer,
-                   int size,
-                   enum PINT_dev_buffer_type buffer_type,
-                   PVFS_id_gen_t tag)
+int PINT_dev_write(
+    void *buffer,
+    int size,
+    enum PINT_dev_buffer_type buffer_type,
+    PVFS_id_gen_t tag)
 {
-    return PINT_dev_write_list(
-        &buffer, &size, 1, size, buffer_type, tag);
+    return PINT_dev_write_list(&buffer, &size, 1, size, buffer_type, tag);
 }
 
 /* PINT_dev_memalloc()
@@ -498,7 +502,8 @@ int PINT_dev_write(void *buffer,
  *
  * returns pointer to buffer on success, NULL on failure
  */
-void *PINT_dev_memalloc(int size)
+void *PINT_dev_memalloc(
+    int size)
 {
     /* no optimizations yet */
     return malloc(size);
@@ -510,7 +515,9 @@ void *PINT_dev_memalloc(int size)
  *
  * no return value
  */
-void PINT_dev_memfree(void *buffer, int size)
+void PINT_dev_memfree(
+    void *buffer,
+    int size)
 {
     free(buffer);
 }
@@ -521,7 +528,8 @@ void PINT_dev_memfree(void *buffer, int size)
  *
  * returns 0 on success, -1 on failure
  */
-static int setup_dev_entry(const char *dev_name)
+static int setup_dev_entry(
+    const char *dev_name)
 {
     int majornum = -1;
     int ret = -1;
@@ -551,13 +559,12 @@ static int setup_dev_entry(const char *dev_name)
             return -1;
         }
 
-        if (S_ISCHR(dev_stat.st_mode) &&
-            (major(dev_stat.st_rdev) == majornum))
+        if (S_ISCHR(dev_stat.st_mode) && (major(dev_stat.st_rdev) == majornum))
         {
             /*
-              the device file already has the correct major number;
-              we're done
-            */
+               the device file already has the correct major number;
+               we're done
+             */
             return 0;
         }
         else
@@ -573,12 +580,10 @@ static int setup_dev_entry(const char *dev_name)
     }
 
     /* if we hit this point, then we need to create a new device file */
-    ret = mknod(dev_name, (S_IFCHR | S_IRUSR | S_IWUSR),
-                makedev(majornum, 0));
+    ret = mknod(dev_name, (S_IFCHR | S_IRUSR | S_IWUSR), makedev(majornum, 0));
     if (ret != 0)
     {
-        gossip_err("Error: could not create new %s device entry.\n",
-                   dev_name);
+        gossip_err("Error: could not create new %s device entry.\n", dev_name);
     }
     return ret;
 }
@@ -593,7 +598,7 @@ static int setup_dev_entry(const char *dev_name)
  */
 static int parse_devices(
     const char *targetfile,
-    const char *devname, 
+    const char *devname,
     int *majornum)
 {
     char line_buf[256];
@@ -617,25 +622,25 @@ static int parse_devices(
     while (fgets(line_buf, sizeof(line_buf), devfile))
     {
         /*
-          sscanf is safe here as long as the target string is at least
-          as large as the source
-        */
+           sscanf is safe here as long as the target string is at least
+           as large as the source
+         */
         ret = sscanf(line_buf, " %d %s ", &major_buf, dev_buf);
         if (ret == 2)
         {
             /*
-              this line is the correct format; see if it matches the
-              devname
-            */
+               this line is the correct format; see if it matches the
+               devname
+             */
             if (strncmp(devname, dev_buf, sizeof(dev_buf)) == 0)
             {
                 *majornum = major_buf;
-                
+
                 /*
-                  don't break out; it doesn't cost much to scan the
-                  whole thing, and we want the last entry if
-                  somehow(?)  there are two
-                */
+                   don't break out; it doesn't cost much to scan the
+                   whole thing, and we want the last entry if
+                   somehow(?)  there are two
+                 */
             }
         }
     }

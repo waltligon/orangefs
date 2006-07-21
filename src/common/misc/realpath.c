@@ -66,7 +66,7 @@ int PINT_realpath(
     {
         if (!getcwd(npath, maxreslth - 2))
         {
-            return(-PVFS_EINVAL);
+            return (-PVFS_EINVAL);
         }
         npath += strlen(npath);
         if (npath[-1] != '/')
@@ -152,7 +152,7 @@ int PINT_realpath(
             if (buf)
                 free(buf);
             buf = malloc(m + n + 1);
-            if(!buf)
+            if (!buf)
             {
                 ret = -PVFS_ENOMEM;
                 goto err;

@@ -33,7 +33,8 @@ static struct flowproto_ops **active_flowproto_table = NULL;
 /* mappings of flow endpoints to the correct protocol */
 static flow_ref_p flow_mapping = NULL;
 
-static void flow_release(flow_descriptor * flow_d);
+static void flow_release(
+    flow_descriptor * flow_d);
 
 /* bring in the flowproto interfaces that we need */
 #ifdef __STATIC_FLOWPROTO_TEMPLATE__
@@ -82,36 +83,36 @@ int PINT_flow_initialize(
     int flags)
 {
     int ret = -1;
-    int i = 0, j = 0, already_exists = 0, active_flow_index = 0, 
+    int i = 0, j = 0, already_exists = 0, active_flow_index = 0,
         requested_flowproto_count = 0;
     char **requested_flowprotos = NULL;
     struct flowproto_ops **tmp_flowproto_ops = NULL;
 
     gen_mutex_lock(&interface_mutex);
 
-    if(flowproto_list)
+    if (flowproto_list)
     {
-	/* seperate out the list of flowprotos to activate */
-	active_flowproto_count = PINT_split_string_list(
-            &requested_flowprotos, flowproto_list);
-	if (active_flowproto_count < 1)
-	{
-	    gossip_lerr("Error: bad flow protocol list.\n");
-	    ret = -EINVAL;
-	    goto PINT_flow_initialize_failure;
-	}
+        /* seperate out the list of flowprotos to activate */
+        active_flowproto_count =
+            PINT_split_string_list(&requested_flowprotos, flowproto_list);
+        if (active_flowproto_count < 1)
+        {
+            gossip_lerr("Error: bad flow protocol list.\n");
+            ret = -EINVAL;
+            goto PINT_flow_initialize_failure;
+        }
         requested_flowproto_count = active_flowproto_count;
     }
     else
     {
-	/* count compiled in flow protocols, we will activate all of them */
-	tmp_flowproto_ops = static_flowprotos;
-	active_flowproto_count = 0;
-	while ((*tmp_flowproto_ops) != NULL)
-	{
-	    tmp_flowproto_ops++;
-	    active_flowproto_count++;
-	}
+        /* count compiled in flow protocols, we will activate all of them */
+        tmp_flowproto_ops = static_flowprotos;
+        active_flowproto_count = 0;
+        while ((*tmp_flowproto_ops) != NULL)
+        {
+            tmp_flowproto_ops++;
+            active_flowproto_count++;
+        }
         requested_flowproto_count = active_flowproto_count;
     }
 
@@ -120,8 +121,8 @@ int PINT_flow_initialize(
         malloc((active_flowproto_count * sizeof(struct flowproto_ops *)));
     if (!active_flowproto_table)
     {
-	ret = -ENOMEM;
-	goto PINT_flow_initialize_failure;
+        ret = -ENOMEM;
+        goto PINT_flow_initialize_failure;
     }
     memset(active_flowproto_table, 0,
            (active_flowproto_count * sizeof(struct flowproto_ops *)));
@@ -129,74 +130,74 @@ int PINT_flow_initialize(
     /* find the interface for each requested method and load it into the
      * active table.
      */
-    if(flowproto_list)
+    if (flowproto_list)
     {
-	for (i = 0; i < requested_flowproto_count; i++)
-	{
-	    tmp_flowproto_ops = static_flowprotos;
-	    while ((*tmp_flowproto_ops) != NULL &&
-		   strcmp((*tmp_flowproto_ops)->flowproto_name,
-			  requested_flowprotos[i]) != 0)
-	    {
-		tmp_flowproto_ops++;
-	    }
-	    if ((*tmp_flowproto_ops) == NULL)
-	    {
-		gossip_lerr("Error: no flowproto available for: %s\n",
-			    requested_flowprotos[i]);
-		ret = -ENOPROTOOPT;
-		goto PINT_flow_initialize_failure;
-	    }
+        for (i = 0; i < requested_flowproto_count; i++)
+        {
+            tmp_flowproto_ops = static_flowprotos;
+            while ((*tmp_flowproto_ops) != NULL &&
+                   strcmp((*tmp_flowproto_ops)->flowproto_name,
+                          requested_flowprotos[i]) != 0)
+            {
+                tmp_flowproto_ops++;
+            }
+            if ((*tmp_flowproto_ops) == NULL)
+            {
+                gossip_lerr("Error: no flowproto available for: %s\n",
+                            requested_flowprotos[i]);
+                ret = -ENOPROTOOPT;
+                goto PINT_flow_initialize_failure;
+            }
 
             /* check that flowproto hasn't already been added to table */
             already_exists = 0;
-            for(j = 0; j < active_flow_index; ++j)
+            for (j = 0; j < active_flow_index; ++j)
             {
-                if(active_flowproto_table[j] == (*tmp_flowproto_ops))
+                if (active_flowproto_table[j] == (*tmp_flowproto_ops))
                 {
                     already_exists = 1;
                 }
             }
-            
-            if(!already_exists)
+
+            if (!already_exists)
             {
-                active_flowproto_table[active_flow_index++] = 
+                active_flowproto_table[active_flow_index++] =
                     (*tmp_flowproto_ops);
             }
             else
             {
                 active_flowproto_count--;
             }
-	}
+        }
     }
     else
     {
-	tmp_flowproto_ops = static_flowprotos;
-	for(i=0; i<active_flowproto_count; i++)
-	{
-	    active_flowproto_table[i] = (*tmp_flowproto_ops);
-	    tmp_flowproto_ops++;
-	}
+        tmp_flowproto_ops = static_flowprotos;
+        for (i = 0; i < active_flowproto_count; i++)
+        {
+            active_flowproto_table[i] = (*tmp_flowproto_ops);
+            tmp_flowproto_ops++;
+        }
     }
 
     /* create a cache of mappings to flow protocols */
     flow_mapping = flow_ref_new();
     if (!flow_mapping)
     {
-	ret = -ENOMEM;
-	goto PINT_flow_initialize_failure;
+        ret = -ENOMEM;
+        goto PINT_flow_initialize_failure;
     }
 
     /* initialize all of the flow protocols */
     for (i = 0; i < active_flowproto_count; i++)
     {
-	ret = active_flowproto_table[i]->flowproto_initialize(i);
-	if (ret < 0)
-	{
-	    gossip_lerr("Error: could not initialize protocol: %s.\n",
-			active_flowproto_table[i]->flowproto_name);
-	    goto PINT_flow_initialize_failure;
-	}
+        ret = active_flowproto_table[i]->flowproto_initialize(i);
+        if (ret < 0)
+        {
+            gossip_lerr("Error: could not initialize protocol: %s.\n",
+                        active_flowproto_table[i]->flowproto_name);
+            goto PINT_flow_initialize_failure;
+        }
     }
 
     /* get rid of method string list */
@@ -210,14 +211,14 @@ int PINT_flow_initialize(
     /* shut down any protocols which may have started */
     if (active_flowproto_table)
     {
-	for (i = 0; i < active_flowproto_count; i++)
-	{
-	    if (active_flowproto_table[i])
-	    {
-		active_flowproto_table[i]->flowproto_finalize();
-	    }
-	}
-	free(active_flowproto_table);
+        for (i = 0; i < active_flowproto_count; i++)
+        {
+            if (active_flowproto_table[i])
+            {
+                active_flowproto_table[i]->flowproto_finalize();
+            }
+        }
+        free(active_flowproto_table);
     }
 
     /* get rid of method string list */
@@ -226,7 +227,7 @@ int PINT_flow_initialize(
 
     if (flow_mapping)
     {
-	flow_ref_cleanup(flow_mapping);
+        flow_ref_cleanup(flow_mapping);
     }
     gen_mutex_unlock(&interface_mutex);
     return (ret);
@@ -238,7 +239,8 @@ int PINT_flow_initialize(
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_finalize(void)
+int PINT_flow_finalize(
+    void)
 {
     int i = 0;
     int ret = 0, tret;
@@ -248,7 +250,7 @@ int PINT_flow_finalize(void)
     /* shut down each active protocol */
     for (i = 0; i < active_flowproto_count; i++)
     {
-	tret = active_flowproto_table[i]->flowproto_finalize();
+        tret = active_flowproto_table[i]->flowproto_finalize();
         if (tret)
             ret = tret;
     }
@@ -270,11 +272,12 @@ int PINT_flow_finalize(void)
  *
  * returns pointer to descriptor on success, NULL on failure
  */
-flow_descriptor *PINT_flow_alloc(void)
+flow_descriptor *PINT_flow_alloc(
+    void)
 {
     flow_descriptor *tmp_desc = NULL;
 
-    tmp_desc = (flow_descriptor *)malloc(sizeof(struct flow_descriptor));
+    tmp_desc = (flow_descriptor *) malloc(sizeof(struct flow_descriptor));
     if (tmp_desc)
     {
         tmp_desc->flow_mutex = NULL;
@@ -290,7 +293,8 @@ flow_descriptor *PINT_flow_alloc(void)
  *
  * returns pointer to descriptor on success, NULL on failure
  */
-void PINT_flow_reset(flow_descriptor *flow_d)
+void PINT_flow_reset(
+    flow_descriptor * flow_d)
 {
     gen_mutex_t *tmp_mutex = NULL;
 
@@ -317,7 +321,8 @@ void PINT_flow_reset(flow_descriptor *flow_d)
  *
  * no return value
  */
-void PINT_flow_free(flow_descriptor *flow_d)
+void PINT_flow_free(
+    flow_descriptor * flow_d)
 {
     assert(flow_d);
     assert(flow_d->flow_mutex);
@@ -334,11 +339,12 @@ void PINT_flow_free(flow_descriptor *flow_d)
  *
  * no return value
  */
-void PINT_flow_clear(flow_descriptor *flow_d)
+void PINT_flow_clear(
+    flow_descriptor * flow_d)
 {
     assert(flow_d);
 
-    if(flow_d->flow_mutex)
+    if (flow_d->flow_mutex)
     {
         gen_mutex_destroy(flow_d->flow_mutex);
     }
@@ -353,7 +359,8 @@ void PINT_flow_clear(flow_descriptor *flow_d)
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_post(flow_descriptor * flow_d)
+int PINT_flow_post(
+    flow_descriptor * flow_d)
 {
     int flowproto_id = -1;
     int ret = -1;
@@ -373,43 +380,45 @@ int PINT_flow_post(flow_descriptor * flow_d)
      */
 
     /* search for match to specified flow protocol type */
-    for(i=0; i<active_flowproto_count; i++)
+    for (i = 0; i < active_flowproto_count; i++)
     {
-	ret =
-	    active_flowproto_table[i]->flowproto_getinfo(NULL,
-	    FLOWPROTO_TYPE_QUERY,
-	    &type);
-	if(ret >= 0)
-	{
-	    flowproto_id = i;
-	    break;
-	}
+        ret =
+            active_flowproto_table[i]->flowproto_getinfo(NULL,
+                                                         FLOWPROTO_TYPE_QUERY,
+                                                         &type);
+        if (ret >= 0)
+        {
+            flowproto_id = i;
+            break;
+        }
     }
 
     if (flowproto_id < 0)
     {
-	gen_mutex_unlock(&interface_mutex);
-	gossip_err("Error: requested flow protocol %d, which doesn't appear to be loaded.\n", (int)type);
-	return (-ENOPROTOOPT);
+        gen_mutex_unlock(&interface_mutex);
+        gossip_err
+            ("Error: requested flow protocol %d, which doesn't appear to be loaded.\n",
+             (int) type);
+        return (-ENOPROTOOPT);
     }
 
     /* setup the request processing states */
     flow_d->file_req_state = PINT_new_request_state(flow_d->file_req);
     if (!flow_d->file_req_state)
     {
-	gen_mutex_unlock(&interface_mutex);
-	return (-EINVAL);
+        gen_mutex_unlock(&interface_mutex);
+        return (-EINVAL);
     }
 
     /* only setup a memory datatype state if caller provided a memory datatype */
-    if(flow_d->mem_req)
+    if (flow_d->mem_req)
     {
-	flow_d->mem_req_state = PINT_new_request_state(flow_d->mem_req);
-	if (!flow_d->mem_req_state)
-	{
-	    gen_mutex_unlock(&interface_mutex);
-	    return (-EINVAL);
-	}
+        flow_d->mem_req_state = PINT_new_request_state(flow_d->mem_req);
+        if (!flow_d->mem_req_state)
+        {
+            gen_mutex_unlock(&interface_mutex);
+            return (-EINVAL);
+        }
     }
 
     flow_d->release = flow_release;
@@ -428,7 +437,8 @@ int PINT_flow_post(flow_descriptor * flow_d)
  *
  * returns 0 on successful attempt, -errno on failure
  */
-int PINT_flow_cancel(flow_descriptor * flow_d)
+int PINT_flow_cancel(
+    flow_descriptor * flow_d)
 {
     int ret;
 
@@ -436,16 +446,17 @@ int PINT_flow_cancel(flow_descriptor * flow_d)
     assert(flow_d);
     assert(flow_d->flowproto_id >= 0);
 
-    if(active_flowproto_table[flow_d->flowproto_id]->flowproto_cancel)
+    if (active_flowproto_table[flow_d->flowproto_id]->flowproto_cancel)
     {
-	ret =
-	active_flowproto_table[flow_d->flowproto_id]->flowproto_cancel(flow_d);
+        ret =
+            active_flowproto_table[flow_d->flowproto_id]->
+            flowproto_cancel(flow_d);
     }
     else
     {
-	ret = -ENOSYS;
+        ret = -ENOSYS;
     }
-    
+
     gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
@@ -457,26 +468,28 @@ int PINT_flow_cancel(flow_descriptor * flow_d)
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_setinfo(flow_descriptor *flow_d,
-		      int option,
-		      void *parameter)
+int PINT_flow_setinfo(
+    flow_descriptor * flow_d,
+    int option,
+    void *parameter)
 {
     int ret, tret, i;
 
     gen_mutex_lock(&interface_mutex);
     if (flow_d)
     {
-        ret = active_flowproto_table[
-            flow_d->flowproto_id]->flowproto_setinfo(
-                flow_d, option, parameter);
+        ret =
+            active_flowproto_table[flow_d->flowproto_id]->
+            flowproto_setinfo(flow_d, option, parameter);
     }
     else
     {
         ret = -ENOSYS;  /* success if any flowproto could handle it */
-        for(i = 0; i < active_flowproto_count; i++)
+        for (i = 0; i < active_flowproto_count; i++)
         {
-            tret = active_flowproto_table[i]->flowproto_setinfo(
-                flow_d, option, parameter);
+            tret =
+                active_flowproto_table[i]->flowproto_setinfo(flow_d, option,
+                                                             parameter);
             if (tret == 0)
                 ret = 0;
         }
@@ -493,22 +506,23 @@ int PINT_flow_setinfo(flow_descriptor *flow_d,
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_getinfo(flow_descriptor *flow_d,
-		      enum flow_getinfo_option opt,
-		      void *parameter)
+int PINT_flow_getinfo(
+    flow_descriptor * flow_d,
+    enum flow_getinfo_option opt,
+    void *parameter)
 {
-    PVFS_size* tmp_size;
+    PVFS_size *tmp_size;
 
     gen_mutex_lock(&interface_mutex);
-    
-    switch(opt)
+
+    switch (opt)
     {
     case FLOW_AMT_COMPLETE_QUERY:
-	tmp_size = (PVFS_size*)parameter;
-	*tmp_size = flow_d->total_transferred;
-	break;
+        tmp_size = (PVFS_size *) parameter;
+        *tmp_size = flow_d->total_transferred;
+        break;
     default:
-	break;
+        break;
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -528,17 +542,18 @@ int PINT_flow_getinfo(flow_descriptor *flow_d,
  *
  * no return value
  */
-static void flow_release(flow_descriptor *flow_d)
+static void flow_release(
+    flow_descriptor * flow_d)
 {
     /* let go of the request processing states */
     if (flow_d->file_req_state)
     {
-	PINT_free_request_state(flow_d->file_req_state);
+        PINT_free_request_state(flow_d->file_req_state);
     }
 
     if (flow_d->mem_req_state)
     {
-	PINT_free_request_state(flow_d->mem_req_state);
+        PINT_free_request_state(flow_d->mem_req_state);
     }
 }
 

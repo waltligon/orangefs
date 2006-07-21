@@ -11,10 +11,17 @@
 #include "pvfs2.h"
 #include "tcache.h"
 
-static void usage(int argc, char** argv);
-static int foo_compare_key_entry(void* key, struct qhash_head* link);
-static int foo_hash_key(void* key, int table_size);
-static int foo_free_payload(void* payload);
+static void usage(
+    int argc,
+    char **argv);
+static int foo_compare_key_entry(
+    void *key,
+    struct qhash_head *link);
+static int foo_hash_key(
+    void *key,
+    int table_size);
+static int foo_free_payload(
+    void *payload);
 
 /* test payload */
 struct foo_payload
@@ -23,34 +30,34 @@ struct foo_payload
     float value;
 };
 
-int main(int argc, char **argv)
+int main(
+    int argc,
+    char **argv)
 {
-    struct PINT_tcache* test_tcache;
+    struct PINT_tcache *test_tcache;
     int i;
-    struct foo_payload* tmp_payload;
-    struct PINT_tcache_entry* test_entry = NULL;
+    struct foo_payload *tmp_payload;
+    struct PINT_tcache_entry *test_entry = NULL;
     int ret = 0;
     int status = 0;
     unsigned int param = 0;
     int removed = 0;
     int reclaimed = 0;
-    
-    if(argc != 1)
+
+    if (argc != 1)
     {
         usage(argc, argv);
-        return(-1);
+        return (-1);
     }
 
     /* initialize */
     printf("Initializing cache...\n");
     test_tcache = PINT_tcache_initialize(foo_compare_key_entry,
-        foo_hash_key,
-        foo_free_payload,
-        -1);
-    if(!test_tcache)
+                                         foo_hash_key, foo_free_payload, -1);
+    if (!test_tcache)
     {
         fprintf(stderr, "PINT_tcache_initialize failure.\n");
-        return(-1);
+        return (-1);
     }
     printf("Done.\n");
 
@@ -122,40 +129,38 @@ int main(int argc, char **argv)
 
 
     /* insert some entries */
-    for(i=0; i< 3; i++)
+    for (i = 0; i < 3; i++)
     {
-        tmp_payload = (struct foo_payload*)malloc(sizeof(struct
-            foo_payload));
+        tmp_payload = (struct foo_payload *) malloc(sizeof(struct foo_payload));
         assert(tmp_payload);
         tmp_payload->key = i;
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
-        if(ret < 0)
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload, &removed);
+        if (ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
-            return(-1);
+            return (-1);
         }
         printf("Done.\n");
         sleep(1);
     }
 
     /* lookup all three */
-    for(i=0; i<3; i++)
+    for (i = 0; i < 3; i++)
     {
         printf("Looking up entry %d\n", i);
         ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
-        if(ret < 0)
+        if (ret < 0)
         {
             PVFS_perror("PINT_tcache_lookup", ret);
-            return(-1);
+            return (-1);
         }
-        if(status != 0)
+        if (status != 0)
         {
             PVFS_perror("PINT_tcache_lookup status", status);
-            return(-1);
+            return (-1);
         }
         printf("Done.\n");
         tmp_payload = test_entry->payload;
@@ -164,35 +169,35 @@ int main(int argc, char **argv)
 
     /* sleep until at least first expires */
     sleep(2);
-    i=0;
+    i = 0;
     printf("Looking up expired entry %d\n", i);
     ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
-    if(ret < 0)
+    if (ret < 0)
     {
         PVFS_perror("PINT_tcache_lookup", ret);
-        return(-1);
+        return (-1);
     }
-    if(status != -PVFS_ETIME)
+    if (status != -PVFS_ETIME)
     {
         PVFS_perror("PINT_tcache_lookup status", status);
-        return(-1);
+        return (-1);
     }
     printf("Done.\n");
     tmp_payload = test_entry->payload;
     printf("Value: %f\n", tmp_payload->value);
 
-    i=2;
+    i = 2;
     printf("Looking up valid entry %d\n", i);
     ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
-    if(ret < 0)
+    if (ret < 0)
     {
         PVFS_perror("PINT_tcache_lookup", ret);
-        return(-1);
+        return (-1);
     }
-    if(status != 0)
+    if (status != 0)
     {
         PVFS_perror("PINT_tcache_lookup status", status);
-        return(-1);
+        return (-1);
     }
     printf("Done.\n");
     tmp_payload = test_entry->payload;
@@ -201,58 +206,56 @@ int main(int argc, char **argv)
     /* try destroying an entry */
     printf("Destroying an entry...\n");
     ret = PINT_tcache_delete(test_tcache, test_entry);
-    if(ret < 0)
+    if (ret < 0)
     {
         PVFS_perror("PINT_tcache_delete", ret);
-        return(-1);
+        return (-1);
     }
     printf("Done.\n");
 
-    i=2;
+    i = 2;
     printf("Looking up destroyed entry %d\n", i);
     ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
-    if(ret == 0)
+    if (ret == 0)
     {
         PVFS_perror("PINT_tcache_lookup", ret);
-        return(-1);
+        return (-1);
     }
     printf("Done.\n");
 
-    i=200;
+    i = 200;
     printf("Looking up entry that never existed %d\n", i);
     ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
-    if(ret == 0)
+    if (ret == 0)
     {
         PVFS_perror("PINT_tcache_lookup", ret);
-        return(-1);
+        return (-1);
     }
     printf("Done.\n");
 
     sleep(5);
 
     /* insert a new entry */
-    i=3;
-    tmp_payload = (struct foo_payload*)malloc(sizeof(struct
-        foo_payload));
+    i = 3;
+    tmp_payload = (struct foo_payload *) malloc(sizeof(struct foo_payload));
     assert(tmp_payload);
     tmp_payload->key = i;
     tmp_payload->value = i;
     printf("Inserting %d...\n", i);
-    ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                   tmp_payload, &removed);
-    if(ret < 0)
+    ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload, &removed);
+    if (ret < 0)
     {
         PVFS_perror("PINT_tcache_insert", ret);
-        return(-1);
+        return (-1);
     }
     printf("Done.\n");
 
     /* reclaim */
     ret = PINT_tcache_reclaim(test_tcache, &reclaimed);
-    if(ret < 0)
+    if (ret < 0)
     {
         PVFS_perror("PINT_tcache_reclaim", ret);
-        return(-1);
+        return (-1);
     }
 
     /* finalize */
@@ -263,13 +266,11 @@ int main(int argc, char **argv)
     /* initialize */
     printf("Initializing cache...\n");
     test_tcache = PINT_tcache_initialize(foo_compare_key_entry,
-        foo_hash_key,
-        foo_free_payload,
-        -1);
-    if(!test_tcache)
+                                         foo_hash_key, foo_free_payload, -1);
+    if (!test_tcache)
     {
         fprintf(stderr, "PINT_tcache_initialize failure.\n");
-        return(-1);
+        return (-1);
     }
     printf("Done.\n");
 
@@ -281,21 +282,19 @@ int main(int argc, char **argv)
     printf("Done.\n");
 
     /* insert some entries */
-    for(i=0; i< 3; i++)
+    for (i = 0; i < 3; i++)
     {
-        tmp_payload = (struct foo_payload*)malloc(sizeof(struct
-            foo_payload));
+        tmp_payload = (struct foo_payload *) malloc(sizeof(struct foo_payload));
         assert(tmp_payload);
         tmp_payload->key = i;
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
-        if(ret < 0)
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload, &removed);
+        if (ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
-            return(-1);
+            return (-1);
         }
         printf("Done.\n");
         sleep(1);
@@ -333,21 +332,19 @@ int main(int argc, char **argv)
 
 
     /* insert some entries */
-    for(i=0; i< 5; i++)
+    for (i = 0; i < 5; i++)
     {
-        tmp_payload = (struct foo_payload*)malloc(sizeof(struct
-            foo_payload));
+        tmp_payload = (struct foo_payload *) malloc(sizeof(struct foo_payload));
         assert(tmp_payload);
         tmp_payload->key = i;
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
-        if(ret < 0)
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload, &removed);
+        if (ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
-            return(-1);
+            return (-1);
         }
         printf("Done.\n");
     }
@@ -360,21 +357,19 @@ int main(int argc, char **argv)
     printf("num_entries: %d\n", param);
 
     /* insert some entries */
-    for(i=5; i< 6; i++)
+    for (i = 5; i < 6; i++)
     {
-        tmp_payload = (struct foo_payload*)malloc(sizeof(struct
-            foo_payload));
+        tmp_payload = (struct foo_payload *) malloc(sizeof(struct foo_payload));
         assert(tmp_payload);
         tmp_payload->key = i;
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
-        if(ret < 0)
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload, &removed);
+        if (ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
-            return(-1);
+            return (-1);
         }
         printf("Done.\n");
     }
@@ -385,21 +380,19 @@ int main(int argc, char **argv)
     printf("num_entries: %d\n", param);
 
     /* insert some entries */
-    for(i=6; i< 20; i++)
+    for (i = 6; i < 20; i++)
     {
-        tmp_payload = (struct foo_payload*)malloc(sizeof(struct
-            foo_payload));
+        tmp_payload = (struct foo_payload *) malloc(sizeof(struct foo_payload));
         assert(tmp_payload);
         tmp_payload->key = i;
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
-        if(ret < 0)
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload, &removed);
+        if (ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
-            return(-1);
+            return (-1);
         }
         printf("Done.\n");
     }
@@ -409,47 +402,55 @@ int main(int argc, char **argv)
     assert(ret == 0);
     printf("num_entries: %d\n", param);
 
-    return(0);
+    return (0);
 }
 
-static void usage(int argc, char** argv)
+static void usage(
+    int argc,
+    char **argv)
 {
     fprintf(stderr, "\n");
     fprintf(stderr, "Usage  : %s\n", argv[0]);
     return;
 }
 
-static int foo_compare_key_entry(void* key, struct qhash_head* link)
+static int foo_compare_key_entry(
+    void *key,
+    struct qhash_head *link)
 {
-    int* real_key = (int*)key;
-    struct foo_payload* tmp_payload = NULL;
-    struct PINT_tcache_entry* tmp_entry = NULL;
+    int *real_key = (int *) key;
+    struct foo_payload *tmp_payload = NULL;
+    struct PINT_tcache_entry *tmp_entry = NULL;
 
-    tmp_entry = qlist_entry(link, struct PINT_tcache_entry, hash_link);
+    tmp_entry = qlist_entry(link, struct PINT_tcache_entry,
+                            hash_link);
     assert(tmp_entry);
 
-    tmp_payload = (struct foo_payload*)tmp_entry->payload;
-    if(*real_key == tmp_payload->key)
+    tmp_payload = (struct foo_payload *) tmp_entry->payload;
+    if (*real_key == tmp_payload->key)
     {
-        return(1);
+        return (1);
     }
 
-    return(0);
+    return (0);
 }
 
-static int foo_hash_key(void* key, int table_size)
+static int foo_hash_key(
+    void *key,
+    int table_size)
 {
-    int* real_key = (int*)key;
+    int *real_key = (int *) key;
     int tmp_ret = 0;
 
-    tmp_ret = (*real_key)%table_size;
-    return(tmp_ret);
+    tmp_ret = (*real_key) % table_size;
+    return (tmp_ret);
 }
 
-static int foo_free_payload(void* payload)
+static int foo_free_payload(
+    void *payload)
 {
     free(payload);
-    return(0);
+    return (0);
 }
 
 /*
@@ -460,4 +461,3 @@ static int foo_free_payload(void* payload)
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
