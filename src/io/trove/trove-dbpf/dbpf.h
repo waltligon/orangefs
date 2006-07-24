@@ -343,53 +343,6 @@ struct dbpf_bstream_resize_op
     /* vtag? */
 };
 
-/* Used to maintain state of partial processing of a listio operation
- */
-struct bstream_listio_state
-{
-    int mem_ct, stream_ct;
-    TROVE_size cur_mem_size;
-    char *cur_mem_off;
-    TROVE_size cur_stream_size;
-    TROVE_offset cur_stream_off;
-};
-
-/* Values for list_proc_state below */
-enum
-{
-    LIST_PROC_INITIALIZED,  /* list state initialized,
-                               but no aiocb array */
-    LIST_PROC_INPROGRESS,   /* aiocb array allocated, ops in progress */
-    LIST_PROC_ALLCONVERTED, /* all list elements converted */
-    LIST_PROC_ALLPOSTED     /* all list elements also posted */
-};
-
-/* Used for both read and write list
- *
- * list_proc_state is used to retain the status of processing on the
- * list arrays.
- *
- * aiocb_array_count - size of the aiocb_array (nothing to do with #
- * of things in progress)
- */
-struct dbpf_bstream_rw_list_op
-{
-    struct open_cache_ref open_ref;
-    int fd, list_proc_state, opcode;
-    int aiocb_array_count, mem_array_count, stream_array_count;
-    char **mem_offset_array;
-    TROVE_size *mem_size_array;
-    TROVE_offset *stream_offset_array;
-    TROVE_size *stream_size_array;
-    TROVE_size *out_size_p;
-    struct aiocb *aiocb_array;
-    struct sigevent sigev;
-    struct bstream_listio_state lio_state;
-#ifndef __PVFS2_TROVE_AIO_THREADED__
-    void *queued_op_ptr;
-#endif
-};
-
 struct dbpf_keyval_get_handle_info_op
 {
     TROVE_keyval_handle_info *info;
@@ -455,8 +408,70 @@ enum dbpf_op_state
     OP_INTERNALLY_DELAYED
 };
 
-#define DBPF_OP_CONTINUE 0
-#define DBPF_OP_COMPLETE 1
+#define TEST_FOR_COMPLETION 0
+#define IMMEDIATE_COMPLETION 1
+
+#ifdef __PVFS2_USE_AIO__
+/* Used to maintain state of partial processing of a listio operation
+ */
+struct bstream_listio_state
+{
+    int mem_ct, stream_ct;
+    TROVE_size cur_mem_size;
+    char *cur_mem_off;
+    TROVE_size cur_stream_size;
+    TROVE_offset cur_stream_off;
+};
+
+/* Values for list_proc_state below */
+enum
+{
+    LIST_PROC_INITIALIZED,  /* list state initialized,
+                               but no aiocb array */
+    LIST_PROC_INPROGRESS,   /* aiocb array allocated, ops in progress */
+    LIST_PROC_ALLCONVERTED, /* all list elements converted */
+    LIST_PROC_ALLPOSTED     /* all list elements also posted */
+};
+
+/* Used for both read and write list
+ *
+ * list_proc_state is used to retain the status of processing on the
+ * list arrays.
+ *
+ * aiocb_array_count - size of the aiocb_array (nothing to do with #
+ * of things in progress)
+ */
+struct dbpf_bstream_rw_list_op
+{
+    struct open_cache_ref open_ref;
+    int fd, list_proc_state, opcode;
+    int aiocb_array_count, mem_array_count, stream_array_count;
+    char **mem_offset_array;
+    TROVE_size *mem_size_array;
+    TROVE_offset *stream_offset_array;
+    TROVE_size *stream_size_array;
+    TROVE_size *out_size_p;
+    struct aiocb *aiocb_array;
+    struct sigevent sigev;
+    struct bstream_listio_state lio_state;
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+    void *queued_op_ptr;
+#endif
+};
+#else
+/*Threaded Implementation*/
+struct dbpf_bstream_rw_list_op
+{
+    int           mem_count;
+    int           stream_count;
+    char        **mem_offset_array;
+    TROVE_size   *mem_size_array;
+    TROVE_offset *stream_offset_array;
+    TROVE_size   *stream_size_array;
+    TROVE_size   *out_size_p;
+};
+
+#endif
 
 /* Used to store parameters for queued operations */
 struct dbpf_op
@@ -520,6 +535,7 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 #define DBPF_SYNC   fdatasync
 #define DBPF_RESIZE ftruncate
 #define DBPF_FSTAT  fstat
+#define DBPF_LSTAT  lstat
 #define DBPF_RENAME rename
 #define DBPF_MKDIR  mkdir
 

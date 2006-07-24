@@ -1,8 +1,8 @@
 DIR := src/io/trove/trove-dbpf
 SERVERSRC += \
-	$(DIR)/dbpf-bstream.c \
 	$(DIR)/dbpf-collection.c \
 	$(DIR)/dbpf-bstream-aio.c \
+	$(DIR)/dbpf-bstream-threaded.c \
 	$(DIR)/dbpf-keyval.c \
 	$(DIR)/dbpf-attr-cache.c \
 	$(DIR)/dbpf-dspace.c \

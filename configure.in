@@ -303,22 +303,15 @@ if test "$use_nptl_workaround" = 1 ; then
 fi
 AC_SUBST(NPTL_WORKAROUND)
 
-use_aio_thcb=1
-AC_ARG_ENABLE([aio-threaded-callbacks],
-[  --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks],
-    if test "$enableval" = no ; then use_aio_thcb=0 ; fi)
-
-dnl there used to be a big hairy test in here, back when glibc-2.3.0 and
-dnl glibc-2.3.1 had buggy aio callbacks.  That test was broken because it
-dnl assumed just linux, and could not handle glibc-2.4.x (or newer).  Rely on
-dnl aio-threaded-callbacks, perhaps with a blacklist of distros that have the
-dnl broken glibc.
-
-MISC_TROVE_FLAGS=""
-if test $use_aio_thcb = 1 ; then
-       MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
-fi
-AC_SUBST(MISC_TROVE_FLAGS)
+dnl use AIO and not threaded I/O
+AC_ARG_ENABLE(aio,
+[  --enable-aio            Enable asynchronous I/O instead of threaded I/O],
+[
+   if test "x$enableval" = "xyes"; then
+        CFLAGS="$CFLAGS -D__PVFS2_USE_AIO__"
+   fi
+],
+)
 
 dnl Check byte ordering
 AC_C_BIGENDIAN
@@ -1053,12 +1046,6 @@ if test "x$ENABLE_COVERAGE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 configured to perform coverage analysis     : yes])
 else
    AC_MSG_RESULT([PVFS2 configured to perform coverage analysis     :  no])
-fi
-
-if test "x$MISC_TROVE_FLAGS" = "x" ; then
-   AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       :  no])
-else
-   AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       : yes])
 fi
 
 if test "x$HAVE_TROVE_TRANSACTION_SUPPORT" = "x" ; then

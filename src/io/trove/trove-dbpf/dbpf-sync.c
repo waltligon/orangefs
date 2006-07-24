@@ -154,9 +154,9 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int enqueue_possible,
 
         gen_mutex_lock(sync_context->mutex);
         sync_context->coalesce_counter++;
-        if( (coll->c_high_watermark > 0 && 
-             sync_context->coalesce_counter >= coll->c_high_watermark) 
-            || sync_context->sync_counter < coll->c_low_watermark )
+        if ((coll->c_high_watermark >= 0 &&
+             sync_context->coalesce_counter >= coll->c_high_watermark)
+            || sync_context->sync_counter < coll->c_low_watermark)
         {
             gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                          "[SYNC_COALESCE]:\thigh or low watermark reached:\n"
@@ -181,9 +181,9 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int enqueue_possible,
      * coalesync. 
      */
     gen_mutex_lock(sync_context->mutex);
-    if( sync_context->sync_counter < coll->c_low_watermark 
-        || ( coll->c_high_watermark > 0 && 
-          sync_context->coalesce_counter >= coll->c_high_watermark ) )
+    if (sync_context->sync_counter < coll->c_low_watermark
+        || (coll->c_high_watermark >= 0 &&
+            sync_context->coalesce_counter >= coll->c_high_watermark))
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]:\thigh or low watermark reached:\n"

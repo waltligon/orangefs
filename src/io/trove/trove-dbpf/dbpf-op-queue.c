@@ -61,7 +61,7 @@ void dbpf_move_op_to_completion_queue_nolock(dbpf_queued_op_t *cur_op,
     
     dbpf_op_queue_add(dbpf_completion_queue_array[cid],cur_op);
 
-    gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
+    gossip_debug(GOSSIP_TROVE_DEBUG,
         "DBPF move_op_to_completion_queue, queued elements in queue %d\n",
         dbpf_completion_queue_array[cid]->elems);
 }

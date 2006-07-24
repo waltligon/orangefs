@@ -144,7 +144,8 @@ typedef struct server_configuration_s
     int db_cache_size_bytes;        /* cache size to use in berkeley db
                                        if zero, use defaults */
     char * db_cache_type;
-
+    
+    int trove_io_thread_count;
 } server_configuration_s;
 
 int PINT_parse_config(

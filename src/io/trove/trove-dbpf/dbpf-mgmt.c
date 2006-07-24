@@ -289,96 +289,114 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
                                    void *parameter)
 {
     int ret = -TROVE_EINVAL;
-	struct dbpf_collection* coll;
-	coll = dbpf_collection_find_registered(coll_id);
-	
-	assert(coll);
-	
-    switch(option)
+    struct dbpf_collection *coll = NULL;
+    coll = dbpf_collection_find_registered(coll_id);
+    
+    if(coll_id != 0){
+        /*
+         * Can be 0 to set global ops
+         */
+        assert(coll);
+    }
+
+    switch (option)
     {
-        case TROVE_COLLECTION_HANDLE_RANGES:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - Setting collection handle "
-                         "ranges to %s\n", 
-                         (int) coll_id, (char *)parameter);
-            ret = trove_set_handle_ranges(
-                coll_id, context_id, (char *)parameter);
-            break;
-        case TROVE_COLLECTION_HANDLE_TIMEOUT:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - Setting handle timeout to "
-                         "%ld microseconds\n",
-                         (int) coll_id, 
-                         (long)((((struct timeval *)parameter)->tv_sec * 1e6) +
-                                ((struct timeval *)parameter)->tv_usec));
-            ret = trove_set_handle_timeout(
-                coll_id, context_id, (struct timeval *)parameter);
-            break;
-        case TROVE_COLLECTION_ATTR_CACHE_KEYWORDS:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - Setting cache keywords "
-                         "of attribute cache to %s\n",
-                         (int) coll_id, (char *)parameter);
-            gen_mutex_lock(&dbpf_attr_cache_mutex);
-            ret = dbpf_attr_cache_set_keywords((char *)parameter);
-            gen_mutex_unlock(&dbpf_attr_cache_mutex);
-            break;
-        case TROVE_COLLECTION_ATTR_CACHE_SIZE:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - Setting "
-                         "cache size of attribute cache to %d\n", 
-                         (int) coll_id,*(int *)parameter);
-            gen_mutex_lock(&dbpf_attr_cache_mutex);
-            ret = dbpf_attr_cache_set_size(*((int *)parameter));
-            gen_mutex_unlock(&dbpf_attr_cache_mutex);
-            break;
-        case TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - Setting maximum elements of "
-                         "attribute cache to %d\n",
-                         (int) coll_id, *(int *)parameter);
-            gen_mutex_lock(&dbpf_attr_cache_mutex);
-            ret = dbpf_attr_cache_set_max_num_elems(*((int *)parameter));
-            gen_mutex_unlock(&dbpf_attr_cache_mutex);
-            break;
-        case TROVE_COLLECTION_ATTR_CACHE_INITIALIZE:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - Initialize collection attr. "
-                         "cache\n", (int) coll_id);
-            gen_mutex_lock(&dbpf_attr_cache_mutex);
-            ret = dbpf_attr_cache_do_initialize();
-            gen_mutex_unlock(&dbpf_attr_cache_mutex);
-            break;
-        case TROVE_COLLECTION_COALESCING_HIGH_WATERMARK:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - Setting HIGH_WATERMARK to %d\n",
-                         (int) coll_id, *(int *)parameter);
-            dbpf_queued_op_set_sync_high_watermark(*(int *)parameter, coll);
-            ret = 0;
-            break;
-        case TROVE_COLLECTION_COALESCING_LOW_WATERMARK:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - Setting LOW_WATERMARK to %d\n",
-                         (int) coll_id, *(int *)parameter);
-            dbpf_queued_op_set_sync_low_watermark(*(int *)parameter, coll);
-            ret = 0;
-            break;
-        case TROVE_COLLECTION_META_SYNC_MODE:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - %s sync mode\n",
-                         (int) coll_id,
-                         (*(int *)parameter) ? "Enabling" : "Disabling");
-            dbpf_set_sync_mode(*(int *)parameter, coll);
-            ret = 0;
-            break;
-        case TROVE_COLLECTION_IMMEDIATE_COMPLETION:
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
-                         "dbpf collection %d - %s immediate completion\n",
-                         (int) coll_id,
-                         (*(int *)parameter) ? "Enabling" : "Disabling");
-            coll->immediate_completion = *(int *)parameter;
-            ret = 0;
-            break;
+    case TROVE_COLLECTION_HANDLE_RANGES:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - Setting collection handle "
+                     "ranges to %s\n", (int) coll_id, (char *) parameter);
+        ret = trove_set_handle_ranges(coll_id, context_id, (char *) parameter);
+        break;
+    case TROVE_COLLECTION_HANDLE_TIMEOUT:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - Setting handle timeout to "
+                     "%ld microseconds\n",
+                     (int) coll_id,
+                     (long) ((((struct timeval *) parameter)->tv_sec * 1e6) +
+                             ((struct timeval *) parameter)->tv_usec));
+        ret =
+            trove_set_handle_timeout(coll_id, context_id,
+                                     (struct timeval *) parameter);
+        break;
+    case TROVE_COLLECTION_ATTR_CACHE_KEYWORDS:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - Setting cache keywords "
+                     "of attribute cache to %s\n",
+                     (int) coll_id, (char *) parameter);
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
+        ret = dbpf_attr_cache_set_keywords((char *) parameter);
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
+        break;
+    case TROVE_COLLECTION_ATTR_CACHE_SIZE:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - Setting "
+                     "cache size of attribute cache to %d\n",
+                     (int) coll_id, *(int *) parameter);
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
+        ret = dbpf_attr_cache_set_size(*((int *) parameter));
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
+        break;
+    case TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - Setting maximum elements of "
+                     "attribute cache to %d\n",
+                     (int) coll_id, *(int *) parameter);
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
+        ret = dbpf_attr_cache_set_max_num_elems(*((int *) parameter));
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
+        break;
+    case TROVE_COLLECTION_ATTR_CACHE_INITIALIZE:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - Initialize collection attr. "
+                     "cache\n", (int) coll_id);
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
+        ret = dbpf_attr_cache_do_initialize();
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
+        break;
+    case TROVE_COLLECTION_COALESCING_HIGH_WATERMARK:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - Setting HIGH_WATERMARK to %d\n",
+                     (int) coll_id, *(int *) parameter);
+        dbpf_queued_op_set_sync_high_watermark(*(int *) parameter, coll);
+        ret = 0;
+        break;
+    case TROVE_COLLECTION_COALESCING_LOW_WATERMARK:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - Setting LOW_WATERMARK to %d\n",
+                     (int) coll_id, *(int *) parameter);
+        dbpf_queued_op_set_sync_low_watermark(*(int *) parameter, coll);
+        ret = 0;
+        break;
+    case TROVE_COLLECTION_META_SYNC_MODE:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - %s sync mode\n",
+                     (int) coll_id,
+                     (*(int *) parameter) ? "Enabling" : "Disabling");
+        dbpf_set_sync_mode(*(int *) parameter, coll);
+        ret = 0;
+        break;
+    case TROVE_COLLECTION_IMMEDIATE_COMPLETION:
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf collection %d - %s immediate completion\n",
+                     (int) coll_id,
+                     (*(int *) parameter) ? "Enabling" : "Disabling");
+        coll->immediate_completion = *(int *) parameter;
+        ret = 0;
+        break;
+    case TROVE_IO_THREAD_COUNT:
+#ifdef __PVFS2_USE_AIO__
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf I/O thread count %d IGNORED !\n"
+                     " compiled with AIO I/O mode!\n",
+                     (*(int *) parameter));
+#else
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf I/O thread count %d\n",
+                     (*(int *) parameter));
+        dbpf_bstream_threaded_set_thread_count((*(int *) parameter));
+#endif
+        ret = 0;
+        break;
     }
     return ret;
 }
@@ -515,8 +533,10 @@ static int dbpf_initialize(char *stoname,
         gossip_err("dbpf_initialize failure: cannot allocate memory\n");
         return -TROVE_ENOMEM;
     }
-
+    
+#ifdef __PVFS2_USE_AIO__
     dbpf_open_cache_initialize();
+#endif    
 
     return dbpf_thread_initialize();
 }
@@ -528,7 +548,9 @@ static int dbpf_finalize(void)
     dbpf_method_id = -TROVE_EINVAL;
 
     dbpf_thread_finalize();
+#ifdef __PVFS2_USE_AIO__    
     dbpf_open_cache_finalize();
+#endif    
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_finalize();
     gen_mutex_unlock(&dbpf_attr_cache_mutex);

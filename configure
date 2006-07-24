@@ -856,6 +856,7 @@ Optional Features:
   --disable-static        Do not build static client library
   --enable-redhat24       Enable workaround for RedHat 2.4 kernel
   --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries
+  --enable-aio            Enable asynchronous I/O instead of threaded I/O
   --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks
   --disable-kernel-aio    Forcibly disable kernel aio
   --enable-kernel-sendfile    Forcibly enable kernel sendfile
@@ -5670,6 +5671,16 @@ if test "$use_nptl_workaround" = 1 ; then
    NPTL_WORKAROUND="1"
 fi
 
+
+# Check whether --enable-aio or --disable-aio was given.
+if test "${enable_aio+set}" = set; then
+  enableval="$enable_aio"
+
+   if test "x$enableval" = "xyes"; then
+        CFLAGS="$CFLAGS -D__PVFS2_USE_AIO__"
+   fi
+
+fi;
 
 use_aio_thcb=1
 # Check whether --enable-aio-threaded-callbacks or --disable-aio-threaded-callbacks was given.

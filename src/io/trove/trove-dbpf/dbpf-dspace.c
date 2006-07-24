@@ -311,7 +311,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
                     1, PINT_PERF_SUB);
 
     *op_p->u.d_create.out_handle_p = new_handle;
-    return DBPF_OP_COMPLETE;
+    return IMMEDIATE_COMPLETION;
 
 return_error:
     if (new_handle != TROVE_HANDLE_NULL)
@@ -367,7 +367,11 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     int count = 0;
     int ret = -TROVE_EINVAL;
     DBT key;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    TROVE_object_ref ref = { op_p->handle, op_p->coll_p->coll_id };
+#ifndef __PVFS2_USE_AIO__
+    char filename[PATH_MAX];
+    char new_tmp_filename[PATH_MAX * 2];
+#endif    
 
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
@@ -395,11 +399,30 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_remove(ref);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
-
+                                   
     /* move bstream if it exists to removable-bstreams. Not a fatal
      * error if this fails (may not have ever been created)
      */
+#ifdef __PVFS2_USE_AIO__     
     ret = dbpf_open_cache_remove(op_p->coll_p->coll_id, op_p->handle);
+#else
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
+                              my_storage_p->name, op_p->coll_p->coll_id, 
+                              llu(op_p->handle));
+
+    /*
+     * Do not remove the file instead move it to new directory
+     * Add a random number to minimize collisions between recreation and
+     * deletion of same handles.
+     */
+    DBPF_GET_SHADOW_REMOVE_BSTREAM_FILENAME(new_tmp_filename,
+                                            PATH_MAX, my_storage_p->name,
+                                            op_p->coll_p->coll_id, 
+                                            llu(op_p->handle),
+                                            rand() % 50000);
+
+    ret = DBPF_RENAME(filename, new_tmp_filename);
+#endif
 
     /*
      * Notify deletion thread that we have something to do.
@@ -447,8 +470,8 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
                     1, PINT_PERF_SUB);
 
     /* return handle to free list */
-    trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
-    return DBPF_OP_COMPLETE;
+    trove_handle_free(op_p->coll_p->coll_id, op_p->handle);
+    return IMMEDIATE_COMPLETION;
 
 return_error:
     return ret;
@@ -898,9 +921,9 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
-    return DBPF_OP_COMPLETE;
-    
-return_error:
+    return IMMEDIATE_COMPLETION;
+
+  return_error:
     return ret;
 }
 
@@ -912,27 +935,10 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     TROVE_ds_attributes *attr = NULL;
     TROVE_size b_size;
     struct stat b_stat;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    TROVE_object_ref ref = { op_p->handle, op_p->coll_p->coll_id };
+#ifdef __PVFS2_USE_AIO__
     struct open_cache_ref tmp_ref;
-
-    /* get an fd for the bstream so we can check size */
-    ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, &tmp_ref);
-    if (ret < 0)
-    {
-        b_size = 0;
-    }
-    else
-    {
-        ret = DBPF_FSTAT(tmp_ref.fd, &b_stat);
-        dbpf_open_cache_put(&tmp_ref);
-        if (ret < 0)
-        {
-            ret = -TROVE_EBADF;
-            goto return_error;
-        }
-        b_size = (TROVE_size)b_stat.st_size;
-    }
+#endif
 
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
@@ -951,6 +957,41 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         op_p->coll_p->ds_db->err(op_p->coll_p->ds_db, ret, "DB->get");
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
+    }
+
+    if( s_attr.type == PVFS_TYPE_DATAFILE ){
+#ifdef __PVFS2_USE_AIO__
+    /* get an fd for the bstream so we can check size */
+    ret = dbpf_open_cache_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, &tmp_ref);
+    if (ret < 0)
+    {
+        b_size = 0;
+    }
+    else
+    {
+        ret = DBPF_FSTAT(tmp_ref.fd, &b_stat);
+        dbpf_open_cache_put(&tmp_ref);
+        if (ret < 0)
+        {
+            ret = -TROVE_EBADF;
+            goto return_error;
+        }
+        b_size = (TROVE_size)b_stat.st_size;
+    }
+#else                                   
+        char filename[PATH_MAX] = {0};
+        DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
+        my_storage_p->name, op_p->coll_p->coll_id, llu(op_p->handle));
+        ret = DBPF_LSTAT(filename, &b_stat);
+        if (ret < 0)
+        { //file exists only if size > 0
+            //ret = -TROVE_EBADF;
+            //goto return_error;
+            b_size = 0;
+        }else
+            b_size = (TROVE_size) b_stat.st_size;
+#endif
     }
 
     gossip_debug(
@@ -999,6 +1040,8 @@ static int dbpf_dspace_cancel(
      *  2) op is pending in a op_queue => find out which queue => cancel op
      *  3) op is serviced => finish, we cannot do anything.
      */
+
+recheckState:     
     gen_mutex_lock(context_mutex);
     cur_op = id_gen_safe_lookup(id);
     if (cur_op == NULL)
@@ -1026,6 +1069,13 @@ static int dbpf_dspace_cancel(
             state = dbpf_op_get_status(cur_op);
             if ( state == OP_QUEUED )
             {
+                /*
+                 * Fixme: for metadata coalesyncing could result in stalling 
+                 * the op queue if this op is the last pending op.
+                 * However, currently meta ops are not canceled, 
+                 * thus right now this is no problem. 
+                 */
+                
                 /*
                  * Now we are sure that the object is still pending !
                  * dequeue and complete the op in canceled state 
@@ -1056,12 +1106,13 @@ static int dbpf_dspace_cancel(
             if ((cur_op->op.type == BSTREAM_READ_LIST) ||
                 (cur_op->op.type == BSTREAM_WRITE_LIST))
             {
+                #ifdef __PVFS2_USE_AIO__
                 ret = aio_cancel(cur_op->op.u.b_rw_list.fd,
                                  cur_op->op.u.b_rw_list.aiocb_array);
-                gossip_debug(
-                    GOSSIP_TROVE_DEBUG, "aio_cancel returned %s\n",
-                    ((ret == AIO_CANCELED) ? "CANCELED" :
-                     "NOT CANCELED"));
+                gossip_debug(GOSSIP_TROVE_DEBUG, "aio_cancel returned %s\n",
+                             ((ret == AIO_CANCELED) ? "CANCELED" :
+                              "NOT CANCELED"));
+                #endif
                 /*
                   NOTE: the normal aio notification method takes care
                   of completing the op and moving it to the completion
@@ -1077,18 +1128,29 @@ static int dbpf_dspace_cancel(
             ret = 0;
         }
         break;
-        case OP_COMPLETED:
-        case OP_CANCELED:
-            /* easy cancelation case; do nothing */
-            gossip_debug(
-                GOSSIP_TROVE_DEBUG, "op is completed: ignoring\n");
-            ret = 0;
-            break;
-        default:
-            gossip_err("Invalid dbpf_op state found (%d)\n", state);
-            assert(0);
-    }    
-    
+   case OP_DEQUEUED:
+        /* object is moved to a different queue,
+           this is done in an instant, so we give the control back to the
+           other threads*/
+
+        gen_mutex_unlock(context_mutex);           
+        gossip_debug(
+            GOSSIP_TROVE_DEBUG, "op %p in OP_DEQUED state, that "
+                "might mean that it is currently transferred between"
+                " the trove scheduling queues\n", cur_op);
+        sched_yield();
+        goto recheckState;
+        break;        
+    case OP_COMPLETED:    
+    case OP_CANCELED:
+        /* easy cancelation case; do nothing */
+        gossip_debug(GOSSIP_TROVE_DEBUG, "op is completed: ignoring\n");
+        ret = 0;
+        break;
+    default:
+        gossip_err("Invalid dbpf_op state found (%d)\n", state);
+        assert(0);
+    }
     gen_mutex_unlock(context_mutex);
 
     return ret;

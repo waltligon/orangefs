@@ -73,6 +73,11 @@ int dbpf_thread_initialize(void)
             exit(1);
         }
     }
+    
+    
+#ifndef __PVFS2_USE_AIO__
+    dbpf_bstream_threaded_initalize();
+#endif        
 
     gossip_debug(GOSSIP_TROVE_DEBUG,
         "dbpf_thread_initialize: initialized\n");
@@ -101,6 +106,10 @@ int dbpf_thread_finalize(void)
     {
         ret = pthread_join(dbpf_thread[i], NULL);
     }
+
+#ifndef __PVFS2_USE_AIO__
+    dbpf_bstream_threaded_finalize();
+#endif
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_finalize: finalized\n");
     return ret;
@@ -214,6 +223,16 @@ void *dbpf_thread_function(void *ptr)
 
     int op_queued_empty = 0, ret = 0;
     dbpf_queued_op_t *cur_op = NULL;
+    
+#ifndef __PVFS2_USE_AIO__
+    /*
+     * dbpf-bstream-threaded maintains its own thread managemenent. 
+     */
+    if (queue_type == OP_QUEUE_IO){
+        return NULL; 
+    }
+#endif
+    
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_meta_thread_function \"%s\""
         " started\n",thread_type);
 
@@ -261,7 +280,7 @@ void *dbpf_thread_function(void *ptr)
                                
         if ( DBPF_OP_MODIFYING_META_OP(cur_op->op.type) )
         {
-            if ( ret == DBPF_OP_COMPLETE ) 
+            if (ret == IMMEDIATE_COMPLETION )
             {
                 ret = dbpf_sync_coalesce(cur_op, 1, 0);
             }
@@ -283,7 +302,7 @@ void *dbpf_thread_function(void *ptr)
                      /* not sure how to recover from failure here */
             }
         }
-        else if (ret == DBPF_OP_COMPLETE || ret < 0)
+        else if (ret == IMMEDIATE_COMPLETION || ret < 0)
         {
             dbpf_move_op_to_completion_queue(
                 cur_op, ((ret == 1) ? 0 : ret), OP_COMPLETED);

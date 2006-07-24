@@ -63,6 +63,7 @@ static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_trusted_portlist);
 static DOTCONF_CB(get_trusted_network);
 #endif
+
 static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
@@ -86,6 +87,8 @@ static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
 static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
+static DOTCONF_CB(get_trove_io_thread_count);
+
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -519,9 +522,16 @@ static const configoption_t options[] =
      * know what you're doing.
      *
      */
-    {"FlowModules",ARG_LIST, get_flow_module_list,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"flowproto_multiqueue,"},
-
+    {"FlowModules", ARG_LIST, get_flow_module_list, NULL,
+     CTX_DEFAULTS | CTX_GLOBAL, "flowproto_multiqueue,"},
+     
+     /*
+      * Number of I/O threads doing parallel blocking I/O for the 
+      * trove threaded I/O variant (without aio).
+      */
+     {"TroveIOThreads", ARG_INT, get_trove_io_thread_count, NULL,
+     CTX_DEFAULTS | CTX_GLOBAL, "1"},
+     
     /* The TROVE storage layer has a management component that deals with
      * allocating handle values for new metafiles and datafiles.  The underlying
      * trove module can be given a hint to tell it how long to wait before
@@ -1830,6 +1840,14 @@ DOTCONF_CB(get_coalescing_low_watermark)
     return NULL;
 }
 
+DOTCONF_CB(get_trove_io_thread_count)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *) cmd->context;
+        
+    config_s->trove_io_thread_count = cmd->data.value;
+    return NULL;
+}
 /*
  * Function: PINT_config_release
  *
