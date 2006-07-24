@@ -9,7 +9,7 @@
 #include "test-pvfs-datatype-contig.h"
 
 int test_pvfs_datatype_contig(
-    MPI_Comm * mycomm __unused,
+    MPI_Comm *mycomm __unused,
     int myid,
     char *buf __unused,
     void *params __unused)
@@ -25,9 +25,9 @@ int test_pvfs_datatype_contig(
 
     debug_printf("test_pvfs_datatype_contig called\n");
 
-    memset(&req_io, 0, sizeof(PVFS_Request));
-    memset(&req_mem, 0, sizeof(PVFS_Request));
-    memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
+    memset(&req_io,0,sizeof(PVFS_Request));
+    memset(&req_mem,0,sizeof(PVFS_Request));
+    memset(&resp_io,0,sizeof(PVFS_sysresp_io));
 
     if (!pvfs_helper.initialized)
     {
@@ -35,39 +35,41 @@ int test_pvfs_datatype_contig(
         return ret;
     }
 
-    for (i = 0; i < TEST_PVFS_DATA_SIZE; i++)
+    for(i = 0; i < TEST_PVFS_DATA_SIZE; i++)
     {
-        int ti = (i % 26) + 65;
+	int ti = (i % 26) + 65;
         io_buffer[i] = (char) ti;
     }
 
     PVFS_util_gen_credentials(&credentials);
 
-    for (i = 0; i < pvfs_helper.num_test_files; i++)
+    for(i = 0; i < pvfs_helper.num_test_files; i++)
     {
-        snprintf(filename, PVFS_NAME_MAX, "%s%.5drank%d",
-                 TEST_FILE_PREFIX, i, myid);
+        snprintf(filename,PVFS_NAME_MAX,"%s%.5drank%d",
+                 TEST_FILE_PREFIX,i,myid);
 
-        memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
+        memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
         ret = PVFS_sys_lookup(pvfs_helper.fs_id,
                               filename, &credentials, &resp_lk,
                               PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (ret < 0)
         {
             debug_printf("test_pvfs_datatype_contig: lookup failed "
-                         "on %s\n", filename);
+                         "on %s\n",filename);
             break;
         }
 
         /* perform contig I/O on the file handle */
-        ret = PVFS_Request_contiguous(TEST_PVFS_DATA_SIZE, PVFS_BYTE, &req_io);
-        if (ret < 0)
+        ret = PVFS_Request_contiguous(TEST_PVFS_DATA_SIZE,
+                                      PVFS_BYTE, &req_io);
+        if(ret < 0)
         {
             debug_printf("Error: PVFS_Request_contiguous() failure.\n");
             break;
         }
-        ret = PVFS_Request_contiguous(TEST_PVFS_DATA_SIZE, PVFS_BYTE, &req_mem);
-        if (ret < 0)
+	ret = PVFS_Request_contiguous(TEST_PVFS_DATA_SIZE,
+                                      PVFS_BYTE, &req_mem);
+        if(ret < 0)
         {
             debug_printf("Error: PVFS_Request_contiguous() failure.\n");
             break;
@@ -75,30 +77,30 @@ int test_pvfs_datatype_contig(
 
         ret = PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer,
                              req_mem, &credentials, &resp_io);
-        if (ret < 0)
+        if(ret < 0)
         {
             debug_printf("Error: PVFS_sys_write() failure.\n");
             break;
         }
 
         debug_printf("test_pvfsdatatype_contig: wrote %d bytes.\n",
-                     (int) resp_io.total_completed);
+                     (int)resp_io.total_completed);
 
         /* now try to read the data back */
-        memset(io_buffer, 0, TEST_PVFS_DATA_SIZE);
+        memset(io_buffer,0,TEST_PVFS_DATA_SIZE);
         ret = PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer,
                             req_mem, &credentials, &resp_io);
-        if (ret < 0)
+        if(ret < 0)
         {
             debug_printf("Error: PVFS_sys_read() failure (2).\n");
             break;
         }
 
         debug_printf("test_pvfs_datatype_contig: read %d bytes.\n",
-                     (int) resp_io.total_completed);
+                     (int)resp_io.total_completed);
 
         /* finally, verify the data */
-        for (j = 0; j < TEST_PVFS_DATA_SIZE; j++)
+        for(j = 0; j < TEST_PVFS_DATA_SIZE; j++)
         {
             if (io_buffer[j] != ((j % 26) + 65))
             {

@@ -30,34 +30,28 @@ struct options
     char **filenames;
 };
 
-static struct options *parse_args(
-    int argc,
-    char **argv);
-static void usage(
-    int argc,
-    char **argv);
+static struct options *parse_args(int argc, char **argv);
+static void usage(int argc, char **argv);
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int ret = -1, i = 0;
     struct options *user_opts = NULL;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
-    if (!user_opts)
+    if(!user_opts)
     {
-        fprintf(stderr, "Error: failed to parse command line arguments.\n");
-        return (-1);
+	fprintf(stderr, "Error: failed to parse command line arguments.\n");
+	return(-1);
     }
 
     /* Initialize the pvfs2 server */
     ret = PVFS_util_init_defaults();
-    if (ret < 0)
+    if(ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return -1;
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return -1;
     }
 
     /* Remove each specified file */
@@ -69,7 +63,7 @@ int main(
         char directory[PVFS_NAME_MAX];
         char filename[PVFS_SEGMENT_MAX];
 
-        char pvfs_path[PVFS_NAME_MAX] = { 0 };
+        char pvfs_path[PVFS_NAME_MAX] = {0};
         PVFS_fs_id cur_fs;
         PVFS_sysresp_lookup resp_lookup;
         PVFS_sysresp_create resp_create;
@@ -80,8 +74,8 @@ int main(
         /* Translate path into pvfs2 relative path */
         rc = PINT_get_base_dir(working_file, directory, PVFS_NAME_MAX);
         num_segs = PINT_string_count_segments(working_file);
-        rc = PINT_get_path_element(working_file, num_segs - 1, filename,
-                                   PVFS_SEGMENT_MAX);
+        rc = PINT_get_path_element(working_file, num_segs - 1,
+                                   filename, PVFS_SEGMENT_MAX);
 
         if (rc)
         {
@@ -90,7 +84,8 @@ int main(
             break;
         }
 
-        rc = PVFS_util_resolve(directory, &cur_fs, pvfs_path, PVFS_NAME_MAX);
+        rc = PVFS_util_resolve(directory, &cur_fs,
+                               pvfs_path, PVFS_NAME_MAX);
         if (rc)
         {
             PVFS_perror("PVFS_util_resolve", rc);
@@ -101,8 +96,8 @@ int main(
         PVFS_util_gen_credentials(&credentials);
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials, &resp_lookup,
-                             PVFS2_LOOKUP_LINK_NO_FOLLOW);
+        rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
+                             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (rc)
         {
             PVFS_perror("PVFS_sys_lookup", rc);
@@ -123,7 +118,11 @@ int main(
 
         parent_ref = resp_lookup.ref;
 
-        rc = PVFS_sys_create(filename, parent_ref, attr, &credentials, NULL,
+        rc = PVFS_sys_create(filename,
+                             parent_ref,
+                             attr,
+                             &credentials,
+                             NULL,
                              &resp_create);
         if (rc)
         {
@@ -147,38 +146,36 @@ int main(
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static struct options *parse_args(
-    int argc,
-    char **argv)
+static struct options* parse_args(int argc, char **argv)
 {
     int one_opt = 0;
     char flags[] = "?";
     struct options *tmp_opts = NULL;
 
-    tmp_opts = (struct options *) malloc(sizeof(struct options));
-    if (!tmp_opts)
+    tmp_opts = (struct options *)malloc(sizeof(struct options));
+    if(!tmp_opts)
     {
-        return NULL;
+	return NULL;
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
     tmp_opts->filenames = 0;
 
-    while ((one_opt = getopt(argc, argv, flags)) != EOF)
+    while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
-        switch (one_opt)
+	switch(one_opt)
         {
-        case ('?'):
-            usage(argc, argv);
-            exit(EXIT_FAILURE);
-        }
+	    case('?'):
+		usage(argc, argv);
+		exit(EXIT_FAILURE);
+	}
     }
 
     if (optind < argc)
     {
         int i = 0;
         tmp_opts->num_files = argc - optind;
-        tmp_opts->filenames = malloc((argc - optind) * sizeof(char *));
+        tmp_opts->filenames = malloc((argc - optind) * sizeof(char*));
         while (optind < argc)
         {
             tmp_opts->filenames[i] = argv[optind];
@@ -188,16 +185,14 @@ static struct options *parse_args(
     }
     else
     {
-        usage(argc, argv);
-        exit(EXIT_FAILURE);
+	usage(argc, argv);
+	exit(EXIT_FAILURE);
     }
     return tmp_opts;
 }
 
 
-static void usage(
-    int argc,
-    char **argv)
+static void usage(int argc, char **argv)
 {
     fprintf(stderr, "Usage: %s [-rf] pvfs2_filename[s]\n", argv[0]);
 }
@@ -210,3 +205,4 @@ static void usage(
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
+

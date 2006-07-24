@@ -15,16 +15,13 @@
 #include <stdio.h>
 #include <string.h>
 
-void *emalloc(
-    unsigned int size);
-char *enter_string(
-    char *oldstring);
+void *emalloc(unsigned int size);
+char *enter_string(char *oldstring);
 
-char *enter_string(
-    char *oldstring)
+char *enter_string(char *oldstring)
 {
     char *newstring;
-    newstring = (char *) emalloc((unsigned) strlen(oldstring) + 1);
+    newstring = (char *)emalloc((unsigned)strlen(oldstring)+1);
     strcpy(newstring, oldstring);
     return newstring;
 }

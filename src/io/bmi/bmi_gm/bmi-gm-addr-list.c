@@ -20,9 +20,8 @@
  *
  * no return value
  */
-void gm_addr_add(
-    struct qlist_head *head,
-    method_addr_p map)
+void gm_addr_add(struct qlist_head *head,
+		 method_addr_p map)
 {
     struct gm_addr *gm_addr_data = NULL;
     gm_addr_data = map->method_data;
@@ -36,8 +35,7 @@ void gm_addr_add(
  *
  * no return value
  */
-void gm_addr_del(
-    method_addr_p map)
+void gm_addr_del(method_addr_p map)
 {
     struct gm_addr *gm_addr_data = NULL;
     gm_addr_data = map->method_data;
@@ -52,28 +50,27 @@ void gm_addr_del(
  *
  * returns pointer to method address on success, NULL on failure
  */
-method_addr_p gm_addr_search(
-    struct qlist_head * head,
-    unsigned int node_id,
-    unsigned int port_id)
+method_addr_p gm_addr_search(struct qlist_head * head,
+			     unsigned int node_id,
+                             unsigned int port_id)
 {
     struct qlist_head *tmp_entry = NULL;
     struct gm_addr *gm_addr_data = NULL;
 
     qlist_for_each(tmp_entry, head)
     {
-        gm_addr_data = qlist_entry(tmp_entry, struct gm_addr,
-                                   gm_addr_list);
-        if (gm_addr_data->node_id == node_id &&
+	gm_addr_data = qlist_entry(tmp_entry, struct gm_addr,
+				   gm_addr_list);
+	if (gm_addr_data->node_id == node_id &&
             gm_addr_data->port_id == port_id)
-        {
-            /* pointer magic :) we know that the method addr structure and
-             * gm_addr structure are adjacent and contiguous.
-             */
-            return ((method_addr_p) ((unsigned long) gm_addr_data -
-                                     (unsigned long) sizeof(struct
-                                                            method_addr)));
-        }
+	{
+	    /* pointer magic :) we know that the method addr structure and
+	     * gm_addr structure are adjacent and contiguous.
+	     */
+	    return ((method_addr_p) ((unsigned long) gm_addr_data -
+				     (unsigned long) sizeof(struct
+							    method_addr)));
+	}
     }
     return (NULL);
 }

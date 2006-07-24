@@ -30,24 +30,23 @@
  */
 static struct dbpf_collection *root_coll_p = NULL;
 
-void dbpf_collection_register(
-    struct dbpf_collection *coll_p)
+void dbpf_collection_register(struct dbpf_collection *coll_p)
 {
     coll_p->next_p = NULL;
 
     if (root_coll_p == NULL)
     {
-        root_coll_p = coll_p;
+	root_coll_p = coll_p;
     }
     else
     {
-        struct dbpf_collection *ptr = root_coll_p;
+	struct dbpf_collection *ptr = root_coll_p;
 
-        while (ptr->next_p != NULL)
+	while(ptr->next_p != NULL)
         {
             ptr = ptr->next_p;
         }
-        ptr->next_p = coll_p;
+	ptr->next_p = coll_p;
     }
     return;
 }
@@ -58,51 +57,46 @@ struct dbpf_collection *dbpf_collection_find_registered(
     struct dbpf_collection *ptr = root_coll_p;
 
     /* look through the list; either end at NULL or a match */
-    while ((ptr != NULL) && (ptr->coll_id != coll_id))
+    while((ptr != NULL) && (ptr->coll_id != coll_id))
     {
         ptr = ptr->next_p;
     }
     return ptr;
 }
 
-void dbpf_collection_deregister(
-    struct dbpf_collection *entry)
+void dbpf_collection_deregister(struct dbpf_collection *entry)
 {
     struct dbpf_collection *ptr = root_coll_p;
 
-    if (root_coll_p == entry)
-    {
+    if (root_coll_p == entry) {
         root_coll_p = NULL;
         return;
     }
-    while (ptr != NULL && ptr->next_p != entry)
-    {
+    while (ptr != NULL && ptr->next_p != entry) {
         ptr = ptr->next_p;
     }
-    if (ptr)
-    {
+    if (ptr) {
         ptr->next_p = entry->next_p;
     }
 }
 
-void dbpf_collection_clear_registered(
-    void)
+void dbpf_collection_clear_registered(void)
 {
     int ret = -TROVE_EINVAL;
     struct dbpf_collection *ptr = root_coll_p, *free_ptr = NULL;
 
     while (ptr != NULL)
     {
-        free_ptr = ptr;
-        ptr = ptr->next_p;
+	free_ptr = ptr;
+	ptr = ptr->next_p;
 
-        if ((ret =
-             free_ptr->coll_attr_db->sync(free_ptr->coll_attr_db, 0)) != 0)
+        if ((ret = free_ptr->coll_attr_db->sync(
+                 free_ptr->coll_attr_db, 0)) != 0)
         {
             gossip_err("db_sync(coll_attr_db): %s\n", db_strerror(ret));
         }
 
-        if ((ret = db_close(free_ptr->coll_attr_db)) != 0)
+        if ((ret = db_close(free_ptr->coll_attr_db)) != 0) 
         {
             gossip_lerr("db_close(coll_attr_db): %s\n", db_strerror(ret));
         }
@@ -112,7 +106,7 @@ void dbpf_collection_clear_registered(
             gossip_err("db_sync(coll_ds_db): %s\n", db_strerror(ret));
         }
 
-        if ((ret = db_close(free_ptr->ds_db)) != 0)
+        if ((ret = db_close(free_ptr->ds_db)) != 0) 
         {
             gossip_lerr("db_close(coll_ds_db): %s\n", db_strerror(ret));
         }
@@ -122,18 +116,18 @@ void dbpf_collection_clear_registered(
             gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
         }
 
-        if ((ret = db_close(free_ptr->keyval_db)) != 0)
+        if ((ret = db_close(free_ptr->keyval_db)) != 0) 
         {
             gossip_lerr("db_close(coll_keyval_db): %s\n", db_strerror(ret));
         }
 
 
         dbpf_putdb_env(free_ptr->coll_env, free_ptr->path_name);
-        free(free_ptr->name);
+	free(free_ptr->name);
         free(free_ptr->path_name);
         PINT_dbpf_keyval_pcache_finalize(free_ptr->pcache);
 
-        free(free_ptr);
+	free(free_ptr);
     }
     root_coll_p = NULL;
 }

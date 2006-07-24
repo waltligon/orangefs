@@ -13,19 +13,13 @@
 #include <string.h>
 #include <errno.h>
 
-static int strips_parse_elem(
-    char *inp,
-    const PVFS_offset * prev_offset,
-    const PVFS_size * prev_size,
-    unsigned *server_nr,
-    PVFS_offset * offset,
-    PVFS_size * size);
+static int strips_parse_elem(char* inp, const PVFS_offset *prev_offset,
+                             const PVFS_size *prev_size, unsigned *server_nr,
+                             PVFS_offset *offset, PVFS_size *size);
 
-static PINT_dist_strips *strips_alloc_mem(
-    const char *inp);
+static PINT_dist_strips* strips_alloc_mem(const char* inp);
 
-void PINT_dist_strips_free_mem(
-    PINT_dist_strips ** strips)
+void PINT_dist_strips_free_mem(PINT_dist_strips **strips)
 {
     if (*strips)
     {
@@ -37,18 +31,15 @@ void PINT_dist_strips_free_mem(
 
 
 static int strips_parse_elem(
-    char *inp,
-    const PVFS_offset * prev_offset,
-    const PVFS_size * prev_size,
-    unsigned *server_nr,
-    PVFS_offset * offset,
-    PVFS_size * size)
+    char* inp, const PVFS_offset *prev_offset,
+    const PVFS_size *prev_size, unsigned *server_nr,
+    PVFS_offset *offset, PVFS_size *size)
 {
     char *s_server, *s_size;
     unsigned i_server;
     PVFS_size i_size;
 
-    if (prev_offset != NULL && prev_size != NULL)
+    if (prev_offset != NULL && prev_size != NULL) 
     {
         s_server = strtok(NULL, ":");
     }
@@ -67,7 +58,7 @@ static int strips_parse_elem(
         return 1;
     }
 
-    if (prev_offset != NULL && prev_size != NULL)
+    if (prev_offset != NULL && prev_size != NULL) 
     {
         *offset = (*prev_offset) + (*prev_size);
     }
@@ -86,18 +77,18 @@ static int strips_parse_elem(
             {
                 switch (s_size[strlen(s_size) - 1])
                 {
-                case 'k':
-                case 'K':
-                    i_size *= 1024;
-                    break;
-                case 'm':
-                case 'M':
-                    i_size *= (1024 * 1024);
-                    break;
-                case 'g':
-                case 'G':
-                    i_size *= (1024 * 1024 * 1024);
-                    break;
+                    case 'k':
+                    case 'K':
+                        i_size *= 1024;
+                        break;
+                    case 'm':
+                    case 'M':
+                        i_size *= (1024 * 1024);
+                        break;
+                    case 'g':
+                    case 'G':
+                        i_size *= (1024 * 1024 * 1024);
+                        break;
                 }
             }
             *size = i_size;
@@ -116,8 +107,7 @@ static int strips_parse_elem(
 }
 
 
-static PINT_dist_strips *strips_alloc_mem(
-    const char *inp)
+static PINT_dist_strips* strips_alloc_mem(const char* inp)
 {
     int i, count = 0;
     /* count ":" to allocate enough memory */
@@ -127,16 +117,16 @@ static PINT_dist_strips *strips_alloc_mem(
         {
             count++;
         }
-    }
+    }  
 
     if (!count)
     {
         /* no ";" found, abort */
-        return (PINT_dist_strips *) NULL;
+        return (PINT_dist_strips*) NULL;
     }
 
     /* allocate array of struct slicing */
-    return (PINT_dist_strips *) (malloc(sizeof(PINT_dist_strips) * count));
+    return (PINT_dist_strips*) (malloc(sizeof(PINT_dist_strips) * count));
 }
 
 /*
@@ -144,13 +134,11 @@ static PINT_dist_strips *strips_alloc_mem(
  * input sytax: {<datafile number>:<strip size>[K|M|G];}+
  */
 int PINT_dist_strips_parse(
-    const char *input,
-    PINT_dist_strips ** strips,
-    unsigned *count)
+    const char *input, PINT_dist_strips **strips, unsigned *count)  
 {
     char inp[PVFS_DIST_VARSTRIP_MAX_STRIPS_STRING_LENGTH];
     PINT_dist_strips *strips_elem;
-    PVFS_size *prev_size = NULL;
+    PVFS_size *prev_size   = NULL;
     PVFS_offset *prev_offset = NULL;
     int i;
 
@@ -169,7 +157,7 @@ int PINT_dist_strips_parse(
 
     *strips = strips_alloc_mem(inp);
 
-    if (!(*strips))
+    if (!(*strips))        
     {
         /* allocation failed, abort */
         return -1;
@@ -178,33 +166,34 @@ int PINT_dist_strips_parse(
     for (i = 0;; i++)
     {
         strips_elem = (*strips) + i;
-        switch (strips_parse_elem
-                (inp, prev_offset, prev_size, &(strips_elem->server_nr),
-                 &(strips_elem->offset), &(strips_elem->size)))
+        switch (
+            strips_parse_elem(
+                inp, prev_offset, prev_size, &(strips_elem->server_nr),
+                &(strips_elem->offset), &(strips_elem->size)))
         {
-        case 0:
-            /* do next element */
-            prev_offset = &(strips_elem->offset);
-            prev_size = &(strips_elem->size);
-            break;
-        case -1:
-            /* an error occured */
-            PINT_dist_strips_free_mem(strips);
-            *count = 0;
-            return -1;
-        case 1:
-            /* finished */
-            *count = i;
-            if (*count == 0)
-            {
-                /* 0 elements, abort */
+            case 0:     
+                /* do next element */
+                prev_offset = &(strips_elem->offset);
+                prev_size   = &(strips_elem->size);
+                break;
+            case -1:
+                /* an error occured */
                 PINT_dist_strips_free_mem(strips);
+                *count = 0;
                 return -1;
-            }
-            else
-            {
-                return 0;
-            }
+            case 1:
+                /* finished */
+                *count = i;
+                if (*count == 0)    
+                {         
+                    /* 0 elements, abort */
+                    PINT_dist_strips_free_mem(strips);
+                    return -1;
+                }
+                else
+                {
+                    return 0;
+                }
         }
     }
 }

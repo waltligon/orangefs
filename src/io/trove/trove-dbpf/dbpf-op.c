@@ -12,20 +12,18 @@
 
 
 
-enum operation_queue_type dbpf_op_queue_get_queue_type(
-    enum dbpf_op_type type)
+enum operation_queue_type dbpf_op_queue_get_queue_type(enum dbpf_op_type type)
 {
-    if (DBPF_OP_IS_BSTREAM(type))
+    if ( DBPF_OP_IS_BSTREAM(type) )
         return OP_QUEUE_IO;
-    if (DBPF_OP_MODIFYING_META_OP(type))
+    if ( DBPF_OP_MODIFYING_META_OP(type) )
         return OP_QUEUE_META_WRITE;
     return OP_QUEUE_META_READ;
 }
 
-dbpf_queued_op_t *dbpf_queued_op_alloc(
-    void)
+dbpf_queued_op_t *dbpf_queued_op_alloc(void)
 {
-    return (dbpf_queued_op_t *) malloc(sizeof(dbpf_queued_op_t));
+    return (dbpf_queued_op_t *)malloc(sizeof(dbpf_queued_op_t));
 }
 
 /* dbpf_queued_op_init()
@@ -34,14 +32,15 @@ dbpf_queued_op_t *dbpf_queued_op_alloc(
  * the next_p must still be handled.
  */
 void dbpf_queued_op_init(
-    dbpf_queued_op_t * q_op_p,
+    dbpf_queued_op_t *q_op_p,
     enum dbpf_op_type type,
     TROVE_handle handle,
     struct dbpf_collection *coll_p,
-    int (*svc_fn) (struct dbpf_op * op),
+    int (*svc_fn)(struct dbpf_op *op),
     void *user_ptr,
     TROVE_ds_flags flags,
-    TROVE_context_id context_id)
+    TROVE_context_id context_id
+    )
 {
     assert(q_op_p);
     bzero(q_op_p, sizeof(dbpf_queued_op_t));
@@ -57,13 +56,12 @@ void dbpf_queued_op_init(
     q_op_p->op.user_ptr = user_ptr;
     q_op_p->op.flags = flags;
     q_op_p->op.context_id = context_id;
-    gen_posix_mutex_init(&q_op_p->op.state_mutex);
+    gen_posix_mutex_init(& q_op_p->op.state_mutex);
 
     id_gen_safe_register(&q_op_p->op.id, q_op_p);
 }
 
-void dbpf_queued_op_free(
-    dbpf_queued_op_t * q_op_p)
+void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)
 {
     if (q_op_p->op.type == DSPACE_CREATE)
     {
@@ -73,9 +71,9 @@ void dbpf_queued_op_free(
     else if ((q_op_p->op.type == BSTREAM_READ_LIST) ||
              (q_op_p->op.type == BSTREAM_WRITE_LIST))
     {
-
+        
     }
-
+    
     id_gen_safe_unregister(q_op_p->op.id);
     free(q_op_p);
 }
@@ -85,28 +83,24 @@ void dbpf_queued_op_free(
  * Notes in statistics that we have been working on this operation
  * again.
  */
-void dbpf_queued_op_touch(
-    dbpf_queued_op_t * q_op_p)
+void dbpf_queued_op_touch(dbpf_queued_op_t *q_op_p)
 {
     q_op_p->stats.svc_ct++;
 }
 
-void dbpf_op_change_status(
-    dbpf_queued_op_t * q_op_p,
-    enum dbpf_op_state state)
+void dbpf_op_change_status(dbpf_queued_op_t *q_op_p, enum dbpf_op_state state)
 {
-    gen_mutex_lock(&q_op_p->op.state_mutex);
+    gen_mutex_lock(& q_op_p->op.state_mutex);
     q_op_p->op.state = state;
-    gen_mutex_unlock(&q_op_p->op.state_mutex);
+    gen_mutex_unlock(& q_op_p->op.state_mutex);
 }
 
-enum dbpf_op_state dbpf_op_get_status(
-    dbpf_queued_op_t * q_op_p)
+enum dbpf_op_state dbpf_op_get_status(dbpf_queued_op_t *q_op_p)
 {
     enum dbpf_op_state state;
-    gen_mutex_lock(&q_op_p->op.state_mutex);
+    gen_mutex_lock(& q_op_p->op.state_mutex);
     state = q_op_p->op.state;
-    gen_mutex_unlock(&q_op_p->op.state_mutex);
+    gen_mutex_unlock(& q_op_p->op.state_mutex);
     return state;
 }
 

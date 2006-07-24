@@ -30,16 +30,13 @@ static int current_tag = 1;
 static gen_mutex_t current_tag_lock = GEN_MUTEX_INITIALIZER;
 
 static gen_mutex_t check_group_mutex = GEN_MUTEX_INITIALIZER;
-static char *check_group_pw_buffer = NULL;
+static char* check_group_pw_buffer = NULL;
 static long check_group_pw_buffer_size = 0;
-static char *check_group_gr_buffer = NULL;
+static char* check_group_gr_buffer = NULL;
 static long check_group_gr_buffer_size = 0;
-static int PINT_check_group(
-    uid_t uid,
-    gid_t gid);
+static int PINT_check_group(uid_t uid, gid_t gid);
 
-void PINT_time_mark(
-    PINT_time_marker * out_marker)
+void PINT_time_mark(PINT_time_marker *out_marker)
 {
     struct rusage usage;
 
@@ -49,34 +46,32 @@ void PINT_time_mark(
     out_marker->stime = usage.ru_stime;
 }
 
-void PINT_time_diff(
-    PINT_time_marker mark1,
-    PINT_time_marker mark2,
-    double *out_wtime_sec,
-    double *out_utime_sec,
-    double *out_stime_sec)
+void PINT_time_diff(PINT_time_marker mark1, 
+                    PINT_time_marker mark2,
+                    double *out_wtime_sec,
+                    double *out_utime_sec,
+                    double *out_stime_sec)
 {
-    *out_wtime_sec =
-        ((double) mark2.wtime.tv_sec +
-         (double) (mark2.wtime.tv_usec) / 1000000) -
-        ((double) mark1.wtime.tv_sec +
-         (double) (mark1.wtime.tv_usec) / 1000000);
+    *out_wtime_sec = 
+        ((double)mark2.wtime.tv_sec +
+         (double)(mark2.wtime.tv_usec) / 1000000) -
+        ((double)mark1.wtime.tv_sec +
+         (double)(mark1.wtime.tv_usec) / 1000000);
 
-    *out_stime_sec =
-        ((double) mark2.stime.tv_sec +
-         (double) (mark2.stime.tv_usec) / 1000000) -
-        ((double) mark1.stime.tv_sec +
-         (double) (mark1.stime.tv_usec) / 1000000);
+    *out_stime_sec = 
+        ((double)mark2.stime.tv_sec +
+         (double)(mark2.stime.tv_usec) / 1000000) -
+        ((double)mark1.stime.tv_sec +
+         (double)(mark1.stime.tv_usec) / 1000000);
 
-    *out_utime_sec =
-        ((double) mark2.utime.tv_sec +
-         (double) (mark2.utime.tv_usec) / 1000000) -
-        ((double) mark1.utime.tv_sec +
-         (double) (mark1.utime.tv_usec) / 1000000);
+    *out_utime_sec = 
+        ((double)mark2.utime.tv_sec +
+         (double)(mark2.utime.tv_usec) / 1000000) -
+        ((double)mark1.utime.tv_sec +
+         (double)(mark1.utime.tv_usec) / 1000000);
 }
 
-PVFS_msg_tag_t PINT_util_get_next_tag(
-    void)
+PVFS_msg_tag_t PINT_util_get_next_tag(void)
 {
     PVFS_msg_tag_t ret;
 
@@ -86,42 +81,40 @@ PVFS_msg_tag_t PINT_util_get_next_tag(
     /* increment the tag, don't use zero */
     if (current_tag + 1 == PINT_MSG_TAG_INVALID)
     {
-        current_tag = 1;
+	current_tag = 1;
     }
     else
     {
-        current_tag++;
+	current_tag++;
     }
     gen_mutex_unlock(&current_tag_lock);
 
     return ret;
 }
 
-int PINT_copy_object_attr(
-    PVFS_object_attr * dest,
-    PVFS_object_attr * src)
+int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     int ret = -PVFS_ENOMEM;
 
     if (dest && src)
     {
-        if (src->mask & PVFS_ATTR_COMMON_UID)
+	if (src->mask & PVFS_ATTR_COMMON_UID)
         {
             dest->owner = src->owner;
         }
-        if (src->mask & PVFS_ATTR_COMMON_GID)
+	if (src->mask & PVFS_ATTR_COMMON_GID)
         {
             dest->group = src->group;
         }
-        if (src->mask & PVFS_ATTR_COMMON_PERM)
+	if (src->mask & PVFS_ATTR_COMMON_PERM)
         {
             dest->perms = src->perms;
         }
-        if (src->mask & PVFS_ATTR_COMMON_ATIME)
+	if (src->mask & PVFS_ATTR_COMMON_ATIME)
         {
             dest->atime = src->atime;
         }
-        if (src->mask & PVFS_ATTR_COMMON_CTIME)
+	if (src->mask & PVFS_ATTR_COMMON_CTIME)
         {
             dest->ctime = src->ctime;
         }
@@ -129,20 +122,23 @@ int PINT_copy_object_attr(
         {
             dest->mtime = src->mtime;
         }
-        if (src->mask & PVFS_ATTR_COMMON_TYPE)
+	if (src->mask & PVFS_ATTR_COMMON_TYPE)
         {
             dest->objtype = src->objtype;
         }
 
         if (src->mask & PVFS_ATTR_DIR_DIRENT_COUNT)
         {
-            dest->u.dir.dirent_count = src->u.dir.dirent_count;
+            dest->u.dir.dirent_count = 
+                src->u.dir.dirent_count;
         }
 
         if (src->mask & PVFS_ATTR_DIR_HINT)
         {
-            dest->u.dir.hint.dfile_count = src->u.dir.hint.dfile_count;
-            dest->u.dir.hint.dist_name_len = src->u.dir.hint.dist_name_len;
+            dest->u.dir.hint.dfile_count = 
+                src->u.dir.hint.dfile_count;
+            dest->u.dir.hint.dist_name_len =
+                src->u.dir.hint.dist_name_len;
             if (dest->u.dir.hint.dist_name_len > 0)
             {
                 dest->u.dir.hint.dist_name = strdup(src->u.dir.hint.dist_name);
@@ -151,11 +147,11 @@ int PINT_copy_object_attr(
                     return ret;
                 }
             }
-            dest->u.dir.hint.dist_params_len = src->u.dir.hint.dist_params_len;
+            dest->u.dir.hint.dist_params_len =
+                src->u.dir.hint.dist_params_len;
             if (dest->u.dir.hint.dist_params_len > 0)
             {
-                dest->u.dir.hint.dist_params =
-                    strdup(src->u.dir.hint.dist_params);
+                dest->u.dir.hint.dist_params = strdup(src->u.dir.hint.dist_params);
                 if (dest->u.dir.hint.dist_params == NULL)
                 {
                     free(dest->u.dir.hint.dist_name);
@@ -165,20 +161,20 @@ int PINT_copy_object_attr(
         }
 
         /*
-           NOTE:
-           we only copy the size out if we're actually a
-           datafile object.  sometimes the size field is
-           valid when the objtype is a metafile because
-           of different uses of the acache.  In this case
-           (namely, getattr), the size is stored in the
-           acache before this deep copy, so it's okay
-           that we're not copying here even though the
-           size mask bit is set.
+          NOTE:
+          we only copy the size out if we're actually a
+          datafile object.  sometimes the size field is
+          valid when the objtype is a metafile because
+          of different uses of the acache.  In this case
+          (namely, getattr), the size is stored in the
+          acache before this deep copy, so it's okay
+          that we're not copying here even though the
+          size mask bit is set.
 
-           if we don't do this trick, the metafile that
-           caches the size will have it's union data
-           overwritten with a bunk size.
-         */
+          if we don't do this trick, the metafile that
+          caches the size will have it's union data
+          overwritten with a bunk size.
+        */
         if ((src->mask & PVFS_ATTR_DATA_SIZE) &&
             (src->mask & PVFS_ATTR_COMMON_TYPE) &&
             (src->objtype == PVFS_TYPE_DATAFILE))
@@ -186,10 +182,10 @@ int PINT_copy_object_attr(
             dest->u.data.size = src->u.data.size;
         }
 
-        if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
+	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
             (src->objtype == PVFS_TYPE_METAFILE))
-        {
-            if (src->mask & PVFS_ATTR_META_DFILES)
+        {      
+            if(src->mask & PVFS_ATTR_META_DFILES)
             {
                 PVFS_size df_array_size = src->u.meta.dfile_count *
                     sizeof(PVFS_handle);
@@ -219,7 +215,7 @@ int PINT_copy_object_attr(
                 dest->u.meta.dfile_count = src->u.meta.dfile_count;
             }
 
-            if (src->mask & PVFS_ATTR_META_DIST)
+            if(src->mask & PVFS_ATTR_META_DIST)
             {
                 assert(src->u.meta.dist_size > 0);
 
@@ -246,14 +242,13 @@ int PINT_copy_object_attr(
             }
         }
 
-        dest->mask = src->mask;
+	dest->mask = src->mask;
         ret = 0;
     }
     return ret;
 }
 
-void PINT_free_object_attr(
-    PVFS_object_attr * attr)
+void PINT_free_object_attr(PVFS_object_attr *attr)
 {
     if (attr)
     {
@@ -287,8 +282,7 @@ void PINT_free_object_attr(
         }
         else if (attr->objtype == PVFS_TYPE_DIRECTORY)
         {
-            if ((attr->mask & PVFS_ATTR_DIR_HINT)
-                || (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
+            if ((attr->mask & PVFS_ATTR_DIR_HINT) || (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
             {
                 if (attr->u.dir.hint.dist_name)
                 {
@@ -311,15 +305,15 @@ void PINT_free_object_attr(
  * returns 0 on success, -PVFS_EPERM if permission is not granted
  */
 int PINT_check_mode(
-    PVFS_object_attr * attr,
-    PVFS_uid uid,
-    PVFS_gid gid,
+    PVFS_object_attr *attr,
+    PVFS_uid uid, PVFS_gid gid,
     enum PINT_access_type access_type)
 {
     int in_group_flag = 0;
     int ret = 0;
     uint32_t perm_mask = (PVFS_ATTR_COMMON_UID |
-                          PVFS_ATTR_COMMON_GID | PVFS_ATTR_COMMON_PERM);
+                          PVFS_ATTR_COMMON_GID |
+                          PVFS_ATTR_COMMON_PERM);
 
     /* if we don't have masks for the permission information that we
      * need, then the system is broken
@@ -344,29 +338,30 @@ int PINT_check_mode(
 
     /* see if uid matches object owner */
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if owner (%d) "
-                 "matches uid (%d)...\n", attr->owner, uid);
-    if (attr->owner == uid)
+        "matches uid (%d)...\n", attr->owner, uid);
+    if(attr->owner == uid)
     {
         /* see if object user permissions match access type */
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-                     "(%d) allows access type (%d) for user...\n", attr->perms,
-                     access_type);
-        if (access_type == PINT_ACCESS_READABLE && (attr->perms & PVFS_U_READ))
+            "(%d) allows access type (%d) for user...\n", attr->perms, access_type);
+        if(access_type == PINT_ACCESS_READABLE && (attr->perms &
+            PVFS_U_READ))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return (0);
+            return(0);
         }
-        if (access_type == PINT_ACCESS_WRITABLE && (attr->perms & PVFS_U_WRITE))
+        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
+            PVFS_U_WRITE))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return (0);
+            return(0);
         }
-        if (access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
-                                                      PVFS_U_EXECUTE))
+        if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
+            PVFS_U_EXECUTE))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return (0);
+            return(0);
         }
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
     }
@@ -377,29 +372,31 @@ int PINT_check_mode(
 
     /* see if other bits allow access */
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-                 "(%d) allows access type (%d) by others...\n", attr->perms,
-                 access_type);
-    if (access_type == PINT_ACCESS_READABLE && (attr->perms & PVFS_O_READ))
+        "(%d) allows access type (%d) by others...\n", attr->perms, access_type);
+    if(access_type == PINT_ACCESS_READABLE && (attr->perms &
+        PVFS_O_READ))
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        return (0);
+        return(0);
     }
-    if (access_type == PINT_ACCESS_WRITABLE && (attr->perms & PVFS_O_WRITE))
+    if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
+        PVFS_O_WRITE))
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        return (0);
+        return(0);
     }
-    if (access_type == PINT_ACCESS_EXECUTABLE && (attr->perms & PVFS_O_EXECUTE))
+    if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
+        PVFS_O_EXECUTE))
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        return (0);
+        return(0);
     }
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
 
     /* see if gid matches object group */
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if group (%d) "
-                 "matches gid (%d)...\n", attr->group, gid);
-    if (attr->group == gid)
+        "matches gid (%d)...\n", attr->group, gid);
+    if(attr->group == gid)
     {
         /* default group match */
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
@@ -410,9 +407,9 @@ int PINT_check_mode(
         /* no default group match, check supplementary groups */
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking for"
-                     " supplementary group match...\n");
+            " supplementary group match...\n");
         ret = PINT_check_group(uid, attr->group);
-        if (ret == 0)
+        if(ret == 0)
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
             in_group_flag = 1;
@@ -420,39 +417,40 @@ int PINT_check_mode(
         else
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
-            if (ret != -PVFS_ENOENT)
+            if(ret != -PVFS_ENOENT)
             {
                 /* system error; not just failed match */
-                return (ret);
+                return(ret);
             }
         }
     }
 
-    if (in_group_flag)
+    if(in_group_flag)
     {
         /* see if object group permissions match access type */
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-                     "(%d) allows access type (%d) for group...\n", attr->perms,
-                     access_type);
-        if (access_type == PINT_ACCESS_READABLE && (attr->perms & PVFS_G_READ))
+            "(%d) allows access type (%d) for group...\n", attr->perms, access_type);
+        if(access_type == PINT_ACCESS_READABLE && (attr->perms &
+            PVFS_G_READ))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return (0);
+            return(0);
         }
-        if (access_type == PINT_ACCESS_WRITABLE && (attr->perms & PVFS_G_WRITE))
+        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
+            PVFS_G_WRITE))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return (0);
+            return(0);
         }
-        if (access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
-                                                      PVFS_G_EXECUTE))
+        if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
+            PVFS_G_EXECUTE))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return (0);
+            return(0);
         }
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
     }
-
+  
     /* default case: access denied */
     return -PVFS_EPERM;
 }
@@ -464,14 +462,12 @@ int PINT_check_mode(
  * returns 0 on success, -PVFS_ENOENT if not a member, other PVFS error codes
  * on system failure
  */
-static int PINT_check_group(
-    uid_t uid,
-    gid_t gid)
+static int PINT_check_group(uid_t uid, gid_t gid)
 {
     struct passwd pwd;
-    struct passwd *pwd_p = NULL;
+    struct passwd* pwd_p = NULL;
     struct group grp;
-    struct group *grp_p = NULL;
+    struct group* grp_p = NULL;
     int i = 0;
     int ret = -1;
 
@@ -490,7 +486,7 @@ static int PINT_check_group(
 
     gen_mutex_lock(&check_group_mutex);
 
-    if (!check_group_pw_buffer)
+    if(!check_group_pw_buffer)
     {
         /* need to create a buffer for pw and grp entries */
 #if defined(_SC_GETGR_R_SIZE_MAX) && defined(_SC_GETPW_R_SIZE_MAX)
@@ -502,61 +498,62 @@ static int PINT_check_group(
         check_group_pw_buffer_size = 1024;
         check_group_gr_buffer_size = 1024;
 #endif
-        check_group_pw_buffer = (char *) malloc(check_group_pw_buffer_size);
-        check_group_gr_buffer = (char *) malloc(check_group_gr_buffer_size);
-        if (!check_group_pw_buffer || !check_group_gr_buffer)
+        check_group_pw_buffer = (char*)malloc(check_group_pw_buffer_size);
+        check_group_gr_buffer = (char*)malloc(check_group_gr_buffer_size);
+        if(!check_group_pw_buffer || !check_group_gr_buffer)
         {
-            if (check_group_pw_buffer)
+            if(check_group_pw_buffer)
             {
                 free(check_group_pw_buffer);
                 check_group_pw_buffer = NULL;
             }
-            if (check_group_gr_buffer)
+            if(check_group_gr_buffer)
             {
                 free(check_group_gr_buffer);
                 check_group_gr_buffer = NULL;
             }
             gen_mutex_unlock(&check_group_mutex);
-            return (-PVFS_ENOMEM);
+            return(-PVFS_ENOMEM);
         }
     }
 
     /* get user information */
     ret = getpwuid_r(uid, &pwd, check_group_pw_buffer,
-                     check_group_pw_buffer_size, &pwd_p);
-    if (ret != 0)
+        check_group_pw_buffer_size,
+        &pwd_p);
+    if(ret != 0)
     {
         gen_mutex_unlock(&check_group_mutex);
-        return (-PVFS_ENOENT);
+        return(-PVFS_ENOENT);
     }
 
     /* check primary group */
-    if (pwd.pw_gid == gid)
-        return 0;
+    if(pwd.pw_gid == gid) return 0;
 
     /* get other group information */
     ret = getgrgid_r(gid, &grp, check_group_gr_buffer,
-                     check_group_gr_buffer_size, &grp_p);
-    if (ret != 0)
+        check_group_gr_buffer_size,
+        &grp_p);
+    if(ret != 0)
     {
         gen_mutex_unlock(&check_group_mutex);
-        return (-PVFS_ENOENT);
+        return(-PVFS_ENOENT);
     }
 
     gen_mutex_unlock(&check_group_mutex);
 
 
-    for (i = 0; grp.gr_mem[i] != NULL; i++)
+    for(i = 0; grp.gr_mem[i] != NULL; i++)
     {
-        if (0 == strcmp(pwd.pw_name, grp.gr_mem[i]))
+        if(0 == strcmp(pwd.pw_name, grp.gr_mem[i]) )
         {
             gen_mutex_unlock(&check_group_mutex);
             return 0;
-        }
+        } 
     }
 
     gen_mutex_unlock(&check_group_mutex);
-    return (-PVFS_ENOENT);
+    return(-PVFS_ENOENT);
 }
 
 

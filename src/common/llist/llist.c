@@ -15,7 +15,7 @@ PINT_llist_p PINT_llist_new(
     PINT_llist_p l_p;
 
     if (!(l_p = (PINT_llist_p) malloc(sizeof(PINT_llist))))
-        return (NULL);
+	return (NULL);
     l_p->next = l_p->item = NULL;
     return (l_p);
 }
@@ -28,7 +28,7 @@ int PINT_llist_empty(
     PINT_llist_p l_p)
 {
     if (l_p->next == NULL)
-        return (1);
+	return (1);
     return (0);
 }
 
@@ -44,17 +44,17 @@ int PINT_llist_add_to_tail(
 {
     PINT_llist_p new_p;
 
-    if (!l_p)   /* not a list */
-        return (-1);
+    if (!l_p)	/* not a list */
+	return (-1);
 
     /* NOTE: first "item" pointer in list is _always_ NULL */
 
     if ((new_p = (PINT_llist_p) malloc(sizeof(PINT_llist))) == NULL)
-        return -1;
+	return -1;
     new_p->next = NULL;
     new_p->item = item;
     while (l_p->next)
-        l_p = l_p->next;
+	l_p = l_p->next;
     l_p->next = new_p;
     return (0);
 }
@@ -71,13 +71,13 @@ int PINT_llist_add_to_head(
 {
     PINT_llist_p new_p;
 
-    if (!l_p)   /* not a list */
-        return (-1);
+    if (!l_p)	/* not a list */
+	return (-1);
 
     /* NOTE: first "item" pointer in list is _always_ NULL */
 
     if ((new_p = (PINT_llist_p) malloc(sizeof(PINT_llist))) == NULL)
-        return -1;
+	return -1;
     new_p->next = l_p->next;
     new_p->item = item;
     l_p->next = new_p;
@@ -93,7 +93,7 @@ void *PINT_llist_head(
     PINT_llist_p l_p)
 {
     if (!l_p || !l_p->next)
-        return (NULL);
+	return (NULL);
     return (l_p->next->item);
 }
 
@@ -105,9 +105,9 @@ void *PINT_llist_tail(
     PINT_llist_p l_p)
 {
     if (!l_p || !l_p->next)
-        return (NULL);
+	return (NULL);
     while (l_p->next)
-        l_p = l_p->next;
+	l_p = l_p->next;
     return (l_p->item);
 }
 
@@ -120,16 +120,16 @@ void *PINT_llist_search(
     PINT_llist_p l_p,
     void *key,
     int (*comp) (void *,
-                 void *))
+		 void *))
 {
-    if (!l_p || !l_p->next || !comp)    /* no or empty list */
-        return (NULL);
+    if (!l_p || !l_p->next || !comp)	/* no or empty list */
+	return (NULL);
 
     for (l_p = l_p->next; l_p; l_p = l_p->next)
     {
-        /* NOTE: "comp" function must return _0_ if a match is made */
-        if (!(*comp) (key, l_p->item))
-            return (l_p->item);
+	/* NOTE: "comp" function must return _0_ if a match is made */
+	if (!(*comp) (key, l_p->item))
+	    return (l_p->item);
     }
     return (NULL);
 }
@@ -144,23 +144,23 @@ void *PINT_llist_rem(
     PINT_llist_p l_p,
     void *key,
     int (*comp) (void *,
-                 void *))
+		 void *))
 {
-    if (!l_p || !l_p->next || !comp)    /* no or empty list */
-        return (NULL);
+    if (!l_p || !l_p->next || !comp)	/* no or empty list */
+	return (NULL);
 
     for (; l_p->next; l_p = l_p->next)
     {
-        /* NOTE: "comp" function must return _0_ if a match is made */
-        if (!(*comp) (key, l_p->next->item))
-        {
-            void *i_p = l_p->next->item;
-            PINT_llist_p rem_p = l_p->next;
+	/* NOTE: "comp" function must return _0_ if a match is made */
+	if (!(*comp) (key, l_p->next->item))
+	{
+	    void *i_p = l_p->next->item;
+	    PINT_llist_p rem_p = l_p->next;
 
-            l_p->next = l_p->next->next;
-            free(rem_p);
-            return (i_p);
-        }
+	    l_p->next = l_p->next->next;
+	    free(rem_p);
+	    return (i_p);
+	}
     }
     return (NULL);
 }
@@ -179,11 +179,11 @@ int PINT_llist_count(
     int count = 0;
 
     if (!l_p)
-        return (-1);
+	return (-1);
 
     for (l_p = l_p->next; l_p; l_p = l_p->next)
     {
-        count++;
+	count++;
     }
 
     return (count);
@@ -201,15 +201,15 @@ int PINT_llist_doall(
     PINT_llist_p tmp_p;
 
     if (!l_p || !l_p->next || !fn)
-        return (-1);
+	return (-1);
     for (l_p = l_p->next; l_p;)
     {
-        tmp_p = l_p->next;      /* save pointer to next element in case the
-                                 * function destroys the element pointed to
-                                 * by l_p...
-                                 */
-        (*fn) (l_p->item);
-        l_p = tmp_p;
+	tmp_p = l_p->next;	/* save pointer to next element in case the
+				 * function destroys the element pointed to
+				 * by l_p...
+				 */
+	(*fn) (l_p->item);
+	l_p = tmp_p;
     }
     return (0);
 }
@@ -222,21 +222,21 @@ int PINT_llist_doall(
 int PINT_llist_doall_arg(
     PINT_llist_p l_p,
     int (*fn) (void *item,
-               void *arg),
+	       void *arg),
     void *arg)
 {
     PINT_llist_p tmp_p;
 
     if (!l_p || !l_p->next || !fn)
-        return (-1);
+	return (-1);
     for (l_p = l_p->next; l_p;)
     {
-        tmp_p = l_p->next;      /* save pointer to next element in case the
-                                 * function destroys the element pointed to
-                                 * by l_p...
-                                 */
-        (*fn) (l_p->item, arg);
-        l_p = tmp_p;
+	tmp_p = l_p->next;	/* save pointer to next element in case the
+				 * function destroys the element pointed to
+				 * by l_p...
+				 */
+	(*fn) (l_p->item, arg);
+	l_p = tmp_p;
     }
     return (0);
 }
@@ -252,7 +252,7 @@ void PINT_llist_free(
     PINT_llist_p tmp_p;
 
     if (!l_p || !fn)
-        return;
+	return;
 
     /* There is never an item in first entry */
     tmp_p = l_p;
@@ -260,10 +260,10 @@ void PINT_llist_free(
     free(tmp_p);
     while (l_p)
     {
-        (*fn) (l_p->item);
-        tmp_p = l_p;
-        l_p = l_p->next;
-        free(tmp_p);
+	(*fn) (l_p->item);
+	tmp_p = l_p;
+	l_p = l_p->next;
+	free(tmp_p);
     }
 }
 
@@ -282,7 +282,7 @@ PINT_llist_p PINT_llist_next(
 
     if (!entry)
     {
-        return (NULL);
+	return (NULL);
     }
 
     return (entry->next);

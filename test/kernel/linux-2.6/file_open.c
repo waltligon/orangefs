@@ -34,89 +34,87 @@ typedef struct
 
 #define REMOVE_FILE_INDICATOR { 0, 0, "", 1, ENOENT }
 
-static open_info_t oinfo[] = {
+static open_info_t oinfo[] =
+{
     REMOVE_FILE_INDICATOR,
 
 #ifdef _LARGEFILE64_SOURCE
-    {(O_RDONLY | O_LARGEFILE), 0666,
-     "O_RDONLY | O_LARGEFILE", 0, ENOENT},
+    { (O_RDONLY | O_LARGEFILE), 0666,
+      "O_RDONLY | O_LARGEFILE", 0, ENOENT },
 #endif
-    {(O_RDONLY | O_APPEND), 0666,
-     "O_RDONLY | O_APPEND", 0, ENOENT},
+    { (O_RDONLY | O_APPEND), 0666,
+      "O_RDONLY | O_APPEND", 0, ENOENT },
 
-    {(O_RDONLY | O_TRUNC), 0666,
-     "O_RDONLY | O_TRUNC", 0, ENOENT},
+    { (O_RDONLY | O_TRUNC), 0666,
+      "O_RDONLY | O_TRUNC", 0, ENOENT },
 
-    {(O_CREAT | O_WRONLY), 0666,
-     "O_CREAT | O_WRONLY", 0, 0},
+    { (O_CREAT | O_WRONLY), 0666,
+      "O_CREAT | O_WRONLY", 0, 0 },
 #ifdef _LARGEFILE64_SOURCE
-    {(O_RDONLY | O_LARGEFILE), 0666,
-     "O_RDONLY | O_LARGEFILE", 0, 0},
+    { (O_RDONLY | O_LARGEFILE), 0666,
+      "O_RDONLY | O_LARGEFILE", 0, 0 },
 #endif
     REMOVE_FILE_INDICATOR,
 
-    {(O_CREAT | O_RDONLY), 0666,
-     "O_CREAT | O_RDONLY", 0, 0},
+    { (O_CREAT | O_RDONLY), 0666,
+      "O_CREAT | O_RDONLY", 0, 0 },
 
     REMOVE_FILE_INDICATOR,
 #ifdef _LARGEFILE64_SOURCE
-    {(O_CREAT | O_RDONLY | O_LARGEFILE), 0666,
-     "O_CREAT | O_RDONLY", 0, 0},
+    { (O_CREAT | O_RDONLY | O_LARGEFILE), 0666,
+      "O_CREAT | O_RDONLY", 0, 0 },
 #endif
     REMOVE_FILE_INDICATOR,
 
-    {(O_SYNC | O_RDONLY), 0666,
-     "O_SYNC | O_RDONLY", 0, ENOENT},
+    { (O_SYNC | O_RDONLY), 0666,
+      "O_SYNC | O_RDONLY", 0, ENOENT },
 
-    {(O_RDONLY | O_APPEND), 0666,
-     "O_RDONLY | O_APPEND", 0, ENOENT},
+    { (O_RDONLY | O_APPEND), 0666,
+      "O_RDONLY | O_APPEND", 0, ENOENT },
 
-    {(O_RDONLY | O_TRUNC), 0666,
-     "O_RDONLY | O_TRUNC", 0, ENOENT},
+    { (O_RDONLY | O_TRUNC), 0666,
+      "O_RDONLY | O_TRUNC", 0, ENOENT },
 
-    {(O_CREAT | O_RDONLY | O_TRUNC), 0666,
-     "O_CREAT | O_RDONLY | O_TRUNC", 0, 0},
+    { (O_CREAT | O_RDONLY | O_TRUNC), 0666,
+      "O_CREAT | O_RDONLY | O_TRUNC", 0, 0 },
 
-    {(O_SYNC | O_RDONLY), 0666,
-     "O_SYNC | O_RDONLY", 0, 0},
+    { (O_SYNC | O_RDONLY), 0666,
+      "O_SYNC | O_RDONLY", 0, 0 },
 
-    {(O_RDONLY | O_APPEND), 0666,
-     "O_RDONLY | O_APPEND", 0, 0},
+    { (O_RDONLY | O_APPEND), 0666,
+      "O_RDONLY | O_APPEND", 0, 0 },
 
-    {(O_RDONLY | O_TRUNC), 0666,
-     "O_RDONLY | O_TRUNC", 0, 0},
+    { (O_RDONLY | O_TRUNC), 0666,
+      "O_RDONLY | O_TRUNC", 0, 0 },
 
-    {(O_CREAT | O_RDWR), 0666,
-     "O_CREAT | O_RDWR", 0, 0},
+    { (O_CREAT | O_RDWR), 0666,
+      "O_CREAT | O_RDWR", 0, 0 },
 
-    {(O_CREAT | O_WRONLY | O_TRUNC), 0666,
-     "O_CREAT | O_WRONLY | O_TRUNC", 0, 0},
-
-    REMOVE_FILE_INDICATOR,
-
-    {(O_CREAT | O_WRONLY | O_EXCL), 0666,
-     "O_CREAT | O_WRONLY | O_EXCL", 0, 0},
+    { (O_CREAT | O_WRONLY | O_TRUNC), 0666,
+      "O_CREAT | O_WRONLY | O_TRUNC", 0, 0 },
 
     REMOVE_FILE_INDICATOR,
 
-    {(O_CREAT | O_WRONLY | O_TRUNC), 0666,
-     "O_CREAT | O_WRONLY | O_TRUNC", 0, 0},
+    { (O_CREAT | O_WRONLY | O_EXCL), 0666,
+      "O_CREAT | O_WRONLY | O_EXCL", 0, 0 },
 
-    {(O_CREAT | O_WRONLY | O_EXCL), 0666,
-     "O_CREAT | O_WRONLY | O_EXCL", 0, EEXIST},
+    REMOVE_FILE_INDICATOR,
 
-    {(O_CREAT | O_WRONLY), 0666,
-     "O_CREAT | O_WRONLY", 0, 0},
+    { (O_CREAT | O_WRONLY | O_TRUNC), 0666,
+      "O_CREAT | O_WRONLY | O_TRUNC", 0, 0 },
+
+    { (O_CREAT | O_WRONLY | O_EXCL), 0666,
+      "O_CREAT | O_WRONLY | O_EXCL", 0, EEXIST },
+
+    { (O_CREAT | O_WRONLY), 0666,
+      "O_CREAT | O_WRONLY", 0, 0 },
 
     REMOVE_FILE_INDICATOR
 };
-
 #define NUM_OPEN_TESTS (sizeof(oinfo) / sizeof(open_info_t))
 
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)	
 {
     int ret = -1, fd = -1, i = 0;
 
@@ -128,7 +126,7 @@ int main(
 
     printf("Using testfile %s\n", argv[1]);
 
-    for (i = 0; i < NUM_OPEN_TESTS; i++)
+    for(i = 0; i < NUM_OPEN_TESTS; i++)
     {
         if (oinfo[i].remove_file_indicator)
         {

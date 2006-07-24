@@ -47,8 +47,8 @@ int main(
     off_array[0] = 327552;
     for (i = 1; i < 17; i++)
     {
-        len_array[i] = 4;
-        off_array[i] = off_array[0] + i * 8;
+	len_array[i] = 4;
+	off_array[i] = off_array[0] + i * 8;
     }
     PVFS_Request_hindexed(17, len_array, off_array, PVFS_BYTE, &file_req);
 
@@ -57,8 +57,8 @@ int main(
     off_array[0] = 135295720;
     for (i = 1; i < 17; i++)
     {
-        len_array[i] = 4;
-        off_array[i] = off_array[0] + i * 8;
+	len_array[i] = 4;
+	off_array[i] = off_array[0] + i * 8;
     }
     PVFS_Request_hindexed(17, len_array, off_array, PVFS_BYTE, &mem_req);
 
@@ -102,37 +102,38 @@ int main(
     total_bytes_client += seg1.bytes;
     for (i = 0; i < seg1.segs; i++)
     {
-        printf("  segment %d: offset: %d size: %d\n",
-               i, (int) seg1.offset_array[i], (int) seg1.size_array[i]);
+	printf("  segment %d: offset: %d size: %d\n",
+	       i, (int) seg1.offset_array[i], (int) seg1.size_array[i]);
     }
 
     printf("PINT_REQUEST_DONE: %d\n", PINT_REQUEST_DONE(file_state));
 
     if (!PINT_REQUEST_DONE(file_state))
     {
-        fprintf(stderr, "NEXT call to PINT_REQUEST_DONE should return 0.\n");
+	fprintf(stderr,
+		"NEXT call to PINT_REQUEST_DONE should return 0.\n");
 
-        seg1.bytemax = BYTEMAX;
-        seg1.segmax = SEGMAX;
-        seg1.bytes = 0;
-        seg1.segs = 0;
+	seg1.bytemax = BYTEMAX;
+	seg1.segmax = SEGMAX;
+	seg1.bytes = 0;
+	seg1.segs = 0;
 
-        /* process request */
-        retval = PINT_process_request(file_state, NULL, &rf1,
-                                      &seg1, PINT_SERVER);
+	/* process request */
+	retval = PINT_process_request(file_state, NULL, &rf1,
+				      &seg1, PINT_SERVER);
 
-        assert(retval >= 0);
+	assert(retval >= 0);
 
-        printf("results of PINT_process_request():\n");
-        printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
-        total_bytes_client += seg1.bytes;
-        for (i = 0; i < seg1.segs; i++)
-        {
-            printf("  segment %d: offset: %d size: %d\n",
-                   i, (int) seg1.offset_array[i], (int) seg1.size_array[i]);
-        }
+	printf("results of PINT_process_request():\n");
+	printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
+	total_bytes_client += seg1.bytes;
+	for (i = 0; i < seg1.segs; i++)
+	{
+	    printf("  segment %d: offset: %d size: %d\n",
+		   i, (int) seg1.offset_array[i], (int) seg1.size_array[i]);
+	}
 
-        printf("PINT_REQUEST_DONE: %d\n", PINT_REQUEST_DONE(file_state));
+	printf("PINT_REQUEST_DONE: %d\n", PINT_REQUEST_DONE(file_state));
     }
 
     return 0;

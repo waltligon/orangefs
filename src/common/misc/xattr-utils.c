@@ -13,22 +13,20 @@
 #include "xattr-utils.h"
 
 #ifndef HAVE_FGETXATTR
-ssize_t fgetxattr(
-    int filedes,
-    const char *name,
-    void *value,
-    size_t size)
+ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size)
 {
     errno = ENOSYS;
     return -1;
 }
-#endif
+#endif 
 
  /*
-  * Local variables:
-  *  c-indent-level: 4
-  *  c-basic-offset: 4
-  * End:
-  *
-  * vim: ts=8 sts=4 sw=4 expandtab
-  */
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */
+
+

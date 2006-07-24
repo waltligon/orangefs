@@ -49,22 +49,14 @@ typedef struct
     char *logstamp;
 } options_t;
 
-static void client_sig_handler(
-    int signum);
-static void parse_args(
-    int argc,
-    char **argv,
-    options_t * opts);
-static int verify_pvfs2_client_path(
-    options_t * opts);
-static int monitor_pvfs2_client(
-    options_t * opts);
+static void client_sig_handler(int signum);
+static void parse_args(int argc, char **argv, options_t *opts);
+static int verify_pvfs2_client_path(options_t *opts);
+static int monitor_pvfs2_client(options_t *opts);
 static pid_t core_pid = -1;
 
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     pid_t new_pid = 0;
     options_t opts;
@@ -79,7 +71,7 @@ int main(
     if ((getuid() != 0) && (geteuid() != 0))
     {
         fprintf(stderr, "Error: must be run as root\n");
-        return (-1);
+	return(-1);
     }
 
     if (opts.verbose)
@@ -89,10 +81,10 @@ int main(
 
     umask(027);
 
-    signal(SIGHUP, client_sig_handler);
-    signal(SIGINT, client_sig_handler);
+    signal(SIGHUP,  client_sig_handler);
+    signal(SIGINT,  client_sig_handler);
     signal(SIGPIPE, client_sig_handler);
-    signal(SIGILL, client_sig_handler);
+    signal(SIGILL,  client_sig_handler);
     signal(SIGTERM, client_sig_handler);
     signal(SIGSEGV, client_sig_handler);
 
@@ -117,64 +109,61 @@ int main(
     return monitor_pvfs2_client(&opts);
 }
 
-static void client_sig_handler(
-    int signum)
+static void client_sig_handler(int signum)
 {
     int ret;
 
     kill(0, signum);
     switch (signum)
     {
-    case SIGPIPE:
-    case SIGILL:
-    case SIGSEGV:
-        exit(1);
-    case SIGHUP:
-    case SIGINT:
-    case SIGTERM:
-        if (core_pid > 0)
-        {
-            /* wait for client core to exit before quitting (it is killed
-             * at the begining of the signal handler)
-             */
-            waitpid(core_pid, &ret, 0);
-        }
-        exit(0);
+        case SIGPIPE:
+        case SIGILL:
+        case SIGSEGV:
+            exit(1);
+        case SIGHUP:
+        case SIGINT:
+        case SIGTERM:
+            if(core_pid > 0)
+            {
+                /* wait for client core to exit before quitting (it is killed
+                 * at the begining of the signal handler)
+                 */
+                waitpid(core_pid, &ret, 0);
+            }
+            exit(0);
     }
 }
 
-static int verify_pvfs2_client_path(
-    options_t * opts)
+static int verify_pvfs2_client_path(options_t *opts)
 {
     int ret = -1;
     struct stat statbuf;
 
     if (opts)
     {
-        memset(&statbuf, 0, sizeof(struct stat));
+        memset(&statbuf, 0 , sizeof(struct stat));
 
         if (stat(opts->path, &statbuf) == 0)
         {
             ret = ((S_ISREG(statbuf.st_mode) &&
                     (statbuf.st_mode & S_IXUSR)) ? 0 : 1);
-
+            
         }
     }
     return ret;
 }
 
-static int monitor_pvfs2_client(
-    options_t * opts)
+static int monitor_pvfs2_client(options_t *opts)
 {
     int ret = 1;
     pid_t wpid = 0;
     int dev_init_failures = 0;
-    char *arg_list[128] = { NULL };
+    char* arg_list[128] = {NULL};
     int arg_index;
 
     assert(opts);
 
-    while (1)
+    while(1)
     {
         if (opts->verbose)
         {
@@ -187,7 +176,7 @@ static int monitor_pvfs2_client(
         {
             if (opts->verbose)
             {
-                printf("Waiting on child with pid %d\n", (int) core_pid);
+                printf("Waiting on child with pid %d\n", (int)core_pid);
             }
 
             /* get rid of stdout/stderr/stdin */
@@ -202,26 +191,26 @@ static int monitor_pvfs2_client(
             {
                 gossip_enable_file(opts->logfile, "a");
                 gossip_err("pvfs2-client-core with pid %d exited with "
-                           "value %d\n", core_pid, (int) WEXITSTATUS(ret));
+                       "value %d\n", core_pid, (int)WEXITSTATUS(ret));
                 gossip_disable();
 
-                if (WEXITSTATUS(ret) == (unsigned char) -PVFS_EDEVINIT)
+                if (WEXITSTATUS(ret) == (unsigned char)-PVFS_EDEVINIT)
                 {
                     /*
-                       it's likely that the device was not released yet
-                       by the client core process, even though it was
-                       terminated.  in this case, sleep for a bit and
-                       try again up to MAX_DEV_INIT_FAILURES
-                       consecutive times.
+                      it's likely that the device was not released yet
+                      by the client core process, even though it was
+                      terminated.  in this case, sleep for a bit and
+                      try again up to MAX_DEV_INIT_FAILURES
+                      consecutive times.
 
-                       this can happen after signaled termination,
-                       particularly on 2.4.x kernels. it seems the
-                       client-core sometimes doesn't release the device
-                       quickly enough.  while inelegant, this sleep is
-                       a temporary measure since we plan to remove the
-                       signaled termination of the client-core all
-                       together in the future.
-                     */
+                      this can happen after signaled termination,
+                      particularly on 2.4.x kernels. it seems the
+                      client-core sometimes doesn't release the device
+                      quickly enough.  while inelegant, this sleep is
+                      a temporary measure since we plan to remove the
+                      signaled termination of the client-core all
+                      together in the future.
+                    */
                     if (++dev_init_failures == MAX_DEV_INIT_FAILURES)
                     {
                         break;
@@ -231,21 +220,21 @@ static int monitor_pvfs2_client(
                 }
 
                 /* catch special case of exiting due to device error */
-                if (WEXITSTATUS(ret) == (unsigned char) -PVFS_ENODEV)
+                if (WEXITSTATUS(ret) == (unsigned char)-PVFS_ENODEV)
                 {
                     /* the pvfs2-client.log should log specifics from
                      * pvfs2-client-core
                      */
                     fprintf(stderr, "Device error caught, exiting now...\n");
-                    exit(1);
+                    exit(1);        
                 }
 
-                if ((opts->path[0] != '/') && (opts->path[0] != '.'))
+                if ((opts->path[0] != '/') && (opts->path [0] != '.'))
                 {
                     printf("*** The pvfs2-client-core has exited ***\n");
                     printf("If the pvfs2-client-core is not in your "
                            "configured PATH, please specify the\n full "
-                           "path name (instead of \"%s\")\n", opts->path);
+                           "path name (instead of \"%s\")\n",opts->path);
                 }
                 break;
             }
@@ -257,7 +246,8 @@ static int monitor_pvfs2_client(
                 if (opts->verbose)
                 {
                     printf("Child process with pid %d was killed by an "
-                           "uncaught signal %d\n", core_pid, WTERMSIG(ret));
+                           "uncaught signal %d\n", core_pid,
+                           WTERMSIG(ret));
                 }
                 core_pid = -1;
                 continue;
@@ -269,7 +259,7 @@ static int monitor_pvfs2_client(
 
             if (opts->verbose)
             {
-                printf("About to exec %s\n", opts->path);
+                printf("About to exec %s\n",opts->path);
             }
 
             arg_list[0] = PVFS2_CLIENT_CORE_NAME;
@@ -278,47 +268,47 @@ static int monitor_pvfs2_client(
             arg_list[3] = "-L";
             arg_list[4] = opts->logfile;
             arg_index = 5;
-            if (opts->acache_hard_limit)
+            if(opts->acache_hard_limit)
             {
                 arg_list[arg_index] = "--acache-hard-limit";
-                arg_list[arg_index + 1] = opts->acache_hard_limit;
-                arg_index += 2;
+                arg_list[arg_index+1] = opts->acache_hard_limit;
+                arg_index+=2;
             }
-            if (opts->acache_soft_limit)
+            if(opts->acache_soft_limit)
             {
                 arg_list[arg_index] = "--acache-soft-limit";
-                arg_list[arg_index + 1] = opts->acache_soft_limit;
-                arg_index += 2;
+                arg_list[arg_index+1] = opts->acache_soft_limit;
+                arg_index+=2;
             }
-            if (opts->acache_reclaim_percentage)
+            if(opts->acache_reclaim_percentage)
             {
                 arg_list[arg_index] = "--acache-reclaim-percentage";
-                arg_list[arg_index + 1] = opts->acache_reclaim_percentage;
-                arg_index += 2;
+                arg_list[arg_index+1] = opts->acache_reclaim_percentage;
+                arg_index+=2;
             }
-            if (opts->perf_time_interval_secs)
+            if(opts->perf_time_interval_secs)
             {
                 arg_list[arg_index] = "--perf-time-interval-secs";
-                arg_list[arg_index + 1] = opts->perf_time_interval_secs;
-                arg_index += 2;
+                arg_list[arg_index+1] = opts->perf_time_interval_secs;
+                arg_index+=2;
             }
-            if (opts->perf_history_size)
+            if(opts->perf_history_size)
             {
                 arg_list[arg_index] = "--perf-history-size";
-                arg_list[arg_index + 1] = opts->perf_history_size;
-                arg_index += 2;
+                arg_list[arg_index+1] = opts->perf_history_size;
+                arg_index+=2;
             }
-            if (opts->gossip_mask)
+            if(opts->gossip_mask)
             {
                 arg_list[arg_index] = "--gossip-mask";
-                arg_list[arg_index + 1] = opts->gossip_mask;
-                arg_index += 2;
+                arg_list[arg_index+1] = opts->gossip_mask;
+                arg_index+=2;
             }
-            if (opts->logstamp)
+            if(opts->logstamp)
             {
                 arg_list[arg_index] = "--logstamp";
-                arg_list[arg_index + 1] = opts->logstamp;
-                arg_index += 2;
+                arg_list[arg_index+1] = opts->logstamp;
+                arg_index+=2;
             }
 
             ret = execvp(opts->path, arg_list);
@@ -332,170 +322,166 @@ static int monitor_pvfs2_client(
     return ret;
 }
 
-static void print_help(
-    char *progname)
+static void print_help(char *progname)
 {
     assert(progname);
 
-    printf("Usage: %s [OPTION]...[PATH]\n\n", progname);
+    printf("Usage: %s [OPTION]...[PATH]\n\n",progname);
     printf("-h, --help                    display this help and exit\n");
     printf("-v, --version                 display version and exit\n");
     printf("-V, --verbose                 run in verbose output mode\n");
     printf("-f, --foreground              run in foreground mode\n");
     printf("-L  --logfile                 specify log file to write to\n"
-           "   (defaults to /tmp/pvfs2-client.log)\n");
+            "   (defaults to /tmp/pvfs2-client.log)\n");
     printf("-a MS, --acache-timeout=MS    acache timeout in ms "
            "(default is 0 ms)\n");
     printf("--acache-soft-limit=LIMIT     acache soft limit\n");
     printf("--acache-hard-limit=LIMIT     acache hard limit\n");
     printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
-    printf
-        ("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
-    printf
-        ("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
+    printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
+    printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
-    printf("-p PATH, --path PATH          execute pvfs2-client at " "PATH\n");
+    printf("-p PATH, --path PATH          execute pvfs2-client at "
+           "PATH\n");
 }
 
-static void parse_args(
-    int argc,
-    char **argv,
-    options_t * opts)
+static void parse_args(int argc, char **argv, options_t *opts)
 {
     int ret = 0, option_index = 0;
     char *cur_option = NULL;
 
-    static struct option long_opts[] = {
-        {"help", 0, 0, 0},
-        {"version", 0, 0, 0},
-        {"verbose", 0, 0, 0},
-        {"foreground", 0, 0, 0},
-        {"logfile", 1, 0, 0},
-        {"acache-timeout", 1, 0, 0},
-        {"acache-soft-limit", 1, 0, 0},
-        {"acache-hard-limit", 1, 0, 0},
-        {"acache-reclaim-percentage", 1, 0, 0},
-        {"perf-time-interval-secs", 1, 0, 0},
-        {"perf-history-size", 1, 0, 0},
-        {"gossip-mask", 1, 0, 0},
-        {"path", 1, 0, 0},
-        {"logstamp", 1, 0, 0},
-        {0, 0, 0, 0}
+    static struct option long_opts[] =
+    {
+        {"help",0,0,0},
+        {"version",0,0,0},
+        {"verbose",0,0,0},
+        {"foreground",0,0,0},
+        {"logfile",1,0,0},
+        {"acache-timeout",1,0,0},
+        {"acache-soft-limit",1,0,0},
+        {"acache-hard-limit",1,0,0},
+        {"acache-reclaim-percentage",1,0,0},
+        {"perf-time-interval-secs",1,0,0},
+        {"perf-history-size",1,0,0},
+        {"gossip-mask",1,0,0},
+        {"path",1,0,0},
+        {"logstamp",1,0,0},
+        {0,0,0,0}
     };
 
     assert(opts);
 
-    while ((ret = getopt_long(argc, argv, "hvVfa:p:L:",
-                              long_opts, &option_index)) != -1)
+    while((ret = getopt_long(argc, argv, "hvVfa:p:L:",
+                             long_opts, &option_index)) != -1)
     {
-        switch (ret)
+        switch(ret)
         {
-        case 0:
-            cur_option = (char *) long_opts[option_index].name;
+            case 0:
+                cur_option = (char *)long_opts[option_index].name;
 
-            if (strcmp("help", cur_option) == 0)
-            {
-                goto do_help;
-            }
-            else if (strcmp("version", cur_option) == 0)
-            {
-                goto do_version;
-            }
-            else if (strcmp("verbose", cur_option) == 0)
-            {
-                goto do_verbose;
-            }
-            else if (strcmp("foreground", cur_option) == 0)
-            {
-                goto do_foreground;
-            }
-            else if (strcmp("acache-timeout", cur_option) == 0)
-            {
-                goto do_acache;
-            }
-            else if (strcmp("path", cur_option) == 0)
-            {
-                goto do_path;
-            }
-            else if (strcmp("logfile", cur_option) == 0)
-            {
-                goto do_logfile;
-            }
-            else if (strcmp("logstamp", cur_option) == 0)
-            {
-                opts->logstamp = optarg;
-            }
-            else if (strcmp("acache-hard-limit", cur_option) == 0)
-            {
-                opts->acache_hard_limit = optarg;
+                if (strcmp("help", cur_option) == 0)
+                {
+                    goto do_help;
+                }
+                else if (strcmp("version", cur_option) == 0)
+                {
+                    goto do_version;
+                }
+                else if (strcmp("verbose", cur_option) == 0)
+                {
+                    goto do_verbose;
+                }
+                else if (strcmp("foreground", cur_option) == 0)
+                {
+                    goto do_foreground;
+                }
+                else if (strcmp("acache-timeout", cur_option) == 0)
+                {
+                    goto do_acache;
+                }
+                else if (strcmp("path", cur_option) == 0)
+                {
+                    goto do_path;
+                }
+                else if (strcmp("logfile", cur_option) == 0)
+                {
+                    goto do_logfile;
+                }
+                else if (strcmp("logstamp", cur_option) == 0)
+                {
+                    opts->logstamp = optarg;
+                }
+                else if (strcmp("acache-hard-limit", cur_option) == 0)
+                {
+                    opts->acache_hard_limit = optarg;
+                    break;
+                }
+                else if (strcmp("acache-soft-limit", cur_option) == 0)
+                {
+                    opts->acache_soft_limit = optarg;
+                    break;
+                }
+                else if (strcmp("acache-reclaim-percentage", cur_option) == 0)
+                {
+                    opts->acache_reclaim_percentage = optarg;
+                    break;
+                }
+                else if (strcmp("perf-time-interval-secs", cur_option) == 0)
+                {
+                    opts->perf_time_interval_secs = optarg;
+                    break;
+                }
+                else if (strcmp("perf-history-size", cur_option) == 0)
+                {
+                    opts->perf_history_size = optarg;
+                    break;
+                }
+                else if (strcmp("gossip-mask", cur_option) == 0)
+                {
+                    opts->gossip_mask = optarg;
+                    break;
+                }
                 break;
-            }
-            else if (strcmp("acache-soft-limit", cur_option) == 0)
-            {
-                opts->acache_soft_limit = optarg;
-                break;
-            }
-            else if (strcmp("acache-reclaim-percentage", cur_option) == 0)
-            {
-                opts->acache_reclaim_percentage = optarg;
-                break;
-            }
-            else if (strcmp("perf-time-interval-secs", cur_option) == 0)
-            {
-                opts->perf_time_interval_secs = optarg;
-                break;
-            }
-            else if (strcmp("perf-history-size", cur_option) == 0)
-            {
-                opts->perf_history_size = optarg;
-                break;
-            }
-            else if (strcmp("gossip-mask", cur_option) == 0)
-            {
-                opts->gossip_mask = optarg;
-                break;
-            }
-            break;
-        case 'h':
+            case 'h':
           do_help:
-            print_help(argv[0]);
-            exit(0);
-        case 'v':
+                print_help(argv[0]);
+                exit(0);
+            case 'v':
           do_version:
-            printf("%s\n", PVFS2_VERSION);
-            exit(0);
-        case 'V':
+                printf("%s\n", PVFS2_VERSION);
+                exit(0);
+            case 'V':
           do_verbose:
-            opts->verbose = 1;
-            break;
-        case 'f':
+                opts->verbose = 1;
+                break;
+            case 'f':
           do_foreground:
-            opts->foreground = 1;
-            /* for now, foreground implies verbose */
-            goto do_verbose;
-            break;
-        case 'a':
+                opts->foreground = 1;
+                /* for now, foreground implies verbose */
+                goto do_verbose;
+                break;
+            case 'a':
           do_acache:
-            opts->acache_timeout = optarg;
-            break;
-        case 'L':
+                opts->acache_timeout = optarg;
+                break;
+            case 'L':
           do_logfile:
-            opts->logfile = optarg;
-            break;
-        case 'p':
+                opts->logfile = optarg;
+                break;
+            case 'p':
           do_path:
-            opts->path = optarg;
-            if (verify_pvfs2_client_path(opts))
-            {
-                fprintf(stderr, "Invalid pvfs2-client-core path: %s\n",
-                        opts->path);
+                opts->path = optarg;
+                if (verify_pvfs2_client_path(opts))
+                {
+                    fprintf(stderr, "Invalid pvfs2-client-core path: %s\n",
+                            opts->path);
+                    exit(1);
+                }
+                break;
+            default:
+                fprintf(stderr, "Unrecognized option.  "
+                        "Try --help for information.\n");
                 exit(1);
-            }
-            break;
-        default:
-            fprintf(stderr, "Unrecognized option.  "
-                    "Try --help for information.\n");
-            exit(1);
         }
     }
 
@@ -504,19 +490,20 @@ static void parse_args(
         opts->logfile = DEFAULT_LOGFILE;
     }
     /* make sure that log file location is writable before proceeding */
-    ret = open(opts->logfile, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
-    if (ret < 0)
+    ret = open(opts->logfile, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
+    if(ret < 0)
     {
-        fprintf(stderr, "Error: logfile (%s) isn't writable.\n", opts->logfile);
+        fprintf(stderr, "Error: logfile (%s) isn't writable.\n",
+                opts->logfile);
         exit(1);
-    }
+    } 
 
     if (!opts->path)
     {
         /*
-           since they didn't specify a specific path, we're going to
-           let execlp() sort things out later
-         */
+          since they didn't specify a specific path, we're going to
+          let execlp() sort things out later
+        */
         opts->path = PVFS2_CLIENT_CORE_NAME;
     }
 

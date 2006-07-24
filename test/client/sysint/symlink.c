@@ -15,16 +15,14 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int ret = -1;
-    char str_buf[256] = { 0 };
-    char *filename = (char *) 0;
+    char str_buf[256] = {0};
+    char *filename = (char *)0;
     PVFS_fs_id cur_fs;
     PVFS_sysresp_symlink resp_sym;
-    char *entry_name = NULL;
+    char* entry_name = NULL;
     char *target = NULL;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
@@ -32,7 +30,7 @@ int main(
 
     if (argc != 3)
     {
-        fprintf(stderr, "Usage: %s filename target\n", argv[0]);
+        fprintf(stderr,"Usage: %s filename target\n",argv[0]);
         return ret;
     }
     filename = argv[1];
@@ -41,26 +39,27 @@ int main(
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
     ret = PVFS_util_get_default_fsid(&cur_fs);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_get_default_fsid", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
-    if (PINT_remove_base_dir(filename, str_buf, 256))
+    if (PINT_remove_base_dir(filename,str_buf,256))
     {
         if (filename[0] != '/')
         {
             printf("You forgot the leading '/'\n");
         }
-        printf("Cannot retrieve link name for creation on %s\n", filename);
-        return (-1);
+        printf("Cannot retrieve link name for creation on %s\n",
+               filename);
+        return(-1);
     }
-    printf("Link to be created is %s\n", str_buf);
+    printf("Link to be created is %s\n",str_buf);
 
     memset(&resp_sym, 0, sizeof(PVFS_sysresp_symlink));
     PVFS_util_gen_credentials(&credentials);
@@ -72,12 +71,12 @@ int main(
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-    ret = PINT_lookup_parent(filename, cur_fs, &credentials,
+    ret = PINT_lookup_parent(filename, cur_fs, &credentials, 
                              &parent_refn.handle);
-    if (ret < 0)
+    if(ret < 0)
     {
-        PVFS_perror("PVFS_util_lookup_parent", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_lookup_parent", ret);
+	return(-1);
     }
     parent_refn.fs_id = cur_fs;
 
@@ -86,10 +85,10 @@ int main(
     if (ret < 0)
     {
         printf("symlink failed with errcode = %d\n", ret);
-        return (-1);
+        return(-1);
     }
-
-    printf("--symlink--\n");
+	
+    printf("--symlink--\n"); 
     printf("Handle: %lld\n", lld(resp_sym.ref.handle));
 
     ret = PVFS_sys_finalize();
@@ -99,5 +98,5 @@ int main(
         return (-1);
     }
 
-    return (0);
+    return(0);
 }

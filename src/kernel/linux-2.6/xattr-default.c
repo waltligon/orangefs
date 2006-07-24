@@ -19,12 +19,8 @@
 
 #include <linux/xattr.h>
 
-int pvfs2_xattr_set_default(
-    struct inode *inode,
-    const char *name,
-    const void *buffer,
-    size_t size,
-    int flags)
+int pvfs2_xattr_set_default(struct inode *inode, 
+    const char *name, const void *buffer, size_t size, int flags)
 {
     int internal_flag = 0;
 
@@ -32,19 +28,16 @@ int pvfs2_xattr_set_default(
         return -EINVAL;
     internal_flag = convert_to_internal_xattr_flags(flags);
     return pvfs2_inode_setxattr(inode, PVFS2_XATTR_NAME_DEFAULT_PREFIX,
-                                name, buffer, size, internal_flag);
+        name, buffer, size, internal_flag);
 }
 
-int pvfs2_xattr_get_default(
-    struct inode *inode,
-    const char *name,
-    void *buffer,
-    size_t size)
+int pvfs2_xattr_get_default(struct inode *inode,
+    const char *name, void *buffer, size_t size)
 {
     if (strcmp(name, "") == 0)
         return -EINVAL;
     return pvfs2_inode_getxattr(inode, PVFS2_XATTR_NAME_DEFAULT_PREFIX,
-                                name, buffer, size);
+        name, buffer, size);
 }
 #endif
 
@@ -56,9 +49,9 @@ struct xattr_handler pvfs2_xattr_default_handler = {
      * so that all un-prefixed xattrs keys get caught
      * here!
      */
-    .prefix = PVFS2_XATTR_NAME_DEFAULT_PREFIX,
-    .get = pvfs2_xattr_get_default,
-    .set = pvfs2_xattr_set_default,
+    .prefix = PVFS2_XATTR_NAME_DEFAULT_PREFIX, 
+    .get    = pvfs2_xattr_get_default,
+    .set    = pvfs2_xattr_set_default,
 };
 
 #endif

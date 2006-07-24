@@ -33,8 +33,7 @@ extern PINT_client_sm *g_sm_p;
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_finalize(
-    )
+int PVFS_sys_finalize()
 {
     PINT_ncache_finalize();
     PINT_acache_finalize();

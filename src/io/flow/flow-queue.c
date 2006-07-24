@@ -19,15 +19,14 @@
  *
  * returns pointer to queue on success, NULL on failure
  */
-flow_queue_p flow_queue_new(
-    void)
+flow_queue_p flow_queue_new(void)
 {
     struct qlist_head *tmp_flow_queue = NULL;
 
     tmp_flow_queue = (struct qlist_head *) malloc(sizeof(struct qlist_head));
     if (tmp_flow_queue)
     {
-        INIT_QLIST_HEAD(tmp_flow_queue);
+	INIT_QLIST_HEAD(tmp_flow_queue);
     }
     return (tmp_flow_queue);
 }
@@ -38,19 +37,18 @@ flow_queue_p flow_queue_new(
  *
  * no return value
  */
-void flow_queue_cleanup(
-    flow_queue_p fqp)
+void flow_queue_cleanup(flow_queue_p fqp)
 {
     struct flow_descriptor *tmp_flow_d = NULL;
 
     do
     {
-        tmp_flow_d = flow_queue_shownext(fqp);
-        if (tmp_flow_d)
-        {
-            flow_queue_remove(tmp_flow_d);
-            /* TODO: what to do here? release flow? */
-        }
+	tmp_flow_d = flow_queue_shownext(fqp);
+	if (tmp_flow_d)
+	{
+	    flow_queue_remove(tmp_flow_d);
+	    /* TODO: what to do here? release flow? */
+	}
     } while (tmp_flow_d);
 
     free(fqp);
@@ -64,9 +62,8 @@ void flow_queue_cleanup(
  *
  * no return value
  */
-void flow_queue_add(
-    flow_queue_p fqp,
-    struct flow_descriptor *flow_d)
+void flow_queue_add(flow_queue_p fqp,
+		    struct flow_descriptor *flow_d)
 {
     qlist_add_tail(&(flow_d->sched_queue_link), fqp);
     return;
@@ -78,8 +75,7 @@ void flow_queue_add(
  *
  * no return value
  */
-void flow_queue_remove(
-    struct flow_descriptor *flow_d)
+void flow_queue_remove(struct flow_descriptor *flow_d)
 {
     qlist_del(&(flow_d->sched_queue_link));
     return;
@@ -91,8 +87,7 @@ void flow_queue_remove(
  *
  * returns 1 if empty, 0 otherwise
  */
-int flow_queue_empty(
-    flow_queue_p fqp)
+int flow_queue_empty(flow_queue_p fqp)
 {
     return (qlist_empty(fqp));
 }
@@ -103,13 +98,12 @@ int flow_queue_empty(
  *
  * returns pointer on success, NULL on failure
  */
-struct flow_descriptor *flow_queue_shownext(
-    flow_queue_p fqp)
+struct flow_descriptor *flow_queue_shownext(flow_queue_p fqp)
 {
     flow_descriptor *flow_d = NULL;
     if (fqp->next == fqp)
     {
-        return (NULL);
+	return (NULL);
     }
     flow_d = qlist_entry(fqp->next, struct flow_descriptor, sched_queue_link);
     return (flow_d);

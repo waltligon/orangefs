@@ -39,28 +39,28 @@ static int pvfs2_readdir(
 
   restart_readdir:
 
-    pos = (PVFS_ds_position) file->f_pos;
+    pos = (PVFS_ds_position)file->f_pos;
     /* are we done? */
     if (pos == PVFS_READDIR_END)
     {
-        pvfs2_print
-            ("Skipping to graceful termination path since we are done\n");
+        pvfs2_print("Skipping to graceful termination path since we are done\n");
         pvfs2_inode->directory_version = 0;
-        pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
+        pvfs2_inode->num_readdir_retries =
+            PVFS2_NUM_READDIR_RETRIES;
         return 0;
     }
 
     pvfs2_print("pvfs2_readdir called on %s (pos=%d, "
-                "retry=%d, v=%llu)\n", dentry->d_name.name, (int) pos,
-                (int) pvfs2_inode->num_readdir_retries,
+                "retry=%d, v=%llu)\n", dentry->d_name.name, (int)pos,
+                (int)pvfs2_inode->num_readdir_retries,
                 llu(pvfs2_inode->directory_version));
 
     switch (pos)
     {
-        /*
-           if we're just starting, populate the "." and ".." entries
-           of the current directory; these always appear
-         */
+	/*
+	   if we're just starting, populate the "." and ".." entries
+	   of the current directory; these always appear
+	 */
     case 0:
         token_set = 1;
         if (pvfs2_inode->directory_version == 0)
@@ -74,7 +74,7 @@ static int pvfs2_readdir(
         }
         file->f_pos++;
         pos++;
-        /* drop through */
+    /* drop through */
     case 1:
         token_set = 1;
         if (pvfs2_inode->directory_version == 0)
@@ -88,48 +88,50 @@ static int pvfs2_readdir(
         }
         file->f_pos++;
         pos++;
-        /* drop through */
+	/* drop through */
     default:
-        /* handle the normal cases here */
-        new_op = op_alloc(PVFS2_VFS_OP_READDIR);
-        if (!new_op)
-        {
-            return -ENOMEM;
-        }
+	/* handle the normal cases here */
+	new_op = op_alloc(PVFS2_VFS_OP_READDIR);
+	if (!new_op)
+	{
+	    return -ENOMEM;
+	}
 
-        if (pvfs2_inode && pvfs2_inode->refn.handle && pvfs2_inode->refn.fs_id)
-        {
-            new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
-        }
-        else
-        {
-            new_op->upcall.req.readdir.refn.handle =
-                pvfs2_ino_to_handle(dentry->d_inode->i_ino);
-            new_op->upcall.req.readdir.refn.fs_id =
-                PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
-        }
-        new_op->upcall.req.readdir.max_dirent_count = MAX_DIRENT_COUNT;
+	if (pvfs2_inode && pvfs2_inode->refn.handle &&
+            pvfs2_inode->refn.fs_id)
+	{
+	    new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
+	}
+	else
+	{
+	    new_op->upcall.req.readdir.refn.handle =
+		pvfs2_ino_to_handle(dentry->d_inode->i_ino);
+	    new_op->upcall.req.readdir.refn.fs_id =
+		PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
+	}
+	new_op->upcall.req.readdir.max_dirent_count = MAX_DIRENT_COUNT;
 
-        /* NOTE:
-           the position we send to the readdir upcall is out of
-           sync with file->f_pos since pvfs2 doesn't include the
-           "." and ".." entries that we added above.
-         */
-        new_op->upcall.req.readdir.token =
+	/* NOTE:
+	   the position we send to the readdir upcall is out of
+	   sync with file->f_pos since pvfs2 doesn't include the
+	   "." and ".." entries that we added above.
+        */
+	new_op->upcall.req.readdir.token =
             (pos == 2 ? PVFS_READDIR_START : pos);
 
-        ret = service_operation(new_op, "pvfs2_readdir",
-                                get_interruptible_flag(dentry->d_inode));
+        ret = service_operation(
+            new_op, "pvfs2_readdir", 
+            get_interruptible_flag(dentry->d_inode));
 
-        pvfs2_print("Readdir downcall status is %d (dirent_count "
-                    "is %d)\n", new_op->downcall.status,
-                    new_op->downcall.resp.readdir.dirent_count);
+	pvfs2_print("Readdir downcall status is %d (dirent_count "
+		    "is %d)\n", new_op->downcall.status,
+		    new_op->downcall.resp.readdir.dirent_count);
 
-        if (new_op->downcall.status == 0)
-        {
-            int i = 0, len = 0;
-            ino_t current_ino = 0;
-            char *current_entry = NULL;
+	if (new_op->downcall.status == 0)
+	{
+	    int i = 0, len = 0;
+	    ino_t current_ino = 0;
+	    char *current_entry = NULL;
 
             if (new_op->downcall.resp.readdir.dirent_count == 0)
             {
@@ -166,16 +168,17 @@ static int pvfs2_readdir(
                             PVFS2_NUM_READDIR_RETRIES);
             }
 
-            for (i = 0; i < new_op->downcall.resp.readdir.dirent_count; i++)
-            {
+	    for (i = 0; i < new_op->downcall.resp.readdir.dirent_count; i++)
+	    {
                 len = new_op->downcall.resp.readdir.d_name_len[i];
-                current_entry = &new_op->downcall.resp.readdir.d_name[i][0];
+                current_entry =
+                    &new_op->downcall.resp.readdir.d_name[i][0];
                 current_ino =
-                    pvfs2_handle_to_ino(new_op->downcall.resp.readdir.refn[i].
-                                        handle);
+                    pvfs2_handle_to_ino(
+                        new_op->downcall.resp.readdir.refn[i].handle);
 
                 pvfs2_print("calling filldir for %s with len %d, pos %ld\n",
-                            current_entry, len, (unsigned long) pos);
+                        current_entry, len, (unsigned long) pos);
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
                 {
@@ -192,24 +195,23 @@ static int pvfs2_readdir(
                 pos++;
             }
             /* for the first time around, use the token teturned by the readdir response */
-            if (token_set == 1)
-            {
-                if (i == new_op->downcall.resp.readdir.dirent_count)
+            if (token_set == 1) {
+                if (i ==  new_op->downcall.resp.readdir.dirent_count)
                     file->f_pos = new_op->downcall.resp.readdir.token;
-                else
+                else 
                     file->f_pos = i;
             }
-            pvfs2_print("pos = %d, file->f_pos should have been %ld\n", pos,
-                        (unsigned long) file->f_pos);
-        }
+            pvfs2_print("pos = %d, file->f_pos should have been %ld\n", pos, 
+                    (unsigned long) file->f_pos);
+	}
         else
         {
             pvfs2_print("Failed to readdir (downcall status %d)\n",
                         new_op->downcall.status);
         }
 
-        op_release(new_op);
-        break;
+	op_release(new_op);
+	break;
     }
     pvfs2_print("pvfs2_readdir about to update_atime %p\n", dentry->d_inode);
 
@@ -220,17 +222,18 @@ static int pvfs2_readdir(
 #endif
 
 
-    pvfs2_print("pvfs2_readdir returning %d\n", ret);
+    pvfs2_print("pvfs2_readdir returning %d\n",ret);
     return ret;
 }
 
 /** PVFS2 implementation of VFS directory operations */
-struct file_operations pvfs2_dir_operations = {
+struct file_operations pvfs2_dir_operations =
+{
 #ifdef PVFS2_LINUX_KERNEL_2_4
-  read:generic_read_dir,
-  readdir:pvfs2_readdir,
-  open:pvfs2_file_open,
-  release:pvfs2_file_release
+    read : generic_read_dir,
+    readdir : pvfs2_readdir,
+    open : pvfs2_file_open,
+    release : pvfs2_file_release
 #else
     .read = generic_read_dir,
     .readdir = pvfs2_readdir,

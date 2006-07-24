@@ -22,9 +22,9 @@
 /* extra parameters provided to pvfs2 param proc handlers */
 struct pvfs2_param_extra
 {
-    int op;                     /* parameter type */
-    int min;                    /* minimum value */
-    int max;                    /* maximum value */
+    int op;  /* parameter type */
+    int min; /* minimum value */
+    int max; /* maximum value */
 };
 
 /* pvfs2_param_proc_handler()
@@ -34,23 +34,23 @@ struct pvfs2_param_extra
  */
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
 static int pvfs2_param_proc_handler(
-    ctl_table * ctl,
-    int write,
-    struct file *filp,
-    void *buffer,
-    size_t * lenp,
-    loff_t * ppos)
+    ctl_table       *ctl,
+    int             write,
+    struct file     *filp,
+    void            *buffer,
+    size_t          *lenp,
+    loff_t          *ppos)
 #else
 static int pvfs2_param_proc_handler(
-    ctl_table * ctl,
-    int write,
-    struct file *filp,
-    void *buffer,
-    size_t * lenp)
+    ctl_table       *ctl,
+    int             write,
+    struct file     *filp,
+    void            *buffer,
+    size_t          *lenp)
 #endif
-{
+{       
     pvfs2_kernel_op_t *new_op = NULL;
-    struct pvfs2_param_extra *extra = ctl->extra1;
+    struct pvfs2_param_extra* extra = ctl->extra1;
     int val = 0;
     int ret = 0;
     ctl_table tmp_ctl = *ctl;
@@ -67,7 +67,7 @@ static int pvfs2_param_proc_handler(
         return -ENOMEM;
     }
 
-    if (write)
+    if(write)
     {
         /* use generic proc handling function to retrive value to set */
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
@@ -75,10 +75,10 @@ static int pvfs2_param_proc_handler(
 #else
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp);
 #endif
-        if (ret != 0)
+        if(ret != 0)
         {
             op_release(new_op);
-            return (ret);
+            return(ret);
         }
         pvfs2_print("pvfs2: proc write %d\n", val);
         new_op->upcall.req.param.value = val;
@@ -93,12 +93,13 @@ static int pvfs2_param_proc_handler(
     new_op->upcall.req.param.op = extra->op;
 
     /* perform operation (get or set) */
-    ret = service_operation(new_op, "pvfs2_param", PVFS2_OP_INTERRUPTIBLE);
-
-    if (ret == 0 && !write)
+    ret = service_operation(new_op, "pvfs2_param",  
+        PVFS2_OP_INTERRUPTIBLE);
+    
+    if(ret == 0 && !write)
     {
         /* use generic proc handling function to output value */
-        val = (int) new_op->downcall.resp.param.value;
+        val = (int)new_op->downcall.resp.param.value;
         pvfs2_print("pvfs2: proc read %d\n", val);
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
@@ -108,42 +109,42 @@ static int pvfs2_param_proc_handler(
     }
 
     op_release(new_op);
-    return (ret);
+    return(ret);
 }
 
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
 static int pvfs2_acache_pc_proc_handler(
-    ctl_table * ctl,
-    int write,
-    struct file *filp,
-    void *buffer,
-    size_t * lenp,
-    loff_t * ppos)
+    ctl_table       *ctl,
+    int             write,
+    struct file     *filp,
+    void            *buffer,
+    size_t          *lenp,
+    loff_t          *ppos)
 #else
 static int pvfs2_acache_pc_proc_handler(
-    ctl_table * ctl,
-    int write,
-    struct file *filp,
-    void *buffer,
-    size_t * lenp)
+    ctl_table       *ctl,
+    int             write,
+    struct file     *filp,
+    void            *buffer,
+    size_t          *lenp)
 #endif
 {
     pvfs2_kernel_op_t *new_op = NULL;
     int ret;
     int pos = 0;
     int to_copy = 0;
-    int *pc_type = ctl->extra1;
+    int* pc_type = ctl->extra1;
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
     loff_t *offset = ppos;
 #else
     loff_t *offset = &filp->f_pos;
 #endif
 
-    if (write)
+    if(write)
     {
         /* don't allow writes to this file */
         *lenp = 0;
-        return (-EPERM);
+        return(-EPERM);
     }
 
     /* build an op structure to send request to pvfs2-client */
@@ -155,28 +156,28 @@ static int pvfs2_acache_pc_proc_handler(
     new_op->upcall.req.perf_count.type = *pc_type;
 
     /* retrieve performance counters */
-    ret = service_operation(new_op, "pvfs2_perf_count", PVFS2_OP_INTERRUPTIBLE);
+    ret = service_operation(new_op, "pvfs2_perf_count",
+         PVFS2_OP_INTERRUPTIBLE);
 
-    if (ret == 0)
+    if(ret == 0)
     {
         /* figure out how many bytes we will copy out */
         pos = strlen(new_op->downcall.resp.perf_count.buffer);
         to_copy = pos - *offset;
-        if (to_copy < 0)
+        if(to_copy < 0)
         {
             to_copy = 0;
         }
-        if (to_copy > *lenp)
+        if(to_copy > *lenp)
         {
             to_copy = *lenp;
         }
 
-        if (to_copy)
+        if(to_copy)
         {
             /* copy correct portion of the string buffer */
-            if (copy_to_user(buffer,
-                             (new_op->downcall.resp.perf_count.buffer +
-                              (*offset)), to_copy))
+            if(copy_to_user(buffer, 
+                (new_op->downcall.resp.perf_count.buffer+(*offset)), to_copy))
             {
                 ret = -EFAULT;
             }
@@ -197,7 +198,7 @@ static int pvfs2_acache_pc_proc_handler(
 
     op_release(new_op);
 
-    return (ret);
+    return(ret);
 }
 
 static struct ctl_table_header *fs_table_header = NULL;
@@ -237,54 +238,48 @@ static struct pvfs2_param_extra perf_reset_extra = {
     .min = 0,
     .max = 1,
 };
-static int min_debug[] = { 0 }, max_debug[] =
-
-{
-1};
-static int min_op_timeout_secs[] = { 0 }, max_op_timeout_secs[] =
-
-{
-INT_MAX};
+static int min_debug[] = {0}, max_debug[] = {1};
+static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
 static ctl_table pvfs2_acache_table[] = {
     /* controls acache timeout */
     {1, "timeout-msecs", NULL, sizeof(int), 0644, NULL,
-     &pvfs2_param_proc_handler, NULL, NULL, &acache_timeout_extra, NULL},
+        &pvfs2_param_proc_handler, NULL, NULL, &acache_timeout_extra, NULL},
     /* controls acache hard limit */
     {2, "hard-limit", NULL, sizeof(int), 0644, NULL,
-     &pvfs2_param_proc_handler, NULL, NULL, &acache_hard_extra, NULL},
+        &pvfs2_param_proc_handler, NULL, NULL, &acache_hard_extra, NULL},
     /* controls acache soft limit */
     {3, "soft-limit", NULL, sizeof(int), 0644, NULL,
-     &pvfs2_param_proc_handler, NULL, NULL, &acache_soft_extra, NULL},
+        &pvfs2_param_proc_handler, NULL, NULL, &acache_soft_extra, NULL},
     /* controls acache reclaim percentage */
-    {4, "reclaim-percentage", NULL, sizeof(int),
-     0644, NULL,
-     &pvfs2_param_proc_handler, NULL, NULL, &acache_rec_extra, NULL},
+    {4, "reclaim-percentage", NULL, sizeof(int), 
+        0644, NULL,
+        &pvfs2_param_proc_handler, NULL, NULL, &acache_rec_extra, NULL},
     {0}
 };
 static int acache_perf_count = PVFS2_PERF_COUNT_REQUEST_ACACHE;
 static ctl_table pvfs2_pc_table[] = {
     {1, "acache", NULL, 4096, 0444, NULL,
-     pvfs2_acache_pc_proc_handler, NULL, NULL, &acache_perf_count, NULL},
+        pvfs2_acache_pc_proc_handler, NULL, NULL, &acache_perf_count, NULL},
     {0}
 };
 static ctl_table pvfs2_table[] = {
     /* controls debugging level */
     {1, "debug", &debug, sizeof(int), 0644, NULL,
-     &proc_dointvec_minmax, &sysctl_intvec,
-     NULL, &min_debug, &max_debug},
+        &proc_dointvec_minmax, &sysctl_intvec,
+        NULL, &min_debug, &max_debug},
     /* operation timeout */
     {2, "op-timeout-secs", &op_timeout_secs, sizeof(int), 0644, NULL,
-     &proc_dointvec_minmax, &sysctl_intvec,
-     NULL, &min_op_timeout_secs, &max_op_timeout_secs},
+        &proc_dointvec_minmax, &sysctl_intvec,
+        NULL, &min_op_timeout_secs, &max_op_timeout_secs},
     /* time interval for client side performance counters */
     {3, "perf-time-interval-secs", NULL, sizeof(int), 0644, NULL,
-     &pvfs2_param_proc_handler, NULL, NULL, &perf_time_interval_extra, NULL},
+        &pvfs2_param_proc_handler, NULL, NULL, &perf_time_interval_extra, NULL},
     /* time interval for client side performance counters */
     {4, "perf-history-size", NULL, sizeof(int), 0644, NULL,
-     &pvfs2_param_proc_handler, NULL, NULL, &perf_history_size_extra, NULL},
+        &pvfs2_param_proc_handler, NULL, NULL, &perf_history_size_extra, NULL},
     /* reset performance counters */
     {5, "perf-counter-reset", NULL, sizeof(int), 0644, NULL,
-     &pvfs2_param_proc_handler, NULL, NULL, &perf_reset_extra, NULL},
+        &pvfs2_param_proc_handler, NULL, NULL, &perf_reset_extra, NULL},
     /* subdir for acache control */
     {6, "acache", NULL, 0, 0555, pvfs2_acache_table},
     {7, "perf-counters", NULL, 0, 0555, pvfs2_pc_table},
@@ -296,8 +291,7 @@ static ctl_table fs_table[] = {
 };
 #endif
 
-void pvfs2_proc_initialize(
-    void)
+void pvfs2_proc_initialize(void)
 {
 #ifdef CONFIG_SYSCTL
     if (!fs_table_header)
@@ -309,11 +303,10 @@ void pvfs2_proc_initialize(
     return;
 }
 
-void pvfs2_proc_finalize(
-    void)
+void pvfs2_proc_finalize(void)
 {
 #ifdef CONFIG_SYSCTL
-    if (fs_table_header)
+    if(fs_table_header) 
     {
         unregister_sysctl_table(fs_table_header);
         fs_table_header = NULL;

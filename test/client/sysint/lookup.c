@@ -16,13 +16,9 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
-void gen_rand_str(
-    int len,
-    char **gen_str);
+void gen_rand_str(int len, char** gen_str);
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc,char **argv)
 {
     int ret = -1;
     int follow_link = PVFS2_LOOKUP_LINK_NO_FOLLOW;
@@ -39,7 +35,8 @@ int main(
             goto lookup_continue;
         }
         printf("USAGE: %s /path/to/lookup [ 1 ]\n", argv[0]);
-        printf(" -- if '1' is the last argument, links " "will be followed\n");
+        printf(" -- if '1' is the last argument, links "
+               "will be followed\n");
         return 1;
     }
   lookup_continue:
@@ -52,25 +49,26 @@ int main(
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
 
     ret = PVFS_util_get_default_fsid(&fs_id);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_get_default_fsid", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
-    memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
+    memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
-    ret = PVFS_sys_lookup(fs_id, filename, &credentials, &resp_lk, follow_link);
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
+                          &resp_lk, follow_link);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
         PVFS_perror("PVFS_perror says", ret);
-        return (-1);
+        return(-1);
     }
 
     printf("Handle     : %llu\n", llu(resp_lk.ref.handle));

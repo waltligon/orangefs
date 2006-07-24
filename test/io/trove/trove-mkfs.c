@@ -15,13 +15,9 @@
 char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
 
-int parse_args(
-    int argc,
-    char **argv);
+int parse_args(int argc, char **argv);
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int ret, count;
     TROVE_op_id op_id;
@@ -36,43 +32,37 @@ int main(
     TROVE_context_id trove_context = -1;
 
     ret = parse_args(argc, argv);
-    if (ret < 0)
-    {
-        fprintf(stderr, "argument parsing failed.\n");
-        return -1;
+    if (ret < 0) {
+	fprintf(stderr, "argument parsing failed.\n");
+	return -1;
     }
 
     /* try to initialize; fails if storage space isn't there? */
     ret = trove_initialize(storage_space, 0, &method_name, 0);
-    if (ret < 0)
-    {
-        fprintf(stderr,
-                "warning: initialize failed.  trying to create storage space.\n");
+    if (ret < 0) {
+	fprintf(stderr, "warning: initialize failed.  trying to create storage space.\n");
 
-        /* create the storage space */
-        /* Q: what good is the op_id here if we have to match on coll_id in test fn? */
-        ret = trove_storage_create(storage_space, NULL, &op_id);
-        if (ret < 0)
-        {
-            fprintf(stderr, "storage create failed.\n");
-            return -1;
-        }
+	/* create the storage space */
+	/* Q: what good is the op_id here if we have to match on coll_id in test fn? */
+	ret = trove_storage_create(storage_space, NULL, &op_id);
+	if (ret < 0) {
+	    fprintf(stderr, "storage create failed.\n");
+	    return -1;
+	}
 
-        /* second try at initialize, in case it failed first try. */
-        ret = trove_initialize(storage_space, 0, &method_name, 0);
-        if (ret < 0)
-        {
-            fprintf(stderr, "initialized failed second time.\n");
-            return -1;
-        }
+	/* second try at initialize, in case it failed first try. */
+	ret = trove_initialize(storage_space, 0, &method_name, 0);
+	if (ret < 0) {
+	    fprintf(stderr, "initialized failed second time.\n");
+	    return -1;
+	}
     }
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
-    if (ret != -1)
-    {
-        fprintf(stderr, "collection lookup succeeded before it should.\n");
-        return -1;
+    if (ret != -1) {
+	fprintf(stderr, "collection lookup succeeded before it should.\n");
+	return -1;
     }
 
     ret = trove_open_context(coll_id, &trove_context);
@@ -85,10 +75,9 @@ int main(
     /* create the collection for the fs */
     /* Q: why do i get to pick the coll id?  so i can make it the same across nodes? */
     ret = trove_collection_create(file_system, FS_COLL_ID, NULL, &op_id);
-    if (ret < 0)
-    {
-        fprintf(stderr, "collection create (fs) failed.\n");
-        return -1;
+    if (ret < 0) {
+	fprintf(stderr, "collection create (fs) failed.\n");
+	return -1;
     }
 
     /* lookup collection.  this is redundant because we just gave it a coll. id to use,
@@ -96,10 +85,9 @@ int main(
      */
     /* NOTE: can't test on this because we still don't know a coll_id */
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
-    if (ret < 0)
-    {
-        fprintf(stderr, "collection lookup failed.\n");
-        return -1;
+    if (ret < 0) {
+	fprintf(stderr, "collection lookup failed.\n");
+	return -1;
     }
 
 
@@ -115,19 +103,19 @@ int main(
     extent_array.extent_array = &cur_extent;
     ret = trove_dspace_create(coll_id,
                               &extent_array,
-                              &root_handle,
-                              TROVE_TEST_DIR,
-                              NULL,
-                              (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
-                              NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-    {
-        fprintf(stderr, "dspace create (for root dir) failed.\n");
-        return -1;
+			      &root_handle,
+			      TROVE_TEST_DIR,
+			      NULL,
+			      (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
+			      NULL,
+                              trove_context,
+			      &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0) {
+	fprintf(stderr, "dspace create (for root dir) failed.\n");
+	return -1;
     }
 
     /* add attribute to collection for root handle */
@@ -139,20 +127,20 @@ int main(
     val.buffer_sz = sizeof(root_handle);
     ret = trove_collection_seteattr(coll_id, &key, &val,
                                     0, NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-    {
-        fprintf(stderr, "collection seteattr (for root handle) failed.\n");
-        return -1;
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0) {
+	fprintf(stderr, "collection seteattr (for root handle) failed.\n");
+	return -1;
     }
 
     /* add attribute to collection for last used handle ??? */
 
     printf("fs created (root handle = %d, coll id = %d, root string = %s)\n",
-           (int) root_handle, (int) coll_id, root_handle_string);
+	   (int) root_handle,
+	   (int) coll_id,
+	   root_handle_string);
 
     trove_close_context(coll_id, trove_context);
     trove_finalize();
@@ -160,26 +148,22 @@ int main(
     return 0;
 }
 
-int parse_args(
-    int argc,
-    char **argv)
+int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:c:")) != EOF)
-    {
-        switch (c)
-        {
-        case 's':
-            strncpy(storage_space, optarg, SSPACE_SIZE);
-            break;
-        case 'c':      /* collection */
-            strncpy(file_system, optarg, FS_SIZE);
-            break;
-        case '?':
-        default:
-            return -1;
-        }
+    while ((c = getopt(argc, argv, "s:c:")) != EOF) {
+	switch (c) {
+	    case 's':
+		strncpy(storage_space, optarg, SSPACE_SIZE);
+		break;
+	    case 'c': /* collection */
+		strncpy(file_system, optarg, FS_SIZE);
+		break;
+	    case '?':
+	    default:
+		return -1;
+	}
     }
     return 0;
 }

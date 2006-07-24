@@ -22,13 +22,13 @@ int main(
 
     for (i = 0; i < num_segments; i++)
     {
-        ret = PINT_get_path_element(path, i, segment, PVFS_SEGMENT_MAX);
-        if (ret < 0)
-        {
-            printf("errcode = %d\n", ret);
-            continue;
-        }
-        printf("segment = %s\n", segment);
+	ret = PINT_get_path_element(path, i, segment, PVFS_SEGMENT_MAX);
+	if (ret < 0)
+	{
+	    printf("errcode = %d\n", ret);
+	    continue;
+	}
+	printf("segment = %s\n", segment);
     }
 
     return 0;

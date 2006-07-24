@@ -13,12 +13,12 @@
 #include "dbpf-sync.h"
 
 static gen_mutex_t dbpf_context_mutex = GEN_MUTEX_INITIALIZER;
-dbpf_op_queue_s *dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+dbpf_op_queue_s * dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 int dbpf_open_context(
     TROVE_coll_id coll_id,
-    TROVE_context_id * context_id)
+    TROVE_context_id *context_id)
 {
     int context_index = 0;
     int ret = 0;
@@ -28,27 +28,29 @@ int dbpf_open_context(
     gen_mutex_lock(&dbpf_context_mutex);
 
     /* find an unused context id */
-    for (context_index = 0; context_index < TROVE_MAX_CONTEXTS; context_index++)
+    for(context_index = 0; context_index < TROVE_MAX_CONTEXTS;
+        context_index++)
     {
-        if (dbpf_completion_queue_array[context_index] == NULL)
-        {
-            break;
-        }
+	if (dbpf_completion_queue_array[context_index] == NULL)
+	{
+	    break;
+	}
     }
 
     if (context_index >= TROVE_MAX_CONTEXTS)
     {
-        /* we don't have any more available! */
-        gen_mutex_unlock(&dbpf_context_mutex);
-        return -EBUSY;
+	/* we don't have any more available! */
+	gen_mutex_unlock(&dbpf_context_mutex);
+	return -EBUSY;
     }
 
     /* create a new completion queue for the context */
-    dbpf_completion_queue_array[context_index] = dbpf_op_queue_new();
-    if (!dbpf_completion_queue_array[context_index])
+    dbpf_completion_queue_array[context_index] =
+        dbpf_op_queue_new();
+    if(!dbpf_completion_queue_array[context_index])
     {
-        gen_mutex_unlock(&dbpf_context_mutex);
-        return -ENOMEM;
+	gen_mutex_unlock(&dbpf_context_mutex);
+	return -ENOMEM;
     }
     dbpf_completion_queue_array_mutex[context_index] = gen_mutex_build();
     assert(dbpf_completion_queue_array_mutex[context_index]);
@@ -57,9 +59,9 @@ int dbpf_open_context(
     gen_mutex_unlock(&dbpf_context_mutex);
 
     ret = dbpf_sync_context_init(context_index);
-    if (ret < 0)
+    if(ret < 0)
     {
-        return ret;
+	return ret;
     }
 
 
@@ -74,8 +76,8 @@ int dbpf_close_context(
 
     if (!dbpf_completion_queue_array[context_id])
     {
-        gen_mutex_unlock(&dbpf_context_mutex);
-        return 1;
+	gen_mutex_unlock(&dbpf_context_mutex);
+	return 1;
     }
 
     gen_mutex_destroy(dbpf_completion_queue_array_mutex[context_id]);
@@ -95,7 +97,8 @@ int dbpf_close_context(
  * Structure holding pointers to all the context operations functions
  * for this storage interface implementation.
  */
-struct TROVE_context_ops dbpf_context_ops = {
+struct TROVE_context_ops dbpf_context_ops =
+{
     dbpf_open_context,
     dbpf_close_context
 };

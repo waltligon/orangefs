@@ -32,8 +32,7 @@ struct server_configuration_s *PINT_get_server_config_struct(
     return PINT_server_config_mgr_get_config(fs_id);
 }
 
-void PINT_put_server_config_struct(
-    struct server_configuration_s *config)
+void PINT_put_server_config_struct(struct server_configuration_s *config)
 {
     PINT_server_config_mgr_put_config(config);
 }
@@ -45,8 +44,7 @@ void PINT_put_server_config_struct(
 int PINT_check_perms(
     PVFS_object_attr attr,
     PVFS_permissions mode,
-    int uid,
-    int gid)
+    int uid, int gid)
 {
     return ((((attr.perms & mode) == mode) ||
              ((attr.group == gid) && (attr.perms & mode) == mode) ||
@@ -63,11 +61,11 @@ int PINT_check_perms(
 int PINT_lookup_parent(
     char *filename,
     PVFS_fs_id fs_id,
-    PVFS_credentials * credentials,
+    PVFS_credentials *credentials,
     PVFS_handle * handle)
 {
     int ret = -PVFS_EINVAL;
-    char buf[PVFS_SEGMENT_MAX] = { 0 };
+    char buf[PVFS_SEGMENT_MAX] = {0};
     PVFS_sysresp_lookup resp_look;
 
     memset(&resp_look, 0, sizeof(PVFS_sysresp_lookup));

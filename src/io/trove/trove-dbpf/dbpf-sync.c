@@ -16,27 +16,28 @@ enum s_sync_context_e
     COALESCE_CONTEXT_LAST = 2
 };
 
-static dbpf_sync_context_t
+static dbpf_sync_context_t 
     sync_array[COALESCE_CONTEXT_LAST][TROVE_MAX_CONTEXTS];
 
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 extern pthread_cond_t dbpf_op_completed_cond;
 
 static int dbpf_sync_db(
-    DB * dbp,
-    enum s_sync_context_e sync_context_type,
+    DB * dbp, 
+    enum s_sync_context_e sync_context_type, 
     dbpf_sync_context_t * sync_context)
 {
-    int ret;
+    int ret; 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]:\tcoalesce %d sync start "
                  "in coalesce_queue:%d pending:%d\n",
-                 sync_context_type, sync_context->coalesce_counter,
+                 sync_context_type, sync_context->coalesce_counter, 
                  sync_context->sync_counter);
     ret = dbp->sync(dbp, 0);
-    if (ret != 0)
+    if(ret != 0)
     {
-        gossip_err("db SYNC failed: %s\n", db_strerror(ret));
+        gossip_err("db SYNC failed: %s\n",
+                   db_strerror(ret));
         ret = -dbpf_db_error_to_trove_error(ret);
         return ret;
     }
@@ -46,12 +47,11 @@ static int dbpf_sync_db(
     return 0;
 }
 
-static int dbpf_sync_get_object_sync_context(
-    enum dbpf_op_type type)
+static int dbpf_sync_get_object_sync_context(enum dbpf_op_type type)
 {
     assert(DBPF_OP_IS_KEYVAL(type) || DBPF_OP_IS_DSPACE(type));
 
-    if (DBPF_OP_IS_KEYVAL(type))
+    if(DBPF_OP_IS_KEYVAL(type))
     {
         return COALESCE_CONTEXT_KEYVAL;
     }
@@ -61,32 +61,32 @@ static int dbpf_sync_get_object_sync_context(
     }
 }
 
-int dbpf_sync_context_init(
-    int context_index)
+int dbpf_sync_context_init(int context_index)
 {
     int c;
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: dbpf_sync_context_init for "
-                 "context %d called\n", context_index);
-    for (c = 0; c < COALESCE_CONTEXT_LAST; c++)
+                 "context %d called\n",
+                 context_index);
+    for(c=0; c < COALESCE_CONTEXT_LAST; c++)
     {
-        bzero(&sync_array[c][context_index], sizeof(dbpf_sync_context_t));
+        bzero(& sync_array[c][context_index], sizeof(dbpf_sync_context_t));
 
-        sync_array[c][context_index].mutex = gen_mutex_build();
+        sync_array[c][context_index].mutex      = gen_mutex_build();
         sync_array[c][context_index].sync_queue = dbpf_op_queue_new();
     }
 
     return 0;
 }
 
-void dbpf_sync_context_destroy(
-    int context_index)
+void dbpf_sync_context_destroy(int context_index)
 {
     int c;
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: dbpf_sync_context_destroy for "
-                 "context %d called\n", context_index);
-    for (c = 0; c < COALESCE_CONTEXT_LAST; c++)
+                 "context %d called\n",
+                 context_index);	
+    for(c=0; c < COALESCE_CONTEXT_LAST; c++)
     {
         gen_mutex_lock(sync_array[c][context_index].mutex);
         gen_mutex_destroy(sync_array[c][context_index].mutex);
@@ -94,17 +94,15 @@ void dbpf_sync_context_destroy(
     }
 }
 
-int dbpf_sync_coalesce(
-    dbpf_queued_op_t * qop_p,
-    int enqueue_possible,
+int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int enqueue_possible, 
     int ret_state)
-{
+{   
     int ret = 0;
-    DB *dbp = NULL;
-    dbpf_sync_context_t *sync_context;
+    DB * dbp = NULL;
+    dbpf_sync_context_t * sync_context;
     dbpf_queued_op_t *ready_op;
     enum s_sync_context_e sync_context_type;
-    struct dbpf_collection *coll = qop_p->op.coll_p;
+    struct dbpf_collection* coll = qop_p->op.coll_p;
     TROVE_context_id cid;
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
@@ -113,7 +111,7 @@ int dbpf_sync_coalesce(
     /*
      * Todo coalesce better in transaction mode
      */
-    if (coll->meta_sync_mode == TROVE_TRANS_MODE)
+    if ( coll->meta_sync_mode == TROVE_TRANS_MODE )
     {
         dbpf_move_op_to_completion_queue(qop_p, ret_state, OP_COMPLETED);
         return 0;
@@ -121,45 +119,44 @@ int dbpf_sync_coalesce(
 
     sync_context_type = dbpf_sync_get_object_sync_context(qop_p->op.type);
 
-    if (!(qop_p->op.flags & TROVE_SYNC))
-    {
+    if ( ! (qop_p->op.flags & TROVE_SYNC) ) {
         /*
          * No sync needed at all
          */
         dbpf_move_op_to_completion_queue(qop_p, ret_state, OP_COMPLETED);
         return 0;
     }
-
-    cid = qop_p->op.context_id;
+    
+    cid = qop_p->op.context_id; 
 
     /*
      * Now we now that this particular op is modifying
      */
-    sync_context = &sync_array[sync_context_type][cid];
+    sync_context = & sync_array[sync_context_type][cid];
 
-    if (sync_context_type == COALESCE_CONTEXT_DSPACE)
+    if( sync_context_type == COALESCE_CONTEXT_DSPACE )
     {
         dbp = qop_p->op.coll_p->ds_db;
     }
-    else if (sync_context_type == COALESCE_CONTEXT_KEYVAL)
+    else if( sync_context_type == COALESCE_CONTEXT_KEYVAL ) 
     {
         dbp = qop_p->op.coll_p->keyval_db;
     }
 
-    if (coll->meta_sync_mode == TROVE_SYNC_MODE_NONE)
+    if ( coll->meta_sync_mode == TROVE_SYNC_MODE_NONE )
     {
 
         dbpf_move_op_to_completion_queue(qop_p, ret_state, OP_COMPLETED);
         /*
          * Sync periodical if count < lw or if lw = 0 and count > hw 
          */
-        int do_sync = 0;
+        int do_sync=0;
 
         gen_mutex_lock(sync_context->mutex);
         sync_context->coalesce_counter++;
-        if ((coll->c_high_watermark > 0 &&
-             sync_context->coalesce_counter >= coll->c_high_watermark)
-            || sync_context->sync_counter < coll->c_low_watermark)
+        if( (coll->c_high_watermark > 0 && 
+             sync_context->coalesce_counter >= coll->c_high_watermark) 
+            || sync_context->sync_counter < coll->c_low_watermark )
         {
             gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                          "[SYNC_COALESCE]:\thigh or low watermark reached:\n"
@@ -168,12 +165,11 @@ int dbpf_sync_coalesce(
                          sync_context->sync_counter);
 
             sync_context->coalesce_counter = 0;
-            do_sync = 1;
+            do_sync = 1;      				
         }
         gen_mutex_unlock(sync_context->mutex);
 
-        if (do_sync)
-        {
+        if ( do_sync ) {
             ret = dbpf_sync_db(dbp, sync_context_type, sync_context);
         }
 
@@ -185,9 +181,9 @@ int dbpf_sync_coalesce(
      * coalesync. 
      */
     gen_mutex_lock(sync_context->mutex);
-    if (sync_context->sync_counter < coll->c_low_watermark
-        || (coll->c_high_watermark > 0 &&
-            sync_context->coalesce_counter >= coll->c_high_watermark))
+    if( sync_context->sync_counter < coll->c_low_watermark 
+        || ( coll->c_high_watermark > 0 && 
+          sync_context->coalesce_counter >= coll->c_high_watermark ) )
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]:\thigh or low watermark reached:\n"
@@ -201,39 +197,42 @@ int dbpf_sync_coalesce(
          */
         ret = dbpf_sync_db(dbp, sync_context_type, sync_context);
 
-        gen_mutex_lock(dbpf_completion_queue_array_mutex[cid]);
+        gen_mutex_lock(
+            dbpf_completion_queue_array_mutex[cid]);
 
-        assert(sync_context->coalesce_counter ==
-               sync_context->sync_queue->elems);
+        assert(
+            sync_context->coalesce_counter == sync_context->sync_queue->elems);
 
         /* move remaining ops in queue with ready-to-be-synced state
          * to completion queue
          */
-        while (!dbpf_op_queue_empty(sync_context->sync_queue))
+        while(!dbpf_op_queue_empty(sync_context->sync_queue))
         {
             ready_op = dbpf_op_pop_front_nolock(sync_context->sync_queue);
             dbpf_move_op_to_completion_queue_nolock(ready_op, 0, OP_COMPLETED);
         }
-
+        
         dbpf_move_op_to_completion_queue_nolock(qop_p, ret_state, OP_COMPLETED);
 
         sync_context->coalesce_counter = 0;
-
-        pthread_cond_signal(&dbpf_op_completed_cond);
-        gen_mutex_unlock(dbpf_completion_queue_array_mutex[cid]);
+        
+        pthread_cond_signal(& dbpf_op_completed_cond);
+        gen_mutex_unlock(
+            dbpf_completion_queue_array_mutex[cid]);
         ret = 1;
     }
-    else if (!enqueue_possible)
+    else if (! enqueue_possible)
     {
         dbpf_move_op_to_completion_queue(qop_p, ret_state, OP_COMPLETED);
     }
     else
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]:\tcoalescing %d op: %d\n",
+                     "[SYNC_COALESCE]:\tcoalescing %d op: %d\n", 
                      sync_context_type, sync_context->coalesce_counter);
 
-        dbpf_op_queue_add(sync_context->sync_queue, qop_p);
+        dbpf_op_queue_add(
+            sync_context->sync_queue, qop_p);
         sync_context->coalesce_counter++;
         ret = 0;
     }
@@ -242,28 +241,27 @@ int dbpf_sync_coalesce(
     return ret;
 }
 
-int dbpf_sync_coalesce_enqueue(
-    dbpf_queued_op_t * qop_p)
+int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
 {
-    dbpf_sync_context_t *sync_context;
+    dbpf_sync_context_t * sync_context;
     enum s_sync_context_e sync_context_type;
 
     if (!DBPF_OP_MODIFYING_META_OP(qop_p->op.type))
-    {
+    { 
         return 0;
-    }
+    } 
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: enqueue called\n");
 
     sync_context_type = dbpf_sync_get_object_sync_context(qop_p->op.type);
 
-    sync_context = &sync_array[sync_context_type][qop_p->op.context_id];
+    sync_context = & sync_array[sync_context_type][qop_p->op.context_id];
 
     gen_mutex_lock(sync_context->mutex);
 
-    if ((qop_p->op.flags & TROVE_SYNC))
-    {
+    if( (qop_p->op.flags & TROVE_SYNC) )
+    { 
         sync_context->sync_counter++;
     }
     else
@@ -281,26 +279,26 @@ int dbpf_sync_coalesce_enqueue(
 }
 
 int dbpf_sync_coalesce_dequeue(
-    dbpf_queued_op_t * qop_p)
+    dbpf_queued_op_t *qop_p)
 {
-    dbpf_sync_context_t *sync_context;
+    dbpf_sync_context_t * sync_context;
     enum s_sync_context_e sync_context_type;
 
     if (!DBPF_OP_MODIFYING_META_OP(qop_p->op.type))
-    {
+    { 
         return 0;
-    }
+    } 
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: dequeue called\n");
 
     sync_context_type = dbpf_sync_get_object_sync_context(qop_p->op.type);
 
-    sync_context = &sync_array[sync_context_type][qop_p->op.context_id];
+    sync_context = & sync_array[sync_context_type][qop_p->op.context_id];
 
     gen_mutex_lock(sync_context->mutex);
-    if ((qop_p->op.flags & TROVE_SYNC))
-    {
+    if( (qop_p->op.flags & TROVE_SYNC) )
+    { 
         sync_context->sync_counter--;
     }
     else
@@ -318,15 +316,13 @@ int dbpf_sync_coalesce_dequeue(
 }
 
 void dbpf_queued_op_set_sync_high_watermark(
-    int high,
-    struct dbpf_collection *coll)
+    int high, struct dbpf_collection* coll)
 {
     coll->c_high_watermark = high;
 }
 
 void dbpf_queued_op_set_sync_low_watermark(
-    int low,
-    struct dbpf_collection *coll)
+    int low, struct dbpf_collection* coll)
 {
     coll->c_low_watermark = low;
 }
@@ -338,4 +334,4 @@ void dbpf_queued_op_set_sync_low_watermark(
  * End:
  *
  * vim: ts=8 sts=4 sw=4 expandtab
- */
+ */ 

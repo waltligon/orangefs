@@ -12,16 +12,15 @@
 /** Return the distribution associated with the given identifier, or null
  *  if none exists.
  */
-PVFS_sys_dist *PVFS_sys_dist_lookup(
-    const char *dist_name)
+PVFS_sys_dist* PVFS_sys_dist_lookup(const char* dist_name)
 {
-    PVFS_sys_dist *sys_dist = 0;
+    PVFS_sys_dist* sys_dist = 0;
 
     if (0 != dist_name)
     {
         /* Construct a dummy dist to lookup the registered dist */
         PINT_dist template_dist;
-        template_dist.dist_name = (char *) dist_name;
+        template_dist.dist_name = (char*)dist_name;
         template_dist.params = 0;
         template_dist.methods = 0;
 
@@ -55,8 +54,7 @@ PVFS_sys_dist *PVFS_sys_dist_lookup(
 
 /** Free resources associated with this distribution.
  */
-PVFS_error PVFS_sys_dist_free(
-    PVFS_sys_dist * dist)
+PVFS_error PVFS_sys_dist_free(PVFS_sys_dist* dist)
 {
     if (0 != dist)
     {
@@ -70,9 +68,9 @@ PVFS_error PVFS_sys_dist_free(
 /** Set the named distribution parameter with the given value.
  */
 PVFS_error PVFS_sys_dist_setparam(
-    PVFS_sys_dist * dist,
-    const char *param,
-    void *value)
+    PVFS_sys_dist* dist,
+    const char* param,
+    void* value)
 {
     PVFS_error rc = -PVFS_EINVAL;
     if (0 != dist)
@@ -86,7 +84,8 @@ PVFS_error PVFS_sys_dist_setparam(
         if (0 == PINT_dist_lookup(&template_dist))
         {
             rc = template_dist.methods->set_param(dist->name,
-                                                  dist->params, param, value);
+                                                  dist->params,
+                                                  param, value);
             if (0 != rc)
             {
                 rc = -PVFS_EINVAL;

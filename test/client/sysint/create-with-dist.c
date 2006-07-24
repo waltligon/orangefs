@@ -16,25 +16,23 @@
 #include "pvfs2-dist-simple-stripe.h"
 #include "pvfs2-internal.h"
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int ret = -1;
-    char str_buf[256] = { 0 };
-    char *filename = (char *) 0;
+    char str_buf[256] = {0};
+    char *filename = (char *)0;
     PVFS_fs_id cur_fs;
     PVFS_sysresp_create resp_create;
-    char *entry_name;
+    char* entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sys_dist *dist = NULL;
     PVFS_size new_strip_size = 8192;
-
+    
     if (argc != 2)
     {
-        fprintf(stderr, "Usage: %s filename\n", argv[0]);
+        fprintf(stderr,"Usage: %s filename\n",argv[0]);
         return ret;
     }
     filename = argv[1];
@@ -42,24 +40,25 @@ int main(
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
     ret = PVFS_util_get_default_fsid(&cur_fs);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_get_default_fsid", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
-    if (PINT_remove_base_dir(filename, str_buf, 256))
+    if (PINT_remove_base_dir(filename,str_buf,256))
     {
         if (filename[0] != '/')
         {
             printf("You forgot the leading '/'\n");
         }
-        printf("Cannot retrieve entry name for creation on %s\n", filename);
-        return (-1);
+        printf("Cannot retrieve entry name for creation on %s\n",
+               filename);
+        return(-1);
     }
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
@@ -70,14 +69,15 @@ int main(
     attr.owner = credentials.uid;
     attr.group = credentials.gid;
     attr.perms = 1877;
-    attr.atime = attr.ctime = attr.mtime = time(NULL);
+    attr.atime = attr.ctime = attr.mtime = 
+	time(NULL);
 
-    ret = PINT_lookup_parent(filename, cur_fs, &credentials,
+    ret = PINT_lookup_parent(filename, cur_fs, &credentials, 
                              &parent_refn.handle);
-    if (ret < 0)
+    if(ret < 0)
     {
-        PVFS_perror("PVFS_util_lookup_parent", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_lookup_parent", ret);
+	return(-1);
     }
     parent_refn.fs_id = cur_fs;
 
@@ -100,21 +100,21 @@ int main(
         return -1;
     }
     /*printf("strip size: %i\n",
-       ((PVFS_simple_stripe_params*)dist->params)->strip_size); */
+      ((PVFS_simple_stripe_params*)dist->params)->strip_size);*/
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
                           &credentials, dist, &resp_create);
     if (ret < 0)
     {
         PVFS_perror("create failed with errcode", ret);
-        return (-1);
+        return(-1);
     }
 
     /* Free the distribution */
     PVFS_sys_dist_free(dist);
-
-    /* print the handle */
-    printf("--create--\n");
-    printf("Handle: %lld\n", lld(resp_create.ref.handle));
+    
+    /* print the handle */ 
+    printf("--create--\n"); 
+    printf("Handle: %lld\n",lld(resp_create.ref.handle));
 
     ret = PVFS_sys_finalize();
     if (ret < 0)
@@ -123,5 +123,5 @@ int main(
         return (-1);
     }
 
-    return (0);
+    return(0);
 }

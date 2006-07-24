@@ -14,9 +14,7 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int ret = -1;
     char *filename = NULL;
@@ -40,14 +38,14 @@ int main(
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
     ret = PVFS_util_get_default_fsid(&fs_id);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_get_default_fsid", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
     PVFS_util_gen_credentials(&credentials);
@@ -75,13 +73,13 @@ int main(
         return ret;
     }
 
-    r_atime = (time_t) resp_getattr.attr.atime;
-    r_mtime = (time_t) resp_getattr.attr.mtime;
-    r_ctime = (time_t) resp_getattr.attr.ctime;
+    r_atime = (time_t)resp_getattr.attr.atime;
+    r_mtime = (time_t)resp_getattr.attr.mtime;
+    r_ctime = (time_t)resp_getattr.attr.ctime;
 
     printf("Retrieved the following attributes\n");
     printf("Handle      : %llu\n", llu(pinode_refn.handle));
-    printf("FSID        : %d\n", (int) pinode_refn.fs_id);
+    printf("FSID        : %d\n", (int)pinode_refn.fs_id);
     printf("mask        : %d\n", resp_getattr.attr.mask);
     printf("uid         : %d\n", resp_getattr.attr.owner);
     printf("gid         : %d\n", resp_getattr.attr.group);
@@ -94,9 +92,9 @@ int main(
     resp_getattr.attr.mtime = time(NULL);
     resp_getattr.attr.mask &= ~PVFS_ATTR_SYS_TYPE;
     /*
-       explicitly set the PVFS_ATTR_COMMON_ATIME, since we
-       want to update the atime field in particular
-     */
+      explicitly set the PVFS_ATTR_COMMON_ATIME, since we
+      want to update the atime field in particular
+    */
     resp_getattr.attr.mask |= PVFS_ATTR_SYS_ATIME;
 
     /* use stored credentials here */
@@ -115,13 +113,13 @@ int main(
     {
         printf("setattr returned success\n");
 
-        r_atime = (time_t) resp_getattr.attr.atime;
-        r_mtime = (time_t) resp_getattr.attr.mtime;
-        r_ctime = (time_t) resp_getattr.attr.ctime;
+        r_atime = (time_t)resp_getattr.attr.atime;
+        r_mtime = (time_t)resp_getattr.attr.mtime;
+        r_ctime = (time_t)resp_getattr.attr.ctime;
 
         printf("Set the following attributes\n");
         printf("Handle      : %llu\n", llu(pinode_refn.handle));
-        printf("FSID        : %d\n", (int) pinode_refn.fs_id);
+        printf("FSID        : %d\n", (int)pinode_refn.fs_id);
         printf("mask        : %d\n", resp_getattr.attr.mask);
         printf("uid         : %d\n", resp_getattr.attr.owner);
         printf("gid         : %d\n", resp_getattr.attr.group);

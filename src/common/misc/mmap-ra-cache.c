@@ -18,12 +18,8 @@
 #include "mmap-ra-cache.h"
 #include "pvfs2-internal.h"
 
-static int hash_key(
-    void *key,
-    int table_size);
-static int hash_key_compare(
-    void *key,
-    struct qlist_head *link);
+static int hash_key(void *key, int table_size);
+static int hash_key_compare(void *key, struct qlist_head *link);
 
 static gen_mutex_t *s_mmap_ra_cache_mutex = NULL;
 static struct qhash_table *s_key_to_data_table = NULL;
@@ -33,15 +29,15 @@ static struct qhash_table *s_key_to_data_table = NULL;
 
 #define DEFAULT_MMAP_RA_CACHE_HTABLE_SIZE  19
 
-int pvfs2_mmap_ra_cache_initialize(
-    void)
+int pvfs2_mmap_ra_cache_initialize(void)
 {
     int ret = -1;
 
     if (!MMAP_RA_CACHE_INITIALIZED())
     {
-        s_key_to_data_table = qhash_init(hash_key_compare, hash_key,
-                                         DEFAULT_MMAP_RA_CACHE_HTABLE_SIZE);
+        s_key_to_data_table = qhash_init(
+            hash_key_compare, hash_key,
+            DEFAULT_MMAP_RA_CACHE_HTABLE_SIZE);
         if (!s_key_to_data_table)
         {
             goto return_error;
@@ -55,7 +51,8 @@ int pvfs2_mmap_ra_cache_initialize(
             goto return_error;
         }
 
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_initialized\n");
+        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                     "mmap_ra_cache_initialized\n");
         ret = 0;
     }
     else
@@ -69,10 +66,8 @@ int pvfs2_mmap_ra_cache_initialize(
     return ret;
 }
 
-int pvfs2_mmap_ra_cache_register(
-    PVFS_object_ref refn,
-    void *data,
-    int data_len)
+int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
+                                 void *data, int data_len)
 {
     int ret = -1;
     mmap_ra_cache_elem_t *cache_elem = NULL;
@@ -98,13 +93,15 @@ int pvfs2_mmap_ra_cache_register(
         cache_elem->data_sz = data_len;
 
         gen_mutex_lock(s_mmap_ra_cache_mutex);
-        qhash_add(s_key_to_data_table, &refn, &cache_elem->hash_link);
+        qhash_add(s_key_to_data_table,
+                  &refn, &cache_elem->hash_link);
         gen_mutex_unlock(s_mmap_ra_cache_mutex);
 
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Inserted mmap ra cache "
                      "element %llu, %d of size %llu\n",
                      llu(cache_elem->refn.handle),
-                     cache_elem->refn.fs_id, llu(cache_elem->data_sz));
+                     cache_elem->refn.fs_id,
+                     llu(cache_elem->data_sz));
 
         ret = 0;
     }
@@ -114,11 +111,8 @@ int pvfs2_mmap_ra_cache_register(
 }
 
 int pvfs2_mmap_ra_cache_get_block(
-    PVFS_object_ref refn,
-    PVFS_size offset,
-    PVFS_size len,
-    void *dest,
-    int *amt_returned)
+    PVFS_object_ref refn, PVFS_size offset,
+    PVFS_size len, void *dest, int *amt_returned)
 {
     int ret = -1;
     void *ptr = NULL;
@@ -131,17 +125,18 @@ int pvfs2_mmap_ra_cache_get_block(
         hash_link = qhash_search(s_key_to_data_table, &refn);
         if (hash_link)
         {
-            cache_elem =
-                qhash_entry(hash_link, mmap_ra_cache_elem_t, hash_link);
+            cache_elem = qhash_entry(
+                hash_link, mmap_ra_cache_elem_t, hash_link);
             assert(cache_elem);
 
             if (cache_elem->data_sz > (offset + len))
             {
                 gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                              "mmap_ra_cache_get_block got block at "
-                             "offset %llu, len %llu\n", llu(offset), llu(len));
+                             "offset %llu, len %llu\n",  llu(offset),
+                             llu(len));
 
-                ptr = (void *) (((char *) cache_elem->data + offset));
+                ptr = (void *)(((char *)cache_elem->data + offset));
                 memcpy(dest, ptr, len);
 
                 if (amt_returned)
@@ -152,21 +147,23 @@ int pvfs2_mmap_ra_cache_get_block(
             }
             else
             {
-                int actual_len = (int) ((offset + len) - cache_elem->data_sz);
+                int actual_len = (int)
+                    ((offset + len) - cache_elem->data_sz);
 
-                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                             "mmap_ra_cache_get_block "
-                             "found invalid block [%llu/%llu]\n", llu(offset),
-                             llu(len));
+                gossip_debug(
+                    GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
+                    "found invalid block [%llu/%llu]\n",
+                    llu(offset), llu(len));
 
                 if (actual_len > 0)
                 {
-                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %llu, "
-                                 "offset is %llu len is %llu\n\t(filling partial %d "
-                                 "bytes)\n", llu(cache_elem->data_sz),
-                                 llu(offset), llu(len), actual_len);
+                    gossip_debug(
+                        GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %llu, "
+                        "offset is %llu len is %llu\n\t(filling partial %d "
+                        "bytes)\n", llu(cache_elem->data_sz), llu(offset),
+                        llu(len), actual_len);
 
-                    ptr = (void *) (((char *) cache_elem->data + offset));
+                    ptr = (void *)(((char *)cache_elem->data + offset));
                     memcpy(dest, ptr, actual_len);
 
                     if (amt_returned)
@@ -179,16 +176,16 @@ int pvfs2_mmap_ra_cache_get_block(
         }
         else
         {
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
-                         "clean cache miss (nothing here)\n");
+            gossip_debug(
+                GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
+                "clean cache miss (nothing here)\n");
         }
         gen_mutex_unlock(s_mmap_ra_cache_mutex);
     }
     return ret;
 }
 
-int pvfs2_mmap_ra_cache_flush(
-    PVFS_object_ref refn)
+int pvfs2_mmap_ra_cache_flush(PVFS_object_ref refn)
 {
     int ret = -1;
     struct qlist_head *hash_link = NULL;
@@ -200,15 +197,16 @@ int pvfs2_mmap_ra_cache_flush(
         hash_link = qhash_search_and_remove(s_key_to_data_table, &refn);
         if (hash_link)
         {
-            cache_elem =
-                qhash_entry(hash_link, mmap_ra_cache_elem_t, hash_link);
+            cache_elem = qhash_entry(
+                hash_link, mmap_ra_cache_elem_t, hash_link);
             assert(cache_elem);
             assert(cache_elem->data);
 
             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Flushed mmap ra cache "
                          "element %llu, %d of size %llu\n",
                          llu(cache_elem->refn.handle),
-                         cache_elem->refn.fs_id, llu(cache_elem->data_sz));
+                         cache_elem->refn.fs_id,
+                         llu(cache_elem->data_sz));
 
             free(cache_elem->data);
             free(cache_elem);
@@ -219,8 +217,7 @@ int pvfs2_mmap_ra_cache_flush(
     return ret;
 }
 
-int pvfs2_mmap_ra_cache_finalize(
-    void)
+int pvfs2_mmap_ra_cache_finalize(void)
 {
     int ret = -1, i = 0;
 
@@ -230,16 +227,16 @@ int pvfs2_mmap_ra_cache_finalize(
     if (MMAP_RA_CACHE_INITIALIZED())
     {
         gen_mutex_lock(s_mmap_ra_cache_mutex);
-        for (i = 0; i < s_key_to_data_table->table_size; i++)
+        for(i = 0; i < s_key_to_data_table->table_size; i++)
         {
             do
             {
-                hash_link =
-                    qhash_search_and_remove_at_index(s_key_to_data_table, i);
+                hash_link = qhash_search_and_remove_at_index(
+                    s_key_to_data_table,i);
                 if (hash_link)
                 {
-                    cache_elem =
-                        qhash_entry(hash_link, mmap_ra_cache_elem_t, hash_link);
+                    cache_elem = qhash_entry(
+                        hash_link, mmap_ra_cache_elem_t, hash_link);
 
                     assert(cache_elem);
                     assert(cache_elem->data);
@@ -247,7 +244,7 @@ int pvfs2_mmap_ra_cache_finalize(
                     free(cache_elem->data);
                     free(cache_elem);
                 }
-            } while (hash_link);
+            } while(hash_link);
         }
 
         ret = 0;
@@ -269,17 +266,15 @@ int pvfs2_mmap_ra_cache_finalize(
  *
  * returns integer offset into table
  */
-static int hash_key(
-    void *key,
-    int table_size)
+static int hash_key(void *key, int table_size)
 {
     unsigned long tmp = 0;
-    PVFS_object_ref *refn = (PVFS_object_ref *) key;
+    PVFS_object_ref *refn = (PVFS_object_ref *)key;
 
     tmp += ((refn->handle << 2) | (refn->fs_id));
     tmp = (tmp % table_size);
 
-    return ((int) tmp);
+    return ((int)tmp);
 }
 
 /* hash_key_compare()
@@ -289,12 +284,10 @@ static int hash_key(
  *
  * returns 1 if match found, 0 otherwise
  */
-static int hash_key_compare(
-    void *key,
-    struct qlist_head *link)
+static int hash_key_compare(void *key, struct qlist_head *link)
 {
     mmap_ra_cache_elem_t *cache_elem = NULL;
-    PVFS_object_ref *refn = (PVFS_object_ref *) key;
+    PVFS_object_ref *refn = (PVFS_object_ref *)key;
 
     cache_elem = qlist_entry(link, mmap_ra_cache_elem_t, hash_link);
     assert(cache_elem);

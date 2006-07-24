@@ -20,5 +20,6 @@ indent --brace-indent0 \
        --cuddle-do-while \
        --no-space-after-function-call-names \
        --dont-break-procedure-type \
+       -st \
        -nut \
        $@

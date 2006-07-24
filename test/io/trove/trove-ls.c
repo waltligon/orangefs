@@ -19,17 +19,13 @@ char file_system[FS_SIZE] = "fs-foo";
 char path_to_dir[PATH_SIZE] = "/";
 TROVE_handle requested_file_handle = 4095;
 
-int parse_args(
-    int argc,
-    char **argv);
+int parse_args(int argc, char **argv);
 
 #define KEYVAL_ARRAY_LEN 10
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
-    int ret, it_ret, ga_ret, num_processed, count, i, j;
+    int ret, it_ret, ga_ret, num_processed, count, i,j;
     TROVE_op_id op_id;
     TROVE_coll_id coll_id;
     TROVE_handle handle;
@@ -45,25 +41,22 @@ int main(
     char ls_name[KEYVAL_ARRAY_LEN][PATH_SIZE];
 
     ret = parse_args(argc, argv);
-    if (ret < 0)
-    {
-        fprintf(stderr, "argument parsing failed.\n");
-        return -1;
+    if (ret < 0) {
+	fprintf(stderr, "argument parsing failed.\n");
+	return -1;
     }
 
     ret = trove_initialize(storage_space, 0, &method_name, 0);
-    if (ret < 0)
-    {
-        fprintf(stderr, "initialize failed.\n");
-        return -1;
+    if (ret < 0) {
+	fprintf(stderr, "initialize failed.\n");
+	return -1;
     }
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
-    if (ret < 0)
-    {
-        fprintf(stderr, "collection lookup failed.\n");
-        return -1;
+    if (ret < 0) {
+	fprintf(stderr, "collection lookup failed.\n");
+	return -1;
     }
 
     ret = trove_open_context(coll_id, &trove_context);
@@ -80,25 +73,26 @@ int main(
 
     /* find the directory handle */
     ret = path_lookup(coll_id, path_name, &handle);
-    if (ret < 0)
-    {
-        return -1;
+    if (ret < 0) {
+	return -1;
     }
 
     /* TODO: verify that this is in fact a directory! */
-    ret = trove_dspace_getattr(coll_id, handle, &s_attr, 0 /* flags */ ,
-                               NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-        return -1;
+    ret = trove_dspace_getattr(coll_id,
+			       handle,
+			       &s_attr,
+			       0 /* flags */,
+			       NULL,
+                               trove_context,
+			       &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0) return -1;
 
-    if (s_attr.type != TROVE_TEST_DIR)
-    {
-        fprintf(stderr, "%s is not a directory.\n", path_name);
-        return -1;
+    if (s_attr.type != TROVE_TEST_DIR) {
+	fprintf(stderr, "%s is not a directory.\n", path_name);
+	return -1;
     }
 
     /* iterate through keyvals in directory */
@@ -108,95 +102,91 @@ int main(
      * calling trove_keval_iterate: if it is different, that means EOF reached
      */
 
-    for (j = 0; j < KEYVAL_ARRAY_LEN; j++)
-    {
-        key[j].buffer = ls_name[j];
-        key[j].buffer_sz = PATH_SIZE;
-        val[j].buffer = &ls_handle[j];
-        val[j].buffer_sz = sizeof(ls_handle);
+    for (j=0; j< KEYVAL_ARRAY_LEN; j++ ) {
+	    key[j].buffer = ls_name[j];
+	    key[j].buffer_sz = PATH_SIZE;
+	    val[j].buffer = &ls_handle[j]; 
+	    val[j].buffer_sz = sizeof(ls_handle);
     }
 
-    for (;;)
-    {
-        num_processed = KEYVAL_ARRAY_LEN;
-        it_ret = trove_keyval_iterate(coll_id,
-                                      handle,
-                                      &pos,
-                                      key,
-                                      val,
-                                      &num_processed,
-                                      0, NULL, NULL, trove_context, &op_id);
-        if (it_ret == -1)
-            return -1;
+    for (;;) {
+	num_processed = KEYVAL_ARRAY_LEN;
+	it_ret = trove_keyval_iterate(coll_id,
+				      handle,
+				      &pos,
+				      key,
+				      val,
+				      &num_processed,
+				      0,
+				      NULL,
+				      NULL, 
+                                      trove_context,
+				      &op_id);
+	if (it_ret == -1) return -1;
 
-        while (it_ret == 0)
-            it_ret =
-                trove_dspace_test(coll_id, op_id, trove_context, &count, NULL,
-                                  NULL, &state, TROVE_DEFAULT_TEST_TIMEOUT);
-        if (it_ret < 0)
-            return -1;
+	while (it_ret == 0) it_ret = trove_dspace_test(
+            coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
+	if (it_ret < 0) return -1;
+	
+	if (num_processed == 0) return 0;
+	
+	for(i = 0; i < num_processed; i++ ) {
+	    TROVE_ds_attributes_s ds_attr;
 
-        if (num_processed == 0)
-            return 0;
+	    ga_ret = trove_dspace_getattr(coll_id,
+					  ls_handle[i],
+					  &ds_attr,
+					  0 /* flags */,
+					  NULL,
+                                          trove_context,
+					  &op_id);
+	    if (ga_ret == -1) return -1;
+	    count = 1;
+	    while (ga_ret == 0) ga_ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+                TROVE_DEFAULT_TEST_TIMEOUT);
 
-        for (i = 0; i < num_processed; i++)
-        {
-            TROVE_ds_attributes_s ds_attr;
+	    printf("%s/%s (handle = %llu, uid = %d, gid = %d, perm = %o, type = %d, b_size = %d)\n",
+		   path_name,
+		   (char *) key[i].buffer,
+		   llu(*(TROVE_handle *) val[i].buffer),
+		   (int) ds_attr.uid,
+		   (int) ds_attr.gid,
+		   ds_attr.mode,
+		   ds_attr.type,
+		   (int) ds_attr.b_size);
+	    
 
-            ga_ret = trove_dspace_getattr(coll_id,
-                                          ls_handle[i],
-                                          &ds_attr, 0 /* flags */ ,
-                                          NULL, trove_context, &op_id);
-            if (ga_ret == -1)
-                return -1;
-            count = 1;
-            while (ga_ret == 0)
-                ga_ret =
-                    trove_dspace_test(coll_id, op_id, trove_context, &count,
-                                      NULL, NULL, &state,
-                                      TROVE_DEFAULT_TEST_TIMEOUT);
-
-            printf
-                ("%s/%s (handle = %llu, uid = %d, gid = %d, perm = %o, type = %d, b_size = %d)\n",
-                 path_name, (char *) key[i].buffer,
-                 llu(*(TROVE_handle *) val[i].buffer), (int) ds_attr.uid,
-                 (int) ds_attr.gid, ds_attr.mode, ds_attr.type,
-                 (int) ds_attr.b_size);
-
-
-        }
+	}
     }
 
     trove_close_context(coll_id, trove_context);
     trove_finalize();
-
+    
     return 0;
 }
 
-int parse_args(
-    int argc,
-    char **argv)
+int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:c:p:")) != EOF)
-    {
-        switch (c)
-        {
-        case 's':
-            strncpy(storage_space, optarg, SSPACE_SIZE);
-            break;
-        case 'c':      /* collection */
-            strncpy(file_system, optarg, FS_SIZE);
-            break;
-        case 'p':
-            strncpy(path_to_dir, optarg, PATH_SIZE);
-            break;
-        case '?':
-        default:
-            fprintf(stderr, "%s: [-c collection] [-p path]\n", argv[0]);
-            return -1;
-        }
+    while ((c = getopt(argc, argv, "s:c:p:")) != EOF) {
+	switch (c) {
+	    case 's':
+		strncpy(storage_space, optarg, SSPACE_SIZE);
+		break;
+	    case 'c': /* collection */
+		strncpy(file_system, optarg, FS_SIZE);
+		break;
+	    case 'p':
+		strncpy(path_to_dir, optarg, PATH_SIZE);
+		break;
+	    case '?':
+	    default:
+		fprintf(stderr, "%s: [-c collection] [-p path]\n", argv[0]);
+		return -1;
+	}
     }
     return 0;
 }

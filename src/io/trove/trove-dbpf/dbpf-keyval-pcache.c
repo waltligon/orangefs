@@ -34,45 +34,46 @@ struct dbpf_keyval_pcache_entry
 };
 
 static int dbpf_keyval_pcache_compare(
-    void *key,
-    struct qhash_head *link);
+    void * key, struct qhash_head * link);
 static int dbpf_keyval_pcache_hash(
-    void *key,
-    int size);
+    void * key, int size);
 static int dbpf_keyval_pcache_entry_free(
-    void *entry);
+    void * entry);
 
-PINT_dbpf_keyval_pcache *PINT_dbpf_keyval_pcache_initialize(
-    void)
+PINT_dbpf_keyval_pcache * PINT_dbpf_keyval_pcache_initialize(void)
 {
-    PINT_dbpf_keyval_pcache *cache;
+    PINT_dbpf_keyval_pcache * cache;
 
     cache = malloc(sizeof(PINT_dbpf_keyval_pcache));
-    if (!cache)
+    if(!cache)
     {
         return NULL;
     }
-
+    
     cache->mutex = gen_mutex_build();
     gen_mutex_init(cache->mutex);
 
-    cache->tcache = PINT_tcache_initialize(dbpf_keyval_pcache_compare,
-                                           dbpf_keyval_pcache_hash,
-                                           dbpf_keyval_pcache_entry_free,
-                                           DBPF_KEYVAL_PCACHE_TABLE_SIZE);
-    if (!cache->tcache)
+    cache->tcache = PINT_tcache_initialize(
+        dbpf_keyval_pcache_compare,
+        dbpf_keyval_pcache_hash,
+        dbpf_keyval_pcache_entry_free,
+        DBPF_KEYVAL_PCACHE_TABLE_SIZE);
+    if(!cache->tcache)
     {
         return NULL;
     }
 
-    PINT_tcache_set_info(cache->tcache, TCACHE_ENABLE_EXPIRATION, 0);
     PINT_tcache_set_info(cache->tcache,
-                         TCACHE_HARD_LIMIT, DBPF_KEYVAL_PCACHE_HARD_LIMIT);
+                         TCACHE_ENABLE_EXPIRATION,
+                         0);
+    PINT_tcache_set_info(cache->tcache,
+                         TCACHE_HARD_LIMIT,
+                         DBPF_KEYVAL_PCACHE_HARD_LIMIT);
 
 
     return cache;
 }
-
+    
 void PINT_dbpf_keyval_pcache_finalize(
     PINT_dbpf_keyval_pcache * cache)
 {
@@ -82,21 +83,20 @@ void PINT_dbpf_keyval_pcache_finalize(
 }
 
 static int dbpf_keyval_pcache_compare(
-    void *key,
-    struct qhash_head *link)
+    void * key, struct qhash_head * link)
 {
-    struct dbpf_keyval_pcache_key *key_entry =
-        (struct dbpf_keyval_pcache_key *) key;
-    struct dbpf_keyval_pcache_entry *link_entry =
+    struct dbpf_keyval_pcache_key * key_entry = 
+        (struct dbpf_keyval_pcache_key *)key;
+    struct dbpf_keyval_pcache_entry * link_entry =
         (struct dbpf_keyval_pcache_entry *)
         (qhash_entry(link, struct PINT_tcache_entry, hash_link))->payload;
 
-    if (key_entry->handle == link_entry->handle &&
-        key_entry->pos == link_entry->pos)
+    if(key_entry->handle == link_entry->handle &&
+       key_entry->pos == link_entry->pos) 
         return 1;
     return 0;
 }
-
+    
 /* hash from http://burtleburtle.net/bob/hash/evahash.html */
 #define mix(a,b,c) \
 do { \
@@ -112,33 +112,32 @@ do { \
 } while(0)
 
 static int dbpf_keyval_pcache_hash(
-    void *key,
-    int size)
+    void * key, int size)
 {
-    struct dbpf_keyval_pcache_entry *key_entry =
-        (struct dbpf_keyval_pcache_entry *) key;
+    struct dbpf_keyval_pcache_entry * key_entry =
+        (struct dbpf_keyval_pcache_entry *)key;
 
-    uint32_t a = (uint32_t) (key_entry->handle >> 32);
-    uint32_t b = (uint32_t) (key_entry->handle & 0x00000000FFFFFFFF);
-    uint32_t c = (uint32_t) (key_entry->pos);
+    uint32_t a = (uint32_t)(key_entry->handle >> 32);
+    uint32_t b = (uint32_t)(key_entry->handle & 0x00000000FFFFFFFF);
+    uint32_t c = (uint32_t)(key_entry->pos);
 
-    mix(a, b, c);
-    return (int) (c & (DBPF_KEYVAL_PCACHE_TABLE_SIZE - 1));
+    mix(a,b,c);
+    return (int)(c & (DBPF_KEYVAL_PCACHE_TABLE_SIZE-1));
 }
 
 static int dbpf_keyval_pcache_entry_free(
-    void *entry)
+    void * entry)
 {
     free(entry);
     return 0;
 }
 
 int PINT_dbpf_keyval_pcache_lookup(
-    PINT_dbpf_keyval_pcache * pcache,
+    PINT_dbpf_keyval_pcache *pcache,
     TROVE_handle handle,
     TROVE_ds_position pos,
-    const char **keyname,
-    int *length)
+    const char ** keyname,
+    int * length)
 {
     struct PINT_tcache_entry *entry;
     struct dbpf_keyval_pcache_key key;
@@ -146,22 +145,24 @@ int PINT_dbpf_keyval_pcache_lookup(
 
     key.handle = handle;
     key.pos = pos;
-
+    
     gen_mutex_lock(pcache->mutex);
-    ret = PINT_tcache_lookup(pcache->tcache, (void *) &key, &entry, &status);
-    if (ret != 0)
+    ret = PINT_tcache_lookup(pcache->tcache, (void *)&key, &entry, &status);
+    if(ret != 0)
     {
-        if (ret == -PVFS_ENOENT)
+        if(ret == -PVFS_ENOENT)
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache NOTFOUND: "
-                         "handle: %llu, pos: %d\n", llu(handle), pos);
+                         "handle: %llu, pos: %d\n",
+                         llu(handle), pos);
         }
         else
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache failed: (error %d): "
-                         "handle: %llu, pos: %d\n", ret, llu(handle), pos);
+                         "handle: %llu, pos: %d\n",
+                         ret, llu(handle), pos);
         }
 
         gen_mutex_unlock(pcache->mutex);
@@ -169,8 +170,8 @@ int PINT_dbpf_keyval_pcache_lookup(
     }
     gen_mutex_unlock(pcache->mutex);
 
-    *keyname = ((struct dbpf_keyval_pcache_entry *) entry->payload)->keyname;
-    *length = ((struct dbpf_keyval_pcache_entry *) entry->payload)->keylen;
+    *keyname = ((struct dbpf_keyval_pcache_entry *)entry->payload)->keyname;
+    *length = ((struct dbpf_keyval_pcache_entry *)entry->payload)->keylen;
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache lookup succeeded: "
@@ -180,22 +181,22 @@ int PINT_dbpf_keyval_pcache_lookup(
     return 0;
 }
 
-int PINT_dbpf_keyval_pcache_insert(
-    PINT_dbpf_keyval_pcache * pcache,
+int PINT_dbpf_keyval_pcache_insert( 
+    PINT_dbpf_keyval_pcache *pcache,
     TROVE_handle handle,
     TROVE_ds_position pos,
-    const char *keyname,
+    const char * keyname,
     int length)
 {
     struct dbpf_keyval_pcache_entry *entry;
     struct dbpf_keyval_pcache_key key;
-    struct PINT_tcache_entry *tentry;
+    struct PINT_tcache_entry * tentry;
     int lookup_status;
     int ret;
     int removed;
-
+    
     entry = malloc(sizeof(struct dbpf_keyval_pcache_entry));
-    if (!entry)
+    if(!entry)
     {
         return -PVFS_ENOMEM;
     }
@@ -204,8 +205,8 @@ int PINT_dbpf_keyval_pcache_insert(
     key.pos = pos;
 
     gen_mutex_lock(pcache->mutex);
-    if (PINT_tcache_lookup
-        (pcache->tcache, (void *) &key, &tentry, &lookup_status) == 0)
+    if(PINT_tcache_lookup(
+            pcache->tcache, (void *)&key, &tentry, &lookup_status) == 0)
     {
         /* remove entry that already exists */
         PINT_tcache_delete(pcache->tcache, tentry);
@@ -216,8 +217,11 @@ int PINT_dbpf_keyval_pcache_insert(
     memcpy(entry->keyname, keyname, length);
     entry->keylen = length;
 
-    ret = PINT_tcache_insert_entry(pcache->tcache, &key, entry, &removed);
-    if (ret != 0)
+    ret = PINT_tcache_insert_entry(pcache->tcache,
+                                   &key,
+                                   entry,
+                                   &removed);
+    if(ret != 0)
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "Trove KeyVal pcache insert failed: (error: %d) "
@@ -237,7 +241,7 @@ int PINT_dbpf_keyval_pcache_insert(
 
     return 0;
 }
-
+    
 /*
  * Local variables:
  *  c-indent-level: 4

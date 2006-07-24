@@ -14,19 +14,18 @@
 #include "pvfs2-internal.h"
 
 /* should return 1 if dentry can still be trusted, else 0 */
-static int pvfs2_d_revalidate_common(
-    struct dentry *dentry)
+static int pvfs2_d_revalidate_common(struct dentry* dentry)
 {
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
-    struct inode *parent_inode = NULL;
+    struct inode *parent_inode = NULL; 
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL;
 
     pvfs2_print("pvfs2_d_revalidate_common: called on dentry %p.\n", dentry);
 
     /* find parent inode */
-    if (dentry && dentry->d_parent)
+    if(dentry && dentry->d_parent)
     {
         pvfs2_print("pvfs2_d_revalidate_common: parent found.\n");
         parent_inode = dentry->d_parent->d_inode;
@@ -35,14 +34,14 @@ static int pvfs2_d_revalidate_common(
     {
         pvfs2_print("pvfs2_d_revalidate_common: parent not found.\n");
     }
-
+    
     if (inode && parent_inode)
     {
         /* first perform a lookup to make sure that the object not only
          * exists, but is still in the expected place in the name space 
          */
-        if (!(PVFS2_SB(inode->i_sb)->root_handle ==
-              pvfs2_ino_to_handle(inode->i_ino)))
+        if(!(PVFS2_SB(inode->i_sb)->root_handle ==
+            pvfs2_ino_to_handle(inode->i_ino)))
         {
             pvfs2_print("pvfs2_d_revalidate_common: attempting lookup.\n");
             new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
@@ -66,31 +65,30 @@ static int pvfs2_d_revalidate_common(
             strncpy(new_op->upcall.req.lookup.d_name,
                     dentry->d_name.name, PVFS2_NAME_LEN);
 
-            ret = service_operation(new_op, "pvfs2_lookup",
-                                    get_interruptible_flag(parent_inode));
+            ret = service_operation(
+                new_op, "pvfs2_lookup", 
+                get_interruptible_flag(parent_inode));
 
-            if ((new_op->downcall.status != 0) ||
-                (new_op->downcall.resp.lookup.refn.handle !=
-                 pvfs2_ino_to_handle(inode->i_ino)))
+            if((new_op->downcall.status != 0) ||
+               (new_op->downcall.resp.lookup.refn.handle !=
+               pvfs2_ino_to_handle(inode->i_ino)))
             {
-                pvfs2_print
-                    ("pvfs2_d_revalidate_common: lookup failure or no match.\n");
+                pvfs2_print("pvfs2_d_revalidate_common: lookup failure or no match.\n");
                 op_release(new_op);
-                return (0);
+                return(0);
             }
-
+            
             op_release(new_op);
         }
         else
         {
-            pvfs2_print
-                ("pvfs2_d_revalidate_common: root handle, lookup skipped.\n");
+            pvfs2_print("pvfs2_d_revalidate_common: root handle, lookup skipped.\n");
         }
 
         /* now perform revalidation */
-        pvfs2_print(" (inode %llu)\n", llu(pvfs2_ino_to_handle(inode->i_ino)));
-        pvfs2_print
-            ("pvfs2_d_revalidate_common: calling pvfs2_internal_revalidate().\n");
+        pvfs2_print(" (inode %llu)\n",
+                    llu(pvfs2_ino_to_handle(inode->i_ino)));
+        pvfs2_print("pvfs2_d_revalidate_common: calling pvfs2_internal_revalidate().\n");
         ret = pvfs2_internal_revalidate(inode);
     }
     else
@@ -106,7 +104,7 @@ static int pvfs2_d_revalidate(
     struct dentry *dentry,
     int flags)
 {
-    return (pvfs2_d_revalidate_common(dentry));
+    return(pvfs2_d_revalidate_common(dentry));
 }
 
 #else
@@ -118,13 +116,14 @@ static int pvfs2_d_revalidate(
     struct nameidata *nd)
 {
 
-    if (nd && (nd->flags & LOOKUP_FOLLOW) && (!nd->flags & LOOKUP_CREATE))
+    if (nd && (nd->flags & LOOKUP_FOLLOW) &&
+        (!nd->flags & LOOKUP_CREATE))
     {
         pvfs2_print("\npvfs2_d_revalidate: Trusting intent; "
                     "skipping getattr\n");
         return 1;
     }
-    return (pvfs2_d_revalidate_common(dentry));
+    return(pvfs2_d_revalidate_common(dentry));
 }
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
@@ -158,7 +157,8 @@ static int pvfs2_d_compare(
 }
 
 /** PVFS2 implementation of VFS dentry operations */
-struct dentry_operations pvfs2_dentry_operations = {
+struct dentry_operations pvfs2_dentry_operations =
+{
     .d_revalidate = pvfs2_d_revalidate,
     .d_hash = pvfs2_d_hash,
     .d_compare = pvfs2_d_compare,

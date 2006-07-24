@@ -379,9 +379,11 @@ static void gui_details_view_insert(
                        &iter,
                        GUI_DETAILS_NAME,
                        s_stat->bmi_address,
-                       GUI_DETAILS_RAM_TOT, fmtbuf[GUI_DETAILS_RAM_TOT],
+                       GUI_DETAILS_RAM_TOT,
+                       fmtbuf[GUI_DETAILS_RAM_TOT],
 #ifndef __KARMA_DISABLE_MEM_USAGE__
-                       GUI_DETAILS_RAM_AVAIL, fmtbuf[GUI_DETAILS_RAM_AVAIL],
+                       GUI_DETAILS_RAM_AVAIL,
+                       fmtbuf[GUI_DETAILS_RAM_AVAIL],
 #endif
                        GUI_DETAILS_UPTIME,
                        fmtbuf[GUI_DETAILS_UPTIME],

@@ -21,10 +21,7 @@ DECLARE_ERRNO_MAPPING_AND_FN();
   the pvfs analog to strerror_r that handles PVFS_error codes as well
   as errno error codes
 */
-int PVFS_strerror_r(
-    int errnum,
-    char *buf,
-    int n)
+int PVFS_strerror_r(int errnum, char *buf, int n)
 {
     int ret = 0;
     int limit = PVFS_util_min(n, MAX_PVFS_STRERROR_LEN);
@@ -40,12 +37,12 @@ int PVFS_strerror_r(
         char *tmpbuf = strerror_r(tmp, buf, limit);
         if (tmpbuf && (strcmp(tmpbuf, buf)))
         {
-            limit = PVFS_util_min(limit, strlen(tmpbuf) + 1);
-            strncpy(buf, tmpbuf, (size_t) limit);
+            limit = PVFS_util_min(limit, strlen(tmpbuf)+1);
+            strncpy(buf, tmpbuf, (size_t)limit);
         }
         ret = (tmpbuf ? 0 : -1);
 #else
-        ret = strerror_r(tmp, buf, (size_t) limit);
+	ret = strerror_r(tmp, buf, (size_t)limit);
 #endif
     }
     return ret;
@@ -58,28 +55,27 @@ int PVFS_strerror_r(
  * prints a warning if the error code is not in a pvfs2 format and
  * assumes errno
  */
-void PVFS_perror(
-    const char *text,
-    int retcode)
+void PVFS_perror(const char *text, int retcode)
 {
     if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
     {
-        char buf[MAX_PVFS_STRERROR_LEN] = { 0 };
+        char buf[MAX_PVFS_STRERROR_LEN] = {0};
         int index = PVFS_get_errno_mapping(-retcode);
 
-        snprintf(buf, MAX_PVFS_STRERROR_LEN, "%s: %s\n", text,
+        snprintf(buf,MAX_PVFS_STRERROR_LEN,"%s: %s\n",text,
                  PINT_non_errno_strerror_mapping[index]);
         fprintf(stderr, "%s", buf);
     }
     else if (IS_PVFS_ERROR(-retcode))
     {
-        fprintf(stderr, "%s: %s\n", text,
-                strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
+	fprintf(stderr, "%s: %s\n", text,
+	strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
     }
     else
     {
-        fprintf(stderr, "Warning: non PVFS2 error code (%x):\n", -retcode);
-        fprintf(stderr, "%s: %s\n", text, strerror(-retcode));
+	fprintf(stderr, "Warning: non PVFS2 error code (%x):\n",
+                -retcode);
+	fprintf(stderr, "%s: %s\n", text, strerror(-retcode));
     }
     return;
 }
@@ -89,27 +85,26 @@ void PVFS_perror(
  * same as PVFS_perror, except that the output is routed through
  * gossip rather than stderr
  */
-void PVFS_perror_gossip(
-    const char *text,
-    int retcode)
+void PVFS_perror_gossip(const char *text, int retcode)
 {
     if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
     {
-        char buf[MAX_PVFS_STRERROR_LEN] = { 0 };
+        char buf[MAX_PVFS_STRERROR_LEN] = {0};
         int index = PVFS_get_errno_mapping(-retcode);
 
-        snprintf(buf, MAX_PVFS_STRERROR_LEN, "%s: %s\n", text,
+        snprintf(buf,MAX_PVFS_STRERROR_LEN,"%s: %s\n",text,
                  PINT_non_errno_strerror_mapping[index]);
-        gossip_err("%s", buf);
+	gossip_err("%s", buf);
     }
     else if (IS_PVFS_ERROR(-retcode))
     {
-        gossip_err("%s: %s\n", text, strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
+	gossip_err("%s: %s\n", text,
+                   strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
     }
     else
     {
-        gossip_err("Warning: non PVFS2 error code (%x):\n", -retcode);
-        gossip_err("%s: %s\n", text, strerror(-retcode));
+	gossip_err("Warning: non PVFS2 error code (%x):\n", -retcode);
+	gossip_err("%s: %s\n", text, strerror(-retcode));
     }
     return;
 }

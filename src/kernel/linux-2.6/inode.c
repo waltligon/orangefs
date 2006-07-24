@@ -14,27 +14,26 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-types.h"
 
-static int read_one_page(
-    struct page *page)
+static int read_one_page(struct page *page)
 {
     void *page_data;
     int ret, max_block;
     ssize_t bytes_read = 0;
     struct inode *inode = page->mapping->host;
-    const uint32_t blocksize = PAGE_CACHE_SIZE; /* inode->i_blksize */
-    const uint32_t blockbits = PAGE_CACHE_SHIFT;        /* inode->i_blkbits */
+    const uint32_t blocksize = PAGE_CACHE_SIZE;  /* inode->i_blksize */
+    const uint32_t blockbits = PAGE_CACHE_SHIFT; /* inode->i_blkbits */
 
-    pvfs2_print("pvfs2_readpage called with page %p\n", page);
+    pvfs2_print("pvfs2_readpage called with page %p\n",page);
     page_data = pvfs2_kmap(page);
 
     max_block = ((inode->i_size / blocksize) + 1);
 
     if (page->index < max_block)
     {
-        loff_t blockptr_offset = (((loff_t) page->index) << blockbits);
-        bytes_read =
-            pvfs2_inode_read(inode, page_data, blocksize, &blockptr_offset, 0,
-                             inode->i_size);
+        loff_t blockptr_offset =
+            (((loff_t)page->index) << blockbits);
+        bytes_read = pvfs2_inode_read(
+            inode, page_data, blocksize, &blockptr_offset, 0, inode->i_size);
     }
     /* only zero remaining unread portions of the page data */
     if (bytes_read > 0)
@@ -89,15 +88,12 @@ static int pvfs2_readpages(
     for (page_idx = 0; page_idx < nr_pages; page_idx++)
     {
         struct page *page;
-        page = list_entry(pages->prev, struct page,
-                          lru);
+        page = list_entry(pages->prev, struct page, lru);
         list_del(&page->lru);
-        if (!add_to_page_cache(page, mapping, page->index, GFP_KERNEL))
-        {
+        if (!add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
             ret = read_one_page(page);
         }
-        else
-        {
+        else {
             page_cache_release(page);
         }
     }
@@ -106,13 +102,9 @@ static int pvfs2_readpages(
 }
 
 #ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
-static int pvfs2_invalidatepage(
-    struct page *page,
-    unsigned long offset)
+static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #else
-static void pvfs2_invalidatepage(
-    struct page *page,
-    unsigned long offset)
+static void pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #endif
 {
     pvfs2_print("pvfs2_invalidatepage called on page %p "
@@ -129,24 +121,21 @@ static void pvfs2_invalidatepage(
 }
 
 #ifdef HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE
-static int pvfs2_releasepage(
-    struct page *page,
-    int foo)
+static int pvfs2_releasepage(struct page *page, int foo)
 #else
-static int pvfs2_releasepage(
-    struct page *page,
-    gfp_t foo)
+static int pvfs2_releasepage(struct page *page, gfp_t foo)
 #endif
 {
     pvfs2_print("pvfs2_releasepage called on page %p\n", page);
     return 0;
 }
 
-struct backing_dev_info pvfs2_backing_dev_info = {
+struct backing_dev_info pvfs2_backing_dev_info =
+{
     .ra_pages = 1024,
 #ifdef HAVE_BDI_MEMORY_BACKED
     /* old interface, up through 2.6.11 */
-    .memory_backed = 1  /* does not contribute to dirty memory */
+    .memory_backed = 1 /* does not contribute to dirty memory */
 #else
     .capabilities = BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK,
 #endif
@@ -154,9 +143,10 @@ struct backing_dev_info pvfs2_backing_dev_info = {
 #endif /* !PVFS2_LINUX_KERNEL_2_4 */
 
 /** PVFS2 implementation of address space operations */
-struct address_space_operations pvfs2_address_operations = {
+struct address_space_operations pvfs2_address_operations =
+{
 #ifdef PVFS2_LINUX_KERNEL_2_4
-  readpage:pvfs2_readpage
+    readpage : pvfs2_readpage
 #else
     .readpage = pvfs2_readpage,
     .readpages = pvfs2_readpages,
@@ -167,20 +157,17 @@ struct address_space_operations pvfs2_address_operations = {
 
 /** Change size of an object referenced by inode
  */
-void pvfs2_truncate(
-    struct inode *inode)
+void pvfs2_truncate(struct inode *inode)
 {
     pvfs2_print("pvfs2: pvfs2_truncate called on inode %d "
-                "with size %d\n", (int) inode->i_ino, (int) inode->i_size);
+                "with size %d\n",(int)inode->i_ino,(int)inode->i_size);
 
     pvfs2_truncate_inode(inode, inode->i_size);
 }
 
 /** Change attributes of an object referenced by dentry.
  */
-int pvfs2_setattr(
-    struct dentry *dentry,
-    struct iattr *iattr)
+int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 {
     int ret = -EINVAL;
     struct inode *inode = dentry->d_inode;
@@ -212,8 +199,7 @@ int pvfs2_setattr(
 #ifdef PVFS2_LINUX_KERNEL_2_4
 /** Linux 2.4 only equivalent of getattr
  */
-int pvfs2_revalidate(
-    struct dentry *dentry)
+int pvfs2_revalidate(struct dentry *dentry)
 {
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
@@ -265,16 +251,17 @@ int pvfs2_getattr(
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 /** PVFS2 implementation of VFS inode operations for files */
-struct inode_operations pvfs2_file_inode_operations = {
+struct inode_operations pvfs2_file_inode_operations =
+{
 #ifdef PVFS2_LINUX_KERNEL_2_4
-  truncate:pvfs2_truncate,
-  setattr:pvfs2_setattr,
-  revalidate:pvfs2_revalidate,
+    truncate : pvfs2_truncate,
+    setattr : pvfs2_setattr,
+    revalidate : pvfs2_revalidate,
 #ifdef HAVE_XATTR
-  setxattr:pvfs2_setxattr,
-  getxattr:pvfs2_getxattr,
-  removexattr:pvfs2_removexattr,
-  listxattr:pvfs2_listxattr,
+    setxattr : pvfs2_setxattr, 
+    getxattr : pvfs2_getxattr,
+    removexattr: pvfs2_removexattr,
+    listxattr: pvfs2_listxattr,
 #endif
 #else
     .truncate = pvfs2_truncate,
@@ -310,14 +297,15 @@ struct inode *pvfs2_get_custom_inode(
     pvfs2_inode_t *pvfs2_inode = NULL;
 
     pvfs2_print("pvfs2_get_custom_inode: called\n  (sb is %p | "
-                "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev), MINOR(dev));
+                "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
+                MINOR(dev));
 
     inode = iget(sb, ino);
     if (inode)
     {
-        /* initialize pvfs2 specific private data */
-        pvfs2_inode = PVFS2_I(inode);
-        if (!pvfs2_inode)
+	/* initialize pvfs2 specific private data */
+	pvfs2_inode = PVFS2_I(inode);
+	if (!pvfs2_inode)
         {
             iput(inode);
             pvfs2_panic("pvfs2_get_custom_inode: PRIVATE "
@@ -345,14 +333,14 @@ struct inode *pvfs2_get_custom_inode(
         inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 
-        pvfs2_print("pvfs2_get_custom_inode: inode %p allocated\n  "
-                    "(pvfs2_inode is %p | sb is %p)\n", inode,
-                    pvfs2_inode, inode->i_sb);
+	pvfs2_print("pvfs2_get_custom_inode: inode %p allocated\n  "
+		    "(pvfs2_inode is %p | sb is %p)\n", inode,
+		    pvfs2_inode, inode->i_sb);
 
         if ((mode & S_IFMT) == S_IFREG)
         {
-            inode->i_op = &pvfs2_file_inode_operations;
-            inode->i_fop = &pvfs2_file_operations;
+	    inode->i_op = &pvfs2_file_inode_operations;
+	    inode->i_fop = &pvfs2_file_operations;
 
             inode->i_blksize = pvfs_bufmap_size_query();
             inode->i_blkbits = PAGE_CACHE_SHIFT;
@@ -364,23 +352,23 @@ struct inode *pvfs2_get_custom_inode(
         }
         else if ((mode & S_IFMT) == S_IFDIR)
         {
-            inode->i_op = &pvfs2_dir_inode_operations;
-            inode->i_fop = &pvfs2_dir_operations;
+	    inode->i_op = &pvfs2_dir_inode_operations;
+	    inode->i_fop = &pvfs2_dir_operations;
 
-            /* dir inodes start with i_nlink == 2 (for "." entry) */
-            inode->i_nlink++;
+	    /* dir inodes start with i_nlink == 2 (for "." entry) */
+	    inode->i_nlink++;
         }
         else
         {
-            pvfs2_print("pvfs2_get_custom_inode: unsupported mode\n");
+	    pvfs2_print("pvfs2_get_custom_inode: unsupported mode\n");
             goto error;
-        }
+	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);
 #endif
     }
-  error:
+error:
     return inode;
 }
 

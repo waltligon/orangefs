@@ -81,7 +81,7 @@ int main(
     PVFS_handle_extent cur_extent;
     PVFS_handle_extent_array extent_array;
 
-        /*************************************************************/
+	/*************************************************************/
     /* initialization stuff */
 
     /* set debugging level */
@@ -92,55 +92,55 @@ int main(
     ret = BMI_initialize("bmi_tcp", "tcp://NULL:3335", BMI_INIT_SERVER);
     if (ret < 0)
     {
-        fprintf(stderr, "BMI init failure.\n");
-        return (-1);
+	fprintf(stderr, "BMI init failure.\n");
+	return (-1);
     }
 
     ret = BMI_open_context(&context);
     if (ret < 0)
     {
-        fprintf(stderr, "BMI_open_context() failure.\n");
-        return (-1);
+	fprintf(stderr, "BMI_open_context() failure.\n");
+	return (-1);
     }
 
     ret = trove_initialize(storage_space, 0, &method_name, 0);
     if (ret < 0)
     {
-        fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
-        return -1;
+	fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
+	return -1;
     }
 
     /* initialize the flow interface. protocol specific */
     ret = PINT_flow_initialize("flowproto_bmi_cache", 0);
     if (ret < 0)
     {
-        fprintf(stderr, "flow init failure.\n");
-        return (-1);
+	fprintf(stderr, "flow init failure.\n");
+	return (-1);
     }
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
     if (ret < 0)
     {
-        fprintf(stderr, "collection lookup failed.\n");
-        return -1;
+	fprintf(stderr, "collection lookup failed.\n");
+	return -1;
     }
 
     ret = trove_open_context(coll_id, &trove_context);
     if (ret < 0)
     {
-        fprintf(stderr, "TROVE_open_context() failure.\n");
-        return (-1);
+	fprintf(stderr, "TROVE_open_context() failure.\n");
+	return (-1);
     }
 
     /* find the parent directory name */
     strcpy(path_name, path_to_file);
     for (i = strlen(path_name); i >= 0; i--)
     {
-        if (path_name[i] != '/')
-            path_name[i] = '\0';
-        else
-            break;
+	if (path_name[i] != '/')
+	    path_name[i] = '\0';
+	else
+	    break;
     }
     file_name = path_to_file + strlen(path_name);
     printf("path is %s\n", path_name);
@@ -150,7 +150,7 @@ int main(
     ret = path_lookup(coll_id, trove_context, path_name, &parent_handle);
     if (ret < 0)
     {
-        return -1;
+	return -1;
     }
 
     file_handle = 0;
@@ -159,20 +159,20 @@ int main(
     extent_array.extent_count = 1;
     extent_array.extent_array = &cur_extent;
     ret = trove_dspace_create(coll_id,
-                              &extent_array,
-                              &file_handle,
-                              TROVE_TEST_FILE,
-                              NULL,
-                              TROVE_FORCE_REQUESTED_HANDLE,
-                              NULL, trove_context, &op_id);
+			      &extent_array,
+			      &file_handle,
+			      TROVE_TEST_FILE,
+			      NULL, 
+			      TROVE_FORCE_REQUESTED_HANDLE,
+			      NULL, trove_context, &op_id);
     while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
+	ret =
+	    trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
+			      &state, TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0)
     {
-        fprintf(stderr, "dspace create failed.\n");
-        return -1;
+	fprintf(stderr, "dspace create failed.\n");
+	return -1;
     }
 
     /* TODO: set attributes of file? */
@@ -183,16 +183,16 @@ int main(
     val.buffer = &file_handle;
     val.buffer_sz = sizeof(file_handle);
     ret =
-        trove_keyval_write(coll_id, parent_handle, &key, &val, 0, NULL, NULL,
-                           trove_context, &op_id);
+	trove_keyval_write(coll_id, parent_handle, &key, &val, 0, NULL, NULL,
+			   trove_context, &op_id);
     while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
+	ret =
+	    trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
+			      &state, TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0)
     {
-        fprintf(stderr, "keyval write failed.\n");
-        return -1;
+	fprintf(stderr, "keyval write failed.\n");
+	return -1;
     }
 
 
@@ -202,16 +202,16 @@ int main(
      */
     do
     {
-        ret = BMI_testunexpected(1, &outcount, &request_info, 10);
+	ret = BMI_testunexpected(1, &outcount, &request_info, 10);
     } while (ret == 0 && outcount == 0);
     if (ret < 0 || request_info.error_code != 0)
     {
-        fprintf(stderr, "waitunexpected failure.\n");
-        return (-1);
+	fprintf(stderr, "waitunexpected failure.\n");
+	return (-1);
     }
     free(request_info.buffer);
 
-        /******************************************************/
+	/******************************************************/
     /* setup request/dist stuff */
 
     /* request description */
@@ -219,20 +219,20 @@ int main(
     ret = PVFS_Request_contiguous(TEST_SIZE, PVFS_BYTE, &req);
     if (ret < 0)
     {
-        fprintf(stderr, "PVFS_Request_contiguous() failure.\n");
-        return (-1);
+	fprintf(stderr, "PVFS_Request_contiguous() failure.\n");
+	return (-1);
     }
 
 
-        /******************************************************/
+	/******************************************************/
     /* setup communicaton stuff */
 
     /* create a flow descriptor */
     flow_d = PINT_flow_alloc();
     if (!flow_d)
     {
-        fprintf(stderr, "flow_alloc failed.\n");
-        return (-1);
+	fprintf(stderr, "flow_alloc failed.\n");
+	return (-1);
     }
 
     /* file data */
@@ -244,14 +244,14 @@ int main(
     flow_d->file_data.dist = PINT_dist_create("basic_dist");
     if (!flow_d->file_data.dist)
     {
-        fprintf(stderr, "Error: failed to create dist.\n");
-        return (-1);
+	fprintf(stderr, "Error: failed to create dist.\n");
+	return (-1);
     }
     ret = PINT_dist_lookup(flow_d->file_data.dist);
     if (ret != 0)
     {
-        fprintf(stderr, "Error: failed to lookup dist.\n");
-        return (-1);
+	fprintf(stderr, "Error: failed to lookup dist.\n");
+	return (-1);
     }
     flow_d->file_req = req;
     flow_d->tag = 0;
@@ -265,7 +265,7 @@ int main(
     flow_d->dest.u.trove.handle = file_handle;
     flow_d->dest.u.trove.coll_id = coll_id;
 
-        /***************************************************
+	/***************************************************
 	 * test bmi to file (analogous to a client side write)
 	 */
 
@@ -273,16 +273,16 @@ int main(
     ret = block_on_flow(flow_d);
     if (ret < 0)
     {
-        return (-1);
+	return (-1);
     }
     time2 = Wtime();
 
 #if 0
     printf("Server bw (recv): %f MB/sec\n",
-           ((TEST_SIZE) / ((time2 - time1) * 1000000.0)));
+	   ((TEST_SIZE) / ((time2 - time1) * 1000000.0)));
 #endif
 
-        /*******************************************************/
+	/*******************************************************/
     /* final cleanup and output */
 
     PINT_flow_free(flow_d);
@@ -291,8 +291,8 @@ int main(
     ret = PINT_flow_finalize();
     if (ret < 0)
     {
-        fprintf(stderr, "flow finalize failure.\n");
-        return (-1);
+	fprintf(stderr, "flow finalize failure.\n");
+	return (-1);
     }
 
     /* shut down BMI */
@@ -307,8 +307,7 @@ int main(
 }
 
 static int done_flag = 0;
-static void callback_fn(
-    flow_descriptor * flow_d)
+static void callback_fn(flow_descriptor* flow_d)
 {
     done_flag = 1;
     return;
@@ -318,29 +317,29 @@ static int block_on_flow(
     flow_descriptor * flow_d)
 {
     int ret = -1;
-    struct timespec req = { 0, 1000 };
+    struct timespec req = {0, 1000};
 
     flow_d->callback = callback_fn;
     ret = PINT_flow_post(flow_d);
     if (ret == 1)
     {
-        return (0);
+	return (0);
     }
     if (ret < 0)
     {
-        fprintf(stderr, "flow post failure.\n");
-        return (ret);
+	fprintf(stderr, "flow post failure.\n");
+	return (ret);
     }
 
-    while (!done_flag)
+    while(!done_flag)
     {
-        nanosleep(&req, NULL);
+	nanosleep(&req, NULL);
     }
 
     if (flow_d->state != FLOW_COMPLETE)
     {
-        fprintf(stderr, "flow finished in error state: %d\n", flow_d->state);
-        return (-1);
+	fprintf(stderr, "flow finished in error state: %d\n", flow_d->state);
+	return (-1);
     }
     return (0);
 }
@@ -375,15 +374,15 @@ int path_lookup(
     val.buffer_sz = sizeof(handle);
 
     ret = trove_collection_geteattr(coll_id, &key, &val, 0,
-                                    NULL, trove_context, &op_id);
+				    NULL, trove_context, &op_id);
     while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
+	ret =
+	    trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
+			      &state, TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0)
     {
-        fprintf(stderr, "collection geteattr (for root handle) failed.\n");
-        return -1;
+	fprintf(stderr, "collection geteattr (for root handle) failed.\n");
+	return -1;
     }
 
     /* TODO: handle more than just a root handle! */

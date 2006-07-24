@@ -58,14 +58,14 @@ int main(
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
     ret = PVFS_util_get_default_fsid(&fs_id);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_get_default_fsid", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
     printf("SYSTEM INTERFACE INITIALIZED\n");
@@ -73,11 +73,11 @@ int main(
     /* lookup the root handle */
     printf("looking up the root handle for fsid = %d\n", fs_id);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+			  &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
-        printf("Lookup failed with errcode = %d\n", ret);
-        return (-1);
+	printf("Lookup failed with errcode = %d\n", ret);
+	return (-1);
     }
     // print the handle 
     printf("--lookup--\n");
@@ -87,16 +87,16 @@ int main(
     resp_create = (PVFS_sysresp_create *) malloc(sizeof(PVFS_sysresp_create));
     if (!resp_create)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // Fill in the create info 
     entry_name = (char *) malloc(strlen(filename) + 1);
     if (!entry_name)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     memcpy(entry_name, filename, strlen(filename) + 1);
     PVFS_util_gen_credentials(&credentials);
@@ -122,11 +122,11 @@ int main(
 
     // call create 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          &credentials, NULL, resp_create);
+			  &credentials, NULL, resp_create);
     if (ret < 0)
     {
-        printf("create failed with errcode = %d\n", ret);
-        return (-1);
+	printf("create failed with errcode = %d\n", ret);
+	return (-1);
     }
 
     // print the handle 
@@ -138,14 +138,14 @@ int main(
     req_gattr = (PVFS_sysreq_getattr *) malloc(sizeof(PVFS_sysreq_getattr));
     if (!req_gattr)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     resp_gattr = (PVFS_sysresp_getattr *) malloc(sizeof(PVFS_sysresp_getattr));
     if (!resp_gattr)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // Fill in the handle 
@@ -157,8 +157,8 @@ int main(
     ret = PVFS_sys_getattr(req_gattr, resp_gattr);
     if (ret < 0)
     {
-        printf("getattr failed with errcode = %d\n", ret);
-        return (-1);
+	printf("getattr failed with errcode = %d\n", ret);
+	return (-1);
     }
     // print the handle 
     printf("--getattr--\n");
@@ -175,7 +175,7 @@ int main(
 
     for (i = 0; i < resp_gattr->attr.u.meta.nr_datafiles; i++)
     {
-        printf("\thandle: %d\n", resp_gattr->attr.u.meta.dfh[i]);
+	printf("\thandle: %d\n", resp_gattr->attr.u.meta.dfh[i]);
     }
 #endif
 
@@ -189,25 +189,25 @@ int main(
     resp_lk = (PVFS_sysresp_lookup *) malloc(sizeof(PVFS_sysresp_lookup));
     if (!resp_lk)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     name = (char *) malloc(strlen(filename) + 2);
     if (!name)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     name[0] = '/';
     memcpy(name + 1, filename, strlen(filename) + 1);
 
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                          resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+			  resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
-        printf("Lookup failed with errcode = %d\n", ret);
-        return (-1);
+	printf("Lookup failed with errcode = %d\n", ret);
+	return (-1);
     }
     // print the handle 
     printf("--lookup--\n");
@@ -230,14 +230,14 @@ int main(
     req_gattr = (PVFS_sysreq_getattr *) malloc(sizeof(PVFS_sysreq_getattr));
     if (!req_gattr)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     resp_gattr = (PVFS_sysresp_getattr *) malloc(sizeof(PVFS_sysresp_getattr));
     if (!resp_gattr)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // Fill in the handle 
@@ -249,8 +249,8 @@ int main(
     ret = PVFS_sys_getattr(req_gattr, resp_gattr);
     if (ret < 0)
     {
-        printf("getattr failed with errcode = %d\n", ret);
-        return (-1);
+	printf("getattr failed with errcode = %d\n", ret);
+	return (-1);
     }
     // print the handle 
     printf("--getattr--\n");
@@ -271,12 +271,12 @@ int main(
     req_sattr = (PVFS_sysreq_setattr *) malloc(sizeof(PVFS_sysreq_setattr));
     if (!req_sattr)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // fill in the handle 
-    req_sattr->pinode_refn.handle = lk_handle;  //resp_lk->pinode_refn.handle;
+    req_sattr->pinode_refn.handle = lk_handle;	//resp_lk->pinode_refn.handle;
     req_sattr->pinode_refn.fs_id = lk_fsid;
     req_sattr->attrmask = ATTR_META;
     req_sattr->attr.owner = 12345;
@@ -296,8 +296,8 @@ int main(
     ret = PVFS_sys_setattr(req_sattr);
     if (ret < 0)
     {
-        printf("setattr failed with errcode = %d\n", ret);
-        return (-1);
+	printf("setattr failed with errcode = %d\n", ret);
+	return (-1);
     }
     // print the handle 
     printf("--setattr--\n");
@@ -318,14 +318,14 @@ int main(
     req_gattr = (PVFS_sysreq_getattr *) malloc(sizeof(PVFS_sysreq_getattr));
     if (!req_gattr)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     resp_gattr = (PVFS_sysresp_getattr *) malloc(sizeof(PVFS_sysresp_getattr));
     if (!resp_gattr)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // Fill in the handle 
@@ -337,8 +337,8 @@ int main(
     ret = PVFS_sys_getattr(req_gattr, resp_gattr);
     if (ret < 0)
     {
-        printf("getattr failed with errcode = %d\n", ret);
-        return (-1);
+	printf("getattr failed with errcode = %d\n", ret);
+	return (-1);
     }
     // print the handle 
     printf("--getattr--\n");
@@ -363,8 +363,8 @@ int main(
     ret = PVFS_sys_init();
     if (ret < 0)
     {
-        printf("PVFS_sys_init() failure.\n");
-        return (ret);
+	printf("PVFS_sys_init() failure.\n");
+	return (ret);
     }
 
     // Test the getattr function 
@@ -372,14 +372,14 @@ int main(
     req_gattr = (PVFS_sysreq_getattr *) malloc(sizeof(PVFS_sysreq_getattr));
     if (!req_gattr)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     resp_gattr = (PVFS_sysresp_getattr *) malloc(sizeof(PVFS_sysresp_getattr));
     if (!resp_gattr)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // Fill in the handle 
@@ -392,8 +392,8 @@ int main(
     ret = PVFS_sys_getattr(req_gattr, resp_gattr);
     if (ret < 0)
     {
-        printf("getattr failed with errcode = %d\n", ret);
-        return (-1);
+	printf("getattr failed with errcode = %d\n", ret);
+	return (-1);
     }
     // print the handle 
     printf("--getattr--\n");
@@ -413,8 +413,8 @@ int main(
     ret = PVFS_sys_init();
     if (ret < 0)
     {
-        printf("PVFS_sys_init() failure.\n");
-        return (ret);
+	printf("PVFS_sys_init() failure.\n");
+	return (ret);
     }
 
     // test the mkdir function 
@@ -422,22 +422,22 @@ int main(
     req_mkdir = (PVFS_sysreq_mkdir *) malloc(sizeof(PVFS_sysreq_mkdir));
     if (!req_mkdir)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     resp_mkdir = (PVFS_sysresp_mkdir *) malloc(sizeof(PVFS_sysresp_mkdir));
     if (!resp_mkdir)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // Fill in the dir info 
     req_mkdir->entry_name = (char *) malloc(strlen(dirname) + 1);
     if (!req_mkdir->entry_name)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     strncpy(req_mkdir->entry_name, dirname, strlen(dirname));
     req_mkdir->entry_name[strlen(dirname)] = '\0';
@@ -453,8 +453,8 @@ int main(
     ret = PVFS_sys_mkdir(req_mkdir, resp_mkdir);
     if (ret < 0)
     {
-        printf("mkdir failed\n");
-        return (-1);
+	printf("mkdir failed\n");
+	return (-1);
     }
     // print the handle 
     printf("--mkdir--\n");
@@ -463,11 +463,11 @@ int main(
 #endif
 
     resp_readdir =
-        (PVFS_sysresp_readdir *) malloc(sizeof(PVFS_sysresp_readdir));
+	(PVFS_sysresp_readdir *) malloc(sizeof(PVFS_sysresp_readdir));
     if (!resp_readdir)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // Fill in the dir info 
@@ -479,11 +479,11 @@ int main(
 
     // call readdir 
     ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-                           &credentials, resp_readdir);
+			   &credentials, resp_readdir);
     if (ret < 0)
     {
-        printf("readdir failed with errcode = %d\n", ret);
-        return (-1);
+	printf("readdir failed with errcode = %d\n", ret);
+	return (-1);
     }
 
     // print the handle 
@@ -491,7 +491,7 @@ int main(
     printf("Token:%ld\n", (long int) resp_readdir->token);
     for (i = 0; i < resp_readdir->pvfs_dirent_outcount; i++)
     {
-        printf("name:%s\n", resp_readdir->dirent_array[i].d_name);
+	printf("name:%s\n", resp_readdir->dirent_array[i].d_name);
     }
 #if 0
 
@@ -501,16 +501,16 @@ int main(
     req_rmdir = (PVFS_sysreq_rmdir *) malloc(sizeof(PVFS_sysreq_rmdir));
     if (!req_rmdir)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // Fill in the dir info 
     req_rmdir->entry_name = (char *) malloc(strlen(dirname) + 1);
     if (!req_rmdir->entry_name)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     strncpy(req_rmdir->entry_name, dirname, strlen(dirname));
     req_rmdir->entry_name[strlen(dirname)] = '\0';
@@ -521,22 +521,22 @@ int main(
     ret = PVFS_sys_rmdir(req_rmdir);
     if (ret < 0)
     {
-        printf("rmdir failed\n");
-        return (-1);
+	printf("rmdir failed\n");
+	return (-1);
     }
     // test the statfs function 
     //      Alloc memory and fill the structures
     req_statfs = (PVFS_sysreq_statfs *) malloc(sizeof(PVFS_sysreq_statfs));
     if (!req_statfs)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
     resp_statfs = (PVFS_sysresp_statfs *) malloc(sizeof(PVFS_sysresp_statfs));
     if (!resp_statfs)
     {
-        printf("Error in malloc\n");
-        return (-1);
+	printf("Error in malloc\n");
+	return (-1);
     }
 
     // Fill in the dir info 
@@ -546,8 +546,8 @@ int main(
     ret = PVFS_sys_statfs(req_statfs, resp_statfs);
     if (ret < 0)
     {
-        printf("statfs failed\n");
-        return (-1);
+	printf("statfs failed\n");
+	return (-1);
     }
 
     // print the handle 
@@ -558,7 +558,7 @@ int main(
 
     printf("IO stats\n");
     printf("blocksize:%lu\n",
-           (unsigned long int) resp_statfs->statfs.iostat.blksize);
+	   (unsigned long int) resp_statfs->statfs.iostat.blksize);
     printf("blockfree:%u\n", resp_statfs->statfs.iostat.blkfree);
     printf("blockstotal:%u\n", resp_statfs->statfs.iostat.blktotal);
     printf("filestotal:%u\n", resp_statfs->statfs.iostat.filetotal);
@@ -569,8 +569,8 @@ int main(
     ret = PVFS_sys_finalize();
     if (ret < 0)
     {
-        printf("finalizing sysint failed with errcode = %d\n", ret);
-        return (-1);
+	printf("finalizing sysint failed with errcode = %d\n", ret);
+	return (-1);
     }
 
     free(filename);
@@ -594,8 +594,8 @@ void gen_rand_str(
     *gen_str = malloc(len + 1);
     for (i = 0; i < len; i++)
     {
-        newchar = ((1 + (rand() % 26)) + poop.tv_usec) % 26;
-        (*gen_str)[i] = alphabet[newchar];
+	newchar = ((1 + (rand() % 26)) + poop.tv_usec) % 26;
+	(*gen_str)[i] = alphabet[newchar];
     }
     (*gen_str)[len] = '\0';
 }

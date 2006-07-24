@@ -78,9 +78,9 @@ static int pvfs2_devreq_open(
 
 static ssize_t pvfs2_devreq_read(
     struct file *file,
-    char __user * buf,
+    char __user *buf,
     size_t count,
-    loff_t * offset)
+    loff_t *offset)
 {
     int ret = 0, len = 0;
     pvfs2_kernel_op_t *cur_op = NULL;
@@ -90,8 +90,7 @@ static ssize_t pvfs2_devreq_read(
     if (!(file->f_flags & O_NONBLOCK))
     {
         /* We do not support blocking reads/opens any more */
-        pvfs2_error
-            ("pvfs2: blocking reads are not supported! (pvfs2-client-core bug)\n");
+        pvfs2_error("pvfs2: blocking reads are not supported! (pvfs2-client-core bug)\n");
         return -EINVAL;
     }
     else
@@ -99,19 +98,17 @@ static ssize_t pvfs2_devreq_read(
         pvfs2_kernel_op_t *op = NULL;
         /* get next op (if any) from top of list */
         spin_lock(&pvfs2_request_list_lock);
-        list_for_each_entry(op, &pvfs2_request_list, list)
+        list_for_each_entry (op, &pvfs2_request_list, list)
         {
             PVFS_fs_id fsid = fsid_of_op(op);
             /* Check if this op's fsid is known and needs remounting */
             if (fsid != PVFS_FS_ID_NULL && fs_mount_pending(fsid) == 1)
             {
-                pvfs2_print("Skipping op tag %lld %s\n", lld(op->tag),
-                            get_opname_string(op));
+                pvfs2_print("Skipping op tag %lld %s\n", lld(op->tag), get_opname_string(op));
                 continue;
             }
             /* op does not belong to any particular fsid or already mounted.. let it through */
-            else
-            {
+            else {
                 cur_op = op;
                 list_del(&cur_op->list);
                 break;
@@ -124,8 +121,7 @@ static ssize_t pvfs2_devreq_read(
     {
         spin_lock(&cur_op->lock);
 
-        pvfs2_print("client-core: reading op tag %lld %s\n", lld(cur_op->tag),
-                    get_opname_string(cur_op));
+        pvfs2_print("client-core: reading op tag %lld %s\n", lld(cur_op->tag), get_opname_string(cur_op));
         if (op_state_in_progress(cur_op) || op_state_serviced(cur_op))
         {
             pvfs2_error("WARNING: Current op already queued...skipping\n");
@@ -142,21 +138,18 @@ static ssize_t pvfs2_devreq_read(
         if ((size_t) len <= count)
         {
             ret = copy_to_user(buf, &proto_ver, sizeof(int32_t));
-            if (ret == 0)
+            if(ret == 0)
             {
-                ret =
-                    copy_to_user(buf + sizeof(int32_t), &magic,
-                                 sizeof(int32_t));
+                ret = copy_to_user(buf + sizeof(int32_t), &magic, sizeof(int32_t));
                 if (ret == 0)
                 {
-                    ret = copy_to_user(buf + 2 * sizeof(int32_t),
+                    ret = copy_to_user(buf + 2*sizeof(int32_t),
                                        &cur_op->tag, sizeof(uint64_t));
                     if (ret == 0)
                     {
-                        ret =
-                            copy_to_user(buf + 2 * sizeof(int32_t) +
-                                         sizeof(uint64_t), &cur_op->upcall,
-                                         sizeof(pvfs2_upcall_t));
+                        ret = copy_to_user(
+                            buf + 2*sizeof(int32_t) + sizeof(uint64_t),
+                            &cur_op->upcall, sizeof(pvfs2_upcall_t));
                     }
                 }
             }
@@ -177,9 +170,9 @@ static ssize_t pvfs2_devreq_read(
 
     {
         /*
-           if in non-blocking mode, return EAGAIN since no requests are
-           ready yet
-         */
+          if in non-blocking mode, return EAGAIN since no requests are
+          ready yet
+        */
         len = -EAGAIN;
     }
     return len;
@@ -206,41 +199,41 @@ static ssize_t pvfs2_devreq_writev(
     buffer = dev_req_alloc();
     if (!buffer)
     {
-        return -ENOMEM;
+	return -ENOMEM;
     }
     ptr = buffer;
 
     for (i = 0; i < count; i++)
     {
-        if (iov[i].iov_len > num_remaining)
-        {
-            pvfs2_error("writev error: Freeing buffer and returning\n");
-            dev_req_release(buffer);
-            return -EMSGSIZE;
-        }
-        ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
+	if (iov[i].iov_len > num_remaining)
+	{
+	    pvfs2_error("writev error: Freeing buffer and returning\n");
+	    dev_req_release(buffer);
+	    return -EMSGSIZE;
+	}
+	ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
         if (ret)
         {
             pvfs2_error("Failed to copy data from user space\n");
-            dev_req_release(buffer);
+	    dev_req_release(buffer);
             return -EIO;
         }
-        num_remaining -= iov[i].iov_len;
-        ptr += iov[i].iov_len;
-        payload_size += iov[i].iov_len;
+	num_remaining -= iov[i].iov_len;
+	ptr += iov[i].iov_len;
+	payload_size += iov[i].iov_len;
     }
 
     /* these elements are currently 8 byte aligned (8 bytes for (version +  
      * magic) 8 bytes for tag).  If you add another element, either make it 8
      * bytes big, or use get_unaligned when asigning  */
     ptr = buffer;
-    proto_ver = *((int32_t *) ptr);
+    proto_ver = *((int32_t *)ptr);
     ptr += sizeof(int32_t);
 
-    magic = *((int32_t *) ptr);
+    magic = *((int32_t *)ptr);
     ptr += sizeof(int32_t);
 
-    tag = *((uint64_t *) ptr);
+    tag = *((uint64_t *)ptr);
     ptr += sizeof(uint64_t);
 
     if (magic != PVFS2_DEVREQ_MAGIC)
@@ -252,8 +245,7 @@ static ssize_t pvfs2_devreq_writev(
     if (proto_ver != PVFS_KERNEL_PROTO_VERSION)
     {
         pvfs2_error("Error: Device protocol version numbers do not match.\n");
-        pvfs2_error
-            ("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
+        pvfs2_error("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
         dev_req_release(buffer);
         return -EPROTO;
     }
@@ -263,43 +255,43 @@ static ssize_t pvfs2_devreq_writev(
     hash_link = qhash_search_and_remove(htable_ops_in_progress, &(tag));
     if (hash_link)
     {
-        op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
-        if (op)
-        {
+	op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
+	if (op)
+	{
             /* Increase ref count! */
             get_op(op);
-            /* cut off magic and tag from payload size */
-            payload_size -= (2 * sizeof(int32_t) + sizeof(uint64_t));
-            if (payload_size <= sizeof(pvfs2_downcall_t))
-            {
-                /* copy the passed in downcall into the op */
-                memcpy(&op->downcall, ptr, sizeof(pvfs2_downcall_t));
-            }
-            else
-            {
-                pvfs2_print("writev: Ignoring %d bytes\n", payload_size);
-            }
+	    /* cut off magic and tag from payload size */
+	    payload_size -= (2*sizeof(int32_t) + sizeof(uint64_t));
+	    if (payload_size <= sizeof(pvfs2_downcall_t))
+	    {
+		/* copy the passed in downcall into the op */
+		memcpy(&op->downcall, ptr, sizeof(pvfs2_downcall_t));
+	    }
+	    else
+	    {
+		pvfs2_print("writev: Ignoring %d bytes\n", payload_size);
+	    }
 
 
             /*
-               if this operation is an I/O operation and if it was
-               initiated on behalf of a *synchronous* VFS I/O operation,
-               only then we need to wait
-               for all data to be copied before we can return to avoid
-               buffer corruption and races that can pull the buffers
-               out from under us.
+              if this operation is an I/O operation and if it was
+              initiated on behalf of a *synchronous* VFS I/O operation,
+              only then we need to wait
+              for all data to be copied before we can return to avoid
+              buffer corruption and races that can pull the buffers
+              out from under us.
 
-               Essentially we're synchronizing with other parts of the
-               vfs implicitly by not allowing the user space
-               application reading/writing this device to return until
-               the buffers are done being used.
-             */
-            if (op->upcall.type == PVFS2_VFS_OP_FILE_IO
-                && op->upcall.req.io.async_vfs_io == PVFS_VFS_SYNC_IO)
+              Essentially we're synchronizing with other parts of the
+              vfs implicitly by not allowing the user space
+              application reading/writing this device to return until
+              the buffers are done being used.
+            */
+            if (op->upcall.type == PVFS2_VFS_OP_FILE_IO 
+                    && op->upcall.req.io.async_vfs_io == PVFS_VFS_SYNC_IO)
             {
                 int timed_out = 0;
                 DECLARE_WAITQUEUE(wait_entry, current);
-
+                
                 /*
                  * tell the vfs op waiting on a waitqueue 
                  * that this op is done 
@@ -308,10 +300,11 @@ static ssize_t pvfs2_devreq_writev(
                 set_op_state_serviced(op);
                 spin_unlock(&op->lock);
 
-                add_wait_queue_exclusive(&op->io_completion_waitq, &wait_entry);
+                add_wait_queue_exclusive(
+                    &op->io_completion_waitq, &wait_entry);
                 wake_up_interruptible(&op->waitq);
 
-                while (1)
+                while(1)
                 {
                     set_current_state(TASK_INTERRUPTIBLE);
 
@@ -325,7 +318,8 @@ static ssize_t pvfs2_devreq_writev(
 
                     if (!signal_pending(current))
                     {
-                        int timeout = MSECS_TO_JIFFIES(1000 * op_timeout_secs);
+                        int timeout = MSECS_TO_JIFFIES(
+                            1000 * op_timeout_secs);
                         if (!schedule_timeout(timeout))
                         {
                             pvfs2_print("*** I/O wait time is up\n");
@@ -343,12 +337,12 @@ static ssize_t pvfs2_devreq_writev(
                 remove_wait_queue(&op->io_completion_waitq, &wait_entry);
 
                 /*
-                   NOTE: for I/O operations we handle releasing the op
-                   object except in the case of timeout.  the reason we
-                   can't free the op in timeout cases is that the op
-                   service logic in the vfs retries operations using
-                   the same op ptr, thus it can't be freed.
-                 */
+                  NOTE: for I/O operations we handle releasing the op
+                  object except in the case of timeout.  the reason we
+                  can't free the op in timeout cases is that the op
+                  service logic in the vfs retries operations using
+                  the same op ptr, thus it can't be freed.
+                */
                 if (!timed_out)
                 {
                     op_release(op);
@@ -356,23 +350,23 @@ static ssize_t pvfs2_devreq_writev(
             }
 #ifdef HAVE_AIO_VFS_SUPPORT
             else if (op->upcall.type == PVFS2_VFS_OP_FILE_IO
-                     && op->upcall.req.io.async_vfs_io == PVFS_VFS_ASYNC_IO)
+                    && op->upcall.req.io.async_vfs_io == PVFS_VFS_ASYNC_IO)
             {
                 pvfs2_kiocb *x = (pvfs2_kiocb *) op->priv;
-                if (x == NULL || x->buffer == NULL
-                    || x->op != op || x->bytes_to_be_copied <= 0)
+                if (x == NULL || x->buffer == NULL 
+                        || x->op != op 
+                        || x->bytes_to_be_copied <= 0)
                 {
                     if (x)
                     {
                         pvfs2_print("WARNING: pvfs2_iocb from op"
-                                    "has invalid fields! %p, %p(%p), %d\n",
-                                    x->buffer, x->op, op,
-                                    (int) x->bytes_to_be_copied);
+                                "has invalid fields! %p, %p(%p), %d\n",
+                                x->buffer, x->op, op, (int) x->bytes_to_be_copied);
                     }
                     else
                     {
                         pvfs2_print("WARNING: cannot retrieve the "
-                                    "pvfs2_iocb pointer from op!\n");
+                                "pvfs2_iocb pointer from op!\n");
                     }
                     /* Most likely means that it was cancelled! */
                 }
@@ -382,28 +376,29 @@ static ssize_t pvfs2_devreq_writev(
 
                     if (op->downcall.status != 0)
                     {
-                        ret = pvfs2_normalize_to_errno(op->downcall.status);
+                        ret = pvfs2_normalize_to_errno(
+                                op->downcall.status);
                         bytes_copied = ret;
                     }
-                    else
-                    {
+                    else {
                         bytes_copied = op->downcall.resp.io.amt_complete;
                     }
                     pvfs2_print("[AIO] status of transfer: %d\n", bytes_copied);
-                    if (x->rw == PVFS_IO_READ && bytes_copied > 0)
+                    if (x->rw == PVFS_IO_READ
+                            && bytes_copied > 0)
                     {
                         /* try and copy it out to user-space */
-                        bytes_copied = pvfs_bufmap_copy_to_user_task(x->tsk,
-                                                                     x->buffer,
-                                                                     x->
-                                                                     buffer_index,
-                                                                     bytes_copied);
+                        bytes_copied = pvfs_bufmap_copy_to_user_task(
+                                x->tsk,
+                                x->buffer,
+                                x->buffer_index,
+                                bytes_copied);
                     }
                     spin_lock(&op->lock);
                     /* we tell VFS that the op is now serviced! */
                     set_op_state_serviced(op);
                     pvfs2_print("Setting state of %p to %d [SERVICED]\n",
-                                op, op->op_state);
+                            op, op->op_state);
                     x->bytes_copied = bytes_copied;
                     /* call aio_complete to finish the operation to wake up regular aio waiters */
                     aio_complete(x->kiocb, x->bytes_copied, 0);
@@ -422,18 +417,18 @@ static ssize_t pvfs2_devreq_writev(
                 set_op_state_serviced(op);
                 spin_unlock(&op->lock);
                 /*
-                   for every other operation (i.e. non-I/O), we need to
-                   wake up the callers for downcall completion
-                   notification
-                 */
+                  for every other operation (i.e. non-I/O), we need to
+                  wake up the callers for downcall completion
+                  notification
+                */
                 wake_up_interruptible(&op->waitq);
             }
-        }
+	}
     }
     else
     {
         /* ignore downcalls that we're not interested in */
-        pvfs2_print("WARNING: No one's waiting for tag %llu\n", llu(tag));
+	pvfs2_print("WARNING: No one's waiting for tag %llu\n", llu(tag));
     }
     dev_req_release(buffer);
 
@@ -441,14 +436,13 @@ static ssize_t pvfs2_devreq_writev(
 }
 
 /* Returns whether any FS are still pending remounted */
-static int mark_all_pending_mounts(
-    void)
+static int mark_all_pending_mounts(void)
 {
     int unmounted = 1;
     pvfs2_sb_info_t *pvfs2_sb = NULL;
 
     spin_lock(&pvfs2_superblocks_lock);
-    list_for_each_entry(pvfs2_sb, &pvfs2_superblocks, list)
+    list_for_each_entry (pvfs2_sb, &pvfs2_superblocks, list)
     {
         /* All of these file system require a remount */
         pvfs2_sb->mount_pending = 1;
@@ -463,16 +457,15 @@ static int mark_all_pending_mounts(
  *           0 if already mounted
  *           1 if needs remount
  */
-int fs_mount_pending(
-    PVFS_fs_id fsid)
+int fs_mount_pending(PVFS_fs_id fsid)
 {
     int mount_pending = -1;
     pvfs2_sb_info_t *pvfs2_sb = NULL;
 
     spin_lock(&pvfs2_superblocks_lock);
-    list_for_each_entry(pvfs2_sb, &pvfs2_superblocks, list)
+    list_for_each_entry (pvfs2_sb, &pvfs2_superblocks, list)
     {
-        if (pvfs2_sb->fs_id == fsid)
+        if (pvfs2_sb->fs_id == fsid) 
         {
             mount_pending = pvfs2_sb->mount_pending;
             break;
@@ -513,10 +506,10 @@ static int pvfs2_devreq_release(
     pvfs2_print("PVFS2 Device Close: Filesystem(s) %s\n",
                 (unmounted ? "UNMOUNTED" : "MOUNTED"));
     /*
-       prune dcache here to get rid of entries that may no longer exist
-       on device re-open, assuming that the sb has been properly filled
-       (may not have been if a mount wasn't attempted)
-     */
+      prune dcache here to get rid of entries that may no longer exist
+      on device re-open, assuming that the sb has been properly filled
+      (may not have been if a mount wasn't attempted)
+    */
     if (unmounted && inode && inode->i_sb)
     {
         shrink_dcache_sb(inode->i_sb);
@@ -532,8 +525,7 @@ static int pvfs2_devreq_release(
     return 0;
 }
 
-int is_daemon_in_service(
-    void)
+int is_daemon_in_service(void)
 {
     int in_service;
 
@@ -547,58 +539,56 @@ int is_daemon_in_service(
     return in_service;
 }
 
-static inline long check_ioctl_command(
-    unsigned int command)
+static inline long check_ioctl_command(unsigned int command)
 {
     /* Check for valid ioctl codes */
-    if (_IOC_TYPE(command) != PVFS_DEV_MAGIC)
+    if (_IOC_TYPE(command) != PVFS_DEV_MAGIC) 
     {
         pvfs2_error("device ioctl magic numbers don't match! "
-                    "did you rebuild pvfs2-client-core/libpvfs2?"
-                    "[cmd %x, magic %x != %x]\n",
-                    command, _IOC_TYPE(command), PVFS_DEV_MAGIC);
+                "did you rebuild pvfs2-client-core/libpvfs2?"
+                "[cmd %x, magic %x != %x]\n",
+                command,
+                _IOC_TYPE(command),
+                PVFS_DEV_MAGIC);
         return -EINVAL;
     }
     /* and valid ioctl commands */
-    if (_IOC_NR(command) >= PVFS_DEV_MAXNR || _IOC_NR(command) <= 0)
+    if (_IOC_NR(command) >= PVFS_DEV_MAXNR || _IOC_NR(command) <= 0) 
     {
         pvfs2_error("Invalid ioctl command number [%d >= %d]\n",
-                    _IOC_NR(command), PVFS_DEV_MAXNR);
+                _IOC_NR(command), PVFS_DEV_MAXNR);
         return -ENOIOCTLCMD;
     }
     return 0;
 }
 
-static long dispatch_ioctl_command(
-    unsigned int command,
-    unsigned long arg)
+static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
 {
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
     static int32_t max_up_size = MAX_ALIGNED_DEV_REQ_UPSIZE;
     static int32_t max_down_size = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
     struct PVFS_dev_map_desc user_desc;
 
-    switch (command)
+    switch(command)
     {
-    case PVFS_DEV_GET_MAGIC:
-        return ((put_user(magic, (int32_t __user *) arg) ==
-                 -EFAULT) ? -EIO : 0);
-    case PVFS_DEV_GET_MAX_UPSIZE:
-        return ((put_user(max_up_size, (int32_t __user *) arg) ==
-                 -EFAULT) ? -EIO : 0);
-    case PVFS_DEV_GET_MAX_DOWNSIZE:
-        return ((put_user(max_down_size, (int32_t __user *) arg) ==
-                 -EFAULT) ? -EIO : 0);
-    case PVFS_DEV_MAP:
+        case PVFS_DEV_GET_MAGIC:
+            return ((put_user(magic, (int32_t __user *)arg) ==
+                     -EFAULT) ? -EIO : 0);
+        case PVFS_DEV_GET_MAX_UPSIZE:
+            return ((put_user(max_up_size, (int32_t __user *)arg) ==
+                     -EFAULT) ? -EIO : 0);
+        case PVFS_DEV_GET_MAX_DOWNSIZE:
+            return ((put_user(max_down_size, (int32_t __user *)arg) ==
+                     -EFAULT) ? -EIO : 0);
+        case PVFS_DEV_MAP:
         {
             int ret;
-            ret =
-                copy_from_user(&user_desc,
-                               (struct PVFS_dev_map_desc __user *) arg,
-                               sizeof(struct PVFS_dev_map_desc));
+            ret = copy_from_user(
+                &user_desc, (struct PVFS_dev_map_desc __user *)arg,
+                sizeof(struct PVFS_dev_map_desc));
             return (ret ? -EIO : pvfs_bufmap_initialize(&user_desc));
         }
-    case PVFS_DEV_REMOUNT_ALL:
+        case PVFS_DEV_REMOUNT_ALL:
         {
             int ret = 0;
             struct list_head *tmp = NULL;
@@ -607,29 +597,29 @@ static long dispatch_ioctl_command(
             pvfs2_print("pvfs2_devreq_ioctl: got PVFS_DEV_REMOUNT_ALL\n");
 
             /*
-               remount all mounted pvfs2 volumes to regain the lost
-               dynamic mount tables (if any) -- NOTE: this is done
-               without keeping the superblock list locked due to the
-               upcall/downcall waiting.  also, the request semaphore is
-               used to ensure that no operations will be serviced until
-               all of the remounts are serviced (to avoid ops between
-               mounts to fail)
-             */
+              remount all mounted pvfs2 volumes to regain the lost
+              dynamic mount tables (if any) -- NOTE: this is done
+              without keeping the superblock list locked due to the
+              upcall/downcall waiting.  also, the request semaphore is
+              used to ensure that no operations will be serviced until
+              all of the remounts are serviced (to avoid ops between
+              mounts to fail)
+            */
             ret = down_interruptible(&request_semaphore);
-            if (ret < 0)
+            if(ret < 0)
             {
-                return (ret);
+                return(ret);
             }
             pvfs2_print("pvfs2_devreq_ioctl: priority remount "
                         "in progress\n");
-            list_for_each(tmp, &pvfs2_superblocks)
-            {
+            list_for_each(tmp, &pvfs2_superblocks) {
                 pvfs2_sb = list_entry(tmp, pvfs2_sb_info_t, list);
                 if (pvfs2_sb && (pvfs2_sb->sb))
                 {
                     pvfs2_print("Remounting SB %p\n", pvfs2_sb);
 
-                    ret = pvfs2_remount(pvfs2_sb->sb, NULL, pvfs2_sb->data);
+                    ret = pvfs2_remount(pvfs2_sb->sb, NULL,
+                                        pvfs2_sb->data);
                     if (ret)
                     {
                         pvfs2_print("Failed to remount SB %p\n", pvfs2_sb);
@@ -637,13 +627,14 @@ static long dispatch_ioctl_command(
                     }
                 }
             }
-            pvfs2_print("pvfs2_devreq_ioctl: priority remount " "complete\n");
+            pvfs2_print("pvfs2_devreq_ioctl: priority remount "
+                        "complete\n");
             up(&request_semaphore);
             return ret;
         }
         break;
     default:
-        return -ENOIOCTLCMD;
+	return -ENOIOCTLCMD;
     }
     return -ENOIOCTLCMD;
 }
@@ -669,21 +660,20 @@ static int pvfs2_devreq_ioctl(
 #if defined(HAVE_COMPAT_IOCTL_HANDLER) || defined(HAVE_REGISTER_IOCTL32_CONVERSION)
 
 /*  Compat structure for the PVFS_DEV_MAP ioctl */
-struct PVFS_dev_map_desc32
+struct PVFS_dev_map_desc32 
 {
     compat_uptr_t ptr;
-    int32_t size;
+    int32_t      size;
 };
 
 #ifndef PVFS2_LINUX_KERNEL_2_4
 static unsigned long translate_dev_map26(
-    unsigned long args,
-    long *error)
+        unsigned long args, long *error)
 {
-    struct PVFS_dev_map_desc32 __user *p32 = (void __user *) args;
+    struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
     /* Depending on the architecture, allocate some space on the user-call-stack based on our expected layout */
-    struct PVFS_dev_map_desc __user *p = compat_alloc_user_space(sizeof(*p));
-    u32 addr;
+    struct PVFS_dev_map_desc    __user *p   = compat_alloc_user_space(sizeof(*p));
+    u32    addr;
 
     *error = 0;
     /* get the ptr from the 32 bit user-space */
@@ -696,17 +686,15 @@ static unsigned long translate_dev_map26(
     if (copy_in_user(&p->size, &p32->size, sizeof(int32_t)))
         goto err;
     return (unsigned long) p;
-  err:
+err:
     *error = -EFAULT;
     return 0;
 }
 #else
 static unsigned long translate_dev_map24(
-    unsigned long args,
-    struct PVFS_dev_map_desc *p,
-    long *error)
+        unsigned long args, struct PVFS_dev_map_desc *p, long *error)
 {
-    struct PVFS_dev_map_desc32 __user *p32 = (void __user *) args;
+    struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
     u32 addr, size;
 
     *error = 0;
@@ -719,7 +707,7 @@ static unsigned long translate_dev_map24(
         goto err;
     p->size = size;
     return 0;
-  err:
+err:
     *error = -EFAULT;
     return 0;
 }
@@ -733,9 +721,7 @@ static unsigned long translate_dev_map24(
  * is compiled as a 64 bit one
  */
 static long pvfs2_devreq_compat_ioctl(
-    struct file *filp,
-    unsigned int cmd,
-    unsigned long args)
+        struct file *filp, unsigned int cmd, unsigned long args)
 {
     long ret;
     unsigned long arg = args;
@@ -766,10 +752,10 @@ static long pvfs2_devreq_compat_ioctl(
 #ifndef PVFS2_LINUX_KERNEL_2_4
 
 static int pvfs2_translate_dev_map(
-    unsigned int fd,
-    unsigned int cmd,
-    unsigned long arg,
-    struct file *file)
+        unsigned int fd,
+        unsigned int cmd,
+        unsigned long arg,
+        struct   file *file)
 {
     long ret;
     unsigned long p;
@@ -788,10 +774,10 @@ static int pvfs2_translate_dev_map(
 #else
 
 static int pvfs2_translate_dev_map(
-    unsigned int fd,
-    unsigned int cmd,
-    unsigned long arg,
-    struct file *file)
+        unsigned int fd,
+        unsigned int cmd,
+        unsigned long arg,
+        struct   file *file)
 {
     long ret;
     struct PVFS_dev_map_desc p;
@@ -804,63 +790,54 @@ static int pvfs2_translate_dev_map(
 #endif
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
-typedef int (
-    *ioctl_fn) (
-    unsigned int fd,
-    unsigned int cmd,
-    unsigned long arg,
-    struct file * file);
+typedef int (*ioctl_fn)(unsigned int fd,
+        unsigned int cmd, unsigned long arg, struct   file *file);
 
-struct ioctl_trans
-{
+struct ioctl_trans {
     unsigned int cmd;
-    ioctl_fn handler;
+    ioctl_fn     handler;
 };
 #endif
 
 static struct ioctl_trans pvfs2_ioctl32_trans[] = {
-    {PVFS_DEV_GET_MAGIC, NULL},
-    {PVFS_DEV_GET_MAX_UPSIZE, NULL},
+    {PVFS_DEV_GET_MAGIC,        NULL},
+    {PVFS_DEV_GET_MAX_UPSIZE,   NULL},
     {PVFS_DEV_GET_MAX_DOWNSIZE, NULL},
-    {PVFS_DEV_MAP, pvfs2_translate_dev_map},
-    {PVFS_DEV_REMOUNT_ALL, NULL},
+    {PVFS_DEV_MAP,              pvfs2_translate_dev_map},
+    {PVFS_DEV_REMOUNT_ALL,      NULL},
     /* Please add stuff above this line and retain the entry below */
-    {0,},
+    {0, },
 };
 
 /* Must be called on module load */
-int pvfs2_ioctl32_init(
-    void)
+int pvfs2_ioctl32_init(void)
 {
     int i, error;
 
-    for (i = 0; pvfs2_ioctl32_trans[i].cmd != 0; i++)
+    for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
     {
-        error =
-            register_ioctl32_conversion(pvfs2_ioctl32_trans[i].cmd,
-                                        pvfs2_ioctl32_trans[i].handler);
-        if (error)
+        error = register_ioctl32_conversion(
+                    pvfs2_ioctl32_trans[i].cmd, pvfs2_ioctl32_trans[i].handler);
+        if (error) 
             goto fail;
         pvfs2_print("Registered ioctl32 command %08x with handler %p\n",
-                    (unsigned int) pvfs2_ioctl32_trans[i].cmd,
-                    pvfs2_ioctl32_trans[i].handler);
+                (unsigned int) pvfs2_ioctl32_trans[i].cmd, pvfs2_ioctl32_trans[i].handler);
     }
     return 0;
-  fail:
+fail:
     while (--i)
         unregister_ioctl32_conversion(pvfs2_ioctl32_trans[i].cmd);
     return error;
 }
 
 /* Must be called on module unload */
-void pvfs2_ioctl32_cleanup(
-    void)
+void pvfs2_ioctl32_cleanup(void)
 {
     int i;
-    for (i = 0; pvfs2_ioctl32_trans[i].cmd != 0; i++)
+    for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
     {
         pvfs2_print("Deregistered ioctl32 command %08x\n",
-                    (unsigned int) pvfs2_ioctl32_trans[i].cmd);
+               (unsigned int) pvfs2_ioctl32_trans[i].cmd);
         unregister_ioctl32_conversion(pvfs2_ioctl32_trans[i].cmd);
     }
 }
@@ -870,14 +847,12 @@ void pvfs2_ioctl32_cleanup(
 #endif /* CONFIG_COMPAT */
 
 #if (defined(CONFIG_COMPAT) && !defined(HAVE_REGISTER_IOCTL32_CONVERSION)) || !defined(CONFIG_COMPAT)
-int pvfs2_ioctl32_init(
-    void)
+int pvfs2_ioctl32_init(void)
 {
     return 0;
 }
 
-void pvfs2_ioctl32_cleanup(
-    void)
+void pvfs2_ioctl32_cleanup(void)
 {
     return;
 }
@@ -903,15 +878,16 @@ static unsigned int pvfs2_devreq_poll(
     return poll_revent_mask;
 }
 
-struct file_operations pvfs2_devreq_file_operations = {
+struct file_operations pvfs2_devreq_file_operations =
+{
 #ifdef PVFS2_LINUX_KERNEL_2_4
-  owner:THIS_MODULE,
-  read:pvfs2_devreq_read,
-  writev:pvfs2_devreq_writev,
-  open:pvfs2_devreq_open,
-  release:pvfs2_devreq_release,
-  ioctl:pvfs2_devreq_ioctl,
-  poll:pvfs2_devreq_poll
+    owner: THIS_MODULE,
+    read : pvfs2_devreq_read,
+    writev : pvfs2_devreq_writev,
+    open : pvfs2_devreq_open,
+    release : pvfs2_devreq_release,
+    ioctl : pvfs2_devreq_ioctl,
+    poll : pvfs2_devreq_poll
 #else
     .read = pvfs2_devreq_read,
     .writev = pvfs2_devreq_writev,

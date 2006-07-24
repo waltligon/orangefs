@@ -16,9 +16,7 @@
 #define ENTRIES_TO_ADD           512
 #define DEFAULT_TIMEOUT_SECONDS    2
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)	
 {
     int timeout = DEFAULT_TIMEOUT_SECONDS;
     int ret = -1, i = 0;
@@ -39,26 +37,26 @@ int main(
     gossip_set_debug_mask(1, GOSSIP_ACACHE_DEBUG);
 
     ret = PINT_cached_config_initialize();
-    if (ret < 0)
+    if(ret < 0)
     {
-        gossip_err("cached_config_initialize() failure.\n");
-        return -1;
+	gossip_err("cached_config_initialize() failure.\n");
+	return -1;
     }
 
     /* initialize the cache */
     ret = PINT_acache_initialize();
-    if (ret < 0)
+    if(ret < 0)
     {
         gossip_err("acache_initialize() failure.\n");
-        return (-1);
+        return(-1);
     }
 
     PINT_acache_set_timeout(timeout * 1000);
 
-    for (i = 0; i < entries_to_add; i++)
+    for(i = 0; i < entries_to_add; i++)
     {
-        tmp.handle = (PVFS_handle) i;
-        tmp.fs_id = (PVFS_fs_id) (i + 1000);
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
         pinode1 = PINT_acache_lookup(tmp, NULL, NULL);
         assert(pinode1 == NULL);
@@ -76,10 +74,10 @@ int main(
         gossip_debug(GOSSIP_ACACHE_DEBUG, "Added %d entries to acache\n", i);
     }
 
-    for (i = 0; i < entries_to_add; i++)
+    for(i = 0; i < entries_to_add; i++)
     {
-        tmp.handle = (PVFS_handle) i;
-        tmp.fs_id = (PVFS_fs_id) (i + 1000);
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
         pinode2 = PINT_acache_lookup(tmp, NULL, NULL);
         assert(pinode2);
@@ -93,13 +91,13 @@ int main(
     }
 
     /* sleep to make sure all entries expired */
-    gossip_debug(GOSSIP_ACACHE_DEBUG, " Sleeping for %d seconds\n", timeout);
+    gossip_debug(GOSSIP_ACACHE_DEBUG," Sleeping for %d seconds\n",timeout);
     sleep(timeout);
 
-    for (i = 0; i < entries_to_add; i++)
+    for(i = 0; i < entries_to_add; i++)
     {
-        tmp.handle = (PVFS_handle) i;
-        tmp.fs_id = (PVFS_fs_id) (i + 1000);
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
         pinode2 = PINT_acache_lookup(tmp, NULL, NULL);
         assert(pinode2);
@@ -107,7 +105,8 @@ int main(
         if (PINT_acache_pinode_status(pinode2, NULL) == PINODE_STATUS_VALID)
         {
             gossip_err("(2) Failure: lookup returned %llu when it "
-                       "should've been expired.\n", llu(pinode2->refn.handle));
+                       "should've been expired.\n",
+                       llu(pinode2->refn.handle));
         }
 
         /* make them once again valid here before dropping the ref */
@@ -116,10 +115,10 @@ int main(
     }
 
     /* again make sure entries are all valid */
-    for (i = 0; i < entries_to_add; i++)
+    for(i = 0; i < entries_to_add; i++)
     {
-        tmp.handle = (PVFS_handle) i;
-        tmp.fs_id = (PVFS_fs_id) (i + 1000);
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
         pinode2 = PINT_acache_lookup(tmp, NULL, NULL);
         assert(pinode2);
@@ -132,9 +131,9 @@ int main(
         }
 
         /*
-           explicitly make all pinode entries invalid
-           here (note, invalidate drops the ref)
-         */
+          explicitly make all pinode entries invalid
+          here (note, invalidate drops the ref)
+        */
         PINT_acache_invalidate(tmp);
     }
 
@@ -144,10 +143,10 @@ int main(
     }
 
     /* drop initial references */
-    for (i = 0; i < entries_to_add; i++)
+    for(i = 0; i < entries_to_add; i++)
     {
-        tmp.handle = (PVFS_handle) i;
-        tmp.fs_id = (PVFS_fs_id) (i + 1000);
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
         PINT_acache_invalidate(tmp);
     }

@@ -26,46 +26,39 @@
 
 /* gen_locks can be declared and initialized at the same time */
 static gen_mutex_t test_mutex = GEN_MUTEX_INITIALIZER;
-static int foo_function(
-    void);
+static int foo_function(void);
 
 
-int main(
-    int argc,
-    char **argv)
-{
+int main(int argc, char **argv)	{
 
-    gen_mutex_lock(&test_mutex);
-    /* Access critical region here */
-    printf("Critical region 1.\n");
-    gen_mutex_unlock(&test_mutex);
+	gen_mutex_lock(&test_mutex);
+		/* Access critical region here */
+		printf("Critical region 1.\n");
+	gen_mutex_unlock(&test_mutex);
 
-    foo_function();
+	foo_function();
 
-    return (0);
+	return(0);
 }
 
 
 /* this function shows how mutex's can be dynamically allocated and
  * destroyed */
-static int foo_function(
-    void)
-{
+static int foo_function(void){
 
-    gen_mutex_t *foo_mutex;
+	gen_mutex_t* foo_mutex;
 
-    foo_mutex = gen_mutex_build();
-    if (!foo_mutex)
-    {
-        return (-1);
-    }
+	foo_mutex = gen_mutex_build();
+	if(!foo_mutex){
+		return(-1);
+	}
 
-    gen_mutex_lock(foo_mutex);
-    /* Access critical region */
-    printf("Critical region 2.\n");
-    gen_mutex_unlock(foo_mutex);
+	gen_mutex_lock(foo_mutex);
+		/* Access critical region */
+		printf("Critical region 2.\n");
+	gen_mutex_unlock(foo_mutex);
 
-    gen_mutex_destroy(foo_mutex);
+	gen_mutex_destroy(foo_mutex);
 
-    return (0);
+	return(0);
 }

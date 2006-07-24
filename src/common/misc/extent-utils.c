@@ -27,8 +27,7 @@
  * the extent_str is invalid, or an error occurs
  *
  */
-PINT_llist *PINT_create_extent_list(
-    char *extent_str)
+PINT_llist *PINT_create_extent_list(char *extent_str)
 {
     PVFS_handle_extent cur_extent, *new_extent = NULL;
     PINT_llist *extent_list = NULL;
@@ -39,7 +38,7 @@ PINT_llist *PINT_create_extent_list(
         extent_list = PINT_llist_new();
         assert(extent_list);
 
-        while (PINT_parse_handle_ranges(extent_str, &cur_extent, &status))
+        while(PINT_parse_handle_ranges(extent_str,&cur_extent,&status))
         {
             new_extent = malloc(sizeof(PVFS_handle_extent));
             assert(new_extent);
@@ -47,7 +46,7 @@ PINT_llist *PINT_create_extent_list(
             new_extent->first = cur_extent.first;
             new_extent->last = cur_extent.last;
 
-            PINT_llist_add_to_tail(extent_list, (void *) new_extent);
+            PINT_llist_add_to_tail(extent_list,(void *)new_extent);
         }
     }
     return extent_list;
@@ -63,11 +62,10 @@ PINT_llist *PINT_create_extent_list(
  * range of the specified extent.  Returns 0 otherwise.
  *
  */
-int PINT_handle_in_extent(
-    PVFS_handle_extent * ext,
-    PVFS_handle handle)
+int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
 {
-    return ((handle > ext->first - 1) && (handle < ext->last + 1));
+    return ((handle > ext->first-1) &&
+            (handle < ext->last+1));
 }
 
 /* PINT_handle_in_extent_list()
@@ -82,7 +80,7 @@ int PINT_handle_in_extent(
  *
  */
 int PINT_handle_in_extent_list(
-    PINT_llist * extent_list,
+    PINT_llist *extent_list,
     PVFS_handle handle)
 {
     int ret = 0;
@@ -92,14 +90,14 @@ int PINT_handle_in_extent_list(
     if (extent_list)
     {
         cur = extent_list;
-        while (cur)
+        while(cur)
         {
             cur_extent = PINT_llist_head(cur);
             if (!cur_extent)
             {
                 break;
             }
-            if (PINT_handle_in_extent(cur_extent, handle))
+            if (PINT_handle_in_extent(cur_extent,handle))
             {
                 ret = 1;
                 break;
@@ -118,8 +116,7 @@ int PINT_handle_in_extent_list(
  * with the extent count total.  returns -PVFS_error on error
  */
 int PINT_extent_list_count_total(
-    PINT_llist * extent_list,
-    uint64_t * count)
+    PINT_llist *extent_list, uint64_t *count)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
@@ -130,7 +127,7 @@ int PINT_extent_list_count_total(
         *count = 0;
 
         cur = extent_list;
-        while (cur)
+        while(cur)
         {
             cur_extent = PINT_llist_head(cur);
             if (!cur_extent)
@@ -154,12 +151,11 @@ int PINT_extent_list_count_total(
  * Frees extent objects within the specified extent_list if any.
  *
  */
-void PINT_release_extent_list(
-    PINT_llist * extent_list)
+void PINT_release_extent_list(PINT_llist *extent_list)
 {
     if (extent_list)
     {
-        PINT_llist_free(extent_list, free);
+        PINT_llist_free(extent_list,free);
     }
 }
 

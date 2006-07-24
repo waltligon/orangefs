@@ -78,20 +78,18 @@ PVFS_Request PVFS_NULL = &PINT_NULL;
 
 /* int PVFS_Request_extent(PVFS_Request request, PVFS_size *extent); */
 
-int PVFS_Request_contiguous(
-    int32_t count,
-    PVFS_Request oldreq,
-    PVFS_Request * newreq)
+int PVFS_Request_contiguous(int32_t count,
+                            PVFS_Request oldreq,
+                            PVFS_Request * newreq)
 {
     return PVFS_Request_hvector(1, count, 0, oldreq, newreq);
 }
 
-int PVFS_Request_vector(
-    int32_t count,
-    int32_t blocklength,
-    PVFS_offset stride,
-    PVFS_Request oldreq,
-    PVFS_Request * newreq)
+int PVFS_Request_vector(int32_t count,
+                        int32_t blocklength,
+                        PVFS_offset stride,
+                        PVFS_Request oldreq,
+                        PVFS_Request * newreq)
 {
     int64_t extent;
     if (oldreq == NULL)
@@ -122,14 +120,13 @@ int PVFS_Request_vector(
  * WBL 3/3/05
  */
 
-static int PINT_subreq(
-    PVFS_offset offset,
-    int32_t bsize,
-    PVFS_size stride,
-    int32_t count,
-    PVFS_Request oldreq,
-    PVFS_size oldext,
-    PVFS_Request * newreq)
+static int PINT_subreq(PVFS_offset offset,
+                       int32_t bsize,
+                       PVFS_size stride,
+                       int32_t count,
+                       PVFS_Request oldreq,
+                       PVFS_size oldext,
+                       PVFS_Request * newreq)
 {
     if (oldreq == NULL)
         return PVFS_ERR_REQ;
@@ -162,12 +159,11 @@ static int PINT_subreq(
     return PVFS_SUCCESS;
 }
 
-int PVFS_Request_hvector(
-    int32_t count,
-    int32_t blocklength,
-    PVFS_size stride,
-    PVFS_Request oldreq,
-    PVFS_Request * newreq)
+int PVFS_Request_hvector(int32_t count,
+                         int32_t blocklength,
+                         PVFS_size stride,
+                         PVFS_Request oldreq,
+                         PVFS_Request * newreq)
 {
     PVFS_size oldext;
     if (oldreq == NULL)
@@ -186,8 +182,7 @@ int PVFS_Request_hvector(
     return PVFS_SUCCESS;
 }
 
-static int PINT_reqstats(
-    PVFS_Request * newreq)
+static int PINT_reqstats(PVFS_Request * newreq)
 {
     /* calculate statistics like ub, lb, depth, etc. */
     if ((*newreq)->sreq)
@@ -217,12 +212,11 @@ static int PINT_reqstats(
     return PVFS_SUCCESS;
 }
 
-int PVFS_Request_indexed(
-    int32_t count,
-    int32_t * blocklengths,
-    PVFS_size * displacements,
-    PVFS_Request oldreq,
-    PVFS_Request * newreq)
+int PVFS_Request_indexed(int32_t count,
+                         int32_t * blocklengths,
+                         PVFS_size * displacements,
+                         PVFS_Request oldreq,
+                         PVFS_Request * newreq)
 {
     PINT_Request *dt;
     int64_t oldext;
@@ -244,19 +238,17 @@ int PVFS_Request_indexed(
     return PVFS_SUCCESS;
 }
 
-static int PVFS_Request_indexed_block(
-    int32_t count,
-    int32_t blocklength,
-    PVFS_size * displacements,
-    PVFS_Request oldreq,
-    PVFS_Request * newreq) __attribute__ ((unused));
+static int PVFS_Request_indexed_block(int32_t count,
+                               int32_t blocklength,
+                               PVFS_size * displacements,
+                               PVFS_Request oldreq,
+                               PVFS_Request * newreq) __attribute__((unused));
 /* this is a stupid first approach, fix it later - WBL */
-static int PVFS_Request_indexed_block(
-    int32_t count,
-    int32_t blocklength,
-    PVFS_size * displacements,
-    PVFS_Request oldreq,
-    PVFS_Request * newreq)
+static int PVFS_Request_indexed_block(int32_t count,
+                               int32_t blocklength,
+                               PVFS_size * displacements,
+                               PVFS_Request oldreq,
+                               PVFS_Request * newreq)
 {
     int i;
     int32_t *blocklengths;
@@ -267,12 +259,11 @@ static int PVFS_Request_indexed_block(
                                 oldreq, newreq);
 }
 
-int PVFS_Request_hindexed(
-    int32_t count,
-    int32_t * blocklengths,
-    PVFS_size * displacements,
-    PVFS_Request oldreq,
-    PVFS_Request * newreq)
+int PVFS_Request_hindexed(int32_t count,
+                          int32_t * blocklengths,
+                          PVFS_size * displacements,
+                          PVFS_Request oldreq,
+                          PVFS_Request * newreq)
 {
     PINT_Request *dt;
     int64_t oldext;
@@ -294,12 +285,11 @@ int PVFS_Request_hindexed(
     return PVFS_SUCCESS;
 }
 
-int PVFS_Request_struct(
-    int32_t count,
-    int32_t * blocklengths,
-    PVFS_size * displacements,
-    PVFS_Request * oldreqs,
-    PVFS_Request * newreq)
+int PVFS_Request_struct(int32_t count,
+                        int32_t * blocklengths,
+                        PVFS_size * displacements,
+                        PVFS_Request * oldreqs,
+                        PVFS_Request * newreq)
 {
     PINT_Request *dt;
     int64_t oldext;
@@ -323,11 +313,10 @@ int PVFS_Request_struct(
     return PVFS_SUCCESS;
 }
 
-int PVFS_Request_resized(
-    PVFS_Request oldreq,
-    PVFS_offset lb,
-    PVFS_size extent,
-    PVFS_Request * newreq)
+int PVFS_Request_resized(PVFS_Request oldreq,
+                         PVFS_offset lb,
+                         PVFS_size extent,
+                         PVFS_Request * newreq)
 {
     int retval;
     if (oldreq == NULL)
@@ -344,17 +333,15 @@ int PVFS_Request_resized(
     return retval;
 }
 
-int PVFS_Address(
-    void *location,
-    PVFS_offset * address)
+int PVFS_Address(void *location,
+                 PVFS_offset * address)
 {
     *address = (char *) location - (char *) PVFS_BOTTOM;
     return PVFS_SUCCESS;
 }
 
-int PVFS_Request_extent(
-    PVFS_Request request,
-    PVFS_size * extent)
+int PVFS_Request_extent(PVFS_Request request,
+                        PVFS_size * extent)
 {
     if (request == NULL)
         return PVFS_ERR_REQ;
@@ -362,9 +349,8 @@ int PVFS_Request_extent(
     return PVFS_SUCCESS;
 }
 
-int PVFS_Request_size(
-    PVFS_Request request,
-    PVFS_size * size)
+int PVFS_Request_size(PVFS_Request request,
+                      PVFS_size * size)
 {
     if (request == NULL)
         return PVFS_ERR_REQ;
@@ -372,9 +358,8 @@ int PVFS_Request_size(
     return PVFS_SUCCESS;
 }
 
-int PVFS_Request_lb(
-    PVFS_Request request,
-    PVFS_size * displacement)
+int PVFS_Request_lb(PVFS_Request request,
+                    PVFS_size * displacement)
 {
     if (request == NULL)
         return PVFS_ERR_REQ;
@@ -382,9 +367,8 @@ int PVFS_Request_lb(
     return PVFS_SUCCESS;
 }
 
-int PVFS_Request_ub(
-    PVFS_Request request,
-    PVFS_size * displacement)
+int PVFS_Request_ub(PVFS_Request request,
+                    PVFS_size * displacement)
 {
     if (request == NULL)
         return PVFS_ERR_REQ;
@@ -397,8 +381,7 @@ int PVFS_Request_ub(
  * contiguous region of memory. A pointer to this contiguous region will
  * then be passed back in the argument
  */
-int PVFS_Request_commit(
-    PVFS_Request * reqp)
+int PVFS_Request_commit(PVFS_Request * reqp)
 {
     PVFS_Request region = NULL;
     PVFS_Request req;
@@ -443,8 +426,7 @@ int PVFS_Request_commit(
     return PVFS_SUCCESS;
 }
 
-int PVFS_Request_free(
-    PVFS_Request * req)
+int PVFS_Request_free(PVFS_Request * req)
 {
     PVFS_Request reqp;
     if (req == NULL)

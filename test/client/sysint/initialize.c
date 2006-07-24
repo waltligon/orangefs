@@ -20,15 +20,15 @@ int main(
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
 
     ret = PVFS_sys_finalize();
     if (ret < 0)
     {
-        printf("finalizing sysint failed with errcode = %d\n", ret);
-        return (-1);
+	printf("finalizing sysint failed with errcode = %d\n", ret);
+	return (-1);
     }
 
     return (0);

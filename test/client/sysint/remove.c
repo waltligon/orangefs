@@ -13,15 +13,13 @@
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc,char **argv)
 {
     int ret = -1;
-    char str_buf[256] = { 0 };
-    char *filename = (char *) 0;
+    char str_buf[256] = {0};
+    char *filename = (char *)0;
     PVFS_fs_id cur_fs;
-    char *entry_name;
+    char* entry_name;
     PVFS_object_ref parent_refn;
     PVFS_credentials credentials;
 
@@ -35,36 +33,37 @@ int main(
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
     ret = PVFS_util_get_default_fsid(&cur_fs);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_get_default_fsid", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
-    if (PINT_remove_base_dir(filename, str_buf, 256))
+    if (PINT_remove_base_dir(filename,str_buf,256))
     {
         if (filename[0] != '/')
         {
             printf("You forgot the leading '/'\n");
         }
-        printf("Cannot retrieve entry name for creation on %s\n", filename);
-        return (-1);
+        printf("Cannot retrieve entry name for creation on %s\n",
+               filename);
+        return(-1);
     }
-    printf("File to be removed is %s\n", str_buf);
+    printf("File to be removed is %s\n",str_buf);
 
     entry_name = str_buf;
 
     PVFS_util_gen_credentials(&credentials);
     ret = PINT_lookup_parent(filename, cur_fs, &credentials,
                              &parent_refn.handle);
-    if (ret < 0)
+    if(ret < 0)
     {
-        PVFS_perror("PVFS_util_lookup_parent", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_lookup_parent", ret);
+	return(-1);
     }
     parent_refn.fs_id = cur_fs;
 
@@ -72,7 +71,7 @@ int main(
     if (ret < 0)
     {
         PVFS_perror("remove failed ", ret);
-        return (-1);
+        return(-1);
     }
 
     printf("===================================\n");
@@ -86,5 +85,5 @@ int main(
         return (-1);
     }
 
-    return (0);
+    return(0);
 }

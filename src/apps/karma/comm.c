@@ -369,7 +369,8 @@ static int gui_comm_stats_collect(
                      PVFS_mgmt_map_addr(cur_fsid,
                                         &creds,
                                         internal_details->error[i].addr,
-                                        &dummy), err_msg);
+                                        &dummy),
+                     err_msg);
             gui_message_new(msgbuf);
         }
 
@@ -379,7 +380,10 @@ static int gui_comm_stats_collect(
     {
 
         PVFS_strerror_r(ret, err_msg, 64);
-        snprintf(msgbuf, 64, "Error: PVFS_mgmt_statfs_list(): %s\n", err_msg);
+        snprintf(msgbuf,
+                 64,
+                 "Error: PVFS_mgmt_statfs_list(): %s\n",
+                 err_msg);
         gui_message_new(msgbuf);
 
         return -1;
@@ -422,7 +426,8 @@ static int gui_comm_perf_collect(
                      PVFS_mgmt_map_addr(cur_fsid,
                                         &creds,
                                         internal_details->error[i].addr,
-                                        &dummy), err_msg);
+                                        &dummy),
+                    err_msg);
             gui_message_new(msgbuf);
         }
 
@@ -431,7 +436,10 @@ static int gui_comm_perf_collect(
     else
     {
         PVFS_strerror_r(ret, err_msg, 64);
-        snprintf(msgbuf, 64, "Error: PVFS_mgmt_perf_mon_list(): %s\n", err_msg);
+        snprintf(msgbuf,
+                 64,
+                 "Error: PVFS_mgmt_perf_mon_list(): %s\n",
+                 err_msg);
         gui_message_new(msgbuf);
 
         return -1;

@@ -14,9 +14,7 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc,char **argv)
 {
     PVFS_sysresp_getparent resp_getparent;
     int ret = -1;
@@ -34,14 +32,14 @@ int main(
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
     ret = PVFS_util_get_default_fsid(&fs_id);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_get_default_fsid", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
     PVFS_util_gen_credentials(&credentials);
@@ -49,7 +47,8 @@ int main(
     if (ret == 0)
     {
         printf("=== getparent data:\n");
-        printf("resp_getparent.basename: %s\n", resp_getparent.basename);
+        printf("resp_getparent.basename: %s\n",
+               resp_getparent.basename);
         printf("resp_getparent.parent_ref.fs_id: %d\n",
                resp_getparent.parent_ref.fs_id);
         printf("resp_getparent.parent_ref.handle: %lld\n",
@@ -66,5 +65,5 @@ int main(
         printf("finalizing sysint failed with errcode = %d\n", ret);
         return (-1);
     }
-    return (0);
+    return(0);
 }

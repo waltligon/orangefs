@@ -90,12 +90,12 @@ pthread_mutex_t *gen_posix_mutex_build(
     mutex_p = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
     if (!mutex_p)
     {
-        return (NULL);
+	return (NULL);
     }
     if ((pthread_mutex_init(mutex_p, NULL)) < 0)
     {
-        free(mutex_p);
-        return (NULL);
+	free(mutex_p);
+	return (NULL);
     }
     return (mutex_p);
 }
@@ -114,7 +114,7 @@ int gen_posix_mutex_destroy(
 
     if (!mut)
     {
-        return (-EINVAL);
+	return (-EINVAL);
     }
     pthread_mutex_destroy(mut);
     free(mut);

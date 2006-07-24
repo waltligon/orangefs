@@ -23,9 +23,7 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-static void usage(
-    int argc,
-    char **argv);
+static void usage(int argc, char** argv);
 
 #define MAX_TALLY 1000
 
@@ -39,13 +37,11 @@ struct tally
     int count;
 };
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int ret = -1;
-    FILE *infile;
-    struct tally *tally_array;
+    FILE* infile;
+    struct tally* tally_array;
     char tmp_buf[512];
     int tally_count = 0;
     int measure_num;
@@ -59,87 +55,93 @@ int main(
     int line = 1;
     int i;
 
-    if (argc != 2)
-        usage(argc, argv);
+    if(argc != 2)
+	usage(argc, argv);
 
     infile = fopen(argv[1], "r");
-    if (!infile)
+    if(!infile)
     {
-        perror("fopen");
-        return (-1);
+	perror("fopen");
+	return(-1);
     }
 
-    tally_array = (struct tally *) malloc(MAX_TALLY * sizeof(struct tally));
-    if (!tally_array)
+    tally_array = (struct tally*)malloc(MAX_TALLY*sizeof(struct tally));
+    if(!tally_array)
     {
-        perror("malloc");
-        return (-1);
+	perror("malloc");
+	return(-1);
     }
-    memset(tally_array, 0, MAX_TALLY * sizeof(struct tally));
+    memset(tally_array, 0, MAX_TALLY*sizeof(struct tally));
 
     printf("# (api_op) (count) (ave) (min) (max)\n");
 
     /* pull in all of the data */
-    while (fgets(tmp_buf, 512, infile))
+    while(fgets(tmp_buf, 512, infile))
     {
-        /* skip comments */
-        if (tmp_buf[0] == '#')
-            continue;
+	/* skip comments */
+	if(tmp_buf[0] == '#')
+	    continue;
 
-        /* read in data line */
-        ret = sscanf(tmp_buf, "%d\t%d\t%d_%d\t%lld\t%f\t%f\t%f\n",
-                     &measure_num,
-                     &server, &api, &op, &value, &start, &end, &len);
-        if (ret != 8)
-        {
-            fprintf(stderr, "Parse error, data line %d.\n", (line));
-            return (-1);
-        }
-        line++;
+	/* read in data line */
+	ret = sscanf(tmp_buf, "%d\t%d\t%d_%d\t%lld\t%f\t%f\t%f\n",
+	    &measure_num,
+	    &server,
+	    &api,
+	    &op,
+	    &value,
+	    &start,
+	    &end,
+	    &len);
+	if(ret != 8)
+	{
+	    fprintf(stderr, "Parse error, data line %d.\n", (line));
+	    return(-1);
+	}
+	line++;
 
-        /* look for a tally for this type of op */
-        for (i = 0; i < tally_count; i++)
-        {
-            if (tally_array[i].op == op && tally_array[i].api == api)
-                break;
-        }
-        if (i >= tally_count)
-        {
-            /* no match, start a new tally */
-            tally_array[i].op = op;
-            tally_array[i].api = api;
-            tally_count++;
-        }
+	/* look for a tally for this type of op */
+	for(i=0; i<tally_count; i++)
+	{
+	    if(tally_array[i].op == op && tally_array[i].api == api)
+		break;
+	}
+	if(i >= tally_count)
+	{
+	    /* no match, start a new tally */
+	    tally_array[i].op = op;
+	    tally_array[i].api = api;
+	    tally_count++;
+	}
 
-        /* add into statistics */
-        if (tally_array[i].min == 0 || tally_array[i].min > len)
-            tally_array[i].min = len;
-        if (tally_array[i].max == 0 || tally_array[i].max < len)
-            tally_array[i].max = len;
-        tally_array[i].sum += len;
-        tally_array[i].count++;
+	/* add into statistics */
+	if(tally_array[i].min == 0 || tally_array[i].min > len)
+	    tally_array[i].min = len;
+	if(tally_array[i].max == 0 || tally_array[i].max < len)
+	    tally_array[i].max = len;
+	tally_array[i].sum += len;
+	tally_array[i].count++;
     }
 
     /* print out results */
-    for (i = 0; i < tally_count; i++)
+    for(i=0; i<tally_count; i++)
     {
-        printf("%d_%d\t%d\t%f\t%f\t%f\n",
-               tally_array[i].api,
-               tally_array[i].op,
-               tally_array[i].count,
-               (tally_array[i].sum / (float) tally_array[i].count),
-               tally_array[i].min, tally_array[i].max);
+	printf("%d_%d\t%d\t%f\t%f\t%f\n",
+	    tally_array[i].api,
+	    tally_array[i].op,
+	    tally_array[i].count,
+	    (tally_array[i].sum / (float)tally_array[i].count),
+	    tally_array[i].min,
+	    tally_array[i].max);
     }
 
-    return (0);
+    return(0);
 }
 
-static void usage(
-    int argc,
-    char **argv)
+static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s <parsed event log>\n", argv[0]);
+    fprintf(stderr, "Usage  : %s <parsed event log>\n",
+	argv[0]);
     return;
 }
 
@@ -151,3 +153,4 @@ static void usage(
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
+

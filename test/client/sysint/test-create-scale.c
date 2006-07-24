@@ -18,21 +18,18 @@
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 
-static double Wtime(
-    void)
+static double Wtime(void)
 {
     struct timeval t;
     gettimeofday(&t, NULL);
-    return ((double) t.tv_sec + (double) (t.tv_usec) / 1000000);
+    return((double)t.tv_sec + (double)(t.tv_usec) / 1000000);
 }
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int ret = -1;
-    char str_buf[256] = { 0 };
-    char *basename = (char *) 0;
+    char str_buf[256] = {0};
+    char *basename = (char *)0;
     PVFS_fs_id cur_fs;
     PVFS_sysresp_create resp_create;
     char entry_name[256];
@@ -41,62 +38,62 @@ int main(
     PVFS_credentials credentials;
     int max_dfiles = 0;
     int iters = 0;
-    int i, j;
+    int i,j;
     double start_time;
     double end_time;
-    double **measurements;
+    double** measurements;
 
     if (argc != 4)
     {
-        fprintf(stderr, "Usage: %s <filename (base)> <max dfiles> <iters>\n",
-                argv[0]);
+        fprintf(stderr,"Usage: %s <filename (base)> <max dfiles> <iters>\n",argv[0]);
         return ret;
     }
     basename = argv[1];
     ret = sscanf(argv[2], "%d", &max_dfiles);
-    if (ret != 1)
+    if(ret != 1)
     {
-        fprintf(stderr, "Error: could not parse args.\n");
-        return (-1);
+	fprintf(stderr, "Error: could not parse args.\n");
+	return(-1);
     }
     ret = sscanf(argv[3], "%d", &iters);
-    if (ret != 1)
+    if(ret != 1)
     {
-        fprintf(stderr, "Error: could not parse args.\n");
-        return (-1);
+	fprintf(stderr, "Error: could not parse args.\n");
+	return(-1);
     }
 
-    measurements = (double **) malloc(max_dfiles * sizeof(double *));
+    measurements = (double**)malloc(max_dfiles*sizeof(double*));
     assert(measurements);
-    memset(measurements, 0, max_dfiles * sizeof(double *));
-    for (i = 0; i < max_dfiles; i++)
+    memset(measurements, 0, max_dfiles*sizeof(double*));
+    for(i=0; i<max_dfiles; i++)
     {
-        measurements[i] = (double *) malloc(iters * sizeof(double));
-        assert(measurements[i]);
-        memset(measurements[i], 0, iters * sizeof(double));
+	measurements[i] = (double*)malloc(iters*sizeof(double));
+	assert(measurements[i]);
+	memset(measurements[i], 0, iters*sizeof(double));
     }
 
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
     ret = PVFS_util_get_default_fsid(&cur_fs);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_get_default_fsid", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
-    if (PINT_remove_base_dir(basename, str_buf, 256))
+    if (PINT_remove_base_dir(basename,str_buf,256))
     {
         if (basename[0] != '/')
         {
             printf("You forgot the leading '/'\n");
         }
-        printf("Cannot retrieve entry name for creation on %s\n", basename);
-        return (-1);
+        printf("Cannot retrieve entry name for creation on %s\n",
+               basename);
+        return(-1);
     }
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
@@ -110,80 +107,82 @@ int main(
     attr.dfile_count = max_dfiles;
     attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
 
-    ret = PINT_lookup_parent(basename, cur_fs, &credentials,
+    ret = PINT_lookup_parent(basename, cur_fs, &credentials, 
                              &parent_refn.handle);
-    if (ret < 0)
+    if(ret < 0)
     {
-        PVFS_perror("PVFS_util_lookup_parent", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_lookup_parent", ret);
+	return(-1);
     }
     parent_refn.fs_id = cur_fs;
 
     /* do one big one to prime connections if needed */
     sprintf(entry_name, "%s%d", str_buf, 0);
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          &credentials, NULL, &resp_create);
+			  &credentials, NULL, &resp_create);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_sys_create", ret);
-        return (-1);
+	PVFS_perror("PVFS_sys_create", ret);
+	return(-1);
     }
     ret = PVFS_sys_remove(entry_name, parent_refn, &credentials);
-    if (ret < 0)
+    if(ret < 0)
     {
-        PVFS_perror("PVFS_sys_remove", ret);
-        return (-1);
+	PVFS_perror("PVFS_sys_remove", ret);
+	return(-1);
     }
 
-    for (i = 0; i < max_dfiles; i++)
+    for(i=0; i<max_dfiles; i++)
     {
-        for (j = 0; j < iters; j++)
-        {
-            sprintf(entry_name, "%s%d", str_buf, j);
-            attr.dfile_count = i + 1;
-            start_time = Wtime();
-            ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                                  &credentials, NULL, &resp_create);
-            end_time = Wtime();
-            if (ret < 0)
-            {
-                PVFS_perror("PVFS_sys_create", ret);
-                return (-1);
-            }
-            measurements[i][j] = end_time - start_time;
-        }
+	for(j=0; j<iters; j++)
+	{
+	    sprintf(entry_name, "%s%d", str_buf, j);
+	    attr.dfile_count = i+1;
+	    start_time = Wtime();
+	    ret = PVFS_sys_create(entry_name, parent_refn, attr,
+				  &credentials, NULL, &resp_create);
+	    end_time = Wtime();
+	    if (ret < 0)
+	    {
+		PVFS_perror("PVFS_sys_create", ret);
+		return(-1);
+	    }
+	    measurements[i][j] = end_time-start_time;
+	}
 
-        for (j = 0; j < iters; j++)
-        {
-            sprintf(entry_name, "%s%d", str_buf, j);
-            ret = PVFS_sys_remove(entry_name, parent_refn, &credentials);
-            if (ret < 0)
-            {
-                PVFS_perror("PVFS_sys_remove", ret);
-                return (-1);
-            }
-        }
+	for(j=0; j<iters; j++)
+	{
+	    sprintf(entry_name, "%s%d", str_buf, j);
+	    ret = PVFS_sys_remove(entry_name, parent_refn, &credentials);
+	    if(ret < 0)
+	    {
+		PVFS_perror("PVFS_sys_remove", ret);
+		return(-1);
+	    }
+	}
     }
 
     /* print out some results */
     printf("<num dfiles> <iterations> <ave> <max> <min> <ave-min-max>\n");
-    for (i = 0; i < max_dfiles; i++)
+    for(i=0; i<max_dfiles; i++)
     {
-        float min = 0;
-        float max = 0;
-        float sum = 0;
-        for (j = 0; j < iters; j++)
-        {
-            if (min == 0 || min > measurements[i][j])
-                min = measurements[i][j];
-            if (max == 0 || max < measurements[i][j])
-                max = measurements[i][j];
+	float min = 0;
+	float max = 0;
+	float sum = 0;
+	for(j=0; j<iters; j++)
+	{
+	    if(min == 0 || min > measurements[i][j])
+		min = measurements[i][j];
+	    if(max == 0 || max < measurements[i][j])
+		max = measurements[i][j];
 
-            sum += measurements[i][j];
-        }
-        printf("%d\t%d\t%f\t%f\t%f\t%f\n", (i + 1), iters,
-               (sum / (float) iters),
-               max, min, ((sum - min - max) / (float) (iters - 2)));
+	    sum += measurements[i][j];
+	}
+	printf("%d\t%d\t%f\t%f\t%f\t%f\n", (i+1), iters,
+	    (sum/(float)iters),
+	    max,
+	    min,
+	    ((sum-min-max)/(float)(iters-2)));
     }
 
     ret = PVFS_sys_finalize();
@@ -193,5 +192,5 @@ int main(
         return (-1);
     }
 
-    return (0);
+    return(0);
 }

@@ -19,13 +19,9 @@ char file_system[FS_SIZE] = "fs-foo";
 char path_to_file[PATH_SIZE] = "/bar";
 TROVE_handle requested_file_handle = 4095;
 
-int parse_args(
-    int argc,
-    char **argv);
+int parse_args(int argc, char **argv);
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int ret, count, i;
     TROVE_op_id op_id;
@@ -41,25 +37,22 @@ int main(
     TROVE_context_id trove_context = -1;
 
     ret = parse_args(argc, argv);
-    if (ret < 0)
-    {
-        fprintf(stderr, "argument parsing failed.\n");
-        return -1;
+    if (ret < 0) {
+	fprintf(stderr, "argument parsing failed.\n");
+	return -1;
     }
 
     ret = trove_initialize(storage_space, 0, &method_name, 0);
-    if (ret < 0)
-    {
-        fprintf(stderr, "initialize failed.\n");
-        return -1;
+    if (ret < 0) {
+	fprintf(stderr, "initialize failed.\n");
+	return -1;
     }
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
-    if (ret < 0)
-    {
-        fprintf(stderr, "collection lookup failed.\n");
-        return -1;
+    if (ret < 0) {
+	fprintf(stderr, "collection lookup failed.\n");
+	return -1;
     }
 
     ret = trove_open_context(coll_id, &trove_context);
@@ -71,12 +64,9 @@ int main(
 
     /* find the parent directory name */
     strcpy(path_name, path_to_file);
-    for (i = strlen(path_name); i >= 0; i--)
-    {
-        if (path_name[i] != '/')
-            path_name[i] = '\0';
-        else
-            break;
+    for (i=strlen(path_name); i >= 0; i--) {
+	if (path_name[i] != '/') path_name[i] = '\0';
+	else break;
     }
     file_name = path_to_file + strlen(path_name);
 #if 0
@@ -86,9 +76,8 @@ int main(
 
     /* find the parent directory handle */
     ret = path_lookup(coll_id, path_name, &parent_handle);
-    if (ret < 0)
-    {
-        return -1;
+    if (ret < 0) {
+	return -1;
     }
 
     file_handle = requested_file_handle;
@@ -97,41 +86,42 @@ int main(
     extent_array.extent_array = &cur_extent;
     ret = trove_dspace_create(coll_id,
                               &extent_array,
-                              &file_handle,
-                              TROVE_TEST_FILE,
-                              NULL,
-                              TROVE_FORCE_REQUESTED_HANDLE,
-                              NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-    {
-        fprintf(stderr, "dspace create failed.\n");
-        return -1;
+			      &file_handle,
+			      TROVE_TEST_FILE,
+			      NULL,
+			      TROVE_FORCE_REQUESTED_HANDLE,
+			      NULL,
+                              trove_context,
+			      &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0) {
+	fprintf(stderr, "dspace create failed.\n");
+	return -1;
     }
 
     /* TODO: set attributes of file? */
-    s_attr.fs_id = coll_id;     /* for now */
+    s_attr.fs_id  = coll_id; /* for now */
     s_attr.handle = file_handle;
-    s_attr.type = TROVE_TEST_FILE;      /* shouldn't need to fill this one in. */
-    s_attr.uid = getuid();
-    s_attr.gid = getgid();
-    s_attr.mode = 0755;
-    s_attr.ctime = time(NULL);
+    s_attr.type   = TROVE_TEST_FILE; /* shouldn't need to fill this one in. */
+    s_attr.uid    = getuid();
+    s_attr.gid    = getgid();
+    s_attr.mode   = 0755;
+    s_attr.ctime  = time(NULL);
     count = 1;
 
     ret = trove_dspace_setattr(coll_id,
-                               file_handle,
-                               &s_attr,
-                               TROVE_SYNC, NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-        return -1;
+			       file_handle,
+			       &s_attr,
+			       TROVE_SYNC,
+			       NULL,
+                               trove_context,
+			       &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0) return -1;
 
     /* add new file name/handle pair to parent directory */
     key.buffer = file_name;
@@ -141,14 +131,12 @@ int main(
 
     ret = trove_keyval_write(coll_id, parent_handle, &key, &val,
                              0, NULL, NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-    {
-        fprintf(stderr, "keyval write failed.\n");
-        return -1;
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0) {
+	fprintf(stderr, "keyval write failed.\n");
+	return -1;
     }
     trove_close_context(coll_id, trove_context);
     trove_finalize();
@@ -158,32 +146,28 @@ int main(
     return 0;
 }
 
-int parse_args(
-    int argc,
-    char **argv)
+int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:c:p:h:")) != EOF)
-    {
-        switch (c)
-        {
-        case 's':
-            strncpy(storage_space, optarg, SSPACE_SIZE);
-            break;
-        case 'c':      /* collection */
-            strncpy(file_system, optarg, FS_SIZE);
-            break;
-        case 'p':
-            strncpy(path_to_file, optarg, PATH_SIZE);
-            break;
-        case 'h':
-            requested_file_handle = atoll(optarg);
-            break;
-        case '?':
-        default:
-            return -1;
-        }
+    while ((c = getopt(argc, argv, "s:c:p:h:")) != EOF) {
+	switch (c) {
+	    case 's':
+		strncpy(storage_space, optarg, SSPACE_SIZE);
+		break;
+	    case 'c': /* collection */
+		strncpy(file_system, optarg, FS_SIZE);
+		break;
+	    case 'p':
+		strncpy(path_to_file, optarg, PATH_SIZE);
+		break;
+	    case 'h':
+		requested_file_handle = atoll(optarg);
+		break;
+	    case '?':
+	    default:
+		return -1;
+	}
     }
     return 0;
 }

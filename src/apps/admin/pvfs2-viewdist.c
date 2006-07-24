@@ -39,79 +39,59 @@
 #include <attr/xattr.h>
 #endif
 
-struct options
+struct options 
 {
     char *srcfile;
 };
 
-enum object_type
-{
-    UNIX_FILE,
-    PVFS2_FILE
+enum object_type { 
+    UNIX_FILE, 
+    PVFS2_FILE 
 };
 
-typedef struct pvfs2_file_object_s
-{
+typedef struct pvfs2_file_object_s {
     PVFS_fs_id fs_id;
     PVFS_object_ref ref;
-    char pvfs2_path[PVFS_NAME_MAX];
+    char pvfs2_path[PVFS_NAME_MAX];	
     char user_path[PVFS_NAME_MAX];
     PVFS_sys_attr attr;
     PVFS_permissions perms;
 } pvfs2_file_object;
 
-typedef struct unix_file_object_s
-{
+typedef struct unix_file_object_s {
     int fd;
     int mode;
     char path[NAME_MAX];
     PVFS_fs_id fs_id;
 } unix_file_object;
 
-typedef struct file_object_s
-{
+typedef struct file_object_s {
     int fs_type;
-    union
-    {
-        unix_file_object ufs;
-        pvfs2_file_object pvfs2;
+    union {
+	unix_file_object ufs;
+	pvfs2_file_object pvfs2;
     } u;
 } file_object;
 
 
-static struct options *parse_args(
-    int argc,
-    char *argv[]);
-static void usage(
-    int argc,
-    char **argv);
-static int resolve_filename(
-    file_object * obj,
-    char *filename);
-static int generic_open(
-    file_object * obj,
-    PVFS_credentials * credentials);
-static int generic_server_location(
-    file_object * obj,
-    PVFS_credentials * creds,
-    char **servers,
-    PVFS_handle * handles,
-    int *nservers);
+static struct options* parse_args(int argc, char* argv[]);
+static void usage(int argc, char** argv);
+static int resolve_filename(file_object *obj, char *filename);
+static int generic_open(file_object *obj, PVFS_credentials *credentials);
+static int generic_server_location(file_object *obj, PVFS_credentials *creds,
+        char **servers, PVFS_handle *handles, int *nservers);
 
 /* metafile distribution */
 #define DIST_KEY "system.pvfs2." METAFILE_DIST_KEYSTR
 /* datafile handles */
 #define DFILE_KEY "system.pvfs2." DATAFILE_HANDLES_KEYSTR
 
-static int generic_dist(
-    file_object * obj,
-    PVFS_credentials * creds,
-    char **dist,
-    int *size)
+static int generic_dist(file_object *obj, PVFS_credentials *creds,
+        char **dist, int *size)
 {
     char *buffer = (char *) malloc(4096);
     int ret;
-
+    
     if (obj->fs_type == UNIX_FILE)
     {
 #ifndef HAVE_FGETXATTR_EXTRA_ARGS
@@ -133,7 +113,8 @@ static int generic_dist(
         key.buffer_sz = strlen(DIST_KEY) + 1;
         val.buffer = buffer;
         val.buffer_sz = 4096;
-        if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, creds, &key, &val)) < 0)
+        if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
+                creds, &key, &val)) < 0)
         {
             PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
@@ -150,17 +131,13 @@ static int generic_dist(
  * is allocated internally in this function.
  * callers job is to free up all the memory
  */
-static int generic_server_location(
-    file_object * obj,
-    PVFS_credentials * creds,
-    char **servers,
-    PVFS_handle * handles,
-    int *nservers)
+static int generic_server_location(file_object *obj, PVFS_credentials *creds,
+        char **servers, PVFS_handle *handles, int *nservers)
 {
     char *buffer = (char *) malloc(4096);
     int ret, num_dfiles, count;
     PVFS_fs_id fsid;
-
+    
     if (obj->fs_type == UNIX_FILE)
     {
 #ifndef HAVE_FGETXATTR_EXTRA_ARGS
@@ -182,7 +159,8 @@ static int generic_server_location(
         key.buffer_sz = strlen(DFILE_KEY) + 1;
         val.buffer = buffer;
         val.buffer_sz = 4096;
-        if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, creds, &key, &val)) < 0)
+        if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
+                creds, &key, &val)) < 0)
         {
             PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
@@ -197,8 +175,7 @@ static int generic_server_location(
     count = num_dfiles < *nservers ? num_dfiles : *nservers;
     for (ret = 0; ret < count; ret++)
     {
-        PVFS_handle *ptr =
-            (PVFS_handle *) ((char *) buffer + ret * sizeof(PVFS_handle));
+        PVFS_handle *ptr = (PVFS_handle *) ((char *) buffer + ret * sizeof(PVFS_handle));
         servers[ret] = (char *) calloc(1, PVFS_MAX_SERVER_ADDR_LEN);
         handles[ret] = *ptr;
         if (servers[ret] == NULL)
@@ -206,9 +183,9 @@ static int generic_server_location(
             break;
         }
         /* ignore any errors */
-        PINT_cached_config_get_server_name(servers[ret],
-                                           PVFS_MAX_SERVER_ADDR_LEN, *ptr,
-                                           fsid);
+        PINT_cached_config_get_server_name(
+                servers[ret], PVFS_MAX_SERVER_ADDR_LEN,
+                *ptr, fsid);
     }
     if (ret != count)
     {
@@ -224,11 +201,9 @@ static int generic_server_location(
     return 0;
 }
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char ** argv)
 {
-    struct options *user_opts = NULL;
+    struct options* user_opts = NULL;
     file_object src;
     PINT_dist *dist;
     char *dist_buf = NULL;
@@ -243,27 +218,27 @@ int main(
     user_opts = parse_args(argc, argv);
     if (!user_opts)
     {
-        fprintf(stderr, "Error, failed to parse command line arguments\n");
-        return (-1);
+	fprintf(stderr, "Error, failed to parse command line arguments\n");
+	return(-1);
     }
 
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_init_defaults", ret);
-        return (-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return(-1);
     }
     memset(&src, 0, sizeof(src));
 
-    resolve_filename(&src, user_opts->srcfile);
+    resolve_filename(&src,  user_opts->srcfile);
 
     PVFS_util_gen_credentials(&credentials);
 
     ret = generic_open(&src, &credentials);
     if (ret < 0)
     {
-        fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
-        goto main_out;
+	fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
+	goto main_out;
     }
 
     ret = generic_dist(&src, &credentials, &dist_buf, &dist_size);
@@ -272,9 +247,7 @@ int main(
         fprintf(stderr, "Could not read distribution information!\n");
         goto main_out;
     }
-    ret =
-        generic_server_location(&src, &credentials, servers, handles,
-                                &nservers);
+    ret = generic_server_location(&src, &credentials, servers, handles, &nservers);
     if (ret < 0)
     {
         fprintf(stderr, "Could not read server location information!\n");
@@ -287,20 +260,20 @@ int main(
     {
         PVFS_simple_stripe_params params;
         PINT_dist_getparams(&params, dist);
-        printf("strip_size = %ld\n", (unsigned long) (params.strip_size));
+        printf("strip_size = %ld\n", (unsigned long)(params.strip_size));
     }
     PINT_dist_free(dist);
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)
     {
         printf("Server %d - %s, handle: %llu (%08llx.bstream)\n", i, servers[i],
-               llu(handles[i]), llu(handles[i]));
+            llu(handles[i]), llu(handles[i]));
         free(servers[i]);
     }
-  main_out:
+main_out:
     PVFS_sys_finalize();
     free(user_opts);
-    return (ret);
+    return(ret);
 }
 
 /* parse_args()
@@ -309,55 +282,50 @@ int main(
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static struct options *parse_args(
-    int argc,
-    char *argv[])
+static struct options* parse_args(int argc, char* argv[])
 {
     char flags[] = "vf:";
     int one_opt = 0;
 
-    struct options *tmp_opts = NULL;
+    struct options* tmp_opts = NULL;
 
     /* create storage for the command line options */
-    tmp_opts = (struct options *) malloc(sizeof(struct options));
-    if (!tmp_opts)
-    {
-        return (NULL);
+    tmp_opts = (struct options*)malloc(sizeof(struct options));
+    if(!tmp_opts){
+	return(NULL);
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while ((one_opt = getopt(argc, argv, flags)) != EOF)
+    while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
-        switch (one_opt)
-        {
-        case ('v'):
-            printf("%s\n", PVFS2_VERSION);
-            exit(0);
-        case ('f'):
-            tmp_opts->srcfile = optarg;
-            break;
-        case ('?'):
-            usage(argc, argv);
-            exit(EXIT_FAILURE);
-        }
+	switch(one_opt){
+            case('v'):
+                printf("%s\n", PVFS2_VERSION);
+                exit(0);
+            case('f'):
+                tmp_opts->srcfile = optarg;
+                break;
+	    case('?'):
+		usage(argc, argv);
+		exit(EXIT_FAILURE);
+	}
     }
     if (tmp_opts->srcfile == NULL)
     {
         usage(argc, argv);
         exit(EXIT_FAILURE);
     }
-    return (tmp_opts);
+    return(tmp_opts);
 }
 
-static void usage(
-    int argc,
-    char **argv)
+static void usage(int argc, char** argv)
 {
-    fprintf(stderr, "Usage: %s ARGS \n", argv[0]);
+    fprintf(stderr, 
+	"Usage: %s ARGS \n", argv[0]);
     fprintf(stderr, "Where ARGS is one or more of"
-            "\n-f <file name>\t\t\tPVFS2 file pathname"
-            "\n-v\t\t\t\tprint version number and exit\n");
+	"\n-f <file name>\t\t\tPVFS2 file pathname"
+	"\n-v\t\t\t\tprint version number and exit\n");
     return;
 }
 
@@ -365,24 +333,19 @@ static void usage(
  *  given 'filename', find the PVFS2 fs_id and relative pvfs_path.  In case of
  *  error, assume 'filename' is a unix file.
  */
-static int resolve_filename(
-    file_object * obj,
-    char *filename)
+static int resolve_filename(file_object *obj, char *filename)
 {
     int ret;
 
-    ret =
-        PVFS_util_resolve(filename, &(obj->u.pvfs2.fs_id),
-                          obj->u.pvfs2.pvfs2_path, PVFS_NAME_MAX);
+    ret = PVFS_util_resolve(filename, &(obj->u.pvfs2.fs_id),
+	    obj->u.pvfs2.pvfs2_path, PVFS_NAME_MAX);
     if (ret < 0)
     {
-        obj->fs_type = UNIX_FILE;
+	obj->fs_type = UNIX_FILE;
         strncpy(obj->u.ufs.path, filename, NAME_MAX);
-    }
-    else
-    {
-        obj->fs_type = PVFS2_FILE;
-        strncpy(obj->u.pvfs2.user_path, filename, PVFS_NAME_MAX);
+    } else {
+	obj->fs_type = PVFS2_FILE;
+	strncpy(obj->u.pvfs2.user_path, filename, PVFS_NAME_MAX);
     }
     return 0;
 }
@@ -390,9 +353,7 @@ static int resolve_filename(
 /* generic_open:
  *  given a file_object, perform the apropriate open calls.  
  */
-static int generic_open(
-    file_object * obj,
-    PVFS_credentials * credentials)
+static int generic_open(file_object *obj, PVFS_credentials *credentials)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
@@ -409,31 +370,33 @@ static int generic_open(
         if (!S_ISREG(stat_buf.st_mode))
         {
             fprintf(stderr, "Not a file!\n");
-            return (-1);
+            return(-1);
         }
         obj->u.ufs.fd = open(obj->u.ufs.path, O_RDONLY);
-        obj->u.ufs.mode = (int) stat_buf.st_mode;
-        if (obj->u.ufs.fd < 0)
-        {
-            perror("open");
-            fprintf(stderr, "could not open %s\n", obj->u.ufs.path);
-            return (-1);
-        }
+        obj->u.ufs.mode = (int)stat_buf.st_mode;
+	if (obj->u.ufs.fd < 0)
+	{
+	    perror("open");
+	    fprintf(stderr, "could not open %s\n", obj->u.ufs.path);
+	    return (-1);
+	}
         if (PINT_statfs_fd_lookup(obj->u.ufs.fd, &statfsbuf) < 0)
         {
             perror("fstatfs:");
             fprintf(stderr, "could not fstatfs %s\n", obj->u.ufs.path);
         }
-        memcpy(&obj->u.ufs.fs_id, &PINT_statfs_fsid(&statfsbuf),
+        memcpy(&obj->u.ufs.fs_id, &PINT_statfs_fsid(&statfsbuf), 
                sizeof(PINT_statfs_fsid(&statfsbuf)));
         return 0;
     }
     else
     {
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        ret = PVFS_sys_lookup(obj->u.pvfs2.fs_id,
-                              (char *) obj->u.pvfs2.pvfs2_path, credentials,
-                              &resp_lookup, PVFS2_LOOKUP_LINK_FOLLOW);
+        ret = PVFS_sys_lookup(obj->u.pvfs2.fs_id, 
+                              (char *) obj->u.pvfs2.pvfs2_path,
+                              credentials, 
+                              &resp_lookup,
+                              PVFS2_LOOKUP_LINK_FOLLOW);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_lookup", ret);
@@ -443,9 +406,8 @@ static int generic_open(
         ref.fs_id = resp_lookup.ref.fs_id;
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
-        ret =
-            PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT, credentials,
-                             &resp_getattr);
+        ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
+                               credentials, &resp_getattr);
         if (ret)
         {
             fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",
@@ -459,7 +421,8 @@ static int generic_open(
             return -1;
         }
         obj->u.pvfs2.perms = resp_getattr.attr.perms;
-        memcpy(&obj->u.pvfs2.attr, &resp_getattr.attr, sizeof(PVFS_sys_attr));
+        memcpy(&obj->u.pvfs2.attr, &resp_getattr.attr,
+               sizeof(PVFS_sys_attr));
         obj->u.pvfs2.attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
         obj->u.pvfs2.ref = ref;
     }

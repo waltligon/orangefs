@@ -25,10 +25,9 @@ struct cache_entry
  *
  * returns pointer to new buffer pool on success, NULL on failure
  */
-struct bufferpool *bmi_gm_bufferpool_init(
-    struct gm_port *current_port,
-    int num_buffers,
-    unsigned long buffer_size)
+struct bufferpool *bmi_gm_bufferpool_init(struct gm_port *current_port,
+					  int num_buffers,
+					  unsigned long buffer_size)
 {
     int i = 0;
     struct cache_entry *tmp_entry = NULL;
@@ -36,13 +35,13 @@ struct bufferpool *bmi_gm_bufferpool_init(
 
     if (buffer_size < sizeof(struct cache_entry))
     {
-        return (NULL);
+	return (NULL);
     }
 
     tmp_bp = malloc(sizeof(struct bufferpool));
     if (!tmp_bp)
     {
-        return (NULL);
+	return (NULL);
     }
     INIT_QLIST_HEAD(&tmp_bp->cache_head);
     tmp_bp->local_port = current_port;
@@ -50,14 +49,14 @@ struct bufferpool *bmi_gm_bufferpool_init(
 
     for (i = 0; i < num_buffers; i++)
     {
-        tmp_entry = (struct cache_entry *) gm_dma_malloc(tmp_bp->local_port,
-                                                         buffer_size);
-        if (!tmp_entry)
-        {
-            bmi_gm_bufferpool_finalize(tmp_bp);
-            return (NULL);
-        }
-        qlist_add(&(tmp_entry->link), &tmp_bp->cache_head);
+	tmp_entry = (struct cache_entry *) gm_dma_malloc(tmp_bp->local_port,
+							 buffer_size);
+	if (!tmp_entry)
+	{
+	    bmi_gm_bufferpool_finalize(tmp_bp);
+	    return (NULL);
+	}
+	qlist_add(&(tmp_entry->link), &tmp_bp->cache_head);
     }
     return (tmp_bp);
 }
@@ -68,19 +67,18 @@ struct bufferpool *bmi_gm_bufferpool_init(
  *
  * returns 0 on success, -errno on failure
  */
-void bmi_gm_bufferpool_finalize(
-    struct bufferpool *bp)
+void bmi_gm_bufferpool_finalize(struct bufferpool *bp)
 {
     struct cache_entry *tmp_entry = NULL;
     struct qlist_head *tmp_link = NULL;
 
     while (bp->cache_head.next != &bp->cache_head)
     {
-        tmp_link = bp->cache_head.next;
-        qlist_del(tmp_link);
-        tmp_entry = qlist_entry(tmp_link, struct cache_entry,
-                                link);
-        gm_dma_free(bp->local_port, tmp_entry);
+	tmp_link = bp->cache_head.next;
+	qlist_del(tmp_link);
+	tmp_entry = qlist_entry(tmp_link, struct cache_entry,
+				link);
+	gm_dma_free(bp->local_port, tmp_entry);
     }
 
     free(bp);
@@ -94,15 +92,14 @@ void bmi_gm_bufferpool_finalize(
  *
  * returns pointer to buffer
  */
-void *bmi_gm_bufferpool_get(
-    struct bufferpool *bp)
+void *bmi_gm_bufferpool_get(struct bufferpool *bp)
 {
     struct cache_entry *tmp_entry = NULL;
     struct qlist_head *tmp_link = NULL;
 
     if (bp->cache_head.next == &bp->cache_head)
     {
-        return (NULL);
+	return (NULL);
     }
 
     tmp_link = bp->cache_head.next;
@@ -118,9 +115,8 @@ void *bmi_gm_bufferpool_get(
  *
  * no return value
  */
-void bmi_gm_bufferpool_put(
-    struct bufferpool *bp,
-    void *buffer)
+void bmi_gm_bufferpool_put(struct bufferpool *bp,
+			   void *buffer)
 {
     struct cache_entry *tmp_entry = NULL;
 
@@ -140,8 +136,7 @@ void bmi_gm_bufferpool_put(
  *
  * returns 1 if empty, 0 otherwise
  */
-int bmi_gm_bufferpool_empty(
-    struct bufferpool *bp)
+int bmi_gm_bufferpool_empty(struct bufferpool *bp)
 {
     return (qlist_empty(&bp->cache_head));
 }

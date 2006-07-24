@@ -27,22 +27,21 @@
  *
  * returns pointer to structure on success, NULL on failure
  */
-struct job_desc *alloc_job_desc(
-    int type)
+struct job_desc *alloc_job_desc(int type)
 {
     struct job_desc *jd = NULL;
 
     jd = (struct job_desc *) malloc(sizeof(struct job_desc));
     if (!jd)
     {
-        return (NULL);
+	return (NULL);
     }
     memset(jd, 0, sizeof(struct job_desc));
 
     if (id_gen_safe_register(&(jd->job_id), jd) < 0)
     {
-        free(jd);
-        return (NULL);
+	free(jd);
+	return (NULL);
     }
 
     jd->type = type;
@@ -55,8 +54,7 @@ struct job_desc *alloc_job_desc(
  *
  * no return value
  */
-void dealloc_job_desc(
-    struct job_desc *jd)
+void dealloc_job_desc(struct job_desc *jd)
 {
     id_gen_safe_unregister(jd->job_id);
     free(jd);
@@ -68,12 +66,12 @@ void dealloc_job_desc(
  *
  * returns pointer to queue on success, NULL on failure
  */
-job_desc_q_p job_desc_q_new(
-    void)
+job_desc_q_p job_desc_q_new(void)
 {
     struct qlist_head *tmp_job_desc_q = NULL;
 
-    tmp_job_desc_q = (struct qlist_head *) malloc(sizeof(struct qlist_head));
+    tmp_job_desc_q = (struct qlist_head *)
+        malloc(sizeof(struct qlist_head));
     if (tmp_job_desc_q)
     {
         INIT_QLIST_HEAD(tmp_job_desc_q);
@@ -87,8 +85,7 @@ job_desc_q_p job_desc_q_new(
  *
  * no return value
  */
-void job_desc_q_cleanup(
-    job_desc_q_p jdqp)
+void job_desc_q_cleanup(job_desc_q_p jdqp)
 {
     job_desc_q_p iterator = NULL;
     job_desc_q_p scratch = NULL;
@@ -96,17 +93,17 @@ void job_desc_q_cleanup(
 
     if (jdqp)
     {
-        qlist_for_each_safe(iterator, scratch, jdqp)
-        {
-            tmp_job_desc = qlist_entry(iterator, struct job_desc,
-                                       job_desc_q_link);
-            /* qlist_for_each_safe lets us iterate and remove nodes.  no
-             * need to adjust pointers as we are freeing everything */
-            free(tmp_job_desc);
-        }
+            qlist_for_each_safe(iterator, scratch, jdqp)
+            {
+                tmp_job_desc = qlist_entry(iterator, struct job_desc,
+                        job_desc_q_link); 
+                /* qlist_for_each_safe lets us iterate and remove nodes.  no
+                 * need to adjust pointers as we are freeing everything */
+                free(tmp_job_desc);
+            }
 
-        free(jdqp);
-        jdqp = NULL;
+            free(jdqp);
+            jdqp = NULL;
     }
     return;
 }
@@ -117,9 +114,8 @@ void job_desc_q_cleanup(
  *
  * no return value
  */
-void job_desc_q_add(
-    job_desc_q_p jdqp,
-    struct job_desc *desc)
+void job_desc_q_add(job_desc_q_p jdqp,
+		    struct job_desc *desc)
 {
     if (jdqp)
     {
@@ -136,8 +132,7 @@ void job_desc_q_add(
  *
  * no return value
  */
-void job_desc_q_remove(
-    struct job_desc *desc)
+void job_desc_q_remove(struct job_desc *desc)
 {
     assert(desc);
     qlist_del(&(desc->job_desc_q_link));
@@ -149,8 +144,7 @@ void job_desc_q_remove(
  *
  * returns 1 if empty, 0 otherwise
  */
-int job_desc_q_empty(
-    job_desc_q_p jdqp)
+int job_desc_q_empty(job_desc_q_p jdqp)
 {
     return (qlist_empty(jdqp));
 }
@@ -161,12 +155,11 @@ int job_desc_q_empty(
  *
  * returns pointer to job desc on success, NULL on failure
  */
-struct job_desc *job_desc_q_shownext(
-    job_desc_q_p jdqp)
+struct job_desc *job_desc_q_shownext(job_desc_q_p jdqp)
 {
     if (jdqp->next == jdqp)
     {
-        return (NULL);
+	return (NULL);
     }
     return (qlist_entry(jdqp->next, struct job_desc, job_desc_q_link));
 }
@@ -178,8 +171,7 @@ struct job_desc *job_desc_q_shownext(
  *
  * no return value
  */
-void job_desc_q_dump(
-    job_desc_q_p jdqp)
+void job_desc_q_dump(job_desc_q_p jdqp)
 {
     struct qlist_head *tmp_link = NULL;
     struct job_desc *tmp_entry = NULL;
@@ -190,37 +182,37 @@ void job_desc_q_dump(
     /* iterate all the way through the queue */
     qlist_for_each(tmp_link, jdqp)
     {
-        tmp_entry = qlist_entry(tmp_link, struct job_desc,
-                                job_desc_q_link);
-        gossip_err("  job id: %ld.\n", (long) tmp_entry->job_id);
-        switch (tmp_entry->type)
-        {
-        case JOB_BMI:
-            gossip_err("    type: JOB_BMI.\n");
-            gossip_err("    bmi_id: %ld.\n", (long) tmp_entry->u.bmi.id);
-            break;
-        case JOB_BMI_UNEXP:
-            gossip_err("    type: JOB_BMI_UNEXP.\n");
-            break;
-        case JOB_TROVE:
-            gossip_err("    type: JOB_TROVE.\n");
-            break;
-        case JOB_FLOW:
-            gossip_err("    type: JOB_FLOW.\n");
-            break;
-        case JOB_REQ_SCHED:
-            gossip_err("    type: JOB_REQ_SCHED.\n");
-            break;
-        case JOB_DEV_UNEXP:
-            gossip_err("    type: JOB_DEV_UNEXP.\n");
-            break;
-        case JOB_REQ_SCHED_TIMER:
-            gossip_err("    type: JOB_REQ_SCHED_TIMER.\n");
-            break;
-        case JOB_NULL:
-            gossip_err("    type: JOB_NULL.\n");
-            break;
-        }
+	tmp_entry = qlist_entry(tmp_link, struct job_desc,
+				job_desc_q_link);
+	gossip_err("  job id: %ld.\n", (long) tmp_entry->job_id);
+	switch (tmp_entry->type)
+	{
+	case JOB_BMI:
+	    gossip_err("    type: JOB_BMI.\n");
+	    gossip_err("    bmi_id: %ld.\n", (long) tmp_entry->u.bmi.id);
+	    break;
+	case JOB_BMI_UNEXP:
+	    gossip_err("    type: JOB_BMI_UNEXP.\n");
+	    break;
+	case JOB_TROVE:
+	    gossip_err("    type: JOB_TROVE.\n");
+	    break;
+	case JOB_FLOW:
+	    gossip_err("    type: JOB_FLOW.\n");
+	    break;
+	case JOB_REQ_SCHED:
+	    gossip_err("    type: JOB_REQ_SCHED.\n");
+	    break;
+	case JOB_DEV_UNEXP:
+	    gossip_err("    type: JOB_DEV_UNEXP.\n");
+	    break;
+	case JOB_REQ_SCHED_TIMER:
+	    gossip_err("    type: JOB_REQ_SCHED_TIMER.\n");
+	    break;
+	case JOB_NULL:
+	    gossip_err("    type: JOB_NULL.\n");
+	    break;
+	}
     }
 
     return;

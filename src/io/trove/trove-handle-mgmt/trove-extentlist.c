@@ -15,13 +15,13 @@
 
 enum extentlist_coalesce_status
 {
-    COALESCE_ERROR = -1,
-    COALESCE_NONE = 0,
-    COALESCE_SUCCESS = 1
+        COALESCE_ERROR=-1,
+        COALESCE_NONE=0,
+        COALESCE_SUCCESS=1
 };
 
 static struct timeval s_extentlist_purgatory =
-    { EXTENTLIST_PURGATORY_DEFAULT, 0 };
+    {EXTENTLIST_PURGATORY_DEFAULT,0};
 
 static int extentlist_coalesce_extent(
     struct avlnode **n,
@@ -29,23 +29,21 @@ static int extentlist_coalesce_extent(
 static int avltree_extent_search(
     struct avlnode *n,
     TROVE_handle handle,
-    TROVE_handle * f_p,
-    TROVE_handle * l_p);
+    TROVE_handle *f_p,
+    TROVE_handle *l_p);
 static inline void extent_init(
     struct TROVE_handle_extent *e,
     TROVE_handle first,
     TROVE_handle last);
 static void extent_show(
     struct avlnode *n,
-    int param,
-    int depth);
+    int param, int depth);
 static void extent_count(
     struct avlnode *n,
-    int param,
-    int depth);
+    int param, int depth);
 static TROVE_handle avltree_extent_search_in_range(
     struct avlnode *n,
-    TROVE_extent * req_extent);
+    TROVE_extent *req_extent);
 
 static uint64_t g_counter = 0;
 
@@ -54,10 +52,9 @@ static uint64_t g_counter = 0;
  * last: end of extent range
  * returns: nothing. what could go wrong?
  */
-static inline void extent_init(
-    struct TROVE_handle_extent *e,
-    TROVE_handle first,
-    TROVE_handle last)
+static inline void extent_init(struct TROVE_handle_extent *e,
+                               TROVE_handle first,
+                               TROVE_handle last) 
 {
     e->first = first;
     e->last = last;
@@ -70,8 +67,7 @@ static inline void extent_init(
  * returns: 0 on success, -1 if error
  */
 
-int extentlist_init(
-    struct TROVE_handle_extentlist *elist)
+int extentlist_init(struct TROVE_handle_extentlist *elist) 
 {
     elist->extents = calloc(EXTENTLIST_SIZE,
                             sizeof(struct TROVE_handle_extent));
@@ -81,7 +77,7 @@ int extentlist_init(
         return -1;
     }
     gettimeofday(&elist->timestamp, NULL);
-#if 0
+#if 0 
     /* XXX: implement on-disk later */
     elist->num_entries = 0;
     elist->__size = EXTENTLIST_SIZE;
@@ -92,10 +88,9 @@ int extentlist_init(
 /*
  * helper function to free memory in the index 
  */
-static void extentlist_node_free(
-    struct avlnode *n,
-    int p,
-    int d)
+static void extentlist_node_free(struct avlnode *n,
+                                 int p,
+                                 int d)
 {
     free(n->d);
     free(n);
@@ -104,10 +99,9 @@ static void extentlist_node_free(
 /*
  * return all allocated memory back to the system 
  */
-void extentlist_free(
-    struct TROVE_handle_extentlist *e)
+void extentlist_free(struct TROVE_handle_extentlist *e)
 {
-    avlpostorder(e->index, extentlist_node_free, 0, 0);
+    avlpostorder(e->index, extentlist_node_free, 0, 0); 
     free(e->extents);
     memset(e, 0, sizeof(struct TROVE_handle_extentlist));
 }
@@ -117,23 +111,21 @@ void extentlist_free(
  * see if we can coalesce this extent with another in the index. if
  * not, add it to the tree ourselves
  */
-int extentlist_addextent(
-    struct TROVE_handle_extentlist *elist,
-    TROVE_handle first,
-    TROVE_handle last)
+int extentlist_addextent(struct TROVE_handle_extentlist *elist,
+                         TROVE_handle first,
+                         TROVE_handle last)
 {
     struct TROVE_handle_extent *e = NULL;
 
-    if ((e =
-         (struct TROVE_handle_extent *)
-         malloc(sizeof(struct TROVE_handle_extent))) == NULL)
+    if ((e = (struct TROVE_handle_extent *)malloc(
+             sizeof(struct TROVE_handle_extent)) ) == NULL)
     {
         perror("extentlist_addextent: malloc");
         return -1;
-    }
+    } 
     extent_init(e, first, last);
 
-    if (extentlist_coalesce_extent(&elist->index, e) == COALESCE_NONE)
+    if (extentlist_coalesce_extent(&elist->index,e)  == COALESCE_NONE)
     {
         /* if the index is empty, avlinsert will allocate space */
         if (avlinsert(&elist->index, e) == 0)
@@ -143,33 +135,30 @@ int extentlist_addextent(
         }
         elist->num_extents++;
     }
-
+        
     /* it might be expensive to check the time every time an extent is
      * released, but we'll cross that bridge when we get there */
-    gettimeofday(&elist->timestamp, NULL);
+    gettimeofday(&elist->timestamp, NULL );
     elist->num_handles += (last - first + 1);
 
     /* XXX: implement on-disk stuff later */
-#if 0
-    void *p;
+#if 0    
+    void * p;
     extent_init(&(elist->extents[elist->num_entries]), first, last);
-    if (elist->num_entries % EXTENTLIST_TIMECHECK_FREQ == 0)
+    if ( elist->num_entries % EXTENTLIST_TIMECHECK_FREQ == 0 )
         gettimeofday(&elist->timestamp, NULL);
     elist->num_entries++;
 
     /* grow the array if too many extents */
-    if (elist->num_entries == elist->__size)
-    {
+    if ( elist->num_entries == elist->__size ) {
 
-        p = realloc(elist->extents,
-                    (sizeof(struct TROVE_handle_extent) * elist->__size * 2));
-        if (p == NULL)
-        {
+        p =  realloc(elist->extents,
+                     (sizeof(struct TROVE_handle_extent) *
+                      elist->__size * 2));
+        if (p == NULL ) {
             perror("extentlist_addextent: realloc");
             return -1;
-        }
-        else
-        {
+        } else {
             elist->extents = p;
             elist->__size *= 2;
         }
@@ -186,14 +175,13 @@ int extentlist_addextent(
  * to do a postorder traversal of 'src', inserting extents into 'dest'
  * and deleting nodes from src without rebalancing.
  */
-int extentlist_merge(
-    struct TROVE_handle_extentlist *dest,
-    struct TROVE_handle_extentlist *src)
+int extentlist_merge(struct TROVE_handle_extentlist *dest,
+                     struct TROVE_handle_extentlist *src)
 {
     struct avlnode *n = src->index;
     gossip_debug(GOSSIP_TROVE_DEBUG, "merging extentlists\n");
 
-    while (n != NULL)
+    while(n != NULL)
     {
         extentlist_addextent(dest, n->d->first, n->d->last);
         avlremove(&n, n->d->first);
@@ -240,7 +228,7 @@ static int extentlist_coalesce_extent(
     struct avlnode **n,
     struct TROVE_handle_extent *e)
 {
-    struct TROVE_handle_extent **lesser = NULL, **greater = NULL;
+    struct TROVE_handle_extent **lesser = NULL, **greater = NULL; 
     int merge_lesser = 0, merge_greater = 0;
 
     if ((lesser = avlaltaccess(*n, (e->first - 1))) != NULL)
@@ -297,7 +285,7 @@ static int extentlist_coalesce_extent(
  *
  */
 TROVE_handle extentlist_get_and_dec_extent(
-    struct TROVE_handle_extentlist * elist)
+    struct TROVE_handle_extentlist *elist)
 {
     /* get the extent from the index 
      * pull a handle out of the extent
@@ -314,7 +302,7 @@ TROVE_handle extentlist_get_and_dec_extent(
 
     /* could either be called w/o calling the setup functions, or we
      * gave out the last handle in the list */
-    if (e == NULL)
+    if (e == NULL )
     {
         gossip_lerr("no handles avaliable\n");
         return -1;
@@ -325,7 +313,7 @@ TROVE_handle extentlist_get_and_dec_extent(
 
     handle = ext->last;
 
-    if (ext->first == ext->last)
+    if (ext->first  == ext->last)
     {
         /* just gave out the last handle in the range */
         if (avlremove(&(elist->index), ext->first) == 0)
@@ -337,7 +325,7 @@ TROVE_handle extentlist_get_and_dec_extent(
     }
     else
     {
-        ext->last--;
+        ext->last--; 
         elist->num_handles--;
     }
     return handle;
@@ -355,8 +343,8 @@ TROVE_handle extentlist_get_and_dec_extent(
  *   0 (an invalid handle) if error
  */
 TROVE_handle extentlist_get_from_extent(
-    struct TROVE_handle_extentlist * elist,
-    TROVE_extent * extent)
+    struct TROVE_handle_extentlist *elist, 
+    TROVE_extent *extent)
 {
     TROVE_handle handle = TROVE_HANDLE_NULL;
 
@@ -375,7 +363,7 @@ TROVE_handle extentlist_get_from_extent(
 
 int extentlist_peek_handles(
     struct TROVE_handle_extentlist *elist,
-    TROVE_handle * out_handle_array,
+    TROVE_handle *out_handle_array,
     int max_num_handles,
     int *returned_handle_count)
 {
@@ -413,7 +401,8 @@ int extentlist_peek_handles(
         {
             break;
         }
-        handle = (handle >= ext->first ? (handle - 1) : TROVE_HANDLE_NULL);
+        handle = (handle >= ext->first ?
+                  (handle - 1) : TROVE_HANDLE_NULL);
 
     } while (handle != TROVE_HANDLE_NULL);
 
@@ -421,15 +410,16 @@ int extentlist_peek_handles(
 }
 
 int extentlist_peek_handles_from_extent(
-    struct TROVE_handle_extentlist *elist,
-    TROVE_extent * extent,
-    TROVE_handle * out_handle_array,
+    struct TROVE_handle_extentlist *elist, 
+    TROVE_extent *extent,
+    TROVE_handle *out_handle_array,
     int max_num_handles,
     int *returned_handle_count)
 {
     int ret = -TROVE_EINVAL;
     TROVE_handle handle = TROVE_HANDLE_NULL;
-    TROVE_handle_extent tmp_extent = { TROVE_HANDLE_NULL, TROVE_HANDLE_NULL };
+    TROVE_handle_extent tmp_extent =
+        {TROVE_HANDLE_NULL, TROVE_HANDLE_NULL};
 
     if (!elist || !extent || !out_handle_array || !returned_handle_count)
     {
@@ -442,15 +432,17 @@ int extentlist_peek_handles_from_extent(
 
     do
     {
-        handle = avltree_extent_search_in_range(elist->index, &tmp_extent);
+        handle = avltree_extent_search_in_range(
+            elist->index, &tmp_extent);
         if (handle == TROVE_HANDLE_NULL)
         {
             break;
         }
 
-        gossip_debug(GOSSIP_TROVE_DEBUG, "extentlist_peek_handles_from_range: "
-                     "got %llu [%llu-%llu]\n", llu(handle),
-                     llu(tmp_extent.first), llu(tmp_extent.last));
+        gossip_debug(
+            GOSSIP_TROVE_DEBUG, "extentlist_peek_handles_from_range: "
+            "got %llu [%llu-%llu]\n", llu(handle), 
+            llu(tmp_extent.first), llu(tmp_extent.last));
 
         out_handle_array[(*returned_handle_count)++] = handle;
 
@@ -465,49 +457,41 @@ int extentlist_peek_handles_from_extent(
     return (*returned_handle_count ? 0 : -TROVE_ENOSPC);
 }
 
-void extentlist_stats(
-    struct TROVE_handle_extentlist *elist)
+void extentlist_stats(struct TROVE_handle_extentlist *elist)
 {
     gossip_debug(GOSSIP_TROVE_DEBUG, "handle/extent ratio: %f\n",
-                 (double) elist->num_handles / (double) elist->num_extents);
+                 (double)elist->num_handles/(double)elist->num_extents);
 }
 
-void extentlist_show(
-    struct TROVE_handle_extentlist *elist)
+void extentlist_show(struct TROVE_handle_extentlist *elist)
 {
-    avldepthfirst(elist->index, extent_show, 0, 0);
+    avldepthfirst(elist->index, extent_show, 0 , 0);
 }
 
 void extentlist_count(
-    struct TROVE_handle_extentlist *elist,
-    uint64_t * count)
+    struct TROVE_handle_extentlist *elist, uint64_t *count)
 {
     /* NOTE: this function is not thread safe at all- we count
      * on the trove-handle-mgmt layer to serialize calls.
      */
 
     g_counter = 0;
-    avldepthfirst(elist->index, extent_count, 0, 0);
+    avldepthfirst(elist->index, extent_count, 0 , 0);
     *count = g_counter;
 }
 
-static void extent_show(
-    struct avlnode *n,
-    int param,
-    int depth)
+static void extent_show(struct avlnode *n, int param, int depth)
 {
-    struct TROVE_handle_extent *e = (struct TROVE_handle_extent *) (n->d);
+    struct TROVE_handle_extent *e =
+        (struct TROVE_handle_extent *)(n->d);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "lb: %llu ub: %llu\n",
                  llu(e->first), llu(e->last));
 }
 
-static void extent_count(
-    struct avlnode *n,
-    int param,
-    int depth)
+static void extent_count(struct avlnode *n, int param, int depth)
 {
-    struct TROVE_handle_extent *e = (struct TROVE_handle_extent *) (n->d);
+    struct TROVE_handle_extent *e = (struct TROVE_handle_extent *)(n->d);
     g_counter += (e->last - e->first + 1);
 }
 
@@ -521,8 +505,8 @@ static void extent_count(
  *  nonzero                        time to move on
  */
 int extentlist_hit_cutoff(
-    struct TROVE_handle_extentlist *elist,
-    TROVE_handle cutoff)
+    struct TROVE_handle_extentlist *elist, 
+    TROVE_handle cutoff) 
 {
     return (elist->num_handles > cutoff);
 }
@@ -543,13 +527,13 @@ int extentlist_endured_purgatory(
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "handle re-use time remaining "
                  "is %d seconds (re-use time is %d)\n",
-                 reuse_seconds_remaining, (int) s_extentlist_purgatory.tv_sec);
+                 reuse_seconds_remaining,
+                 (int)s_extentlist_purgatory.tv_sec);
 
     return (reuse_seconds_remaining > s_extentlist_purgatory.tv_sec);
 }
 
-int extentlist_set_purgatory(
-    struct timeval *timeout)
+int extentlist_set_purgatory(struct timeval * timeout)
 {
     assert(timeout->tv_sec > -1);
     s_extentlist_purgatory = *timeout;
@@ -563,16 +547,15 @@ int extentlist_set_purgatory(
  *
  * returns 0 on success, -1 on failure (not present in extentlist).
  */
-int extentlist_handle_remove(
-    struct TROVE_handle_extentlist *elist,
-    TROVE_handle handle)
+int extentlist_handle_remove(struct TROVE_handle_extentlist *elist,
+                             TROVE_handle handle)
 {
     int ret = -1;
     TROVE_handle key_handle, last_handle;
     struct TROVE_handle_extent *old_e, *new_e;
 
-    ret =
-        avltree_extent_search(elist->index, handle, &key_handle, &last_handle);
+    ret = avltree_extent_search(
+        elist->index, handle, &key_handle, &last_handle);
     if (ret == -1)
     {
         return ret;
@@ -583,12 +566,11 @@ int extentlist_handle_remove(
 
     if (key_handle == last_handle)
     {
-        return 0;       /* done, length 1 extent now gone */
+        return 0; /* done, length 1 extent now gone */
     }
 
-    if ((old_e =
-         (struct TROVE_handle_extent *)
-         malloc(sizeof(struct TROVE_handle_extent))) == NULL)
+    if ((old_e = (struct TROVE_handle_extent *)malloc(
+             sizeof(struct TROVE_handle_extent))) == NULL)
     {
         assert(0);
     }
@@ -596,28 +578,27 @@ int extentlist_handle_remove(
     if (key_handle == handle)
     {
         old_e->first = key_handle + 1;
-        old_e->last = last_handle;
+        old_e->last  = last_handle;
         avlinsert(&(elist->index), old_e);
     }
     else if (last_handle == handle)
     {
         old_e->first = key_handle;
-        old_e->last = last_handle - 1;
+        old_e->last  = last_handle - 1;
         avlinsert(&(elist->index), old_e);
     }
     else
     {
         /* splitting extent into two */
-        if ((new_e =
-             (struct TROVE_handle_extent *)
-             malloc(sizeof(struct TROVE_handle_extent))) == NULL)
+        if ((new_e = (struct TROVE_handle_extent *)malloc(
+                 sizeof(struct TROVE_handle_extent))) == NULL)
         {
             assert(0);
         }
         old_e->first = key_handle;
-        old_e->last = handle - 1;
+        old_e->last  = handle - 1;
         new_e->first = handle + 1;
-        new_e->last = last_handle;
+        new_e->last  = last_handle;
         avlinsert(&(elist->index), old_e);
         avlinsert(&(elist->index), new_e);
     }
@@ -631,11 +612,10 @@ int extentlist_handle_remove(
  * returns -1 if not found, or 0 if the handle is found in an
  * extent.  In that case first and last are returned...
  */
-static int avltree_extent_search(
-    struct avlnode *n,
-    TROVE_handle handle,
-    TROVE_handle * first_p,
-    TROVE_handle * last_p)
+static int avltree_extent_search(struct avlnode *n,
+                                 TROVE_handle handle,
+                                 TROVE_handle *first_p,
+                                 TROVE_handle *last_p)
 {
     struct TROVE_handle_extent *e = NULL;
 
@@ -644,8 +624,8 @@ static int avltree_extent_search(
         return -1;
     }
 
-    e = (struct TROVE_handle_extent *) n->d;
-
+    e = (struct TROVE_handle_extent *)n->d;
+    
     if (e->first > handle)
     {
         return avltree_extent_search(n->left, handle, first_p, last_p);
@@ -656,7 +636,7 @@ static int avltree_extent_search(
     }
 
     *first_p = e->first;
-    *last_p = e->last;
+    *last_p  = e->last;
     return 0;
 }
 
@@ -670,8 +650,7 @@ static int avltree_extent_search(
  * index
  */
 static TROVE_handle avltree_extent_search_in_range(
-    struct avlnode *n,
-    TROVE_extent * req_extent)
+    struct avlnode *n, TROVE_extent *req_extent)
 {
     struct TROVE_handle_extent *e = NULL, *left = NULL, *right = NULL;
 
@@ -680,45 +659,51 @@ static TROVE_handle avltree_extent_search_in_range(
         return 0;
     }
 
-    e = (struct TROVE_handle_extent *) n->d;
+    e = (struct TROVE_handle_extent *)n->d;
 
     if (n->left != NULL)
     {
-        left = (struct TROVE_handle_extent *) n->left->d;
+        left = (struct TROVE_handle_extent *)n->left->d;
     }
 
     if (n->right != NULL)
     {
-        right = (struct TROVE_handle_extent *) n->right->d;
+        right = (struct TROVE_handle_extent *)n->right->d;
     }
 
     /* request matches at one edge or the other of an existing extent */
-    if ((req_extent->first == e->first) || (req_extent->first == e->last))
+    if ((req_extent->first == e->first) ||
+        (req_extent->first == e->last))
     {
         return req_extent->first;
     }
-    else if ((req_extent->last == e->first) || (req_extent->last == e->last))
+    else if ((req_extent->last == e->first) ||
+             (req_extent->last == e->last))
     {
         return req_extent->last;
     }
-    else if ((req_extent->first > e->first) && (req_extent->last < e->last))
+    else if ((req_extent->first > e->first) &&
+             (req_extent->last < e->last))
     {
         /* request fits within an existing extent */
         return req_extent->last;
     }
-    else if ((req_extent->first < e->first) && (req_extent->last > e->last))
+    else if ((req_extent->first < e->first) &&
+             (req_extent->last > e->last))
     {
         /* request completely overlaps */
         return e->last;
     }
     else if ((req_extent->first < e->first) &&
-             (req_extent->last < e->last) && (req_extent->last > e->first))
+             (req_extent->last < e->last) &&
+             (req_extent->last > e->first))
     {
         /* request left-overlaps */
         return e->first;
     }
     else if ((req_extent->first > e->first) &&
-             (req_extent->last > e->last) && (req_extent->first < e->last))
+             (req_extent->last > e->last) &&
+             (req_extent->first < e->last))
     {
         /* request right-overlaps */
         return e->last;

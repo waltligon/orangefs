@@ -203,7 +203,8 @@ void gui_status_data_prepare(
     total_free_space = 0.0;
     for (j = 0; j < svr_stat_ct; j++)
     {
-        float first = ((float) (svr_stat[j].ram_total_bytes)) / divisor;
+        float first =
+            ((float) (svr_stat[j].ram_total_bytes)) / divisor;
         graph_data[GUI_STATUS_MEMORY].first_val[j] = first;
         graph_data[GUI_STATUS_MEMORY].bar_color[j] = BAR_GREEN;
         total_free_space += first;

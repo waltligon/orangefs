@@ -16,17 +16,14 @@ char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
 
 TROVE_handle requested_file_handle = 9999;
-struct teststruct
-{
+struct teststruct {
     int a;
     long b;
     int size;
     char *string;
 };
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char ** argv )
 {
 
     int ret, count;
@@ -47,17 +44,15 @@ int main(
     foo.size = strlen(foo.string);
 
     ret = trove_initialize(storage_space, 0, &method_name, 0);
-    if (ret < 0)
-    {
-        fprintf(stderr, "initialize failed\n");
-        return -1;
+    if (ret < 0 ) {
+	fprintf(stderr, "initialize failed\n");
+	return -1;
     }
 
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
-    if (ret < 0)
-    {
-        fprintf(stderr, "collection lookup failed");
-        return -1;
+    if (ret < 0 ) {
+	fprintf(stderr, "collection lookup failed");
+	return -1;
     }
 
     ret = trove_open_context(coll_id, &trove_context);
@@ -68,9 +63,8 @@ int main(
     }
 
     ret = path_lookup(coll_id, "/", &parent_handle);
-    if (ret < 0)
-    {
-        return -1;
+    if (ret < 0 ) {
+	return -1;
     }
 
     file_handle = 0;
@@ -78,84 +72,80 @@ int main(
     extent_array.extent_count = 1;
     extent_array.extent_array = &cur_extent;
     ret = trove_dspace_create(coll_id,
-                              &extent_array,
+			      &extent_array,
                               &file_handle,
-                              TROVE_TEST_BSTREAM,
-                              NULL,
-                              TROVE_FORCE_REQUESTED_HANDLE | TROVE_SYNC,
-                              NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-    {
-        fprintf(stderr, "dspace create failed.\n");
-        return -1;
+			      TROVE_TEST_BSTREAM,
+			      NULL,
+			      TROVE_FORCE_REQUESTED_HANDLE | TROVE_SYNC,
+			      NULL,
+                              trove_context,
+			      &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0) {
+	fprintf(stderr, "dspace create failed.\n");
+	return -1;
     }
 
     /* not sure where to find the handle for bstream for the handle
      * generator.  store some keys into the collection? */
 
     buffsz = sizeof(foo);
-    ret = trove_bstream_write_at(coll_id, file_handle,
-                                 &foo, &buffsz,
-                                 0, 0, NULL, NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-    {
-        fprintf(stderr, "bstream write failed.\n");
-        return -1;
+    ret = trove_bstream_write_at(coll_id, file_handle, 
+				 &foo, &buffsz,
+				 0, 0, NULL, NULL,
+                                 trove_context, &op_id);
+    while ( ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0 ) {
+	fprintf(stderr, "bstream write failed.\n");
+	return -1;
     }
     ret = trove_bstream_write_at(coll_id, file_handle,
-                                 foo.string, &buffsz,
-                                 buffsz, 0, NULL, NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-    {
-        fprintf(stderr, "bstream write failed.\n");
-        return -1;
+				 foo.string, &buffsz,
+				 buffsz, 0, NULL, NULL,
+                                 trove_context, &op_id);
+    while ( ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0 ) {
+	fprintf(stderr, "bstream write failed.\n");
+	return -1;
     }
 
     buffsz = sizeof(bar);
     ret = trove_bstream_read_at(coll_id, file_handle,
-                                &bar, &buffsz,
-                                0, 0, NULL, NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-    {
-        fprintf(stderr, "bstream read failed.\n");
-        return -1;
+				&bar, &buffsz,
+				0, 0, NULL, NULL,
+                                trove_context, &op_id);
+    while ( ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0 ) {
+	fprintf(stderr, "bstream read failed.\n");
+	return -1;
     }
     bar.string = malloc(bar.size + 1);
-    ret = trove_bstream_read_at(coll_id, file_handle,
-                                bar.string, &buffsz,
-                                buffsz, 0, NULL, NULL, trove_context, &op_id);
-    while (ret == 0)
-        ret =
-            trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
-                              &state, TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
-    {
-        fprintf(stderr, "bstream write failed.\n");
-        return -1;
+    ret = trove_bstream_read_at(coll_id, file_handle, 
+				bar.string, &buffsz,
+				buffsz, 0, NULL, NULL,
+                                trove_context, &op_id);
+    while ( ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
+    if (ret < 0 ) {
+	fprintf(stderr, "bstream write failed.\n");
+	return -1;
     }
 
     trove_close_context(coll_id, trove_context);
-    trove_finalize();
+    trove_finalize(); 
     return 0;
-}
-
-
+}		
+	
+	
 /*
  * Local variables:
  *  c-indent-level: 4

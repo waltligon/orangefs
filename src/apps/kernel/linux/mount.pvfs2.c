@@ -43,7 +43,7 @@ static int do_mtab(
 static int parse_args(
     int argc,
     char *argv[],
-    int *flags,
+    int* flags,
     char **dev,
     char **mntpnt,
     char **kern_options,
@@ -58,7 +58,7 @@ int main(
     struct mntent myment;
     struct stat sb, mntstat;
     char *dev, *kern_options, *orig_options, *tmp_mntpnt;
-    char mntpnt[PVFS_NAME_MAX + 2];
+    char mntpnt[PVFS_NAME_MAX+2];
 
     if (argc < 3)
     {
@@ -68,18 +68,18 @@ int main(
     }
 
     if ((ret = parse_args(argc, argv, &flags, &dev, &tmp_mntpnt, &kern_options,
-                          &orig_options)))
+        &orig_options)))
     {
         fprintf(stderr, "Error: could not parse command line arguments.\n");
         usage(argc, argv);
         return (-1);
     }
 
-    ret = PINT_realpath(tmp_mntpnt, mntpnt, (PVFS_NAME_MAX + 1));
-    if (ret < 0)
+    ret = PINT_realpath(tmp_mntpnt, mntpnt, (PVFS_NAME_MAX+1));
+    if(ret < 0)
     {
         PVFS_perror("PINT_realpath", ret);
-        return (-1);
+        return(-1);
     }
     free(tmp_mntpnt);
 
@@ -92,7 +92,9 @@ int main(
         return (-1);
     }
 
-    if ((ret = mount(dev, mntpnt, type, flags, (void *) kern_options)) < 0)
+    if ((ret =
+         mount(dev, mntpnt, type, flags,
+               (void *)kern_options)) < 0)
     {
         perror("mount");
         return (-1);
@@ -104,7 +106,7 @@ int main(
     myment.mnt_type = type;
     myment.mnt_opts = orig_options;
     /* if we weren't given any options, then just use "rw" as a place holder */
-    if (!myment.mnt_opts)
+    if(!myment.mnt_opts)
     {
         myment.mnt_opts = "rw";
     }
@@ -117,11 +119,11 @@ int main(
 
     ret = do_mtab(&myment);
 
-    if (dev)
+    if(dev)
         free(dev);
-    if (orig_options)
+    if(orig_options)
         free(orig_options);
-    if (kern_options)
+    if(kern_options)
         free(kern_options);
 
     return (ret);
@@ -146,7 +148,7 @@ static int parse_args(
     int opt;
     int opts_set_flag = 0;
     char mopts[256] = "";
-    char *index;
+    char* index;
 
     /* safety */
     *dev = NULL;
@@ -161,21 +163,21 @@ static int parse_args(
         {
         case 'o':
 
-            if (strlen(optarg) > 255)
+            if(strlen(optarg) > 255)
             {
                 fprintf(stderr, "Error: options string is too long.\n");
-                return (-1);
+                return(-1);
             }
-            if (opts_set_flag)
+            if(opts_set_flag)
             {
                 fprintf(stderr, "Error: please use only one -o argument.\n");
-                return (-1);
+                return(-1);
             }
-            *orig_options = (char *) malloc(strlen(optarg) + 1);
-            if (!(*orig_options))
+            *orig_options = (char*)malloc(strlen(optarg)+1);
+            if(!(*orig_options))
             {
                 perror("malloc");
-                return (-1);
+                return(-1);
             }
             opts_set_flag = 1;
             strcpy(*orig_options, optarg);
@@ -183,10 +185,10 @@ static int parse_args(
             /* copy into another temporary buffer for strtok */
             strcpy(mopts, optarg);
             index = strtok(mopts, ",");
-            while (index != NULL)
+            while(index != NULL)
             {
                 /* find out if "ro" was specified and set flag appropriately */
-                if (!strcmp(index, "ro"))
+                if(!strcmp(index, "ro"))
                 {
                     *flags |= MS_RDONLY;
                 }
@@ -206,41 +208,41 @@ static int parse_args(
         return (-1);
     }
 
-    if (opts_set_flag)
+    if(opts_set_flag)
     {
-        *kern_options = (char *) malloc(strlen(*orig_options) +
-                                        strlen(argv[optind]) + 2);
-        if (!(*kern_options))
+        *kern_options = (char*)malloc(strlen(*orig_options) +
+            strlen(argv[optind]) + 2);
+        if(!(*kern_options))
         {
             perror("malloc");
-            return (-1);
+            return(-1);
         }
         sprintf(*kern_options, "%s,%s", argv[optind], *orig_options);
     }
     else
     {
-        *kern_options = (char *) malloc(strlen(argv[optind]) + 1);
-        if (!(*kern_options))
+        *kern_options = (char*)malloc(strlen(argv[optind]) + 1);
+        if(!(*kern_options))
         {
             perror("malloc");
-            return (-1);
+            return(-1);
         }
         strcpy(*kern_options, argv[optind]);
     }
 
-    *mntpnt = (char *) malloc(strlen(argv[optind + 1]) + 1);
-    if (!(*mntpnt))
+    *mntpnt = (char*)malloc(strlen(argv[optind + 1])+1);
+    if(!(*mntpnt))
     {
         perror("malloc");
-        return (-1);
+        return(-1);
     }
     strcpy(*mntpnt, argv[optind + 1]);
 
-    *dev = (char *) malloc(strlen(argv[optind]) + 1);
-    if (!(*dev))
+    *dev = (char*)malloc(strlen(argv[optind])+1);
+    if(!(*dev))
     {
         perror("malloc");
-        return (-1);
+        return(-1);
     }
     strcpy(*dev, argv[optind]);
 
@@ -313,9 +315,7 @@ static int do_mtab(
 
     if (rename(PVFS2_TMP_MTAB, PVFS2_MTAB))
     {
-        fprintf(stderr,
-                "Error: couldn't rename " PVFS2_TMP_MTAB " to " PVFS2_MTAB
-                "\n");
+        fprintf(stderr, "Error: couldn't rename " PVFS2_TMP_MTAB " to " PVFS2_MTAB "\n");
         return -1;
     }
 

@@ -16,9 +16,7 @@
  *     Cached: retured the extent 
  *     NOT cached: return NULL.
  */
-struct extent *lookup_cache_item(
-    struct inode *mapping,
-    unsigned long index)
+struct extent * lookup_cache_item(struct inode *mapping, unsigned long index)
 {
     struct extent *extent;
 
@@ -38,65 +36,55 @@ struct extent *lookup_cache_item(
  * Each inode has a cache tree, protected by its "lock". 
  * NOT cache policy related.
  */
-static inline int add_cache_item_no_policy(
-    struct extent *extent,
-    struct inode *mapping,
-    unsigned long index)
+static inline int add_cache_item_no_policy(struct extent *extent, 
+         struct inode *mapping, unsigned long index)
 {
-    int error;
+	int error;
 
-    error = radix_tree_insert(&mapping->page_tree, index, extent);
-    if (!error)
-    {
-        list_add(&extent->list, &mapping->clean_pages);
-        extent->mapping = mapping;
-        extent->index = index;
-        mapping->nrpages++;
-    }
-    return error;
+	error = radix_tree_insert(&mapping->page_tree, index, extent); 
+	if ( !error ) {
+	    list_add(&extent->list, &mapping->clean_pages);
+	    extent->mapping = mapping;
+	    extent->index = index;
+	    mapping->nrpages++;
+	}
+	return error;
 }
 
 /* add an item into a cache list with certain policy.
  * Current implementation is related to LRU. This function is
  * cache policy related.
  */
-static inline void add_cache_item_with_policy(
-    struct extent *extent,
-    int cache_policy)
+static inline void add_cache_item_with_policy(struct extent *extent, int cache_policy)
 {
     struct cache_stack *cache_stack = NULL;
 
     cache_stack = get_extent_cache_stack(extent);
 
-    switch (cache_policy)
-    {
-    case LRU_POLICY:
-        LRU_add_cache_item(cache_stack, extent);
-        break;
+    switch (cache_policy) {
+        case LRU_POLICY:
+            LRU_add_cache_item(cache_stack, extent);
+            break;
 
-    default:
-        NCAC_error("unknown cache policy");
-        break;
+        default:
+		    NCAC_error("unknown cache policy");
+            break;
     }
 }
 
 /* add an extent into the cache. */
-int add_cache_item(
-    struct extent *extent,
-    struct inode *mapping,
-    unsigned long index,
-    int policy)
+int add_cache_item(struct extent *extent, struct inode *mapping,
+            unsigned long index, int policy)
 {
     /* 1. bookkeeping in the radix tree */
     int ret = add_cache_item_no_policy(extent, mapping, index);
 
-    /* 2. put into cache list with respect to the cache policy */
-    if (ret == 0)
-    {
-        add_cache_item_with_policy(extent, policy);
-        return ret;
-    }
-    return ret;
+    /* 2. put into cache list with respect to the cache policy */ 
+	if (ret == 0){
+		add_cache_item_with_policy(extent, policy);
+		return ret;
+	}
+    return ret;    
 }
 
 /* ==================================================================
@@ -107,8 +95,7 @@ int add_cache_item(
  * ================================================================== 
  */
 
-static void remove_cache_item_no_policy(
-    struct extent *extent)
+static void remove_cache_item_no_policy(struct extent *extent)
 {
     struct inode *mapping = extent->mapping;
 
@@ -119,46 +106,38 @@ static void remove_cache_item_no_policy(
     extent->mapping = NULL;
 }
 
-static void remove_cache_item_with_policy(
-    struct extent *victim,
-    int policy)
+static void remove_cache_item_with_policy(struct extent *victim, int policy)
 {
     struct cache_stack *cache;
 
     cache = get_extent_cache_stack(victim);
-    if (NULL == cache)
-    {
+    if ( NULL == cache ){
         NCAC_error("extent cache stack is NULL");
         return;
     }
-    switch (policy)
-    {
-    case LRU_POLICY:
-        LRU_remove_cache_item(cache, victim);
-        break;
-    default:
-        NCAC_error("unknown cache policy");
-        break;
+    switch (policy){
+        case LRU_POLICY:
+            LRU_remove_cache_item(cache, victim);
+            break;
+        default:
+		    NCAC_error("unknown cache policy");
+            break;
     }
 }
 
-void remove_cache_item(
-    struct extent *extent,
-    int policy)
+void remove_cache_item(struct extent *extent, int policy)
 {
 
     remove_cache_item_with_policy(extent, policy);
     remove_cache_item_no_policy(extent);
 }
 
-struct extent *get_free_extent_list_item(
-    struct list_head *list)
+struct extent * get_free_extent_list_item(struct list_head *list)
 {
     struct extent *new;
     struct list_head *delete;
 
-    if (list_empty(list))
-        return NULL;
+    if ( list_empty(list) ) return NULL;
 
     delete = list->next;
     list_del_init(delete);
@@ -175,47 +154,43 @@ struct extent *get_free_extent_list_item(
  * extents are returned into the extent free list.
  * Different cache policies take their own ways to do shrink.
  */
-int shrink_cache(
-    struct cache_stack *cache_stack,
-    unsigned int expected,
-    int policy,
-    unsigned int *shrinked)
+int shrink_cache(struct cache_stack *cache_stack, 
+                 unsigned int expected, 
+                 int policy, 
+                 unsigned int *shrinked)
 {
-    int ret = -1;
+    int ret=-1;
 
-    switch (policy)
-    {
-    case LRU_POLICY:
-        ret = LRU_shrink_cache(cache_stack, expected, shrinked);
-        break;
+    switch (policy){
+        case LRU_POLICY:
+            ret = LRU_shrink_cache(cache_stack, expected, shrinked);
+            break;
 
-    case ARC_POLICY:
-        ret = LRU_shrink_cache(cache_stack, expected, shrinked);
-        break;
-
-    default:
-        NCAC_error("unknown cache policy");
-        break;
+        case ARC_POLICY: 
+            ret = LRU_shrink_cache(cache_stack, expected, shrinked);
+            break;
+        
+        default:
+		    NCAC_error("unknown cache policy");
+            break;
     }
     return ret;
 }
 
 
-int is_extent_discardable(
-    struct extent *victim)
+int is_extent_discardable(struct extent *victim)
 {
-    if (PageClean(victim) && 0 == victim->reads && 0 == victim->writes)
+    if ( PageClean(victim) && 0 == victim->reads && 0 == victim->writes ) 
         return 1;
-    else
+    else 
         return 0;
 }
 
 /* hit_cache_item: cache hit, change the position according to the policy */
-void hit_cache_item(
-    struct extent *extent,
-    int cache_policy)
+void hit_cache_item(struct extent *extent, int cache_policy)
 {
     remove_cache_item_with_policy(extent, cache_policy);
     add_cache_item_with_policy(extent, cache_policy);
     return;
 }
+

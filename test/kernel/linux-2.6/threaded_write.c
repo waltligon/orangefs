@@ -28,21 +28,20 @@ typedef struct
     int index;
 } threaded_write_info_t;
 
-void *write_file(
-    void *ptr)
+void *write_file(void *ptr)
 {
     char *buf = NULL;
-    threaded_write_info_t *info = (threaded_write_info_t *) ptr;
+    threaded_write_info_t *info = (threaded_write_info_t *)ptr;
     struct iovec iov[2];
 
     sleep(2);
 
     if (info)
     {
-        buf = (char *) malloc(info->size);
+        buf = (char *)malloc(info->size);
         if (buf)
         {
-            memset(buf, (char) info->index, info->size);
+            memset(buf, (char)info->index, info->size);
             memset(&iov, 0, sizeof(struct iovec));
 
             iov[0].iov_base = buf;
@@ -66,9 +65,7 @@ void *write_file(
     return NULL;
 }
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int fd = 0, i = 0, num_threads = 0;
     pthread_t threads[MAX_NUM_THREADS];
@@ -88,15 +85,15 @@ int main(
         return 1;
     }
 
-    fd = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    fd = open(argv[1], O_WRONLY|O_CREAT|O_TRUNC, 0666);
     if (fd == -1)
     {
         fprintf(stderr, "Failed to open file %s for writing: %s\n", argv[1],
-                strerror(errno));
+		strerror(errno));
         return 1;
     }
 
-    for (i = 0; i < num_threads; i++)
+    for(i = 0; i < num_threads; i++)
     {
         memset(&info[i], 0, sizeof(threaded_write_info_t));
 
@@ -104,14 +101,14 @@ int main(
         info[i].size = DATA_SIZE_PER_THREAD;
         info[i].index = i;
 
-        if (pthread_create(&threads[i], NULL, write_file, (void *) &info[i]))
+        if (pthread_create(&threads[i], NULL, write_file, (void *)&info[i]))
         {
             fprintf(stderr, "Failed to spawn thread %d\n", i);
             break;
         }
     }
 
-    for (i = 0; i < num_threads; i++)
+    for(i = 0; i < num_threads; i++)
     {
         pthread_join(threads[i], NULL);
         if (info[i].error_code)

@@ -16,15 +16,14 @@
  *
  * returns pointer to flow reference list on success, NULL on failure
  */
-flow_ref_p flow_ref_new(
-    void)
+flow_ref_p flow_ref_new(void)
 {
     struct qlist_head *tmp_frp = NULL;
 
     tmp_frp = (struct qlist_head *) malloc(sizeof(struct qlist_head));
     if (tmp_frp)
     {
-        INIT_QLIST_HEAD(tmp_frp);
+	INIT_QLIST_HEAD(tmp_frp);
     }
 
     return (tmp_frp);
@@ -36,18 +35,17 @@ flow_ref_p flow_ref_new(
  * 
  * no return value
  */
-int flow_ref_add(
-    flow_ref_p frp,
-    enum flow_endpoint_type src_endpoint,
-    enum flow_endpoint_type dest_endpoint,
-    int flowproto_id)
+int flow_ref_add(flow_ref_p frp,
+		 enum flow_endpoint_type src_endpoint,
+		 enum flow_endpoint_type dest_endpoint,
+		 int flowproto_id)
 {
     struct flow_ref_entry *tmp_entry = NULL;
 
     tmp_entry = (struct flow_ref_entry *) malloc(sizeof(struct flow_ref_entry));
     if (!tmp_entry)
     {
-        return (-ENOMEM);
+	return (-ENOMEM);
     }
 
     tmp_entry->src_endpoint = src_endpoint;
@@ -65,10 +63,9 @@ int flow_ref_add(
  *
  * returns pointer to entry if found, NULL otherwise
  */
-struct flow_ref_entry *flow_ref_search(
-    flow_ref_p frp,
-    enum flow_endpoint_type src_endpoint,
-    enum flow_endpoint_type dest_endpoint)
+struct flow_ref_entry *flow_ref_search(flow_ref_p frp,
+				       enum flow_endpoint_type src_endpoint,
+				       enum flow_endpoint_type dest_endpoint)
 {
     flow_ref_p tmp_link = NULL;
     flow_ref_p tmp_next_link = NULL;
@@ -78,15 +75,15 @@ struct flow_ref_entry *flow_ref_search(
     tmp_next_link = tmp_link->next;
     while (tmp_link != frp)
     {
-        tmp_entry = qlist_entry(tmp_link, struct flow_ref_entry,
-                                flow_ref_link);
-        if (tmp_entry->src_endpoint == src_endpoint &&
-            tmp_entry->dest_endpoint == dest_endpoint)
-        {
-            return (tmp_entry);
-        }
-        tmp_link = tmp_next_link;
-        tmp_next_link = tmp_link->next;
+	tmp_entry = qlist_entry(tmp_link, struct flow_ref_entry,
+				flow_ref_link);
+	if (tmp_entry->src_endpoint == src_endpoint &&
+	    tmp_entry->dest_endpoint == dest_endpoint)
+	{
+	    return (tmp_entry);
+	}
+	tmp_link = tmp_next_link;
+	tmp_next_link = tmp_link->next;
     }
 
     return (NULL);
@@ -98,8 +95,7 @@ struct flow_ref_entry *flow_ref_search(
  *
  * no return value
  */
-void flow_ref_remove(
-    struct flow_ref_entry *entry)
+void flow_ref_remove(struct flow_ref_entry *entry)
 {
     qlist_del(&(entry->flow_ref_link));
     return;
@@ -112,8 +108,7 @@ void flow_ref_remove(
  *
  * no return value
  */
-void flow_ref_cleanup(
-    flow_ref_p frp)
+void flow_ref_cleanup(flow_ref_p frp)
 {
     flow_ref_p iterator = NULL;
     flow_ref_p scratch = NULL;
@@ -121,9 +116,9 @@ void flow_ref_cleanup(
 
     qlist_for_each_safe(iterator, scratch, frp)
     {
-        tmp_entry = qlist_entry(iterator, struct flow_ref_entry,
-                                flow_ref_link);
-        free(tmp_entry);
+	tmp_entry = qlist_entry(iterator, struct flow_ref_entry,
+				flow_ref_link);
+	free(tmp_entry);
     }
 
     free(frp);

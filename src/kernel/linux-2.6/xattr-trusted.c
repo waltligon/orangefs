@@ -17,36 +17,29 @@
 
 #include <linux/xattr.h>
 
-int pvfs2_xattr_set_trusted(
-    struct inode *inode,
-    const char *name,
-    const void *buffer,
-    size_t size,
-    int flags)
+int pvfs2_xattr_set_trusted(struct inode *inode, 
+    const char *name, const void *buffer, size_t size, int flags)
 {
     int internal_flag = 0;
 
     if (strcmp(name, "") == 0)
         return -EINVAL;
-    if (!capable(CAP_SYS_ADMIN))
+    if(!capable(CAP_SYS_ADMIN))
         return -EPERM;
     internal_flag = convert_to_internal_xattr_flags(flags);
     return pvfs2_inode_setxattr(inode, PVFS2_XATTR_NAME_TRUSTED_PREFIX,
-                                name, buffer, size, internal_flag);
+        name, buffer, size, internal_flag);
 }
 
-int pvfs2_xattr_get_trusted(
-    struct inode *inode,
-    const char *name,
-    void *buffer,
-    size_t size)
+int pvfs2_xattr_get_trusted(struct inode *inode,
+    const char *name, void *buffer, size_t size)
 {
     if (strcmp(name, "") == 0)
         return -EINVAL;
-    if (!capable(CAP_SYS_ADMIN))
+    if(!capable(CAP_SYS_ADMIN))
         return -EPERM;
     return pvfs2_inode_getxattr(inode, PVFS2_XATTR_NAME_TRUSTED_PREFIX,
-                                name, buffer, size);
+        name, buffer, size);
 }
 
 #endif
@@ -54,9 +47,9 @@ int pvfs2_xattr_get_trusted(
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
 
 struct xattr_handler pvfs2_xattr_trusted_handler = {
-    .prefix = PVFS2_XATTR_NAME_TRUSTED_PREFIX,
-    .get = pvfs2_xattr_get_trusted,
-    .set = pvfs2_xattr_set_trusted,
+    .prefix = PVFS2_XATTR_NAME_TRUSTED_PREFIX, 
+    .get    = pvfs2_xattr_get_trusted,
+    .set    = pvfs2_xattr_set_trusted,
 };
 
 #endif

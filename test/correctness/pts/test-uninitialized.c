@@ -28,8 +28,7 @@
  * Postconditions: returns the error code given by lookup - thats if it doesn't segfault or other catostrophic failure
  * Hase 1 test cases
  */
-static int test_lookup(
-    void)
+static int test_lookup(void)
 {
     int fs_id, ret;
     PVFS_credentials credentials;
@@ -54,8 +53,7 @@ static int test_lookup(
  * Postconditions: returns error from getattr
  * Has 2 Test Cases
  */
-static int test_getattr(
-    void)
+static int test_getattr(void)
 {
     int fs_id, ret;
     PVFS_credentials credentials;
@@ -73,11 +71,12 @@ static int test_getattr(
 
     PVFS_util_gen_credentials(&credentials);
 
-    if ((ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                               &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+    if ((ret = PVFS_sys_lookup(
+             fs_id, name, &credentials,
+             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
-        fprintf(stderr, "lookup failed %d\n", ret);
-        return ret;
+	fprintf(stderr, "lookup failed %d\n", ret);
+	return ret;
     }
 
     pinode_refn = resp_lookup.ref;
@@ -91,8 +90,7 @@ static int test_getattr(
  * Parameters: none
  * Postconditions:
  */
-static int test_setattr(
-    void)
+static int test_setattr(void)
 {
     return -2;
 }
@@ -102,8 +100,7 @@ static int test_setattr(
  * Postconditions: returns the error returned by mkdir
  * Has 2 test cases
  */
-static int test_mkdir(
-    void)
+static int test_mkdir(void)
 {
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
@@ -121,11 +118,12 @@ static int test_mkdir(
     fs_id = 9;
 
     PVFS_util_gen_credentials(&credentials);
-    if ((ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                               &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+    if ((ret = PVFS_sys_lookup(
+             fs_id, name, &credentials,
+             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
-        fprintf(stderr, "lookup failed %d\n", ret);
-        return -1;
+	fprintf(stderr, "lookup failed %d\n", ret);
+	return -1;
     }
 
     parent_refn = resp_lookup.ref;
@@ -133,7 +131,8 @@ static int test_mkdir(
     attr.owner = credentials.uid;
     attr.group = credentials.gid;
     attr.perms = 1877;
-    attr.atime = attr.ctime = attr.mtime = time(NULL);
+    attr.atime = attr.ctime = attr.mtime = 
+	time(NULL);
 
     ret = PVFS_sys_mkdir(name, parent_refn, attr, &credentials, &resp_mkdir);
     return ret;
@@ -144,8 +143,7 @@ static int test_mkdir(
  * Postconditions: returns error code of readdir
  * Has 2 Test cases
  */
-static int test_readdir(
-    void)
+static int test_readdir(void)
 {
 
     int ret;
@@ -167,11 +165,12 @@ static int test_readdir(
     fs_id = 9;
 
     PVFS_util_gen_credentials(&credentials);
-    if ((ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                               &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+    if ((ret = PVFS_sys_lookup(
+             fs_id, name, &credentials,
+             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
-        fprintf(stderr, "lookup failed %d\n", ret);
-        return -1;
+	fprintf(stderr, "lookup failed %d\n", ret);
+	return -1;
     }
 
     pinode_refn = resp_lookup.ref;
@@ -179,8 +178,8 @@ static int test_readdir(
     pvfs_dirent_incount = 1;
 
     ret =
-        PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, &credentials,
-                         &resp_readdir);
+	PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, &credentials,
+			 &resp_readdir);
     return ret;
 }
 
@@ -189,8 +188,7 @@ static int test_readdir(
  * Postconditions: returns error code of readdir
  * Has 2 test cases
  */
-static int test_create(
-    void)
+static int test_create(void)
 {
     int ret, fs_id;
     PVFS_sys_attr attr;
@@ -215,13 +213,13 @@ static int test_create(
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
-        printf("Lookup failed with errcode = %d\n", ret);
-        return (-1);
+	printf("Lookup failed with errcode = %d\n", ret);
+	return (-1);
     }
 
     ret =
-        PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-                        NULL, &resp_create);
+	PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
+			NULL, &resp_create);
     return ret;
 }
 
@@ -230,8 +228,7 @@ static int test_create(
  * Postconditions: returns error code of readdir
  * Has 2 tset cases
  */
-static int test_remove(
-    void)
+static int test_remove(void)
 {
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
@@ -251,8 +248,8 @@ static int test_remove(
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
-        printf("Lookup failed with errcode = %d\n", ret);
-        return (-1);
+	printf("Lookup failed with errcode = %d\n", ret);
+	return (-1);
     }
     ret = PVFS_sys_remove(filename, resp_look.ref, &credentials);
     return ret;
@@ -262,8 +259,7 @@ static int test_remove(
  * Parameters: testcase - the test case that is checked for this function
  * Postconditions: returns error code of readdir
  */
-static int test_rename(
-    void)
+static int test_rename(void)
 {
 
 //      return PVFS_sys_rename(old_name, old_parent_refn, new_name, new_parent_refn, credentials);
@@ -274,8 +270,7 @@ static int test_rename(
  * Parameters: testcase - the test case that is checked for this function
  * Postconditions: returns error code of readdir
  */
-static int test_symlink(
-    void)
+static int test_symlink(void)
 {
     return -2;
 }
@@ -284,8 +279,7 @@ static int test_symlink(
  * Parameters: testcase - the test case that is checked for this function
  * Postconditions: returns error code of readdir
  */
-static int test_readlink(
-    void)
+static int test_readlink(void)
 {
     return -2;
 }
@@ -295,8 +289,7 @@ static int test_readlink(
  * Postconditions: returns error code of readdir
  * Has 2 test cases
  */
-static int test_read(
-    void)
+static int test_read(void)
 {
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
@@ -321,13 +314,13 @@ static int test_read(
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
-        debug_printf("test_pvfs_datatype_hvector: lookup failed "
-                     "on %s\n", filename);
+	debug_printf("test_pvfs_datatype_hvector: lookup failed "
+		     "on %s\n", filename);
     }
 
     ret =
-        PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, NULL, &credentials,
-                      &resp_io);
+	PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, NULL, &credentials,
+		      &resp_io);
     return ret;
 }
 
@@ -336,8 +329,7 @@ static int test_read(
  * Postconditions: returns error code of readdir
  * Has 2 test cases
  */
-static int test_write(
-    void)
+static int test_write(void)
 {
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
@@ -362,18 +354,17 @@ static int test_write(
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
-        debug_printf("test_pvfs_datatype_hvector: lookup failed "
-                     "on %s\n", filename);
+	debug_printf("test_pvfs_datatype_hvector: lookup failed "
+		     "on %s\n", filename);
     }
 
     ret =
-        PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, NULL, &credentials,
-                       &resp_io);
+	PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, NULL, &credentials,
+		       &resp_io);
     return ret;
 }
 
-static int test_finalize(
-    void)
+static int test_finalize(void)
 {
     int ret = -2;
     ret = PVFS_sys_finalize();
@@ -384,11 +375,10 @@ static int test_finalize(
  * Parameters: comm - special pts communicator, rank - the rank of the process, buf -  * (not used), rawparams - configuration information to specify which function to test
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_uninitialized(
-    MPI_Comm * comm __unused,
-    int rank,
-    char *buf __unused,
-    void *rawparams)
+int test_uninitialized(MPI_Comm * comm __unused,
+		       int rank,
+		       char *buf __unused,
+		       void *rawparams)
 {
     int ret = -1;
     null_params *params;
@@ -397,145 +387,132 @@ int test_uninitialized(
     /* right now, the system interface isn't threadsafe, so we just want to run with one process. */
     if (rank == 0)
     {
-        if (params->p1 >= 0 && params->p2 >= 0)
-        {
-            switch (params->p1)
-            {
-            case 0:
-                fprintf(stderr, "[test_uninitialized] test_lookup %d\n",
-                        params->p2);
-                ret = test_lookup();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_lookup", ret);
-                    return ret;
-                }
-                return 0;
-            case 1:
-                fprintf(stderr, "[test_uninitialized] test_getattr %d\n",
-                        params->p2);
-                ret = test_getattr();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_getattr", ret);
-                    return ret;
-                }
-                return 0;
-            case 2:
-                fprintf(stderr, "[test_uninitialized] test_setattr %d\n",
-                        params->p2);
-                ret = test_setattr();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_setattr", ret);
-                    return ret;
-                }
-                return 0;
-            case 3:
-                fprintf(stderr, "[test_uninitialized] test_mkdir %d\n",
-                        params->p2);
-                ret = test_mkdir();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_", ret);
-                    return ret;
-                }
-                return 0;
-            case 4:
-                fprintf(stderr, "[test_uninitialized] test_readdir %d\n",
-                        params->p2);
-                ret = test_readdir();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_readdir", ret);
-                    return ret;
-                }
-                return 0;
-            case 5:
-                fprintf(stderr, "[test_uninitialized] test_create %d\n",
-                        params->p2);
-                ret = test_create();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_create", ret);
-                    return ret;
-                }
-                return 0;
-            case 6:
-                fprintf(stderr, "[test_uninitialized] test_remove %d\n",
-                        params->p2);
-                ret = test_remove();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_remove", ret);
-                    return ret;
-                }
-                return 0;
-            case 7:
-                fprintf(stderr, "[test_uninitialized] test_rename %d\n",
-                        params->p2);
-                ret = test_rename();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_rename", ret);
-                    return ret;
-                }
-                return 0;
-            case 8:
-                fprintf(stderr, "[test_uninitialized] test_symlink %d\n",
-                        params->p2);
-                ret = test_symlink();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_symlink", ret);
-                    return ret;
-                }
-                return 0;
-            case 9:
-                fprintf(stderr, "[test_uninitialized] test_readlink %d\n",
-                        params->p2);
-                ret = test_readlink();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_readlink", ret);
-                    return ret;
-                }
-                return 0;
-            case 10:
-                fprintf(stderr, "[test_uninitialized] test_read %d\n",
-                        params->p2);
-                ret = test_read();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_read", ret);
-                    return ret;
-                }
-                return 0;
-            case 11:
-                fprintf(stderr, "[test_uninitialized] test_write %d\n",
-                        params->p2);
-                ret = test_write();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_write", ret);
-                    return ret;
-                }
-                return 0;
-            case 12:
-                fprintf(stderr, "[test_uninitialized] test_finalize %d\n",
-                        params->p2);
-                ret = test_finalize();
-                if (ret >= 0)
-                {
-                    PVFS_perror("test_finalize", ret);
-                    return ret;
-                }
-                return 0;
-            default:
-                fprintf(stderr, "Error: invalid param %d\n", params->p1);
-                return -2;
-            }
-        }
+	if (params->p1 >= 0 && params->p2 >= 0)
+	{
+	    switch (params->p1)
+	    {
+	    case 0:
+		fprintf(stderr, "[test_uninitialized] test_lookup %d\n",
+			params->p2);
+		ret = test_lookup();
+		if(ret >= 0){
+		    PVFS_perror("test_lookup",ret);
+		    return ret;
+		}
+		return 0;
+	    case 1:
+		fprintf(stderr, "[test_uninitialized] test_getattr %d\n",
+			params->p2);
+		ret = test_getattr();
+		if(ret >= 0){
+		    PVFS_perror("test_getattr",ret);
+		    return ret;
+		}
+		return 0;
+	    case 2:
+		fprintf(stderr, "[test_uninitialized] test_setattr %d\n",
+			params->p2);
+		ret = test_setattr();
+		if(ret >= 0){
+		    PVFS_perror("test_setattr",ret);
+		    return ret;
+		}
+		return 0;
+	    case 3:
+		fprintf(stderr, "[test_uninitialized] test_mkdir %d\n",
+			params->p2);
+		ret = test_mkdir();
+		if(ret >= 0){
+		    PVFS_perror("test_",ret);
+		    return ret;
+		}
+		return 0;
+	    case 4:
+		fprintf(stderr, "[test_uninitialized] test_readdir %d\n",
+			params->p2);
+		ret = test_readdir();
+		if(ret >= 0){
+		    PVFS_perror("test_readdir",ret);
+		    return ret;
+		}
+		return 0;
+	    case 5:
+		fprintf(stderr, "[test_uninitialized] test_create %d\n",
+			params->p2);
+		ret = test_create();
+		if(ret >= 0){
+		    PVFS_perror("test_create",ret);
+		    return ret;
+		}
+		return 0;
+	    case 6:
+		fprintf(stderr, "[test_uninitialized] test_remove %d\n",
+			params->p2);
+		ret = test_remove();
+		if(ret >= 0){
+		    PVFS_perror("test_remove",ret);
+		    return ret;
+		}
+		return 0;
+	    case 7:
+		fprintf(stderr, "[test_uninitialized] test_rename %d\n",
+			params->p2);
+		ret = test_rename();
+		if(ret >= 0){
+		    PVFS_perror("test_rename",ret);
+		    return ret;
+		}
+		return 0;
+	    case 8:
+		fprintf(stderr, "[test_uninitialized] test_symlink %d\n",
+			params->p2);
+		ret = test_symlink();
+		if(ret >= 0){
+		    PVFS_perror("test_symlink",ret);
+		    return ret;
+		}
+		return 0;
+	    case 9:
+		fprintf(stderr, "[test_uninitialized] test_readlink %d\n",
+			params->p2);
+		ret = test_readlink();
+		if(ret >= 0){
+		    PVFS_perror("test_readlink",ret);
+		    return ret;
+		}
+		return 0;
+	    case 10:
+		fprintf(stderr, "[test_uninitialized] test_read %d\n",
+			params->p2);
+		ret = test_read();
+		if(ret >= 0){
+		    PVFS_perror("test_read",ret);
+		    return ret;
+		}
+		return 0;
+	    case 11:
+		fprintf(stderr, "[test_uninitialized] test_write %d\n",
+			params->p2);
+		ret = test_write();
+		if(ret >= 0){
+		    PVFS_perror("test_write",ret);
+		    return ret;
+		}
+		return 0;
+	    case 12:
+		fprintf(stderr, "[test_uninitialized] test_finalize %d\n",
+			params->p2);
+		ret = test_finalize();
+		if(ret >= 0){
+		    PVFS_perror("test_finalize",ret);
+		    return ret;
+		}
+		return 0;
+	    default:
+		fprintf(stderr, "Error: invalid param %d\n", params->p1);
+		return -2;
+	    }
+	}
     }
     return ret;
 }

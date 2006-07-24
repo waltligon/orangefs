@@ -31,8 +31,8 @@
 #endif
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
-static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] =
-    { 1, 1, 0, 1, 0, 0, 0, 0 };
+static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] = 
+    {1,1,0,1,0,0,0,0};
 
 /* how long to wait on cancelled rendezvous receive operations to finish 
  * before reusing the buffer for something else
@@ -41,80 +41,68 @@ static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] =
 #define PINT_CANCELLED_REND_RECLAIM_TIMEOUT (60*15)
 
 /* function prototypes */
-int BMI_gm_initialize(
-    method_addr_p listen_addr,
-    int method_id,
-    int init_flags);
-int BMI_gm_finalize(
-    void);
-int BMI_gm_set_info(
-    int option,
-    void *inout_parameter);
-int BMI_gm_get_info(
-    int option,
-    void *inout_parameter);
-void *BMI_gm_memalloc(
-    bmi_size_t size,
-    enum bmi_op_type send_recv);
-int BMI_gm_memfree(
-    void *buffer,
-    bmi_size_t size,
-    enum bmi_op_type send_recv);
-int BMI_gm_post_send(
-    bmi_op_id_t * id,
-    method_addr_p dest,
-    const void *buffer,
-    bmi_size_t size,
-    enum bmi_buffer_type buffer_type,
-    bmi_msg_tag_t tag,
-    void *user_ptr,
-    bmi_context_id context_id);
-int BMI_gm_post_send_list(
-    bmi_op_id_t * id,
+int BMI_gm_initialize(method_addr_p listen_addr,
+		      int method_id,
+		      int init_flags);
+int BMI_gm_finalize(void);
+int BMI_gm_set_info(int option,
+		    void *inout_parameter);
+int BMI_gm_get_info(int option,
+		    void *inout_parameter);
+void *BMI_gm_memalloc(bmi_size_t size,
+		      enum bmi_op_type send_recv);
+int BMI_gm_memfree(void *buffer,
+		   bmi_size_t size,
+		   enum bmi_op_type send_recv);
+int BMI_gm_post_send(bmi_op_id_t * id,
+		     method_addr_p dest,
+		     const void *buffer,
+		     bmi_size_t size,
+		     enum bmi_buffer_type buffer_type,
+		     bmi_msg_tag_t tag,
+		     void *user_ptr,
+		     bmi_context_id context_id);
+int BMI_gm_post_send_list(bmi_op_id_t * id,
     method_addr_p dest,
     const void *const *buffer_list,
-    const bmi_size_t * size_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id);
-int BMI_gm_post_sendunexpected_list(
-    bmi_op_id_t * id,
+int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     method_addr_p dest,
     const void *const *buffer_list,
-    const bmi_size_t * size_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id);
-int BMI_gm_post_sendunexpected(
-    bmi_op_id_t * id,
-    method_addr_p dest,
-    const void *buffer,
-    bmi_size_t size,
-    enum bmi_buffer_type buffer_type,
-    bmi_msg_tag_t tag,
-    void *user_ptr,
-    bmi_context_id context_id);
-int BMI_gm_post_recv(
-    bmi_op_id_t * id,
-    method_addr_p src,
-    void *buffer,
-    bmi_size_t expected_size,
-    bmi_size_t * actual_size,
-    enum bmi_buffer_type buffer_type,
-    bmi_msg_tag_t tag,
-    void *user_ptr,
-    bmi_context_id context_id);
-int BMI_gm_post_recv_list(
-    bmi_op_id_t * id,
+int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
+			       method_addr_p dest,
+			       const void *buffer,
+			       bmi_size_t size,
+			       enum bmi_buffer_type buffer_type,
+			       bmi_msg_tag_t tag,
+			       void *user_ptr,
+			       bmi_context_id context_id);
+int BMI_gm_post_recv(bmi_op_id_t * id,
+		     method_addr_p src,
+		     void *buffer,
+		     bmi_size_t expected_size,
+		     bmi_size_t * actual_size,
+		     enum bmi_buffer_type buffer_type,
+		     bmi_msg_tag_t tag,
+		     void *user_ptr,
+		     bmi_context_id context_id);
+int BMI_gm_post_recv_list(bmi_op_id_t * id,
     method_addr_p src,
     void *const *buffer_list,
-    const bmi_size_t * size_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_expected_size,
     bmi_size_t * total_actual_size,
@@ -122,26 +110,23 @@ int BMI_gm_post_recv_list(
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id);
-int BMI_gm_test(
-    bmi_op_id_t id,
-    int *outcount,
-    bmi_error_code_t * error_code,
-    bmi_size_t * actual_size,
-    void **user_ptr,
-    int max_idle_time_ms,
-    bmi_context_id context_id);
-int BMI_gm_testsome(
-    int incount,
-    bmi_op_id_t * id_array,
-    int *outcount,
-    int *index_array,
-    bmi_error_code_t * error_code_array,
-    bmi_size_t * actual_size_array,
-    void **user_ptr_array,
-    int max_idle_time_ms,
-    bmi_context_id context_id);
-int BMI_gm_testcontext(
-    int incount,
+int BMI_gm_test(bmi_op_id_t id,
+		int *outcount,
+		bmi_error_code_t * error_code,
+		bmi_size_t * actual_size,
+		void **user_ptr,
+		int max_idle_time_ms,
+		bmi_context_id context_id);
+int BMI_gm_testsome(int incount,
+		    bmi_op_id_t * id_array,
+		    int *outcount,
+		    int *index_array,
+		    bmi_error_code_t * error_code_array,
+		    bmi_size_t * actual_size_array,
+		    void **user_ptr_array,
+		    int max_idle_time_ms,
+		    bmi_context_id context_id);
+int BMI_gm_testcontext(int incount,
     bmi_op_id_t * out_id_array,
     int *outcount,
     bmi_error_code_t * error_code_array,
@@ -149,22 +134,15 @@ int BMI_gm_testcontext(
     void **user_ptr_array,
     int max_idle_time_ms,
     bmi_context_id context_id);
-int BMI_gm_testunexpected(
-    int incount,
-    int *outcount,
-    struct method_unexpected_info *info,
-    int max_idle_time_ms);
-method_addr_p BMI_gm_method_addr_lookup(
-    const char *id_string);
-int BMI_gm_open_context(
-    bmi_context_id context_id);
-void BMI_gm_close_context(
-    bmi_context_id context_id);
-int BMI_gm_cancel(
-    bmi_op_id_t id,
-    bmi_context_id context_id);
-int BMI_gm_get_unexp_maxsize(
-    void);
+int BMI_gm_testunexpected(int incount,
+			  int *outcount,
+			  struct method_unexpected_info *info,
+			  int max_idle_time_ms);
+method_addr_p BMI_gm_method_addr_lookup(const char *id_string);
+int BMI_gm_open_context(bmi_context_id context_id);
+void BMI_gm_close_context(bmi_context_id context_id);
+int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id);
+int BMI_gm_get_unexp_maxsize(void);
 
 char BMI_gm_method_name[] = "bmi_gm";
 
@@ -231,14 +209,14 @@ static op_list_p op_list_array[NUM_INDICES] = { NULL, NULL, NULL, NULL,
     NULL, NULL, NULL, NULL, NULL
 };
 
-static op_list_p completion_array[BMI_MAX_CONTEXTS] = { NULL };
+static op_list_p completion_array[BMI_MAX_CONTEXTS] = {NULL};
 
 /* GM message modes */
 enum
 {
-    GM_MODE_IMMED = 1,          /* immediate */
-    GM_MODE_UNEXP = 2,  /* unexpected */
-    GM_MODE_REND = 4    /* rendezvous */
+    GM_MODE_IMMED = 1,		/* immediate */
+    GM_MODE_UNEXP = 2,		/* unexpected */
+    GM_MODE_REND = 4		/* rendezvous */
 };
 
 /* control message types */
@@ -254,25 +232,25 @@ enum
 /* control messages */
 struct ctrl_req
 {
-    bmi_size_t actual_size;     /* size of message we want to send */
-    bmi_msg_tag_t msg_tag;      /* message tag */
-    bmi_op_id_t sender_op_id;   /* used for matching ctrl's */
+    bmi_size_t actual_size;	/* size of message we want to send */
+    bmi_msg_tag_t msg_tag;	/* message tag */
+    bmi_op_id_t sender_op_id;	/* used for matching ctrl's */
     /* will probably be padded later for immediate messages */
 };
 struct ctrl_ack
 {
-    PVFS_id_gen_t sender_op_id; /* used for matching ctrl's */
-    bmi_op_id_t receiver_op_id; /* used for matching ctrl's */
-    gm_remote_ptr_t remote_ptr; /* peer address to target */
+    PVFS_id_gen_t sender_op_id;	/* used for matching ctrl's */
+    bmi_op_id_t receiver_op_id;	/* used for matching ctrl's */
+    gm_remote_ptr_t remote_ptr;	/* peer address to target */
 };
 struct ctrl_immed
 {
-    bmi_msg_tag_t msg_tag;      /* message tag */
+    bmi_msg_tag_t msg_tag;	/* message tag */
     int32_t actual_size;
 };
 struct ctrl_put
 {
-    bmi_op_id_t receiver_op_id; /* remote op that this completes */
+    bmi_op_id_t receiver_op_id;	/* remote op that this completes */
 };
 
 struct ctrl_msg
@@ -281,10 +259,10 @@ struct ctrl_msg
     uint32_t magic_nr;
     union
     {
-        struct ctrl_req req;
-        struct ctrl_ack ack;
-        struct ctrl_immed immed;
-        struct ctrl_put put;
+	struct ctrl_req req;
+	struct ctrl_ack ack;
+	struct ctrl_immed immed;
+	struct ctrl_put put;
     }
     u;
 };
@@ -292,7 +270,7 @@ struct ctrl_msg
 /* tunable parameters */
 enum
 {
-    GM_WAIT_METRIC = 50000,     /* maximum usecs we will wait during tests */
+    GM_WAIT_METRIC = 50000,	/* maximum usecs we will wait during tests */
     /* max number of network events we will process per function call. */
     GM_MAX_EVENT_CYCLES = 1
 };
@@ -303,8 +281,8 @@ enum
     GM_IMMED_SIZE = 14,
     GM_CTRL_LENGTH = sizeof(struct ctrl_msg),
     GM_MODE_IMMED_LIMIT = 0,
-    GM_MODE_REND_LIMIT = 524288,        /* 512K */
-    GM_MODE_UNEXP_LIMIT = 16384 /* 16K */
+    GM_MODE_REND_LIMIT = 524288,	/* 512K */
+    GM_MODE_UNEXP_LIMIT = 16384	/* 16K */
 };
 static gm_size_t GM_IMMED_LENGTH;
 
@@ -313,15 +291,15 @@ struct gm_op
 {
     /* used by callback functions to discard ctrl message buffers */
     struct ctrl_msg *freeable_ctrl_buffer;
-    bmi_op_id_t peer_op_id;     /* op id of partner's operation */
+    bmi_op_id_t peer_op_id;	/* op id of partner's operation */
     /* indicates how buffer was allocated or pinned */
     int buffer_status;
     gm_remote_ptr_t remote_ptr;
     void *tmp_xfer_buffer;
-    uint8_t complete;           /* indicates when operation is completed */
-    uint8_t list_flag;          /* indicates this is a list operation */
-    uint8_t cancelled;          /* indicates operation has been cancelled */
-    long cancelled_tv_sec;      /* timestamp for when the op was cancelled */
+    uint8_t complete; /* indicates when operation is completed */
+    uint8_t list_flag; /* indicates this is a list operation */
+    uint8_t cancelled; /* indicates operation has been cancelled */
+    long cancelled_tv_sec; /* timestamp for when the op was cancelled */
 };
 
 /* the local port that we are communicating on */
@@ -346,114 +324,79 @@ static struct bufferpool *io_pool = NULL;
 #endif /* ENABLE_GM_BUFPOOL */
 
 /* internal utility functions */
-static method_addr_p alloc_gm_method_addr(
-    void);
-static void dealloc_gm_method_addr(
-    method_addr_p map);
-static int gm_post_send_check_resource(
-    struct method_op *mop);
-static int gm_post_send_build_op(
-    bmi_op_id_t * id,
+static method_addr_p alloc_gm_method_addr(void);
+static void dealloc_gm_method_addr(method_addr_p map);
+static int gm_post_send_check_resource(struct method_op* mop);
+static int gm_post_send_build_op(bmi_op_id_t * id,
     method_addr_p dest,
     const void *buffer,
     bmi_size_t size,
     bmi_msg_tag_t tag,
     int mode,
     int buffer_status,
-    void *user_ptr,
-    bmi_context_id context_id);
-static int gm_post_send_build_op_list(
-    bmi_op_id_t * id,
+    void *user_ptr, bmi_context_id context_id);
+static int gm_post_send_build_op_list(bmi_op_id_t * id,
     method_addr_p dest,
     const void *const *buffer_list,
-    const bmi_size_t * size_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     bmi_msg_tag_t tag,
     int mode,
     int buffer_status,
-    void *user_ptr,
-    bmi_context_id context_id);
-static void ctrl_req_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status);
-void dealloc_gm_method_op(
-    method_op_p op_p);
-static method_op_p alloc_gm_method_op(
-    void);
-static int ctrl_recv_pool_init(
-    int pool_size);
-static int gm_do_work(
-    int wait_time);
-static void delayed_token_sweep(
-    void);
-static int receive_cycle(
-    int timeout);
-void alarm_callback(
-    void *context);
-static int recv_event_handler(
-    gm_recv_event_t * poll_event,
-    int fast);
-static void ctrl_ack_handler(
-    bmi_op_id_t ctrl_op_id,
-    unsigned int node_id,
-    gm_remote_ptr_t remote_ptr,
-    bmi_op_id_t peer_op_id);
-static int ctrl_req_handler_rend(
-    bmi_op_id_t ctrl_op_id,
-    bmi_size_t ctrl_actual_size,
-    bmi_msg_tag_t ctrl_tag,
-    unsigned int node_id,
-    unsigned int port_id);
-static int immed_unexp_recv_handler(
-    bmi_size_t size,
-    bmi_msg_tag_t msg_tag,
-    method_addr_p map,
-    void *buffer);
-static int immed_recv_handler(
-    bmi_size_t actual_size,
-    bmi_msg_tag_t msg_tag,
-    method_addr_p map,
-    void *buffer);
-static void put_recv_handler(
-    bmi_op_id_t ctrl_op_id);
-static void ctrl_ack_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status);
-static void data_send_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status);
-static void immed_send_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status);
-static void ctrl_put_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status);
-static void initiate_send_rend(
-    method_op_p mop);
-static void initiate_send_immed(
-    method_op_p mop);
-static void initiate_put_announcement(
-    method_op_p mop);
-static void send_data_buffer(
-    method_op_p mop);
-static void prepare_for_recv(
-    method_op_p mop);
-static void setup_send_data_buffer(
-    method_op_p mop);
-static void setup_send_data_buffer_list(
-    method_op_p mop);
-static void prepare_for_recv_list(
-    method_op_p mop);
-static void reclaim_cancelled_io_buffers(
-    void);
-static int io_buffers_exhausted(
-    void);
+    void *user_ptr, bmi_context_id context_id);
+static void ctrl_req_callback(struct gm_port *port,
+			      void *context,
+			      gm_status_t status);
+void dealloc_gm_method_op(method_op_p op_p);
+static method_op_p alloc_gm_method_op(void);
+static int ctrl_recv_pool_init(int pool_size);
+static int gm_do_work(int wait_time);
+static void delayed_token_sweep(void);
+static int receive_cycle(int timeout);
+void alarm_callback(void *context);
+static int recv_event_handler(gm_recv_event_t * poll_event,
+			     int fast);
+static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
+			     unsigned int node_id,
+			     gm_remote_ptr_t remote_ptr,
+			     bmi_op_id_t peer_op_id);
+static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
+				 bmi_size_t ctrl_actual_size,
+				 bmi_msg_tag_t ctrl_tag,
+				 unsigned int node_id,
+                                 unsigned int port_id);
+static int immed_unexp_recv_handler(bmi_size_t size,
+				    bmi_msg_tag_t msg_tag,
+				    method_addr_p map,
+				    void *buffer);
+static int immed_recv_handler(bmi_size_t actual_size,
+			      bmi_msg_tag_t msg_tag,
+			      method_addr_p map,
+			      void *buffer);
+static void put_recv_handler(bmi_op_id_t ctrl_op_id);
+static void ctrl_ack_callback(struct gm_port *port,
+			      void *context,
+			      gm_status_t status);
+static void data_send_callback(struct gm_port *port,
+			       void *context,
+			       gm_status_t status);
+static void immed_send_callback(struct gm_port *port,
+				void *context,
+				gm_status_t status);
+static void ctrl_put_callback(struct gm_port *port,
+			      void *context,
+			      gm_status_t status);
+static void initiate_send_rend(method_op_p mop);
+static void initiate_send_immed(method_op_p mop);
+static void initiate_put_announcement(method_op_p mop);
+static void send_data_buffer(method_op_p mop);
+static void prepare_for_recv(method_op_p mop);
+static void setup_send_data_buffer(method_op_p mop);
+static void setup_send_data_buffer_list(method_op_p mop);
+static void prepare_for_recv_list(method_op_p mop);
+static void reclaim_cancelled_io_buffers(void);
+static int io_buffers_exhausted(void);
 
 /*************************************************************************
  * Visible Interface 
@@ -466,10 +409,9 @@ static int io_buffers_exhausted(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_initialize(
-    method_addr_p listen_addr,
-    int method_id,
-    int init_flags)
+int BMI_gm_initialize(method_addr_p listen_addr,
+		      int method_id,
+		      int init_flags)
 {
     gm_status_t gm_ret;
     unsigned int rec_tokens = 0;
@@ -486,14 +428,14 @@ int BMI_gm_initialize(
     /* check args */
     if ((init_flags & BMI_INIT_SERVER) && !listen_addr)
     {
-        gossip_lerr("Error: bad parameters to GM module.\n");
-        return (bmi_gm_errno_to_pvfs(-EINVAL));
+	gossip_lerr("Error: bad parameters to GM module.\n");
+	return (bmi_gm_errno_to_pvfs(-EINVAL));
     }
 
     gen_mutex_lock(&interface_mutex);
 
     GM_IMMED_LENGTH = gm_max_length_for_size(GM_IMMED_SIZE) -
-        sizeof(struct ctrl_msg);
+	sizeof(struct ctrl_msg);
 
     /* zero out our parameter structure and fill it in */
     memset(&gm_method_params, 0, sizeof(struct method_params));
@@ -504,68 +446,64 @@ int BMI_gm_initialize(
     /* set up the operation lists */
     for (i = 0; i < NUM_INDICES; i++)
     {
-        op_list_array[i] = op_list_new();
-        if (!op_list_array[i])
-        {
-            tmp_errno = bmi_gm_errno_to_pvfs(-ENOMEM);
-            goto gm_initialize_failure;
-        }
+	op_list_array[i] = op_list_new();
+	if (!op_list_array[i])
+	{
+	    tmp_errno = bmi_gm_errno_to_pvfs(-ENOMEM);
+	    goto gm_initialize_failure;
+	}
     }
 
     /* start up gm */
     gm_ret = gm_init();
     if (gm_ret != GM_SUCCESS)
     {
-        gossip_lerr("Error: gm_init() failure.\n");
-        gen_mutex_unlock(&interface_mutex);
-        return (bmi_gm_errno_to_pvfs(-EPROTO));
+	gossip_lerr("Error: gm_init() failure.\n");
+	gen_mutex_unlock(&interface_mutex);
+	return (bmi_gm_errno_to_pvfs(-EPROTO));
     }
 
-    if (init_flags & BMI_INIT_SERVER)
+    if(init_flags & BMI_INIT_SERVER)
     {
-        /* hang on to our local listening address if needed */
-        gm_method_params.listen_addr = listen_addr;
+	/* hang on to our local listening address if needed */
+	gm_method_params.listen_addr = listen_addr;
 
-        /* open our local port for communication */
-        gm_addr_data = listen_addr->method_data;
-        gm_ret = gm_open(&local_port, BMI_GM_UNIT_NUM,
-                         gm_addr_data->port_id, BMI_GM_PORT_NAME,
-                         GM_API_VERSION_1_3);
-        if (gm_ret != GM_SUCCESS)
-        {
-            ret = bmi_gm_errno_to_pvfs(-EPROTO);
-            goto gm_initialize_failure;
-        }
+	/* open our local port for communication */
+	gm_addr_data = listen_addr->method_data;
+	gm_ret = gm_open(&local_port, BMI_GM_UNIT_NUM, 
+	    gm_addr_data->port_id, BMI_GM_PORT_NAME, GM_API_VERSION_1_3);
+	if (gm_ret != GM_SUCCESS)
+	{
+	    ret = bmi_gm_errno_to_pvfs(-EPROTO);
+	    goto gm_initialize_failure;
+	}
     }
     else
     {
-        /* we must cycle through and find an open port */
-        for (i = 0; i < BMI_GM_MAX_PORTS; i++)
-        {
-            if (!bmi_gm_reserved_ports[i])
-            {
-                gm_ret = gm_open(&local_port, BMI_GM_UNIT_NUM,
-                                 (unsigned int) i, BMI_GM_PORT_NAME,
-                                 GM_API_VERSION_1_3);
-                if (gm_ret == GM_SUCCESS)
-                    break;
-            }
-        }
-        if (i >= BMI_GM_MAX_PORTS)
-        {
-            gossip_lerr("Error: failed to find available GM port.\n");
-            ret = bmi_gm_errno_to_pvfs(-EPROTO);
-            goto gm_initialize_failure;
-        }
-        gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Using port number %i.\n", i);
+	/* we must cycle through and find an open port */
+	for(i=0; i<BMI_GM_MAX_PORTS; i++)
+	{
+	    if(!bmi_gm_reserved_ports[i])
+	    {
+		gm_ret = gm_open(&local_port, BMI_GM_UNIT_NUM, 
+		    (unsigned int)i, BMI_GM_PORT_NAME, GM_API_VERSION_1_3);
+		if(gm_ret == GM_SUCCESS)
+		    break;
+	    }
+	}
+	if(i >= BMI_GM_MAX_PORTS)
+	{
+	    gossip_lerr("Error: failed to find available GM port.\n");
+	    ret = bmi_gm_errno_to_pvfs(-EPROTO);
+	    goto gm_initialize_failure;
+	}
+	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Using port number %i.\n", i);
     }
 
     rec_tokens = gm_num_receive_tokens(local_port);
     send_tokens = gm_num_send_tokens(local_port);
-    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Available recieve tokens: %u.\n",
-                  rec_tokens);
-    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Available send tokens: %u.\n",
-                  send_tokens);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Available recieve tokens: %u.\n", rec_tokens);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Available send tokens: %u.\n", send_tokens);
 
     /* we will use half of the send tokens for low priority, and half for
      * high priority */
@@ -578,8 +516,8 @@ int BMI_gm_initialize(
     ret = ctrl_recv_pool_init(recv_token_count_high);
     if (ret < 0)
     {
-        tmp_errno = bmi_gm_errno_to_pvfs(ret);
-        goto gm_initialize_failure;
+	tmp_errno = bmi_gm_errno_to_pvfs(ret);
+	goto gm_initialize_failure;
     }
 
 #ifdef ENABLE_GM_REGCACHE
@@ -587,18 +525,18 @@ int BMI_gm_initialize(
     ret = bmi_gm_regcache_init(local_port);
     if (ret < 0)
     {
-        tmp_errno = bmi_gm_errno_to_pvfs(ret);
-        goto gm_initialize_failure;
+	tmp_errno = bmi_gm_errno_to_pvfs(ret);
+	goto gm_initialize_failure;
     }
 #endif /* ENABLE_GM_REGCACHE */
 
     /* intialize the control buffer cache */
     ctrl_send_pool = bmi_gm_bufferpool_init(local_port, send_tokens,
-                                            GM_CTRL_LENGTH);
+					    GM_CTRL_LENGTH);
     if (!ctrl_send_pool)
     {
-        tmp_errno = bmi_gm_errno_to_pvfs(ret);
-        goto gm_initialize_failure;
+	tmp_errno = bmi_gm_errno_to_pvfs(ret);
+	goto gm_initialize_failure;
     }
 
 #ifdef ENABLE_GM_BUFPOOL
@@ -606,9 +544,9 @@ int BMI_gm_initialize(
     io_pool = bmi_gm_bufferpool_init(local_port, 32, GM_MODE_REND_LIMIT);
     if (!io_pool)
     {
-        tmp_errno = bmi_gm_errno_to_pvfs(ret);
-        gossip_lerr("Error: failed to obtain memory for buffer pool.\n");
-        goto gm_initialize_failure;
+	tmp_errno = bmi_gm_errno_to_pvfs(ret);
+	gossip_lerr("Error: failed to obtain memory for buffer pool.\n");
+	goto gm_initialize_failure;
     }
 #endif /* ENABLE_GM_BUFPOOL */
 
@@ -619,14 +557,12 @@ int BMI_gm_initialize(
     gm_get_host_name(local_port, gm_host_name);
     gm_get_node_id(local_port, &gm_host_id);
     min_message_size = gm_min_message_size(local_port);
-    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM Interface host name: %s.\n",
-                  gm_host_name);
-    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM Interface node id: %u.\n",
-                  gm_host_id);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM Interface host name: %s.\n", gm_host_name);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM Interface node id: %u.\n", gm_host_id);
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM Interface min msg size: %u.\n",
-                  min_message_size);
+		  min_message_size);
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM immediate mode limit: %d.\n",
-                  GM_MODE_IMMED_LIMIT);
+		  GM_MODE_IMMED_LIMIT);
 
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM module successfully initialized.\n");
     gen_mutex_unlock(&interface_mutex);
@@ -637,10 +573,10 @@ int BMI_gm_initialize(
     /* cleanup data structures and bail out */
     for (i = 0; i < NUM_INDICES; i++)
     {
-        if (op_list_array[i])
-        {
-            op_list_cleanup(op_list_array[i]);
-        }
+	if (op_list_array[i])
+	{
+	    op_list_cleanup(op_list_array[i]);
+	}
     }
 
 #ifdef ENABLE_GM_REGCACHE
@@ -650,11 +586,11 @@ int BMI_gm_initialize(
 
     /* shut down ctrl buffer cache */
     if (ctrl_send_pool)
-        bmi_gm_bufferpool_finalize(ctrl_send_pool);
+	bmi_gm_bufferpool_finalize(ctrl_send_pool);
 
 #ifdef ENABLE_GM_BUFPOOL
     if (io_pool)
-        bmi_gm_bufferpool_finalize(io_pool);
+	bmi_gm_bufferpool_finalize(io_pool);
 #endif /* ENABLE_GM_BUFPOOL */
 
     gm_finalize();
@@ -670,8 +606,7 @@ int BMI_gm_initialize(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_finalize(
-    void)
+int BMI_gm_finalize(void)
 {
     int i = 0;
 
@@ -679,11 +614,11 @@ int BMI_gm_finalize(
     /* note that this forcefully shuts down operations */
     for (i = 0; i < NUM_INDICES; i++)
     {
-        if (op_list_array[i])
-        {
-            op_list_cleanup(op_list_array[i]);
-            op_list_array[i] = NULL;
-        }
+	if (op_list_array[i])
+	{
+	    op_list_cleanup(op_list_array[i]);
+	    op_list_array[i] = NULL;
+	}
     }
 
 #ifdef ENABLE_GM_REGCACHE
@@ -713,51 +648,50 @@ int BMI_gm_finalize(
  *
  * returns a pointer to method_addr on success, NULL on failure
  */
-method_addr_p BMI_gm_method_addr_lookup(
-    const char *id_string)
+method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
 {
     char *gm_string = NULL;
     method_addr_p new_addr = NULL;
     struct gm_addr *gm_data = NULL;
     char local_tag[] = "NULL";
-    char *delim = NULL;
+    char* delim = NULL;
     int ret = -1;
 
     gm_string = string_key("gm", id_string);
     if (!gm_string)
     {
-        /* the string doesn't even have our info */
-        gossip_lerr("Error: NULL id_string.\n");
-        return (NULL);
+	/* the string doesn't even have our info */
+	gossip_lerr("Error: NULL id_string.\n");
+	return (NULL);
     }
 
     /* start breaking up the method information */
     /* for gm, it is hostname:portnumber */
-    if ((delim = index(gm_string, ':')) == NULL)
+    if((delim = index(gm_string, ':')) == NULL)
     {
-        gossip_lerr("Error: malformed gm address.\n");
-        free(gm_string);
-        return (NULL);
+	gossip_lerr("Error: malformed gm address.\n");
+	free(gm_string);
+	return(NULL);
     }
 
     /* looks ok, so let's build the method addr structure */
     new_addr = alloc_gm_method_addr();
     if (!new_addr)
     {
-        gossip_lerr("Error: unable to allocate GM method address.\n");
-        free(gm_string);
-        return (NULL);
+	gossip_lerr("Error: unable to allocate GM method address.\n");
+	free(gm_string);
+	return (NULL);
     }
     gm_data = new_addr->method_data;
 
     /* pull off the port first */
-    ret = sscanf((delim + 1), "%u", &(gm_data->port_id));
-    if (ret != 1)
+    ret = sscanf((delim+1), "%u", &(gm_data->port_id));
+    if(ret != 1)
     {
-        gossip_lerr("Error: malformed gm address.\n");
-        dealloc_gm_method_addr(new_addr);
-        free(gm_string);
-        return (NULL);
+	gossip_lerr("Error: malformed gm address.\n");
+	dealloc_gm_method_addr(new_addr);
+	free(gm_string);
+	return(NULL);
     }
 
     /* now chop off the port information and parse the rest */
@@ -766,20 +700,20 @@ method_addr_p BMI_gm_method_addr_lookup(
     gen_mutex_lock(&interface_mutex);
     if (strncmp(gm_string, local_tag, strlen(local_tag)) == 0)
     {
-        new_addr->local_addr = 1;
+	new_addr->local_addr = 1;
     }
-    else if (local_port != NULL)
+    else if(local_port != NULL)
     {
-        gm_data->node_id = gm_host_name_to_node_id(local_port, gm_string);
-        if (gm_data->node_id == GM_NO_SUCH_NODE_ID)
-        {
-            gossip_lerr("Error: gm_host_name_to_node_id() failure for: %s.\n",
-                        gm_string);
-            dealloc_method_addr(new_addr);
-            free(gm_string);
-            gen_mutex_unlock(&interface_mutex);
-            return (NULL);
-        }
+	gm_data->node_id = gm_host_name_to_node_id(local_port, gm_string);
+	if (gm_data->node_id == GM_NO_SUCH_NODE_ID)
+	{
+	    gossip_lerr("Error: gm_host_name_to_node_id() failure for: %s.\n",
+		gm_string);
+	    dealloc_method_addr(new_addr);
+	    free(gm_string);
+	    gen_mutex_unlock(&interface_mutex);
+	    return (NULL);
+	}
     }
 
     free(gm_string);
@@ -796,9 +730,8 @@ method_addr_p BMI_gm_method_addr_lookup(
  *
  * returns 0 on success, -errno on failure
  */
-void *BMI_gm_memalloc(
-    bmi_size_t size,
-    enum bmi_op_type send_recv)
+void *BMI_gm_memalloc(bmi_size_t size,
+		      enum bmi_op_type send_recv)
 {
     /* NOTE: In the send case, we allocate a little bit of extra memory
      * at the END of the buffer to use for message trailers.  We stick it
@@ -811,34 +744,34 @@ void *BMI_gm_memalloc(
     gen_mutex_lock(&interface_mutex);
     if (send_recv == BMI_RECV)
     {
-        if (size <= GM_IMMED_LENGTH)
-        {
-            new_buffer = malloc(size);
-        }
-        else
-        {
-            new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
-                                                             long) size);
-        }
+	if (size <= GM_IMMED_LENGTH)
+	{
+	    new_buffer = malloc(size);
+	}
+	else
+	{
+	    new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
+							     long) size);
+	}
     }
     else if (send_recv == BMI_SEND)
     {
-        if (size <= GM_IMMED_LENGTH)
-        {
-            /* pad enough room for a ctrl structure */
-            size += sizeof(struct ctrl_msg);
-            new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
-                                                             long) size);
-        }
-        else
-        {
-            new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
-                                                             long) size);
-        }
+	if (size <= GM_IMMED_LENGTH)
+	{
+	    /* pad enough room for a ctrl structure */
+	    size += sizeof(struct ctrl_msg);
+	    new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
+							     long) size);
+	}
+	else
+	{
+	    new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
+							     long) size);
+	}
     }
     else
     {
-        new_buffer = NULL;
+	new_buffer = NULL;
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -852,31 +785,30 @@ void *BMI_gm_memalloc(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_memfree(
-    void *buffer,
-    bmi_size_t size,
-    enum bmi_op_type send_recv)
+int BMI_gm_memfree(void *buffer,
+		   bmi_size_t size,
+		   enum bmi_op_type send_recv)
 {
     gen_mutex_lock(&interface_mutex);
     if (send_recv == BMI_RECV)
     {
-        if (size <= GM_IMMED_LENGTH)
-        {
-            free(buffer);
-        }
-        else
-        {
-            gm_dma_free(local_port, buffer);
-        }
+	if (size <= GM_IMMED_LENGTH)
+	{
+	    free(buffer);
+	}
+	else
+	{
+	    gm_dma_free(local_port, buffer);
+	}
     }
     else if (send_recv == BMI_SEND)
     {
-        gm_dma_free(local_port, buffer);
+	gm_dma_free(local_port, buffer);
     }
     else
     {
-        gen_mutex_unlock(&interface_mutex);
-        return (bmi_gm_errno_to_pvfs(-EINVAL));
+	gen_mutex_unlock(&interface_mutex);
+	return (bmi_gm_errno_to_pvfs(-EINVAL));
     }
 
     buffer = NULL;
@@ -891,23 +823,22 @@ int BMI_gm_memfree(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_set_info(
-    int option,
-    void *inout_parameter)
+int BMI_gm_set_info(int option,
+		    void *inout_parameter)
 {
-    switch (option)
+    switch(option)
     {
-    case BMI_TCP_BUFFER_SEND_SIZE:
-    case BMI_TCP_BUFFER_RECEIVE_SIZE:
-    case BMI_FORCEFUL_CANCEL_MODE:
-    case BMI_DROP_ADDR:
+        case BMI_TCP_BUFFER_SEND_SIZE:
+        case BMI_TCP_BUFFER_RECEIVE_SIZE:
+        case BMI_FORCEFUL_CANCEL_MODE:
+        case BMI_DROP_ADDR:
 #ifdef USE_TRUSTED
-    case BMI_TRUSTED_CONNECTION:
+        case BMI_TRUSTED_CONNECTION:
 #endif
-        /* these tcp-specific hints mean nothing to GM */
-        return 0;
-    default:
-        return (bmi_gm_errno_to_pvfs(-ENOSYS));
+            /* these tcp-specific hints mean nothing to GM */
+            return 0;
+        default:
+            return (bmi_gm_errno_to_pvfs(-ENOSYS));
     }
 }
 
@@ -917,27 +848,26 @@ int BMI_gm_set_info(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_get_info(
-    int option,
-    void *inout_parameter)
+int BMI_gm_get_info(int option,
+		    void *inout_parameter)
 {
     int ret = -1;
 
     switch (option)
     {
     case BMI_CHECK_MAXSIZE:
-        *((int *) inout_parameter) = GM_MODE_REND_LIMIT;
-        ret = 0;
+	*((int *) inout_parameter) = GM_MODE_REND_LIMIT;
+	ret = 0;
         break;
     case BMI_GET_UNEXP_SIZE:
         *((int *) inout_parameter) = GM_MODE_UNEXP_LIMIT;
         ret = 0;
         break;
     default:
-        gossip_ldebug(GOSSIP_BMI_DEBUG_GM,
-                      "BMI GM hint %d not implemented.\n", option);
-        ret = 0;
-        break;
+	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, 
+	    "BMI GM hint %d not implemented.\n", option);
+	ret = 0;
+    break;
     }
 
     return (ret);
@@ -951,15 +881,14 @@ int BMI_gm_get_info(
  * returns 0 on success that requires later poll, returns 1 on instant
  * completion, -errno on failure
  */
-int BMI_gm_post_send(
-    bmi_op_id_t * id,
-    method_addr_p dest,
-    const void *buffer,
-    bmi_size_t size,
-    enum bmi_buffer_type buffer_type,
-    bmi_msg_tag_t tag,
-    void *user_ptr,
-    bmi_context_id context_id)
+int BMI_gm_post_send(bmi_op_id_t * id,
+		     method_addr_p dest,
+		     const void *buffer,
+		     bmi_size_t size,
+		     enum bmi_buffer_type buffer_type,
+		     bmi_msg_tag_t tag,
+		     void *user_ptr,
+		     bmi_context_id context_id)
 {
     int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
@@ -975,63 +904,63 @@ int BMI_gm_post_send(
     /* make sure it's not too big */
     if (size > GM_MODE_REND_LIMIT)
     {
-        return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     gen_mutex_lock(&interface_mutex);
     if (buffer_type != BMI_PRE_ALLOC)
     {
-        if (size <= GM_IMMED_LENGTH)
-        {
-            /* pad enough room for a ctrl structure */
-            buffer_size = sizeof(struct ctrl_msg) + size;
+	if (size <= GM_IMMED_LENGTH)
+	{
+	    /* pad enough room for a ctrl structure */
+	    buffer_size = sizeof(struct ctrl_msg) + size;
 
-            /* create a new buffer and copy */
-            new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
-                                                             long) buffer_size);
-            if (!new_buffer)
-            {
-                gen_mutex_unlock(&interface_mutex);
-                gossip_lerr("Error: gm_dma_malloc failure.\n");
-                return (bmi_gm_errno_to_pvfs(-ENOMEM));
-            }
-            memcpy(new_buffer, buffer, size);
-            /* this seems little shady, but we are going to go ahead and forget
-             * about the buffer that the user gave us.  It serves no purpose
-             * here anymore.
-             */
-            buffer = new_buffer;
-            buffer_status = GM_BUF_METH_ALLOC;
-        }
-        else
-        {
-            buffer_status = GM_BUF_METH_REG;
-        }
+	    /* create a new buffer and copy */
+	    new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
+							     long) buffer_size);
+	    if (!new_buffer)
+	    {
+		gen_mutex_unlock(&interface_mutex);
+		gossip_lerr("Error: gm_dma_malloc failure.\n");
+		return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	    }
+	    memcpy(new_buffer, buffer, size);
+	    /* this seems little shady, but we are going to go ahead and forget
+	     * about the buffer that the user gave us.  It serves no purpose
+	     * here anymore.
+	     */
+	    buffer = new_buffer;
+	    buffer_status = GM_BUF_METH_ALLOC;
+	}
+	else
+	{
+	    buffer_status = GM_BUF_METH_REG;
+	}
     }
 
     if (size <= GM_IMMED_LENGTH)
     {
-        /* Immediate mode stuff */
-        new_ctrl_msg = (struct ctrl_msg *) (buffer + size);
-        new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
-        new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
-        new_ctrl_msg->u.immed.actual_size = size;
-        new_ctrl_msg->u.immed.msg_tag = tag;
-        ret = gm_post_send_build_op(id, dest, buffer, size,
-                                    tag,
-                                    GM_MODE_IMMED,
-                                    buffer_status, user_ptr, context_id);
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	/* Immediate mode stuff */
+	new_ctrl_msg = (struct ctrl_msg *) (buffer + size);
+	new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
+	new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
+	new_ctrl_msg->u.immed.actual_size = size;
+	new_ctrl_msg->u.immed.msg_tag = tag;
+	ret = gm_post_send_build_op(id, dest, buffer, size,
+					    tag,
+					    GM_MODE_IMMED,
+					    buffer_status, user_ptr, context_id);
+	gen_mutex_unlock(&interface_mutex);
+	return(ret);
     }
     else
     {
-        /* 3 way rendezvous mode */
-        ret = gm_post_send_build_op(id, dest, buffer, size,
-                                    tag, GM_MODE_REND,
-                                    buffer_status, user_ptr, context_id);
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	/* 3 way rendezvous mode */
+	ret = gm_post_send_build_op(id, dest, buffer, size,
+					    tag, GM_MODE_REND,
+					    buffer_status, user_ptr, context_id);
+	gen_mutex_unlock(&interface_mutex);
+	return(ret);
     }
 }
 
@@ -1043,11 +972,10 @@ int BMI_gm_post_send(
  * returns 0 on success, 1 on immediate successful completion,
  * -errno on failure
  */
-int BMI_gm_post_send_list(
-    bmi_op_id_t * id,
+int BMI_gm_post_send_list(bmi_op_id_t * id,
     method_addr_p dest,
     const void *const *buffer_list,
-    const bmi_size_t * size_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
@@ -1069,10 +997,10 @@ int BMI_gm_post_send_list(
      * normal post_send() function because it is more efficient in
      * the single buffer case 
      */
-    if (list_count == 1)
+    if(list_count == 1)
     {
-        return (BMI_gm_post_send(id, dest, buffer_list[0], size_list[0],
-                                 buffer_type, tag, user_ptr, context_id));
+	return(BMI_gm_post_send(id, dest, buffer_list[0], size_list[0], 
+	    buffer_type, tag, user_ptr, context_id));
     }
 
     /* TODO: think about this some.  For now this is going to be
@@ -1087,54 +1015,53 @@ int BMI_gm_post_send_list(
     /* make sure it's not too big */
     if (total_size > GM_MODE_REND_LIMIT)
     {
-        return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     gen_mutex_lock(&interface_mutex);
     if (total_size <= GM_IMMED_LENGTH)
     {
-        /* pad enough room for a ctrl structure */
-        buffer_size = sizeof(struct ctrl_msg) + total_size;
+	/* pad enough room for a ctrl structure */
+	buffer_size = sizeof(struct ctrl_msg) + total_size;
 
-        /* create a new buffer and copy */
-        new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
-                                                         long) buffer_size);
-        if (!new_buffer)
-        {
-            gossip_lerr("Error: gm_dma_malloc failure.\n");
-            gen_mutex_unlock(&interface_mutex);
-            return (bmi_gm_errno_to_pvfs(-ENOMEM));
-        }
+	/* create a new buffer and copy */
+	new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
+							 long) buffer_size);
+	if (!new_buffer)
+	{
+	    gossip_lerr("Error: gm_dma_malloc failure.\n");
+	    gen_mutex_unlock(&interface_mutex);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	}
 
-        copy_buffer = new_buffer;
-        for (i = 0; i < list_count; i++)
-        {
-            memcpy(copy_buffer, buffer_list[i], size_list[i]);
-            copy_buffer = (void *) ((long) copy_buffer + (long) size_list[i]);
-        }
+	copy_buffer = new_buffer;
+	for(i=0; i<list_count; i++)
+	{
+	    memcpy(copy_buffer, buffer_list[i], size_list[i]);
+	    copy_buffer = (void*)((long)copy_buffer + (long)size_list[i]);
+	}
 
-        /* Immediate mode stuff */
-        new_ctrl_msg = (struct ctrl_msg *) (new_buffer + total_size);
-        new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
-        new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
-        new_ctrl_msg->u.immed.actual_size = total_size;
-        new_ctrl_msg->u.immed.msg_tag = tag;
-        buffer_status = GM_BUF_METH_ALLOC;
-        ret = gm_post_send_build_op(id, dest, new_buffer, total_size,
-                                    tag,
-                                    GM_MODE_IMMED,
-                                    buffer_status, user_ptr, context_id);
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	/* Immediate mode stuff */
+	new_ctrl_msg = (struct ctrl_msg *) (new_buffer + total_size);
+	new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
+	new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
+	new_ctrl_msg->u.immed.actual_size = total_size;
+	new_ctrl_msg->u.immed.msg_tag = tag;
+	buffer_status = GM_BUF_METH_ALLOC;
+	ret = gm_post_send_build_op(id, dest, new_buffer, total_size,
+					    tag,
+					    GM_MODE_IMMED,
+					    buffer_status, user_ptr, context_id);
+	gen_mutex_unlock(&interface_mutex);
+	return(ret);
     }
     else
     {
-        ret = gm_post_send_build_op_list(id, dest, buffer_list,
-                                         size_list, list_count, total_size, tag,
-                                         GM_MODE_REND, buffer_status, user_ptr,
-                                         context_id);
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	ret = gm_post_send_build_op_list(id, dest, buffer_list, 
+	    size_list, list_count, total_size, tag, GM_MODE_REND, 
+	    buffer_status, user_ptr, context_id);
+	gen_mutex_unlock(&interface_mutex);
+	return(ret);
     }
 
 }
@@ -1148,11 +1075,10 @@ int BMI_gm_post_send_list(
  * returns 0 on success, 1 on immediate successful completion,
  * -errno on failure
  */
-int BMI_gm_post_sendunexpected_list(
-    bmi_op_id_t * id,
+int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     method_addr_p dest,
     const void *const *buffer_list,
-    const bmi_size_t * size_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
@@ -1168,18 +1094,17 @@ int BMI_gm_post_sendunexpected_list(
     int i;
     int ret;
 
-    gossip_ldebug(GOSSIP_BMI_DEBUG_GM,
-                  "BMI_gm_post_sendunexpected_list called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, 
+	"BMI_gm_post_sendunexpected_list called.\n");
 
     /* if there is only one buffer in the list, pass it on to the
      * normal post_sendunexpected() function because it is more 
      * efficient in the single buffer case 
      */
-    if (list_count == 1)
+    if(list_count == 1)
     {
-        return (BMI_gm_post_sendunexpected(id, dest, buffer_list[0],
-                                           size_list[0], buffer_type, tag,
-                                           user_ptr, context_id));
+	return(BMI_gm_post_sendunexpected(id, dest, buffer_list[0], 
+	    size_list[0], buffer_type, tag, user_ptr, context_id));
     }
 
     /* TODO: think about this some.  For now this is going to be
@@ -1194,7 +1119,7 @@ int BMI_gm_post_sendunexpected_list(
     /* make sure it's not too big */
     if (total_size > GM_MODE_UNEXP_LIMIT)
     {
-        return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     /* pad enough room for a ctrl structure */
@@ -1204,19 +1129,19 @@ int BMI_gm_post_sendunexpected_list(
 
     /* create a new buffer and copy */
     new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
-                                                     long) buffer_size);
+						     long) buffer_size);
     if (!new_buffer)
     {
-        gen_mutex_unlock(&interface_mutex);
-        gossip_lerr("Error: gm_dma_malloc failure.\n");
-        return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	gen_mutex_unlock(&interface_mutex);
+	gossip_lerr("Error: gm_dma_malloc failure.\n");
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
 
     copy_buffer = new_buffer;
-    for (i = 0; i < list_count; i++)
+    for(i=0; i<list_count; i++)
     {
-        memcpy(copy_buffer, buffer_list[i], size_list[i]);
-        copy_buffer = (void *) ((long) copy_buffer + (long) size_list[i]);
+	memcpy(copy_buffer, buffer_list[i], size_list[i]);
+	copy_buffer = (void*)((long)copy_buffer + (long)size_list[i]);
     }
 
     /* Immediate mode stuff */
@@ -1226,11 +1151,11 @@ int BMI_gm_post_sendunexpected_list(
     new_ctrl_msg->u.immed.actual_size = total_size;
     new_ctrl_msg->u.immed.msg_tag = tag;
     ret = gm_post_send_build_op(id, dest, new_buffer, total_size,
-                                tag,
-                                GM_MODE_UNEXP,
-                                buffer_status, user_ptr, context_id);
+					tag,
+					GM_MODE_UNEXP,
+					buffer_status, user_ptr, context_id);
     gen_mutex_unlock(&interface_mutex);
-    return (ret);
+    return(ret);
 }
 
 
@@ -1241,15 +1166,14 @@ int BMI_gm_post_sendunexpected_list(
  * returns 0 on success that requires later poll, returns 1 on instant
  * completion, -errno on failure
  */
-int BMI_gm_post_sendunexpected(
-    bmi_op_id_t * id,
-    method_addr_p dest,
-    const void *buffer,
-    bmi_size_t size,
-    enum bmi_buffer_type buffer_type,
-    bmi_msg_tag_t tag,
-    void *user_ptr,
-    bmi_context_id context_id)
+int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
+			       method_addr_p dest,
+			       const void *buffer,
+			       bmi_size_t size,
+			       enum bmi_buffer_type buffer_type,
+			       bmi_msg_tag_t tag,
+			       void *user_ptr,
+			       bmi_context_id context_id)
 {
     int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
@@ -1264,31 +1188,31 @@ int BMI_gm_post_sendunexpected(
 
     if (size > GM_MODE_UNEXP_LIMIT)
     {
-        return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     gen_mutex_lock(&interface_mutex);
     if (buffer_type != BMI_PRE_ALLOC)
     {
-        /* pad enough room for a ctrl structure */
-        buffer_size = sizeof(struct ctrl_msg) + size;
+	/* pad enough room for a ctrl structure */
+	buffer_size = sizeof(struct ctrl_msg) + size;
 
-        /* create a new buffer and copy */
-        new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
-                                                         long) buffer_size);
-        if (!new_buffer)
-        {
-            gossip_lerr("Error: gm_dma_malloc failure.\n");
-            gen_mutex_unlock(&interface_mutex);
-            return (bmi_gm_errno_to_pvfs(-ENOMEM));
-        }
-        memcpy(new_buffer, buffer, size);
-        buffer_status = GM_BUF_METH_ALLOC;
-        /* this seems little shady, but we are going to go ahead and forget
-         * about the buffer that the user gave us.  It serves no purpose
-         * here anymore.
-         */
-        buffer = new_buffer;
+	/* create a new buffer and copy */
+	new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
+							 long) buffer_size);
+	if (!new_buffer)
+	{
+	    gossip_lerr("Error: gm_dma_malloc failure.\n");
+	    gen_mutex_unlock(&interface_mutex);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	}
+	memcpy(new_buffer, buffer, size);
+	buffer_status = GM_BUF_METH_ALLOC;
+	/* this seems little shady, but we are going to go ahead and forget
+	 * about the buffer that the user gave us.  It serves no purpose
+	 * here anymore.
+	 */
+	buffer = new_buffer;
     }
 
     /* Immediate mode stuff */
@@ -1299,10 +1223,10 @@ int BMI_gm_post_sendunexpected(
     new_ctrl_msg->u.immed.msg_tag = tag;
 
     ret = gm_post_send_build_op(id, dest, buffer, size,
-                                tag, GM_MODE_UNEXP,
-                                buffer_status, user_ptr, context_id);
+					tag, GM_MODE_UNEXP,
+					buffer_status, user_ptr, context_id);
     gen_mutex_unlock(&interface_mutex);
-    return (ret);
+    return(ret);
 }
 
 
@@ -1314,16 +1238,15 @@ int BMI_gm_post_sendunexpected(
  * returns 0 on success that requires later poll, returns 1 on instant
  * completion, -errno on failure
  */
-int BMI_gm_post_recv(
-    bmi_op_id_t * id,
-    method_addr_p src,
-    void *buffer,
-    bmi_size_t expected_size,
-    bmi_size_t * actual_size,
-    enum bmi_buffer_type buffer_type,
-    bmi_msg_tag_t tag,
-    void *user_ptr,
-    bmi_context_id context_id)
+int BMI_gm_post_recv(bmi_op_id_t * id,
+		     method_addr_p src,
+		     void *buffer,
+		     bmi_size_t expected_size,
+		     bmi_size_t * actual_size,
+		     enum bmi_buffer_type buffer_type,
+		     bmi_msg_tag_t tag,
+		     void *user_ptr,
+		     bmi_context_id context_id)
 {
     method_op_p query_op = NULL;
     method_op_p new_method_op = NULL;
@@ -1347,12 +1270,12 @@ int BMI_gm_post_recv(
     /* make sure it's not too big */
     if (expected_size > GM_MODE_REND_LIMIT)
     {
-        return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
-    /* set flag to indicate if we need to pinn this buffer internally */
-    if (expected_size > GM_IMMED_LENGTH && buffer_type != BMI_PRE_ALLOC)
-        buffer_status = GM_BUF_METH_REG;
+    /* set flag to indicate if we need to pinn this buffer internally */ 
+    if(expected_size > GM_IMMED_LENGTH && buffer_type != BMI_PRE_ALLOC)
+	buffer_status = GM_BUF_METH_REG;
 
     /* push work first; use this as an opportunity to make sure that the
      * receive keeps buffers moving as quickly as possible
@@ -1361,8 +1284,8 @@ int BMI_gm_post_recv(
     ret = gm_do_work(0);
     if (ret < 0)
     {
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	gen_mutex_unlock(&interface_mutex);
+	return (ret);
     }
 
     /* see if this operation has already begun... */
@@ -1375,102 +1298,102 @@ int BMI_gm_post_recv(
     query_op = op_list_search(op_list_array[IND_NEED_RECV_POST], &key);
     if (query_op)
     {
-        gm_addr_data = query_op->addr->method_data;
-        *id = query_op->op_id;
-        query_op->context_id = context_id;
-        query_op->user_ptr = user_ptr;
-        gm_op_data = query_op->method_data;
-        gm_op_data->buffer_status = buffer_status;
+	gm_addr_data = query_op->addr->method_data;
+	*id = query_op->op_id;
+	query_op->context_id = context_id;
+	query_op->user_ptr = user_ptr;
+	gm_op_data = query_op->method_data;
+	gm_op_data->buffer_status = buffer_status;
 
-        if (query_op->actual_size > expected_size)
-        {
-            gossip_lerr("Error: message ordering violation;\n");
-            gossip_lerr("Error: message too large for next buffer.\n");
-            gen_mutex_unlock(&interface_mutex);
-            return (bmi_gm_errno_to_pvfs(-EPROTO));
-        }
+	if(query_op->actual_size > expected_size)
+	{
+	    gossip_lerr("Error: message ordering violation;\n");
+	    gossip_lerr("Error: message too large for next buffer.\n");
+	    gen_mutex_unlock(&interface_mutex);
+	    return(bmi_gm_errno_to_pvfs(-EPROTO));
+	}
 
-        /* we found the operation in progress. */
-        if (query_op->mode == GM_MODE_REND)
-        {
-            /* post has occurred */
-            op_list_remove(query_op);
-            query_op->buffer = buffer;
+	/* we found the operation in progress. */
+	if (query_op->mode == GM_MODE_REND)
+	{
+	    /* post has occurred */
+	    op_list_remove(query_op);
+	    query_op->buffer = buffer;
 
-            /* now we need a token to send a ctrl ack */
-            if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
-            {
+	    /* now we need a token to send a ctrl ack */
+	    if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
+	    {
 #ifdef ENABLE_GM_BUFPOOL
-                if (!io_buffers_exhausted())
-                {
+		if (!io_buffers_exhausted())
+		{
 #endif /* ENABLE_GM_BUFPOOL */
-                    prepare_for_recv(query_op);
-                    ret = 0;
+		    prepare_for_recv(query_op);
+		    ret = 0;
 #ifdef ENABLE_GM_BUFPOOL
-                }
-                else
-                {
-                    gm_free_send_token(local_port, GM_HIGH_PRIORITY);
-                    op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
-                                query_op);
-                    ret = 0;
-                }
+		}
+		else
+		{
+		    gm_free_send_token(local_port, GM_HIGH_PRIORITY);
+		    op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
+				query_op);
+		    ret = 0;
+		}
 #endif /* ENABLE_GM_BUFPOOL */
-            }
-            else
-            {
-                /* we don't have enough tokens */
-                op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
-                            query_op);
-                ret = 0;
-            }
-        }
-        else if (query_op->mode == GM_MODE_IMMED)
-        {
-            /* all is done except memory copy- complete instantly */
-            op_list_remove(query_op);
-            gm_op_data = query_op->method_data;
-            memcpy(buffer, query_op->buffer, query_op->actual_size);
-            *actual_size = query_op->actual_size;
-            free(query_op->buffer);
-            *id = 0;
-            dealloc_gm_method_op(query_op);
-            ret = 1;
-        }
-        else
-        {
-            /* we don't have any other modes implemented yet */
-            ret = bmi_gm_errno_to_pvfs(-ENOSYS);
-        }
+	    }
+	    else
+	    {
+		/* we don't have enough tokens */
+		op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
+			    query_op);
+		ret = 0;
+	    }
+	}
+	else if (query_op->mode == GM_MODE_IMMED)
+	{
+	    /* all is done except memory copy- complete instantly */
+	    op_list_remove(query_op);
+	    gm_op_data = query_op->method_data;
+	    memcpy(buffer, query_op->buffer, query_op->actual_size);
+	    *actual_size = query_op->actual_size;
+	    free(query_op->buffer);
+	    *id = 0;
+	    dealloc_gm_method_op(query_op);
+	    ret = 1;
+	}
+	else
+	{
+	    /* we don't have any other modes implemented yet */
+	    ret = bmi_gm_errno_to_pvfs(-ENOSYS);
+	}
     }
     else
     {
-        /* we must create the operation and queue it up */
-        new_method_op = alloc_gm_method_op();
-        if (!new_method_op)
-        {
-            gen_mutex_unlock(&interface_mutex);
-            return (bmi_gm_errno_to_pvfs(-ENOMEM));
-        }
-        *id = new_method_op->op_id;
-        new_method_op->user_ptr = user_ptr;
-        new_method_op->send_recv = BMI_RECV;
-        new_method_op->addr = src;
-        new_method_op->buffer = buffer;
-        new_method_op->expected_size = expected_size;
-        new_method_op->actual_size = 0;
-        new_method_op->msg_tag = tag;
-        new_method_op->context_id = context_id;
-        /* TODO: make sure this is ok */
-        new_method_op->mode = 0;
-        gm_op_data = new_method_op->method_data;
-        gm_op_data->buffer_status = buffer_status;
+	/* we must create the operation and queue it up */
+	new_method_op = alloc_gm_method_op();
+	if (!new_method_op)
+	{
+	    gen_mutex_unlock(&interface_mutex);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	}
+	*id = new_method_op->op_id;
+	new_method_op->user_ptr = user_ptr;
+	new_method_op->send_recv = BMI_RECV;
+	new_method_op->addr = src;
+	new_method_op->buffer = buffer;
+	new_method_op->expected_size = expected_size;
+	new_method_op->actual_size = 0;
+	new_method_op->msg_tag = tag;
+	new_method_op->context_id = context_id;
+	/* TODO: make sure this is ok */
+	new_method_op->mode = 0;
+	gm_op_data = new_method_op->method_data;
+	gm_op_data->buffer_status = buffer_status;
 
-        /* just for safety; the user should not use this value in this case */
-        *actual_size = 0;
+	/* just for safety; the user should not use this value in this case */
+	*actual_size = 0;
 
-        op_list_add(op_list_array[IND_NEED_CTRL_MATCH], new_method_op);
-        ret = 0;
+	op_list_add(op_list_array[IND_NEED_CTRL_MATCH], new_method_op);
+	ret = 0;
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -1485,11 +1408,10 @@ int BMI_gm_post_recv(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_post_recv_list(
-    bmi_op_id_t * id,
+int BMI_gm_post_recv_list(bmi_op_id_t * id,
     method_addr_p src,
     void *const *buffer_list,
-    const bmi_size_t * size_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_expected_size,
     bmi_size_t * total_actual_size,
@@ -1506,7 +1428,7 @@ int BMI_gm_post_recv_list(
     int ret = -1;
     int buffer_status = GM_BUF_USER_ALLOC;
     int i;
-    void *copy_buffer;
+    void* copy_buffer;
     bmi_size_t copy_size, total_copied;
 
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "BMI_gm_post_recv_list called.\n");
@@ -1515,11 +1437,10 @@ int BMI_gm_post_recv_list(
      * normal post_recv() function because it is more efficient in
      * the single buffer case 
      */
-    if (list_count == 1)
+    if(list_count == 1)
     {
-        return (BMI_gm_post_recv(id, src, buffer_list[0], size_list[0],
-                                 total_actual_size, buffer_type, tag, user_ptr,
-                                 context_id));
+	return(BMI_gm_post_recv(id, src, buffer_list[0], size_list[0],
+	    total_actual_size, buffer_type, tag, user_ptr, context_id));
     }
 
     /* what happens here ?
@@ -1534,16 +1455,16 @@ int BMI_gm_post_recv_list(
     /* make sure it's not too big */
     if (total_expected_size > GM_MODE_REND_LIMIT)
     {
-        return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     /* TODO: this is going to be lame for a while; if we are in
      * rendezvous mode on list operations we will buffer copy
      * regardless of how the caller prepared the buffer 
      */
-    /* set flag to indicate if we need to pinn this buffer internally */
-    if (total_expected_size > GM_IMMED_LENGTH)
-        buffer_status = GM_BUF_METH_REG;
+    /* set flag to indicate if we need to pinn this buffer internally */ 
+    if(total_expected_size > GM_IMMED_LENGTH)
+	buffer_status = GM_BUF_METH_REG;
 
     gen_mutex_lock(&interface_mutex);
     /* push work first; use this as an opportunity to make sure that the
@@ -1552,8 +1473,8 @@ int BMI_gm_post_recv_list(
     ret = gm_do_work(0);
     if (ret < 0)
     {
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	gen_mutex_unlock(&interface_mutex);
+	return (ret);
     }
 
     /* see if this operation has already begun... */
@@ -1566,130 +1487,130 @@ int BMI_gm_post_recv_list(
     query_op = op_list_search(op_list_array[IND_NEED_RECV_POST], &key);
     if (query_op)
     {
-        gm_addr_data = query_op->addr->method_data;
-        *id = query_op->op_id;
-        query_op->context_id = context_id;
-        query_op->user_ptr = user_ptr;
+	gm_addr_data = query_op->addr->method_data;
+	*id = query_op->op_id;
+	query_op->context_id = context_id;
+	query_op->user_ptr = user_ptr;
 
-        if (query_op->actual_size > total_expected_size)
-        {
-            gossip_lerr("Error: message ordering violation;\n");
-            gossip_lerr("Error: message too large for next buffer.\n");
-            gen_mutex_unlock(&interface_mutex);
-            return (bmi_gm_errno_to_pvfs(-EPROTO));
-        }
+	if(query_op->actual_size > total_expected_size)
+	{
+	    gossip_lerr("Error: message ordering violation;\n");
+	    gossip_lerr("Error: message too large for next buffer.\n");
+	    gen_mutex_unlock(&interface_mutex);
+	    return(bmi_gm_errno_to_pvfs(-EPROTO));
+	}
 
-        /* we found the operation in progress. */
+	/* we found the operation in progress. */
 
-        if (query_op->mode == GM_MODE_REND)
-        {
-            /* post has occurred */
-            op_list_remove(query_op);
+	if (query_op->mode == GM_MODE_REND)
+	{
+	    /* post has occurred */
+	    op_list_remove(query_op);
 
-            gm_op_data = query_op->method_data;
-            gm_op_data->list_flag = 1;
-            gm_op_data->buffer_status = GM_BUF_METH_REG;
-            query_op->buffer_list = buffer_list;
-            query_op->size_list = size_list;
-            query_op->list_count = list_count;
+	    gm_op_data = query_op->method_data;
+	    gm_op_data->list_flag = 1;
+	    gm_op_data->buffer_status = GM_BUF_METH_REG;
+	    query_op->buffer_list = buffer_list;
+	    query_op->size_list = size_list;
+	    query_op->list_count = list_count;
 
-            /* now we need a token to send a ctrl ack */
-            if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
-            {
+	    /* now we need a token to send a ctrl ack */
+	    if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
+	    {
 #ifdef ENABLE_GM_BUFPOOL
-                if (!io_buffers_exhausted())
-                {
+		if (!io_buffers_exhausted())
+		{
 #endif /* ENABLE_GM_BUFPOOL */
-
-                    prepare_for_recv_list(query_op);
-                    ret = 0;
+		    
+		    prepare_for_recv_list(query_op);
+		    ret = 0;
 
 #ifdef ENABLE_GM_BUFPOOL
-                }
-                else
-                {
-                    gm_free_send_token(local_port, GM_HIGH_PRIORITY);
-                    op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
-                                query_op);
-                    ret = 0;
-                }
+		}
+		else
+		{
+		    gm_free_send_token(local_port, GM_HIGH_PRIORITY);
+		    op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
+				query_op);
+		    ret = 0;
+		}
 #endif /* ENABLE_GM_BUFPOOL */
-            }
-            else
-            {
-                /* we don't have enough tokens */
-                op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
-                            query_op);
-                ret = 0;
-            }
-        }
-        else if (query_op->mode == GM_MODE_IMMED)
-        {
-            /* all is done except memory copy- complete instantly */
-            op_list_remove(query_op);
-            gm_op_data = query_op->method_data;
-            copy_buffer = query_op->buffer;
-            total_copied = 0;
-            for (i = 0; i < list_count; i++)
-            {
-                if (total_copied == query_op->actual_size)
-                    break;
-                copy_size = query_op->actual_size - total_copied;
-                if (copy_size > size_list[i])
-                    copy_size = size_list[i];
-                memcpy(buffer_list[i], copy_buffer, copy_size);
-                copy_buffer = (void *) ((long) copy_buffer + (long) copy_size);
-                total_copied += copy_size;
-            }
-            *total_actual_size = query_op->actual_size;
-            free(query_op->buffer);
-            *id = 0;
-            dealloc_gm_method_op(query_op);
-            ret = 1;
-        }
-        else
-        {
-            /* we don't have any other modes implemented yet */
-            ret = bmi_gm_errno_to_pvfs(-ENOSYS);
-        }
+	    }
+	    else
+	    {
+		/* we don't have enough tokens */
+		op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
+			    query_op);
+		ret = 0;
+	    }
+	}
+	else if (query_op->mode == GM_MODE_IMMED)
+	{
+	    /* all is done except memory copy- complete instantly */
+	    op_list_remove(query_op);
+	    gm_op_data = query_op->method_data;
+	    copy_buffer = query_op->buffer;
+	    total_copied = 0;
+	    for(i=0; i<list_count; i++)
+	    {
+		if(total_copied == query_op->actual_size)
+		    break;
+		copy_size = query_op->actual_size - total_copied;
+		if(copy_size > size_list[i])
+		    copy_size = size_list[i];
+		memcpy(buffer_list[i], copy_buffer, copy_size);
+		copy_buffer = (void*)((long)copy_buffer + (long)copy_size);
+		total_copied += copy_size;
+	    }
+	    *total_actual_size = query_op->actual_size;
+	    free(query_op->buffer);
+	    *id = 0;
+	    dealloc_gm_method_op(query_op);
+	    ret = 1;
+	}
+	else
+	{
+	    /* we don't have any other modes implemented yet */
+	    ret = bmi_gm_errno_to_pvfs(-ENOSYS);
+	}
     }
     else
     {
-        /* we must create the operation and queue it up */
-        new_method_op = alloc_gm_method_op();
-        if (!new_method_op)
-        {
-            gen_mutex_unlock(&interface_mutex);
-            return (bmi_gm_errno_to_pvfs(-ENOMEM));
-        }
-        *id = new_method_op->op_id;
-        new_method_op->user_ptr = user_ptr;
-        new_method_op->send_recv = BMI_RECV;
-        new_method_op->addr = src;
-        new_method_op->buffer = NULL;
-        new_method_op->expected_size = total_expected_size;
-        new_method_op->actual_size = 0;
-        new_method_op->msg_tag = tag;
-        new_method_op->context_id = context_id;
-        /* TODO: make sure this is ok */
-        new_method_op->mode = 0;
+	/* we must create the operation and queue it up */
+	new_method_op = alloc_gm_method_op();
+	if (!new_method_op)
+	{
+	    gen_mutex_unlock(&interface_mutex);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	}
+	*id = new_method_op->op_id;
+	new_method_op->user_ptr = user_ptr;
+	new_method_op->send_recv = BMI_RECV;
+	new_method_op->addr = src;
+	new_method_op->buffer = NULL;
+	new_method_op->expected_size = total_expected_size;
+	new_method_op->actual_size = 0;
+	new_method_op->msg_tag = tag;
+	new_method_op->context_id = context_id;
+	/* TODO: make sure this is ok */
+	new_method_op->mode = 0;
 
-        gm_op_data = new_method_op->method_data;
-        gm_op_data->buffer_status = buffer_status;
-        gm_op_data->list_flag = 1;
+	gm_op_data = new_method_op->method_data;
+	gm_op_data->buffer_status = buffer_status;
+	gm_op_data->list_flag = 1;
 
-        new_method_op->buffer_list = buffer_list;
-        new_method_op->size_list = size_list;
-        new_method_op->list_count = list_count;
-        /* just for safety; the user should not use this value in this case */
-        *total_actual_size = 0;
+	new_method_op->buffer_list = buffer_list;
+	new_method_op->size_list = size_list;
+	new_method_op->list_count = list_count;
+	/* just for safety; the user should not use this value in this case */
+	*total_actual_size = 0;
 
-        op_list_add(op_list_array[IND_NEED_CTRL_MATCH], new_method_op);
-        ret = 0;
+	op_list_add(op_list_array[IND_NEED_CTRL_MATCH], new_method_op);
+	ret = 0;
     }
 
     gen_mutex_unlock(&interface_mutex);
-    return (ret);
+    return(ret);
 }
 
 
@@ -1699,75 +1620,74 @@ int BMI_gm_post_recv_list(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_test(
-    bmi_op_id_t id,
-    int *outcount,
-    bmi_error_code_t * error_code,
-    bmi_size_t * actual_size,
-    void **user_ptr,
-    int max_idle_time_ms,
-    bmi_context_id context_id)
+int BMI_gm_test(bmi_op_id_t id,
+		int *outcount,
+		bmi_error_code_t * error_code,
+		bmi_size_t * actual_size,
+		void **user_ptr,
+		int max_idle_time_ms,
+		bmi_context_id context_id)
 {
     int ret = -1;
-    method_op_p query_op = (method_op_p) id_gen_safe_lookup(id);
+    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
     struct gm_op *gm_op_data = query_op->method_data;
 
     *outcount = 0;
 
     gen_mutex_lock(&interface_mutex);
 
-    if (gm_op_data->complete)
+    if(gm_op_data->complete)
     {
-        assert(query_op->context_id == context_id);
-        op_list_remove(query_op);
-        if (user_ptr != NULL)
-        {
-            (*user_ptr) = query_op->user_ptr;
-        }
-        (*error_code) = query_op->error_code;
-        (*actual_size) = query_op->actual_size;
-        dealloc_gm_method_op(query_op);
-        (*outcount)++;
+	assert(query_op->context_id == context_id);
+	op_list_remove(query_op);
+	if(user_ptr != NULL)
+	{
+	    (*user_ptr) = query_op->user_ptr;
+	}
+	(*error_code) = query_op->error_code;
+	(*actual_size) = query_op->actual_size;
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
     }
-    if (gm_op_data->cancelled && gm_op_data->cancelled_tv_sec)
+    if(gm_op_data->cancelled && gm_op_data->cancelled_tv_sec)
     {
         /* report this operation as complete; it is only hanging around
          * to protect a recv buffer after cancellation
          */
-        if (user_ptr != NULL)
-        {
-            (*user_ptr) = query_op->user_ptr;
-        }
-        (*error_code) = -PVFS_ECANCEL;
-        (*actual_size) = 0;
-        (*outcount)++;
+        if(user_ptr != NULL)
+	{
+	    (*user_ptr) = query_op->user_ptr;
+	}
+	(*error_code) = -PVFS_ECANCEL;
+	(*actual_size) = 0;
+	(*outcount)++;
     }
-    if (*outcount)
+    if(*outcount)
     {
         gen_mutex_unlock(&interface_mutex);
-        return (0);
+        return(0);
     }
 
     /* do some ``real work'' here */
-    ret = gm_do_work(max_idle_time_ms * 1000);
+    ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
     {
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	gen_mutex_unlock(&interface_mutex);
+	return (ret);
     }
 
-    if (gm_op_data->complete)
+    if(gm_op_data->complete)
     {
-        assert(query_op->context_id == context_id);
-        op_list_remove(query_op);
-        if (user_ptr != NULL)
-        {
-            (*user_ptr) = query_op->user_ptr;
-        }
-        (*error_code) = query_op->error_code;
-        (*actual_size) = query_op->actual_size;
-        dealloc_gm_method_op(query_op);
-        (*outcount)++;
+	assert(query_op->context_id == context_id);
+	op_list_remove(query_op);
+	if(user_ptr != NULL)
+	{
+	    (*user_ptr) = query_op->user_ptr;
+	}
+	(*error_code) = query_op->error_code;
+	(*actual_size) = query_op->actual_size;
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -1781,16 +1701,15 @@ int BMI_gm_test(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_testsome(
-    int incount,
-    bmi_op_id_t * id_array,
-    int *outcount,
-    int *index_array,
-    bmi_error_code_t * error_code_array,
-    bmi_size_t * actual_size_array,
-    void **user_ptr_array,
-    int max_idle_time_ms,
-    bmi_context_id context_id)
+int BMI_gm_testsome(int incount,
+		    bmi_op_id_t * id_array,
+		    int *outcount,
+		    int *index_array,
+		    bmi_error_code_t * error_code_array,
+		    bmi_size_t * actual_size_array,
+		    void **user_ptr_array,
+		    int max_idle_time_ms,
+		    bmi_context_id context_id)
 {
     int ret = -1;
     int i;
@@ -1801,75 +1720,75 @@ int BMI_gm_testsome(
 
     gen_mutex_lock(&interface_mutex);
 
-    for (i = 0; i < incount; i++)
+    for(i=0; i<incount; i++)
     {
-        if (id_array[i])
-        {
-            query_op = (method_op_p) id_gen_safe_lookup(id_array[i]);
-            gm_op_data = query_op->method_data;
-            if (gm_op_data->complete)
-            {
-                assert(query_op->context_id == context_id);
-                op_list_remove(query_op);
-                error_code_array[*outcount] = query_op->error_code;
-                actual_size_array[*outcount] = query_op->actual_size;
-                index_array[*outcount] = i;
-                if (user_ptr_array != NULL)
-                    user_ptr_array[*outcount] = query_op->user_ptr;
-                dealloc_gm_method_op(query_op);
-                (*outcount)++;
-            }
-            if (gm_op_data->cancelled && gm_op_data->cancelled_tv_sec)
+	if(id_array[i])
+	{
+	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
+	    gm_op_data = query_op->method_data;
+	    if(gm_op_data->complete)
+	    {
+		assert(query_op->context_id == context_id);
+		op_list_remove(query_op);
+		error_code_array[*outcount] = query_op->error_code;
+		actual_size_array[*outcount] = query_op->actual_size;
+		index_array[*outcount] = i;
+		if (user_ptr_array != NULL)
+		    user_ptr_array[*outcount] = query_op->user_ptr;
+		dealloc_gm_method_op(query_op);
+		(*outcount)++;
+	    }
+            if(gm_op_data->cancelled && gm_op_data->cancelled_tv_sec)
             {
                 /* report this operation as complete; it is only hanging around
                  * to protect a recv buffer after cancellation
                  */
-                error_code_array[*outcount] = -PVFS_ECANCEL;
-                actual_size_array[*outcount] = 0;
-                index_array[*outcount] = i;
-                if (user_ptr_array != NULL)
+		error_code_array[*outcount] = -PVFS_ECANCEL;
+		actual_size_array[*outcount] = 0;
+		index_array[*outcount] = i;
+                if(user_ptr_array != NULL)
                     user_ptr_array[*outcount] = query_op->user_ptr;
                 (*outcount)++;
             }
-        }
+	}
     }
-    if (*outcount)
+    if(*outcount)
     {
         gen_mutex_unlock(&interface_mutex);
-        return (0);
+        return(0);
     }
 
     /* do some ``real work'' here */
-    ret = gm_do_work(max_idle_time_ms * 1000);
+    ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
     {
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	gen_mutex_unlock(&interface_mutex);
+	return (ret);
     }
 
-    for (i = 0; i < incount; i++)
+    for(i=0; i<incount; i++)
     {
-        if (id_array[i])
-        {
-            query_op = (method_op_p) id_gen_safe_lookup(id_array[i]);
-            gm_op_data = query_op->method_data;
-            if (gm_op_data->complete)
-            {
-                assert(query_op->context_id == context_id);
-                op_list_remove(query_op);
-                error_code_array[*outcount] = query_op->error_code;
-                actual_size_array[*outcount] = query_op->actual_size;
-                index_array[*outcount] = i;
-                if (user_ptr_array != NULL)
-                    user_ptr_array[*outcount] = query_op->user_ptr;
-                dealloc_gm_method_op(query_op);
-                (*outcount)++;
-            }
-        }
+	if(id_array[i])
+	{
+	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
+	    gm_op_data = query_op->method_data;
+	    if(gm_op_data->complete)
+	    {
+		assert(query_op->context_id == context_id);
+		op_list_remove(query_op);
+		error_code_array[*outcount] = query_op->error_code;
+		actual_size_array[*outcount] = query_op->actual_size;
+		index_array[*outcount] = i;
+		if (user_ptr_array != NULL)
+		    user_ptr_array[*outcount] = query_op->user_ptr;
+		dealloc_gm_method_op(query_op);
+		(*outcount)++;
+	    }
+	}
     }
 
     gen_mutex_unlock(&interface_mutex);
-    return (0);
+    return(0);
 }
 
 
@@ -1880,8 +1799,7 @@ int BMI_gm_testsome(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_testcontext(
-    int incount,
+int BMI_gm_testcontext(int incount,
     bmi_op_id_t * out_id_array,
     int *outcount,
     bmi_error_code_t * error_code_array,
@@ -1900,94 +1818,90 @@ int BMI_gm_testcontext(
     gen_mutex_lock(&interface_mutex);
 
     /* check queue before doing anything */
-    while ((*outcount < incount) && (query_op =
-                                     op_list_shownext(completion_array
-                                                      [context_id])))
+    while((*outcount < incount) && (query_op = 
+	op_list_shownext(completion_array[context_id])))
     {
-        assert(query_op->context_id == context_id);
-        op_list_remove(query_op);
-        error_code_array[*outcount] = query_op->error_code;
-        actual_size_array[*outcount] = query_op->actual_size;
-        out_id_array[*outcount] = query_op->op_id;
-        if (user_ptr_array != NULL)
-            user_ptr_array[*outcount] = query_op->user_ptr;
-        dealloc_gm_method_op(query_op);
-        (*outcount)++;
+	assert(query_op->context_id == context_id);
+	op_list_remove(query_op);
+	error_code_array[*outcount] = query_op->error_code;
+	actual_size_array[*outcount] = query_op->actual_size;
+	out_id_array[*outcount] = query_op->op_id;
+	if(user_ptr_array != NULL)
+	    user_ptr_array[*outcount] = query_op->user_ptr;
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
     }
     /* this is kind of nasty- look for cancelled rend recvs that we
      * have not reported yet.  Must iterate queue.
      */
     qlist_for_each(tmp_entry, op_list_array[IND_CANCELLED_REND])
     {
-        if (*outcount >= incount)
+        if(*outcount >= incount)
             break;
-        query_op = qlist_entry(tmp_entry, struct method_op,
-                               op_list_entry);
-        gm_op_data = query_op->method_data;
-        if (!gm_op_data->complete)
+        query_op = qlist_entry(tmp_entry, struct method_op, op_list_entry);
+	gm_op_data = query_op->method_data;
+        if(!gm_op_data->complete)
         {
             gm_op_data->complete = 1;
             error_code_array[*outcount] = -PVFS_ECANCEL;
             actual_size_array[*outcount] = 0;
             out_id_array[*outcount] = query_op->op_id;
-            if (user_ptr_array != NULL)
+            if(user_ptr_array != NULL)
                 user_ptr_array[*outcount] = query_op->user_ptr;
-            (*outcount)++;
+	    (*outcount)++;
         }
     }
-    if (*outcount)
+    if(*outcount)
     {
         gen_mutex_unlock(&interface_mutex);
-        return (0);
+        return(0);
     }
 
     /* do some ``real work'' here */
-    ret = gm_do_work(max_idle_time_ms * 1000);
+    ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
     {
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	gen_mutex_unlock(&interface_mutex);
+	return (ret);
     }
 
     /* check queue again */
-    while ((*outcount < incount) && (query_op =
-                                     op_list_shownext(completion_array
-                                                      [context_id])))
+    while((*outcount < incount) && (query_op = 
+	op_list_shownext(completion_array[context_id])))
     {
-        assert(query_op->context_id == context_id);
-        op_list_remove(query_op);
-        error_code_array[*outcount] = query_op->error_code;
-        actual_size_array[*outcount] = query_op->actual_size;
-        out_id_array[*outcount] = query_op->op_id;
-        if (user_ptr_array != NULL)
-            user_ptr_array[*outcount] = query_op->user_ptr;
-        dealloc_gm_method_op(query_op);
-        (*outcount)++;
+	assert(query_op->context_id == context_id);
+	op_list_remove(query_op);
+	error_code_array[*outcount] = query_op->error_code;
+	actual_size_array[*outcount] = query_op->actual_size;
+	out_id_array[*outcount] = query_op->op_id;
+	if(user_ptr_array != NULL)
+	    user_ptr_array[*outcount] = query_op->user_ptr;
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
     }
     /* this is kind of nasty- look for cancelled rend recvs that we
      * have not reported yet.  Must iterate queue.
      */
     qlist_for_each(tmp_entry, op_list_array[IND_CANCELLED_REND])
     {
-        if (*outcount >= incount)
+        if(*outcount >= incount)
             break;
-        query_op = qlist_entry(tmp_entry, struct method_op,
-                               op_list_entry);
-        gm_op_data = query_op->method_data;
-        if (!gm_op_data->complete)
+        query_op = qlist_entry(tmp_entry, struct method_op, op_list_entry);
+	gm_op_data = query_op->method_data;
+        if(!gm_op_data->complete)
         {
             gm_op_data->complete = 1;
             error_code_array[*outcount] = -PVFS_ECANCEL;
             actual_size_array[*outcount] = 0;
             out_id_array[*outcount] = query_op->op_id;
-            if (user_ptr_array != NULL)
+            if(user_ptr_array != NULL)
                 user_ptr_array[*outcount] = query_op->user_ptr;
-            (*outcount)++;
+	    (*outcount)++;
         }
     }
 
     gen_mutex_unlock(&interface_mutex);
-    return (0);
+    return(0);
 }
 
 
@@ -1997,11 +1911,10 @@ int BMI_gm_testcontext(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_testunexpected(
-    int incount,
-    int *outcount,
-    struct method_unexpected_info *info,
-    int max_idle_time_ms)
+int BMI_gm_testunexpected(int incount,
+			  int *outcount,
+			  struct method_unexpected_info *info,
+			  int max_idle_time_ms)
 {
     int ret = -1;
     method_op_p query_op = NULL;
@@ -2011,44 +1924,44 @@ int BMI_gm_testunexpected(
     gen_mutex_lock(&interface_mutex);
 
     while ((*outcount < incount) &&
-           (query_op =
-            op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
+	   (query_op =
+	    op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
     {
-        info[*outcount].error_code = query_op->error_code;
-        info[*outcount].addr = query_op->addr;
-        info[*outcount].buffer = query_op->buffer;
-        info[*outcount].size = query_op->actual_size;
-        info[*outcount].tag = query_op->msg_tag;
-        op_list_remove(query_op);
-        dealloc_gm_method_op(query_op);
-        (*outcount)++;
+	info[*outcount].error_code = query_op->error_code;
+	info[*outcount].addr = query_op->addr;
+	info[*outcount].buffer = query_op->buffer;
+	info[*outcount].size = query_op->actual_size;
+	info[*outcount].tag = query_op->msg_tag;
+	op_list_remove(query_op);
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
     }
-    if (*outcount)
+    if(*outcount)
     {
         gen_mutex_unlock(&interface_mutex);
-        return (0);
+        return(0);
     }
 
     /* do some ``real work'' here */
-    ret = gm_do_work(max_idle_time_ms * 1000);
+    ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
     {
-        gen_mutex_unlock(&interface_mutex);
-        return (ret);
+	gen_mutex_unlock(&interface_mutex);
+	return (ret);
     }
 
     while ((*outcount < incount) &&
-           (query_op =
-            op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
+	   (query_op =
+	    op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
     {
-        info[*outcount].error_code = query_op->error_code;
-        info[*outcount].addr = query_op->addr;
-        info[*outcount].buffer = query_op->buffer;
-        info[*outcount].size = query_op->actual_size;
-        info[*outcount].tag = query_op->msg_tag;
-        op_list_remove(query_op);
-        dealloc_gm_method_op(query_op);
-        (*outcount)++;
+	info[*outcount].error_code = query_op->error_code;
+	info[*outcount].addr = query_op->addr;
+	info[*outcount].buffer = query_op->buffer;
+	info[*outcount].size = query_op->actual_size;
+	info[*outcount].tag = query_op->msg_tag;
+	op_list_remove(query_op);
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -2062,20 +1975,19 @@ int BMI_gm_testunexpected(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_open_context(
-    bmi_context_id context_id)
+int BMI_gm_open_context(bmi_context_id context_id)
 {
     gen_mutex_lock(&interface_mutex);
     /* start a new queue for tracking completions in this context */
     completion_array[context_id] = op_list_new();
     if (!completion_array[context_id])
     {
-        gen_mutex_unlock(&interface_mutex);
-        return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	gen_mutex_unlock(&interface_mutex);
+	return(bmi_gm_errno_to_pvfs(-ENOMEM));
     }
 
     gen_mutex_unlock(&interface_mutex);
-    return (0);
+    return(0);
 }
 
 /* BMI_gm_close_context()
@@ -2084,8 +1996,7 @@ int BMI_gm_open_context(
  *
  * no return value
  */
-void BMI_gm_close_context(
-    bmi_context_id context_id)
+void BMI_gm_close_context(bmi_context_id context_id)
 {
     gen_mutex_lock(&interface_mutex);
     /* tear down completion queue for this context */
@@ -2106,8 +2017,7 @@ void BMI_gm_close_context(
  *
  * no return value
  */
-static void dealloc_gm_method_addr(
-    method_addr_p map)
+static void dealloc_gm_method_addr(method_addr_p map)
 {
 
     dealloc_method_addr(map);
@@ -2123,18 +2033,17 @@ static void dealloc_gm_method_addr(
  *
  * returns pointer to struct on success, NULL on failure
  */
-static method_addr_p alloc_gm_method_addr(
-    void)
+static method_addr_p alloc_gm_method_addr(void)
 {
 
     struct method_addr *my_method_addr = NULL;
     struct gm_addr *gm_data = NULL;
 
     my_method_addr = alloc_method_addr(gm_method_params.method_id, sizeof(struct
-                                                                          gm_addr));
+									  gm_addr));
     if (!my_method_addr)
     {
-        return (NULL);
+	return (NULL);
     }
 
     /* note that we trust the alloc_method_addr() function to have zeroed
@@ -2154,8 +2063,7 @@ static method_addr_p alloc_gm_method_addr(
  *
  * returns pointer to struct on success, NULL on failure
  */
-static method_op_p alloc_gm_method_op(
-    void)
+static method_op_p alloc_gm_method_op(void)
 {
     method_op_p my_method_op = NULL;
 
@@ -2176,8 +2084,7 @@ static method_op_p alloc_gm_method_op(
  * 
  * no return value
  */
-void dealloc_gm_method_op(
-    method_op_p op_p)
+void dealloc_gm_method_op(method_op_p op_p)
 {
     dealloc_method_op(op_p);
     return;
@@ -2190,30 +2097,27 @@ void dealloc_gm_method_op(
  *
  * returns 0 on success, -errno on failure
  */
-static int gm_post_send_build_op_list(
-    bmi_op_id_t * id,
+static int gm_post_send_build_op_list(bmi_op_id_t * id,
     method_addr_p dest,
     const void *const *buffer_list,
-    const bmi_size_t * size_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     bmi_msg_tag_t tag,
     int mode,
     int buffer_status,
-    void *user_ptr,
-    bmi_context_id context_id)
+    void *user_ptr, bmi_context_id context_id)
 {
     method_op_p new_method_op = NULL;
     struct gm_op *gm_op_data = NULL;
 
-    gossip_ldebug(GOSSIP_BMI_DEBUG_GM,
-                  "gm_post_send_build_op_list() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "gm_post_send_build_op_list() called.\n");
 
     /* we need an op structure to keep up with this send */
     new_method_op = alloc_gm_method_op();
     if (!new_method_op)
     {
-        return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
     *id = new_method_op->op_id;
     new_method_op->user_ptr = user_ptr;
@@ -2222,7 +2126,7 @@ static int gm_post_send_build_op_list(
     new_method_op->buffer = NULL;
     new_method_op->actual_size = total_size;
     /* TODO: is this right thing to do for send side? */
-    new_method_op->expected_size = 0;
+    new_method_op->expected_size = 0;  
     new_method_op->msg_tag = tag;
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Tag: %d.\n", (int) tag);
     new_method_op->mode = mode;
@@ -2246,16 +2150,14 @@ static int gm_post_send_build_op_list(
  *
  * returns 0 on success, -errno on failure
  */
-static int gm_post_send_build_op(
-    bmi_op_id_t * id,
+static int gm_post_send_build_op(bmi_op_id_t * id,
     method_addr_p dest,
     const void *buffer,
     bmi_size_t size,
     bmi_msg_tag_t tag,
     int mode,
     int buffer_status,
-    void *user_ptr,
-    bmi_context_id context_id)
+    void *user_ptr, bmi_context_id context_id)
 {
     method_op_p new_method_op = NULL;
     struct gm_op *gm_op_data = NULL;
@@ -2266,7 +2168,7 @@ static int gm_post_send_build_op(
     new_method_op = alloc_gm_method_op();
     if (!new_method_op)
     {
-        return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
     *id = new_method_op->op_id;
     new_method_op->user_ptr = user_ptr;
@@ -2275,7 +2177,7 @@ static int gm_post_send_build_op(
     new_method_op->buffer = (void *) buffer;
     new_method_op->actual_size = size;
     /* TODO: is this right thing to do for send side? */
-    new_method_op->expected_size = 0;
+    new_method_op->expected_size = 0;  
     new_method_op->msg_tag = tag;
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Tag: %d.\n", (int) tag);
     new_method_op->mode = mode;
@@ -2294,13 +2196,11 @@ static int gm_post_send_build_op(
  *
  * returns 0 on success, -errno on failure
  */
-static int gm_post_send_check_resource(
-    struct method_op *mop)
+static int gm_post_send_check_resource(struct method_op* mop)
 {
     int ret = -1;
 
-    gossip_ldebug(GOSSIP_BMI_DEBUG_GM,
-                  "gm_post_send_check_resource() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "gm_post_send_check_resource() called.\n");
 
     /* what do we want to do here? 
      * For now, try to send a control message and then bail out.  The
@@ -2312,32 +2212,32 @@ static int gm_post_send_check_resource(
      */
     if (!op_list_empty(op_list_array[IND_NEED_SEND_TOK_HI_CTRL]))
     {
-        op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], mop);
-        /* push on existing work rather than attempting this send */
-        return (gm_do_work(0));
+	op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], mop);
+	/* push on existing work rather than attempting this send */
+	return (gm_do_work(0));
     }
 
     /* all clear; let's see if we have a send token for the control message */
     if (!gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
     {
-        /* queue up and wait for a token */
-        op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], mop);
-        /* push on existing work rather than attempting this send */
-        ret = gm_do_work(0);
+	/* queue up and wait for a token */
+	op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], mop);
+	/* push on existing work rather than attempting this send */
+	ret = gm_do_work(0);
     }
     else
     {
-        gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Proceeding with communication.\n");
-        if (mop->mode == GM_MODE_REND)
-        {
-            initiate_send_rend(mop);
-            ret = 0;
-        }
-        else
-        {
-            initiate_send_immed(mop);
-            ret = 0;
-        }
+	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Proceeding with communication.\n");
+	if (mop->mode == GM_MODE_REND)
+	{
+	    initiate_send_rend(mop);
+	    ret = 0;
+	}
+	else
+	{
+	    initiate_send_immed(mop);
+	    ret = 0;
+	}
     }
 
     return (ret);
@@ -2352,8 +2252,7 @@ static int gm_post_send_check_resource(
  *
  * no return value
  */
-static void initiate_send_immed(
-    method_op_p mop)
+static void initiate_send_immed(method_op_p mop)
 {
 
     struct gm_addr *gm_addr_data = mop->addr->method_data;
@@ -2365,9 +2264,9 @@ static void initiate_send_immed(
 
     /* send ctrl message */
     gm_send_with_callback(local_port, mop->buffer,
-                          GM_IMMED_SIZE, true_msg_len, GM_HIGH_PRIORITY,
-                          gm_addr_data->node_id, gm_addr_data->port_id,
-                          immed_send_callback, mop);
+				  GM_IMMED_SIZE, true_msg_len, GM_HIGH_PRIORITY,
+				  gm_addr_data->node_id, gm_addr_data->port_id, immed_send_callback,
+				  mop);
 
     /* queue up to wait for completion */
     op_list_add(op_list_array[IND_SENDING], mop);
@@ -2383,8 +2282,7 @@ static void initiate_send_immed(
  *
  * no return value.
  */
-static void initiate_put_announcement(
-    method_op_p mop)
+static void initiate_put_announcement(method_op_p mop)
 {
     struct gm_op *gm_op_data = mop->method_data;
     struct gm_addr *gm_addr_data = mop->addr->method_data;
@@ -2403,9 +2301,10 @@ static void initiate_put_announcement(
 
     /* send ctrl message */
     gm_send_with_callback(local_port, my_ctrl,
-                          GM_IMMED_SIZE, GM_CTRL_LENGTH,
-                          GM_HIGH_PRIORITY, gm_addr_data->node_id,
-                          gm_addr_data->port_id, ctrl_put_callback, mop);
+				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
+				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
+				  gm_addr_data->port_id,
+				  ctrl_put_callback, mop);
 
     /* queue up to wait for completion */
     op_list_add(op_list_array[IND_SENDING], mop);
@@ -2421,8 +2320,7 @@ static void initiate_put_announcement(
  *
  * no return value
  */
-static void initiate_send_rend(
-    method_op_p mop)
+static void initiate_send_rend(method_op_p mop)
 {
     struct gm_op *gm_op_data = mop->method_data;
     struct gm_addr *gm_addr_data = mop->addr->method_data;
@@ -2443,9 +2341,10 @@ static void initiate_send_rend(
 
     /* send ctrl message */
     gm_send_with_callback(local_port, my_ctrl,
-                          GM_IMMED_SIZE, GM_CTRL_LENGTH,
-                          GM_HIGH_PRIORITY, gm_addr_data->node_id,
-                          gm_addr_data->port_id, ctrl_req_callback, mop);
+				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
+				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
+				  gm_addr_data->port_id,
+				  ctrl_req_callback, mop);
 
     /* queue up to wait for completion */
     op_list_add(op_list_array[IND_SENDING], mop);
@@ -2460,10 +2359,9 @@ static void initiate_send_rend(
  *
  * no return value
  */
-static void ctrl_put_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status)
+static void ctrl_put_callback(struct gm_port *port,
+			      void *context,
+			      gm_status_t status)
 {
     /* the context is our operation */
     method_op_p my_op = context;
@@ -2482,31 +2380,31 @@ static void ctrl_put_callback(
     /* see if the receiver couldn't keep up */
     if (status == GM_SEND_TIMED_OUT)
     {
-        gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
-        op_list_remove(my_op);
-        my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
+	op_list_remove(my_op);
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
     /* look for other errors */
     if (status != GM_SUCCESS)
     {
-
-        gossip_lerr("Error: GM send failure, detected in callback.\n");
-        gossip_err("Error: %s (%d)\n", gm_strerror(status), (int) status);
-        gossip_err("Sending from %s to %s\n", gm_host_name,
-                   gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
-        op_list_remove(my_op);
-        /* TODO: need generic solution to map GM codes to pvfs2 codes */
-        if (status == GM_SEND_TARGET_NODE_UNREACHABLE)
-            my_op->error_code = -PVFS_EHOSTUNREACH;
-        else
-            my_op->error_code = -PVFS_EPROTO;
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	
+	gossip_lerr("Error: GM send failure, detected in callback.\n");
+	gossip_err("Error: %s (%d)\n", gm_strerror(status), (int)status);
+	gossip_err("Sending from %s to %s\n", gm_host_name,
+	    gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
+	op_list_remove(my_op);
+	/* TODO: need generic solution to map GM codes to pvfs2 codes */
+	if(status == GM_SEND_TARGET_NODE_UNREACHABLE)
+	    my_op->error_code = -PVFS_EHOSTUNREACH;
+	else
+	    my_op->error_code = -PVFS_EPROTO;
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
     /* operation is now complete */
@@ -2528,10 +2426,9 @@ static void ctrl_put_callback(
  *
  * no return value
  */
-static void immed_send_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status)
+static void immed_send_callback(struct gm_port *port,
+				void *context,
+				gm_status_t status)
 {
     /* the context is our operation */
     method_op_p my_op = context;
@@ -2545,37 +2442,37 @@ static void immed_send_callback(
 
     if (gm_op_data->buffer_status == GM_BUF_METH_ALLOC)
     {
-        /* this was an internally allocated buffer */
-        gm_dma_free(local_port, my_op->buffer);
+	/* this was an internally allocated buffer */
+	gm_dma_free(local_port, my_op->buffer);
     }
 
     /* see if the receiver couldn't keep up */
     if (status == GM_SEND_TIMED_OUT)
     {
-        gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
-        op_list_remove(my_op);
-        my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
+	op_list_remove(my_op);
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
     /* look for other errors */
     if (status != GM_SUCCESS)
     {
-        gossip_lerr("Error: GM send failure, detected in callback.\n");
-        gossip_err("Error: %s (%d)\n", gm_strerror(status), (int) status);
-        gossip_err("Sending from %s to %s\n", gm_host_name,
-                   gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
-        op_list_remove(my_op);
-        /* TODO: need generic solution to map GM codes to pvfs2 codes */
-        if (status == GM_SEND_TARGET_NODE_UNREACHABLE)
-            my_op->error_code = -PVFS_EHOSTUNREACH;
-        else
-            my_op->error_code = -PVFS_EPROTO;
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	gossip_lerr("Error: GM send failure, detected in callback.\n");
+	gossip_err("Error: %s (%d)\n", gm_strerror(status), (int)status);
+	gossip_err("Sending from %s to %s\n", gm_host_name,
+	    gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
+	op_list_remove(my_op);
+	/* TODO: need generic solution to map GM codes to pvfs2 codes */
+	if(status == GM_SEND_TARGET_NODE_UNREACHABLE)
+	    my_op->error_code = -PVFS_EHOSTUNREACH;
+	else
+	    my_op->error_code = -PVFS_EPROTO;
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
     /* golden! */
@@ -2604,10 +2501,9 @@ static void immed_send_callback(
  *
  * no return value
  */
-static void ctrl_req_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status)
+static void ctrl_req_callback(struct gm_port *port,
+			      void *context,
+			      gm_status_t status)
 {
     /* the context is our operation */
     method_op_p my_op = context;
@@ -2627,39 +2523,39 @@ static void ctrl_req_callback(
     /* see if the receiver couldn't keep up */
     if (status == GM_SEND_TIMED_OUT)
     {
-        gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
-        op_list_remove(my_op);
-        my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
+	op_list_remove(my_op);
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
     /* look for other errors */
     if (status != GM_SUCCESS)
     {
-        gossip_lerr("Error: GM send failure, detected in callback.\n");
-        gossip_err("Error: %s (%d)\n", gm_strerror(status), (int) status);
-        gossip_err("Sending from %s to %s\n", gm_host_name,
-                   gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
-        op_list_remove(my_op);
-        /* TODO: need generic solution to map GM codes to pvfs2 codes */
-        if (status == GM_SEND_TARGET_NODE_UNREACHABLE)
-            my_op->error_code = -PVFS_EHOSTUNREACH;
-        else
-            my_op->error_code = -PVFS_EPROTO;
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	gossip_lerr("Error: GM send failure, detected in callback.\n");
+	gossip_err("Error: %s (%d)\n", gm_strerror(status), (int)status);
+	gossip_err("Sending from %s to %s\n", gm_host_name,
+	    gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
+	op_list_remove(my_op);
+	/* TODO: need generic solution to map GM codes to pvfs2 codes */
+	if(status == GM_SEND_TARGET_NODE_UNREACHABLE)
+	    my_op->error_code = -PVFS_EHOSTUNREACH;
+	else
+	    my_op->error_code = -PVFS_EPROTO;
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
-    if (gm_op_data->cancelled)
+    if(gm_op_data->cancelled)
     {
         /* this operation has been cancelled; don't do any further work */
-        op_list_remove(my_op);
+	op_list_remove(my_op);
         my_op->error_code = -PVFS_ECANCEL;
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
         return;
     }
 
@@ -2684,8 +2580,7 @@ static void ctrl_req_callback(
  *
  * returns 0 on success, -errno on failure
  */
-static int ctrl_recv_pool_init(
-    int pool_size)
+static int ctrl_recv_pool_init(int pool_size)
 {
 
     struct ctrl_msg *tmp_ctrl = NULL;
@@ -2693,14 +2588,14 @@ static int ctrl_recv_pool_init(
 
     for (i = 0; i < pool_size; i++)
     {
-        tmp_ctrl = gm_dma_malloc(local_port,
-                                 gm_max_length_for_size(GM_IMMED_SIZE));
-        if (!tmp_ctrl)
-        {
-            return (bmi_gm_errno_to_pvfs(-ENOMEM));
-        }
-        gm_provide_receive_buffer(local_port, tmp_ctrl,
-                                  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
+	tmp_ctrl = gm_dma_malloc(local_port,
+				 gm_max_length_for_size(GM_IMMED_SIZE));
+	if (!tmp_ctrl)
+	{
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	}
+	gm_provide_receive_buffer(local_port, tmp_ctrl,
+				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
     }
 
     recv_token_count_high -= pool_size;
@@ -2717,8 +2612,7 @@ static int ctrl_recv_pool_init(
  *
  * returns 0 on success, -errno on failure
  */
-static int gm_do_work(
-    int wait_time)
+static int gm_do_work(int wait_time)
 {
     int events = 0;
     int ret = -1;
@@ -2736,33 +2630,33 @@ static int gm_do_work(
     events = gm_receive_pending(local_port);
     if (events == 0)
     {
-        /* since there isn't any GM work to do right this second, let's
-         * try to service operations waiting on tokens first.
-         */
-        delayed_token_sweep();
+	/* since there isn't any GM work to do right this second, let's
+	 * try to service operations waiting on tokens first.
+	 */
+	delayed_token_sweep();
 
-        /* See if there is anything to do now; specify timeout so we 
-         * don't busy spin if idle 
-         */
-        if (gm_receive_pending(local_port) || wait_time > 0)
-        {
-            ret = receive_cycle(wait_time);
-            if (ret < 0)
-            {
-                return (ret);
-            }
-        }
+	/* See if there is anything to do now; specify timeout so we 
+	 * don't busy spin if idle 
+	 */
+	if (gm_receive_pending(local_port) || wait_time > 0)
+	{
+	    ret = receive_cycle(wait_time);
+	    if (ret < 0)
+	    {
+		return (ret);
+	    }
+	}
     }
     else
     {
-        /* we know there is work to do- call receive with no timeout */
-        ret = receive_cycle(0);
-        if (ret < 0)
-        {
-            return (ret);
-        }
-        /* maybe we have tokens available now */
-        delayed_token_sweep();
+	/* we know there is work to do- call receive with no timeout */
+	ret = receive_cycle(0);
+	if (ret < 0)
+	{
+	    return (ret);
+	}
+	/* maybe we have tokens available now */
+	delayed_token_sweep();
     }
 
     return (0);
@@ -2776,11 +2670,10 @@ static int gm_do_work(
  *
  * returns 0 on success, -errno on failure
  */
-static void delayed_token_sweep(
-    void)
+static void delayed_token_sweep(void)
 {
     method_op_p query_op = NULL;
-    struct gm_op *gm_op_data = NULL;
+    struct gm_op* gm_op_data = NULL;
 
     /* NOTE: the order is important here.  We try to push the
      * last steps of stalled messages first in order to preserve
@@ -2792,93 +2685,93 @@ static void delayed_token_sweep(
      */
     if (!op_list_empty(op_list_array[IND_NEED_SEND_TOK_HI_PUT]))
     {
-        /* see if we have any high priority send tokens */
-        if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
-        {
-            query_op =
-                op_list_shownext(op_list_array[IND_NEED_SEND_TOK_HI_PUT]);
-            op_list_remove(query_op);
-            initiate_put_announcement(query_op);
-            return;
-        }
+	/* see if we have any high priority send tokens */
+	if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
+	{
+	    query_op =
+		op_list_shownext(op_list_array[IND_NEED_SEND_TOK_HI_PUT]);
+	    op_list_remove(query_op);
+	    initiate_put_announcement(query_op);
+	    return;
+	}
     }
 
     /* look for stuff waiting on low send tokens */
     if (!op_list_empty(op_list_array[IND_NEED_SEND_TOK_LOW]))
     {
-        /* we need a low priority send token */
-        if (gm_alloc_send_token(local_port, GM_LOW_PRIORITY))
-        {
+	/* we need a low priority send token */
+	if (gm_alloc_send_token(local_port, GM_LOW_PRIORITY))
+	{
 #ifdef ENABLE_GM_BUFPOOL
-            if (!io_buffers_exhausted())
-            {
+	    if (!io_buffers_exhausted())
+	    {
 #endif /* ENABLE_GM_BUFPOOL */
-                query_op =
-                    op_list_shownext(op_list_array[IND_NEED_SEND_TOK_LOW]);
-
-                op_list_remove(query_op);
-                gm_op_data = query_op->method_data;
-                if (gm_op_data->list_flag)
-                    setup_send_data_buffer_list(query_op);
-                else
-                    setup_send_data_buffer(query_op);
-                send_data_buffer(query_op);
-                return;
+		query_op =
+		    op_list_shownext(op_list_array[IND_NEED_SEND_TOK_LOW]);
+		
+		op_list_remove(query_op);
+		gm_op_data = query_op->method_data;
+		if(gm_op_data->list_flag)
+		    setup_send_data_buffer_list(query_op);
+		else
+		    setup_send_data_buffer(query_op);
+		send_data_buffer(query_op);
+		return;
 #ifdef ENABLE_GM_BUFPOOL
-            }
-            else
-            {
-                gm_free_send_token(local_port, GM_LOW_PRIORITY);
-            }
+	    }
+	    else
+	    {
+		gm_free_send_token(local_port, GM_LOW_PRIORITY);
+	    }
 #endif /* ENABLE_GM_BUFPOOL */
-        }
+	}
     }
 
     /* look for stuff waiting for tokens to acknowledge send request */
     if (!op_list_empty(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK]))
     {
-        if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
-        {
+	if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
+	{
 #ifdef ENABLE_GM_BUFPOOL
-            if (!io_buffers_exhausted())
-            {
+	    if (!io_buffers_exhausted())
+	    {
 #endif /* ENABLE_GM_BUFPOOL */
-                query_op =
-                    op_list_shownext(op_list_array
-                                     [IND_NEED_SEND_TOK_HI_CTRLACK]);
-                op_list_remove(query_op);
-                prepare_for_recv(query_op);
-                return;
+		query_op =
+		    op_list_shownext(op_list_array
+				     [IND_NEED_SEND_TOK_HI_CTRLACK]);
+		op_list_remove(query_op);
+		prepare_for_recv(query_op);
+		return;
 #ifdef ENABLE_GM_BUFPOOL
-            }
-            else
-            {
-                gm_free_send_token(local_port, GM_HIGH_PRIORITY);
-            }
+	    }
+	    else
+	    {
+		gm_free_send_token(local_port, GM_HIGH_PRIORITY);
+	    }
 #endif /* ENABLE_GM_BUFPOOL */
-        }
+	}
     }
 
     /* look for stuff that is waiting for a token to send a ctrl requeset */
     if (!op_list_empty(op_list_array[IND_NEED_SEND_TOK_HI_CTRL]))
     {
-        /* see if we have any high priority send tokens */
-        if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
-        {
-            query_op =
-                op_list_shownext(op_list_array[IND_NEED_SEND_TOK_HI_CTRL]);
-            op_list_remove(query_op);
-            if (query_op->mode == GM_MODE_REND)
-            {
-                initiate_send_rend(query_op);
-                return;
-            }
-            else
-            {
-                initiate_send_immed(query_op);
-                return;
-            }
-        }
+	/* see if we have any high priority send tokens */
+	if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
+	{
+	    query_op =
+		op_list_shownext(op_list_array[IND_NEED_SEND_TOK_HI_CTRL]);
+	    op_list_remove(query_op);
+	    if (query_op->mode == GM_MODE_REND)
+	    {
+		initiate_send_rend(query_op);
+		return;
+	    }
+	    else
+	    {
+		initiate_send_immed(query_op);
+		return;
+	    }
+	}
     }
 
     return;
@@ -2892,8 +2785,7 @@ static void delayed_token_sweep(
  *
  * returns 0 on success, -errno on failure
  */
-static int receive_cycle(
-    int timeout)
+static int receive_cycle(int timeout)
 {
     gm_alarm_t poll_timeout_alarm;
     int ret = -1;
@@ -2902,54 +2794,54 @@ static int receive_cycle(
 
     if (timeout > 0)
     {
-        gm_initialize_alarm(&poll_timeout_alarm);
-        gm_set_alarm(local_port, &poll_timeout_alarm, timeout,
-                     alarm_callback, NULL);
+	gm_initialize_alarm(&poll_timeout_alarm);
+	gm_set_alarm(local_port, &poll_timeout_alarm, timeout,
+		     alarm_callback, NULL);
     }
     global_timeout_flag = 0;
     do
     {
-        if (timeout > 0)
+        if(timeout > 0)
         {
-            poll_event = gm_blocking_receive_no_spin(local_port);
+	    poll_event = gm_blocking_receive_no_spin(local_port);
         }
         else
         {
             poll_event = gm_receive(local_port);
         }
 
-        switch (gm_ntohc(poll_event->recv.type))
-        {
-        case GM_FAST_HIGH_PEER_RECV_EVENT:
-        case GM_FAST_HIGH_RECV_EVENT:
-            handled_events++;
-            ret = recv_event_handler(poll_event, 1);
-            break;
-        case GM_HIGH_PEER_RECV_EVENT:
-        case GM_HIGH_RECV_EVENT:
-            handled_events++;
-            ret = recv_event_handler(poll_event, 0);
-            break;
-        case _GM_SLEEP_EVENT:
-            handled_events++;
-            gen_mutex_unlock(&interface_mutex);
-            gm_unknown(local_port, poll_event);
-            gen_mutex_lock(&interface_mutex);
-            ret = 0;
-            break;
-        default:
-            handled_events++;
-            gm_unknown(local_port, poll_event);
-            ret = 0;
-            break;
-        }
+	switch (gm_ntohc(poll_event->recv.type))
+	{
+	    case GM_FAST_HIGH_PEER_RECV_EVENT:
+	    case GM_FAST_HIGH_RECV_EVENT:
+		handled_events++;
+		ret = recv_event_handler(poll_event, 1);
+		break;
+	    case GM_HIGH_PEER_RECV_EVENT:
+	    case GM_HIGH_RECV_EVENT:
+		handled_events++;
+		ret = recv_event_handler(poll_event, 0);
+		break;
+            case _GM_SLEEP_EVENT:
+		handled_events++;
+                gen_mutex_unlock(&interface_mutex);
+                gm_unknown(local_port, poll_event);
+                gen_mutex_lock(&interface_mutex);
+		ret = 0;
+                break;
+	    default:
+		handled_events++;
+		gm_unknown(local_port, poll_event);
+		ret = 0;
+		break;
+	}
     } while (((timeout > 0 && !global_timeout_flag && ret == 0) ||
-              (timeout == 0 && gm_receive_pending(local_port) && ret == 0)) &&
-             handled_events < GM_MAX_EVENT_CYCLES);
+	      (timeout == 0 && gm_receive_pending(local_port) && ret == 0)) &&
+	     handled_events < GM_MAX_EVENT_CYCLES);
 
     if (timeout > 0 && !global_timeout_flag)
     {
-        gm_cancel_alarm(&poll_timeout_alarm);
+	gm_cancel_alarm(&poll_timeout_alarm);
     }
 
     return (ret);
@@ -2963,8 +2855,7 @@ static int receive_cycle(
  *
  * no return value
  */
-void alarm_callback(
-    void *context)
+void alarm_callback(void *context)
 {
     global_timeout_flag = 1;
     gossip_debug(GOSSIP_BMI_DEBUG_GM, "Timer expired.\n");
@@ -2979,11 +2870,10 @@ void alarm_callback(
  *
  * returns 0 on success, -errno on failure
  */
-static int immed_unexp_recv_handler(
-    bmi_size_t size,
-    bmi_msg_tag_t msg_tag,
-    method_addr_p map,
-    void *buffer)
+static int immed_unexp_recv_handler(bmi_size_t size,
+				    bmi_msg_tag_t msg_tag,
+				    method_addr_p map,
+				    void *buffer)
 {
     method_op_p new_method_op = NULL;
     struct gm_op *gm_op_data = NULL;
@@ -2992,7 +2882,7 @@ static int immed_unexp_recv_handler(
     new_method_op = alloc_gm_method_op();
     if (!new_method_op)
     {
-        return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
     new_method_op->send_recv = BMI_RECV;
     new_method_op->addr = map;
@@ -3017,11 +2907,10 @@ static int immed_unexp_recv_handler(
  *
  * returns 0 on success, -errno on failure
  */
-static int immed_recv_handler(
-    bmi_size_t actual_size,
-    bmi_msg_tag_t msg_tag,
-    method_addr_p map,
-    void *buffer)
+static int immed_recv_handler(bmi_size_t actual_size,
+			      bmi_msg_tag_t msg_tag,
+			      method_addr_p map,
+			      void *buffer)
 {
     method_op_p new_method_op = NULL;
 
@@ -3029,7 +2918,7 @@ static int immed_recv_handler(
     new_method_op = alloc_gm_method_op();
     if (!new_method_op)
     {
-        return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
     new_method_op->send_recv = BMI_RECV;
     new_method_op->addr = map;
@@ -3054,9 +2943,8 @@ static int immed_recv_handler(
  *
  * returns 0 on success, -errno on failure
  */
-static int recv_event_handler(
-    gm_recv_event_t * poll_event,
-    int fast)
+static int recv_event_handler(gm_recv_event_t * poll_event,
+			     int fast)
 {
     struct ctrl_msg ctrl_copy;
     int ret = bmi_gm_errno_to_pvfs(-ENOSYS);
@@ -3066,7 +2954,7 @@ static int recv_event_handler(
     method_op_p query_op = NULL;
     struct gm_addr *gm_addr_data = NULL;
     struct gm_op *gm_op_data = NULL;
-    void *copy_buffer;
+    void* copy_buffer;
     bmi_size_t copy_size, total_copied;
     int i;
 
@@ -3087,200 +2975,198 @@ static int recv_event_handler(
     /* grab a copy of the control message out of the event */
     if (fast)
     {
-        ctrl_copy = *(struct ctrl_msg *) (gm_ntohp(poll_event->recv.message) +
-                                          gm_ntohl(poll_event->recv.length) -
-                                          sizeof(struct ctrl_msg));
+	ctrl_copy = *(struct ctrl_msg *) (gm_ntohp(poll_event->recv.message) +
+				       gm_ntohl(poll_event->recv.length) -
+				       sizeof(struct ctrl_msg));
     }
     else
     {
-        ctrl_copy = *(struct ctrl_msg *) (gm_ntohp(poll_event->recv.buffer) +
-                                          gm_ntohl(poll_event->recv.length) -
-                                          sizeof(struct ctrl_msg));
+	ctrl_copy = *(struct ctrl_msg *) (gm_ntohp(poll_event->recv.buffer) +
+				       gm_ntohl(poll_event->recv.length) -
+				       sizeof(struct ctrl_msg));
     }
 
     /* check magic */
-    if (ctrl_copy.magic_nr != BMI_MAGIC_NR)
+    if(ctrl_copy.magic_nr != BMI_MAGIC_NR)
     {
-        gossip_err("Error: bad magic in bmi_gm message.\n");
-        gm_provide_receive_buffer(local_port,
-                                  gm_ntohp(poll_event->recv.buffer),
-                                  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
-        return (0);
+	gossip_err("Error: bad magic in bmi_gm message.\n");
+	gm_provide_receive_buffer(local_port,
+				  gm_ntohp(poll_event->recv.buffer),
+				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
+	return(0);
     }
 
     /* repost buffer ASAP unless we need to copy data out of it */
-    if (ctrl_copy.ctrl_type != CTRL_IMMED_TYPE &&
-        ctrl_copy.ctrl_type != CTRL_UNEXP_TYPE)
+    if(ctrl_copy.ctrl_type != CTRL_IMMED_TYPE && 
+	ctrl_copy.ctrl_type != CTRL_UNEXP_TYPE)
     {
-        gm_provide_receive_buffer(local_port,
-                                  gm_ntohp(poll_event->recv.buffer),
-                                  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
+	gm_provide_receive_buffer(local_port,
+				  gm_ntohp(poll_event->recv.buffer),
+				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
     }
 
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Ctrl_type: %d.\n", ctrl_copy.ctrl_type);
-    switch (ctrl_copy.ctrl_type)
+    switch(ctrl_copy.ctrl_type)
     {
-    case CTRL_ACK_TYPE:
-        /* this is a response to one of our control requests */
-        ctrl_ack_handler(ctrl_copy.u.ack.sender_op_id,
-                         gm_ntohs(poll_event->recv.sender_node_id),
-                         ctrl_copy.u.ack.remote_ptr,
-                         ctrl_copy.u.ack.receiver_op_id);
-        ret = 0;
-        break;
-    case CTRL_REQ_TYPE:
-        /* this is a new control request from someone */
-        ret = ctrl_req_handler_rend(ctrl_copy.u.req.sender_op_id,
-                                    ctrl_copy.u.req.actual_size,
-                                    ctrl_copy.u.req.msg_tag,
-                                    gm_ntohs(poll_event->recv.
-                                             sender_node_id),
-                                    gm_ntoh_u8(poll_event->recv.
-                                               sender_port_id));
-        break;
-    case CTRL_PUT_TYPE:
-        put_recv_handler(ctrl_copy.u.put.receiver_op_id);
-        ret = 0;
-        break;
-    case CTRL_IMMED_TYPE:
-        /* try to find a matching post from the receiver so that we don't
-         * have to buffer this yet again */
-        map = gm_addr_search(&gm_addr_list,
-                             gm_ntohs(poll_event->recv.sender_node_id),
-                             gm_ntoh_u8(poll_event->recv.sender_port_id));
-        if (!map)
-        {
-            /* TODO: handle this error better */
-            gossip_lerr("Error: unknown sender!\n");
-            return (bmi_gm_errno_to_pvfs(-EPROTO));
-        }
+	case CTRL_ACK_TYPE:
+	    /* this is a response to one of our control requests */
+	    ctrl_ack_handler(ctrl_copy.u.ack.sender_op_id,
+			     gm_ntohs(poll_event->recv.sender_node_id), 
+			     ctrl_copy.u.ack.remote_ptr,
+			     ctrl_copy.u.ack.receiver_op_id);
+	    ret = 0;
+	    break;
+	case CTRL_REQ_TYPE:
+	    /* this is a new control request from someone */
+	    ret = ctrl_req_handler_rend(ctrl_copy.u.req.sender_op_id, 
+					    ctrl_copy.u.req.actual_size,
+					    ctrl_copy.u.req.msg_tag,
+					    gm_ntohs(poll_event->recv.
+						     sender_node_id),
+					    gm_ntoh_u8(poll_event->recv.
+						     sender_port_id));
+	    break;
+	case CTRL_PUT_TYPE: 
+	    put_recv_handler(ctrl_copy.u.put.receiver_op_id);
+	    ret = 0;
+	    break;
+	case CTRL_IMMED_TYPE:
+	    /* try to find a matching post from the receiver so that we don't
+	     * have to buffer this yet again */
+	    map = gm_addr_search(&gm_addr_list,
+				 gm_ntohs(poll_event->recv.sender_node_id),
+				 gm_ntoh_u8(poll_event->recv.sender_port_id));
+	    if (!map)
+	    {
+		/* TODO: handle this error better */
+		gossip_lerr("Error: unknown sender!\n");
+		return (bmi_gm_errno_to_pvfs(-EPROTO));
+	    }
 
-        memset(&key, 0, sizeof(struct op_list_search_key));
-        key.method_addr = map;
-        key.method_addr_yes = 1;
-        key.msg_tag = ctrl_copy.u.immed.msg_tag;
-        key.msg_tag_yes = 1;
+	    memset(&key, 0, sizeof(struct op_list_search_key));
+	    key.method_addr = map;
+	    key.method_addr_yes = 1;
+	    key.msg_tag = ctrl_copy.u.immed.msg_tag;
+	    key.msg_tag_yes = 1;
 
-        query_op = op_list_search(op_list_array[IND_NEED_CTRL_MATCH], &key);
-        if (!query_op)
-        {
-            gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Doh! Using extra buffer.\n");
-            tmp_buffer = malloc(ctrl_copy.u.immed.actual_size);
-            if (!tmp_buffer)
-            {
-                /* TODO: handle error */
-                return (bmi_gm_errno_to_pvfs(-ENOMEM));
-            }
-            if (fast)
-            {
-                memcpy(tmp_buffer, gm_ntohp(poll_event->recv.message),
-                       ctrl_copy.u.immed.actual_size);
-            }
-            else
-            {
-                memcpy(tmp_buffer, gm_ntohp(poll_event->recv.buffer),
-                       ctrl_copy.u.immed.actual_size);
-            }
-            gm_provide_receive_buffer(local_port,
-                                      gm_ntohp(poll_event->recv.buffer),
-                                      GM_IMMED_SIZE, GM_HIGH_PRIORITY);
-            ret = immed_recv_handler(ctrl_copy.u.immed.actual_size,
-                                     ctrl_copy.u.immed.msg_tag, map,
-                                     tmp_buffer);
-        }
-        else
-        {
-            /* found a match */
-            gm_op_data = query_op->method_data;
-            if (fast)
-                copy_buffer = gm_ntohp(poll_event->recv.message);
-            else
-                copy_buffer = gm_ntohp(poll_event->recv.buffer);
+	    query_op = op_list_search(op_list_array[IND_NEED_CTRL_MATCH], &key);
+	    if (!query_op)
+	    {
+		gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Doh! Using extra buffer.\n");
+		tmp_buffer = malloc(ctrl_copy.u.immed.actual_size);
+		if (!tmp_buffer)
+		{
+		    /* TODO: handle error */
+		    return (bmi_gm_errno_to_pvfs(-ENOMEM));
+		}
+		if (fast)
+		{
+		    memcpy(tmp_buffer, gm_ntohp(poll_event->recv.message),
+			   ctrl_copy.u.immed.actual_size);
+		}
+		else
+		{
+		    memcpy(tmp_buffer, gm_ntohp(poll_event->recv.buffer),
+			   ctrl_copy.u.immed.actual_size);
+		}
+		gm_provide_receive_buffer(local_port,
+					  gm_ntohp(poll_event->recv.buffer),
+					  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
+		ret = immed_recv_handler(ctrl_copy.u.immed.actual_size,
+					 ctrl_copy.u.immed.msg_tag, map, 
+					 tmp_buffer);
+	    }
+	    else
+	    {
+		/* found a match */
+		gm_op_data = query_op->method_data;
+		if(fast)
+		    copy_buffer = gm_ntohp(poll_event->recv.message);
+		else
+		    copy_buffer = gm_ntohp(poll_event->recv.buffer);
 
-            if (gm_op_data->list_flag)
-            {
-                total_copied = 0;
-                for (i = 0; i < query_op->list_count; i++)
-                {
-                    if (total_copied == ctrl_copy.u.immed.actual_size)
-                        break;
+		if(gm_op_data->list_flag)
+		{
+		    total_copied = 0;
+		    for(i=0; i<query_op->list_count; i++)
+		    {
+			if(total_copied == ctrl_copy.u.immed.actual_size)
+			    break;
 
-                    copy_size = ctrl_copy.u.immed.actual_size - total_copied;
-                    if (copy_size > query_op->size_list[i])
-                        copy_size = query_op->size_list[i];
-                    memcpy(query_op->buffer_list[i], copy_buffer, copy_size);
-                    copy_buffer =
-                        (void *) ((long) copy_buffer + (long) copy_size);
-                    total_copied += copy_size;
-                }
-            }
-            else
-            {
-                memcpy(query_op->buffer, copy_buffer,
-                       ctrl_copy.u.immed.actual_size);
-            }
+			copy_size = ctrl_copy.u.immed.actual_size - total_copied;
+			if(copy_size > query_op->size_list[i])
+			    copy_size = query_op->size_list[i];
+			memcpy(query_op->buffer_list[i], copy_buffer, copy_size);
+			copy_buffer = (void*)((long)copy_buffer + (long)copy_size);
+			total_copied += copy_size;
+		    }
+		}
+		else
+		{
+		    memcpy(query_op->buffer, copy_buffer,
+			   ctrl_copy.u.immed.actual_size);
+		}
 
-            gm_provide_receive_buffer(local_port,
-                                      gm_ntohp(poll_event->recv.buffer),
-                                      GM_IMMED_SIZE, GM_HIGH_PRIORITY);
-            op_list_remove(query_op);
-            query_op->actual_size = ctrl_copy.u.immed.actual_size;
-            query_op->error_code = 0;
-            op_list_add(completion_array[query_op->context_id], query_op);
-            gm_op_data->complete = 1;
-            ret = 0;
-        }
-        break;
-    case CTRL_UNEXP_TYPE:
-        map = gm_addr_search(&gm_addr_list,
-                             gm_ntohs(poll_event->recv.sender_node_id),
-                             gm_ntoh_u8(poll_event->recv.sender_port_id));
-        if (!map)
-        {
-            /* new address! */
-            map = alloc_gm_method_addr();
-            gm_addr_data = map->method_data;
-            gm_addr_data->node_id = gm_ntohs(poll_event->recv.sender_node_id);
-            gm_addr_data->port_id = gm_ntohc(poll_event->recv.sender_port_id);
-            /* let the bmi layer know about it */
-            ret = bmi_method_addr_reg_callback(map);
-            if (ret < 0)
-            {
-                dealloc_gm_method_addr(map);
-                return (ret);
-            }
-            /* keep up with it ourselves also */
-            gm_addr_add(&gm_addr_list, map);
-        }
+		gm_provide_receive_buffer(local_port,
+					  gm_ntohp(poll_event->recv.buffer),
+					  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
+		op_list_remove(query_op);
+		query_op->actual_size = ctrl_copy.u.immed.actual_size;
+		query_op->error_code = 0;
+		op_list_add(completion_array[query_op->context_id], query_op);
+		gm_op_data->complete = 1;
+		ret = 0;
+	    }
+	    break;
+	case CTRL_UNEXP_TYPE:
+	    map = gm_addr_search(&gm_addr_list,
+				 gm_ntohs(poll_event->recv.sender_node_id),
+				 gm_ntoh_u8(poll_event->recv.sender_port_id));
+	    if (!map)
+	    {
+		/* new address! */
+		map = alloc_gm_method_addr();
+		gm_addr_data = map->method_data;
+		gm_addr_data->node_id = gm_ntohs(poll_event->recv.sender_node_id);
+		gm_addr_data->port_id = gm_ntohc(poll_event->recv.sender_port_id);
+		/* let the bmi layer know about it */
+		ret = bmi_method_addr_reg_callback(map);
+		if (ret < 0)
+		{
+		    dealloc_gm_method_addr(map);
+		    return (ret);
+		}
+		/* keep up with it ourselves also */
+		gm_addr_add(&gm_addr_list, map);
+	    }
 
-        tmp_buffer = malloc(ctrl_copy.u.immed.actual_size);
-        if (!tmp_buffer)
-        {
-            /* TODO: handle error */
-            return (bmi_gm_errno_to_pvfs(-ENOMEM));
-        }
-        if (fast)
-        {
-            memcpy(tmp_buffer, gm_ntohp(poll_event->recv.message),
-                   ctrl_copy.u.immed.actual_size);
-        }
-        else
-        {
-            memcpy(tmp_buffer, gm_ntohp(poll_event->recv.buffer),
-                   ctrl_copy.u.immed.actual_size);
-        }
-        gm_provide_receive_buffer(local_port,
-                                  gm_ntohp(poll_event->recv.buffer),
-                                  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
-        ret =
-            immed_unexp_recv_handler(ctrl_copy.u.immed.actual_size,
-                                     ctrl_copy.u.immed.msg_tag, map,
-                                     tmp_buffer);
-        break;
-    default:
-        /* TODO: handle this better */
-        assert(0);
-        break;
+	    tmp_buffer = malloc(ctrl_copy.u.immed.actual_size);
+	    if (!tmp_buffer)
+	    {
+		/* TODO: handle error */
+		return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	    }
+	    if (fast)
+	    {
+		memcpy(tmp_buffer, gm_ntohp(poll_event->recv.message),
+		       ctrl_copy.u.immed.actual_size);
+	    }
+	    else
+	    {
+		memcpy(tmp_buffer, gm_ntohp(poll_event->recv.buffer),
+		       ctrl_copy.u.immed.actual_size);
+	    }
+	    gm_provide_receive_buffer(local_port,
+				      gm_ntohp(poll_event->recv.buffer),
+				      GM_IMMED_SIZE, GM_HIGH_PRIORITY);
+	    ret =
+		immed_unexp_recv_handler(ctrl_copy.u.immed.actual_size, 
+		    ctrl_copy.u.immed.msg_tag, map, tmp_buffer);
+	    break;
+	default:
+	    /* TODO: handle this better */
+	    assert(0);
+	    break;
     }
 
     return (ret);
@@ -3292,18 +3178,17 @@ static int recv_event_handler(
  *
  * returns 0 on success, -errno on failure
  */
-static void put_recv_handler(
-    bmi_op_id_t ctrl_op_id)
+static void put_recv_handler(bmi_op_id_t ctrl_op_id)
 {
     method_op_p query_op = NULL;
     struct gm_op *gm_op_data = NULL;
-    void *copy_buffer;
+    void* copy_buffer;
     bmi_size_t copy_size, total_copied;
     int i;
 
     /* find the matching operation */
     query_op = id_gen_safe_lookup(ctrl_op_id);
-    if (!query_op)
+    if(!query_op)
     {
         /* operation must have been cancelled; just return */
         return;
@@ -3315,80 +3200,79 @@ static void put_recv_handler(
     /* let go of the buffer if we need to */
     if (gm_op_data->buffer_status == GM_BUF_METH_REG)
     {
-        if (gm_op_data->list_flag)
-        {
+	if(gm_op_data->list_flag)
+	{
 #ifdef ENABLE_GM_REGCACHE
-            /* we don't handle this yet */
-            assert(0);
+	    /* we don't handle this yet */
+	    assert(0);
 
 #endif /* ENABLE_GM_REGCACHE */
 #ifdef ENABLE_GM_REGISTER
-            /* we don't handle this yet */
-            assert(0);
+	    /* we don't handle this yet */
+	    assert(0);
 
 #endif /* ENABLE_GM_REGISTER */
 #ifdef ENABLE_GM_BUFCOPY
-            /* we don't handle this yet */
-            assert(0);
+	    /* we don't handle this yet */
+	    assert(0);
 
 #endif /* ENABLE_GM_BUFCOPY */
 #ifdef ENABLE_GM_BUFPOOL
-            if (!gm_op_data->cancelled)
+            if(!gm_op_data->cancelled)
             {
                 copy_buffer = gm_op_data->tmp_xfer_buffer;
                 total_copied = 0;
-                for (i = 0; i < query_op->list_count; i++)
+                for(i=0; i<query_op->list_count; i++)
                 {
-                    if (total_copied == query_op->actual_size)
+                    if(total_copied == query_op->actual_size)
                         break;
 
                     copy_size = query_op->actual_size - total_copied;
-                    if (copy_size > query_op->size_list[i])
+                    if(copy_size > query_op->size_list[i])
                         copy_size = query_op->size_list[i];
 
                     memcpy(query_op->buffer_list[i], copy_buffer, copy_size);
-                    copy_buffer =
-                        (void *) ((long) copy_buffer + (long) copy_size);
+                    copy_buffer = (void*)((long)copy_buffer + (long)copy_size);
                     total_copied += copy_size;
                 }
             }
-            bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
+	    bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
 #endif /* ENABLE_GM_BUFPOOL */
-        }
-        else
-        {
+	}
+	else
+	{
 #ifdef ENABLE_GM_REGCACHE
-            bmi_gm_unuse_interval((unsigned long) query_op->buffer,
-                                  query_op->actual_size);
+	    bmi_gm_unuse_interval((unsigned long) query_op->buffer,
+				  query_op->actual_size);
 #endif /* ENABLE_GM_REGCACHE */
 #ifdef ENABLE_GM_REGISTER
-            gm_deregister_memory(local_port, query_op->buffer,
-                                 query_op->actual_size);
+	    gm_deregister_memory(local_port, query_op->buffer,
+				 query_op->actual_size);
 #endif /* ENABLE_GM_REGISTER */
 #ifdef ENABLE_GM_BUFCOPY
-            memcpy(query_op->buffer, gm_op_data->tmp_xfer_buffer,
-                   query_op->actual_size);
-            gm_dma_free(local_port, gm_op_data->tmp_xfer_buffer);
+	    memcpy(query_op->buffer, gm_op_data->tmp_xfer_buffer,
+		   query_op->actual_size);
+	    gm_dma_free(local_port, gm_op_data->tmp_xfer_buffer);
 #endif /* ENABLE_GM_BUFCOPY */
 #ifdef ENABLE_GM_BUFPOOL
-            if (!gm_op_data->cancelled)
+            if(!gm_op_data->cancelled)
             {
                 memcpy(query_op->buffer, gm_op_data->tmp_xfer_buffer,
                        query_op->actual_size);
             }
-            bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
+	    bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
 #endif /* ENABLE_GM_BUFPOOL */
-        }
+	}
     }
 
     /* if this is an operation that has been cancelled, then don't put
      * it in the completion queue (it should have already been announced)
      * Instead, just quietly gid rid of the operation
      */
-    if (gm_op_data->cancelled)
+    if(gm_op_data->cancelled)
     {
         cancelled_rend_count--;
-        dealloc_gm_method_op(query_op);
+	dealloc_gm_method_op(query_op);
         return;
     }
 
@@ -3406,11 +3290,10 @@ static void put_recv_handler(
  *
  * returns 0 on success, -errno on failure
  */
-static void ctrl_ack_handler(
-    bmi_op_id_t ctrl_op_id,
-    unsigned int node_id,
-    gm_remote_ptr_t remote_ptr,
-    bmi_op_id_t peer_op_id)
+static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
+			     unsigned int node_id,
+			     gm_remote_ptr_t remote_ptr,
+			     bmi_op_id_t peer_op_id)
 {
     method_op_p query_op = NULL;
     struct gm_op *gm_op_data = NULL;
@@ -3424,7 +3307,7 @@ static void ctrl_ack_handler(
     /* find the matching operation */
     query_op = id_gen_safe_lookup(ctrl_op_id);
 
-    if (!query_op)
+    if(!query_op)
     {
         /* the op is gone; probably canceled.  Just return. */
         return;
@@ -3440,32 +3323,31 @@ static void ctrl_ack_handler(
      */
     if (!op_list_empty(op_list_array[IND_NEED_SEND_TOK_LOW]))
     {
-        gossip_ldebug(GOSSIP_BMI_DEBUG_GM,
-                      "Stalling behind stalled message.\n");
-        op_list_add(op_list_array[IND_NEED_SEND_TOK_LOW], query_op);
-        return;
+	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Stalling behind stalled message.\n");
+	op_list_add(op_list_array[IND_NEED_SEND_TOK_LOW], query_op);
+	return;
     }
 
     if (!gm_alloc_send_token(local_port, GM_LOW_PRIORITY))
     {
-        /* we don't have a send token */
-        op_list_add(op_list_array[IND_NEED_SEND_TOK_LOW], query_op);
-        return;
+	/* we don't have a send token */
+	op_list_add(op_list_array[IND_NEED_SEND_TOK_LOW], query_op);
+	return;
     }
 
 #ifdef ENABLE_GM_BUFPOOL
     if (io_buffers_exhausted())
     {
-        gm_free_send_token(local_port, GM_LOW_PRIORITY);
-        op_list_add(op_list_array[IND_NEED_SEND_TOK_LOW], query_op);
-        return;
+	gm_free_send_token(local_port, GM_LOW_PRIORITY);
+	op_list_add(op_list_array[IND_NEED_SEND_TOK_LOW], query_op);
+	return;
     }
 #endif /* ENABLE_GM_BUFPOOL */
 
-    if (gm_op_data->list_flag)
-        setup_send_data_buffer_list(query_op);
+    if(gm_op_data->list_flag)
+	setup_send_data_buffer_list(query_op);
     else
-        setup_send_data_buffer(query_op);
+	setup_send_data_buffer(query_op);
     send_data_buffer(query_op);
     return;
 }
@@ -3477,8 +3359,7 @@ static void ctrl_ack_handler(
  *
  * no return value
  */
-static void setup_send_data_buffer(
-    method_op_p mop)
+static void setup_send_data_buffer(method_op_p mop)
 {
     struct gm_op *gm_op_data = mop->method_data;
     bmi_size_t pinned_size = 0;
@@ -3486,55 +3367,55 @@ static void setup_send_data_buffer(
     if (gm_op_data->buffer_status == GM_BUF_METH_REG)
     {
 #ifdef ENABLE_GM_REGCACHE
-        pinned_size = bmi_gm_use_interval((unsigned long) mop->buffer,
-                                          mop->actual_size);
-        if (pinned_size != mop->actual_size)
-        {
-            gossip_lerr
-                ("Error: could not register memory, wanted: %d, got: %d\n",
-                 (int) mop->actual_size, (int) pinned_size);
-            bmi_gm_unuse_interval((unsigned long) mop->buffer, pinned_size);
-            /* TODO: handle this better */
-            mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
-            op_list_add(completion_array[mop->context_id], mop);
-            gm_op_data->complete = 1;
-            return;
-        }
+	pinned_size = bmi_gm_use_interval((unsigned long) mop->buffer,
+					  mop->actual_size);
+	if (pinned_size != mop->actual_size)
+	{
+	    gossip_lerr
+		("Error: could not register memory, wanted: %d, got: %d\n",
+		 (int) mop->actual_size, (int) pinned_size);
+	    bmi_gm_unuse_interval((unsigned long) mop->buffer, pinned_size);
+	    /* TODO: handle this better */
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
+	    op_list_add(completion_array[mop->context_id], mop);
+	    gm_op_data->complete = 1;
+	    return;
+	}
 #endif /* ENABLE_GM_REGCACHE */
 #ifdef ENABLE_GM_REGISTER
-        pinned_size = mop->actual_size;
-        if (gm_register_memory(local_port, mop->buffer,
-                               mop->actual_size) != GM_SUCCESS)
-        {
-            gossip_lerr("Error: could not register memory.\n");
-            /* TODO: handle this better */
-            mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
-            op_list_add(completion_array[mop->context_id], mop);
-            gm_op_data->complete = 1;
-            return;
-        }
+	pinned_size = mop->actual_size;
+	if (gm_register_memory(local_port, mop->buffer,
+			       mop->actual_size) != GM_SUCCESS)
+	{
+	    gossip_lerr("Error: could not register memory.\n");
+	    /* TODO: handle this better */
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
+	    op_list_add(completion_array[mop->context_id], mop);
+	    gm_op_data->complete = 1;
+	    return;
+	}
 #endif /* ENABLE_GM_REGISTER */
 #ifdef ENABLE_GM_BUFCOPY
-        pinned_size = mop->actual_size;
-        gm_op_data->tmp_xfer_buffer = gm_dma_malloc(local_port,
-                                                    (unsigned long) mop->
-                                                    actual_size);
-        if (!gm_op_data->tmp_xfer_buffer)
-        {
-            gossip_lerr("Error: gm_dma_malloc().\n");
-            mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
-            op_list_add(completion_array[mop->context_id], mop);
-            gm_op_data->complete = 1;
-            return;
-        }
-        memcpy(gm_op_data->tmp_xfer_buffer, mop->buffer, mop->actual_size);
-        mop->buffer = gm_op_data->tmp_xfer_buffer;
+	pinned_size = mop->actual_size;
+	gm_op_data->tmp_xfer_buffer = gm_dma_malloc(local_port,
+						    (unsigned long) mop->
+						    actual_size);
+	if (!gm_op_data->tmp_xfer_buffer)
+	{
+	    gossip_lerr("Error: gm_dma_malloc().\n");
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
+	    op_list_add(completion_array[mop->context_id], mop);
+	    gm_op_data->complete = 1;
+	    return;
+	}
+	memcpy(gm_op_data->tmp_xfer_buffer, mop->buffer, mop->actual_size);
+	mop->buffer = gm_op_data->tmp_xfer_buffer;
 #endif /* ENABLE_GM_BUFCOPY */
 #ifdef ENABLE_GM_BUFPOOL
-        pinned_size = mop->actual_size;
-        gm_op_data->tmp_xfer_buffer = bmi_gm_bufferpool_get(io_pool);
-        memcpy(gm_op_data->tmp_xfer_buffer, mop->buffer, mop->actual_size);
-        mop->buffer = gm_op_data->tmp_xfer_buffer;
+	pinned_size = mop->actual_size;
+	gm_op_data->tmp_xfer_buffer = bmi_gm_bufferpool_get(io_pool);
+	memcpy(gm_op_data->tmp_xfer_buffer, mop->buffer, mop->actual_size);
+	mop->buffer = gm_op_data->tmp_xfer_buffer;
 #endif /* ENABLE_GM_BUFPOOL */
 
     }
@@ -3549,12 +3430,11 @@ static void setup_send_data_buffer(
  *
  * no return value
  */
-static void setup_send_data_buffer_list(
-    method_op_p mop)
+static void setup_send_data_buffer_list(method_op_p mop)
 {
     struct gm_op *gm_op_data = mop->method_data;
     int i;
-    void *copy_buffer;
+    void* copy_buffer;
 
 #ifdef ENABLE_GM_REGCACHE
     /* we don't handle this yet */
@@ -3571,10 +3451,10 @@ static void setup_send_data_buffer_list(
 #ifdef ENABLE_GM_BUFPOOL
     gm_op_data->tmp_xfer_buffer = bmi_gm_bufferpool_get(io_pool);
     copy_buffer = gm_op_data->tmp_xfer_buffer;
-    for (i = 0; i < mop->list_count; i++)
+    for(i=0; i<mop->list_count; i++)
     {
-        memcpy(copy_buffer, mop->buffer_list[i], mop->size_list[i]);
-        copy_buffer = (void *) ((long) copy_buffer + (long) mop->size_list[i]);
+	memcpy(copy_buffer, mop->buffer_list[i], mop->size_list[i]);
+	copy_buffer = (void*)((long)copy_buffer + (long)mop->size_list[i]);
     }
     mop->buffer = gm_op_data->tmp_xfer_buffer;
 #endif /* ENABLE_GM_BUFPOOL */
@@ -3590,8 +3470,7 @@ static void setup_send_data_buffer_list(
  *
  * no return value
  */
-static void send_data_buffer(
-    method_op_p mop)
+static void send_data_buffer(method_op_p mop)
 {
     struct gm_addr *gm_addr_data = mop->addr->method_data;
     struct gm_op *gm_op_data = mop->method_data;
@@ -3603,10 +3482,10 @@ static void send_data_buffer(
      */
 
     gm_directed_send_with_callback(local_port, mop->buffer,
-                                   gm_op_data->remote_ptr,
-                                   mop->actual_size, GM_LOW_PRIORITY,
-                                   gm_addr_data->node_id, gm_addr_data->port_id,
-                                   data_send_callback, mop);
+				   gm_op_data->remote_ptr,
+				   mop->actual_size, GM_LOW_PRIORITY,
+				   gm_addr_data->node_id, gm_addr_data->port_id,
+				   data_send_callback, mop);
 
     op_list_add(op_list_array[IND_SENDING], mop);
 
@@ -3622,8 +3501,7 @@ static void send_data_buffer(
  *
  * returns 0 on success, -errno on failure
  */
-static void prepare_for_recv(
-    method_op_p mop)
+static void prepare_for_recv(method_op_p mop)
 {
     struct gm_addr *gm_addr_data = mop->addr->method_data;
     struct gm_op *gm_op_data = mop->method_data;
@@ -3648,57 +3526,57 @@ static void prepare_for_recv(
     if (gm_op_data->buffer_status == GM_BUF_METH_REG)
     {
 #ifdef ENABLE_GM_REGCACHE
-        pinned_size = bmi_gm_use_interval((unsigned long) mop->buffer,
-                                          mop->actual_size);
-        if (pinned_size != mop->actual_size)
-        {
-            gossip_lerr
-                ("Error: could not register memory, wanted: %d, got: %d\n",
-                 (int) mop->actual_size, (int) pinned_size);
-            /* TODO: handle this error better */
-            mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
-            op_list_add(completion_array[mop->context_id], mop);
-            gm_op_data->complete = 1;
-            return;
-        }
+	pinned_size = bmi_gm_use_interval((unsigned long) mop->buffer,
+					  mop->actual_size);
+	if (pinned_size != mop->actual_size)
+	{
+	    gossip_lerr
+		("Error: could not register memory, wanted: %d, got: %d\n",
+		 (int) mop->actual_size, (int) pinned_size);
+	    /* TODO: handle this error better */
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
+	    op_list_add(completion_array[mop->context_id], mop);
+	    gm_op_data->complete = 1;
+	    return;
+	}
 #endif /* ENABLE_GM_REGCACHE */
 #ifdef ENABLE_GM_REGISTER
-        pinned_size = mop->actual_size;
-        if (gm_register_memory(local_port, mop->buffer,
-                               mop->actual_size) != GM_SUCCESS)
-        {
-            gossip_lerr("Error: could not register memory.\n");
-            /* TODO: handle this better */
-            mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
-            op_list_add(completion_array[mop->context_id], mop);
-            gm_op_data->complete = 1;
-            return;
-        }
+	pinned_size = mop->actual_size;
+	if (gm_register_memory(local_port, mop->buffer,
+			       mop->actual_size) != GM_SUCCESS)
+	{
+	    gossip_lerr("Error: could not register memory.\n");
+	    /* TODO: handle this better */
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
+	    op_list_add(completion_array[mop->context_id], mop);
+	    gm_op_data->complete = 1;
+	    return;
+	}
 #endif /* ENABLE_GM_REGISTER */
 #ifdef ENABLE_GM_BUFCOPY
-        pinned_size = mop->actual_size;
-        gm_op_data->tmp_xfer_buffer = gm_dma_malloc(local_port,
-                                                    (unsigned long) mop->
-                                                    actual_size);
-        if (!gm_op_data->tmp_xfer_buffer)
-        {
-            gossip_lerr("Error: gm_dma_malloc().\n");
-            /* TODO: handle this better */
-            mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
-            op_list_add(completion_array[mop->context_id], mop);
-            gm_op_data->complete = 1;
-            return;
-        }
-        new_ctrl->u.ack.remote_ptr = 0;
-        new_ctrl->u.ack.remote_ptr +=
-            (unsigned long) gm_op_data->tmp_xfer_buffer;
+	pinned_size = mop->actual_size;
+	gm_op_data->tmp_xfer_buffer = gm_dma_malloc(local_port,
+						    (unsigned long) mop->
+						    actual_size);
+	if (!gm_op_data->tmp_xfer_buffer)
+	{
+	    gossip_lerr("Error: gm_dma_malloc().\n");
+	    /* TODO: handle this better */
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
+	    op_list_add(completion_array[mop->context_id], mop);
+	    gm_op_data->complete = 1;
+	    return;
+	}
+	new_ctrl->u.ack.remote_ptr = 0;
+	new_ctrl->u.ack.remote_ptr +=
+	    (unsigned long) gm_op_data->tmp_xfer_buffer;
 #endif /* ENABLE_GM_BUFCOPY */
 #ifdef ENABLE_GM_BUFPOOL
-        pinned_size = mop->actual_size;
-        gm_op_data->tmp_xfer_buffer = bmi_gm_bufferpool_get(io_pool);
-        new_ctrl->u.ack.remote_ptr = 0;
-        new_ctrl->u.ack.remote_ptr +=
-            (unsigned long) gm_op_data->tmp_xfer_buffer;
+	pinned_size = mop->actual_size;
+	gm_op_data->tmp_xfer_buffer = bmi_gm_bufferpool_get(io_pool);
+	new_ctrl->u.ack.remote_ptr = 0;
+	new_ctrl->u.ack.remote_ptr +=
+	    (unsigned long) gm_op_data->tmp_xfer_buffer;
 #endif /* ENABLE_GM_BUFPOOL */
 
     }
@@ -3706,9 +3584,10 @@ static void prepare_for_recv(
     /* send ctrl message */
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Sending ctrl ack.\n");
     gm_send_with_callback(local_port, new_ctrl,
-                          GM_IMMED_SIZE, GM_CTRL_LENGTH,
-                          GM_HIGH_PRIORITY, gm_addr_data->node_id,
-                          gm_addr_data->port_id, ctrl_ack_callback, mop);
+				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
+				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
+				  gm_addr_data->port_id,
+				  ctrl_ack_callback, mop);
 
     /* queue up op */
     op_list_add(op_list_array[IND_SENDING], mop);
@@ -3725,8 +3604,7 @@ static void prepare_for_recv(
  *
  * returns 0 on success, -errno on failure
  */
-static void prepare_for_recv_list(
-    method_op_p mop)
+static void prepare_for_recv_list(method_op_p mop)
 {
     struct gm_addr *gm_addr_data = mop->addr->method_data;
     struct gm_op *gm_op_data = mop->method_data;
@@ -3751,23 +3629,23 @@ static void prepare_for_recv_list(
     if (gm_op_data->buffer_status == GM_BUF_METH_REG)
     {
 #ifdef ENABLE_GM_REGCACHE
-        /* we don't handle this yet */
-        assert(0);
+	/* we don't handle this yet */
+	assert(0);
 #endif /* ENABLE_GM_REGCACHE */
 #ifdef ENABLE_GM_REGISTER
-        /* we don't handle this yet */
-        assert(0);
+	/* we don't handle this yet */
+	assert(0);
 #endif /* ENABLE_GM_REGISTER */
 #ifdef ENABLE_GM_BUFCOPY
-        /* we don't handle this yet */
-        assert(0);
+	/* we don't handle this yet */
+	assert(0);
 #endif /* ENABLE_GM_BUFCOPY */
 #ifdef ENABLE_GM_BUFPOOL
-        pinned_size = mop->actual_size;
-        gm_op_data->tmp_xfer_buffer = bmi_gm_bufferpool_get(io_pool);
-        new_ctrl->u.ack.remote_ptr = 0;
-        new_ctrl->u.ack.remote_ptr +=
-            (unsigned long) gm_op_data->tmp_xfer_buffer;
+	pinned_size = mop->actual_size;
+	gm_op_data->tmp_xfer_buffer = bmi_gm_bufferpool_get(io_pool);
+	new_ctrl->u.ack.remote_ptr = 0;
+	new_ctrl->u.ack.remote_ptr +=
+	    (unsigned long) gm_op_data->tmp_xfer_buffer;
 #endif /* ENABLE_GM_BUFPOOL */
 
     }
@@ -3775,9 +3653,10 @@ static void prepare_for_recv_list(
     /* send ctrl message */
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Sending ctrl ack.\n");
     gm_send_with_callback(local_port, new_ctrl,
-                          GM_IMMED_SIZE, GM_CTRL_LENGTH,
-                          GM_HIGH_PRIORITY, gm_addr_data->node_id,
-                          gm_addr_data->port_id, ctrl_ack_callback, mop);
+				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
+				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
+				  gm_addr_data->port_id,
+				  ctrl_ack_callback, mop);
 
     /* queue up op */
     op_list_add(op_list_array[IND_SENDING], mop);
@@ -3792,10 +3671,9 @@ static void prepare_for_recv_list(
  *
  * no return value
  */
-static void ctrl_ack_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status)
+static void ctrl_ack_callback(struct gm_port *port,
+			      void *context,
+			      gm_status_t status)
 {
     /* the context is our operation */
     method_op_p my_op = context;
@@ -3815,26 +3693,26 @@ static void ctrl_ack_callback(
     /* see if the receiver couldn't keep up */
     if (status == GM_SEND_TIMED_OUT)
     {
-        gossip_lerr("Error: GM TIMEOUT!  Not handled.\n");
-        op_list_remove(my_op);
-        my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	gossip_lerr("Error: GM TIMEOUT!  Not handled.\n");
+	op_list_remove(my_op);
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
     /* look for other errors */
     if (status != GM_SUCCESS)
     {
-        gossip_lerr("Error: GM send failure, detected in callback.\n");
-        gossip_err("Error: %s (%d)\n", gm_strerror(status), (int) status);
-        gossip_err("Sending from %s to %s\n", gm_host_name,
-                   gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
-        op_list_remove(my_op);
-        my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	gossip_lerr("Error: GM send failure, detected in callback.\n");
+	gossip_err("Error: %s (%d)\n", gm_strerror(status), (int)status);
+	gossip_err("Sending from %s to %s\n", gm_host_name,
+	    gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
+	op_list_remove(my_op);
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
     /* golden! */
@@ -3857,10 +3735,9 @@ static void ctrl_ack_callback(
  *
  * no return value
  */
-static void data_send_callback(
-    struct gm_port *port,
-    void *context,
-    gm_status_t status)
+static void data_send_callback(struct gm_port *port,
+			       void *context,
+			       gm_status_t status)
 {
     /* the context is our operation */
     method_op_p my_op = context;
@@ -3873,59 +3750,59 @@ static void data_send_callback(
     if (gm_op_data->buffer_status == GM_BUF_METH_REG)
     {
 #ifdef ENABLE_GM_REGCACHE
-        bmi_gm_unuse_interval((unsigned long) my_op->buffer,
-                              my_op->actual_size);
+	bmi_gm_unuse_interval((unsigned long) my_op->buffer,
+			      my_op->actual_size);
 #endif /* ENABLE_GM_REGCACHE */
 #ifdef ENABLE_GM_REGISTER
-        gm_deregister_memory(local_port, my_op->buffer, my_op->actual_size);
+	gm_deregister_memory(local_port, my_op->buffer, my_op->actual_size);
 #endif /* ENABLE_GM_REGISTER */
 #ifdef ENABLE_GM_BUFCOPY
-        gm_dma_free(local_port, my_op->buffer);
+	gm_dma_free(local_port, my_op->buffer);
 #endif /* ENABLE_GM_BUFCOPY */
 #ifdef ENABLE_GM_BUFPOOL
-        bmi_gm_bufferpool_put(io_pool, my_op->buffer);
+	bmi_gm_bufferpool_put(io_pool, my_op->buffer);
 #endif /* ENABLE_GM_BUFPOOL */
     }
 
     /* see if the receiver couldn't keep up */
     if (status == GM_SEND_TIMED_OUT)
     {
-        gossip_lerr("Error: GM TIMEOUT!  Not handled.\n");
-        op_list_remove(my_op);
-        my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	gossip_lerr("Error: GM TIMEOUT!  Not handled.\n");
+	op_list_remove(my_op);
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
     /* look for other errors */
     if (status != GM_SUCCESS)
     {
-        gossip_lerr("Error: GM send failure, detected in callback.\n");
-        gossip_err("Error: GM return value: %d.\n", (int) status);
-        gossip_err("Sending from %s to %s\n", gm_host_name,
-                   gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
-        op_list_remove(my_op);
-        /* TODO: need generic solution to map GM codes to pvfs2 codes */
-        if (status == GM_SEND_TARGET_NODE_UNREACHABLE)
-            my_op->error_code = -PVFS_EHOSTUNREACH;
-        else
-            my_op->error_code = -PVFS_EPROTO;
-        op_list_add(completion_array[my_op->context_id], my_op);
-        gm_op_data->complete = 1;
-        return;
+	gossip_lerr("Error: GM send failure, detected in callback.\n");
+	gossip_err("Error: GM return value: %d.\n", (int) status);
+	gossip_err("Sending from %s to %s\n", gm_host_name,
+	    gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
+	op_list_remove(my_op);
+	/* TODO: need generic solution to map GM codes to pvfs2 codes */
+	if(status == GM_SEND_TARGET_NODE_UNREACHABLE)
+	    my_op->error_code = -PVFS_EHOSTUNREACH;
+	else
+	    my_op->error_code = -PVFS_EPROTO;
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+	return;
     }
 
     op_list_remove(my_op);
     /* we must now let the other side know that the data has arrived */
     if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
     {
-        initiate_put_announcement(my_op);
+	initiate_put_announcement(my_op);
     }
     else
     {
-        /* we have to wait for a token to become available */
-        op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_PUT], my_op);
+	/* we have to wait for a token to become available */
+	op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_PUT], my_op);
     }
     return;
 }
@@ -3936,12 +3813,11 @@ static void data_send_callback(
  *
  * returns 0 on success, -errno on failure
  */
-static int ctrl_req_handler_rend(
-    bmi_op_id_t ctrl_op_id,
-    bmi_size_t ctrl_actual_size,
-    bmi_msg_tag_t ctrl_tag,
-    unsigned int node_id,
-    unsigned int port_id)
+static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
+				 bmi_size_t ctrl_actual_size,
+				 bmi_msg_tag_t ctrl_tag,
+				 unsigned int node_id,
+                                 unsigned int port_id)
 {
     method_addr_p map = NULL;
     struct gm_addr *gm_addr_data = NULL;
@@ -3965,10 +3841,10 @@ static int ctrl_req_handler_rend(
     map = gm_addr_search(&gm_addr_list, node_id, port_id);
     if (!map)
     {
-        /* where did this come from?! */
-        /* TODO: handle this error condition */
-        gossip_lerr("Error: ctrl message from unknown host!!!\n");
-        return (bmi_gm_errno_to_pvfs(-EPROTO));
+	/* where did this come from?! */
+	/* TODO: handle this error condition */
+	gossip_lerr("Error: ctrl message from unknown host!!!\n");
+	return (bmi_gm_errno_to_pvfs(-EPROTO));
     }
     gm_addr_data = map->method_data;
 
@@ -3982,77 +3858,77 @@ static int ctrl_req_handler_rend(
     active_method_op = op_list_search(op_list_array[IND_NEED_CTRL_MATCH], &key);
     if (active_method_op)
     {
-        op_list_remove(active_method_op);
+	op_list_remove(active_method_op);
 
-        if (ctrl_actual_size > active_method_op->expected_size)
-        {
-            gossip_lerr("Error: message ordering violation;\n");
-            gossip_lerr("Error: message too large for next buffer.\n");
-            /* TODO: handle this better */
-            return (bmi_gm_errno_to_pvfs(-EPROTO));
-        }
+	if(ctrl_actual_size > active_method_op->expected_size)
+	{
+	    gossip_lerr("Error: message ordering violation;\n");
+	    gossip_lerr("Error: message too large for next buffer.\n");
+	    /* TODO: handle this better */
+	    return(bmi_gm_errno_to_pvfs(-EPROTO));
+	}
 
-        /* store remote side's op_id */
-        gm_op_data = active_method_op->method_data;
-        gm_op_data->peer_op_id = ctrl_op_id;
+	/* store remote side's op_id */
+	gm_op_data = active_method_op->method_data;
+	gm_op_data->peer_op_id = ctrl_op_id;
 
-        /* store actual size of transfer */
-        active_method_op->actual_size = ctrl_actual_size;
+	/* store actual size of transfer */
+	active_method_op->actual_size = ctrl_actual_size;
 
-        /* now we need one send token to send ctrl ack */
-        if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
-        {
-            /* got it! */
+	/* now we need one send token to send ctrl ack */
+	if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
+	{
+	    /* got it! */
 #ifdef ENABLE_GM_BUFPOOL
-            if (io_buffers_exhausted())
-            {
-                gm_free_send_token(local_port, GM_HIGH_PRIORITY);
-                op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
-                            active_method_op);
-                ret = 0;
-            }
-            else
-            {
+	    if (io_buffers_exhausted())
+	    {
+		gm_free_send_token(local_port, GM_HIGH_PRIORITY);
+		op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
+			    active_method_op);
+		ret = 0;
+	    }
+	    else
+	    {
 #endif /* ENABLE_GM_BUFPOOL */
-                if (gm_op_data->list_flag)
-                    prepare_for_recv_list(active_method_op);
-                else
-                    prepare_for_recv(active_method_op);
-                ret = 0;
+		if(gm_op_data->list_flag)
+		    prepare_for_recv_list(active_method_op);
+		else
+		    prepare_for_recv(active_method_op);
+		ret = 0;
 #ifdef ENABLE_GM_BUFPOOL
-            }
+	    }
 #endif /* ENABLE_GM_BUFPOOL */
-        }
-        else
-        {
-            /* we don't have enough tokens */
-            op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
-                        active_method_op);
-            ret = 0;
-        }
+	}
+	else
+	{
+	    /* we don't have enough tokens */
+	    op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
+			active_method_op);
+	    ret = 0;
+	}
     }
     else
     {
-        /* post has _not_ occurred, queue up and wait for post */
-        /* we need an op structure to keep up with this */
-        active_method_op = alloc_gm_method_op();
-        if (!active_method_op)
-        {
-            return (bmi_gm_errno_to_pvfs(-ENOMEM));
-        }
-        active_method_op->send_recv = BMI_RECV;
-        active_method_op->addr = map;
-        active_method_op->actual_size = ctrl_actual_size;
-        /* TODO: is this the right thing to do here? */
-        active_method_op->expected_size = 0;
-        active_method_op->msg_tag = ctrl_tag;
-        active_method_op->mode = GM_MODE_REND;
-        active_method_op->context_id = -1;
-        gm_op_data = active_method_op->method_data;
-        gm_op_data->peer_op_id = ctrl_op_id;
+	/* post has _not_ occurred, queue up and wait for post */
+	/* we need an op structure to keep up with this */
+	active_method_op = alloc_gm_method_op();
+	if (!active_method_op)
+	{
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
+	}
+	active_method_op->send_recv = BMI_RECV;
+	active_method_op->addr = map;
+	active_method_op->actual_size = ctrl_actual_size;
+	/* TODO: is this the right thing to do here? */
+	active_method_op->expected_size = 0;
+	active_method_op->msg_tag = ctrl_tag;
+	active_method_op->mode = GM_MODE_REND;
+	active_method_op->context_id = -1;
+	gm_op_data = active_method_op->method_data;
+	gm_op_data->peer_op_id = ctrl_op_id;
 
-        op_list_add(op_list_array[IND_NEED_RECV_POST], active_method_op);
-        ret = 0;
+	op_list_add(op_list_array[IND_NEED_RECV_POST], active_method_op);
+	ret = 0;
     }
     return (ret);
 
@@ -4064,11 +3940,9 @@ static int ctrl_req_handler_rend(
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_cancel(
-    bmi_op_id_t id,
-    bmi_context_id context_id)
+int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
 {
-    method_op_p query_op = (method_op_p) id_gen_safe_lookup(id);
+    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
     method_op_p tmp_op;
     struct gm_op *gm_op_data = query_op->method_data;
     struct op_list_search_key key;
@@ -4082,21 +3956,21 @@ int BMI_gm_cancel(
 
     gen_mutex_lock(&interface_mutex);
 
-    gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                 "BMI_gm_cancel: send_recv: %d, complete: %d, mode: %d\n",
-                 query_op->send_recv, gm_op_data->complete, query_op->mode);
+    gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+        "BMI_gm_cancel: send_recv: %d, complete: %d, mode: %d\n",
+        query_op->send_recv, gm_op_data->complete, query_op->mode);
 
     /* easy case: is the operation already completed? */
-    if (gm_op_data->complete)
+    if(gm_op_data->complete)
     {
         gossip_debug(GOSSIP_BMI_DEBUG_GM, "BMI_gm_cancel: complete case.\n");
         /* do nothing */
-        gen_mutex_unlock(&interface_mutex);
-        return (0);
+	gen_mutex_unlock(&interface_mutex);
+	return(0);
     }
 
     /* send case */
-    if (query_op->send_recv == BMI_SEND)
+    if(query_op->send_recv == BMI_SEND)
     {
         /* find out if we are blocking on resource usage and haven't sent 
          * anything yet
@@ -4105,10 +3979,10 @@ int BMI_gm_cancel(
         key.op_id = query_op->op_id;
         key.op_id_yes = 1;
         tmp_op = op_list_search(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], &key);
-        if (tmp_op)
+        if(tmp_op)
         {
-            gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                         "BMI_gm_cancel: nothing sent yet.\n");
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: nothing sent yet.\n");
             /* nothing sent yet; clean up and move to comp. queue */
             assert(tmp_op == query_op);
             op_list_remove(query_op);
@@ -4120,8 +3994,8 @@ int BMI_gm_cancel(
             query_op->error_code = -PVFS_ECANCEL;
             op_list_add(completion_array[query_op->context_id], query_op);
             gm_op_data->complete = 1;
-            gen_mutex_unlock(&interface_mutex);
-            return (0);
+	    gen_mutex_unlock(&interface_mutex);
+            return(0);
         }
 
         /* see if the send is literally in flight (waiting on a gm callback) */
@@ -4129,48 +4003,46 @@ int BMI_gm_cancel(
          * done message
          */
         tmp_op = op_list_search(op_list_array[IND_SENDING], &key);
-        if (tmp_op)
+        if(tmp_op)
         {
             assert(tmp_op == query_op);
-            if (query_op->mode == GM_MODE_IMMED ||
+            if(query_op->mode == GM_MODE_IMMED ||
                 query_op->mode == GM_MODE_UNEXP)
             {
-                gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                             "BMI_gm_cancel: sending immed msg.\n");
+                gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                    "BMI_gm_cancel: sending immed msg.\n");
                 /* op is practically done; just wait for GM callback to 
-                 * trigger and transition it to completion queue */
+                 * trigger and transition it to completion queue */ 
                 gen_mutex_unlock(&interface_mutex);
-                return (0);
+                return(0);
             }
-            else if (gm_op_data->freeable_ctrl_buffer &&
-                     (gm_op_data->freeable_ctrl_buffer->ctrl_type ==
-                      CTRL_PUT_TYPE))
+            else if(gm_op_data->freeable_ctrl_buffer &&
+                (gm_op_data->freeable_ctrl_buffer->ctrl_type == CTRL_PUT_TYPE))
             {
                 /* op is practically done; just wait for GM callback to 
-                 * trigger and transition it to completion queue */
-                gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                             "BMI_gm_cancel: sending put msg.\n");
+                 * trigger and transition it to completion queue */ 
+                gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                    "BMI_gm_cancel: sending put msg.\n");
                 gen_mutex_unlock(&interface_mutex);
-                return (0);
+                return(0);
             }
-            else if (gm_op_data->freeable_ctrl_buffer &&
-                     (gm_op_data->freeable_ctrl_buffer->ctrl_type ==
-                      CTRL_REQ_TYPE))
+            else if(gm_op_data->freeable_ctrl_buffer &&
+                (gm_op_data->freeable_ctrl_buffer->ctrl_type == CTRL_REQ_TYPE))
             {
                 /* waiting on ctrl req callback */
                 /* mark op as being in a cancelled state and handle it in
                  * req callback and ack handler
                  */
-                gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                             "BMI_gm_cancel: sending req msg.\n");
+                gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                    "BMI_gm_cancel: sending req msg.\n");
                 gm_op_data->cancelled = 1;
                 gen_mutex_unlock(&interface_mutex);
-                return (0);
+                return(0);
             }
             else
             {
-                gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                             "BMI_gm_cancel: sending payload.\n");
+                gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                    "BMI_gm_cancel: sending payload.\n");
                 /* waiting on data send callback */
                 /* nothing sane to do here except let it try to finish.  If
                  * the data send callback triggers with successful status,
@@ -4178,31 +4050,31 @@ int BMI_gm_cancel(
                  * can release the buffer.  If it errors, then we are done.
                  */
                 gen_mutex_unlock(&interface_mutex);
-                return (0);
+                return(0);
             }
         }
-
+        
         /* see if we are waiting on a token for a put msg */
         tmp_op = op_list_search(op_list_array[IND_NEED_SEND_TOK_HI_PUT], &key);
-        if (tmp_op)
+        if(tmp_op)
         {
-            gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                         "BMI_gm_cancel: waiting on put token.\n");
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: waiting on put token.\n");
             assert(tmp_op == query_op);
             /* nothing to do here; operation is practically finished and we
              * should make a best effort to tell the receiver it can 
              * release the buffer
              */
             gen_mutex_unlock(&interface_mutex);
-            return (0);
+            return(0);
         }
-
+        
         /* see if we are waiting on a token for the data payload */
         tmp_op = op_list_search(op_list_array[IND_NEED_SEND_TOK_LOW], &key);
-        if (tmp_op)
+        if(tmp_op)
         {
-            gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                         "BMI_gm_cancel: waiting on data payload token.\n");
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: waiting on data payload token.\n");
             assert(tmp_op == query_op);
 
             /* no payload sent yet, clean up and get out */
@@ -4211,12 +4083,12 @@ int BMI_gm_cancel(
             op_list_add(completion_array[query_op->context_id], query_op);
             gm_op_data->complete = 1;
             gen_mutex_unlock(&interface_mutex);
-            return (0);
+            return(0);
         }
     }
 
     /* recv case */
-    if (query_op->send_recv == BMI_RECV)
+    if(query_op->send_recv == BMI_RECV)
     {
         memset(&key, 0, sizeof(struct op_list_search_key));
         key.op_id = query_op->op_id;
@@ -4224,27 +4096,26 @@ int BMI_gm_cancel(
 
         /* easy case for recv: have we even been contacted yet? */
         tmp_op = op_list_search(op_list_array[IND_NEED_CTRL_MATCH], &key);
-        if (tmp_op)
+        if(tmp_op)
         {
-            gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                         "BMI_gm_cancel: nothing received yet.\n");
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: nothing received yet.\n");
             /* nothing to do, no resources consumed */
             assert(tmp_op == query_op);
             op_list_remove(query_op);
             query_op->error_code = -PVFS_ECANCEL;
             op_list_add(completion_array[query_op->context_id], query_op);
             gm_op_data->complete = 1;
-            gen_mutex_unlock(&interface_mutex);
-            return (0);
+	    gen_mutex_unlock(&interface_mutex);
+            return(0);
         }
 
         /* are we waiting on resources to send a ctrl ack? */
-        tmp_op =
-            op_list_search(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK], &key);
-        if (tmp_op)
+        tmp_op = op_list_search(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK], &key);
+        if(tmp_op)
         {
-            gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                         "BMI_gm_cancel: nothing received yet.\n");
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: nothing received yet.\n");
             assert(tmp_op == query_op);
             /* luckily no resources are consumed at this stage, just clean
              * up and get out
@@ -4253,17 +4124,17 @@ int BMI_gm_cancel(
             query_op->error_code = -PVFS_ECANCEL;
             op_list_add(completion_array[query_op->context_id], query_op);
             gm_op_data->complete = 1;
-            gen_mutex_unlock(&interface_mutex);
-            return (0);
+	    gen_mutex_unlock(&interface_mutex);
+            return(0);
         }
 
         /* are we actually in the process of receiving data? */
         tmp_op = op_list_search(op_list_array[IND_RECVING], &key);
-        if (tmp_op)
+        if(tmp_op)
         {
             struct timeval tv;
-            gossip_debug(GOSSIP_BMI_DEBUG_GM,
-                         "BMI_gm_cancel: receiving data.\n");
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: receiving data.\n");
             assert(tmp_op == query_op);
 
             /* resources have been consumed (big recv buffer), 
@@ -4284,9 +4155,9 @@ int BMI_gm_cancel(
              * and report it as completed with PVFS_ECANCEL error code so 
              * that the caller doesn't get hung.  The caller can continue
              * without any risk at this point. */
-
-            gen_mutex_unlock(&interface_mutex);
-            return (0);
+            
+	    gen_mutex_unlock(&interface_mutex);
+            return(0);
         }
     }
 
@@ -4297,11 +4168,10 @@ int BMI_gm_cancel(
 
     gen_mutex_unlock(&interface_mutex);
 
-    return (0);
+    return(0);
 }
 
-static void reclaim_cancelled_io_buffers(
-    void)
+static void reclaim_cancelled_io_buffers(void)
 {
     struct timeval tv;
     method_op_p query_op = NULL;
@@ -4309,12 +4179,12 @@ static void reclaim_cancelled_io_buffers(
 
     gettimeofday(&tv, NULL);
 
-    if (cancelled_rend_count)
+    if(cancelled_rend_count)
     {
-        while ((query_op = op_list_shownext(op_list_array[IND_CANCELLED_REND])))
+        while((query_op = op_list_shownext(op_list_array[IND_CANCELLED_REND])))
         {
-            gm_op_data = query_op->method_data;
-            if ((tv.tv_sec - gm_op_data->cancelled_tv_sec) <
+	    gm_op_data = query_op->method_data;
+            if((tv.tv_sec - gm_op_data->cancelled_tv_sec) <
                 PINT_CANCELLED_REND_RECLAIM_TIMEOUT)
             {
                 /* these are too recent; move on */
@@ -4332,10 +4202,10 @@ static void reclaim_cancelled_io_buffers(
         /* if after doing this we still have too many exhausted buffers, then
          * just give up - we did the best we could...
          */
-        if ((io_pool->num_buffers - cancelled_rend_count) < 4)
+        if((io_pool->num_buffers - cancelled_rend_count) < 4)
         {
-            gossip_lerr
-                ("Error: BMI_GM: exhausted memory buffers due to cancellation.\n");
+            gossip_lerr(
+                "Error: BMI_GM: exhausted memory buffers due to cancellation.\n");
             assert(0);
         }
     }
@@ -4343,24 +4213,23 @@ static void reclaim_cancelled_io_buffers(
     return;
 }
 
-static int io_buffers_exhausted(
-    void)
+static int io_buffers_exhausted(void)
 {
-    if (!bmi_gm_bufferpool_empty(io_pool))
+    if(!bmi_gm_bufferpool_empty(io_pool))
     {
-        return (0);
+        return(0);
     }
 
     /* try to get some cancelled buffers back */
     reclaim_cancelled_io_buffers();
 
-    if (!bmi_gm_bufferpool_empty(io_pool))
+    if(!bmi_gm_bufferpool_empty(io_pool))
     {
-        return (0);
+        return(0);
     }
     else
     {
-        return (1);
+        return(1);
     }
 }
 
