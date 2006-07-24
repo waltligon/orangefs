@@ -662,7 +662,7 @@ static int translate_0_0_1(
         handle_range,
         NULL,
         1,
-        2);
+        0);
     if(ret != 0)
     {
         fprintf(stderr, "Error: failed to create new collection.\n");
@@ -940,7 +940,6 @@ static int translate_coll_eattr_0_0_1(
             return(-1);
         }
         /* skip the version attribute- we don't want to copy that one */
-        printf("eattr key: %s\n", key.data);
         if(ret == 0 && strncmp(key.data, "trove-dbpf-version", 
                                sizeof("trove-dbpf-version")) != 0)
         {
