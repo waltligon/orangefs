@@ -513,7 +513,7 @@ static void incrementHandleRef(
 }
 
 static void decrementHandleRef(
-    io_handle_queue_t * elem)
+    io_handle_queue_t * elem, TROVE_size * total_write_size_out)
 {
     gen_mutex_lock(&elem->active_io->mutex);
     elem->active_io->ref_count--;
@@ -522,17 +522,17 @@ static void decrementHandleRef(
     gen_mutex_unlock(&elem->active_io->mutex);
 
     if (elem->active_io->ref_count == 0 && noProcessElementAvailable(elem))
-    {
+    {                           
         /* update cache file size and truncate file in case O_DIRECT was used !*/
         #ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
-        active_file_io = NULL;
+        active_file_io = NULL;                           
         if(checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
-            elem->active_io->total_write_size)){
-            ftruncate(elem->active_io->filehandle, elem->active_io->total_write_size);
+            *total_write_size_out)){                
+            ftruncate(elem->active_io->filehandle, *total_write_size_out);
         }
         #else
         checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
-            elem->active_io->total_write_size);
+            *total_write_size_out);
         #endif
             
         /*have to free HandleQueue at the end !*/
@@ -848,7 +848,7 @@ static void * bstream_threaded_thread_io_function(
     
     odirectBuffAlloc = malloc(IO_BUFFER_SIZE + mem_pagesize);
     if (odirectBuffAlloc == NULL) {
-        fprintf(stderr, "Not enough free memory to allocate ODIRECT buffer\n");
+        gossip_err("Not enough free memory to allocate ODIRECT buffer\n");
         return NULL;
     }
     buff_real = (unsigned char *)(((unsigned long)odirectBuffAlloc + 
@@ -1050,7 +1050,8 @@ static void * bstream_threaded_thread_io_function(
             }
         }
 
-        decrementHandleRef(current_handle);
+        decrementHandleRef(current_handle, io_processing_slice->parentRequest->
+            op.u.b_rw_list.out_size_p);
     }
     
     free(odirectBuffAlloc);
