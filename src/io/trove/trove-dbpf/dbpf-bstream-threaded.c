@@ -123,6 +123,8 @@ typedef struct active_io_processing_t
     int positionOfProcessing[ACTIVE_QUEUE_LAST];
 
     TROVE_size total_write_size;
+    TROVE_size latest_offset_written;
+    
     int use_o_direct;
     int return_code;
 } active_io_processing_t;
@@ -513,7 +515,7 @@ static void incrementHandleRef(
 }
 
 static void decrementHandleRef(
-    io_handle_queue_t * elem, TROVE_size * total_write_size_out)
+    io_handle_queue_t * elem, TROVE_size latest_offset_written)
 {
     gen_mutex_lock(&elem->active_io->mutex);
     elem->active_io->ref_count--;
@@ -527,12 +529,12 @@ static void decrementHandleRef(
         #ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
         active_file_io = NULL;                           
         if(checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
-            *total_write_size_out)){                
-            ftruncate(elem->active_io->filehandle, *total_write_size_out);
+            latest_offset_written)){                
+            ftruncate(elem->active_io->filehandle, latest_offset_written);
         }
         #else
         checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
-            *total_write_size_out);
+            latest_offset_written);
         #endif
             
         /*have to free HandleQueue at the end !*/
@@ -667,6 +669,7 @@ static void processIOSlice(
     gen_mutex_t * mutex,
     TROVE_size * io_size_out,
     TROVE_size * total_write_size_out,
+    TROVE_size * latest_offset_written,
     int *return_code_out,
     int thread_no,
     char * odirectbuf,
@@ -824,6 +827,7 @@ modifyBuffer:
     {
         /* request is finished */
         dbpf_op_queue_remove(slice->parentRequest);
+        *latest_offset_written = *total_write_size_out;
         dbpf_move_op_to_completion_queue(slice->parentRequest,
                                     *return_code_out, OP_COMPLETED);
     }
@@ -995,7 +999,9 @@ static void * bstream_threaded_thread_io_function(
                            &current_handle->active_io->mutex,
                            &current_handle->active_io->total_write_size,
                            io_processing_slice->parentRequest->op.u.b_rw_list.
-                           out_size_p, &current_handle->active_io->return_code,
+                           out_size_p, 
+                           &current_handle->active_io->latest_offset_written,
+                           &current_handle->active_io->return_code,
                            thread_number, buff_real, 
                            current_handle->active_io->use_o_direct);
             break;
@@ -1008,6 +1014,7 @@ static void * bstream_threaded_thread_io_function(
                                &current_handle->active_io->total_write_size,
                                io_processing_slice->parentRequest->op.u.
                                b_rw_list.out_size_p,
+                               &current_handle->active_io->latest_offset_written,
                                &current_handle->active_io->return_code,
                                thread_number, buff_real,
                                current_handle->active_io->use_o_direct);
@@ -1050,8 +1057,8 @@ static void * bstream_threaded_thread_io_function(
             }
         }
 
-        decrementHandleRef(current_handle, io_processing_slice->parentRequest->
-            op.u.b_rw_list.out_size_p);
+        decrementHandleRef(current_handle,
+            current_handle->active_io->latest_offset_written);
     }
     
     free(odirectBuffAlloc);
