@@ -254,7 +254,7 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
 int dbpf_attr_cache_ds_attr_change_cached_data_bsize_if_necessary(
     TROVE_object_ref key, PVFS_size b_size)
 {
-    int ret = -1;
+    int ret = 0;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
 
     cache_elem = dbpf_attr_cache_elem_lookup(key);
@@ -264,7 +264,7 @@ int dbpf_attr_cache_ds_attr_change_cached_data_bsize_if_necessary(
         gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
                     "cached b_size for key %llu\n",
                      llu(key.handle));
-        ret = 0;
+        ret = 1;
     }
     return ret;
 }

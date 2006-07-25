@@ -3,6 +3,12 @@
  *
  * See COPYING in top-level directory.
  */
+ 
+/*
+ * Needed for O_DIRECT disk access
+ */
+#define _XOPEN_SOURCE 500
+#define _GNU_SOURCE
 
 #include <unistd.h>
 #include <stdio.h>
@@ -15,6 +21,8 @@
 #endif
 #include <assert.h>
 #include <errno.h>
+
+#undef __PVFS2_USE_AIO__ 
 
 #ifndef __PVFS2_USE_AIO__
 
@@ -29,24 +37,54 @@
 #include "pthread.h"
 #include "dbpf-bstream.h"
 
-
 /*
+ * Hopefully we don't need to define O_DIRECT on special machines (?) 
+ *
+#if defined(__linux__)
+#include <asm/page.h>
+# if !defined(O_DIRECT) && (defined(__alpha__) || defined(__i386__))
+#  define O_DIRECT 040000 
+# endif
+#endif
+
+#if defined(O_DIRECT)
+#define TROVE_ODIRECT 1
+#else
+#define TROVE_ODIRECT 0
+#endif
  * Prototypes are not visible via unistd.h without previous define
  * pread/pwrite available since glibc 2.1 and kernel 2.2. ...
- */
-ssize_t pwrite64(
+
+extern ssize_t pwrite64(
     int fildes,
     const void *buf,
     size_t nbyte,
     off64_t offset);
-ssize_t pread64(
+extern ssize_t pread64(
     int fildes,
     void *buf,
     size_t nbyte,
     off64_t offset);
 
 #define PREAD pread64
-#define PWRITE pwrite64
+#define PWRITE pwrite64    
+*/
+
+#define PREAD pread
+#define PWRITE pwrite
+
+/*
+ * Size for doing only one read operation instead of 
+ * two for the ends of O_direct
+ */
+#define DIRECT_SIZE_LIMIT 16*1024
+#define DIRECT_MIN_IO     4*1024
+
+/*
+ * Define this value to get O_DIRECT TO WORK PROPERLY,
+ * THIS IS DEFINITELY A HACK FOR NOW, for evaluation purpose only ! 
+ */
+#define THREADS_SCHEDULE_ONLY_ONE_HANDLE 1
 
 enum active_queue_e
 {
@@ -85,6 +123,7 @@ typedef struct active_io_processing_t
     int positionOfProcessing[ACTIVE_QUEUE_LAST];
 
     TROVE_size total_write_size;
+    int use_o_direct;
     int return_code;
 } active_io_processing_t;
 
@@ -117,6 +156,7 @@ struct handle_queue_t
 static int threads_running = 0;
 static int initialised = 0;
 static int thread_count = 0;
+static int mem_pagesize = 0;
 
 static io_handle_queue_t *active_file_io;
 static pthread_mutex_t active_file_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -128,6 +168,10 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 static void *bstream_threaded_thread_io_function(
     void *pthread_number);
+static int checkAndUpdateCacheSize(
+    TROVE_coll_id coll_id,
+    TROVE_handle handle,
+    TROVE_size write_size);    
 
 int dbpf_bstream_threaded_set_thread_count(
     int count)
@@ -141,7 +185,14 @@ int dbpf_bstream_threaded_set_thread_count(
     if (!threads_running)
     {
         thread_count = count;
-        //initialise threads:
+#ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
+        if (count > 1){
+            gossip_err("In that mode currently only 1 thread is allowed\n");
+            exit(1);
+        }
+#endif
+        
+        /*initialise threads:*/
         threads_running = 1;
 
         io_threads = (pthread_t *) calloc(thread_count, sizeof(pthread_t));
@@ -166,7 +217,9 @@ int dbpf_bstream_threaded_set_thread_count(
 
 static int open_fd(
     TROVE_coll_id coll_id,
-    TROVE_handle handle)
+    TROVE_handle handle,
+    int o_direct 
+    )
 {
     char filename[PATH_MAX] = { 0 };
     int ifd = 0;
@@ -174,7 +227,8 @@ static int open_fd(
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
                               my_storage_p->name, coll_id, llu(handle));
 
-    ifd = DBPF_OPEN(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    ifd = DBPF_OPEN(filename, O_RDWR | O_CREAT | ( o_direct & O_DIRECT ), 
+        S_IRUSR | S_IWUSR);
 
     return ((ifd < 0) ? -trove_errno_to_trove_error(errno) : ifd);
 }
@@ -199,10 +253,10 @@ static void debugPrint(
 static int noProcessElementAvailable(
     io_handle_queue_t * elem)
 {
-    return (!
-            (elem->active_io->totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_READ]
-             || elem->active_io->
-             totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_WRITE]
+    return (!(
+             elem->active_io->totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_READ]
+             || 
+             elem->active_io->totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_WRITE]
              || elem->request_to_process_count[IO_QUEUE_FLUSH]
              || elem->request_to_process_count[IO_QUEUE_RESIZE]));
 }
@@ -286,11 +340,14 @@ static void transformIOrequestsIntoArray(
 
             current_request_slot++;
             if (cur_mem_size == cur_stream_size)
-            {   //take next mem_area and stream
+            {   /*take next mem_area and stream*/
                 mem_num++;
                 stream_num++;
-                if (stream_num == streamCount || mem_num == memCount)   //we finished decoding...
+                if (stream_num == streamCount || mem_num == memCount)
+                {   
+                /*we finished decoding...*/
                     break;
+                }
 
                 cur_stream_offset = IOreq->stream_offset_array[stream_num];
                 mem_offset = IOreq->mem_offset_array[mem_num];
@@ -298,10 +355,12 @@ static void transformIOrequestsIntoArray(
                 cur_stream_size = IOreq->stream_size_array[stream_num];
             }
             else if (cur_stream_size < cur_mem_size)
-            {   //take next stream update memory position
+            {   /*take next stream update memory position*/
                 stream_num++;
-                if (stream_num == streamCount)  //we finished decoding... ERROR !!!
+                if (stream_num == streamCount)  
+                {/*we finished decoding... ERROR !!!*/
                     break;
+                }
                 cur_stream_offset = IOreq->stream_offset_array[stream_num];
                 cur_mem_size -= cur_size;
                 mem_offset += cur_size;
@@ -310,11 +369,12 @@ static void transformIOrequestsIntoArray(
                 total_stream_size += cur_stream_size;
             }
             else
-            {   //cur_stream_size > cur_mem_size
-                //keep stream position
+            {   /*cur_stream_size > cur_mem_size
+                  keep stream position*/
                 mem_num++;
-                if (mem_num == memCount)        //we finished decoding... ERROR !!!
+                if (mem_num == memCount){/*we finished decoding... ERROR !!!*/
                     break;
+                }
 
                 mem_offset = IOreq->mem_offset_array[mem_num];
                 cur_mem_size = IOreq->mem_size_array[mem_num];
@@ -362,6 +422,12 @@ static void scheduleHandleOps(
     io_handle_queue_t * elem,
     enum active_queue_e queue_type)
 {
+    /*
+     * Open file in O_DIRECT mode (for now), use later better scheduling
+     * algorithms to decide (triggered by request scheduler ?)...
+     */
+     elem->active_io->use_o_direct = 1;
+    
     if (elem->active_io->totalNumberOfUnprocessedSlices[queue_type] <= 1)
         return;
 
@@ -379,7 +445,7 @@ static void markOpsAsInserviceandCountSlices(
         (active_io_processing_t *) malloc(sizeof(active_io_processing_t));
     bzero(elem->active_io, sizeof(active_io_processing_t));
         
-    //at first mark operations as in service (reason dspace_cancel)...
+    /*at first mark operations as in service (reason dspace_cancel)...*/
     for (i = 0; i < IO_QUEUE_LAST; i++)
     {
         dbpf_op_queue_s *queue = &elem->requests[i];
@@ -423,7 +489,8 @@ static void incrementHandleRef(
                  elem, elem->active_io->ref_count);
     if (elem->active_io->filehandle == 0)
     {
-        elem->active_io->filehandle = open_fd(elem->fs_id, elem->handle);
+        elem->active_io->filehandle = open_fd(elem->fs_id, elem->handle, 
+            elem->active_io->use_o_direct );
         gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF open filehandle %d\n",
                      elem->active_io->filehandle);
 
@@ -456,7 +523,19 @@ static void decrementHandleRef(
 
     if (elem->active_io->ref_count == 0 && noProcessElementAvailable(elem))
     {
-        //have to free HandleQueue at the end !
+        /* update cache file size and truncate file in case O_DIRECT was used !*/
+        #ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
+        active_file_io = NULL;
+        if(checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
+            elem->active_io->total_write_size)){
+            ftruncate(elem->active_io->filehandle, elem->active_io->total_write_size);
+        }
+        #else
+        checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
+            elem->active_io->total_write_size);
+        #endif
+            
+        /*have to free HandleQueue at the end !*/
         if (elem->active_io->filehandle)
             close(elem->active_io->filehandle);
         gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -491,7 +570,7 @@ static int insertOperation(
 {
     int i;
     pthread_mutex_lock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
-    //Lookup handle
+    /*Lookup handle*/
 
     io_handle_queue_t *current;
     for (current = handle_queue.first; current != NULL; current = current->next)
@@ -505,7 +584,7 @@ static int insertOperation(
     if (current == NULL)
     {
 
-        //create a new handle
+        /*create a new handle*/
         current = (io_handle_queue_t *) malloc(sizeof(io_handle_queue_t));
         gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF new handlequeue %p\n", current);
         if (current == NULL)
@@ -530,7 +609,7 @@ static int insertOperation(
         for (i = 0; i < IO_QUEUE_LAST; i++)
             dbpf_op_queue_init(&current->requests[i]);
     }
-    //add object to handles queue
+    /*add object to handles queue*/
     *out_op_id_p =
         dbpf_queued_op_queue_nolock(new_op, &current->requests[type]);
     current->request_to_process_count[type]++;
@@ -550,18 +629,19 @@ static void updateCacheSize(
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 }
 
-static void checkAndUpdateCacheSize(
+static int checkAndUpdateCacheSize(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     TROVE_size write_size)
 {
     /* adjust size in cached attribute element, if present */
-
+    int ret;
     TROVE_object_ref ref = { handle, coll_id };
     gen_mutex_lock(&dbpf_attr_cache_mutex);
-    dbpf_attr_cache_ds_attr_change_cached_data_bsize_if_necessary(ref,
+    ret = dbpf_attr_cache_ds_attr_change_cached_data_bsize_if_necessary(ref,
                                                                   write_size);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
+    return ret;
 }
 
 static void moveAllToCompletionQueue(
@@ -588,60 +668,162 @@ static void processIOSlice(
     TROVE_size * io_size_out,
     TROVE_size * total_write_size_out,
     int *return_code_out,
-    int thread_no)
+    int thread_no,
+    char * odirectbuf,
+    int use_o_direct)
 {
-    TROVE_size tmpret;
-
-    if (type == IO_QUEUE_WRITE)
-    {
-        gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
-                     "IO slice on thread:%d - %p - WRITE FD:%d POS:%lld SIZE:%lld \n",
-                     thread_no, slice, fd, slice->stream_offset, slice->size);
-        tmpret =
-            PWRITE(fd, slice->mem_offset, slice->size, slice->stream_offset);
-    }
-    else
-    {
-        gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
-                     "IO slice on thread:%d - %p - READ FD:%d POS:%lld SIZE:%lld \n",
-                     thread_no, slice, fd, slice->stream_offset, slice->size);
-        tmpret =
-            PREAD(fd, slice->mem_offset, slice->size, slice->stream_offset);
+    TROVE_size retSize = 0;
+    /*
+     * Calculate real I/O access boundaries
+     */
+    TROVE_offset physical_startPos;
+    TROVE_size   physical_size;
+       
+   /*
+    * we could calculate the startpos with division ops, too :)
+    */
+   physical_startPos = (TROVE_offset) (
+        ((unsigned long) slice->stream_offset) & (~(mem_pagesize - 1)));
+   physical_size = (TROVE_size)(((unsigned long)  
+        slice->stream_offset + slice->size + mem_pagesize - 1 ) & 
+        (~(mem_pagesize - 1))) - physical_startPos;    
+    /*
+     * use tmp buffer in case data is not aligned to pagesize and
+     * do a read modify write for writes or read more data than 
+     * necessary (for reads).
+     * Problem: files have to be a size * 512 resp. mem_pagesize.
+     */
+    /*
+     * This optimization helps for example the pvfs2-cp op.
+     */     
+     if ( ! use_o_direct || (
+        physical_startPos == slice->stream_offset && 
+            slice->size == physical_size ))
+        {
+        if (type == IO_QUEUE_WRITE)
+        {
+            gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
+                         "IO slice on thread:%d - %p - WRITE FD:%d POS:%lld SIZE:%lld \n",
+                         thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));
+            retSize =
+                PWRITE(fd, slice->mem_offset, slice->size, slice->stream_offset);
+        }
+        else
+        {
+            gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
+                         "IO slice on thread:%d - %p - READ FD:%d POS:%lld SIZE:%lld \n",
+                         thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));
+            retSize =
+                PREAD(fd, slice->mem_offset, slice->size, slice->stream_offset);
+        }
+        
+        if (retSize == 0)
+        {
+            retSize = 0;
+            gossip_debug(GOSSIP_TROVE_DEBUG,"WARNING could not do IO to %d\n", fd);
+            *return_code_out = -trove_errno_to_trove_error(errno);
+        }
+        else if (retSize < slice->size)
+        {
+            /*could not read/write correctly ! TODO better error handling !*/
+            gossip_err
+                ("WARNING could not do IO correct to %d - %lld of %lld bytes done\n",
+                 fd, llu(retSize), llu(slice->size));
+            *return_code_out = -trove_errno_to_trove_error(errno);
+        }         
+    }else{
+       gossip_debug(GOSSIP_PERFORMANCE_DEBUG, 
+        "Unaligned data will be aligned %lld - %lld to %lld - %lld\n",
+            slice->stream_offset,  slice->size,
+            physical_startPos, physical_size);       
+            
+       if (type == IO_QUEUE_WRITE)
+       {
+            gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
+                         "IO slice on thread:%d - %p - WRITE FD:%d POS:%lld SIZE:%lld \n",
+                         thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));
+            /* read modify write data (for now, better to check if results can be
+             * reused or cached)*/
+            if ( physical_size <= DIRECT_SIZE_LIMIT ){
+                /*
+                 * read in one step
+                 */
+                retSize =
+                    PREAD(fd, odirectbuf, physical_size, physical_startPos);
+                if (retSize < physical_size){
+                    gossip_debug(GOSSIP_TROVE_DEBUG,"Pread error %s %llu\n",strerror(errno), llu(retSize));
+                    bzero( odirectbuf + retSize, physical_size - retSize );
+                }                    
+            }else{
+                /* read both ends */
+                TROVE_offset end_offset;
+                end_offset = physical_size - DIRECT_SIZE_LIMIT;
+                retSize =
+                    PREAD(fd, odirectbuf, DIRECT_SIZE_LIMIT, physical_startPos);
+                if (retSize < DIRECT_SIZE_LIMIT){
+                    /*
+                     * End of file reached bzero stuff out ! FIXME adapt filesize
+                     */
+                    gossip_debug(GOSSIP_TROVE_DEBUG,"Pread1 error %s %llu\n",strerror(errno), llu(retSize));
+                    bzero( odirectbuf + retSize, DIRECT_SIZE_LIMIT - retSize );
+                    bzero( odirectbuf + end_offset, physical_startPos + end_offset );
+                    goto modifyBuffer;
+                }
+                retSize =
+                    PREAD(fd, odirectbuf+end_offset, DIRECT_SIZE_LIMIT, 
+                    physical_startPos + end_offset);
+                if (retSize < DIRECT_SIZE_LIMIT){
+                     gossip_debug(GOSSIP_TROVE_DEBUG,"Pread2 error %s %llu\n",strerror(errno), llu(retSize));
+                     bzero( odirectbuf+end_offset+ retSize, DIRECT_SIZE_LIMIT - retSize );
+                }
+            }
+modifyBuffer:                       
+            /* modify buffer */
+            memcpy(odirectbuf + (physical_startPos - slice->stream_offset), 
+                slice->mem_offset, slice->size);
+            
+            /* write stuff back to disk */
+            retSize =
+                PWRITE(fd, odirectbuf, physical_size, physical_startPos);
+            if (retSize < physical_size){
+                 gossip_debug(GOSSIP_TROVE_DEBUG,"PWRITE error %s %llu\n",strerror(errno), llu(retSize));
+                 assert(0);
+            }
+            retSize = slice->size;           
+       }
+       else
+       {
+            TROVE_offset buff_offset = slice->stream_offset - physical_startPos;
+            gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
+                         "IO slice on thread:%d - %p - READ FD:%d POS:%lld SIZE:%lld \n",
+                         thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));    
+            /* read more data and discard */
+            retSize =
+                PREAD(fd, odirectbuf, physical_size, physical_startPos);
+            if (retSize < physical_size){
+                 gossip_debug(GOSSIP_TROVE_DEBUG,"Pread file too small %s %llu\n",strerror(errno), llu(retSize));
+                 retSize =  retSize - (TROVE_size) (physical_size - buff_offset);
+            }
+            memcpy(slice->mem_offset, odirectbuf + buff_offset, slice->size);
+       }            
     }
 
     gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
                  "IO slice on thread:%d DONE: %p\n", thread_no, slice);
 
-    if (tmpret == 0)
-    {
-        tmpret = 0;
-        gossip_err("WARNING could not do IO to %d\n", fd);
-        *return_code_out = -trove_errno_to_trove_error(errno);
-    }
-    else if (tmpret < slice->size)
-    {
-        //could not read/write correctly ! TODO better error handling !
-        gossip_err
-            ("WARNING could not do IO correct to %d - %lld of %lld bytes done\n",
-             fd, tmpret, slice->size);
-        *return_code_out = -trove_errno_to_trove_error(errno);
-    }
-
     gen_mutex_lock(mutex);
     (*slice->remainingNumberOfSlices)--;
-    *io_size_out += tmpret;
-    if (type == IO_QUEUE_WRITE && tmpret > 0 &&
-        (slice->stream_offset + tmpret > *total_write_size_out))
+    *io_size_out += retSize;
+    if (type == IO_QUEUE_WRITE && retSize > 0 &&
+        (slice->stream_offset + retSize > *total_write_size_out))
     {
-        *total_write_size_out = slice->stream_offset + tmpret;
+        *total_write_size_out = slice->stream_offset + retSize;
     }
 
     if (*(slice->remainingNumberOfSlices) == 0)
     {
         /* request is finished */
         dbpf_op_queue_remove(slice->parentRequest);
-        if (type == IO_QUEUE_WRITE)
-            checkAndUpdateCacheSize(coll_id, handle, *total_write_size_out);
         dbpf_move_op_to_completion_queue(slice->parentRequest,
                                     *return_code_out, OP_COMPLETED);
     }
@@ -651,20 +833,31 @@ static void processIOSlice(
 static void * bstream_threaded_thread_io_function(
     void *vpthread_number)
 {
+    /*
+     * We reuse the biggest buffer, so no contig. malloc / free necessary.
+     */
+    void * odirectBuffAlloc;
+    char * buff_real;
     int ret;
     dbpf_queued_op_t *request;
     active_io_processing_slice_t *io_processing_slice;
     int io_slice_number;
-
-    enum IO_queue_type req_type = -1;
-    
     int thread_number = *((int *) vpthread_number);
+    enum IO_queue_type req_type = -1;
     free((int *) vpthread_number);
+    
+    odirectBuffAlloc = malloc(IO_BUFFER_SIZE + mem_pagesize);
+    if (odirectBuffAlloc == NULL) {
+        fprintf(stderr, "Not enough free memory to allocate ODIRECT buffer\n");
+        return NULL;
+    }
+    buff_real = (unsigned char *)(((unsigned long)odirectBuffAlloc + 
+                mem_pagesize - 1) & (~(mem_pagesize - 1)));
 
     while (1)
-    {
-        //case 1: active file has IO jobs
-        //case 2: active file has no IO jobs
+    { 
+        /*case 1: active file has IO jobs
+          case 2: active file has no IO jobs*/
         pthread_mutex_lock(&active_file_mutex);
         io_handle_queue_t *current_handle = active_file_io;
 
@@ -672,11 +865,11 @@ static void * bstream_threaded_thread_io_function(
         {
             incrementHandleRef(current_handle);
 
-            //choose next operation
+            /*choose next operation*/
             if (current_handle->request_to_process_count[IO_QUEUE_RESIZE] > 0)
             {
                 req_type = IO_QUEUE_RESIZE;
-                //first RESIZE (value only last request):
+                /*first RESIZE (value only last request):*/
                 request =
                     (dbpf_queued_op_t *) current_handle->
                     requests[req_type].list.prev;
@@ -712,7 +905,7 @@ static void * bstream_threaded_thread_io_function(
             else if (current_handle->
                      request_to_process_count[IO_QUEUE_FLUSH] > 0)
             {
-                //(value only first request)
+                /*(value only first request)*/
                 req_type = IO_QUEUE_FLUSH;
                 request =
                     (dbpf_queued_op_t *) current_handle->
@@ -721,18 +914,21 @@ static void * bstream_threaded_thread_io_function(
             }
             else
             {
-                assert(0);
+                /*
+                 * do nothing
+                 */
             }
-
-            //check if this is the last operation:
+#ifndef THREADS_SCHEDULE_ONLY_ONE_HANDLE
+            /*check if this is the last operation:*/
             if (noProcessElementAvailable(current_handle))
             {
                 active_file_io = NULL;
             }
+#endif            
         }
         pthread_mutex_unlock(&active_file_mutex);
 
-        //case 2
+        /*case 2*/
         if (current_handle == NULL)
         {
             pthread_mutex_lock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
@@ -741,16 +937,16 @@ static void * bstream_threaded_thread_io_function(
             {
                 if (handle_queue.first == NULL)
                 {
-                    //gossip_debug(GOSSIP_TROVE_DEBUG, "%d: no active file waiting\n", thread_number);
+                    /*gossip_debug(GOSSIP_TROVE_DEBUG, "%d: no active file waiting\n", thread_number);*/
                     if (!threads_running)
                     {
-                        //abort thread!
+                        /*abort thread!*/
                         pthread_mutex_unlock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
                         gossip_debug(GOSSIP_TROVE_DEBUG,
                                      "Quit IO thread %d\n", thread_number);
                         break;
                     }
-                    //gossip_debug(GOSSIP_TROVE_DEBUG, "%d: LOCK COND WAIT\n", thread_number);
+                    /*gossip_debug(GOSSIP_TROVE_DEBUG, "%d: LOCK COND WAIT\n", thread_number);*/
                     pthread_cond_wait(&dbpf_op_incoming_cond[OP_QUEUE_IO],
                                       &dbpf_op_queue_mutex[OP_QUEUE_IO]);
 
@@ -769,7 +965,7 @@ static void * bstream_threaded_thread_io_function(
                          * Spurious wakeup
                          */
                         pthread_mutex_unlock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
-                        //gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF %d: Fruits eaten by other threads\n", thread_number);
+                        /*gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF %d: Fruits eaten by other threads\n", thread_number);*/
                         continue;
                     }
                 }
@@ -800,7 +996,8 @@ static void * bstream_threaded_thread_io_function(
                            &current_handle->active_io->total_write_size,
                            io_processing_slice->parentRequest->op.u.b_rw_list.
                            out_size_p, &current_handle->active_io->return_code,
-                           thread_number);
+                           thread_number, buff_real, 
+                           current_handle->active_io->use_o_direct);
             break;
         case (IO_QUEUE_WRITE):
             {
@@ -812,7 +1009,8 @@ static void * bstream_threaded_thread_io_function(
                                io_processing_slice->parentRequest->op.u.
                                b_rw_list.out_size_p,
                                &current_handle->active_io->return_code,
-                               thread_number);
+                               thread_number, buff_real,
+                               current_handle->active_io->use_o_direct);
                 break;
             }
         case (IO_QUEUE_RESIZE):
@@ -853,8 +1051,9 @@ static void * bstream_threaded_thread_io_function(
         }
 
         decrementHandleRef(current_handle);
-
     }
+    
+    free(odirectBuffAlloc);
     return NULL;
 }
 
@@ -868,12 +1067,13 @@ int dbpf_bstream_threaded_initalize(
     handle_queue.last = NULL;
 
     active_file_io = NULL;
-    //spawn all threads:
+    /*spawn all threads during setting of thread NO*/
 
     if (initialised)
         return -1;
 
     initialised = 1;
+    mem_pagesize = getpagesize();
 
     return 0;
 }
@@ -883,7 +1083,7 @@ int dbpf_bstream_threaded_finalize(
 {
     threads_running = 0;
     initialised = 0;
-    //shutdown threads safely
+    /*shutdown threads safely*/
     int t;
     void *p;
     for (t = 0; t < thread_count; t++)

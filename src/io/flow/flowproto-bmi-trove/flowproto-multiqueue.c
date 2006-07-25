@@ -23,8 +23,6 @@
 #include "pvfs2-internal.h"
 
 #define BUFFERS_PER_FLOW 8
-#define BUFFER_SIZE (256*1024)
-#define MAX_REGIONS 64
 
 #define FLOW_CLEANUP(__flow_data)                                     \
 do {                                                                  \
@@ -43,8 +41,8 @@ struct result_chain_entry
     PVFS_id_gen_t posted_id;
     void *buffer_offset;
     PINT_Request_result result;
-    PVFS_size size_list[MAX_REGIONS];
-    PVFS_offset offset_list[MAX_REGIONS];
+    PVFS_size size_list[IO_MAX_REGIONS];
+    PVFS_offset offset_list[IO_MAX_REGIONS];
     struct result_chain_entry *next;
     struct fp_queue_item *q_item;
     struct PINT_thread_mgr_trove_callback trove_callback;
@@ -80,7 +78,7 @@ struct fp_private_data
     int dest_pending;
     int dest_last_posted;
     int initial_posts;
-    void *tmp_buffer_list[MAX_REGIONS];
+    void *tmp_buffer_list[IO_MAX_REGIONS];
     void *intermediate;
     int cleanup_pending_count;
     int req_proc_done;
@@ -760,7 +758,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
         {
             /* if the q_item has not been used, allocate a buffer */
             q_item->buffer = BMI_memalloc(q_item->parent->src.u.bmi.address,
-                BUFFER_SIZE, BMI_RECV);
+                IO_BUFFER_SIZE, BMI_RECV);
             /* TODO: error handling */
             assert(q_item->buffer);
             q_item->bmi_callback.fn = bmi_recv_callback_wrapper;
@@ -784,9 +782,9 @@ static void bmi_recv_callback_fn(void *user_ptr,
                 result_tmp->offset_list;
             result_tmp->result.size_array = 
                 result_tmp->size_list;
-            result_tmp->result.bytemax = BUFFER_SIZE - bytes_processed;
+            result_tmp->result.bytemax = IO_BUFFER_SIZE - bytes_processed;
             result_tmp->result.bytes = 0;
-            result_tmp->result.segmax = MAX_REGIONS;
+            result_tmp->result.segmax = IO_MAX_REGIONS;
             result_tmp->result.segs = 0;
             result_tmp->buffer_offset = tmp_buffer;
             ret = PINT_process_request(q_item->parent->file_req_state,
@@ -813,10 +811,10 @@ static void bmi_recv_callback_fn(void *user_ptr,
                 tmp_buffer = (void*)((char*)tmp_buffer + old_result_tmp->result.bytes);
                 bytes_processed += old_result_tmp->result.bytes;
             }
-        }while(bytes_processed < BUFFER_SIZE && 
+        }while(bytes_processed < IO_BUFFER_SIZE && 
             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
-        assert(bytes_processed <= BUFFER_SIZE);
+        assert(bytes_processed <= IO_BUFFER_SIZE);
         if(bytes_processed == 0)
         {        
             qlist_del(&q_item->list_link);
@@ -830,7 +828,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
         ret = BMI_post_recv(&q_item->posted_id,
             q_item->parent->src.u.bmi.address,
             q_item->buffer,
-            BUFFER_SIZE,
+            IO_BUFFER_SIZE,
             &tmp_actual_size,
             BMI_PRE_ALLOC,
             q_item->parent->tag,
@@ -1065,7 +1063,7 @@ static int bmi_send_callback_fn(void *user_ptr,
     {
         /* if the q_item has not been used, allocate a buffer */
         q_item->buffer = BMI_memalloc(q_item->parent->dest.u.bmi.address,
-            BUFFER_SIZE, BMI_SEND);
+            IO_BUFFER_SIZE, BMI_SEND);
         /* TODO: error handling */
         assert(q_item->buffer);
         q_item->bmi_callback.fn = bmi_send_callback_wrapper;
@@ -1093,9 +1091,9 @@ static int bmi_send_callback_fn(void *user_ptr,
             result_tmp->offset_list;
         result_tmp->result.size_array = 
             result_tmp->size_list;
-        result_tmp->result.bytemax = BUFFER_SIZE - bytes_processed;
+        result_tmp->result.bytemax = IO_BUFFER_SIZE - bytes_processed;
         result_tmp->result.bytes = 0;
-        result_tmp->result.segmax = MAX_REGIONS;
+        result_tmp->result.segmax = IO_MAX_REGIONS;
         result_tmp->result.segs = 0;
         result_tmp->buffer_offset = tmp_buffer;
         ret = PINT_process_request(q_item->parent->file_req_state,
@@ -1125,10 +1123,10 @@ static int bmi_send_callback_fn(void *user_ptr,
             q_item->buffer_used += old_result_tmp->result.bytes;
         }
 
-    }while(bytes_processed < BUFFER_SIZE && 
+    }while(bytes_processed < IO_BUFFER_SIZE && 
         !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
-    assert(bytes_processed <= BUFFER_SIZE);
+    assert(bytes_processed <= IO_BUFFER_SIZE);
 
     /* important to update the sequence /after/ request processed */
     q_item->seq = flow_data->next_seq;
@@ -1328,7 +1326,7 @@ static void trove_write_callback_fn(void *user_ptr,
     {
         /* if the q_item has not been used, allocate a buffer */
         q_item->buffer = BMI_memalloc(q_item->parent->src.u.bmi.address,
-            BUFFER_SIZE, BMI_RECV);
+            IO_BUFFER_SIZE, BMI_RECV);
         /* TODO: error handling */
         assert(q_item->buffer);
         q_item->bmi_callback.fn = bmi_recv_callback_wrapper;
@@ -1360,9 +1358,9 @@ static void trove_write_callback_fn(void *user_ptr,
                 result_tmp->offset_list;
             result_tmp->result.size_array = 
                 result_tmp->size_list;
-            result_tmp->result.bytemax = BUFFER_SIZE - bytes_processed;
+            result_tmp->result.bytemax = IO_BUFFER_SIZE - bytes_processed;
             result_tmp->result.bytes = 0;
-            result_tmp->result.segmax = MAX_REGIONS;
+            result_tmp->result.segmax = IO_MAX_REGIONS;
             result_tmp->result.segs = 0;
             result_tmp->buffer_offset = tmp_buffer;
             assert(!PINT_REQUEST_DONE(q_item->parent->file_req_state));
@@ -1391,10 +1389,10 @@ static void trove_write_callback_fn(void *user_ptr,
                     ((char*)tmp_buffer + old_result_tmp->result.bytes);
                 bytes_processed += old_result_tmp->result.bytes;
             }
-        }while(bytes_processed < BUFFER_SIZE && 
+        }while(bytes_processed < IO_BUFFER_SIZE && 
             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
-        assert(bytes_processed <= BUFFER_SIZE);
+        assert(bytes_processed <= IO_BUFFER_SIZE);
  
         flow_data->total_bytes_processed += bytes_processed;
 
@@ -1414,7 +1412,7 @@ static void trove_write_callback_fn(void *user_ptr,
         ret = BMI_post_recv(&q_item->posted_id,
             q_item->parent->src.u.bmi.address,
             q_item->buffer,
-            BUFFER_SIZE,
+            IO_BUFFER_SIZE,
             &tmp_actual_size,
             BMI_PRE_ALLOC,
             q_item->parent->tag,
@@ -1464,7 +1462,7 @@ static void cleanup_buffers(struct fp_private_data *flow_data)
             {
                 BMI_memfree(flow_data->parent->src.u.bmi.address,
                     flow_data->prealloc_array[i].buffer,
-                    BUFFER_SIZE,
+                    IO_BUFFER_SIZE,
                     BMI_RECV);
             }
             result_tmp = &(flow_data->prealloc_array[i].result_chain);
@@ -1487,7 +1485,7 @@ static void cleanup_buffers(struct fp_private_data *flow_data)
             {
                 BMI_memfree(flow_data->parent->dest.u.bmi.address,
                     flow_data->prealloc_array[i].buffer,
-                    BUFFER_SIZE,
+                    IO_BUFFER_SIZE,
                     BMI_SEND);
             }
             result_tmp = &(flow_data->prealloc_array[i].result_chain);
@@ -1507,7 +1505,7 @@ static void cleanup_buffers(struct fp_private_data *flow_data)
         if(flow_data->intermediate)
         {
             BMI_memfree(flow_data->parent->dest.u.bmi.address,
-                flow_data->intermediate, BUFFER_SIZE, BMI_SEND);
+                flow_data->intermediate, IO_BUFFER_SIZE, BMI_SEND);
         }
     }
     else if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
@@ -1516,7 +1514,7 @@ static void cleanup_buffers(struct fp_private_data *flow_data)
         if(flow_data->intermediate)
         {
             BMI_memfree(flow_data->parent->src.u.bmi.address,
-                flow_data->intermediate, BUFFER_SIZE, BMI_RECV);
+                flow_data->intermediate, IO_BUFFER_SIZE, BMI_RECV);
         }
     }
 }
@@ -1574,9 +1572,9 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         q_item->result_chain.offset_list;
     q_item->result_chain.result.size_array = 
         q_item->result_chain.size_list;
-    q_item->result_chain.result.bytemax = BUFFER_SIZE;
+    q_item->result_chain.result.bytemax = IO_BUFFER_SIZE;
     q_item->result_chain.result.bytes = 0;
-    q_item->result_chain.result.segmax = MAX_REGIONS;
+    q_item->result_chain.result.segmax = IO_MAX_REGIONS;
     q_item->result_chain.result.segs = 0;
     q_item->result_chain.buffer_offset = NULL;
     ret = PINT_process_request(q_item->parent->file_req_state,
@@ -1588,16 +1586,16 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     /* TODO: error handling */ 
     assert(ret >= 0);
 
-    /* was MAX_REGIONS enough to satisfy this step? */
+    /* was IO_MAX_REGIONS enough to satisfy this step? */
     if(!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
-        q_item->result_chain.result.bytes < BUFFER_SIZE)
+        q_item->result_chain.result.bytes < IO_BUFFER_SIZE)
     {
         /* create an intermediate buffer */
         if(!flow_data->intermediate)
         {
             flow_data->intermediate = BMI_memalloc(
                 flow_data->parent->dest.u.bmi.address,
-                BUFFER_SIZE, BMI_SEND);
+                IO_BUFFER_SIZE, BMI_SEND);
             /* TODO: error handling */
             assert(flow_data->intermediate);
         }
@@ -1615,9 +1613,9 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         do
         {
             q_item->result_chain.result.bytemax =
-                (BUFFER_SIZE - bytes_processed);
+                (IO_BUFFER_SIZE - bytes_processed);
             q_item->result_chain.result.bytes = 0;
-            q_item->result_chain.result.segmax = MAX_REGIONS;
+            q_item->result_chain.result.segmax = IO_MAX_REGIONS;
             q_item->result_chain.result.segs = 0;
             q_item->result_chain.buffer_offset = NULL;
             /* process ahead */
@@ -1638,10 +1636,10 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
                 memcpy(dest_ptr, src_ptr, q_item->result_chain.size_list[i]);
                 bytes_processed += q_item->result_chain.size_list[i];
             }
-        }while(bytes_processed < BUFFER_SIZE &&
+        }while(bytes_processed < IO_BUFFER_SIZE &&
             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
-        assert (bytes_processed <= BUFFER_SIZE);
+        assert (bytes_processed <= IO_BUFFER_SIZE);
 
         /* setup for BMI operation */
         flow_data->tmp_buffer_list[0] = flow_data->intermediate;
@@ -1761,9 +1759,9 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         do
         {
             q_item->result_chain.result.bytemax =
-                (BUFFER_SIZE - bytes_processed);
+                (IO_BUFFER_SIZE - bytes_processed);
             q_item->result_chain.result.bytes = 0;
-            q_item->result_chain.result.segmax = MAX_REGIONS;
+            q_item->result_chain.result.segmax = IO_MAX_REGIONS;
             q_item->result_chain.result.segs = 0;
             q_item->result_chain.buffer_offset = NULL;
             /* process ahead */
@@ -1785,10 +1783,10 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
                 memcpy(dest_ptr, src_ptr, region_size);
                 bytes_processed += region_size;
             }
-        }while(bytes_processed < BUFFER_SIZE &&
+        }while(bytes_processed < IO_BUFFER_SIZE &&
             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
-        assert(bytes_processed <= BUFFER_SIZE);
+        assert(bytes_processed <= IO_BUFFER_SIZE);
     }
 
     /* are we done? */
@@ -1807,9 +1805,9 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         q_item->result_chain.offset_list;
     q_item->result_chain.result.size_array = 
         q_item->result_chain.size_list;
-    q_item->result_chain.result.bytemax = BUFFER_SIZE;
+    q_item->result_chain.result.bytemax = IO_BUFFER_SIZE;
     q_item->result_chain.result.bytes = 0;
-    q_item->result_chain.result.segmax = MAX_REGIONS;
+    q_item->result_chain.result.segmax = IO_MAX_REGIONS;
     q_item->result_chain.result.segs = 0;
     q_item->result_chain.buffer_offset = NULL;
     ret = PINT_process_request(q_item->parent->file_req_state,
@@ -1820,24 +1818,24 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     /* TODO: error handling */ 
     assert(ret >= 0);
 
-    /* was MAX_REGIONS enough to satisfy this step? */
+    /* was IO_MAX_REGIONS enough to satisfy this step? */
     if(!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
-        q_item->result_chain.result.bytes < BUFFER_SIZE)
+        q_item->result_chain.result.bytes < IO_BUFFER_SIZE)
     {
         /* create an intermediate buffer */
         if(!flow_data->intermediate)
         {
             flow_data->intermediate = BMI_memalloc(
                 flow_data->parent->src.u.bmi.address,
-                BUFFER_SIZE, BMI_RECV);
+                IO_BUFFER_SIZE, BMI_RECV);
             /* TODO: error handling */
             assert(flow_data->intermediate);
         }
         /* setup for BMI operation */
         flow_data->tmp_buffer_list[0] = flow_data->intermediate;
         buffer_type = BMI_PRE_ALLOC;
-        q_item->buffer_used = BUFFER_SIZE;
-        total_size = BUFFER_SIZE;
+        q_item->buffer_used = IO_BUFFER_SIZE;
+        total_size = IO_BUFFER_SIZE;
         size_array = &q_item->buffer_used;
         segs = 1;
         /* we will copy data out on next iteration */

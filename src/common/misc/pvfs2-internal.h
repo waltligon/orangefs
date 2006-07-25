@@ -48,5 +48,9 @@
 
 
 #define IO_MAX_REGIONS 64
+/*
+ * Must be a multiple of pagesize (reused for O_DIRECT)
+ */
+#define IO_BUFFER_SIZE (256*1024)
 
 #endif /* PVFS2_INTERNAL_H */
