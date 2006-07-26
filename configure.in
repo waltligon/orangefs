@@ -63,6 +63,7 @@ if test "x$GCC" = "x"; then
 fi
 
 CFLAGS=$USR_CFLAGS
+MISC_TROVE_FLAGS=""
 
 AC_PROG_CPP
 AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
@@ -303,15 +304,28 @@ if test "$use_nptl_workaround" = 1 ; then
 fi
 AC_SUBST(NPTL_WORKAROUND)
 
+
+AX_CHECK_ODIRECT_AVAILABLE()
+AX_CHECK_PWRITE_AVAILABLE()
+
 dnl use AIO and not threaded I/O
 AC_ARG_ENABLE(aio,
 [  --enable-aio            Enable asynchronous I/O instead of threaded I/O],
 [
    if test "x$enableval" = "xyes"; then
-        CFLAGS="$CFLAGS -D__PVFS2_USE_AIO__"
+        MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
+        HAVE_TROVE_AIO=1
+        AC_SUBST(HAVE_TROVE_AIO)
    fi
 ],
 )
+
+if test "x$HAVE_TROVE_PWRITE" = "x" ; then
+if test "x$HAVE_TROVE_AIO" = "x" ; then
+  AC_MSG_ERROR(Pwrite is not available on your system, thus threaded 
+    TROVE version not available!)
+fi
+fi
 
 dnl Check byte ordering
 AC_C_BIGENDIAN
@@ -976,6 +990,8 @@ for d in src/apps src/io src/common src/client src/kernel \
        doc src/apps/kernel test; do
        install -d $d;
 done
+
+AC_SUBST(MISC_TROVE_FLAGS)
 
 dnl output final version of top level makefile and subdirectory
 dnl    makefile includes

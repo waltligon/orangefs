@@ -43,7 +43,7 @@ void dbpf_queued_op_init(
     )
 {
     assert(q_op_p);
-    bzero(q_op_p, sizeof(dbpf_queued_op_t));
+    memset(q_op_p, 0, sizeof(dbpf_queued_op_t));
 
     INIT_QLIST_HEAD(&q_op_p->link);
     q_op_p->state = 0;

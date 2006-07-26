@@ -70,7 +70,7 @@ int dbpf_sync_context_init(int context_index)
                  context_index);
     for(c=0; c < COALESCE_CONTEXT_LAST; c++)
     {
-        bzero(& sync_array[c][context_index], sizeof(dbpf_sync_context_t));
+        memset(& sync_array[c][context_index], 0, sizeof(dbpf_sync_context_t));
 
         sync_array[c][context_index].mutex      = gen_mutex_build();
         sync_array[c][context_index].sync_queue = dbpf_op_queue_new();

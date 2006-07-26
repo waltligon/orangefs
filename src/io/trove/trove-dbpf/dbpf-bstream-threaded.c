@@ -37,39 +37,6 @@
 #include "pthread.h"
 #include "dbpf-bstream.h"
 
-/*
- * Hopefully we don't need to define O_DIRECT on special machines (?) 
- *
-#if defined(__linux__)
-#include <asm/page.h>
-# if !defined(O_DIRECT) && (defined(__alpha__) || defined(__i386__))
-#  define O_DIRECT 040000 
-# endif
-#endif
-
-#if defined(O_DIRECT)
-#define TROVE_ODIRECT 1
-#else
-#define TROVE_ODIRECT 0
-#endif
- * Prototypes are not visible via unistd.h without previous define
- * pread/pwrite available since glibc 2.1 and kernel 2.2. ...
-
-extern ssize_t pwrite64(
-    int fildes,
-    const void *buf,
-    size_t nbyte,
-    off64_t offset);
-extern ssize_t pread64(
-    int fildes,
-    void *buf,
-    size_t nbyte,
-    off64_t offset);
-
-#define PREAD pread64
-#define PWRITE pwrite64    
-*/
-
 #define PREAD pread
 #define PWRITE pwrite
 
@@ -445,7 +412,7 @@ static void markOpsAsInserviceandCountSlices(
     
     elem->active_io =
         (active_io_processing_t *) malloc(sizeof(active_io_processing_t));
-    bzero(elem->active_io, sizeof(active_io_processing_t));
+    memset(elem->active_io, 0, sizeof(active_io_processing_t));
         
     /*at first mark operations as in service (reason dspace_cancel)...*/
     for (i = 0; i < IO_QUEUE_LAST; i++)
@@ -595,7 +562,7 @@ static int insertOperation(
             return -TROVE_ENOMEM;
         }
 
-        bzero(current, sizeof(io_handle_queue_t));
+        memset(current, 0, sizeof(io_handle_queue_t));
 
         current->fs_id = coll_id;
         current->handle = handle;
@@ -686,8 +653,8 @@ static void processIOSlice(
     * we could calculate the startpos with division ops, too :)
     */
    physical_startPos = (TROVE_offset) (
-        ((unsigned long) slice->stream_offset) & (~(mem_pagesize - 1)));
-   physical_size = (TROVE_size)(((unsigned long)  
+        ((uintptr_t) slice->stream_offset) & (~(mem_pagesize - 1)));
+   physical_size = (TROVE_size)(((uintptr_t )  
         slice->stream_offset + slice->size + mem_pagesize - 1 ) & 
         (~(mem_pagesize - 1))) - physical_startPos;    
     /*
@@ -755,7 +722,7 @@ static void processIOSlice(
                     PREAD(fd, odirectbuf, physical_size, physical_startPos);
                 if (retSize < physical_size){
                     gossip_debug(GOSSIP_TROVE_DEBUG,"Pread error %s %llu\n",strerror(errno), llu(retSize));
-                    bzero( odirectbuf + retSize, physical_size - retSize );
+                    memset( odirectbuf + retSize, 0, physical_size - retSize );
                 }                    
             }else{
                 /* read both ends */
@@ -765,11 +732,16 @@ static void processIOSlice(
                     PREAD(fd, odirectbuf, DIRECT_SIZE_LIMIT, physical_startPos);
                 if (retSize < DIRECT_SIZE_LIMIT){
                     /*
-                     * End of file reached bzero stuff out ! FIXME adapt filesize
+                     * End of file reached bzero stuff out !
                      */
                     gossip_debug(GOSSIP_TROVE_DEBUG,"Pread1 error %s %llu\n",strerror(errno), llu(retSize));
-                    bzero( odirectbuf + retSize, DIRECT_SIZE_LIMIT - retSize );
-                    bzero( odirectbuf + end_offset, physical_startPos + end_offset );
+                    memset( odirectbuf + retSize, 0, DIRECT_SIZE_LIMIT - retSize );
+                    /*
+                     * This is not really needed when the file is truncated at the end...
+                     * But ensures that an parallel reader gets no old data. 
+                     */
+                    memset( odirectbuf + end_offset, 0, physical_startPos + end_offset );
+                    
                     goto modifyBuffer;
                 }
                 retSize =
@@ -777,7 +749,8 @@ static void processIOSlice(
                     physical_startPos + end_offset);
                 if (retSize < DIRECT_SIZE_LIMIT){
                      gossip_debug(GOSSIP_TROVE_DEBUG,"Pread2 error %s %llu\n",strerror(errno), llu(retSize));
-                     bzero( odirectbuf+end_offset+ retSize, DIRECT_SIZE_LIMIT - retSize );
+                     memset( odirectbuf+end_offset+ retSize, 0, 
+                        DIRECT_SIZE_LIMIT - retSize );
                 }
             }
 modifyBuffer:                       
@@ -855,7 +828,7 @@ static void * bstream_threaded_thread_io_function(
         gossip_err("Not enough free memory to allocate ODIRECT buffer\n");
         return NULL;
     }
-    buff_real = (unsigned char *)(((unsigned long)odirectBuffAlloc + 
+    buff_real = (unsigned char *)(((uintptr_t )odirectBuffAlloc + 
                 mem_pagesize - 1) & (~(mem_pagesize - 1)));
 
     while (1)

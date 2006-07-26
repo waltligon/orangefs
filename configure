@@ -309,7 +309,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_CFLAGS DB_LIB HAVE_TROVE_TRANSACTION_SUPPORT NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX GM_HOME BUILD_GM BUILD_IB IB_INCDIR IB_LIBDIR BUILD_OPENIB OPENIB_INCDIR OPENIB_LIBDIR SERVER_LDFLAGS BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND HAVE_TROVE_ODIRECT HAVE_TROVE_PWRITE HAVE_TROVE_AIO LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_CFLAGS DB_LIB HAVE_TROVE_TRANSACTION_SUPPORT NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX GM_HOME BUILD_GM BUILD_IB IB_INCDIR IB_LIBDIR BUILD_OPENIB OPENIB_INCDIR OPENIB_LIBDIR SERVER_LDFLAGS BUILD_VIS VISCFLAGS VISLIBS MISC_TROVE_FLAGS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -857,7 +857,6 @@ Optional Features:
   --enable-redhat24       Enable workaround for RedHat 2.4 kernel
   --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries
   --enable-aio            Enable asynchronous I/O instead of threaded I/O
-  --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks
   --disable-kernel-aio    Forcibly disable kernel aio
   --enable-kernel-sendfile    Forcibly enable kernel sendfile
   --enable-fast           Disable optional debugging, enable optimizations.
@@ -4974,6 +4973,7 @@ echo "$as_me: error: no" >&2;}
 fi
 
 CFLAGS=$USR_CFLAGS
+MISC_TROVE_FLAGS=""
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -5672,29 +5672,177 @@ if test "$use_nptl_workaround" = 1 ; then
 fi
 
 
+
+
+
+echo "$as_me:$LINENO: checking if server supports ODIRECT" >&5
+echo $ECHO_N "checking if server supports ODIRECT... $ECHO_C" >&6
+
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+#define _XOPEN_SOURCE 500
+#define _GNU_SOURCE
+
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdlib.h>
+
+int
+main ()
+{
+
+int fd;
+char * buff;
+fd = open(filename, O_RDWR | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
+close(fd);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+
+echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+HAVE_TROVE_ODIRECT=1
+
+
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+
+
+
+
+echo "$as_me:$LINENO: checking if server supports pwrite" >&5
+echo $ECHO_N "checking if server supports pwrite... $ECHO_C" >&6
+
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+#define _XOPEN_SOURCE 500
+#define _GNU_SOURCE
+
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdlib.h>
+
+int
+main ()
+{
+
+int fd;
+char * buff;
+fd = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+pwrite(fd, buff, 1024, 0);
+close(fd);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+
+echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+HAVE_TROVE_PWRITE=1
+
+MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_HAVE_ODIRECT__"
+
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+
+
+
 # Check whether --enable-aio or --disable-aio was given.
 if test "${enable_aio+set}" = set; then
   enableval="$enable_aio"
 
    if test "x$enableval" = "xyes"; then
-        CFLAGS="$CFLAGS -D__PVFS2_USE_AIO__"
+        MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
+        HAVE_TROVE_AIO=1
+
    fi
 
 fi;
 
-use_aio_thcb=1
-# Check whether --enable-aio-threaded-callbacks or --disable-aio-threaded-callbacks was given.
-if test "${enable_aio_threaded_callbacks+set}" = set; then
-  enableval="$enable_aio_threaded_callbacks"
-  if test "$enableval" = no ; then use_aio_thcb=0 ; fi
-fi;
-
-
-MISC_TROVE_FLAGS=""
-if test $use_aio_thcb = 1 ; then
-       MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+if test "x$HAVE_TROVE_PWRITE" = "x" ; then
+if test "x$HAVE_TROVE_AIO" = "x" ; then
+  { { echo "$as_me:$LINENO: error: Pwrite is not available on your system" >&5
+echo "$as_me: error: Pwrite is not available on your system" >&2;}
+   { (exit thus threaded
+    TROVE version not available!); exit thus threaded
+    TROVE version not available!; }; }
 fi
-
+fi
 
 echo "$as_me:$LINENO: checking whether byte ordering is bigendian" >&5
 echo $ECHO_N "checking whether byte ordering is bigendian... $ECHO_C" >&6
@@ -13486,6 +13634,8 @@ for d in src/apps src/io src/common src/client src/kernel \
        install -d $d;
 done
 
+
+
                                                                                                                                                                                                                                                                                                                                                                                                                                                         ac_config_files="$ac_config_files Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/kernel/linux/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_ib/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -14179,7 +14329,9 @@ s,@BUILD_KARMA@,$BUILD_KARMA,;t t
 s,@build_static@,$build_static,;t t
 s,@REDHAT_RELEASE@,$REDHAT_RELEASE,;t t
 s,@NPTL_WORKAROUND@,$NPTL_WORKAROUND,;t t
-s,@MISC_TROVE_FLAGS@,$MISC_TROVE_FLAGS,;t t
+s,@HAVE_TROVE_ODIRECT@,$HAVE_TROVE_ODIRECT,;t t
+s,@HAVE_TROVE_PWRITE@,$HAVE_TROVE_PWRITE,;t t
+s,@HAVE_TROVE_AIO@,$HAVE_TROVE_AIO,;t t
 s,@LINUX_KERNEL_SRC@,$LINUX_KERNEL_SRC,;t t
 s,@LINUX24_KERNEL_SRC@,$LINUX24_KERNEL_SRC,;t t
 s,@LINUX24_KERNEL_MINOR_VER@,$LINUX24_KERNEL_MINOR_VER,;t t
@@ -14210,6 +14362,7 @@ s,@SERVER_LDFLAGS@,$SERVER_LDFLAGS,;t t
 s,@BUILD_VIS@,$BUILD_VIS,;t t
 s,@VISCFLAGS@,$VISCFLAGS,;t t
 s,@VISLIBS@,$VISLIBS,;t t
+s,@MISC_TROVE_FLAGS@,$MISC_TROVE_FLAGS,;t t
 s,@LIBOBJS@,$LIBOBJS,;t t
 s,@LTLIBOBJS@,$LTLIBOBJS,;t t
 CEOF
@@ -14735,14 +14888,6 @@ echo "${ECHO_T}PVFS2 configured to perform coverage analysis     : yes" >&6
 else
    echo "$as_me:$LINENO: result: PVFS2 configured to perform coverage analysis     :  no" >&5
 echo "${ECHO_T}PVFS2 configured to perform coverage analysis     :  no" >&6
-fi
-
-if test "x$MISC_TROVE_FLAGS" = "x" ; then
-   echo "$as_me:$LINENO: result: PVFS2 configured for aio threaded callbacks       :  no" >&5
-echo "${ECHO_T}PVFS2 configured for aio threaded callbacks       :  no" >&6
-else
-   echo "$as_me:$LINENO: result: PVFS2 configured for aio threaded callbacks       : yes" >&5
-echo "${ECHO_T}PVFS2 configured for aio threaded callbacks       : yes" >&6
 fi
 
 if test "x$HAVE_TROVE_TRANSACTION_SUPPORT" = "x" ; then
