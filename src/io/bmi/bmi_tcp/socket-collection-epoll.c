@@ -46,6 +46,7 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 {
     struct epoll_event event;
     socket_collection_p tmp_scp = NULL;
+    
     int ret = -1;
 
     tmp_scp = (struct socket_collection*) malloc(sizeof(struct

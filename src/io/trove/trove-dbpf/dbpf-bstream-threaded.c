@@ -44,8 +44,10 @@
  * Size for doing only one read operation instead of 
  * two for the ends of O_direct
  */
-#define DIRECT_SIZE_LIMIT 16*1024
-#define DIRECT_MIN_IO     4*1024
+#define DIRECT_IO_SIZE 4*1024
+#define DIRECT_IO_SIZE_LIMIT_MULTIPLIER 4
+#define MEM_PAGESIZE 4096
+/* MEM_PAGESIZE = getpagesize(); */
 
 /*
  * Define this value to get O_DIRECT TO WORK PROPERLY,
@@ -125,7 +127,6 @@ struct handle_queue_t
 static int threads_running = 0;
 static int initialised = 0;
 static int thread_count = 0;
-static int mem_pagesize = 0;
 
 static io_handle_queue_t *active_file_io;
 static pthread_mutex_t active_file_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -653,15 +654,18 @@ static void processIOSlice(
     * we could calculate the startpos with division ops, too :)
     */
    physical_startPos = (TROVE_offset) (
-        ((uintptr_t) slice->stream_offset) & (~(mem_pagesize - 1)));
+        ((uintptr_t) slice->stream_offset) & (~((uintptr_t) MEM_PAGESIZE - 1)));
+        
    physical_size = (TROVE_size)(((uintptr_t )  
-        slice->stream_offset + slice->size + mem_pagesize - 1 ) & 
-        (~(mem_pagesize - 1))) - physical_startPos;    
+        slice->stream_offset + slice->size + MEM_PAGESIZE - 1 ) & 
+        (~((uintptr_t) MEM_PAGESIZE - 1))) - physical_startPos;
+   
+   assert(physical_size <= IO_BUFFER_SIZE + MEM_PAGESIZE);            
     /*
      * use tmp buffer in case data is not aligned to pagesize and
      * do a read modify write for writes or read more data than 
      * necessary (for reads).
-     * Problem: files have to be a size * 512 resp. mem_pagesize.
+     * Problem: files have to be a size * 512 resp. MEM_PAGESIZE.
      */
     /*
      * This optimization helps for example the pvfs2-cp op.
@@ -697,24 +701,24 @@ static void processIOSlice(
         {
             /*could not read/write correctly ! TODO better error handling !*/
             gossip_err
-                ("WARNING could not do IO correct to %d - %lld of %lld bytes done\n",
+                ("WARNING could not do IO correct to %d - %llu of %llu bytes done\n",
                  fd, llu(retSize), llu(slice->size));
             *return_code_out = -trove_errno_to_trove_error(errno);
         }         
     }else{
        gossip_debug(GOSSIP_PERFORMANCE_DEBUG, 
-        "Unaligned data will be aligned %lld - %lld to %lld - %lld\n",
-            slice->stream_offset,  slice->size,
-            physical_startPos, physical_size);       
+        "Unaligned data will be aligned %llu - %llu to %llu - %llu\n",
+            llu(slice->stream_offset),  llu(slice->size),
+            llu(physical_startPos), llu(physical_size));       
             
        if (type == IO_QUEUE_WRITE)
        {
             gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
-                         "IO slice on thread:%d - %p - WRITE FD:%d POS:%lld SIZE:%lld \n",
+                         "IO slice on thread:%d - %p - WRITE FD:%d POS:%llu SIZE:%llu \n",
                          thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));
             /* read modify write data (for now, better to check if results can be
              * reused or cached)*/
-            if ( physical_size <= DIRECT_SIZE_LIMIT ){
+            if ( physical_size <= DIRECT_IO_SIZE_LIMIT_MULTIPLIER * DIRECT_IO_SIZE ){
                 /*
                  * read in one step
                  */
@@ -727,35 +731,38 @@ static void processIOSlice(
             }else{
                 /* read both ends */
                 TROVE_offset end_offset;
-                end_offset = physical_size - DIRECT_SIZE_LIMIT;
+                end_offset = physical_size - DIRECT_IO_SIZE -1;
                 retSize =
-                    PREAD(fd, odirectbuf, DIRECT_SIZE_LIMIT, physical_startPos);
-                if (retSize < DIRECT_SIZE_LIMIT){
+                    PREAD(fd, odirectbuf, DIRECT_IO_SIZE, physical_startPos);
+                if (retSize < DIRECT_IO_SIZE){
                     /*
                      * End of file reached bzero stuff out !
                      */
                     gossip_debug(GOSSIP_TROVE_DEBUG,"Pread1 error %s %llu\n",strerror(errno), llu(retSize));
-                    memset( odirectbuf + retSize, 0, DIRECT_SIZE_LIMIT - retSize );
+                    memset( odirectbuf + retSize, 0, DIRECT_IO_SIZE - retSize );
                     /*
                      * This is not really needed when the file is truncated at the end...
-                     * But ensures that an parallel reader gets no old data. 
+                     * But ensures that an parallel reader gets at least no old data.
+                     * could be optimized, though 
                      */
-                    memset( odirectbuf + end_offset, 0, physical_startPos + end_offset );
+                    memset( odirectbuf + end_offset, 0, DIRECT_IO_SIZE);
                     
                     goto modifyBuffer;
                 }
+                
                 retSize =
-                    PREAD(fd, odirectbuf+end_offset, DIRECT_SIZE_LIMIT, 
-                    physical_startPos + end_offset);
-                if (retSize < DIRECT_SIZE_LIMIT){
+                    PREAD(fd, odirectbuf + end_offset, DIRECT_IO_SIZE, 
+                        physical_startPos + end_offset);
+                if (retSize < DIRECT_IO_SIZE){
                      gossip_debug(GOSSIP_TROVE_DEBUG,"Pread2 error %s %llu\n",strerror(errno), llu(retSize));
                      memset( odirectbuf+end_offset+ retSize, 0, 
-                        DIRECT_SIZE_LIMIT - retSize );
+                        DIRECT_IO_SIZE - retSize );
                 }
             }
 modifyBuffer:                       
             /* modify buffer */
-            memcpy(odirectbuf + (physical_startPos - slice->stream_offset), 
+            
+            memcpy(odirectbuf + (slice->stream_offset - physical_startPos), 
                 slice->mem_offset, slice->size);
             
             /* write stuff back to disk */
@@ -823,13 +830,18 @@ static void * bstream_threaded_thread_io_function(
     enum IO_queue_type req_type = -1;
     free((int *) vpthread_number);
     
-    odirectBuffAlloc = malloc(IO_BUFFER_SIZE + mem_pagesize);
+    odirectBuffAlloc = malloc(IO_BUFFER_SIZE + 2 * MEM_PAGESIZE);
+    /*
+     * keep valgrind happy, also for debugging...
+     */
+    memset(odirectBuffAlloc, 255, IO_BUFFER_SIZE + 2 * MEM_PAGESIZE);
+    
     if (odirectBuffAlloc == NULL) {
         gossip_err("Not enough free memory to allocate ODIRECT buffer\n");
         return NULL;
     }
     buff_real = (unsigned char *)(((uintptr_t )odirectBuffAlloc + 
-                mem_pagesize - 1) & (~(mem_pagesize - 1)));
+                MEM_PAGESIZE - 1) & (~(MEM_PAGESIZE - 1)));
 
     while (1)
     { 
@@ -1054,7 +1066,6 @@ int dbpf_bstream_threaded_initalize(
         return -1;
 
     initialised = 1;
-    mem_pagesize = getpagesize();
 
     return 0;
 }
