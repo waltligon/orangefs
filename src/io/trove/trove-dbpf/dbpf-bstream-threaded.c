@@ -50,6 +50,13 @@
 /* MEM_PAGESIZE = getpagesize(); */
 
 /*
+ * for testing of threaded impl:
+ * 
+ * undef O_DIRECT
+ * #define O_DIRECT 0
+ */
+
+/*
  * Define this value to get O_DIRECT TO WORK PROPERLY,
  * THIS IS DEFINITELY A HACK FOR NOW, for evaluation purpose only ! 
  */
@@ -94,7 +101,7 @@ typedef struct active_io_processing_t
     TROVE_size total_write_size;
     TROVE_size latest_offset_written;
     
-    int use_o_direct;
+    int openflags;
     int return_code;
 } active_io_processing_t;
 
@@ -188,7 +195,7 @@ int dbpf_bstream_threaded_set_thread_count(
 static int open_fd(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
-    int o_direct 
+    int openflags 
     )
 {
     char filename[PATH_MAX] = { 0 };
@@ -196,9 +203,12 @@ static int open_fd(
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
                               my_storage_p->name, coll_id, llu(handle));
-
-    ifd = DBPF_OPEN(filename, O_RDWR | O_CREAT | ( o_direct & O_DIRECT ), 
+    
+    gossip_debug(GOSSIP_PERFORMANCE_DEBUG, "DBPF open filehandle start\n");
+    ifd = DBPF_OPEN(filename, O_RDWR | O_CREAT | openflags, 
         S_IRUSR | S_IWUSR);
+    gossip_debug(GOSSIP_PERFORMANCE_DEBUG, "DBPF open filehandle %d with ODIRECT %d\n",
+                     ifd, openflags && O_DIRECT);        
 
     return ((ifd < 0) ? -trove_errno_to_trove_error(errno) : ifd);
 }
@@ -396,7 +406,7 @@ static void scheduleHandleOps(
      * Open file in O_DIRECT mode (for now), use later better scheduling
      * algorithms to decide (triggered by request scheduler ?)...
      */
-     elem->active_io->use_o_direct = 1;
+     elem->active_io->openflags = O_DIRECT;
     
     if (elem->active_io->totalNumberOfUnprocessedSlices[queue_type] <= 1)
         return;
@@ -459,11 +469,6 @@ static void incrementHandleRef(
                  elem, elem->active_io->ref_count);
     if (elem->active_io->filehandle == 0)
     {
-        elem->active_io->filehandle = open_fd(elem->fs_id, elem->handle, 
-            elem->active_io->use_o_direct );
-        gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF open filehandle %d\n",
-                     elem->active_io->filehandle);
-
         transformIOrequestsIntoArray(elem, ACTIVE_QUEUE_READ, IO_QUEUE_READ);
         transformIOrequestsIntoArray(elem, ACTIVE_QUEUE_WRITE, IO_QUEUE_WRITE);
 
@@ -477,7 +482,9 @@ static void incrementHandleRef(
                      totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_WRITE]);
         scheduleHandleOps(elem, ACTIVE_QUEUE_WRITE);
         scheduleHandleOps(elem, ACTIVE_QUEUE_READ);
-
+        
+        elem->active_io->filehandle = open_fd(elem->fs_id, elem->handle, 
+            elem->active_io->openflags );
     }
     gen_mutex_unlock(&elem->active_io->mutex);
 }
@@ -641,7 +648,7 @@ static void processIOSlice(
     int *return_code_out,
     int thread_no,
     char * odirectbuf,
-    int use_o_direct)
+    int openflags)
 {
     TROVE_size retSize = 0;
     /*
@@ -670,9 +677,7 @@ static void processIOSlice(
     /*
      * This optimization helps for example the pvfs2-cp op.
      */     
-     if ( ! use_o_direct || (
-        physical_startPos == slice->stream_offset && 
-            slice->size == physical_size ))
+     if ( ! (openflags & O_DIRECT) )
         {
         if (type == IO_QUEUE_WRITE)
         {
@@ -701,8 +706,8 @@ static void processIOSlice(
         {
             /*could not read/write correctly ! TODO better error handling !*/
             gossip_err
-                ("WARNING could not do IO correct to %d - %llu of %llu bytes done\n",
-                 fd, llu(retSize), llu(slice->size));
+                ("WARNING could not do IO correct to %d - %lld of %llu bytes done, reason: %s\n",
+                 fd, lld(retSize), llu(slice->size), strerror(errno));
             *return_code_out = -trove_errno_to_trove_error(errno);
         }         
     }else{
@@ -988,7 +993,7 @@ static void * bstream_threaded_thread_io_function(
                            &current_handle->active_io->latest_offset_written,
                            &current_handle->active_io->return_code,
                            thread_number, buff_real, 
-                           current_handle->active_io->use_o_direct);
+                           current_handle->active_io->openflags);
             break;
         case (IO_QUEUE_WRITE):
             {
@@ -1002,7 +1007,7 @@ static void * bstream_threaded_thread_io_function(
                                &current_handle->active_io->latest_offset_written,
                                &current_handle->active_io->return_code,
                                thread_number, buff_real,
-                               current_handle->active_io->use_o_direct);
+                               current_handle->active_io->openflags);
                 break;
             }
         case (IO_QUEUE_RESIZE):
