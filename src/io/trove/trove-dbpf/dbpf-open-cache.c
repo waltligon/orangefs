@@ -9,7 +9,6 @@
  * db references than will fit in the cache, then the overflow references
  * will all get new fds that are closed on put
  */
-
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>

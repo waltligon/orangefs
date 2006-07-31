@@ -56,7 +56,6 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 #define DBPF_MAX_IOS_IN_PROGRESS  16
 static int s_dbpf_ios_in_progress = 0;
-static gen_mutex_t s_dbpf_io_mutex = GEN_MUTEX_INITIALIZER;
 
 static int issue_or_delay_io_operation(
     dbpf_queued_op_t * cur_op,
@@ -104,15 +103,13 @@ static int dbpf_bstream_flush_op_svc(
 static int dbpf_bstream_resize_op_svc(
     struct dbpf_op *op_p);
 
-#ifdef __PVFS2_TROVE_AIO_THREADED__
 #include "dbpf-thread.h"
 #include "pvfs2-internal.h"
 
-
-
-static dbpf_op_queue_s *s_dbpf_io_ready_queue = NULL;
 extern pthread_cond_t dbpf_op_completed_cond;
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
+
+#ifdef __PVFS2_TROVE_AIO_THREADED__
 
 static void aio_progress_notification(
     union sigval sig)
@@ -283,23 +280,19 @@ static void start_delayed_ops_if_any(
     int i = 0, aiocb_inuse_count = 0;
     struct aiocb *aiocbs = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = { 0 };
 
-    gen_mutex_lock(&s_dbpf_io_mutex);
+    gen_mutex_lock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
     if (dec_first)
     {
         s_dbpf_ios_in_progress--;
     }
     gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF I/O ops in progress: %d\n",
                  s_dbpf_ios_in_progress);
+                 
+    assert(& dbpf_op_queue[OP_QUEUE_IO]);
 
-    if (s_dbpf_io_ready_queue == NULL)
+    if (!dbpf_op_queue_empty(& dbpf_op_queue[OP_QUEUE_IO]))
     {
-        s_dbpf_io_ready_queue = dbpf_op_queue_new();
-    }
-    assert(s_dbpf_io_ready_queue);
-
-    if (!dbpf_op_queue_empty(s_dbpf_io_ready_queue))
-    {
-        cur_op = dbpf_op_pop_front_nolock(s_dbpf_io_ready_queue);
+        cur_op = dbpf_op_pop_front_nolock(& dbpf_op_queue[OP_QUEUE_IO]);
         assert(cur_op);
 #ifndef __PVFS2_TROVE_AIO_THREADED__
         assert(cur_op->op.state == OP_INTERNALLY_DELAYED);
@@ -373,11 +366,12 @@ static void start_delayed_ops_if_any(
            operation queue so that the calling thread can continue to
            call the service method (state flag is updated as well)
          */
-        dbpf_queued_op_queue_nolock(cur_op);
+        dbpf_queued_op_queue_nolock(cur_op, & dbpf_op_queue[OP_QUEUE_IO]);
+        
 #endif
     }
   error_exit:
-    gen_mutex_unlock(&s_dbpf_io_mutex);
+    gen_mutex_unlock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
 }
 
 static int issue_or_delay_io_operation(
@@ -391,7 +385,7 @@ static int issue_or_delay_io_operation(
     int i;
     assert(cur_op);
 
-    gen_mutex_lock(&s_dbpf_io_mutex);
+    gen_mutex_lock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
     if (dec_first)
     {
         s_dbpf_ios_in_progress--;
@@ -402,16 +396,8 @@ static int issue_or_delay_io_operation(
     }
     else
     {
-        if (s_dbpf_io_ready_queue == NULL)
-        {
-            s_dbpf_io_ready_queue = dbpf_op_queue_new();
-            if (!s_dbpf_io_ready_queue)
-            {
-                return -TROVE_ENOMEM;
-            }
-        }
-        assert(s_dbpf_io_ready_queue);
-        dbpf_op_queue_add(s_dbpf_io_ready_queue, cur_op);
+        assert(& dbpf_op_queue[OP_QUEUE_IO]);
+        dbpf_op_queue_add(& dbpf_op_queue[OP_QUEUE_IO], cur_op);
 
         op_delayed = 1;
 #ifndef __PVFS2_TROVE_AIO_THREADED__
@@ -432,7 +418,7 @@ static int issue_or_delay_io_operation(
     gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF I/O ops in progress: %d\n",
                  s_dbpf_ios_in_progress);
 
-    gen_mutex_unlock(&s_dbpf_io_mutex);
+    gen_mutex_unlock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
 
     if (!op_delayed)
     {
@@ -904,9 +890,10 @@ static inline int dbpf_bstream_rw_list(
     struct dbpf_collection *coll_p = NULL;
     enum dbpf_op_type tmp_type;
     int event_type;
+    int i = 0;
 #ifdef __PVFS2_TROVE_AIO_THREADED__
     struct dbpf_op *op_p = NULL;
-    int i = 0, aiocb_inuse_count = 0;
+    int aiocb_inuse_count = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = { 0 };
 #endif
 
@@ -1031,7 +1018,7 @@ static inline int dbpf_bstream_rw_list(
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__
 
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p, & dbpf_op_queue[OP_QUEUE_IO]);
 
 #else
     op_p = &q_op_p->op;

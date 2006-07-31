@@ -22,8 +22,6 @@
 #include <assert.h>
 #include <errno.h>
 
-#undef __PVFS2_USE_AIO__ 
-
 #ifndef __PVFS2_USE_AIO__
 
 #include "gossip.h"
@@ -44,7 +42,7 @@
  * Size for doing only one read operation instead of 
  * two for the ends of O_direct
  */
-#define DIRECT_IO_SIZE 4*1024
+#define DIRECT_IO_SIZE (4*1024)
 #define DIRECT_IO_SIZE_LIMIT_MULTIPLIER 4
 #define MEM_PAGESIZE 4096
 /* MEM_PAGESIZE = getpagesize(); */
@@ -60,7 +58,7 @@
  * Define this value to get O_DIRECT TO WORK PROPERLY,
  * THIS IS DEFINITELY A HACK FOR NOW, for evaluation purpose only ! 
  */
-#define THREADS_SCHEDULE_ONLY_ONE_HANDLE 1
+/*#define THREADS_SCHEDULE_ONLY_ONE_HANDLE 1*/
 
 enum active_queue_e
 {
@@ -406,7 +404,9 @@ static void scheduleHandleOps(
      * Open file in O_DIRECT mode (for now), use later better scheduling
      * algorithms to decide (triggered by request scheduler ?)...
      */
+#ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
      elem->active_io->openflags = O_DIRECT;
+#endif     
     
     if (elem->active_io->totalNumberOfUnprocessedSlices[queue_type] <= 1)
         return;
@@ -501,16 +501,16 @@ static void decrementHandleRef(
     if (elem->active_io->ref_count == 0 && noProcessElementAvailable(elem))
     {                           
         /* update cache file size and truncate file in case O_DIRECT was used !*/
-        #ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
+#ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
         active_file_io = NULL;                           
         if(checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
             latest_offset_written)){                
             ftruncate(elem->active_io->filehandle, latest_offset_written);
         }
-        #else
+#else
         checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
             latest_offset_written);
-        #endif
+#endif
             
         /*have to free HandleQueue at the end !*/
         if (elem->active_io->filehandle)
@@ -721,6 +721,8 @@ static void processIOSlice(
             gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
                          "IO slice on thread:%d - %p - WRITE FD:%d POS:%llu SIZE:%llu \n",
                          thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));
+            if ( slice->stream_offset != physical_startPos || 
+                slice->size != physical_size){
             /* read modify write data (for now, better to check if results can be
              * reused or cached)*/
             if ( physical_size <= DIRECT_IO_SIZE_LIMIT_MULTIPLIER * DIRECT_IO_SIZE ){
@@ -737,22 +739,24 @@ static void processIOSlice(
                 /* read both ends */
                 TROVE_offset end_offset;
                 end_offset = physical_size - DIRECT_IO_SIZE -1;
-                retSize =
-                    PREAD(fd, odirectbuf, DIRECT_IO_SIZE, physical_startPos);
-                if (retSize < DIRECT_IO_SIZE){
-                    /*
-                     * End of file reached bzero stuff out !
-                     */
-                    gossip_debug(GOSSIP_TROVE_DEBUG,"Pread1 error %s %llu\n",strerror(errno), llu(retSize));
-                    memset( odirectbuf + retSize, 0, DIRECT_IO_SIZE - retSize );
-                    /*
-                     * This is not really needed when the file is truncated at the end...
-                     * But ensures that an parallel reader gets at least no old data.
-                     * could be optimized, though 
-                     */
-                    memset( odirectbuf + end_offset, 0, DIRECT_IO_SIZE);
-                    
-                    goto modifyBuffer;
+                if (slice->stream_offset != physical_startPos){
+                    retSize =
+                        PREAD(fd, odirectbuf, DIRECT_IO_SIZE, physical_startPos);
+                    if (retSize < DIRECT_IO_SIZE){
+                        /*
+                         * End of file reached bzero stuff out !
+                         */
+                        gossip_debug(GOSSIP_TROVE_DEBUG,"Pread1 error %s %llu\n",strerror(errno), llu(retSize));
+                        memset( odirectbuf + retSize, 0, DIRECT_IO_SIZE - retSize );
+                        /*
+                         * This is not really needed when the file is truncated at the end...
+                         * But ensures that an parallel reader gets at least no old data.
+                         * could be optimized, though 
+                         */
+                        memset( odirectbuf + end_offset, 0, DIRECT_IO_SIZE);
+                        
+                        goto modifyBuffer;
+                    }
                 }
                 
                 retSize =
@@ -763,6 +767,7 @@ static void processIOSlice(
                      memset( odirectbuf+end_offset+ retSize, 0, 
                         DIRECT_IO_SIZE - retSize );
                 }
+            }
             }
 modifyBuffer:                       
             /* modify buffer */

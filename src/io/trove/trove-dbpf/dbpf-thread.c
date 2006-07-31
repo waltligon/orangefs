@@ -306,6 +306,8 @@ void *dbpf_thread_function(void *ptr)
         {
             dbpf_move_op_to_completion_queue(
                 cur_op, ((ret == 1) ? 0 : ret), OP_COMPLETED);
+        }else if(ret == TEST_FOR_COMPLETION){
+            
         }else{
             assert(0);
         }
