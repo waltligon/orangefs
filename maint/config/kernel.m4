@@ -15,7 +15,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
-	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
 
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
