@@ -608,9 +608,9 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
         sm_p->u.sym.sym_resp->ref = symlink_ref;
 
         /* insert newly created symlink into the ncache */
-        PINT_ncache_insert(sm_p->u.sym.link_name,
-                           0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,
-                           symlink_ref, sm_p->object_ref);
+        PINT_ncache_update((const char*) sm_p->u.sym.link_name, 
+                           (const PVFS_object_ref*) &symlink_ref, 
+                           (const PVFS_object_ref*) &(sm_p->object_ref));
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.sym.retry_count < sm_p->msgarray_params.retry_limit))

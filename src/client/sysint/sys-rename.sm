@@ -27,6 +27,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "ncache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -397,6 +398,15 @@ static int rename_init(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: init\n");
 
     assert(js_p->error_code == 0);
+
+    /* Invalidate the old entry in ncache */
+    PINT_ncache_invalidate(
+            (const char*) sm_p->u.rename.entries[0],
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
+    /* Invalidate the new entry in ncache in case it already exists */
+    PINT_ncache_invalidate(
+            (const char*) sm_p->u.rename.entries[1],
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
 
     return 1;
 }

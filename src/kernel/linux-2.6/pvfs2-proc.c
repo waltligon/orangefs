@@ -113,7 +113,7 @@ static int pvfs2_param_proc_handler(
 }
 
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
-static int pvfs2_acache_pc_proc_handler(
+static int pvfs2_pc_proc_handler(
     ctl_table       *ctl,
     int             write,
     struct file     *filp,
@@ -121,7 +121,7 @@ static int pvfs2_acache_pc_proc_handler(
     size_t          *lenp,
     loff_t          *ppos)
 #else
-static int pvfs2_acache_pc_proc_handler(
+static int pvfs2_pc_proc_handler(
     ctl_table       *ctl,
     int             write,
     struct file     *filp,
@@ -223,6 +223,26 @@ static struct pvfs2_param_extra acache_rec_extra = {
     .min = 0,
     .max = 100,
 };
+static struct pvfs2_param_extra ncache_timeout_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_NCACHE_TIMEOUT_MSECS,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra ncache_hard_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_NCACHE_HARD_LIMIT,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra ncache_soft_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_NCACHE_SOFT_LIMIT,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra ncache_rec_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_NCACHE_RECLAIM_PERCENTAGE,
+    .min = 0,
+    .max = 100,
+};
 static struct pvfs2_param_extra perf_time_interval_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_PERF_TIME_INTERVAL_SECS,
     .min = 0,
@@ -256,10 +276,29 @@ static ctl_table pvfs2_acache_table[] = {
         &pvfs2_param_proc_handler, NULL, NULL, &acache_rec_extra, NULL},
     {0}
 };
+static ctl_table pvfs2_ncache_table[] = {
+    /* controls ncache timeout */
+    {1, "timeout-msecs", NULL, sizeof(int), 0644, NULL,
+        &pvfs2_param_proc_handler, NULL, NULL, &ncache_timeout_extra, NULL},
+    /* controls ncache hard limit */
+    {2, "hard-limit", NULL, sizeof(int), 0644, NULL,
+        &pvfs2_param_proc_handler, NULL, NULL, &ncache_hard_extra, NULL},
+    /* controls ncache soft limit */
+    {3, "soft-limit", NULL, sizeof(int), 0644, NULL,
+        &pvfs2_param_proc_handler, NULL, NULL, &ncache_soft_extra, NULL},
+    /* controls ncache reclaim percentage */
+    {4, "reclaim-percentage", NULL, sizeof(int), 
+        0644, NULL,
+        &pvfs2_param_proc_handler, NULL, NULL, &ncache_rec_extra, NULL},
+    {0}
+};
 static int acache_perf_count = PVFS2_PERF_COUNT_REQUEST_ACACHE;
+static int ncache_perf_count = PVFS2_PERF_COUNT_REQUEST_NCACHE;
 static ctl_table pvfs2_pc_table[] = {
     {1, "acache", NULL, 4096, 0444, NULL,
-        pvfs2_acache_pc_proc_handler, NULL, NULL, &acache_perf_count, NULL},
+        pvfs2_pc_proc_handler, NULL, NULL, &acache_perf_count, NULL},
+    {2, "ncache", NULL, 4096, 0444, NULL,
+        pvfs2_pc_proc_handler, NULL, NULL, &ncache_perf_count, NULL},
     {0}
 };
 static ctl_table pvfs2_table[] = {
@@ -283,6 +322,8 @@ static ctl_table pvfs2_table[] = {
     /* subdir for acache control */
     {6, "acache", NULL, 0, 0555, pvfs2_acache_table},
     {7, "perf-counters", NULL, 0, 0555, pvfs2_pc_table},
+    /* subdir for ncache control */
+    {8, "ncache", NULL, 0, 0555, pvfs2_ncache_table},
     {0}
 };
 static ctl_table fs_table[] = {

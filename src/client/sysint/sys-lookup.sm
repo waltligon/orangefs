@@ -592,9 +592,10 @@ static int lookup_init(PINT_client_sm *sm_p,
     assert(js_p->error_code == 0);
 
     /* check the ncache to see if we can bypass this entire lookup */
-    if (PINT_ncache_lookup(sm_p->u.lookup.orig_pathname, 0,
-                           sm_p->u.lookup.starting_refn,
-                           &sm_p->u.lookup.lookup_resp->ref) == 0)
+    if (PINT_ncache_get_cached_entry(
+                (const char*)sm_p->u.lookup.orig_pathname, 
+                &sm_p->u.lookup.lookup_resp->ref,
+                (const PVFS_object_ref*) &(sm_p->u.lookup.starting_refn)) == 0)
     {
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup: ncache fast path!\n");
         js_p->error_code = LOOKUP_NCACHE_HIT_FASTPATH;
@@ -1011,21 +1012,6 @@ static int lookup_cleanup(PINT_client_sm *sm_p,
 
     sm_p->error_code = js_p->error_code;
 
-    /*
-      on success, attempt to insert the resolved segment/object refn
-      into the ncache if it wasn't a cache hit AND we didn't just
-      resolve a symlink object, rather than a truly resolved object
-      (for now)
-    */
-    if ((js_p->error_code == 0) && (!sm_p->ncache_hit) &&
-        (!sm_p->u.lookup.skipped_final_resolution))
-    {
-        PINT_ncache_insert(sm_p->u.lookup.orig_pathname,
-                           0 /*sm_p->u.lookup.follow_link*/,
-                           sm_p->u.lookup.lookup_resp->ref,
-                           sm_p->u.lookup.starting_refn);
-    }
-
     /* clean up all used memory for this lookup */
     for(i = 0; i < MAX_LOOKUP_CONTEXTS; i++)
     {
@@ -1115,6 +1101,24 @@ static int lookup_segment_lookup_comp_fn(
             PINT_copy_object_attr(
                 &(cur_seg->seg_attr),
                 &(resp_p->u.lookup_path.attr_array[i]));
+        }
+        
+        if (!sm_p->ncache_hit)
+        {
+            gossip_debug(
+                GOSSIP_NCACHE_DEBUG, "*** ncache update on %s "
+                                     "target (%llu|%d) "
+                                     "parent (%llu|%d)\n",
+                cur_seg->seg_name,
+                llu(last_resolved_refn.handle),
+                last_resolved_refn.fs_id,
+                llu(cur_seg->seg_starting_refn.handle),
+                cur_seg->seg_starting_refn.fs_id);
+
+            PINT_ncache_update(
+                    (const char*) cur_seg->seg_name,
+                    (const PVFS_object_ref*) &(last_resolved_refn),
+                    (const PVFS_object_ref*) &(cur_seg->seg_starting_refn));
         }
     }
     assert(i == resp_p->u.lookup_path.handle_count);
