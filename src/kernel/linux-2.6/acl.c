@@ -319,6 +319,7 @@ static int pvfs2_xattr_get_acl_access(struct inode *inode,
     pvfs2_print("pvfs2_xattr_get_acl_access %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        pvfs2_error("get_acl_access invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_get_acl(inode, ACL_TYPE_ACCESS, buffer, size);
@@ -330,6 +331,7 @@ static int pvfs2_xattr_get_acl_default(struct inode *inode,
     pvfs2_print("pvfs2_xattr_get_acl_default %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        pvfs2_error("get_acl_default invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_get_acl(inode, ACL_TYPE_DEFAULT, buffer, size);
@@ -383,6 +385,7 @@ static int pvfs2_xattr_set_acl_access(struct inode *inode,
     pvfs2_print("pvfs2_xattr_set_acl_access: %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        pvfs2_error("set_acl_access invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_set_acl(inode, ACL_TYPE_ACCESS, buffer, size);
@@ -394,6 +397,7 @@ static int pvfs2_xattr_set_acl_default(struct inode *inode,
     pvfs2_print("pvfs2_xattr_set_acl_default: %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        pvfs2_error("set_acl_default invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_set_acl(inode, ACL_TYPE_DEFAULT, buffer, size);

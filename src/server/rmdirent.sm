@@ -235,35 +235,9 @@ static int rmdirent_update_directory_attr(
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->attr;
-    ds_attr = &(s_op->ds_attr);
+    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | PVFS_ATTR_COMMON_CTIME);
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
-
-    /* overwrite all non-null attribute time fields */
-    if (s_op->req->u.rmdirent.parent_atime)
-    {
-        tmp_attr_ptr->atime = s_op->req->u.rmdirent.parent_atime;
-    }
-    if (s_op->req->u.rmdirent.parent_mtime)
-    {
-        /*
-         * directory mtime is always stored as a version, but converted
-         * to a normal mtime on a getattr;
-         */
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, "updating parent dir version "
-            "to %llu\n\tmtime is %llu\n",
-            llu(PVFS_util_mktime_version(s_op->req->u.rmdirent.parent_mtime)),
-            llu(s_op->req->u.rmdirent.parent_mtime));
-
-        tmp_attr_ptr->mtime = PVFS_util_mktime_version(
-                    s_op->req->u.rmdirent.parent_mtime);
-    }
-    if (s_op->req->u.rmdirent.parent_ctime)
-    {
-        tmp_attr_ptr->ctime = s_op->req->u.rmdirent.parent_ctime;
-    }
-
     ds_attr = &(s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 

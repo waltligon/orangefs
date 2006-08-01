@@ -159,10 +159,21 @@ struct address_space_operations pvfs2_address_operations =
  */
 void pvfs2_truncate(struct inode *inode)
 {
+    loff_t orig_size = i_size_read(inode);
     pvfs2_print("pvfs2: pvfs2_truncate called on inode %d "
-                "with size %d\n",(int)inode->i_ino,(int)inode->i_size);
+                "with size %ld\n",(int)inode->i_ino, (long) orig_size);
 
-    pvfs2_truncate_inode(inode, inode->i_size);
+    /* successful truncate when size changes also requires mtime updates 
+     * although the mtime updates are propagated lazily!
+     */
+    if (pvfs2_truncate_inode(inode, inode->i_size) == 0
+            && (orig_size != i_size_read(inode)))
+    {
+        pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+        SetMtimeFlag(pvfs2_inode);
+        inode->i_mtime = CURRENT_TIME;
+        mark_inode_dirty_sync(inode);
+    }
 }
 
 /** Change attributes of an object referenced by dentry.
@@ -184,7 +195,7 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
         {
             ret = pvfs2_inode_setattr(inode, iattr);
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
-            if (!ret && iattr->ia_valid & ATTR_MODE)
+            if (!ret && (iattr->ia_valid & ATTR_MODE))
             {
                 /* change mod on a file that has ACLs */
                 ret = pvfs2_acl_chmod(inode);

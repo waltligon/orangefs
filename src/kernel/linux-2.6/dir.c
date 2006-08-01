@@ -215,12 +215,10 @@ static int pvfs2_readdir(
     }
     pvfs2_print("pvfs2_readdir about to update_atime %p\n", dentry->d_inode);
 
-#ifdef HAVE_TOUCH_ATIME
-    touch_atime(file->f_vfsmnt, dentry);
-#else
-    update_atime(dentry->d_inode);
-#endif
 
+    SetAtimeFlag(pvfs2_inode);
+    dentry->d_inode->i_atime = CURRENT_TIME;
+    mark_inode_dirty_sync(dentry->d_inode);
 
     pvfs2_print("pvfs2_readdir returning %d\n",ret);
     return ret;

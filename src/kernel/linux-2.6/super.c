@@ -484,6 +484,18 @@ int pvfs2_remount(
     return ret;
 }
 
+/* Called whenever the VFS dirties the inode in response to atime updates */
+static void pvfs2_dirty_inode(struct inode *inode)
+{
+    if (inode)
+    {
+        pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+        pvfs2_print("pvfs2_dirty_inode: %ld\n", (long) inode->i_ino);
+        SetAtimeFlag(pvfs2_inode);
+    }
+    return;
+}
+
 struct super_operations pvfs2_s_ops =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -491,6 +503,7 @@ struct super_operations pvfs2_s_ops =
     statfs : pvfs2_statfs,
     remount_fs : pvfs2_remount,
     put_super : pvfs2_kill_sb,
+    dirty_inode : pvfs2_dirty_inode,
     clear_inode: pvfs2_clear_inode,
     put_inode: pvfs2_put_inode,
 #else
@@ -498,6 +511,7 @@ struct super_operations pvfs2_s_ops =
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,
     .read_inode = pvfs2_read_inode,
+    .dirty_inode = pvfs2_dirty_inode,
     .put_inode = pvfs2_put_inode,
     .statfs = pvfs2_statfs,
     .remount_fs = pvfs2_remount
@@ -825,6 +839,20 @@ struct super_block *pvfs2_get_sb(
 }
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
+static void pvfs2_flush_sb(
+        struct super_block *sb)
+{
+    if (!list_empty(&sb->s_dirty))
+    {
+        struct inode *inode = NULL;
+        list_for_each_entry (inode, &sb->s_dirty, i_list)
+        {
+            pvfs2_flush_times(inode);
+        }
+    }
+    return;
+}
+
 void pvfs2_kill_sb(
     struct super_block *sb)
 {
@@ -832,6 +860,10 @@ void pvfs2_kill_sb(
 
     if (sb && !IS_ERR(sb))
     {
+        /*
+         * Flush any dirty inodes atimes, mtimes to server
+         */
+        pvfs2_flush_sb(sb);
         /*
           issue the unmount to userspace to tell it to remove the
           dynamic mount info it has for this superblock

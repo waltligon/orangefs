@@ -382,9 +382,27 @@ typedef struct
 #endif
     sector_t last_failed_block_index_read;
     int error_code;
+
+    unsigned long time_flags;
     /* All allocated pvfs2_inode_t objects are chained to a list */
     struct list_head list;
 } pvfs2_inode_t;
+
+#define P_ATIME_FLAG 0
+#define P_MTIME_FLAG 1
+#define P_CTIME_FLAG 2
+
+#define ClearAtimeFlag(pinode) clear_bit(P_ATIME_FLAG, &(pinode)->time_flags)
+#define SetAtimeFlag(pinode)   set_bit(P_ATIME_FLAG, &(pinode)->time_flags)
+#define AtimeFlag(pinode)      test_bit(P_ATIME_FLAG, &(pinode)->time_flags)
+
+#define ClearMtimeFlag(pinode) clear_bit(P_MTIME_FLAG, &(pinode)->time_flags)
+#define SetMtimeFlag(pinode)   set_bit(P_MTIME_FLAG, &(pinode)->time_flags)
+#define MtimeFlag(pinode)      test_bit(P_MTIME_FLAG, &(pinode)->time_flags)
+
+#define ClearCtimeFlag(pinode) clear_bit(P_CTIME_FLAG, &(pinode)->time_flags)
+#define SetCtimeFlag(pinode)   set_bit(P_CTIME_FLAG, &(pinode)->time_flags)
+#define CtimeFlag(pinode)      test_bit(P_CTIME_FLAG, &(pinode)->time_flags)
 
 /** mount options.  only accepted mount options are listed.
  */
@@ -626,6 +644,7 @@ int     fs_mount_pending(PVFS_fs_id fsid);
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
+int pvfs2_flush_times(struct inode *inode);
 
 ssize_t pvfs2_inode_getxattr(
         struct inode *inode, const char* prefix,
@@ -726,7 +745,6 @@ do {                                                         \
     spin_lock(&pvfs2_request_list_lock);                     \
     list_add_tail(&op->list, &pvfs2_request_list);           \
     spin_unlock(&pvfs2_request_list_lock);                   \
-                                                             \
     spin_unlock(&op->lock);                                  \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
@@ -739,7 +757,6 @@ do {                                                         \
     spin_lock(&pvfs2_request_list_lock);                     \
     list_add(&op->list, &pvfs2_request_list);                \
     spin_unlock(&pvfs2_request_list_lock);                   \
-                                                             \
     spin_unlock(&op->lock);                                  \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
@@ -916,15 +933,8 @@ do { ClearPageReserved(page); put_page(page); } while(0)
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
-    time_t cur_time = CURRENT_TIME;               \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
-    sys_attr.atime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.mtime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.ctime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
     sys_attr.size = 0;                            \
     sys_attr.perms = PVFS2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \
@@ -947,15 +957,8 @@ do                                                \
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
-    struct timespec cur_time = CURRENT_TIME;      \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
-    sys_attr.atime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.mtime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.ctime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
     sys_attr.size = 0;                            \
     sys_attr.perms = PVFS2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \

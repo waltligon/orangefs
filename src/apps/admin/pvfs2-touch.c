@@ -112,8 +112,7 @@ int main(int argc, char **argv)
         attr.perms = 0;
         attr.atime = time(NULL);
         attr.mtime = attr.atime;
-        attr.ctime = attr.atime;
-        attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+        attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
         attr.dfile_count = 0;
 
         parent_ref = resp_lookup.ref;

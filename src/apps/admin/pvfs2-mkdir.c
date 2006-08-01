@@ -228,9 +228,6 @@ static int make_directory(PVFS_credentials     * credentials,
     attr.owner = credentials->uid;
     attr.group = credentials->gid;
     attr.perms = mode;
-    attr.atime = time(NULL);
-    attr.mtime = attr.atime;
-    attr.ctime = attr.atime;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
         
     /* Clear out any info from previous calls */
@@ -311,9 +308,6 @@ static int make_directory(PVFS_credentials     * credentials,
         fprintf(stdout, "\t owner [%d]\n",  attr.owner);
         fprintf(stdout, "\t group [%d]\n",  attr.group);
         fprintf(stdout, "\t perms [%o]\n",  attr.perms);
-        fprintf(stdout, "\t atime [%llu]\n", llu(attr.atime));
-        fprintf(stdout, "\t mtime [%llu]\n", llu(attr.mtime));
-        fprintf(stdout, "\t ctime [%llu]\n", llu(attr.ctime));
     }
 
     ret = PVFS_sys_mkdir(basename_ptr, 

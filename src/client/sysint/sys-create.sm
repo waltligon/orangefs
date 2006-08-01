@@ -754,7 +754,7 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.create.metafile_handle,
         PVFS_TYPE_METAFILE,
         sm_p->u.create.sys_attr,
-        (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_META_ALL));
+        PVFS_ATTR_META_ALL);
 
     msg_p->req.u.setattr.attr.u.meta.dfile_array =
         sm_p->u.create.datafile_handles;

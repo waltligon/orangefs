@@ -327,13 +327,18 @@ out:
     }
     if (new_op) 
         op_release(new_op);
-    if (ret > 0 && file != NULL && inode != NULL)
+    if (ret > 0 && inode != NULL && pvfs2_inode != NULL)
     {
-#ifdef HAVE_TOUCH_ATIME
-        touch_atime(file->f_vfsmnt, file->f_dentry);
-#else
-        update_atime(inode);
-#endif
+        if (rw->type == IO_READ)
+        {
+            SetAtimeFlag(pvfs2_inode);
+            inode->i_atime = CURRENT_TIME;
+        }
+        else {
+            SetMtimeFlag(pvfs2_inode);
+            inode->i_mtime = CURRENT_TIME;
+        }
+        mark_inode_dirty_sync(inode);
     }
     return ret;
 }
@@ -801,13 +806,19 @@ out:
         kfree(iovecptr);
         kfree(seg_array);
     }
-    if (ret > 0 && file != NULL && inode != NULL)
+    if (ret > 0 && inode != NULL && pvfs2_inode != NULL)
     {
-#ifdef HAVE_TOUCH_ATIME
-        touch_atime(file->f_vfsmnt, file->f_dentry);
-#else
-        update_atime(inode);
-#endif
+        if (type == IO_READV)
+        {
+            SetAtimeFlag(pvfs2_inode);
+            inode->i_atime = CURRENT_TIME;
+        }
+        else 
+        {
+            SetMtimeFlag(pvfs2_inode);
+            inode->i_mtime = CURRENT_TIME;
+        }
+        mark_inode_dirty_sync(inode);
     }
     return ret;
 }
@@ -929,18 +940,21 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
         pvfs2_print("pvfs2_aio_retry: buffer %p,"
                 " size %d return %d bytes\n",
                     x->buffer, (int) x->bytes_to_be_copied, (int) error);
-        if ((x->rw == PVFS_IO_WRITE) && error > 0)
+        if (error > 0)
         {
-#ifndef HAVE_TOUCH_ATIME
             struct inode *inode = iocb->ki_filp->f_mapping->host;
-#endif
-            struct file *filp = iocb->ki_filp;
-            /* update atime if need be */
-#ifdef HAVE_TOUCH_ATIME
-            touch_atime(filp->f_vfsmnt, filp->f_dentry);
-#else
-            update_atime(inode);
-#endif
+            pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+            if (x->rw == PVFS_IO_READ)
+            {
+                SetAtimeFlag(pvfs2_inode);
+                inode->i_atime = CURRENT_TIME;
+            }
+            else 
+            {
+                SetMtimeFlag(pvfs2_inode);
+                inode->i_mtime = CURRENT_TIME;
+            }
+            mark_inode_dirty_sync(inode);
         }
         /* 
          * Now we can happily free up the op,
@@ -1364,6 +1378,12 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                 pvfs_bufmap_put(buffer_index);
                 pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
                         buffer_index);
+                if (error > 0)
+                {
+                    SetAtimeFlag(pvfs2_inode);
+                    inode->i_atime = CURRENT_TIME;
+                    mark_inode_dirty_sync(inode);
+                }
                 /* new_op is freed by the client-daemon */
                 goto out_error;
             }
@@ -1623,11 +1643,9 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                         (int) buffer_index);
                 if (error > 0)
                 {
-#ifdef HAVE_TOUCH_ATIME
-                    touch_atime(filp->f_vfsmnt, filp->f_dentry);
-#else
-                    update_atime(inode);
-#endif
+                    SetMtimeFlag(pvfs2_inode);
+                    inode->i_mtime = CURRENT_TIME;
+                    mark_inode_dirty_sync(inode);
                 }
                 /* new_op is freed by the client-daemon */
                 goto out_error;
@@ -1744,12 +1762,7 @@ int pvfs2_file_release(
     pvfs2_print("pvfs2_file_release: called on %s\n",
                 file->f_dentry->d_name.name);
 
-#ifdef HAVE_TOUCH_ATIME
-    touch_atime(file->f_vfsmnt, file->f_dentry);
-#else
-    update_atime(inode);
-#endif
-
+    pvfs2_flush_times(inode);
     if (S_ISDIR(inode->i_mode))
     {
         return dcache_dir_close(inode, file);
@@ -1794,6 +1807,8 @@ int pvfs2_fsync(
     pvfs2_print("pvfs2_fsync got return value of %d\n",ret);
 
     op_release(new_op);
+
+    pvfs2_flush_times(file->f_dentry->d_inode);
     return ret;
 }
 

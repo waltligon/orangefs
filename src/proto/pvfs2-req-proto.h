@@ -395,17 +395,16 @@ endecode_fields_4_struct(
                                   __handle,      \
                                   __objtype,     \
                                   __attr,        \
-                                  __amask)       \
+                                  __extra_amask) \
 do {                                             \
     memset(&(__req), 0, sizeof(__req));          \
     (__req).op = PVFS_SERV_SETATTR;              \
     (__req).credentials = (__creds);             \
     (__req).u.setattr.fs_id = (__fsid);          \
     (__req).u.setattr.handle = (__handle);       \
-    PINT_CONVERT_ATTR(&(__req).u.setattr.attr,   \
-       &(__attr), PVFS_ATTR_COMMON_ALL);         \
-    (__req).u.setattr.attr.objtype = (__objtype);\
-    (__req).u.setattr.attr.mask |= (__amask);    \
+    (__attr).objtype = (__objtype);              \
+    (__attr).mask |= PVFS_ATTR_SYS_TYPE;         \
+    PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask);\
 } while (0)
 
 /* lookup path ************************************************/
@@ -496,8 +495,7 @@ endecode_fields_4_struct(
                                 __creds,               \
                                 __fs_id,               \
                                 __ext_array,           \
-                                __attr,                \
-                                __amask)               \
+                                __attr)                \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_MKDIR;                      \
@@ -507,11 +505,9 @@ do {                                                   \
         (__ext_array).extent_count;                    \
     (__req).u.mkdir.handle_extent_array.extent_array = \
         (__ext_array).extent_array;                    \
-    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr,           \
-       &(__attr), PVFS_ATTR_COMMON_ALL);               \
-    (__req).u.mkdir.attr.mask &= (__amask);            \
-    (__req).u.mkdir.attr.mask |= PVFS_ATTR_COMMON_TYPE;\
-    (__req).u.mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;\
+    (__attr).objtype = PVFS_TYPE_DIRECTORY;            \
+    (__attr).mask   |= PVFS_ATTR_SYS_TYPE;             \
+    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\
 } while (0)
 
 struct PVFS_servresp_mkdir

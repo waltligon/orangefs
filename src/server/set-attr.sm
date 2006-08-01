@@ -118,8 +118,10 @@ static int setattr_verify_attribs(
 
     gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from request:\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
-                 req_a_p->owner, req_a_p->group, req_a_p->perms,
-                 req_a_p->objtype);
+                 (req_a_p->mask & PVFS_ATTR_COMMON_UID)  ? req_a_p->owner : -1,
+                 (req_a_p->mask & PVFS_ATTR_COMMON_GID)  ? req_a_p->group : -1,
+                 (req_a_p->mask & PVFS_ATTR_COMMON_PERM) ? req_a_p->perms : -1,
+                 (req_a_p->mask & PVFS_ATTR_COMMON_TYPE) ? req_a_p->objtype : -1);
     /*
       here we're enforcing that no one can change the type of the
       handle/object already stored once it's been set to a non-zero
@@ -138,7 +140,7 @@ static int setattr_verify_attribs(
         js_p->error_code = -PVFS_EACCES;
         return 1;
     }
-    else if(!req_a_p->objtype)
+    else if (req_a_p->objtype == PVFS_TYPE_NONE)
     {
         /* if the requested object type is PVFS_TYPE_NONE, then the
          * setattr is only on the common attributes, so we use the
@@ -277,7 +279,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
      * It is better to do it here than change the PVFS_object_attr_overwrite_setable
      * macro, since there are many more users of it, I think.
      */
-     if (a_p->mask & PVFS_ATTR_COMMON_MTIME)
+     if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
      {
          PVFS_time orig_mtime = a_p->mtime;
          a_p->mtime = PVFS_util_mktime_version(orig_mtime);

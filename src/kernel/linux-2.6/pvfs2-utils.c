@@ -312,55 +312,60 @@ static inline int copy_attributes_from_inode(
     PVFS_sys_attr *attrs,
     struct iattr *iattr)
 {
-    int ret = -1;
     umode_t tmp_mode;
 
-    if (inode && attrs)
+    if (!iattr || !inode || !attrs)
     {
-        /*
-          if we got a non-NULL iattr structure, we need to be careful
-          to only copy the attributes out of the iattr object that we
-          know are valid
-        */
-        attrs->owner = ((iattr && (iattr->ia_valid & ATTR_UID)) ?
-                        iattr->ia_uid : inode->i_uid);
+        pvfs2_error("NULL iattr (%p), inode (%p), attrs (%p) in copy_attributes_from_inode!\n",
+                iattr, inode, attrs);
+        return -EINVAL;
+    }
+    /*
+      we need to be careful
+      to only copy the attributes out of the iattr object that we
+      know are valid
+    */
+    attrs->mask = 0;
+    if (iattr->ia_valid & ATTR_UID) 
+    {
+        attrs->owner = iattr->ia_uid;
         attrs->mask |= PVFS_ATTR_SYS_UID;
-
-        attrs->group = ((iattr && (iattr->ia_valid & ATTR_GID)) ?
-                        iattr->ia_gid : inode->i_gid);
+    }
+    if (iattr->ia_valid & ATTR_GID)
+    {
+        attrs->group = iattr->ia_gid; 
         attrs->mask |= PVFS_ATTR_SYS_GID;
+    }
 
-        attrs->atime =
-            ((iattr && (iattr->ia_valid & ATTR_ATIME)) ?
-             pvfs2_convert_time_field((void *)&iattr->ia_atime) :
-             pvfs2_convert_time_field((void *)&inode->i_atime));
+    if (iattr->ia_valid & ATTR_ATIME)
+    {
         attrs->mask |= PVFS_ATTR_SYS_ATIME;
-
-        attrs->mtime =
-            ((iattr && (iattr->ia_valid & ATTR_MTIME)) ?
-             pvfs2_convert_time_field((void *)&iattr->ia_mtime) :
-             pvfs2_convert_time_field((void *)&inode->i_mtime));
+        if (iattr->ia_valid & ATTR_ATIME_SET)
+        {
+            attrs->atime = pvfs2_convert_time_field((void *)&iattr->ia_atime);
+            attrs->mask |= PVFS_ATTR_SYS_ATIME_SET;
+        }
+    }
+    if (iattr->ia_valid & ATTR_MTIME)
+    {
         attrs->mask |= PVFS_ATTR_SYS_MTIME;
-
-        attrs->ctime =
-            ((iattr && (iattr->ia_valid & ATTR_CTIME)) ?
-             pvfs2_convert_time_field((void *)&iattr->ia_ctime) :
-             pvfs2_convert_time_field((void *)&inode->i_ctime));
+        if (iattr->ia_valid & ATTR_MTIME_SET)
+        {
+            attrs->mtime = pvfs2_convert_time_field((void *)&iattr->ia_mtime);
+            attrs->mask |= PVFS_ATTR_SYS_MTIME_SET;
+        }
+    }
+    if (iattr->ia_valid & ATTR_CTIME)
+    {
         attrs->mask |= PVFS_ATTR_SYS_CTIME;
+    }
+    /* PVFS2 cannot set size with a setattr operation.  Probably not likely
+     * to be requested through the VFS, but just in case, don't worry about
+     * ATTR_SIZE */
 
-        /* PVFS2 cannot set size with a setattr operation.  Probably not likely
-         * to be requested through the VFS, but just in case, don't worry about
-         * ATTR_SIZE */
-
-        if (iattr && (iattr->ia_valid & ATTR_MODE))
-        {
-            tmp_mode = iattr->ia_mode;
-        }
-        else
-        {
-            tmp_mode = inode->i_mode;
-        }
-
+    if (iattr->ia_valid & ATTR_MODE)
+    {
+        tmp_mode = iattr->ia_mode;
         if (tmp_mode & (S_ISVTX))
         {
             if(inode->i_ino == PVFS2_SB(inode->i_sb)->root_handle)
@@ -387,14 +392,9 @@ static inline int copy_attributes_from_inode(
 
         convert_attribute_mode_to_pvfs_sys_attr(
             tmp_mode, attrs);
-
-        /* we carefully selected which bits to set in attrs->mask above, so
-         * don't undo all that work by setting attrs->mask to
-         * PVFS_ATTR_SYS_ALL_SETABLE */
-
-        ret = 0;
     }
-    return ret;
+
+    return 0;
 }
 
 /*
@@ -536,7 +536,50 @@ int pvfs2_inode_setattr(
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
+
+        /* successful setattr should clear the atime, mtime and ctime flags */
+        if (ret == 0) {
+            ClearAtimeFlag(pvfs2_inode);
+            ClearMtimeFlag(pvfs2_inode);
+            ClearCtimeFlag(pvfs2_inode);
+        }
     }
+    return ret;
+}
+
+int pvfs2_flush_times(struct inode *inode)
+{
+    /*
+     * If it is a dirty inode, this function gets called.
+     * Gather all the information that needs to be setattr'ed
+     * Right now, this will only be used for atime, mtime 
+     * and/or ctime.
+     */
+    struct iattr wbattr;
+    int ret;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    memset(&wbattr, 0, sizeof(wbattr));
+
+    /*  -- Lazy atime,mtime and ctime update --
+     * Note: all times are dictated by server in the new scheme 
+     * and not by the clients
+     */
+
+    if (MtimeFlag(pvfs2_inode))
+        wbattr.ia_valid |= ATTR_MTIME;
+    if (CtimeFlag(pvfs2_inode))
+        wbattr.ia_valid |= ATTR_CTIME;
+    if (AtimeFlag(pvfs2_inode))
+        wbattr.ia_valid |= ATTR_ATIME;
+
+    pvfs2_print("*********** pvfs2_flush_times: %ld (ia_valid %d)\n", 
+            (long) inode->i_ino, wbattr.ia_valid);
+    if (wbattr.ia_valid == 0)
+    {
+        return 0;
+    }
+
+    ret = pvfs2_inode_setattr(inode, &wbattr);
     return ret;
 }
 

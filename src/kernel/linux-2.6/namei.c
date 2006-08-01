@@ -38,7 +38,12 @@ static int pvfs2_create(
 
     if (inode)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
+        
         ret = 0;
     }
 
@@ -240,8 +245,12 @@ static int pvfs2_unlink(
     ret = pvfs2_remove_entry(dir, dentry);
     if (ret == 0)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
         inode->i_nlink--;
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
     }
     return ret;
 }
@@ -294,7 +303,12 @@ static int pvfs2_symlink(
 
     if (inode)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
+
         ret = 0;
     }
     return ret;
@@ -319,7 +333,12 @@ static int pvfs2_mkdir(
          */
 	dir->i_nlink++;
 #endif
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
+
 	ret = 0;
     }
     return ret;
@@ -335,6 +354,7 @@ static int pvfs2_rmdir(
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
         inode->i_nlink--; 
 #if 0
         /* NOTE: we have no good way to keep nlink consistent for directories
@@ -342,7 +362,10 @@ static int pvfs2_rmdir(
          */
 	dir->i_nlink--;
 #endif
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
     }
     return ret;
 }

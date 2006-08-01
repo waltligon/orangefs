@@ -333,7 +333,7 @@ static int mkdir_msg_comp_fn(void *v_p,
     sm_p->u.mkdir.metafile_handle = resp_p->u.mkdir.handle;
 
     /* also insert entry into attr cache */
-    PINT_CONVERT_ATTR(&attr, &sm_p->u.mkdir.sys_attr, PVFS_ATTR_COMMON_ALL);
+    PINT_CONVERT_ATTR(&attr, &sm_p->u.mkdir.sys_attr, 0);
     PINT_acache_update(sm_p->object_ref, &attr, NULL);
 
     gossip_debug(
@@ -401,8 +401,7 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         meta_handle_extent_array,
-        sm_p->u.mkdir.sys_attr,
-        PVFS_ATTR_SYS_ALL_NOSIZE);
+        sm_p->u.mkdir.sys_attr);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
