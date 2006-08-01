@@ -110,7 +110,10 @@ PVFS_error PVFS_isys_truncate(
                  "PVFS_isys_truncate entered with %lld\n", lld(size));
 
     PINT_smcb_alloc(&smcb, PVFS_SYS_TRUNCATE,
-             sizeof(struct PINT_client_sm), client_op_state_get_machine);
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;

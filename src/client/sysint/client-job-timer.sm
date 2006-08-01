@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <sys/time.h>
 
+#include "state-machine.h"
 #include "client-state-machine.h"
 #include "job-time-mgr.h"
 
@@ -53,7 +54,7 @@ static int job_timer_error(struct PINT_smcb *smcb, job_status_s* js_p)
     gossip_err("Error: stopping client job timer.\n");
 
     PINT_SET_OP_COMPLETE;
-    return 0;
+    return SM_ACTION_DEFERRED;
 }
 
 /* job_timer_do_work()
@@ -76,7 +77,7 @@ static int job_timer_do_work(struct PINT_smcb *smcb, job_status_s* js_p)
     if (ret < 0)
     {
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
         
     /* post another timer */

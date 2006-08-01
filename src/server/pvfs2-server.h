@@ -482,6 +482,7 @@ struct server_configuration_s *get_server_config_struct(void);
 
 /* exported state machine resource reclamation function */
 int server_state_machine_complete(PINT_smcb *smcb);
+int server_state_machine_terminate(PINT_smcb *smcb, job_status_s *js_p);
 
 /* starts state machines not associated with an incoming request */
 int server_state_machine_alloc_noreq(

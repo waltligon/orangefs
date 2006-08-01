@@ -753,6 +753,7 @@ extern struct PINT_state_machine_s pvfs2_server_get_config_nested_sm;
 
 /* method for lookup up SM from OP */
 struct PINT_state_machine_s *client_op_state_get_machine(int);
+int client_state_machine_terminate(struct PINT_smcb *, job_status_s *);
 
 #endif /* __SM_CHECK_DEP */
 #endif /* __PVFS2_CLIENT_STATE_MACHINE_H */

@@ -634,16 +634,6 @@ int main(int argc, char **argv)
                     smcb, &server_job_status_array[i]);
             }
 
-            /* Either of the above might have completed immediately
-             * (ret == 1).  While the job continues to complete
-             * immediately, we continue to service it.
-             */
-            while (ret == SM_ACTION_COMPLETE) /* ret == 1 */
-            {
-                ret = PINT_state_machine_next(
-                    smcb, &server_job_status_array[i]);
-            }
-
             if (SM_ACTION_ISERR(ret)) /* ret < 0 */
             {
                 PVFS_perror_gossip("Error: state machine processing error", ret);
@@ -1658,10 +1648,22 @@ static int server_post_unexpected_recv(job_status_s *js_p)
     struct PINT_smcb *smcb = NULL;
     struct PINT_server_op *s_op;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_post_unexpected_recv\n");
+
     if (js_p)
     {
-        PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP,
-                sizeof(struct PINT_server_op), server_op_state_get_machine);
+        ret = PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP,
+                sizeof(struct PINT_server_op),
+                server_op_state_get_machine,
+                server_state_machine_terminate,
+                server_job_context);
+        if (ret < 0)
+        {
+            gossip_lerr("Error: failed to allocate SMCB "
+                        "of op type %x\n", BMI_UNEXPECTED_OP);
+            return ret;
+        }
         s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
         /*
@@ -1698,6 +1700,9 @@ static int server_state_machine_start(
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_id_gen_t tmp_id;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_start %p\n",smcb);
 
     ret = PINT_decode(s_op->unexp_bmi_buff.buffer,
                       PINT_DECODE_REQ,
@@ -1757,26 +1762,23 @@ int server_state_machine_alloc_noreq(
 {
     int ret = -PVFS_EINVAL;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_alloc_noreq %d\n",op);
+
     if (new_op)
     {
         ret = PINT_smcb_alloc(new_op, op, 
-                sizeof(struct PINT_server_op), server_op_state_get_machine);
+                sizeof(struct PINT_server_op),
+                server_op_state_get_machine,
+                server_state_machine_terminate,
+                server_job_context);
         if (ret < 0)
         {
             gossip_lerr("Error: failed to allocate SMCB "
                         "of op type %x\n", op);
-            PINT_smcb_free(new_op);
-            return -PVFS_ENOSYS;
+            return ret;
         }
 
-        /* find the state machine for this op type */
-        if (!PINT_state_machine_locate(*new_op))
-        {
-            gossip_lerr("Error: failed to locate state machine function "
-                        "of op type %x\n", op);
-            PINT_smcb_free(new_op);
-            return -PVFS_ENOSYS;
-        }
         ret = 0;
     }
     return ret;
@@ -1799,28 +1801,19 @@ int server_state_machine_start_noreq(struct PINT_smcb *smcb)
     int ret = -PVFS_EINVAL;
     job_status_s tmp_status;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_start_noreq %p\n",smcb);
+
     tmp_status.error_code = 0;
 
     if (new_op)
     {
         /* execute first state */
-        ret = PINT_state_machine_invoke(smcb, &tmp_status);
+        ret = PINT_state_machine_start(smcb, &tmp_status);
         if (ret < 0)
         {
             gossip_lerr("Error: failed to start state machine.\n");
             return ret;
-        }
-
-        /* continue as long as states are immediately completing */
-        while(ret == 1)
-        {
-            ret = PINT_state_machine_next(smcb, &tmp_status);
-        }
-
-        if (ret < 0)
-        {
-            gossip_lerr("Error: unhandled state machine processing "
-                        "error (most likely an unhandled job error).\n");
         }
     }
     return ret;
@@ -1839,6 +1832,9 @@ int server_state_machine_complete(PINT_smcb *smcb)
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_complete %p\n",smcb);
     
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
@@ -1858,9 +1854,24 @@ int server_state_machine_complete(PINT_smcb *smcb)
     }
 
     /* free the operation structure itself */
-    PINT_smcb_free(&smcb);
+    /* moved to terminate function
+    PINT_smcb_free(&smcb); 
+    */
 
-    return SM_ACTION_COMPLETE;
+    /* we didn't post an operation, so by returning DEFERRED
+     * we will never run again
+     */
+    return SM_ACTION_TERMINATE;
+}
+
+int server_state_machine_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* free the operation structure itself */
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_terminate %p\n",smcb);
+    PINT_smcb_free(&smcb); 
+    return SM_ACTION_TERMINATE;
 }
 
 struct server_configuration_s *get_server_config_struct(void)
@@ -1908,6 +1919,9 @@ static int parse_port_from_host_id(char* host_id)
  */
 struct PINT_state_machine_s *server_op_state_get_machine(int op)
 {
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_op_state_get_machine %d\n",op);
+
     switch (op)
     {
     case BMI_UNEXPECTED_OP :

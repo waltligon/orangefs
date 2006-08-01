@@ -88,6 +88,7 @@ w           [ \t\n]*
 <CODE>"extern"	   {LIST; RETURNVAL(EXTERN);}
 <CODE>"return"	   {LIST; RETURNVAL(STATE_RETURN);}
 <CODE>"run"	   {LIST; RETURNVAL(RUN);}
+<CODE>"pjmp"	   {LIST; RETURNVAL(PJMP);}
 <CODE>"jump"	   {LIST; RETURNVAL(JUMP);}
 <CODE>"success"	   {LIST; RETURNVAL(SUCCESS);}
 <CODE>"default"	   {LIST; RETURNVAL(DEFAULT);}

@@ -13,13 +13,17 @@
  * they are kept separate from the rest of the code to keep the number of
  * includes for the statecomp code down.
  */
-#define SM_NONE   0
-#define SM_NEXT   1
-#define SM_RETURN 2
-#define SM_EXTERN 3
-#define SM_NESTED 5
-#define SM_JUMP   6
-#define SM_TERMINATE 7
+enum PINT_state_code {
+    SM_NONE  = 0,
+    SM_NEXT  = 1,
+    SM_RETURN= 2,
+    SM_EXTERN= 3,
+    SM_NESTED= 5,
+    SM_JUMP  = 6,
+    SM_TERM  = 7,
+    SM_PJMP  = 8,
+    SM_RUN   = 9
+};
 
 /* these define things like stack size and so forth for the common
  * state machine code.

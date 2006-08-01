@@ -24,7 +24,9 @@ void gen_init(void);
 void gen_state_decl(char *state_name);
 void gen_state_array(char *machine_name, char *first_state_name);
 void gen_state_start(char *state_name);
-void gen_state_action(char *run_func, int flag);
+void gen_state_action(char *run_func, int flag, char *state_name);
+void gen_trtbl(char *state_name);
+void gen_pjtbl(char *state_name);
 void gen_return_code(char *return_code);
 void gen_next_state(int flag, char *new_state);
 void gen_state_end(void);
@@ -57,6 +59,7 @@ void yyerror(char *);
 %token <i> STATE
 %token <i> EXTERN
 %token <i> RUN
+%token <i> PJMP
 %token <i> JUMP
 %token <i> STATE_RETURN
 %token <i> STATE_TERMINATE
@@ -79,6 +82,7 @@ void yyerror(char *);
 %type <s> state_decl_list .state_decl_list. state_decl
 	  state_def state_def_list .state_def_list.
 	  transition transition_list state_machine target state_machine_list
+	  task task_list
 
 %start state_machine_list
 
@@ -141,17 +145,18 @@ state_def_list	  : state_def
 		  | state_def state_def_list
 		  ;
 
-state_def	  : STATE identifier LBRACE
-		     {$$ = symlook($2);
-		      if ($$->type != TYPE_STATE){
-			 fprintf(stderr,"bad state identifier %s\n", $2);
-			 fprintf(stderr,"declared as another type\n");
-			 exit(1);
-		      }
-		      else{
-			 gen_state_start($2);}}
-		    .state_body. RBRACE
-		      {gen_state_end();}
+state_def  : STATE identifier LBRACE
+		    		  {$$ = symlook($2);
+		      		if ($$->type != TYPE_STATE)
+						{
+			 				fprintf(stderr,"bad state identifier %s\n", $2);
+			 				fprintf(stderr,"declared as another type\n");
+			 				exit(1);
+		      		} else{
+			 		 		gen_state_start($2);}
+						}
+		    	.state_body. RBRACE
+		      		{gen_state_end();}
 		  ;
 
 .state_body.	  : /* empty */
@@ -159,13 +164,30 @@ state_def	  : STATE identifier LBRACE
 		  | state_body
 		  ;
 
-state_body	  : state_action transition_list
+state_body	  : state_action
+						{gen_trtbl($<c>-2);}
+					transition_list
 		  ;
 
 state_action	  : RUN identifier SEMICOLON
-		     {gen_state_action($2, SM_NONE);}
+		     {gen_state_action($2, SM_RUN, $<c>-2);}
+		  | PJMP identifier
+		  	  {gen_state_action($2, SM_PJMP, $<c>-2);}
+		  	 LBRACE
+			  {gen_pjtbl($<c>-2);}
+			 task_list RBRACE SEMICOLON
 		  | JUMP identifier SEMICOLON
-		     {gen_state_action($2, SM_JUMP);}
+		     {gen_state_action($2, SM_JUMP, $<c>-2);}
+		  ;
+
+task_list	: task
+		  | task task_list
+		  ;
+
+task	: return_code
+			{gen_return_code($1);}
+			ARROW identifier SEMICOLON
+			{gen_next_state(SM_NEXT, $4);}
 		  ;
 
 transition_list   : transition 
@@ -178,20 +200,21 @@ transition	  : return_code
 		     {$$ = $4;}
 		  ;
 
-target		  : identifier
+target  : identifier
 		     {$$ = symlook($1);
 		      if ($$ == NULL){
-			 fprintf(stderr,"jump to undeclared state %s\n", $1);
-			 exit(1);
-		      }
-		      else{
-			 gen_next_state(SM_NEXT, $$->name);}}
+					fprintf(stderr,"jump to undeclared state %s\n", $1);
+			 		exit(1);
+		      }else{
+			      gen_next_state(SM_NEXT, $$->name);
+				}
+			  }
 		  | STATE_RETURN
 		     {$$ = NULL;
 		      gen_next_state(SM_RETURN, NULL);}
 		  | STATE_TERMINATE
 		     {$$ = NULL;
-		      gen_next_state(SM_TERMINATE, NULL);}
+		      gen_next_state(SM_TERM, NULL);}
 		  ;
 
 return_code	  : SUCCESS {$$ = "0";}

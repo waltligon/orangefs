@@ -241,6 +241,9 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
  */
 struct PINT_state_machine_s *client_op_state_get_machine(int op)
 {
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "client_op_state_get_machine %d\n",op);
+
     switch (op)
     {
     /* special cases first */
@@ -272,6 +275,29 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
             }
         }
     }
+}
+
+/* callback for a terminating state machine
+ * the client adds terminted jobs to a completion list, unless
+ * they were cancelled.
+ */
+
+int client_state_machine_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "client_state_machine_terminate smcb %p\n",smcb);
+
+    if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
+            (PINT_smcb_cancelled(smcb)) &&
+            (cancelled_io_jobs_are_pending(smcb))))
+    {
+        ret = add_sm_to_completion_list(smcb);
+        assert(ret == 0);
+    }
+    return SM_ACTION_TERMINATE;
 }
 
 /*
@@ -313,10 +339,8 @@ PVFS_error PINT_client_state_machine_post(
     int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-#if 0
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_client_state_machine_post called\n");
-#endif
+                 "PINT_client_state_machine_post smcb %p\n",smcb);
 
     CLIENT_SM_INIT_ONCE();
 
@@ -380,6 +404,9 @@ PVFS_error PINT_sys_dev_unexp(
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_sys_dev_unexp\n");
+
     CLIENT_SM_INIT_ONCE();
 
     /* we require more input args than the regular post method above */
@@ -388,11 +415,16 @@ PVFS_error PINT_sys_dev_unexp(
         return -PVFS_EINVAL;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
-            sizeof(struct PINT_client_sm), client_op_state_get_machine);
-    if (!smcb)
+    ret = PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
+            sizeof(struct PINT_client_sm),
+            client_op_state_get_machine,
+            client_state_machine_terminate,
+            pint_client_sm_context);
+    if (ret < 0)
     {
-        return -PVFS_ENOMEM;
+        gossip_lerr("Error: failed to allocate SMCB "
+                    "of op type %x\n", PVFS_DEV_UNEXPECTED);
+        return ret;
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->user_ptr = user_ptr;
@@ -401,7 +433,7 @@ PVFS_error PINT_sys_dev_unexp(
     memset(jstat, 0, sizeof(job_status_s));
     ret = job_dev_unexp(info, (void *)smcb, 0, jstat, &id,
                         JOB_NO_IMMED_COMPLETE, pint_client_sm_context);
-    if (ret)
+    if (ret < 0)
     {
         PVFS_perror_gossip("PINT_sys_dev_unexp failed", ret);
         PINT_smcb_free(&smcb);
@@ -425,7 +457,8 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_client_io_cancel called\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "PINT_client_io_cancel id %lld\n",id);
 
     smcb = PINT_id_gen_safe_lookup(id);
     if (!smcb)
@@ -553,10 +586,8 @@ PVFS_error PINT_client_state_machine_test(
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
 
-#if 0
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_client_state_machine_test called\n");
-#endif
+                 "PINT_client_state_machine_test id %lld\n",op_id);
 
     CLIENT_SM_ASSERT_INITIALIZED();
 
@@ -595,6 +626,7 @@ PVFS_error PINT_client_state_machine_test(
 	tmp_smcb = (PINT_smcb *)client_sm_p_array[i];
         assert(tmp_smcb);
 
+        /* why is this here - why doesn't an unexpected just terminate? */
         if (PINT_smcb_op(tmp_smcb) == PVFS_DEV_UNEXPECTED)
         {
             PINT_smcb_set_complete(tmp_smcb);
@@ -604,27 +636,32 @@ PVFS_error PINT_client_state_machine_test(
         {
             ret = PINT_state_machine_next(tmp_smcb, &job_status_array[i]);
 
-            assert(ret == SM_ACTION_DEFERRED); /* ret == 0 */
+            assert(ret == SM_ACTION_DEFERRED ||
+                    ret == SM_ACTION_TERMINATE); /* ret == 0 */
         }
 
         /* make sure we don't return internally cancelled I/O jobs */
+        /*  This is handled in terminate fn now
         if ((PINT_smcb_op(tmp_smcb) == PVFS_SYS_IO) &&
                 (PINT_smcb_cancelled(tmp_smcb)) &&
                 (cancelled_io_jobs_are_pending(tmp_smcb)))
         {
             continue;
         }
+        */
 
         /*
           if we've found a completed operation and it's NOT the op
           being tested here, we add it to our local completion list so
           that later calls to the sysint test/testsome can find it
         */
+        /*  This is handled in terminate fn now
         if ((tmp_smcb != smcb) && (PINT_smcb_complete(tmp_smcb)))
         {
             ret = add_sm_to_completion_list(tmp_smcb);
             assert(ret == 0);
         }
+        */
     }
 
     if (PINT_smcb_complete(smcb))
@@ -655,10 +692,8 @@ PVFS_error PINT_client_state_machine_testsome(
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
 
-#if 0
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_client_state_machine_testsome called\n");
-#endif
+                 "PINT_client_state_machine_testsome\n");
 
     CLIENT_SM_ASSERT_INITIALIZED();
 
@@ -718,16 +753,19 @@ PVFS_error PINT_client_state_machine_testsome(
              * itself; the return value of the underlying operation is
              * kept in the job status structure.
              */
-            assert(ret == SM_ACTION_DEFERRED);
+            assert(ret == SM_ACTION_DEFERRED ||
+                    ret == SM_ACTION_TERMINATE);
         }
 
         /* make sure we don't return internally cancelled I/O jobs */
+        /* now done in terminate function
         if ((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
                 (PINT_smcb_cancelled(smcb)) &&
                 (cancelled_io_jobs_are_pending(smcb)))
         {
             continue;
         }
+        */
 
         /*
           by adding the completed op to our completion list, we can
@@ -735,11 +773,13 @@ PVFS_error PINT_client_state_machine_testsome(
           grab all completed operations when we're finished
           (i.e. outside of this loop).
         */
+        /* now done in terminate function
         if (PINT_smcb_complete(smcb))
         {
             ret = add_sm_to_completion_list(smcb);
             assert(ret == 0);
         }
+        */
     }
 
     return completion_list_retrieve_completed(
@@ -796,6 +836,10 @@ void PVFS_sys_release(PVFS_sys_op_id op_id)
     PINT_smcb *smcb = PINT_id_gen_safe_lookup(op_id);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_credentials *cred_p = sm_p->cred_p;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+              "PVFS_sys_release id %lld\n",op_id);
+
     if (smcb)
     {
         PINT_id_gen_safe_unregister(op_id);
@@ -815,6 +859,10 @@ void PVFS_mgmt_release(PVFS_mgmt_op_id op_id)
 {
     PINT_smcb *smcb = PINT_id_gen_safe_lookup(op_id);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+              "PVFS_mgmt_release id %lld\n",op_id);
+
     if (smcb)
     {
         PINT_id_gen_safe_unregister(op_id);

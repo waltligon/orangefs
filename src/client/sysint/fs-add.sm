@@ -120,7 +120,10 @@ PVFS_error PVFS_isys_fs_add(
     mntent->the_pvfs_config_server = mntent->pvfs_config_servers[i];
 
     PINT_smcb_alloc(&smcb, PVFS_SYS_FS_ADD,
-             sizeof(struct PINT_client_sm), client_op_state_get_machine);
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -231,7 +234,7 @@ static int fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         free(sm_p->u.get_config.config);
         sm_p->error_code  = js_p->error_code;
         PINT_SET_OP_COMPLETE;
-        return(0);
+        return SM_ACTION_DEFERRED;
     }
 
 #ifdef USE_TRUSTED
@@ -261,7 +264,7 @@ static int fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         free(sm_p->u.get_config.config);
         sm_p->error_code  = ret;
         PINT_SET_OP_COMPLETE;
-        return(0);
+        return SM_ACTION_DEFERRED;
     }
 
     /*
@@ -280,7 +283,7 @@ static int fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         free(sm_p->u.get_config.config);
         sm_p->error_code  = ret;
         PINT_SET_OP_COMPLETE;
-        return(0);
+        return SM_ACTION_DEFERRED;
     }
 
     /* finally, try to add the new config to the server config manager */
@@ -294,7 +297,7 @@ static int fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         free(sm_p->u.get_config.config);
         sm_p->error_code  = ret;
         PINT_SET_OP_COMPLETE;
-        return(0);
+        return SM_ACTION_DEFERRED;
     }
 
     /*
@@ -306,9 +309,9 @@ static int fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     gen_mutex_unlock(&mt_config);
 
     sm_p->error_code  = 0;
-    PINT_SET_OP_COMPLETE;
 
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_DEFERRED;
 }
 
 /*

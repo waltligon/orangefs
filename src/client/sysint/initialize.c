@@ -193,7 +193,10 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     /* start job timer */
     PINT_smcb_alloc(&smcb, PVFS_CLIENT_JOB_TIMER,
-            sizeof(struct PINT_client_sm), client_op_state_get_machine);
+            sizeof(struct PINT_client_sm),
+            client_op_state_get_machine,
+            NULL,
+            pint_client_sm_context);
     if(!smcb)
     {
 	return(-PVFS_ENOMEM);

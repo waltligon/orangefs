@@ -46,12 +46,43 @@ int PINT_state_machine_halt(void)
     return 0;
 }
 
+/* Function: PINT_state_machine_terminate
+   Params: smcb, job status
+   Returns: 0 on sucess, otherwise error
+   Synopsis: This function cleans up and terminates a SM
+        in some cases we may need to keep the SM alive until
+        its children terminate or something - in which case we
+        will post the relevant job here.
+ */
+int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
+{
+    /* notify parent */
+    if (smcb->parent_smcb)
+    {
+        job_id_t id;
+        /* acquire lock here */
+        if (--smcb->parent_smcb->children_running == 0)
+        {
+            /* wake up parent, through job interface */
+            job_null(0, smcb, 0, r, &id, smcb->context);
+        }
+        /* release lock here */
+    }
+    /* call state machine completion function */
+    if (smcb->terminate_fn)
+    {
+        (*smcb->terminate_fn)(smcb, r);
+    }
+    return 0;
+}
+
 /* Function: PINT_state_machine_invoke
-   Params:
-   Returns:
-   Synopsis: Currently undocumented!  Why is this here?  appears
-            only potential use is in the function above, where it
-            it isn't even used.
+   Params: smcb pointer and job status pointer
+   Returns: return value of state action
+   Synopsis: runs the current state action, produces debugging
+        output if needed, checls return value and takes action
+        if needed (sets op_terminate if SM_ACTION_TERMINATED is
+        returned)
  */
 int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
 {
@@ -59,11 +90,15 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
     const char * state_name;
     const char * machine_name;
 
-    if (!smcb || !smcb->current_state || !smcb->current_state->state_action)
+    if (!smcb || !smcb->current_state ||
+            !smcb->current_state->flag == SM_RUN ||
+            !smcb->current_state->action.func)
     {
         gossip_err("SM invoke called in invalid smcb\n");
         return -1;
     }
+
+    /* print pre-call debugging info */
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
             "SM invoke smcb %p op %d\n",smcb,(smcb)->op);
 
@@ -77,9 +112,11 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
                  machine_name,
                  state_name,
                  (int32_t)r->status_user_tag);
-                
-    retval = (smcb->current_state->state_action)(smcb,r);
+     
+    /* call state action function */
+    retval = (smcb->current_state->action.func)(smcb,r);
 
+    /* print post-call debugging info */
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
                  "[SM Exiting]: (%p) %s:%s (error code: %d)\n",
                  smcb,
@@ -88,40 +125,59 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
                  state_name,
                  r->error_code);
 
-    /* process return value */
+    /* process return code */
     switch (retval)
     {
+    case SM_ACTION_TERMINATE :
+        {
+            smcb->op_terminate = 1;
+        }
     case SM_ACTION_COMPLETE :
     case SM_ACTION_DEFERRED :
-        return retval;
+        {
+            return retval;
+        }
     default :
-        /* error */
-        break;
+        {
+            /* error */
+            gossip_err("SM returned invalid return code %d\n", retval);
+            break;
+        }
     }
 
     return retval;
 }
 
+/* Function: PINT_state_machine_next()
+   Params: smcb pointer and job status pointer
+   Returns: return value of last state action
+   Synopsis: runs the state action pointed to by the
+        current state, then continues to run the SM
+        as long asreturn code is SM_ACTION_COMPLETE
+ */
+
 int PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
 {
     int ret;
+    /* run the current state action function */
     ret = PINT_state_machine_invoke(smcb, r);
-    if (ret == SM_ACTION_COMPLETE)
+    if (ret == SM_ACTION_COMPLETE || ret == SM_ACTION_TERMINATE)
+        /* keep running until state machine deferrs or terminates */
         ret = PINT_state_machine_next(smcb, r);
     return ret;
 }
 
 /* Function: PINT_state_machine_next()
-   Params: 
-   Returns:   return value of state action
-
+   Params: smcb pointer and job status pointer
+   Returns: return value of last state action
    Synopsis: Runs through a list of return values to find the next function to
    call.  Calls that function.  If that function returned COMPLETED loop
    and repeat.
  */
 int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 {
-    union PINT_state_array_values *loc; /* temp pointer into state memory */
+    struct PINT_state_s *loc; /* temp pointer into state memory */
+    struct PINT_tran_tbl_s *tloc;
     int ret;                            /* holes state action return code */
 
     if (!smcb && !smcb->current_state)
@@ -138,50 +194,66 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 	    /* skip over the current state action to
              * get to the return code list
              */
-	    loc = smcb->current_state + 1;
+	    loc = smcb->current_state;
+            tloc = loc->trtbl;
     
 	    /* for each entry in the state machine table there is a return
 	    * code followed by a next state pointer to the new state.
 	    * This loops through each entry, checking for a match on the
 	    * return address, and then sets the new current_state and calls
 	    * the new state action function */
-	    while (loc->return_value != r->error_code &&
-	            loc->return_value != DEFAULT_ERROR) 
+	    while (tloc->return_value != r->error_code &&
+	           tloc->return_value != DEFAULT_ERROR) 
 	    {
 	        /* each entry has a return value followed by a next state
 	        * pointer, so we increment by two.
 	        */
-	        loc += 2;
+	        tloc += 1;
 	    }
 
 	    /* skip over the return code to get to the pointer for the
 	    * next state
 	    */
-	    loc += 1;
+	    /*loc += 1;*/
 
-	    /* its not legal to actually reach a termination point; preceding
-	    * function should have completed state machine.
+	    /* we expect the last state action function to return
+            * SM_ACTION_TERMINATE which sets the smcb->op_terminate
+            * flag.  ALSO the state machine much direct the next state
+            * to be terminate, which sets loc->flag to SM_TERMINATE.
+	    * We'll terminate for EITHER, but print an error if not
+            * both.
 	    */
-	    if(loc->flag == SM_TERMINATE)
+	    if(tloc->flag == SM_TERM || smcb->op_terminate)
 	    {
-	        gossip_err("Error: state machine using an"
-                        " invalid termination path.\n");
-	        return(-PVFS_EINVAL);
+                if (!(tloc->flag == SM_TERM))
+                {
+	            gossip_lerr("Error: state machine reached terminate"
+                            " without returning SM_ACTION_TERMINATE\n");
+                }
+                {
+                if (!smcb->op_terminate)
+	            gossip_lerr("Error: state machine returned"
+                           " SM_ACTION_TERMINATE but didn't reach terminate\n");
+                }
+                /* process terminating SM */
+                PINT_state_machine_terminate(smcb, r);
+
+                return SM_ACTION_TERMINATE;
 	    }
 
 	    /* Update the server_op struct to reflect the new location
 	    * see if the selected return value is a STATE_RETURN */
-	    if (loc->flag == SM_RETURN)
+	    if (tloc->flag == SM_RETURN)
 	    {
 	        smcb->current_state = PINT_pop_state(smcb);
                 /* skip state flags */
-	        smcb->current_state += 1;
+	        /*smcb->current_state += 1;*/
 	    }
-        } while (loc->flag == SM_RETURN);
+        } while (tloc->flag == SM_RETURN);
 
-        smcb->current_state = loc->next_state;
+        smcb->current_state = tloc->next_state;
         /* skip state name and parent SM ref */
-        smcb->current_state += 2;
+        /*smcb->current_state += 2;*/
 
         /* To do nested states, we check to see if the next state is
         * a nested state machine, and if so we push the return state
@@ -191,23 +263,23 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 	    PINT_push_state(smcb, smcb->current_state);
 
             /* skip state flag; now we point to the SM */
-	    smcb->current_state += 1;
+	    /*smcb->current_state += 1;*/
 
 	    smcb->current_state =
-                    smcb->current_state->nested_machine->state_machine;
+                    smcb->current_state->action.nested->state_machine;
             /* skip state name a parent SM ref */
-            smcb->current_state += 2;
+            /*smcb->current_state += 2;*/
         }
 
         /* skip over the flag so that we point to the function for the next
         * state.  then call it.
         */
-        smcb->current_state += 1;
+        /*smcb->current_state += 1;*/
 
         /* runs state_action and returns the return code */
         ret = PINT_state_machine_invoke(smcb, r);
 
-    } while (ret == SM_ACTION_COMPLETE);
+    } while (ret == SM_ACTION_COMPLETE || ret == SM_ACTION_TERMINATE);
 
     return ret;
 }
@@ -222,14 +294,14 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
  */
 int PINT_state_machine_locate(struct PINT_smcb *smcb)
 {
-    union PINT_state_array_values *current_tmp;
+    struct PINT_state_s *current_tmp;
     struct PINT_state_machine_s *op_sm;
 
     /* check for valid inputs */
     if (!smcb || smcb->op < 0 || !smcb->op_get_state_machine)
     {
 	gossip_err("State machine requested not valid\n");
-	return 0;
+	return -PVFS_EINVAL;
     }
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
             "SM locate smcb %p op %d\n",smcb,(smcb)->op);
@@ -239,7 +311,7 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
     {
 	current_tmp = op_sm->state_machine;
         /* skip SM name and parent */
-        current_tmp += 2;
+        /*current_tmp += 2;*/
 	/* handle the case in which the first state points to a nested
 	 * machine, rather than a simple function
 	 */
@@ -247,18 +319,18 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
 	{
 	    PINT_push_state(smcb, current_tmp);
             /* skip state flag */
-	    current_tmp += 1;
+	    /*current_tmp += 1;*/
 	    current_tmp = ((struct PINT_state_machine_s *)
-                           current_tmp->nested_machine)->state_machine;
+                           current_tmp->action.nested)->state_machine;
             /* skip SM name and parent */
-            current_tmp += 2;
+            /*current_tmp += 2;*/
 	}
 
 	/* this sets a pointer to a "PINT_state_array_values"
 	 * structure, whose state_action member is the function to call.
 	 */
         /* skip state flag */
-        smcb->current_state = current_tmp + 1;
+        /*smcb->current_state = current_tmp + 1;*/
 	return 1; /* indicates successful locate */
     }
 
@@ -293,21 +365,21 @@ int PINT_smcb_op(struct PINT_smcb *smcb)
 /* Function: PINT_smcb_set_complete
    Params: pointer to an smcb pointer
    Returns: nothing
-   Synopsis: sets op_complete on existing smcb
+   Synopsis: sets op_terminate on existing smcb
  */
 void PINT_smcb_set_complete(struct PINT_smcb *smcb)
 {
-    smcb->op_complete = 1;
+    smcb->op_terminate = 1;
 }
 
 /* Function: PINT_smcb_complete
    Params: pointer to an smcb pointer
    Returns: op (int)
-   Synopsis: returns the op_complete currently set in the smcb
+   Synopsis: returns the op_terminate currently set in the smcb
  */
 int PINT_smcb_complete(struct PINT_smcb *smcb)
 {
-    return smcb->op_complete;
+    return smcb->op_terminate;
 }
 
 /* Function: PINT_smcb_set_cancelled
@@ -341,7 +413,9 @@ int PINT_smcb_alloc(
         struct PINT_smcb **smcb,
         int op,
         int frame_size,
-        struct PINT_state_machine_s *(*getmach)(int))
+        struct PINT_state_machine_s *(*getmach)(int),
+        int (*term_fn)(struct PINT_smcb *, job_status_s *),
+        job_context_id context_id)
 {
     *smcb = (struct PINT_smcb *)malloc(sizeof(struct PINT_smcb));
     if (!(*smcb))
@@ -350,20 +424,28 @@ int PINT_smcb_alloc(
     }
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
             "SM allocate smcb %p op %d\n",*smcb,op);
+    /* zero out all members */
     memset(*smcb, 0, sizeof(struct PINT_smcb));
+    /* if frame_size given, allocate a frame */
     if (frame_size > 0)
     {
         (*smcb)->frame_stack[0] = malloc(frame_size);
         if (!((*smcb)->frame_stack[0]))
         {
+            free(*smcb);
+            *smcb = NULL;
             return -PVFS_ENOMEM;
         }
+        /* zero out all members */
         memset((*smcb)->frame_stack[0], 0, frame_size);
     }
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
+    (*smcb)->terminate_fn = term_fn;
+    (*smcb)->context = context_id;
+    /* if a getmach given, lookup state machine */
     if (getmach)
-        PINT_state_machine_locate(*smcb);
+        return PINT_state_machine_locate(*smcb);
     return 0; /* success */
 }
 
@@ -401,7 +483,7 @@ void PINT_smcb_free(struct PINT_smcb **smcb)
    Returns: 
    Synopsis: 
  */
-union PINT_state_array_values *PINT_pop_state(struct PINT_smcb *smcb)
+struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
 {
     assert(smcb->stackptr > 0);
 
@@ -414,7 +496,7 @@ union PINT_state_array_values *PINT_pop_state(struct PINT_smcb *smcb)
    Synopsis: 
  */
 void PINT_push_state(struct PINT_smcb *smcb,
-				   union PINT_state_array_values *p)
+				   struct PINT_state_s *p)
 {
     assert(smcb->stackptr < PINT_STATE_STACK_SIZE);
 
@@ -480,7 +562,7 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb)
    Returns: 
    Synopsis: 
  */
-union PINT_state_array_values  *PINT_sm_something(void)
+struct PINT_state_s  *PINT_sm_something(void)
 {
     return NULL;
 }
@@ -501,13 +583,18 @@ void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
     for(i = smcb->framebaseptr; i < smcb->framebaseptr; i++)
     {
         /* allocate smcb */
-        PINT_smcb_alloc(&new_sm, smcb->op, 0, NULL);
+        PINT_smcb_alloc(&new_sm, smcb->op, 0, NULL,
+                smcb->terminate_fn, smcb->context);
+        /* set parent smcb pointer */
+        new_sm->parent_smcb = smcb;
+        /* increment parent's counter */
+        smcb->children_running++;
         /* assign frame */
         PINT_sm_push_frame(new_sm, smcb->frame_stack[i]);
         /* locate SM to run */
         new_sm->current_state = PINT_sm_something();
         /* invoke SM */
-        PINT_state_machine_invoke(new_sm, r);
+        PINT_state_machine_start(new_sm, r);
     }
 }
 

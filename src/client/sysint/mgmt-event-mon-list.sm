@@ -87,7 +87,10 @@ PVFS_error PVFS_imgmt_event_mon_list(
     }
 
     PINT_smcb_alloc(&smcb, PVFS_MGMT_EVENT_MON_LIST,
-             sizeof(struct PINT_client_sm), client_op_state_get_machine);
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
     if (!smcb)
     {
         return -PVFS_ENOMEM;

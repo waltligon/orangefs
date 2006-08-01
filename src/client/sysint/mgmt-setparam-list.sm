@@ -95,7 +95,10 @@ PVFS_error PVFS_imgmt_setparam_list(
     }
 
     PINT_smcb_alloc(&smcb, PVFS_MGMT_SETPARAM_LIST,
-             sizeof(struct PINT_client_sm), client_op_state_get_machine);
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
