@@ -36,7 +36,7 @@ void gen_init(void)
 
 void gen_state_decl(char *state_name)
 {
-    fprintf(out_file, "static struct PINT_state_s ST_%s[];\n", state_name);
+    fprintf(out_file, "static struct PINT_state_s ST_%s;\n", state_name);
     fprintf(out_file, "static struct PINT_pjmp_tbl_s ST_%s_pjtbl[];\n",
             state_name);
     fprintf(out_file, "static struct PINT_tran_tbl_s ST_%s_trtbl[];\n",
@@ -49,16 +49,16 @@ void gen_machine(char *machine_name,
     current_machine = machine_name;
     fprintf(out_file, "\nstruct PINT_state_machine_s %s = {\n", machine_name);
     fprintf(out_file, "\t.name = \"%s\",\n", machine_name);
-    fprintf(out_file, "\t.state_machine = ST_%s\n", first_state_name);
+    fprintf(out_file, "\t.first_state = &ST_%s\n", first_state_name);
     fprintf(out_file, "};\n\n");
 }
 
 void gen_state_start(char *state_name)
 {
     fprintf(out_file,
-            "static struct PINT_state_s ST_%s[] = {\n"
-            "\t{ .state_name = \"%s\" },\n"
-            "\t{ .parent_machine = &%s },\n" ,
+            "static struct PINT_state_s ST_%s = {\n"
+            "\t .state_name = \"%s\" ,\n"
+            "\t .parent_machine = &%s ,\n" ,
             state_name, state_name, current_machine);
 }
 
@@ -71,22 +71,22 @@ void gen_state_action(char *run_func, int flag, char *state_name)
 {
     switch (flag) {
 	case SM_RUN:
-	    fprintf(out_file, "\t{ .flag = SM_RUN },\n");
-            fprintf(out_file, "\t{ .action.func = %s },\n", run_func);
-            fprintf(out_file,"\t{ .pjtbl = NULL },\n");
-            fprintf(out_file,"\t{ .trtbl = ST_%s_trtbl }", state_name);
+	    fprintf(out_file, "\t .flag = SM_RUN ,\n");
+            fprintf(out_file, "\t .action.func = %s ,\n", run_func);
+            fprintf(out_file,"\t .pjtbl = NULL ,\n");
+            fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
 	    break;
 	case SM_PJMP:
-	    fprintf(out_file, "\t{ .flag = SM_PJMP },\n");
-            fprintf(out_file, "\t{ .action.nested = &%s },\n", run_func);
-            fprintf(out_file,"\t{ .pjtbl = ST_%s_pjtbl },\n", state_name);
-            fprintf(out_file,"\t{ .trtbl = ST_%s_trtbl }", state_name);
+	    fprintf(out_file, "\t .flag = SM_PJMP ,\n");
+            fprintf(out_file, "\t .action.nested = &%s ,\n", run_func);
+            fprintf(out_file,"\t .pjtbl = ST_%s_pjtbl ,\n", state_name);
+            fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
 	    break;
 	case SM_JUMP:
-	    fprintf(out_file, "\t{ .flag = SM_JUMP },\n");
-            fprintf(out_file, "\t{ .action.nested = &%s },\n", run_func);
-            fprintf(out_file,"\t{ .pjtbl = NULL },\n");
-            fprintf(out_file,"\t{ .trtbl = ST_%s_trtbl }", state_name);
+	    fprintf(out_file, "\t .flag = SM_JUMP ,\n");
+            fprintf(out_file, "\t .action.nested = &%s ,\n", run_func);
+            fprintf(out_file,"\t .pjtbl = NULL ,\n");
+            fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
 	    break;
 	default:
 	    fprintf(stderr,
@@ -119,7 +119,7 @@ void gen_return_code(char *return_code)
     {
         fprintf(out_file,",\n");
     }
-    fprintf(out_file, "\t{ .return_value = %s }", return_code);
+    fprintf(out_file, "\t{ .return_value = %s ", return_code);
     needcomma = 1;
 }
 
@@ -131,15 +131,15 @@ void gen_next_state(int flag, char *new_state)
     }
     switch (flag) {
 	case SM_NEXT:
-	    fprintf(out_file, "\t{ .next_state = ST_%s }", new_state);
+	    fprintf(out_file, "\t .next_state = &ST_%s }", new_state);
 	    break;
 	case SM_RETURN:
 	    terminate_path_flag = 1;
-	    fprintf(out_file, "\t{ .flag = SM_RETURN }");
+	    fprintf(out_file, "\t .flag = SM_RETURN }");
 	    break;
 	case SM_TERM:
 	    terminate_path_flag = 1;
-	    fprintf(out_file, "\t{ .flag = SM_TERM }");
+	    fprintf(out_file, "\t .flag = SM_TERM }");
 	    break;
 	default:
 	    fprintf(stderr,

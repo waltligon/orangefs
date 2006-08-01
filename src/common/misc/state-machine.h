@@ -70,7 +70,7 @@ typedef struct PINT_smcb
 struct PINT_state_machine_s
 {
     const char *name;
-    struct PINT_state_s *state_machine;
+    struct PINT_state_s *first_state;
 };
 
 struct PINT_state_s
