@@ -131,17 +131,68 @@ static int is_root_handle_in_my_range(
     struct filesystem_configuration_s *fs);
 #endif
 
-/* 
- * NOTE: The documentation for the server config format is generated
- * from the following static array.  The documentation for an option
- * is taken from the comments found before the beginning of each sub-structure
- * as shown.
+/* PVFS2 servers are deployed using configuration files that provide information
+ * about the file systems, storage locations and endpoints that each server
+ * manages.  For every pvfs2 deployment, there is a global config file
+ * (<i>fs.conf</i>) shared between all of the pvfs2 servers, as well as
+ * per-server config files (<i>server.conf</i>) that contain config options 
+ * unique to that server (such as host/port endpoint).  Configuration options 
+ * in both the global and server specific config files have the following format:
+ * 
+ * <pre>
+ * OptionName OptionValue
+ * </pre>
+ *
+ * An option cannot span more than one line, and only one option can
+ * be specified on each line.  The <i>OptionValue</i> should 
+ * be formatted based on the option's type:
+ *
+ * <ul>
+ * <li>Integer - must be an integer value
+ * <li>String - must be a string without breaks (newlines)
+ * <li>List - a set of strings separated by commas
+ * </ul>
+ *
+ * Options are grouped together using contexts, and usually
+ * indented within a context for clarity.  A context is started
+ * with a context start tag, and ended with a context end tag:
+ * 
+ * <pre>
+ * &lt;ContextName&gt;
+ *     Option1Name Option1Value
+ *     Option2Name Option2Value
+ * &lt;/ContextName&gt;
+ * </pre>
+ *
+ * Options are required to be defined within a specified context 
+ * or set of contexts. 
+ * Sub-contexts can also be specified, and must be defined within
+ * their specified parent context.  For example, the <i>Range</i> option is
+ * specified in either the <i>DataHandleRanges</i> or <i>MetaHandleRanges</i> 
+ * contexts.  Both of
+ * those contexts are specified to be defined in the <i>FileSystem</i> context.
+ * Details of the required context an option or sub-context must be defined in
+ * are given in the <a href="#OptionDetails">Option Details</a> section. 
+ *
+ * Options and contexts that appear in the top-level (not defined within
+ * another context) are considered to be defined in a special <i>Global</i>
+ * context.  Many options are only specified to appear within either the
+ * <i>Global</i> context or the <a name="Default">Default</a> context, 
+ * which is a context that allows a default value to be specified for certain
+ * options.
+ *
+ * The options detailed below each specify their type, the context
+ * where they appear, a default value, and description.  The default
+ * value is used if the option is not specified in any of the config files.
+ * Options without default values are required to be defined in the
+ * config file.
  */
 static const configoption_t options[] =
 {
     /* 
-     * Specifies a string identifier for the pvfs server that is to be
-     * run on this host.  The format of this string is:
+     * Specifies a string identifier for the pvfs2 server that is to be
+     * run on this host.  This option is required for each per-server config
+     * file.  The format of this string is:
      *
      * {transport}://{hostname}:{port}
      *
@@ -153,16 +204,16 @@ static const configoption_t options[] =
      */
     {"HostID",ARG_STR, get_pvfs_server_id,NULL,CTX_GLOBAL,NULL},
     
-    /* Specifies the local path for the pvfs server to use as storage space.
+    /* Specifies the local path for the pvfs2 server to use as storage space.
+     * This option is required for each per-server config file.
      * Example:
      *
      * /tmp/pvfs.storage
      */
     {"StorageSpace",ARG_STR, get_storage_space,NULL,CTX_GLOBAL,NULL},
 
-    /* Specifies the beginning of the Defaults context.  Options specified
-     * within the Defaults context are used as default values over all the
-     * pvfs server specific config files.
+    /* Options specified within the Defaults context are used as 
+     * default values over all the pvfs2 server specific config files.
      */
     {"<Defaults>",ARG_NONE, enter_defaults_context,NULL,CTX_GLOBAL,NULL},
 
@@ -171,8 +222,8 @@ static const configoption_t options[] =
     {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_DEFAULTS,NULL},
 
 #ifdef USE_TRUSTED
-    /* Specifies the beginning of the Security context. Options specified 
-     * within the Security context are used to dictate whether the pvfs
+    /* Options specified within the Security context are used to dictate 
+     * whether the pvfs2
      * servers will accept or handle file-system requests.
      * This section is optional and does not need to be specified.
      */
@@ -209,8 +260,7 @@ static const configoption_t options[] =
         CTX_SECURITY,NULL},
 #endif
 
-    /* Specifies the beginning of the Aliases context.  This groups 
-     * the Alias mapping options.
+    /* This groups the Alias mapping options.
      *
      * The Aliases context should be defined before any FileSystem contexts
      * are defined, as options in the FileSystem context usually need to
@@ -235,8 +285,7 @@ static const configoption_t options[] =
      */
     {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALIASES,NULL},
 
-    /* Specifies the beginning of a Filesystem context.  This groups
-     * options specific to a filesystem.  A pvfs server may manage
+    /* This groups options specific to a filesystem.  A pvfs2 server may manage
      * more than one filesystem, so a config file may have more than
      * one Filesystem context, each defining the parameters of a different
      * Filesystem.
@@ -248,11 +297,11 @@ static const configoption_t options[] =
     {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_FILESYSTEM,
         NULL},
 
-    /* Specifies the beginning of a StorageHints context.  This groups
+    /* This groups
      * options specific to a filesystem and related to the behavior of the
      * storage system.  Mostly these options are passed directly to the
      * TROVE storage module which may or may not support them.  The
-     * DBPF module (the only TROVE module implemented at present) supports
+     * DBPF module (currently the only TROVE module available) supports
      * all of them.
      */
     {"<StorageHints>",ARG_NONE, enter_storage_hints_context,NULL,
@@ -398,7 +447,9 @@ static const configoption_t options[] =
      * a '-'.  Examples of possible values are:
      *
      * EventLogging flow,msgpair,io
+     * 
      * EventLogging -storage
+     * 
      * EventLogging -flow,-flowproto
      */
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
