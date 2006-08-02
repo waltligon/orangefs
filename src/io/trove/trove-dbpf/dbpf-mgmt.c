@@ -63,6 +63,8 @@ static void dbpf_db_error_callback(
 #endif
     char * msg);
 
+int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
+
 DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 {
     int ret;
@@ -80,7 +82,9 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
     ret = db_env_create(&dbenv, 0);
     if (ret != 0) 
     {
-        gossip_err("dbpf_putdb_env: could not create any environment handle: %s\n", db_strerror(ret));
+        gossip_err("dbpf_env_create: could not create "
+                   "any environment handle: %s\n", 
+                   db_strerror(ret));
         return 0;
     }
     /* don't check return code here; we don't care if it fails */
@@ -182,6 +186,9 @@ retry:
                 *error = ret;
                 return NULL;
             }
+            assert(my_storage_p != NULL);
+            ret = dbenv->open(dbenv, path, DB_CREATE|DB_THREAD|DB_PRIVATE, 0);
+        }
 
         if(ret == DB_RUNRECOVERY)
         {
@@ -217,25 +224,33 @@ int dbpf_putdb_env(DB_ENV *dbenv, const char *path)
         gossip_err("dbpf_putdb_env: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
-    /* Remove any db env backing log etc. Sadly we cannot make use of the same dbenv for removing stuff */
+
+    /* Remove any db env backing log etc. 
+     * Sadly we cannot make use of the same dbenv for removing stuff */
     ret = db_env_create(&dbenv, 0);
     if (ret != 0) 
     {
-        gossip_err("dbpf_putdb_env: could not create any environment handle: %s\n", db_strerror(ret));
+        gossip_err("dbpf_putdb_env: could not create "
+                   "any environment handle: %s\n", 
+                   db_strerror(ret));
         return 0;
     }
     ret = dbenv->remove(dbenv, path, DB_FORCE);
     if (ret != 0) 
     {
-        gossip_err("dbpf_putdb_env: could not remove environment handle: %s\n", db_strerror(ret));
+        gossip_err("dbpf_putdb_env: could not remove "
+                   "environment handle: %s\n", 
+                   db_strerror(ret));
     }
     return 0;
 }
 
-static struct dbpf_storage *dbpf_storage_lookup(char *stoname, int *err_p, TROVE_ds_flags flags);
+static struct dbpf_storage *dbpf_storage_lookup(
+    char *stoname, int *err_p, TROVE_ds_flags flags);
 static int dbpf_db_create(const char *sto_path, char *dbname, DB_ENV *envp);
-static DB *dbpf_db_open(const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
-                        int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2));
+static DB *dbpf_db_open(
+    const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
+    int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2));
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 
