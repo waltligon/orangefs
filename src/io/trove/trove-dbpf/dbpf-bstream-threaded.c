@@ -35,8 +35,7 @@
 #include "pthread.h"
 #include "dbpf-bstream.h"
 
-#define PREAD pread
-#define PWRITE pwrite
+
 
 /*
  * Size for doing only one read operation instead of 
@@ -59,6 +58,33 @@
  * THIS IS DEFINITELY A HACK FOR NOW, for evaluation purpose only ! 
  */
 /*#define THREADS_SCHEDULE_ONLY_ONE_HANDLE 1*/
+    
+int PREAD(int fd, void *buf, size_t count, off_t offset);
+int PWRITE(int fd, const void *buf, size_t count, off_t offset);
+
+inline int PREAD(int fd, void *buf, size_t count, off_t offset){
+    int ret = 0;
+    int retSize = 0;
+    do{
+        ret = pread(fd, buf, count, offset);
+        if (ret){
+            retSize +=ret;
+        }
+    }while(ret == -1 && errno == EINTR);
+    return retSize;
+}
+
+inline int PWRITE(int fd, const void *buf, size_t count, off_t offset){
+    int ret = 0;
+    int retSize = 0;
+    do{
+        ret = pwrite(fd, buf, count, offset);
+        if (ret){
+            retSize +=ret;
+        }
+    }while(ret == -1 && errno == EINTR);
+    return retSize;
+}
 
 enum active_queue_e
 {
