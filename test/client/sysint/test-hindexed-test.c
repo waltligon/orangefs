@@ -455,8 +455,8 @@ int main(int argc, char **argv)
     /* now compare the relevant portions */
     for (c = 0; c < frame.cf_valid_count; c++)
     {
-			if (memcmp(frame.rd_buffer + frame.cf_valid_start[c],
-					 frame.wr_buffer + frame.cf_valid_start[c],
+			if (memcmp((char *)frame.rd_buffer + frame.cf_valid_start[c],
+					 (char *) frame.wr_buffer + frame.cf_valid_start[c],
 					 frame.cf_valid_size[c]))
 			{
 				 fprintf(stderr, "(%d) -> Read buffer did not match with write buffer from [%Ld upto %d bytes]\n",
