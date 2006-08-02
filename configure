@@ -856,7 +856,7 @@ Optional Features:
   --disable-static        Do not build static client library
   --enable-redhat24       Enable workaround for RedHat 2.4 kernel
   --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries
-  --enable-aio            Enable asynchronous I/O instead of threaded I/O
+  --disable-aio          use threaded I/O instead of asynchronous I/O
   --disable-kernel-aio    Forcibly disable kernel aio
   --enable-kernel-sendfile    Forcibly enable kernel sendfile
   --enable-fast           Disable optional debugging, enable optimizations.
@@ -5826,11 +5826,16 @@ rm -f conftest.err conftest.$ac_objext \
 if test "${enable_aio+set}" = set; then
   enableval="$enable_aio"
 
-   if test "x$enableval" = "xyes"; then
-        MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
-        HAVE_TROVE_AIO=1
-
+   if test "x$enableval" = "xno"; then
+        echo ""
    fi
+
+else
+
+   MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
+   HAVE_TROVE_AIO=1
+
+
 
 fi;
 

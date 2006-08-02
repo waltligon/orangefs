@@ -23,6 +23,8 @@
 #include "dbpf-sync.h"
 #include "pvfs2-util.h"
 
+extern dbpf_op_queue_s  s_dbpf_io_ready_queue;
+
 static pthread_t dbpf_thread[OP_QUEUE_LAST];
 static char * threadNames[OP_QUEUE_LAST] = {
     "Meta read",
@@ -77,6 +79,8 @@ int dbpf_thread_initialize(void)
     
 #ifndef __PVFS2_USE_AIO__
     dbpf_bstream_threaded_initalize();
+#else
+    dbpf_op_queue_init(& s_dbpf_io_ready_queue);
 #endif        
 
     gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -307,7 +311,35 @@ void *dbpf_thread_function(void *ptr)
             dbpf_move_op_to_completion_queue(
                 cur_op, ((ret == 1) ? 0 : ret), OP_COMPLETED);
         }else if(ret == TEST_FOR_COMPLETION){
+            /* readd it to the queue */
+            int yield; 
+            /* lazy check to check if we are the only op, if yes 
+               let other threads go first */            
+            yield = dbpf_op_queue_empty(& dbpf_op_queue[OP_QUEUE_IO]);
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+            /*
+              check if trove is telling us to NOT mark this as
+              completed, and also to NOT re-add it to the service
+              queue.  this can happen if trove is throttling I/O
+              internally and will handle re-starting the operation
+              without our help.
+            */
+            if (dbpf_op_get_status(cur_op) == OP_INTERNALLY_DELAYED)
+            {
+                if (yield)
+                {
+                    sched_yield();
+                }
+                continue;
+            }
+#endif            
+            assert(cur_op->op.state != OP_COMPLETED);
             
+            dbpf_queued_op_queue(cur_op, & dbpf_op_queue[OP_QUEUE_IO]);
+            if (yield)
+            {
+                sched_yield();
+            }
         }else{
             assert(0);
         }

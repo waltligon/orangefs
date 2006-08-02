@@ -310,14 +310,17 @@ AX_CHECK_PWRITE_AVAILABLE()
 
 dnl use AIO and not threaded I/O
 AC_ARG_ENABLE(aio,
-[  --enable-aio            Enable asynchronous I/O instead of threaded I/O],
+[  --disable-aio          use threaded I/O instead of asynchronous I/O],
 [
-   if test "x$enableval" = "xyes"; then
-        MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
-        HAVE_TROVE_AIO=1
-        AC_SUBST(HAVE_TROVE_AIO)
+   if test "x$enableval" = "xno"; then
+        echo ""
    fi
 ],
+[
+   MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
+   HAVE_TROVE_AIO=1
+   AC_SUBST(HAVE_TROVE_AIO)
+]
 )
 
 if test "x$HAVE_TROVE_PWRITE" = "x" ; then

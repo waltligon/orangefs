@@ -74,14 +74,14 @@ typedef struct
     TROVE_offset stream_offset;
 
     char *mem_offset;
-    dbpf_queued_op_t *parentRequest;
+    dbpf_queued_op_t * parent_request;
     /*
      * Number of requests to process, in case of real I/O ops read and write
      * these ops are transformed into their small contiguous I/O requests.
      * The remainingNumber of slices shows how much contiguous I/O requests
      * have to be done until this request is finished. 
      */    
-    char *remainingNumberOfSlices;
+    char *remaining_number_of_slices;
 } active_io_processing_slice_t;
 
 typedef struct active_io_processing_t
@@ -92,9 +92,9 @@ typedef struct active_io_processing_t
     int filehandle;
 
     active_io_processing_slice_t *request[ACTIVE_QUEUE_LAST];
-    char *requestNumberOfSlices[ACTIVE_QUEUE_LAST];
-    int totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_LAST];
-    int positionOfProcessing[ACTIVE_QUEUE_LAST];
+    char *request_number_of_slices[ACTIVE_QUEUE_LAST];
+    int   total_number_of_unprocessed_slices[ACTIVE_QUEUE_LAST];
+    int   position_of_processing[ACTIVE_QUEUE_LAST];
 
     TROVE_size total_write_size;
     TROVE_size latest_offset_written;
@@ -143,7 +143,8 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 static void *bstream_threaded_thread_io_function(
     void *pthread_number);
-static int checkAndUpdateCacheSize(
+    
+static int check_update_cache_size(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     TROVE_size write_size);    
@@ -212,7 +213,7 @@ static int open_fd(
 }
 
 
-static void debugPrint(
+static void debug_print(
     char *prefix,
     io_handle_queue_t * elems,
     int thread_number)
@@ -228,19 +229,19 @@ static void debugPrint(
                  elems->requests[IO_QUEUE_FLUSH].elems);
 }
 
-static int noProcessElementAvailable(
+static int is_no_process_element_available(
     io_handle_queue_t * elem)
 {
     return (!(
-             elem->active_io->totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_READ]
+             elem->active_io->total_number_of_unprocessed_slices[ACTIVE_QUEUE_READ]
              || 
-             elem->active_io->totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_WRITE]
+             elem->active_io->total_number_of_unprocessed_slices[ACTIVE_QUEUE_WRITE]
              || elem->request_to_process_count[IO_QUEUE_FLUSH]
              || elem->request_to_process_count[IO_QUEUE_RESIZE]));
 }
 
 
-static void transformIOrequestsIntoArray(
+static void transform_IO_req_to_Array(
     io_handle_queue_t * elem,
     enum active_queue_e active_queue,
     enum IO_queue_type queue_type)
@@ -268,10 +269,10 @@ static void transformIOrequestsIntoArray(
         return;
 
     elem->active_io->request[active_queue] = (active_io_processing_slice_t *)
-        calloc(elem->active_io->totalNumberOfUnprocessedSlices[active_queue], 
+        calloc(elem->active_io->total_number_of_unprocessed_slices[active_queue], 
         sizeof(active_io_processing_slice_t));
 
-    elem->active_io->requestNumberOfSlices[active_queue] = (char *)
+    elem->active_io->request_number_of_slices[active_queue] = (char *)
         calloc(count, sizeof(char));
 
     dbpf_queued_op_t *op;
@@ -300,7 +301,7 @@ static void transformIOrequestsIntoArray(
         total_mem_size = cur_mem_size;
 
         elem->active_io->
-            requestNumberOfSlices[active_queue][current_trove_request] =
+            request_number_of_slices[active_queue][current_trove_request] =
             (memCount > streamCount ? memCount : streamCount);
 
         while (1)
@@ -308,10 +309,10 @@ static void transformIOrequestsIntoArray(
             active_io_processing_slice_t *currentSlice =
                 &elem->active_io->request[active_queue][current_request_slot];
 
-            currentSlice->remainingNumberOfSlices =
+            currentSlice->remaining_number_of_slices =
                 &elem->active_io->
-                requestNumberOfSlices[active_queue][current_trove_request];
-            currentSlice->parentRequest = op;
+                request_number_of_slices[active_queue][current_trove_request];
+            currentSlice->parent_request = op;
             currentSlice->mem_offset = mem_offset;
             currentSlice->size = cur_size;
             currentSlice->stream_offset = cur_stream_offset;
@@ -371,12 +372,12 @@ static void transformIOrequestsIntoArray(
 
         current_trove_request++;
     }
-    assert( elem->active_io->totalNumberOfUnprocessedSlices[active_queue] ==
+    assert( elem->active_io->total_number_of_unprocessed_slices[active_queue] ==
         current_request_slot );
 }
 
 
-static int compareSlices(
+static int compare_slices(
     const void *ps1,
     const void *ps2)
 {
@@ -408,15 +409,15 @@ static void scheduleHandleOps(
      elem->active_io->openflags = O_DIRECT;
 #endif     
     
-    if (elem->active_io->totalNumberOfUnprocessedSlices[queue_type] <= 1)
+    if (elem->active_io->total_number_of_unprocessed_slices[queue_type] <= 1)
         return;
 
     qsort((void *) elem->active_io->request[queue_type],
-          elem->active_io->totalNumberOfUnprocessedSlices[queue_type],
-          sizeof(active_io_processing_slice_t), &compareSlices);
+          elem->active_io->total_number_of_unprocessed_slices[queue_type],
+          sizeof(active_io_processing_slice_t), &compare_slices);
 }
 
-static void markOpsAsInserviceandCountSlices(
+static void mark_ops_as_in_service_count_slices(
     io_handle_queue_t * elem)
 {
     enum IO_queue_type i;
@@ -446,7 +447,7 @@ static void markOpsAsInserviceandCountSlices(
                     op->op.u.b_rw_list.mem_count : 
                     op->op.u.b_rw_list.stream_count;
             }
-            elem->active_io->totalNumberOfUnprocessedSlices[active_queue] = slice_count;
+            elem->active_io->total_number_of_unprocessed_slices[active_queue] = slice_count;
         }else{
             qlist_for_each(tmp_link, &queue->list)
             {
@@ -460,7 +461,7 @@ static void markOpsAsInserviceandCountSlices(
     gen_mutex_init(&elem->active_io->mutex);
 }
 
-static void incrementHandleRef(
+static void increment_handle_ref(
     io_handle_queue_t * elem)
 {
     gen_mutex_lock(&elem->active_io->mutex);
@@ -469,17 +470,17 @@ static void incrementHandleRef(
                  elem, elem->active_io->ref_count);
     if (elem->active_io->filehandle == 0)
     {
-        transformIOrequestsIntoArray(elem, ACTIVE_QUEUE_READ, IO_QUEUE_READ);
-        transformIOrequestsIntoArray(elem, ACTIVE_QUEUE_WRITE, IO_QUEUE_WRITE);
+        transform_IO_req_to_Array(elem, ACTIVE_QUEUE_READ, IO_QUEUE_READ);
+        transform_IO_req_to_Array(elem, ACTIVE_QUEUE_WRITE, IO_QUEUE_WRITE);
 
         gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
                      "IO TransformIORequestsIntoArray r:%d w:%d into slices: r:%d w:%d\n",
                      elem->requests[IO_QUEUE_READ].elems,
                      elem->requests[IO_QUEUE_WRITE].elems,
                      elem->active_io->
-                     totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_READ],
+                     total_number_of_unprocessed_slices[ACTIVE_QUEUE_READ],
                      elem->active_io->
-                     totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_WRITE]);
+                     total_number_of_unprocessed_slices[ACTIVE_QUEUE_WRITE]);
         scheduleHandleOps(elem, ACTIVE_QUEUE_WRITE);
         scheduleHandleOps(elem, ACTIVE_QUEUE_READ);
         
@@ -489,7 +490,7 @@ static void incrementHandleRef(
     gen_mutex_unlock(&elem->active_io->mutex);
 }
 
-static void decrementHandleRef(
+static void decrement_handle_ref(
     io_handle_queue_t * elem, TROVE_size latest_offset_written)
 {
     gen_mutex_lock(&elem->active_io->mutex);
@@ -498,17 +499,17 @@ static void decrementHandleRef(
                  elem, elem->active_io->ref_count);
     gen_mutex_unlock(&elem->active_io->mutex);
 
-    if (elem->active_io->ref_count == 0 && noProcessElementAvailable(elem))
+    if (elem->active_io->ref_count == 0 && is_no_process_element_available(elem))
     {                           
         /* update cache file size and truncate file in case O_DIRECT was used !*/
 #ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
         active_file_io = NULL;                           
-        if(checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
+        if(check_update_cache_size(elem->fs_id, elem->handle, 
             latest_offset_written)){                
             ftruncate(elem->active_io->filehandle, latest_offset_written);
         }
 #else
-        checkAndUpdateCacheSize(elem->fs_id, elem->handle, 
+        check_update_cache_size(elem->fs_id, elem->handle, 
             latest_offset_written);
 #endif
             
@@ -521,16 +522,16 @@ static void decrementHandleRef(
         if (elem->active_io->request[ACTIVE_QUEUE_READ] != NULL)
         {
             free(elem->active_io->request[ACTIVE_QUEUE_READ]);
-            free(elem->active_io->requestNumberOfSlices[ACTIVE_QUEUE_READ]);
+            free(elem->active_io->request_number_of_slices[ACTIVE_QUEUE_READ]);
             elem->active_io->request[ACTIVE_QUEUE_READ] = 0;
-            elem->active_io->requestNumberOfSlices[ACTIVE_QUEUE_READ] = 0;
+            elem->active_io->request_number_of_slices[ACTIVE_QUEUE_READ] = 0;
         }
         if (elem->active_io->request[ACTIVE_QUEUE_WRITE] != NULL)
         {
             free(elem->active_io->request[ACTIVE_QUEUE_WRITE]);
-            free(elem->active_io->requestNumberOfSlices[ACTIVE_QUEUE_WRITE]);
+            free(elem->active_io->request_number_of_slices[ACTIVE_QUEUE_WRITE]);
             elem->active_io->request[ACTIVE_QUEUE_WRITE] = 0;
-            elem->active_io->requestNumberOfSlices[ACTIVE_QUEUE_WRITE] = 0;
+            elem->active_io->request_number_of_slices[ACTIVE_QUEUE_WRITE] = 0;
         }
         free(elem->active_io);
         elem->active_io = 0;
@@ -538,7 +539,7 @@ static void decrementHandleRef(
     }
 }
 
-static int insertOperation(
+static int insert_operation(
     dbpf_queued_op_t * new_op,
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -594,7 +595,7 @@ static int insertOperation(
     return TEST_FOR_COMPLETION;
 }
 
-static void updateCacheSize(
+static void update_cache_size(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     TROVE_size size)
@@ -606,7 +607,7 @@ static void updateCacheSize(
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 }
 
-static int checkAndUpdateCacheSize(
+static int check_update_cache_size(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     TROVE_size write_size)
@@ -621,7 +622,7 @@ static int checkAndUpdateCacheSize(
     return ret;
 }
 
-static void moveAllToCompletionQueue(
+static void move_all_to_completion_queue(
     dbpf_op_queue_s * op_queue,
     int ret)
 {
@@ -635,7 +636,7 @@ static void moveAllToCompletionQueue(
     }
 }
 
-static void processIOSlice(
+static void process_IO_slice(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     enum IO_queue_type type,
@@ -805,7 +806,7 @@ modifyBuffer:
                  "IO slice on thread:%d DONE: %p\n", thread_no, slice);
 
     gen_mutex_lock(mutex);
-    (*slice->remainingNumberOfSlices)--;
+    (*slice->remaining_number_of_slices)--;
     *io_size_out += retSize;
     if (type == IO_QUEUE_WRITE && retSize > 0 &&
         (slice->stream_offset + retSize > *total_write_size_out))
@@ -813,12 +814,12 @@ modifyBuffer:
         *total_write_size_out = slice->stream_offset + retSize;
     }
 
-    if (*(slice->remainingNumberOfSlices) == 0)
+    if (*(slice->remaining_number_of_slices) == 0)
     {
         /* request is finished */
-        dbpf_op_queue_remove(slice->parentRequest);
+        dbpf_op_queue_remove(slice->parent_request);
         *latest_offset_written = *total_write_size_out;
-        dbpf_move_op_to_completion_queue(slice->parentRequest,
+        dbpf_move_op_to_completion_queue(slice->parent_request,
                                     *return_code_out, OP_COMPLETED);
     }
     gen_mutex_unlock(mutex);
@@ -862,7 +863,7 @@ static void * bstream_threaded_thread_io_function(
 
         if (current_handle != NULL)
         {
-            incrementHandleRef(current_handle);
+            increment_handle_ref(current_handle);
 
             /*choose next operation*/
             if (current_handle->request_to_process_count[IO_QUEUE_RESIZE] > 0)
@@ -876,27 +877,27 @@ static void * bstream_threaded_thread_io_function(
                 current_handle->request_to_process_count[req_type] = 0;
             }
             else if (current_handle->active_io->
-                     totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_WRITE] > 0)
+                     total_number_of_unprocessed_slices[ACTIVE_QUEUE_WRITE] > 0)
             {
                 current_handle->active_io->
-                    totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_WRITE]--;
+                    total_number_of_unprocessed_slices[ACTIVE_QUEUE_WRITE]--;
                 req_type = IO_QUEUE_WRITE;
                 io_slice_number =
                     current_handle->active_io->
-                    positionOfProcessing[ACTIVE_QUEUE_WRITE]++;
+                    position_of_processing[ACTIVE_QUEUE_WRITE]++;
                 io_processing_slice =
                     &current_handle->active_io->
                     request[ACTIVE_QUEUE_WRITE][io_slice_number];
             }
             else if (current_handle->active_io->
-                     totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_READ] > 0)
+                     total_number_of_unprocessed_slices[ACTIVE_QUEUE_READ] > 0)
             {
                 current_handle->active_io->
-                    totalNumberOfUnprocessedSlices[ACTIVE_QUEUE_READ]--;
+                    total_number_of_unprocessed_slices[ACTIVE_QUEUE_READ]--;
                 req_type = IO_QUEUE_READ;
                 io_slice_number =
                     current_handle->active_io->
-                    positionOfProcessing[ACTIVE_QUEUE_READ]++;
+                    position_of_processing[ACTIVE_QUEUE_READ]++;
                 io_processing_slice =
                     &current_handle->active_io->
                     request[ACTIVE_QUEUE_READ][io_slice_number];
@@ -919,7 +920,7 @@ static void * bstream_threaded_thread_io_function(
             }
 #ifndef THREADS_SCHEDULE_ONLY_ONE_HANDLE
             /*check if this is the last operation:*/
-            if (noProcessElementAvailable(current_handle))
+            if (is_no_process_element_available(current_handle))
             {
                 active_file_io = NULL;
             }
@@ -970,7 +971,7 @@ static void * bstream_threaded_thread_io_function(
                 }
 
                 current_handle = handle_queue.first;
-                debugPrint("fetching new IO request queue", current_handle,
+                debug_print("fetching new IO request queue", current_handle,
                            thread_number);
 
                 handle_queue.first = current_handle->next;
@@ -979,7 +980,7 @@ static void * bstream_threaded_thread_io_function(
 
                 handle_queue.count--;
 
-                markOpsAsInserviceandCountSlices(current_handle);
+                mark_ops_as_in_service_count_slices(current_handle);
             }
             pthread_mutex_unlock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
             continue;
@@ -988,12 +989,12 @@ static void * bstream_threaded_thread_io_function(
         switch (req_type)
         {
         case (IO_QUEUE_READ):
-            processIOSlice(current_handle->fs_id, current_handle->handle,
+            process_IO_slice(current_handle->fs_id, current_handle->handle,
                            req_type, current_handle->active_io->filehandle,
                            io_processing_slice,
                            &current_handle->active_io->mutex,
                            &current_handle->active_io->total_write_size,
-                           io_processing_slice->parentRequest->op.u.b_rw_list.
+                           io_processing_slice->parent_request->op.u.b_rw_list.
                            out_size_p, 
                            &current_handle->active_io->latest_offset_written,
                            &current_handle->active_io->return_code,
@@ -1002,12 +1003,12 @@ static void * bstream_threaded_thread_io_function(
             break;
         case (IO_QUEUE_WRITE):
             {
-                processIOSlice(current_handle->fs_id, current_handle->handle,
+                process_IO_slice(current_handle->fs_id, current_handle->handle,
                                req_type, current_handle->active_io->filehandle,
                                io_processing_slice,
                                &current_handle->active_io->mutex,
                                &current_handle->active_io->total_write_size,
-                               io_processing_slice->parentRequest->op.u.
+                               io_processing_slice->parent_request->op.u.
                                b_rw_list.out_size_p,
                                &current_handle->active_io->latest_offset_written,
                                &current_handle->active_io->return_code,
@@ -1025,12 +1026,12 @@ static void * bstream_threaded_thread_io_function(
                 }
                 else
                 {
-                    updateCacheSize(current_handle->fs_id,
+                    update_cache_size(current_handle->fs_id,
                                     current_handle->handle,
                                     request->op.u.b_resize.size);
                 }
 
-                moveAllToCompletionQueue(&current_handle->
+                move_all_to_completion_queue(&current_handle->
                                          requests[IO_QUEUE_RESIZE], ret);
 
                 break;
@@ -1042,7 +1043,7 @@ static void * bstream_threaded_thread_io_function(
                 {
                     ret = -trove_errno_to_trove_error(errno);
                 }
-                moveAllToCompletionQueue(&current_handle->
+                move_all_to_completion_queue(&current_handle->
                                          requests[IO_QUEUE_FLUSH], ret);
 
                 break;
@@ -1052,7 +1053,7 @@ static void * bstream_threaded_thread_io_function(
             }
         }
 
-        decrementHandleRef(current_handle,
+        decrement_handle_ref(current_handle,
             current_handle->active_io->latest_offset_written);
     }
     
@@ -1135,7 +1136,7 @@ static int dbpf_bstream_resize(
     /* initialize the op-specific members */
     q_op_p->op.u.b_resize.size = *inout_size_p;
 
-    return insertOperation(q_op_p, coll_id, handle, IO_QUEUE_RESIZE,
+    return insert_operation(q_op_p, coll_id, handle, IO_QUEUE_RESIZE,
                            out_op_id_p);
 }
 
@@ -1194,7 +1195,7 @@ static inline int dbpf_bstream_rw_list(
 
     q_op_p->op.u.b_rw_list.out_size_p = out_size_p;
 
-    return insertOperation(q_op_p, coll_id, handle, opcode, out_op_id_p);
+    return insert_operation(q_op_p, coll_id, handle, opcode, out_op_id_p);
 
 }
 
@@ -1226,7 +1227,7 @@ static int dbpf_bstream_flush(
                         BSTREAM_FLUSH,
                         handle, coll_p, NULL, user_ptr, flags, context_id);
 
-    return insertOperation(q_op_p, coll_id, handle, IO_QUEUE_FLUSH,
+    return insert_operation(q_op_p, coll_id, handle, IO_QUEUE_FLUSH,
                            out_op_id_p);
 }
 

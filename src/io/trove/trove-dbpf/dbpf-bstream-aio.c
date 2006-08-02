@@ -4,7 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#ifdef __PVFS2_USE_AIO__
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -12,6 +11,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <assert.h>
+
+#ifdef __PVFS2_USE_AIO__
 
 #include "trove.h"
 #include "trove-internal.h"
@@ -56,6 +57,8 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 #define DBPF_MAX_IOS_IN_PROGRESS  16
 static int s_dbpf_ios_in_progress = 0;
+static gen_mutex_t s_dbpf_io_mutex = GEN_MUTEX_INITIALIZER;
+dbpf_op_queue_s  s_dbpf_io_ready_queue;
 
 static int issue_or_delay_io_operation(
     dbpf_queued_op_t * cur_op,
@@ -65,13 +68,6 @@ static int issue_or_delay_io_operation(
     int dec_first);
 static void start_delayed_ops_if_any(
     int dec_first);
-
-static char *list_proc_state_strings[] = {
-    "LIST_PROC_INITIALIZED",
-    "LIST_PROC_INPROGRESS ",
-    "LIST_PROC_ALLCONVERTED",
-    "LIST_PROC_ALLPOSTED",
-};
 
 static inline int dbpf_bstream_rw_list(
     TROVE_coll_id coll_id,
@@ -106,10 +102,16 @@ static int dbpf_bstream_resize_op_svc(
 #include "dbpf-thread.h"
 #include "pvfs2-internal.h"
 
-extern pthread_cond_t dbpf_op_completed_cond;
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 #ifdef __PVFS2_TROVE_AIO_THREADED__
+
+static char *list_proc_state_strings[] = {
+    "LIST_PROC_INITIALIZED",
+    "LIST_PROC_INPROGRESS ",
+    "LIST_PROC_ALLCONVERTED",
+    "LIST_PROC_ALLPOSTED",
+};
 
 static void aio_progress_notification(
     union sigval sig)
@@ -280,7 +282,7 @@ static void start_delayed_ops_if_any(
     int i = 0, aiocb_inuse_count = 0;
     struct aiocb *aiocbs = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = { 0 };
 
-    gen_mutex_lock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
+    gen_mutex_lock(& s_dbpf_io_mutex);
     if (dec_first)
     {
         s_dbpf_ios_in_progress--;
@@ -288,11 +290,11 @@ static void start_delayed_ops_if_any(
     gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF I/O ops in progress: %d\n",
                  s_dbpf_ios_in_progress);
                  
-    assert(& dbpf_op_queue[OP_QUEUE_IO]);
+    assert(& s_dbpf_io_ready_queue);
 
-    if (!dbpf_op_queue_empty(& dbpf_op_queue[OP_QUEUE_IO]))
+    if (!dbpf_op_queue_empty(& s_dbpf_io_ready_queue))
     {
-        cur_op = dbpf_op_pop_front_nolock(& dbpf_op_queue[OP_QUEUE_IO]);
+        cur_op = dbpf_op_pop_front_nolock( & s_dbpf_io_ready_queue);
         assert(cur_op);
 #ifndef __PVFS2_TROVE_AIO_THREADED__
         assert(cur_op->op.state == OP_INTERNALLY_DELAYED);
@@ -366,12 +368,12 @@ static void start_delayed_ops_if_any(
            operation queue so that the calling thread can continue to
            call the service method (state flag is updated as well)
          */
-        dbpf_queued_op_queue_nolock(cur_op, & dbpf_op_queue[OP_QUEUE_IO]);
+        dbpf_queued_op_queue(cur_op, & dbpf_op_queue[OP_QUEUE_IO]);
         
 #endif
     }
   error_exit:
-    gen_mutex_unlock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
+    gen_mutex_unlock(& s_dbpf_io_mutex);
 }
 
 static int issue_or_delay_io_operation(
@@ -385,7 +387,7 @@ static int issue_or_delay_io_operation(
     int i;
     assert(cur_op);
 
-    gen_mutex_lock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
+    gen_mutex_lock(& s_dbpf_io_mutex);
     if (dec_first)
     {
         s_dbpf_ios_in_progress--;
@@ -396,8 +398,8 @@ static int issue_or_delay_io_operation(
     }
     else
     {
-        assert(& dbpf_op_queue[OP_QUEUE_IO]);
-        dbpf_op_queue_add(& dbpf_op_queue[OP_QUEUE_IO], cur_op);
+        assert(& s_dbpf_io_ready_queue);
+        dbpf_op_queue_add(& s_dbpf_io_ready_queue, cur_op);
 
         op_delayed = 1;
 #ifndef __PVFS2_TROVE_AIO_THREADED__
@@ -418,7 +420,7 @@ static int issue_or_delay_io_operation(
     gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF I/O ops in progress: %d\n",
                  s_dbpf_ios_in_progress);
 
-    gen_mutex_unlock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
+    gen_mutex_unlock(& s_dbpf_io_mutex);
 
     if (!op_delayed)
     {
