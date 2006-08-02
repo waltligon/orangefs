@@ -161,7 +161,7 @@ retry:
             ret = dbenv->remove(dbenv, path, DB_FORCE);
             if (ret != 0)
             {
-                gossip_lerr("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
+                gossip_lerr("dbpf_remove(%s): %s\n", path, db_strerror(ret));
                 *error = ret;
                 return NULL;
             }
@@ -169,6 +169,19 @@ retry:
             my_storage_p->flags |= TROVE_DB_CACHE_MMAP;
             goto retry;
         }
+
+        /* berkeley db is sometimes configured without shared memory.  If
+         * open returns an EINVAL, retry with DB_PRIVATE.
+         */
+        if(ret == EINVAL) {
+
+            ret = dbenv->remove(dbenv, path, DB_FORCE);
+            if(ret != 0)
+            {
+                gossip_lerr("dbpf_remove(%s): %s\n", path, db_strerror(ret));
+                *error = ret;
+                return NULL;
+            }
 
         if(ret == DB_RUNRECOVERY)
         {
