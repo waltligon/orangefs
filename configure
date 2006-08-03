@@ -6852,14 +6852,15 @@ rm -f conftest.err conftest.$ac_objext \
 # Check whether --enable-aio was given.
 if test "${enable_aio+set}" = set; then
   enableval=$enable_aio;
-   if test "x$enableval" = "xno"; then
-        echo ""
-   fi
+   MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
+   HAVE_TROVE_AIO=1
+
 
 else
 
-   MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
-   HAVE_TROVE_AIO=1
+   if test "x$enableval" = "xno"; then
+        echo ""
+   fi
 
 
 

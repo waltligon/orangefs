@@ -20,7 +20,7 @@ typedef struct
     int coalesce_counter;
     
     gen_mutex_t * mutex;
-    dbpf_op_queue_s * sync_queue;
+    dbpf_op_queue_t * sync_queue;
 } dbpf_sync_context_t;
 
 int dbpf_sync_context_init(int context_index);

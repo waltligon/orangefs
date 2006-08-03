@@ -63,7 +63,7 @@ enum operation_queue_type{
  *
  */
 
-struct dbpf_op_queue_t;
+struct dbpf_op_queue_s;
 
 typedef struct
 {
@@ -76,7 +76,7 @@ typedef struct
     /* the operation return code after being services */
     TROVE_ds_state state;
 
-    struct dbpf_op_queue_t * queue;
+    struct dbpf_op_queue_s *queue;
 
     struct qlist_head link;
 } dbpf_queued_op_t;

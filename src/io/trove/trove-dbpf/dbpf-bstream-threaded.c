@@ -138,9 +138,9 @@ typedef struct active_io_processing_t
     int return_code;
 } active_io_processing_t;
 
-typedef struct io_handle_queue_t
+typedef struct io_handle_queue_s
 {
-    struct io_handle_queue_t *next;
+    struct io_handle_queue_s *next;
 
     PVFS_handle handle;
     PVFS_fs_id fs_id;
@@ -148,7 +148,7 @@ typedef struct io_handle_queue_t
     /*during processing in the active queue we need extra information */
     active_io_processing_t *active_io;
     
-    dbpf_op_queue_s requests[IO_QUEUE_LAST];
+    dbpf_op_queue_t requests[IO_QUEUE_LAST];
     /*
      * Number of requests to process, in case of real I/O ops read and write
      * these ops are transformed into their small contiguous I/O requests
@@ -312,7 +312,7 @@ static void transform_io_req_to_array(
 
     dbpf_queued_op_t *op;
     struct qlist_head *tmp_link;
-    dbpf_op_queue_s *queue = &elem->requests[queue_type];
+    dbpf_op_queue_t *queue = &elem->requests[queue_type];
 
     int current_trove_request = 0;
     qlist_for_each(tmp_link, &queue->list)
@@ -465,7 +465,7 @@ static void mark_ops_as_in_service_count_slices(
     /*at first mark operations as in service (reason dspace_cancel)...*/
     for (i = 0; i < IO_QUEUE_LAST; i++)
     {
-        dbpf_op_queue_s *queue = &elem->requests[i];
+        dbpf_op_queue_t *queue = &elem->requests[i];
         dbpf_queued_op_t *op;
         struct qlist_head *tmp_link;
         int slice_count = 0;
@@ -660,7 +660,7 @@ static int check_update_cache_size(
 }
 
 static void move_all_to_completion_queue(
-    dbpf_op_queue_s * op_queue,
+    dbpf_op_queue_t * op_queue,
     int ret)
 {
     int i;

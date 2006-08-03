@@ -21,10 +21,11 @@ extern "C" {
 
 #include "id-generator.h"
 
-typedef struct dbpf_op_queue_t{
+typedef struct dbpf_op_queue_s
+{
     struct qlist_head list;
     int elems;
-} dbpf_op_queue_s;
+} dbpf_op_queue_t;
 
 enum
 {
@@ -36,12 +37,12 @@ enum
 extern pthread_cond_t dbpf_op_incoming_cond[OP_QUEUE_LAST];
 
 /* the queue that stores pending serviceable operations */
-extern dbpf_op_queue_s dbpf_op_queue[OP_QUEUE_LAST];
+extern dbpf_op_queue_t dbpf_op_queue[OP_QUEUE_LAST];
 
 /* lock to be obtained before manipulating dbpf_op_queue */
 extern gen_mutex_t dbpf_op_queue_mutex[OP_QUEUE_LAST];
 
-extern dbpf_op_queue_s * dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+extern dbpf_op_queue_t * dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t    *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 extern pthread_cond_t  dbpf_op_completed_cond;
 
@@ -49,34 +50,38 @@ extern int dbpf_op_queue_waiting_operation_count[OP_QUEUE_LAST];
 
 extern pthread_cond_t dbpf_op_completed_cond;
 
+dbpf_op_queue_t * dbpf_op_queue_new(void);
+void dbpf_op_queue_init(dbpf_op_queue_t * queue);
 
+void dbpf_move_op_to_completion_queue(
+    dbpf_queued_op_t *cur_op, 
+    TROVE_ds_state ret_state, 
+    enum dbpf_op_state end_state);
 
-dbpf_op_queue_s * dbpf_op_queue_new(void);
-void dbpf_op_queue_init(dbpf_op_queue_s * queue);
+void dbpf_move_op_to_completion_queue_nolock(
+    dbpf_queued_op_t *cur_op, 
+    TROVE_ds_state ret_state, 
+    enum dbpf_op_state end_state);    
 
-void dbpf_move_op_to_completion_queue(dbpf_queued_op_t *cur_op, 
-    TROVE_ds_state ret_state, enum dbpf_op_state end_state);
-void dbpf_move_op_to_completion_queue_nolock(dbpf_queued_op_t *cur_op, 
-    TROVE_ds_state ret_state, enum dbpf_op_state end_state);    
+void dbpf_op_queue_cleanup_nolock(dbpf_op_queue_t *  op_queue);
 
-void dbpf_op_queue_cleanup_nolock(dbpf_op_queue_s *  op_queue);
-
-void dbpf_op_queue_add( dbpf_op_queue_s *  op_queue,
-    dbpf_queued_op_t *dbpf_op);
+void dbpf_op_queue_add(dbpf_op_queue_t *  op_queue,
+                       dbpf_queued_op_t *dbpf_op);
 
 void dbpf_op_queue_remove(dbpf_queued_op_t *dbpf_op);
 
-int dbpf_op_queue_empty(dbpf_op_queue_s *  op_queue);
+int dbpf_op_queue_empty(dbpf_op_queue_t *  op_queue);
 
-dbpf_queued_op_t *dbpf_op_pop_front_nolock(dbpf_op_queue_s *  op_queue);
+dbpf_queued_op_t *dbpf_op_pop_front_nolock(dbpf_op_queue_t *  op_queue);
 
 TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p, 
-    dbpf_op_queue_s* queue );
-TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p, 
-    dbpf_op_queue_s* queue);
+                                 dbpf_op_queue_t* queue);
 
-void dbpf_queued_op_dequeue(dbpf_queued_op_t *q_op_p );
-void dbpf_queued_op_dequeue_nolock(dbpf_queued_op_t *q_op_p );
+TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p, 
+                                        dbpf_op_queue_t* queue);
+
+void dbpf_queued_op_dequeue(dbpf_queued_op_t *q_op_p);
+void dbpf_queued_op_dequeue_nolock(dbpf_queued_op_t *q_op_p);
 
 int dbpf_op_init_queued_or_immediate(
     struct dbpf_op *op_p,

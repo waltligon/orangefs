@@ -23,8 +23,6 @@
 #include "dbpf-sync.h"
 #include "pvfs2-util.h"
 
-extern dbpf_op_queue_s  s_dbpf_io_ready_queue;
-
 static pthread_t dbpf_thread[OP_QUEUE_LAST];
 static char * thread_names[OP_QUEUE_LAST] = {
     "Meta read",
@@ -79,8 +77,6 @@ int dbpf_thread_initialize(void)
     
 #ifndef __PVFS2_USE_AIO__
     dbpf_bstream_threaded_initalize();
-#else
-    dbpf_op_queue_init(& s_dbpf_io_ready_queue);
 #endif        
 
     gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -210,7 +206,7 @@ void *dbpf_background_file_removal_thread_function(void *ptr)
 
 void *dbpf_thread_function(void *ptr)
 {
-    dbpf_op_queue_s * work_queue;
+    dbpf_op_queue_t * work_queue;
     gen_mutex_t * work_queue_mutex;
     pthread_cond_t * queue_cond;
     char * thread_type;

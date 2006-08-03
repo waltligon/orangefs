@@ -67,12 +67,6 @@ static int dbpf_bstream_aio_issue_or_delay(
     int dec_first);
 
 /**
- * If we haven't reached max number of IO operations, we post the
- * next IO from the dbpf op queue.
- */
-static void dbpf_bstream_aio_start_delayed(void);
-
-/**
  * Setup and post the next AIO operation for the given dbpf queued op
  */
 static int dbpf_bstream_aio_setup_next_op(dbpf_queued_op_t * q_op_p,
@@ -100,7 +94,6 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 static int s_dbpf_ios_in_progress_max = 512;
 static int s_dbpf_ios_in_progress = 0;
-
 int dbpf_bstream_aio_set_max_progress(int progress_max)
 {
     s_dbpf_ios_in_progress_max = progress_max;
@@ -151,6 +144,12 @@ extern pthread_cond_t dbpf_op_completed_cond;
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 #ifdef __PVFS2_TROVE_AIO_THREADED__
+
+/**
+ * If we haven't reached max number of IO operations, we post the
+ * next IO from the dbpf op queue.
+ */
+static void dbpf_bstream_aio_start_delayed(void);
 
 static void aio_progress_notification(
     union sigval sig)
@@ -215,7 +214,6 @@ static void aio_progress_notification(
         }
     }
 }
-#endif /* __PVFS2_TROVE_AIO_THREADED__ */
 
 static void dbpf_bstream_aio_start_delayed(void)
 {
@@ -234,9 +232,6 @@ static void dbpf_bstream_aio_start_delayed(void)
     {
         cur_op = dbpf_op_pop_front_nolock(& dbpf_op_queue[OP_QUEUE_IO]);
         assert(cur_op);
-#ifndef __PVFS2_TROVE_AIO_THREADED__
-        assert(cur_op->op.state == OP_INTERNALLY_DELAYED);
-#endif
         assert((cur_op->op.type == BSTREAM_READ_AT) ||
                (cur_op->op.type == BSTREAM_READ_LIST) ||
                (cur_op->op.type == BSTREAM_WRITE_AT) ||
@@ -297,21 +292,12 @@ static void dbpf_bstream_aio_start_delayed(void)
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
                      "(handle %llu, ret %d))\n", __func__, cur_op,
                      llu(cur_op->op.handle), ret);
-
-#ifndef __PVFS2_TROVE_AIO_THREADED__
-        /*
-           to continue making progress on this previously delayed I/O
-           operation, we need to re-add it back to the normal dbpf
-           operation queue so that the calling thread can continue to
-           call the service method (state flag is updated as well)
-         */
-        dbpf_queued_op_queue_nolock(cur_op, & dbpf_op_queue[OP_QUEUE_IO]);
-        
-#endif
     }
   error_exit:
     gen_mutex_unlock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
 }
+
+#endif /* __PVFS2_TROVE_AIO_THREADED__ */
 
 static int dbpf_bstream_aio_issue_or_delay(
     dbpf_queued_op_t * cur_op,
@@ -326,6 +312,8 @@ static int dbpf_bstream_aio_issue_or_delay(
 
     if (s_dbpf_ios_in_progress < s_dbpf_ios_in_progress_max)
     {
+        /* issue */
+
         if (gossip_debug_enabled(GOSSIP_TROVE_DEBUG))
         {
             gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -360,6 +348,7 @@ static int dbpf_bstream_aio_issue_or_delay(
     }
     else
     {
+        /* delay */
         gen_mutex_lock(&dbpf_op_queue_mutex[OP_QUEUE_IO]);
         assert(& dbpf_op_queue[OP_QUEUE_IO]);
         dbpf_op_queue_add(& dbpf_op_queue[OP_QUEUE_IO], cur_op);
@@ -1238,17 +1227,6 @@ static void aiocb_print(struct aiocb *ptr)
 }
 #endif
 
-
-struct TROVE_bstream_ops dbpf_bstream_ops = {
-    dbpf_bstream_read_at,
-    dbpf_bstream_write_at,
-    dbpf_bstream_resize,
-    dbpf_bstream_validate,
-    dbpf_bstream_read_list,
-    dbpf_bstream_write_list,
-    dbpf_bstream_flush
-};
-
 static int dbpf_bstream_aiocb_init(struct aiocb ** new_aiocb_p)
 {
     int i;
@@ -1422,6 +1400,16 @@ static int dbpf_bstream_aio_finish(struct dbpf_op * op_p)
 
     return ret;
 }
+
+struct TROVE_bstream_ops dbpf_bstream_ops = {
+    dbpf_bstream_read_at,
+    dbpf_bstream_write_at,
+    dbpf_bstream_resize,
+    dbpf_bstream_validate,
+    dbpf_bstream_read_list,
+    dbpf_bstream_write_list,
+    dbpf_bstream_flush
+};
 
 #endif /* use AIO */
 /*

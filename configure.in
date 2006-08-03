@@ -312,15 +312,16 @@ dnl use AIO and not threaded I/O
 AC_ARG_ENABLE(aio,
 [  --disable-aio          use threaded I/O instead of asynchronous I/O],
 [
-   if test "x$enableval" = "xno"; then
-        echo ""
-   fi
-],
-[
    MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
    HAVE_TROVE_AIO=1
    AC_SUBST(HAVE_TROVE_AIO)
+],
+[
+   if test "x$enableval" = "xno"; then
+        echo ""
+   fi
 ]
+
 )
 
 if test "x$HAVE_TROVE_PWRITE" = "x" ; then
