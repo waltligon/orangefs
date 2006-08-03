@@ -14,23 +14,21 @@ extern "C"
 
 #ifdef __PVFS2_USE_AIO__
 #include <aio.h>
+int dbpf_bstream_aio_set_max_progress(int max);
 
 #else
-    int dbpf_bstream_threaded_initalize(
-    void);
-    int dbpf_bstream_threaded_finalize(
-    void);
-    int dbpf_bstream_threaded_set_thread_count(
-    int count);
+int dbpf_bstream_threaded_initalize(void);
+int dbpf_bstream_threaded_finalize(void);
+int dbpf_bstream_threaded_set_thread_count(int count);
 
-    enum IO_queue_type
-    {
-        IO_QUEUE_RESIZE,
-        IO_QUEUE_WRITE,
-        IO_QUEUE_READ,
-        IO_QUEUE_FLUSH,
-        IO_QUEUE_LAST
-    };
+enum io_queue_type
+{
+    IO_QUEUE_RESIZE,
+    IO_QUEUE_WRITE,
+    IO_QUEUE_READ,
+    IO_QUEUE_FLUSH,
+    IO_QUEUE_LAST
+};
 #endif
 
 #include "trove.h"

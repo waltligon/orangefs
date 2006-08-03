@@ -26,7 +26,7 @@
 extern dbpf_op_queue_s  s_dbpf_io_ready_queue;
 
 static pthread_t dbpf_thread[OP_QUEUE_LAST];
-static char * threadNames[OP_QUEUE_LAST] = {
+static char * thread_names[OP_QUEUE_LAST] = {
     "Meta read",
     "Meta write",
     "I/O",
@@ -38,7 +38,7 @@ static int dbpf_threads_running = 0;
 int dbpf_thread_initialize(void)
 {
     int ret = 0, i;
-    int * threadType[OP_QUEUE_LAST];
+    int * thread_type[OP_QUEUE_LAST];
      
     if (dbpf_threads_running)
         return 0;
@@ -62,11 +62,11 @@ int dbpf_thread_initialize(void)
         }
         else    
         {
-            threadType[i] = (int*) malloc(sizeof(int));
-            *threadType[i] = i;
+            thread_type[i] = (int*) malloc(sizeof(int));
+            *thread_type[i] = i;
             
             ret = pthread_create(& dbpf_thread[i], NULL,
-                             dbpf_thread_function, threadType[i]);
+                             dbpf_thread_function, thread_type[i]);
         }
         if ( ret != 0)
         {
@@ -219,7 +219,7 @@ void *dbpf_thread_function(void *ptr)
     queue_type = *((int*) ptr);
     free ((int*)ptr);
     
-    thread_type = threadNames[queue_type];
+    thread_type = thread_names[queue_type];
 
     work_queue = & dbpf_op_queue[queue_type];
     work_queue_mutex = & dbpf_op_queue_mutex[queue_type];
@@ -349,8 +349,6 @@ void *dbpf_thread_function(void *ptr)
         " ending\n",thread_type);
     return ptr;
 }
-
-
 
 /*
  * Local variables:
