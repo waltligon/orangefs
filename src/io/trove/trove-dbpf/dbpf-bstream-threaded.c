@@ -4,6 +4,8 @@
  * See COPYING in top-level directory.
  */
  
+#include "dbpf.h"
+
 /*
  * Needed for O_DIRECT disk access
  */
@@ -28,7 +30,6 @@
 #include "pvfs2-debug.h"
 #include "trove.h"
 #include "trove-internal.h"
-#include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-attr-cache.h"
 #include "pint-event.h"

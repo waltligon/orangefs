@@ -11,6 +11,7 @@
 extern "C" {
 #endif
 
+#include <sys/types.h>
 #include <db.h>
 #include <aio.h>
 #include "trove.h"
@@ -542,7 +543,9 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 #define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret)  \
 do {                                                      \
     int tmp_ret, tmp_errno;                               \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)                  \
+    if ((dbpf_op_ptr->flags & TROVE_SYNC) &&              \
+        ((dbpf_op_ptr->type == BSTREAM_WRITE_AT) ||       \
+         (dbpf_op_ptr->type == BSTREAM_WRITE_LIST)))      \
     {                                                     \
         if ((tmp_ret = DBPF_SYNC(fd)) != 0)               \
         {                                                 \
