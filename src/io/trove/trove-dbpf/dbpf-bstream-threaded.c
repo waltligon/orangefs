@@ -66,7 +66,7 @@ inline int PREAD(int fd, void *buf, size_t count, off_t offset){
     int ret = 0;
     int retSize = 0;
     do{
-        ret = pread(fd, buf, count - retSize, offset + retSize);
+        ret = pread(fd, buf + retSize, count - retSize, offset + retSize);
         if (ret){
             retSize +=ret;
         }
@@ -78,7 +78,7 @@ inline int PWRITE(int fd, const void *buf, size_t count, off_t offset){
     int ret = 0;
     int retSize = 0;
     do{
-        ret = pwrite(fd, buf, count - retSize, offset + retSize);
+        ret = pwrite(fd, buf + retSize, count - retSize, offset + retSize);
         if (ret){
             retSize +=ret;
         }
