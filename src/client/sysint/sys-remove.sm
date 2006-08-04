@@ -44,8 +44,7 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    MSGPAIR_RETURN_SUCCESS = 1,
-    RMDIRENT_RETRY,
+    RMDIRENT_RETRY = 1,
     CRDIRENT_RETRY,
     RETURN_STORED_ERROR_CODE
 };
@@ -112,7 +111,6 @@ machine pvfs2_client_remove_sm(
     {
         jump pvfs2_msgpairarray_sm;
         success => do_remove;
-        MSGPAIR_RETURN_SUCCESS => do_remove;
         default => rmdirent_retry_or_fail;
     }
 
@@ -160,7 +158,6 @@ machine pvfs2_client_remove_sm(
     {
         jump pvfs2_msgpairarray_sm;
         success => cleanup;
-        MSGPAIR_RETURN_SUCCESS => cleanup;
         default => crdirent_retry_or_fail;
     }
 

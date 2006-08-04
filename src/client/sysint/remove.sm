@@ -22,8 +22,7 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    REMOVE_MUST_REMOVE_DATAFILES = 1,
-    MSGPAIR_RETURN_SUCCESS
+    REMOVE_MUST_REMOVE_DATAFILES = 1
 };
 
 static int remove_getattr_init(PINT_client_sm *sm_p,
@@ -119,7 +118,6 @@ nested machine pvfs2_client_remove_helper_sm(
     {
         jump pvfs2_msgpairarray_sm;
         success => remove_helper_cleanup;
-        MSGPAIR_RETURN_SUCCESS => remove_helper_cleanup;
         default => object_remove_failure;
     }
 
