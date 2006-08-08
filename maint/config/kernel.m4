@@ -134,6 +134,43 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		)
 	fi
 
+	tmp_cflags=$CFLAGS
+	dnl if this test passes, there is a struct dentry* argument
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(if statfs callbacks' arguments in kernel has struct dentry argument)
+	dnl if this test passes, the kernel has it
+	dnl if this test fails, the kernel does not have it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		extern int pvfs_statfs(struct dentry *, struct kstatfs *);
+			  static struct super_operations s_op = {
+				  .statfs = pvfs_statfs,
+			  };
+		], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if statfs callback has struct dentry argument),
+		AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(if get_sb callbacks' in kernel has struct vfsmount argument)
+	dnl if this test passes, the kernel has it
+	dnl if this test fails, the kernel does not have it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/mount.h>
+		extern int pvfs_get_sb(struct file_system_type *fst, int flags, const char *devname, void *data, struct vfsmount *);
+			  static struct file_system_type fst = {
+				  .get_sb = pvfs_get_sb,
+			  };
+		], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if get_sb callback has struct vfsmount argument),
+		AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
 	AC_MSG_CHECKING(for xattr support in kernel)
 	dnl if this test passes, the kernel has it
 	dnl if this test fails, the kernel does not have it
@@ -213,6 +250,10 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		 #endif
 		 ] )
 
+	AC_CHECK_HEADERS([linux/mount.h], [], [], 
+		[#define __KERNEL__
+		 #include <linux/mount.h>
+		 ] )
 	AC_CHECK_HEADERS([linux/ioctl32.h], [], [], 
 		[#define __KERNEL__
 		 #include <linux/ioctl32.h>

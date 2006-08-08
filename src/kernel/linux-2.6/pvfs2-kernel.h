@@ -77,6 +77,9 @@ typedef unsigned long sector_t;
 #ifdef HAVE_LINUX_SYSCALLS_H
 #include <linux/syscalls.h>
 #endif
+#ifdef HAVE_LINUX_MOUNT_H
+#include <linux/mount.h>
+#endif
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <linux/uio.h>
@@ -552,9 +555,16 @@ struct super_block* pvfs2_get_sb(
     void *data,
     int silent);
 #else
+#ifdef HAVE_VFSMOUNT_GETSB
+int pvfs2_get_sb(
+    struct file_system_type *fst, int flags,
+    const char *devname, void *data, 
+    struct vfsmount *mnt);
+#else
 struct super_block *pvfs2_get_sb(
     struct file_system_type *fst, int flags,
     const char *devname, void *data);
+#endif
 #endif
 
 void pvfs2_kill_sb(struct super_block *sb);

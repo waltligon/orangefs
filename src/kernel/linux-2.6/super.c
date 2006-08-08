@@ -296,17 +296,30 @@ static void pvfs2_put_inode(
 */
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_statfs(
-    struct super_block *sb,
+    struct super_block *psb,
     struct statfs *buf)
 #else
+#ifdef HAVE_DENTRY_STATFS_SOP
 static int pvfs2_statfs(
-    struct super_block *sb,
+    struct dentry *dentry,
     struct kstatfs *buf)
+#else
+static int pvfs2_statfs(
+    struct super_block *psb,
+    struct kstatfs *buf)
+#endif
 #endif
 {
     int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     int flags = 0;
+    struct super_block *sb = NULL;
+
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_DENTRY_STATFS_SOP)
+    sb = dentry->d_sb;
+#else
+    sb = psb;
+#endif
 
     pvfs2_print("pvfs2_statfs: called on sb %p (fs_id is %d)\n",
                 sb, (int)(PVFS2_SB(sb)->fs_id));
@@ -737,11 +750,20 @@ int pvfs2_fill_sb(
     return 0;
 }
 
+#ifdef HAVE_VFSMOUNT_GETSB
+int pvfs2_get_sb(
+    struct file_system_type *fst,
+    int flags,
+    const char *devname,
+    void *data,
+    struct vfsmount *mnt)
+#else
 struct super_block *pvfs2_get_sb(
     struct file_system_type *fst,
     int flags,
     const char *devname,
     void *data)
+#endif
 {
     int ret = -EINVAL;
     struct super_block *sb = ERR_PTR(-EINVAL);
@@ -755,7 +777,12 @@ struct super_block *pvfs2_get_sb(
         new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
         if (!new_op)
         {
-            return ERR_PTR(-ENOMEM);
+            ret = -ENOMEM;
+#ifdef HAVE_VFSMOUNT_GETSB
+            return ret;
+#else
+            return ERR_PTR(ret);
+#endif
         }
         strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
                 devname, PVFS_MAX_SERVER_ADDR_LEN);
@@ -794,8 +821,16 @@ struct super_block *pvfs2_get_sb(
           here.  so we store it temporarily and pass all of the info
           to fill_sb where it's properly copied out
         */
+#ifdef HAVE_VFSMOUNT_GETSB
+        ret = get_sb_nodev(
+            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb, mnt);
+        if (ret)
+            goto free_op;
+        sb = mnt->mnt_sb;
+#else
         sb = get_sb_nodev(
             fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
+#endif
 
         if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {
@@ -813,6 +848,10 @@ struct super_block *pvfs2_get_sb(
             /* finally, add this sb to our list of known pvfs2 sb's */
             add_pvfs2_sb(sb);
         }
+        else {
+            ret = -EINVAL;
+            pvfs2_error("Invalid superblock obtained from get_sb_nodev (%p)\n", sb);
+        }
     }
     else
     {
@@ -820,22 +859,33 @@ struct super_block *pvfs2_get_sb(
     }
 
     op_release(new_op);
+#ifdef HAVE_VFSMOUNT_GETSB
+    return ret;
+#else
     return sb;
+#endif
 
-  error_exit:
-    pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
-
+error_exit:
     if (ret || IS_ERR(sb))
     {
         sb = ERR_PTR(ret);
     }
+#ifdef HAVE_VFSMOUNT_GETSB
+free_op:
+#endif
+    pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
 
     if (new_op)
     {
         op_release(new_op);
     }
+#ifdef HAVE_VFSMOUNT_GETSB
+    pvfs2_print("pvfs2_get_sb: returning %d\n", ret);
+    return ret;
+#else
     pvfs2_print("pvfs2_get_sb: returning sb %p\n", sb);
     return sb;
+#endif
 }
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
