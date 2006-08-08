@@ -293,8 +293,9 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
      */
     if(dspace_a_p->objtype == PVFS_TYPE_SYMLINK)
     {
-        if(dspace_a_p->perms != 0 && dspace_a_p->perms != a_p->perms)
+        if (dspace_a_p->perms != 0 && ((a_p->mask & PVFS_ATTR_COMMON_PERM) && (dspace_a_p->perms != a_p->perms)))
         {
+            gossip_debug(GOSSIP_SETATTR_DEBUG, "Cannot change perms of symlink: Permission denied\n");
             js_p->error_code = -PVFS_EPERM;
             return(1);
         }
