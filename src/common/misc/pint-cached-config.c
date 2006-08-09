@@ -277,6 +277,7 @@ int PINT_cached_config_get_next_meta(
             }
             else
             {
+                /* we let the jitter loop below increment the cursor by one */ 
                 jitter = 0;
             }
             while(jitter-- > -1)
@@ -338,6 +339,7 @@ int PINT_cached_config_get_next_io(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
     int jitter = 0, num_io_servers = 0;
+    PINT_llist* old_data_server_cursor = NULL;
 
     if (config && num_servers && io_handle_extent_array)
     {
@@ -352,6 +354,7 @@ int PINT_cached_config_get_next_io(
 
             num_io_servers = PINT_llist_count(
                 cur_config_cache->fs->data_handle_ranges);
+
 
             /* pick random starting point, then round robin */
             if(!io_randomized)
@@ -378,6 +381,7 @@ int PINT_cached_config_get_next_io(
                 cur_config_cache->data_server_cursor = PINT_llist_next(
                     cur_config_cache->data_server_cursor);
             }
+            old_data_server_cursor = cur_config_cache->data_server_cursor;
 
             while(num_servers)
             {
@@ -418,6 +422,10 @@ int PINT_cached_config_get_next_io(
 		    io_addr_array++;
             }
             ret = ((num_servers == 0) ? 0 : ret);
+            /* reset data server cursor to point to the old cursor; the
+             * jitter on the next iteration will increment it by one
+             */
+            cur_config_cache->data_server_cursor = old_data_server_cursor;
         }
     }
     return ret;

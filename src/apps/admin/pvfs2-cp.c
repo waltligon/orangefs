@@ -558,7 +558,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
         if ((ret == 0) && (open_type == OPEN_SRC))
         {
             memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
-            ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL,
+            ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
                                    credentials, &resp_getattr);
             if (ret)
             {
@@ -683,9 +683,6 @@ void make_attribs(PVFS_sys_attr *attr, PVFS_credentials *credentials,
     attr->owner = credentials->uid; 
     attr->group = credentials->gid;
     attr->perms = PVFS2_translate_mode(mode);
-    attr->atime = time(NULL);
-    attr->mtime = attr->atime;
-    attr->ctime = attr->atime;
     attr->mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     attr->dfile_count = nr_datafiles;
 

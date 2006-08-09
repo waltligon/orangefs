@@ -308,10 +308,7 @@ static int readdir_msg_comp_fn(void *v_p,
     {
         int dirent_array_len =
             (sizeof(PVFS_dirent) * *(sm_p->readdir.dirent_outcount));
-#if 0
-        int i = 0;
-        PVFS_object_ref tmp_ref;
-#endif
+
         /* this dirent_array MUST be freed by caller */
         *(sm_p->readdir.dirent_array) =
             (PVFS_dirent *) malloc(dirent_array_len);
@@ -319,19 +316,6 @@ static int readdir_msg_comp_fn(void *v_p,
 
         memcpy(*(sm_p->readdir.dirent_array),
                resp_p->u.readdir.dirent_array, dirent_array_len);
-#if 0
-        /* insert all handles into the ncache while we have them */
-        tmp_ref.fs_id = sm_p->object_ref.fs_id;
-        for(i = 0;
-            i < *(sm_p->readdir.dirent_outcount); i++)
-        {
-            tmp_ref.handle = resp_p->u.readdir.dirent_array[i].handle;
-            PINT_ncache_insert(
-                resp_p->u.readdir.dirent_array[i].d_name,
-                0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */, tmp_ref,
-                sm_p->object_ref);
-        }
-#endif
     }
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
@@ -353,7 +337,23 @@ static int readdir_msg_failure(PINT_client_sm *sm_p,
 static int readdir_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
+    int i = 0;
+    PVFS_object_ref tmp_ref;
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: cleanup\n");
+
+    if(js_p->error_code == 0)
+    {
+        /* insert all handles into the ncache while we have them */
+        tmp_ref.fs_id = sm_p->object_ref.fs_id;
+        for(i = 0; i < *(sm_p->readdir.dirent_outcount); i++)
+        {
+            tmp_ref.handle = (*(sm_p->readdir.dirent_array))[i].handle;
+            PINT_ncache_update(
+                (const char *) (*(sm_p->readdir.dirent_array))[i].d_name,
+                (const PVFS_object_ref *) &(tmp_ref),
+                (const PVFS_object_ref *) &(sm_p->object_ref));
+        }
+    }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 

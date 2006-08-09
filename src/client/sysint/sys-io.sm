@@ -812,37 +812,6 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             cur_ctx->msg_send_has_been_posted = 1;
             ++sm_p->u.io.msgpair_completion_count;
         }
-
-        if(sm_p->u.io.io_type == PVFS_IO_WRITE)
-        {
-            ret = io_post_flow(sm_p, cur_ctx);
-            if(ret < 0)
-            {
-                char buf[64] = {0};
-                PVFS_strerror_r(ret, buf, 64);
-
-                gossip_debug(GOSSIP_IO_DEBUG,
-                             "%s: io_post_flow failed: "
-                             "%s (%d remaining msgpairs)\n",
-                             __func__, 
-                             buf, 
-                             sm_p->u.io.msgpair_completion_count);
-
-                PVFS_perror_gossip("Flow post failed", ret);
-                cur_ctx->msg_send_has_been_posted = 0;
-                cur_ctx->msg_recv_has_been_posted = 0;
-                js_p->error_code = ret;
-                continue;
-            }
-
-            ret = io_post_write_ack_recv(sm_p, cur_ctx);
-            if(ret < 0)
-            {
-                PVFS_perror_gossip("Post of write-ack recv failed", ret);
-                js_p->error_code = ret;
-                continue;
-            }
-        }
     }
 
     gossip_debug(GOSSIP_IO_DEBUG, "io_datafile_post_msgpairs: "
@@ -969,24 +938,35 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
             goto check_next_step;
         }
  
-        if(sm_p->u.io.io_type == PVFS_IO_READ)
+        /* for now we wait to post the flow until we get back
+         * the response from the server for both reads and writes
+         */
+        ret = io_post_flow(sm_p, cur_ctx);
+        if(ret < 0)
         {
-            ret = io_post_flow(sm_p, cur_ctx);
+            char buf[64] = {0};
+            PVFS_strerror_r(ret, buf, 64);
+
+            gossip_debug(GOSSIP_IO_DEBUG,
+                         "%s: io_post_flow failed: "
+                         "%s (%d remaining msgpairs)\n",
+                         __func__, 
+                         buf, 
+                         sm_p->u.io.msgpair_completion_count);
+
+            PVFS_perror_gossip("Flow post failed", ret);
+            cur_ctx->msg_send_has_been_posted = 0;
+            cur_ctx->msg_recv_has_been_posted = 0;
+            js_p->error_code = ret;
+            goto check_next_step;
+        }
+
+        if(sm_p->u.io.io_type == PVFS_IO_WRITE)
+        {
+            ret = io_post_write_ack_recv(sm_p, cur_ctx);
             if(ret < 0)
             {
-                char buf[64] = {0};
-                PVFS_strerror_r(ret, buf, 64);
-
-                gossip_debug(GOSSIP_IO_DEBUG,
-                             "%s: io_post_flow failed: "
-                             "%s (%d remaining msgpairs)\n",
-                             __func__, 
-                             buf, 
-                             sm_p->u.io.msgpair_completion_count);
-
-                PVFS_perror_gossip("Flow post failed", ret);
-                cur_ctx->msg_send_has_been_posted = 0;
-                cur_ctx->msg_recv_has_been_posted = 0;
+                PVFS_perror_gossip("Post of write-ack recv failed", ret);
                 js_p->error_code = ret;
                 goto check_next_step;
             }
@@ -2456,6 +2436,8 @@ io_find_offset(
                                    &rfdata, &result, PINT_SERVER);
         if(res < 0)
         {
+            PINT_free_request_state(filereq_state);
+            PINT_free_request_state(memreq_state);
             return res;
         }
 
@@ -2476,6 +2458,9 @@ io_find_offset(
     } while(!PINT_REQUEST_DONE(filereq_state) && result.segs);
 
     *total_return_offset = total_offset;
+
+    PINT_free_request_state(filereq_state);
+    PINT_free_request_state(memreq_state);
     return 0;
 }
 

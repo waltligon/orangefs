@@ -19,6 +19,7 @@
 #include "gossip.h"
 #include "job.h"
 #include "acache.h"
+#include "ncache.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
@@ -86,6 +87,7 @@ typedef struct
 {
     /* client side attribute cache timeout; 0 is effectively disabled */
     int acache_timeout;
+    int ncache_timeout;
     char* logfile;
     unsigned int acache_hard_limit;
     int acache_hard_limit_set;
@@ -93,6 +95,12 @@ typedef struct
     int acache_soft_limit_set;
     unsigned int acache_reclaim_percentage;
     int acache_reclaim_percentage_set;
+    unsigned int ncache_hard_limit;
+    int ncache_hard_limit_set;
+    unsigned int ncache_soft_limit;
+    int ncache_soft_limit_set;
+    unsigned int ncache_reclaim_percentage;
+    int ncache_reclaim_percentage_set;
     unsigned int perf_time_interval_secs;
     unsigned int perf_history_size;
     char* gossip_mask;
@@ -187,6 +195,7 @@ static struct PVFS_dev_map_desc s_io_desc[NUM_MAP_DESC];
 static int s_desc_size[NUM_MAP_DESC] = {PVFS2_BUFMAP_TOTAL_SIZE, PVFS2_READDIR_TOTAL_SIZE};
 
 static struct PINT_perf_counter* acache_pc = NULL;
+static struct PINT_perf_counter* ncache_pc = NULL;
 
 /* used only for deleting all allocated vfs_request objects */
 vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
@@ -202,6 +211,8 @@ static void print_help(char *progname);
 static void reset_acache_timeout(void);
 static char *get_vfs_op_name_str(int op_type);
 static int set_acache_parameters(options_t* s_opts);
+static void reset_ncache_timeout(void);
+static int set_ncache_parameters(options_t* s_opts);
 
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
@@ -569,12 +580,10 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a setattr request for fsid %d | handle %llu\n",
+        "got a setattr request for fsid %d | handle %llu [mask %d]\n",
         vfs_request->in_upcall.req.setattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.setattr.refn.handle));
-    gossip_debug(
-        GOSSIP_CLIENTCORE_DEBUG,
-        "perms: %d\n", (int)vfs_request->in_upcall.req.setattr.attributes.perms);
+        llu(vfs_request->in_upcall.req.setattr.refn.handle),
+        vfs_request->in_upcall.req.setattr.attributes.mask);
 
     ret = PVFS_isys_setattr(
         vfs_request->in_upcall.req.setattr.refn,
@@ -769,15 +778,24 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
     {
         return -PVFS_ENOMEM;
     }
+    vfs_request->response.geteattr.err_array = 
+        (PVFS_error *) malloc(sizeof(PVFS_error));
+    if(vfs_request->response.geteattr.err_array == NULL)
+    {
+        free(vfs_request->response.geteattr.val_array);
+        return -PVFS_ENOMEM;
+    }
     vfs_request->response.geteattr.val_array[0].buffer = 
         (void *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
     if (vfs_request->response.geteattr.val_array[0].buffer == NULL)
     {
         free(vfs_request->response.geteattr.val_array);
+        free(vfs_request->response.geteattr.err_array);
         return -PVFS_ENOMEM;
     }
     vfs_request->response.geteattr.val_array[0].buffer_sz = 
         PVFS_REQ_LIMIT_VAL_LEN;
+
     /* Remember to free these up */
     ret = PVFS_isys_geteattr_list(
         vfs_request->in_upcall.req.getxattr.refn,
@@ -928,110 +946,102 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
 }
 
 
-#define generate_upcall_mntent(mntent, in_upcall, mount)              \
-do {                                                                  \
-    /*                                                                \
-      generate a unique dynamic mount point; the id will be passed to \
-      the kernel via the downcall so we can match it with a proper    \
-      unmount request at unmount time.  if we're unmounting, use the  \
-      passed in id from the upcall                                    \
-    */                                                                \
-    if (mount)                                                        \
-        snprintf(buf, PATH_MAX, "<DYNAMIC-%d>", dynamic_mount_id);    \
-    else                                                              \
-        snprintf(buf, PATH_MAX, "<DYNAMIC-%d>",                       \
-                 in_upcall.req.fs_umount.id);                         \
-                                                                      \
-    mntent.mnt_dir = strdup(buf);                                     \
-    if (!mntent.mnt_dir)                                              \
-    {                                                                 \
-        ret = -PVFS_ENOMEM;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-                                                                      \
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Using %s Point %s\n",      \
-                 (mount ? "Mount" : "Unmount"), mntent.mnt_dir);      \
-                                                                      \
-    if (mount) {                                                      \
-        ptr = rindex(in_upcall.req.fs_mount.pvfs2_config_server,      \
-                     (int)'/');                                       \
-        ptrcomma = strchr(in_upcall.req.fs_mount.pvfs2_config_server, \
-                     (int)',');                                       \
-    } else {                                                          \
-        ptr = rindex(in_upcall.req.fs_umount.pvfs2_config_server,     \
-                     (int)'/');                                       \
-        ptrcomma = strchr(in_upcall.req.fs_umount.pvfs2_config_server,\
-                     (int)',');                                       \
-    }                                                                 \
-                                                                      \
-    if (!ptr || ptrcomma)                                             \
-    {                                                                 \
-        gossip_err("Configuration server MUST be of the form "        \
-                   "protocol://address/fs_name\n");                   \
-        ret = -PVFS_EINVAL;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-    *ptr = '\0';                                                      \
-    ptr++;                                                            \
-                                                                      \
-    /* We do not yet support multi-home for kernel module; needs */   \
-    /* same parsing code as in PVFS_util_parse_pvfstab() and a */     \
-    /* loop around BMI_addr_lookup() to pick one that works. */       \
-    mntent.pvfs_config_servers =                                      \
-        malloc(sizeof(*mntent.pvfs_config_servers));                  \
-    if (!mntent.pvfs_config_servers)                                  \
-    {                                                                 \
-        ret = -PVFS_ENOMEM;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-                                                                      \
-    if (mount)                                                        \
-        mntent.pvfs_config_servers[0] = strdup(                       \
-            in_upcall.req.fs_mount.pvfs2_config_server);              \
-    else                                                              \
-        mntent.pvfs_config_servers[0] = strdup(                       \
-            in_upcall.req.fs_umount.pvfs2_config_server);             \
-                                                                      \
-    if (!mntent.pvfs_config_servers[0])                               \
-    {                                                                 \
-        ret = -PVFS_ENOMEM;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-    mntent.the_pvfs_config_server = mntent.pvfs_config_servers[0];    \
-    mntent.num_pvfs_config_servers = 1;                               \
-                                                                      \
-    gossip_debug(                                                     \
-        GOSSIP_CLIENTCORE_DEBUG, "Got Configuration Server: %s "      \
-        "(len=%d)\n", mntent.the_pvfs_config_server,                  \
-        (int)strlen(mntent.the_pvfs_config_server));                  \
-                                                                      \
-    mntent.pvfs_fs_name = strdup(ptr);                                \
-    if (!mntent.pvfs_fs_name)                                         \
-    {                                                                 \
-        ret = -PVFS_ENOMEM;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-                                                                      \
-    gossip_debug(                                                     \
-        GOSSIP_CLIENTCORE_DEBUG, "Got FS Name: %s (len=%d)\n",        \
-        mntent.pvfs_fs_name, (int)strlen(mntent.pvfs_fs_name));       \
-                                                                      \
-    mntent.encoding = ENCODING_DEFAULT;                               \
-    mntent.flowproto = FLOWPROTO_DEFAULT;                             \
-                                                                      \
-    /* also fill in the fs_id for umount */                           \
-    if (!mount)                                                       \
-        mntent.fs_id = in_upcall.req.fs_umount.fs_id;                 \
-                                                                      \
-    ret = 0;                                                          \
-} while(0)
+static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
+        pvfs2_upcall_t *in_upcall, int mount) 
+{
+    char *ptr = NULL, *ptrcomma = NULL;
+    char buf[PATH_MAX] = {0};
+    /*                                                                
+      generate a unique dynamic mount point; the id will be passed to
+      the kernel via the downcall so we can match it with a proper
+      unmount request at unmount time.  if we're unmounting, use the
+      passed in id from the upcall
+    */
+    if (mount)
+        snprintf(buf, PATH_MAX, "<DYNAMIC-%d>", dynamic_mount_id);
+    else
+        snprintf(buf, PATH_MAX, "<DYNAMIC-%d>", in_upcall->req.fs_umount.id);
+
+    mntent->mnt_dir = strdup(buf);
+    if (!mntent->mnt_dir)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Using %s Point %s\n",
+                 (mount ? "Mount" : "Unmount"), mntent->mnt_dir);
+
+    if (mount) {
+        ptr = rindex(in_upcall->req.fs_mount.pvfs2_config_server,
+                     (int)'/');
+        ptrcomma = strchr(in_upcall->req.fs_mount.pvfs2_config_server,
+                     (int)',');
+    } else {
+        ptr = rindex(in_upcall->req.fs_umount.pvfs2_config_server,
+                     (int)'/');
+        ptrcomma = strchr(in_upcall->req.fs_umount.pvfs2_config_server,
+                     (int)',');
+    }
+
+    if (!ptr || ptrcomma)
+    {
+        gossip_err("Configuration server MUST be of the form "
+                   "protocol://address/fs_name\n");
+        return -PVFS_EINVAL;
+    }
+    *ptr = '\0';
+    ptr++;
+    /* We do not yet support multi-home for kernel module; needs */
+    /* same parsing code as in PVFS_util_parse_pvfstab() and a */
+    /* loop around BMI_addr_lookup() to pick one that works. */
+    mntent->pvfs_config_servers = (char **) calloc(1, sizeof(char *));
+    if (!mntent->pvfs_config_servers)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    if (mount)
+        mntent->pvfs_config_servers[0] = strdup(
+            in_upcall->req.fs_mount.pvfs2_config_server);
+    else
+        mntent->pvfs_config_servers[0] = strdup(
+            in_upcall->req.fs_umount.pvfs2_config_server);
+                                                                     
+    if (!mntent->pvfs_config_servers[0])
+    {
+        return -PVFS_ENOMEM;
+    }
+    mntent->the_pvfs_config_server = mntent->pvfs_config_servers[0];
+    mntent->num_pvfs_config_servers = 1;
+
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG, "Got Configuration Server: %s "
+        "(len=%d)\n", mntent->the_pvfs_config_server,
+        (int)strlen(mntent->the_pvfs_config_server));
+
+    mntent->pvfs_fs_name = strdup(ptr);
+    if (!mntent->pvfs_fs_name)
+    {
+        return -PVFS_ENOMEM;
+    }
+                                                       
+    gossip_debug(                                     
+        GOSSIP_CLIENTCORE_DEBUG, "Got FS Name: %s (len=%d)\n",
+        mntent->pvfs_fs_name, (int)strlen(mntent->pvfs_fs_name));
+                                                              
+    mntent->encoding = ENCODING_DEFAULT;                      
+    mntent->flowproto = FLOWPROTO_DEFAULT;                   
+                                                           
+    /* also fill in the fs_id for umount */               
+    if (!mount)                                           
+        mntent->fs_id = in_upcall->req.fs_umount.fs_id;     
+    
+    return 0;
+}
 
 static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_ENODEV;
-    char *ptr = NULL, *ptrcomma = NULL;
-    char buf[PATH_MAX] = {0};
-
     /*
       since we got a mount request from the vfs, we know that some
       mntent entries are not filled in, so add some defaults here
@@ -1050,11 +1060,14 @@ static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
         "Got an fs mount request for host:\n  %s\n",
         vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
 
-    generate_upcall_mntent((*vfs_request->mntent), vfs_request->in_upcall, 1);
-
+    ret = generate_upcall_mntent(vfs_request->mntent, &vfs_request->in_upcall, 1);
+    if (ret < 0)
+    {
+        goto failed;
+    }
     ret = PVFS_isys_fs_add(vfs_request->mntent, &vfs_request->op_id, (void*)vfs_request);
 
-fail_downcall:
+failed:
     if(ret < 0)
     {
         PVFS_perror_gossip("Posting fs_add failed", ret);
@@ -1067,8 +1080,6 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_ENODEV;
     struct PVFS_sys_mntent mntent;
-    char *ptr = NULL, *ptrcomma = NULL;
-    char buf[PATH_MAX] = {0};
 
     /*
       since we got a umount request from the vfs, we know that
@@ -1082,35 +1093,41 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
         "Got an fs umount request via host %s\n",
         vfs_request->in_upcall.req.fs_umount.pvfs2_config_server);
 
-    generate_upcall_mntent(mntent, vfs_request->in_upcall, 0);
-
+    ret = generate_upcall_mntent(&mntent, &vfs_request->in_upcall, 0);
+    if (ret < 0)
+    {
+        goto fail_downcall;
+    }
     ret = PVFS_sys_fs_remove(&mntent);
     if (ret < 0)
     {
-      fail_downcall:
-        gossip_err(
-            "Failed to umount via host %s\n",
-            vfs_request->in_upcall.req.fs_umount.pvfs2_config_server);
-
-        PVFS_perror("Umount failed", ret);
-
-        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
-        vfs_request->out_downcall.status = ret;
+        goto fail_downcall;
     }
     else
     {
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "FS umount ok\n");
 
         reset_acache_timeout();
+        reset_ncache_timeout();
 
         vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
         vfs_request->out_downcall.status = 0;
     }
-
+ok:
     PVFS_util_free_mntent(&mntent);
 
     write_inlined_device_response(vfs_request);
     return 0;
+fail_downcall:
+    gossip_err(
+        "Failed to umount via host %s\n",
+        vfs_request->in_upcall.req.fs_umount.pvfs2_config_server);
+
+    PVFS_perror("Umount failed", ret);
+
+    vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
+    vfs_request->out_downcall.status = ret;
+    goto ok;
 }
 
 static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
@@ -1142,6 +1159,22 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             break;
 
+        case PVFS2_PERF_COUNT_REQUEST_NCACHE:
+            tmp_str = PINT_perf_generate_text(ncache_pc,
+                PERF_COUNT_BUF_SIZE);
+            if(!tmp_str)
+            {
+                vfs_request->out_downcall.status = -PVFS_EINVAL;
+            }
+            else
+            {
+                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                    tmp_str, PERF_COUNT_BUF_SIZE);
+                free(tmp_str);
+                vfs_request->out_downcall.status = 0;
+            }
+            break;
+
         default:
             /* unsupported request, didn't match anything in case statement */
             vfs_request->out_downcall.status = -PVFS_ENOSYS;
@@ -1154,12 +1187,14 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
     return 0;
 }
 
-
+#define ACACHE 0
+#define NCACHE 1
 static PVFS_error service_param_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
     unsigned int val;
     int tmp_param = -1;
+    int tmp_subsystem = -1;
     unsigned int tmp_perf_val;
 
     gossip_debug(
@@ -1170,17 +1205,40 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
 
     switch(vfs_request->in_upcall.req.param.op)
     {
+        /* These first case statements fall through to get/set calls */
         case PVFS2_PARAM_REQUEST_OP_ACACHE_TIMEOUT_MSECS:
             tmp_param = ACACHE_TIMEOUT_MSECS;
+            tmp_subsystem = ACACHE;
             break;
         case PVFS2_PARAM_REQUEST_OP_ACACHE_HARD_LIMIT:
             tmp_param = ACACHE_HARD_LIMIT;
+            tmp_subsystem = ACACHE;
             break;
         case PVFS2_PARAM_REQUEST_OP_ACACHE_SOFT_LIMIT:
             tmp_param = ACACHE_SOFT_LIMIT;
+            tmp_subsystem = ACACHE;
             break;
         case PVFS2_PARAM_REQUEST_OP_ACACHE_RECLAIM_PERCENTAGE:
             tmp_param = ACACHE_RECLAIM_PERCENTAGE;
+            tmp_subsystem = ACACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_NCACHE_TIMEOUT_MSECS:
+            tmp_param = NCACHE_TIMEOUT_MSECS;
+            tmp_subsystem = NCACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_NCACHE_HARD_LIMIT:
+            tmp_param = NCACHE_HARD_LIMIT;
+            tmp_subsystem = NCACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_NCACHE_SOFT_LIMIT:
+            tmp_param = NCACHE_SOFT_LIMIT;
+            tmp_subsystem = NCACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_NCACHE_RECLAIM_PERCENTAGE:
+            tmp_param = NCACHE_RECLAIM_PERCENTAGE;
+            tmp_subsystem = NCACHE;
+            break;
+        /* These next few case statements return without falling through */
         case PVFS2_PARAM_REQUEST_OP_PERF_TIME_INTERVAL_SECS:
             if(vfs_request->in_upcall.req.param.type ==
                 PVFS2_PARAM_REQUEST_GET)
@@ -1210,6 +1268,8 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 tmp_perf_val = vfs_request->in_upcall.req.param.value;
                 ret = PINT_perf_set_info(
                     acache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
+                ret = PINT_perf_set_info(
+                    ncache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
             }    
             vfs_request->out_downcall.status = ret;
             write_inlined_device_response(vfs_request);
@@ -1220,13 +1280,13 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 PVFS2_PARAM_REQUEST_SET)
             {
                 PINT_perf_reset(acache_pc);
+                PINT_perf_reset(ncache_pc);
             }    
             vfs_request->out_downcall.resp.param.value = 0;
             vfs_request->out_downcall.status = 0;
             write_inlined_device_response(vfs_request);
             return(0);
             break;
-
     }
 
     if(tmp_param == -1)
@@ -1237,26 +1297,42 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
         return 0;
     }
 
-    /* get or set acache parameters */
+    /* get or set acache/ncache parameters */
     if(vfs_request->in_upcall.req.param.type ==
         PVFS2_PARAM_REQUEST_GET)
     {
-        vfs_request->out_downcall.status = 
-            PINT_acache_get_info(tmp_param, &val);
+        if(tmp_subsystem == ACACHE)
+        {
+            vfs_request->out_downcall.status = 
+                PINT_acache_get_info(tmp_param, &val);
+        }
+        else
+        {
+            vfs_request->out_downcall.status = 
+                PINT_ncache_get_info(tmp_param, &val);
+        }
         vfs_request->out_downcall.resp.param.value = val;
     }
     else
     {
         val = vfs_request->in_upcall.req.param.value;
         vfs_request->out_downcall.resp.param.value = 0;
-        vfs_request->out_downcall.status = 
-            PINT_acache_set_info(tmp_param, val);
+        if(tmp_subsystem == ACACHE)
+        {
+            vfs_request->out_downcall.status = 
+                PINT_acache_set_info(tmp_param, val);
+        }
+        else
+        {
+            vfs_request->out_downcall.status = 
+                PINT_ncache_set_info(tmp_param, val);
+        }
     }
-
     write_inlined_device_response(vfs_request);
     return 0;
 }
-
+#undef ACACHE 
+#undef NCACHE 
 
 static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
 {
@@ -1476,10 +1552,11 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     }
 #endif /* USE_MMAP_RA_CACHE */
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s: off %ld size %ld\n",
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "posted %s: off %ld size %ld tag: %Ld\n",
             vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ ? "read" : "write",
             (unsigned long) vfs_request->in_upcall.req.io.offset,
-            (unsigned long) vfs_request->in_upcall.req.io.count);
+            (unsigned long) vfs_request->in_upcall.req.io.count,
+            lld(vfs_request->info.tag));
     ret = PVFS_Request_contiguous(
         (int32_t)vfs_request->in_upcall.req.io.count,
         PVFS_BYTE, &vfs_request->mem_req);
@@ -2225,6 +2302,7 @@ static inline void package_downcall_members(
                     }
                 }
                 reset_acache_timeout();
+                reset_ncache_timeout();
 
                 /*
                   before sending success response we need to resolve the root
@@ -2332,6 +2410,7 @@ static inline void package_downcall_members(
 
                 vfs_request->out_downcall.resp.io.amt_complete =
                     (size_t)vfs_request->response.io.total_completed;
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "completed I/O on tag %Ld\n", lld(vfs_request->info.tag));
 #endif
             }
 #ifdef USE_MMAP_RA_CACHE
@@ -2417,6 +2496,8 @@ static inline void package_downcall_members(
             vfs_request->response.geteattr.val_array[0].buffer = NULL;
             free(vfs_request->response.geteattr.val_array);
             vfs_request->response.geteattr.val_array = NULL;
+            free(vfs_request->response.geteattr.err_array);
+            vfs_request->response.geteattr.err_array = NULL;
             break;
         case PVFS2_VFS_OP_SETXATTR:
             break;
@@ -2548,7 +2629,7 @@ static inline PVFS_error handle_unexp_vfs_request(
     {
         gossip_debug(
             GOSSIP_CLIENTCORE_DEBUG, "Got an upcall operation of "
-            "type %x before mounting.  ignoring.\n",
+            "type %x before mounting. ignoring.\n",
             vfs_request->in_upcall.type);
         /*
           if we don't have any mount information yet, just discard the
@@ -2565,11 +2646,12 @@ static inline PVFS_error handle_unexp_vfs_request(
       make sure the operation is not currently in progress.  if it is,
       ignore it -- this can happen if the vfs issues a retry request
       on an operation that's taking a long time to complete.
+      Can this happen any more?
     */
     if (is_op_in_progress(vfs_request))
     {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, " Ignoring upcall of type "
-                     "%x that's already in progress (tag=%lld)\n",
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, " WARNING: Client-core obtained duplicate upcall of type "
+                     "%x that's already in progress (tag=%lld)?\n",
                      vfs_request->in_upcall.type,
                      lld(vfs_request->info.tag));
 
@@ -2967,6 +3049,7 @@ int main(int argc, char **argv)
     struct tm *local_time = NULL;
     uint64_t debug_mask = GOSSIP_NO_DEBUG;
     PINT_client_sm *acache_timer_sm_p = NULL;
+    PINT_client_sm *ncache_timer_sm_p = NULL;
 
 #ifndef STANDALONE_RUN_MODE
     struct rlimit lim = {0,0};
@@ -3053,6 +3136,12 @@ int main(int argc, char **argv)
         PVFS_perror("set_acache_parameters", ret);
         return(ret);
     }
+    ret = set_ncache_parameters(&s_opts);
+    if(ret < 0)
+    {
+        PVFS_perror("set_ncache_parameters", ret);
+        return(ret);
+    }
 
     /* start performance counters for acache */
     acache_pc = PINT_perf_initialize(acache_keys);
@@ -3070,6 +3159,22 @@ int main(int argc, char **argv)
     }
     PINT_acache_enable_perf_counter(acache_pc);
 
+    /* start performance counters for ncache */
+    ncache_pc = PINT_perf_initialize(ncache_keys);
+    if(!ncache_pc)
+    {
+        fprintf(stderr, "Error: PINT_perf_initialize failure.\n");
+        return(-PVFS_ENOMEM);
+    }
+    ret = PINT_perf_set_info(ncache_pc, PINT_PERF_HISTORY_SIZE,
+        s_opts.perf_history_size);
+    if(ret < 0)
+    {
+        fprintf(stderr, "Error: PINT_perf_set_info (history_size).\n");
+        return(ret);
+    }
+    PINT_ncache_enable_perf_counter(ncache_pc);
+
     /* start a timer to roll over performance counters (acache) */
     acache_timer_sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
     if(!acache_timer_sm_p)
@@ -3082,6 +3187,23 @@ int main(int argc, char **argv)
     acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
     ret = PINT_client_state_machine_post(
         acache_timer_sm_p, PVFS_CLIENT_PERF_COUNT_TIMER, NULL, NULL);
+    if (ret < 0)
+    {
+        return(ret);
+    }
+
+    /* start a timer to roll over performance counters (ncache) */
+    ncache_timer_sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
+    if(!ncache_timer_sm_p)
+    {
+	return(-PVFS_ENOMEM);
+    }
+    memset(ncache_timer_sm_p, 0, sizeof(*ncache_timer_sm_p));
+    ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
+        &s_opts.perf_time_interval_secs;
+    ncache_timer_sm_p->u.perf_count_timer.pc = ncache_pc;
+    ret = PINT_client_state_machine_post(
+        ncache_timer_sm_p, PVFS_CLIENT_PERF_COUNT_TIMER, NULL, NULL);
     if (ret < 0)
     {
         return(ret);
@@ -3187,6 +3309,11 @@ static void print_help(char *progname)
     printf("--acache-soft-limit=LIMIT     acache soft limit\n");
     printf("--acache-hard-limit=LIMIT     acache hard limit\n");
     printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
+    printf("-n MS, --ncache-timeout=MS    ncache timeout in ms "
+           "(default is 0 ms)\n");
+    printf("--ncache-soft-limit=LIMIT     ncache soft limit\n");
+    printf("--ncache-hard-limit=LIMIT     ncache hard limit\n");
+    printf("--ncache-reclaim-percentage=LIMIT ncache reclaim percentage\n");
     printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
     printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
     printf("--logfile=VALUE               override the default log file\n");
@@ -3203,11 +3330,15 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"help",0,0,0},
         {"acache-timeout",1,0,0},
         {"acache-reclaim-percentage",1,0,0},
+        {"ncache-timeout",1,0,0},
+        {"ncache-reclaim-percentage",1,0,0},
         {"perf-time-interval-secs",1,0,0},
         {"perf-history-size",1,0,0},
         {"gossip-mask",1,0,0},
         {"acache-hard-limit",1,0,0},
         {"acache-soft-limit",1,0,0},
+        {"ncache-hard-limit",1,0,0},
+        {"ncache-soft-limit",1,0,0},
         {"logfile",1,0,0},
         {"logstamp",1,0,0},
         {0,0,0,0}
@@ -3217,7 +3348,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
     opts->perf_time_interval_secs = PERF_DEFAULT_TIME_INTERVAL_SECS;
     opts->perf_history_size = PERF_DEFAULT_HISTORY_SIZE;
 
-    while((ret = getopt_long(argc, argv, "ha:L:",
+    while((ret = getopt_long(argc, argv, "ha:n:L:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
@@ -3232,6 +3363,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("acache-timeout", cur_option) == 0)
                 {
                     goto do_acache;
+                }
+                else if (strcmp("ncache-timeout", cur_option) == 0)
+                {
+                    goto do_ncache;
                 }
                 else if (strcmp("logfile", cur_option) == 0)
                 {
@@ -3289,6 +3424,36 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     }
                     opts->acache_reclaim_percentage_set = 1;
                 }
+                else if (strcmp("ncache-hard-limit", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->ncache_hard_limit);
+                    if(ret != 1)
+                    {
+                        fprintf(stderr, "Error: invalid ncache-hard-limit value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->ncache_hard_limit_set = 1;
+                }
+                else if (strcmp("ncache-soft-limit", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->ncache_soft_limit);
+                    if(ret != 1)
+                    {
+                        fprintf(stderr, "Error: invalid ncache-soft-limit value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->ncache_soft_limit_set = 1;
+                }
+                else if (strcmp("ncache-reclaim-percentage", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->ncache_reclaim_percentage);
+                    if(ret != 1)
+                    {
+                        fprintf(stderr, "Error: invalid ncache-reclaim-percentage value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->ncache_reclaim_percentage_set = 1;
+                }
                 else if (strcmp("perf-time-interval-secs", cur_option) == 0)
                 {
                     ret = sscanf(optarg, "%u",
@@ -3331,6 +3496,17 @@ static void parse_args(int argc, char **argv, options_t *opts)
                                "disabling the acache.\n",
                                opts->acache_timeout);
                     opts->acache_timeout = 0;
+                }
+                break;
+            case 'n':
+          do_ncache:
+                opts->ncache_timeout = atoi(optarg);
+                if (opts->ncache_timeout < 0)
+                {
+                    fprintf(stderr, "Invalid ncache timeout value of %d ms,"
+                               "disabling the ncache.\n",
+                               opts->ncache_timeout);
+                    opts->ncache_timeout = 0;
                 }
                 break;
             default:
@@ -3385,6 +3561,49 @@ static void reset_acache_timeout(void)
     {
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "All file systems "
                      "unmounted. Not resetting the acache.\n");
+    }
+}
+
+static void reset_ncache_timeout(void)
+{
+    int min_stored_timeout = 0, max_ncache_timeout_ms = 0;
+
+    min_stored_timeout =
+        PINT_server_config_mgr_get_abs_min_handle_recycle_time();
+
+    /*
+      if all file systems have been unmounted, this value will be -1,
+      so don't do anything in that case
+    */
+    if (min_stored_timeout != -1)
+    {
+        /*
+          determine the new maximum ncache timeout value based on server
+          handle recycle times and what the user specified on the command
+          line.  if they differ then reset the entire ncache to be sure
+          there are no entries in the cache that could exceed the new
+          timeout.
+        */
+        max_ncache_timeout_ms = PVFS_util_min(
+            (min_stored_timeout * 1000), s_opts.ncache_timeout);
+
+        if (max_ncache_timeout_ms != s_opts.ncache_timeout)
+        {
+            gossip_debug(
+                GOSSIP_CLIENTCORE_DEBUG, "Resetting ncache timeout to %d"
+                " milliseconds\n (based on new dynamic configuration "
+                "handle recycle time value)\n", max_ncache_timeout_ms);
+
+            PINT_ncache_finalize();
+            PINT_ncache_initialize();
+            s_opts.ncache_timeout = max_ncache_timeout_ms;
+            set_ncache_parameters(&s_opts);
+        }
+    }
+    else
+    {
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "All file systems "
+                     "unmounted. Not resetting the ncache.\n");
     }
 }
 
@@ -3481,6 +3700,53 @@ static int set_acache_parameters(options_t* s_opts)
     if(ret < 0)
     {
         PVFS_perror_gossip("PINT_acache_set_info (timout-msecs)", ret);
+        return(ret);
+    }
+
+    return(0);
+}
+
+static int set_ncache_parameters(options_t* s_opts)
+{
+    int ret = -1;
+
+    /* pass along ncache settings if they were specified on command line */
+    if(s_opts->ncache_reclaim_percentage_set)
+    {
+        ret = PINT_ncache_set_info(NCACHE_RECLAIM_PERCENTAGE, 
+            s_opts->ncache_reclaim_percentage);
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("PINT_ncache_set_info (reclaim-percentage)", ret);
+            return(ret);
+        }
+    }
+    if(s_opts->ncache_hard_limit_set)
+    {
+        ret = PINT_ncache_set_info(NCACHE_HARD_LIMIT, 
+            s_opts->ncache_hard_limit);
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("PINT_ncache_set_info (hard-limit)", ret);
+            return(ret);
+        }
+    }
+    if(s_opts->ncache_soft_limit_set)
+    {
+        ret = PINT_ncache_set_info(NCACHE_SOFT_LIMIT, 
+            s_opts->ncache_soft_limit);
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("PINT_ncache_set_info (soft-limit)", ret);
+            return(ret);
+        }
+    }
+
+    /* for timeout we always take the command line argument value */
+    ret = PINT_ncache_set_info(NCACHE_TIMEOUT_MSECS, s_opts->ncache_timeout);
+    if(ret < 0)
+    {
+        PVFS_perror_gossip("PINT_ncache_set_info (timout-msecs)", ret);
         return(ret);
     }
 

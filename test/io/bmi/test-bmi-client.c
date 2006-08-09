@@ -65,6 +65,8 @@ int main(
     void *out_test_user_ptr = NULL;
     bmi_size_t actual_size;
     bmi_context_id context;
+    char method[24], *cp;
+    int len;
 
     /* grab any command line options */
     user_opts = parse_args(argc, argv);
@@ -77,8 +79,17 @@ int main(
     gossip_enable_stderr();
     gossip_set_debug_mask(1, GOSSIP_BMI_DEBUG_ALL);
 
+    /* convert address to bmi method type by prefixing bmi_ */
+    cp = strchr(user_opts->hostid, ':');
+    if (!cp)
+        return 1;
+    len = cp - user_opts->hostid;
+    strcpy(method, "bmi_");
+    strncpy(method + 4, user_opts->hostid, len);
+    method[4+len] = '\0';
+
     /* initialize local interface */
-    ret = BMI_initialize("bmi_tcp", NULL, 0);
+    ret = BMI_initialize(method, NULL, 0);
     if (ret < 0)
     {
 	errno = -ret;
@@ -290,11 +301,7 @@ static struct options *parse_args(
     int argc,
     char *argv[])
 {
-
-    /* getopt stuff */
-    extern char *optarg;
-    extern int optind, opterr, optopt;
-    char flags[] = "h:r:s:c:";
+    const char flags[] = "h:s:";
     int one_opt = 0;
 
     struct options *tmp_opts = NULL;
@@ -302,13 +309,14 @@ static struct options *parse_args(
     int ret = -1;
 
     /* create storage for the command line options */
-    tmp_opts = (struct options *) malloc(sizeof(struct options));
+    tmp_opts = malloc(sizeof(struct options));
     if (!tmp_opts)
     {
 	goto parse_args_error;
     }
 
     /* fill in defaults (except for hostid) */
+    tmp_opts->hostid = NULL;
     tmp_opts->message_size = 32000;
 
     /* look at command line arguments */
@@ -318,7 +326,7 @@ static struct options *parse_args(
 	{
 	case ('h'):
 	    len = (strlen(optarg)) + 1;
-	    if ((tmp_opts->hostid = (char *) malloc(len)) == NULL)
+	    if ((tmp_opts->hostid = malloc(len)) == NULL)
 	    {
 		goto parse_args_error;
 	    }
@@ -337,12 +345,14 @@ static struct options *parse_args(
     }
 
     /* if we didn't get a host argument, fill in a default: */
-    len = (strlen(DEFAULT_HOSTID)) + 1;
-    if ((tmp_opts->hostid = (char *) malloc(len)) == NULL)
-    {
-	goto parse_args_error;
+    if (tmp_opts->hostid == NULL) {
+        len = (strlen(DEFAULT_HOSTID)) + 1;
+        if ((tmp_opts->hostid = malloc(len)) == NULL)
+        {
+            goto parse_args_error;
+        }
+        memcpy(tmp_opts->hostid, DEFAULT_HOSTID, len);
     }
-    memcpy(tmp_opts->hostid, DEFAULT_HOSTID, len);
 
     return (tmp_opts);
 

@@ -296,6 +296,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 			       PVFS_handle handle,
 			       PVFS_ds_keyval * key_array,
 			       PVFS_ds_keyval * val_array,
+                               PVFS_error * err_array,
 			       int count,
 			       PVFS_ds_flags flags,
 			       PVFS_vtag * vtag,
@@ -341,6 +342,17 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
 			    job_context_id context_id);
+
+/* get handle info for a keyval */
+int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
+                                     PVFS_handle handle,
+                                     PVFS_ds_flags flags,
+                                     PVFS_ds_keyval_handle_info *info,
+                                     void *user_ptr,
+                                     job_aint status_user_tag,
+                                     job_status_s * out_status_p,
+                                     job_id_t * id,
+                                     job_context_id context_id);
 
 /* read generic dspace attributes */
 int job_trove_dspace_getattr(PVFS_fs_id coll_id,
@@ -401,6 +413,7 @@ int job_trove_bstream_validate(PVFS_fs_id coll_id,
 int job_trove_keyval_remove(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    PVFS_ds_keyval * key_p,
+                            PVFS_ds_keyval * val_p,
 			    PVFS_ds_flags flags,
 			    PVFS_vtag * vtag,
 			    void *user_ptr,

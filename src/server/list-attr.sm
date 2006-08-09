@@ -794,23 +794,17 @@ static int listattr_get_dirent_count(
     handle    = &s_op->u.listattr.handles[s_op->u.listattr.handle_index];
 
     js_p->error_code = 0;
-    s_op->key.buffer = Trove_Common_Keys[DIRDATA_SIZE_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIRDATA_SIZE_KEY].size;
-    s_op->val.buffer = &s_op->u.listattr.dirent_count;
-    s_op->val.buffer_sz = sizeof(PVFS_size);
 
-    ret = job_trove_keyval_read(
-        s_op->u.listattr.fs_id,
-        *handle,
-        &s_op->key,
-        &s_op->val,
-        0,
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &tmp_id,
-        server_job_context);
+    ret = job_trove_keyval_get_handle_info(
+            s_op->u.listattr.fs_id,
+            *handle,
+            TROVE_KEYVAL_HANDLE_COUNT,
+            &s_op->u.listattr.keyval_handle_info,
+            s_op,
+            0,
+            js_p,
+            &tmp_id,
+            server_job_context);
 
     return ret;
 }
@@ -820,6 +814,8 @@ static int listattr_interpret_dirent_count(
 {
     PVFS_object_attr *resp_attr = NULL;
 
+    /* from the keyval_handle_info, retrieve the dirent_count */
+    s_op->u.listattr.dirent_count = s_op->u.listattr.keyval_handle_info.count;
     resp_attr = &s_op->resp.u.listattr.attr[s_op->u.listattr.handle_index];
     resp_attr->u.dir.dirent_count = s_op->u.listattr.dirent_count;
 

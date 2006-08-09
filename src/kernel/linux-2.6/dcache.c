@@ -13,11 +13,6 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-internal.h"
 
-extern int debug;
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-
 /* should return 1 if dentry can still be trusted, else 0 */
 static int pvfs2_d_revalidate_common(struct dentry* dentry)
 {
@@ -27,17 +22,17 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL;
 
-    pvfs2_print("pvfs2_d_revalidate: called on dentry %p.\n", dentry);
+    pvfs2_print("pvfs2_d_revalidate_common: called on dentry %p.\n", dentry);
 
     /* find parent inode */
     if(dentry && dentry->d_parent)
     {
-        pvfs2_print("pvfs2_d_revalidate: parent found.\n");
+        pvfs2_print("pvfs2_d_revalidate_common: parent found.\n");
         parent_inode = dentry->d_parent->d_inode;
     }
     else
     {
-        pvfs2_print("pvfs2_d_revalidate: parent not found.\n");
+        pvfs2_print("pvfs2_d_revalidate_common: parent not found.\n");
     }
     
     if (inode && parent_inode)
@@ -48,13 +43,12 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         if(!(PVFS2_SB(inode->i_sb)->root_handle ==
             pvfs2_ino_to_handle(inode->i_ino)))
         {
-            pvfs2_print("pvfs2_d_revalidate: attempting lookup.\n");
-            new_op = op_alloc();
+            pvfs2_print("pvfs2_d_revalidate_common: attempting lookup.\n");
+            new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
             if (!new_op)
             {
                 return 0;
             }
-            new_op->upcall.type = PVFS2_VFS_OP_LOOKUP;
             new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
             parent = PVFS2_I(parent_inode);
             if (parent && parent->refn.handle && parent->refn.fs_id)
@@ -72,14 +66,14 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
                     dentry->d_name.name, PVFS2_NAME_LEN);
 
             ret = service_operation(
-                new_op, "pvfs2_lookup", PVFS2_OP_RETRY_COUNT,
+                new_op, "pvfs2_lookup", 
                 get_interruptible_flag(parent_inode));
 
             if((new_op->downcall.status != 0) ||
                (new_op->downcall.resp.lookup.refn.handle !=
                pvfs2_ino_to_handle(inode->i_ino)))
             {
-                pvfs2_print("pvfs2_d_revalidate: lookup failure or no match.\n");
+                pvfs2_print("pvfs2_d_revalidate_common: lookup failure or no match.\n");
                 op_release(new_op);
                 return(0);
             }
@@ -88,13 +82,13 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         }
         else
         {
-            pvfs2_print("pvfs2_d_revalidate: root handle, lookup skipped.\n");
+            pvfs2_print("pvfs2_d_revalidate_common: root handle, lookup skipped.\n");
         }
 
         /* now perform revalidation */
         pvfs2_print(" (inode %llu)\n",
                     llu(pvfs2_ino_to_handle(inode->i_ino)));
-        pvfs2_print("pvfs2_d_revalidate: calling pvfs2_internal_revalidate().\n");
+        pvfs2_print("pvfs2_d_revalidate_common: calling pvfs2_internal_revalidate().\n");
         ret = pvfs2_internal_revalidate(inode);
     }
     else
@@ -106,7 +100,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
 
 /* should return 1 if dentry can still be trusted, else 0 */
 #ifdef PVFS2_LINUX_KERNEL_2_4
-int pvfs2_d_revalidate(
+static int pvfs2_d_revalidate(
     struct dentry *dentry,
     int flags)
 {
@@ -117,7 +111,7 @@ int pvfs2_d_revalidate(
 
 /** Verify that dentry is valid.
  */
-int pvfs2_d_revalidate(
+static int pvfs2_d_revalidate(
     struct dentry *dentry,
     struct nameidata *nd)
 {

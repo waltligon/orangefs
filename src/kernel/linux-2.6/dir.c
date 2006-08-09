@@ -15,21 +15,6 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-internal.h"
 
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-extern int debug;
-extern struct address_space_operations pvfs2_address_operations;
-extern struct backing_dev_info pvfs2_backing_dev_info;
-
-/* shared file/dir operations defined in file.c */
-extern int pvfs2_file_open(
-    struct inode *inode,
-    struct file *file);
-extern int pvfs2_file_release(
-    struct inode *inode,
-    struct file *file);
-
 typedef struct 
 {
     int buffer_index;
@@ -194,166 +179,166 @@ static int pvfs2_readdir(
         /* drop through */
     default:
     {
-            readdir_handle_t rhandle;
+        readdir_handle_t rhandle;
 
-            rhandle.buffer_index = -1;
-            rhandle.dents_buf = NULL;
-            memset(&rhandle.readdir_response, 0, sizeof(rhandle.readdir_response));
+        rhandle.buffer_index = -1;
+        rhandle.dents_buf = NULL;
+        memset(&rhandle.readdir_response, 0, sizeof(rhandle.readdir_response));
 
-            /* handle the normal cases here */
-            new_op = op_alloc();
-            if (!new_op)
+	/* handle the normal cases here */
+	new_op = op_alloc(PVFS2_VFS_OP_READDIR);
+	if (!new_op)
+	{
+	    return -ENOMEM;
+	}
+
+	if (pvfs2_inode && pvfs2_inode->refn.handle &&
+            pvfs2_inode->refn.fs_id)
+	{
+	    new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
+	}
+	else
+	{
+	    new_op->upcall.req.readdir.refn.handle =
+		pvfs2_ino_to_handle(dentry->d_inode->i_ino);
+	    new_op->upcall.req.readdir.refn.fs_id =
+		PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
+	}
+	new_op->upcall.req.readdir.max_dirent_count = MAX_DIRENT_COUNT;
+
+	/* NOTE:
+	   the position we send to the readdir upcall is out of
+	   sync with file->f_pos since pvfs2 doesn't include the
+	   "." and ".." entries that we added above.
+        */
+	new_op->upcall.req.readdir.token =
+            (pos == 2 ? PVFS_READDIR_START : pos);
+
+        ret = readdir_index_get(&buffer_index);
+        if (ret < 0)
+        {
+            pvfs2_error("pvfs2_readdir: readdir_index_get() failure (%d)\n", ret);
+            goto err;
+        }
+        new_op->upcall.req.readdir.buf_index = buffer_index;
+
+        ret = service_operation(
+            new_op, "pvfs2_readdir", 
+            get_interruptible_flag(dentry->d_inode));
+
+	pvfs2_print("Readdir downcall status is %d\n", 
+		    new_op->downcall.status);
+
+        if (new_op->downcall.status == 0)
+        {
+            int i = 0, len = 0;
+            ino_t current_ino = 0;
+            char *current_entry = NULL;
+            long bytes_decoded;
+
+            if ((bytes_decoded = readdir_handle_ctor(&rhandle, 
+                            new_op->downcall.trailer_buf,
+                            buffer_index)) < 0)
             {
-                return -ENOMEM;
-            }
-            new_op->upcall.type = PVFS2_VFS_OP_READDIR;
-
-            if (pvfs2_inode && pvfs2_inode->refn.handle &&
-                pvfs2_inode->refn.fs_id)
-            {
-                new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
-            }
-            else
-            {
-                new_op->upcall.req.readdir.refn.handle =
-                    pvfs2_ino_to_handle(dentry->d_inode->i_ino);
-                new_op->upcall.req.readdir.refn.fs_id =
-                    PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
-            }
-            new_op->upcall.req.readdir.max_dirent_count = MAX_DIRENT_COUNT;
-
-            /* NOTE:
-               the position we send to the readdir upcall is out of
-               sync with file->f_pos since pvfs2 doesn't include the
-               "." and ".." entries that we added above.
-            */
-            new_op->upcall.req.readdir.token =
-                (pos == 2 ? PVFS_READDIR_START : pos);
-
-            ret = readdir_index_get(&buffer_index);
-            if (ret < 0)
-            {
-                pvfs2_error("pvfs2_readdir: readdir_index_get() failure (%d)\n", ret);
+                ret = bytes_decoded;
+                pvfs2_error("pvfs2_readdir: Could not decode trailer buffer "
+                        " into a readdir response %d\n", ret);
                 goto err;
             }
-            new_op->upcall.req.readdir.buf_index = buffer_index;
-
-            ret = service_operation(
-                new_op, "pvfs2_readdir", PVFS2_OP_RETRY_COUNT,
-                get_interruptible_flag(dentry->d_inode));
-
-            pvfs2_print("Readdir downcall status is %d\n", new_op->downcall.status);
-
-            if (new_op->downcall.status == 0)
+            if (bytes_decoded != new_op->downcall.trailer_size)
             {
-                int i = 0, len = 0;
-                ino_t current_ino = 0;
-                char *current_entry = NULL;
-                long bytes_decoded;
+                pvfs2_error("pvfs2_readdir: # bytes decoded (%ld) != trailer size (%ld)\n",
+                        bytes_decoded, (long) new_op->downcall.trailer_size);
+                ret = -EINVAL;
+                goto err;
+            }
+            if (rhandle.readdir_response.pvfs_dirent_outcount == 0)
+            {
+                goto graceful_termination_path;
+            }
 
-                if ((bytes_decoded = readdir_handle_ctor(&rhandle, new_op->downcall.trailer_buf,
-                                buffer_index)) < 0)
-                {
-                    ret = bytes_decoded;
-                    pvfs2_error("pvfs2_readdir: Could not decode trailer buffer "
-                            " into a readdir response %d\n", ret);
-                    goto err;
-                }
-                if (bytes_decoded != new_op->downcall.trailer_size)
-                {
-                    pvfs2_error("pvfs2_readdir: # bytes decoded (%ld) != trailer size (%ld)\n",
-                            bytes_decoded, (long) new_op->downcall.trailer_size);
-                    ret = -EINVAL;
-                    goto err;
-                }
-                if (rhandle.readdir_response.pvfs_dirent_outcount == 0)
-                {
-                    goto graceful_termination_path;
-                }
+            if (pvfs2_inode->directory_version == 0)
+            {
+                pvfs2_inode->directory_version =
+                        rhandle.readdir_response.directory_version;
+            }
 
-                if (pvfs2_inode->directory_version == 0)
+            if (pvfs2_inode->num_readdir_retries > -1)
+            {
+                if (pvfs2_inode->directory_version !=
+                    rhandle.readdir_response.directory_version)
                 {
+                    pvfs2_print("detected directory change on listing; "
+                                "starting over\n");
+
+                    file->f_pos = 0;
                     pvfs2_inode->directory_version =
                         rhandle.readdir_response.directory_version;
+
+                    readdir_handle_dtor(&rhandle);
+                    op_release(new_op);
+                    pvfs2_inode->num_readdir_retries--;
+                    goto restart_readdir;
                 }
-
-                if (pvfs2_inode->num_readdir_retries > -1)
-                {
-                    if (pvfs2_inode->directory_version !=
-                        rhandle.readdir_response.directory_version)
-                    {
-                        pvfs2_print("detected directory change on listing; "
-                                    "starting over\n");
-
-                        file->f_pos = 0;
-                        pvfs2_inode->directory_version =
-                            rhandle.readdir_response.directory_version;
-
-                        readdir_handle_dtor(&rhandle);
-                        op_release(new_op);
-                        pvfs2_inode->num_readdir_retries--;
-                        goto restart_readdir;
-                    }
-                }
-                else
-                {
-                    pvfs2_print("Giving up on readdir retries to avoid "
-                                "possible livelock (%d tries attempted)\n",
-                                PVFS2_NUM_READDIR_RETRIES);
-                }
-
-                for (i = 0; i < rhandle.readdir_response.pvfs_dirent_outcount; i++)
-                {
-                    len = rhandle.readdir_response.dirent_array[i].d_length;
-                    current_entry = rhandle.readdir_response.dirent_array[i].d_name;
-                    current_ino = pvfs2_handle_to_ino(
-                            rhandle.readdir_response.dirent_array[i].handle);
-
-                    pvfs2_print("calling filldir for %s with len %d, pos %ld\n",
-                            current_entry, len, (unsigned long) pos);
-                    if (filldir(dirent, current_entry, len, pos,
-                                current_ino, DT_UNKNOWN) < 0)
-                    {
-graceful_termination_path:
-                        pvfs2_inode->directory_version = 0;
-                        pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
-
-                        ret = 0;
-                        break;
-                    }
-                    file->f_pos++;
-                    pos++;
-                }
-                /* For the first time around, use the token returned by the readdir response */
-                if (token_set == 1) {
-                    if (i == rhandle.readdir_response.pvfs_dirent_outcount)
-                        file->f_pos = rhandle.readdir_response.token;
-                    else 
-                        file->f_pos = i;
-                }
-                pvfs2_print("pos = %d, file->f_pos is %ld\n", pos, 
-                        (unsigned long) file->f_pos);
             }
             else
             {
-                readdir_index_put(buffer_index);
-                pvfs2_print("Failed to readdir (downcall status %d)\n",
-                            new_op->downcall.status);
+                pvfs2_print("Giving up on readdir retries to avoid "
+                            "possible livelock (%d tries attempted)\n",
+                            PVFS2_NUM_READDIR_RETRIES);
             }
-err:
-            readdir_handle_dtor(&rhandle);
-            op_release(new_op);
-            break;
+
+            for (i = 0; i < rhandle.readdir_response.pvfs_dirent_outcount; i++)
+            {
+                len = rhandle.readdir_response.dirent_array[i].d_length;
+                current_entry = rhandle.readdir_response.dirent_array[i].d_name;
+                current_ino = pvfs2_handle_to_ino(
+                        rhandle.readdir_response.dirent_array[i].handle);
+
+                pvfs2_print("calling filldir for %s with len %d, pos %ld\n",
+                        current_entry, len, (unsigned long) pos);
+                if (filldir(dirent, current_entry, len, pos,
+                            current_ino, DT_UNKNOWN) < 0)
+                {
+graceful_termination_path:
+                    pvfs2_inode->directory_version = 0;
+                    pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
+
+                    ret = 0;
+                    break;
+                }
+                file->f_pos++;
+                pos++;
+            }
+            /* For the first time around, use the token returned by the readdir response */
+            if (token_set == 1) {
+                if (i == rhandle.readdir_response.pvfs_dirent_outcount)
+                    file->f_pos = rhandle.readdir_response.token;
+                else 
+                    file->f_pos = i;
+            }
+            pvfs2_print("pos = %d, file->f_pos is %ld\n", pos, 
+                    (unsigned long) file->f_pos);
         }
+        else
+        {
+            readdir_index_put(buffer_index);
+            pvfs2_print("Failed to readdir (downcall status %d)\n",
+                        new_op->downcall.status);
+        }
+err:
+        readdir_handle_dtor(&rhandle);
+        op_release(new_op);
+        break;
+    }
     }
     if (ret == 0)
     {
         pvfs2_print("pvfs2_readdir about to update_atime %p\n", dentry->d_inode);
-#ifdef HAVE_TOUCH_ATIME
-        touch_atime(file->f_vfsmnt, dentry);
-#else
-        update_atime(dentry->d_inode);
-#endif
+
+        SetAtimeFlag(pvfs2_inode);
+        dentry->d_inode->i_atime = CURRENT_TIME;
+        mark_inode_dirty_sync(dentry->d_inode);
     }
 
     pvfs2_print("pvfs2_readdir returning %d\n",ret);
@@ -594,13 +579,11 @@ static int pvfs2_readdirplus(
             memset(&rhandle.readdirplus_response, 0, sizeof(rhandle.readdirplus_response));
 
             /* handle the normal cases here */
-            new_op = op_alloc();
+            new_op = op_alloc(PVFS2_VFS_OP_READDIRPLUS);
             if (!new_op)
             {
                 return -ENOMEM;
             }
-            new_op->upcall.type = PVFS2_VFS_OP_READDIRPLUS;
-
             if (pvfs2_inode && pvfs2_inode->refn.handle &&
                 pvfs2_inode->refn.fs_id)
             {
@@ -633,7 +616,7 @@ static int pvfs2_readdirplus(
             new_op->upcall.req.readdirplus.buf_index = buffer_index;
 
             ret = service_operation(
-                new_op, "pvfs2_readdirplus", PVFS2_OP_RETRY_COUNT,
+                new_op, "pvfs2_readdirplus", 
                 get_interruptible_flag(dentry->d_inode));
 
             pvfs2_print("Readdirplus downcall status is %d\n",
@@ -821,15 +804,14 @@ err:
             break;
         }
     }
+
     if (ret == 0)
     {
-        pvfs2_print("pvfs2_readdirplus about to update_atime %p\n", dentry->d_inode);
-#ifdef HAVE_TOUCH_ATIME
-        touch_atime(file->f_vfsmnt, dentry);
-#else
-        update_atime(dentry->d_inode);
-#endif
+        SetAtimeFlag(pvfs2_inode);
+        dentry->d_inode->i_atime = CURRENT_TIME;
+        mark_inode_dirty_sync(dentry->d_inode);
     }
+
     pvfs2_print("pvfs2_readdirplus returning %d\n",ret);
     return ret;
 }

@@ -126,9 +126,6 @@ static int make_link(PVFS_credentials     * pCredentials,
     attr.owner = pCredentials->uid;
     attr.group = pCredentials->gid;
     attr.perms = 0777;              
-    attr.atime = time(NULL);
-    attr.mtime = attr.atime;
-    attr.ctime = attr.atime;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
     /* We need to change the PINT_remove_base_dir to an API call (pvfs_util), 

@@ -367,7 +367,7 @@ void print_entry(
     memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
     PVFS_util_gen_credentials(&credentials);
 
-    ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
+    ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
                            &credentials, &getattr_response);
     if (ret)
     {
@@ -415,7 +415,7 @@ int do_list(
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
-    if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
+    if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
                          &credentials, &getattr_response) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||

@@ -80,7 +80,7 @@ int dbpf_op_init_queued_or_immediate(
 int dbpf_queue_or_service(
     struct dbpf_op *op_p,
     dbpf_queued_op_t *q_op_p,
-    TROVE_ds_flags flags,
+    struct dbpf_collection *coll_p,
     TROVE_op_id *out_op_id_p);
 
 int dbpf_queued_op_complete(dbpf_queued_op_t * op,
@@ -102,9 +102,6 @@ enum
     DBPF_QUEUED_OP_BUSY = 0,
     DBPF_QUEUED_OP_SUCCESS = 1
 };
-
-void dbpf_queued_op_set_sync_high_watermark(int high);
-void dbpf_queued_op_set_sync_low_watermark(int low);
 
 #if defined(__cplusplus)
 }

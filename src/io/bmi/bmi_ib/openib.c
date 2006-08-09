@@ -6,10 +6,11 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.1.6.1 2006-06-07 03:20:47 slang Exp $
+ * $Id: openib.c,v 1.1.6.2 2006-08-09 20:17:39 vilayann Exp $
  */
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/io/bmi/bmi-byteswap.h>  /* bmitoh64 */
 #include <src/common/misc/pvfs2-internal.h>  /* llu */
@@ -29,6 +30,10 @@ struct openib_device_priv {
     int nic_port; /* port number */
     struct ibv_comp_channel *channel;
 
+    /* max values as reported by NIC */
+    int nic_max_sge;
+    int nic_max_wr;
+
     /*
      * Temp array for filling scatter/gather lists to pass to IB functions,
      * allocated once at start to max size defined as reported by the qp.
@@ -46,6 +51,8 @@ struct openib_device_priv {
      */
     unsigned int num_unsignaled_sends;
     unsigned int max_unsignaled_sends;
+    unsigned int num_ack_unsignaled_sends;
+    unsigned int max_ack_unsignaled_sends;
 };
 
 /*
@@ -80,7 +87,6 @@ static const int IBV_MTU = IBV_MTU_1024;  /* dmtu, 1k good for mellanox */
 
 static int exchange_data(int sock, int is_server, void *xin, void *xout,
                          size_t len);
-static void verify_prop_caps(struct ibv_qp_cap *cap);
 static void init_connection_modify_qp(struct ibv_qp *qp,
                                       uint32_t remote_qp_num, int remote_lid);
 static void openib_post_rr(const ib_connection_t *c, buf_head_t *bh);
@@ -133,31 +139,65 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
     memset(&att, 0, sizeof(att));
     att.send_cq = od->nic_cq;
     att.recv_cq = od->nic_cq;
-    att.cap.max_recv_wr = 512;
-    att.cap.max_send_wr = 512;
+    att.cap.max_recv_wr = ib_device->eager_buf_num + 50;  /* plus some rdmaw */
+    if ((int) att.cap.max_recv_wr > od->nic_max_wr)
+	att.cap.max_recv_wr = od->nic_max_wr;
+    att.cap.max_send_wr = att.cap.max_recv_wr;
     att.cap.max_recv_sge = 16;
     att.cap.max_send_sge = 16;
+    if ((int) att.cap.max_recv_sge > od->nic_max_sge) {
+	att.cap.max_recv_sge = od->nic_max_sge;
+	/* -1 to work around mellanox issue */
+	att.cap.max_send_sge = od->nic_max_sge - 1;
+    }
     att.qp_type = IBV_QPT_RC;
     oc->qp = ibv_create_qp(od->nic_pd, &att);
     if (!oc->qp)
 	error("%s: create QP", __func__);
 
-    verify_prop_caps(&att.cap);
+    /* compare the caps that came back against what we already have */
+    if (od->sg_max_len == 0) {
+	od->sg_max_len = att.cap.max_send_sge;
+	if (att.cap.max_recv_sge < od->sg_max_len)
+	    od->sg_max_len = att.cap.max_recv_sge;
+	od->sg_tmp_array = Malloc(od->sg_max_len * sizeof(*od->sg_tmp_array));
+    } else {
+	if (att.cap.max_send_sge < od->sg_max_len)
+	    error("%s: new conn has smaller send SG array size %d vs %d",
+		  __func__, att.cap.max_send_sge, od->sg_max_len);
+	if (att.cap.max_recv_sge < od->sg_max_len)
+	    error("%s: new conn has smaller recv SG array size %d vs %d",
+		  __func__, att.cap.max_recv_sge, od->sg_max_len);
+    }
+
+    if (od->max_unsignaled_sends == 0)
+	od->max_unsignaled_sends = att.cap.max_send_wr;
+    else
+	if (att.cap.max_send_wr < od->max_unsignaled_sends)
+	    error("%s: new connection has smaller max_send_wr, %d vs %d",
+	          __func__, att.cap.max_send_wr, od->max_unsignaled_sends);
 
     /* create the ack queue pair */
     memset(&att, 0, sizeof(att));
     att.send_cq = od->nic_cq;
     att.recv_cq = od->nic_cq;
-    att.cap.max_recv_wr = 512;
-    att.cap.max_send_wr = 512;
-    att.cap.max_recv_sge = 16;
-    att.cap.max_send_sge = 16;
+    att.cap.max_recv_wr = ib_device->eager_buf_num + 10;  /* and some extra */
+    if ((int) att.cap.max_recv_wr > od->nic_max_wr)
+	att.cap.max_recv_wr = od->nic_max_wr;
+    att.cap.max_send_wr = att.cap.max_recv_wr;
+    att.cap.max_recv_sge = 1;
+    att.cap.max_send_sge = 1;
     att.qp_type = IBV_QPT_RC;
     oc->qp_ack = ibv_create_qp(od->nic_pd, &att);
     if (!oc->qp_ack)
 	error("%s: create QP ack", __func__);
 
-    verify_prop_caps(&att.cap);
+    if (od->max_ack_unsignaled_sends == 0)
+	od->max_ack_unsignaled_sends = att.cap.max_send_wr;
+    else
+	if (att.cap.max_send_wr < od->max_ack_unsignaled_sends)
+	    error("%s: new ack connection has smaller max_send_wr, %d vs %d",
+	          __func__, att.cap.max_send_wr, od->max_ack_unsignaled_sends);
 
     /* exchange data, converting info to network order and back */
     ch_out.lid = htobmi16(od->nic_lid);
@@ -176,11 +216,6 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
     init_connection_modify_qp(oc->qp, oc->remote_qp_num, oc->remote_lid);
     init_connection_modify_qp(oc->qp_ack, oc->remote_qp_ack_num,
                               oc->remote_lid);
-
-    /* request notification of requests on the command queue */
-    ret = ibv_req_notify_cq(od->nic_cq, 0);
-    if (ret)
-	error_xerrno(ret, "%s: ibv_req_notify_cq", __func__);
 
     /* post initial RRs */
     for (i=0; i<ib_device->eager_buf_num; i++)
@@ -228,36 +263,6 @@ static int exchange_data(int sock, int is_server, void *xin, void *xout,
 
   out:
     return ret;
-}
-
-/*
- * If not set, set them.  Otherwise verify that none of our assumed global
- * limits are different for this new connection.
- */
-static void verify_prop_caps(struct ibv_qp_cap *cap)
-{
-    struct openib_device_priv *od = ib_device->priv;
-
-    if (od->sg_max_len == 0) {
-	od->sg_max_len = cap->max_send_sge;
-	if (cap->max_recv_sge < od->sg_max_len)
-	    od->sg_max_len = cap->max_recv_sge;
-	od->sg_tmp_array = Malloc(od->sg_max_len * sizeof(*od->sg_tmp_array));
-    } else {
-	if (cap->max_send_sge < od->sg_max_len)
-	    error("%s: new connection has smaller send SG array size %d vs %d",
-	          __func__, cap->max_send_sge, od->sg_max_len);
-	if (cap->max_recv_sge < od->sg_max_len)
-	    error("%s: new connection has smaller recv SG array size %d vs %d",
-	          __func__, cap->max_recv_sge, od->sg_max_len);
-    }
-    if (od->max_unsignaled_sends == 0) {
-	od->max_unsignaled_sends = cap->max_send_wr;
-    } else {
-	if (cap->max_send_wr < od->max_unsignaled_sends)
-	    error("%s: new connection has smaller max_send_wr size, %d vs %d",
-	          __func__, cap->max_send_wr, od->max_unsignaled_sends);
-    }
 }
 
 /*
@@ -392,10 +397,10 @@ static void openib_send_bye(ib_connection_t *c)
     sg.lkey = oc->eager_send_mr->lkey,
 
     memset(&sr, 0, sizeof(sr));
-    sr.opcode = IBV_WR_SEND,
-    sr.send_flags = IBV_SEND_SOLICITED,
-    sr.sg_list = &sg,
-    sr.num_sge = 1,
+    sr.opcode = IBV_WR_SEND;
+    sr.send_flags = IBV_SEND_SIGNALED;
+    sr.sg_list = &sg;
+    sr.num_sge = 1;
 
     ret = ibv_post_send(oc->qp, &sr, &bad_wr);
     if (ret < 0)
@@ -466,10 +471,10 @@ static void openib_post_sr(const buf_head_t *bh, u_int32_t len)
     };
     struct ibv_send_wr *bad_wr;
 
-    debug(2, "%s: %s bh %d len %u wr %d/%d", __func__, c->peername, bh->num,
+    debug(4, "%s: %s bh %d len %u wr %d/%d", __func__, c->peername, bh->num,
           len, od->num_unsignaled_sends, od->max_unsignaled_sends);
 
-    if (od->num_unsignaled_sends + 100 == od->max_unsignaled_sends)
+    if (od->num_unsignaled_sends + 10 == od->max_unsignaled_sends)
         od->num_unsignaled_sends = 0;
     else
         ++od->num_unsignaled_sends;
@@ -477,7 +482,6 @@ static void openib_post_sr(const buf_head_t *bh, u_int32_t len)
     ret = ibv_post_send(oc->qp, &sr, &bad_wr);
     if (ret < 0)
         error("%s: ibv_post_send", __func__);
-
 }
 
 /*
@@ -500,7 +504,7 @@ static void openib_post_rr(const ib_connection_t *c, buf_head_t *bh)
     };
     struct ibv_recv_wr *bad_wr;
 
-    debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
+    debug(4, "%s: %s bh %d", __func__, c->peername, bh->num);
     ret = ibv_post_recv(oc->qp, &rr, &bad_wr);
     if (ret)
         error("%s: ibv_post_recv", __func__);
@@ -542,12 +546,12 @@ static void openib_post_sr_ack(ib_connection_t *c, int his_bufnum)
     struct ibv_send_wr *bad_wr;
 
     debug(2, "%s: %s bh %d wr %d/%d", __func__, c->peername, his_bufnum,
-          od->num_unsignaled_sends, od->max_unsignaled_sends);
+          od->num_unsignaled_sends, od->max_ack_unsignaled_sends);
 
-    if (od->num_unsignaled_sends + 100 == od->max_unsignaled_sends)
-        od->num_unsignaled_sends = 0;
+    if (od->num_ack_unsignaled_sends + 10 == od->max_ack_unsignaled_sends)
+        od->num_ack_unsignaled_sends = 0;
     else
-        ++od->num_unsignaled_sends;
+        ++od->num_ack_unsignaled_sends;
 
     ret = ibv_post_send(oc->qp_ack, &sr, &bad_wr);
     if (ret)
@@ -576,7 +580,7 @@ static void openib_post_rr_ack(const ib_connection_t *c, const buf_head_t * bh)
     };
     struct ibv_recv_wr *bad_rr;
 
-    debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
+    debug(4, "%s: %s bh %d", __func__, c->peername, bh->num);
 
     ret = ibv_post_recv(oc->qp_ack, &rr, &bad_rr);
     if (ret < 0)
@@ -635,7 +639,6 @@ static void openib_post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts,
     /* constant things for every send */
     memset(&sr, 0, sizeof(sr));
     sr.opcode = IBV_WR_RDMA_WRITE;
-    sr.send_flags = IBV_SEND_SIGNALED;
     sr.sg_list = od->sg_tmp_array;
     sr.next = NULL;
 
@@ -733,9 +736,6 @@ static int openib_check_cq(struct bmi_ib_wc *wc)
     if (ret < 0)
 	error_xerrno(ret, "%s: ibv_poll_cq", __func__);
     if (ret == 0) {  /* empty */
-	ret = ibv_req_notify_cq(od->nic_cq, 0);
-	if (ret < 0)
-	    error_xerrno(ret, "%s: ibv_req_notify_cq", __func__);
 	return 0;
     }
 
@@ -762,7 +762,22 @@ static int openib_check_cq(struct bmi_ib_wc *wc)
 	      __func__, desc.sl, desc.dlid_path_bits);
 	error("%s: unknown opcode %d", __func__, desc.opcode);
     }
+
     return 1;
+}
+
+static int openib_prepare_cq_block(void)
+{
+    struct openib_device_priv *od = ib_device->priv;
+    int ret;
+
+    /* ask for the next notfication */
+    ret = ibv_req_notify_cq(od->nic_cq, 0);
+    if (ret < 0)
+	error_xerrno(ret, "%s: ibv_req_notify_cq", __func__);
+
+    /* return the fd that can be fed to poll() */
+    return od->channel->fd;
 }
 
 /*
@@ -810,6 +825,32 @@ static const char *openib_port_state_string(enum ibv_port_state state)
 	CASE(IBV_PORT_ARMED);
 	CASE(IBV_PORT_ACTIVE);
 	CASE(IBV_PORT_ACTIVE_DEFER);
+    }
+    return s;
+}
+
+static const char *async_event_type_string(enum ibv_event_type event_type)
+{
+    const char *s = "(UNKNOWN)";
+
+    switch (event_type) {
+	CASE(IBV_EVENT_CQ_ERR);
+	CASE(IBV_EVENT_QP_FATAL);
+	CASE(IBV_EVENT_QP_REQ_ERR);
+	CASE(IBV_EVENT_QP_ACCESS_ERR);
+	CASE(IBV_EVENT_COMM_EST);
+	CASE(IBV_EVENT_SQ_DRAINED);
+	CASE(IBV_EVENT_PATH_MIG);
+	CASE(IBV_EVENT_PATH_MIG_ERR);
+	CASE(IBV_EVENT_DEVICE_FATAL);
+	CASE(IBV_EVENT_PORT_ACTIVE);
+	CASE(IBV_EVENT_PORT_ERR);
+	CASE(IBV_EVENT_LID_CHANGE);
+	CASE(IBV_EVENT_PKEY_CHANGE);
+	CASE(IBV_EVENT_SM_CHANGE);
+	CASE(IBV_EVENT_SRQ_ERR);
+	CASE(IBV_EVENT_SRQ_LIMIT_REACHED);
+	CASE(IBV_EVENT_QP_LAST_WQE_REACHED);
     }
     return s;
 }
@@ -891,14 +932,30 @@ static struct ibv_device *get_nic_handle(void)
     return nic_handle;
 }
 
+static int openib_check_async_events(void)
+{
+    struct openib_device_priv *od = ib_device->priv;
+    int ret;
+    struct ibv_async_event ev;
+
+    ret = ibv_get_async_event(od->ctx, &ev);
+    if (ret < 0) {
+	if (errno == EAGAIN)
+	    return 0;
+	error_errno("%s: ibv_get_async_event", __func__);
+    }
+    warning("%s: %s", __func__, async_event_type_string(ev.event_type));
+    ibv_ack_async_event(&ev);
+    return 1;
+}
+
 
 /*
  * Startup, once per application.
- * XXX: Watch for async events someday.
  */
 int openib_ib_initialize(void)
 {
-    int ret = 0;
+    int flags, ret = 0;
     struct ibv_device *nic_handle;
     struct ibv_context *ctx;
     int cqe_num; /* local variables, mainly for debug */
@@ -937,9 +994,11 @@ int openib_ib_initialize(void)
     ib_device->func.post_rr_ack = openib_post_rr_ack;
     ib_device->func.post_sr_rdmaw = openib_post_sr_rdmaw;
     ib_device->func.check_cq = openib_check_cq;
+    ib_device->func.prepare_cq_block = openib_prepare_cq_block;
     ib_device->func.wc_status_string = openib_wc_status_string;
     ib_device->func.mem_register = openib_mem_register;
     ib_device->func.mem_deregister = openib_mem_deregister;
+    ib_device->func.check_async_events = openib_check_async_events;
 
     od->ctx = ctx;
     od->nic_port = IBV_PORT;  /* maybe let this be configurable */
@@ -954,12 +1013,6 @@ int openib_ib_initialize(void)
 	error("%s: port state is %s but should be ACTIVE; check subnet manager",
 	      __func__, openib_port_state_string(hca_port.state));
 
-    /* Allocate a Protection Domain (global) */
-    od->nic_pd = ibv_alloc_pd(od->ctx);
-    if (!od->nic_pd)
-	error("%s: ibv_alloc_pd", __func__);
-    debug(2, "%s: built pd %lx", __func__, (unsigned long) od->nic_pd);
-
     /* Query the device for the max_ requests and such */
     ret = ibv_query_device(od->ctx, &hca_cap);
     if (ret)
@@ -967,6 +1020,8 @@ int openib_ib_initialize(void)
 
     debug(1, "%s: max %d completion queue entries", __func__, hca_cap.max_cq);
     cqe_num = IBV_NUM_CQ_ENTRIES;
+    od->nic_max_sge = hca_cap.max_sge;
+    od->nic_max_wr = hca_cap.max_qp_wr;
 
     if (hca_cap.max_cq < cqe_num) {
 	cqe_num = hca_cap.max_cq;
@@ -974,25 +1029,38 @@ int openib_ib_initialize(void)
 	        __func__, hca_cap.max_cq, cqe_num);
     }
 
-    /* Create completion channel */
+    /* Allocate a Protection Domain (global) */
+    od->nic_pd = ibv_alloc_pd(od->ctx);
+    if (!od->nic_pd)
+	error("%s: ibv_alloc_pd", __func__);
+
+    /* create completion channel for blocking on CQ events */
     od->channel = ibv_create_comp_channel(od->ctx);
     if (!od->channel)
 	error("%s: ibv_create_comp_channel failed", __func__);
 
-
+    /* build a CQ (global), connected to this channel */
     od->nic_cq = ibv_create_cq(od->ctx, cqe_num, NULL, od->channel, 0);
     if (!od->nic_cq)
 	error("%s: ibv_create_cq failed", __func__);
+
+    /* use non-blocking IO on the async fd */
+    flags = fcntl(ctx->async_fd, F_GETFL);
+    if (flags < 0)
+	error_errno("%s: get async fd flags", __func__);
+    if (fcntl(ctx->async_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+	error_errno("%s: set async fd nonblocking", __func__);
 
     /* will be set on first connection */
     od->sg_tmp_array = 0;
     od->sg_max_len = 0;
     od->num_unsignaled_sends = 0;
     od->max_unsignaled_sends = 0;
+    od->num_ack_unsignaled_sends = 0;
+    od->max_ack_unsignaled_sends = 0;
 
     return 0;
 }
-
 
 /*
  * Shutdown.
@@ -1010,7 +1078,6 @@ static void openib_ib_finalize(void)
     ret = ibv_destroy_comp_channel(od->channel);
     if (ret)
 	error_xerrno(ret, "%s: ibv_destroy_comp_channel", __func__);
-
     ret = ibv_dealloc_pd(od->nic_pd);
     if (ret)
 	error_xerrno(ret, "%s: ibv_dealloc_pd", __func__);
@@ -1018,6 +1085,7 @@ static void openib_ib_finalize(void)
     if (ret)
 	error_xerrno(ret, "%s: ibv_close_device", __func__);
 
-    free(ib_device->priv);
+    free(od);
+    ib_device->priv = NULL;
 }
 

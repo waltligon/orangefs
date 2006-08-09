@@ -31,8 +31,6 @@
 #endif
 #include "bmi-byteswap.h"
 
-extern int debug;
-
 /*
  * Encoding and Decoding the extended attributes so that we can
  * retrieve it properly on any architecture.
@@ -321,6 +319,7 @@ static int pvfs2_xattr_get_acl_access(struct inode *inode,
     pvfs2_print("pvfs2_xattr_get_acl_access %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        pvfs2_error("get_acl_access invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_get_acl(inode, ACL_TYPE_ACCESS, buffer, size);
@@ -332,6 +331,7 @@ static int pvfs2_xattr_get_acl_default(struct inode *inode,
     pvfs2_print("pvfs2_xattr_get_acl_default %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        pvfs2_error("get_acl_default invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_get_acl(inode, ACL_TYPE_DEFAULT, buffer, size);
@@ -385,6 +385,7 @@ static int pvfs2_xattr_set_acl_access(struct inode *inode,
     pvfs2_print("pvfs2_xattr_set_acl_access: %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        pvfs2_error("set_acl_access invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_set_acl(inode, ACL_TYPE_ACCESS, buffer, size);
@@ -396,6 +397,7 @@ static int pvfs2_xattr_set_acl_default(struct inode *inode,
     pvfs2_print("pvfs2_xattr_set_acl_default: %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        pvfs2_error("set_acl_default invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_set_acl(inode, ACL_TYPE_DEFAULT, buffer, size);
@@ -567,10 +569,14 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
         return -EACCES;
     }
     /* Do permission checks only for lookups and opens */
-    if (!nd || !(nd->flags & (LOOKUP_OPEN | LOOKUP_ACCESS)))
-    {
-        return 0;
+/*
+    if ((mask & MAY_EXEC) == 0) {
+        if (!nd || !(nd->flags & (LOOKUP_OPEN | LOOKUP_ACCESS)))
+        {
+            return 0;
+        }
     }
+*/
     if (current->fsuid == inode->i_uid) 
     {
         mode >>= 6;
@@ -606,22 +612,20 @@ check_groups:
         if (in_group_p(inode->i_gid))
             mode >>= 3;
     }
-    pvfs2_print("pvfs2_permission: mode & mask & S_IRWXO = %d, mask = %d\n", mode & mask & S_IRWXO, mask);
     if ((mode & mask & S_IRWXO) == mask)
+    {
         return 0;
+    }
 check_capabilities:
     /* Are we allowed to override DAC */
-    if ((mask & (MAY_READ|MAY_WRITE)) || (inode->i_mode & S_IXUGO))
+    if(!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
     {
-        if (capable(CAP_DAC_OVERRIDE))
+        if(capable(CAP_DAC_OVERRIDE))
+        {
             return 0;
+        }
     }
-    /* Allow read/search if CAP_DAC_READ_SEARCH */
-    if (capable(CAP_DAC_READ_SEARCH) && 
-            ((mask == MAY_READ) || (S_ISDIR(inode->i_mode) && !(mask && MAY_WRITE))))
-    {
-        return 0;
-    }
+
     pvfs2_print("pvfs2_permission: disallowing access\n");
     return -EACCES;
 #endif

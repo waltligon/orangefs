@@ -97,14 +97,15 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
 static inline int PVFS2_translate_mode(int mode)
 {
     int ret = 0, i = 0;
-    static int modes[10] =
+#define NUM_MODES 10
+    static int modes[NUM_MODES] =
     {
         S_IXOTH, S_IWOTH, S_IROTH,
         S_IXGRP, S_IWGRP, S_IRGRP,
         S_IXUSR, S_IWUSR, S_IRUSR,
-        S_ISGID
+        S_ISGID 
     };
-    static int pvfs2_modes[10] =
+    static int pvfs2_modes[NUM_MODES] =
     {
         PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
         PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
@@ -112,7 +113,7 @@ static inline int PVFS2_translate_mode(int mode)
         PVFS_G_SGID
     };
 
-    for(i = 0; i < 10; i++)
+    for(i = 0; i < NUM_MODES; i++)
     {
         if (mode & modes[i])
         {
@@ -120,6 +121,7 @@ static inline int PVFS2_translate_mode(int mode)
         }
     }
     return ret;
+#undef NUM_MODES
 }
 
 #ifndef __KERNEL__

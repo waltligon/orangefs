@@ -132,6 +132,7 @@ struct TROVE_keyval_ops
 			 TROVE_coll_id coll_id,
 			 TROVE_handle handle,
 			 TROVE_keyval_s *key_p,
+                         TROVE_keyval_s *val_p,
 			 TROVE_ds_flags flags,
 			 TROVE_vtag_s *inout_vtag,
 			 void *user_ptr,
@@ -177,6 +178,7 @@ struct TROVE_keyval_ops
 			    TROVE_handle handle,
 			    TROVE_keyval_s *key_array,
 			    TROVE_keyval_s *val_array,
+                            TROVE_ds_state *err_array,
 			    int count,
 			    TROVE_ds_flags flags,
 			    TROVE_vtag_s *out_vtag,
@@ -202,6 +204,14 @@ struct TROVE_keyval_ops
 			void *user_ptr,
 			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p);
+    int (*keyval_get_handle_info)(
+        TROVE_coll_id coll_id,
+        TROVE_handle handle,
+        TROVE_ds_flags flags,
+        TROVE_keyval_handle_info *info,
+        void *user_ptr,
+        TROVE_context_id context_id,
+        TROVE_op_id *out_op_id_p);
 };
 
 struct TROVE_dspace_ops

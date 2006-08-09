@@ -6,18 +6,6 @@
 
 #include "pvfs2-kernel.h"
 
-extern struct file_system_type pvfs2_fs_type;
-extern struct dentry_operations pvfs2_dentry_operations;
-extern struct address_space_operations pvfs2_address_operations;
-extern struct backing_dev_info pvfs2_backing_dev_info;
-
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-
-extern void pvfs2_kill_sb(struct super_block *sb);
-extern int debug;
-
 /* list for storing pvfs2 specific superblocks in use */
 LIST_HEAD(pvfs2_superblocks);
 
@@ -216,7 +204,7 @@ static void pvfs2_read_inode(
        called after a successful dentry lookup if the inode is not
        present in the inode cache already.  so this is our chance.
     */
-    if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL) != 0)
+    if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
     {
         /* assume an I/O error and mark the inode as bad */
         pvfs2_make_bad_inode(inode);
@@ -248,7 +236,7 @@ static void pvfs2_read_inode(
         pvfs2_print("pvfs2: pvfs2_read_inode: allocated %p (inode = %lu | "
                 "ct = %d)\n", pvfs2_inode, inode->i_ino,
                 (int)atomic_read(&inode->i_count));
-        if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL) != 0)
+        if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
             pvfs2_make_bad_inode(inode);
         }
@@ -351,27 +339,39 @@ static int pvfs2_statfs_lite(
 */
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_statfs(
-    struct super_block *sb,
+    struct super_block *psb,
     struct statfs *buf)
 #else
+#ifdef HAVE_DENTRY_STATFS_SOP
 static int pvfs2_statfs(
-    struct super_block *sb,
+    struct dentry *dentry,
     struct kstatfs *buf)
+#else
+static int pvfs2_statfs(
+    struct super_block *psb,
+    struct kstatfs *buf)
+#endif
 #endif
 {
     int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     int flags = 0;
+    struct super_block *sb = NULL;
+
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_DENTRY_STATFS_SOP)
+    sb = dentry->d_sb;
+#else
+    sb = psb;
+#endif
 
     pvfs2_print("pvfs2_statfs: called on sb %p (fs_id is %d)\n",
                 sb, (int)(PVFS2_SB(sb)->fs_id));
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_STATFS);
     if (!new_op)
     {
         return ret;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_STATFS;
     new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->fs_id;
 
     if(PVFS2_SB(sb)->mnt_options.intr)
@@ -380,7 +380,7 @@ static int pvfs2_statfs(
     }
 
     ret = service_operation(
-        new_op, "pvfs2_statfs", PVFS2_OP_RETRY_COUNT, flags);
+        new_op, "pvfs2_statfs",  flags);
 
     if (new_op->downcall.status > -1)
     {
@@ -500,12 +500,11 @@ int pvfs2_remount(
 #endif
         }
 
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
         if (!new_op)
         {
             return -ENOMEM;
         }
-        new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
         strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
                 PVFS2_SB(sb)->devname, PVFS_MAX_SERVER_ADDR_LEN);
 
@@ -516,7 +515,7 @@ int pvfs2_remount(
          * request_semaphore to prevent other operations from bypassing this
          * one
          */
-        ret = service_operation(new_op, "pvfs2_remount", 0, 
+        ret = service_operation(new_op, "pvfs2_remount", 
             (PVFS2_OP_PRIORITY|PVFS2_OP_NO_SEMAPHORE));
 
         pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
@@ -533,6 +532,7 @@ int pvfs2_remount(
             {
                 strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
             }
+            PVFS2_SB(sb)->mount_pending = 0;
         }
 
         op_release(new_op);
@@ -645,16 +645,14 @@ static int pvfs2_get_fs_key(PVFS_fs_id fsid, char *fs_key, int *fs_keylen)
 
     pvfs2_print("pvfs2: pvfs2_get_fs_key fsid is %d\n", fsid);
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_FSKEY);
     if (!new_op)
     {
         return -ENOMEM;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_FSKEY;
     new_op->upcall.req.fs_key.fsid = fsid;
 
-    ret = service_operation(
-        new_op, "pvfs2_get_fs_key", PVFS2_OP_RETRY_COUNT, PVFS2_OP_INTERRUPTIBLE);
+    ret = service_operation(new_op, "pvfs2_get_fs_key", PVFS2_OP_INTERRUPTIBLE);
 
     /* copy the keys and key lengths */
     if (ret == 0)
@@ -755,6 +753,18 @@ static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keyle
 
 #endif
 
+/* Called whenever the VFS dirties the inode in response to atime updates */
+static void pvfs2_dirty_inode(struct inode *inode)
+{
+    if (inode)
+    {
+        pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+        pvfs2_print("pvfs2_dirty_inode: %ld\n", (long) inode->i_ino);
+        SetAtimeFlag(pvfs2_inode);
+    }
+    return;
+}
+
 struct super_operations pvfs2_s_ops =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -762,6 +772,7 @@ struct super_operations pvfs2_s_ops =
     statfs : pvfs2_statfs,
     remount_fs : pvfs2_remount,
     put_super : pvfs2_kill_sb,
+    dirty_inode : pvfs2_dirty_inode,
     clear_inode: pvfs2_clear_inode,
     put_inode: pvfs2_put_inode,
 #else
@@ -769,6 +780,7 @@ struct super_operations pvfs2_s_ops =
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,
     .read_inode = pvfs2_read_inode,
+    .dirty_inode = pvfs2_dirty_inode,
     .put_inode = pvfs2_put_inode,
     .statfs = pvfs2_statfs,
     .remount_fs = pvfs2_remount,
@@ -827,20 +839,19 @@ struct super_block* pvfs2_get_sb(
         dev_name = PVFS2_SB(sb)->devname;
     }
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
     if (!new_op)
     {
         ret = -ENOMEM;
         goto error_exit;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
     strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
             dev_name, PVFS_MAX_SERVER_ADDR_LEN);
 
     pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                 new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-    ret = service_operation(new_op, "pvfs2_get_sb", 0, 0);
+    ret = service_operation(new_op, "pvfs2_get_sb", 0);
 
     pvfs2_print("%s: mount got return value of %d\n", __func__, ret);
     if (ret)
@@ -1004,11 +1015,20 @@ int pvfs2_fill_sb(
     return 0;
 }
 
+#ifdef HAVE_VFSMOUNT_GETSB
+int pvfs2_get_sb(
+    struct file_system_type *fst,
+    int flags,
+    const char *devname,
+    void *data,
+    struct vfsmount *mnt)
+#else
 struct super_block *pvfs2_get_sb(
     struct file_system_type *fst,
     int flags,
     const char *devname,
     void *data)
+#endif
 {
     int ret = -EINVAL;
     struct super_block *sb = ERR_PTR(-EINVAL);
@@ -1019,19 +1039,23 @@ struct super_block *pvfs2_get_sb(
 
     if (devname)
     {
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
         if (!new_op)
         {
-            return ERR_PTR(-ENOMEM);
+            ret = -ENOMEM;
+#ifdef HAVE_VFSMOUNT_GETSB
+            return ret;
+#else
+            return ERR_PTR(ret);
+#endif
         }
-        new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
         strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
                 devname, PVFS_MAX_SERVER_ADDR_LEN);
 
         pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-        ret = service_operation(new_op, "pvfs2_get_sb", 0, 0);
+        ret = service_operation(new_op, "pvfs2_get_sb", 0);
 
         pvfs2_print("pvfs2_get_sb: mount got return value of %d\n", ret);
         if (ret)
@@ -1062,8 +1086,16 @@ struct super_block *pvfs2_get_sb(
           here.  so we store it temporarily and pass all of the info
           to fill_sb where it's properly copied out
         */
+#ifdef HAVE_VFSMOUNT_GETSB
+        ret = get_sb_nodev(
+            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb, mnt);
+        if (ret)
+            goto free_op;
+        sb = mnt->mnt_sb;
+#else
         sb = get_sb_nodev(
             fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
+#endif
 
         if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {
@@ -1078,8 +1110,14 @@ struct super_block *pvfs2_get_sb(
             /* Issue an upcall to pre-fetch the fs key so that subsequent calls would be hits */
             pvfs2_sb_get_fs_key(sb, NULL, NULL);
 
+            /* mount_pending must be cleared */
+            PVFS2_SB(sb)->mount_pending = 0;
             /* finally, add this sb to our list of known pvfs2 sb's */
             add_pvfs2_sb(sb);
+        }
+        else {
+            ret = -EINVAL;
+            pvfs2_error("Invalid superblock obtained from get_sb_nodev (%p)\n", sb);
         }
     }
     else
@@ -1088,25 +1126,50 @@ struct super_block *pvfs2_get_sb(
     }
 
     op_release(new_op);
+#ifdef HAVE_VFSMOUNT_GETSB
+    return ret;
+#else
     return sb;
+#endif
 
-  error_exit:
-    pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
-
+error_exit:
     if (ret || IS_ERR(sb))
     {
         sb = ERR_PTR(ret);
     }
+#ifdef HAVE_VFSMOUNT_GETSB
+free_op:
+#endif
+    pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
 
     if (new_op)
     {
         op_release(new_op);
     }
+#ifdef HAVE_VFSMOUNT_GETSB
+    pvfs2_print("pvfs2_get_sb: returning %d\n", ret);
+    return ret;
+#else
     pvfs2_print("pvfs2_get_sb: returning sb %p\n", sb);
     return sb;
+#endif
 }
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+static void pvfs2_flush_sb(
+        struct super_block *sb)
+{
+    if (!list_empty(&sb->s_dirty))
+    {
+        struct inode *inode = NULL;
+        list_for_each_entry (inode, &sb->s_dirty, i_list)
+        {
+            pvfs2_flush_times(inode);
+        }
+    }
+    return;
+}
 
 void pvfs2_kill_sb(
     struct super_block *sb)
@@ -1115,6 +1178,10 @@ void pvfs2_kill_sb(
 
     if (sb && !IS_ERR(sb))
     {
+        /*
+         * Flush any dirty inodes atimes, mtimes to server
+         */
+        pvfs2_flush_sb(sb);
         /*
           issue the unmount to userspace to tell it to remove the
           dynamic mount info it has for this superblock

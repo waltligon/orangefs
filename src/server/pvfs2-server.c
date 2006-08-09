@@ -92,6 +92,11 @@ static struct server_configuration_s server_config;
 static int signal_recvd_flag = 0;
 static pid_t server_controlling_pid = 0;
 
+/* A list of all serv_op's posted for unexpected message alone */
+static QLIST_HEAD(posted_sop_list);
+/* A list of all serv_op's posted for expected messages alone */
+static QLIST_HEAD(inprogress_sop_list);
+
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
 
@@ -105,14 +110,17 @@ typedef struct
 
 static options_t s_server_options = { 0, 0, 1, NULL };
 
+/* each of the elements in this array consists of a string and its length.
+ * we're able to use sizeof here because sizeof an inlined string ("") gives
+ * the length of the string with the null terminator
+ */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
-    {"root_handle", 12},
-    {"dir_ent", 8},
-    {"datafile_handles", 17},
-    {"metafile_dist", 14},
-    {"symlink_target", 15},
-    {"dirdata_size", 13}
+    {ROOT_HANDLE_KEYSTR, sizeof(ROOT_HANDLE_KEYSTR)},
+    {DIRECTORY_ENTRY_KEYSTR, sizeof(DIRECTORY_ENTRY_KEYSTR)},
+    {DATAFILE_HANDLES_KEYSTR, sizeof(DATAFILE_HANDLES_KEYSTR)},
+    {METAFILE_DIST_KEYSTR, sizeof(METAFILE_DIST_KEYSTR)},
+    {SYMLINK_TARGET_KEYSTR, sizeof(SYMLINK_TARGET_KEYSTR)}
 };
 
 /* extended attribute name spaces supported in PVFS2 */
@@ -140,6 +148,7 @@ static int server_initialize(
 static int server_initialize_subsystems(
     PINT_server_status_flag *server_status_flag);
 static int server_setup_signal_handlers(void);
+static int server_purge_unexpected_recv_machines(void);
 static int server_setup_process_environment(int background);
 static int server_shutdown(
     PINT_server_status_flag status,
@@ -155,6 +164,7 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
+static int parse_port_from_host_id(char* host_id);
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_params PINT_server_req_table[] =
@@ -573,11 +583,23 @@ int main(int argc, char **argv)
     {
         int i, comp_ct = PVFS_SERVER_TEST_COUNT;
 
+        /* IF a signal was received and we have drained all the state machines
+         * that were in progress, then we initiate shutdown of the server
+         */
         if (signal_recvd_flag != 0)
         {
-            ret = 0;
-            siglevel = signal_recvd_flag;
-            goto server_shutdown;
+            /*
+             * If we received a signal, then find out if we can exit now
+             * by checking if all s_ops (for expected messages) have either 
+             * finished or timed out,
+             */
+            if (qlist_empty(&inprogress_sop_list))
+            {
+                ret = 0;
+                siglevel = signal_recvd_flag;
+                goto server_shutdown;
+            }
+            /* not completed. continue... */
         }
 
         ret = job_testcontext(server_job_id_array,
@@ -908,6 +930,7 @@ static int server_initialize_subsystems(
     char buf[16] = {0};
     PVFS_fs_id orig_fsid;
     PVFS_ds_flags init_flags = 0;
+    int port_num = 0;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -952,6 +975,16 @@ static int server_initialize_subsystems(
                                    &server_config.db_cache_size_bytes);
     /* this should never fail */
     assert(ret == 0);
+
+    /* parse port number and allow trove to use it to help differentiate
+     * shmem regions if needed
+     */
+    port_num = parse_port_from_host_id(server_config.host_id);
+    if(port_num > 0)
+    {
+        ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &port_num);
+        assert(ret == 0);
+    }
 
     if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
                                                "mmap")))
@@ -1168,6 +1201,26 @@ static int server_initialize_subsystems(
                 gossip_lerr("Error setting coalescing low watermark\n");
                 return ret;
             }
+            
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_META_SYNC_MODE,
+                (void *)&cur_fs->trove_sync_meta);
+            if(ret < 0)
+            {
+                gossip_lerr("Error setting coalescing low watermark\n");
+                return ret;
+            } 
+            
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_IMMEDIATE_COMPLETION,
+                (void *)&cur_fs->immediate_completion);
+            if(ret < 0)
+            {
+                gossip_lerr("Error setting trove immediate completion\n");
+                return ret;
+            } 
 
             gossip_debug(GOSSIP_SERVER_DEBUG, "File system %s using "
                          "handles:\n\t%s\n", cur_fs->file_system_name,
@@ -1522,6 +1575,14 @@ static void server_sig_handler(int sig)
          * server to exit gracefully on the next work cycle
          */
         signal_recvd_flag = sig;
+        /*
+         * iterate through all the machines that we had posted for
+         * unexpected BMI messages and deallocate them.
+         * From now the server will only try and finish operations
+         * that are already in progress, wait for them to timeout
+         * or complete before initiating shutdown
+         */
+        server_purge_unexpected_recv_machines();
     }
 }
 
@@ -1653,6 +1714,8 @@ static int server_post_unexpected_recv(job_status_s *js_p)
         }
         memset(s_op, 0, sizeof(PINT_server_op));
         s_op->op = BMI_UNEXPECTED_OP;
+        /* Add an unexpected s_ops to the list */
+        qlist_add_tail(&s_op->next, &posted_sop_list);
 
         /*
           TODO: Consider the optimization of enabling immediate
@@ -1673,6 +1736,34 @@ static int server_post_unexpected_recv(job_status_s *js_p)
         }
     }
     return ret;
+}
+
+/* server_purge_unexpected_recv_machines()
+ *
+ * removes any s_ops that were posted to field unexpected BMI messages
+ *
+ * returns 0 on success and -PVFS_errno on failure.
+ */
+static int server_purge_unexpected_recv_machines(void)
+{
+    struct qlist_head *tmp = NULL, *tmp2 = NULL;
+
+    if (qlist_empty(&posted_sop_list))
+    {
+        gossip_err("WARNING: Found empty posted operation list!\n");
+        return -PVFS_EINVAL;
+    }
+    qlist_for_each_safe (tmp, tmp2, &posted_sop_list)
+    {
+        PINT_server_op *s_op = qlist_entry(tmp, PINT_server_op, next);
+
+        /* Remove s_op from the posted_sop_list */
+        qlist_del(&s_op->next);
+
+        /* free the operation structure itself */
+        free(s_op);
+    }
+    return 0;
 }
 
 /* server_state_machine_start()
@@ -1713,6 +1804,9 @@ static int server_state_machine_start(
         PVFS_perror_gossip("Error: PINT_decode failure", ret);
         return ret;
     }
+    /* Remove s_op from posted_sop_list and move it to the inprogress_sop_list */
+    qlist_del(&s_op->next);
+    qlist_add_tail(&s_op->next, &inprogress_sop_list);
 
     /* set timestamp on the beginning of this state machine */
     id_gen_fast_register(&tmp_id, s_op);
@@ -1757,6 +1851,8 @@ int server_state_machine_alloc_noreq(
         }
         memset(*new_op, 0, sizeof(PINT_server_op));
         (*new_op)->op = op;
+
+        /* NOTE: We do not add these state machines to the in-progress or posted sop lists */
 
         /* find the state machine for this op type */
         (*new_op)->current_state = PINT_state_machine_locate(*new_op);
@@ -1846,6 +1942,9 @@ int server_state_machine_complete(PINT_server_op *s_op)
         free(s_op->unexp_bmi_buff.buffer);
     }
 
+    /* Remove s_op from the inprogress_sop_list */
+    qlist_del(&s_op->next);
+
     /* free the operation structure itself */
     free(s_op);
 
@@ -1855,6 +1954,37 @@ int server_state_machine_complete(PINT_server_op *s_op)
 struct server_configuration_s *get_server_config_struct(void)
 {
     return &server_config;
+}
+
+/* parse_port_from_host_id()
+ *
+ * attempts to parse the port number from a BMI address.  Returns port number
+ * on success, -1 on failure
+ */
+static int parse_port_from_host_id(char* host_id)
+{
+    int ret = -1;
+    int port_num;
+    char* port_index;
+    char* colon_index;
+
+    /* see if we have a <proto>://<hostname>:<port> format */
+    port_index = rindex(host_id, ':');
+    colon_index = index(host_id, ':');
+    /* if so, parse the port number */
+    if(port_index && (port_index != colon_index))
+    {
+        port_index++;
+        ret = sscanf(port_index, "%d", &port_num);
+    }
+
+    /* report error if we don't find a valid port number in the string */
+    if(ret != 1)
+    {
+        return(-1);
+    }
+    
+    return(port_num);
 }
 
 /*

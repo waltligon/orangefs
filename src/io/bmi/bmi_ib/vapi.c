@@ -5,11 +5,13 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.1.6.1 2006-06-07 03:20:47 slang Exp $
+ * $Id: vapi.c,v 1.1.6.2 2006-08-09 20:17:39 vilayann Exp $
  */
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <netinet/in.h>  /* htonl */
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/io/bmi/bmi-method-support.h>   /* struct method_addr */
@@ -59,7 +61,11 @@ struct vapi_device_priv {
 
     /* async events */
     EVAPI_async_handler_hndl_t nic_async_event_handler;
-    int async_event_handler_waiting_drain;
+    int async_event_pipe[2];
+
+    /* completion channel events */
+    EVAPI_compl_handler_hndl_t nic_cq_event_handler;
+    int cq_event_pipe[2];
 };
 
 /*
@@ -383,23 +389,6 @@ static void vapi_drain_qp(ib_connection_t *c)
     ret = VAPI_modify_qp(vd->nic_handle, qp, &attr, &mask, &cap);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_modify_qp RTS -> SQD", __func__);
-
-#if 0  /* screw the async notification, doesn't work nicely */
-    /* wait for the asynch notification */
-    vd->async_event_handler_waiting_drain = 1;
-    trips = 0;
-    while (vd->async_event_handler_waiting_drain != 0) {
-	struct timeval tv = { 0, 100000 };
-	(void) select(0,0,0,0,&tv);
-	if (++trips == 20)  /* 20 seconds later, bored */
-	    break;
-    }
-    if (vd->async_event_handler_waiting_drain == 0)
-	debug(2, "%s: drain async notification worked fine", __func__);
-    else
-	vd->async_event_handler_waiting_drain = 0;
-	/* oops, but ignore error and return anyway */
-#endif
 }
 
 static void vapi_send_bye(ib_connection_t *c)
@@ -774,6 +763,21 @@ static int vapi_check_cq(struct bmi_ib_wc *wc)
     return 1;
 }
 
+static int vapi_prepare_cq_block(void)
+{
+    struct vapi_device_priv *vd = ib_device->priv;
+    int ret;
+
+    /* ask for the next notfication */
+    ret = VAPI_req_comp_notif(vd->nic_handle, vd->nic_cq, VAPI_NEXT_COMP);
+    if (ret < 0)
+	error_verrno(ret, "%s: VAPI_req_comp_notif", __func__);
+
+    /* return the fd that can be fed to poll() */
+    return vd->cq_event_pipe[0];
+}
+
+
 /*
  * Return string form of work completion status field.
  */
@@ -856,27 +860,37 @@ error_verrno(int ecode, const char *fmt, ...)
 }
 
 /*
- * Catch errors from IB.
+ * Catch errors from IB.  This is invoked in its own thread created
+ * by libvapi.  Just ship the event down an fd and read it later when
+ * we want to get it, like the OpenIB model.
  */
 static void
 async_event_handler(VAPI_hca_hndl_t nic_handle_in __attribute__((unused)),
   VAPI_event_record_t *e, void *private_data __attribute__((unused)) )
 {
     struct vapi_device_priv *vd = ib_device->priv;
+    int ret;
 
-    /* catch drain events, else error */
-    if (e->type == VAPI_SEND_QUEUE_DRAINED) {
-	debug(2, "%s: caught send queue drained", __func__);
-	vd->async_event_handler_waiting_drain = 0;
-    } else if (e->type == VAPI_CLIENT_REREGISTER) {
-	warning("%s: ignoring reregister event, port %d", __func__,
-	        e->modifier.port_num);
-    } else
-	/* qp handle is ulong in 2.4, uint32 in 2.6 */
-	error("%s: event %s, syndrome %s, qp or cq or port 0x%lx",
-	  __func__, VAPI_event_record_sym(e->type),
-	  VAPI_event_syndrome_sym(e->syndrome),
-	  (unsigned long) e->modifier.qp_hndl);
+    ret = write(vd->async_event_pipe[1], e, sizeof(*e));
+    if (ret != sizeof(*e))
+	error_errno("%s: write async event pipe", __func__);
+}
+
+/*
+ * To deal with blocking completion events.  Just write down a pipe
+ * that something is ready to go; signaling to poll that an event is
+ * ready.
+ */
+static void cq_event_handler(VAPI_hca_hndl_t hca __attribute__((unused)),
+                             VAPI_cq_hndl_t cq __attribute__((unused)),
+		             void *private_data __attribute__((unused)))
+{
+    struct vapi_device_priv *vd = ib_device->priv;
+    int i = 0, ret;
+
+    ret = write(vd->cq_event_pipe[1], &i, sizeof(i));
+    if (ret != sizeof(i))
+	error_errno("%s: write cq event pipe", __func__);
 }
 
 #ifdef HAVE_IB_WRAP_COMMON_H
@@ -960,11 +974,31 @@ static void reinit_mosal(void)
 }
 
 /*
+ * Just catch and report the events, do not try to do anything with
+ * them.
+ */
+static int vapi_check_async_events(void)
+{
+    struct vapi_device_priv *vd = ib_device->priv;
+    int ret;
+    VAPI_event_record_t ev;
+
+    ret = read(vd->async_event_pipe[0], &ev, sizeof(ev));
+    if (ret < 0) {
+	if (errno == EAGAIN)
+	    return 0;
+	error_errno("%s: read async event pipe", __func__);
+    }
+    warning("%s: %s", __func__, VAPI_event_record_sym(ev.type));
+    return 1;
+}
+
+/*
  * VAPI-specific startup.
  */
 int vapi_ib_initialize(void)
 {
-    int ret;
+    int ret, flags;
     u_int32_t num_hcas;
     VAPI_hca_id_t hca_ids[10];
     VAPI_hca_port_t nic_port_props;
@@ -1003,9 +1037,11 @@ int vapi_ib_initialize(void)
     ib_device->func.post_rr_ack = vapi_post_rr_ack;
     ib_device->func.post_sr_rdmaw = vapi_post_sr_rdmaw;
     ib_device->func.check_cq = vapi_check_cq;
+    ib_device->func.prepare_cq_block = vapi_prepare_cq_block;
     ib_device->func.wc_status_string = vapi_wc_status_string;
     ib_device->func.mem_register = vapi_mem_register;
     ib_device->func.mem_deregister = vapi_mem_deregister;
+    ib_device->func.check_async_events = vapi_check_async_events;
 
     /*
      * Apparently VAPI_open_hca() is a once-per-machine sort of thing, and
@@ -1063,11 +1099,37 @@ int vapi_ib_initialize(void)
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_create_cq ret %d", __func__, ret);
 
+    /* create completion "channel" */
+    ret = pipe(vd->cq_event_pipe);
+    if (ret < 0)
+	error_errno("%s: pipe", __func__);
+    flags = fcntl(vd->cq_event_pipe[0], F_GETFL);
+    if (flags < 0)
+	error_errno("%s: get cq pipe flags", __func__);
+    if (fcntl(vd->cq_event_pipe[0], F_SETFL, flags | O_NONBLOCK) < 0)
+	error_errno("%s: set cq pipe nonblocking", __func__);
+
+    /* register handler for the cq */
+    ret = EVAPI_set_comp_eventh(vd->nic_handle, vd->nic_cq, cq_event_handler,
+                                NULL, &vd->nic_cq_event_handler);
+    if (ret < 0)
+	error_verrno(ret, "%s: EVAPI_set_comp_eventh", __func__);
+
+    /* build a pipe to queue up async events, and set it to non-blocking
+     * on the receive side */
+    ret = pipe(vd->async_event_pipe);
+    if (ret < 0)
+	error_errno("%s: pipe", __func__);
+    flags = fcntl(vd->async_event_pipe[0], F_GETFL);
+    if (flags < 0)
+	error_errno("%s: get async pipe flags", __func__);
+    if (fcntl(vd->async_event_pipe[0], F_SETFL, flags | O_NONBLOCK) < 0)
+	error_errno("%s: set async pipe nonblocking", __func__);
+
     /* will be set on first connection */
     vd->sg_tmp_array = NULL;
     vd->sg_max_len = 0;
     vd->max_outstanding_wr = 0;
-    vd->async_event_handler_waiting_drain = 0;
 
     return 0;
 }
@@ -1082,6 +1144,13 @@ static void vapi_ib_finalize(void)
 
     if (vd->sg_tmp_array)
 	free(vd->sg_tmp_array);
+    ret = EVAPI_clear_comp_eventh(vd->nic_handle, vd->nic_cq_event_handler);
+    if (ret < 0)
+	error_verrno(ret, "%s: EVAPI_clear_comp_eventh", __func__);
+
+    close(vd->cq_event_pipe[0]);
+    close(vd->cq_event_pipe[1]);
+
     ret = VAPI_destroy_cq(vd->nic_handle, vd->nic_cq);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_destroy_cq", __func__);
@@ -1094,6 +1163,10 @@ static void vapi_ib_finalize(void)
     if (ret < 0)
 	error_verrno(ret, "%s: EVAPI_clear_async_event_handler", __func__);
     ret = EVAPI_release_hca_hndl(vd->nic_handle);
+
+    close(vd->async_event_pipe[0]);
+    close(vd->async_event_pipe[1]);
+
     if (ret < 0)
 	error_verrno(ret, "%s: EVAPI_release_hca_hndl", __func__);
     ret = VAPI_close_hca(vd->nic_handle);
@@ -1103,6 +1176,7 @@ static void vapi_ib_finalize(void)
 	error_verrno(ret, "%s: VAPI_close_hca", __func__);
      */
 
-    free(ib_device->priv);
+    free(vd);
+    ib_device->priv = NULL;
 }
 

@@ -1179,6 +1179,17 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	return(0);
     }
 
+    /*
+     * Pass the TCP address structure as the parameter for this operation,
+     * holding the lock.
+     */
+    if (option == BMI_TCP_CLOSE_SOCKET) {
+        inout_parameter = tmp_ref->method_addr;
+        ret = tmp_ref->interface->BMI_meth_set_info(option, inout_parameter);
+        gen_mutex_unlock(&ref_mutex);
+        return ret;
+    }
+
     gen_mutex_unlock(&ref_mutex);
 
     ret = tmp_ref->interface->BMI_meth_set_info(option, inout_parameter);

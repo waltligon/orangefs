@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     TROVE_keyval_s key, val;
     TROVE_context_id trove_context = -1;
     char *method_name;
-    char root_handle_string[] = "root_handle"; /* TODO: DEFINE ELSEWHERE? */
+    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -429,7 +429,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		val_p->read_sz);
 	print_object_attributes((struct PVFS_object_attr *) val_p->buffer);
     }
-    else if (!strncmp(key_p->buffer, "datafile_handles", 17) && val_p->read_sz % sizeof(PVFS_handle) == 0) {
+    else if (!strncmp(key_p->buffer, "dh", 17) && val_p->read_sz % sizeof(PVFS_handle) == 0) {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d) as handles = ",
 		(char *) key_p->buffer,
@@ -438,7 +438,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		val_p->read_sz);
 	print_datafile_handles((PVFS_handle *) val_p->buffer, val_p->read_sz / sizeof(PVFS_handle));
     }
-    else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "dir_ent", 8)) {
+    else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "de", 3)) {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx\n",
 		(char *) key_p->buffer,

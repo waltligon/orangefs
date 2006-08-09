@@ -22,7 +22,7 @@
  * compatibility (such as changing the semantics or protocol fields for an
  * existing request type)
  */
-#define PVFS2_PROTO_MAJOR 1
+#define PVFS2_PROTO_MAJOR 2
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
@@ -109,6 +109,8 @@ typedef struct
 #define PVFS_REQ_LIMIT_SEGMENT_BYTES      PVFS_SEGMENT_MAX
 /* max total size of I/O request descriptions */
 #define PVFS_REQ_LIMIT_IOREQ_BYTES        8192
+/* maximum size of distribution name used for the hints */
+#define PVFS_REQ_LIMIT_DIST_NAME          128
 /* max count of segments allowed per path lookup (note that this governs 
  * the number of handles and attributes returned in lookup_path responses)
  */
@@ -199,7 +201,7 @@ endecode_fields_1_struct(
 struct PVFS_servreq_remove
 {
     PVFS_handle handle;
-    PVFS_fs_id fs_id;
+    PVFS_fs_id  fs_id;
 };
 endecode_fields_2_struct(
     PVFS_servreq_remove,
@@ -396,17 +398,16 @@ endecode_fields_4_struct(
                                   __handle,      \
                                   __objtype,     \
                                   __attr,        \
-                                  __amask)       \
+                                  __extra_amask) \
 do {                                             \
     memset(&(__req), 0, sizeof(__req));          \
     (__req).op = PVFS_SERV_SETATTR;              \
     (__req).credentials = (__creds);             \
     (__req).u.setattr.fs_id = (__fsid);          \
     (__req).u.setattr.handle = (__handle);       \
-    PINT_CONVERT_ATTR(&(__req).u.setattr.attr,   \
-       &(__attr), PVFS_ATTR_COMMON_ALL);         \
-    (__req).u.setattr.attr.objtype = (__objtype);\
-    (__req).u.setattr.attr.mask |= (__amask);    \
+    (__attr).objtype = (__objtype);              \
+    (__attr).mask |= PVFS_ATTR_SYS_TYPE;         \
+    PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask);\
 } while (0)
 
 /* lookup path ************************************************/
@@ -497,8 +498,7 @@ endecode_fields_4_struct(
                                 __creds,               \
                                 __fs_id,               \
                                 __ext_array,           \
-                                __attr,                \
-                                __amask)               \
+                                __attr)                \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_MKDIR;                      \
@@ -508,11 +508,9 @@ do {                                                   \
         (__ext_array).extent_count;                    \
     (__req).u.mkdir.handle_extent_array.extent_array = \
         (__ext_array).extent_array;                    \
-    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr,           \
-       &(__attr), PVFS_ATTR_COMMON_ALL);               \
-    (__req).u.mkdir.attr.mask &= (__amask);            \
-    (__req).u.mkdir.attr.mask |= PVFS_ATTR_COMMON_TYPE;\
-    (__req).u.mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;\
+    (__attr).objtype = PVFS_TYPE_DIRECTORY;            \
+    (__attr).mask   |= PVFS_ATTR_SYS_TYPE;             \
+    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\
 } while (0)
 
 struct PVFS_servresp_mkdir
@@ -532,20 +530,13 @@ struct PVFS_servreq_crdirent
     PVFS_handle new_handle;    /* handle of new entry */
     PVFS_handle parent_handle; /* handle of directory */
     PVFS_fs_id fs_id;          /* file system */
-    PVFS_time parent_atime;
-    PVFS_time parent_mtime;
-    PVFS_time parent_ctime;
 };
-endecode_fields_8_struct(
+endecode_fields_4_struct(
     PVFS_servreq_crdirent,
     string, name,
     PVFS_handle, new_handle,
     PVFS_handle, parent_handle,
-    PVFS_fs_id, fs_id,
-    skip4,,
-    PVFS_time, parent_atime,
-    PVFS_time, parent_mtime,
-    PVFS_time, parent_ctime)
+    PVFS_fs_id, fs_id)
 #define extra_size_PVFS_servreq_crdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
 
@@ -554,10 +545,7 @@ endecode_fields_8_struct(
                                    __name,          \
                                    __new_handle,    \
                                    __parent_handle, \
-                                   __fs_id,         \
-                                   __parent_atime,  \
-                                   __parent_mtime,  \
-                                   __parent_ctime)  \
+                                   __fs_id)         \
 do {                                                \
     memset(&(__req), 0, sizeof(__req));             \
     (__req).op = PVFS_SERV_CRDIRENT;                \
@@ -567,12 +555,6 @@ do {                                                \
     (__req).u.crdirent.parent_handle =              \
        (__parent_handle);                           \
     (__req).u.crdirent.fs_id = (__fs_id);           \
-    (__req).u.crdirent.parent_atime =               \
-       (__parent_atime);                            \
-    (__req).u.crdirent.parent_mtime =               \
-       (__parent_mtime);                            \
-    (__req).u.crdirent.parent_ctime =               \
-       (__parent_ctime);                            \
 } while (0)
 
 /* rmdirent ****************************************************/
@@ -583,19 +565,12 @@ struct PVFS_servreq_rmdirent
     char *entry;               /* name of entry to remove */
     PVFS_handle parent_handle; /* handle of directory */
     PVFS_fs_id fs_id;          /* file system */
-    PVFS_time parent_atime;
-    PVFS_time parent_mtime;
-    PVFS_time parent_ctime;
 };
-endecode_fields_7_struct(
+endecode_fields_3_struct(
     PVFS_servreq_rmdirent,
     string, entry,
     PVFS_handle, parent_handle,
-    PVFS_fs_id, fs_id,
-    skip4,,
-    PVFS_time, parent_atime,
-    PVFS_time, parent_mtime,
-    PVFS_time, parent_ctime)
+    PVFS_fs_id, fs_id)
 #define extra_size_PVFS_servreq_rmdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
 
@@ -603,10 +578,7 @@ endecode_fields_7_struct(
                                    __creds,       \
                                    __fsid,        \
                                    __handle,      \
-                                   __entry,       \
-                                   __parent_atime,\
-                                   __parent_mtime,\
-                                   __parent_ctime)\
+                                   __entry)       \
 do {                                              \
     memset(&(__req), 0, sizeof(__req));           \
     (__req).op = PVFS_SERV_RMDIRENT;              \
@@ -614,17 +586,11 @@ do {                                              \
     (__req).u.rmdirent.fs_id = (__fsid);          \
     (__req).u.rmdirent.parent_handle = (__handle);\
     (__req).u.rmdirent.entry = (__entry);         \
-    (__req).u.rmdirent.parent_atime =             \
-       (__parent_atime);                          \
-    (__req).u.rmdirent.parent_mtime =             \
-       (__parent_mtime);                          \
-    (__req).u.rmdirent.parent_ctime =             \
-       (__parent_ctime);                          \
 } while (0);
 
 struct PVFS_servresp_rmdirent
 {
-    PVFS_handle entry_handle; /* handle of removed entry */
+    PVFS_handle entry_handle;   /* handle of removed entry */
 };
 endecode_fields_1_struct(
     PVFS_servresp_rmdirent,
@@ -639,20 +605,13 @@ struct PVFS_servreq_chdirent
     PVFS_handle new_dirent_handle; /* handle of directory */
     PVFS_handle parent_handle;     /* handle of directory */
     PVFS_fs_id fs_id;              /* file system */
-    PVFS_time parent_atime;
-    PVFS_time parent_mtime;
-    PVFS_time parent_ctime;
 };
-endecode_fields_8_struct(
+endecode_fields_4_struct(
     PVFS_servreq_chdirent,
     string, entry,
     PVFS_handle, new_dirent_handle,
     PVFS_handle, parent_handle,
-    PVFS_fs_id, fs_id,
-    skip4,,
-    PVFS_time, parent_atime,
-    PVFS_time, parent_mtime,
-    PVFS_time, parent_ctime)
+    PVFS_fs_id, fs_id)
 #define extra_size_PVFS_servreq_chdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
 
@@ -661,10 +620,7 @@ endecode_fields_8_struct(
                                    __fsid,         \
                                    __parent_handle,\
                                    __new_dirent,   \
-                                   __entry,        \
-                                   __parent_atime, \
-                                   __parent_mtime, \
-                                   __parent_ctime) \
+                                   __entry)        \
 do {                                               \
     memset(&(__req), 0, sizeof(__req));            \
     (__req).op = PVFS_SERV_CHDIRENT;               \
@@ -675,12 +631,6 @@ do {                                               \
     (__req).u.chdirent.new_dirent_handle =         \
         (__new_dirent);                            \
     (__req).u.chdirent.entry = (__entry);          \
-    (__req).u.chdirent.parent_atime =              \
-       (__parent_atime);                           \
-    (__req).u.chdirent.parent_mtime =              \
-       (__parent_mtime);                           \
-    (__req).u.chdirent.parent_ctime =              \
-       (__parent_ctime);                           \
 } while (0);
 
 struct PVFS_servresp_chdirent
@@ -1405,14 +1355,17 @@ struct PVFS_servresp_geteattr
 {
     int32_t nkey;           /* number of values returned */
     PVFS_ds_keyval *val;    /* array of values returned */
+    PVFS_error *err;        /* array of error codes */
 };
-endecode_fields_1a_struct(
+endecode_fields_1aa_struct(
     PVFS_servresp_geteattr,
     skip4,,
     int32_t, nkey,
-    PVFS_ds_keyval, val)
+    PVFS_ds_keyval, val,
+    PVFS_error, err);
 #define extra_size_PVFS_servresp_geteattr \
-    (PVFS_REQ_LIMIT_VAL_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
+    (PVFS_REQ_LIMIT_VAL_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST + \
+    PVFS_REQ_LIMIT_KEYVAL_LIST * sizeof(PVFS_error))
 
 /* seteattr ****************************************************/
 /* - sets list of extended attributes */

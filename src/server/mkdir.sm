@@ -22,8 +22,6 @@ static int mkdir_create_dirdata_dspace(
     PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_write_dirdata_handle(
     PINT_server_op *s_op, job_status_s *js_p);
-static int mkdir_init_dirdata_count(
-    PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_error(
@@ -39,7 +37,6 @@ nested machine pvfs2_mkdir_work_sm(create,
                                    set_attrib,
                                    create_dirdata_dspace, 
                                    write_dirdata_handle, 
-                                   init_dirdata_count,
                                    err_msg)
 {
     state create
@@ -66,13 +63,6 @@ nested machine pvfs2_mkdir_work_sm(create,
     state write_dirdata_handle
     {
         run mkdir_write_dirdata_handle;
-        success => init_dirdata_count;
-        default => err_msg;
-    }
-
-    state init_dirdata_count
-    {
-        run mkdir_init_dirdata_count;
         success => return;
         default => err_msg;
     }
@@ -143,7 +133,6 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s *js_p)
 
     int ret;
     job_id_t i;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dspace on coll_id %d\n",
                  s_op->u.mkdir.fs_id);
@@ -157,10 +146,7 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s *js_p)
     ret = job_trove_dspace_create(
         s_op->u.mkdir.fs_id, &s_op->u.mkdir.handle_extent_array,
         PVFS_TYPE_DIRECTORY, NULL,
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->u.mkdir.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->u.mkdir.fs_id), 
+        TROVE_SYNC, 
         s_op, 0, js_p, &i,
         server_job_context);
 
@@ -183,7 +169,6 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
     int ret = -1;
     job_id_t j_id;
     PVFS_ds_attributes *ds_attr = NULL;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     /* save the handle from the mkdir in the response */
     s_op->resp.u.mkdir.handle = js_p->handle;
@@ -192,6 +177,7 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
                  llu(js_p->handle));
 
     ds_attr = (&s_op->ds_attr);
+    PVFS_ds_init_time(ds_attr);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " setting directory version to "
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
@@ -200,10 +186,7 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
     ret = job_trove_dspace_setattr(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
         ds_attr, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->u.mkdir.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->u.mkdir.fs_id),
+        TROVE_SYNC,
         s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;
@@ -233,10 +216,7 @@ static int mkdir_create_dirdata_dspace(
 
     ret = job_trove_dspace_create(
         s_op->u.mkdir.fs_id, &extent_array, PVFS_TYPE_DIRDATA, NULL,
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->u.mkdir.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->u.mkdir.fs_id),
+        TROVE_SYNC,
         s_op, 0, js_p, &i,
         server_job_context);
 
@@ -281,39 +261,7 @@ static int mkdir_write_dirdata_handle(
     ret = job_trove_keyval_write(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
         &s_op->key, &s_op->val, 
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->u.mkdir.fs_id),
-        NULL, s_op, 0, js_p, &i, server_job_context);
-
-    return ret;
-}
-
-static int mkdir_init_dirdata_count(PINT_server_op *s_op, job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL;
-    job_id_t i;
-    struct server_configuration_s *user_opts = get_server_config_struct();
-
-    if (js_p->error_code)
-    {
-        return 1;
-    }
-    js_p->error_code = 0;
-
-    s_op->key.buffer = Trove_Common_Keys[DIRDATA_SIZE_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIRDATA_SIZE_KEY].size;
-    
-    s_op->u.mkdir.init_dirdata_size = 0;
-    s_op->val.buffer = (void *)&s_op->u.mkdir.init_dirdata_size;
-    s_op->val.buffer_sz = sizeof(PVFS_size);
-
-    ret = job_trove_keyval_write(
-        s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
-        &s_op->key, &s_op->val, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->u.mkdir.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->u.mkdir.fs_id),
+        0,
         NULL, s_op, 0, js_p, &i, server_job_context);
 
     return ret;

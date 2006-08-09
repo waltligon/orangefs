@@ -160,7 +160,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
@@ -365,7 +365,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
@@ -490,7 +490,7 @@ static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
     op_p->u.d_iterate_handles.position_p = position_p;
     op_p->u.d_iterate_handles.count_p = inout_count_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
@@ -687,7 +687,7 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
    /* initialize op-specific members */
     op_p->u.d_verify.type_p = type_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
@@ -798,7 +798,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
    /* initialize op-specific members */
     op_p->u.d_getattr.attr_p = ds_attr_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
@@ -927,7 +927,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
@@ -961,7 +961,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
         op_p->coll_p->ds_db->err(
-            op_p->coll_p->ds_db, ret, "DB->put");
+            op_p->coll_p->ds_db, ret, "DB->put setattr");
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
@@ -987,7 +987,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
     TROVE_ds_attributes *attr = NULL;
-    TROVE_size b_size = 0;
+    TROVE_size b_size;
     struct stat b_stat;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     struct open_cache_ref tmp_ref;
@@ -997,6 +997,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         op_p->coll_p->coll_id, op_p->handle, 0, &tmp_ref);
     if (ret < 0)
     {
+        b_size = 0;
     }
     else
     {
@@ -1025,7 +1026,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
         op_p->coll_p->ds_db->err(op_p->coll_p->ds_db, ret, "DB->get");
-        ret = -TROVE_EIO;
+        ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
 

@@ -19,6 +19,8 @@
 
 #include "pvfs2-types.h"
 #include "acache.h"
+#include "gossip.h"
+#include "ncache.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -29,6 +31,7 @@
 #define MAX_DEV_INIT_FAILURES 10
 
 #define DEFAULT_ACACHE_TIMEOUT_STR "5"
+#define DEFAULT_NCACHE_TIMEOUT_STR "5"
 
 #define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
 
@@ -40,6 +43,10 @@ typedef struct
     char *acache_hard_limit;
     char *acache_soft_limit;
     char *acache_reclaim_percentage;
+    char *ncache_timeout;
+    char *ncache_hard_limit;
+    char *ncache_soft_limit;
+    char *ncache_reclaim_percentage;
     char *perf_time_interval_secs;
     char *perf_history_size;
     char *gossip_mask;
@@ -188,11 +195,10 @@ static int monitor_pvfs2_client(options_t *opts)
 
             if (WIFEXITED(ret))
             {
-                if (opts->verbose)
-                {
-                    printf("Child process with pid %d exited with "
-                           "value %d\n", core_pid, (int)WEXITSTATUS(ret));
-                }
+                gossip_enable_file(opts->logfile, "a");
+                gossip_err("pvfs2-client-core with pid %d exited with "
+                       "value %d\n", core_pid, (int)WEXITSTATUS(ret));
+                gossip_disable();
 
                 if (WEXITSTATUS(ret) == (unsigned char)-PVFS_EDEVINIT)
                 {
@@ -265,9 +271,11 @@ static int monitor_pvfs2_client(options_t *opts)
             arg_list[0] = PVFS2_CLIENT_CORE_NAME;
             arg_list[1] = "-a";
             arg_list[2] = opts->acache_timeout;
-            arg_list[3] = "-L";
-            arg_list[4] = opts->logfile;
-            arg_index = 5;
+            arg_list[3] = "-n";
+            arg_list[4] = opts->ncache_timeout;
+            arg_list[5] = "-L";
+            arg_list[6] = opts->logfile;
+            arg_index = 7;
             if(opts->acache_hard_limit)
             {
                 arg_list[arg_index] = "--acache-hard-limit";
@@ -284,6 +292,24 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 arg_list[arg_index] = "--acache-reclaim-percentage";
                 arg_list[arg_index+1] = opts->acache_reclaim_percentage;
+                arg_index+=2;
+            }
+            if(opts->ncache_hard_limit)
+            {
+                arg_list[arg_index] = "--ncache-hard-limit";
+                arg_list[arg_index+1] = opts->ncache_hard_limit;
+                arg_index+=2;
+            }
+            if(opts->ncache_soft_limit)
+            {
+                arg_list[arg_index] = "--ncache-soft-limit";
+                arg_list[arg_index+1] = opts->ncache_soft_limit;
+                arg_index+=2;
+            }
+            if(opts->ncache_reclaim_percentage)
+            {
+                arg_list[arg_index] = "--ncache-reclaim-percentage";
+                arg_list[arg_index+1] = opts->ncache_reclaim_percentage;
                 arg_index+=2;
             }
             if(opts->perf_time_interval_secs)
@@ -338,6 +364,11 @@ static void print_help(char *progname)
     printf("--acache-soft-limit=LIMIT     acache soft limit\n");
     printf("--acache-hard-limit=LIMIT     acache hard limit\n");
     printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
+    printf("-n MS, --ncache-timeout=MS    ncache timeout in ms "
+           "(default is 0 ms)\n");
+    printf("--ncache-soft-limit=LIMIT     ncache soft limit\n");
+    printf("--ncache-hard-limit=LIMIT     ncache hard limit\n");
+    printf("--ncache-reclaim-percentage=LIMIT ncache reclaim percentage\n");
     printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
     printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
@@ -361,6 +392,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"acache-soft-limit",1,0,0},
         {"acache-hard-limit",1,0,0},
         {"acache-reclaim-percentage",1,0,0},
+        {"ncache-timeout",1,0,0},
+        {"ncache-soft-limit",1,0,0},
+        {"ncache-hard-limit",1,0,0},
+        {"ncache-reclaim-percentage",1,0,0},
         {"perf-time-interval-secs",1,0,0},
         {"perf-history-size",1,0,0},
         {"gossip-mask",1,0,0},
@@ -399,6 +434,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     goto do_acache;
                 }
+                else if (strcmp("ncache-timeout", cur_option) == 0)
+                {
+                    goto do_ncache;
+                }
                 else if (strcmp("path", cur_option) == 0)
                 {
                     goto do_path;
@@ -424,6 +463,21 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("acache-reclaim-percentage", cur_option) == 0)
                 {
                     opts->acache_reclaim_percentage = optarg;
+                    break;
+                }
+                else if (strcmp("ncache-hard-limit", cur_option) == 0)
+                {
+                    opts->ncache_hard_limit = optarg;
+                    break;
+                }
+                else if (strcmp("ncache-soft-limit", cur_option) == 0)
+                {
+                    opts->ncache_soft_limit = optarg;
+                    break;
+                }
+                else if (strcmp("ncache-reclaim-percentage", cur_option) == 0)
+                {
+                    opts->ncache_reclaim_percentage = optarg;
                     break;
                 }
                 else if (strcmp("perf-time-interval-secs", cur_option) == 0)
@@ -463,6 +517,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
             case 'a':
           do_acache:
                 opts->acache_timeout = optarg;
+                break;
+            case 'n':
+          do_ncache:
+                opts->ncache_timeout = optarg;
                 break;
             case 'L':
           do_logfile:
@@ -510,6 +568,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
     if (!opts->acache_timeout)
     {
         opts->acache_timeout = DEFAULT_ACACHE_TIMEOUT_STR;
+    }
+    if (!opts->ncache_timeout)
+    {
+        opts->ncache_timeout = DEFAULT_NCACHE_TIMEOUT_STR;
     }
 }
 

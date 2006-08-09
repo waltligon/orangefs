@@ -35,6 +35,9 @@ TESTSRC += \
 	$(DIR)/get-eattr.c \
 	$(DIR)/del-eattr.c \
 	$(DIR)/list-eattr.c \
-	$(DIR)/test-accesses.c
+	$(DIR)/test-accesses.c \
+	$(DIR)/test-hindexed-test.c \
+	$(DIR)/io-stress.c
 
-MODLDFLAGS_$(DIR) = -lssl -lcrypto
+MODCFLAGS_$(DIR)/io-stress.c := -D_GNU_SOURCE
+MODLDFLAGS_$(DIR) := -lrt -lssl -lcrypto

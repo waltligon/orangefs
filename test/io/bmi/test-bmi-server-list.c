@@ -67,6 +67,8 @@ int main(
     int last = 0;
     int i = 0;
     bmi_context_id context;
+    char method[24], *cp;
+    int len;
 
     /* grab any command line options */
     user_opts = parse_args(argc, argv);
@@ -77,11 +79,19 @@ int main(
 
     /* set debugging stuff */
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, GOSSIP_BMI_DEBUG_ALL);
+    gossip_set_debug_mask(0, GOSSIP_BMI_DEBUG_ALL);
 
+    /* convert address to bmi method type by prefixing bmi_ */
+    cp = strchr(user_opts->hostid, ':');
+    if (!cp)
+        return 1;
+    len = cp - user_opts->hostid;
+    strcpy(method, "bmi_");
+    strncpy(method + 4, user_opts->hostid, len);
+    method[4+len] = '\0';
 
     /* initialize local interface (default options) */
-    ret = BMI_initialize("bmi_tcp", user_opts->hostid, BMI_INIT_SERVER);
+    ret = BMI_initialize(method, user_opts->hostid, BMI_INIT_SERVER);
     if (ret < 0)
     {
 	errno = -ret;
@@ -260,9 +270,7 @@ static struct options *parse_args(
 {
 
     /* getopt stuff */
-    extern char *optarg;
-    extern int optind, opterr, optopt;
-    char flags[] = "h:r:s:c:";
+    char flags[] = "h:";
     int one_opt = 0;
 
     struct options *tmp_opts = NULL;
@@ -274,6 +282,7 @@ static struct options *parse_args(
     {
 	goto parse_args_error;
     }
+    tmp_opts->hostid = NULL;
 
     /* look at command line arguments */
     while ((one_opt = getopt(argc, argv, flags)) != EOF)
@@ -294,12 +303,14 @@ static struct options *parse_args(
     }
 
     /* if we didn't get a host argument, fill in a default: */
-    len = (strlen(DEFAULT_SERVERID)) + 1;
-    if ((tmp_opts->hostid = (char *) malloc(len)) == NULL)
-    {
-	goto parse_args_error;
+    if (tmp_opts->hostid == NULL) {
+        len = (strlen(DEFAULT_SERVERID)) + 1;
+        if ((tmp_opts->hostid = (char *) malloc(len)) == NULL)
+        {
+            goto parse_args_error;
+        }
+        memcpy(tmp_opts->hostid, DEFAULT_SERVERID, len);
     }
-    memcpy(tmp_opts->hostid, DEFAULT_SERVERID, len);
 
     return (tmp_opts);
 

@@ -11,8 +11,10 @@
 #include "pvfs2-mgmt.h"
 #include "gen-locks.h"
 
-#define PERF_DEFAULT_TIME_INTERVAL_SECS (60*5)
-#define PERF_DEFAULT_HISTORY_SIZE       6
+enum {
+PERF_DEFAULT_TIME_INTERVAL_SECS = 300,
+PERF_DEFAULT_HISTORY_SIZE       = 6,
+};
 
 /** flag that indicates that values for a particular key should be preserved
  * across rollover rather than reset to 0

@@ -15,20 +15,6 @@
 
 /* this file implements the /dev/pvfs2-req device node */
 
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-extern struct qhash_table *htable_ops_in_progress;
-extern struct file_system_type pvfs2_fs_type;
-extern struct semaphore devreq_semaphore;
-extern struct semaphore request_semaphore;
-extern int debug;
-extern int op_timeout_secs;
-
-/* defined in super.c */
-extern struct list_head pvfs2_superblocks;
-extern spinlock_t pvfs2_superblocks_lock;
-
 static int open_access_count = 0;
 
 #define DUMP_DEVICE_ERROR()                                            \
@@ -48,10 +34,15 @@ static int pvfs2_devreq_open(
     struct inode *inode,
     struct file *file)
 {
-    int ret = -EACCES;
+    int ret = -EINVAL;
 
-    pvfs2_print("pvfs2_devreq_open: trying to open\n");
-
+    if (!(file->f_flags & O_NONBLOCK))
+    {
+        pvfs2_error("pvfs2: device cannot be opened in blocking mode\n");
+        return ret;
+    }
+    ret = -EACCES;
+    pvfs2_print("pvfs2-client-core: opening device\n");
     down(&devreq_semaphore);
 
     if (open_access_count == 0)
@@ -81,7 +72,7 @@ static int pvfs2_devreq_open(
     }
     up(&devreq_semaphore);
 
-    pvfs2_print("pvfs2_devreq_open: open complete (ret = %d)\n", ret);
+    pvfs2_print("pvfs2-client-core: open device complete (ret = %d)\n", ret);
     return ret;
 }
 
@@ -99,71 +90,43 @@ static ssize_t pvfs2_devreq_read(
 
     if (!(file->f_flags & O_NONBLOCK))
     {
-        /* block until we have a request */
-        DECLARE_WAITQUEUE(wait_entry, current);
-
-        add_wait_queue(&pvfs2_request_list_waitq, &wait_entry);
-
-        while(1)
+        /* We do not support blocking reads/opens any more */
+        pvfs2_error("pvfs2: blocking reads are not supported! (pvfs2-client-core bug)\n");
+        return -EINVAL;
+    }
+    else
+    {
+        pvfs2_kernel_op_t *op = NULL;
+        /* get next op (if any) from top of list */
+        spin_lock(&pvfs2_request_list_lock);
+        list_for_each_entry (op, &pvfs2_request_list, list)
         {
-            set_current_state(TASK_INTERRUPTIBLE);
-
-            spin_lock(&pvfs2_request_list_lock);
-            if (!list_empty(&pvfs2_request_list))
+            PVFS_fs_id fsid = fsid_of_op(op);
+            /* Check if this op's fsid is known and needs remounting */
+            if (fsid != PVFS_FS_ID_NULL && fs_mount_pending(fsid) == 1)
             {
-                cur_op = list_entry(
-                    pvfs2_request_list.next, pvfs2_kernel_op_t, list);
+                pvfs2_print("Skipping op tag %lld %s\n", lld(op->tag), get_opname_string(op));
+                continue;
+            }
+            /* op does not belong to any particular fsid or already 
+             * mounted.. let it through
+             */
+            else {
+                cur_op = op;
                 list_del(&cur_op->list);
                 cur_op->op_linger_tmp--;
-                /* if there is a trailer, readd it to the request list */
+                /* if there is a trailer, re-add it to the request list */
                 if (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 1)
                 {
                     if (cur_op->upcall.trailer_size <= 0 || cur_op->upcall.trailer_buf == NULL) 
                     {
-                        pvfs2_error("[1]BUG:trailer_size is %ld and trailer buf is %p\n",
+                        pvfs2_error("BUG:trailer_size is %ld and trailer buf is %p\n",
                                 (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
                     }
                     /* readd it to the head of the list */
                     list_add(&cur_op->list, &pvfs2_request_list);
                 }
-                spin_unlock(&pvfs2_request_list_lock);
                 break;
-            }
-            spin_unlock(&pvfs2_request_list_lock);
-
-            if (!signal_pending(current))
-            {
-                schedule();
-                continue;
-            }
-
-            pvfs2_print("*** device read interrupted by signal\n");
-            break;
-        }
-
-        set_current_state(TASK_RUNNING);
-        remove_wait_queue(&pvfs2_request_list_waitq, &wait_entry);
-    }
-    else
-    {
-        /* get next op (if any) from top of list */
-        spin_lock(&pvfs2_request_list_lock);
-        if (!list_empty(&pvfs2_request_list))
-        {
-            cur_op = list_entry(
-                pvfs2_request_list.next, pvfs2_kernel_op_t, list);
-            list_del(&cur_op->list);
-            cur_op->op_linger_tmp--;
-            /* if there is a trailer, readd it to the request list */
-            if (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 1)
-            {
-                if (cur_op->upcall.trailer_size <= 0 || cur_op->upcall.trailer_buf == NULL) 
-                {
-                    pvfs2_error("[2]BUG:trailer_size is %ld and trailer buf is %p\n",
-                            (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
-                }
-                /* readd it to the head of the list */
-                list_add(&cur_op->list, &pvfs2_request_list);
             }
         }
         spin_unlock(&pvfs2_request_list_lock);
@@ -173,8 +136,8 @@ static ssize_t pvfs2_devreq_read(
     {
         spin_lock(&cur_op->lock);
 
-        if ((cur_op->op_state == PVFS2_VFS_STATE_INPROGR) ||
-            (cur_op->op_state == PVFS2_VFS_STATE_SERVICED))
+        pvfs2_print("client-core: reading op tag %lld %s\n", lld(cur_op->tag), get_opname_string(cur_op));
+        if (op_state_in_progress(cur_op) || op_state_serviced(cur_op))
         {
             if (cur_op->op_linger == 1)
                 pvfs2_error("WARNING: Current op already queued...skipping\n");
@@ -182,7 +145,7 @@ static ssize_t pvfs2_devreq_read(
         else if (cur_op->op_linger == 1 
                 || (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0)) 
         {
-            cur_op->op_state = PVFS2_VFS_STATE_INPROGR;
+            set_op_state_inprogress(cur_op);
 
             /* atomically move the operation to the htable_ops_in_progress */
             qhash_add(htable_ops_in_progress,
@@ -442,7 +405,7 @@ static ssize_t pvfs2_devreq_writev(
                  * that this op is done 
                  */
                 spin_lock(&op->lock);
-                op->op_state = PVFS2_VFS_STATE_SERVICED;
+                set_op_state_serviced(op);
                 spin_unlock(&op->lock);
 
                 add_wait_queue_exclusive(
@@ -541,7 +504,7 @@ static ssize_t pvfs2_devreq_writev(
                     }
                     spin_lock(&op->lock);
                     /* we tell VFS that the op is now serviced! */
-                    op->op_state = PVFS2_VFS_STATE_SERVICED;
+                    set_op_state_serviced(op);
                     pvfs2_print("Setting state of %p to %d [SERVICED]\n",
                             op, op->op_state);
                     x->bytes_copied = bytes_copied;
@@ -560,7 +523,7 @@ static ssize_t pvfs2_devreq_writev(
                 
                 /* tell the vfs op waiting on a waitqueue that this op is done */
                 spin_lock(&op->lock);
-                op->op_state = PVFS2_VFS_STATE_SERVICED;
+                set_op_state_serviced(op);
                 spin_unlock(&op->lock);
                 /*
                   for every other operation (i.e. non-I/O), we need to
@@ -581,6 +544,46 @@ static ssize_t pvfs2_devreq_writev(
     return count;
 }
 
+/* Returns whether any FS are still pending remounted */
+static int mark_all_pending_mounts(void)
+{
+    int unmounted = 1;
+    pvfs2_sb_info_t *pvfs2_sb = NULL;
+
+    spin_lock(&pvfs2_superblocks_lock);
+    list_for_each_entry (pvfs2_sb, &pvfs2_superblocks, list)
+    {
+        /* All of these file system require a remount */
+        pvfs2_sb->mount_pending = 1;
+        unmounted = 0;
+    }
+    spin_unlock(&pvfs2_superblocks_lock);
+    return unmounted;
+}
+
+/* Determine if a given file system needs to be remounted or not 
+ *  Returns -1 on error
+ *           0 if already mounted
+ *           1 if needs remount
+ */
+int fs_mount_pending(PVFS_fs_id fsid)
+{
+    int mount_pending = -1;
+    pvfs2_sb_info_t *pvfs2_sb = NULL;
+
+    spin_lock(&pvfs2_superblocks_lock);
+    list_for_each_entry (pvfs2_sb, &pvfs2_superblocks, list)
+    {
+        if (pvfs2_sb->fs_id == fsid) 
+        {
+            mount_pending = pvfs2_sb->mount_pending;
+            break;
+        }
+    }
+    spin_unlock(&pvfs2_superblocks_lock);
+    return mount_pending;
+}
+
 /*
   NOTE: gets called when the last reference to this device is dropped.
   Using the open_access_count variable, we enforce a reference count
@@ -595,7 +598,7 @@ static int pvfs2_devreq_release(
 {
     int unmounted = 0;
 
-    pvfs2_print("pvfs2_devreq_release: trying to finalize\n");
+    pvfs2_print("pvfs2-client-core: exiting, closing device\n");
 
     down(&devreq_semaphore);
     pvfs_bufmap_finalize();
@@ -608,18 +611,14 @@ static int pvfs2_devreq_release(
     module_put(pvfs2_fs_type.owner);
 #endif
 
+    unmounted = mark_all_pending_mounts();
+    pvfs2_print("PVFS2 Device Close: Filesystem(s) %s\n",
+                (unmounted ? "UNMOUNTED" : "MOUNTED"));
     /*
       prune dcache here to get rid of entries that may no longer exist
       on device re-open, assuming that the sb has been properly filled
       (may not have been if a mount wasn't attempted)
     */
-    spin_lock(&pvfs2_superblocks_lock);
-    unmounted = list_empty(&pvfs2_superblocks);
-    spin_unlock(&pvfs2_superblocks_lock);
-
-    pvfs2_print("PVFS2 Device Close: Filesystem(s) %s\n",
-                (unmounted ? "UNMOUNTED" : "MOUNTED"));
-
     if (unmounted && inode && inode->i_sb)
     {
         shrink_dcache_sb(inode->i_sb);
@@ -627,8 +626,26 @@ static int pvfs2_devreq_release(
 
     up(&devreq_semaphore);
 
-    pvfs2_print("pvfs2_devreq_release: finalize complete\n");
+    /* Walk through the list of ops in the request list, mark them as purged and wake them up */
+    purge_waiting_ops();
+    /* Walk through the hash table of in progress operations; mark them as purged and wake them up */
+    purge_inprogress_ops();
+    pvfs2_print("pvfs2-client-core: device close complete\n");
     return 0;
+}
+
+int is_daemon_in_service(void)
+{
+    int in_service;
+
+    /* 
+     * What this function does is checks if client-core is alive based on the access
+     * count we maintain on the device.
+     */
+    down(&devreq_semaphore);
+    in_service = open_access_count == 1 ? 0 : -EIO;
+    up(&devreq_semaphore);
+    return in_service;
 }
 
 static inline long check_ioctl_command(unsigned int command)

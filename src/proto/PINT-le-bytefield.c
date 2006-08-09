@@ -667,7 +667,8 @@ static int lebf_decode_resp(
 #undef CASE
 
     if (ptr != (char *)input_buffer + input_size) {
-	gossip_lerr("%s: improper input buffer size", __func__);
+	gossip_lerr("%s: improper input buffer size [%p + %d != %p]\n", __func__,
+                input_buffer, input_size, ptr);
 	ret = -PVFS_EPROTO;
     }
 

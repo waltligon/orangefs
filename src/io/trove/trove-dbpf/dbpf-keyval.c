@@ -43,23 +43,44 @@
 /**
  * The keyval database contains attributes for pvfs2 handles
  * (files, directories, symlinks, etc.) that are not considered
- * common attributes.  The following table lists all the currently
- * stored keyvals, based on their handle type:
+ * common attributes.  Each key in the keyval database consists of a
+ * handle and a string.  The handles can be of different types, and the strings
+ * vary based on the type of handle and the data to be stored (the value for that
+ * key).  The following table lists all the currently stored keyvals, 
+ * based on their handle type:
  *
- * <table>
- * <th><td>Handle Type</td><td>Key Class</td><td>Key</td><td>Value</td><td>Description</td></th>
- * <tr><td>meta-file</td><td>COMMON</td><td>metafile_handles</td><td>Datafile Array</td><td>Holds the list of datafile handles that exist for this metafile</td></tr>
- * <tr><td>meta-file</td><td>COMMON</td><td>metafile_dist</td><td>Distribution</td><td>Holds the distribution type</td></tr>
- * <tr><td>symlink</td><td>COMMON</td><td>symlink_target</td><td>Target Handle</td><td>Holds the file handle that this symlink points to</td></tr>
- * <tr><td>directory</td><td>COMMON</td><td>dir_ent</td><td>Entries Handle</td><td>Holds the handle that manages the directory entries for this directory</td></tr>
- * <tr><td>directory</td><td>COMMON</td><td>dirdata_size</td><td>Size</td><td>Holds the number of entries in the directory</td></tr>
- * <tr><td>dir-ent</td><td>COMPONENT</td><td>&lt;component name&gt;</td><td>Entry Handle</td><td>Holds the directory entry (with name &lt;component name &gt;) handle</td></tr>
- * <tr><td>ALL</td><td>XATTR</td><td>&lt;extended attribute name&gt;</td><td>&lt;extended attribute content&gt;</td><td>Holds the extended attribute that can be defined for any handle type (commonly files and directories).</td></tr>
- * </table>
+ * Handle Type   Key Class   Key                       Value    
+ * ================================================================
+ * 
+ * meta-file     COMMON      "mh"                      Datafile Array
+ * meta-file     COMMON      "md"                      Distribution
+ * symlink       COMMON      "st"                      Target Handle
+ * directory     COMMON      "de"                      Entries Handle
+ * dir-ent       COMPONENT   <component name>          Entry Handle
+ * ALL           XATTR       <extended attribute name> <extended attribute content>
+ *
+ * The descriptions for the common keys are:
+ *
+ * md:  (m)etafile (d)istribution - stores the distribution type
+ * mh:  stores the (d)atafile (h)andles that exist for this metafile
+ * st:  stores the (s)ymlink (t)arget path that the symlink references
+ * de:  stores the handle that manages the (d)irectory (e)ntries for this directory
+ *
+ * The <component name> strings are the actual object names 
+ * (files, directories, etc) in the directory.  They map to the handles for those 
+ * objects.
+ *
+ * There is also now a special 'null' keyval that has a handle and the null
+ * string as its key.  This acts as handle info for a particular handle.  This
+ * is useful for dir-ent handles, where the number of entries on that handle
+ * must be counted.  The null keyval is accessed internally, based on flags
+ * passed in through the API.
  */
 
-/* Structure for key in the keyval DB */
-/* The keys in the keyval database are now stored as the following
+/**
+ * Structure for key in the keyval DB:
+ *
+ * The keys in the keyval database are now stored as the following
  * struct (dbpf_keyval_db_entry).  The size of key field (the common
  * name or component name of the key) is not explicitly specified in the
  * struct, instead it is calculated from the DBT->size field of the
@@ -92,7 +113,7 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p);
-
+static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op *op_p);
 
 #define DBPF_ITERATE_CURRENT_POSITION 1
 
@@ -117,6 +138,15 @@ static int dbpf_keyval_iterate_cursor_get(
     TROVE_keyval_s * key, 
     TROVE_keyval_s * data, 
     uint32_t db_flags);
+
+enum dbpf_handle_info_action
+{
+    DBPF_KEYVAL_HANDLE_COUNT_INCREMENT,
+    DBPF_KEYVAL_HANDLE_COUNT_DECREMENT
+};
+
+static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
+                                       enum dbpf_handle_info_action action);
 
 static int dbpf_keyval_read(TROVE_coll_id coll_id,
                             TROVE_handle handle,
@@ -184,7 +214,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     op_p->u.k_read.key = key_p;
     op_p->u.k_read.val = val_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
@@ -242,9 +272,9 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
             op_p->u.k_read.val->buffer, data.size))
     {
         /*
-NOTE: this can happen if the keyword isn't registered, or if
-there is no associated cache_elem for this key
-*/
+         * NOTE: this can happen if the keyword isn't registered, or if
+         * there is no associated cache_elem for this key
+         */
         gossip_debug(
             GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
             "(key is %s)\n", (char *)key_entry.key);
@@ -309,7 +339,7 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
@@ -393,10 +423,11 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     ret = op_p->coll_p->keyval_db->put(
         op_p->coll_p->keyval_db, NULL, &key, &data, dbflags);
     /* Either a put error or key already exists */
-    if (ret != 0)
+    if (ret != 0 )
     {
-        op_p->coll_p->keyval_db->err(
-            op_p->coll_p->keyval_db, ret, "DB->put");
+        /*op_p->coll_p->keyval_db->err(
+            op_p->coll_p->keyval_db, ret, "DB->put keyval write");
+	*/
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
@@ -404,10 +435,20 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
                  "of %s\n", (char *)key_entry.key);
 
+    if(op_p->flags & TROVE_NOOVERWRITE)
+    {
+        ret = dbpf_keyval_handle_info_ops(
+            op_p, DBPF_KEYVAL_HANDLE_COUNT_INCREMENT);
+        if(ret != 0)
+        {
+            goto return_error;
+        }
+    }
+
     /*
-       now that the data is written to disk, update the cache if it's
-       an attr keyval we manage.
-       */
+     * now that the data is written to disk, update the cache if it's
+     * an attr keyval we manage.
+     */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     cache_elem = dbpf_attr_cache_elem_lookup(ref);
     if (cache_elem)
@@ -417,9 +458,9 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
                 op_p->u.k_write.val.buffer, data.size))
         {
             /*
-NOTE: this can happen if the keyword isn't registered,
-or if there is no associated cache_elem for this key
-*/
+             * NOTE: this can happen if the keyword isn't registered,
+             * or if there is no associated cache_elem for this key
+             */
             gossip_debug(
                 GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
                 "(key is %s)\n", (char *)key_entry.key);
@@ -439,7 +480,6 @@ or if there is no associated cache_elem for this key
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
 
-
 return_error:
     return ret;
 }
@@ -447,6 +487,7 @@ return_error:
 static int dbpf_keyval_remove(TROVE_coll_id coll_id,
                               TROVE_handle handle,
                               TROVE_keyval_s *key_p,
+                              TROVE_keyval_s *val_p,
                               TROVE_ds_flags flags,
                               TROVE_vtag_s *vtag,
                               void *user_ptr,
@@ -483,11 +524,19 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
 
     /* initialize op-specific members */
     op_p->u.k_remove.key = *key_p;
+    if(val_p)
+    {
+        op_p->u.k_remove.val = *val_p;
+    }
+    else
+    {
+        op_p->u.k_remove.val.buffer = NULL;
+    }
       
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
@@ -501,8 +550,15 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
                  (char *)op_p->u.k_remove.key.buffer);
                  
     ret = PINT_dbpf_keyval_remove(op_p->coll_p->keyval_db, op_p->handle,
-                                  &op_p->u.k_remove.key);
+                                  &op_p->u.k_remove.key,
+                                  &op_p->u.k_remove.val);
     if (ret != 0)
+    {
+        goto return_error;
+    }
+
+    ret = dbpf_keyval_handle_info_ops(op_p, DBPF_KEYVAL_HANDLE_COUNT_DECREMENT);
+    if(ret != 0)
     {
         goto return_error;
     }
@@ -572,7 +628,7 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
     op_p->u.k_iterate.position_p = position_p;
     op_p->u.k_iterate.count_p = inout_count_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 /* dbpf_keyval_iterate_op_svc()
@@ -715,7 +771,7 @@ static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
     op_p->u.k_iterate_keys.position_p = position_p;
     op_p->u.k_iterate_keys.count_p = inout_count_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 /* dbpf_keyval_iterate_keys_op_svc()
@@ -802,6 +858,7 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
                                  TROVE_handle handle,
                                  TROVE_keyval_s *key_array,
                                  TROVE_keyval_s *val_array,
+                                 TROVE_ds_state *err_array,
                                  int count,
                                  TROVE_ds_flags flags,
                                  TROVE_vtag_s *vtag,
@@ -840,9 +897,10 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     /* initialize the op-specific members */
     op_p->u.k_read_list.key_array = key_array;
     op_p->u.k_read_list.val_array = val_array;
+    op_p->u.k_read_list.err_array = err_array;
     op_p->u.k_read_list.count = count;
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
@@ -850,6 +908,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL, i = 0;
     struct dbpf_keyval_db_entry key_entry;
     DBT key, data;
+    int success_count = 0;
 
     for(i = 0; i < op_p->u.k_read_list.count; i++)
     {
@@ -873,19 +932,28 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
         if (ret != 0)
         {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->get");
-            ret = -dbpf_db_error_to_trove_error(ret);
-            goto return_error;
+            op_p->u.k_read_list.err_array[i] = 
+                -dbpf_db_error_to_trove_error(ret);
+            op_p->u.k_read_list.val_array[i].read_sz = 0;
         }
-
-        op_p->u.k_read_list.val_array[i].read_sz = data.size;
+        else
+        {
+            success_count++;
+            op_p->u.k_read_list.err_array[i] = 0;
+            op_p->u.k_read_list.val_array[i].read_sz = data.size;
+        }
     }
 
-    return 1;
-
-return_error:
-    return ret;
+    if(success_count)
+    {
+        /* return success if we read at least one of the requested keys */
+        return 1;
+    }
+    else
+    {
+        /* if everything failed, then return first error code */
+        return(op_p->u.k_read_list.err_array[0]);
+    }
 }
 
 static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
@@ -935,7 +1003,7 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
@@ -1015,7 +1083,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         if (ret != 0)
         {
             op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->put");
+                op_p->coll_p->keyval_db, ret, "DB->put keyval write list");
             ret = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         }
@@ -1098,7 +1166,7 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
         return ret;
     }
 
-    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
@@ -1200,7 +1268,7 @@ int PINT_dbpf_keyval_iterate(
         if(callback)
         {
             key->buffer_sz = key->read_sz;
-            ret = callback(db_p, handle, key);
+            ret = callback(db_p, handle, key, NULL);
             if(ret != 0)
             {
                 goto return_error;
@@ -1233,10 +1301,14 @@ int PINT_dbpf_keyval_iterate(
             goto return_error;
         }
 
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "iterate key: %*s, val: %llu\n", 
+                     key->read_sz, (char *)key->buffer, 
+                     (val ? llu(*(PVFS_handle *)val->buffer) : 0));
+
         if(callback)
         {
             key->buffer_sz = key->read_sz;
-            ret = callback(db_p, handle, key);
+            ret = callback(db_p, handle, key, NULL);
             if(ret != 0)
             {
                 goto return_error;
@@ -1261,11 +1333,11 @@ return_error:
 }
 
 int PINT_dbpf_keyval_remove(
-    DB *db_p, TROVE_handle handle, TROVE_keyval_s *key)
+    DB *db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val)
 {
     int ret;
     struct dbpf_keyval_db_entry key_entry;
-    DBT db_key;
+    DBT db_key, db_val;
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "PINT_dbpf_keyval_remove: handle (%llu), key: (%d) %*s\n",
@@ -1286,10 +1358,24 @@ int PINT_dbpf_keyval_remove(
                  key->buffer_sz,
                  db_key.size);
 
+
+    if(val && val->buffer)
+    {
+        memset(&db_val, 0, sizeof(DBT));
+        db_val.flags |= DB_DBT_USERMEM;
+        db_val.data = val->buffer;
+        db_val.ulen = val->buffer_sz;
+        ret = db_p->get(db_p, NULL, &db_key, &db_val, 0);
+        if(ret != 0)
+        {
+            ret = -dbpf_db_error_to_trove_error(ret);
+        }
+        val->read_sz = db_val.size;
+    }
+
     ret = db_p->del(db_p, NULL, &db_key, 0);
     if(ret != 0)
     {
-        db_p->err(db_p, ret, "DB->del");
         ret = -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1314,6 +1400,13 @@ static int dbpf_keyval_iterate_get_first_entry(
     if(ret != 0)
     {
         return ret;
+    }
+
+    if(key.buffer_sz == 0)
+    {
+        /* skip handle_info */
+        ret = dbpf_keyval_iterate_cursor_get(
+            handle, dbc_p, &key, NULL, DB_NEXT);
     }
 
     return 0;
@@ -1376,8 +1469,6 @@ static int dbpf_keyval_iterate_step_to_position(
     int ret;
     TROVE_keyval_s key;
 
-    memset(&key, 0, sizeof(TROVE_keyval_s));
-
     assert(pos != TROVE_ITERATE_START);
 
     ret = dbpf_keyval_iterate_get_first_entry(handle, dbc_p);
@@ -1388,6 +1479,8 @@ static int dbpf_keyval_iterate_step_to_position(
 
     for(i = 0; i < pos; ++i)
     {
+        memset(&key, 0, sizeof(TROVE_keyval_s));
+
         ret = dbpf_keyval_iterate_cursor_get(
             handle, dbc_p, &key, NULL, DB_NEXT);
         if(ret != 0)
@@ -1399,6 +1492,25 @@ static int dbpf_keyval_iterate_step_to_position(
     return 0;
 }
 
+/**
+ * dbpf_keyval_iterate_cursor_get is part of a set of iterate functions
+ * that abstact the DB functions so to allow us to iterate over directory
+ * entries and xattrs easily.  This function takes the handle and fills in
+ * the key and value to get in the iteration step.  The iterate step can
+ * be to set with the db_flags parameter to the initial iterate position 
+ * (DB_SET_RANGE), get the next position (DB_NEXT), or even get the current 
+ * position (DB_CURRENT).
+ *
+ * The key parameter is filled in up to the space available specified in
+ * buffer_sz.  The read_sz value is set to the amount filled in.
+ * Finally, if the buffer_sz is less than the size of the available key
+ * length, buffer_sz is set to the size of the available key.  Note that
+ * buffer_sz may end up being more than it was set to when key was passed
+ * in, this is useful for the SET_RANGE flag when checking for the null
+ * keyval string (handle info item) which must be skipped over.
+ *
+ * The data parameter can be null, in which case only the key is filled in.
+ */
 static int dbpf_keyval_iterate_cursor_get(
     TROVE_handle handle,
     DBC * dbc_p,
@@ -1491,6 +1603,7 @@ static int dbpf_keyval_iterate_cursor_get(
         key->buffer_sz : DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size);
 
     memcpy(key->buffer, key_entry.key, key_sz);
+    key->buffer_sz = DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size);
 
     key->read_sz = key_sz;
     
@@ -1498,6 +1611,174 @@ static int dbpf_keyval_iterate_cursor_get(
     {
         data->read_sz = (data->buffer_sz < db_data.size) ?
             data->buffer_sz : db_data.size;
+    }
+
+    return 0;
+}
+
+static int dbpf_keyval_get_handle_info(
+    TROVE_coll_id coll_id,
+    TROVE_handle handle,
+    TROVE_ds_flags flags,
+    TROVE_keyval_handle_info *info,
+    void * user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id *out_op_id_p)
+{
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
+    struct dbpf_collection *coll_p = NULL;
+    int ret;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if(coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
+
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_GET_HANDLE_INFO,
+        coll_p,
+        handle,
+        dbpf_keyval_get_handle_info_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
+    {
+        return ret;
+    }
+
+    op_p->u.k_get_handle_info.info = info;
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_ADD);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+}
+
+static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
+{
+    DBT key, data;
+    int ret = -TROVE_EINVAL;
+    struct dbpf_keyval_db_entry key_entry;
+
+    memset(&key_entry, 0, sizeof(key_entry));
+    key_entry.handle = op_p->handle;
+    memset(&key, 0, sizeof(key));
+    memset(&data, 0, sizeof(data));
+    key.data = &key_entry;
+    key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
+    key.flags = DB_DBT_USERMEM;
+    data.data = op_p->u.k_get_handle_info.info;
+    data.ulen = sizeof(TROVE_keyval_handle_info);
+    data.flags = DB_DBT_USERMEM;
+
+    ret = op_p->coll_p->keyval_db->get(
+        op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+    if(ret != 0)
+    {
+        return -dbpf_db_error_to_trove_error(ret);
+    }
+
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                 "[DBPF KEYVAL]: handle_info get: handle: %llu, count: %d\n",
+                 llu(op_p->handle), op_p->u.k_get_handle_info.info->count); 
+
+    return 1;
+}    
+
+/**
+ * keyval attrs are special parameters that can exist as metadata for
+ * a keyval or set of keyvals (such as all the keyvals for directory
+ * entries).  The keys for these special keyvals are the handle 
+ * and a null string.
+ */
+static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p, 
+                                       enum dbpf_handle_info_action action)
+{
+    DBT key, data;
+    int ret = -TROVE_EINVAL;
+    TROVE_keyval_handle_info info;
+    struct dbpf_keyval_db_entry key_entry;
+
+    if(op_p->flags & TROVE_KEYVAL_HANDLE_COUNT)
+    {
+        key_entry.handle = op_p->handle;
+        memset(&key, 0, sizeof(key));
+        memset(&data, 0, sizeof(data));
+        key.flags = DB_DBT_USERMEM;
+        key.data = &key_entry;
+        key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
+        data.data = &info;
+        data.ulen = sizeof(TROVE_keyval_handle_info);
+        data.flags = DB_DBT_USERMEM;
+
+        ret = op_p->coll_p->keyval_db->get(
+            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        if(ret == DB_NOTFOUND)
+        {
+            /* doesn't exist yet so we can set to 0 */
+            memset(&info, 0, sizeof(TROVE_keyval_handle_info));
+            data.size = sizeof(TROVE_keyval_handle_info);
+        }
+        else if(ret != 0)
+        {
+            op_p->coll_p->keyval_db->err(
+                op_p->coll_p->keyval_db, ret, "DB->get");
+            return -dbpf_db_error_to_trove_error(ret);
+        }
+       
+        if(action == DBPF_KEYVAL_HANDLE_COUNT_INCREMENT)
+        {
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                         "[DBPF KEYVAL]: handle_info "
+                         "count increment: handle: %llu, value: %d\n",
+                         llu(op_p->handle), info.count);
+            info.count++;
+        }
+        else if(action == DBPF_KEYVAL_HANDLE_COUNT_DECREMENT)
+        {
+            assert(info.count > 0);
+
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                         "[DBPF KEYVAL]: handle_info "
+                         "count decrement: handle: %llu, value: %d\n",
+                         llu(op_p->handle), info.count);
+            info.count--;
+
+            if(info.count == 0)
+            {
+                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                             "[DBPF KEYVAL]: handle_info "
+                             "count decremented to zero, removing keyval\n");
+                /* special case if we get down to zero remove this
+                 * keyval as well
+                 */
+                op_p->coll_p->keyval_db->del(
+                    op_p->coll_p->keyval_db, NULL, &key, 0);
+                if(ret != 0)
+                {
+                    op_p->coll_p->keyval_db->err(
+                        op_p->coll_p->keyval_db, ret, "DB->del");
+                    return -dbpf_db_error_to_trove_error(ret);
+                }
+
+                return 0;
+            }
+        }
+
+        ret = op_p->coll_p->keyval_db->put(
+            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        if(ret != 0)
+        {
+            op_p->coll_p->keyval_db->err(
+                op_p->coll_p->keyval_db, ret, "DB->put keyval handle info ops");
+            return -dbpf_db_error_to_trove_error(ret);
+        }
     }
 
     return 0;
@@ -1542,7 +1823,8 @@ struct TROVE_keyval_ops dbpf_keyval_ops =
     dbpf_keyval_iterate_keys,
     dbpf_keyval_read_list,
     dbpf_keyval_write_list,
-    dbpf_keyval_flush
+    dbpf_keyval_flush,
+    dbpf_keyval_get_handle_info
 };
 
 /*

@@ -16,12 +16,27 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-internal.h"
 
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern struct qhash_table *htable_ops_in_progress;
-extern int debug;
-extern int op_timeout_secs;
-extern wait_queue_head_t pvfs2_request_list_waitq;
+
+/* What we do in this function is to walk the list of operations that are present 
+ * in the request queue and mark them as purged.
+ * NOTE: This is called from the device close after client-core has guaranteed that no new
+ * operations could appear on the list since the client-core is anyway going to exit.
+ */
+void purge_waiting_ops(void)
+{
+    pvfs2_kernel_op_t *op;
+    spin_lock(&pvfs2_request_list_lock);
+    list_for_each_entry(op, &pvfs2_request_list, list)
+    {
+        spin_lock(&op->lock);
+        pvfs2_print("pvfs2-client-core: purging op tag %lld %s\n", lld(op->tag), get_opname_string(op));
+        set_op_state_purged(op);
+        spin_unlock(&op->lock);
+        wake_up_interruptible(&op->waitq);
+    }
+    spin_unlock(&pvfs2_request_list_lock);
+    return;
+}
 
 /**
  * submits a PVFS2 operation and waits for it to complete
@@ -36,13 +51,14 @@ extern wait_queue_head_t pvfs2_request_list_waitq;
 int service_operation(
     pvfs2_kernel_op_t* op,  /**< operation structure to process */
     const char* op_name,    /**< string name for operation */
-    int num_retries,        /**< number of times to retry (may be zero) */
     int flags)               /**< flags to modify behavior */
 {
     sigset_t orig_sigset; 
     int ret = 0;
 
-    pvfs2_print("pvfs2: service_operation: %s\n", op_name);
+retry_servicing:
+    op->downcall.status = 0;
+    pvfs2_print("pvfs2: service_operation: %s %p\n", op_name, op);
 
     /* mask out signals if this operation is not to be interrupted */
     if(!(flags & PVFS2_OP_INTERRUPTIBLE)) 
@@ -66,6 +82,14 @@ int service_operation(
         }
     }
     
+    if (is_daemon_in_service() < 0)
+    {
+        /* By incrementing the per-operation attempt counter, we directly go into the timeout logic
+         * while waiting for the matching downcall to be read
+         */
+        op->attempts++;
+    }
+
     /* queue up the operation */
     if(flags & PVFS2_OP_PRIORITY)
     {
@@ -80,27 +104,28 @@ int service_operation(
     {
         up(&request_semaphore);
     }
-    
-    /* loop up to num_retries if we hit a timeout */
-    do
+
+    /* If we are asked to service an asynchronous operation from VFS perspective, we are done */
+    if (flags & PVFS2_OP_ASYNC)
     {
-        if(flags & PVFS2_OP_CANCELLATION)
-        {
-            ret = wait_for_cancellation_downcall(op);
-        }
-        else
-        {
-            ret = wait_for_matching_downcall(op);
-        }
-        num_retries--;
-    }while(ret == -ETIMEDOUT && num_retries >= 0);
+        return 0;
+    }
+    
+    if(flags & PVFS2_OP_CANCELLATION)
+    {
+        ret = wait_for_cancellation_downcall(op);
+    }
+    else
+    {
+        ret = wait_for_matching_downcall(op);
+    }
 
     if(ret < 0)
     {
         /* failed to get matching downcall */
         if(ret == -ETIMEDOUT)
         { 
-            pvfs2_error("pvfs2: %s -- wait timed out and retries exhausted. "
+            pvfs2_error("pvfs2: %s -- wait timed out;. "
                         "aborting attempt.\n", op_name);
         }
         op->downcall.status = ret;
@@ -118,7 +143,14 @@ int service_operation(
     }
 
     BUG_ON(ret != op->downcall.status);
-    pvfs2_print("pvfs2: service_operation returning: %d.\n", ret);
+    /* retry if operation has not been serviced and if requested */
+    if (!op_state_serviced(op) && op->downcall.status == -EAGAIN)
+    {
+        pvfs2_print("pvfs2: tag %lld (%s) -- operation to be retried (%d attempt)\n", 
+                lld(op->tag), op_name, op->attempts + 1);
+        goto retry_servicing;
+    }
+    pvfs2_print("pvfs2: service_operation %s returning: %d for %p.\n", op_name, ret, op);
     return(ret);
 }
 
@@ -135,39 +167,44 @@ void clean_up_interrupted_operation(
       and then lock the appropriate list.
     */
     spin_lock(&op->lock);
-    switch (op->op_state)
+
+    if (op_state_waiting(op))
     {
-	case PVFS2_VFS_STATE_WAITING:
-	    /*
-              upcall hasn't been read; remove op from upcall request
-              list.
-            */
-	    remove_op_from_request_list(op);
-	    pvfs2_print("Interrupted: Removed op from request_list\n");
-	    break;
-	case PVFS2_VFS_STATE_INPROGR:
-	    /* op must be removed from the in progress htable */
-	    remove_op_from_htable_ops_in_progress(op);
-	    pvfs2_print("Interrupted: Removed op from "
-			"htable_ops_in_progress\n");
-	    break;
-	case PVFS2_VFS_STATE_SERVICED:
-	    /*
-              can this happen? even if it does, I think we're ok with
-              doing nothing since no cleanup is necessary
-	     */
-	    break;
+        /*
+          upcall hasn't been read; remove op from upcall request
+          list.
+        */
+        remove_op_from_request_list(op);
+        pvfs2_print("Interrupted: Removed op %p from request_list\n", op);
+    }
+    else if (op_state_in_progress(op))
+    {
+        /* op must be removed from the in progress htable */
+        remove_op_from_htable_ops_in_progress(op);
+        pvfs2_print("Interrupted: Removed op %p from "
+                    "htable_ops_in_progress\n", op);
+    }
+    else if (!op_state_serviced(op))
+    {
+            pvfs2_error("interrupted operation is in a weird state 0x%x\n",
+                    op->op_state);
     }
     spin_unlock(&op->lock);
 }
 
-/** sleeps on waitqueue waiting for matching downcall for some amount of
- *    time and then wakes up.
+/** sleeps on waitqueue waiting for matching downcall.
+ *  if client-core finishes servicing, then we are good to go.
+ *  else if client-core exits, we get woken up here, and retry with a timeout
  *
  *  \post when this call returns to the caller, the specified op will no
  *        longer be on any list or htable.
  *
  *  \returns 0 on success and -errno on failure
+ *  Errors are:
+ *  EAGAIN in case we want the caller to requeue and try again..
+ *  EINTR/EIO/ETIMEDOUT indicating we are done trying to service this 
+ *                operation since client-core seems to be exiting too often
+ *                or if we were interrupted.
  */
 int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
 {
@@ -183,30 +220,57 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
 	set_current_state(TASK_INTERRUPTIBLE);
 
 	spin_lock(&op->lock);
-	if (op->op_state == PVFS2_VFS_STATE_SERVICED)
+        if (op_state_serviced(op))
 	{
 	    spin_unlock(&op->lock);
 	    ret = 0;
 	    break;
 	}
-	spin_unlock(&op->lock);
 
 	if (!signal_pending(current))
 	{
-	    if (!schedule_timeout
-		(MSECS_TO_JIFFIES(1000 * op_timeout_secs)))
-	    {
-                pvfs2_print("*** operation timed out (tag %lld)\n",
-                            lld(op->tag));
+            /* if this was our first attempt and client-core has not purged our operation,
+             * we are happy to simply wait 
+             */
+            if (op->attempts == 0 && !op_state_purged(op))
+            {
+                spin_unlock(&op->lock);
+                schedule();
+            }
+            else {
+                spin_unlock(&op->lock);
+                /* subsequent attempts, we retry exactly once with timeouts */
+                if (!schedule_timeout(MSECS_TO_JIFFIES(1000 * op_timeout_secs)))
+                {
+                    pvfs2_print("*** operation timed out (tag %lld, %p, att %d)\n",
+                                lld(op->tag), op, op->attempts);
+                    ret = -ETIMEDOUT;
+                    clean_up_interrupted_operation(op);
+                    break;
+                }
+            }
+            spin_lock(&op->lock);
+            op->attempts++;
+            /* if the operation was purged in the meantime, it is better to requeue it afresh 
+             *  but ensure that we have not been purged repeatedly. This could happen if client-core
+             *  crashes when an op is being serviced, so we requeue the op, client core crashes again
+             *  so we requeue the op, client core starts, and so on...*/
+            if (op_state_purged(op))
+            {
+                ret = (op->attempts < PVFS2_PURGE_RETRY_COUNT) ? -EAGAIN : -EIO;
+                spin_unlock(&op->lock);
                 clean_up_interrupted_operation(op);
-		ret = -ETIMEDOUT;
-		break;
-	    }
-	    continue;
+                break;
+            }
+            spin_unlock(&op->lock);
+            continue;
 	}
+        else {
+            spin_unlock(&op->lock);
+        }
 
-        pvfs2_print("*** operation interrupted by a signal (tag %lld)\n",
-                    lld(op->tag));
+        pvfs2_print("*** operation interrupted by a signal (tag %lld, op %p)\n",
+                    lld(op->tag), op);
         clean_up_interrupted_operation(op);
         ret = -EINTR;
         break;
@@ -243,7 +307,7 @@ int wait_for_cancellation_downcall(pvfs2_kernel_op_t * op)
 	set_current_state(TASK_INTERRUPTIBLE);
 
 	spin_lock(&op->lock);
-	if (op->op_state == PVFS2_VFS_STATE_SERVICED)
+        if (op_state_serviced(op))
 	{
 	    spin_unlock(&op->lock);
 	    ret = 0;
@@ -254,7 +318,7 @@ int wait_for_cancellation_downcall(pvfs2_kernel_op_t * op)
         if (!schedule_timeout
             (MSECS_TO_JIFFIES(1000 * op_timeout_secs)))
         {
-            pvfs2_print("*** operation timed out\n");
+            pvfs2_print("*** operation timed out: %p\n", op);
             clean_up_interrupted_operation(op);
             ret = -ETIMEDOUT;
             break;

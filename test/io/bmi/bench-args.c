@@ -27,8 +27,8 @@ int bench_args(
     int ret = -1;
 
     /* fill in defaults */
-    user_opts->message_len = 100;
-    user_opts->total_len = 1000;
+    user_opts->message_len = 128;
+    user_opts->total_len = user_opts->message_len * 8;
     user_opts->flags = 0;
     user_opts->method_name[0] = '\0';
     user_opts->num_servers = 1;

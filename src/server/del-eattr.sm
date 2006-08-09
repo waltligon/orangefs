@@ -147,7 +147,6 @@ static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = 0;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     /* set up key and value structure for keyval write */
     s_op->key.buffer = s_op->req->u.deleattr.key.buffer;
@@ -170,10 +169,8 @@ static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
         s_op->req->u.deleattr.fs_id,
         s_op->req->u.deleattr.handle,
         &(s_op->key),
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.deleattr.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.deleattr.fs_id),
+        NULL,
+        TROVE_SYNC ,
         NULL,
         s_op,
         0,

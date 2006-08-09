@@ -13,14 +13,15 @@
  *  \ingroup tcache
  * Implementation of the Timeout Cache (tcache) component.
  */
-
-#define TCACHE_DEFAULT_TIMEOUT_MSECS    4000
-#define TCACHE_DEFAULT_EXPIRATION_ENABLED  1
-#define TCACHE_DEFAULT_SOFT_LIMIT       5120
-#define TCACHE_DEFAULT_HARD_LIMIT      10240
-#define TCACHE_DEFAULT_RECLAIM_PERCENTAGE 25
-#define TCACHE_DEFAULT_TABLE_SIZE       1019 
-#define TCACHE_DEFAULT_REPLACE_ALGORITHM   LEAST_RECENTLY_USED
+enum {
+TCACHE_DEFAULT_TIMEOUT_MSECS   = 4000,
+TCACHE_DEFAULT_EXPIRATION_ENABLED = 1,
+TCACHE_DEFAULT_SOFT_LIMIT     =  5120,
+TCACHE_DEFAULT_HARD_LIMIT     = 10240,
+TCACHE_DEFAULT_RECLAIM_PERCENTAGE = 25,
+TCACHE_DEFAULT_TABLE_SIZE     =  1019,
+TCACHE_DEFAULT_REPLACE_ALGORITHM  = LEAST_RECENTLY_USED,
+};
 
 static int check_expiration(
     struct PINT_tcache* tcache,
@@ -100,7 +101,7 @@ void PINT_tcache_finalize(
                 hash_link);
             assert(tmp_entry);
 
-            PINT_tcache_purge(tcache, tmp_entry);
+            PINT_tcache_delete(tcache, tmp_entry);
         }
     }
 
@@ -267,14 +268,14 @@ int PINT_tcache_insert_entry(
     struct PINT_tcache* tcache, /**< pointer to tcache instance */
     void* key,                  /**< that uniquely identifies the payload */
     void* payload,              /**< data to store in the cache */
-    int* removed)               /**< number of entries removed to make room */
+    int* purged)                /**< number of entries purged to make room */
 {
     struct PINT_tcache_entry* tmp_entry = NULL;
     int tmp_status = 0;
     int ret = -1;
 
-    *removed = 0;
-
+    *purged = 0;
+  
     if(tcache->enable == 0)
     {
         /* cache has been disabled, do nothing except discard payload*/
@@ -286,7 +287,7 @@ int PINT_tcache_insert_entry(
     if(tcache->num_entries >= tcache->soft_limit)
     {
         /* try to reclaim some entries */
-        ret = PINT_tcache_reclaim(tcache, removed);
+        ret = PINT_tcache_reclaim(tcache, purged);
         if(ret < 0)
         {
             return(ret);
@@ -313,12 +314,12 @@ int PINT_tcache_insert_entry(
         /* we don't care about the status- we need to remove an entry
          * regardless
          */
-        ret = PINT_tcache_purge(tcache, tmp_entry);
+        ret = PINT_tcache_delete(tcache, tmp_entry);
         if(ret < 0)
         {
             return(ret);
         }
-        *removed = 1;
+        *purged = 1;
     }
 
     /* create new entry */
@@ -419,7 +420,7 @@ int tcache_lookup_oldest(
 }
 
 /**
- * Tries to remove and destroy expired entries, up to
+ * Tries to purge and destroy expired entries, up to
  * TCACHE_RECLAIM_PERCENTAGE of the current soft limit value.  The
  * payload_free() function is used to destroy the payload associated with
  * reclaimed entries. 
@@ -431,7 +432,7 @@ int PINT_tcache_reclaim(
 {
     struct qlist_head *iterator = NULL, *scratch = NULL;
     struct PINT_tcache_entry* tmp_entry;
-    int entries_to_remove = (tcache->reclaim_percentage *
+    int entries_to_purge = (tcache->reclaim_percentage *
         tcache->soft_limit)/100; 
     int status = 0;
     int ret;
@@ -460,17 +461,17 @@ int PINT_tcache_reclaim(
             break;
         }
 
-        /* remove entry otherwise */
-        ret = PINT_tcache_purge(tcache, tmp_entry);
+        /* delete entry otherwise */
+        ret = PINT_tcache_delete(tcache, tmp_entry);
         if(ret < 0)
         {
             return(ret);
         }
-        entries_to_remove--;
+        entries_to_purge--;
         (*reclaimed)++;
         
         /* break if we hit percentage cap */
-        if(entries_to_remove <= 0)
+        if(entries_to_purge <= 0)
         {
             break;
         }
@@ -484,7 +485,7 @@ int PINT_tcache_reclaim(
  * will be used to destroy payload data.
  * \return 0 on success, -PVFS_error on failure
  */
-int PINT_tcache_purge(
+int PINT_tcache_delete(
     struct PINT_tcache* tcache,      /**< pointer to tcache instance */
     struct PINT_tcache_entry* entry) /**< entry to remove and destroy */
 {

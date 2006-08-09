@@ -41,6 +41,13 @@ static int issue_or_delay_io_operation(
     int aiocb_inuse_count, struct sigevent *sig, int dec_first);
 static void start_delayed_ops_if_any(int dec_first);
 
+static char *list_proc_state_strings[] = {
+    "LIST_PROC_INITIALIZED",
+    "LIST_PROC_INPROGRESS ",
+    "LIST_PROC_ALLCONVERTED",
+    "LIST_PROC_ALLPOSTED",
+};
+
 static inline int dbpf_bstream_rw_list(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -90,7 +97,7 @@ static void aio_progress_notification(union sigval sig)
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG," --- aio_progress_notification called "
-        "with handle %llu\n", llu(op_p->handle));
+        "with handle %llu (%p)\n", llu(op_p->handle), cur_op);
 
     aiocb_p = op_p->u.b_rw_list.aiocb_array;
     assert(aiocb_p);
@@ -159,7 +166,7 @@ static void aio_progress_notification(union sigval sig)
         op_p->u.b_rw_list.fd = -1;
         
         gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
-                     "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
+                     "(state is %s)\n", list_proc_state_strings[op_p->u.b_rw_list.list_proc_state]);
 
         /* this is a macro defined in dbpf-thread.h */
         move_op_to_completion_queue(
@@ -171,7 +178,7 @@ static void aio_progress_notification(union sigval sig)
     else
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "*** issuing more aio requests "
-                     "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
+                     "(state is %s)\n", list_proc_state_strings[op_p->u.b_rw_list.list_proc_state]);
 
         /* no operations in progress; convert and post some more */
         op_p->u.b_rw_list.aiocb_array_count = AIOCB_ARRAY_SZ;
@@ -420,6 +427,7 @@ static int issue_or_delay_io_operation(
                          aiocb_inuse_count, sig);
         if (ret != 0)
         {
+            s_dbpf_ios_in_progress--;
             gossip_lerr("lio_listio() returned %d\n", ret);
             dbpf_open_cache_put(&cur_op->op.u.b_rw_list.open_ref);
             return -trove_errno_to_trove_error(errno);

@@ -35,6 +35,36 @@ static flow_ref_p flow_mapping = NULL;
 
 static void flow_release(flow_descriptor * flow_d);
 
+/* bring in the flowproto interfaces that we need */
+#ifdef __STATIC_FLOWPROTO_TEMPLATE__
+extern struct flowproto_ops flowproto_template_ops;
+#endif
+#ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
+extern struct flowproto_ops flowproto_dump_offsets_ops;
+#endif
+#ifdef __STATIC_FLOWPROTO_BMI_CACHE__
+extern struct flowproto_ops fp_bmi_cache_ops;
+#endif
+#ifdef __STATIC_FLOWPROTO_MULTIQUEUE__
+extern struct flowproto_ops fp_multiqueue_ops;
+#endif
+
+static struct flowproto_ops *static_flowprotos[] = {
+#ifdef __STATIC_FLOWPROTO_TEMPLATE__
+    &flowproto_template_ops,
+#endif
+#ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
+    &flowproto_dump_offsets_ops,
+#endif
+#ifdef __STATIC_FLOWPROTO_BMI_CACHE__
+    &fp_bmi_cache_ops,
+#endif
+#ifdef __STATIC_FLOWPROTO_MULTIQUEUE__
+    &fp_multiqueue_ops,
+#endif
+    NULL
+};
+
 /* PINT_flow_initialize()
  *
  * initializes the flow interface.  Should be called exactly once before
@@ -56,36 +86,6 @@ int PINT_flow_initialize(
         requested_flowproto_count = 0;
     char **requested_flowprotos = NULL;
     struct flowproto_ops **tmp_flowproto_ops = NULL;
-
-    /* bring in the flowproto interfaces that we need */
-#ifdef __STATIC_FLOWPROTO_TEMPLATE__
-    extern struct flowproto_ops flowproto_template_ops;
-#endif /* __STATIC_FLOWPROTO_TEMPLATE__ */
-#ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
-    extern struct flowproto_ops flowproto_dump_offsets_ops;
-#endif /* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
-#ifdef __STATIC_FLOWPROTO_BMI_CACHE__
-    extern struct flowproto_ops fp_bmi_cache_ops;
-#endif /* __STATIC_FLOWPROTO_BMI_CACHE__ */
-#ifdef __STATIC_FLOWPROTO_MULTIQUEUE__
-    extern struct flowproto_ops fp_multiqueue_ops;
-#endif /* __STATIC_FLOWPROTO_MULTIQUEUE__ */
-
-    static struct flowproto_ops *static_flowprotos[] = {
-#ifdef __STATIC_FLOWPROTO_TEMPLATE__
-	&flowproto_template_ops,
-#endif				/* __STATIC_FLOWPROTO_TEMPLATE__ */
-#ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
-	&flowproto_dump_offsets_ops,
-#endif				/* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
-#ifdef __STATIC_FLOWPROTO_BMI_CACHE__
-	&fp_bmi_cache_ops,
-#endif				/* __STATIC_FLOWPROTO_BMI_CACHE__ */
-#ifdef __STATIC_FLOWPROTO_MULTIQUEUE__
-	&fp_multiqueue_ops,
-#endif				/* __STATIC_FLOWPROTO_MULTIQUEUE__ */
-	NULL
-    };
 
     gen_mutex_lock(&interface_mutex);
 
@@ -116,7 +116,7 @@ int PINT_flow_initialize(
     }
 
     /* create table to keep up with active flow protocols */
-    active_flowproto_table = (struct flowproto_ops **)
+    active_flowproto_table =
         malloc((active_flowproto_count * sizeof(struct flowproto_ops *)));
     if (!active_flowproto_table)
     {

@@ -815,8 +815,9 @@ int change_owner(
     }
     else
     {
+    
         /* Determine if we need to use sudo to change owner/group */
-        if(geteuid() != owner_id ||
+        if(geteuid() != owner_id &&
            geteuid() != group_id)
         {
             if(verbose)

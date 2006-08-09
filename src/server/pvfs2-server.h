@@ -22,6 +22,7 @@
 #include <string.h>
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
+#include "pvfs2-internal.h"
 #include "job.h"
 #include "bmi.h"
 #include "src/server/request-scheduler/request-scheduler.h"
@@ -152,8 +153,7 @@ enum
     DIR_ENT_KEY          = 1,
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
-    SYMLINK_TARGET_KEY   = 4,
-    DIRDATA_SIZE_KEY     = 5
+    SYMLINK_TARGET_KEY   = 4
 };
 
 typedef enum
@@ -252,6 +252,7 @@ struct PINT_server_remove_op
     int key_count;
     int index;
     int remove_keyvals_state;
+    PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -275,12 +276,10 @@ struct PINT_server_io_op
     flow_descriptor* flow_d;
 };
 
-#define SMALL_IO_MAX_REGIONS 64
-
 struct PINT_server_small_io_op
 {
-    PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
-    PVFS_size sizes[SMALL_IO_MAX_REGIONS];
+    PVFS_offset offsets[IO_MAX_REGIONS];
+    PVFS_size sizes[IO_MAX_REGIONS];
     PVFS_size result_bytes;
 };
 
@@ -307,10 +306,12 @@ struct PINT_server_mkdir_op
 struct PINT_server_getattr_op
 {
     PVFS_handle handle;
-    PVFS_size dirent_count;
     PVFS_fs_id fs_id;
     PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
+    PVFS_error* err_array;
+    PVFS_ds_keyval_handle_info keyval_handle_info;
+    PVFS_handle dirent_handle;
 };
 
 struct PINT_server_listattr_op
@@ -324,6 +325,7 @@ struct PINT_server_listattr_op
     PVFS_error *errors;
     uint32_t attrmask;
     uint32_t handle_index;
+    PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
 /* this is used in both set_eattr, get_eattr and list_eattr */
@@ -338,6 +340,7 @@ struct PINT_server_eattr_op
  */
 typedef struct PINT_server_op
 {
+    struct qlist_head   next; /* used to queue structures used for unexp style messages */
     enum PVFS_server_op op;  /* type of operation that we are servicing */
     /* the following fields are used in state machine processing to keep
      * track of the current state

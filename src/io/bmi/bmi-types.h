@@ -73,7 +73,8 @@ enum
 #endif
     BMI_GET_UNEXP_SIZE = 10,     /**< get the maximum unexpected payload */
     BMI_TCP_BUFFER_SEND_SIZE = 11,
-    BMI_TCP_BUFFER_RECEIVE_SIZE = 12
+    BMI_TCP_BUFFER_RECEIVE_SIZE = 12,
+    BMI_TCP_CLOSE_SOCKET = 13,
 };
 
 /* mappings from PVFS errors to BMI errors */

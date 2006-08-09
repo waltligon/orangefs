@@ -41,6 +41,7 @@ int dbpf_attr_cache_set_keywords(char *keywords)
     return (s_cacheable_keyword_array ? 0 : -1);
 }
 
+       
 int dbpf_attr_cache_set_size(int cache_size)
 {
     s_cache_size = cache_size;

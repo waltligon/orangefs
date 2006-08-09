@@ -266,6 +266,8 @@ exec 2<&7 7<&-
 if [ -f $PVFS2_DEST/pvfs2-built-with-warnings -o \
 	-f ${PVFS2_DEST}/pvfs2-test-built-with-warnings ] ; then
 	tinder_report successwarn
+	rm -f $PVFS2_DEST/pvfs2-built-with-warnings
+	rm -f ${PVFS2_DEST}/pvfs2-test-built-with-warnings
 
 elif [ $nr_failed -gt 0 ]; then
 	tinder_report test_failed

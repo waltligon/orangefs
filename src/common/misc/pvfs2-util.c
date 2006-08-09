@@ -180,6 +180,28 @@ int PVFS_util_copy_sys_attr(
                 return ret;
             }
         }
+        else if ((src_attr->mask & PVFS_ATTR_SYS_DIR_HINT))
+        {
+            if (src_attr->dist_name)
+            {
+                dest_attr->dist_name = strdup(src_attr->dist_name);
+                if (dest_attr->dist_name == NULL)
+                {
+                    ret = -PVFS_ENOMEM;
+                    return ret;
+                }
+            }
+            if (src_attr->dist_params)
+            {
+                dest_attr->dist_params = strdup(src_attr->dist_params);
+                if (dest_attr->dist_params == NULL)
+                {
+                    free(dest_attr->dist_name);
+                    ret = -PVFS_ENOMEM;
+                    return ret;
+                }
+            }
+        }
         ret = 0;
     }
     return ret;
@@ -194,6 +216,16 @@ void PVFS_util_release_sys_attr(PVFS_sys_attr *attr)
         {
             free(attr->link_target);
             attr->link_target = NULL;
+        }
+        else if ((attr->mask & PVFS_ATTR_SYS_DIR_HINT) &&
+            (attr->objtype == PVFS_TYPE_DIRECTORY))
+        {
+            if (attr->dist_name)
+                free(attr->dist_name);
+            if (attr->dist_params)
+                free(attr->dist_params);
+            attr->dist_name = NULL;
+            attr->dist_params = NULL;
         }
     }
 }
@@ -1476,6 +1508,11 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_DIR_DIRENT_COUNT;
     }
 
+    if (sys_attrmask & PVFS_ATTR_SYS_DIR_HINT)
+    {
+        attrmask |= PVFS_ATTR_DIR_HINT;
+    }
+
     if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
@@ -1536,6 +1573,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_META_DFILES)
     {
         sys_mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+    }
+    if (obj_mask & PVFS_ATTR_DIR_HINT)
+    {
+        sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
     }
     return sys_mask;
 }

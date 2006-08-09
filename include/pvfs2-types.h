@@ -243,11 +243,17 @@ typedef struct PVFS_ds_keyval_s
                            /* only valid after a read */
 } PVFS_ds_keyval;
 
+typedef struct
+{
+    uint32_t count;
+} PVFS_ds_keyval_handle_info;
+
 /* attribute masks used by system interface callers */
 #define PVFS_ATTR_SYS_SIZE                  (1 << 20)
 #define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
 #define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
 #define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
+#define PVFS_ATTR_SYS_DIR_HINT              (1 << 27)
 #define PVFS_ATTR_SYS_UID                   (1 << 0)
 #define PVFS_ATTR_SYS_GID                   (1 << 1)
 #define PVFS_ATTR_SYS_PERM                  (1 << 2)
@@ -255,6 +261,8 @@ typedef struct PVFS_ds_keyval_s
 #define PVFS_ATTR_SYS_CTIME                 (1 << 4)
 #define PVFS_ATTR_SYS_MTIME                 (1 << 5)
 #define PVFS_ATTR_SYS_TYPE                  (1 << 6)
+#define PVFS_ATTR_SYS_ATIME_SET             (1 << 7)
+#define PVFS_ATTR_SYS_MTIME_SET             (1 << 8)
 #define PVFS_ATTR_SYS_COMMON_ALL \
 (PVFS_ATTR_SYS_UID   | PVFS_ATTR_SYS_GID   | \
  PVFS_ATTR_SYS_PERM  | PVFS_ATTR_SYS_ATIME | \
@@ -264,12 +272,19 @@ typedef struct PVFS_ds_keyval_s
 #define PVFS_ATTR_SYS_ALL                    \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
+ PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT)
+#define PVFS_ATTR_SYS_ALL_NOHINT                \
+(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
+ PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
  PVFS_ATTR_SYS_DIRENT_COUNT)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
- PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT)
+ PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
-(PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE)
+(PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
+#define PVFS_ATTR_SYS_ALL_TIMES \
+((PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) | PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
+
 
 /* Extended attribute flags */
 #define PVFS_XATTR_CREATE  0x1

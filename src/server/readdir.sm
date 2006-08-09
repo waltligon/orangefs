@@ -140,8 +140,7 @@ static int readdir_read_dirdata_handle(
     ret = job_trove_keyval_read(
         s_op->req->u.readdir.fs_id, s_op->req->u.readdir.handle,
         &s_op->key, &s_op->val, 
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.readdir.fs_id), 
+        0, 
         NULL, s_op, 0, js_p, &i,
         server_job_context);
 
@@ -220,8 +219,7 @@ static int readdir_iterate_on_entries(
         s_op->req->u.readdir.fs_id, s_op->u.readdir.dirent_handle,
         s_op->req->u.readdir.token, s_op->key_a, s_op->val_a,
         s_op->req->u.readdir.dirent_count, 
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.readdir.fs_id), 
+        0, 
         NULL, s_op, 0, js_p, 
         &j_id, server_job_context);
 

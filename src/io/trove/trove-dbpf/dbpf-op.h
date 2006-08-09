@@ -41,7 +41,6 @@ extern "C" {
 struct dbpf_queued_op_stats
 {
     int svc_ct;
-    int coalesce_sync;
 };
 
 /* struct dbpf_queued_op

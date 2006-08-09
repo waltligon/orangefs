@@ -538,7 +538,6 @@ static int getattr_object_getattr_comp_fn(
                           &resp_p->u.getattr.attr);
 
     attr =  &sm_p->getattr.attr;
-    assert(attr);
 
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
      * a -PVFS_error will be triggered if the
@@ -617,7 +616,18 @@ static int getattr_object_getattr_comp_fn(
             }
             return 0;
         case PVFS_TYPE_DIRECTORY:
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "getattr comp_fn [%p] "
+                "dfile_count = %d "
+                "dist_name_len = %d "
+                "dist_params_len = %d\n",
+                attr,
+                attr->u.dir.hint.dfile_count,
+                attr->u.dir.hint.dist_name_len,
+                attr->u.dir.hint.dist_params_len);
             return 0;
+        }
         case PVFS_TYPE_SYMLINK:
             return 0;
         case PVFS_TYPE_DATAFILE:
@@ -843,6 +853,42 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
        sm_p->getattr.req_attrmask & PVFS_ATTR_META_DFILES)
     {
         sysresp->attr.dfile_count = attr->u.meta.dfile_count;
+    }
+    if (attr->objtype == PVFS_TYPE_DIRECTORY)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "dfile_count: %d\n", 
+            attr->u.dir.hint.dfile_count);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_len = %d, dist_params_len = %d\n",
+            attr->u.dir.hint.dist_name_len, attr->u.dir.hint.dist_params_len);
+        sysresp->attr.dfile_count = attr->u.dir.hint.dfile_count;
+        /* 
+         * If we retrieved any extended attributes for the directory
+         * in question, the caller's responsibility to free it up
+         */
+        if (attr->u.dir.hint.dist_name_len > 0 && 
+            (sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_HINT))
+        {
+            sysresp->attr.dist_name = strdup(attr->u.dir.hint.dist_name);
+            if (!sysresp->attr.dist_name)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return 0;
+            }
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_hint: %s\n", sysresp->attr.dist_name);
+        }
+        if (attr->u.dir.hint.dist_params_len > 0 &&
+            (sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_HINT))
+        {
+            sysresp->attr.dist_params = strdup(attr->u.dir.hint.dist_params);
+            if (!sysresp->attr.dist_params)
+            {
+                free(sysresp->attr.dist_name);
+                sysresp->attr.dist_name = NULL;
+                js_p->error_code = -PVFS_ENOMEM;
+                return 0;
+            }
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_params: %s\n", sysresp->attr.dist_params);
+        }
     }
 
     /* copy outgoing sys_attr fields from returned object_attr */

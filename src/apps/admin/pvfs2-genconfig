@@ -288,10 +288,6 @@ sub emit_filesystem
         print $target "\t\tCoalescingLowWatermark 1\n";
     }
 
-    print $target "\t\tAttrCacheKeywords datafile_handles,metafile_dist\n";
-    print $target "\t\tAttrCacheKeywords dir_ent, symlink_target\n";
-    print $target "\t\tAttrCacheSize 4093\n";
-    print $target "\t\tAttrCacheMaxNumElems 32768\n";
     print $target "\t</StorageHints>\n";
 
     if($opt_gen_key ne "0")

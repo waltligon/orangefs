@@ -6,7 +6,11 @@
 
 #include "pvfs2-kernel.h"
 
+/* A list of all allocated pvfs2 inode objects */
+static spinlock_t pvfs2_inode_list_lock = SPIN_LOCK_UNLOCKED;
+static LIST_HEAD(pvfs2_inode_list);
 
+/* tags assigned to kernel upcall operations */
 static uint64_t next_tag_value;
 static spinlock_t next_tag_value_lock = SPIN_LOCK_UNLOCKED;
 
@@ -22,10 +26,6 @@ static kmem_cache_t *pvfs2_inode_cache = NULL;
 /* a cache for pvfs2_kiocb objects (i.e pvfs2 iocb structures ) */
 static kmem_cache_t *pvfs2_kiocb_cache = NULL;
 #endif
-
-extern int debug;
-extern int pvfs2_gen_credentials(
-    PVFS_credentials *credentials);
 
 int op_cache_initialize(void)
 {
@@ -56,7 +56,62 @@ int op_cache_finalize(void)
     return 0;
 }
 
-static pvfs2_kernel_op_t *op_alloc_common(int op_linger)
+char *get_opname_string(pvfs2_kernel_op_t *new_op)
+{
+    if (new_op)
+    {
+        int32_t type = new_op->upcall.type;
+        if (type == PVFS2_VFS_OP_FILE_IO)
+            return "OP_FILE_IO";
+        else if (type == PVFS2_VFS_OP_LOOKUP)
+            return "OP_LOOKUP";
+        else if (type == PVFS2_VFS_OP_CREATE)
+            return "OP_CREATE";
+        else if (type == PVFS2_VFS_OP_GETATTR)
+            return "OP_GETATTR";
+        else if (type == PVFS2_VFS_OP_REMOVE)
+            return "OP_REMOVE";
+        else if (type == PVFS2_VFS_OP_MKDIR)
+            return "OP_MKDIR";
+        else if (type == PVFS2_VFS_OP_READDIR)
+            return "OP_READDIR";
+        else if (type == PVFS2_VFS_OP_SETATTR)
+            return "OP_SETATTR";
+        else if (type == PVFS2_VFS_OP_SYMLINK)
+            return "OP_SYMLINK";
+        else if (type == PVFS2_VFS_OP_RENAME)
+            return "OP_RENAME";
+        else if (type == PVFS2_VFS_OP_STATFS)
+            return "OP_STATFS";
+        else if (type == PVFS2_VFS_OP_TRUNCATE)
+            return "OP_TRUNCATE";
+        else if (type == PVFS2_VFS_OP_MMAP_RA_FLUSH)
+            return "OP_MMAP_RA_FLUSH";
+        else if (type == PVFS2_VFS_OP_FS_MOUNT)
+            return "OP_FS_MOUNT";
+        else if (type == PVFS2_VFS_OP_FS_UMOUNT)
+            return "OP_FS_UMOUNT";
+        else if (type == PVFS2_VFS_OP_GETXATTR)
+            return "OP_GETXATTR";
+        else if (type == PVFS2_VFS_OP_SETXATTR)
+            return "OP_SETXATTR";
+        else if (type == PVFS2_VFS_OP_LISTXATTR)
+            return "OP_LISTXATTR";
+        else if (type == PVFS2_VFS_OP_REMOVEXATTR)
+            return "OP_REMOVEXATTR";
+        else if (type == PVFS2_VFS_OP_PARAM)
+            return "OP_PARAM";
+        else if (type == PVFS2_VFS_OP_PERF_COUNT)
+            return "OP_PERF_COUNT";
+        else if (type == PVFS2_VFS_OP_CANCEL)
+            return "OP_CANCEL";
+        else if (type == PVFS2_VFS_OP_FSYNC)
+            return "OP_FSYNC";
+    }
+    return "OP_INVALID";
+}
+
+static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
 {
     pvfs2_kernel_op_t *new_op = NULL;
 
@@ -82,6 +137,9 @@ static pvfs2_kernel_op_t *op_alloc_common(int op_linger)
             next_tag_value = 100;
         }
         spin_unlock(&next_tag_value_lock);
+        new_op->upcall.type = type;
+        new_op->attempts = 0;
+        pvfs2_print("Alloced OP (%p: %ld %s)\n", new_op, (unsigned long) new_op->tag, get_opname_string(new_op));
 
         pvfs2_gen_credentials(&new_op->upcall.credentials);
         new_op->op_linger = new_op->op_linger_tmp = op_linger;
@@ -93,20 +151,21 @@ static pvfs2_kernel_op_t *op_alloc_common(int op_linger)
     return new_op;
 }
 
-pvfs2_kernel_op_t *op_alloc()
+pvfs2_kernel_op_t *op_alloc(int32_t type)
 {
-    return op_alloc_common(1);
+    return op_alloc_common(1, type);
 }
 
-pvfs2_kernel_op_t *op_alloc_trailer()
+pvfs2_kernel_op_t *op_alloc_trailer(int32_t type)
 {
-    return op_alloc_common(2);
+    return op_alloc_common(2, type);
 }
 
 void op_release(pvfs2_kernel_op_t *pvfs2_op)
 {
     if (pvfs2_op)
     {
+        pvfs2_print("Releasing OP (%p: %ld)\n", pvfs2_op, (unsigned long) pvfs2_op->tag);
         pvfs2_op_initialize(pvfs2_op);
         kmem_cache_free(op_cache, pvfs2_op);
     }
@@ -227,6 +286,22 @@ static void pvfs2_inode_cache_dtor(
     }
 }
 
+static inline void add_to_pinode_list(pvfs2_inode_t *pvfs2_inode)
+{
+    spin_lock(&pvfs2_inode_list_lock);
+    list_add_tail(&pvfs2_inode->list, &pvfs2_inode_list);
+    spin_unlock(&pvfs2_inode_list_lock);
+    return;
+}
+
+static inline void del_from_pinode_list(pvfs2_inode_t *pvfs2_inode)
+{
+    spin_lock(&pvfs2_inode_list_lock);
+    list_del_init(&pvfs2_inode->list);
+    spin_unlock(&pvfs2_inode_list_lock);
+    return;
+}
+
 int pvfs2_inode_cache_initialize(void)
 {
     pvfs2_inode_cache = kmem_cache_create(
@@ -244,6 +319,16 @@ int pvfs2_inode_cache_initialize(void)
 
 int pvfs2_inode_cache_finalize(void)
 {
+    if (!list_empty(&pvfs2_inode_list))
+    {
+        pvfs2_error("pvfs2_inode_cache_finalize: WARNING: releasing unreleased pvfs2 inode objects!\n");
+        while (pvfs2_inode_list.next != &pvfs2_inode_list)
+        {
+            pvfs2_inode_t *pinode = list_entry(pvfs2_inode_list.next, pvfs2_inode_t, list);
+            list_del(pvfs2_inode_list.next);
+            kmem_cache_free(pvfs2_inode_cache, pinode);
+        }
+    }
     if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
     {
         pvfs2_panic("Failed to destroy pvfs2_inode_cache\n");
@@ -268,6 +353,9 @@ pvfs2_inode_t* pvfs2_inode_alloc(void)
     {
         pvfs2_panic("Failed to allocate pvfs2_inode\n");
     }
+    else {
+        add_to_pinode_list(pvfs2_inode);
+    }
     return pvfs2_inode;
 }
 
@@ -275,6 +363,7 @@ void pvfs2_inode_release(pvfs2_inode_t *pinode)
 {
     if (pinode)
     {
+        del_from_pinode_list(pinode);
         kmem_cache_free(pvfs2_inode_cache, pinode);
     }
     else

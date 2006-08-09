@@ -449,7 +449,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     pref = lookup_resp.ref;
 
     PVFS_sys_getattr(pref,
-		     PVFS_ATTR_SYS_ALL,
+		     PVFS_ATTR_SYS_ALL_NOHINT,
 		     creds,
 		     &getattr_resp);
 
@@ -565,7 +565,7 @@ int descend(PVFS_fs_id cur_fs,
             }
 
             ret = PVFS_sys_getattr(entry_ref,
-                                   PVFS_ATTR_SYS_ALL,
+                                   PVFS_ATTR_SYS_ALL_NOHINT,
                                    creds,
                                    &getattr_resp);
             if (ret != 0) {
@@ -795,7 +795,7 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 	handle_ref.fs_id  = cur_fs;
 
 	ret = PVFS_sys_getattr(handle_ref,
-			       PVFS_ATTR_SYS_ALL,
+			       PVFS_ATTR_SYS_ALL_NOHINT,
 			       creds,
 			       &getattr_resp);
 	if (ret) {
@@ -876,7 +876,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 	handle_ref.fs_id  = cur_fs;
 
 	ret = PVFS_sys_getattr(handle_ref,
-			       PVFS_ATTR_SYS_ALL,
+			       PVFS_ATTR_SYS_ALL_NOHINT,
 			       creds,
 			       &getattr_resp);
 	if (ret) {
@@ -987,7 +987,7 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 	handle_ref.fs_id  = cur_fs;
 
 	ret = PVFS_sys_getattr(handle_ref,
-			       PVFS_ATTR_SYS_ALL,
+			       PVFS_ATTR_SYS_ALL_NOHINT,
 			       creds,
 			       &getattr_resp);
 	if (ret) {
@@ -1035,10 +1035,7 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
     attr.owner = creds->uid;
     attr.group = creds->gid;
     attr.perms = PVFS2_translate_mode(0755);
-    attr.atime = time(NULL);
-    attr.mtime = attr.atime;
-    attr.ctime = attr.atime;
-    attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
     ret = PVFS_sys_lookup(cur_fs,
 			  "/",

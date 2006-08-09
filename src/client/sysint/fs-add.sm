@@ -222,6 +222,7 @@ static int fs_add_parent_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
+    PVFS_BMI_addr_t addr;
 
     if(js_p->error_code != 0)
     {
@@ -243,6 +244,16 @@ static int fs_add_parent_cleanup(
                  (void *)&sm_p->u.get_config.config->tcp_buffer_size_send);
     BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
                  (void *)&sm_p->u.get_config.config->tcp_buffer_size_receive);
+    /*
+     * Force the connection to the config server down so future transfers
+     * will get the new buffer size.
+     */
+    ret = BMI_addr_lookup(&addr,
+                          sm_p->u.get_config.mntent->the_pvfs_config_server);
+    if (ret == 0 && 
+        sm_p->u.get_config.config->tcp_buffer_size_send != 0 &&
+        sm_p->u.get_config.config->tcp_buffer_size_receive != 0)
+        BMI_set_info(addr, BMI_TCP_CLOSE_SOCKET, NULL);
 
     /* 
       clear out all configuration information about file systems that
@@ -316,5 +327,5 @@ static int fs_add_parent_cleanup(
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 expandtab
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */

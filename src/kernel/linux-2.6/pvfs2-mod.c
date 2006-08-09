@@ -9,16 +9,11 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-proc.h"
+#include "pvfs2-internal.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
-
-extern struct file_operations pvfs2_devreq_file_operations;
-extern void pvfs2_kill_sb(struct super_block *sb);
-extern spinlock_t pvfs2_request_list_lock;
-extern struct list_head pvfs2_request_list;
-extern wait_queue_head_t pvfs2_request_list_waitq;
 
 static int hash_func(void *key, int table_size);
 static int hash_compare(void *key, struct qhash_head *link);
@@ -100,7 +95,6 @@ spinlock_t pvfs2_request_list_lock = SPIN_LOCK_UNLOCKED;
 
 /* used for incoming request notification */
 DECLARE_WAIT_QUEUE_HEAD(pvfs2_request_list_waitq);
-
 
 static int __init pvfs2_init(void)
 {
@@ -274,6 +268,29 @@ static int hash_compare(void *key, struct qhash_head *link)
         link, pvfs2_kernel_op_t, list);
 
     return (op->tag == *real_tag);
+}
+
+/* What we do in this function is to walk the list of operations that are in progress
+ * in the hash table and mark them as purged as well.
+ */
+void purge_inprogress_ops(void)
+{
+    int i;
+
+    for (i = 0; i < hash_table_size; i++)
+    {
+        struct qhash_head *tmp_link = NULL, *scratch = NULL;
+        qhash_for_each_safe(tmp_link, scratch, &(htable_ops_in_progress->array[i]))
+        {
+            pvfs2_kernel_op_t *op = qhash_entry(tmp_link, pvfs2_kernel_op_t, list);
+            spin_lock(&op->lock);
+            pvfs2_print("pvfs2-client-core: purging in-progress op tag %lld %s\n", lld(op->tag), get_opname_string(op));
+            set_op_state_purged(op);
+            spin_unlock(&op->lock);
+            wake_up_interruptible(&op->waitq);
+        }
+    }
+    return;
 }
 
 module_init(pvfs2_init);

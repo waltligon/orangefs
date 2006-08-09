@@ -10,7 +10,7 @@
 #include "trove.h"
 #include "pvfs2-internal.h"
 
-#define ROOT_HANDLE_STRING "root_handle"
+#define ROOT_HANDLE_STRING ROOT_HANDLE_KEYSTR
 #define MB 1024*1024
 enum {
     INIT_TEST_SIZE = 40*MB,

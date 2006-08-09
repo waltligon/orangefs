@@ -69,10 +69,13 @@
 } while (0)
 
 /* strings; decoding just points into existing character data */
+/* now handles NULL strings as well */
 #define encode_string(pptr,pbuf) do { \
-    u_int32_t len = strlen(*pbuf); \
+    u_int32_t len; \
+    if(*pbuf) {len = strlen(*pbuf);} \
+    else {len = 0;} \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
-    memcpy(*(pptr)+4, *pbuf, len+1); \
+    if(len) {memcpy(*(pptr)+4, *pbuf, len+1);} \
     *(pptr) += roundup8(4 + len + 1); \
 } while (0)
 #define decode_string(pptr,pbuf) do { \
@@ -228,6 +231,26 @@ static inline void decode_##name(char **pptr, sname *x) { \
     endecode_fields_5_generic(name, name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5)
 #define endecode_fields_5_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5) \
     endecode_fields_5_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5)
+
+#define endecode_fields_7(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) \
+static inline void encode_##name(char **pptr, const name *x) { \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##t6(pptr, &x->x6); \
+    encode_##t7(pptr, &x->x7); \
+} \
+static inline void decode_##name(char **pptr, name *x) { \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##t6(pptr, &x->x6); \
+    decode_##t7(pptr, &x->x7); \
+}
 
 #define endecode_fields_7_struct(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) \
 static inline void encode_##name(char **pptr, const struct name *x) { \
@@ -397,10 +420,37 @@ static inline void decode_##name(char **pptr, sname *x) { typeof(tn1) i; \
 	decode_##ta1(pptr, &(x)->a1[i]); \
 }
 
+/* one field then two arrays */
+#define endecode_fields_1aa_generic(name, sname, t1, x1, tn1, n1, ta1, a1, ta2, a2) \
+static inline void encode_##name(char **pptr, const sname *x) { typeof(tn1) i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##tn1(pptr, &x->n1); \
+    for (i=0; i<x->n1; i++) \
+	encode_##ta1(pptr, &(x)->a1[i]); \
+    for (i=0; i<x->n1; i++) \
+	encode_##ta2(pptr, &(x)->a2[i]); \
+} \
+static inline void decode_##name(char **pptr, sname *x) { typeof(tn1) i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##tn1(pptr, &x->n1); \
+    x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+    for (i=0; i<x->n1; i++) \
+	decode_##ta1(pptr, &(x)->a1[i]); \
+    x->a2 = decode_malloc(x->n1 * sizeof(*x->a2)); \
+    for (i=0; i<x->n1; i++) \
+	decode_##ta2(pptr, &(x)->a2[i]); \
+}
+
+
 #define endecode_fields_1a(name, t1, x1, tn1, n1, ta1, a1) \
     endecode_fields_1a_generic(name, name, t1, x1, tn1, n1, ta1, a1)
 #define endecode_fields_1a_struct(name, t1, x1, tn1, n1, ta1, a1) \
     endecode_fields_1a_generic(name, struct name, t1, x1, tn1, n1, ta1, a1)
+
+#define endecode_fields_1aa(name, t1, x1, tn1, n1, ta1, a1, ta2, a2) \
+    endecode_fields_1aa_generic(name, name, t1, x1, tn1, n1, ta1, a1, ta2, a2)
+#define endecode_fields_1aa_struct(name, t1, x1, tn1, n1, ta1, a1, ta2, a2) \
+    endecode_fields_1aa_generic(name, struct name, t1, x1, tn1, n1, ta1, a1, ta2, a2)
 
 /* one field, and array, another field, another array - a special case */
 #define endecode_fields_1a_1a_struct(name, t1,x1, tn1, n1, ta1, a1, t2,x2, tn2, n2, ta2, a2) \
@@ -449,27 +499,6 @@ static inline void decode_##name(char **pptr, sname *x) { int i; \
     endecode_fields_2a_generic(name, name, t1, x1, t2, x2, tn1, n1, ta1, a1)
 #define endecode_fields_2a_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1) \
     endecode_fields_2a_generic(name, struct name, t1, x1, t2, x2, tn1, n1, ta1, a1)
-
-/* special case where we have two arrays of the same size after 1 field */
-#define endecode_fields_1aa_struct(name, t1, x1, tn1, n1, ta1, a1, ta2, a2) \
-static inline void encode_##name(char **pptr, const struct name *x) { int i; \
-    encode_##t1(pptr, &x->x1); \
-    encode_##tn1(pptr, &x->n1); \
-    for (i=0; i<x->n1; i++) \
-	encode_##ta1(pptr, &(x)->a1[i]); \
-    for (i=0; i<x->n1; i++) \
-	encode_##ta2(pptr, &(x)->a2[i]); \
-} \
-static inline void decode_##name(char **pptr, struct name *x) { int i; \
-    decode_##t1(pptr, &x->x1); \
-    decode_##tn1(pptr, &x->n1); \
-    x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
-    for (i=0; i<x->n1; i++) \
-	decode_##ta1(pptr, &(x)->a1[i]); \
-    x->a2 = decode_malloc(x->n1 * sizeof(*x->a2)); \
-    for (i=0; i<x->n1; i++) \
-	decode_##ta2(pptr, &(x)->a2[i]); \
-}
 
 /* special case where we have two arrays of the same size after 2 fields */
 #define endecode_fields_2aa_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, ta2, a2) \

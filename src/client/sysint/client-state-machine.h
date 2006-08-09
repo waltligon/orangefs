@@ -95,6 +95,8 @@ struct PINT_client_mkdir_sm
     PVFS_sysresp_mkdir *mkdir_resp; /* in/out parameter */
     PVFS_sys_attr sys_attr;         /* input parameter  */
 
+    PVFS_ds_keyval *key_array;
+    PVFS_ds_keyval *val_array;
     int retry_count;
     int stored_error_code;
     PVFS_handle metafile_handle;

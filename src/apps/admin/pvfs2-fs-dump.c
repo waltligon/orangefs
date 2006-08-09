@@ -439,7 +439,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     pref = lookup_resp.ref;
 
     PVFS_sys_getattr(pref,
-		     PVFS_ATTR_SYS_ALL,
+		     PVFS_ATTR_SYS_ALL_NOHINT,
 		     creds,
 		     &getattr_resp);
 
@@ -505,7 +505,7 @@ int descend(PVFS_fs_id cur_fs,
             entry_ref.fs_id  = cur_fs;
 
             if ((ret = PVFS_sys_getattr(entry_ref,
-                             PVFS_ATTR_SYS_ALL,
+                             PVFS_ATTR_SYS_ALL_NOHINT,
                              creds,
                              &getattr_resp)) != 0)
             {

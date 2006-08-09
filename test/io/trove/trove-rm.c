@@ -123,7 +123,7 @@ int main(int argc, char **argv)
     key.buffer = file_name;
     key.buffer_sz = strlen(file_name)+1;
 
-    ret = trove_keyval_remove(coll_id, parent_handle, &key,
+    ret = trove_keyval_remove(coll_id, parent_handle, &key, NULL,
                               0, NULL, NULL, trove_context, &op_id);
     while (ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,

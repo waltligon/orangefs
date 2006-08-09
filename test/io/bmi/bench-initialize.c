@@ -132,9 +132,19 @@ int bench_initialize_bmi_interface(
 {
     char local_address[256];
     int ret = -1;
+    const char *s;
 
-    gossip_enable_stderr();
-    gossip_set_debug_mask(0, 0);
+    s = getenv("PVFS2_DEBUGMASK");
+    if (s)
+        gossip_set_debug_mask(1, PVFS_debug_eventlog_to_mask(s));
+    else
+        gossip_set_debug_mask(0, 0);
+
+    s = getenv("PVFS2_DEBUGFILE");
+    if (s)
+        gossip_enable_file(s, "w");
+    else
+        gossip_enable_stderr();
 
     /* build the local listening address */
     if (strcmp(method, "bmi_tcp") == 0)
@@ -144,6 +154,10 @@ int bench_initialize_bmi_interface(
     else if (strcmp(method, "bmi_gm") == 0)
     {
 	sprintf(local_address, "gm://NULL:%d\n", BMI_GM_PORT);
+    }
+    else if (strcmp(method, "bmi_ib") == 0)
+    {
+	sprintf(local_address, "ib://NULL:%d\n", BMI_IB_PORT);
     }
     else
     {
@@ -305,6 +319,10 @@ int bench_initialize_bmi_addresses_client(
 	else if (strcmp(method_name, "bmi_gm") == 0)
 	{
 	    sprintf(bmi_server_name, "gm://%s:%d", server_name, BMI_GM_PORT);
+	}
+	else if (strcmp(method_name, "bmi_ib") == 0)
+	{
+	    sprintf(bmi_server_name, "ib://%s:%d", server_name, BMI_IB_PORT);
 	}
 	else
 	{

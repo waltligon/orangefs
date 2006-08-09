@@ -25,8 +25,6 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 
-#define SMALL_IO_MAX_REGIONS 64
-
 /* The small-io state machine should only be invoked/jumped-to from the
  * sys-io state machine.  We make this assumption and expect io parameters
  * to be initialized already.
@@ -124,7 +122,7 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
             file_data.dist = attr->u.meta.dist;
             file_data.extend_flag = 1;
 
-            result.segmax = SMALL_IO_MAX_REGIONS;
+            result.segmax = IO_MAX_REGIONS;
             result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
             file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
             mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
@@ -224,8 +222,8 @@ static int small_io_completion_fn(void * user_args,
 
     if(resp_p->u.small_io.io_type == PVFS_IO_READ)
     {
-        PVFS_size sizes[SMALL_IO_MAX_REGIONS];
-        PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
+        PVFS_size sizes[IO_MAX_REGIONS];
+        PVFS_offset offsets[IO_MAX_REGIONS];
         PVFS_object_attr * attr = &sm_p->getattr.attr;
         PINT_request_file_data fdata;
         PINT_Request_result result;
@@ -242,7 +240,7 @@ static int small_io_completion_fn(void * user_args,
             fdata.dist = attr->u.meta.dist;
             fdata.fsize = resp_p->u.small_io.bstream_size;
 
-            result.segmax = SMALL_IO_MAX_REGIONS;
+            result.segmax = IO_MAX_REGIONS;
             result.bytemax = resp_p->u.small_io.result_size;
             result.size_array = sizes;
             result.offset_array = offsets;

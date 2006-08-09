@@ -20,11 +20,13 @@
  */
   
 /* compile time defaults */
-#define ACACHE_DEFAULT_TIMEOUT_MSECS    5000
-#define ACACHE_DEFAULT_SOFT_LIMIT       5120
-#define ACACHE_DEFAULT_HARD_LIMIT      10240
-#define ACACHE_DEFAULT_RECLAIM_PERCENTAGE 25
-#define ACACHE_DEFAULT_REPLACE_ALGORITHM   LEAST_RECENTLY_USED
+enum {
+ACACHE_DEFAULT_TIMEOUT_MSECS = 5000,
+ACACHE_DEFAULT_SOFT_LIMIT    = 5120,
+ACACHE_DEFAULT_HARD_LIMIT    = 10240,
+ACACHE_DEFAULT_RECLAIM_PERCENTAGE = 25,
+ACACHE_DEFAULT_REPLACE_ALGORITHM = LEAST_RECENTLY_USED,
+};
 
 struct PINT_perf_key acache_keys[] = 
 {
@@ -36,6 +38,7 @@ struct PINT_perf_key acache_keys[] =
    {"ACACHE_UPDATES", PERF_ACACHE_UPDATES, 0},
    {"ACACHE_PURGES", PERF_ACACHE_PURGES, 0},
    {"ACACHE_REPLACEMENTS", PERF_ACACHE_REPLACEMENTS, 0},
+   {"ACACHE_DELETIONS", PERF_ACACHE_DELETIONS, 0},
    {"ACACHE_ENABLED", PERF_ACACHE_ENABLED, PINT_PERF_PRESERVE},
    {NULL, 0, 0},
 };
@@ -305,9 +308,12 @@ void PINT_acache_invalidate(
                              &tmp_status);
     if(ret == 0)
     {
-        PINT_tcache_purge(acache, tmp_entry);
+        PINT_tcache_delete(acache, tmp_entry);
+        PINT_perf_count(acache_pc, PERF_ACACHE_DELETIONS, 1,
+                        PINT_PERF_ADD);
     }
 
+    /* set the new current number of entries */
     PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
                     acache->num_entries, PINT_PERF_SET);
 
@@ -371,7 +377,7 @@ int PINT_acache_update(
     struct PINT_tcache_entry* tmp_entry;
     struct acache_payload* tmp_payload;
     int status;
-    int removed;
+    int purged;
     unsigned int enabled;
 
     /* skip out immediately if the cache is disabled */
@@ -433,23 +439,31 @@ int PINT_acache_update(
         acache_free_payload(tmp_entry->payload);
         tmp_entry->payload = tmp_payload;
         ret = PINT_tcache_refresh_entry(acache, tmp_entry);
+        /* this counts as an update of an existing entry */
         PINT_perf_count(acache_pc, PERF_ACACHE_UPDATES, 1, PINT_PERF_ADD);
     }
     else
     {
         /* not found in cache; insert new payload*/
-        ret = PINT_tcache_insert_entry(acache, &refn, tmp_payload, &removed);
-        if(removed == 1)
+        ret = PINT_tcache_insert_entry(acache, &refn, tmp_payload, &purged);
+        /* the purged variable indicates how many entries had to be purged
+         * from the tcache to make room for this new one
+         */
+        if(purged == 1)
         {
-            /* assume an entry was replaced */
-            PINT_perf_count(acache_pc, PERF_ACACHE_REPLACEMENTS, removed,
+            /* since only one item was purged, we count this as one item being
+             * replaced rather than as a purge and an insert 
+             */
+            PINT_perf_count(acache_pc, PERF_ACACHE_REPLACEMENTS, purged, 
                 PINT_PERF_ADD);
         }
         else
         {
             /* otherwise we just purged as part of reclaimation */
-            /* NOTE: it is ok if the removed value happens to be zero */
-            PINT_perf_count(acache_pc, PERF_ACACHE_PURGES, removed,
+            /* if we didn't purge anything, then the "purged" variable will
+             * be zero and this counter call won't do anything.
+             */
+            PINT_perf_count(acache_pc, PERF_ACACHE_PURGES, purged,
                 PINT_PERF_ADD);
         }
     }

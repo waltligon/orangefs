@@ -13,13 +13,6 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-internal.h"
 
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-extern int debug, timing;
-
-extern struct dentry_operations pvfs2_dentry_operations;
-
 /** Get a newly allocated inode to go with a negative dentry.
  */
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -45,7 +38,12 @@ static int pvfs2_create(
 
     if (inode)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
+        
         ret = 0;
     }
 
@@ -57,11 +55,11 @@ static int pvfs2_create(
  *  fsid into a handle for the object.
  */
 #ifdef PVFS2_LINUX_KERNEL_2_4
-struct dentry *pvfs2_lookup(
+static struct dentry *pvfs2_lookup(
     struct inode *dir,
     struct dentry *dentry)
 #else
-struct dentry *pvfs2_lookup(
+static struct dentry *pvfs2_lookup(
     struct inode *dir,
     struct dentry *dentry,
     struct nameidata *nd)
@@ -91,12 +89,11 @@ struct dentry *pvfs2_lookup(
 	return ERR_PTR(-ENAMETOOLONG);
     }
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
     if (!new_op)
     {
 	return NULL;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_LOOKUP;
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
     new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
@@ -151,7 +148,7 @@ struct dentry *pvfs2_lookup(
                   PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
 
     ret = service_operation(
-        new_op, "pvfs2_lookup", PVFS2_OP_RETRY_COUNT,
+        new_op, "pvfs2_lookup", 
         get_interruptible_flag(dir));
 
     pvfs2_print("Lookup Got %llu, fsid %d (ret=%d)\n",
@@ -219,7 +216,7 @@ struct dentry *pvfs2_lookup(
       already exists that was interrupted during this lookup -- no
       need to add another negative dentry for an existing file)
     */
-    if (!inode && (new_op->op_state == PVFS2_VFS_STATE_SERVICED))
+    if (!inode && op_state_serviced(new_op))
     {
         /*
           make sure to set the pvfs2 specific dentry operations for
@@ -254,8 +251,12 @@ static int pvfs2_unlink(
     ret = pvfs2_remove_entry(dir, dentry);
     if (ret == 0)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
         inode->i_nlink--;
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
     }
     return ret;
 }
@@ -308,7 +309,12 @@ static int pvfs2_symlink(
 
     if (inode)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
+
         ret = 0;
     }
     return ret;
@@ -333,7 +339,12 @@ static int pvfs2_mkdir(
          */
 	dir->i_nlink++;
 #endif
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
+
 	ret = 0;
     }
     return ret;
@@ -349,6 +360,7 @@ static int pvfs2_rmdir(
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
         inode->i_nlink--; 
 #if 0
         /* NOTE: we have no good way to keep nlink consistent for directories
@@ -356,7 +368,10 @@ static int pvfs2_rmdir(
          */
 	dir->i_nlink--;
 #endif
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
     }
     return ret;
 }
@@ -392,12 +407,11 @@ static int pvfs2_rename(
     }
 #endif
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_RENAME);
     if (!new_op)
     {
 	return ret;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_RENAME;
 
     /*
       if no handle/fs_id is available in the parent,
@@ -440,7 +454,7 @@ static int pvfs2_rename(
 	    new_dentry->d_name.name, PVFS2_NAME_LEN);
 
     ret = service_operation(
-        new_op, "pvfs2_rename", PVFS2_OP_RETRY_COUNT,
+        new_op, "pvfs2_rename", 
         get_interruptible_flag(old_dentry->d_inode));
 
     pvfs2_print("pvfs2_rename: got downcall status %d\n", ret);
