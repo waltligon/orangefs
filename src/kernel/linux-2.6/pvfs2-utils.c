@@ -225,6 +225,7 @@ static inline int copy_attributes_to_inode(
             perm_mode |= S_ISGID;
 
         inode->i_mode |= perm_mode;
+
         /* NOTE: this will change once we move from the iget() model to the
          * iget5() interface where i_ino will only be a hash and not the actual
          * handle itself!
@@ -330,11 +331,13 @@ static inline int copy_attributes_from_inode(
     {
         attrs->owner = iattr->ia_uid;
         attrs->mask |= PVFS_ATTR_SYS_UID;
+        pvfs2_print("(UID) %d\n", attrs->owner);
     }
     if (iattr->ia_valid & ATTR_GID)
     {
         attrs->group = iattr->ia_gid; 
         attrs->mask |= PVFS_ATTR_SYS_GID;
+        pvfs2_print("(GID) %d\n", attrs->group);
     }
 
     if (iattr->ia_valid & ATTR_ATIME)
@@ -383,9 +386,10 @@ static inline int copy_attributes_from_inode(
                 return(-EINVAL);
             }
         }
+
         if (tmp_mode & (S_ISUID))
         {
-            pvfs2_print("User attempted to set setuid bit; "
+            pvfs2_print("Attempting to set setuid bit (not supported); "
                 "returning EINVAL.\n");
             return(-EINVAL);
         }
@@ -798,6 +802,10 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         /* For some reason, val_sz should include the \0 at the end as well */
         new_op->upcall.req.setxattr.keyval.val_sz = size + 1;
 
+        pvfs2_print("pvfs2_inode_setxattr: key %s, key_sz %d\n", 
+                 (char*)new_op->upcall.req.setxattr.keyval.key, 
+                 (int) new_op->upcall.req.setxattr.keyval.key_sz);
+
         ret = service_operation(
             new_op, "pvfs2_inode_setxattr", 
             get_interruptible_flag(inode));
@@ -846,6 +854,10 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
             PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
         new_op->upcall.req.removexattr.key_sz = ret + 1;
 
+        pvfs2_print("pvfs2_inode_removexattr: key %s, key_sz %d\n", 
+                (char*)new_op->upcall.req.removexattr.key, 
+                (int) new_op->upcall.req.removexattr.key_sz);
+
         ret = service_operation(
             new_op, "pvfs2_inode_removexattr", 
             get_interruptible_flag(inode));
@@ -875,7 +887,7 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
 int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
 {
     ssize_t ret = -ENOMEM, total = 0;
-    int i;
+    int i = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
     ssize_t length = 0;
@@ -956,7 +968,8 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
             }
         }
     done:
-        pvfs2_print("pvfs2_inode_listxattr: returning %d\n", ret ? (int) ret : (int) total);
+        pvfs2_print("pvfs2_inode_listxattr: returning %d (filled in %d keys)\n",
+                ret ? (int) ret : (int) total, i);
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
         up_read(&pvfs2_inode->xattr_sem);

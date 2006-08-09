@@ -903,110 +903,102 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
 }
 
 
-#define generate_upcall_mntent(mntent, in_upcall, mount)              \
-do {                                                                  \
-    /*                                                                \
-      generate a unique dynamic mount point; the id will be passed to \
-      the kernel via the downcall so we can match it with a proper    \
-      unmount request at unmount time.  if we're unmounting, use the  \
-      passed in id from the upcall                                    \
-    */                                                                \
-    if (mount)                                                        \
-        snprintf(buf, PATH_MAX, "<DYNAMIC-%d>", dynamic_mount_id);    \
-    else                                                              \
-        snprintf(buf, PATH_MAX, "<DYNAMIC-%d>",                       \
-                 in_upcall.req.fs_umount.id);                         \
-                                                                      \
-    mntent.mnt_dir = strdup(buf);                                     \
-    if (!mntent.mnt_dir)                                              \
-    {                                                                 \
-        ret = -PVFS_ENOMEM;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-                                                                      \
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Using %s Point %s\n",      \
-                 (mount ? "Mount" : "Unmount"), mntent.mnt_dir);      \
-                                                                      \
-    if (mount) {                                                      \
-        ptr = rindex(in_upcall.req.fs_mount.pvfs2_config_server,      \
-                     (int)'/');                                       \
-        ptrcomma = strchr(in_upcall.req.fs_mount.pvfs2_config_server, \
-                     (int)',');                                       \
-    } else {                                                          \
-        ptr = rindex(in_upcall.req.fs_umount.pvfs2_config_server,     \
-                     (int)'/');                                       \
-        ptrcomma = strchr(in_upcall.req.fs_umount.pvfs2_config_server,\
-                     (int)',');                                       \
-    }                                                                 \
-                                                                      \
-    if (!ptr || ptrcomma)                                             \
-    {                                                                 \
-        gossip_err("Configuration server MUST be of the form "        \
-                   "protocol://address/fs_name\n");                   \
-        ret = -PVFS_EINVAL;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-    *ptr = '\0';                                                      \
-    ptr++;                                                            \
-                                                                      \
-    /* We do not yet support multi-home for kernel module; needs */   \
-    /* same parsing code as in PVFS_util_parse_pvfstab() and a */     \
-    /* loop around BMI_addr_lookup() to pick one that works. */       \
-    mntent.pvfs_config_servers =                                      \
-        malloc(sizeof(*mntent.pvfs_config_servers));                  \
-    if (!mntent.pvfs_config_servers)                                  \
-    {                                                                 \
-        ret = -PVFS_ENOMEM;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-                                                                      \
-    if (mount)                                                        \
-        mntent.pvfs_config_servers[0] = strdup(                       \
-            in_upcall.req.fs_mount.pvfs2_config_server);              \
-    else                                                              \
-        mntent.pvfs_config_servers[0] = strdup(                       \
-            in_upcall.req.fs_umount.pvfs2_config_server);             \
-                                                                      \
-    if (!mntent.pvfs_config_servers[0])                               \
-    {                                                                 \
-        ret = -PVFS_ENOMEM;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-    mntent.the_pvfs_config_server = mntent.pvfs_config_servers[0];    \
-    mntent.num_pvfs_config_servers = 1;                               \
-                                                                      \
-    gossip_debug(                                                     \
-        GOSSIP_CLIENTCORE_DEBUG, "Got Configuration Server: %s "      \
-        "(len=%d)\n", mntent.the_pvfs_config_server,                  \
-        (int)strlen(mntent.the_pvfs_config_server));                  \
-                                                                      \
-    mntent.pvfs_fs_name = strdup(ptr);                                \
-    if (!mntent.pvfs_fs_name)                                         \
-    {                                                                 \
-        ret = -PVFS_ENOMEM;                                           \
-        goto fail_downcall;                                           \
-    }                                                                 \
-                                                                      \
-    gossip_debug(                                                     \
-        GOSSIP_CLIENTCORE_DEBUG, "Got FS Name: %s (len=%d)\n",        \
-        mntent.pvfs_fs_name, (int)strlen(mntent.pvfs_fs_name));       \
-                                                                      \
-    mntent.encoding = ENCODING_DEFAULT;                               \
-    mntent.flowproto = FLOWPROTO_DEFAULT;                             \
-                                                                      \
-    /* also fill in the fs_id for umount */                           \
-    if (!mount)                                                       \
-        mntent.fs_id = in_upcall.req.fs_umount.fs_id;                 \
-                                                                      \
-    ret = 0;                                                          \
-} while(0)
+static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
+        pvfs2_upcall_t *in_upcall, int mount) 
+{
+    char *ptr = NULL, *ptrcomma = NULL;
+    char buf[PATH_MAX] = {0};
+    /*                                                                
+      generate a unique dynamic mount point; the id will be passed to
+      the kernel via the downcall so we can match it with a proper
+      unmount request at unmount time.  if we're unmounting, use the
+      passed in id from the upcall
+    */
+    if (mount)
+        snprintf(buf, PATH_MAX, "<DYNAMIC-%d>", dynamic_mount_id);
+    else
+        snprintf(buf, PATH_MAX, "<DYNAMIC-%d>", in_upcall->req.fs_umount.id);
+
+    mntent->mnt_dir = strdup(buf);
+    if (!mntent->mnt_dir)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Using %s Point %s\n",
+                 (mount ? "Mount" : "Unmount"), mntent->mnt_dir);
+
+    if (mount) {
+        ptr = rindex(in_upcall->req.fs_mount.pvfs2_config_server,
+                     (int)'/');
+        ptrcomma = strchr(in_upcall->req.fs_mount.pvfs2_config_server,
+                     (int)',');
+    } else {
+        ptr = rindex(in_upcall->req.fs_umount.pvfs2_config_server,
+                     (int)'/');
+        ptrcomma = strchr(in_upcall->req.fs_umount.pvfs2_config_server,
+                     (int)',');
+    }
+
+    if (!ptr || ptrcomma)
+    {
+        gossip_err("Configuration server MUST be of the form "
+                   "protocol://address/fs_name\n");
+        return -PVFS_EINVAL;
+    }
+    *ptr = '\0';
+    ptr++;
+    /* We do not yet support multi-home for kernel module; needs */
+    /* same parsing code as in PVFS_util_parse_pvfstab() and a */
+    /* loop around BMI_addr_lookup() to pick one that works. */
+    mntent->pvfs_config_servers = (char **) calloc(1, sizeof(char *));
+    if (!mntent->pvfs_config_servers)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    if (mount)
+        mntent->pvfs_config_servers[0] = strdup(
+            in_upcall->req.fs_mount.pvfs2_config_server);
+    else
+        mntent->pvfs_config_servers[0] = strdup(
+            in_upcall->req.fs_umount.pvfs2_config_server);
+                                                                     
+    if (!mntent->pvfs_config_servers[0])
+    {
+        return -PVFS_ENOMEM;
+    }
+    mntent->the_pvfs_config_server = mntent->pvfs_config_servers[0];
+    mntent->num_pvfs_config_servers = 1;
+
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG, "Got Configuration Server: %s "
+        "(len=%d)\n", mntent->the_pvfs_config_server,
+        (int)strlen(mntent->the_pvfs_config_server));
+
+    mntent->pvfs_fs_name = strdup(ptr);
+    if (!mntent->pvfs_fs_name)
+    {
+        return -PVFS_ENOMEM;
+    }
+                                                       
+    gossip_debug(                                     
+        GOSSIP_CLIENTCORE_DEBUG, "Got FS Name: %s (len=%d)\n",
+        mntent->pvfs_fs_name, (int)strlen(mntent->pvfs_fs_name));
+                                                              
+    mntent->encoding = ENCODING_DEFAULT;                      
+    mntent->flowproto = FLOWPROTO_DEFAULT;                   
+                                                           
+    /* also fill in the fs_id for umount */               
+    if (!mount)                                           
+        mntent->fs_id = in_upcall->req.fs_umount.fs_id;     
+    
+    return 0;
+}
 
 static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_ENODEV;
-    char *ptr = NULL, *ptrcomma = NULL;
-    char buf[PATH_MAX] = {0};
-
     /*
       since we got a mount request from the vfs, we know that some
       mntent entries are not filled in, so add some defaults here
@@ -1025,11 +1017,14 @@ static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
         "Got an fs mount request for host:\n  %s\n",
         vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
 
-    generate_upcall_mntent((*vfs_request->mntent), vfs_request->in_upcall, 1);
-
+    ret = generate_upcall_mntent(vfs_request->mntent, &vfs_request->in_upcall, 1);
+    if (ret < 0)
+    {
+        goto failed;
+    }
     ret = PVFS_isys_fs_add(vfs_request->mntent, &vfs_request->op_id, (void*)vfs_request);
 
-fail_downcall:
+failed:
     if(ret < 0)
     {
         PVFS_perror_gossip("Posting fs_add failed", ret);
@@ -1042,8 +1037,6 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_ENODEV;
     struct PVFS_sys_mntent mntent;
-    char *ptr = NULL, *ptrcomma = NULL;
-    char buf[PATH_MAX] = {0};
 
     /*
       since we got a umount request from the vfs, we know that
@@ -1057,20 +1050,15 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
         "Got an fs umount request via host %s\n",
         vfs_request->in_upcall.req.fs_umount.pvfs2_config_server);
 
-    generate_upcall_mntent(mntent, vfs_request->in_upcall, 0);
-
+    ret = generate_upcall_mntent(&mntent, &vfs_request->in_upcall, 0);
+    if (ret < 0)
+    {
+        goto fail_downcall;
+    }
     ret = PVFS_sys_fs_remove(&mntent);
     if (ret < 0)
     {
-      fail_downcall:
-        gossip_err(
-            "Failed to umount via host %s\n",
-            vfs_request->in_upcall.req.fs_umount.pvfs2_config_server);
-
-        PVFS_perror("Umount failed", ret);
-
-        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
-        vfs_request->out_downcall.status = ret;
+        goto fail_downcall;
     }
     else
     {
@@ -1082,11 +1070,21 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
         vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
         vfs_request->out_downcall.status = 0;
     }
-
+ok:
     PVFS_util_free_mntent(&mntent);
 
     write_inlined_device_response(vfs_request);
     return 0;
+fail_downcall:
+    gossip_err(
+        "Failed to umount via host %s\n",
+        vfs_request->in_upcall.req.fs_umount.pvfs2_config_server);
+
+    PVFS_perror("Umount failed", ret);
+
+    vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
+    vfs_request->out_downcall.status = ret;
+    goto ok;
 }
 
 static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)

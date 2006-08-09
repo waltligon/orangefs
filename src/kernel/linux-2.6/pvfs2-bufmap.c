@@ -434,7 +434,7 @@ int pvfs_bufmap_copy_iovec_from_user(
     {
         pvfs2_print("pvfs2_bufmap_copy_iovec_from_user: not yet "
                     "initialized; returning\n");
-        return 1;
+        return -EIO;
     }
     /*
      * copy the passed in iovec so that we can change some of its fields
@@ -558,7 +558,7 @@ int pvfs_bufmap_copy_to_user_iovec(
     {
         pvfs2_print("pvfs2_bufmap_copy_to_user_iovec: not yet "
                     "initialized; returning\n");
-        return 1;
+        return -EIO;
     }
     /*
      * copy the passed in iovec so that we can change some of its fields

@@ -22,7 +22,7 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    REMOVE_MUST_REMOVE_DATAFILES = 1
+    REMOVE_MUST_REMOVE_DATAFILES = 1,
 };
 
 static int remove_getattr_init(PINT_client_sm *sm_p,

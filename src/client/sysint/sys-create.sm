@@ -812,10 +812,7 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
         sm_p->object_ref.handle,
-        sm_p->object_ref.fs_id,
-        sm_p->u.create.sys_attr.atime,
-        sm_p->u.create.sys_attr.mtime,
-        sm_p->u.create.sys_attr.ctime);
+        sm_p->object_ref.fs_id);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;

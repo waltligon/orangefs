@@ -308,15 +308,9 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
         NULL, s_op, 0, js_p, &i, server_job_context);
 
     /*
-      check if any attributes have changed on the parent that require
-      an update; object times only are considered
-    */
-    if (s_op->req->u.crdirent.parent_atime ||
-        s_op->req->u.crdirent.parent_mtime ||
-        s_op->req->u.crdirent.parent_ctime)
-    {
-        s_op->u.crdirent.dir_attr_update_required = 1;
-    }
+     * creating an entry will cause directory times to be updated.
+     */
+    s_op->u.crdirent.dir_attr_update_required = 1;
     return ret;
 }
 

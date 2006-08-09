@@ -253,12 +253,7 @@ static int chdirent_change_directory_entry(PINT_server_op *s_op,
         0,
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
-    if (s_op->req->u.chdirent.parent_atime ||
-        s_op->req->u.chdirent.parent_mtime ||
-        s_op->req->u.chdirent.parent_ctime)
-    {
-        s_op->u.chdirent.dir_attr_update_required = 1;
-    }
+    s_op->u.chdirent.dir_attr_update_required = 1;
     return ret;
 }
 
