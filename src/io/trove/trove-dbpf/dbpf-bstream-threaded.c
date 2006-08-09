@@ -24,16 +24,18 @@
 
 #ifndef __PVFS2_USE_AIO__
 
-#include "dbpf.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
 #include "trove.h"
 #include "trove-internal.h"
+#include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-attr-cache.h"
 #include "pint-event.h"
 #include "pthread.h"
 #include "dbpf-bstream.h"
+
+
 
 /*
  * Size for doing only one read operation instead of 
@@ -60,39 +62,28 @@
 int PREAD(int fd, void *buf, size_t count, off_t offset);
 int PWRITE(int fd, const void *buf, size_t count, off_t offset);
 
-inline int PREAD(int fd, void *buf, size_t count, off_t offset)
-{
+inline int PREAD(int fd, void *buf, size_t count, off_t offset){
     int ret = 0;
-    int ret_size = 0;
-
-    do
-    {
-        ret = pread(fd, ((char *)buf) + ret_size, 
-		    count - ret_size, offset + ret_size);
-        if (ret)
-	{
-            ret_size += ret;
+    int retSize = 0;
+    do{
+        ret = pread(fd, buf + retSize, count - retSize, offset + retSize);
+        if (ret){
+            retSize +=ret;
         }
-    } while((ret == -1 && errno == EINTR) || (ret_size < count && ret > 0));
-
-    return ret_size;
+    }while( (ret == -1 && errno == EINTR) || (retSize < count && ret > 0) );
+    return retSize;
 }
 
-inline int PWRITE(int fd, const void *buf, size_t count, off_t offset)
-{
+inline int PWRITE(int fd, const void *buf, size_t count, off_t offset){
     int ret = 0;
-    int ret_size = 0;
-    do
-    {
-        ret = pwrite(fd, ((char *)buf) + ret_size, 
-		     count - ret_size, offset + ret_size);
-        if (ret)
-	{
-            ret_size +=ret;
+    int retSize = 0;
+    do{
+        ret = pwrite(fd, buf + retSize, count - retSize, offset + retSize);
+        if (ret){
+            retSize +=ret;
         }
-    } while((ret == -1 && errno == EINTR)  || (ret_size < count && ret > 0));
-
-    return ret_size;
+    }while( (ret == -1 && errno == EINTR)  || (retSize < count && ret > 0) );
+    return retSize;
 }
 
 enum active_queue_e
@@ -113,7 +104,7 @@ typedef struct
     /*
      * Number of requests to process, in case of real I/O ops read and write
      * these ops are transformed into their small contiguous I/O requests.
-     * The remaining_umber_of_slices shows how much contiguous I/O requests
+     * The remainingNumber of slices shows how much contiguous I/O requests
      * have to be done until this request is finished. 
      */    
     char *remaining_number_of_slices;
@@ -138,9 +129,9 @@ typedef struct active_io_processing_t
     int return_code;
 } active_io_processing_t;
 
-typedef struct io_handle_queue_s
+typedef struct io_handle_queue_t
 {
-    struct io_handle_queue_s *next;
+    struct io_handle_queue_t *next;
 
     PVFS_handle handle;
     PVFS_fs_id fs_id;
@@ -148,7 +139,7 @@ typedef struct io_handle_queue_s
     /*during processing in the active queue we need extra information */
     active_io_processing_t *active_io;
     
-    dbpf_op_queue_t requests[IO_QUEUE_LAST];
+    dbpf_op_queue_s requests[IO_QUEUE_LAST];
     /*
      * Number of requests to process, in case of real I/O ops read and write
      * these ops are transformed into their small contiguous I/O requests
@@ -276,15 +267,15 @@ static int is_no_process_element_available(
 }
 
 
-static void transform_io_req_to_array(
+static void transform_IO_req_to_Array(
     io_handle_queue_t * elem,
     enum active_queue_e active_queue,
-    enum io_queue_type queue_type)
+    enum IO_queue_type queue_type)
 {
     int mem_num;
     int stream_num;
-    int stream_count;
-    int mem_count;
+    int streamCount;
+    int memCount;
 
     int current_request_slot = 0;
 
@@ -297,7 +288,7 @@ static void transform_io_req_to_array(
     char *mem_offset;
 
     TROVE_size cur_stream_offset;
-    struct dbpf_bstream_rw_list_op *io_req;
+    struct dbpf_bstream_rw_list_op *IOreq;
 
     int count = elem->requests[queue_type].elems;
     if (count == 0)
@@ -312,73 +303,73 @@ static void transform_io_req_to_array(
 
     dbpf_queued_op_t *op;
     struct qlist_head *tmp_link;
-    dbpf_op_queue_t *queue = &elem->requests[queue_type];
+    dbpf_op_queue_s *queue = &elem->requests[queue_type];
 
     int current_trove_request = 0;
     qlist_for_each(tmp_link, &queue->list)
     {
         op = qlist_entry(tmp_link, dbpf_queued_op_t, link);
-        io_req = &op->op.u.b_rw_list;
+        IOreq = &op->op.u.b_rw_list;
 
         mem_num = 0;
         stream_num = 0;
 
-        stream_count = io_req->stream_count;
-        mem_count = io_req->mem_count;
-        cur_mem_size = io_req->mem_size_array[0];
-        cur_stream_size = io_req->stream_size_array[0];
+        streamCount = IOreq->stream_count;
+        memCount = IOreq->mem_count;
+        cur_mem_size = IOreq->mem_size_array[0];
+        cur_stream_size = IOreq->stream_size_array[0];
         cur_size = (cur_mem_size < cur_stream_size) ?
             cur_mem_size : cur_stream_size;
-        mem_offset = io_req->mem_offset_array[0];
+        mem_offset = IOreq->mem_offset_array[0];
 
-        cur_stream_offset = io_req->stream_offset_array[0];
+        cur_stream_offset = IOreq->stream_offset_array[0];
         total_stream_size = cur_stream_size;
         total_mem_size = cur_mem_size;
 
         elem->active_io->
             request_number_of_slices[active_queue][current_trove_request] =
-            (mem_count > stream_count ? mem_count : stream_count);
+            (memCount > streamCount ? memCount : streamCount);
 
         while (1)
         {
-            active_io_processing_slice_t *current_slice =
+            active_io_processing_slice_t *currentSlice =
                 &elem->active_io->request[active_queue][current_request_slot];
 
-            current_slice->remaining_number_of_slices =
+            currentSlice->remaining_number_of_slices =
                 &elem->active_io->
                 request_number_of_slices[active_queue][current_trove_request];
-            current_slice->parent_request = op;
-            current_slice->mem_offset = mem_offset;
-            current_slice->size = cur_size;
-            current_slice->stream_offset = cur_stream_offset;
+            currentSlice->parent_request = op;
+            currentSlice->mem_offset = mem_offset;
+            currentSlice->size = cur_size;
+            currentSlice->stream_offset = cur_stream_offset;
 
             current_request_slot++;
             if (cur_mem_size == cur_stream_size)
             {   /*take next mem_area and stream*/
                 mem_num++;
                 stream_num++;
-                if (stream_num == stream_count || mem_num == mem_count)
+                if (stream_num == streamCount || mem_num == memCount)
                 {   
                 /*we finished decoding...*/
                     break;
                 }
 
-                cur_stream_offset = io_req->stream_offset_array[stream_num];
-                mem_offset = io_req->mem_offset_array[mem_num];
-                cur_mem_size = io_req->mem_size_array[mem_num];
-                cur_stream_size = io_req->stream_size_array[stream_num];
+                cur_stream_offset = IOreq->stream_offset_array[stream_num];
+                mem_offset = IOreq->mem_offset_array[mem_num];
+                cur_mem_size = IOreq->mem_size_array[mem_num];
+                cur_stream_size = IOreq->stream_size_array[stream_num];
             }
             else if (cur_stream_size < cur_mem_size)
             {   /*take next stream update memory position*/
                 stream_num++;
-                if (stream_num == stream_count)  
+                if (stream_num == streamCount)  
                 {/*we finished decoding... ERROR !!!*/
                     break;
                 }
-                cur_stream_offset = io_req->stream_offset_array[stream_num];
+                cur_stream_offset = IOreq->stream_offset_array[stream_num];
                 cur_mem_size -= cur_size;
                 mem_offset += cur_size;
-                cur_stream_size = io_req->stream_size_array[stream_num];
+                cur_stream_size = IOreq->stream_size_array[stream_num];
 
                 total_stream_size += cur_stream_size;
             }
@@ -386,12 +377,12 @@ static void transform_io_req_to_array(
             {   /*cur_stream_size > cur_mem_size
                   keep stream position*/
                 mem_num++;
-                if (mem_num == mem_count){/*we finished decoding... ERROR !!!*/
+                if (mem_num == memCount){/*we finished decoding... ERROR !!!*/
                     break;
                 }
 
-                mem_offset = io_req->mem_offset_array[mem_num];
-                cur_mem_size = io_req->mem_size_array[mem_num];
+                mem_offset = IOreq->mem_offset_array[mem_num];
+                cur_mem_size = IOreq->mem_size_array[mem_num];
                 cur_stream_size -= cur_size;
 
                 total_mem_size += cur_mem_size;
@@ -429,11 +420,10 @@ static int compare_slices(
 }
 
 /*
- * Do scheduling with current elements RW operations, 
- * run quicksort to sort stream_offsets
+ * Do scheduling with current elements RW operations, run quicksort to sort stream_offsets
  * ascending.
  */
-static void schedule_handle_ops(
+static void scheduleHandleOps(
     io_handle_queue_t * elem,
     enum active_queue_e queue_type)
 {
@@ -456,7 +446,7 @@ static void schedule_handle_ops(
 static void mark_ops_as_in_service_count_slices(
     io_handle_queue_t * elem)
 {
-    enum io_queue_type i;
+    enum IO_queue_type i;
     
     elem->active_io =
         (active_io_processing_t *) malloc(sizeof(active_io_processing_t));
@@ -465,7 +455,7 @@ static void mark_ops_as_in_service_count_slices(
     /*at first mark operations as in service (reason dspace_cancel)...*/
     for (i = 0; i < IO_QUEUE_LAST; i++)
     {
-        dbpf_op_queue_t *queue = &elem->requests[i];
+        dbpf_op_queue_s *queue = &elem->requests[i];
         dbpf_queued_op_t *op;
         struct qlist_head *tmp_link;
         int slice_count = 0;
@@ -502,24 +492,23 @@ static void increment_handle_ref(
 {
     gen_mutex_lock(&elem->active_io->mutex);
     elem->active_io->ref_count++;
-    gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF increment_handle_ref %p %d\n",
+    gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF incrementHandleRef %p %d\n",
                  elem, elem->active_io->ref_count);
     if (elem->active_io->filehandle == 0)
     {
-        transform_io_req_to_array(elem, ACTIVE_QUEUE_READ, IO_QUEUE_READ);
-        transform_io_req_to_array(elem, ACTIVE_QUEUE_WRITE, IO_QUEUE_WRITE);
+        transform_IO_req_to_Array(elem, ACTIVE_QUEUE_READ, IO_QUEUE_READ);
+        transform_IO_req_to_Array(elem, ACTIVE_QUEUE_WRITE, IO_QUEUE_WRITE);
 
         gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
-                     "IO transform_io_req_to_array r:%d w:%d "
-		     "into slices: r:%d w:%d\n",
+                     "IO TransformIORequestsIntoArray r:%d w:%d into slices: r:%d w:%d\n",
                      elem->requests[IO_QUEUE_READ].elems,
                      elem->requests[IO_QUEUE_WRITE].elems,
                      elem->active_io->
                      total_number_of_unprocessed_slices[ACTIVE_QUEUE_READ],
                      elem->active_io->
                      total_number_of_unprocessed_slices[ACTIVE_QUEUE_WRITE]);
-        schedule_handle_ops(elem, ACTIVE_QUEUE_WRITE);
-        schedule_handle_ops(elem, ACTIVE_QUEUE_READ);
+        scheduleHandleOps(elem, ACTIVE_QUEUE_WRITE);
+        scheduleHandleOps(elem, ACTIVE_QUEUE_READ);
         
         elem->active_io->filehandle = open_fd(elem->fs_id, elem->handle, 
             elem->active_io->openflags );
@@ -532,7 +521,7 @@ static void decrement_handle_ref(
 {
     gen_mutex_lock(&elem->active_io->mutex);
     elem->active_io->ref_count--;
-    gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF decrement_handle_ref %p %d\n",
+    gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF decrementHandleRef %p %d\n",
                  elem, elem->active_io->ref_count);
     gen_mutex_unlock(&elem->active_io->mutex);
 
@@ -550,7 +539,7 @@ static void decrement_handle_ref(
             latest_offset_written);
 #endif
             
-        /*have to free handle_queue at the end !*/
+        /*have to free HandleQueue at the end !*/
         if (elem->active_io->filehandle)
             close(elem->active_io->filehandle);
         gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -580,7 +569,7 @@ static int insert_operation(
     dbpf_queued_op_t * new_op,
     TROVE_coll_id coll_id,
     TROVE_handle handle,
-    enum io_queue_type type,
+    enum IO_queue_type type,
     PVFS_id_gen_t * out_op_id_p)
 {
     int i;
@@ -660,7 +649,7 @@ static int check_update_cache_size(
 }
 
 static void move_all_to_completion_queue(
-    dbpf_op_queue_t * op_queue,
+    dbpf_op_queue_s * op_queue,
     int ret)
 {
     int i;
@@ -673,10 +662,10 @@ static void move_all_to_completion_queue(
     }
 }
 
-static void process_io_slice(
+static void process_IO_slice(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
-    enum io_queue_type type,
+    enum IO_queue_type type,
     int fd,
     active_io_processing_slice_t * slice,
     gen_mutex_t * mutex,
@@ -688,22 +677,22 @@ static void process_io_slice(
     char * odirectbuf,
     int openflags)
 {
-    TROVE_size ret_size = 0;
+    TROVE_size retSize = 0;
     /*
      * Calculate real I/O access boundaries
      */
-    TROVE_offset physical_start_pos;
+    TROVE_offset physical_startPos;
     TROVE_size   physical_size;
        
    /*
     * we could calculate the startpos with division ops, too :)
     */
-   physical_start_pos = (TROVE_offset) (
+   physical_startPos = (TROVE_offset) (
         ((uintptr_t) slice->stream_offset) & (~((uintptr_t) MEM_PAGESIZE - 1)));
         
    physical_size = (TROVE_size)(((uintptr_t )  
         slice->stream_offset + slice->size + MEM_PAGESIZE - 1 ) & 
-        (~((uintptr_t) MEM_PAGESIZE - 1))) - physical_start_pos;
+        (~((uintptr_t) MEM_PAGESIZE - 1))) - physical_startPos;
    
    assert(physical_size <= IO_BUFFER_SIZE + MEM_PAGESIZE);            
     /*
@@ -722,7 +711,7 @@ static void process_io_slice(
             gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
                          "IO slice on thread:%d - %p - WRITE FD:%d POS:%lld SIZE:%lld \n",
                          thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));
-            ret_size =
+            retSize =
                 PWRITE(fd, slice->mem_offset, slice->size, slice->stream_offset);
         }
         else
@@ -730,134 +719,110 @@ static void process_io_slice(
             gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
                          "IO slice on thread:%d - %p - READ FD:%d POS:%lld SIZE:%lld \n",
                          thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));
-            ret_size =
+            retSize =
                 PREAD(fd, slice->mem_offset, slice->size, slice->stream_offset);
         }
         
-        if (ret_size == 0)
+        if (retSize == 0)
         {
-            ret_size = 0;
+            retSize = 0;
             gossip_debug(GOSSIP_TROVE_DEBUG,"WARNING could not do IO to %d\n", fd);
             *return_code_out = -trove_errno_to_trove_error(errno);
         }
-        else if (ret_size < slice->size)
+        else if (retSize < slice->size)
         {
             /*could not read/write correctly ! TODO better error handling !*/
             gossip_err
                 ("WARNING could not do IO correct to %d - %lld of %llu bytes done, reason: %s\n",
-                 fd, lld(ret_size), llu(slice->size), strerror(errno));
+                 fd, lld(retSize), llu(slice->size), strerror(errno));
             *return_code_out = -trove_errno_to_trove_error(errno);
         }         
     }else{
        gossip_debug(GOSSIP_PERFORMANCE_DEBUG, 
-		    "Unaligned data will be aligned %llu - %llu to %llu - %llu\n",
-		    llu(slice->stream_offset),  llu(slice->size),
-		    llu(physical_start_pos), llu(physical_size));       
+        "Unaligned data will be aligned %llu - %llu to %llu - %llu\n",
+            llu(slice->stream_offset),  llu(slice->size),
+            llu(physical_startPos), llu(physical_size));       
             
        if (type == IO_QUEUE_WRITE)
        {
             gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
-                         "IO slice on thread:%d - %p - "
-			 "WRITE FD:%d POS:%llu SIZE:%llu \n",
-                         thread_no, slice, fd, 
-			 llu(slice->stream_offset), llu(slice->size));
-            if (slice->stream_offset != physical_start_pos || 
-                slice->size != physical_size)
-	    {
-		/* read modify write data (for now, better 
-		 * to check if results can be reused or cached)
-		 */
-		if (physical_size <= 
-		    (DIRECT_IO_SIZE_LIMIT_MULTIPLIER * DIRECT_IO_SIZE))
-		{
-		    /*
-		     * read in one step
-		     */
-		    ret_size =
-			PREAD(fd, odirectbuf, physical_size, physical_start_pos);
-		    if (ret_size < physical_size)
-		    {
-			gossip_debug(GOSSIP_TROVE_DEBUG,
-				     "Pread error %s %llu\n",
-				     strerror(errno), llu(ret_size));
-			memset(odirectbuf + ret_size, 0, 
-			       physical_size - ret_size);
-		    }                    
-		}
-		else
-		{
-		    /* read both ends */
-		    TROVE_offset end_offset;
-		    end_offset = physical_size - DIRECT_IO_SIZE -1;
-		    if (slice->stream_offset != physical_start_pos)
-		    {
-			ret_size =
-			    PREAD(fd, odirectbuf, 
-				  DIRECT_IO_SIZE, physical_start_pos);
-			if (ret_size < DIRECT_IO_SIZE)
-			{
-			    /*
-			     * End of file reached bzero stuff out !
-			     */
-			    gossip_debug(GOSSIP_TROVE_DEBUG,
-					 "Pread1 error %s %llu\n",
-					 strerror(errno), llu(ret_size));
-			    memset(odirectbuf + ret_size, 0, 
-				   DIRECT_IO_SIZE - ret_size);
-			    /*
-			     * This is not really needed when the file is 
-			     * truncated at the end...
-			     * But ensures that an parallel reader gets at 
-			     * least no old data. could be optimized, though 
-			     */
-			    memset(odirectbuf + end_offset, 0, DIRECT_IO_SIZE);
-
-			    goto modify_buffer;
-			}
-		    }
-
-		    ret_size =
-			PREAD(fd, odirectbuf + end_offset, DIRECT_IO_SIZE, 
-			      physical_start_pos + end_offset);
-		    if (ret_size < DIRECT_IO_SIZE)
-		    {
-			gossip_debug(GOSSIP_TROVE_DEBUG,
-				     "Pread2 error %s %llu\n",
-				     strerror(errno), llu(ret_size));
-			memset(odirectbuf+end_offset+ret_size, 0, 
-			       DIRECT_IO_SIZE - ret_size);
-		    }
-		}
-	    }
-modify_buffer:                       
+                         "IO slice on thread:%d - %p - WRITE FD:%d POS:%llu SIZE:%llu \n",
+                         thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));
+            if ( slice->stream_offset != physical_startPos || 
+                slice->size != physical_size){
+            /* read modify write data (for now, better to check if results can be
+             * reused or cached)*/
+            if ( physical_size <= DIRECT_IO_SIZE_LIMIT_MULTIPLIER * DIRECT_IO_SIZE ){
+                /*
+                 * read in one step
+                 */
+                retSize =
+                    PREAD(fd, odirectbuf, physical_size, physical_startPos);
+                if (retSize < physical_size){
+                    gossip_debug(GOSSIP_TROVE_DEBUG,"Pread error %s %llu\n",strerror(errno), llu(retSize));
+                    memset( odirectbuf + retSize, 0, physical_size - retSize );
+                }                    
+            }else{
+                /* read both ends */
+                TROVE_offset end_offset;
+                end_offset = physical_size - DIRECT_IO_SIZE -1;
+                if (slice->stream_offset != physical_startPos){
+                    retSize =
+                        PREAD(fd, odirectbuf, DIRECT_IO_SIZE, physical_startPos);
+                    if (retSize < DIRECT_IO_SIZE){
+                        /*
+                         * End of file reached bzero stuff out !
+                         */
+                        gossip_debug(GOSSIP_TROVE_DEBUG,"Pread1 error %s %llu\n",strerror(errno), llu(retSize));
+                        memset( odirectbuf + retSize, 0, DIRECT_IO_SIZE - retSize );
+                        /*
+                         * This is not really needed when the file is truncated at the end...
+                         * But ensures that an parallel reader gets at least no old data.
+                         * could be optimized, though 
+                         */
+                        memset( odirectbuf + end_offset, 0, DIRECT_IO_SIZE);
+                        
+                        goto modifyBuffer;
+                    }
+                }
+                
+                retSize =
+                    PREAD(fd, odirectbuf + end_offset, DIRECT_IO_SIZE, 
+                        physical_startPos + end_offset);
+                if (retSize < DIRECT_IO_SIZE){
+                     gossip_debug(GOSSIP_TROVE_DEBUG,"Pread2 error %s %llu\n",strerror(errno), llu(retSize));
+                     memset( odirectbuf+end_offset+ retSize, 0, 
+                        DIRECT_IO_SIZE - retSize );
+                }
+            }
+            }
+modifyBuffer:                       
             /* modify buffer */
             
-	    memcpy(odirectbuf + (slice->stream_offset - physical_start_pos), 
-		   slice->mem_offset, slice->size);
+            memcpy(odirectbuf + (slice->stream_offset - physical_startPos), 
+                slice->mem_offset, slice->size);
             
             /* write stuff back to disk */
-            ret_size =
-                PWRITE(fd, odirectbuf, physical_size, physical_start_pos);
-	    assert(ret_size >= physical_size);
-            ret_size = slice->size;           
+            retSize =
+                PWRITE(fd, odirectbuf, physical_size, physical_startPos);
+            if (retSize < physical_size){
+                 gossip_debug(GOSSIP_TROVE_DEBUG,"PWRITE error %s %llu\n",strerror(errno), llu(retSize));
+                 assert(0);
+            }
+            retSize = slice->size;           
        }
        else
        {
-            TROVE_offset buff_offset = slice->stream_offset - physical_start_pos;
+            TROVE_offset buff_offset = slice->stream_offset - physical_startPos;
             gossip_debug(GOSSIP_PERFORMANCE_DEBUG,
-                         "IO slice on thread:%d - %p - "
-			 "READ FD:%d POS:%lld SIZE:%lld \n",
-                         thread_no, slice, fd, 
-			 llu(slice->stream_offset), llu(slice->size));    
-
+                         "IO slice on thread:%d - %p - READ FD:%d POS:%lld SIZE:%lld \n",
+                         thread_no, slice, fd, llu(slice->stream_offset), llu(slice->size));    
             /* read more data and discard */
-            ret_size = PREAD(fd, odirectbuf, physical_size, physical_start_pos);
-            if (ret_size < physical_size)
-	    {
-                 gossip_debug(GOSSIP_TROVE_DEBUG,
-			      "Pread file too small %s %llu\n",
-			      strerror(errno), llu(ret_size));
-                 ret_size =  ret_size - (TROVE_size) (physical_size - buff_offset);
+            retSize =
+                PREAD(fd, odirectbuf, physical_size, physical_startPos);
+            if (retSize < physical_size){
+                 gossip_debug(GOSSIP_TROVE_DEBUG,"Pread file too small %s %llu\n",strerror(errno), llu(retSize));
+                 retSize =  retSize - (TROVE_size) (physical_size - buff_offset);
             }
             memcpy(slice->mem_offset, odirectbuf + buff_offset, slice->size);
        }            
@@ -868,11 +833,11 @@ modify_buffer:
 
     gen_mutex_lock(mutex);
     (*slice->remaining_number_of_slices)--;
-    *io_size_out += ret_size;
-    if (type == IO_QUEUE_WRITE && ret_size > 0 &&
-        (slice->stream_offset + ret_size > *total_write_size_out))
+    *io_size_out += retSize;
+    if (type == IO_QUEUE_WRITE && retSize > 0 &&
+        (slice->stream_offset + retSize > *total_write_size_out))
     {
-        *total_write_size_out = slice->stream_offset + ret_size;
+        *total_write_size_out = slice->stream_offset + retSize;
     }
 
     if (*(slice->remaining_number_of_slices) == 0)
@@ -886,33 +851,34 @@ modify_buffer:
     gen_mutex_unlock(mutex);
 }
 
-static void * bstream_threaded_thread_io_function(void *vpthread_number)
+static void * bstream_threaded_thread_io_function(
+    void *vpthread_number)
 {
     /*
      * We reuse the biggest buffer, so no contig. malloc / free necessary.
      */
-    char * odirect_buff;
+    void * odirectBuffAlloc;
     char * buff_real;
     int ret;
     dbpf_queued_op_t *request;
     active_io_processing_slice_t *io_processing_slice;
     int io_slice_number;
     int thread_number = *((int *) vpthread_number);
-    enum io_queue_type req_type = -1;
+    enum IO_queue_type req_type = -1;
     free((int *) vpthread_number);
     
-    odirect_buff = malloc(IO_BUFFER_SIZE + 2 * MEM_PAGESIZE);
+    odirectBuffAlloc = malloc(IO_BUFFER_SIZE + 2 * MEM_PAGESIZE);
     /*
      * keep valgrind happy, also for debugging...
      */
-    memset(odirect_buff, 255, IO_BUFFER_SIZE + 2 * MEM_PAGESIZE);
+    memset(odirectBuffAlloc, 255, IO_BUFFER_SIZE + 2 * MEM_PAGESIZE);
     
-    if (odirect_buff == NULL) {
+    if (odirectBuffAlloc == NULL) {
         gossip_err("Not enough free memory to allocate ODIRECT buffer\n");
         return NULL;
     }
-    buff_real = (char *)(((uintptr_t)odirect_buff + MEM_PAGESIZE - 1) 
-			 & (~(MEM_PAGESIZE - 1)));
+    buff_real = (unsigned char *)(((uintptr_t )odirectBuffAlloc + 
+                MEM_PAGESIZE - 1) & (~(MEM_PAGESIZE - 1)));
 
     while (1)
     { 
@@ -932,7 +898,7 @@ static void * bstream_threaded_thread_io_function(void *vpthread_number)
                 /*first RESIZE (value only last request):*/
                 request =
                     (dbpf_queued_op_t *) current_handle->
-		    requests[req_type].list.prev;
+                    requests[req_type].list.prev;
 
                 current_handle->request_to_process_count[req_type] = 0;
             }
@@ -1049,77 +1015,82 @@ static void * bstream_threaded_thread_io_function(void *vpthread_number)
         switch (req_type)
         {
         case (IO_QUEUE_READ):
-            process_io_slice(current_handle->fs_id, current_handle->handle,
-			     req_type, current_handle->active_io->filehandle,
-			     io_processing_slice,
-			     &current_handle->active_io->mutex,
-			     &current_handle->active_io->total_write_size,
-			     io_processing_slice->parent_request->op.u.b_rw_list.
-			     out_size_p, 
-			     &current_handle->active_io->latest_offset_written,
-			     &current_handle->active_io->return_code,
-			     thread_number, buff_real, 
-			     current_handle->active_io->openflags);
+            process_IO_slice(current_handle->fs_id, current_handle->handle,
+                           req_type, current_handle->active_io->filehandle,
+                           io_processing_slice,
+                           &current_handle->active_io->mutex,
+                           &current_handle->active_io->total_write_size,
+                           io_processing_slice->parent_request->op.u.b_rw_list.
+                           out_size_p, 
+                           &current_handle->active_io->latest_offset_written,
+                           &current_handle->active_io->return_code,
+                           thread_number, buff_real, 
+                           current_handle->active_io->openflags);
             break;
-
         case (IO_QUEUE_WRITE):
-	    process_io_slice(current_handle->fs_id, current_handle->handle,
-			     req_type, current_handle->active_io->filehandle,
-			     io_processing_slice,
-			     &current_handle->active_io->mutex,
-			     &current_handle->active_io->total_write_size,
-			     io_processing_slice->parent_request->op.u.
-			     b_rw_list.out_size_p,
-			     &current_handle->active_io->latest_offset_written,
-			     &current_handle->active_io->return_code,
-			     thread_number, buff_real,
-			     current_handle->active_io->openflags);
-	    break;
-
+            {
+                process_IO_slice(current_handle->fs_id, current_handle->handle,
+                               req_type, current_handle->active_io->filehandle,
+                               io_processing_slice,
+                               &current_handle->active_io->mutex,
+                               &current_handle->active_io->total_write_size,
+                               io_processing_slice->parent_request->op.u.
+                               b_rw_list.out_size_p,
+                               &current_handle->active_io->latest_offset_written,
+                               &current_handle->active_io->return_code,
+                               thread_number, buff_real,
+                               current_handle->active_io->openflags);
+                break;
+            }
         case (IO_QUEUE_RESIZE):
-	    ret = ftruncate(current_handle->active_io->filehandle,
-			    request->op.u.b_resize.size);
-	    if (ret != 0)
-	    {
-		ret = -trove_errno_to_trove_error(errno);
-	    }
-	    else
-	    {
-		update_cache_size(current_handle->fs_id,
-				  current_handle->handle,
-				  request->op.u.b_resize.size);
-	    }
+            {
+                ret = ftruncate(current_handle->active_io->filehandle,
+                                request->op.u.b_resize.size);
+                if (ret != 0)
+                {
+                    ret = -trove_errno_to_trove_error(errno);
+                }
+                else
+                {
+                    update_cache_size(current_handle->fs_id,
+                                    current_handle->handle,
+                                    request->op.u.b_resize.size);
+                }
 
-	    move_all_to_completion_queue(
-		&current_handle->requests[IO_QUEUE_RESIZE], ret);
+                move_all_to_completion_queue(&current_handle->
+                                         requests[IO_QUEUE_RESIZE], ret);
 
-	    break;
+                break;
+            }
         case (IO_QUEUE_FLUSH):
-	    ret = fdatasync(current_handle->active_io->filehandle);
-	    if (ret != 0)
-	    {
-		ret = -trove_errno_to_trove_error(errno);
-	    }
-	    move_all_to_completion_queue(
-		&current_handle->requests[IO_QUEUE_FLUSH], ret);
+            {
+                ret = fdatasync(current_handle->active_io->filehandle);
+                if (ret != 0)
+                {
+                    ret = -trove_errno_to_trove_error(errno);
+                }
+                move_all_to_completion_queue(&current_handle->
+                                         requests[IO_QUEUE_FLUSH], ret);
 
-	    break;
+                break;
         default:
                 gossip_lerr("ERROR, unknown IO type i!\n");
                 assert(0);
+            }
         }
 
         decrement_handle_ref(current_handle,
             current_handle->active_io->latest_offset_written);
     }
     
-    free(odirect_buff);
+    free(odirectBuffAlloc);
     return NULL;
 }
 
 
 
-int dbpf_bstream_threaded_initalize(void)
+int dbpf_bstream_threaded_initalize(
+    )
 {
     handle_queue.count = 0;
     handle_queue.first = NULL;
@@ -1136,7 +1107,8 @@ int dbpf_bstream_threaded_initalize(void)
     return 0;
 }
 
-int dbpf_bstream_threaded_finalize(void)
+int dbpf_bstream_threaded_finalize(
+    )
 {
     threads_running = 0;
     initialised = 0;
@@ -1215,7 +1187,7 @@ static inline int dbpf_bstream_rw_list(
     void *user_ptr,
     TROVE_context_id context_id,
     TROVE_op_id * out_op_id_p,
-    enum io_queue_type opcode)
+    enum IO_queue_type opcode)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;

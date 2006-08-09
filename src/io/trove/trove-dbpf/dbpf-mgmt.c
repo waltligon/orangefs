@@ -397,15 +397,6 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
 #endif
         ret = 0;
         break;
-#ifdef __PVFS_USE_AIO__
-    case TROVE_IO_AIO_MAX_PROGRESS:
-        gossip_debug(GOSSIP_TROVE_DEBUG,
-                     "dbpf AIO max in progress: %d\n",
-                     (*(int *) parameter));
-        dbpf_bstream_aio_set_max_progress(*(int *)parameter);
-        ret = 0;
-        break;
-#endif
     }
     return ret;
 }

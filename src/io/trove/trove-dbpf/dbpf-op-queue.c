@@ -10,7 +10,7 @@
 #include "dbpf-sync.h"
 
 /* the queue that stores pending serviceable operations */
-dbpf_op_queue_t dbpf_op_queue[OP_QUEUE_LAST];
+dbpf_op_queue_s dbpf_op_queue[OP_QUEUE_LAST];
 
 /* lock to be obtained before manipulating dbpf_op_queue */
 gen_mutex_t     dbpf_op_queue_mutex[OP_QUEUE_LAST];
@@ -19,7 +19,7 @@ pthread_cond_t dbpf_op_completed_cond;
 pthread_cond_t dbpf_op_incoming_cond[OP_QUEUE_LAST];
 
 /*
-static void debug_print_list(dbpf_op_queue_t *  op_queue)
+static void debugPrintList(dbpf_op_queue_s *  op_queue)
 {
        gossip_debug(GOSSIP_TROVE_DEBUG,
                  "op_queue %p Elems: %d\n",
@@ -66,26 +66,24 @@ void dbpf_move_op_to_completion_queue_nolock(dbpf_queued_op_t *cur_op,
         dbpf_completion_queue_array[cid]->elems);
 }
 
-dbpf_op_queue_t * dbpf_op_queue_new(void)
+dbpf_op_queue_s * dbpf_op_queue_new(void)
 {
-    dbpf_op_queue_t *tmp_queue;
+    dbpf_op_queue_s *tmp_queue;
 
-    tmp_queue = (dbpf_op_queue_t *)malloc(sizeof(dbpf_op_queue_t));
+    tmp_queue = (dbpf_op_queue_s *)malloc(sizeof(dbpf_op_queue_s));
     if (tmp_queue)
-    {
         dbpf_op_queue_init(tmp_queue);
-    }
     return tmp_queue;
 }
 
-void dbpf_op_queue_init(dbpf_op_queue_t * queue)
+void dbpf_op_queue_init(dbpf_op_queue_s * queue)
 {
    INIT_QLIST_HEAD(& queue->list);
    queue->elems = 0;
 }
 
 
-void dbpf_op_queue_cleanup_nolock(dbpf_op_queue_t * op_queue)
+void dbpf_op_queue_cleanup_nolock(dbpf_op_queue_s * op_queue)
 {
     dbpf_queued_op_t *cur_op = NULL;
 
@@ -100,7 +98,7 @@ void dbpf_op_queue_cleanup_nolock(dbpf_op_queue_t * op_queue)
     return;
 }
 
-void dbpf_op_queue_add(dbpf_op_queue_t *  op_queue,
+void dbpf_op_queue_add(dbpf_op_queue_s *  op_queue,
                        dbpf_queued_op_t *dbpf_op)
 {
     op_queue->elems++;
@@ -111,19 +109,19 @@ void dbpf_op_queue_add(dbpf_op_queue_t *  op_queue,
 
 void dbpf_op_queue_remove(dbpf_queued_op_t *dbpf_op)
 {
-    dbpf_op_queue_t * queue = dbpf_op->queue;
+    dbpf_op_queue_s * queue = dbpf_op->queue;
     queue->elems--;
     assert(queue->elems > -1);
 
     qlist_del(&dbpf_op->link);
 }
 
-int dbpf_op_queue_empty(dbpf_op_queue_t *  op_queue)
+int dbpf_op_queue_empty(dbpf_op_queue_s *  op_queue)
 {
     return qlist_empty(& op_queue->list);
 }
 
-dbpf_queued_op_t *dbpf_op_pop_front_nolock(dbpf_op_queue_t *  op_queue)
+dbpf_queued_op_t *dbpf_op_pop_front_nolock(dbpf_op_queue_s *  op_queue)
 {
     if ( op_queue->elems == 0 ) return NULL;
 
@@ -144,8 +142,7 @@ dbpf_queued_op_t *dbpf_op_pop_front_nolock(dbpf_op_queue_t *  op_queue)
  * 3) unlock the queue
  * 4) return the id
  */
-TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p, 
-                                 dbpf_op_queue_t* queue)
+TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p, dbpf_op_queue_s* queue)
 {
     TROVE_op_id tmp_id = 0;
     assert(q_op_p->queue_type < OP_QUEUE_LAST);
@@ -167,8 +164,7 @@ TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p,
  * same as dbpf_queued_op_queue(), but assumes dbpf_op_queue_mutex
  * already held
  */
-TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p, 
-                                        dbpf_op_queue_t* queue)
+TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p, dbpf_op_queue_s* queue)
 {
     TROVE_op_id tmp_id = 0;
     

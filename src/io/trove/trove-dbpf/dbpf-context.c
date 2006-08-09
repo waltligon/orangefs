@@ -13,7 +13,7 @@
 #include "dbpf-sync.h"
 
 static gen_mutex_t dbpf_context_mutex = GEN_MUTEX_INITIALIZER;
-dbpf_op_queue_t * dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+dbpf_op_queue_s * dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 int dbpf_open_context(

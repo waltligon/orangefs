@@ -13,7 +13,7 @@ extern "C" {
 
 #include "trove-types.h"
 
-extern dbpf_op_queue_t * dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+extern dbpf_op_queue_s * dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 
 int dbpf_open_context(
     TROVE_coll_id coll_id,
