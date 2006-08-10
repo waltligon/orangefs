@@ -127,16 +127,33 @@ static __keyword_mask_t s_keyword_mask_map[] =
 static const int num_keyword_mask_map = (int)           \
 (sizeof(s_keyword_mask_map) / sizeof(__keyword_mask_t));
 
-/*
- * Based on human readable keywords, translate them into
- * a mask value appropriate for the debugging level desired.
- * The 'computed' mask is returned; 0 if no keywords are
- * present or recognized.
- *
- * Prefix a keyword with "-" to turn it off.  All keywords
- * processed in specified order.
- */
-uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
+/* map all kmod keywords to kmod debug masks here */
+static __keyword_mask_t s_kmod_keyword_mask_map[] =
+{
+    {"super" , GOSSIP_SUPER_DEBUG},
+    {"inode" , GOSSIP_INODE_DEBUG},
+    {"file"  , GOSSIP_FILE_DEBUG},
+    {"dir"   , GOSSIP_DIR_DEBUG},
+    {"utils" , GOSSIP_UTILS_DEBUG},
+    {"wait"  , GOSSIP_WAIT_DEBUG},
+    {"acl"   , GOSSIP_ACL_DEBUG},
+    {"dcache", GOSSIP_DCACHE_DEBUG},
+    {"dev"   , GOSSIP_DEV_DEBUG},
+    {"name"  , GOSSIP_NAME_DEBUG},
+    {"bufmap", GOSSIP_BUFMAP_DEBUG},
+    {"cache" , GOSSIP_CACHE_DEBUG},
+    {"proc"  , GOSSIP_PROC_DEBUG},
+    {"xattr" , GOSSIP_XATTR_DEBUG},
+    {"init"  , GOSSIP_INIT_DEBUG},
+    {"none"  , GOSSIP_NO_DEBUG},
+    {"all"   , GOSSIP_MAX_DEBUG}
+};
+
+static const int num_kmod_keyword_mask_map = (int)           \
+(sizeof(s_kmod_keyword_mask_map) / sizeof(__keyword_mask_t));
+
+static uint64_t debug_to_mask(__keyword_mask_t *mask_map, 
+        int num_mask_map, const char *event_logging)
 {
     uint64_t mask = 0;
     char *s = NULL, *t = NULL;
@@ -156,17 +173,17 @@ uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
                 ++t;
             }
 
-            for(i = 0; i < num_keyword_mask_map; i++)
+            for(i = 0; i < num_mask_map; i++)
             {
-                if (!strcmp(t, s_keyword_mask_map[i].keyword))
+                if (!strcmp(t, mask_map[i].keyword))
                 {
                     if (negate)
                     {
-                        mask &= ~s_keyword_mask_map[i].mask_val;
+                        mask &= ~mask_map[i].mask_val;
                     }
                     else
                     {
-                        mask |= s_keyword_mask_map[i].mask_val;
+                        mask |= mask_map[i].mask_val;
                     }
                     break;
                 }
@@ -176,6 +193,27 @@ uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
         free(s);
     }
     return mask;
+}
+
+/*
+ * Based on human readable keywords, translate them into
+ * a mask value appropriate for the debugging level desired.
+ * The 'computed' mask is returned; 0 if no keywords are
+ * present or recognized.
+ *
+ * Prefix a keyword with "-" to turn it off.  All keywords
+ * processed in specified order.
+ */
+uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
+{
+    return debug_to_mask(s_keyword_mask_map, 
+            num_keyword_mask_map, event_logging);
+}
+
+uint64_t PVFS_kmod_eventlog_to_mask(const char *event_logging)
+{
+    return debug_to_mask(s_kmod_keyword_mask_map, 
+            num_kmod_keyword_mask_map, event_logging);
 }
 
 /*
@@ -193,7 +231,6 @@ const char *PVFS_debug_get_next_debug_keyword(int position)
     return (((position > -1) && (position < num_entries)) ?
             s_keyword_mask_map[position].keyword : NULL);
 }
-
 /*
  * Local variables:
  *  c-indent-level: 4

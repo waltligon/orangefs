@@ -937,7 +937,15 @@ variable to a valid file name.  This causes all debug information
 specified by the PVFS2\_DEBUGMASK to be stored in the file specified,
 no longer intermixing the output with the client program.  The file
 specified in the PVFS2\_DEBUGFILE environment variable will be
-appended if it already exists.
+appended if it already exists. 
+Another influential environment variable that can be used to trigger
+kmod logging messages is PVFS2\_KMODMASK. By setting values of this variable
+to ``file, inode'' prior to starting pvfs2-client-core daemon,
+verbose kmod subsystem error diagnostics are written to the system ring buffer
+and eventually to the kernel logs.
+One could also set the kmod diagnostic level when the kernel module is loaded
+like so, insmod pvfs2.ko gossip\_debug\_mask=<diagnostic level>.
+The diagnostic level will be a bitwise OR of values specified in pvfs2-debug.h.
 
 \section{ROMIO Support}
 \label{sec:romio}

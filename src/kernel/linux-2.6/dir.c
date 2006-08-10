@@ -43,14 +43,14 @@ static int pvfs2_readdir(
     /* are we done? */
     if (pos == PVFS_READDIR_END)
     {
-        pvfs2_print("Skipping to graceful termination path since we are done\n");
+        gossip_debug(GOSSIP_DIR_DEBUG, "Skipping to graceful termination path since we are done\n");
         pvfs2_inode->directory_version = 0;
         pvfs2_inode->num_readdir_retries =
             PVFS2_NUM_READDIR_RETRIES;
         return 0;
     }
 
-    pvfs2_print("pvfs2_readdir called on %s (pos=%d, "
+    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir called on %s (pos=%d, "
                 "retry=%d, v=%llu)\n", dentry->d_name.name, (int)pos,
                 (int)pvfs2_inode->num_readdir_retries,
                 llu(pvfs2_inode->directory_version));
@@ -66,7 +66,7 @@ static int pvfs2_readdir(
         if (pvfs2_inode->directory_version == 0)
         {
             ino = dentry->d_inode->i_ino;
-            pvfs2_print("calling filldir of . with pos = %d\n", pos);
+            gossip_debug(GOSSIP_DIR_DEBUG, "calling filldir of . with pos = %d\n", pos);
             if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
             {
                 break;
@@ -80,7 +80,7 @@ static int pvfs2_readdir(
         if (pvfs2_inode->directory_version == 0)
         {
             ino = parent_ino(dentry);
-            pvfs2_print("calling filldir of .. with pos = %d\n", pos);
+            gossip_debug(GOSSIP_DIR_DEBUG, "calling filldir of .. with pos = %d\n", pos);
             if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
             {
                 break;
@@ -123,7 +123,7 @@ static int pvfs2_readdir(
             new_op, "pvfs2_readdir", 
             get_interruptible_flag(dentry->d_inode));
 
-	pvfs2_print("Readdir downcall status is %d (dirent_count "
+	gossip_debug(GOSSIP_DIR_DEBUG, "Readdir downcall status is %d (dirent_count "
 		    "is %d)\n", new_op->downcall.status,
 		    new_op->downcall.resp.readdir.dirent_count);
 
@@ -149,7 +149,7 @@ static int pvfs2_readdir(
                 if (pvfs2_inode->directory_version !=
                     new_op->downcall.resp.readdir.directory_version)
                 {
-                    pvfs2_print("detected directory change on listing; "
+                    gossip_debug(GOSSIP_DIR_DEBUG, "detected directory change on listing; "
                                 "starting over\n");
 
                     file->f_pos = 0;
@@ -163,7 +163,7 @@ static int pvfs2_readdir(
             }
             else
             {
-                pvfs2_print("Giving up on readdir retries to avoid "
+                gossip_debug(GOSSIP_DIR_DEBUG, "Giving up on readdir retries to avoid "
                             "possible livelock (%d tries attempted)\n",
                             PVFS2_NUM_READDIR_RETRIES);
             }
@@ -177,7 +177,7 @@ static int pvfs2_readdir(
                     pvfs2_handle_to_ino(
                         new_op->downcall.resp.readdir.refn[i].handle);
 
-                pvfs2_print("calling filldir for %s with len %d, pos %ld\n",
+                gossip_debug(GOSSIP_DIR_DEBUG, "calling filldir for %s with len %d, pos %ld\n",
                         current_entry, len, (unsigned long) pos);
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
@@ -201,26 +201,26 @@ static int pvfs2_readdir(
                 else 
                     file->f_pos = i;
             }
-            pvfs2_print("pos = %d, file->f_pos should have been %ld\n", pos, 
+            gossip_debug(GOSSIP_DIR_DEBUG, "pos = %d, file->f_pos should have been %ld\n", pos, 
                     (unsigned long) file->f_pos);
 	}
         else
         {
-            pvfs2_print("Failed to readdir (downcall status %d)\n",
+            gossip_debug(GOSSIP_DIR_DEBUG, "Failed to readdir (downcall status %d)\n",
                         new_op->downcall.status);
         }
 
 	op_release(new_op);
 	break;
     }
-    pvfs2_print("pvfs2_readdir about to update_atime %p\n", dentry->d_inode);
+    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir about to update_atime %p\n", dentry->d_inode);
 
 
     SetAtimeFlag(pvfs2_inode);
     dentry->d_inode->i_atime = CURRENT_TIME;
     mark_inode_dirty_sync(dentry->d_inode);
 
-    pvfs2_print("pvfs2_readdir returning %d\n",ret);
+    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir returning %d\n",ret);
     return ret;
 }
 

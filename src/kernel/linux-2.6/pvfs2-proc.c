@@ -80,7 +80,7 @@ static int pvfs2_param_proc_handler(
             op_release(new_op);
             return(ret);
         }
-        pvfs2_print("pvfs2: proc write %d\n", val);
+        gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc write %d\n", val);
         new_op->upcall.req.param.value = val;
         new_op->upcall.req.param.type = PVFS2_PARAM_REQUEST_SET;
     }
@@ -100,7 +100,7 @@ static int pvfs2_param_proc_handler(
     {
         /* use generic proc handling function to output value */
         val = (int)new_op->downcall.resp.param.value;
-        pvfs2_print("pvfs2: proc read %d\n", val);
+        gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc read %d\n", val);
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
 #else
@@ -258,7 +258,7 @@ static struct pvfs2_param_extra perf_reset_extra = {
     .min = 0,
     .max = 1,
 };
-static int min_debug[] = {0}, max_debug[] = {1};
+static int min_debug[] = {0}, max_debug[] = {GOSSIP_MAX_DEBUG};
 static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
 static ctl_table pvfs2_acache_table[] = {
     /* controls acache timeout */
@@ -303,7 +303,7 @@ static ctl_table pvfs2_pc_table[] = {
 };
 static ctl_table pvfs2_table[] = {
     /* controls debugging level */
-    {1, "debug", &debug, sizeof(int), 0644, NULL,
+    {1, "debug", &gossip_debug_mask, sizeof(int), 0644, NULL,
         &proc_dointvec_minmax, &sysctl_intvec,
         NULL, &min_debug, &max_debug},
     /* operation timeout */

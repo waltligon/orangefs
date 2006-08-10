@@ -20,8 +20,10 @@
 #ifndef __GOSSIP_H
 #define __GOSSIP_H
 
+#ifndef __KERNEL__
 #include <stdint.h>
 #include "syslog.h"
+#endif
 #include "pvfs2-config.h"
 
 /********************************************************************
@@ -38,6 +40,34 @@ enum gossip_logstamp
     GOSSIP_LOGSTAMP_DATETIME = 2
 };
 #define GOSSIP_LOGSTAMP_DEFAULT GOSSIP_LOGSTAMP_USEC
+
+/* Keep a simplified version for the kmod */
+#ifdef __KERNEL__
+
+#ifdef GOSSIP_DISABLE_DEBUG
+#define gossip_debug(mask, format, f...) do {} while(0)
+#else
+extern int gossip_debug_mask;
+
+/* try to avoid function call overhead by checking masks in macro */
+#define gossip_debug(mask, format, f...)                  \
+do {                                                      \
+    if (gossip_debug_mask & mask)                         \
+    {                                                     \
+        printk(format, ##f);                              \
+    }                                                     \
+} while(0)
+#endif /* GOSSIP_DISABLE_DEBUG */
+
+/* do file and line number printouts w/ the GNU preprocessor */
+#define gossip_ldebug(mask, format, f...)                  \
+do {                                                       \
+    gossip_debug(mask, "%s: " format, __func__ , ##f); \
+} while(0)
+
+#define gossip_err printk
+
+#else
 
 int gossip_enable_syslog(
     int priority);
@@ -154,6 +184,8 @@ int gossip_err(
 #define gossip_lerr gossip_err
 
 #endif /* __GNUC__ */
+
+#endif /* __KERNEL__ */
 
 #endif /* __GOSSIP_H */
 
