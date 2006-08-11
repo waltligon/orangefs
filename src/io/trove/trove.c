@@ -30,6 +30,7 @@ extern struct TROVE_mgmt_ops    *mgmt_method_table[];
 struct PINT_perf_counter* PINT_server_pc = NULL;
 
 int TROVE_db_cache_size_bytes = 0;
+int TROVE_alt_aio_mode = 0;
 int TROVE_shm_key_hint = 0;
 
 /** Initiate reading from a contiguous region in a bstream into a
@@ -962,6 +963,11 @@ int trove_collection_setinfo(
     if(option == TROVE_SHM_KEY_HINT)
     {
         TROVE_shm_key_hint = *((int*)parameter);
+	return(0);
+    }
+    if(option == TROVE_ALT_AIO_MODE)
+    {
+        TROVE_alt_aio_mode = *((int*)parameter);
 	return(0);
     }
 

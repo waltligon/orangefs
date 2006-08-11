@@ -71,6 +71,7 @@ static DOTCONF_CB(get_attr_cache_keywords_list);
 static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
+static DOTCONF_CB(get_trove_alt_aio);
 static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_db_cache_size_bytes);
 static DOTCONF_CB(get_db_cache_type);
@@ -655,6 +656,12 @@ static const configoption_t options[] =
      */
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
+
+    /* enable alternate AIO implementation for certain types of I/O
+     * operations (experimental 
+     */
+    {"TroveAltAIOMode",ARG_STR, get_trove_alt_aio, NULL, 
+        CTX_DEFAULTS|CTX_GLOBAL,"no"},
 
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
@@ -1478,6 +1485,28 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
     return NULL;
 }
 
+DOTCONF_CB(get_trove_alt_aio)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if(strcasecmp(cmd->data.str, "yes") == 0)
+    {
+        config_s->trove_alt_aio_mode = 1;
+    }
+    else if(strcasecmp(cmd->data.str, "no") == 0)
+    {
+        config_s->trove_alt_aio_mode = 0;
+    }
+    else
+    {
+        return("TroveAltAIOMode value must be 'yes' or 'no'.\n");
+    }
+
+    return NULL;
+}
+
+
 DOTCONF_CB(get_trove_sync_meta)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -1815,6 +1844,10 @@ DOTCONF_CB(get_default_num_dfiles)
         PINT_llist_head(config_s->file_systems);
 
     fs_conf->default_num_dfiles = (int)cmd->data.value;
+    if(fs_conf->default_num_dfiles < 0)
+    {
+        return("Error DefaultNumDFiles must be positive.\n");
+    }
     return NULL;
 }
 

@@ -677,19 +677,10 @@ int BMI_tcp_set_info(int option,
             tcp_method_params.listen_addr->method_data)->socket);
 #endif
        break;
-    /*
-     * Used after changing buffer sizes to force the connection to
-     * the server used for the config to close so it can be reopened
-     * with the new buffer sizes as the rest of the future server
-     * connections will be.
-     */
-    case BMI_TCP_CLOSE_SOCKET: {
-        struct method_addr *map = inout_parameter;
-        if (tcp_socket_collection_p)
-            BMI_socket_collection_remove(tcp_socket_collection_p, map);
-        ret = tcp_shutdown_addr(map);
+    case BMI_TCP_CLOSE_SOCKET: 
+        /* this should no longer make it to the bmi_tcp method; see bmi.c */
+        ret = 0;
         break;
-    }
     case BMI_FORCEFUL_CANCEL_MODE:
 	forceful_cancel_mode = 1;
 	ret = 0;
@@ -1464,11 +1455,19 @@ void BMI_tcp_close_context(bmi_context_id context_id)
  */
 int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
 {
-    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
-
-    assert(query_op);
-
+    method_op_p query_op = NULL;
+    
     gen_mutex_lock(&interface_mutex);
+
+    query_op = (method_op_p)id_gen_safe_lookup(id);
+    if(!query_op)
+    {
+        /* if we can't find the operattion, then assume that it has already
+         * completed naturally
+         */
+        gen_mutex_unlock(&interface_mutex);
+        return(0);
+    }
 
     /* easy case: is the operation already completed? */
     if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==

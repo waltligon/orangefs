@@ -498,6 +498,9 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
     struct fp_private_data *flow_data = NULL;
     int i;
 
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto posting %p\n",
+                 flow_d);
+
     assert((flow_d->src.endpoint_id == BMI_ENDPOINT && 
             flow_d->dest.endpoint_id == TROVE_ENDPOINT) ||
            (flow_d->src.endpoint_id == TROVE_ENDPOINT &&
@@ -663,6 +666,8 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
         return(-ENOSYS);
     }
 
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto posted %p\n",
+                 flow_d);
     return (0);
 }
 

@@ -815,14 +815,6 @@ static int server_initialize(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Initialization completed successfully.\n");
 
-    /* make sure that stdin/stdout/stderr are disconnected */
-    if (s_server_options.server_background)
-    {
-        freopen("/dev/null", "r", stdin);
-        freopen("/dev/null", "w", stdout);
-        freopen("/dev/null", "w", stderr);
-    }
-
     return ret;
 }
 
@@ -966,6 +958,10 @@ static int server_initialize_subsystems(
 
     ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
                                    &server_config.db_cache_size_bytes);
+    /* this should never fail */
+    assert(ret == 0);
+    ret = trove_collection_setinfo(0, 0, TROVE_ALT_AIO_MODE,
+        &server_config.trove_alt_aio_mode);
     /* this should never fail */
     assert(ret == 0);
 

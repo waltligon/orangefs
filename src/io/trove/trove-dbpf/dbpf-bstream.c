@@ -73,6 +73,41 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
 
+struct alt_aio_item
+{   
+    struct aiocb *cb_p;
+    struct sigevent *sig;
+    struct qlist_head list_link;
+};      
+static int alt_lio_listio(int mode, struct aiocb *list[],
+    int nent, struct sigevent *sig);
+static void* alt_lio_thread(void*);
+extern int TROVE_alt_aio_mode;
+
+
+#ifdef __PVFS2_TROVE_AIO_THREADED__ 
+/* allow bypassing default lio_listio implementation if user requests it and
+ * some conditions are met
+ */
+static inline int LIO_LISTIO(int mode, struct aiocb *list[],
+    int nent, struct sigevent *sig)
+{
+    if((TROVE_alt_aio_mode) && (nent == 1) && 
+        (((list[0])->aio_lio_opcode == LIO_READ) || 
+        ((list[0])->aio_lio_opcode == LIO_WRITE)) && 
+        (mode == LIO_NOWAIT))
+    { 
+        return(alt_lio_listio(mode, list, nent, sig)); 
+    } 
+    else 
+    { 
+        return(lio_listio(mode, list, nent, sig)); 
+    } 
+}
+#else
+#define LIO_LISTIO lio_listio
+#endif
+
 #ifdef __PVFS2_TROVE_AIO_THREADED__
 #include "dbpf-thread.h"
 #include "pvfs2-internal.h"
@@ -321,7 +356,7 @@ static void start_delayed_ops_if_any(int dec_first)
             }
         }
 
-        ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count,
+        ret = LIO_LISTIO(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count,
                          &cur_op->op.u.b_rw_list.sigev);
 
         if (ret != 0)
@@ -423,7 +458,7 @@ static int issue_or_delay_io_operation(
             }
         }
 
-        ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
+        ret = LIO_LISTIO(LIO_NOWAIT, aiocb_ptr_array,
                          aiocb_inuse_count, sig);
         if (ret != 0)
         {
@@ -1336,6 +1371,108 @@ struct TROVE_bstream_ops dbpf_bstream_ops =
     dbpf_bstream_write_list,
     dbpf_bstream_flush
 };
+
+int alt_lio_listio(int mode, struct aiocb *list[],
+    int nent, struct sigevent *sig) 
+{   
+    struct alt_aio_item* tmp_item;
+    int ret;
+    pthread_t tid;
+    pthread_attr_t attr;
+    
+    /* alt_lio only supports a subset of the full lio functionality */
+    /* NOTE: an earlier check is supposed to make sure that we don't invoke
+     * this function for unsupported cases
+     */
+    assert(mode == LIO_NOWAIT);
+    assert(nent == 1);
+    assert((list[0]->aio_lio_opcode == LIO_READ) ||
+        (list[0]->aio_lio_opcode == LIO_WRITE));
+    
+    tmp_item = (struct alt_aio_item*)malloc(sizeof(struct alt_aio_item));
+    if(!tmp_item)
+    {
+        /* preserve errno */
+        return(-1);
+    }
+    tmp_item->cb_p = list[0];
+    tmp_item->sig = sig;
+    
+    /* set detached state */
+    ret = pthread_attr_init(&attr);
+    if(ret != 0)
+    {
+        free(tmp_item);
+        errno = ret;
+        return(-1);
+    }
+    ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    if(ret != 0)
+    {
+        free(tmp_item);
+        errno = ret;
+        return(-1);
+    }
+
+    /* create thread to perform I/O and trigger callback */
+    ret = pthread_create(&tid, &attr, alt_lio_thread, tmp_item);
+    if(ret != 0)
+    {
+        free(tmp_item);
+        errno = ret;
+        return(-1);
+    }
+
+    return(0);
+}
+
+/* prototypes for pread and pwrite; _XOPEN_SOURCE causes db.h problems */
+ssize_t pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+static void* alt_lio_thread(void* foo)
+{
+    struct alt_aio_item* tmp_item = (struct alt_aio_item*)foo;
+    int ret = 0;
+
+    if(tmp_item->cb_p->aio_lio_opcode == LIO_READ)
+    {
+        ret = pread(tmp_item->cb_p->aio_fildes,
+            (void*)tmp_item->cb_p->aio_buf,
+            tmp_item->cb_p->aio_nbytes,
+            tmp_item->cb_p->aio_offset);
+    }
+    else if(tmp_item->cb_p->aio_lio_opcode == LIO_WRITE)
+    {
+        ret = pwrite(tmp_item->cb_p->aio_fildes,
+            (const void*)tmp_item->cb_p->aio_buf,
+            tmp_item->cb_p->aio_nbytes,
+            tmp_item->cb_p->aio_offset);
+    }
+    else
+    {
+        /* this should have been caught already */
+        assert(0);
+    }
+
+    /* store error and return codes */
+    if(ret < 0)
+    {
+        tmp_item->cb_p->__error_code = errno;
+    }
+    else
+    {
+        tmp_item->cb_p->__error_code = 0;
+        tmp_item->cb_p->__return_value = ret;
+    }
+
+    /* run callback fn */
+    tmp_item->sig->sigev_notify_function(
+        tmp_item->sig->sigev_value);
+
+    free(tmp_item);
+
+    return(NULL);
+}
 
 /*
  * Local variables:
