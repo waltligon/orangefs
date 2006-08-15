@@ -964,6 +964,10 @@ static int server_initialize_subsystems(
         &server_config.trove_alt_aio_mode);
     /* this should never fail */
     assert(ret == 0);
+    ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
+        &server_config.trove_max_concurrent_io);
+    /* this should never fail */
+    assert(ret == 0);
 
     /* parse port number and allow trove to use it to help differentiate
      * shmem regions if needed

@@ -67,6 +67,8 @@ static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
 static DOTCONF_CB(get_handle_recycle_timeout_seconds);
+static DOTCONF_CB(get_flow_buffer_size_bytes);
+static DOTCONF_CB(get_flow_buffers_per_flow);
 static DOTCONF_CB(get_attr_cache_keywords_list);
 static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
@@ -74,6 +76,7 @@ static DOTCONF_CB(get_trove_sync_meta);
 static DOTCONF_CB(get_trove_alt_aio);
 static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_db_cache_size_bytes);
+static DOTCONF_CB(get_trove_max_concurrent_io);
 static DOTCONF_CB(get_db_cache_type);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
@@ -424,6 +427,12 @@ static const configoption_t options[] =
     {"ID",ARG_INT, get_filesystem_collid,NULL,
         CTX_FILESYSTEM,NULL},
 
+    /* maximum number of AIO operations that Trove will allow to run
+     * concurrently 
+     */
+    {"TroveMaxConcurrentIO", ARG_INT, get_trove_max_concurrent_io, NULL,
+        CTX_DEFAULTS|CTX_GLOBAL,"16"},
+
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  The output of these
      * different log levels is written to a file, which is specified in
@@ -573,6 +582,14 @@ static const configoption_t options[] =
      */
     {"FlowModules",ARG_LIST, get_flow_module_list,NULL,
         CTX_DEFAULTS|CTX_GLOBAL,"flowproto_multiqueue,"},
+
+    /* buffer size to use for bulk data transfers */
+    {"FlowBufferSizeBytes", ARG_INT,
+         get_flow_buffer_size_bytes, NULL, CTX_FILESYSTEM,"262144"},
+
+    /* number of buffers to use for bulk data transfers */
+    {"FlowBuffersPerFlow", ARG_INT,
+         get_flow_buffers_per_flow, NULL, CTX_FILESYSTEM,"8"},
 
     /* The TROVE storage layer has a management component that deals with
      * allocating handle values for new metafiles and datafiles.  The underlying
@@ -749,6 +766,7 @@ int PINT_parse_config(
     config_s->client_job_flow_timeout = PVFS2_CLIENT_JOB_FLOW_TIMEOUT_DEFAULT;
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
+    config_s->trove_max_concurrent_io = 16;
 
     if (cache_config_files(
             config_s, global_config_filename, server_config_filename))
@@ -986,6 +1004,8 @@ DOTCONF_CB(enter_filesystem_context)
     fs_conf->encoding = ENCODING_DEFAULT;
     fs_conf->trove_sync_meta = TROVE_SYNC;
     fs_conf->trove_sync_data = TROVE_SYNC;
+    fs_conf->fp_buffer_size = -1;
+    fs_conf->fp_buffers_per_flow = -1;
 
     if (!config_s->file_systems)
     {
@@ -1389,6 +1409,31 @@ static const char * replace_old_keystring(const char * oldkey)
 }
 
 
+DOTCONF_CB(get_flow_buffer_size_bytes)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    fs_conf->fp_buffer_size = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_flow_buffers_per_flow)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    fs_conf->fp_buffers_per_flow = cmd->data.value;
+
+    return NULL;
+}
+
 DOTCONF_CB(get_attr_cache_keywords_list)
 {
     int i = 0, len = 0;
@@ -1574,6 +1619,14 @@ DOTCONF_CB(get_db_cache_size_bytes)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     config_s->db_cache_size_bytes = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_trove_max_concurrent_io)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->trove_max_concurrent_io = cmd->data.value;
     return NULL;
 }
 
@@ -2331,6 +2384,9 @@ static void copy_filesystem(
             src_fs->attr_cache_max_num_elems;
         dest_fs->trove_sync_meta = src_fs->trove_sync_meta;
         dest_fs->trove_sync_data = src_fs->trove_sync_data;
+
+        dest_fs->fp_buffer_size = src_fs->fp_buffer_size;
+        dest_fs->fp_buffers_per_flow = src_fs->fp_buffers_per_flow;
     }
 }
 

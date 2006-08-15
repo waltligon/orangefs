@@ -306,6 +306,8 @@ void PINT_flow_reset(flow_descriptor *flow_d)
     flow_d->aggregate_size = -1;
     flow_d->state = FLOW_INITIAL;
     flow_d->type = FLOWPROTO_DEFAULT;
+    flow_d->buffers_per_flow = -1;
+    flow_d->buffer_size = -1;
 
     flow_d->flow_mutex = (tmp_mutex ? tmp_mutex : gen_mutex_build());
     assert(flow_d->flow_mutex);

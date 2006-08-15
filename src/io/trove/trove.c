@@ -32,6 +32,7 @@ struct PINT_perf_counter* PINT_server_pc = NULL;
 int TROVE_db_cache_size_bytes = 0;
 int TROVE_alt_aio_mode = 0;
 int TROVE_shm_key_hint = 0;
+int TROVE_max_concurrent_io = 16;
 
 /** Initiate reading from a contiguous region in a bstream into a
  *  contiguous region in memory.
@@ -968,6 +969,11 @@ int trove_collection_setinfo(
     if(option == TROVE_ALT_AIO_MODE)
     {
         TROVE_alt_aio_mode = *((int*)parameter);
+	return(0);
+    }
+    if(option == TROVE_MAX_CONCURRENT_IO)
+    {
+        TROVE_max_concurrent_io = *((int*)parameter);
 	return(0);
     }
 

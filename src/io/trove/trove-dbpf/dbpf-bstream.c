@@ -31,7 +31,7 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 #define AIOCB_ARRAY_SZ 64
 
-#define DBPF_MAX_IOS_IN_PROGRESS  16
+extern int TROVE_max_concurrent_io;
 static int s_dbpf_ios_in_progress = 0;
 static dbpf_op_queue_p s_dbpf_io_ready_queue = NULL;
 static gen_mutex_t s_dbpf_io_mutex = GEN_MUTEX_INITIALIZER;
@@ -312,9 +312,6 @@ static void start_delayed_ops_if_any(int dec_first)
                (cur_op->op.type == BSTREAM_WRITE_LIST));
         dbpf_op_queue_remove(cur_op);
 
-        assert(s_dbpf_ios_in_progress <
-               (DBPF_MAX_IOS_IN_PROGRESS + 1));
-
         gossip_debug(GOSSIP_TROVE_DEBUG, "starting delayed I/O "
                      "operation %p (%d in progress)\n", cur_op,
                      s_dbpf_ios_in_progress);
@@ -398,7 +395,7 @@ static int issue_or_delay_io_operation(
     {
         s_dbpf_ios_in_progress--;
     }
-    if (s_dbpf_ios_in_progress < DBPF_MAX_IOS_IN_PROGRESS)
+    if (s_dbpf_ios_in_progress < TROVE_max_concurrent_io)
     {
         s_dbpf_ios_in_progress++;
     }

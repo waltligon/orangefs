@@ -85,6 +85,9 @@ typedef struct filesystem_configuration_s
     int coalescing_high_watermark;
     int coalescing_low_watermark;
 
+    int fp_buffer_size;
+    int fp_buffers_per_flow;
+
 } filesystem_configuration_s;
 
 typedef struct distribution_param_configuration_s
@@ -149,6 +152,9 @@ typedef struct server_configuration_s
     int trove_alt_aio_mode;         /* enables experimental alternative AIO
                                      * implementation for some types of 
                                      * operations 
+                                     */
+    int trove_max_concurrent_io;    /* allow the number of aio operations to
+                                     * be configurable.
                                      */
 } server_configuration_s;
 

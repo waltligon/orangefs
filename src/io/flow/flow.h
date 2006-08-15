@@ -120,6 +120,10 @@ struct flow_descriptor
     /* information about the datafile that this flow will access */
     PINT_request_file_data file_data;
 
+    /* the buffer settings may be ignored by some protocols */
+    int buffer_size;            /* buffer size to use */
+    int buffers_per_flow;       /* number of buffers to allow per flow */
+
 	/***********************************************************/
     /* fields that can be read publicly upon completion */
 
