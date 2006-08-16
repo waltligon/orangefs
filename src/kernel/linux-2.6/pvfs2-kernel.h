@@ -366,7 +366,7 @@ typedef struct
     sector_t last_failed_block_index_read;
     int error_code;
 
-    unsigned long time_flags;
+    unsigned long pinode_flags;
     /* All allocated pvfs2_inode_t objects are chained to a list */
     struct list_head list;
 } pvfs2_inode_t;
@@ -374,18 +374,24 @@ typedef struct
 #define P_ATIME_FLAG 0
 #define P_MTIME_FLAG 1
 #define P_CTIME_FLAG 2
+#define P_MODE_FLAG  3
 
-#define ClearAtimeFlag(pinode) clear_bit(P_ATIME_FLAG, &(pinode)->time_flags)
-#define SetAtimeFlag(pinode)   set_bit(P_ATIME_FLAG, &(pinode)->time_flags)
-#define AtimeFlag(pinode)      test_bit(P_ATIME_FLAG, &(pinode)->time_flags)
+#define ClearAtimeFlag(pinode) clear_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
+#define SetAtimeFlag(pinode)   set_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
+#define AtimeFlag(pinode)      test_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
 
-#define ClearMtimeFlag(pinode) clear_bit(P_MTIME_FLAG, &(pinode)->time_flags)
-#define SetMtimeFlag(pinode)   set_bit(P_MTIME_FLAG, &(pinode)->time_flags)
-#define MtimeFlag(pinode)      test_bit(P_MTIME_FLAG, &(pinode)->time_flags)
+#define ClearMtimeFlag(pinode) clear_bit(P_MTIME_FLAG, &(pinode)->pinode_flags)
+#define SetMtimeFlag(pinode)   set_bit(P_MTIME_FLAG, &(pinode)->pinode_flags)
+#define MtimeFlag(pinode)      test_bit(P_MTIME_FLAG, &(pinode)->pinode_flags)
 
-#define ClearCtimeFlag(pinode) clear_bit(P_CTIME_FLAG, &(pinode)->time_flags)
-#define SetCtimeFlag(pinode)   set_bit(P_CTIME_FLAG, &(pinode)->time_flags)
-#define CtimeFlag(pinode)      test_bit(P_CTIME_FLAG, &(pinode)->time_flags)
+#define ClearCtimeFlag(pinode) clear_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
+#define SetCtimeFlag(pinode)   set_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
+#define CtimeFlag(pinode)      test_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
+
+#define ClearModeFlag(pinode)  clear_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define SetModeFlag(pinode)    set_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define ModeFlag(pinode)       test_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+
 
 /** mount options.  only accepted mount options are listed.
  */
@@ -634,7 +640,7 @@ int     fs_mount_pending(PVFS_fs_id fsid);
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
-int pvfs2_flush_times(struct inode *inode);
+int pvfs2_flush_inode(struct inode *inode);
 
 ssize_t pvfs2_inode_getxattr(
         struct inode *inode, const char* prefix,

@@ -381,16 +381,16 @@ static inline int copy_attributes_from_inode(
             }
             else
             {
-                gossip_debug(GOSSIP_UTILS_DEBUG, "User attempted to set sticky bit on non-root "
-                    "directory; returning EINVAL.\n");
+                gossip_debug(GOSSIP_UTILS_DEBUG, "User attempted to set sticky bit"
+                        "on non-root directory; returning EINVAL.\n");
                 return(-EINVAL);
             }
         }
 
         if (tmp_mode & (S_ISUID))
         {
-            gossip_debug(GOSSIP_UTILS_DEBUG, "Attempting to set setuid bit (not supported); "
-                "returning EINVAL.\n");
+            gossip_debug(GOSSIP_UTILS_DEBUG, "Attempting to set setuid bit "
+                    "(not supported); returning EINVAL.\n");
             return(-EINVAL);
         }
 
@@ -546,17 +546,18 @@ int pvfs2_inode_setattr(
             ClearAtimeFlag(pvfs2_inode);
             ClearMtimeFlag(pvfs2_inode);
             ClearCtimeFlag(pvfs2_inode);
+            ClearModeFlag(pvfs2_inode);
         }
     }
     return ret;
 }
 
-int pvfs2_flush_times(struct inode *inode)
+int pvfs2_flush_inode(struct inode *inode)
 {
     /*
      * If it is a dirty inode, this function gets called.
      * Gather all the information that needs to be setattr'ed
-     * Right now, this will only be used for atime, mtime 
+     * Right now, this will only be used for mode, atime, mtime 
      * and/or ctime.
      */
     struct iattr wbattr;
@@ -567,6 +568,8 @@ int pvfs2_flush_times(struct inode *inode)
     /*  -- Lazy atime,mtime and ctime update --
      * Note: all times are dictated by server in the new scheme 
      * and not by the clients
+     *
+     * Also mode updates are being handled now..
      */
 
     if (MtimeFlag(pvfs2_inode))
@@ -575,9 +578,14 @@ int pvfs2_flush_times(struct inode *inode)
         wbattr.ia_valid |= ATTR_CTIME;
     if (AtimeFlag(pvfs2_inode))
         wbattr.ia_valid |= ATTR_ATIME;
+    if (ModeFlag(pvfs2_inode)) 
+    {
+        wbattr.ia_mode = inode->i_mode;
+        wbattr.ia_valid |= ATTR_MODE;
+    }
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "*********** pvfs2_flush_times: %ld (ia_valid %d)\n", 
-            (long) inode->i_ino, wbattr.ia_valid);
+    gossip_debug(GOSSIP_UTILS_DEBUG, "*********** pvfs2_flush_mode: %ld "
+            "(ia_valid %d)\n", (long) inode->i_ino, wbattr.ia_valid);
     if (wbattr.ia_valid == 0)
     {
         return 0;

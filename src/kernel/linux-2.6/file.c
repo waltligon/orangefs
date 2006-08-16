@@ -1762,7 +1762,7 @@ int pvfs2_file_release(
     gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_release: called on %s\n",
                 file->f_dentry->d_name.name);
 
-    pvfs2_flush_times(inode);
+    pvfs2_flush_inode(inode);
     if (S_ISDIR(inode->i_mode))
     {
         return dcache_dir_close(inode, file);
@@ -1808,7 +1808,7 @@ int pvfs2_fsync(
 
     op_release(new_op);
 
-    pvfs2_flush_times(file->f_dentry->d_inode);
+    pvfs2_flush_inode(file->f_dentry->d_inode);
     return ret;
 }
 

@@ -897,7 +897,7 @@ static void pvfs2_flush_sb(
         struct inode *inode = NULL;
         list_for_each_entry (inode, &sb->s_dirty, i_list)
         {
-            pvfs2_flush_times(inode);
+            pvfs2_flush_inode(inode);
         }
     }
     return;
