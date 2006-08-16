@@ -45,7 +45,7 @@ do {                                                                  \
 struct result_chain_entry
 {
     PVFS_id_gen_t posted_id;
-    void *buffer_offset;
+    char *buffer_offset;
     PINT_Request_result result;
     PVFS_size size_list[MAX_REGIONS];
     PVFS_offset offset_list[MAX_REGIONS];

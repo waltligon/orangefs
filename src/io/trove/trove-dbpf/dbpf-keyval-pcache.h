@@ -28,7 +28,7 @@ int PINT_dbpf_keyval_pcache_lookup(
     PINT_dbpf_keyval_pcache *pcache,
     TROVE_handle handle,
     TROVE_ds_position pos,
-    const char ** keyname,
+    const void ** keyname,
     int * length);
 
 int PINT_dbpf_keyval_pcache_insert( 

@@ -904,7 +904,7 @@ struct PVFS_servreq_small_io
     PVFS_size sizes[SMALL_IO_MAX_SEGMENTS];
 
     PVFS_size total_bytes; /* changed from int32_t */
-    void * buffer;
+    char * buffer;
 };
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1007,7 +1007,7 @@ struct PVFS_servresp_small_io
     /* for writes, this is the amount written.  
      * for reads, this is the number of bytes read */
     PVFS_size result_size; 
-    void * buffer;
+    char * buffer;
 };
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

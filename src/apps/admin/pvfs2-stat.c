@@ -444,19 +444,22 @@ void print_stats(const PVFS_object_ref * ref,
    }
    if(attr->mask & PVFS_ATTR_SYS_ATIME)
    {
-      sprintf(a_time, "%s", ctime((const time_t *)&(attr)->atime));
+      time_t a_tmp = attr->atime;
+      sprintf(a_time, "%s", ctime((const time_t *)&a_tmp));
       a_time[strlen(a_time)-1] = 0;
       fprintf(stdout, "  atime         : %llu (%s)\n", llu(attr->atime), a_time);
    }
    if(attr->mask & PVFS_ATTR_SYS_MTIME)
    {
-      sprintf(m_time, "%s", ctime((const time_t *)&(attr)->mtime));
+      time_t m_tmp = attr->mtime;
+      sprintf(m_time, "%s", ctime((const time_t *)&m_tmp));
       m_time[strlen(m_time)-1] = 0;
       fprintf(stdout, "  mtime         : %llu (%s)\n", llu(attr->mtime), m_time);
    }
    if(attr->mask & PVFS_ATTR_SYS_CTIME)
    {
-      sprintf(c_time, "%s", ctime((const time_t *)&(attr)->ctime));
+      time_t c_tmp = attr->ctime;
+      sprintf(c_time, "%s", ctime((const time_t *)&c_tmp));
       c_time[strlen(c_time)-1] = 0;
       fprintf(stdout, "  ctime         : %llu (%s)\n", llu(attr->ctime), c_time);
    }
