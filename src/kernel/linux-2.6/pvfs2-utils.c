@@ -588,14 +588,21 @@ int pvfs2_flush_times(struct inode *inode)
 }
 
 /* metafile distribution */
-#define DIST_KEY "system.pvfs2." METAFILE_DIST_KEYSTR
+#define DIST_KEY    "system.pvfs2." METAFILE_DIST_KEYSTR
 /* datafile handles */
-#define DFILE_KEY "system.pvfs2." DATAFILE_HANDLES_KEYSTR
+#define DFILE_KEY   "system.pvfs2." DATAFILE_HANDLES_KEYSTR
+/* symlink */
+#define SYMLINK_KEY "system.pvfs2." SYMLINK_TARGET_KEYSTR
+/* root handle */  
+#define ROOT_KEY    "system.pvfs2." ROOT_HANDLE_KEYSTR
+/* directory entry key */
+#define DIRENT_KEY  "system.pvfs2." DIRECTORY_ENTRY_KEYSTR
 
 /* Extended attributes helper functions */
 static char *xattr_non_zero_terminated[] = {
     DFILE_KEY,
-    DIST_KEY
+    DIST_KEY,
+    ROOT_KEY,
 };
 
 /* Extended attributes helper functions */
@@ -615,6 +622,31 @@ static int xattr_zero_terminated(const char *name)
             return 0;
     }
     return 1;
+}
+
+static char *xattr_resvd_keys[] = {
+    DFILE_KEY,
+    DIST_KEY,
+    DIRENT_KEY,
+    SYMLINK_KEY,
+    ROOT_KEY,
+};
+/*
+ * this function returns
+ * 0 if the key corresponding to name is not meant to be printed as part of a listxattr
+ * 1 if the key corresponding to name is meant to be returned as part of a listxattr.
+ * Currently xattr_resvd_keys[] is the array that holds the reserved entries
+ */
+static int is_reserved_key(const char *key, size_t size)
+{
+    int i;
+    static int resv_count = sizeof(xattr_resvd_keys)/sizeof(char *);
+    for (i = 0; i < resv_count; i++) 
+    {
+        if (strncmp(key, xattr_resvd_keys[i], size) == 0)
+            return 1;
+    }
+    return 0;
 }
 
 /*
@@ -667,9 +699,6 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
          * later on...
          */
         new_op->upcall.req.getxattr.key_sz = ret + 1;
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_getxattr: key %s, key_sz %d\n", 
-                (char*)new_op->upcall.req.getxattr.key, 
-                (int) new_op->upcall.req.getxattr.key_sz);
 
         ret = service_operation(
             new_op, "pvfs2_inode_getxattr",  
@@ -718,8 +747,11 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
                     memcpy(buffer, new_op->downcall.resp.getxattr.val, 
                             new_length);
                     ret = new_length;
-                    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_getxattr: key: %s, val_length: %d\n",
-                        (char*)new_op->upcall.req.getxattr.key, (int) ret);
+                    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %ld key %s "
+                            " key_sz %d, val_length %d\n", 
+                        (long) inode->i_ino,
+                        (char*)new_op->upcall.req.getxattr.key, 
+                        (int) new_op->upcall.req.getxattr.key_sz, (int) ret);
                 }
             }
         }
@@ -727,7 +759,6 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         {
             ret = -ENODATA; /* if no such keys exists we set this to be errno */
         }
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_getxattr: returning %d\n", (int) ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -768,6 +799,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
     /* This is equivalent to a removexattr */
     if (size == 0 && value == NULL)
     {
+        gossip_debug(GOSSIP_XATTR_DEBUG, "removing xattr (%s%s)\n", prefix, name);
         return pvfs2_inode_removexattr(inode, prefix, name);
     }
     if (inode)
@@ -802,15 +834,17 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         /* For some reason, val_sz should include the \0 at the end as well */
         new_op->upcall.req.setxattr.keyval.val_sz = size + 1;
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_setxattr: key %s, key_sz %d\n", 
+        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: key %s, key_sz %d "
+                " value size %d\n", 
                  (char*)new_op->upcall.req.setxattr.keyval.key, 
-                 (int) new_op->upcall.req.setxattr.keyval.key_sz);
+                 (int) new_op->upcall.req.setxattr.keyval.key_sz,
+                 size + 1);
 
         ret = service_operation(
             new_op, "pvfs2_inode_setxattr", 
             get_interruptible_flag(inode));
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_setxattr: returning %d\n", ret);
+        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: returning %d\n", ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -854,7 +888,7 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
             PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
         new_op->upcall.req.removexattr.key_sz = ret + 1;
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_removexattr: key %s, key_sz %d\n", 
+        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_removexattr: key %s, key_sz %d\n", 
                 (char*)new_op->upcall.req.removexattr.key, 
                 (int) new_op->upcall.req.removexattr.key_sz);
 
@@ -866,7 +900,7 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
         {
             ret = -ENODATA;
         }
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_removexattr: returning %d\n", ret);
+        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_removexattr: returning %d\n", ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -887,7 +921,7 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
 int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
 {
     ssize_t ret = -ENOMEM, total = 0;
-    int i = 0;
+    int i = 0, count_keys = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
     ssize_t length = 0;
@@ -952,10 +986,26 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
                 {
                     if (total + new_op->downcall.resp.listxattr.lengths[i] <= size)
                     {
-                        memcpy(buffer + total, new_op->downcall.resp.listxattr.key + key_size,
-                                new_op->downcall.resp.listxattr.lengths[i]);
+                        /* Since many dumb programs try to setxattr() on our reserved xattrs
+                         * this is a feeble attempt at defeating those by not listing them
+                         * in the output of listxattr.. sigh
+                         */
+
+                        if (is_reserved_key(new_op->downcall.resp.listxattr.key + key_size, 
+                                            new_op->downcall.resp.listxattr.lengths[i]) == 0)
+                        {
+                            gossip_debug(GOSSIP_XATTR_DEBUG, "Copying key %d -> %s\n", 
+                                    i, new_op->downcall.resp.listxattr.key + key_size);
+                            memcpy(buffer + total, new_op->downcall.resp.listxattr.key + key_size,
+                                    new_op->downcall.resp.listxattr.lengths[i]);
+                            total += new_op->downcall.resp.listxattr.lengths[i];
+                            count_keys++;
+                        }
+                        else {
+                            gossip_debug(GOSSIP_XATTR_DEBUG, "[RESERVED] key %d -> %s\n", 
+                                    i, new_op->downcall.resp.listxattr.key + key_size);
+                        }
                         key_size += new_op->downcall.resp.listxattr.lengths[i];
-                        total += new_op->downcall.resp.listxattr.lengths[i];
                     }
                     else {
                         goto done;
@@ -968,8 +1018,9 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
             }
         }
     done:
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_listxattr: returning %d (filled in %d keys)\n",
-                ret ? (int) ret : (int) total, i);
+        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_listxattr: returning %d [size of buffer %ld] "
+                "(filled in %d keys)\n",
+                ret ? (int) ret : (int) total, (long) size, count_keys);
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
         up_read(&pvfs2_inode->xattr_sem);

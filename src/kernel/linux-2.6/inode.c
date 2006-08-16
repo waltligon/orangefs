@@ -375,6 +375,8 @@ struct inode *pvfs2_get_custom_inode(
             goto error;
 	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %ld\n", 
+                (long) inode->i_ino);
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);
 #endif
