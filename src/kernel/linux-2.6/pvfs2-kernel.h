@@ -284,12 +284,6 @@ extern struct xattr_handler pvfs2_xattr_acl_default_handler, pvfs2_xattr_acl_acc
 extern struct xattr_handler pvfs2_xattr_trusted_handler;
 extern struct xattr_handler pvfs2_xattr_default_handler;
 
-typedef struct {
-    int32_t p_tag;
-    uint32_t p_perm;
-    uint32_t p_id;
-} pvfs2_acl_entry;
-
 #endif
 
 static inline int convert_to_internal_xattr_flags(int setxattr_flags)
@@ -648,7 +642,7 @@ ssize_t pvfs2_inode_getxattr(
 int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         const char *name, const void *value, size_t size, int flags);
 int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
-        const char *name);
+        const char *name, int flags);
 int pvfs2_inode_listxattr(struct inode *inode, char *, size_t);
 
 int pvfs2_inode_getattr(

@@ -536,7 +536,7 @@ int pvfs2_inode_setattr(
             new_op, "pvfs2_inode_setattr", 
             get_interruptible_flag(inode));
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_setattr: returning %d\n", ret);
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_inode_setattr: returning %d\n", ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -808,7 +808,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
     if (size == 0 && value == NULL)
     {
         gossip_debug(GOSSIP_XATTR_DEBUG, "removing xattr (%s%s)\n", prefix, name);
-        return pvfs2_inode_removexattr(inode, prefix, name);
+        return pvfs2_inode_removexattr(inode, prefix, name, flags);
     }
     if (inode)
     {
@@ -862,7 +862,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
 }
 
 int pvfs2_inode_removexattr(struct inode *inode, const char* prefix, 
-    const char *name)
+    const char *name, int flags)
 {
     int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -906,9 +906,14 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
 
         if (ret == -ENOENT)
         {
-            ret = -ENODATA;
+            /* Request to replace a non-existent attribute is an error */
+            if (flags & XATTR_REPLACE)
+                ret = -ENODATA;
+            else
+                ret = 0;
         }
-        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_removexattr: returning %d\n", ret);
+        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_removexattr: returning %d\n",
+                ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -1080,7 +1085,7 @@ static inline struct inode *pvfs2_create_file(
         new_op, "pvfs2_create_file", 
         get_interruptible_flag(dir));
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "Create Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
+    gossip_debug(GOSSIP_ACL_DEBUG, "Create Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
                 llu(new_op->downcall.resp.create.refn.handle),
                 new_op->downcall.resp.create.refn.fs_id, ret);
 
@@ -1110,12 +1115,14 @@ static inline struct inode *pvfs2_create_file(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
+        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Regular File) %ld -> %s\n",
+                (long) inode->i_ino, dentry->d_name.name);
     }
     else
     {
         *error_code = ret;
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_file: failed with error code %d\n",
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_create_file: failed with error code %d\n",
                     *error_code);
     }
 
@@ -1195,6 +1202,8 @@ static inline struct inode *pvfs2_create_dir(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
+        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Directory) %ld -> %s\n",
+                (long) inode->i_ino, dentry->d_name.name);
     }
     else
     {
@@ -1282,6 +1291,8 @@ static inline struct inode *pvfs2_create_symlink(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
+        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Symlink) %ld -> %s\n",
+                (long) inode->i_ino, dentry->d_name.name);
     }
     else
     {

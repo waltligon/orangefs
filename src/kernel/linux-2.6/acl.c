@@ -163,6 +163,7 @@ pvfs2_acl_encode(const struct posix_acl *acl, size_t *size)
             case ACL_GROUP_OBJ:
             case ACL_MASK:
             case ACL_OTHER:
+                entry->p_id = htobmi32(ACL_UNDEFINED_ID);
                 e += sizeof(pvfs2_acl_entry);
                 break;
 
@@ -250,7 +251,7 @@ pvfs2_get_acl(struct inode *inode, int type)
 static int
 pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 {
-    int error;
+    int error = 0;
     void *value = NULL;
     size_t size = 0;
     const char *name = NULL;
@@ -291,7 +292,7 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
                     inode->i_mode = mode;
                     SetModeFlag(pvfs2_inode);
                     mark_inode_dirty_sync(inode);
-                    if (error == 0) /* not equivalent */
+                    if (error == 0) /* equivalent. so dont set acl! */
                         acl = NULL;
                 }
             }
@@ -329,7 +330,12 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
     }
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: name %s, value %p, size %d, "
             " acl %p\n", name, value, size, acl);
-    /* Go ahead and set the extended attribute now */
+    /* Go ahead and set the extended attribute now 
+     * NOTE: Suppose acl was NULL, then value will be NULL and 
+     * size will be 0 and that will xlate to a removexattr.
+     * However, we dont want removexattr complain if attributes
+     * does not exist.
+     */
     error = pvfs2_inode_setxattr(inode, "", name, value, size, 0);
     if (value) 
     {
@@ -631,8 +637,12 @@ static int pvfs2_check_acl(struct inode *inode, int mask)
 
     acl = pvfs2_get_acl(inode, ACL_TYPE_ACCESS);
 
-    if (IS_ERR(acl))
-        return PTR_ERR(acl);
+    if (IS_ERR(acl)) {
+        int error = PTR_ERR(acl);
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: pvfs2_get_acl returned error %d\n",
+                error);
+        return error;
+    }
     if (acl) 
     {
         int error = posix_acl_permission(inode, acl, mask);
@@ -653,15 +663,25 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
     ret = generic_permission(inode, mask, pvfs2_check_acl);
     if (ret != 0)
     {
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: inode: %ld mask = %x"
-                "mode = %x current->fsuid = %x "
-                "inode->i_uid = %x, inode->i_gid = %x  ret = %d\n",
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission failed: inode: %ld mask = %o"
+                "mode = %o current->fsuid = %d "
+                "inode->i_uid = %d, inode->i_gid = %d "
+                "in_group_p = %d "
+                "(ret = %d)\n",
                 (long) inode->i_ino, mask, inode->i_mode, current->fsuid, 
-                inode->i_uid, inode->i_gid, ret);
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: mode [%x] & mask [%x] "
-                " & S_IRWXO [%x] = %d == mask [%x]?\n", 
+                inode->i_uid, inode->i_gid, 
+                in_group_p(inode->i_gid),
+                ret);
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: mode [%o] & mask [%o] "
+                " & S_IRWXO [%o] = %o == mask [%o]?\n", 
                 inode->i_mode, mask, S_IRWXO, 
                 (inode->i_mode & mask & S_IRWXO), mask);
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: did we check ACL's? (mode & S_IRWXG = %d)\n",
+                inode->i_mode & S_IRWXG);
+    }
+    else {
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission succeeded on inode %ld\n",
+                (long) inode->i_ino);
     }
     return ret;
 #else
@@ -669,9 +689,13 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
     int mode = inode->i_mode;
     int error;
 
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: mask = %x mode = %x "
-            "current->fsuid = %x, inode->i_uid = %x\n",
-            mask, mode, current->fsuid, inode->i_uid);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: inode: %ld mask = %o"
+            "mode = %o current->fsuid = %d "
+            "inode->i_uid = %d, inode->i_gid = %d"
+            "in_group_p = %d\n", 
+            (long) inode->i_ino, mask, mode, current->fsuid,
+            inode->i_uid, inode->i_gid,
+            in_group_p(inode->i_gid));
 
     /* No write access on a rdonly FS */
     if ((mask & MAY_WRITE) && IS_RDONLY(inode) &&
@@ -699,11 +723,7 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
              * Access ACL won't work if we don't have group permission bits
              * set on the file!
              */
-            gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: [ACL] mode >> 3 (%x)"
-                    " & mask (%x) & S_IRWXO (%x) [%x] != mask [%x]\n",
-                    mode >> 3, mask, S_IRWXO, ((mode >> 3) & mask & S_IRWXO),
-                    mask);
-            if (((mode >> 3) & mask & S_IRWXO) != mask)
+            if (!(mode & S_IRWXG))
             {
                 goto check_groups;
             }
@@ -733,6 +753,8 @@ check_groups:
     {
         return 0;
     }
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: mode (%o) & mask (%o) & S_IRWXO (%o) = %o == mask (%o)?\n",
+            mode, mask, S_IRWXO, mode & mask & S_IRWXO, mask);
 check_capabilities:
     /* Are we allowed to override DAC */
     if (!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))

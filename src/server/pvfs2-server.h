@@ -376,6 +376,10 @@ typedef struct PINT_server_op
     PINT_sm_msgpair_state *msgarray;
     PINT_sm_msgpair_params msgarray_params;
 
+    PVFS_handle target_handle;
+    PVFS_fs_id target_fs_id;
+    PVFS_object_attr *target_object_attr;
+
     union
     {
 	/* request-specific scratch spaces for use during processing */

@@ -23,7 +23,8 @@
 enum 
 {
     STATE_ENOTDIR = 22,
-    STATE_NOMORESEGS = 23
+    STATE_NOMORESEGS = 23,
+    LOOKUP_CHECK_DIR_ACLS = 24,
 };
 
 static int lookup_init(
@@ -33,6 +34,10 @@ static int lookup_cleanup(
 static int lookup_read_object_metadata(
     PINT_server_op *s_op, job_status_s* js_p);
 static int lookup_verify_object_metadata(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_check_acls_if_needed(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_check_acls(
     PINT_server_op *s_op, job_status_s* js_p);
 static int lookup_read_directory_entry(
     PINT_server_op *s_op, job_status_s* js_p);
@@ -52,6 +57,8 @@ machine pvfs2_lookup_sm(
     read_directory_entry_handle,
     read_directory_entry,
     verify_object_metadata,
+    read_directory_acls,
+    check_acls,
     setup_resp,
     final_response,
     cleanup)
@@ -80,6 +87,20 @@ machine pvfs2_lookup_sm(
     state verify_object_metadata
     {
         run lookup_verify_object_metadata;
+        LOOKUP_CHECK_DIR_ACLS => read_directory_acls;
+        success => read_directory_entry_handle;
+        default => setup_resp;
+    }
+
+    state read_directory_acls
+    {
+        run lookup_check_acls_if_needed;
+        default => check_acls;
+    }
+
+    state check_acls
+    {
+        run lookup_check_acls;
         success => read_directory_entry_handle;
         default => setup_resp;
     }
@@ -225,6 +246,10 @@ static int lookup_read_object_metadata(
     /* update our successful handle read count */
     s_op->u.lookup.handle_ct++;
 
+    /* Copy the fsid and handle to the s_op structure for the acl check */
+    s_op->target_handle = handle;
+    s_op->target_fs_id = s_op->req->u.lookup_path.fs_id;
+
     /* get the dspace attributes/metadata */
     ret = job_trove_dspace_getattr(
         s_op->req->u.lookup_path.fs_id, handle, s_op, ds_attr,
@@ -270,6 +295,7 @@ static int lookup_verify_object_metadata(
 
     PVFS_ds_attr_to_object_attr(ds_attr, a_p);
     a_p->mask = PVFS_ATTR_COMMON_ALL;
+    s_op->target_object_attr = a_p;
 
     /* update our successful attr read count */
     s_op->u.lookup.attr_ct++;
@@ -326,6 +352,7 @@ static int lookup_verify_object_metadata(
         /* doesn't look like we have permission to traverse directory; bail
          * out
          */
+        js_p->error_code = LOOKUP_CHECK_DIR_ACLS;
         return(1);
     }
 
@@ -341,6 +368,108 @@ static int lookup_verify_object_metadata(
 		 s_op->u.lookup.segp);
 
 
+    return 1;
+}
+
+/*
+ * Post a keyval DB read of the posix acls to check and see if 
+ * directory traversal is allowed or not
+ */
+static int lookup_check_acls_if_needed(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    /* If we get here with an invalid fsid and handle, we have to
+     * return -PVFS_EACCESS 
+     */
+    if (s_op->target_fs_id == PVFS_FS_ID_NULL
+        || s_op->target_handle == PVFS_HANDLE_NULL)
+    {
+        js_p->error_code = -PVFS_EACCES;
+        return 1;
+    }
+    js_p->error_code = 0;
+
+    memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
+    memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
+    s_op->key.buffer = "system.posix_acl_access";
+    s_op->key.buffer_sz = strlen(s_op->key.buffer) + 1;
+    s_op->val.buffer = (char *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
+    if (!s_op->val.buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
+
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "About to retrieve acl keyvals "
+                 "for handle %llu\n", llu(s_op->target_handle));
+
+    /* Read acl keys */
+    ret = job_trove_keyval_read(
+        s_op->target_fs_id,
+        s_op->target_handle,
+        &s_op->key,
+        &s_op->val,
+        0,
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &i,
+        server_job_context);
+    return ret;
+}
+
+/*
+ * Verify if the completed keyval DB operation allows the lookup
+ * to proceed or not. i.e. executable privileges on directory
+ * for the requesting user or not.
+ */
+static int lookup_check_acls(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    PVFS_object_attr *obj_attr = NULL;
+    int want = PVFS2_ACL_EXECUTE;
+
+    /* The dspace attr must have been read at this point */
+    obj_attr = s_op->target_object_attr;
+    assert(obj_attr);
+
+    /* anything non-zero we treat as a real error */
+    if (js_p->error_code)
+    {
+        goto cleanup;
+    }
+    /* ok; let the actual acl check be done */
+    js_p->error_code = PINT_check_acls(s_op->val.buffer,
+                        s_op->val.read_sz,
+                        obj_attr, 
+                        s_op->req->credentials.uid,
+                        s_op->req->credentials.gid,
+                        want);
+    /* if we are good to go,
+       find the segment that we should look up in the directory */
+    if (js_p->error_code == 0)
+    {
+        int ret = PINT_string_next_segment(
+            s_op->req->u.lookup_path.path, &s_op->u.lookup.segp,
+            &s_op->u.lookup.segstate);
+
+        assert(ret == 0);
+
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  after ACL check "
+                    "object is a directory; will be "
+                     "looking for handle for segment \"%s\" in a bit\n",
+                     s_op->u.lookup.segp);
+    }
+cleanup:
+    if (s_op->val.buffer) 
+        free(s_op->val.buffer);
+    memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
+    memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
     return 1;
 }
 

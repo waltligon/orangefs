@@ -1707,6 +1707,8 @@ static int server_post_unexpected_recv(job_status_s *js_p)
         }
         memset(s_op, 0, sizeof(PINT_server_op));
         s_op->op = BMI_UNEXPECTED_OP;
+        s_op->target_handle = PVFS_HANDLE_NULL;
+        s_op->target_fs_id = PVFS_FS_ID_NULL;
         /* Add an unexpected s_ops to the list */
         qlist_add_tail(&s_op->next, &posted_sop_list);
 
@@ -1844,6 +1846,8 @@ int server_state_machine_alloc_noreq(
         }
         memset(*new_op, 0, sizeof(PINT_server_op));
         (*new_op)->op = op;
+        (*new_op)->target_handle = PVFS_HANDLE_NULL;
+        (*new_op)->target_fs_id = PVFS_FS_ID_NULL;
 
         /* NOTE: We do not add these state machines to the in-progress or posted sop lists */
 

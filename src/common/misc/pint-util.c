@@ -25,6 +25,7 @@
 #include "gen-locks.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
+#include "bmi-byteswap.h"
 
 static int current_tag = 1;
 static gen_mutex_t current_tag_lock = GEN_MUTEX_INITIALIZER;
@@ -302,7 +303,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
  * checks to see if the type of access described by "access_type" is permitted 
  * for user "uid" of group "gid" on the object with attributes "attr"
  *
- * returns 0 on success, -PVFS_EPERM if permission is not granted
+ * returns 0 on success, -PVFS_EACCES if permission is not granted
  */
 int PINT_check_mode(
     PVFS_object_attr *attr,
@@ -451,8 +452,9 @@ int PINT_check_mode(
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
     }
   
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "******PINT_check_mode: denying access\n");
     /* default case: access denied */
-    return -PVFS_EPERM;
+    return -PVFS_EACCES;
 }
 
 /* PINT_check_group()
@@ -556,6 +558,144 @@ static int PINT_check_group(uid_t uid, gid_t gid)
     return(-PVFS_ENOENT);
 }
 
+/* Checks if a given user is part of any groups that matches the file gid */
+static int in_group_p(PVFS_uid uid, PVFS_gid gid, PVFS_gid attr_group)
+{
+    if (attr_group == gid)
+        return 1;
+    if (PINT_check_group(uid, attr_group) == 0)
+        return 1;
+    return 0;
+}
+
+/*
+ * Return 0 if requesting clients is granted want access to the object
+ * by the acl. Returns -PVFS_E... otherwise.
+ */
+int PINT_check_acls(void *acl_buf, size_t acl_size, 
+    PVFS_object_attr *attr,
+    PVFS_uid uid, PVFS_gid gid, int want)
+{
+    pvfs2_acl_entry pe, *pa;
+    int i = 0, found = 0, count = 0;
+    uint32_t perm_mask = (PVFS_ATTR_COMMON_UID |
+                          PVFS_ATTR_COMMON_GID |
+                          PVFS_ATTR_COMMON_PERM);
+
+    if (acl_size == 0)
+    {
+        gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "no acl's present.. denying access\n");
+        return -PVFS_EACCES;
+    }
+
+    /* keyval for ACLs includes a \0. so subtract the thingie */
+    acl_size--;
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: read keyval size "
+    " %d (%d acl entries)\n",
+        acl_size, 
+        acl_size / sizeof(pvfs2_acl_entry));
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
+        uid, gid, want);
+
+    assert((attr->mask & perm_mask) == perm_mask);
+    assert(acl_buf);
+    assert(acl_size % sizeof(pvfs2_acl_entry) == 0);
+    count = acl_size / sizeof(pvfs2_acl_entry);
+
+    for (i = 0; i < count; i++)
+    {
+        pa = (pvfs2_acl_entry *) acl_buf + i;
+        /* 
+           NOTE: Remember that keyval is encoded as lebf, so convert it 
+           to host representation 
+        */
+        pe.p_tag  = bmitoh32(pa->p_tag);
+        pe.p_perm = bmitoh32(pa->p_perm);
+        pe.p_id   = bmitoh32(pa->p_id);
+        pa = &pe;
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
+            "(p_tag %d, p_perm %d, p_id %d)\n",
+            i, pa->p_tag, pa->p_perm, pa->p_id);
+        switch(pa->p_tag) 
+        {
+            case PVFS2_ACL_USER_OBJ:
+                /* (May have been checked already) */
+                if (attr->owner == uid)
+                    goto check_perm;
+                break;
+            case PVFS2_ACL_USER:
+                if (pa->p_id == uid)
+                    goto mask;
+                break;
+            case PVFS2_ACL_GROUP_OBJ:
+                if (in_group_p(uid, gid, attr->group)) 
+                {
+                    found = 1;
+                    if ((pa->p_perm & want) == want)
+                        goto mask;
+                }
+                break;
+            case PVFS2_ACL_GROUP:
+                if (in_group_p(uid, gid, pa->p_id)) {
+                    found = 1;
+                    if ((pa->p_perm & want) == want)
+                        goto mask;
+                }
+                break;
+            case PVFS2_ACL_MASK:
+                break;
+            case PVFS2_ACL_OTHER:
+                if (found)
+                {
+                    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls:"
+                        "returning access denied\n");
+                    return -PVFS_EACCES;
+                }
+                else
+                    goto check_perm;
+            default:
+                gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: "
+                        "returning EIO\n");
+                return -PVFS_EIO;
+        }
+    }
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: returning EIO\n");
+    return -PVFS_EIO;
+mask:
+    /* search the remaining entries */
+    i = i + 1;
+    for (; i < count; i++)
+    {
+        pvfs2_acl_entry me, *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
+        
+        /* 
+          NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
+          convert it to host endian format
+         */
+        me.p_tag  = bmitoh32(mask_obj->p_tag);
+        me.p_perm = bmitoh32(mask_obj->p_perm);
+        me.p_id   = bmitoh32(mask_obj->p_id);
+        mask_obj = &me;
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
+            "(p_tag %d, p_perm %d, p_id %d)\n",
+            i, mask_obj->p_tag, mask_obj->p_perm, mask_obj->p_id);
+        if (mask_obj->p_tag == PVFS2_ACL_MASK) 
+        {
+            if ((pa->p_perm & mask_obj->p_perm & want) == want)
+                return 0;
+            gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls:"
+                "returning access denied (mask)\n");
+            return -PVFS_EACCES;
+        }
+    }
+
+check_perm:
+    if ((pa->p_perm & want) == want)
+        return 0;
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: returning"
+            "access denied\n");
+    return -PVFS_EACCES;
+}
 
 /*
  * Local variables:
