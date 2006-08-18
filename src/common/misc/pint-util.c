@@ -584,7 +584,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 
     if (acl_size == 0)
     {
-        gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "no acl's present.. denying access\n");
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no acl's present.. denying access\n");
         return -PVFS_EACCES;
     }
 
@@ -647,19 +647,19 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
             case PVFS2_ACL_OTHER:
                 if (found)
                 {
-                    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls:"
+                    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(1) PINT_check_acls:"
                         "returning access denied\n");
                     return -PVFS_EACCES;
                 }
                 else
                     goto check_perm;
             default:
-                gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: "
+                gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(2) PINT_check_acls: "
                         "returning EIO\n");
                 return -PVFS_EIO;
         }
     }
-    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: returning EIO\n");
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(3) PINT_check_acls: returning EIO\n");
     return -PVFS_EIO;
 mask:
     /* search the remaining entries */
@@ -676,14 +676,14 @@ mask:
         me.p_perm = bmitoh32(mask_obj->p_perm);
         me.p_id   = bmitoh32(mask_obj->p_id);
         mask_obj = &me;
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded (mask) ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
             i, mask_obj->p_tag, mask_obj->p_perm, mask_obj->p_id);
         if (mask_obj->p_tag == PVFS2_ACL_MASK) 
         {
             if ((pa->p_perm & mask_obj->p_perm & want) == want)
                 return 0;
-            gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls:"
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(4) PINT_check_acls:"
                 "returning access denied (mask)\n");
             return -PVFS_EACCES;
         }
@@ -692,7 +692,7 @@ mask:
 check_perm:
     if ((pa->p_perm & want) == want)
         return 0;
-    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: returning"
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(5) PINT_check_acls: returning"
             "access denied\n");
     return -PVFS_EACCES;
 }

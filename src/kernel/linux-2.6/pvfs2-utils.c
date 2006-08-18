@@ -582,9 +582,11 @@ int pvfs2_flush_inode(struct inode *inode)
     {
         wbattr.ia_mode = inode->i_mode;
         wbattr.ia_valid |= ATTR_MODE;
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_flush_inode (%ld) writing mode %o\n",
+                (long) inode->i_ino, inode->i_mode);
     }
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "*********** pvfs2_flush_mode: %ld "
+    gossip_debug(GOSSIP_UTILS_DEBUG, "*********** pvfs2_flush_inode: %ld "
             "(ia_valid %d)\n", (long) inode->i_ino, wbattr.ia_valid);
     if (wbattr.ia_valid == 0)
     {

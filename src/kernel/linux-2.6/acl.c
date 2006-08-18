@@ -510,6 +510,7 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
 
     if (dir == NULL)
         dir = inode;
+    ClearModeFlag(pvfs2_inode);
     if (!S_ISLNK(inode->i_mode))
     {
         if (get_acl_flag(inode) == 1)
@@ -525,10 +526,9 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
         {
             int old_mode = inode->i_mode;
             inode->i_mode &= ~current->fs->umask;
-            gossip_debug(GOSSIP_ACL_DEBUG, "inode->i_mode before %x and "
-                    "after %x\n", old_mode, inode->i_mode);
+            gossip_debug(GOSSIP_ACL_DEBUG, "inode->i_mode before %o and "
+                    "after %o\n", old_mode, inode->i_mode);
             SetModeFlag(pvfs2_inode);
-            mark_inode_dirty_sync(inode);
         }
     }
     if (get_acl_flag(inode) == 1 && acl)
@@ -542,6 +542,7 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
             if (error) {
                 gossip_err("pvfs2_set_acl (default) directory failed with "
                         "error %d\n", error);
+                ClearModeFlag(pvfs2_inode);
                 goto cleanup;
             }
         }
@@ -549,6 +550,7 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
         error = -ENOMEM;
         if (!clone) {
             gossip_err("posix_acl_clone failed with ENOMEM\n");
+            ClearModeFlag(pvfs2_inode);
             goto cleanup;
         }
         mode = inode->i_mode;
@@ -556,10 +558,13 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
         if (error >= 0)
         {
             gossip_debug(GOSSIP_ACL_DEBUG, "posix_acl_create_masq changed mode "
-                    "from %x to %x\n", inode->i_mode, mode);
+                    "from %o to %o\n", inode->i_mode, mode);
+            /*
+             * Dont do a needless ->setattr() if mode has not changed 
+             */
+            if (inode->i_mode != mode)
+                SetModeFlag(pvfs2_inode);
             inode->i_mode = mode;
-            SetModeFlag(pvfs2_inode);
-            mark_inode_dirty_sync(inode);
             /* 
              * if this is an ACL that cannot be captured by
              * the mode bits, go for the server! 
@@ -572,6 +577,9 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
         }
         posix_acl_release(clone);
     }
+    /* If mode of the inode was changed, then do a forcible ->setattr */
+    if (ModeFlag(pvfs2_inode))
+        pvfs2_flush_inode(inode);
 cleanup:
     posix_acl_release(acl);
     return error;

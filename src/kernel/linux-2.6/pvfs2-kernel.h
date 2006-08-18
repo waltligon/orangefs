@@ -382,10 +382,9 @@ typedef struct
 #define SetCtimeFlag(pinode)   set_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
 #define CtimeFlag(pinode)      test_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
 
-#define ClearModeFlag(pinode)  clear_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
-#define SetModeFlag(pinode)    set_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
-#define ModeFlag(pinode)       test_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
-
+#define ClearModeFlag(pinode) clear_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define SetModeFlag(pinode)   set_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define ModeFlag(pinode)      test_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
 
 /** mount options.  only accepted mount options are listed.
  */
