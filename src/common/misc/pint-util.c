@@ -592,8 +592,8 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
     acl_size--;
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: read keyval size "
     " %d (%d acl entries)\n",
-        acl_size, 
-        acl_size / sizeof(pvfs2_acl_entry));
+        (int) acl_size, 
+        (int) (acl_size / sizeof(pvfs2_acl_entry)));
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
         uid, gid, want);
 
