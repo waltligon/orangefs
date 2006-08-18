@@ -20,7 +20,6 @@
 #include "pint-dist-utils.h"
 #include "pint-sysint-utils.h"
 #include "gen-locks.h"
-#include "pint-servreq.h"
 #include "PINT-reqproto-encode.h"
 #include "trove.h"
 #include "server-config-mgr.h"
