@@ -35,20 +35,6 @@ void PINT_put_server_config_struct(struct server_configuration_s *config)
     PINT_server_config_mgr_put_config(config);
 }
 
-/* check permissions of a PVFS object against the access mode
- *
- * returns 0 on success, -1 on error
- */
-int PINT_check_perms(
-    PVFS_object_attr attr,
-    PVFS_permissions mode,
-    int uid, int gid)
-{
-    return ((((attr.perms & mode) == mode) ||
-             ((attr.group == gid) && (attr.perms & mode) == mode) ||
-             (attr.owner == uid)) ? 0 : -1);
-}
-
 /* PINT_lookup_parent()
  *
  * given a pathname and an fsid, looks up the handle of the parent

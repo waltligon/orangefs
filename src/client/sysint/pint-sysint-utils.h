@@ -28,16 +28,6 @@
 #include "trove.h"
 #include "server-config.h"
 
-int PINT_check_perms(
-    PVFS_object_attr attr,
-    PVFS_permissions mode,
-    int uid,
-    int gid);
-int PINT_do_lookup (
-    char* name,
-    PVFS_object_ref parent,
-    PVFS_credentials cred,
-    PVFS_object_ref *entry);
 int PINT_server_get_config(
     struct server_configuration_s *config,
     struct PVFS_sys_mntent* mntent);
