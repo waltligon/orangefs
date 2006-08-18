@@ -235,6 +235,7 @@ static inline int copy_attributes_to_inode(
         {
             /* special case: mark the root inode as sticky */
             inode->i_mode |= S_ISVTX;
+            gossip_debug(GOSSIP_ACL_DEBUG, "Marking inode %ld as sticky\n", (long) inode->i_ino);
         }
 
         switch (attrs->objtype)
@@ -278,13 +279,14 @@ static inline int copy_attributes_to_inode(
                     gossip_debug(GOSSIP_UTILS_DEBUG, "Copied attr link target %s\n",
                                 pvfs2_inode->link_target);
                 }
+                gossip_debug(GOSSIP_UTILS_DEBUG, "symlink mode %o\n", inode->i_mode);
                 ret = 0;
                 break;
             default:
                 gossip_err("pvfs2:copy_attributes_to_inode: got invalid "
                             "attribute type %x\n", attrs->objtype);
         }
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: copy_attributes_to_inode: setting inode->i_mode to %x from %x\n",
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: copy_attributes_to_inode: setting inode->i_mode to %o from %o\n",
                 inode->i_mode, old_mode);
     }
     return ret;
@@ -689,6 +691,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
     }
     if (inode)
     {
+        gossip_debug(GOSSIP_XATTR_DEBUG, "getxattr on inode %ld, name %s (uid %o, gid %o)\n", 
+                (long) inode->i_ino, name, current->fsuid, current->fsgid);
         pvfs2_inode = PVFS2_I(inode);
         /* obtain the xattr semaphore */
         down_read(&pvfs2_inode->xattr_sem);
@@ -768,6 +772,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         else if (ret == -ENOENT)
         {
             ret = -ENODATA; /* if no such keys exists we set this to be errno */
+            gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %ld key %s does not exist!\n",
+                    (long) inode->i_ino, (char *) new_op->upcall.req.getxattr.key);
         }
 
         /* when request is serviced properly, free req op struct */
@@ -814,10 +820,18 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
     }
     if (inode)
     {
+        gossip_debug(GOSSIP_XATTR_DEBUG, "setxattr on inode %ld, name %s\n", 
+                (long) inode->i_ino, name);
         if (IS_RDONLY(inode))
+        {
+            gossip_err("pvfs2_inode_setxattr: Read-only file system\n");
             return -EROFS;
+        }
         if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
+        {
+            gossip_err("pvfs2_inode_setxattr: Immutable inode or append-only inode; operation not permitted\n");
             return -EPERM;
+        }
         pvfs2_inode = PVFS2_I(inode);
 
         down_write(&pvfs2_inode->xattr_sem);

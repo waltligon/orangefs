@@ -261,7 +261,7 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
     if (S_ISLNK(inode->i_mode))
     {
         gossip_err("pvfs2_set_acl: disallow on symbolic links\n");
-        return -EOPNOTSUPP;
+        return -EACCES;
     }
     /* if ACL option is not set, then we return early */
     if (get_acl_flag(inode) == 0)
@@ -606,7 +606,7 @@ int pvfs2_acl_chmod(struct inode *inode)
     if (S_ISLNK(inode->i_mode))
     {
         gossip_err("pvfs2_acl_chmod: operation not permitted on symlink!\n");
-        error = -EOPNOTSUPP;
+        error = -EACCES;
         goto out;
     }
     acl = pvfs2_get_acl(inode, ACL_TYPE_ACCESS);
@@ -660,6 +660,7 @@ static int pvfs2_check_acl(struct inode *inode, int mask)
                 (long) inode->i_ino, acl, mask, error);
         return error;
     }
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl returning EAGAIN\n");
     return -EAGAIN;
 }
 

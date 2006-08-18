@@ -932,6 +932,8 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
         if (ret != 0)
         {
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "keyval get %s failed with error %s\n",
+                    key_entry.key, db_strerror(ret));
             op_p->u.k_read_list.err_array[i] = 
                 -dbpf_db_error_to_trove_error(ret);
             op_p->u.k_read_list.val_array[i].read_sz = 0;

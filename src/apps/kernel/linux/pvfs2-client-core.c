@@ -2081,6 +2081,9 @@ static inline void package_downcall_members(
                             val_sz);
                 }
             }
+            else {
+                PVFS_perror("getxattr: ", *error_code);
+            }
             /* free up the memory allocate to response.geteattr */
             free(vfs_request->response.geteattr.val_array[0].buffer);
             vfs_request->response.geteattr.val_array[0].buffer = NULL;

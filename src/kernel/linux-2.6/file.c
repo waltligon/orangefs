@@ -2128,6 +2128,7 @@ static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
     } else {
         if (is_read_only(inode->i_rdev)) {
             err = -EPERM;
+            gossip_err("Operation not permitted on read only file system\n");
             goto out;
         }
         if (pos >= inode->i_size) {
