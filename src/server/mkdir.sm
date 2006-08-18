@@ -177,6 +177,7 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
                  llu(js_p->handle));
 
     ds_attr = (&s_op->ds_attr);
+    PVFS_ds_init_time(ds_attr);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " setting directory version to "
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),

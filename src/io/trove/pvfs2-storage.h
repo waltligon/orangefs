@@ -97,60 +97,93 @@ struct PVFS_ds_storedattr_s
 };
 typedef struct PVFS_ds_storedattr_s PVFS_ds_storedattr;
 
+#define PVFS_ds_init_time(__dsa)                        \
+do {                                                    \
+    (__dsa)->ctime = time(NULL);                        \
+    (__dsa)->atime = time(NULL);                        \
+    (__dsa)->mtime = time(NULL);                        \
+} while (0)
+
 #define PVFS_ds_attr_to_stored(__from, __to)	        \
 do {						        \
     (__to) = * ((PVFS_ds_storedattr *) &(__from));	\
 } while (0)
 
-#define PVFS_ds_stored_to_attr(__from, __to, __b_size)\
+#define PVFS_ds_stored_to_attr(__from, __to, __b_size)          \
 do {                                                            \
-    memcpy(&__to, &__from, sizeof(PVFS_ds_storedattr));         \
+    memcpy(&(__to), &(__from), sizeof(PVFS_ds_storedattr));     \
     (__to).b_size = (__b_size);                                 \
 } while (0)
 
-#define PVFS_ds_attr_to_object_attr(__dsa, __oa)           \
-do {                                                       \
-    __oa->owner = __dsa->uid; __oa->group = __dsa->gid;    \
-    __oa->perms = __dsa->mode; __oa->ctime = __dsa->ctime; \
-    __oa->mtime = __dsa->mtime; __oa->atime = __dsa->atime;\
-    __oa->objtype = __dsa->type;                           \
-    __oa->u.meta.dfile_count = __dsa->dfile_count;         \
-    __oa->u.meta.dist_size = __dsa->dist_size;             \
+#define PVFS_ds_attr_to_object_attr(__dsa, __oa)                   \
+do {                                                               \
+    (__oa)->owner = (__dsa)->uid;                                  \
+    (__oa)->group = (__dsa)->gid;                                  \
+    (__oa)->perms = (__dsa)->mode;                                 \
+    (__oa)->ctime = (__dsa)->ctime;                                \
+    (__oa)->mtime = (__dsa)->mtime;                                \
+    (__oa)->atime = (__dsa)->atime;                                \
+    (__oa)->objtype = (__dsa)->type;                               \
+    (__oa)->u.meta.dfile_count = (__dsa)->dfile_count;             \
+    (__oa)->u.meta.dist_size = (__dsa)->dist_size;                 \
 } while(0)
 
 #define PVFS_object_attr_to_ds_attr(__oa, __dsa)           \
 do {                                                       \
-    __dsa->uid = __oa->owner; __dsa->gid = __oa->group;    \
-    __dsa->mode = __oa->perms; __dsa->ctime = __oa->ctime; \
-    __dsa->mtime = __oa->mtime; __dsa->atime = __oa->atime;\
-    __dsa->type = __oa->objtype;                           \
-    __dsa->dfile_count = __oa->u.meta.dfile_count;         \
-    __dsa->dist_size = __oa->u.meta.dist_size;             \
+    (__dsa)->uid = (__oa)->owner;                          \
+    (__dsa)->gid = (__oa)->group;                          \
+    (__dsa)->mode = (__oa)->perms;                         \
+    (__dsa)->ctime = (__oa)->ctime;                        \
+    (__dsa)->mtime = (__oa)->mtime;                        \
+    (__dsa)->atime = (__oa)->atime;                        \
+    (__dsa)->type = (__oa)->objtype;                       \
+    (__dsa)->dfile_count = (__oa)->u.meta.dfile_count;     \
+    (__dsa)->dist_size = (__oa)->u.meta.dist_size;         \
 } while(0)
 
 #define PVFS_object_attr_overwrite_setable(dest, src)          \
 do {                                                           \
-    if (src->mask & PVFS_ATTR_COMMON_UID)                      \
-        dest->owner = src->owner;                              \
-    if (src->mask & PVFS_ATTR_COMMON_GID)                      \
-        dest->group = src->group;                              \
-    if (src->mask & PVFS_ATTR_COMMON_PERM)                     \
-        dest->perms = src->perms;                              \
-    if (src->mask & PVFS_ATTR_COMMON_ATIME)                    \
-        dest->atime = src->atime;                              \
-    if (src->mask & PVFS_ATTR_COMMON_CTIME)                    \
-        dest->ctime = src->ctime;                              \
-    if (src->mask & PVFS_ATTR_COMMON_MTIME)                    \
-        dest->mtime = src->mtime;                              \
-    if (src->mask & PVFS_ATTR_COMMON_TYPE)                     \
+    if ((src)->mask & PVFS_ATTR_COMMON_UID)                    \
+        (dest)->owner = (src)->owner;                          \
+    if ((src)->mask & PVFS_ATTR_COMMON_GID)                    \
+        (dest)->group = (src)->group;                          \
+    if ((src)->mask & PVFS_ATTR_COMMON_PERM)                   \
+        (dest)->perms = (src)->perms;                          \
+    if ((src)->mask & PVFS_ATTR_COMMON_ATIME)                  \
     {                                                          \
-        dest->objtype = src->objtype;                          \
-        if ((src->objtype == PVFS_TYPE_METAFILE) &&            \
-            (src->mask & PVFS_ATTR_META_DIST))                 \
-            dest->u.meta.dist_size = src->u.meta.dist_size;    \
-        if ((src->objtype == PVFS_TYPE_METAFILE) &&            \
-            (src->mask & PVFS_ATTR_META_DFILES))               \
-            dest->u.meta.dfile_count = src->u.meta.dfile_count;\
+        if ((src)->mask & PVFS_ATTR_COMMON_ATIME_SET)          \
+        {                                                      \
+            (dest)->atime = (src)->atime;                      \
+        }                                                      \
+        else                                                   \
+        {                                                      \
+            (dest)->atime = time(NULL);                        \
+        }                                                      \
+    }                                                          \
+    if ((src)->mask & PVFS_ATTR_COMMON_MTIME)                  \
+    {                                                          \
+        if ((src)->mask & PVFS_ATTR_COMMON_MTIME_SET)          \
+        {                                                      \
+            (dest)->mtime = (src)->mtime;                      \
+        }                                                      \
+        else                                                   \
+        {                                                      \
+            (dest)->mtime = time(NULL);                        \
+        }                                                      \
+    }                                                          \
+    if ((src)->mask & PVFS_ATTR_COMMON_CTIME)                  \
+    {                                                          \
+        (dest)->ctime = time(NULL);                            \
+    }                                                          \
+    if ((src)->mask & PVFS_ATTR_COMMON_TYPE)                   \
+    {                                                          \
+        (dest)->objtype = (src)->objtype;                      \
+        if (((src)->objtype == PVFS_TYPE_METAFILE) &&          \
+            ((src)->mask & PVFS_ATTR_META_DIST))               \
+            (dest)->u.meta.dist_size = (src)->u.meta.dist_size;\
+        if (((src)->objtype == PVFS_TYPE_METAFILE) &&          \
+            ((src)->mask & PVFS_ATTR_META_DFILES))             \
+            (dest)->u.meta.dfile_count = (src)->u.meta.dfile_count;\
     }                                                          \
 } while(0)
 

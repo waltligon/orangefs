@@ -13,16 +13,21 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-#define ENTRIES_TO_ADD 255
+#define ENTRIES_TO_ADD 255 
+#define LESS_ENTRIES_TO_ADD 120
 
 int main(int argc, char **argv)
 {
     int ret = -1;
-    int found_flag, i;
+    int i,num_dirs,num_files;
     PVFS_object_ref test_ref;
     char new_filename[ENTRIES_TO_ADD][PVFS_NAME_MAX];
-
+    char* filename;
     PVFS_object_ref root_ref = {100, 200};
+    PVFS_object_ref parent_ref;
+    PVFS_object_ref entry_ref;
+    char entry_handle[1024];
+    char entry_name[PVFS_NAME_MAX] = "";
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1, GOSSIP_NCACHE_DEBUG);
@@ -35,32 +40,38 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PINT_ncache_set_timeout(5000);
+    PINT_ncache_set_info(TCACHE_TIMEOUT_MSECS,5000);
+    PINT_ncache_set_info(TCACHE_HARD_LIMIT,ENTRIES_TO_ADD - 1);
+    PINT_ncache_set_info(TCACHE_SOFT_LIMIT,LESS_ENTRIES_TO_ADD - 1);
 
     test_ref.handle = 1000;
     test_ref.fs_id = 2000;
-
-    ret = PINT_ncache_insert(
-        "testfile001", PVFS2_LOOKUP_LINK_NO_FOLLOW,
-        test_ref, root_ref);
-
+    filename = "testfile1000";
+    ret = PINT_ncache_update(
+        (const char*) filename,
+        (const PVFS_object_ref*) &test_ref, 
+        (const PVFS_object_ref*) &root_ref);
     test_ref.handle = 1001;
-    ret = PINT_ncache_insert(
-        "testfile001", PVFS2_LOOKUP_LINK_FOLLOW,
-        test_ref, root_ref);
-
-    ret = PINT_ncache_lookup(
-        "testfile001", PVFS2_LOOKUP_LINK_NO_FOLLOW,
-        root_ref, &test_ref);
-    if (test_ref.handle != 1000)
+    ret = PINT_ncache_get_cached_entry(
+        (const char*) filename, 
+        &test_ref,
+        (const PVFS_object_ref*) &root_ref); 
+    if (test_ref.handle != 1000 || ret != 0)
     {
         gossip_err("[1] Cannot properly resolve inserted entry!\n");
         return -1;
     }
 
-    ret = PINT_ncache_lookup(
-        "testfile001", PVFS2_LOOKUP_LINK_FOLLOW,
-        root_ref, &test_ref);
+    test_ref.handle = 1001;
+    ret = PINT_ncache_update(
+        (const char*) "testfile1001", 
+        (const PVFS_object_ref*) &test_ref, 
+        (const PVFS_object_ref*) &root_ref);
+
+    ret = PINT_ncache_get_cached_entry(
+        (const char*) "testfile1001", 
+        &test_ref,
+        (const PVFS_object_ref*) &root_ref); 
     if (test_ref.handle != 1001)
     {
         gossip_err("[2] Cannot properly resolve inserted entry!\n");
@@ -72,17 +83,20 @@ int main(int argc, char **argv)
 
     sleep(2);
 
-    for(i = 0; i < ENTRIES_TO_ADD; i++)
+    /* Insert a bunch of entries into the cache */
+    for(i = 1; i < ENTRIES_TO_ADD; i++)
     {
         snprintf(new_filename[i],PVFS_NAME_MAX,"ncache_testname%.3d",i);
 	test_ref.handle = i;
 	test_ref.fs_id = 0;
-	ret = PINT_ncache_insert(
-            new_filename[i], PVFS2_LOOKUP_LINK_NO_FOLLOW,
-            test_ref, root_ref);
+	ret = PINT_ncache_update(
+            (const char*) new_filename[i],
+            (const PVFS_object_ref*) &test_ref, 
+            (const PVFS_object_ref*) &root_ref);
 	if (ret < 0)
 	{
 	    gossip_err("Error: failed to insert entry.\n");
+            PVFS_perror_gossip("return code is: ", ret);
 	    return(-1);
 	}
     }
@@ -90,42 +104,17 @@ int main(int argc, char **argv)
     gossip_debug(GOSSIP_NCACHE_DEBUG, "Attempted insertion of %d ncache "
                  "elements\n", ENTRIES_TO_ADD);
 
-    for(i = 0; i < ENTRIES_TO_ADD; i++)
+    /* Make sure all entries can be retrieved */
+    for(i = 1; i < ENTRIES_TO_ADD; i++)
     {
-	ret = PINT_ncache_lookup(
-            new_filename[i], PVFS2_LOOKUP_LINK_NO_FOLLOW,
-            root_ref, &test_ref);
+	ret = PINT_ncache_get_cached_entry(
+            (const char*) new_filename[i], 
+            &test_ref,
+            (const PVFS_object_ref*) &root_ref); 
 	if ((ret < 0) && (ret != -PVFS_ENOENT))
 	{
-	    gossip_err("ncache_lookup() failure.\n");
+	    gossip_err("ncache_get_cached_entry() failure.\n");
 	    return(-1);
-	}
-
-	if (i >= (ENTRIES_TO_ADD - PINT_NCACHE_MAX_ENTRIES))
-	{
-	    if (ret == -PVFS_ENOENT)
-            {
-		gossip_err("Failure: lookup didn't find an entry %d.\n",i);
-                break;
-	    }
-	    /*should have a valid handle*/
-	    else if (test_ref.handle != (PVFS_handle)i)
-	    {
-		gossip_err("Failure: lookup returned %llu when it should "
-                           "have returned %d.\n", llu(test_ref.handle), i);
-                break;
-	    }
-	}
-	else
-	{
-	    /*these should be cache misses*/
-	    if (ret == 0)
-	    {
-		gossip_err("Failure: lookup returned %llu when it "
-                           "shouldn't have returned a handle.\n",
-                           llu(test_ref.handle));
-                break;
-	    }
 	}
     }
 
@@ -140,60 +129,56 @@ int main(int argc, char **argv)
     sleep(5);
 
     /* make sure all valid entries are now expired */
-    for(i = 0; i < ENTRIES_TO_ADD; i++)
+    for(i = 1; i < ENTRIES_TO_ADD; i++)
     {
-        if (i < (ENTRIES_TO_ADD - PINT_NCACHE_MAX_ENTRIES))
-        {
-            ret = PINT_ncache_lookup(
-                new_filename[i], PVFS2_LOOKUP_LINK_NO_FOLLOW,
-                root_ref, &test_ref);
+        ret = PINT_ncache_get_cached_entry(
+            (const char*) new_filename[i], 
+            &test_ref,
+            (const PVFS_object_ref*) &root_ref); 
 
-            if (ret != -PVFS_ENOENT)
-            {
-                gossip_err("ncache_lookup() failure.\n");
-                return(-1);
-            }
+        if (ret != -PVFS_ENOENT)
+        {
+            gossip_err("ncache_lookup() failure.\n");
+            return(-1);
         }
     }
 
     /*remove all entries */
-    for(i = 0; i < ENTRIES_TO_ADD; i++)
+    for(i = 1; i < ENTRIES_TO_ADD; i++)
     {
-	ret = PINT_ncache_remove(
-            new_filename[i], PVFS2_LOOKUP_LINK_NO_FOLLOW,
-            root_ref, &found_flag);
-	if (ret < 0)
-	{
-	    gossip_err("Error: ncache_remove() failure.\n");
-	    return(-1);
-	}
-
-	if (!found_flag)
-	{
-	    if (i >= (ENTRIES_TO_ADD - PINT_NCACHE_MAX_ENTRIES))
-	    {
-                /*should have a valid handle*/
-		gossip_err("Error: ncache_remove() didn't find %d when "
-                           "it was supposed to.\n", i);
-	    }
-	}
-	else
-	{
-	    if (i < (ENTRIES_TO_ADD - PINT_NCACHE_MAX_ENTRIES))
-	    {
-                /*shouldn't have a valid handle*/
-		gossip_err("Error: ncache_remove() found %d when it "
-                           "wasn't supposed to.\n", i);
-	    }
-	}
+	PINT_ncache_invalidate(
+            (const char*) new_filename[i], 
+            (const PVFS_object_ref*) &root_ref); 
     }
 
-    ret = PINT_ncache_finalize();
-    if (ret < 0)
+    PINT_ncache_set_info(TCACHE_TIMEOUT_MSECS,5000);
+    PINT_ncache_set_info(TCACHE_HARD_LIMIT, 20000);
+    PINT_ncache_set_info(TCACHE_SOFT_LIMIT, 10000);
+
+    /* Stress Test */
+    for(num_dirs=1;num_dirs<11;num_dirs++)
     {
-	gossip_err("ncache_finalize() failure.\n");
-	return(-1);
+        gossip_set_debug_mask(1, GOSSIP_NCACHE_DEBUG);
+        gossip_debug(GOSSIP_NCACHE_DEBUG, "Adding entries for dir [%d]\n", num_dirs);
+                
+        gossip_set_debug_mask(0, GOSSIP_NCACHE_DEBUG);
+        for(num_files=0;num_files<1000;num_files++)
+        {
+            snprintf(entry_name,PVFS_NAME_MAX,"child-dir%d",num_files);
+            sprintf(entry_handle, "%d%d", num_dirs, num_files);
+            entry_ref.handle = atoi(entry_handle); /* handle is [num_dirs][num_files] */
+        	entry_ref.fs_id = 1175112761L;
+            parent_ref.handle = 1879042325L + ((PVFS_handle) (num_dirs - 1));
+            parent_ref.fs_id = 1175112761L;
+
+        	ret = PINT_ncache_update(
+        	    (const char*) entry_name,
+                (const PVFS_object_ref*) &entry_ref, 
+                (const PVFS_object_ref*) &parent_ref);
+        }
     }
+
+    PINT_ncache_finalize();
     return(0);
 }
 

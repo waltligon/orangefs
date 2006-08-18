@@ -516,8 +516,8 @@ int BMI_post_recv(bmi_op_id_t * id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-                 "BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld\n",
-                 (long)src, (long)buffer, (long)expected_size);
+                 "BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
+                 (long)src, (long)buffer, (long)expected_size, (int)tag);
 
     *id = 0;
 
@@ -554,8 +554,8 @@ int BMI_post_send(bmi_op_id_t * id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-                 "BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld\n",
-                 (long)dest, (long)buffer, (long)size);
+                 "BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
+                 (long)dest, (long)buffer, (long)size, (int)tag);
 
     *id = 0;
 
@@ -592,8 +592,8 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_sendunexpected: addr: %ld, offset: 0x%lx, size: %ld\n", 
-	(long)dest, (long)buffer, (long)size);
+	"BMI_post_sendunexpected: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n", 
+	(long)dest, (long)buffer, (long)size, (int)tag);
 
     *id = 0;
 
@@ -1179,15 +1179,22 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	return(0);
     }
 
-    /*
-     * Pass the TCP address structure as the parameter for this operation,
-     * holding the lock.
-     */
-    if (option == BMI_TCP_CLOSE_SOCKET) {
-        inout_parameter = tmp_ref->method_addr;
-        ret = tmp_ref->interface->BMI_meth_set_info(option, inout_parameter);
+    /* if the caller requests a TCP specific close socket action */
+    if (option == BMI_TCP_CLOSE_SOCKET) 
+    {
+        /* check to see if the address is in fact a tcp address */
+        if(strcmp(tmp_ref->interface->method_name, "bmi_tcp") == 0)
+        {
+            /* take the same action as in the BMI_DEC_ADDR_REF case to clean
+             * out the entire address structure and anything linked to it so 
+             * that the next addr_lookup starts from scratch
+             */
+	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "Closing bmi_tcp connection at caller's request.\n"); 
+            ref_list_rem(cur_ref_list, addr);
+            dealloc_ref_st(tmp_ref);
+        }
         gen_mutex_unlock(&ref_mutex);
-        return ret;
+        return 0;
     }
 
     gen_mutex_unlock(&ref_mutex);
@@ -1439,8 +1446,8 @@ int BMI_post_send_list(bmi_op_id_t * id,
     int i;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_send_list: addr: %ld, count: %d, total_size: %ld\n", 
-	(long)dest, list_count, (long)total_size);
+	"BMI_post_send_list: addr: %ld, count: %d, total_size: %ld, tag: %d\n", 
+	(long)dest, list_count, (long)total_size, (int)tag);
 
     for(i=0; i<list_count; i++)
     {
@@ -1506,8 +1513,8 @@ int BMI_post_recv_list(bmi_op_id_t * id,
     int i;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_recv_list: addr: %ld, count: %d, total_size: %ld\n", 
-	(long)src, list_count, (long)total_expected_size);
+	"BMI_post_recv_list: addr: %ld, count: %d, total_size: %ld, tag: %d\n", 
+	(long)src, list_count, (long)total_expected_size, (int)tag);
 
     for(i=0; i<list_count; i++)
     {
@@ -1572,8 +1579,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
 	"BMI_post_sendunexpected_list: addr: %ld, count: %d, "
-                 "total_size: %ld\n",  (long)dest, list_count,
-                 (long)total_size);
+                 "total_size: %ld, tag: %d\n",  (long)dest, list_count,
+                 (long)total_size, (int)tag);
 
     for(i=0; i<list_count; i++)
     {
@@ -1627,6 +1634,14 @@ int BMI_cancel(bmi_op_id_t id,
                  "%s: cancel id %llu\n", __func__, llu(id));
 
     target_op = id_gen_safe_lookup(id);
+    if(target_op == NULL)
+    {
+        /* if we can't find the operation, then assume it has already
+         * completed naturally.
+         */
+        return(0);
+    }
+
     assert(target_op->op_id == id);
 
     if(active_method_table[target_op->addr->method_type]->BMI_meth_cancel)

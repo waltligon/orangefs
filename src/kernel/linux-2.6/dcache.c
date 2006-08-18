@@ -22,17 +22,17 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL;
 
-    pvfs2_print("pvfs2_d_revalidate_common: called on dentry %p.\n", dentry);
+    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: called on dentry %p.\n", dentry);
 
     /* find parent inode */
     if(dentry && dentry->d_parent)
     {
-        pvfs2_print("pvfs2_d_revalidate_common: parent found.\n");
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: parent found.\n");
         parent_inode = dentry->d_parent->d_inode;
     }
     else
     {
-        pvfs2_print("pvfs2_d_revalidate_common: parent not found.\n");
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: parent not found.\n");
     }
     
     if (inode && parent_inode)
@@ -43,7 +43,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         if(!(PVFS2_SB(inode->i_sb)->root_handle ==
             pvfs2_ino_to_handle(inode->i_ino)))
         {
-            pvfs2_print("pvfs2_d_revalidate_common: attempting lookup.\n");
+            gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: attempting lookup.\n");
             new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
             if (!new_op)
             {
@@ -73,7 +73,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
                (new_op->downcall.resp.lookup.refn.handle !=
                pvfs2_ino_to_handle(inode->i_ino)))
             {
-                pvfs2_print("pvfs2_d_revalidate_common: lookup failure or no match.\n");
+                gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: lookup failure or no match.\n");
                 op_release(new_op);
                 return(0);
             }
@@ -82,18 +82,18 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         }
         else
         {
-            pvfs2_print("pvfs2_d_revalidate_common: root handle, lookup skipped.\n");
+            gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: root handle, lookup skipped.\n");
         }
 
         /* now perform revalidation */
-        pvfs2_print(" (inode %llu)\n",
+        gossip_debug(GOSSIP_DCACHE_DEBUG, " (inode %llu)\n",
                     llu(pvfs2_ino_to_handle(inode->i_ino)));
-        pvfs2_print("pvfs2_d_revalidate_common: calling pvfs2_internal_revalidate().\n");
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: calling pvfs2_internal_revalidate().\n");
         ret = pvfs2_internal_revalidate(inode);
     }
     else
     {
-        pvfs2_print("\n");
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "\n");
     }
     return ret;
 }
@@ -119,7 +119,7 @@ static int pvfs2_d_revalidate(
     if (nd && (nd->flags & LOOKUP_FOLLOW) &&
         (!nd->flags & LOOKUP_CREATE))
     {
-        pvfs2_print("\npvfs2_d_revalidate: Trusting intent; "
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "\npvfs2_d_revalidate: Trusting intent; "
                     "skipping getattr\n");
         return 1;
     }
@@ -136,7 +136,7 @@ static int pvfs2_d_hash(
     struct dentry *parent,
     struct qstr *hash)
 {
-/*     pvfs2_print("pvfs2: pvfs2_d_hash called " */
+/*     gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2: pvfs2_d_hash called " */
 /*                 "(name: %s | len: %d | hash: %d)\n", */
 /*                 hash->name, hash->len, hash->hash); */
     return 0;
@@ -147,7 +147,7 @@ static int pvfs2_d_compare(
     struct qstr *d_name,
     struct qstr *name)
 {
-    pvfs2_print("pvfs2_d_compare: called on parent %p\n  (name1: %s| "
+    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_compare: called on parent %p\n  (name1: %s| "
                 "name2: %s)\n", parent, d_name->name, name->name);
 
     /* if we have a match, return 0 (normally called from __d_lookup) */

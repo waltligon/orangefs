@@ -57,7 +57,7 @@
  * Define this value to get O_DIRECT TO WORK PROPERLY,
  * THIS IS DEFINITELY A HACK FOR NOW, for evaluation purpose only ! 
  */
-/*#define THREADS_SCHEDULE_ONLY_ONE_HANDLE 1*/
+#define THREADS_SCHEDULE_ONLY_ONE_HANDLE 1
     
 int PREAD(int fd, void *buf, size_t count, off_t offset);
 int PWRITE(int fd, const void *buf, size_t count, off_t offset);
@@ -66,7 +66,8 @@ inline int PREAD(int fd, void *buf, size_t count, off_t offset){
     int ret = 0;
     int retSize = 0;
     do{
-        ret = pread(fd, buf + retSize, count - retSize, offset + retSize);
+        ret = pread(fd, ((char *)buf) + retSize, 
+		    count - retSize, offset + retSize);
         if (ret){
             retSize +=ret;
         }
@@ -78,7 +79,8 @@ inline int PWRITE(int fd, const void *buf, size_t count, off_t offset){
     int ret = 0;
     int retSize = 0;
     do{
-        ret = pwrite(fd, buf + retSize, count - retSize, offset + retSize);
+        ret = pwrite(fd, ((char *)buf) + retSize, 
+		     count - retSize, offset + retSize);
         if (ret){
             retSize +=ret;
         }
@@ -139,7 +141,7 @@ typedef struct io_handle_queue_t
     /*during processing in the active queue we need extra information */
     active_io_processing_t *active_io;
     
-    dbpf_op_queue_s requests[IO_QUEUE_LAST];
+    dbpf_op_queue_t requests[IO_QUEUE_LAST];
     /*
      * Number of requests to process, in case of real I/O ops read and write
      * these ops are transformed into their small contiguous I/O requests
@@ -303,7 +305,7 @@ static void transform_IO_req_to_Array(
 
     dbpf_queued_op_t *op;
     struct qlist_head *tmp_link;
-    dbpf_op_queue_s *queue = &elem->requests[queue_type];
+    dbpf_op_queue_t *queue = &elem->requests[queue_type];
 
     int current_trove_request = 0;
     qlist_for_each(tmp_link, &queue->list)
@@ -455,7 +457,7 @@ static void mark_ops_as_in_service_count_slices(
     /*at first mark operations as in service (reason dspace_cancel)...*/
     for (i = 0; i < IO_QUEUE_LAST; i++)
     {
-        dbpf_op_queue_s *queue = &elem->requests[i];
+        dbpf_op_queue_t *queue = &elem->requests[i];
         dbpf_queued_op_t *op;
         struct qlist_head *tmp_link;
         int slice_count = 0;
@@ -649,7 +651,7 @@ static int check_update_cache_size(
 }
 
 static void move_all_to_completion_queue(
-    dbpf_op_queue_s * op_queue,
+    dbpf_op_queue_t * op_queue,
     int ret)
 {
     int i;
@@ -674,7 +676,7 @@ static void process_IO_slice(
     TROVE_size * latest_offset_written,
     int *return_code_out,
     int thread_no,
-    char * odirectbuf,
+    unsigned char * odirectbuf,
     int openflags)
 {
     TROVE_size retSize = 0;
@@ -820,10 +822,7 @@ modifyBuffer:
             /* read more data and discard */
             retSize =
                 PREAD(fd, odirectbuf, physical_size, physical_startPos);
-            if (retSize < physical_size){
-                 gossip_debug(GOSSIP_TROVE_DEBUG,"Pread file too small %s %llu\n",strerror(errno), llu(retSize));
-                 retSize =  retSize - (TROVE_size) (physical_size - buff_offset);
-            }
+	    retSize -= buff_offset;
             memcpy(slice->mem_offset, odirectbuf + buff_offset, slice->size);
        }            
     }
@@ -858,7 +857,7 @@ static void * bstream_threaded_thread_io_function(
      * We reuse the biggest buffer, so no contig. malloc / free necessary.
      */
     void * odirectBuffAlloc;
-    char * buff_real;
+    unsigned char * buff_real;
     int ret;
     dbpf_queued_op_t *request;
     active_io_processing_slice_t *io_processing_slice;
@@ -1019,9 +1018,9 @@ static void * bstream_threaded_thread_io_function(
                            req_type, current_handle->active_io->filehandle,
                            io_processing_slice,
                            &current_handle->active_io->mutex,
-                           &current_handle->active_io->total_write_size,
                            io_processing_slice->parent_request->op.u.b_rw_list.
                            out_size_p, 
+                           &current_handle->active_io->total_write_size,
                            &current_handle->active_io->latest_offset_written,
                            &current_handle->active_io->return_code,
                            thread_number, buff_real, 
@@ -1033,9 +1032,9 @@ static void * bstream_threaded_thread_io_function(
                                req_type, current_handle->active_io->filehandle,
                                io_processing_slice,
                                &current_handle->active_io->mutex,
-                               &current_handle->active_io->total_write_size,
                                io_processing_slice->parent_request->op.u.
                                b_rw_list.out_size_p,
+                               &current_handle->active_io->total_write_size,
                                &current_handle->active_io->latest_offset_written,
                                &current_handle->active_io->return_code,
                                thread_number, buff_real,

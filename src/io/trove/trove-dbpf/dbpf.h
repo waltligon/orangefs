@@ -50,7 +50,7 @@ extern "C" {
 #endif
 
 #define TROVE_DB_OPEN_FLAGS              (TROVE_DB_DIRTY_READ | DB_THREAD)
-#define TROVE_DB_CREATE_FLAGS            (DB_CREATE | TROVE_DB_OPEN_FLAGS | TROVE_DB_OPEN_TXN)
+#define TROVE_DB_CREATE_FLAGS            (DB_CREATE | TROVE_DB_OPEN_FLAGS)
 
 /*
   for more efficient host filesystem accesses, we have a simple
@@ -85,8 +85,16 @@ extern "C" {
 do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"
+#define DBPF_GET_STO_ATTRIB_DBNAME(__buf, __path_max, __stoname)         \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%s", __stoname, STO_ATTRIB_DBNAME);   \
+} while (0)
 
 #define COLLECTIONS_DBNAME "collections.db"
+#define DBPF_GET_COLLECTIONS_DBNAME(__buf, __path_max, __stoname)        \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%s", __stoname, COLLECTIONS_DBNAME);  \
+} while (0)
 
 #define DBPF_GET_COLL_DIRNAME(__buf, __path_max, __stoname, __collid)    \
 do {                                                                     \

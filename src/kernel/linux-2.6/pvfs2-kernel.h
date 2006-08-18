@@ -59,6 +59,9 @@ typedef unsigned long sector_t;
 #include <linux/fs.h>
 
 #include "pvfs2-config.h"
+#include "pvfs2-debug.h"
+#include "gossip.h"
+
 #ifdef HAVE_AIO
 #include <linux/aio.h>
 #endif
@@ -76,6 +79,9 @@ typedef unsigned long sector_t;
 #endif
 #ifdef HAVE_LINUX_SYSCALLS_H
 #include <linux/syscalls.h>
+#endif
+#ifdef HAVE_LINUX_MOUNT_H
+#include <linux/mount.h>
 #endif
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
@@ -113,29 +119,6 @@ typedef unsigned long sector_t;
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-types.h"
-
-#define pvfs2_error printk
-
-#ifdef PVFS2_KERNEL_DEBUG
-#define pvfs2_print printk
-#define pvfs2_panic(msg)                                       \
-do {                                                           \
-    pvfs2_error("BUG! Please contact pvfs2-developers@beowulf-"\
-                "underground.org\n");                          \
-    panic(msg);                                                \
-} while(0)
-#else
-#define pvfs2_print(format...) do{                             \
-    if(debug)                                                  \
-        printk(format);                                        \
-}while(0)
-#define pvfs2_panic(msg)                                       \
-do {                                                           \
-    pvfs2_error("BUG! Please contact pvfs2-developers@beowulf-"\
-                "underground.org\n");                          \
-    pvfs2_error(msg);                                          \
-} while(0)
-#endif
 
 /*
   this attempts to disable the annotations used by the 'sparse' kernel
@@ -231,12 +214,12 @@ enum pvfs2_vfs_op_states {
 #define get_op(op) \
     do {\
         atomic_inc(&(op)->aio_ref_count);\
-        pvfs2_print("(get) Alloced OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+        gossip_debug(GOSSIP_CACHE_DEBUG, "(get) Alloced OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
     } while(0)
 #define put_op(op) \
     do {\
         if (atomic_sub_and_test(1, &(op)->aio_ref_count) == 1) {\
-            pvfs2_print("(put) Releasing OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+            gossip_debug(GOSSIP_CACHE_DEBUG, "(put) Releasing OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
             op_release(op);\
         }\
     } while(0)
@@ -382,9 +365,33 @@ typedef struct
 #endif
     sector_t last_failed_block_index_read;
     int error_code;
+
+    unsigned long pinode_flags;
     /* All allocated pvfs2_inode_t objects are chained to a list */
     struct list_head list;
 } pvfs2_inode_t;
+
+#define P_ATIME_FLAG 0
+#define P_MTIME_FLAG 1
+#define P_CTIME_FLAG 2
+#define P_MODE_FLAG  3
+
+#define ClearAtimeFlag(pinode) clear_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
+#define SetAtimeFlag(pinode)   set_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
+#define AtimeFlag(pinode)      test_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
+
+#define ClearMtimeFlag(pinode) clear_bit(P_MTIME_FLAG, &(pinode)->pinode_flags)
+#define SetMtimeFlag(pinode)   set_bit(P_MTIME_FLAG, &(pinode)->pinode_flags)
+#define MtimeFlag(pinode)      test_bit(P_MTIME_FLAG, &(pinode)->pinode_flags)
+
+#define ClearCtimeFlag(pinode) clear_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
+#define SetCtimeFlag(pinode)   set_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
+#define CtimeFlag(pinode)      test_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
+
+#define ClearModeFlag(pinode)  clear_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define SetModeFlag(pinode)    set_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define ModeFlag(pinode)       test_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+
 
 /** mount options.  only accepted mount options are listed.
  */
@@ -534,9 +541,16 @@ struct super_block* pvfs2_get_sb(
     void *data,
     int silent);
 #else
+#ifdef HAVE_VFSMOUNT_GETSB
+int pvfs2_get_sb(
+    struct file_system_type *fst, int flags,
+    const char *devname, void *data, 
+    struct vfsmount *mnt);
+#else
 struct super_block *pvfs2_get_sb(
     struct file_system_type *fst, int flags,
     const char *devname, void *data);
+#endif
 #endif
 
 void pvfs2_kill_sb(struct super_block *sb);
@@ -626,6 +640,7 @@ int     fs_mount_pending(PVFS_fs_id fsid);
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
+int pvfs2_flush_inode(struct inode *inode);
 
 ssize_t pvfs2_inode_getxattr(
         struct inode *inode, const char* prefix,
@@ -726,7 +741,6 @@ do {                                                         \
     spin_lock(&pvfs2_request_list_lock);                     \
     list_add_tail(&op->list, &pvfs2_request_list);           \
     spin_unlock(&pvfs2_request_list_lock);                   \
-                                                             \
     spin_unlock(&op->lock);                                  \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
@@ -739,7 +753,6 @@ do {                                                         \
     spin_lock(&pvfs2_request_list_lock);                     \
     list_add(&op->list, &pvfs2_request_list);                \
     spin_unlock(&pvfs2_request_list_lock);                   \
-                                                             \
     spin_unlock(&op->lock);                                  \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
@@ -848,10 +861,10 @@ do {                                                      \
 #ifdef USE_MMAP_RA_CACHE
 #define clear_inode_mmap_ra_cache(inode)                  \
 do {                                                      \
-  pvfs2_print("calling clear_inode_mmap_ra_cache on %d\n",\
+  gossip_debug(GOSSIP_INODE_DEBUG, "calling clear_inode_mmap_ra_cache on %d\n",\
               (int)inode->i_ino);                         \
   pvfs2_flush_mmap_racache(inode);                        \
-  pvfs2_print("clear_inode_mmap_ra_cache finished\n");    \
+  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_mmap_ra_cache finished\n");    \
 } while(0)
 #else
 #define clear_inode_mmap_ra_cache(inode)
@@ -859,7 +872,7 @@ do {                                                      \
 
 #define add_pvfs2_sb(sb)                                             \
 do {                                                                 \
-    pvfs2_print("Adding SB %p to pvfs2 superblocks\n", PVFS2_SB(sb));\
+    gossip_debug(GOSSIP_SUPER_DEBUG, "Adding SB %p to pvfs2 superblocks\n", PVFS2_SB(sb));\
     spin_lock(&pvfs2_superblocks_lock);                              \
     list_add_tail(&PVFS2_SB(sb)->list, &pvfs2_superblocks);          \
     spin_unlock(&pvfs2_superblocks_lock);                            \
@@ -874,7 +887,7 @@ do {                                                                 \
     list_for_each(tmp, &pvfs2_superblocks) {                         \
         pvfs2_sb = list_entry(tmp, pvfs2_sb_info_t, list);           \
         if (pvfs2_sb && (pvfs2_sb->sb == sb)) {                      \
-            pvfs2_print("Removing SB %p from pvfs2 superblocks\n",   \
+            gossip_debug(GOSSIP_SUPER_DEBUG, "Removing SB %p from pvfs2 superblocks\n",   \
                         pvfs2_sb);                                   \
             list_del(&pvfs2_sb->list);                               \
             break;                                                   \
@@ -916,15 +929,8 @@ do { ClearPageReserved(page); put_page(page); } while(0)
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
-    time_t cur_time = CURRENT_TIME;               \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
-    sys_attr.atime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.mtime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.ctime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
     sys_attr.size = 0;                            \
     sys_attr.perms = PVFS2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \
@@ -947,15 +953,8 @@ do                                                \
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
-    struct timespec cur_time = CURRENT_TIME;      \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
-    sys_attr.atime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.mtime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.ctime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
     sys_attr.size = 0;                            \
     sys_attr.perms = PVFS2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \

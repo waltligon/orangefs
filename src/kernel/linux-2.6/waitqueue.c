@@ -29,7 +29,7 @@ void purge_waiting_ops(void)
     list_for_each_entry(op, &pvfs2_request_list, list)
     {
         spin_lock(&op->lock);
-        pvfs2_print("pvfs2-client-core: purging op tag %lld %s\n", lld(op->tag), get_opname_string(op));
+        gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2-client-core: purging op tag %lld %s\n", lld(op->tag), get_opname_string(op));
         set_op_state_purged(op);
         spin_unlock(&op->lock);
         wake_up_interruptible(&op->waitq);
@@ -58,7 +58,7 @@ int service_operation(
 
 retry_servicing:
     op->downcall.status = 0;
-    pvfs2_print("pvfs2: service_operation: %s %p\n", op_name, op);
+    gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: service_operation: %s %p\n", op_name, op);
 
     /* mask out signals if this operation is not to be interrupted */
     if(!(flags & PVFS2_OP_INTERRUPTIBLE)) 
@@ -77,7 +77,7 @@ retry_servicing:
                 unmask_blocked_signals(&orig_sigset);
             }
             op->downcall.status = ret;
-            pvfs2_print("pvfs2: service_operation interrupted.\n");
+            gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: service_operation interrupted.\n");
             return(ret);
         }
     }
@@ -125,7 +125,7 @@ retry_servicing:
         /* failed to get matching downcall */
         if(ret == -ETIMEDOUT)
         { 
-            pvfs2_error("pvfs2: %s -- wait timed out;. "
+            gossip_err("pvfs2: %s -- wait timed out;. "
                         "aborting attempt.\n", op_name);
         }
         op->downcall.status = ret;
@@ -146,11 +146,11 @@ retry_servicing:
     /* retry if operation has not been serviced and if requested */
     if (!op_state_serviced(op) && op->downcall.status == -EAGAIN)
     {
-        pvfs2_print("pvfs2: tag %lld (%s) -- operation to be retried (%d attempt)\n", 
+        gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: tag %lld (%s) -- operation to be retried (%d attempt)\n", 
                 lld(op->tag), op_name, op->attempts + 1);
         goto retry_servicing;
     }
-    pvfs2_print("pvfs2: service_operation %s returning: %d for %p.\n", op_name, ret, op);
+    gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: service_operation %s returning: %d for %p.\n", op_name, ret, op);
     return(ret);
 }
 
@@ -175,18 +175,18 @@ void clean_up_interrupted_operation(
           list.
         */
         remove_op_from_request_list(op);
-        pvfs2_print("Interrupted: Removed op %p from request_list\n", op);
+        gossip_debug(GOSSIP_WAIT_DEBUG, "Interrupted: Removed op %p from request_list\n", op);
     }
     else if (op_state_in_progress(op))
     {
         /* op must be removed from the in progress htable */
         remove_op_from_htable_ops_in_progress(op);
-        pvfs2_print("Interrupted: Removed op %p from "
+        gossip_debug(GOSSIP_WAIT_DEBUG, "Interrupted: Removed op %p from "
                     "htable_ops_in_progress\n", op);
     }
     else if (!op_state_serviced(op))
     {
-            pvfs2_error("interrupted operation is in a weird state 0x%x\n",
+            gossip_err("interrupted operation is in a weird state 0x%x\n",
                     op->op_state);
     }
     spin_unlock(&op->lock);
@@ -242,7 +242,7 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
                 /* subsequent attempts, we retry exactly once with timeouts */
                 if (!schedule_timeout(MSECS_TO_JIFFIES(1000 * op_timeout_secs)))
                 {
-                    pvfs2_print("*** operation timed out (tag %lld, %p, att %d)\n",
+                    gossip_debug(GOSSIP_WAIT_DEBUG, "*** operation timed out (tag %lld, %p, att %d)\n",
                                 lld(op->tag), op, op->attempts);
                     ret = -ETIMEDOUT;
                     clean_up_interrupted_operation(op);
@@ -269,7 +269,7 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
             spin_unlock(&op->lock);
         }
 
-        pvfs2_print("*** operation interrupted by a signal (tag %lld, op %p)\n",
+        gossip_debug(GOSSIP_WAIT_DEBUG, "*** operation interrupted by a signal (tag %lld, op %p)\n",
                     lld(op->tag), op);
         clean_up_interrupted_operation(op);
         ret = -EINTR;
@@ -318,7 +318,7 @@ int wait_for_cancellation_downcall(pvfs2_kernel_op_t * op)
         if (!schedule_timeout
             (MSECS_TO_JIFFIES(1000 * op_timeout_secs)))
         {
-            pvfs2_print("*** operation timed out: %p\n", op);
+            gossip_debug(GOSSIP_WAIT_DEBUG, "*** operation timed out: %p\n", op);
             clean_up_interrupted_operation(op);
             ret = -ETIMEDOUT;
             break;

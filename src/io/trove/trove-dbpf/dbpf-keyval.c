@@ -1427,7 +1427,7 @@ static int dbpf_keyval_iterate_skip_to_position(
 
     ret = PINT_dbpf_keyval_pcache_lookup(
         pcache, handle, pos, 
-        (const char **)&key.buffer, &key.buffer_sz);
+        (const void **)&key.buffer, &key.buffer_sz);
     if(ret == -PVFS_ENOENT)
     {
         /* if the lookup fails (because the server was restarted)

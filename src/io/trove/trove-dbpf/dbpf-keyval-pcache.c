@@ -136,7 +136,7 @@ int PINT_dbpf_keyval_pcache_lookup(
     PINT_dbpf_keyval_pcache *pcache,
     TROVE_handle handle,
     TROVE_ds_position pos,
-    const char ** keyname,
+    const void ** keyname,
     int * length)
 {
     struct PINT_tcache_entry *entry;
@@ -176,7 +176,7 @@ int PINT_dbpf_keyval_pcache_lookup(
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache lookup succeeded: "
                  "handle: %llu, pos: %d, key: %*s\n",
-                 llu(handle), pos, *length, *keyname);
+                 llu(handle), pos, *length, (char *) *keyname);
 
     return 0;
 }

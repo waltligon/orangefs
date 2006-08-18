@@ -326,6 +326,7 @@ struct PINT_server_eattr_op
  */
 typedef struct PINT_server_op
 {
+    struct qlist_head   next; /* used to queue structures used for unexp style messages */
     enum PVFS_server_op op;  /* type of operation that we are servicing */
     /* the following fields are used in state machine processing to keep
      * track of the current state

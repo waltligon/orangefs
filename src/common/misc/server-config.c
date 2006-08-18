@@ -68,12 +68,16 @@ static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
 static DOTCONF_CB(get_handle_recycle_timeout_seconds);
+static DOTCONF_CB(get_flow_buffer_size_bytes);
+static DOTCONF_CB(get_flow_buffers_per_flow);
 static DOTCONF_CB(get_attr_cache_keywords_list);
 static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
+static DOTCONF_CB(get_trove_alt_aio);
 static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_db_cache_size_bytes);
+static DOTCONF_CB(get_trove_max_concurrent_io);
 static DOTCONF_CB(get_db_cache_type);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
@@ -134,17 +138,68 @@ static int is_root_handle_in_my_range(
     struct filesystem_configuration_s *fs);
 #endif
 
-/* 
- * NOTE: The documentation for the server config format is generated
- * from the following static array.  The documentation for an option
- * is taken from the comments found before the beginning of each sub-structure
- * as shown.
+/* PVFS2 servers are deployed using configuration files that provide information
+ * about the file systems, storage locations and endpoints that each server
+ * manages.  For every pvfs2 deployment, there is a global config file
+ * (<i>fs.conf</i>) shared between all of the pvfs2 servers, as well as
+ * per-server config files (<i>server.conf</i>) that contain config options 
+ * unique to that server (such as host/port endpoint).  Configuration options 
+ * in both the global and server specific config files have the following format:
+ * 
+ * <pre>
+ * OptionName OptionValue
+ * </pre>
+ *
+ * An option cannot span more than one line, and only one option can
+ * be specified on each line.  The <i>OptionValue</i> should 
+ * be formatted based on the option's type:
+ *
+ * <ul>
+ * <li>Integer - must be an integer value
+ * <li>String - must be a string without breaks (newlines)
+ * <li>List - a set of strings separated by commas
+ * </ul>
+ *
+ * Options are grouped together using contexts, and usually
+ * indented within a context for clarity.  A context is started
+ * with a context start tag, and ended with a context end tag:
+ * 
+ * <pre>
+ * &lt;ContextName&gt;
+ *     Option1Name Option1Value
+ *     Option2Name Option2Value
+ * &lt;/ContextName&gt;
+ * </pre>
+ *
+ * Options are required to be defined within a specified context 
+ * or set of contexts. 
+ * Sub-contexts can also be specified, and must be defined within
+ * their specified parent context.  For example, the <i>Range</i> option is
+ * specified in either the <i>DataHandleRanges</i> or <i>MetaHandleRanges</i> 
+ * contexts.  Both of
+ * those contexts are specified to be defined in the <i>FileSystem</i> context.
+ * Details of the required context an option or sub-context must be defined in
+ * are given in the <a href="#OptionDetails">Option Details</a> section. 
+ *
+ * Options and contexts that appear in the top-level (not defined within
+ * another context) are considered to be defined in a special <i>Global</i>
+ * context.  Many options are only specified to appear within either the
+ * <i>Global</i> context or the <a name="Default">Default</a> context, 
+ * which is a context that allows a default value to be specified for certain
+ * options.
+ *
+ * The options detailed below each specify their type, the context
+ * where they appear, a default value, and description.  The default
+ * value is used if the option is not specified in any of the config files.
+ * Options without default values are required to be defined in the
+ * config file.
  */
 static const configoption_t options[] =
 {
     /* 
-     * Specifies a string identifier for the pvfs server that is to be
-     * run on this host.  The format of this string is:
+     * Specifies a string identifier for the pvfs2 server that is to be
+     * run on this host.  This option is required for each per-server config
+     * file.  The format of this string is:
      *
      * {transport}://{hostname}:{port}
      *
@@ -156,16 +211,16 @@ static const configoption_t options[] =
      */
     {"HostID",ARG_STR, get_pvfs_server_id,NULL,CTX_GLOBAL,NULL},
     
-    /* Specifies the local path for the pvfs server to use as storage space.
+    /* Specifies the local path for the pvfs2 server to use as storage space.
+     * This option is required for each per-server config file.
      * Example:
      *
      * /tmp/pvfs.storage
      */
     {"StorageSpace",ARG_STR, get_storage_space,NULL,CTX_GLOBAL,NULL},
 
-    /* Specifies the beginning of the Defaults context.  Options specified
-     * within the Defaults context are used as default values over all the
-     * pvfs server specific config files.
+    /* Options specified within the Defaults context are used as 
+     * default values over all the pvfs2 server specific config files.
      */
     {"<Defaults>",ARG_NONE, enter_defaults_context,NULL,CTX_GLOBAL,NULL},
 
@@ -174,8 +229,8 @@ static const configoption_t options[] =
     {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_DEFAULTS,NULL},
 
 #ifdef USE_TRUSTED
-    /* Specifies the beginning of the Security context. Options specified 
-     * within the Security context are used to dictate whether the pvfs
+    /* Options specified within the Security context are used to dictate 
+     * whether the pvfs2
      * servers will accept or handle file-system requests.
      * This section is optional and does not need to be specified.
      */
@@ -212,8 +267,7 @@ static const configoption_t options[] =
         CTX_SECURITY,NULL},
 #endif
 
-    /* Specifies the beginning of the Aliases context.  This groups 
-     * the Alias mapping options.
+    /* This groups the Alias mapping options.
      *
      * The Aliases context should be defined before any FileSystem contexts
      * are defined, as options in the FileSystem context usually need to
@@ -238,8 +292,7 @@ static const configoption_t options[] =
      */
     {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALIASES,NULL},
 
-    /* Specifies the beginning of a Filesystem context.  This groups
-     * options specific to a filesystem.  A pvfs server may manage
+    /* This groups options specific to a filesystem.  A pvfs2 server may manage
      * more than one filesystem, so a config file may have more than
      * one Filesystem context, each defining the parameters of a different
      * Filesystem.
@@ -251,11 +304,11 @@ static const configoption_t options[] =
     {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_FILESYSTEM,
         NULL},
 
-    /* Specifies the beginning of a StorageHints context.  This groups
+    /* This groups
      * options specific to a filesystem and related to the behavior of the
      * storage system.  Mostly these options are passed directly to the
      * TROVE storage module which may or may not support them.  The
-     * DBPF module (the only TROVE module implemented at present) supports
+     * DBPF module (currently the only TROVE module available) supports
      * all of them.
      */
     {"<StorageHints>",ARG_NONE, enter_storage_hints_context,NULL,
@@ -377,6 +430,12 @@ static const configoption_t options[] =
     {"ID",ARG_INT, get_filesystem_collid,NULL,
         CTX_FILESYSTEM,NULL},
 
+    /* maximum number of AIO operations that Trove will allow to run
+     * concurrently 
+     */
+    {"TroveMaxConcurrentIO", ARG_INT, get_trove_max_concurrent_io, NULL,
+        CTX_DEFAULTS|CTX_GLOBAL,"16"},
+
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  The output of these
      * different log levels is written to a file, which is specified in
@@ -401,7 +460,9 @@ static const configoption_t options[] =
      * a '-'.  Examples of possible values are:
      *
      * EventLogging flow,msgpair,io
+     * 
      * EventLogging -storage
+     * 
      * EventLogging -flow,-flowproto
      */
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
@@ -532,6 +593,14 @@ static const configoption_t options[] =
      {"TroveIOThreads", ARG_INT, get_trove_io_thread_count, NULL,
      CTX_DEFAULTS | CTX_GLOBAL, "1"},
      
+    /* buffer size to use for bulk data transfers */
+    {"FlowBufferSizeBytes", ARG_INT,
+         get_flow_buffer_size_bytes, NULL, CTX_FILESYSTEM,"262144"},
+
+    /* number of buffers to use for bulk data transfers */
+    {"FlowBuffersPerFlow", ARG_INT,
+         get_flow_buffers_per_flow, NULL, CTX_FILESYSTEM,"8"},
+
     /* The TROVE storage layer has a management component that deals with
      * allocating handle values for new metafiles and datafiles.  The underlying
      * trove module can be given a hint to tell it how long to wait before
@@ -615,6 +684,12 @@ static const configoption_t options[] =
      */
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
+
+    /* enable alternate AIO implementation for certain types of I/O
+     * operations (experimental 
+     */
+    {"TroveAltAIOMode",ARG_STR, get_trove_alt_aio, NULL, 
+        CTX_DEFAULTS|CTX_GLOBAL,"no"},
 
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
@@ -702,6 +777,7 @@ int PINT_parse_config(
     config_s->client_job_flow_timeout = PVFS2_CLIENT_JOB_FLOW_TIMEOUT_DEFAULT;
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
+    config_s->trove_max_concurrent_io = 16;
 
     if (cache_config_files(
             config_s, global_config_filename, server_config_filename))
@@ -939,6 +1015,8 @@ DOTCONF_CB(enter_filesystem_context)
     fs_conf->encoding = ENCODING_DEFAULT;
     fs_conf->trove_sync_meta = TROVE_SYNC;
     fs_conf->trove_sync_data = TROVE_SYNC;
+    fs_conf->fp_buffer_size = -1;
+    fs_conf->fp_buffers_per_flow = -1;
 
     if (!config_s->file_systems)
     {
@@ -1342,6 +1420,31 @@ static const char * replace_old_keystring(const char * oldkey)
 }
 
 
+DOTCONF_CB(get_flow_buffer_size_bytes)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    fs_conf->fp_buffer_size = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_flow_buffers_per_flow)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    fs_conf->fp_buffers_per_flow = cmd->data.value;
+
+    return NULL;
+}
+
 DOTCONF_CB(get_attr_cache_keywords_list)
 {
     int i = 0, len = 0;
@@ -1438,6 +1541,28 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
     return NULL;
 }
 
+DOTCONF_CB(get_trove_alt_aio)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if(strcasecmp(cmd->data.str, "yes") == 0)
+    {
+        config_s->trove_alt_aio_mode = 1;
+    }
+    else if(strcasecmp(cmd->data.str, "no") == 0)
+    {
+        config_s->trove_alt_aio_mode = 0;
+    }
+    else
+    {
+        return("TroveAltAIOMode value must be 'yes' or 'no'.\n");
+    }
+
+    return NULL;
+}
+
+
 DOTCONF_CB(get_trove_sync_meta)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -1513,6 +1638,14 @@ DOTCONF_CB(get_db_cache_size_bytes)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     config_s->db_cache_size_bytes = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_trove_max_concurrent_io)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->trove_max_concurrent_io = cmd->data.value;
     return NULL;
 }
 
@@ -1783,6 +1916,10 @@ DOTCONF_CB(get_default_num_dfiles)
         PINT_llist_head(config_s->file_systems);
 
     fs_conf->default_num_dfiles = (int)cmd->data.value;
+    if(fs_conf->default_num_dfiles < 0)
+    {
+        return("Error DefaultNumDFiles must be positive.\n");
+    }
     return NULL;
 }
 
@@ -2274,6 +2411,9 @@ static void copy_filesystem(
             src_fs->attr_cache_max_num_elems;
         dest_fs->trove_sync_meta = src_fs->trove_sync_meta;
         dest_fs->trove_sync_data = src_fs->trove_sync_data;
+
+        dest_fs->fp_buffer_size = src_fs->fp_buffer_size;
+        dest_fs->fp_buffers_per_flow = src_fs->fp_buffers_per_flow;
     }
 }
 

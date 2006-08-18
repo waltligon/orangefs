@@ -181,7 +181,6 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         gossip_lerr("Error initializing name lookup cache\n");
         goto error_exit;        
     }        
-    PINT_ncache_set_timeout(PINT_NCACHE_TIMEOUT_MS);
     client_status_flag |= CLIENT_NCACHE_INIT;
 
     /* initialize the server configuration manager */

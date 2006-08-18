@@ -162,6 +162,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    struct filesystem_configuration_s *fs_conf;
         
     s_op->u.io.flow_d = PINT_flow_alloc();
     if (!s_op->u.io.flow_d)
@@ -200,6 +201,15 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     s_op->u.io.flow_d->tag = s_op->tag;
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
+
+    fs_conf = PINT_config_find_fs_id(user_opts, 
+        s_op->req->u.io.fs_id);
+    if(fs_conf)
+    {
+        /* pick up any buffer settings overrides from fs conf */
+        s_op->u.io.flow_d->buffer_size = fs_conf->fp_buffer_size;
+        s_op->u.io.flow_d->buffers_per_flow = fs_conf->fp_buffers_per_flow;
+    }
 
     gossip_debug(GOSSIP_IO_DEBUG, "flow: fsize: %lld, " 
         "server_nr: %d, server_ct: %d\n",

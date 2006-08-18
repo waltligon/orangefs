@@ -14,16 +14,52 @@
 #include "pvfs2-attr.h"
 
 /* converts common fields between sys attr and obj attr structures */
-#define PINT_CONVERT_ATTR(dest, src, attrmask)  \
-do{                                             \
-    (dest)->owner = (src)->owner;               \
-    (dest)->group = (src)->group;               \
-    (dest)->perms = (src)->perms;               \
-    (dest)->atime = (src)->atime;               \
-    (dest)->mtime = (src)->mtime;               \
-    (dest)->ctime = (src)->ctime;               \
-    (dest)->objtype = (src)->objtype;           \
-    (dest)->mask = ((src)->mask & attrmask);    \
+#define PINT_CONVERT_ATTR(dest, src, extra_amask)       \
+do{                                                     \
+    (dest)->mask = 0;                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_UID)                \
+    {                                                   \
+        (dest)->owner = (src)->owner;                   \
+        (dest)->mask  |= PVFS_ATTR_COMMON_UID;          \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_GID)                \
+    {                                                   \
+        (dest)->group = (src)->group;                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_GID;           \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_PERM)               \
+    {                                                   \
+        (dest)->perms = (src)->perms;                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_PERM;          \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_ATIME)              \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_ATIME;         \
+        if ((src)->mask & PVFS_ATTR_SYS_ATIME_SET)      \
+        {                                               \
+            (dest)->atime = (src)->atime;               \
+            (dest)->mask |= PVFS_ATTR_COMMON_ATIME_SET; \
+        }                                               \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_MTIME)              \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_MTIME;         \
+        if ((src)->mask & PVFS_ATTR_SYS_MTIME_SET)      \
+        {                                               \
+            (dest)->mtime = (src)->mtime;               \
+            (dest)->mask |= PVFS_ATTR_COMMON_MTIME_SET; \
+        }                                               \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_CTIME)              \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_CTIME;         \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_TYPE)               \
+    {                                                   \
+        (dest)->objtype = (src)->objtype;               \
+        (dest)->mask |= PVFS_ATTR_COMMON_TYPE;          \
+    }                                                   \
+    (dest)->mask |= (extra_amask);                      \
 }while(0)
 
 struct PINT_time_marker_s

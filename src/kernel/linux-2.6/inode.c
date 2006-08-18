@@ -23,7 +23,7 @@ static int read_one_page(struct page *page)
     const uint32_t blocksize = PAGE_CACHE_SIZE;  /* inode->i_blksize */
     const uint32_t blockbits = PAGE_CACHE_SHIFT; /* inode->i_blkbits */
 
-    pvfs2_print("pvfs2_readpage called with page %p\n",page);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readpage called with page %p\n",page);
     page_data = pvfs2_kmap(page);
 
     max_block = ((inode->i_size / blocksize) + 1);
@@ -83,7 +83,7 @@ static int pvfs2_readpages(
     int page_idx;
     int ret;
 
-    pvfs2_print("pvfs2_readpages called\n");
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readpages called\n");
 
     for (page_idx = 0; page_idx < nr_pages; page_idx++)
     {
@@ -107,7 +107,7 @@ static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 static void pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #endif
 {
-    pvfs2_print("pvfs2_invalidatepage called on page %p "
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
                 "(offset is %lu)\n", page, offset);
 
     ClearPageUptodate(page);
@@ -126,7 +126,7 @@ static int pvfs2_releasepage(struct page *page, int foo)
 static int pvfs2_releasepage(struct page *page, gfp_t foo)
 #endif
 {
-    pvfs2_print("pvfs2_releasepage called on page %p\n", page);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_releasepage called on page %p\n", page);
     return 0;
 }
 
@@ -159,10 +159,21 @@ struct address_space_operations pvfs2_address_operations =
  */
 void pvfs2_truncate(struct inode *inode)
 {
-    pvfs2_print("pvfs2: pvfs2_truncate called on inode %d "
-                "with size %d\n",(int)inode->i_ino,(int)inode->i_size);
+    loff_t orig_size = i_size_read(inode);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %d "
+                "with size %ld\n",(int)inode->i_ino, (long) orig_size);
 
-    pvfs2_truncate_inode(inode, inode->i_size);
+    /* successful truncate when size changes also requires mtime updates 
+     * although the mtime updates are propagated lazily!
+     */
+    if (pvfs2_truncate_inode(inode, inode->i_size) == 0
+            && (orig_size != i_size_read(inode)))
+    {
+        pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+        SetMtimeFlag(pvfs2_inode);
+        inode->i_mtime = CURRENT_TIME;
+        mark_inode_dirty_sync(inode);
+    }
 }
 
 /** Change attributes of an object referenced by dentry.
@@ -172,19 +183,19 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     int ret = -EINVAL;
     struct inode *inode = dentry->d_inode;
 
-    pvfs2_print("pvfs2_setattr: called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: called on %s\n", dentry->d_name.name);
 
     ret = inode_change_ok(inode, iattr);
     if (ret == 0)
     {
         ret = inode_setattr(inode, iattr);
-        pvfs2_print("pvfs2_setattr: inode_setattr returned %d\n", ret);
+        gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: inode_setattr returned %d\n", ret);
 
         if (ret == 0)
         {
             ret = pvfs2_inode_setattr(inode, iattr);
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
-            if (!ret && iattr->ia_valid & ATTR_MODE)
+            if (!ret && (iattr->ia_valid & ATTR_MODE))
             {
                 /* change mod on a file that has ACLs */
                 ret = pvfs2_acl_chmod(inode);
@@ -192,7 +203,7 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 #endif
         }
     }
-    pvfs2_print("pvfs2_setattr: returning %d\n", ret);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: returning %d\n", ret);
     return ret;
 }
 
@@ -204,7 +215,7 @@ int pvfs2_revalidate(struct dentry *dentry)
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
 
-    pvfs2_print("pvfs2_revalidate: called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_revalidate: called on %s\n", dentry->d_name.name);
 
     /*
      * A revalidate expects that all fields of the inode would be refreshed
@@ -229,7 +240,7 @@ int pvfs2_getattr(
     int ret = -ENOENT;
     struct inode *inode = dentry->d_inode;
 
-    pvfs2_print("pvfs2_getattr: called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_getattr: called on %s\n", dentry->d_name.name);
 
     /*
      * Similar to the above comment, a getattr also expects that all fields/attributes
@@ -296,7 +307,7 @@ struct inode *pvfs2_get_custom_inode(
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    pvfs2_print("pvfs2_get_custom_inode: called\n  (sb is %p | "
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: called\n  (sb is %p | "
                 "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
                 MINOR(dev));
 
@@ -308,7 +319,7 @@ struct inode *pvfs2_get_custom_inode(
 	if (!pvfs2_inode)
         {
             iput(inode);
-            pvfs2_panic("pvfs2_get_custom_inode: PRIVATE "
+            gossip_err("pvfs2_get_custom_inode: PRIVATE "
                         "DATA NOT ALLOCATED\n");
             return NULL;
         }
@@ -333,7 +344,7 @@ struct inode *pvfs2_get_custom_inode(
         inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 
-	pvfs2_print("pvfs2_get_custom_inode: inode %p allocated\n  "
+	gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: inode %p allocated\n  "
 		    "(pvfs2_inode is %p | sb is %p)\n", inode,
 		    pvfs2_inode, inode->i_sb);
 
@@ -360,10 +371,12 @@ struct inode *pvfs2_get_custom_inode(
         }
         else
         {
-	    pvfs2_print("pvfs2_get_custom_inode: unsupported mode\n");
+	    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: unsupported mode\n");
             goto error;
 	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %ld\n", 
+                (long) inode->i_ino);
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);
 #endif

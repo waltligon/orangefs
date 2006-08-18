@@ -46,17 +46,18 @@ pvfs2_acl_decode(const void *value, size_t size)
 {
     int n, count;
     struct posix_acl *acl;
+    const char *end = (char *)value + size;
 
     /* badness! */
     if (!value) 
     {
-        pvfs2_error("pvfs2_acl_decode: NULL buffers\n");
+        gossip_err("pvfs2_acl_decode: NULL buffers\n");
         return NULL;
     }
     /* even more badness */
     if (size < 0 || (size  % sizeof(pvfs2_acl_entry)) != 0)
     {
-        pvfs2_error("pvfs2_acl_decode: Invalid value of size %d [should be a multiple of %d]\n",
+        gossip_err("pvfs2_acl_decode: Invalid value of size %d [should be a multiple of %d]\n",
                 (int) size, (int) sizeof(pvfs2_acl_entry));
         return ERR_PTR(-EINVAL);
     }
@@ -64,22 +65,31 @@ pvfs2_acl_decode(const void *value, size_t size)
     /* No ACLs */
     if (count == 0)
     {
-        pvfs2_print("pvfs2_acl_decode: no acls!\n");
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_decode: no acls!\n");
         return NULL;
     }
     /* Allocate a posix acl structure */
     acl = posix_acl_alloc(count, GFP_KERNEL);
     if (!acl) 
     {
-        pvfs2_error("pvfs2_acl_decode: Could not allocate acl!\n");
+        gossip_err("pvfs2_acl_decode: Could not allocate acl!\n");
         return ERR_PTR(-ENOMEM);
     }
+    gossip_debug(GOSSIP_ACL_DEBUG, "acl decoded %d bytes (%d acl entries)\n",
+            size, count);
     for (n = 0; n < count; n++) 
     {
         pvfs2_acl_entry *entry = (pvfs2_acl_entry *)value;
+
+        if ((char *) value + sizeof(pvfs2_acl_entry) > end)
+            goto fail;
         
         acl->a_entries[n].e_tag = bmitoh32(entry->p_tag);
         acl->a_entries[n].e_perm = bmitoh32(entry->p_perm);
+        gossip_debug(GOSSIP_ACL_DEBUG, "Decoded acl entry %d "
+                "(p_tag %d, p_perm %d, p_id %d)\n",
+                n, acl->a_entries[n].e_tag, acl->a_entries[n].e_perm, 
+                bmitoh32(entry->p_id));
         switch(acl->a_entries[n].e_tag) 
         {
             case ACL_USER_OBJ:
@@ -98,15 +108,18 @@ pvfs2_acl_decode(const void *value, size_t size)
                 break;
 
             default:
-                pvfs2_error("pvfs2_acl_decode: bogus value of e_tag obtained %d\n",
+                gossip_err("pvfs2_acl_decode: bogus value of e_tag obtained %d\n",
                         acl->a_entries[n].e_tag);
                 goto fail;
         }
     }
+    if (value != end)
+        goto fail;
     return acl;
 
 fail:
     posix_acl_release(acl);
+    gossip_err("pvfs2_acl_decode: returning EINVAL\n");
     return ERR_PTR(-EINVAL);
 }
 
@@ -123,43 +136,58 @@ pvfs2_acl_encode(const struct posix_acl *acl, size_t *size)
     size_t n;
 
     *size = acl->a_count * sizeof(pvfs2_acl_entry);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_encode: acl encoded %ld bytes "
+            " (%d entries)\n", (long) *size, acl->a_count);
     e = (char *)kmalloc(*size, GFP_KERNEL);
     if (!e) 
     {
-        pvfs2_error("pvfs2_acl_encode: Could not allocate %d bytes for acl encode\n", 
-                (int) *size);
+        gossip_err("pvfs2_acl_encode: Could not allocate %d bytes "
+                "for acl encode\n", (int) *size);
         return ERR_PTR(-ENOMEM);
     }
     ptr = e;
     for (n = 0; n < acl->a_count; n++) 
     {
         pvfs2_acl_entry *entry = (pvfs2_acl_entry *)e;
-        if (acl->a_entries[n].e_tag != ACL_USER
-                && acl->a_entries[n].e_tag != ACL_GROUP
-                && acl->a_entries[n].e_tag != ACL_USER_OBJ
-                && acl->a_entries[n].e_tag != ACL_GROUP_OBJ
-                && acl->a_entries[n].e_tag != ACL_MASK
-                && acl->a_entries[n].e_tag != ACL_OTHER)
-        {
-            pvfs2_error("pvfs2_acl_encode: bogus value of e_tag %d\n",
-                    acl->a_entries[n].e_tag);
-            goto fail;
-        }
+
         entry->p_tag  = htobmi32(acl->a_entries[n].e_tag);
         entry->p_perm = htobmi32(acl->a_entries[n].e_perm);
-        entry->p_id   = htobmi32(acl->a_entries[n].e_id);
-        e += sizeof(pvfs2_acl_entry);
+        switch (acl->a_entries[n].e_tag) 
+        {
+            case ACL_USER:
+            case ACL_GROUP:
+                entry->p_id = htobmi32(acl->a_entries[n].e_id);
+                e += sizeof(pvfs2_acl_entry);
+                break;
+            case ACL_USER_OBJ:
+            case ACL_GROUP_OBJ:
+            case ACL_MASK:
+            case ACL_OTHER:
+                e += sizeof(pvfs2_acl_entry);
+                break;
+
+            default:
+                gossip_err("pvfs2_acl_encode: bogus value of e_tag %d\n",
+                        acl->a_entries[n].e_tag);
+                goto fail;
+        }
+        gossip_debug(GOSSIP_ACL_DEBUG, "Encoded acl entry %d "
+                "(p_tag %d, p_perm %d, p_id %d)\n",
+                n, acl->a_entries[n].e_tag, acl->a_entries[n].e_perm, 
+                acl->a_entries[n].e_id);
     }
     return (char *) ptr;
 fail:
     kfree(ptr);
+    gossip_err("pvfs2_acl_encode: returning EINVAL\n");
     return ERR_PTR(-EINVAL);
 }
 
 /**
  * Routines that retrieve and/or set ACLs for PVFS2 files.
  */
-static struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
+static struct posix_acl *
+pvfs2_get_acl(struct inode *inode, int type)
 {
     struct posix_acl *acl;
     int ret;
@@ -168,6 +196,8 @@ static struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
     /* Won't work if you don't mount with the right set of options */
     if (get_acl_flag(inode) == 0) 
     {
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_get_acl: ACL options disabled on "
+                "this FS!\n");
         return NULL;
     }
     switch (type)
@@ -179,7 +209,7 @@ static struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
             key = PVFS2_XATTR_NAME_ACL_DEFAULT;
             break;
         default:
-            pvfs2_error("pvfs2_get_acl: bogus value of type %d\n", type);
+            gossip_err("pvfs2_get_acl: bogus value of type %d\n", type);
             return ERR_PTR(-EINVAL);
     }
     /*
@@ -191,9 +221,11 @@ static struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
     value = (char *) kmalloc(PVFS_MAX_XATTR_VALUELEN, GFP_KERNEL);
     if (value == NULL)
     {
-        pvfs2_error("pvfs2_get_acl: Could not allocate value ptr\n");
+        gossip_err("pvfs2_get_acl: Could not allocate value ptr\n");
         return ERR_PTR(-ENOMEM);
     }
+    gossip_debug(GOSSIP_ACL_DEBUG, "inode %ld, key %s, type %d\n", 
+            (long) inode->i_ino, key, type);
     ret = pvfs2_inode_getxattr(inode, "", key, value, PVFS_MAX_XATTR_VALUELEN);
     /* if the key exists, convert it to an in-memory rep */
     if (ret > 0)
@@ -205,6 +237,8 @@ static struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
         acl = NULL;
     }
     else {
+        gossip_err("inode %ld retrieving acl's failed with error %d\n",
+                (long) inode->i_ino, ret);
         acl = ERR_PTR(ret);
     }
     if (value) {
@@ -220,56 +254,70 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
     void *value = NULL;
     size_t size = 0;
     const char *name = NULL;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
     /* We dont't allow this on a symbolic link */
     if (S_ISLNK(inode->i_mode))
     {
+        gossip_err("pvfs2_set_acl: disallow on symbolic links\n");
         return -EOPNOTSUPP;
     }
     /* if ACL option is not set, then we return early */
     if (get_acl_flag(inode) == 0)
     {
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: ACL options disabled on"
+                "this FS!\n");
         return 0;
     }
     switch (type)
     {
         case ACL_TYPE_ACCESS:
+        {
             name = PVFS2_XATTR_NAME_ACL_ACCESS;
             if (acl) 
             {
                 mode_t mode = inode->i_mode;
-                pvfs2_print("pvfs2_set_acl: original mode %d\n", mode);
                 /* can we represent this with the UNIXy permission bits? */
                 error = posix_acl_equiv_mode(acl, &mode);
                 /* uh oh some error.. */
                 if (error < 0) 
                 {
-                    pvfs2_error("pvfs2_set_acl: posix_acl_equiv_mode error %d\n", error);
+                    gossip_err("pvfs2_set_acl: posix_acl_equiv_mode error %d\n", 
+                            error);
                     return error;
                 }
                 else /* okay, go ahead and do just that */
                 {
-
-                    pvfs2_print("pvfs2_set_acl: after posix_acl_equiv_mode mode %d\n", mode);
                     inode->i_mode = mode;
+                    SetModeFlag(pvfs2_inode);
+                    mark_inode_dirty_sync(inode);
                     if (error == 0) /* not equivalent */
                         acl = NULL;
                 }
             }
             break;
-
+        }
         case ACL_TYPE_DEFAULT:
+        {
             name = PVFS2_XATTR_NAME_ACL_DEFAULT;
             /* Default ACLs cannot be set/modified for non-directory objects! */
             if (!S_ISDIR(inode->i_mode))
             {
+                gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: setting default "
+                        "ACLs on non-dir object? %s\n",
+                        acl ? "disallowed" : "ok");
                 return acl ? -EACCES : 0;
             }
             break;
-
+        }
         default:
+        {
+            gossip_err("pvfs2_set_acl: invalid type %d!\n", type);
             return -EINVAL;
+        }
     }
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: inode %ld, key %s type %d\n",
+            (long) inode->i_ino, name, type);
     /* If we do have an access control list, then we need to encode that! */
     if (acl) 
     {
@@ -279,6 +327,8 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
             return (int) PTR_ERR(value);
         }
     }
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: name %s, value %p, size %d, "
+            " acl %p\n", name, value, size, acl);
     /* Go ahead and set the extended attribute now */
     error = pvfs2_inode_setxattr(inode, "", name, value, size, 0);
     if (value) 
@@ -297,28 +347,38 @@ pvfs2_xattr_get_acl(struct inode *inode, int type, void *buffer, size_t size)
     /* if we have not been mounted with acl option, ignore this */
     if (get_acl_flag(inode) == 0)
     {
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_get_acl: ACL options "
+                "disabled on this FS!\n");
         return -EOPNOTSUPP;
     }
     acl = pvfs2_get_acl(inode, type);
     if (IS_ERR(acl))
     {
-        return PTR_ERR(acl);
+        error = PTR_ERR(acl);
+        gossip_err("pvfs2_get_acl failed with error %d\n", error);
+        goto out;
     }
     if (acl == NULL)
     {
-        return -ENODATA;
+        gossip_err("pvfs2_get_acl failed due to no acls!\n");
+        error = -ENODATA;
+        goto out;
     }
     error = posix_acl_to_xattr(acl, buffer, size);
     posix_acl_release(acl);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_get_acl: posix_acl_to_xattr "
+            "returned %d\n", error);
+out:
     return error;
 }
 
 static int pvfs2_xattr_get_acl_access(struct inode *inode,
         const char *name, void *buffer, size_t size)
 {
-    pvfs2_print("pvfs2_xattr_get_acl_access %s\n", name);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_get_acl_access %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        gossip_err("get_acl_access invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_get_acl(inode, ACL_TYPE_ACCESS, buffer, size);
@@ -327,9 +387,10 @@ static int pvfs2_xattr_get_acl_access(struct inode *inode,
 static int pvfs2_xattr_get_acl_default(struct inode *inode,
         const char *name, void *buffer, size_t size)
 {
-    pvfs2_print("pvfs2_xattr_get_acl_default %s\n", name);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_get_acl_default %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        gossip_err("get_acl_default invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_get_acl(inode, ACL_TYPE_DEFAULT, buffer, size);
@@ -342,14 +403,21 @@ pvfs2_xattr_set_acl(struct inode *inode, int type, const void *value,
     struct posix_acl *acl;
     int error;
 
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_set_acl called with size %ld\n",
+            (long)size);
     /* if we have not been mounted with acl option, ignore this */
     if (get_acl_flag(inode) == 0)
     {
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_set_acl: ACL options "
+                "disabled on this FS!\n");
         return -EOPNOTSUPP;
     }
     /* Are we capable of setting acls on a file for which we should not be? */
     if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
     {
+        gossip_err("pvfs2_xattr_set_acl: operation not permitted "
+                "(current->fsuid %d), (inode->owner %d)\n", 
+                current->fsuid, inode->i_uid);
         return -EPERM;
     }
     if (value) 
@@ -357,13 +425,18 @@ pvfs2_xattr_set_acl(struct inode *inode, int type, const void *value,
         acl = posix_acl_from_xattr(value, size);
         if (IS_ERR(acl))
         {
-            return PTR_ERR(acl);
+            error = PTR_ERR(acl);
+            gossip_err("pvfs2_xattr_set_acl: posix_acl_from_xattr returned "
+                    "error %d\n", error);
+            goto err;
         }
         else if (acl) 
         {
             error = posix_acl_valid(acl);
             if (error)
             {
+                gossip_err("pvfs2_xattr_set_acl: posix_acl_valid returned "
+                        "error %d\n", error);
                 goto out;
             }
         }
@@ -372,17 +445,20 @@ pvfs2_xattr_set_acl(struct inode *inode, int type, const void *value,
         acl = NULL;
     }
     error = pvfs2_set_acl(inode, type, acl);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl returned error %d\n", error);
 out:
     posix_acl_release(acl);
+err:
     return error;
 }
 
 static int pvfs2_xattr_set_acl_access(struct inode *inode, 
         const char *name, const void *buffer, size_t size, int flags)
 {
-    pvfs2_print("pvfs2_xattr_set_acl_access: %s\n", name);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_set_acl_access: %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        gossip_err("set_acl_access invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_set_acl(inode, ACL_TYPE_ACCESS, buffer, size);
@@ -391,9 +467,10 @@ static int pvfs2_xattr_set_acl_access(struct inode *inode,
 static int pvfs2_xattr_set_acl_default(struct inode *inode, 
         const char *name, const void *buffer, size_t size, int flags)
 {
-    pvfs2_print("pvfs2_xattr_set_acl_default: %s\n", name);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_set_acl_default: %s\n", name);
     if (strcmp(name, "") != 0)
     {
+        gossip_err("set_acl_default invalid name %s\n", name);
         return -EINVAL;
     }
     return pvfs2_xattr_set_acl(inode, ACL_TYPE_DEFAULT, buffer, size);
@@ -423,6 +500,7 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
 {
     struct posix_acl *acl = NULL;
     int error = 0;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
     if (dir == NULL)
         dir = inode;
@@ -431,12 +509,20 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
         if (get_acl_flag(inode) == 1)
         {
             acl = pvfs2_get_acl(dir, ACL_TYPE_DEFAULT);
-            if (IS_ERR(acl))
-                return PTR_ERR(acl);
+            if (IS_ERR(acl)) {
+                error = PTR_ERR(acl);
+                gossip_err("pvfs2_get_acl (default) failed with error %d\n", error);
+                return error;
+            }
         }
         if (!acl && dir != inode)
         {
+            int old_mode = inode->i_mode;
             inode->i_mode &= ~current->fs->umask;
+            gossip_debug(GOSSIP_ACL_DEBUG, "inode->i_mode before %x and "
+                    "after %x\n", old_mode, inode->i_mode);
+            SetModeFlag(pvfs2_inode);
+            mark_inode_dirty_sync(inode);
         }
     }
     if (get_acl_flag(inode) == 1 && acl)
@@ -447,18 +533,27 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
         if (S_ISDIR(inode->i_mode)) 
         {
             error = pvfs2_set_acl(inode, ACL_TYPE_DEFAULT, acl);
-            if (error)
+            if (error) {
+                gossip_err("pvfs2_set_acl (default) directory failed with "
+                        "error %d\n", error);
                 goto cleanup;
+            }
         }
         clone = posix_acl_clone(acl, GFP_KERNEL);
         error = -ENOMEM;
-        if (!clone)
+        if (!clone) {
+            gossip_err("posix_acl_clone failed with ENOMEM\n");
             goto cleanup;
+        }
         mode = inode->i_mode;
         error = posix_acl_create_masq(clone, &mode);
         if (error >= 0)
         {
+            gossip_debug(GOSSIP_ACL_DEBUG, "posix_acl_create_masq changed mode "
+                    "from %x to %x\n", inode->i_mode, mode);
             inode->i_mode = mode;
+            SetModeFlag(pvfs2_inode);
+            mark_inode_dirty_sync(inode);
             /* 
              * if this is an ACL that cannot be captured by
              * the mode bits, go for the server! 
@@ -466,6 +561,7 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
             if (error > 0)
             {
                 error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, clone);
+                gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl (access) returned %d\n", error);
             }
         }
         posix_acl_release(clone);
@@ -489,29 +585,40 @@ int pvfs2_acl_chmod(struct inode *inode)
 
     if (get_acl_flag(inode) == 0)
     {
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_chmod: ACL options "
+                "disabled on this FS!\n");
         return 0;
     }
     if (S_ISLNK(inode->i_mode))
     {
-        return -EOPNOTSUPP;
+        gossip_err("pvfs2_acl_chmod: operation not permitted on symlink!\n");
+        error = -EOPNOTSUPP;
+        goto out;
     }
     acl = pvfs2_get_acl(inode, ACL_TYPE_ACCESS);
     if (IS_ERR(acl) || !acl)
     {
-        return PTR_ERR(acl);
+        error = PTR_ERR(acl);
+        gossip_err("pvfs2_acl_chmod: get acl (access) failed with %d\n", error);
+        goto out;
     }
     clone = posix_acl_clone(acl, GFP_KERNEL);
     posix_acl_release(acl);
     if (!clone)
     {
-        return -ENOMEM;
+        gossip_err("pvfs2_acl_chmod failed with ENOMEM\n");
+        error = -ENOMEM;
+        goto out;
     }
     error = posix_acl_chmod_masq(clone, inode->i_mode);
     if (!error)
     {
         error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, clone);
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_chmod: pvfs2 set acl "
+                "(access) returned %d\n", error);
     }
     posix_acl_release(clone);
+out:
     return error;
 }
 
@@ -519,11 +626,20 @@ static int pvfs2_check_acl(struct inode *inode, int mask)
 {
     struct posix_acl *acl = NULL;
 
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: called on inode %ld\n",
+            (long) inode->i_ino);
+
     acl = pvfs2_get_acl(inode, ACL_TYPE_ACCESS);
+
+    if (IS_ERR(acl))
+        return PTR_ERR(acl);
     if (acl) 
     {
         int error = posix_acl_permission(inode, acl, mask);
         posix_acl_release(acl);
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: posix_acl_permission "
+                " (inode %ld, acl %p, mask %x) returned %d\n",
+                (long) inode->i_ino, acl, mask, error);
         return error;
     }
     return -EAGAIN;
@@ -535,44 +651,42 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
     int ret;
 
     ret = generic_permission(inode, mask, pvfs2_check_acl);
-    pvfs2_print("pvfs2_permission: inode: %p mask = %x mode = %x current->fsuid = %x "
-            "inode->i_uid = %x, inode->i_gid = %x  ret = %d\n",
-            inode, mask, inode->i_mode, current->fsuid, inode->i_uid, 
-                inode->i_gid, ret);
-    pvfs2_print("pvfs2_permission: mode [%x] & mask [%x] & S_IRWXO [%x] = %d == mask [%x]?\n", 
-            inode->i_mode, mask, S_IRWXO, (inode->i_mode & mask & S_IRWXO), 
-                mask);
+    if (ret != 0)
+    {
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: inode: %ld mask = %x"
+                "mode = %x current->fsuid = %x "
+                "inode->i_uid = %x, inode->i_gid = %x  ret = %d\n",
+                (long) inode->i_ino, mask, inode->i_mode, current->fsuid, 
+                inode->i_uid, inode->i_gid, ret);
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: mode [%x] & mask [%x] "
+                " & S_IRWXO [%x] = %d == mask [%x]?\n", 
+                inode->i_mode, mask, S_IRWXO, 
+                (inode->i_mode & mask & S_IRWXO), mask);
+    }
     return ret;
 #else
     /* We sort of duplicate the code below from generic_permission. */
     int mode = inode->i_mode;
     int error;
 
-    pvfs2_print("pvfs2_permission: mask = %x mode = %x current->fsuid = %x, inode->i_uid = %x\n",
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: mask = %x mode = %x "
+            "current->fsuid = %x, inode->i_uid = %x\n",
             mask, mode, current->fsuid, inode->i_uid);
 
     /* No write access on a rdonly FS */
     if ((mask & MAY_WRITE) && IS_RDONLY(inode) &&
             (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
     {
-        pvfs2_print("pvfs2_permission: cannot write to a read-only-file-system!\n");
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: cannot write to a "
+                "read-only-file-system!\n");
         return -EROFS;
     }
     /* No write access to any immutable files */
     if ((mask & MAY_WRITE) && IS_IMMUTABLE(inode)) 
     {
-        pvfs2_error("pvfs2_permission: cannot write to an immutable file!\n");
+        gossip_err("pvfs2_permission: cannot write to an immutable file!\n");
         return -EACCES;
     }
-    /* Do permission checks only for lookups and opens */
-/*
-    if ((mask & MAY_EXEC) == 0) {
-        if (!nd || !(nd->flags & (LOOKUP_OPEN | LOOKUP_ACCESS)))
-        {
-            return 0;
-        }
-    }
-*/
     if (current->fsuid == inode->i_uid) 
     {
         mode >>= 6;
@@ -585,6 +699,10 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
              * Access ACL won't work if we don't have group permission bits
              * set on the file!
              */
+            gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: [ACL] mode >> 3 (%x)"
+                    " & mask (%x) & S_IRWXO (%x) [%x] != mask [%x]\n",
+                    mode >> 3, mask, S_IRWXO, ((mode >> 3) & mask & S_IRWXO),
+                    mask);
             if (((mode >> 3) & mask & S_IRWXO) != mask)
             {
                 goto check_groups;
@@ -593,7 +711,8 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
             /* ACL disallows access */
             if (error == -EACCES) 
             {
-                pvfs2_print("pvfs2_permission: acl disallowing access to file\n");
+                gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: acl disallowing "
+                        "access to file\n");
                 goto check_capabilities;
             }
             /* No ACLs present? */
@@ -601,6 +720,8 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
             {
                 goto check_groups;
             }
+            gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: returning %d\n",
+                    error);
             /* Any other error */
             return error;
         }
@@ -614,7 +735,7 @@ check_groups:
     }
 check_capabilities:
     /* Are we allowed to override DAC */
-    if(!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
+    if (!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
     {
         if(capable(CAP_DAC_OVERRIDE))
         {
@@ -622,7 +743,7 @@ check_capabilities:
         }
     }
 
-    pvfs2_print("pvfs2_permission: disallowing access\n");
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: disallowing access\n");
     return -EACCES;
 #endif
 }

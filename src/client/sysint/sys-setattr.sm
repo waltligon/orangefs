@@ -108,7 +108,7 @@ PVFS_error PVFS_isys_setattr(
      * make sure the caller didn't set invalid mask bits.
      * only common attributes can be set.
      */
-    if ((attr.mask & ~PVFS_ATTR_SYS_ALL_SETABLE) != 0)
+    if ((attr.mask & ~PVFS_ATTR_SYS_ALL_TIMES) != 0)
     {
         gossip_lerr("PVFS_isys_setattr() failure: invalid attributes "
                     "specified\n");
@@ -116,7 +116,7 @@ PVFS_error PVFS_isys_setattr(
     }
 
     /* make sure that the permission bits are acceptable */
-    if ((attr.perms & ~PVFS_PERM_VALID) != 0)
+    if ((attr.mask & PVFS_ATTR_SYS_PERM) && (attr.perms & ~PVFS_PERM_VALID) != 0)
     {
         gossip_lerr("PVFS_isys_setattr() failure: invalid or unsupported" 
                     "permission bits\n");
@@ -208,6 +208,7 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_ds_type objtype;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: "
                  "setattr_msg_setup_msgpair\n");
@@ -218,15 +219,17 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
 
     PINT_init_msgpair(sm_p, msg_p);
 
+    objtype = ((sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_TYPE) ? 
+         sm_p->u.setattr.sys_attr.objtype : PVFS_TYPE_NONE);
+
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
-        ((sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_TYPE) ? 
-         sm_p->u.setattr.sys_attr.objtype : PVFS_TYPE_NONE),
+        objtype,
         sm_p->u.setattr.sys_attr,
-        PVFS_ATTR_COMMON_TYPE);
+        0);
 
     /* clients should not be able to mess with dfile and distribution
      * information here.  Those parameters should only be set at create time.
@@ -276,8 +279,7 @@ static int setattr_cleanup(PINT_client_sm *sm_p,
      */
     if(sm_p->error_code == 0)
     {
-        PINT_CONVERT_ATTR(&attr, &sm_p->u.setattr.sys_attr,
-            PVFS_ATTR_COMMON_ALL);
+        PINT_CONVERT_ATTR(&attr, &sm_p->u.setattr.sys_attr, 0);
         PINT_acache_update(sm_p->object_ref, &attr, NULL);
     }
     else

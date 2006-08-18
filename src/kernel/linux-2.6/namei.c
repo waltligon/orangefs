@@ -31,18 +31,23 @@ static int pvfs2_create(
     int ret = -EINVAL;
     struct inode *inode = NULL;
 
-    pvfs2_print("pvfs2_create: called\n");
+    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_create: called\n");
 
     inode = pvfs2_create_entry(
         dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE, &ret);
 
     if (inode)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
+        
         ret = 0;
     }
 
-    pvfs2_print("pvfs2_create: returning %d\n", ret);
+    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_create: returning %d\n", ret);
     return ret;
 }
 
@@ -74,7 +79,7 @@ static struct dentry *pvfs2_lookup(
       -EEXIST on O_EXCL opens, which is broken if we skip this lookup
       in the create path)
     */
-    pvfs2_print("pvfs2_lookup called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup called on %s\n", dentry->d_name.name);
 
     if (dentry->d_name.len > PVFS2_NAME_LEN)
     {
@@ -132,7 +137,7 @@ static struct dentry *pvfs2_lookup(
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
 
-    pvfs2_print("pvfs2_lookup: doing lookup on %s\n  under %llu,%d "
+    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup: doing lookup on %s\n  under %llu,%d "
                 "(follow=%s)\n", new_op->upcall.req.lookup.d_name,
                 llu(new_op->upcall.req.lookup.parent_refn.handle),
                 new_op->upcall.req.lookup.parent_refn.fs_id,
@@ -143,7 +148,7 @@ static struct dentry *pvfs2_lookup(
         new_op, "pvfs2_lookup", 
         get_interruptible_flag(dir));
 
-    pvfs2_print("Lookup Got %llu, fsid %d (ret=%d)\n",
+    gossip_debug(GOSSIP_NAME_DEBUG, "Lookup Got %llu, fsid %d (ret=%d)\n",
                 llu(new_op->downcall.resp.lookup.refn.handle),
                 new_op->downcall.resp.lookup.refn.fs_id, ret);
 
@@ -164,7 +169,7 @@ static struct dentry *pvfs2_lookup(
 
             pvfs2_d_splice_alias(dentry, inode);
 
-            pvfs2_print("Lookup success (inode ct = %d)\n",
+            gossip_debug(GOSSIP_NAME_DEBUG, "Lookup success (inode ct = %d)\n",
                         (int)atomic_read(&inode->i_count));
 	}
         else if (inode && is_bad_inode(inode))
@@ -185,7 +190,7 @@ static struct dentry *pvfs2_lookup(
 	else
 	{
             op_release(new_op);
-            pvfs2_print("Returning -EACCES\n");
+            gossip_debug(GOSSIP_NAME_DEBUG, "Returning -EACCES\n");
             return ERR_PTR(-EACCES);
 	}
     }
@@ -208,7 +213,7 @@ static struct dentry *pvfs2_lookup(
           potential future lookup of this cached negative dentry can
           be properly revalidated.
         */
-        pvfs2_print("pvfs2_lookup: Adding *negative* dentry %p\n  "
+        gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup: Adding *negative* dentry %p\n  "
                     "for %s\n", dentry, dentry->d_name.name);
 
         dentry->d_op = &pvfs2_dentry_operations;
@@ -234,14 +239,18 @@ static int pvfs2_unlink(
     int ret = -ENOENT;
     struct inode *inode = dentry->d_inode;
 
-    pvfs2_print("pvfs2_unlink: pvfs2_unlink called on %s\n",
+    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_unlink: pvfs2_unlink called on %s\n",
                 dentry->d_name.name);
 
     ret = pvfs2_remove_entry(dir, dentry);
     if (ret == 0)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
         inode->i_nlink--;
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
     }
     return ret;
 }
@@ -287,14 +296,19 @@ static int pvfs2_symlink(
     int ret = -EINVAL, mode = 755;
     struct inode *inode = NULL;
 
-    pvfs2_print("pvfs2_symlink: called\n");
+    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_symlink: called\n");
 
     inode = pvfs2_create_entry(
         dir, dentry, symname, mode, PVFS2_VFS_OP_SYMLINK, &ret);
 
     if (inode)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
+
         ret = 0;
     }
     return ret;
@@ -319,7 +333,12 @@ static int pvfs2_mkdir(
          */
 	dir->i_nlink++;
 #endif
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
+
 	ret = 0;
     }
     return ret;
@@ -335,6 +354,7 @@ static int pvfs2_rmdir(
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
     {
+        pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
         inode->i_nlink--; 
 #if 0
         /* NOTE: we have no good way to keep nlink consistent for directories
@@ -342,7 +362,10 @@ static int pvfs2_rmdir(
          */
 	dir->i_nlink--;
 #endif
+
+        SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
+        mark_inode_dirty_sync(dir);
     }
     return ret;
 }
@@ -359,7 +382,7 @@ static int pvfs2_rename(
     pvfs2_kernel_op_t *new_op = NULL;
     struct super_block *sb = NULL;
 
-    pvfs2_print("pvfs2_rename: called (%s/%s => %s/%s) ct=%d\n",
+    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_rename: called (%s/%s => %s/%s) ct=%d\n",
                 old_dentry->d_parent->d_name.name, old_dentry->d_name.name,
                 new_dentry->d_parent->d_name.name, new_dentry->d_name.name,
                 atomic_read(&new_dentry->d_count));
@@ -371,7 +394,7 @@ static int pvfs2_rename(
      */
     if (are_directories && (new_dir->i_nlink >= PVFS2_LINK_MAX))
     {
-        pvfs2_error("pvfs2_rename: directory %s surpassed "
+        gossip_err("pvfs2_rename: directory %s surpassed "
                     "PVFS2_LINK_MAX\n",
                     new_dentry->d_name.name);
         return -EMLINK;
@@ -428,7 +451,7 @@ static int pvfs2_rename(
         new_op, "pvfs2_rename", 
         get_interruptible_flag(old_dentry->d_inode));
 
-    pvfs2_print("pvfs2_rename: got downcall status %d\n", ret);
+    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_rename: got downcall status %d\n", ret);
 
     if (new_dentry->d_inode)
     {

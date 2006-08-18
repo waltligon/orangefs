@@ -75,7 +75,7 @@ int main(
     double stddev_bmi_time, stddev_mpi_time;
     double agg_bmi_bw, agg_mpi_bw;
     double ave_bmi_time, ave_mpi_time;
-    int total_data_xfer = 0;
+    double total_data_xfer = 0;
     bmi_context_id context = -1;
 
     /* start up benchmark environment */
@@ -315,8 +315,8 @@ int main(
      */
     if (world_rank == 0)
     {
-	total_data_xfer = opts.num_servers * num_clients * num_messages *
-	    opts.message_len;
+	total_data_xfer = (double)opts.num_servers * (double)num_clients *
+            (double)num_messages * (double)opts.message_len;
 	if (opts.num_servers > 1)
 	{
 	    var_bmi_time = sumsq_bmi_time -
@@ -352,8 +352,8 @@ int main(
 
     if (world_rank == opts.num_servers)
     {
-	total_data_xfer = opts.num_servers * num_clients * num_messages *
-	    opts.message_len;
+	total_data_xfer = (double)opts.num_servers * (double)num_clients *
+            (double)num_messages * (double)opts.message_len;
 
 	if (num_clients > 1)
 	{

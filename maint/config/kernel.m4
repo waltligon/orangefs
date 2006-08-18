@@ -15,7 +15,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
-	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
 
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
@@ -115,21 +115,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		have_aio=no
 	)
 
-	AC_MSG_CHECKING(for touch_atime support in kernel)
-	AC_TRY_COMPILE([
-		#define __KERNEL__
-		#include <linux/fs.h>
-		void stuff()
-		{
-			struct vfsmnount *mnt;
-			struct dentry *dentry; 
-			touch_atime(mnt, dentry);
-		}
-		], [],
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_TOUCH_ATIME, 1, Define if kernel has touch_atime routine),
-		AC_MSG_RESULT(no)
-	)
 	if test "x$have_aio" = "xyes" -a "x$enable_kernel_aio" = "xyes"; then
 		AC_MSG_CHECKING(for ki_dtor in kiocb structure of kernel)
 		dnl if this test passes, the kernel does have it and we enable
@@ -148,6 +133,43 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			AC_MSG_RESULT(no)
 		)
 	fi
+
+	tmp_cflags=$CFLAGS
+	dnl if this test passes, there is a struct dentry* argument
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(if statfs callbacks' arguments in kernel has struct dentry argument)
+	dnl if this test passes, the kernel has it
+	dnl if this test fails, the kernel does not have it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		extern int pvfs_statfs(struct dentry *, struct kstatfs *);
+			  static struct super_operations s_op = {
+				  .statfs = pvfs_statfs,
+			  };
+		], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if statfs callback has struct dentry argument),
+		AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(if get_sb callbacks' in kernel has struct vfsmount argument)
+	dnl if this test passes, the kernel has it
+	dnl if this test fails, the kernel does not have it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/mount.h>
+		extern int pvfs_get_sb(struct file_system_type *fst, int flags, const char *devname, void *data, struct vfsmount *);
+			  static struct file_system_type fst = {
+				  .get_sb = pvfs_get_sb,
+			  };
+		], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if get_sb callback has struct vfsmount argument),
+		AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(for xattr support in kernel)
 	dnl if this test passes, the kernel has it
@@ -228,6 +250,10 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		 #endif
 		 ] )
 
+	AC_CHECK_HEADERS([linux/mount.h], [], [], 
+		[#define __KERNEL__
+		 #include <linux/mount.h>
+		 ] )
 	AC_CHECK_HEADERS([linux/ioctl32.h], [], [], 
 		[#define __KERNEL__
 		 #include <linux/ioctl32.h>

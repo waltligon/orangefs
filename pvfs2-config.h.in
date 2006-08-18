@@ -46,6 +46,9 @@
 /* Define if db library has DB_DIRTY_READ flag */
 #undef HAVE_DB_DIRTY_READ
 
+/* Define if statfs callback has struct dentry argument */
+#undef HAVE_DENTRY_STATFS_SOP
+
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
@@ -113,6 +116,9 @@
 /* Define to 1 if you have the <linux/ioctl32.h> header file. */
 #undef HAVE_LINUX_IOCTL32_H
 
+/* Define to 1 if you have the <linux/mount.h> header file. */
+#undef HAVE_LINUX_MOUNT_H
+
 /* Define to 1 if you have the <linux/posix_acl.h> header file. */
 #undef HAVE_LINUX_POSIX_ACL_H
 
@@ -133,9 +139,6 @@
 
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
-
-/* Define to 1 if you have the <mntent.h,> header file. */
-#undef HAVE_MNTENT_H_
 
 /* Use the MPE profiling library */
 #undef HAVE_MPE
@@ -215,9 +218,6 @@
 /* Define to 1 if you have the <sys/xattr.h> header file. */
 #undef HAVE_SYS_XATTR_H
 
-/* Define if kernel has touch_atime routine */
-#undef HAVE_TOUCH_ATIME
-
 /* Trove Transaction support available */
 #undef HAVE_TROVE_TRANSACTION_SUPPORT
 
@@ -232,6 +232,9 @@
 
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+
+/* Define if get_sb callback has struct vfsmount argument */
+#undef HAVE_VFSMOUNT_GETSB
 
 /* Define if kernel has xattr support */
 #undef HAVE_XATTR
@@ -260,10 +263,10 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of `long int', as computed by sizeof. */
+/* The size of a `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of `void *', as computed by sizeof. */
+/* The size of a `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */
