@@ -20,6 +20,79 @@
 #include "extent-utils.h"
 #include "pint-cached-config.h"
 
+/* maps bmi address to handle ranges/extents */
+struct bmi_host_extent_table_s
+{
+    char *bmi_address;
+
+    /* ptrs are type struct extent */
+    PINT_llist *extent_list;
+};
+
+struct config_fs_cache_s
+{
+    struct qlist_head hash_link;
+    struct filesystem_configuration_s *fs;
+
+    /* ptrs are struct bmi_host_extent_table_s */
+    PINT_llist *bmi_host_extent_tables;
+
+    /* index into fs->meta_handle_ranges obj (see server-config.h) */
+    PINT_llist *meta_server_cursor;
+
+    /* index into fs->data_handle_ranges obj (see server-config.h) */
+    PINT_llist *data_server_cursor;
+
+    /*
+      the following fields are used to cache arrays of unique physical
+      server addresses, of particular use to the mgmt interface
+    */
+    phys_server_desc_s* io_server_array;
+    int io_server_count;
+    phys_server_desc_s* meta_server_array;
+    int meta_server_count;
+    phys_server_desc_s* server_array;
+    int server_count;
+
+};
+
+#define map_handle_range_to_extent_list(hrange_list)             \
+do { cur = hrange_list;                                          \
+ while(cur) {                                                    \
+     cur_mapping = PINT_llist_head(cur);                         \
+     if (!cur_mapping) break;                                    \
+     assert(cur_mapping->alias_mapping);                         \
+     assert(cur_mapping->alias_mapping->host_alias);             \
+     assert(cur_mapping->handle_range);                          \
+     cur_host_extent_table = malloc(                             \
+         sizeof(struct bmi_host_extent_table_s));                \
+     if (!cur_host_extent_table) {                               \
+         ret = -ENOMEM;                                          \
+         break;                                                  \
+     }                                                           \
+     cur_host_extent_table->bmi_address =                        \
+         PINT_config_get_host_addr_ptr(                          \
+             config,cur_mapping->alias_mapping->host_alias);     \
+     assert(cur_host_extent_table->bmi_address);                 \
+     cur_host_extent_table->extent_list =                        \
+         PINT_create_extent_list(cur_mapping->handle_range);     \
+     if (!cur_host_extent_table->extent_list) {                  \
+         free(cur_host_extent_table);                            \
+         ret = -ENOMEM;                                          \
+         break;                                                  \
+     }                                                           \
+     /*                                                          \
+       add this host to extent list mapping to                   \
+       config cache object's host extent table                   \
+     */                                                          \
+     ret = PINT_llist_add_to_tail(                               \
+         cur_config_fs_cache->bmi_host_extent_tables,            \
+         cur_host_extent_table);                                 \
+     assert(ret == 0);                                           \
+     cur = PINT_llist_next(cur);                                 \
+ } } while(0)
+
+
 struct qhash_table *PINT_fsid_config_cache_table = NULL;
 
 /* these are based on code from src/server/request-scheduler.c */
@@ -1164,12 +1237,12 @@ static int hash_fsid(void *fsid, int table_size)
  */
 static int hash_fsid_compare(void *key, struct qlist_head *link)
 {
-    config_fs_cache_s *fs_info = NULL;
+    struct config_fs_cache_s *fs_info = NULL;
     PVFS_fs_id *real_fsid = (PVFS_fs_id *)key;
 
     assert(PINT_fsid_config_cache_table);
 
-    fs_info = qlist_entry(link, config_fs_cache_s, hash_link);
+    fs_info = qlist_entry(link, struct config_fs_cache_s, hash_link);
     if ((PVFS_fs_id)fs_info->fs->coll_id == *real_fsid)
     {
         return 1;
