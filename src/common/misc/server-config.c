@@ -1217,6 +1217,9 @@ DOTCONF_CB(get_logfile)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    /* free whatever was added in set_defaults phase */
+    if (config_s->logfile)
+        free(config_s->logfile);
     config_s->logfile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
@@ -1641,6 +1644,8 @@ DOTCONF_CB(get_db_cache_type)
                "be either \"sys\" or \"mmap\"\n";
     }
 
+    if (config_s->db_cache_type)
+        free(config_s->db_cache_type);
     config_s->db_cache_type = strdup(cmd->data.str);
     if(!config_s->db_cache_type)
     {
@@ -2026,6 +2031,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
             free(config_s->bmi_modules);
             config_s->bmi_modules = NULL;
         }
+
+        if (config_s->flow_modules)
+        {
+            free(config_s->flow_modules);
+            config_s->flow_modules = NULL;
+        }
 #ifdef USE_TRUSTED
         if (config_s->allowed_network)
         {
@@ -2055,6 +2066,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             PINT_llist_free(config_s->host_aliases,free_host_alias);
             config_s->host_aliases = NULL;
+        }
+
+        if (config_s->db_cache_type)
+        {
+            free(config_s->db_cache_type);
+            config_s->db_cache_type = NULL;
         }
     }
 }
@@ -2305,17 +2322,9 @@ static void copy_filesystem(
                 malloc(sizeof(struct host_handle_mapping_s));
             assert(new_h_mapping);
 
-            new_h_mapping->alias_mapping = (struct host_alias_s *)
-                malloc(sizeof(struct host_alias_s));
-            assert(new_h_mapping->alias_mapping);
-
-            new_h_mapping->alias_mapping->host_alias =
-                strdup(cur_h_mapping->alias_mapping->host_alias);
-            assert(new_h_mapping->alias_mapping->host_alias);
-
-            new_h_mapping->alias_mapping->bmi_address =
-                strdup(cur_h_mapping->alias_mapping->bmi_address);
-            assert(new_h_mapping->alias_mapping->bmi_address);
+            /* these are pointers into another struct with a different
+             * lifetime, do not copy */
+            new_h_mapping->alias_mapping = cur_h_mapping->alias_mapping;
 
             new_h_mapping->handle_range =
                 strdup(cur_h_mapping->handle_range);
@@ -2344,17 +2353,7 @@ static void copy_filesystem(
                 malloc(sizeof(struct host_handle_mapping_s));
             assert(new_h_mapping);
 
-            new_h_mapping->alias_mapping = (struct host_alias_s *)
-                malloc(sizeof(struct host_alias_s));
-            assert(new_h_mapping->alias_mapping);
-
-            new_h_mapping->alias_mapping->host_alias =
-                strdup(cur_h_mapping->alias_mapping->host_alias);
-            assert(new_h_mapping->alias_mapping->host_alias);
-
-            new_h_mapping->alias_mapping->bmi_address =
-                strdup(cur_h_mapping->alias_mapping->bmi_address);
-            assert(new_h_mapping->alias_mapping->bmi_address);
+            new_h_mapping->alias_mapping = cur_h_mapping->alias_mapping;
 
             new_h_mapping->handle_range =
                 strdup(cur_h_mapping->handle_range);
