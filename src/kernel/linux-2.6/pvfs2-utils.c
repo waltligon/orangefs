@@ -845,7 +845,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         new_op->upcall.req.setxattr.keyval.val_sz = size + 1;
 
         gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: key %s, key_sz %d "
-                " value size %d\n", 
+                " value size %zd\n", 
                  (char*)new_op->upcall.req.setxattr.keyval.key, 
                  (int) new_op->upcall.req.setxattr.keyval.key_sz,
                  size + 1);
