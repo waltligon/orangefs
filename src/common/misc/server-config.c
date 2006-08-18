@@ -14,7 +14,7 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include "dotconf.h"
+#include "src/common/dotconf/dotconf.h"
 #include "server-config.h"
 #include "pvfs2.h"
 #include "job.h"

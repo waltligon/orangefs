@@ -25,7 +25,6 @@
 #include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
 
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
 

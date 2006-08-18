@@ -14,7 +14,6 @@
 #include "pvfs2-attr.h"
 #include "pint-sysint-utils.h"
 #include "bmi.h"
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
 #include "quickhash.h"

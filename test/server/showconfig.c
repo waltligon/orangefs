@@ -8,7 +8,6 @@
 #include <string.h>
 #include "trove.h"
 #include "pvfs2-storage.h"
-#include "dotconf.h"
 #include "server-config.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"

@@ -14,7 +14,6 @@
 #include "pint-cached-config.h"
 #include "acache.h"
 #include "PINT-reqproto-encode.h"
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config-mgr.h"
 #include "str-utils.h"

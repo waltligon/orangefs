@@ -11,7 +11,6 @@
 #include "pvfs2-storage.h"
 #include "pvfs2-mgmt.h"
 #include "bmi.h"
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
 

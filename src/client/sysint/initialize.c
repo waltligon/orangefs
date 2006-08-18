@@ -22,7 +22,6 @@
 #include "gen-locks.h"
 #include "pint-servreq.h"
 #include "PINT-reqproto-encode.h"
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config-mgr.h"
 #include "client-state-machine.h"
