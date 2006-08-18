@@ -912,10 +912,10 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
     enum dbpf_op_type tmp_type;
-    int event_type;
+    int event_type, i;
 #ifdef __PVFS2_TROVE_AIO_THREADED__
     struct dbpf_op *op_p = NULL;
-    int i = 0, aiocb_inuse_count = 0;
+    int aiocb_inuse_count = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
 #endif
 
