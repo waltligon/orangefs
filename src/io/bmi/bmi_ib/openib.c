@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.3 2006-06-28 17:40:48 pw Exp $
+ * $Id: openib.c,v 1.4 2006-08-18 21:27:30 pw Exp $
  */
 #include <string.h>
 #include <errno.h>
@@ -1005,7 +1005,7 @@ int openib_ib_initialize(void)
 
     /* get the lid and verify port state */
     ret = ibv_query_port(od->ctx, od->nic_port, &hca_port);
-    if(ret)
+    if (ret)
 	error_xerrno(ret, "%s: ibv_query_port", __func__);
     od->nic_lid = hca_port.lid;
 

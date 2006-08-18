@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.34 2006-06-30 18:11:46 pw Exp $
+ * $Id: ib.c,v 1.35 2006-08-18 21:27:30 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1479,7 +1479,7 @@ BMI_ib_rev_lookup(struct method_addr *meth)
  * Build and fill an IB-specific method_addr structure.
  */
 static struct method_addr *ib_alloc_method_addr(ib_connection_t *c,
-                                                const char *hostname, int port)
+                                                char *hostname, int port)
 {
     struct method_addr *map;
     ib_method_addr_t *ibmap;
@@ -1505,7 +1505,7 @@ static struct method_addr *BMI_ib_method_addr_lookup(const char *id)
 {
     char *s, *hostname, *cp, *cq;
     int port;
-    struct method_addr *map = 0;
+    struct method_addr *map = NULL;
 
     /* parse hostname */
     s = string_key("ib", id);  /* allocs a string */
@@ -1836,12 +1836,22 @@ static int BMI_ib_get_info(int option, void *param)
 }
 
 /*
- * Used to set some optional parameters.  Just ignore.
+ * Used to set some optional parameters and random functions, like ioctl.
  */
-static int BMI_ib_set_info(int option __unused, void *param __unused)
+static int BMI_ib_set_info(int option, void *param __unused)
 {
-    /* XXX: should return -ENOSYS, but 0 now until callers handle
-     * that correctly. */
+    switch (option) {
+    case BMI_DROP_ADDR: {
+	struct method_addr *map = param;
+	ib_method_addr_t *ibmap = map->method_data;
+	free(ibmap->hostname);
+	free(map);
+	break;
+    }
+    default:
+	/* Should return -ENOSYS, but return 0 for caller ease. */
+	break;
+    }
     return 0;
 }
 
