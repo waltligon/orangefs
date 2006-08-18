@@ -16,6 +16,7 @@
 #include <stdlib.h>
 
 #include "pvfs2.h"
+#include "pvfs2-internal.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 
@@ -106,7 +107,7 @@ static int fillup_buffer(cm_frame_t *frame)
 	frame->cf_valid_size[c] = (rand() % (chunk_size - tmp_start)) + 1;
 	assert(frame->cf_valid_start[c] + frame->cf_valid_size[c] <= frame->buf_size);
 	
-	printf("(%d): valid_start: %Ld, valid_size: %d\n", c, frame->cf_valid_start[c],
+	printf("(%d): valid_start: %lld, valid_size: %d\n", c, lld(frame->cf_valid_start[c]),
 		frame->cf_valid_size[c]);
 	
 	should_be += frame->cf_valid_size[c];
@@ -353,8 +354,8 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Error: short write!\n");
 			fprintf(stderr, "Tried to write %d bytes\n", 
 				 should_be);
-			fprintf(stderr, "Only got %Ld bytes.\n",
-				total_written);
+			fprintf(stderr, "Only got %lld bytes.\n",
+				lld(total_written));
 			ret = -1;
 			goto main_out;
     }
@@ -363,7 +364,7 @@ int main(int argc, char **argv)
     printf("********************************************************\n");
     printf("PVFS2 Hindexed Test Write Statistics:\n");
     printf("********************************************************\n");
-    printf("Bytes written: %Ld\n", Ld(total_written));
+    printf("Bytes written: %lld\n", lld(total_written));
     printf("Elapsed time: %f seconds\n", (time2-time1));
     printf("Bandwidth: %f MB/second\n", (((double)total_written)/((double)(1024*1024))/(time2-time1)));
     printf("********************************************************\n\n");
@@ -376,7 +377,7 @@ int main(int argc, char **argv)
 			ret = -1;
 			goto main_out;
     }
-    printf("Measured file size is %Ld\n", resp_getattr.attr.size);
+    printf("Measured file size is %lld\n", lld(resp_getattr.attr.size));
 
     /* now read it back from the file and make sure we have the correct data */
     time1 = Wtime();
@@ -432,10 +433,10 @@ int main(int argc, char **argv)
     if(total_written != total_read)
     {
 			fprintf(stderr, "Error: short reads!\n");
-			fprintf(stderr, "Tried to read %Ld bytes\n", 
-				total_written);
-			fprintf(stderr, "Only got %Ld bytes.\n",
-				total_read);
+			fprintf(stderr, "Tried to read %lld bytes\n", 
+				lld(total_written));
+			fprintf(stderr, "Only got %lld bytes.\n",
+				lld(total_read));
 			ret = -1;
 			goto main_out;
     }
@@ -444,7 +445,7 @@ int main(int argc, char **argv)
     printf("\n********************************************************\n");
     printf("PVFS2 Hindexed Test Read Statistics:\n");
     printf("********************************************************\n");
-    printf("Bytes read: %Ld\n", Ld(total_read));
+    printf("Bytes read: %lld\n", lld(total_read));
     printf("Elapsed time: %f seconds\n", (time2-time1));
     printf("Bandwidth: %f MB/second\n",
 	(((double)total_read)/((double)(1024*1024))/(time2-time1)));
@@ -459,8 +460,8 @@ int main(int argc, char **argv)
 					 (char *) frame.wr_buffer + frame.cf_valid_start[c],
 					 frame.cf_valid_size[c]))
 			{
-				 fprintf(stderr, "(%d) -> Read buffer did not match with write buffer from [%Ld upto %d bytes]\n",
-					 c, frame.cf_valid_start[c], frame.cf_valid_size[c]);
+				 fprintf(stderr, "(%d) -> Read buffer did not match with write buffer from [%lld upto %d bytes]\n",
+					 c, lld(frame.cf_valid_start[c]), frame.cf_valid_size[c]);
 				 ret = -1;
 			}
     }
