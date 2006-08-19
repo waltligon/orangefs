@@ -234,10 +234,14 @@ static int open_fd(
     gossip_debug(GOSSIP_PERFORMANCE_DEBUG, "DBPF open filehandle start\n");
     ifd = DBPF_OPEN(filename, O_RDWR | O_CREAT | openflags, 
         S_IRUSR | S_IWUSR);
+    if( ifd < 0){
+        gossip_debug(GOSSIP_PERFORMANCE_DEBUG, "DBPF open filehandle %d with ODIRECT %d Error:%s\n",
+                     ifd, openflags && O_DIRECT, strerror((errno)));        
+        return -trove_errno_to_trove_error(errno);
+    }
     gossip_debug(GOSSIP_PERFORMANCE_DEBUG, "DBPF open filehandle %d with ODIRECT %d\n",
                      ifd, openflags && O_DIRECT);        
-
-    return ((ifd < 0) ? -trove_errno_to_trove_error(errno) : ifd);
+    return ifd;
 }
 
 
@@ -514,6 +518,10 @@ static void increment_handle_ref(
         
         elem->active_io->filehandle = open_fd(elem->fs_id, elem->handle, 
             elem->active_io->openflags );
+        if( elem->active_io->filehandle < 1 ){
+            gossip_err("Does the filesystem support O_DIRECT ?");
+            exit(1);
+        }
     }
     gen_mutex_unlock(&elem->active_io->mutex);
 }
@@ -856,8 +864,7 @@ static void * bstream_threaded_thread_io_function(
     /*
      * We reuse the biggest buffer, so no contig. malloc / free necessary.
      */
-    void * odirectBuffAlloc;
-    unsigned char * buff_real;
+    unsigned char * buffer;
     int ret;
     dbpf_queued_op_t *request;
     active_io_processing_slice_t *io_processing_slice;
@@ -866,18 +873,16 @@ static void * bstream_threaded_thread_io_function(
     enum IO_queue_type req_type = -1;
     free((int *) vpthread_number);
     
-    odirectBuffAlloc = malloc(IO_BUFFER_SIZE + 2 * MEM_PAGESIZE);
+    posix_memalign((void**) & buffer, MEM_PAGESIZE,  IO_BUFFER_SIZE+MEM_PAGESIZE);
     /*
      * keep valgrind happy, also for debugging...
      */
-    memset(odirectBuffAlloc, 255, IO_BUFFER_SIZE + 2 * MEM_PAGESIZE);
+    memset(buffer, 255, IO_BUFFER_SIZE);
     
-    if (odirectBuffAlloc == NULL) {
+    if (buffer == NULL) {
         gossip_err("Not enough free memory to allocate ODIRECT buffer\n");
         return NULL;
     }
-    buff_real = (unsigned char *)(((uintptr_t )odirectBuffAlloc + 
-                MEM_PAGESIZE - 1) & (~(MEM_PAGESIZE - 1)));
 
     while (1)
     { 
@@ -1023,7 +1028,7 @@ static void * bstream_threaded_thread_io_function(
                            &current_handle->active_io->total_write_size,
                            &current_handle->active_io->latest_offset_written,
                            &current_handle->active_io->return_code,
-                           thread_number, buff_real, 
+                           thread_number, buffer, 
                            current_handle->active_io->openflags);
             break;
         case (IO_QUEUE_WRITE):
@@ -1037,7 +1042,7 @@ static void * bstream_threaded_thread_io_function(
                                &current_handle->active_io->total_write_size,
                                &current_handle->active_io->latest_offset_written,
                                &current_handle->active_io->return_code,
-                               thread_number, buff_real,
+                               thread_number, buffer,
                                current_handle->active_io->openflags);
                 break;
             }
@@ -1082,7 +1087,7 @@ static void * bstream_threaded_thread_io_function(
             current_handle->active_io->latest_offset_written);
     }
     
-    free(odirectBuffAlloc);
+    free(buffer);
     return NULL;
 }
 
