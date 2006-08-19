@@ -309,20 +309,24 @@ AX_CHECK_ODIRECT_AVAILABLE()
 AX_CHECK_PWRITE_AVAILABLE()
 
 dnl use AIO and not threaded I/O
-AC_ARG_ENABLE(aio,
-[  --disable-aio          use threaded I/O instead of asynchronous I/O],
-[
+AC_MSG_CHECKING(if aio is enabled in dbpf)
+    AC_ARG_ENABLE([aio],
+        [AS_HELP_STRING([--enable-aio],
+        [use asynchronous I/O instead of threaded @<:@default=yes@:>@])],
+        [with_aio=$enableval],
+        [with_aio=yes])
+        
+
+if test "x$with_aio" == xyes ; then
    MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
    HAVE_TROVE_AIO=1
    AC_SUBST(HAVE_TROVE_AIO)
-],
-[
-   if test "x$enableval" = "xno"; then
-        echo ""
-   fi
-]
+   AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+fi   
 
-)
+
 
 if test "x$HAVE_TROVE_PWRITE" = "x" ; then
 if test "x$HAVE_TROVE_AIO" = "x" ; then

@@ -368,7 +368,7 @@ void print_entry(
     PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                           &credentials, &getattr_response);
+                           &credentials, &getattr_response, NULL);
     if (ret)
     {
         fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
@@ -403,7 +403,7 @@ int do_list(
     PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if(ret < 0)
     {
         PVFS_perror("PVFS_sys_lookup", ret);
@@ -416,7 +416,7 @@ int do_list(
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                         &credentials, &getattr_response) == 0)
+                         &credentials, &getattr_response, NULL) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
             (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK) ||
@@ -434,7 +434,7 @@ int do_list(
             if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
                 if (PVFS_sys_getparent(ref.fs_id, name, &credentials,
-                                       &getparent_resp) == 0)
+                                       &getparent_resp, NULL) == 0)
                 {
                     print_dot_and_dot_dot_info_if_required(
                         getparent_resp.parent_ref);
@@ -460,7 +460,7 @@ int do_list(
         memset(&rd_response, 0, sizeof(PVFS_sysresp_readdir));
         ret = PVFS_sys_readdir(
                 ref, (!token ? PVFS_READDIR_START : token),
-                pvfs_dirent_incount, &credentials, &rd_response);
+                pvfs_dirent_incount, &credentials, &rd_response, NULL);
         if(ret < 0)
         {
             PVFS_perror("PVFS_sys_readdir", ret);

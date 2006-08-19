@@ -79,7 +79,7 @@ int main(int argc, char **argv)
         ret = PVFS_mgmt_setparam_single(
             cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
             user_opts->debug_mask, user_opts->single_server,
-            NULL, NULL);
+            NULL, NULL, NULL);
     }
     else
     {
@@ -87,7 +87,7 @@ int main(int argc, char **argv)
 
         ret = PVFS_mgmt_setparam_all(
             cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
-            user_opts->debug_mask, NULL, NULL);
+            user_opts->debug_mask, NULL, NULL, NULL);
     }
 
     if (ret)

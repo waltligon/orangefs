@@ -179,7 +179,7 @@ int pvfs2_vis_start(char* path, int update_interval)
 				      next_id_array,
 				      io_server_count, 
 				      HISTORY,
-				      NULL);
+				      NULL, NULL);
 	if (ret < 0)
 	{
 	    return ret;
@@ -294,7 +294,7 @@ static void *poll_for_updates(void *args)
 				      next_id_array,
 				      server_count, 
 				      history_count,
-				      NULL);
+				      NULL, NULL);
 	if (ret < 0)
 	{
 	    pint_vis_error = ret;

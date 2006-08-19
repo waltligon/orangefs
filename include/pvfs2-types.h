@@ -65,6 +65,10 @@ typedef int64_t PVFS_offset;
 typedef int64_t PVFS_size;
 typedef int64_t PVFS_id_gen_t;
 
+/* Request ID type has to be bigger in the future ! 
+ *  For now its important to have the type defined */
+typedef int64_t PVFS_request_id;
+
 /** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
 

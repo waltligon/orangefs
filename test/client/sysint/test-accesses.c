@@ -71,7 +71,7 @@ int main(int argc, char * argv[])
     ret = PVFS_util_get_default_fsid(&curfs);
     if(ret < 0) goto error;
 
-    ret = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0);
+    ret = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0, NULL);
     if(ret < 0) goto error;
 
     PVFS_util_gen_credentials(&creds);
@@ -84,7 +84,7 @@ int main(int argc, char * argv[])
 
     ret = PVFS_sys_create(
 	(char*)filename, 
-	lookup_resp.ref, attr, &creds, NULL, &create_resp);
+	lookup_resp.ref, attr, &creds, NULL, &create_resp, NULL);
     if(ret < 0) goto error;
 
     for(; i < count; ++i)
@@ -122,7 +122,7 @@ int main(int argc, char * argv[])
 
 	ret = PVFS_sys_io(
 	    create_resp.ref, file_req, offset, membuff, mem_req,
-	    &creds, &io_resp, PVFS_IO_WRITE);
+	    &creds, &io_resp, PVFS_IO_WRITE, NULL);
 	if(ret < 0) goto error;
 
 	printf("Write response: size: %llu\n", llu(io_resp.total_completed));
@@ -141,7 +141,7 @@ error:
     PVFS_sys_remove(
 	(char*)filename,
 	lookup_resp.ref,
-	&creds);
+	&creds, NULL);
 
     PVFS_perror_gossip(errormsg, ret);
     fprintf(stderr, "%s\n", errormsg);

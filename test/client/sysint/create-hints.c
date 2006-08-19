@@ -14,6 +14,7 @@
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-hint.h"
 
 int main(int argc, char **argv)
 {
@@ -26,6 +27,7 @@ int main(int argc, char **argv)
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
+    PVFS_hint * hint = NULL;
 
     if (argc != 2)
     {
@@ -81,8 +83,23 @@ int main(int argc, char **argv)
     printf("File to be created is %s under parent %llu\n",
            str_buf, llu(parent_refn.handle));
 
+    ret = PVFS_add_hint(& hint, REQUEST_ID, "REQUEST ID BLUB THIS IS A VERY LONG LONG TEST !!!!");
+    if(ret < 0){
+        printf("Error add hint: %d, %s \n", -ret, strerror(-ret));
+        return 1;
+    }
+    
+    ret = PVFS_add_hint(& hint, CREATE_SET_METAFILE_NODE, "localhost");
+    if(ret < 0){
+        printf("Error add hint: %d, %s \n", -ret, strerror(-ret));
+        return 1;
+    }
+
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          &credentials, NULL, &resp_create, NULL);
+                          &credentials, NULL, &resp_create, hint);
+                          
+    PVFS_free_hint(& hint);
+    
     if (ret < 0)
     {
         PVFS_perror("create failed with errcode", ret);

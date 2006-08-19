@@ -43,7 +43,7 @@ int main(int argc,char **argv)
     }
 
     PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_getparent(fs_id, argv[1], &credentials, &resp_getparent);
+    ret = PVFS_sys_getparent(fs_id, argv[1], &credentials, &resp_getparent, NULL);
     if (ret == 0)
     {
         printf("=== getparent data:\n");

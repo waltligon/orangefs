@@ -24,11 +24,13 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value)
     {
         case 0:
             return 0;
+	/*
         case DB_VERSION_MISMATCH:
             gossip_err("Error: DB_VERSION_MISMATCH encountered,"
                 " version of libdb is different from the libdb which created"
                 " the database environment. This should never happen!\n");
             return TROVE_EIO;
+	*/
         case DB_OLD_VERSION:
             gossip_err("Error: DB_OLD_VERSION encountered,"
                 " version of libdb is different from the libdb which created"

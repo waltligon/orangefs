@@ -77,7 +77,8 @@ int PINT_do_lookup (
     PVFS_object_ref *entry);
 int PINT_server_get_config(
     struct server_configuration_s *config,
-    struct PVFS_sys_mntent* mntent);
+    struct PVFS_sys_mntent* mntent,
+    PVFS_hint * hints);
 void PINT_release_pvfstab(void);
 
 struct server_configuration_s *PINT_get_server_config_struct(

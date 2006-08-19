@@ -157,7 +157,7 @@ int main(int argc, char **argv)
 				      next_id_array,
 				      io_server_count, 
 				      HISTORY,
-				      NULL);
+				      NULL, NULL);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_perf_mon_list", ret);

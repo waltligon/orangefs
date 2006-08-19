@@ -68,6 +68,7 @@ PVFS_error PVFS_imgmt_noop(
     PVFS_credentials *credentials,
     PVFS_BMI_addr_t addr,
     PVFS_mgmt_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr)
 {
     PINT_client_sm *sm_p = NULL;
@@ -86,6 +87,7 @@ PVFS_error PVFS_imgmt_noop(
     sm_p->msgpair.fs_id = fs_id;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.svr_addr = addr;
+    sm_p->hints = hints;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "
                  "PINT_client_state_machine_post()\n");
@@ -99,14 +101,15 @@ PVFS_error PVFS_imgmt_noop(
 PVFS_error PVFS_mgmt_noop(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    PVFS_BMI_addr_t addr)
+    PVFS_BMI_addr_t addr,
+    PVFS_hint * hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop entered\n");
 
-    ret = PVFS_imgmt_noop(fs_id, credentials, addr, &op_id, NULL);
+    ret = PVFS_imgmt_noop(fs_id, credentials, addr, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_noop call", ret);
@@ -132,7 +135,7 @@ static int mgmt_noop_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "noop state: mgmt_noop_setup_msgpair\n");
 
-    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgpair.req, *sm_p->cred_p);
+    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgpair.req, *sm_p->cred_p, sm_p->hints);
 
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;

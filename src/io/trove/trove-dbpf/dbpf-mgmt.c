@@ -637,6 +637,8 @@ static int dbpf_storage_create(char *stoname,
     char sto_attrib_dbname[PATH_MAX] = {0};
     char collections_dbname[PATH_MAX] = {0};
     char deletion_path_name[PATH_MAX];
+    DB_ENV * env;
+    int error;
     
 
     DBPF_GET_STORAGE_DIRNAME(storage_dirname, PATH_MAX, stoname);
@@ -644,6 +646,12 @@ static int dbpf_storage_create(char *stoname,
     if (ret != 0)
     {
         return ret;
+    }
+    
+    env = dbpf_getdb_env(storage_dirname, 0, &error);
+    if (error)
+    {
+        return error;
     }
     
     DBPF_GET_STO_ATTRIB_DBNAME(sto_attrib_dbname, PATH_MAX, stoname);
@@ -668,6 +676,8 @@ static int dbpf_storage_create(char *stoname,
      */
     DBPF_GET_SHADOW_REMOVE_BSTREAM_DIRNAME(deletion_path_name, PATH_MAX, 
         stoname);
+        
+    dbpf_putdb_env(env, storage_dirname);
     
     ret = DBPF_MKDIR(deletion_path_name, 0755);
     if(ret != 0)
@@ -768,7 +778,7 @@ static int dbpf_collection_create(char *collname,
     struct stat dbstat;
     char path_name[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
     char coll_path[PATH_MAX] = {0};
-    DB_ENV * env;
+    DB_ENV * env = NULL;
 
     if (my_storage_p == NULL)
     {
@@ -833,6 +843,12 @@ static int dbpf_collection_create(char *collname,
             gossip_err("DBPF_MKDIR failed on storage directory %s\n", path_name);
             return -trove_errno_to_trove_error(errno);
         }
+    }
+    
+    /* per-collection environment */
+    if ((env = dbpf_getdb_env(coll_path, COLL_ENV_FLAGS, &ret)) == NULL)
+    {
+         return -trove_errno_to_trove_error(errno);
     }
     
     DBPF_GET_COLL_DIRNAME(coll_path, PATH_MAX, sto_p->name, new_coll_id);
@@ -1615,6 +1631,15 @@ static struct dbpf_storage *dbpf_storage_lookup(
     sto_p->refct = 0;
     sto_p->flags = flags;
 
+    sto_p->env = dbpf_getdb_env(sto_p->name, 0, error_p);
+    if (*error_p)
+    {
+        free(sto_p->name);
+        free(sto_p);
+        my_storage_p = NULL;
+        return NULL;
+    }
+
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
     sto_p->sto_attr_db = dbpf_db_open(sto_p->name, path_name, NULL, error_p, NULL);
     if (sto_p->sto_attr_db == NULL)
@@ -1635,7 +1660,8 @@ static struct dbpf_storage *dbpf_storage_lookup(
         my_storage_p = NULL;
         return NULL;
     }
-
+    
+    dbpf_putdb_env(sto_p->env, path_name);
     my_storage_p = sto_p;
     return sto_p;
 }

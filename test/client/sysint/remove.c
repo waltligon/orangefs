@@ -67,7 +67,7 @@ int main(int argc,char **argv)
     }
     parent_refn.fs_id = cur_fs;
 
-    ret = PVFS_sys_remove(entry_name, parent_refn, &credentials);
+    ret = PVFS_sys_remove(entry_name, parent_refn, &credentials, NULL);
     if (ret < 0)
     {
         PVFS_perror("remove failed ", ret);

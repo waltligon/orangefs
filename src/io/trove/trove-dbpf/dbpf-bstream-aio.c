@@ -58,7 +58,7 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 #define DBPF_MAX_IOS_IN_PROGRESS  16
 static int s_dbpf_ios_in_progress = 0;
 static gen_mutex_t s_dbpf_io_mutex = GEN_MUTEX_INITIALIZER;
-dbpf_op_queue_s  s_dbpf_io_ready_queue;
+dbpf_op_queue_t  s_dbpf_io_ready_queue;
 
 static int issue_or_delay_io_operation(
     dbpf_queued_op_t * cur_op,

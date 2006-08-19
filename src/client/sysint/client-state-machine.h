@@ -17,6 +17,7 @@
 */
 #include "pvfs2-sysint.h"
 #include "pvfs2-types.h"
+#include "pvfs2-hint.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-util.h"
 #include "PINT-reqproto-encode.h"
@@ -492,6 +493,12 @@ typedef struct PINT_client_sm
     void *user_ptr;
 
     PVFS_credentials *cred_p;
+    
+    /*
+     * hints for specific client action, for example request_ID...
+     */ 
+    PVFS_hint *hints;
+    
     union
     {
 	struct PINT_client_remove_sm remove;

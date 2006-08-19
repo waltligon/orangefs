@@ -23,6 +23,7 @@
 #include <ucontext.h>
 #endif
 
+#include "pvfs2-hint.h"
 #include "bmi.h"
 #include "gossip.h"
 #include "job.h"
@@ -1927,6 +1928,8 @@ int server_state_machine_complete(PINT_server_op *s_op)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
+        PVFS_free_hint(& s_op->decoded.stub_dec.req.hints);
+        
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
