@@ -110,7 +110,7 @@ int PINT_hint_decode(PVFS_hint ** out_hint, const char * buffer, int * out_lengt
 }
 
 
-const char * PVFS_get_hint(
+char * PVFS_get_hint(
     const PVFS_hint * hint,
     const enum pvfs2_hint_type type
     )

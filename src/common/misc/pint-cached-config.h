@@ -46,6 +46,14 @@ int PINT_cached_config_get_next_io(
     PVFS_BMI_addr_t *io_addr_array,
     PVFS_handle_extent_array *io_handle_extent_array);
 
+int PINT_cached_config_get_one_server_str(
+    char * alias,
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    PVFS_BMI_addr_t *io_addr,
+    PVFS_handle_extent_array *io_handle_extent,
+    int is_dataserver); 
+
 const char *PINT_cached_config_map_addr(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,

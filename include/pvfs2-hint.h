@@ -9,7 +9,10 @@
 #define MAX_HINT_LENGTH 1024
 
 enum pvfs2_hint_type{
-    REQUEST_ID = 0,
+    REQUEST_ID = 0, 
+/*
+ * separate multiple tokens with komma ","
+ */
     CREATE_SET_DATAFILE_NODES = 1,
     CREATE_SET_METAFILE_NODE = 2,
     NUMBER_HINT_TYPES = 3  
@@ -30,7 +33,7 @@ int PVFS_add_hint(
     char * hint
     );
 
-const char * PVFS_get_hint(
+char * PVFS_get_hint(
     const PVFS_hint * hint,
     const enum pvfs2_hint_type type);
 

@@ -94,7 +94,16 @@ int main(int argc, char **argv)
         printf("Error add hint: %d, %s \n", -ret, strerror(-ret));
         return 1;
     }
+    
+    ret = PVFS_add_hint(& hint, CREATE_SET_DATAFILE_NODES, "localhost");
+    if(ret < 0){
+        printf("Error add hint: %d, %s \n", -ret, strerror(-ret));
+        return 1;
+    }    
 
+    printf("Try to create a file with metadata server and dataserver"
+            " localhost using hints!");
+    attr.dfile_count = 1;
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
                           &credentials, NULL, &resp_create, hint);
                           
