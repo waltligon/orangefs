@@ -43,6 +43,10 @@ void PVFS_free_hint(
     
 
 int32_t PINT_hint_calc_size(const PVFS_hint * hint);
+
+enum pvfs2_hint_type PVFS_hint_get_type(const char * hint_str);
+const char *         PVFS_hint_get_str(enum pvfs2_hint_type type);
+int                  PVFS_hint_get_count(void);
     
 int PINT_hint_encode(const PVFS_hint * hint, char * buffer, int * out_length, int max_length);
 int PINT_hint_decode(PVFS_hint ** out_hint, const char * buffer, int * out_length);

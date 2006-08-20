@@ -5,13 +5,38 @@
 #include "pvfs2-hint.h"
 #include "gossip.h"
 #include "assert.h"
-/*#include "PINT-reqproto-encode.h"*/
 
-static int hint_transfer_to_server[NUMBER_HINT_TYPES] = {
-    1,
-    0,
-    0
+struct hint_internal{
+    const int transfer_to_server;
+    const char * string;
 };
+
+static const struct hint_internal hint_types[NUMBER_HINT_TYPES] = {
+    {1, "REQUEST_ID"},
+    {0, "CREATE_SET_DATAFILE_NODES"},
+    {0, "CREATE_SET_METAFILE_NODE"}
+};
+
+enum pvfs2_hint_type PVFS_hint_get_type(const char * hint_str){
+    int i;
+    for(i = 0; i < NUMBER_HINT_TYPES; i++){
+        if( strcmp(hint_types[i].string, hint_str) == 0){
+            return i;
+        }
+    }
+    return -1;
+}
+
+const char *         PVFS_hint_get_str(enum pvfs2_hint_type type){
+    if ( type < NUMBER_HINT_TYPES ){
+        return hint_types[type].string;
+    }
+    return NULL;
+}
+
+int PVFS_hint_get_count(void){
+    return NUMBER_HINT_TYPES;
+}
 
 int PVFS_add_hint(
     PVFS_hint ** old_hint, 
@@ -40,7 +65,7 @@ int32_t PINT_hint_calc_size(const PVFS_hint * hint){
     int count = 4;
     PVFS_hint * act;
     for( act = (PVFS_hint *) hint ; act != NULL ; act = act->next_hint){
-        if (hint_transfer_to_server[act->type]){
+        if (hint_types[act->type].transfer_to_server){
             /* length + type + act. string + 8-byte alignment (chosse bigger in case
              * string is exactly divisible by 8)*/
             count += 4 + 4 + act->length + 8 - act->length % 8; 
@@ -56,7 +81,7 @@ int PINT_hint_encode(const PVFS_hint * hint, char * buffer, int * out_length, in
     const int32_t number_hint_types = NUMBER_HINT_TYPES;
 
     for( act = (PVFS_hint *) hint ; act != NULL ; act = act->next_hint){
-        if (hint_transfer_to_server[act->type]){
+        if (hint_types[act->type].transfer_to_server){
             if ( buffer - start_buffer + act->length + 8 <= max_length){
                 encode_int32_t((int32_t*) & buffer, & (act->type));
                 encode_string(& buffer, &(act->hint));

@@ -820,6 +820,7 @@ install:: all install_doc
 	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-types.h $(prefix)/include
+	install -m 644 $(srcdir)/include/pvfs2-hint.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-util.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(prefix)/include
 

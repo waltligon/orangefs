@@ -13,6 +13,7 @@
 #define __PVFS2_H
 
 #include "pvfs2-types.h"
+#include "pvfs2-hint.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-debug.h"
 #include "pvfs2-util.h"
