@@ -41,7 +41,9 @@ int32_t PINT_hint_calc_size(const PVFS_hint * hint){
     PVFS_hint * act;
     for( act = (PVFS_hint *) hint ; act != NULL ; act = act->next_hint){
         if (hint_transfer_to_server[act->type]){
-            count += 8 + act->length; 
+            /* length + type + act. string + 8-byte alignment (chosse bigger in case
+             * string is exactly divisible by 8)*/
+            count += 4 + 4 + act->length + 8 - act->length % 8; 
         }
     }
     return (int32_t) count;
