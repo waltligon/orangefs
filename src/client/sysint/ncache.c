@@ -98,6 +98,8 @@ void PINT_ncache_enable_perf_counter(
 int PINT_ncache_initialize(void)
 {
     int ret = -1;
+    unsigned int ncache_timeout_msecs;
+    char * ncache_timeout_str = NULL;
   
     gen_mutex_lock(&ncache_mutex);
   
@@ -113,8 +115,15 @@ int PINT_ncache_initialize(void)
     }
   
     /* fill in defaults that are specific to ncache */
+    ncache_timeout_str = getenv("PVFS2_NCACHE_TIMEOUT");
+    if (ncache_timeout_str != NULL) 
+        ncache_timeout_msecs = (unsigned int)strtoul(ncache_timeout_str,NULL,0);
+    else
+        ncache_timeout_msecs = NCACHE_DEFAULT_TIMEOUT_MSECS;
+
     ret = PINT_tcache_set_info(ncache, TCACHE_TIMEOUT_MSECS,
-                               NCACHE_DEFAULT_TIMEOUT_MSECS);
+                               ncache_timeout_msecs);
+                
     if(ret < 0)
     {
         PINT_tcache_finalize(ncache);
