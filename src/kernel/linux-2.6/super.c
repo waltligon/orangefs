@@ -218,7 +218,7 @@ static void pvfs2_read_inode(
 
     if (inode->u.generic_ip)
     {
-        pvfs2_panic("Found an initialized inode in pvfs2_read_inode! "
+        gossip_err("ERROR! Found an initialized inode in pvfs2_read_inode! "
                     "Should not have been initialized?\n");
         return;
     }
