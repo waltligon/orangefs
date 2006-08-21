@@ -351,7 +351,7 @@ static int gui_comm_stats_collect(
                                 &creds,
                                 internal_stats,
                                 internal_addrs,
-                                internal_stat_ct, internal_details);
+                                internal_stat_ct, internal_details, NULL);
     if (ret == 0)
         return 0;
     else if (ret == -PVFS_EDETAIL)
@@ -408,7 +408,8 @@ static int gui_comm_perf_collect(
                                   internal_addrs,
                                   internal_perf_ids,
                                   internal_addr_ct,
-                                  GUI_COMM_PERF_HISTORY, internal_details);
+                                  GUI_COMM_PERF_HISTORY, internal_details, 
+                                  NULL);
     if (ret == 0)
         return 0;
     else if (ret == -PVFS_EDETAIL)
