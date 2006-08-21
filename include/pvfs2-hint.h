@@ -1,9 +1,6 @@
 #ifndef PVFS2HINT_H_
 #define PVFS2HINT_H_
 
-#include <stdlib.h>
-#include <string.h>
-
 #include "pvfs2-types.h"
 
 #define MAX_HINT_LENGTH 1024

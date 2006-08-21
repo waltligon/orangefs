@@ -113,7 +113,14 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-        
+    
+    const char * request_id;
+    request_id = PVFS_get_hint( s_op->req->hints,
+        REQUEST_ID);
+    if(request_id != NULL){
+        gossip_err("I/O request ID received: %s\n", request_id);
+    }        
+    
     /* this is where we report the file size to the client before
      * starting the I/O transfer, or else report an error if we
      * failed to get the size, or failed for permission reasons

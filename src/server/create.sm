@@ -87,7 +87,7 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
 	request_id = PVFS_get_hint( s_op->req->hints,
 		REQUEST_ID);
 	if(request_id != NULL){
-		gossip_err("Request ID received %s\n", request_id);
+		gossip_err("Create request ID received: %s\n", request_id);
 	}
 
     ret = job_trove_dspace_create(

@@ -2,9 +2,12 @@
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
 #include "pvfs2-hint.h"
 #include "gossip.h"
-#include "assert.h"
 
 struct hint_internal{
     const int transfer_to_server;
@@ -51,6 +54,10 @@ int PVFS_add_hint(
     new_hint->type = type;
     new_hint->length = strlen(hint) + 1;
     new_hint->hint = malloc(new_hint->length);
+    if( !new_hint->hint){
+        free(new_hint);
+        return -PVFS_ENOMEM;
+    } 
     strncpy(new_hint->hint, hint, new_hint->length);
     
     new_hint->next_hint = *old_hint;
@@ -66,9 +73,8 @@ int32_t PINT_hint_calc_size(const PVFS_hint * hint){
     PVFS_hint * act;
     for( act = (PVFS_hint *) hint ; act != NULL ; act = act->next_hint){
         if (hint_types[act->type].transfer_to_server){
-            /* length + type + act. string + 8-byte alignment (chosse bigger in case
-             * string is exactly divisible by 8)*/
-            count += 4 + 4 + act->length + 8 - act->length % 8; 
+            /* length + type + act. string + 8-byte alignment*/
+            count += 4 + 4 + act->length + roundup8(act->length); 
         }
     }
     return (int32_t) count;

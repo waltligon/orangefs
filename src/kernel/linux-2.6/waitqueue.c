@@ -55,6 +55,7 @@ int service_operation(
 {
     sigset_t orig_sigset; 
     int ret = 0;
+    op->upcall.pid = current->pid;
 
 retry_servicing:
     op->downcall.status = 0;
