@@ -74,7 +74,7 @@ int32_t PINT_hint_calc_size(const PVFS_hint * hint){
     for( act = (PVFS_hint *) hint ; act != NULL ; act = act->next_hint){
         if (hint_types[act->type].transfer_to_server){
             /* length + type + act. string + 8-byte alignment*/
-            count += 4 + 4 + act->length + roundup8(act->length); 
+            count += 4 + 4 + roundup8(act->length); 
         }
     }
     return (int32_t) count;
