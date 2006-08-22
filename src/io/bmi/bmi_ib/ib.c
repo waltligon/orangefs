@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.35 2006-08-18 21:27:30 pw Exp $
+ * $Id: ib.c,v 1.36 2006-08-22 15:41:14 vilayann Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1813,6 +1813,15 @@ static int BMI_ib_memfree(void *buf, bmi_size_t len,
     return memcache_memfree(ib_device->memcache, buf, len);
 }
 
+static int BMI_ib_unexpected_free(void *buf)
+{
+	if (buf)
+	{
+		free(buf);
+	}
+	return 0;
+}
+
 /*
  * Callers sometimes want to know odd pieces of information.  Satisfy
  * them.
@@ -1996,6 +2005,7 @@ const struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_get_info = BMI_ib_get_info,
     .BMI_meth_memalloc = BMI_ib_memalloc,
     .BMI_meth_memfree = BMI_ib_memfree,
+	 .BMI_meth_unexpected_free = BMI_ib_unexpected_free,
     .BMI_meth_post_send = BMI_ib_post_send,
     .BMI_meth_post_sendunexpected = BMI_ib_post_sendunexpected,
     .BMI_meth_post_recv = BMI_ib_post_recv,

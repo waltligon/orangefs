@@ -111,6 +111,9 @@ int BMI_memfree(PVFS_BMI_addr_t addr,
 		bmi_size_t size,
 		enum bmi_op_type send_recv);
 
+int BMI_unexpected_free(PVFS_BMI_addr_t addr,
+		void *buffer);
+
 int BMI_set_info(PVFS_BMI_addr_t addr,
 		 int option,
 		 void *inout_parameter);

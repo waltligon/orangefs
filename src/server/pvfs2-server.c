@@ -630,7 +630,6 @@ int main(int argc, char **argv)
                 if (ret < 0)
                 {
                     PVFS_perror_gossip("Error: server_state_machine_start", ret);
-                    free(s_op->unexp_bmi_buff.buffer);
                     /* TODO: tell BMI to drop this address? */
                     /* set return code to zero to allow server to continue
                      * processing 
@@ -1781,6 +1780,14 @@ static int server_state_machine_start(
                       s_op->unexp_bmi_buff.addr,
                       s_op->unexp_bmi_buff.size);
 
+    /* acknowledge that the unexpected buffer has been used up.
+     * If *someone* decides to do in-place decoding, then we will have to move
+     * this back to state_machine_complete().
+     */
+    BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
+            s_op->unexp_bmi_buff.buffer);
+    s_op->unexp_bmi_buff.buffer = NULL;
+
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     if (ret == -PVFS_EPROTONOSUPPORT)
     {
@@ -1931,12 +1938,6 @@ int server_state_machine_complete(PINT_server_op *s_op)
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
-    }
-
-    /* free the buffer that the unexpected request came in on */
-    if (s_op->unexp_bmi_buff.buffer)
-    {
-        free(s_op->unexp_bmi_buff.buffer);
     }
 
     /* Remove s_op from the inprogress_sop_list */

@@ -174,7 +174,7 @@ int main(int argc, char **argv)
 	}
 
 	BMI_memfree(req_info.addr, ack, sizeof(struct ack_foo), BMI_RECV);
-	free(req_info.buffer);
+	BMI_unexpected_free(req_info.addr, req_info.buffer);
 
 	/* shut down the interfaces */
 	job_close_context(context);
