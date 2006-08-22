@@ -1467,7 +1467,7 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     }
     new_op->upcall.req.ra_cache_flush.refn = pvfs2_inode->refn;
 
-    ret = service_operation(new_op, "pvfs2_flush_mmap_racache", 0,
+    ret = service_operation(new_op, "pvfs2_flush_mmap_racache",
                       get_interruptible_flag(inode));
 
     gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_mmap_racache got return "
