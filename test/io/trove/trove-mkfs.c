@@ -26,7 +26,6 @@ int main(int argc, char **argv)
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
     char *method_name;
-    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
     TROVE_extent cur_extent;
     TROVE_handle_extent_array extent_array;
     TROVE_context_id trove_context = -1;
@@ -121,8 +120,8 @@ int main(int argc, char **argv)
     /* add attribute to collection for root handle */
     /* NOTE: should be using the data_sz field, but it doesn't exist yet. */
     /* NOTE: put ROOT_HANDLE_STRING in trove-test.h; not sure where it should be. */
-    key.buffer = root_handle_string;
-    key.buffer_sz = strlen(root_handle_string) + 1;
+    key.buffer = ROOT_HANDLE_KEYSTR;
+    key.buffer_sz = ROOT_HANDLE_KEYLEN;
     val.buffer = &root_handle;
     val.buffer_sz = sizeof(root_handle);
     ret = trove_collection_seteattr(coll_id, &key, &val,

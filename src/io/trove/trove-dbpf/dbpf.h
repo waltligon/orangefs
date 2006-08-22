@@ -22,7 +22,6 @@ extern "C" {
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
 #define TROVE_DBPF_VERSION_VALUE                                  "0.1.2"
 #define LAST_HANDLE_STRING                                  "last_handle"
-#define ROOT_HANDLE_STRING                                  ROOT_HANDLE_KEYSTR
 
 #ifdef HAVE_DB_DIRTY_READ
 #define TROVE_DB_DIRTY_READ DB_DIRTY_READ

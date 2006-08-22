@@ -24,8 +24,6 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
-static char *dir_ent_string = DIRECTORY_ENTRY_KEYSTR;
-static char *root_handle_string = ROOT_HANDLE_KEYSTR;
 static char *lost_and_found_string = "lost+found";
 
 static TROVE_handle s_used_handles[4] =
@@ -302,8 +300,8 @@ int pvfs2_mkspace(
         s_used_handles[0] = new_root_handle;
 
         /* set collection attribute for root handle */
-        key.buffer = root_handle_string;
-        key.buffer_sz = strlen(root_handle_string) + 1;
+        key.buffer = ROOT_HANDLE_KEYSTR;
+        key.buffer_sz = ROOT_HANDLE_KEYLEN;
         val.buffer = &new_root_handle;
         val.buffer_sz = sizeof(new_root_handle);
         ret = trove_collection_seteattr(coll_id, &key, &val, 0,
@@ -404,8 +402,8 @@ int pvfs2_mkspace(
                       "with handle %llu\n", llu(root_dirdata_handle));
         s_used_handles[1] = root_dirdata_handle;
 
-        key.buffer = dir_ent_string;
-        key.buffer_sz = strlen(dir_ent_string) + 1;
+        key.buffer = DIRECTORY_ENTRY_KEYSTR;
+        key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
         val.buffer = &root_dirdata_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 
@@ -555,8 +553,8 @@ int pvfs2_mkspace(
             "with handle %llu\n", llu(lost_and_found_dirdata_handle));
         s_used_handles[3] = lost_and_found_dirdata_handle;
 
-        key.buffer = dir_ent_string;
-        key.buffer_sz = strlen(dir_ent_string) + 1;
+        key.buffer = DIRECTORY_ENTRY_KEYSTR;
+        key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
         val.buffer = &lost_and_found_dirdata_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 
@@ -624,8 +622,9 @@ int pvfs2_mkspace(
 
     mkspace_print(verbose, "collection created:\n"
                   "\troot handle = %llu, coll id = %d, "
-                  "root string = \"%s\"\n",
-                  llu(root_handle), coll_id, root_handle_string);
+                  "root string = \"%.*s\"\n",
+                  llu(root_handle), coll_id, 
+		  strlen(ROOT_HANDLE_KEYSTR), ROOT_HANDLE_KEYSTR);
     return 0;
 }
 
