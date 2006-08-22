@@ -151,12 +151,41 @@ PVFS_error PVFS_mgmt_noop(
     PVFS_credentials *credentials,
     PVFS_BMI_addr_t addr,
     PVFS_hint * hints);
-
+    
+PVFS_error PVFS_imgmt_migrate(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t metaserver_addr,
+    PVFS_object_ref target_datafile_ref,
+    PVFS_BMI_addr_t source_dataserver,
+    PVFS_BMI_addr_t target_dataserver, 
+    PVFS_mgmt_op_id *op_id,
+    PVFS_hint * hints,
+    void *user_ptr);
+    
+PVFS_error PVFS_mgmt_migrate(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t metaserver_addr,
+    PVFS_object_ref target_datafile_ref,
+    PVFS_BMI_addr_t source_dataserver,
+    PVFS_BMI_addr_t target_dataserver, 
+    PVFS_hint * hints);
+    
 const char* PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     PVFS_BMI_addr_t addr,
     int* server_type);
+
+PVFS_error PVFS_mgmt_map_addr_to_alias(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t addr,
+    char ** out_alias,
+    PVFS_handle * out_lower_handle,
+    PVFS_handle * out_upper_handle,
+    int server_type);
 
 PVFS_error PVFS_imgmt_setparam_list(
     PVFS_fs_id fs_id,
@@ -170,6 +199,11 @@ PVFS_error PVFS_imgmt_setparam_list(
     PVFS_mgmt_op_id *op_id,
     PVFS_hint * hints,
     void *user_ptr);
+
+PVFS_error PVFS_mgmt_get_datafiles_from_acache(
+    PVFS_object_ref metafile_ref, 
+    PVFS_handle * dfile_array, 
+    int * count);
 
 PVFS_error PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,

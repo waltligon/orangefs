@@ -519,9 +519,9 @@ typedef struct PINT_client_sm
 	struct PINT_client_mgmt_event_mon_list_sm event_mon_list;
 	struct PINT_client_mgmt_iterate_handles_list_sm iterate_handles_list;
 	struct PINT_client_mgmt_get_dfile_array_sm get_dfile_array;
-        struct PINT_client_mgmt_remove_dirent_sm mgmt_remove_dirent;
-        struct PINT_client_mgmt_create_dirent_sm mgmt_create_dirent;
-        struct PINT_client_mgmt_get_dirdata_handle_sm mgmt_get_dirdata_handle;
+    struct PINT_client_mgmt_remove_dirent_sm mgmt_remove_dirent;
+    struct PINT_client_mgmt_create_dirent_sm mgmt_create_dirent;
+    struct PINT_client_mgmt_get_dirdata_handle_sm mgmt_get_dirdata_handle;
 	struct PINT_server_get_config_sm get_config;
 	struct PINT_client_geteattr_sm geteattr;
 	struct PINT_client_seteattr_sm seteattr;
@@ -613,6 +613,7 @@ enum
     PVFS_MGMT_REMOVE_DIRENT        = 78,
     PVFS_MGMT_CREATE_DIRENT        = 79,
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
+    PVFS_MGMT_MIGRATE              = 81,
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
@@ -729,6 +730,7 @@ extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
 extern struct PINT_state_machine_s pvfs2_client_perf_count_timer_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_migrate_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;

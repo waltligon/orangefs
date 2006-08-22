@@ -105,6 +105,10 @@ static void lebf_initialize(void)
 	    case PVFS_SERV_REMOVE:
 		/* nothing special, let normal encoding work */
 		break;
+        case PVFS_SERV_MGMT_MIGRATE:
+        req.u.mgmt_migrate.new_datafile_extent_array.extent_count = 0;
+        reqsize = extra_size_PVFS_servreq_mgmt_migrate;        
+        break;
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 		/* nothing special, let normal encoding work */
 		break;
@@ -336,6 +340,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
 	CASE(PVFS_SERV_REMOVE, remove);
+    CASE(PVFS_SERV_MGMT_MIGRATE, mgmt_migrate);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
@@ -442,6 +447,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MKDIR, mkdir);
         CASE(PVFS_SERV_READDIR, readdir);
         CASE(PVFS_SERV_STATFS, statfs);
+        CASE(PVFS_SERV_MGMT_MIGRATE, mgmt_migrate);
         CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
         CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
         CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
@@ -543,6 +549,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_READDIR, readdir);
 	CASE(PVFS_SERV_FLUSH, flush);
 	CASE(PVFS_SERV_STATFS, statfs);
+    CASE(PVFS_SERV_MGMT_MIGRATE, mgmt_migrate);
 	CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
 	CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
 	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
@@ -625,6 +632,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_MKDIR, mkdir);
 	CASE(PVFS_SERV_READDIR, readdir);
 	CASE(PVFS_SERV_STATFS, statfs);
+    CASE(PVFS_SERV_MGMT_MIGRATE, mgmt_migrate);
 	CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
 	CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
 	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
@@ -727,7 +735,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DFILES)
 		    decode_free(req->u.mkdir.attr.u.meta.dfile_array);
 		break;
-
+        case PVFS_SERV_MGMT_MIGRATE:
+        decode_free(req->u.mgmt_migrate.new_datafile_extent_array.extent_array);
+        break;
 	    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
 		decode_free(req->u.mgmt_dspace_info_list.handle_array);
 		break;
@@ -842,6 +852,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_FLUSH:
 	    case PVFS_SERV_MGMT_SETPARAM:
 	    case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_MGMT_MIGRATE:
 	    case PVFS_SERV_STATFS:
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PROTO_ERROR:

@@ -402,7 +402,14 @@ struct PINT_server_req_params PINT_server_req_table[] =
         "small_io",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_small_io_sm}
+        &pvfs2_small_io_sm},
+        
+      /* 34 */
+    {PVFS_SERV_MGMT_MIGRATE,
+        "mgmt_migrate",
+        PINT_SERVER_CHECK_ATTR,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_mgmt_migrate_sm},      
 };
 
 int main(int argc, char **argv)

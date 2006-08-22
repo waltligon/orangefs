@@ -437,7 +437,7 @@ int PINT_cached_config_get_next_io(
  *  * returns 0 on success, -errno on failure
  */
 int PINT_cached_config_get_one_server_str(
-    char * alias,
+    const char * alias,
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     PVFS_BMI_addr_t *io_addr,
@@ -459,20 +459,25 @@ int PINT_cached_config_get_one_server_str(
     cur_config_cache = qlist_entry(
             hash_link, struct config_fs_cache_s, hash_link);
     
+ 
     if(is_dataserver)
     {
-        cur_mapping = PINT_llist_head(
-                cur_config_cache->data_server_cursor);  
         num_io_servers = PINT_llist_count(
             cur_config_cache->fs->data_handle_ranges);
+        cur_config_cache->data_server_cursor =
+                cur_config_cache->fs->data_handle_ranges;
+        cur_mapping = PINT_llist_head(
+                cur_config_cache->data_server_cursor);       
     }else
     {
-        cur_mapping = PINT_llist_head(
-                cur_config_cache->meta_server_cursor);  
         num_io_servers = PINT_llist_count(
             cur_config_cache->fs->meta_handle_ranges);
+        cur_config_cache->meta_server_cursor =
+            cur_config_cache->fs->meta_handle_ranges;
+        cur_mapping = PINT_llist_head(
+            cur_config_cache->meta_server_cursor);       
     }
-        
+    assert(cur_mapping);   
     
     for(i=0; i < num_io_servers; i++)
     {
@@ -493,11 +498,15 @@ int PINT_cached_config_get_one_server_str(
         if(is_dataserver)
         {
             cur_config_cache->data_server_cursor = PINT_llist_next(
+                    cur_config_cache->data_server_cursor); 
+            cur_mapping = PINT_llist_head(
                     cur_config_cache->data_server_cursor);
         }else
         {
-            cur_config_cache->data_server_cursor = PINT_llist_next(
-                    cur_config_cache->meta_server_cursor);
+            cur_config_cache->meta_server_cursor = PINT_llist_next(
+                    cur_config_cache->meta_server_cursor);            
+            cur_mapping = PINT_llist_head(
+                    cur_config_cache->meta_server_cursor);  
         }
     }
     if ( i == num_io_servers ){
@@ -506,6 +515,85 @@ int PINT_cached_config_get_one_server_str(
     
     return 0; 
 }            
+
+/*
+ * return the extend and alias of the io server given by bmi_address.
+ * 
+ *  * returns 0 on success, -errno on failure
+ */
+int PINT_cached_config_get_one_server_alias(
+    const char * bmi_address,
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    PVFS_handle_extent_array *io_handle_extent,
+    char ** const out_alias, 
+    int is_dataserver)
+{
+    int i;
+    
+    struct qlist_head *hash_link = NULL;
+    int num_io_servers;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+    
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if (!hash_link)
+    {
+            return -PVFS_EINVAL;            
+    }
+    cur_config_cache = qlist_entry(
+            hash_link, struct config_fs_cache_s, hash_link);
+    
+    if(is_dataserver)
+    {
+        num_io_servers = PINT_llist_count(
+            cur_config_cache->fs->data_handle_ranges);
+        cur_config_cache->data_server_cursor =
+                cur_config_cache->fs->data_handle_ranges;
+        cur_mapping = PINT_llist_head(
+                cur_config_cache->data_server_cursor);       
+    }else
+    {
+        num_io_servers = PINT_llist_count(
+            cur_config_cache->fs->meta_handle_ranges);
+        cur_config_cache->meta_server_cursor =
+            cur_config_cache->fs->meta_handle_ranges;
+        cur_mapping = PINT_llist_head(
+            cur_config_cache->meta_server_cursor);       
+    }
+    assert(cur_mapping);   
+    
+    for(i=0; i < num_io_servers; i++)
+    {
+        if( strcmp(cur_mapping->alias_mapping->bmi_address, bmi_address) == 0 )
+        {
+            io_handle_extent->extent_count = cur_mapping->handle_extent_array.extent_count;
+            io_handle_extent->extent_array = cur_mapping->handle_extent_array.extent_array;
+            *out_alias = cur_mapping->alias_mapping->host_alias ;
+
+            break;
+        }
+        if(is_dataserver)
+        {
+            cur_config_cache->data_server_cursor = PINT_llist_next(
+                    cur_config_cache->data_server_cursor); 
+            cur_mapping = PINT_llist_head(
+                    cur_config_cache->data_server_cursor);
+        }else
+        {
+            cur_config_cache->meta_server_cursor = PINT_llist_next(
+                    cur_config_cache->meta_server_cursor);            
+            cur_mapping = PINT_llist_head(
+                    cur_config_cache->meta_server_cursor);  
+        }
+    }
+    if ( i == num_io_servers ){
+           return -PVFS_EINVAL;
+    }
+    
+    return 0; 
+}           
+           
             
 
 /* PINT_cached_config_map_addr()

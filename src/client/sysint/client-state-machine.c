@@ -213,6 +213,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
 {
     {&pvfs2_client_mgmt_setparam_list_sm},
+    {&pvfs2_client_mgmt_migrate_sm},
     {&pvfs2_client_mgmt_noop_sm},
     {&pvfs2_client_mgmt_statfs_list_sm},
     {&pvfs2_client_mgmt_perf_mon_list_sm},
@@ -805,6 +806,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_FLUSH, "PVFS_SYS_FLUSH" },
         { PVFS_MGMT_SETPARAM_LIST, "PVFS_MGMT_SETPARAM_LIST" },
         { PVFS_MGMT_NOOP, "PVFS_MGMT_NOOP" },
+        { PVFS_MGMT_MIGRATE, "PVFS_MGMT_MIGRATE" },
         { PVFS_SYS_TRUNCATE, "PVFS_SYS_TRUNCATE" },
         { PVFS_MGMT_STATFS_LIST, "PVFS_MGMT_STATFS_LIST" },
         { PVFS_MGMT_PERF_MON_LIST, "PVFS_MGMT_PERF_MON_LIST" },

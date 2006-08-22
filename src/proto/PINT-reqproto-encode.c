@@ -355,7 +355,7 @@ int PINT_encode_calc_max_size(
     return(ret);
 }
 
-static char PVFS_server_op_name[][35]={
+static char PVFS_server_op_name[][PVFS_MAX_SERVER_OP+2]={
     "PVFS_SERV_INVALID",
     "PVFS_SERV_CREATE",
     "PVFS_SERV_REMOVE",
@@ -389,7 +389,8 @@ static char PVFS_server_op_name[][35]={
     "PVFS_SERV_SETEATTR",
     "PVFS_SERV_DELEATTR",
     "PVFS_SERV_LISTEATTR",
-    "PVFS_SERV_SMALL_IO"
+    "PVFS_SERV_SMALL_IO",
+    "PVFS_SERV_MGMT_MIGRATE"
 };
 
 char * server_op_to_str(enum PVFS_server_op sop){

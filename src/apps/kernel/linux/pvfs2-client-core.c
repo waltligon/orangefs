@@ -417,12 +417,15 @@ static int create_request_id(PVFS_hint ** hint, vfs_request_t *vfs_request)
     if (s_opts.create_request_id)
     {
         char str[REQ_LENGTH];
-        if( vfs_request->in_upcall.pid != 0 ){
+        if( vfs_request->in_upcall.tgid != -1 ){
+            snprintf(str, REQ_LENGTH, "host:%s,pid:%d,tgid:%d", 
+                hostname, vfs_request->in_upcall.pid, 
+                vfs_request->in_upcall.tgid);
+        }else{
             snprintf(str, REQ_LENGTH, "host:%s,pid:%d", 
                 hostname, vfs_request->in_upcall.pid);
-        }else{
-            snprintf(str, REQ_LENGTH, "host:%s", hostname);
         }
+        
         str[REQ_LENGTH-1] = 0;
         PVFS_add_hint(hint, REQUEST_ID, str);
     }
