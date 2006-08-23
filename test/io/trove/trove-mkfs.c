@@ -136,10 +136,11 @@ int main(int argc, char **argv)
 
     /* add attribute to collection for last used handle ??? */
 
-    printf("fs created (root handle = %d, coll id = %d, root string = %s)\n",
+    printf("fs created (root handle = %d, coll id = %d, root string = %.*s)\n",
 	   (int) root_handle,
 	   (int) coll_id,
-	   root_handle_string);
+	   (ROOT_HANDLE_KEYLEN-1),
+           ROOT_HANDLE_KEYSTR);
 
     trove_close_context(coll_id, trove_context);
     trove_finalize();
