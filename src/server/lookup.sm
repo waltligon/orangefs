@@ -182,7 +182,11 @@ static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
     /* allocate the internal ds_attr_array */
     s_op->u.lookup.ds_attr_array = (PVFS_ds_attributes *)
         malloc(s_op->u.lookup.seg_ct * sizeof(PVFS_ds_attributes));
-    assert(s_op->u.lookup.ds_attr_array);
+    if(!s_op->u.lookup.ds_attr_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
 
     /* allocate memory
      *
@@ -361,6 +365,11 @@ static int lookup_verify_object_metadata(
         s_op->req->u.lookup_path.path, &s_op->u.lookup.segp,
         &s_op->u.lookup.segstate);
 
+    if(ret != 0)
+    {
+        gossip_err("PINT_string_next_segment failed: path: %s\n",
+                   s_op->req->u.lookup_path.path);
+    }
     assert(ret == 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a directory; will be "

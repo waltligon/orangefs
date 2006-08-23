@@ -1784,10 +1784,6 @@ static int server_state_machine_start(
      * If *someone* decides to do in-place decoding, then we will have to move
      * this back to state_machine_complete().
      */
-    BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
-            s_op->unexp_bmi_buff.buffer);
-    s_op->unexp_bmi_buff.buffer = NULL;
-
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     if (ret == -PVFS_EPROTONOSUPPORT)
     {
@@ -1940,7 +1936,11 @@ int server_state_machine_complete(PINT_server_op *s_op)
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
-    /* Remove s_op from the inprogress_sop_list */
+    BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
+                        s_op->unexp_bmi_buff.buffer);
+    s_op->unexp_bmi_buff.buffer = NULL;
+
+   /* Remove s_op from the inprogress_sop_list */
     qlist_del(&s_op->next);
 
     /* free the operation structure itself */
