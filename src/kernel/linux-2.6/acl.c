@@ -366,7 +366,6 @@ pvfs2_xattr_get_acl(struct inode *inode, int type, void *buffer, size_t size)
     }
     if (acl == NULL)
     {
-        gossip_err("pvfs2_get_acl failed due to no acls!\n");
         error = -ENODATA;
         goto out;
     }
