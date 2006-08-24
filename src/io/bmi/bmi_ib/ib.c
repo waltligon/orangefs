@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.36 2006-08-22 15:41:14 vilayann Exp $
+ * $Id: ib.c,v 1.37 2006-08-24 21:09:23 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1653,7 +1653,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
     s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
 	warning("%s: create tcp socket: %m", __func__);
-	return bmi_errno_to_pvfs(errno);
+	return bmi_errno_to_pvfs(-errno);
     }
     hp = gethostbyname(ibmap->hostname);
     if (!hp) {
@@ -1671,7 +1671,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
 	    goto retry;
 	else {
 	    warning("%s: connect to server %s: %m", __func__, peername);
-	    return bmi_errno_to_pvfs(errno);
+	    return bmi_errno_to_pvfs(-errno);
 	}
     }
     ibmap->c = ib_new_connection(s, peername, 0);
@@ -1681,7 +1681,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
 
     if (close(s) < 0) {
 	warning("%s: close sock: %m", __func__);
-	return bmi_errno_to_pvfs(errno);
+	return bmi_errno_to_pvfs(-errno);
     }
     return 0;
 }
@@ -1800,8 +1800,8 @@ static int ib_block_for_activity(int timeout_ms)
     return ret;
 }
 
-static void * BMI_ib_memalloc(bmi_size_t len,
-                              enum bmi_op_type send_recv __unused)
+static void *BMI_ib_memalloc(bmi_size_t len,
+                             enum bmi_op_type send_recv __unused)
 {
     return memcache_memalloc(ib_device->memcache, len,
                              ib_device->eager_buf_payload);
@@ -1815,11 +1815,8 @@ static int BMI_ib_memfree(void *buf, bmi_size_t len,
 
 static int BMI_ib_unexpected_free(void *buf)
 {
-	if (buf)
-	{
-		free(buf);
-	}
-	return 0;
+    free(buf);
+    return 0;
 }
 
 /*
@@ -2005,7 +2002,7 @@ const struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_get_info = BMI_ib_get_info,
     .BMI_meth_memalloc = BMI_ib_memalloc,
     .BMI_meth_memfree = BMI_ib_memfree,
-	 .BMI_meth_unexpected_free = BMI_ib_unexpected_free,
+    .BMI_meth_unexpected_free = BMI_ib_unexpected_free,
     .BMI_meth_post_send = BMI_ib_post_send,
     .BMI_meth_post_sendunexpected = BMI_ib_post_sendunexpected,
     .BMI_meth_post_recv = BMI_ib_post_recv,
