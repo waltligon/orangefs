@@ -1461,6 +1461,15 @@ static struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
 
+    /* we want to stat the attrib db first in case it doesn't
+     * exist but the storage directory does
+     */
+    if(stat(path_name, &sbuf) < 0)
+    {
+        *error_p = -TROVE_ENOENT;
+        return NULL;
+    }
+    
     sto_p->sto_attr_db = dbpf_db_open(sto_p->name, path_name, NULL, error_p, NULL);
     if (sto_p->sto_attr_db == NULL)
     {
