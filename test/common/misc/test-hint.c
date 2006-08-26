@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "pvfs2.h"
 #include "pvfs2-hint.h"
+
 
 int main(int argc, char ** argv){
 	PVFS_hint * hint = NULL;
