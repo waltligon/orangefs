@@ -45,76 +45,6 @@ const char *PVFS_mgmt_map_addr(
     return ret;
 }
 
-/** Maps a given opaque server address back to its alias.  Also
- *  fills in server extend.
- *
- *  \return Pointer to string on success, NULL on failure.
- */
-PVFS_error PVFS_mgmt_map_addr_to_alias(
-    PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
-    PVFS_BMI_addr_t addr,
-    char ** out_alias,
-    PVFS_handle * out_lower_handle,
-    PVFS_handle * out_upper_handle,
-    int server_type)
-{
-    struct server_configuration_s *server_config =
-        PINT_get_server_config_struct(fs_id);
-    const char * bmi_address;
-    int ret; 
-   
-    bmi_address = BMI_addr_rev_lookup(addr);
-   
-    PVFS_handle_extent_array handle_extent;
-    ret = PINT_cached_config_get_one_server_alias(bmi_address, server_config, fs_id, & handle_extent,
-        out_alias, server_type == PVFS_MGMT_IO_SERVER);
-
-    *out_lower_handle = handle_extent.extent_array->first;
-    *out_upper_handle = handle_extent.extent_array->last;
-
-    PINT_put_server_config_struct(server_config);
-    return ret;
-}
-
-PVFS_error PVFS_mgmt_get_datafiles_from_acache(
-    PVFS_object_ref metafile_ref, 
-    PVFS_handle * dfile_array, 
-    int * inout_count)
-{
-    int ret;
-    PVFS_object_attr attr;
-    int status;
-    int size_status;
-    PVFS_size size;
-   
-    memset(& attr, 0, sizeof(PVFS_object_attr));
-    attr.mask = PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_META_DFILES;
-    
-    ret =  PINT_acache_get_cached_entry( metafile_ref, & attr, & status, &size, & size_status);
-    
-    if( ret != 0 )
-    {
-        PINT_free_object_attr(& attr);
-        return ret;
-    }
-    if( attr.objtype != PVFS_TYPE_METAFILE)
-    {
-        PINT_free_object_attr(& attr);
-        return -PVFS_EINVAL;
-    }
-    
-    if( attr.u.meta.dfile_count > *inout_count){
-        return -PVFS_EINVAL;
-    } 
-    *inout_count = attr.u.meta.dfile_count;
-    memcpy(dfile_array, attr.u.meta.dfile_array, 
-        sizeof(PVFS_handle) * attr.u.meta.dfile_count);
-    
-    PINT_free_object_attr(& attr);
-    return 0;
-}
-
 /** Obtains file system statistics from all servers in a given
  *  file system.
  *
@@ -318,28 +248,6 @@ PVFS_error PVFS_mgmt_count_servers(
         server_config, fs_id, server_type, count);
     PINT_put_server_config_struct(server_config);
     return ret;
-}
-
-PVFS_error PVFS_get_bmi_address(
-    const char * alias, 
-    PVFS_fs_id fs_id,
-    PVFS_BMI_addr_t * out_address)
-{
-    struct server_configuration_s *server_config = NULL;
-    server_config = PINT_get_server_config_struct(fs_id);
-    char *bmi_alias;
-    int ret;
-        
-    bmi_alias = PINT_config_get_host_addr_ptr(server_config, (char *) alias);
-    ret = BMI_addr_lookup(out_address, bmi_alias);
-    
-    PINT_put_server_config_struct(server_config);
-    if (ret)
-    {
-        return -PVFS_EINVAL;
-    }            
-
-    return 0;        
 }
 
 /** Turns on/off admin mode of system/mgmt interface.  This changes

@@ -22,12 +22,14 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 
+#define DFILE_KEY "system.pvfs2." DATAFILE_HANDLES_KEYSTR
+
 /* optional parameters, filled in by parse_args() */
 struct options
 {
     char *file;
-    char *old_dataserver_alias;
-    char *new_dataserver_alias;
+    char *old_dataserver;
+    char *new_dataserver;
     PVFS_handle old_dataserver_handle_number;
     
     int verbose;
@@ -41,6 +43,7 @@ static void usage(
     int argc,
     char **argv);
     
+    
 int lookup(
     char *pvfs2_file,
     PVFS_credentials * credentials,
@@ -48,179 +51,67 @@ int lookup(
     PVFS_object_ref * out_object_ref,
     PVFS_sysresp_getattr * out_resp_getattr);
     
-const char *get_server_for_handle(
-    PVFS_handle handle,
-    int server_count,
-    char **server_names,
-    PVFS_handle * data_lower_handle,
-    PVFS_handle * data_upper_handle);
-
-const char *get_server_for_handle(
-    PVFS_handle handle,
-    int server_count,
-    char **server_names,
-    PVFS_handle * data_lower_handle,
-    PVFS_handle * data_upper_handle)
+/*
+ * nservers is an in-out style parameter
+ * servers is allocated memory upto *nservers and each element inside that
+ * is allocated internally in this function.
+ * callers job is to free up all the memory
+ */
+static int generic_server_location( PVFS_object_ref obj, PVFS_credentials *creds,
+        char **servers, PVFS_handle *handles, int *nservers)
 {
-    int i;
-    for (i = 0; i < server_count; i++)
-    {
-        if (data_lower_handle[i] <= handle && handle <= data_upper_handle[i])
-        {
-            return server_names[i];
-        }
-    }
-    return NULL;
-}
-
-int migrate_alias(
-    PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
-    PVFS_object_ref metafile_ref,
-    PVFS_handle datafile_handle,
-    const char * const metaserver_alias,
-    const char * const source_alias,
-    const char * const target_alias
-    );
+    char *buffer = (char *) malloc(4096);
+    int ret, num_dfiles, count;
+    PVFS_fs_id fsid;
     
-int getServers(
-    int type,
-    PVFS_fs_id fsid,
-    PVFS_credentials * credentials,
-    PVFS_BMI_addr_t ** out_addr_array_p,
-    char ***out_server_names,
-    int *out_server_count,
-    PVFS_handle ** lower_handle,
-    PVFS_handle ** upper_handle);
-    
-static inline double Wtime(
-    void)
-{
-    struct timeval t;
-    gettimeofday(&t, NULL);
-    return ((double) t.tv_sec + (double) (t.tv_usec) / 1000000);
-}
+    PVFS_ds_keyval key, val;
 
-int getServers(
-    int type,
-    PVFS_fs_id fsid,
-    PVFS_credentials * credentials,
-    PVFS_BMI_addr_t ** out_addr_array_p,
-    char ***out_server_names,
-    int *out_server_count,
-    PVFS_handle ** lower_handle_p,
-    PVFS_handle ** upper_handle_p)
-{
-    int ret, i;
-    int count;
-    PVFS_BMI_addr_t *addr_array;
-
-    ret = PVFS_mgmt_count_servers(fsid, credentials, type, &count);
-    if (ret < 0)
+    key.buffer = DFILE_KEY;
+    key.buffer_sz = strlen(DFILE_KEY) + 1;
+    val.buffer = buffer;
+    val.buffer_sz = 4096;
+    if ((ret = PVFS_sys_geteattr(obj, 
+            creds, &key, &val, NULL)) < 0)
     {
-        PVFS_perror("PVFS_mgmt_count_servers()", ret);
-        exit(1);
-    }
-
-    *out_server_count = count;
-
-    addr_array = (PVFS_BMI_addr_t *) malloc(count * sizeof(PVFS_BMI_addr_t));
-    memset(addr_array, 0, count * sizeof(PVFS_BMI_addr_t));
-    *out_addr_array_p = addr_array;
-
-    *out_server_names = (char **) malloc(count * sizeof(char *));
-    *lower_handle_p = (PVFS_handle *) malloc(count * sizeof(PVFS_handle));
-    *upper_handle_p = (PVFS_handle *) malloc(count * sizeof(PVFS_handle));
-
-    if (addr_array == NULL || *out_server_names == NULL ||
-        *lower_handle_p == NULL || *upper_handle_p == NULL)
-    {
-        perror("malloc");
-        return ret;
-    }
-
-    ret =
-        PVFS_mgmt_get_server_array(fsid, credentials, type, addr_array,
-                                   out_server_count);
-    if (ret < 0)
-    {
-        PVFS_perror("PVFS_mgmt_get_server_array()", ret);
-        return ret;
-    }
-
-    if (count != *out_server_count)
-    {
-        fprintf(stderr, "Error count != *out_server_count: %d != %d \n", count,
-                *out_server_count);
+        PVFS_perror("PVFS_sys_geteattr", ret);
         return -1;
     }
+    ret = val.read_sz;
+    fsid = obj.fs_id;
 
-    char **server_names = *out_server_names;
-    PVFS_handle *lower_handle = *lower_handle_p;
-    PVFS_handle *upper_handle = *upper_handle_p;
-
-    for (i = 0; i < count; i++)
+    /*
+     * At this point, we know all the dfile handles 
+     */
+    num_dfiles = (ret / sizeof(PVFS_handle));
+    count = num_dfiles < *nservers ? num_dfiles : *nservers;
+    for (ret = 0; ret < count; ret++)
     {
-        ret = PVFS_mgmt_map_addr_to_alias(fsid, credentials, addr_array[i],
-                                          &server_names[i],
-                                          &lower_handle[i], &upper_handle[i],
-                                          type);
-        if (ret != 0)
+        PVFS_handle *ptr = (PVFS_handle *) ((char *) buffer + ret * sizeof(PVFS_handle));
+        servers[ret] = (char *) calloc(1, PVFS_MAX_SERVER_ADDR_LEN);
+        handles[ret] = *ptr;
+        if (servers[ret] == NULL)
         {
-            fprintf(stderr,
-                    "Could not map bmi_address to string for entry: %d\n",
-                    i + 1);
-            exit(1);
+            break;
         }
+        /* ignore any errors */
+        PINT_cached_config_get_server_name(
+                servers[ret], PVFS_MAX_SERVER_ADDR_LEN,
+                *ptr, fsid);
     }
-
+    if (ret != count)
+    {
+        int j;
+        for (j = 0; j < ret; j++)
+        {
+            free(servers[j]);
+            servers[j] = NULL;
+        }
+        return -1;
+    }
+    *nservers = count;
     return 0;
 }
 
-int migrate_alias(
-    PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
-    PVFS_object_ref metafile_ref,    
-    PVFS_handle datafile_handle,
-    const char * const metaserver_alias,
-    const char * const source_alias,
-    const char * const target_alias
-    )
-{
-    PVFS_hint * hints = NULL;
-    PVFS_BMI_addr_t source_address;
-    PVFS_BMI_addr_t target_address;
-    PVFS_BMI_addr_t meta_address;
-    PVFS_error ret;
-
-    ret = PVFS_get_bmi_address(source_alias, fs_id, &source_address);    
-    if( ret != 0){
-        return ret;
-    }
-    ret = PVFS_get_bmi_address(target_alias, fs_id, &target_address);    
-    if( ret != 0){
-        return ret;
-    }
-    ret = PVFS_get_bmi_address(metaserver_alias, fs_id, &meta_address);    
-    if( ret != 0){
-        return ret;
-    }    
-    
-    PVFS_add_hint(& hints, REQUEST_ID, "pvfs2-migrate");        
-    ret = PVFS_mgmt_migrate(fs_id, credentials, meta_address , metafile_ref.handle, 
-        datafile_handle, source_address, target_address, hints);
-    PVFS_free_hint(& hints);
-    
-    return ret;
-}
-
-
-/*
- * Steps:
- * lookup filename
- * map aliases to handle_ranges
- * start migration and we are done once the migration finishes :)
- */
 int main(
     int argc,
     char **argv)
@@ -231,19 +122,19 @@ int main(
 
     PVFS_fs_id fsid = 0;
     PVFS_object_ref metafile_ref;
-    int data_server_count;
-    PVFS_BMI_addr_t *data_addr_array = NULL;
-    char **data_server_names = NULL;
-    PVFS_handle *data_lower_handle = NULL;
-    PVFS_handle *data_upper_handle = NULL;
+    int i;
+
+    char *servers[1024];
+    char metadataserver[256];
     
-    int meta_server_count;
-    PVFS_BMI_addr_t *meta_addr_array = NULL;
-    char **meta_server_names = NULL;
-    PVFS_handle *meta_lower_handle = NULL;
-    PVFS_handle *meta_upper_handle = NULL;
+    PVFS_handle handles[1024];
+    int nservers = 1024;
     
-    char * metaserver_alias = NULL;
+    PVFS_BMI_addr_t bmi_metadataserver;
+    PVFS_BMI_addr_t bmi_olddatataserver;
+    PVFS_BMI_addr_t bmi_newdatataserver;
+    
+    PVFS_hint * hints = NULL;
 
     PVFS_sysresp_getattr resp_getattr;  
     
@@ -269,146 +160,115 @@ int main(
         return -1;
     }
     
-    ret = getServers(PVFS_MGMT_IO_SERVER,
-                     fsid,
-                     &credentials,
-                     &data_addr_array,
-                     &data_server_names,
-                     &data_server_count,
-                     &data_lower_handle, &data_upper_handle);
+    ret = generic_server_location(metafile_ref, &credentials, servers, 
+        handles, &nservers);
     if (ret < 0)
     {
-        return ret;
+        fprintf(stderr, "Could not read server location information!\n");
+        return -1;
     }    
     
-    ret = getServers(PVFS_MGMT_META_SERVER,
-                     fsid,
-                     &credentials,
-                     &meta_addr_array,
-                     &meta_server_names,
-                     &meta_server_count,
-                     &meta_lower_handle, &meta_upper_handle);
-    if (ret < 0)
-    {
-        return ret;
-    }    
-    
-    /*
-     * Lookup server alias !
-     */
-    metaserver_alias = (char *) get_server_for_handle(
-                                      metafile_ref.handle,
-                                      meta_server_count, meta_server_names,
-                                      meta_lower_handle, meta_upper_handle);
-     
     if( user_opts->old_dataserver_handle_number != 0){
-        user_opts->old_dataserver_alias = (char *) get_server_for_handle(
-                                      user_opts->old_dataserver_handle_number,
-                                      data_server_count, data_server_names,
-                                      data_lower_handle, data_upper_handle);
+        /*
+         * Lookup server bmi-address !
+         */
+        for(i = 0 ; i < nservers; i++)
+        {
+            if( user_opts->old_dataserver_handle_number == handles[i] )
+            {
+                user_opts->old_dataserver = servers[i];
+                break;
+            }
+        }
+         
+        if( i == nservers)
+        {
+            fprintf(stderr, "Error, could not find dataserver for handle: %lld\n", 
+                lld(user_opts->old_dataserver_handle_number));
+            return(-1);
+        }
     }else{
         /*
-         * lookup handle number !
-         * get datafiles from acache if possible !
+         * Lookup by server bmi address:
          */
-         
-        PVFS_sys_attr *attr;
-        PVFS_handle *dfile_array;
-        int dfile_count;
-        int i;
-        int matching = 0;
-        PVFS_handle server_lower_range;
-        PVFS_handle server_upper_range;
-        
-        attr = & resp_getattr.attr;
-        
-        dfile_array =
-            (PVFS_handle *) malloc(sizeof(PVFS_handle) * attr->dfile_count);
-        dfile_count = attr->dfile_count;
-        ret =
-            PVFS_mgmt_get_datafiles_from_acache(metafile_ref, dfile_array,
-                                                &dfile_count);
-        /*
-         * find matching server.
-         */
-        
-        for (i = 0; i < data_server_count; i++)
+        for(i = 0 ; i < nservers; i++)
         {
-            if( strcmp(data_server_names[i], user_opts->old_dataserver_alias) == 0 )
+            if( strcmp(servers[i], user_opts->old_dataserver) == 0)
             {
-               server_lower_range = data_lower_handle[i];
-               server_upper_range = data_upper_handle[i];
-               break;
+                user_opts->old_dataserver_handle_number = handles[i];
+                break;
             }
-        }        
-        if( i == data_server_count )
-        {
-            fprintf(stderr, "Server name could not be found !\n");
-            return -1;
         }
-        
-        /*
-         * Find matching handles in datafiles
-         */
-        for (i = 0; i < dfile_count; i++)
+        if( i == nservers)
         {
-                if (server_lower_range <= dfile_array[i] && 
-                    dfile_array[i] <= server_upper_range)
-                {
-                    matching++;
-                    user_opts->old_dataserver_handle_number = dfile_array[i];
-                    if(user_opts->verbose )
-                    {
-                        printf("Found datafile %lld\n", dfile_array[i]);
-                    }
-                }           
+            fprintf(stderr, "Error, could not find handle within datafile for server: %s\n", 
+                user_opts->old_dataserver);
+            return(-1);
         }
-        
-        if( matching < 1 )
-        {
-            fprintf(stderr, "Found no datafile in range of server !\n");
-            return -1;
-        }
-        
-        if( matching > 1 )
-        {
-            fprintf(stderr, "Found multiple datafiles in range of server, please specify datafile !\n");
-            return -1;
-        }
-
-        free(dfile_array);
     }
    
     
-    if (user_opts->old_dataserver_alias == NULL){
-        fprintf(stderr, "Error, could not find handle for handle: %lld\n", 
-            lld(user_opts->old_dataserver_handle_number));
-        exit(1); 
-    }
+
     /*
     * Got metafile 
     */
-    if( strcmp(user_opts->old_dataserver_alias, user_opts->new_dataserver_alias) == 0 )
+    if( strcmp(user_opts->old_dataserver, user_opts->new_dataserver) == 0 )
     {
         fprintf(stderr, "Error, source and target dataserver are %s, nothing to be done\n", 
-            user_opts->old_dataserver_alias);
-        /*exit(1);*/
+            user_opts->old_dataserver);
+        return (-1);
+    }
+    
+    ret = PINT_cached_config_get_server_name(metadataserver, 256, 
+        metafile_ref.handle, metafile_ref.fs_id);
+    if( ret != 0)
+    {
+        fprintf(stderr, "Error, could not get metadataserver name\n");
+        return (-1);
+    }
+    
+    
+    ret = BMI_addr_lookup(&bmi_metadataserver,metadataserver);
+    if (ret < 0)
+    {
+        fprintf(stderr, "Error, BMI_addr_lookup unsuccessful %s\n",
+        metadataserver );
+        return(-1);
+    }
+    
+    ret = BMI_addr_lookup(&bmi_newdatataserver, user_opts->new_dataserver);
+    if (ret < 0)
+    {
+        fprintf(stderr, "Error, BMI_addr_lookup unsuccessful %s\n",
+         user_opts->new_dataserver );
+        return(-1);
+    }    
+    
+    ret = BMI_addr_lookup(&bmi_olddatataserver,user_opts->old_dataserver);
+    if (ret < 0)
+    {
+        fprintf(stderr, "Error, BMI_addr_lookup unsuccessful %s\n",
+        user_opts->old_dataserver );
+        return(-1);
     }
     
     if( user_opts->verbose )
     {
         printf("Found metafile handle: %lld\n", lld(metafile_ref.handle));
-        printf("Starting migration for pvfs2-file:%s on metadaserver: %s \n"
-                "\t replace dataserver %s with %s for handle: %lld\n",
-            user_opts->file, metaserver_alias,  
-            user_opts->old_dataserver_alias, user_opts->new_dataserver_alias,
+        printf("Starting migration for pvfs2-file:%s \n\tMetadataserver: %s \n"
+                "\treplace dataserver %s with %s \n\taffected datafile with handle: %lld\n",
+            user_opts->file, metadataserver,  
+            user_opts->old_dataserver, user_opts->new_dataserver,
             lld(user_opts->old_dataserver_handle_number));         
     }
+
     
-    ret = migrate_alias( fsid, & credentials, metafile_ref, 
-        user_opts->old_dataserver_handle_number,
-        metaserver_alias, user_opts->old_dataserver_alias,
-        user_opts->new_dataserver_alias);
+    PVFS_add_hint(& hints, REQUEST_ID, "pvfs2-migrate");        
+    ret = PVFS_mgmt_migrate(metafile_ref.fs_id, & credentials, bmi_metadataserver
+        , metafile_ref.handle, 
+        user_opts->old_dataserver_handle_number, 
+        bmi_olddatataserver, bmi_newdatataserver, hints);
+    PVFS_free_hint(& hints);
     
     if ( ret != 0 )
     {
@@ -449,7 +309,7 @@ static struct options *parse_args(
         switch (one_opt)
         {
         case('d'):        
-            tmp_opts->old_dataserver_alias = optarg;
+            tmp_opts->old_dataserver = optarg;
             break;
         case('s'):
             tmp_opts->old_dataserver_handle_number = (PVFS_handle) atoll(optarg);
@@ -467,7 +327,7 @@ static struct options *parse_args(
     }
 
     if( tmp_opts->old_dataserver_handle_number == 0 &&
-        tmp_opts->old_dataserver_alias  == NULL ){
+        tmp_opts->old_dataserver  == NULL ){
         usage(argc, argv);
         exit(EXIT_FAILURE);   
     } 
@@ -477,7 +337,7 @@ static struct options *parse_args(
         exit(EXIT_FAILURE);
     }
     tmp_opts->file = argv[argc - 2];
-    tmp_opts->new_dataserver_alias = argv[argc - 1];
+    tmp_opts->new_dataserver = argv[argc - 1];
 
     return (tmp_opts);
 }

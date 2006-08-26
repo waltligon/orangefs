@@ -323,7 +323,8 @@ int PINT_req_sched_target_handle(
     case PVFS_SERV_MGMT_MIGRATE:
     *readonly_flag = 0;
     *handle = req->u.mgmt_migrate.handle;
-    *fs_id = req->u.mgmt_migrate.fs_id;  
+    *fs_id = req->u.mgmt_migrate.fs_id;
+    return (0);
     case PVFS_SERV_MGMT_NOOP:
 	return (1);
     case PVFS_SERV_MGMT_PERF_MON:

@@ -212,6 +212,7 @@ int main(int argc, char ** argv)
     PVFS_credentials credentials;
     char *servers[256];
     PVFS_handle handles[256];
+    char metadataserver[256];
     int i, nservers = 256;
 
     memset(&dist, 0, sizeof(dist));
@@ -263,6 +264,17 @@ int main(int argc, char ** argv)
         printf("strip_size = %ld\n", (unsigned long)(params.strip_size));
     }
     PINT_dist_free(dist);
+    
+    
+    ret = PINT_cached_config_get_server_name(metadataserver, 256, 
+        src.u.pvfs2.ref.handle, src.u.pvfs2.ref.fs_id);
+    if( ret != 0)
+    {
+        fprintf(stderr, "Error, could not get metadataserver name\n");
+        return (-1);
+    }
+    printf("Metadataserver: %s\n", metadataserver);
+      
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)
     {

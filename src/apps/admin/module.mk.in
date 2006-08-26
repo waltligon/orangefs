@@ -15,7 +15,6 @@ ADMINSRC := \
 	$(DIR)/pvfs2-event-mon-example.c \
 	$(DIR)/pvfs2-mkdir.c \
 	$(DIR)/pvfs2-migrate.c \
-	$(DIR)/pvfs2-print-file-mapping.c \
 	$(DIR)/pvfs2-chmod.c \
 	$(DIR)/pvfs2-chown.c \
 	$(DIR)/pvfs2-fs-dump.c\
