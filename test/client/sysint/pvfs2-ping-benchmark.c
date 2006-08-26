@@ -72,7 +72,6 @@ int main(
     int ret = -1, err = 0;
     int i;
     PVFS_fs_id fs_id;
-    const PVFS_util_tab *tab;
     struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = { 0 };
     PVFS_credentials creds;
@@ -105,11 +104,7 @@ int main(
     if (ret < 0)
     {
         fprintf(stderr, "Failure: could not find filesystem for %s "
-                "in pvfs2tab %s\n", user_opts->fs_path_real, tab->tabfile_name);
-        for (i = 0; i < tab->mntent_count; i++)
-        {
-            fprintf(stderr, "Entry %d: %s\n", i, tab->mntent_array[i].mnt_dir);
-        }
+                "in pvfs2tab \n", user_opts->fs_path_real);
         return (-1);
     }
 
