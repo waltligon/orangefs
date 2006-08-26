@@ -69,6 +69,10 @@ int PVFS_add_hint(
 /* Size: 4 for sentinel at the end, 8 + string size for each element,
  * type + length*/
 int32_t PINT_hint_calc_size(const PVFS_hint * hint){
+#ifdef NO_PVFS_HINT_SUPPORT    
+    return 0;
+#endif
+    
     int count = 4;
     PVFS_hint * act;
     for( act = (PVFS_hint *) hint ; act != NULL ; act = act->next_hint){
@@ -82,6 +86,10 @@ int32_t PINT_hint_calc_size(const PVFS_hint * hint){
 
 
 int PINT_hint_encode(const PVFS_hint * hint, char * buffer, int * out_length, int max_length){
+#ifdef NO_PVFS_HINT_SUPPORT    
+    return 0;
+#endif    
+    
     PVFS_hint * act;
     char * start_buffer = buffer;
     const int32_t number_hint_types = NUMBER_HINT_TYPES;
@@ -110,6 +118,12 @@ int PINT_hint_encode(const PVFS_hint * hint, char * buffer, int * out_length, in
  * out_hint must be NULL before running the function !
  */ 
 int PINT_hint_decode(PVFS_hint ** out_hint, const char * buffer, int * out_length){
+#ifdef NO_PVFS_HINT_SUPPORT    
+    * out_hint =  NULL;
+    * out_length = 0;
+    return 0;
+#endif    
+    
     PVFS_hint * hint = NULL;
     char * buff = (char *) buffer; 
     char * cur_hint;

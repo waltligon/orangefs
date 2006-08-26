@@ -255,6 +255,29 @@ struct PINT_server_remove_op
     PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
+typedef struct PINT_server_sm_recv_state_s
+{
+    int max_resp_sz;
+    void *encoded_resp_p;
+    job_id_t recv_id;
+    job_status_s recv_status;
+    PVFS_BMI_addr_t address;
+} PINT_server_sm_recv_state;
+
+struct PINT_server_mgmt_migrate
+{
+    /* metaserver */
+    int32_t                     dfile_to_replace;  
+    
+    /* dataserver */
+    
+    PVFS_size                   file_size;
+    PVFS_Request                file_request;
+    PINT_server_sm_recv_state   write_ack;
+
+    flow_descriptor            *flow_d;    
+};
+
 struct PINT_server_mgmt_remove_dirent_op
 {
     PVFS_handle dirdata_handle;
@@ -381,18 +404,19 @@ typedef struct PINT_server_op
 	/* request-specific scratch spaces for use during processing */
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
-	struct PINT_server_getconfig_op getconfig;
-	struct PINT_server_lookup_op lookup;
-	struct PINT_server_crdirent_op crdirent;
-	struct PINT_server_readdir_op readdir;
-	struct PINT_server_remove_op remove;
-	struct PINT_server_chdirent_op chdirent;
-	struct PINT_server_rmdirent_op rmdirent;
-	struct PINT_server_io_op io;
+    	struct PINT_server_getconfig_op getconfig;
+    	struct PINT_server_lookup_op lookup;
+    	struct PINT_server_crdirent_op crdirent;
+    	struct PINT_server_readdir_op readdir;
+    	struct PINT_server_remove_op remove;
+    	struct PINT_server_chdirent_op chdirent;
+    	struct PINT_server_rmdirent_op rmdirent;
+    	struct PINT_server_io_op io;
         struct PINT_server_small_io_op small_io;
-	struct PINT_server_flush_op flush;
-	struct PINT_server_truncate_op truncate;
-	struct PINT_server_mkdir_op mkdir;
+    	struct PINT_server_flush_op flush;
+    	struct PINT_server_truncate_op truncate;
+    	struct PINT_server_mkdir_op mkdir;
+        struct PINT_server_mgmt_migrate mgmt_migrate;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
     } u;

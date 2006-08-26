@@ -320,6 +320,28 @@ PVFS_error PVFS_mgmt_count_servers(
     return ret;
 }
 
+PVFS_error PVFS_get_bmi_address(
+    const char * alias, 
+    PVFS_fs_id fs_id,
+    PVFS_BMI_addr_t * out_address)
+{
+    struct server_configuration_s *server_config = NULL;
+    server_config = PINT_get_server_config_struct(fs_id);
+    char *bmi_alias;
+    int ret;
+        
+    bmi_alias = PINT_config_get_host_addr_ptr(server_config, (char *) alias);
+    ret = BMI_addr_lookup(out_address, bmi_alias);
+    
+    PINT_put_server_config_struct(server_config);
+    if (ret)
+    {
+        return -PVFS_EINVAL;
+    }            
+
+    return 0;        
+}
+
 /** Turns on/off admin mode of system/mgmt interface.  This changes
  *  a local variable that determines the "mode" of subsequent server
  *  requests.

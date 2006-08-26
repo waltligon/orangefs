@@ -35,15 +35,18 @@
  */
 #ifndef __SM_CHECK_DEP
 
+#ifndef __PVFS2_SERVER__
 #define PINT_STATE_STACK_SIZE 3
-
-#define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
-#define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
 
 /* Default client timeout in seconds used to set the timeout for jobs that
  * send or receive request messages.
  */
 #define PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT 30
+#endif
+
+
+#define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
+#define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
 
 /* Default number of times to retry restartable client operations. */
 #define PVFS2_CLIENT_RETRY_LIMIT_DEFAULT  (5)
@@ -284,6 +287,23 @@ struct PINT_client_mgmt_setparam_list_sm
     PVFS_error_details *details;
 };
 
+struct PINT_client_mgmt_migrate_sm
+{
+    PVFS_fs_id fs_id;
+    
+    PVFS_BMI_addr_t metaserver_addr;
+    PVFS_handle     target_metafile;
+    
+    PVFS_handle     target_datafile;
+    
+    PVFS_BMI_addr_t source_dataserver;
+    PVFS_BMI_addr_t target_dataserver;
+    
+    /* data needed during the process*/
+    PVFS_handle     new_datafile;
+    int stored_error_code;    
+};
+
 struct PINT_client_mgmt_statfs_list_sm
 {
     PVFS_fs_id fs_id;
@@ -514,6 +534,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_rename_sm rename;
 	struct PINT_client_mgmt_setparam_list_sm setparam_list;
 	struct PINT_client_truncate_sm  truncate;
+    struct PINT_client_mgmt_migrate_sm migrate;
 	struct PINT_client_mgmt_statfs_list_sm statfs_list;
 	struct PINT_client_mgmt_perf_mon_list_sm perf_mon_list;
 	struct PINT_client_mgmt_event_mon_list_sm event_mon_list;
@@ -650,43 +671,10 @@ do {                                                          \
     }                                                         \
 } while(0)
 
-#define PINT_init_msgarray_params(msgarray_params_ptr, __fsid)     \
-do {                                                               \
-    PINT_sm_msgpair_params *mpp = msgarray_params_ptr;             \
-    struct server_configuration_s *server_config =                 \
-        PINT_get_server_config_struct(__fsid);                     \
-    mpp->job_context = pint_client_sm_context;                     \
-    if (server_config)                                             \
-    {                                                              \
-        mpp->job_timeout = server_config->client_job_bmi_timeout;  \
-        mpp->retry_limit = server_config->client_retry_limit;      \
-        mpp->retry_delay = server_config->client_retry_delay_ms;   \
-    }                                                              \
-    else                                                           \
-    {                                                              \
-        mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;   \
-        mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;       \
-        mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;    \
-    }                                                              \
-    PINT_put_server_config_struct(server_config);                  \
-} while(0)
-
-#define PINT_init_msgpair(sm_p, msg_p)                         \
-do {                                                           \
-    msg_p = &sm_p->msgpair;                                    \
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));           \
-    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))\
-    {                                                          \
-        free(sm_p->msgarray);                                  \
-        sm_p->msgarray = NULL;                                 \
-    }                                                          \
-    sm_p->msgarray = msg_p;                                    \
-    sm_p->msgarray_count = 1;                                  \
-} while(0)
-
 /************************************
  * state-machine.h included here
  ************************************/
+#ifndef __PVFS2_SERVER__
 #define PINT_OP_STATE       PINT_client_sm
 
 /* This macro allows the generic state-machine-fns.h locate function
@@ -702,6 +690,7 @@ do {                                                           \
       ((_op == PVFS_SERVER_GET_CONFIG) ? (&pvfs2_server_get_config_sm) : \
        ((_op == PVFS_CLIENT_JOB_TIMER) ? (&pvfs2_client_job_timer_sm) : \
         ((_op == PVFS_CLIENT_PERF_COUNT_TIMER) ? (&pvfs2_client_perf_count_timer_sm) : NULL)))))
+#endif 
 
 struct PINT_client_op_entry_s
 {
@@ -755,7 +744,9 @@ extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_nested_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_nested_sm;
 
+#ifndef __PVFS2_SERVER__
 #include "state-machine.h"
+#endif
 
 #endif /* __SM_CHECK_DEP */
 #endif /* __PVFS2_CLIENT_STATE_MACHINE_H */

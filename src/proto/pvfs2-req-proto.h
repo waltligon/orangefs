@@ -202,17 +202,6 @@ endecode_fields_1_struct(
     PVFS_servresp_create,
     PVFS_handle, handle)
 
-/*
- * New datafile handle
- */
-struct PVFS_servresp_mgmt_migrate
-{
-    PVFS_handle handle;
-};
-endecode_fields_1_struct(
-    PVFS_servresp_mgmt_migrate,
-    PVFS_handle, handle)
-
 /* remove *****************************************************/
 /* - used to remove an existing metafile or datafile object */
 
@@ -938,42 +927,61 @@ endecode_fields_1_struct(
 
 struct PVFS_servreq_mgmt_migrate
 {
-    PVFS_handle handle;
-    PVFS_fs_id  fs_id;
-    
-    PVFS_handle datafile_handle;
-    PVFS_handle_extent_array new_datafile_extent_array;
+    PVFS_fs_id  fs_id;   
+    PVFS_handle handle; /* we operate with this one !*/
+    PVFS_handle old_datafile_handle;
+    PVFS_handle new_datafile_handle;
+    PVFS_handle metafile_handle;
+    int32_t     role; /* metaserver, source or target*/ 
 };
-endecode_fields_4_struct(
-    PVFS_servreq_mgmt_migrate,
-    PVFS_handle, handle,
-    PVFS_fs_id, fs_id,
-    PVFS_handle, datafile_handle,
-    PVFS_handle_extent_array, new_datafile_extent_array)
-#define extra_size_PVFS_servreq_mgmt_migrate \
-    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
 
-#define PINT_SERVREQ_MGMT_MIGRATE_FILL(__req,                \
+endecode_fields_6_struct(
+    PVFS_servreq_mgmt_migrate,
+    PVFS_fs_id,  fs_id,
+    PVFS_handle, handle,
+    PVFS_handle, old_datafile_handle,
+    PVFS_handle, new_datafile_handle,
+    PVFS_handle, metafile_handle,
+    int32_t,     role)
+
+enum migrate_role{
+    PVFS_MIGRATE_ROLE_METASERVER = 5,
+    PVFS_MIGRATE_ROLE_SOURCE_DATA_SERVER = 6
+};
+
+#define PINT_SERVREQ_MGMT_MIGRATE_FILL(__req,          \
                                  __creds,              \
-                                 __handle,             \
                                  __fsid,               \
-                                 __data_handle,        \
-                                 __ext_array,          \
+                                 __metafile_handle,    \
+                                 __old_datafile_handle,\
+                                 __new_datafile_handle,\
+                                 __role,               \
                                  __hints)              \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
-    (__req).op = PVFS_SERV_CREATE;                     \
+    (__req).op = PVFS_SERV_MGMT_MIGRATE;               \
     (__req).hints = (__hints);                         \
     (__req).credentials = (__creds);                   \
     (__req).u.mgmt_migrate.fs_id = (__fsid);           \
-    (__req).u.mgmt_migrate.handle = (__handle);        \
-    (__req).u.mgmt_migrate.datafile_handle = (__data_handle);      \
-    (__req).u.mgmt_migrate.new_datafile_extent_array.extent_count =\
-        (__ext_array).extent_count;                                \
-    (__req).u.mgmt_migrate.new_datafile_extent_array.extent_array =\
-        (__ext_array).extent_array;                                \
+    (__req).u.mgmt_migrate.old_datafile_handle =       \
+        (__old_datafile_handle);                       \
+    (__req).u.mgmt_migrate.new_datafile_handle =       \
+        (__new_datafile_handle);                       \
+    (__req).u.mgmt_migrate.metafile_handle =           \
+        (__metafile_handle);                           \
+    (__req).u.mgmt_migrate.role = __role;                     \
+        switch(__role){                                       \
+            case PVFS_MIGRATE_ROLE_METASERVER:                \
+            (__req).u.mgmt_migrate.handle = __metafile_handle;\
+            break;                                            \
+            case PVFS_MIGRATE_ROLE_SOURCE_DATA_SERVER:        \
+            (__req).u.mgmt_migrate.handle = __old_datafile_handle;\
+            break;                                              \
+            default:                                            \
+            assert(0);                                          \
+        }                                                       \
 } while (0)
-
+    
 
 struct PVFS_servreq_small_io
 {
@@ -1646,7 +1654,6 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_dspace_info_list mgmt_dspace_info_list;
         struct PVFS_servresp_mgmt_event_mon mgmt_event_mon;
         struct PVFS_servresp_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
-        struct PVFS_servresp_mgmt_migrate mgmt_migrate;
         struct PVFS_servresp_geteattr geteattr;
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;

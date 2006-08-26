@@ -1,6 +1,6 @@
 /* 
  * (C) 2001 Clemson University and The University of Chicago 
- *
+ * I'm happy to got it this far :) (JMK)
  * See COPYING in top-level directory.
  */
 
@@ -13,35 +13,213 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-req-proto.h"
+#include "pint-cached-config.h"
+#include "pint-util.h"
+#include "msgpairarray.h"
 
-static int mgmt_migrate(
+extern PINT_dist basic_dist;
+
+static int migrate_decide_role(
     PINT_server_op *s_op, job_status_s *js_p);
+
+/*****************************/    
+static int mgmt_migrate_metaserver_init(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int mgmt_migrate_metaserver_notify_old_dataserver_prepare(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int mgmt_migrate_metaserver_find_target_handle_number(
+    PINT_server_op *s_op, job_status_s *js_p);    
+static int mgmt_migrate_metaserver_rewrite_handles(
+    PINT_server_op *s_op, job_status_s *js_p);    
+    
+/*****************************/
+static int mgmt_migrate_source_dataserver_prepare_io_write(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int mgmt_migrate_source_dataserver_prepare_io_read(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int mgmt_migrate_source_dataserver_flow_finished(
+    PINT_server_op *s_op, job_status_s *js_p);    
+static int mgmt_migrate_source_dataserver_wait_for_write_ack(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int mgmt_migrate_source_dataserver_remove_datafile_setup(
+    PINT_server_op *s_op, job_status_s *js_p);    
+/*****************************/    
+    
 static int mgmt_migrate_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
 
+enum{
+    STATE_METASERVER = PVFS_MIGRATE_ROLE_METASERVER,
+    STATE_SOURCE_DATASERVER = PVFS_MIGRATE_ROLE_SOURCE_DATA_SERVER
+};
+
+#define STATUS_ACK_RCVD 100
+
+static int mgmt_migrate_io_start_cmp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+    
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
+
+/*
+ * Depending on role do work,
+ * logic moved to server to make it easier to implement variants.
+ * 3 different roles: metadadataserver, source data server, target data server.
+ */
 
 %%
 
 machine pvfs2_mgmt_migrate_sm(
     prelude,
-    migrate,
+    decide_role,
+    metaserver_init,
+    metaserver_read_handles,
+    metadataserver_find_target_handle_number,    
+    metaserver_notify_old_dataserver_prepare,
+    metaserver_notify_old_dataserver_prepare_xfer_msgpair,  
+    metaserver_rewrite_handles,
+    source_dataserver_prepare_io_write,
+    source_dataserver_start_io_write,
+    source_dataserver_start_io_read,
+    source_dataserver_flow_finished,
+    source_dataserver_wait_for_write_ack,
+    source_dataserver_remove_datafile_setup,
+    source_dataserver_remove_datafile_work,
     final_response,
     cleanup)
 {
     state prelude
     {
         jump pvfs2_prelude_sm;
-        success => migrate;
+        success => decide_role;
         default => final_response;
     }
 
-    state migrate
+    state decide_role
     {
-        run mgmt_migrate;
+        run migrate_decide_role;
+        STATE_METASERVER => metaserver_init;
+        STATE_SOURCE_DATASERVER => source_dataserver_prepare_io_write;
+        default => final_response;
+    }
+    
+    /*
+     * metaserver: 
+     *  protocol ongoing migration in metadata, if another migrates abort current 
+     *      migration 
+     *  notify new_dataserver about incomming message from olddataserver
+     *  notify old_dataserver to send all data to new_dataserver
+     *  migration finished, notify client done in final_response
+     *  Problem: metaserver dies while newdataserevr waits to receive msg.
+     */
+    state metaserver_init
+    {
+        run mgmt_migrate_metaserver_init;
+        success => metaserver_read_handles;
         default => final_response;
     }
 
+    state metaserver_read_handles
+    {
+        jump pvfs2_get_attr_work_sm;
+        success => metadataserver_find_target_handle_number;
+        default => final_response; 
+    }
+    
+    state metadataserver_find_target_handle_number
+    {
+        run mgmt_migrate_metaserver_find_target_handle_number;
+        success => metaserver_notify_old_dataserver_prepare;
+        default => final_response; 
+    }
+    
+    state metaserver_notify_old_dataserver_prepare
+    {
+        run mgmt_migrate_metaserver_notify_old_dataserver_prepare;
+        success => metaserver_notify_old_dataserver_prepare_xfer_msgpair;
+        default => final_response;
+    }
+   
+    
+    state metaserver_notify_old_dataserver_prepare_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => metaserver_rewrite_handles;
+        default => final_response; /* failure */
+    }
+    
+    /*
+     * Once the message pair finishes we know the datatransfer is completed.
+     */
+
+    state metaserver_rewrite_handles
+    {
+        run mgmt_migrate_metaserver_rewrite_handles;
+        default => final_response; 
+    }
+          
+    /*
+     * old dataserver: 
+     *  start client I/O sm to actually do I/O
+     *  remove file, this is necessary that no other server could possibly
+     *  do I/O with the deprecated file. Write ops are stalled.
+     *  send ack to meta server via final response, now all data is written.
+     */
+    state source_dataserver_prepare_io_write
+    {
+        run mgmt_migrate_source_dataserver_prepare_io_write;
+        success => source_dataserver_start_io_write;
+        default => final_response;
+    }
+    
+    state source_dataserver_start_io_write
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => source_dataserver_start_io_read;
+        default => final_response;
+    }
+    
+    state source_dataserver_start_io_read
+    {
+        run mgmt_migrate_source_dataserver_prepare_io_read;
+        success => source_dataserver_flow_finished;
+        default => final_response;
+    }
+    
+    state source_dataserver_flow_finished
+    {
+        run mgmt_migrate_source_dataserver_flow_finished;
+        success => source_dataserver_wait_for_write_ack;
+        default => final_response;
+    }
+    
+    
+    state source_dataserver_wait_for_write_ack
+    {
+        run mgmt_migrate_source_dataserver_wait_for_write_ack;
+        success => source_dataserver_remove_datafile_setup;
+        default => final_response;
+    }    
+    
+    state source_dataserver_remove_datafile_setup
+    {
+        run mgmt_migrate_source_dataserver_remove_datafile_setup;
+        success => source_dataserver_remove_datafile_work;
+        default => final_response;
+    }    
+    
+    state source_dataserver_remove_datafile_work
+    {
+        jump pvfs2_remove_work_sm;
+        default => final_response;
+    }  
+    
+    /*
+     * target dataserver:
+     *  does a normal I/O write from source !
+     */
+     
+     /**********************/
     state final_response
     {
         jump pvfs2_final_response_sm;
@@ -57,19 +235,505 @@ machine pvfs2_mgmt_migrate_sm(
 
 %%
 
-static int mgmt_migrate(
-    PINT_server_op *s_op, job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL;
-    job_id_t j_id;
 
+
+/***************/
+
+static int mgmt_migrate_source_dataserver_prepare_io_write(
+    PINT_server_op *s_op, job_status_s *js_p){
+    PVFS_BMI_addr_t  target_dataserver;
+    int ret;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_handle handle = s_op->req->u.mgmt_migrate.new_datafile_handle;
+    PVFS_fs_id  fs_id = s_op->req->u.mgmt_migrate.fs_id ;
+    struct filesystem_configuration_s* cur_fs = NULL;
+    struct server_configuration_s *server_config = NULL;
+
+    js_p->error_code = 0; 
+    s_op->u.mgmt_migrate.file_size = s_op->ds_attr.b_size;
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+        "mgmt_migrate_source_dataserver_prepare_io_write, file size: %lld\n", 
+        lld(s_op->u.mgmt_migrate.file_size));
+
+    ret = PINT_cached_config_map_to_server( & target_dataserver,
+        handle, fs_id );
+    if( ret != 0)
+    {
+        js_p->error_code = ret;
+        return 1;        
+    }
+
+    server_config = get_server_config_struct();
+    cur_fs = PINT_config_find_fs_id(server_config, fs_id);
+    
+    PINT_init_msgpair(s_op, msg_p);
+    
+    ret = PVFS_Request_contiguous(s_op->u.mgmt_migrate.file_size, PVFS_BYTE, 
+        & s_op->u.mgmt_migrate.file_request);
+    if (ret < 0)
+    {
+        gossip_err("Error: PVFS_Request_contiguous failure\n");
+        return (ret);
+    }
+        
+    /*
+     * start I/O
+     */
+    PINT_SERVREQ_IO_FILL(
+        msg_p->req,
+        s_op->req->credentials,
+        fs_id,
+        handle,
+        PVFS_IO_WRITE,
+        cur_fs->flowproto,
+        /*
+        s_op->req->u.mgmt_migrate.server_nr, 
+        s_op->req->u.mgmt_migrate.server_ct,
+        s_op->req->u.mgmt_migrate.io_dist,
+        */
+        0,
+        1,
+        & basic_dist,
+        s_op->u.mgmt_migrate.file_request,
+        0, /* sm_p->u.io.file_req_offset */
+        s_op->u.mgmt_migrate.file_size,
+        s_op->req->hints);
+       
+    msg_p->fs_id = fs_id;
+    msg_p->handle = handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn =  mgmt_migrate_io_start_cmp_fn;    
+    msg_p->svr_addr = target_dataserver;
+    
+    s_op->u.mgmt_migrate.write_ack.recv_id = -1;
+    return 1;
+}
+
+static int mgmt_migrate_io_start_cmp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index)
+{
+    assert(resp_p->op == PVFS_SERV_IO);
+
+    if (resp_p->status == 0)
+    {
+       if( resp_p->u.io.bstream_size != 0 )
+       {
+            gossip_err("mgmt_migrate_io_start_cmp_fn: io filesize of new file != 0\n");
+            return -PVFS_EBADF;
+       } 
+    }
+    
+    return resp_p->status;
+}
+    
+static int mgmt_migrate_source_dataserver_prepare_io_read(
+    PINT_server_op *s_op, job_status_s *js_p){
+    PVFS_BMI_addr_t  source_dataserver;
+    PVFS_BMI_addr_t  target_dataserver;
+    int ret;
+    job_id_t tmp_id;
+    PVFS_handle handle = s_op->req->u.mgmt_migrate.old_datafile_handle;
+    PVFS_fs_id  fs_id = s_op->req->u.mgmt_migrate.fs_id ;
+    struct filesystem_configuration_s* cur_fs = NULL;
+    struct server_configuration_s *server_config = NULL;
+    PINT_server_sm_recv_state * write_ack;
+    struct PINT_server_mgmt_migrate * migrate;
+    migrate =& s_op->u.mgmt_migrate;
+
+    js_p->error_code = 0; 
+    migrate->file_size = s_op->ds_attr.b_size;
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+        "mgmt_migrate_source_dataserver_prepare_io_read, file size: %lld\n", 
+        lld(migrate->file_size));
+
+    ret = PINT_cached_config_map_to_server( & target_dataserver,
+        s_op->req->u.mgmt_migrate.new_datafile_handle, fs_id );
+    if( ret != 0)
+    {
+        js_p->error_code = ret;
+        return 1;        
+    }
+
+    ret = PINT_cached_config_map_to_server( & source_dataserver,
+        handle, fs_id );
+    if( ret != 0)
+    {
+        js_p->error_code = ret;
+        return 1;        
+    }
+    
+    server_config = get_server_config_struct();
+    cur_fs = PINT_config_find_fs_id(server_config, fs_id);
+        
+    /*
+     * pre-post final write ACK
+     */
+     
+   write_ack = & migrate->write_ack;
+   
+   write_ack->max_resp_sz = PINT_encode_calc_max_size(
+        PINT_ENCODE_RESP, PVFS_SERV_WRITE_COMPLETION,
+        cur_fs->encoding);
+   write_ack->encoded_resp_p = BMI_memalloc(
+        target_dataserver, write_ack->max_resp_sz,
+        BMI_RECV);
+
+    if (!write_ack->encoded_resp_p)
+    {
+        gossip_err("BMI_memalloc (for write ack) failed\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+
+    /*
+       pre-post this recv with an infinite timeout and adjust it
+       after the flow completes since we don't know how long a flow
+       can take at this point
+       */ 
+    write_ack->address = target_dataserver;
+    
+    ret = job_bmi_recv(
+        target_dataserver, write_ack->encoded_resp_p,
+        write_ack->max_resp_sz, s_op->msgpair.session_tag,
+        BMI_PRE_ALLOC, s_op, STATUS_ACK_RCVD,
+        & write_ack->recv_status, & write_ack->recv_id,
+        server_job_context, JOB_TIMEOUT_INF);
+
+    if (ret < 0)
+    {
+        gossip_err("job_bmi_recv (write ack) failed\n");
+        js_p->error_code = ret;
+        return 1;
+    }     
+    
+
+    /*
+     * prepare flow to disk !
+     */
+
+    /* must reset the error_code and internal PINT_distribute fields
+     * in case of a retry */
+    migrate->flow_d = PINT_flow_alloc();
+    if (!migrate->flow_d)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    
+    migrate->flow_d->file_data.fsize = migrate->file_size;
+    migrate->flow_d->file_data.dist = & basic_dist;
+    migrate->flow_d->file_data.server_nr = 0;
+    migrate->flow_d->file_data.server_ct = 1; /*s_op->req->u.mgmt_migrate.server_ct*/
+
+    migrate->flow_d->file_req = migrate->file_request;
+    migrate->flow_d->file_req_offset = 0;
+
+    /*migrate->flow_d->mem_req = migrate->file_request;*/
+
+    migrate->flow_d->tag = s_op->msgpair.session_tag;
+    migrate->flow_d->type = cur_fs->flowproto;
+    migrate->flow_d->user_ptr = NULL;
+
+    gossip_debug(GOSSIP_IO_DEBUG, "Migration start flow bstream_size=%lld, "
+                "datafile handle:%lld nr=%d, ct=%d, file_req_off = %lld\n",
+                 lld(migrate->flow_d->file_data.fsize),
+                 lld(handle),
+                 migrate->flow_d->file_data.server_nr,
+                 migrate->flow_d->file_data.server_ct,
+                 lld(migrate->flow_d->file_req_offset));
+
+    migrate->flow_d->file_data.extend_flag = 0;
+    
+    migrate->flow_d->src.endpoint_id = TROVE_ENDPOINT;
+    migrate->flow_d->src.u.trove.handle = handle;
+    migrate->flow_d->src.u.trove.coll_id = fs_id;
+    migrate->flow_d->dest.endpoint_id = BMI_ENDPOINT;
+    migrate->flow_d->dest.u.bmi.address = target_dataserver;
+
+    /* pick up any buffer settings overrides from fs conf */
+    migrate->flow_d->buffer_size = cur_fs->fp_buffer_size;
+    migrate->flow_d->buffers_per_flow = cur_fs->fp_buffers_per_flow;
+    migrate->flow_d->aggregate_size = migrate->file_size;
+    
+    ret = job_flow(
+        migrate->flow_d, s_op, 0,
+        js_p, &tmp_id,
+        server_job_context,
+        server_config->server_job_flow_timeout);
 
     return ret;
 }
 
+static int mgmt_migrate_source_dataserver_flow_finished(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    PINT_server_sm_recv_state * write_ack;
+    write_ack = & s_op->u.mgmt_migrate.write_ack;
+        
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+        "mgmt_migrate_source_dataserver_flow_finished transferred:%lld\n",
+         s_op->u.mgmt_migrate.flow_d->total_transferred);
+    
+    if( s_op->u.mgmt_migrate.flow_d->total_transferred != 
+        s_op->u.mgmt_migrate.file_size )
+    {
+        gossip_err(
+        "mgmt_migrate_source_dataserver_flow_finished with errors transferred:%lld" 
+        " of %lld bytes\n",
+         s_op->u.mgmt_migrate.flow_d->total_transferred,
+         s_op->u.mgmt_migrate.file_size);        
+    }
+        
+    if (s_op->u.mgmt_migrate.flow_d->error_code != 0)
+    {
+        js_p->error_code = s_op->u.mgmt_migrate.flow_d->error_code;
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "Migrate flow desc error: %d\n",(js_p->error_code));
+       return 1;
+    }
+    
+    return 0;
+}
+
+
+static int mgmt_migrate_source_dataserver_wait_for_write_ack(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret;
+    struct PINT_decoded_msg decoded_resp;
+    PINT_server_sm_recv_state * write_ack;
+    write_ack = & s_op->u.mgmt_migrate.write_ack;
+    
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+        "mgmt_migrate_source_dataserver_wait_for_write_ack\n");
+        
+    ret = PINT_decode(write_ack->encoded_resp_p, PINT_DECODE_RESP,
+                  & decoded_resp, /* holds data on decoded resp */
+                  write_ack->address, write_ack->max_resp_sz);
+
+    if (ret != 0)
+    {
+        PVFS_perror_gossip("msgpairarray decode error", ret);
+    }
+    js_p->error_code = ret;
+    
+    assert(js_p->status_user_tag == STATUS_ACK_RCVD);
+    
+    if( write_ack->recv_status.error_code != 0 )
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "mgmt_migrate_source_dataserver_wait_for_write_ack error code:%d\n",
+                write_ack->recv_status.error_code);    
+         js_p->error_code = write_ack->recv_status.error_code;
+    }
+    
+    PINT_decode_release(& decoded_resp, PINT_DECODE_RESP);
+                
+    return 1;
+}
+
+static int mgmt_migrate_source_dataserver_remove_datafile_setup(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+        "mgmt_migrate_source_dataserver_remove_datafile_setup\n");
+    s_op->u.remove.handle = s_op->req->u.mgmt_migrate.old_datafile_handle;
+    s_op->u.remove.fs_id = s_op->req->u.mgmt_migrate.fs_id;
+    js_p->error_code = 0;
+
+    return 1;
+}
+
+/***************/
+static int mgmt_migrate_metaserver_init(
+    PINT_server_op *s_op, job_status_s *js_p){
+    js_p->error_code = 0; 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_migrate_metaserver_init\n");
+    
+    PINT_init_msgarray_params_server(&s_op->msgarray_params);
+    
+    s_op->u.getattr.handle = s_op->req->u.mgmt_migrate.metafile_handle;
+    s_op->u.getattr.fs_id = s_op->req->u.mgmt_migrate.fs_id;
+    s_op->u.getattr.attrmask = PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST;
+    
+    return 1;         
+}
+
+static int mgmt_migrate_metaserver_find_target_handle_number(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int i;
+    i = PINT_copy_object_attr(& s_op->attr, & s_op->resp.u.getattr.attr);
+    PINT_free_object_attr(& s_op->resp.u.getattr.attr);
+    if( i != 0 )
+    {
+        js_p->error_code = i;
+        return 1;
+    }
+    
+    assert(s_op->attr.u.meta.dist);
+    assert(s_op->attr.u.meta.dfile_count);
+    assert(s_op->attr.u.meta.dfile_array);
+    
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "migrate state: mgmt_migrate_metaserver_find_target_handle_number\n");    
+    /*
+     * lookup old handle:
+     */
+         
+    for(i=0; i < s_op->attr.u.meta.dfile_count ; i++)
+    {
+        if (s_op->attr.u.meta.dfile_array[i] == 
+            s_op->req->u.mgmt_migrate.old_datafile_handle)
+        {
+            
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "Migration found datafile on pos %i with new datafile\n", i);
+            s_op->u.mgmt_migrate.dfile_to_replace = i;
+            break;
+        }
+    }    
+    if ( i == s_op->attr.u.meta.dfile_count)
+    {
+        /*
+         * This should never happen !
+         */
+        gossip_err("Could not find datafile %lld for migration in metafile: %lld!\n",
+                   s_op->req->u.mgmt_migrate.old_datafile_handle,
+                   s_op->req->u.mgmt_migrate.metafile_handle);
+        js_p->error_code = -PVFS_EINVAL;
+    }
+    
+    return 1;  
+}    
+
+
+static int mgmt_migrate_metaserver_notify_old_dataserver_prepare(
+    PINT_server_op *s_op, job_status_s *js_p){
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_BMI_addr_t  old_dataserver;
+    int ret;
+    
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "migrate state: mgmt_migrate_metaserver_notify_old_dataserver_prepare\n");
+    PVFS_handle handle = s_op->req->u.mgmt_migrate.old_datafile_handle;
+    PVFS_fs_id  fs_id = s_op->req->u.mgmt_migrate.fs_id ;
+
+    ret = PINT_cached_config_map_to_server( & old_dataserver,
+        handle, fs_id);
+    if( ret != 0)
+    {
+        js_p->error_code = ret;
+        return 1;        
+    }
+    
+    PINT_init_msgpair(s_op, msg_p);
+
+    PINT_SERVREQ_MGMT_MIGRATE_FILL(
+        msg_p->req,
+        s_op->req->credentials,
+        fs_id,
+        s_op->req->u.mgmt_migrate.metafile_handle,
+        s_op->req->u.mgmt_migrate.old_datafile_handle,
+        s_op->req->u.mgmt_migrate.new_datafile_handle,
+        PVFS_MIGRATE_ROLE_SOURCE_DATA_SERVER,
+        /*s_op->u.mgmt_migrate.dfile_to_replace,
+        s_op->attr.u.meta.dfile_count,
+        s_op->attr.u.meta.dist,*/
+        s_op->req->hints);
+            
+    msg_p->fs_id = fs_id;
+    msg_p->handle = s_op->req->u.mgmt_migrate.new_datafile_handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn =  NULL;    
+    msg_p->svr_addr = old_dataserver;
+    return 1;         
+}
+
+
+static int mgmt_migrate_metaserver_rewrite_handles(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret = 0;
+    job_id_t j_id;
+    
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "migrate state: mgmt_migrate_metaserver_rewrite_handles\n");    
+
+    s_op->attr.u.meta.dfile_array[s_op->u.mgmt_migrate.dfile_to_replace] = 
+                s_op->req->u.mgmt_migrate.new_datafile_handle;
+
+    /* set up key and value structure for keyval write */
+    s_op->key.buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
+    
+    s_op->val.buffer = s_op->attr.u.meta.dfile_array;
+    s_op->val.buffer_sz =  
+        s_op->attr.u.meta.dfile_count * sizeof(PVFS_handle);    
+
+    ret = job_trove_keyval_write(
+        s_op->req->u.mgmt_migrate.fs_id, 
+        s_op->req->u.mgmt_migrate.metafile_handle,
+        &(s_op->key), &(s_op->val),
+        TROVE_SYNC,
+        NULL, s_op, 0, js_p, &j_id, server_job_context);
+    
+    return ret;  
+}    
+    
+/***************/
+    
+static int migrate_decide_role(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_migrate decide role: %d\n",
+                     llu(s_op->req->u.mgmt_migrate.role));    
+                     
+    js_p->error_code = s_op->req->u.mgmt_migrate.role;
+    return 1;
+}
+
+
+
 static int mgmt_migrate_cleanup(
     PINT_server_op *s_op, job_status_s *js_p)
 {
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_migrate_cleanup role: %d \n",
+        s_op->req->u.mgmt_migrate.role );
+    if ( s_op->req->u.mgmt_migrate.role == PVFS_MIGRATE_ROLE_METASERVER )
+    {
+        PINT_free_object_attr(& s_op->attr);
+    }else if(s_op->req->u.mgmt_migrate.role == PVFS_MIGRATE_ROLE_SOURCE_DATA_SERVER &&
+        s_op->u.mgmt_migrate.file_request != 0 )
+    {
+        PVFS_Request_free(& s_op->u.mgmt_migrate.file_request);
+    
+        if (s_op->u.mgmt_migrate.flow_d != 0)
+        {
+            if (s_op->u.mgmt_migrate.flow_d->error_code != 0)
+            {
+                js_p->error_code = s_op->u.mgmt_migrate.flow_d->error_code;
+                gossip_debug(GOSSIP_SERVER_DEBUG, 
+                    "cleanup migrate flow desc error: %d\n",(js_p->error_code));
+            }
+            PINT_flow_free(s_op->u.mgmt_migrate.flow_d);
+        }
+        
+        if( s_op->u.mgmt_migrate.write_ack.recv_id != -1 )
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "cleanup migrate bmi cancel recv\n");
+            job_bmi_cancel(s_op->u.mgmt_migrate.write_ack.recv_id, 
+                server_job_context);
+        }
+    }
+    
+    
+
     return(server_state_machine_complete(s_op));
 }
 

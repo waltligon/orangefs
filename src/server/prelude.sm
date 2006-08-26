@@ -264,7 +264,7 @@ static int prelude_perm_check(
 		 */
 		js_p->error_code = 0;
 	    }
-            else /* setattr, seteattr, seteattr_list */
+            else /* setattr, seteattr, seteattr_list, migration */
             {
                 /*
                   NOTE: on other file systems, setattr doesn't

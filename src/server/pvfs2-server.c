@@ -408,7 +408,7 @@ struct PINT_server_req_params PINT_server_req_table[] =
     {PVFS_SERV_MGMT_MIGRATE,
         "mgmt_migrate",
         PINT_SERVER_CHECK_ATTR,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_mgmt_migrate_sm},      
 };
 

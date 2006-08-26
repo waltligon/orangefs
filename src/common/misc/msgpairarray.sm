@@ -161,13 +161,13 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 {
     int ret = -PVFS_EINVAL, i = 0, tmp = 0;
     struct server_configuration_s *server_config = NULL;
-    PVFS_msg_tag_t session_tag;
+    PVFS_msg_tag_t * session_tag;
     PINT_sm_msgpair_state *msg_p = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     int num_incomplete_msgpairs = (sm_p->msgarray_params.comp_ct / 2);
     int must_loop_encodings = 0;
     int local_enc_and_alloc = 0;
-
+    
     gossip_debug(
         GOSSIP_MSGPAIR_DEBUG, "%s: sm %p "
         "%d total message(s) with %d incomplete\n", __func__, sm_p,
@@ -262,16 +262,20 @@ static int msgpairarray_post(PARENT_SM *sm_p,
             local_enc_and_alloc = 1;
         }
 
-        session_tag = PINT_util_get_next_tag();
+        session_tag = & msg_p->session_tag;
+        if ( *session_tag == 0)
+        {  
+            *session_tag = PINT_util_get_next_tag();
+        }
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d: "
                      "posting recv\n", __func__, sm_p, i);
-
+bmi_recv:
         /* post receive of response; job_id stored in recv_id */
         ret = job_bmi_recv(msg_p->svr_addr,
                            msg_p->encoded_resp_p,
                            msg_p->max_resp_sz,
-                           session_tag,
+                           *session_tag,
                            BMI_PRE_ALLOC,
                            sm_p,
                            i,
@@ -295,7 +299,17 @@ static int msgpairarray_post(PARENT_SM *sm_p,
         {
             /* it is impossible for this recv to complete at this point
              * without errors; we haven't sent the request yet!
+             * may it be in case of an retry operation that we got the 
+             *  answer in the meantime ?
              */
+            if ( msg_p->retry_flag == PVFS_MSGPAIR_RETRY && ret == 1)
+            {
+                /*
+                 * repost recv
+                 */
+                goto bmi_recv;   
+            }
+            
             assert(ret < 0 || msg_p->recv_status.error_code != 0);
             if (ret < 0)
             {
@@ -342,7 +356,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
                                 msg_p->encoded_req.size_list,
                                 msg_p->encoded_req.list_count,
                                 msg_p->encoded_req.total_size,
-                                session_tag,
+                                *session_tag,
                                 msg_p->encoded_req.buffer_type,
                                 1,
                                 sm_p,

@@ -146,6 +146,11 @@ PVFS_error PVFS_imgmt_noop(
     PVFS_hint * hints,
     void *user_ptr);
 
+PVFS_error PVFS_get_bmi_address(
+    const char * alias, 
+    PVFS_fs_id fs_id,
+    PVFS_BMI_addr_t * out_address);  
+
 PVFS_error PVFS_mgmt_noop(
     PVFS_fs_id,
     PVFS_credentials *credentials,
@@ -156,7 +161,8 @@ PVFS_error PVFS_imgmt_migrate(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     PVFS_BMI_addr_t metaserver_addr,
-    PVFS_object_ref target_datafile_ref,
+    PVFS_handle     target_metafile,
+    PVFS_handle     target_datafile,    
     PVFS_BMI_addr_t source_dataserver,
     PVFS_BMI_addr_t target_dataserver, 
     PVFS_mgmt_op_id *op_id,
@@ -167,7 +173,8 @@ PVFS_error PVFS_mgmt_migrate(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     PVFS_BMI_addr_t metaserver_addr,
-    PVFS_object_ref target_datafile_ref,
+    PVFS_handle     target_metafile,
+    PVFS_handle     target_datafile,    
     PVFS_BMI_addr_t source_dataserver,
     PVFS_BMI_addr_t target_dataserver, 
     PVFS_hint * hints);
