@@ -22,6 +22,13 @@
 #include <assert.h>
 #include <errno.h>
 
+/*
+ * For eclipse allow to index file always...
+ */
+#ifdef __INCLUDE_ALL__
+#undef __PVFS2_USE_AIO__
+#endif
+
 #ifndef __PVFS2_USE_AIO__
 
 #include "gossip.h"
@@ -57,7 +64,7 @@
  * Define this value to get O_DIRECT TO WORK PROPERLY,
  * THIS IS DEFINITELY A HACK FOR NOW, for evaluation purpose only ! 
  */
-#define THREADS_SCHEDULE_ONLY_ONE_HANDLE 1
+#define THREADS_SCHEDULE_ONLY_ONE_HANDLE
     
 int PREAD(int fd, void *buf, size_t count, off_t offset);
 int PWRITE(int fd, const void *buf, size_t count, off_t offset);
@@ -331,6 +338,7 @@ static void transform_IO_req_to_Array(
         cur_stream_offset = IOreq->stream_offset_array[0];
         total_stream_size = cur_stream_size;
         total_mem_size = cur_mem_size;
+        fprintf(stderr, "TRANSFORM REQ: %lld\n", lld(cur_size));
 
         elem->active_io->
             request_number_of_slices[active_queue][current_trove_request] =
@@ -537,18 +545,9 @@ static void decrement_handle_ref(
 
     if (elem->active_io->ref_count == 0 && is_no_process_element_available(elem))
     {                           
-        /* update cache file size and truncate file in case O_DIRECT was used !*/
 #ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
-        active_file_io = NULL;                           
-        if(check_update_cache_size(elem->fs_id, elem->handle, 
-            latest_offset_written)){                
-            ftruncate(elem->active_io->filehandle, latest_offset_written);
-        }
-#else
-        check_update_cache_size(elem->fs_id, elem->handle, 
-            latest_offset_written);
-#endif
-            
+        active_file_io = NULL;        
+#endif        
         /*have to free HandleQueue at the end !*/
         if (elem->active_io->filehandle)
             close(elem->active_io->filehandle);
@@ -852,6 +851,24 @@ modifyBuffer:
         /* request is finished */
         dbpf_op_queue_remove(slice->parent_request);
         *latest_offset_written = *total_write_size_out;
+                /* update cache file size and truncate file in case O_DIRECT was used !*/
+#ifdef THREADS_SCHEDULE_ONLY_ONE_HANDLE
+        if ( *latest_offset_written > 0)
+        {                          
+            
+            if(check_update_cache_size(coll_id, 
+                handle, *latest_offset_written)){                
+                ftruncate(fd, *latest_offset_written);
+                gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF latest_offset_written: %lld\n",
+                    lld(*latest_offset_written));              
+            }
+        }
+#else
+        check_update_cache_size(elem->fs_id, elem->handle, 
+            latest_offset_written);
+#endif
+            
+        
         dbpf_move_op_to_completion_queue(slice->parent_request,
                                     *return_code_out, OP_COMPLETED);
     }
