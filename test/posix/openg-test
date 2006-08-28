@@ -20,7 +20,7 @@ openg_shallowfile=$PVFS2_MNT/openg-test
 open_deepfile=$base/open-test
 open_shallowfile=$PVFS2_MNT/open-test
 
-clients="1 5 10 15 20 25 30"
+clients="1 10 20 30 40 50 60"
 
 for c in $clients; do
 
