@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.37 2006-08-24 21:09:23 pw Exp $
+ * $Id: ib.c,v 1.38 2006-08-28 17:33:11 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1790,13 +1790,13 @@ static int ib_block_for_activity(int timeout_ms)
 	numfd = 2;
     }
     ret = poll(pfd, numfd, timeout_ms);
+    debug(4, "%s: ret %d rev0 0x%x", __func__, ret, pfd[0].revents);
     if (ret < 0) {
 	if (errno == EINTR)  /* normal, ignore but break */
 	    ret = 0;
 	else
 	    error_errno("%s: poll listen sock", __func__);
     }
-    debug(4, "%s: ret %d rev0 0x%x", __func__, ret, pfd[0].revents);
     return ret;
 }
 
