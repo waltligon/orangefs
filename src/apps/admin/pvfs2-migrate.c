@@ -31,7 +31,7 @@ struct options
     char *old_dataserver;
     char *new_dataserver;
     PVFS_handle old_dataserver_handle_number;
-    
+    int override_restrictions;
     int verbose;
 };
 
@@ -135,7 +135,10 @@ int main(
     PVFS_BMI_addr_t bmi_newdatataserver;
     
     PVFS_hint * hints = NULL;
-
+    
+    PVFS_add_hint(& hints, REQUEST_ID, "pvfs2-migrate");
+    PINT_hint_add_environment_hints(& hints);
+    
     PVFS_sysresp_getattr resp_getattr;  
     
     user_opts = parse_args(argc, argv);
@@ -214,9 +217,17 @@ int main(
     */
     if( strcmp(user_opts->old_dataserver, user_opts->new_dataserver) == 0 )
     {
-        fprintf(stderr, "Error, source and target dataserver are %s, nothing to be done\n", 
-            user_opts->old_dataserver);
-        return (-1);
+        if( user_opts->override_restrictions )
+        {
+            fprintf(stderr, "Warning, source and target dataserver are %s, override active\n", 
+                user_opts->old_dataserver);
+        }
+        else
+        {
+            fprintf(stderr, "Error, source and target dataserver are %s, nothing to be done\n", 
+                user_opts->old_dataserver);
+            return (-1);
+        }
     }
     
     ret = PINT_cached_config_get_server_name(metadataserver, 256, 
@@ -262,8 +273,6 @@ int main(
             lld(user_opts->old_dataserver_handle_number));         
     }
 
-    
-    PVFS_add_hint(& hints, REQUEST_ID, "pvfs2-migrate");        
     ret = PVFS_mgmt_migrate(metafile_ref.fs_id, & credentials, bmi_metadataserver
         , metafile_ref.handle, 
         user_opts->old_dataserver_handle_number, 
@@ -275,7 +284,11 @@ int main(
         PVFS_perror("Error file could not be migrated", ret);
         return -1;
     }
-    
+    if( user_opts->verbose )
+    {
+        printf("Migration done\n");
+    }
+        
     PVFS_sys_finalize();
     free(user_opts);
     return (ret);
@@ -304,7 +317,7 @@ static struct options *parse_args(
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while ((one_opt = getopt(argc, argv, "s:d:vV")) != EOF)
+    while ((one_opt = getopt(argc, argv, "s:d:voV")) != EOF)
     {
         switch (one_opt)
         {
@@ -316,6 +329,9 @@ static struct options *parse_args(
             break;            
         case ('v'):
             tmp_opts->verbose = 1;
+            break;
+        case ('o'):
+            tmp_opts->override_restrictions = 1;
             break;
         case ('V'):
             printf("%s\n", PVFS2_VERSION);
@@ -354,6 +370,7 @@ static void usage(
             "\n-s handle_number \t migrate datafile with handle number to new_dataserver"
             "\nWhere ARGS is one or more of"
             "\n-v\t\t\t verbose output\n"
+            "\n-o\t\t\t override restrictions\n"
             "\n-V\t\t\t print version number and exit\n");
     return;
 }
