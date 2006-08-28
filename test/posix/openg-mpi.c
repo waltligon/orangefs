@@ -124,11 +124,12 @@ int main(int argc, char *argv[])
 	int rank, np;
 	size_t len;
 	struct stat sbuf;
-	char opt[] = "f:m:", *fname = NULL;
-	double begin, end;
+	char opt[] = "f:m:c", *fname = NULL;
+	double begin_openg, end_openg, begin_openfh, end_openfh, max_end;
 	enum muck_options_t muck_options = DONT_MUCK;
 	struct hbuf hb;
 	MPI_Datatype d;
+	int openg_flags = 0;
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -142,6 +143,9 @@ int main(int argc, char *argv[])
 			case 'm':
 				muck_options = atoi(optarg);
 				break;
+			case 'c':
+				openg_flags |= O_CREAT;
+				break;
 			case '?':
 			default:
 				fprintf(stderr, "Invalid arguments\n");
@@ -151,7 +155,7 @@ int main(int argc, char *argv[])
 	}
 	if (fname == NULL)
 	{
-		fprintf(stderr, "Usage: %s -f <fname> -m {muck options 0,1,2}\n",
+		fprintf(stderr, "Usage: %s -f <fname> -m {muck options 0,1,2} -c\n",
 				argv[0]);
 		MPI_Finalize();
 		exit(1);
@@ -173,16 +177,17 @@ int main(int argc, char *argv[])
 	/* Rank 0 does the openg */
 	if (rank == 0)
 	{
-		begin = Wtime();
-		err = openg(fname, (void *) hb.handle, (size_t *) &hb.handle_length, O_RDONLY, 0);
+		begin_openg = Wtime();
+		openg_flags |= O_RDONLY;
+		err = openg(fname, (void *) hb.handle, (size_t *) &hb.handle_length, openg_flags, 0);
 		if (err < 0) {
 			perror("openg error:");
 			MPI_Finalize();
 			exit(1);
 		}
-		end = Wtime();
+		end_openg = Wtime();
 		printf("Rank %d openg on %s yielded length %ld [Time %g msec]\n",
-				rank, fname, (unsigned long) hb.handle_length, msec_diff(&end, &begin));
+				rank, fname, (unsigned long) hb.handle_length, msec_diff(&end_openg, &begin_openg));
 	}
 
 	/* Broadcast the handle buffer to everyone */
@@ -195,8 +200,8 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	/* muck with buffers if need be */
-	muck_with_buffer(hb.handle, hb.handle_length, muck_options);
-	begin = Wtime();
+/*	muck_with_buffer(hb.handle, hb.handle_length, muck_options); */
+	begin_openfh = Wtime();
 	fd = openfh((void *) hb.handle, (size_t) hb.handle_length);
 	if (fd < 0) {
 		fprintf(stderr, "openfh on rank %d failed: %s\n",
@@ -204,13 +209,20 @@ int main(int argc, char *argv[])
 		MPI_Finalize();
 		exit(1);
 	}
-	end = Wtime();
+	end_openfh = Wtime();
 	printf("Rank %d:  openfh returned fd: %d [Time %g msec]\n",
-			rank, fd, msec_diff(&end, &begin));
-	fstat(fd, &sbuf);
+			rank, fd, msec_diff(&end_openfh, &begin_openfh));
+/*	fstat(fd, &sbuf);
 	printf("Rank %d: stat indicates file size %lu\n", rank, (unsigned long) sbuf.st_size);
-	sha1_file_digest(fd);
+	sha1_file_digest(fd); */
 	close(fd);
+	MPI_Allreduce(&end_openfh, &max_end, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+	if(rank == 0)
+	{
+	    printf("Total time for openg/openfh: [Time %g msec]\n",
+		   msec_diff(&max_end, &begin_openg));
+	}
+
 	MPI_Finalize();
 	return 0;
 }

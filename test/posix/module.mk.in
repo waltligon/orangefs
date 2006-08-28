@@ -20,7 +20,10 @@ MPIMISCSRC += \
 	$(DIR)/sha1.c \
 	$(DIR)/sockio.c
 
-MPITESTSRC += $(DIR)/openg-mpi.c
+MPITESTSRC += $(DIR)/openg-mpi.c $(DIR)/open.c
 
 MODCFLAGS_$(DIR)/getdents.c = -D_GNU_SOURCE
 MODLDFLAGS_$(DIR) = -lssl -lcrypto
+
+LDFLAGS_$(DIR) = -lssl -lcrypto
+
