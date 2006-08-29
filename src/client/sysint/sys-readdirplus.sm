@@ -616,7 +616,10 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
      {
          if (sm_p->u.readdirplus.obj_attr_array[i].objtype == PVFS_TYPE_METAFILE)
          {
-             assert(sm_p->u.readdirplus.obj_attr_array[i].mask & PVFS_ATTR_META_ALL);
+             if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
+             {
+                 assert(sm_p->u.readdirplus.obj_attr_array[i].mask & PVFS_ATTR_META_ALL);
+             }
              nhandles += sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count;
              /* Allocate size_array here */
              sm_p->u.readdirplus.size_array[i] = (PVFS_size *)
@@ -643,12 +646,18 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
          if (sm_p->u.readdirplus.obj_attr_array[i].objtype == PVFS_TYPE_METAFILE)
          {
              int j;
-             assert(sm_p->u.readdirplus.obj_attr_array[i].mask & PVFS_ATTR_META_DIST);
-             assert(sm_p->u.readdirplus.obj_attr_array[i].mask & PVFS_ATTR_META_DFILES);
-             assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_array);
-             assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count > 0);
-             assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist);
-             assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist_size > 0);
+             if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST)
+             {
+                 assert(sm_p->u.readdirplus.obj_attr_array[i].mask & PVFS_ATTR_META_DIST);
+                 assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist);
+                 assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist_size > 0);
+             }
+             if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DFILES)
+             {
+                 assert(sm_p->u.readdirplus.obj_attr_array[i].mask & PVFS_ATTR_META_DFILES);
+                 assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_array);
+                 assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count > 0);
+             }
              for (j = 0; j < sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count; j++) 
              {
                  sm_p->u.readdirplus.input_handle_array[nhandles].handle = 
@@ -840,7 +849,7 @@ static int readdirplus_cleanup(PINT_client_sm *sm_p,
                 PVFS_util_object_to_sys_attr_mask(sm_p->u.readdirplus.obj_attr_array[i].mask);
             if (readdirplus_resp->attr_array[i].objtype == PVFS_TYPE_METAFILE)
             {
-                if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
+                if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST)
                 {
                     PVFS_size (*logical_file_size)(void* params,
                                                    uint32_t num_handles,
