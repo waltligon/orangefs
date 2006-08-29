@@ -12,6 +12,7 @@ TESTSRC += \
 	$(DIR)/getdents.c \
 	$(DIR)/readwritex.c \
 	$(DIR)/vecio_test.c \
+	$(DIR)/stat.c \
 	$(DIR)/xio_test.c
 
 MPIMISCSRC += \
@@ -23,6 +24,7 @@ MPIMISCSRC += \
 MPITESTSRC += $(DIR)/openg-mpi.c $(DIR)/open.c
 
 MODCFLAGS_$(DIR)/getdents.c = -D_GNU_SOURCE
+MODCFLAGS_$(DIR)/stat.c = -D_GNU_SOURCE
 MODLDFLAGS_$(DIR) = -lssl -lcrypto
 
 LDFLAGS_$(DIR) = -lssl -lcrypto
