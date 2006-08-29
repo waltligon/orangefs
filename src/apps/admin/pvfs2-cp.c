@@ -70,6 +70,7 @@ typedef struct file_object_s {
     } u;
 } file_object;
 
+static PVFS_hint * hints = NULL;
 
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
@@ -132,6 +133,8 @@ int main (int argc, char ** argv)
 	return(-1);
     }
 
+    PINT_hint_add_environment_hints(& hints);
+    
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
@@ -198,6 +201,7 @@ int main (int argc, char ** argv)
     {
 	print_timings(time2-time1, total_written);
     }
+    
     ret = 0;
 
 main_out:
@@ -205,6 +209,8 @@ main_out:
     PVFS_sys_finalize();
     free(user_opts);
     free(buffer);
+    
+    PVFS_free_hint(& hints);
     return(ret);
 }
 
@@ -331,7 +337,7 @@ static size_t generic_read(file_object *src, char *buffer,
 	    return (ret);
 	}
 	ret = PVFS_sys_read(src->u.pvfs2.ref, file_req, offset,
-		buffer, mem_req, credentials, &resp_io, NULL);
+		buffer, mem_req, credentials, &resp_io, hints);
 	if (ret == 0)
 	{
             PVFS_Request_free(&mem_req);
@@ -363,7 +369,7 @@ static size_t generic_write(file_object *dest, char *buffer,
 	    return(ret);
 	}
 	ret = PVFS_sys_write(dest->u.pvfs2.ref, file_req, offset,
-		buffer, mem_req, credentials, &resp_io, NULL);
+		buffer, mem_req, credentials, &resp_io, hints);
 	if (ret == 0) 
         {
             PVFS_Request_free(&mem_req);
@@ -484,7 +490,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 	    ret = PVFS_sys_lookup(obj->u.pvfs2.fs_id, obj->u.pvfs2.pvfs2_path,
                                   credentials, &resp_lookup,
-                                  PVFS2_LOOKUP_LINK_FOLLOW, NULL);
+                                  PVFS2_LOOKUP_LINK_FOLLOW, hints);
 	    if (ret < 0)
 	    {
 		PVFS_perror("PVFS_sys_lookup", ret);
@@ -553,13 +559,13 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 	ret = PVFS_sys_ref_lookup(parent_ref.fs_id, entry_name,
                                   parent_ref, credentials, &resp_lookup,
-                                  PVFS2_LOOKUP_LINK_FOLLOW, NULL);
+                                  PVFS2_LOOKUP_LINK_FOLLOW, hints);
 
         if ((ret == 0) && (open_type == OPEN_SRC))
         {
             memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
             ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                                   credentials, &resp_getattr, NULL);
+                                   credentials, &resp_getattr, hints);
             if (ret)
             {
                 fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",
@@ -628,7 +634,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
             
 		ret = PVFS_sys_create(entry_name, parent_ref, 
                                       obj->u.pvfs2.attr, credentials,
-                                      new_dist, &resp_create, NULL);
+                                      new_dist, &resp_create, hints);
 		if (ret < 0)
 		{
 		    PVFS_perror("PVFS_sys_create", ret); 
@@ -662,7 +668,7 @@ static int generic_cleanup(file_object *src, file_object *dest,
     /* preserve permissions doing a pvfs2 => pvfs2 copy */
     if ((src->fs_type == PVFS2_FILE) && (dest->fs_type == PVFS2_FILE))
     {
-        PVFS_sys_setattr(dest->u.pvfs2.ref, src->u.pvfs2.attr, credentials, NULL);
+        PVFS_sys_setattr(dest->u.pvfs2.ref, src->u.pvfs2.attr, credentials, hints);
     }
 
     if ((src->fs_type == UNIX_FILE) && (src->u.ufs.fd != -1))

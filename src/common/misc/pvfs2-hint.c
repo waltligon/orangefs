@@ -17,7 +17,8 @@ struct hint_internal{
 static const struct hint_internal hint_types[NUMBER_HINT_TYPES] = {
     {1, "REQUEST_ID"},
     {0, "CREATE_SET_DATAFILE_NODES"},
-    {0, "CREATE_SET_METAFILE_NODE"}
+    {0, "CREATE_SET_METAFILE_NODE"},
+    {1, "REQUEST_SCHEDULER"}
 };
 
 enum pvfs2_hint_type PVFS_hint_get_type(const char * hint_str){
@@ -188,6 +189,73 @@ void PVFS_free_hint(
     *hint = NULL;
 }
 
+/*
+ * example environment variable
+ * PVFS2_HINTS =
+ *'REQUEST_ID:blubb+CREATE_SET_DATAFILE_NODES:localhost,localhost'
+ */
+int PINT_hint_add_environment_hints(PVFS_hint ** out_hint)
+{
+    char * env;
+    char * env_copy;
+    char * save_ptr;
+    char * aktvar;
+    int len;
+    if( out_hint == NULL )
+    {
+        return 1;
+    }
+    env = getenv("PVFS2_HINTS");
+    if( env == NULL )
+    {
+        return 0;
+    }
+    len = strlen(env);
+    env_copy = (char *) malloc(sizeof(char) * (len+1));
+    strncpy(env_copy, env, len+1);
+    
+    /* parse hints and do not overwrite already specified hints !*/
+    aktvar = strtok_r(env_copy, "+", & save_ptr);      
+    while( aktvar != NULL )
+    {
+        enum pvfs2_hint_type hint_type;
+        char * rest;
+        
+        rest = index(aktvar, ':');
+        if (rest == NULL)
+        {
+            gossip_err("Environment variable PVFS2_HINTS is malformed starting with: %s\n",
+                save_ptr);
+            free(env_copy);
+            return 0; 
+        }
+        
+        *rest = 0;
+        
+        hint_type = PVFS_hint_get_type(aktvar);
+        if( hint_type == -1)
+        {
+            gossip_err("Environment variable PVFS2_HINTS is malformed, unknown "
+                " hint name: %s\n", aktvar);
+        }
+        else
+        {
+            char * old_hint;
+            old_hint = PVFS_get_hint(*out_hint, hint_type);
+            
+            /* do not overwrite old hints */
+            if ( old_hint == NULL )
+            {
+                PVFS_add_hint( out_hint, hint_type, rest+1 );
+            }
+        }
+        
+        aktvar = strtok_r(NULL, "+", & save_ptr);
+    }
+    
+    free(env_copy);
+    return 1;
+}
 
 
 /*

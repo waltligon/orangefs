@@ -238,7 +238,8 @@ PVFS_error PVFS_isys_create(
     int num_dfiles_req = 0;
     PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-
+    char * hintvalue;
+    
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
 
     if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
@@ -322,9 +323,21 @@ PVFS_error PVFS_isys_create(
     /* If an application hint has been provided, use that to request dfile
        else, if a tabfile hint has been provided, use that instead*/
     num_dfiles_req = 0;
+    /* hints allow to override this behavior, e.g. for MPI */
+    hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_DATAFILE_NODES);
+    
     if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
         num_dfiles_req = attr.dfile_count;
+    }
+    else if (hintvalue)
+    { 
+        while( (hintvalue = rindex(hintvalue, ',')))
+        {    
+            hintvalue++;
+            num_dfiles_req++;
+        }
+        num_dfiles_req++;
     }
     else
     {
@@ -654,6 +667,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
+    hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_DATAFILE_NODES);
+    
     memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
     /* allocate msgarray and set msgarray_count */
@@ -706,12 +721,17 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 	 * If the user parses a hint to explicity set the hostnames for the 
 	 * datafiles use these values!
 	 */
-    hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_DATAFILE_NODES);
     if ( hintvalue ){
         int tokens = 0;
+        char * hintcpy;
         char * act_hostname;    
-        char * save_ptr;    
-        act_hostname = strtok_r(hintvalue, ",", & save_ptr);         
+        char * save_ptr;
+        char * hintbuff;
+        hintbuff = (char *) malloc((strlen(hintvalue)+1)*sizeof(char));
+        hintcpy = hintbuff;
+        strcpy(hintcpy, hintvalue);    
+        
+        act_hostname = strtok_r(hintcpy, ",", & save_ptr);         
         while ( act_hostname ){
             if ( tokens >= sm_p->u.create.num_data_files){
                 gossip_err("Datafiles given by hint are not valid, "
@@ -721,7 +741,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
                 return 1;                
             }
             ret = PINT_cached_config_get_one_server_str(
-                hintvalue,
+                act_hostname,
                 server_config,
                 sm_p->object_ref.fs_id,
                 & sm_p->u.create.data_server_addrs[tokens],
@@ -737,6 +757,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
             act_hostname = strtok_r(NULL, ",", & save_ptr);
             tokens++;
         }  
+        free(hintbuff);
     }else{	
         ret = PINT_cached_config_get_next_io(
             server_config,

@@ -8,11 +8,13 @@
 enum pvfs2_hint_type{
     REQUEST_ID = 0, 
 /*
- * separate multiple tokens with komma ","
+ * separate multiple tokens in a hint with komma ",", "+" should not be used 
+ * within a hint's key/value
  */
     CREATE_SET_DATAFILE_NODES = 1,
     CREATE_SET_METAFILE_NODE = 2,
-    NUMBER_HINT_TYPES = 3  
+    REQUEST_SCHEDULER, /* queue, schedule */
+    NUMBER_HINT_TYPES 
 };
 
 typedef struct pvfs2_hint_t{
@@ -47,6 +49,11 @@ int                  PVFS_hint_get_count(void);
     
 int PINT_hint_encode(const PVFS_hint * hint, char * buffer, int * out_length, int max_length);
 int PINT_hint_decode(PVFS_hint ** out_hint, const char * buffer, int * out_length);
+
+/*
+ * function allows users to specify hints in an environment variable.
+ */
+int PINT_hint_add_environment_hints(PVFS_hint ** out_hint);
 
 #endif /*PVFS2HINT_H_*/
 

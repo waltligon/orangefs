@@ -70,7 +70,6 @@ int main(
     char **argv)
 {
     int ret = -1, err = 0;
-    int i;
     PVFS_fs_id fs_id;
     struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = { 0 };

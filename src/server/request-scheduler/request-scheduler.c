@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <string.h>
 
 #include "request-scheduler.h"
 #include "quickhash.h"
@@ -74,7 +75,6 @@ struct req_sched_element
     struct timeval tv;			/* used for timer events */
     int readonly_flag;                  /* indicates a read only operation */
 };
-
 
 /* hash table */
 static struct qhash_table *req_sched_table;
@@ -268,11 +268,11 @@ int PINT_req_sched_target_handle(
 	*fs_id = req->u.io.fs_id;
 	return (0);
     case PVFS_SERV_SMALL_IO:
-        if(req->u.small_io.io_type == PVFS_IO_WRITE)
-            *readonly_flag = 0;
-        *handle = req->u.small_io.handle;
-        *fs_id = req->u.small_io.fs_id;
-        return (0);
+    if(req->u.small_io.io_type == PVFS_IO_WRITE)
+        *readonly_flag = 0;
+    *handle = req->u.small_io.handle;
+    *fs_id = req->u.small_io.fs_id;
+    return (0);
     case PVFS_SERV_GETATTR:
 	*handle = req->u.getattr.handle;
 	*fs_id = req->u.getattr.fs_id;
@@ -321,6 +321,7 @@ int PINT_req_sched_target_handle(
 	*fs_id = req->u.flush.fs_id;
 	return (0);
     case PVFS_SERV_MGMT_MIGRATE:
+    /* for testing allow on metadataserver parallel ops */
     *readonly_flag = 0;
     *handle = req->u.mgmt_migrate.handle;
     *fs_id = req->u.mgmt_migrate.fs_id;
@@ -405,13 +406,14 @@ int PINT_req_sched_post(
     int readonly_flag = 0;
     struct qlist_head *iterator;
     int tmp_flag;
+    char * hint;
 
     /* find the handle */
     ret = PINT_req_sched_target_handle(in_request, req_index, &handle, &fs_id, 
 	&readonly_flag);
     if (ret < 0)
     {
-	return (ret);
+	   return (ret);
     }
     if(ret == 1)
     {
@@ -445,7 +447,7 @@ int PINT_req_sched_post(
 							     req_sched_element));
     if (!tmp_element)
     {
-	return (-errno);
+	   return (-errno);
     }
 
     tmp_element->req_ptr = in_request;
@@ -680,10 +682,30 @@ int PINT_req_sched_post(
 	    ret = 0;
 	}
     }
-    
-    tmp_element->state = REQ_SCHEDULED;
-    ret = 1;
 
+    hint = PVFS_get_hint(in_request->hints, REQUEST_SCHEDULER);
+    if ( hint != NULL)
+    {
+        if( strcmp(hint, "queue") == 0 )
+        {
+            gossip_debug(
+                GOSSIP_REQ_SCHED_DEBUG,
+                "REQ SCHED hint received, queue element for handle: %llu\n",
+                llu(handle));
+            tmp_element->state = REQ_QUEUED;
+            ret = 0;
+        }
+        else if( strcmp(hint, "schedule") == 0 )
+        {
+            gossip_debug(
+                GOSSIP_REQ_SCHED_DEBUG,
+                "REQ SCHED hint received, SCHEDULE element for handle: %llu\n",
+                llu(handle));
+            tmp_element->state = REQ_SCHEDULED;
+            ret = 1;
+        }
+    }
+  
     /* add this element to the list */
     tmp_element->list_head = tmp_list;
     qlist_add_tail(&(tmp_element->list_link), &(tmp_list->req_list));
@@ -913,7 +935,7 @@ int PINT_req_sched_release(
     struct req_sched_element *tmp_element = NULL;
     struct req_sched_list *tmp_list = NULL;
     struct req_sched_element *next_element = NULL;
-
+    
     /* NOTE: for now, this function always returns immediately- no
      * need to fill in the out_id
      */
@@ -952,6 +974,7 @@ int PINT_req_sched_release(
 	}
 	else
 	{
+               
 	    /* something is queued behind this request */
 	    /* find the next request, change its state, and add it to
 	     * the queue of requests that are ready to be scheduled
@@ -959,14 +982,15 @@ int PINT_req_sched_release(
 	    next_element = qlist_entry((tmp_list->req_list.next),
 				       struct req_sched_element,
 				       list_link);
-	    /* skip it if the top queue item is already ready for
-	     * scheduling 
-	     */
-	    if (next_element->state != REQ_READY_TO_SCHEDULE &&
-		next_element->state != REQ_SCHEDULED)
-	    {
-		next_element->state = REQ_READY_TO_SCHEDULE;
-		qlist_add_tail(&(next_element->ready_link), &ready_queue);
+
+    	    /* skip it if the top queue item is already ready for
+    	     * scheduling 
+    	     */
+    	    if (next_element->state != REQ_READY_TO_SCHEDULE &&
+    		next_element->state != REQ_SCHEDULED)
+    	    {
+        		next_element->state = REQ_READY_TO_SCHEDULE;
+        		qlist_add_tail(&(next_element->ready_link), &ready_queue);
 
                 if(next_element->req_ptr->op == PVFS_SERV_IO)
                 {
@@ -1022,7 +1046,8 @@ int PINT_req_sched_release(
                         }
                     }
                 }
-	    }
+	       }
+        print_req_scheduler_queues(tmp_list);
 	}
 	sched_count--;
     }
