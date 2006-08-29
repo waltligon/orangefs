@@ -597,6 +597,8 @@ int main(int argc, char **argv)
         {
             int unexpected_msg = 0;
             struct PINT_smcb *smcb = server_completed_job_p_array[i];
+            gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: job "
+                    "completed smcb %p\n", smcb);
 
             /* Completed jobs might be ongoing, or might be new
              * (unexpected) ones.  We handle the first step of either
@@ -1853,14 +1855,6 @@ int server_state_machine_complete(PINT_smcb *smcb)
         free(s_op->unexp_bmi_buff.buffer);
     }
 
-    /* free the operation structure itself */
-    /* moved to terminate function
-    PINT_smcb_free(&smcb); 
-    */
-
-    /* we didn't post an operation, so by returning DEFERRED
-     * we will never run again
-     */
     return SM_ACTION_TERMINATE;
 }
 

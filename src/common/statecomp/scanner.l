@@ -31,6 +31,7 @@ extern YYSTYPE yylval;
 extern FILE *out_file;
 extern char *in_file_name;
 void produce_listing(int line, char *listing);
+static void lexerr(void);
 extern int yylex(void);
 extern void yyerror(char *);
 
@@ -62,7 +63,7 @@ string      ["][^"]*["]
 float1      [-+]?[0-9]+"."[0-9]*([eE][-+]?[0-9]+)?
 float2      [-+]?"."[0-9]+([eE][-+]?[0-9]+)?
 float3      [-+]?[0-9]+[eE][-+]?[0-9]+
-int         [-+][0-9]+
+int         [-+]?[0-9]+
 id          [_a-zA-Z][_0-9a-zA-Z]*
 w           [ \t\n]*
 
@@ -109,13 +110,18 @@ w           [ \t\n]*
 
 
 <CODE>{id}     	{LIST; yylval.c = yytext; return(IDENTIFIER);}
-<CODE>{int}    	{LIST; yylval.c = yytext; return(INTEGER);}
+<CODE>{int}    	{LIST; yylval.c = yytext; return(INTVAL);}
 
 <CODE>"\n"	{MAKELIST; line++;}
 <CODE>[ \t]+	{LIST; /* eat white space */ }
-<*>.		{LIST; fprintf(stderr,"scanner error bad char %s\n",yytext);}
+<*>.		{LIST; lexerr();}
 
 %%
+
+static void lexerr(void)
+{
+    fprintf(stderr,"scanner error line %d: bad char %s\n", line, yytext);
+}
 
 /*
  * Local variables:

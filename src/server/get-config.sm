@@ -19,16 +19,72 @@ static PINT_sm_action getconfig_cleanup(
 static PINT_sm_action getconfig_init(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
+/*******************/
+static PINT_sm_action start_pjmp_action(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+
+static PINT_sm_action end_pjmp_action(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+
+static PINT_sm_action st1_action(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+
+static PINT_sm_action st2_action(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+
+static PINT_sm_action st3_action(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+/*******************/
+	//	success => init;
+
 %%
 
-machine pvfs2_get_config_sm(prelude, init, final_response, cleanup)
+machine pvfs2_server_test_pjmp_sm(st1, st2, st3)
+{
+    state st1
+    {
+        run st1_action;
+        default => st2;
+    }
+
+    state st2
+    {
+        run st2_action;
+        default => st3;
+    }
+
+    state st3
+    {
+        run st3_action;
+	default => terminate;
+    }
+
+}
+
+machine pvfs2_get_config_sm(prelude, init, final_response, cleanup
+        ,start_pjmp, end_pjmp)
 {
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		success => init;
+		success => start_pjmp;
 		default => final_response;
 	}
+
+        state start_pjmp
+        {
+            pjmp start_pjmp_action
+            {
+                1 => pvfs2_server_test_pjmp_sm;
+            }
+            default => end_pjmp;
+        }
+
+        state end_pjmp
+        {
+            run end_pjmp_action;
+            default => init;
+        }
 
 	state init
 	{
@@ -51,6 +107,61 @@ machine pvfs2_get_config_sm(prelude, init, final_response, cleanup)
 
 %%
 
+/*******************/
+static PINT_sm_action start_pjmp_action(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int i;
+    for (i = 0; i < 4; i++)
+    {
+        struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
+        s_op->op = i; /* used in print to ID task */
+        PINT_sm_push_frame(smcb, 1, s_op);
+    }
+    js_p->error_code = 0;
+    return SM_ACTION_DEFERRED;
+}
+
+static PINT_sm_action end_pjmp_action(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int i;
+    for (i = 0; i < 4; i++)
+    {
+        struct PINT_server_op *s_op = PINT_sm_pop_frame(smcb);
+        free(s_op);
+    }
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action st1_action(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    fprintf(stderr,"RUNNING ACTION: ST1 TASK: T%d\n", s_op->op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action st2_action(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    fprintf(stderr,"RUNNING ACTION: ST2 TASK: T%d\n", s_op->op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action st3_action(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    fprintf(stderr,"RUNNING ACTION: ST3 TASK: T%d\n", s_op->op);
+    js_p->error_code = 0;
+    return SM_ACTION_TERMINATE;
+}
+/*******************/
 
 /*
  * Function: getconfig_init

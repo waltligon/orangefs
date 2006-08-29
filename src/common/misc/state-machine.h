@@ -39,6 +39,12 @@
  * function.  See src/server/server-state-machine.c for examples.
  */
 
+struct PINT_frame_s
+{
+    int task_id;
+    void *frame;
+};
+
 /* State machine control block - one per running instance of a state
  * machine
  */
@@ -50,7 +56,7 @@ typedef struct PINT_smcb
     int framestackptr;
     struct PINT_state_s *current_state;
     struct PINT_state_s *state_stack[PINT_STATE_STACK_SIZE];
-    void *frame_stack[PINT_FRAME_STACK_SIZE];
+    struct PINT_frame_s frame_stack[PINT_FRAME_STACK_SIZE];
     /* usage specific routinet to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int);
     /* state machine context and control variables */
@@ -60,6 +66,7 @@ typedef struct PINT_smcb
     int op_terminate; /* indicates SM is ready to terminate */
     int op_cancelled; /* indicates SM operation was cancelled */
     int children_running; /* the number of child SMs running */
+    /* add a lock here */
     job_context_id context; /* job context when waiting for children */
     int (*terminate_fn)(struct PINT_smcb *, job_status_s *);
     void *user_ptr; /* external user pointer */
@@ -193,9 +200,10 @@ void PINT_smcb_free(struct PINT_smcb **);
 struct PINT_state_s *PINT_pop_state(struct PINT_smcb *);
 void PINT_push_state(struct PINT_smcb *, struct PINT_state_s *);
 void *PINT_sm_frame(struct PINT_smcb *, int);
-void PINT_sm_push_frame(struct PINT_smcb *smcb, void *frame_p);
+void PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);
 void PINT_sm_set_frame(struct PINT_smcb *smcb);
 void *PINT_sm_pop_frame(struct PINT_smcb *smcb);
+struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id);
 void PINT_sm_start_child_frames(struct PINT_smcb *smcb);
 
 /* This macro is used in calls to PINT_sm_fram() */

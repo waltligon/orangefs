@@ -44,7 +44,11 @@ void yyerror(char *);
  * vim: ts=8 sts=4 sw=4 expandtab
  */
 
+
 %}
+
+%token-table
+%error-verbose
 
 %union{
    int i;
@@ -73,7 +77,7 @@ void yyerror(char *);
 %token <i> SEMICOLON
 %token <i> ARROW
 %token <c> IDENTIFIER
-%token <c> INTEGER
+%token <c> INTVAL
 
 %type <i> .state_body. state_body state_action .NESTED. .EXTERN.
 
@@ -175,7 +179,7 @@ state_action	  : RUN identifier SEMICOLON
 		  	  {gen_state_action($2, SM_PJMP, $<c>-2);}
 		  	 LBRACE
 			  {gen_pjtbl($<c>-2);}
-			 task_list RBRACE SEMICOLON
+			 task_list RBRACE
 		  | JUMP identifier SEMICOLON
 		     {gen_state_action($2, SM_JUMP, $<c>-2);}
 		  ;
@@ -187,7 +191,7 @@ task_list	: task
 task	: return_code
 			{gen_return_code($1);}
 			ARROW identifier SEMICOLON
-			{gen_next_state(SM_NEXT, $4);}
+			{gen_next_state(SM_PJMP, $4);}
 		  ;
 
 transition_list   : transition 
@@ -218,10 +222,22 @@ target  : identifier
 		  ;
 
 return_code	  : SUCCESS {$$ = "0";}
-		  | INTEGER {$$ = enter_string($1);}
+		  | INTVAL {$$ = enter_string($1);}
 		  | identifier {$$ = $1;} /* check for decl */
 		  | DEFAULT {$$ = "-1";}
 		  ;
 
 identifier	  : IDENTIFIER {$$ = enter_string($1);}
 		  ;
+
+%%
+
+void yyerror(char *s)
+{
+	/*
+	fprintf(stderr,"syntax error line %d: %s\n", line, s);
+	*/
+	fprintf(stderr,"syntax error line %d token %d(%s): %s\n",
+			line, yychar, yytname[yychar], s);
+}
+

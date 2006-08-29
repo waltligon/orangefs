@@ -39,6 +39,7 @@ int yyparse (void);
 #endif
 
 
+
 static void initialize(void);
 static void parse_args(int argc, char **argv);
 static void finalize(void);
@@ -64,12 +65,31 @@ char *in_file_name = 0;
 
 int main(int argc, char **argv)
 {
+    int retval;
     initialize();
     parse_args(argc, argv);
     gen_init();
-    yyparse();
-    finalize();
-    return 0;
+    retval = yyparse();
+    switch (retval)
+    {
+        case 0:
+            /* successful parse */
+            finalize();
+            break;
+        case 1:
+            /* syntax error */
+            fprintf(stderr,"yyparse returned syntax error\n");
+            break;
+        case 2:
+            /* out of memory error */
+            fprintf(stderr,"yyparse returned out of memory error\n");
+            break;
+        default:
+            /* unknown error */
+            fprintf(stderr,"yyparse returned unknown error\n");
+            break;
+    }
+    return retval;
 }
 
 static void initialize()
@@ -186,11 +206,7 @@ static void finalize(void)
     free(in_file_name);
 }
 
-void yyerror(char *s)
-{
-    fprintf(stderr,"syntax error line %d: %s\n", line, s);
-}
-
+/* This should be in parser.y but I'll worry with it later - WBL */
 void yywrap(void)
 {
     /*

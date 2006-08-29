@@ -7,6 +7,7 @@
 #ifndef __STATE_MACHINE_FNS_H
 #define __STATE_MACHINE_FNS_H
 
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
@@ -60,13 +61,19 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
     if (smcb->parent_smcb)
     {
         job_id_t id;
+#if 0
         /* acquire lock here */
         if (--smcb->parent_smcb->children_running == 0)
         {
+#endif
             /* wake up parent, through job interface */
-            job_null(0, smcb, 0, r, &id, smcb->context);
+            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                "SM job_null called smcb %p\n", smcb->parent_smcb);
+            job_null(0, smcb->parent_smcb, 0, r, &id, smcb->context);
+#if 0
         }
         /* release lock here */
+#endif
     }
     /* call state machine completion function */
     if (smcb->terminate_fn)
@@ -91,10 +98,11 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
     const char * machine_name;
 
     if (!(smcb) || !(smcb->current_state) ||
-            !(smcb->current_state->flag == SM_RUN) ||
+            !(smcb->current_state->flag == SM_RUN ||
+              smcb->current_state->flag == SM_PJMP) ||
             !(smcb->current_state->action.func))
     {
-        gossip_err("SM invoke called in invalid smcb\n");
+        gossip_err("SM invoke called on invalid smcb or state\n");
         return -1;
     }
 
@@ -125,24 +133,40 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
                  state_name,
                  r->error_code);
 
+    if (smcb->current_state->flag == SM_PJMP)
+    {
+        /* start child SMs */
+        PINT_sm_start_child_frames(smcb);
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                "SM (%p) started %d child frames\n",
+                smcb, smcb->children_running);
+        if (smcb->children_running > 0)
+            retval = SM_ACTION_DEFERRED;
+        else
+            retval = SM_ACTION_COMPLETE;
+    }
+
     /* process return code */
     switch (retval)
     {
     case SM_ACTION_TERMINATE :
-        {
+            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                    "SM Terminates (%p)\n", smcb);
             smcb->op_terminate = 1;
-        }
-    case SM_ACTION_COMPLETE :
-    case SM_ACTION_DEFERRED :
-        {
-            return retval;
-        }
-    default :
-        {
-            /* error */
-            gossip_err("SM returned invalid return code %d\n", retval);
             break;
-        }
+    case SM_ACTION_COMPLETE :
+            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                    "SM Returns Complete (%p)\n", smcb);
+            break;
+    case SM_ACTION_DEFERRED :
+            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                    "SM Returns Deferred (%p)\n", smcb);
+            break;
+    default :
+            /* error */
+            gossip_err("SM returned invalid return code %d (%p)\n",
+                    retval, smcb);
+            break;
     }
 
     return retval;
@@ -187,6 +211,14 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
     }
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
             "SM next smcb %p op %d\n",smcb,(smcb)->op);
+    if (smcb->children_running > 0)
+    {
+        if (--smcb->children_running > 0)
+        {
+            /* SM is still deferred */
+            return SM_ACTION_DEFERRED;
+        }
+    }
     /* loop while invoke of new state returns COMPLETED */
     do {
         /* loop while returning from nested SM */
@@ -214,13 +246,13 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 	    {
                 if (!(transtbl[i].flag == SM_TERM))
                 {
-	            gossip_lerr("Error: state machine reached terminate"
-                            " without returning SM_ACTION_TERMINATE\n");
-                }
-                {
-                if (!smcb->op_terminate)
 	            gossip_lerr("Error: state machine returned"
                            " SM_ACTION_TERMINATE but didn't reach terminate\n");
+                }
+                if (!smcb->op_terminate)
+                {
+	            gossip_lerr("Error: state machine reached terminate"
+                            " without returning SM_ACTION_TERMINATE\n");
                 }
                 /* process terminating SM */
                 PINT_state_machine_terminate(smcb, r);
@@ -383,15 +415,16 @@ int PINT_smcb_alloc(
     /* if frame_size given, allocate a frame */
     if (frame_size > 0)
     {
-        (*smcb)->frame_stack[0] = malloc(frame_size);
-        if (!((*smcb)->frame_stack[0]))
+        void *new_frame = malloc(frame_size);
+        if (!new_frame)
         {
             free(*smcb);
             *smcb = NULL;
             return -PVFS_ENOMEM;
         }
         /* zero out all members */
-        memset((*smcb)->frame_stack[0], 0, frame_size);
+        memset(new_frame, 0, frame_size);
+        PINT_sm_push_frame(*smcb, 0, new_frame);
     }
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
@@ -404,39 +437,40 @@ int PINT_smcb_alloc(
 }
 
 /* Function: PINT_smcb_free
-   Params: pointer to an smcb pointer
-   Returns: nothing, but sets the pointer to NULL
-   Synopsis: this frees an smcb struct, including its frame stack
-             and anything on the frame stack
+ * Params: pointer to an smcb pointer
+ * Returns: nothing, but sets the pointer to NULL
+ * Synopsis: this frees an smcb struct, including
+ * anything on the frame stack with a zero task_id
  */
 void PINT_smcb_free(struct PINT_smcb **smcb)
 {
     int i;
-    if (smcb)
+    assert(smcb && *smcb);
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+             "SM free smcb %p op %d\n",*smcb,(*smcb)->op);
+    for (i = 0; i < PINT_FRAME_STACK_SIZE; i++)
     {
-        if (*smcb)
+        if ((*smcb)->frame_stack[i].frame &&
+            (*smcb)->frame_stack[i].task_id == 0)
         {
-            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                     "SM free smcb %p op %d\n",*smcb,(*smcb)->op);
-            for (i = 0; i < PINT_FRAME_STACK_SIZE; i++)
-            {
-                if ((*smcb)->frame_stack[i])
-                {
-                    /* DO we really want to do this??? */
-                    free((*smcb)->frame_stack[i]);
-                }
-            }
-            free(*smcb);
+            /* only free if task_id is 0 */
+            free((*smcb)->frame_stack[i].frame);
         }
-        (*smcb) = (struct PINT_smcb *)0;
+        (*smcb)->frame_stack[i].task_id = 0;
+        (*smcb)->frame_stack[i].frame = NULL;
     }
+    free(*smcb);
+    (*smcb) = (struct PINT_smcb *)0;
 }
 
 /* Function: PINT_pop_state
-   Params: pointer to an smcb pointer
-   Returns: 
-   Synopsis: 
+ * Params: pointer to an smcb pointer
+ * Returns: 
+ * Synopsis: pushes a SM pointer onto a stack for
+ *      implementing nested SMs - called by the
+ *      "next" routine above
  */
+/* should probably be STATIC - WBL */
 struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
 {
     assert(smcb->stackptr > 0);
@@ -445,10 +479,13 @@ struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
 }
 
 /* Function: PINT_push_state
-   Params: pointer to an smcb pointer
-   Returns: 
-   Synopsis: 
+ * Params: pointer to an smcb pointer
+ * Returns: 
+ * Synopsis: pops a SM pointer off of a stack for
+ *      implementing nested SMs - called by the
+ *      "next" routine above
  */
+/* should probably be STATIC - WBL */
 void PINT_push_state(struct PINT_smcb *smcb,
 				   struct PINT_state_s *p)
 {
@@ -458,31 +495,37 @@ void PINT_push_state(struct PINT_smcb *smcb,
 }
 
 /* Function: PINT_sm_frame
-   Params: pointer to smcb, stack index
-   Returns: pointer to frame
-   Synopsis: returns a frame off of the frame stack
+ * Params: pointer to smcb, stack index
+ * Returns: pointer to frame
+ * Synopsis: returns a frame off of the frame stack
  */
 void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
 {
-    return smcb->frame_stack[smcb->framebaseptr + index];
+    assert(smcb->framebaseptr + index < smcb->framestackptr);
+    
+    return smcb->frame_stack[smcb->framebaseptr + index].frame;
 }
 
 /* Function: PINT_sm_push_frame
-   Params: pointer to smcb, void pointer for new frame
-   Returns: 
-   Synopsis: pushes a new frame pointer onto the frame_stack
+ * Params: pointer to smcb, void pointer for new frame
+ * Returns: 
+ * Synopsis: pushes a new frame pointer onto the frame_stack
  */
-void PINT_sm_push_frame(struct PINT_smcb *smcb, void *frame_p)
+void PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p)
  {
+    int index;
     assert(smcb->framestackptr < PINT_FRAME_STACK_SIZE);
 
-    smcb->frame_stack[smcb->framestackptr++] = frame_p;
+    index = smcb->framestackptr;
+    smcb->framestackptr++;
+    smcb->frame_stack[index].task_id = task_id;
+    smcb->frame_stack[index].frame = frame_p;
  }
 
 /* Function: PINT_sm_set
-   Params: pointer to smcb
-   Returns: 
-   Synopsis: This moves the framebaseptr up to the stop of the frame_stack
+ * Params: pointer to smcb
+ * Returns: 
+ * Synopsis: This moves the framebaseptr up to the stop of the frame_stack
  */
 void PINT_sm_set_frame(struct PINT_smcb *smcb)
 {
@@ -491,13 +534,13 @@ void PINT_sm_set_frame(struct PINT_smcb *smcb)
     if (smcb->framestackptr == 0)
         smcb->framebaseptr = 0;
     else
-        smcb->framebaseptr = smcb->framestackptr-1;
+        smcb->framebaseptr = smcb->framestackptr - 1;
 }
 
 /* Function: PINT_sm_pop_frame
-   Params: pointer to an smcb pointer
-   Returns: frame pointer
-   Synopsis: pops a frame pointer from the frame_stack and returns it
+ * Params: pointer to an smcb pointer
+ * Returns: frame pointer
+ * Synopsis: pops a frame pointer from the frame_stack and returns it
  */
 void *PINT_sm_pop_frame(struct PINT_smcb *smcb)
 {
@@ -505,36 +548,56 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb)
     void *frame;
     assert(smcb->framestackptr > smcb->framebaseptr);
 
-    index = --smcb->framestackptr;
-    frame = smcb->frame_stack[index];
-    smcb->frame_stack[index + 1] = NULL; /* so we won't free on smcb_free */
+    smcb->framestackptr--;
+    index = smcb->framestackptr;
+    frame = smcb->frame_stack[index].frame;
+    smcb->frame_stack[index].task_id = 0;
+    /* so we won't free on smcb_free */
+    smcb->frame_stack[index].frame = NULL;
     return frame;
 }
 
-/* Function: DUMMY FUNCTION
-   Params: 
-   Returns: 
-   Synopsis: 
+/* Function: PINT_sm_task_map
+ * Params: smcb and an integer task_id
+ * Returns: The state machine a new child state should execute
+ * Synopsis: Uses the task_id and task jump table from the SM
+ *      code to decide which SM a new child should run.  Called
+ *      by the start_child_frames function
  */
-struct PINT_state_s  *PINT_sm_something(void)
+/* should probably be STATIC - WBL */
+struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id)
 {
-    return NULL;
+    struct PINT_pjmp_tbl_s *pjmptbl;
+    int i;
+
+    pjmptbl = smcb->current_state->pjtbl;
+    for (i = 0; ; i++)
+    {
+        if (pjmptbl[i].return_value == task_id ||
+                pjmptbl[i].return_value == -1)
+            return pjmptbl[i].state_machine->first_state;
+    }
 }
 
 /* Function: PINT_sm_start_child_frames
-   Params: pointer to an smcb pointer
-   Returns: 
-   Synopsis: This starts all the enw child SMs based on the frame_stack
+ * Params: pointer to an smcb pointer
+ * Returns: number of children started
+ * Synopsis: This starts all the enw child SMs based on the frame_stack
+ *      This is called by the invoke function above which expects the
+ *      number of children to be returned to decide if the state is
+ *      deferred or not.
  */
+/* should probably be STATIC - WBL */
 void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
 {
-    int i;
+    int i, retval;
     struct PINT_smcb *new_sm;
-    job_status_s *r;
+    job_status_s r;
 
     assert(smcb);
 
-    for(i = smcb->framebaseptr; i < smcb->framebaseptr; i++)
+    /* framebaseptr is the current SM, start at +1 */
+    for(i = smcb->framebaseptr + 1; i < smcb->framestackptr; i++)
     {
         /* allocate smcb */
         PINT_smcb_alloc(&new_sm, smcb->op, 0, NULL,
@@ -544,11 +607,18 @@ void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
         /* increment parent's counter */
         smcb->children_running++;
         /* assign frame */
-        PINT_sm_push_frame(new_sm, smcb->frame_stack[i]);
+        PINT_sm_push_frame(new_sm, smcb->frame_stack[i].task_id,
+                smcb->frame_stack[i].frame);
         /* locate SM to run */
-        new_sm->current_state = PINT_sm_something();
+        new_sm->current_state = PINT_sm_task_map(smcb,
+                smcb->frame_stack[i].task_id);
+
+fprintf(stderr,"child %d task_id %d state %p flag %d func %p\n",
+    i, smcb->frame_stack[i].task_id, new_sm->current_state,
+    new_sm->current_state->flag, new_sm->current_state->action.func);
+
         /* invoke SM */
-        PINT_state_machine_start(new_sm, r);
+        retval = PINT_state_machine_start(new_sm, &r);
     }
 }
 

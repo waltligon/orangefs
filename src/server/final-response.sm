@@ -79,8 +79,8 @@ static PINT_sm_action final_response_release(
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (FR sm) state: release: (error_code = %d)\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op),
+                 "(s_op %p) %s (FR sm) state: release: (error_code = %d)\n",
+                 s_op, PINT_map_server_op_to_string(s_op->req->op),
                  js_p->error_code);
 
     /* this seems a little odd, but since this is the first state of the
@@ -121,9 +121,8 @@ static PINT_sm_action final_response_send_resp(
     
     gossip_debug(
         GOSSIP_SERVER_DEBUG, 
-	"(%p) %s (FR sm) state: send_resp (status = %d)\n",
-	s_op,
-	PINT_map_server_op_to_string(s_op->req->op),
+	"(s_op %p) %s (FR sm) state: send_resp (status = %d)\n",
+	s_op, PINT_map_server_op_to_string(s_op->req->op),
 	s_op->resp.status);
 
     if (js_p->error_code != 0)
@@ -165,7 +164,7 @@ static PINT_sm_action final_response_cleanup(
     char status_string[64] = {0};
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (FR sm) state: cleanup\n",
+                 "(s_op %p) %s (FR sm) state: cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);

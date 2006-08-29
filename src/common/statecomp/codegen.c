@@ -78,7 +78,7 @@ void gen_state_action(char *run_func, int flag, char *state_name)
 	    break;
 	case SM_PJMP:
 	    fprintf(out_file, "\t .flag = SM_PJMP ,\n");
-            fprintf(out_file, "\t .action.nested = &%s ,\n", run_func);
+            fprintf(out_file, "\t .action.func = &%s ,\n", run_func);
             fprintf(out_file,"\t .pjtbl = ST_%s_pjtbl ,\n", state_name);
             fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
 	    break;
@@ -130,6 +130,9 @@ void gen_next_state(int flag, char *new_state)
         fprintf(out_file,",\n");
     }
     switch (flag) {
+	case SM_PJMP:
+	    fprintf(out_file, "\t .state_machine = &%s }", new_state);
+	    break;
 	case SM_NEXT:
 	    fprintf(out_file, "\t .next_state = &ST_%s }", new_state);
 	    break;
