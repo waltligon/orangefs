@@ -8,7 +8,6 @@
 
 #include "pvfs2-sysint.h"
 #include "pint-sysint-utils.h"
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
 #include "PINT-reqproto-encode.h"

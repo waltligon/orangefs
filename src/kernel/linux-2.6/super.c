@@ -218,7 +218,7 @@ static void pvfs2_read_inode(
 
     if (inode->u.generic_ip)
     {
-        pvfs2_panic("Found an initialized inode in pvfs2_read_inode! "
+        gossip_err("ERROR! Found an initialized inode in pvfs2_read_inode! "
                     "Should not have been initialized?\n");
         return;
     }
@@ -767,7 +767,7 @@ struct super_block *pvfs2_get_sb(
 {
     int ret = -EINVAL;
     struct super_block *sb = ERR_PTR(-EINVAL);
-    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_kernel_op_t *new_op;
     pvfs2_mount_sb_info_t mount_sb_info;
 
     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: called with devname %s\n", devname);
@@ -852,13 +852,13 @@ struct super_block *pvfs2_get_sb(
             ret = -EINVAL;
             gossip_err("Invalid superblock obtained from get_sb_nodev (%p)\n", sb);
         }
+        op_release(new_op);
     }
     else
     {
         gossip_err("ERROR: device name not specified.\n");
     }
 
-    op_release(new_op);
 #ifdef HAVE_VFSMOUNT_GETSB
     return ret;
 #else

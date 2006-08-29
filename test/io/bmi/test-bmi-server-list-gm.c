@@ -236,7 +236,7 @@ int main(
     BMI_memfree(client_addr, recv_buffer2, (my_req->size -
 					    (my_req->size / 2)), BMI_RECV);
     BMI_memfree(client_addr, my_ack, sizeof(struct server_ack), BMI_SEND);
-    free(my_req);
+    BMI_unexpected_free(my_req);
 
     /* shutdown the local interface */
     BMI_close_context(context);

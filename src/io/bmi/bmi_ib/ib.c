@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.34.2.2 2006-07-24 17:20:28 slang Exp $
+ * $Id: ib.c,v 1.34.2.3 2006-08-29 10:41:18 kunkel Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1479,7 +1479,7 @@ BMI_ib_rev_lookup(struct method_addr *meth)
  * Build and fill an IB-specific method_addr structure.
  */
 static struct method_addr *ib_alloc_method_addr(ib_connection_t *c,
-                                                const char *hostname, int port)
+                                                char *hostname, int port)
 {
     struct method_addr *map;
     ib_method_addr_t *ibmap;
@@ -1505,7 +1505,7 @@ static struct method_addr *BMI_ib_method_addr_lookup(const char *id)
 {
     char *s, *hostname, *cp, *cq;
     int port;
-    struct method_addr *map = 0;
+    struct method_addr *map = NULL;
 
     /* parse hostname */
     s = string_key("ib", id);  /* allocs a string */
@@ -1653,7 +1653,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
     s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
 	warning("%s: create tcp socket: %m", __func__);
-	return bmi_errno_to_pvfs(errno);
+	return bmi_errno_to_pvfs(-errno);
     }
     hp = gethostbyname(ibmap->hostname);
     if (!hp) {
@@ -1671,7 +1671,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
 	    goto retry;
 	else {
 	    warning("%s: connect to server %s: %m", __func__, peername);
-	    return bmi_errno_to_pvfs(errno);
+	    return bmi_errno_to_pvfs(-errno);
 	}
     }
     ibmap->c = ib_new_connection(s, peername, 0);
@@ -1681,7 +1681,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
 
     if (close(s) < 0) {
 	warning("%s: close sock: %m", __func__);
-	return bmi_errno_to_pvfs(errno);
+	return bmi_errno_to_pvfs(-errno);
     }
     return 0;
 }
@@ -1790,18 +1790,18 @@ static int ib_block_for_activity(int timeout_ms)
 	numfd = 2;
     }
     ret = poll(pfd, numfd, timeout_ms);
+    debug(4, "%s: ret %d rev0 0x%x", __func__, ret, pfd[0].revents);
     if (ret < 0) {
 	if (errno == EINTR)  /* normal, ignore but break */
 	    ret = 0;
 	else
 	    error_errno("%s: poll listen sock", __func__);
     }
-    debug(4, "%s: ret %d rev0 0x%x", __func__, ret, pfd[0].revents);
     return ret;
 }
 
-static void * BMI_ib_memalloc(bmi_size_t len,
-                              enum bmi_op_type send_recv __unused)
+static void *BMI_ib_memalloc(bmi_size_t len,
+                             enum bmi_op_type send_recv __unused)
 {
     return memcache_memalloc(ib_device->memcache, len,
                              ib_device->eager_buf_payload);
@@ -1811,6 +1811,12 @@ static int BMI_ib_memfree(void *buf, bmi_size_t len,
                           enum bmi_op_type send_recv __unused)
 {
     return memcache_memfree(ib_device->memcache, buf, len);
+}
+
+static int BMI_ib_unexpected_free(void *buf)
+{
+    free(buf);
+    return 0;
 }
 
 /*
@@ -1836,12 +1842,22 @@ static int BMI_ib_get_info(int option, void *param)
 }
 
 /*
- * Used to set some optional parameters.  Just ignore.
+ * Used to set some optional parameters and random functions, like ioctl.
  */
-static int BMI_ib_set_info(int option __unused, void *param __unused)
+static int BMI_ib_set_info(int option, void *param __unused)
 {
-    /* XXX: should return -ENOSYS, but 0 now until callers handle
-     * that correctly. */
+    switch (option) {
+    case BMI_DROP_ADDR: {
+	struct method_addr *map = param;
+	ib_method_addr_t *ibmap = map->method_data;
+	free(ibmap->hostname);
+	free(map);
+	break;
+    }
+    default:
+	/* Should return -ENOSYS, but return 0 for caller ease. */
+	break;
+    }
     return 0;
 }
 
@@ -1986,6 +2002,7 @@ const struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_get_info = BMI_ib_get_info,
     .BMI_meth_memalloc = BMI_ib_memalloc,
     .BMI_meth_memfree = BMI_ib_memfree,
+    .BMI_meth_unexpected_free = BMI_ib_unexpected_free,
     .BMI_meth_post_send = BMI_ib_post_send,
     .BMI_meth_post_sendunexpected = BMI_ib_post_sendunexpected,
     .BMI_meth_post_recv = BMI_ib_post_recv,

@@ -1092,6 +1092,38 @@ int BMI_memfree(PVFS_BMI_addr_t addr,
     return (ret);
 }
 
+/** Acknowledge that an unexpected message has been
+ * serviced that was returned from BMI_test_unexpected().
+ *
+ *  \return 0 on success, -errno on failure.
+ */
+int BMI_unexpected_free(PVFS_BMI_addr_t addr,
+		void *buffer)
+{
+    ref_st_p tmp_ref = NULL;
+    int ret = -1;
+
+    /* find a reference that matches this address */
+    gen_mutex_lock(&ref_mutex);
+    tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+    if (!tmp_ref)
+    {
+	gen_mutex_unlock(&ref_mutex);
+	return (bmi_errno_to_pvfs(-EINVAL));
+    }
+    gen_mutex_unlock(&ref_mutex);
+
+    if (!tmp_ref->interface->BMI_meth_unexpected_free)
+    {
+        gossip_err("unimplemented BMI_meth_unexpected_free callback\n");
+        return bmi_errno_to_pvfs(-EOPNOTSUPP);
+    }
+    /* free the memory */
+    ret = tmp_ref->interface->BMI_meth_unexpected_free(buffer);
+
+    return (ret);
+}
+
 /** Pass in optional parameters.
  *
  *  \return 0 on success, -errno on failure.

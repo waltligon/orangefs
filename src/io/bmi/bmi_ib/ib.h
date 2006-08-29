@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.19 2006-06-28 17:40:48 pw Exp $
+ * $Id: ib.h,v 1.19.2.1 2006-08-29 10:41:18 kunkel Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -72,7 +72,7 @@ typedef struct S_buf_head {
 
 /* "private data" part of method_addr */
 typedef struct {
-    const char *hostname;
+    char *hostname;
     int port;
     ib_connection_t *c;
 } ib_method_addr_t;

@@ -414,7 +414,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
 
     assert(opts);
 
-    while((ret = getopt_long(argc, argv, "hvVfa:p:L:",
+    while((ret = getopt_long(argc, argv, "hvVfa:n:p:L:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)

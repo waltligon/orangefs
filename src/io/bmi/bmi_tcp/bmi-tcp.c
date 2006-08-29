@@ -67,6 +67,7 @@ void *BMI_tcp_memalloc(bmi_size_t size,
 int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
 		    enum bmi_op_type send_recv);
+int BMI_tcp_unexpected_free(void *buffer);
 int BMI_tcp_post_send(bmi_op_id_t * id,
 		      method_addr_p dest,
 		      const void *buffer,
@@ -285,28 +286,29 @@ static void bmi_set_sock_buffers(int socket);
 
 /* exported method interface */
 struct bmi_method_ops bmi_tcp_ops = {
-    BMI_tcp_method_name,
-    BMI_tcp_initialize,
-    BMI_tcp_finalize,
-    BMI_tcp_set_info,
-    BMI_tcp_get_info,
-    BMI_tcp_memalloc,
-    BMI_tcp_memfree,
-    BMI_tcp_post_send,
-    BMI_tcp_post_sendunexpected,
-    BMI_tcp_post_recv,
-    BMI_tcp_test,
-    BMI_tcp_testsome,
-    BMI_tcp_testcontext,
-    BMI_tcp_testunexpected,
-    BMI_tcp_method_addr_lookup,
-    BMI_tcp_post_send_list,
-    BMI_tcp_post_recv_list,
-    BMI_tcp_post_sendunexpected_list,
-    BMI_tcp_open_context,
-    BMI_tcp_close_context,
-    BMI_tcp_cancel,
-    BMI_tcp_addr_rev_lookup_unexpected
+    .method_name = BMI_tcp_method_name,
+    .BMI_meth_initialize = BMI_tcp_initialize,
+    .BMI_meth_finalize = BMI_tcp_finalize,
+    .BMI_meth_set_info = BMI_tcp_set_info,
+    .BMI_meth_get_info = BMI_tcp_get_info,
+    .BMI_meth_memalloc = BMI_tcp_memalloc,
+    .BMI_meth_memfree  = BMI_tcp_memfree,
+    .BMI_meth_unexpected_free = BMI_tcp_unexpected_free,
+    .BMI_meth_post_send = BMI_tcp_post_send,
+    .BMI_meth_post_sendunexpected = BMI_tcp_post_sendunexpected,
+    .BMI_meth_post_recv = BMI_tcp_post_recv,
+    .BMI_meth_test = BMI_tcp_test,
+    .BMI_meth_testsome = BMI_tcp_testsome,
+    .BMI_meth_testcontext = BMI_tcp_testcontext,
+    .BMI_meth_testunexpected = BMI_tcp_testunexpected,
+    .BMI_meth_method_addr_lookup = BMI_tcp_method_addr_lookup,
+    .BMI_meth_post_send_list = BMI_tcp_post_send_list,
+    .BMI_meth_post_recv_list = BMI_tcp_post_recv_list,
+    .BMI_meth_post_sendunexpected_list = BMI_tcp_post_sendunexpected_list,
+    .BMI_meth_open_context = BMI_tcp_open_context,
+    .BMI_meth_close_context = BMI_tcp_close_context,
+    .BMI_meth_cancel = BMI_tcp_cancel,
+    .BMI_meth_rev_lookup_unexpected = BMI_tcp_addr_rev_lookup_unexpected
 };
 
 /* module parameters */
@@ -638,6 +640,21 @@ int BMI_tcp_memfree(void *buffer,
         buffer = NULL;
     }
 
+    return (0);
+}
+
+/* BMI_tcp_unexpected_free()
+ * 
+ * Frees memory that was returned from BMI_tcp_test_unexpected()
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_tcp_unexpected_free(void *buffer)
+{
+    if (buffer)
+    {
+	free(buffer);
+    }
     return (0);
 }
 

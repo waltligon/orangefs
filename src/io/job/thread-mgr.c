@@ -182,19 +182,22 @@ static void *bmi_thread_function(void *ptr)
 	    }
 
 	    /* execute callback for each completed unexpected message */
-	    gen_mutex_lock(&bmi_mutex);
-	    for(i=0; i<outcount; i++)
-	    {
-		bmi_unexp_fn(&stat_bmi_unexp_array[i]);
-		bmi_unexp_count--;
-	    }
-	    gen_mutex_unlock(&bmi_mutex);
+            if (outcount > 0)
+            {
+                gen_mutex_lock(&bmi_mutex);
+                for (i=0; i<outcount; i++)
+                {
+                    bmi_unexp_fn(&stat_bmi_unexp_array[i]);
+                    bmi_unexp_count--;
+                }
+                gen_mutex_unlock(&bmi_mutex);
+            }
 
 	    /* set a flag if we are getting as many incoming BMI unexpected
 	     * operations as we can handle to indicate that we should cycle
 	     * quickly 
 	     */
-	    if(outcount == THREAD_MGR_TEST_COUNT)
+	    if (outcount == THREAD_MGR_TEST_COUNT)
 		quick_flag = 1;
 	}
 	else

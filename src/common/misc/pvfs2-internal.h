@@ -46,7 +46,6 @@
 #define METAFILE_DIST_KEYSTR    "md"
 #define SYMLINK_TARGET_KEYSTR   "st"
 
-
 #define IO_MAX_REGIONS 64
 /*
  * Must be a multiple of pagesize (reused for O_DIRECT)

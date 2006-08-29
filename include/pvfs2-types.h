@@ -406,6 +406,29 @@ enum PVFS_server_mode
     PVFS_SERVER_ADMIN_MODE = 2        /* administrative mode */
 };
 
+/* PVFS2 ACL structures */
+typedef struct {
+    int32_t  p_tag;
+    uint32_t p_perm;
+    uint32_t p_id;
+} pvfs2_acl_entry;
+
+/* These defines match that of the POSIX defines */
+#define PVFS2_ACL_UNDEFINED_ID   (-1)
+
+/* p_tag entry in struct posix_acl_entry */
+#define PVFS2_ACL_USER_OBJ    (0x01)
+#define PVFS2_ACL_USER        (0x02)
+#define PVFS2_ACL_GROUP_OBJ   (0x04)
+#define PVFS2_ACL_GROUP       (0x08)
+#define PVFS2_ACL_MASK        (0x10)
+#define PVFS2_ACL_OTHER       (0x20)
+
+/* permissions in the p_perm field */
+#define PVFS2_ACL_READ       (0x04)
+#define PVFS2_ACL_WRITE      (0x02)
+#define PVFS2_ACL_EXECUTE    (0x01)
+
 /* PVFS2 errors
  *
  * Errors are made up of a code to indicate the error type and a class

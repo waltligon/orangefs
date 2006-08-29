@@ -6729,9 +6729,12 @@ echo "$as_me: error: The kernel source tree must have been configured." >&2;}
     fi
     vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/version.h`
     if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
-       { { echo "$as_me:$LINENO: error: The kernel source tree does not appear to be 2.6" >&5
+    	# 2.6.18 moves UTS_RELEASE into its own header
+	if ! grep -q  UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h ; then
+	       { { echo "$as_me:$LINENO: error: The kernel source tree does not appear to be 2.6" >&5
 echo "$as_me: error: The kernel source tree does not appear to be 2.6" >&2;}
    { (exit 1); exit 1; }; }
+	fi
     fi
     # At least up through 2.6.3 needed to write .__modpost.cmd; this changed
     # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
@@ -9782,7 +9785,7 @@ main ()
 			"tmp",
 			NULL,
 			DB_BTREE,
-			DB_CREATE | DB_AUTO_COMMIT,
+			DB_CREATE | DB_AUTO_COMMIT|DB_READ_UNCOMMITTED,
 			0777) != 0)
 	{
 		return 1;
@@ -10588,7 +10591,7 @@ main ()
 			"tmp",
 			NULL,
 			DB_BTREE,
-			DB_CREATE | DB_AUTO_COMMIT,
+			DB_CREATE | DB_AUTO_COMMIT|DB_READ_UNCOMMITTED,
 			0777) != 0)
 	{
 		return 1;
@@ -10673,6 +10676,7 @@ fi;
 fi
 
 if test "x$BUILD_SERVER" = "x1"; then
+		if test "x$with_aio" == xyes ; then
 
 
 echo "$as_me:$LINENO: checking if server lib needs -lrt" >&5
@@ -10786,6 +10790,7 @@ rm -f conftest.err conftest.$ac_objext \
 
 LDFLAGS=$oldldflags
 
+	fi
 fi
 
 case "$host_os" in

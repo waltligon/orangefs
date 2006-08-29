@@ -11,7 +11,6 @@
 #include "pvfs2-storage.h"
 #include "pvfs2-mgmt.h"
 #include "bmi.h"
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
 
@@ -121,42 +120,6 @@ int PINT_cached_config_get_handle_timeout(
 
 int PINT_cached_config_reinitialize(
     struct server_configuration_s *config);
-
-#define map_handle_range_to_extent_list(hrange_list)             \
-do { cur = hrange_list;                                          \
- while(cur) {                                                    \
-     cur_mapping = PINT_llist_head(cur);                         \
-     if (!cur_mapping) break;                                    \
-     assert(cur_mapping->alias_mapping);                         \
-     assert(cur_mapping->alias_mapping->host_alias);             \
-     assert(cur_mapping->handle_range);                          \
-     cur_host_extent_table = (bmi_host_extent_table_s *)malloc(  \
-         sizeof(bmi_host_extent_table_s));                       \
-     if (!cur_host_extent_table) {                               \
-         ret = -ENOMEM;                                          \
-         break;                                                  \
-     }                                                           \
-     cur_host_extent_table->bmi_address =                        \
-         PINT_config_get_host_addr_ptr(                          \
-             config,cur_mapping->alias_mapping->host_alias);     \
-     assert(cur_host_extent_table->bmi_address);                 \
-     cur_host_extent_table->extent_list =                        \
-         PINT_create_extent_list(cur_mapping->handle_range);     \
-     if (!cur_host_extent_table->extent_list) {                  \
-         free(cur_host_extent_table);                            \
-         ret = -ENOMEM;                                          \
-         break;                                                  \
-     }                                                           \
-     /*                                                          \
-       add this host to extent list mapping to                   \
-       config cache object's host extent table                   \
-     */                                                          \
-     ret = PINT_llist_add_to_tail(                               \
-         cur_config_fs_cache->bmi_host_extent_tables,            \
-         cur_host_extent_table);                                 \
-     assert(ret == 0);                                           \
-     cur = PINT_llist_next(cur);                                 \
- } } while(0)
 
 #endif /* __PINT_CACHED_CONFIG_H */
 

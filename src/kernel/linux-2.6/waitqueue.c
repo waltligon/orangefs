@@ -131,8 +131,8 @@ retry_servicing:
         /* failed to get matching downcall */
         if(ret == -ETIMEDOUT)
         { 
-            gossip_err("pvfs2: %s -- wait timed out;. "
-                        "aborting attempt.\n", op_name);
+            gossip_err("pvfs2: %s -- wait timed out; aborting attempt.\n",
+                       op_name);
         }
         op->downcall.status = ret;
     }

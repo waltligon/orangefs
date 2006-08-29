@@ -654,7 +654,6 @@ int main(int argc, char **argv)
                 if (ret < 0)
                 {
                     PVFS_perror_gossip("Error: server_state_machine_start", ret);
-                    free(s_op->unexp_bmi_buff.buffer);
                     /* TODO: tell BMI to drop this address? */
                     /* set return code to zero to allow server to continue
                      * processing 
@@ -987,6 +986,14 @@ static int server_initialize_subsystems(
     ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
                                    &server_config.db_cache_size_bytes);
                                                                       
+    /* this should never fail */
+    assert(ret == 0);
+    ret = trove_collection_setinfo(0, 0, TROVE_ALT_AIO_MODE,
+        &server_config.trove_alt_aio_mode);
+    /* this should never fail */
+    assert(ret == 0);
+    ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
+        &server_config.trove_max_concurrent_io);
     /* this should never fail */
     assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_ALT_AIO_MODE,
@@ -1744,9 +1751,11 @@ static int server_post_unexpected_recv(job_status_s *js_p)
         }
         memset(s_op, 0, sizeof(PINT_server_op));
         s_op->op = BMI_UNEXPECTED_OP;
+        s_op->target_handle = PVFS_HANDLE_NULL;
+        s_op->target_fs_id = PVFS_FS_ID_NULL;
         /* Add an unexpected s_ops to the list */
         qlist_add_tail(&s_op->next, &posted_sop_list);
-
+        
         /*
           TODO: Consider the optimization of enabling immediate
           completion in this part of the code (see the mailing list
@@ -1816,6 +1825,10 @@ static int server_state_machine_start(
                       s_op->unexp_bmi_buff.addr,
                       s_op->unexp_bmi_buff.size);
 
+    /* acknowledge that the unexpected buffer has been used up.
+     * If *someone* decides to do in-place decoding, then we will have to move
+     * this back to state_machine_complete().
+     */
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     if (ret == -PVFS_EPROTONOSUPPORT)
     {
@@ -1881,6 +1894,10 @@ int server_state_machine_alloc_noreq(
         }
         memset(*new_op, 0, sizeof(PINT_server_op));
         (*new_op)->op = op;
+        (*new_op)->target_handle = PVFS_HANDLE_NULL;
+        (*new_op)->target_fs_id = PVFS_FS_ID_NULL;
+
+        /* NOTE: We do not add these state machines to the in-progress or posted sop lists */
 
         /* NOTE: We do not add these state machines to the in-progress or posted sop lists */
 
@@ -1968,11 +1985,12 @@ int server_state_machine_complete(PINT_server_op *s_op)
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
-    /* free the buffer that the unexpected request came in on */
-    if (s_op->unexp_bmi_buff.buffer)
-    {
-        free(s_op->unexp_bmi_buff.buffer);
-    }
+    BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
+                        s_op->unexp_bmi_buff.buffer);
+    s_op->unexp_bmi_buff.buffer = NULL;
+
+   /* Remove s_op from the inprogress_sop_list */
+    qlist_del(&s_op->next);
 
     /* Remove s_op from the inprogress_sop_list */
     qlist_del(&s_op->next);

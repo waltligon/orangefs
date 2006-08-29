@@ -284,12 +284,6 @@ extern struct xattr_handler pvfs2_xattr_acl_default_handler, pvfs2_xattr_acl_acc
 extern struct xattr_handler pvfs2_xattr_trusted_handler;
 extern struct xattr_handler pvfs2_xattr_default_handler;
 
-typedef struct {
-    int32_t p_tag;
-    uint32_t p_perm;
-    uint32_t p_id;
-} pvfs2_acl_entry;
-
 #endif
 
 static inline int convert_to_internal_xattr_flags(int setxattr_flags)
@@ -388,10 +382,9 @@ typedef struct
 #define SetCtimeFlag(pinode)   set_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
 #define CtimeFlag(pinode)      test_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
 
-#define ClearModeFlag(pinode)  clear_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
-#define SetModeFlag(pinode)    set_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
-#define ModeFlag(pinode)       test_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
-
+#define ClearModeFlag(pinode) clear_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define SetModeFlag(pinode)   set_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define ModeFlag(pinode)      test_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
 
 /** mount options.  only accepted mount options are listed.
  */
@@ -648,7 +641,7 @@ ssize_t pvfs2_inode_getxattr(
 int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         const char *name, const void *value, size_t size, int flags);
 int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
-        const char *name);
+        const char *name, int flags);
 int pvfs2_inode_listxattr(struct inode *inode, char *, size_t);
 
 int pvfs2_inode_getattr(

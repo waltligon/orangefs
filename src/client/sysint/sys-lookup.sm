@@ -20,7 +20,6 @@
 #include "str-utils.h"
 #include "pint-util.h"
 #include "ncache.h"
-#include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
