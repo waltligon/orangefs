@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	begin = Wtime();
-	err = openg(fname, ptr, &len, O_RDONLY, 0);
+	err = openg(fname, ptr, &len, O_RDONLY, 0775);
 	if (err < 0) {
 		perror("openg(2) error:");
 		exit(1);

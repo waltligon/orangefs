@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
 	{
 		begin_openg = Wtime();
 		openg_flags |= O_RDONLY;
-		err = openg(fname, (void *) hb.handle, (size_t *) &hb.handle_length, openg_flags, 0);
+		err = openg(fname, (void *) hb.handle, (size_t *) &hb.handle_length, openg_flags, 0775);
 		if (err < 0) {
 			perror("openg error:");
 			MPI_Finalize();

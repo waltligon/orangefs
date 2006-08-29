@@ -2,16 +2,38 @@
 
 # first test open
 
-MPICH2_INSTALL=/home/slang/INSTALL-mpich2
-PVFS2_TOPDIR=/home/slang/pvfs2-pos-ext
-PVFS2_MNT=$PVFS2_TOPDIR/mnt
+E_OPTERR=65
+
+usage()
+{
+	echo "Usage: `basename $0` -m <MPICH2 install path> -p <PVFS2 posix extensions path> -d <PVFS2 mount point>"
+ 	exit $E_OPTERR;
+}
+
+MPICH2_INSTALL=/usr/local/mpich2/
+
+while getopts "m:p:d:" Option
+do
+	case $Option in
+		m) MPICH2_INSTALL=$OPTARG;;
+		p) PVFS2_TOPDIR=$OPTARG;;
+		d) PVFS2_MNT=$OPTARG;;
+		*) usage;;	
+	esac
+done
+
+if [ -z "$PVFS2_TOPDIR" -o -z "$PVFS2_MNT" ]
+then
+	echo "Please specify PVFS2 top dir and mount point";
+	usage;
+fi
 
 levels=8
 
 base="$PVFS2_MNT"
 for i in `seq 1 $levels`; do 
 
-	mkdir -p $base/$i 
+	mkdir -p -m 775 $base/$i 
 	base="$base/$i" 
 done
 

@@ -228,7 +228,7 @@ int main(int argc, char *argv[])
 	/* if I am the client, openg the file and send a packet */
 	else {
 		begin = Wtime();
-		err = openg(fname, ptr, &len, O_RDONLY, 0);
+		err = openg(fname, ptr, &len, O_RDONLY, 0775);
 		end = Wtime();
 		if (err < 0) {
 			perror("openg error:");

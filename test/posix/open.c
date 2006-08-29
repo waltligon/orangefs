@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
 
 	begin = Wtime();
 	open_flags |= O_RDONLY;
-	err = open(fname, open_flags, 0);
+	err = open(fname, open_flags, 0775);
 	if (err < 0) {
 		perror("open(2) error:");
 		MPI_Finalize();
