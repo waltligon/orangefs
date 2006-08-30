@@ -72,12 +72,10 @@ enum PVFS_server_op
     PVFS_SERV_SETEATTR = 30,
     PVFS_SERV_DELEATTR = 31,
     PVFS_SERV_LISTEATTR = 32,
-    PVFS_SERV_SMALL_IO = 33
-    /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define
-     * (below) if you add a new operation to this list
-     */
+    PVFS_SERV_SMALL_IO = 33,
+    /* leave this entry last */
+    PVFS_SERV_NUM_OPS
 };
-#define PVFS_MAX_SERVER_OP 34
 
 /*
  * These ops must always work, even if the server is in admin mode.

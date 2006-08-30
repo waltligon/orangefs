@@ -332,6 +332,7 @@ int PINT_req_sched_target_handle(
     case PVFS_SERV_PERF_UPDATE:
     case PVFS_SERV_JOB_TIMER:
     case PVFS_SERV_PROTO_ERROR:
+    case PVFS_SERV_NUM_OPS:   /* sentinel */
 	/* these should never show up here */
 	return (-EINVAL);
     }

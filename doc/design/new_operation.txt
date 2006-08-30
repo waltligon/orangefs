@@ -83,8 +83,8 @@ Everything Else:
   define a PINT_server_xxx_op with the information specific to your new
   operation, and add it to the union in PINT_server_op.
 
-  Add a new enum to PVFS_server_op, remembering to increate the
-  PVFS_MAX_SERVER_OP define.  Define a server request structure
+  Add a new enum to PVFS_server_op, just before the sentinel
+  PVFS_SERV_NUM_OPS.  Define a server request structure
   (PVFS_servreq_xxx) and optionally (but encouraged) a
   PINT_SERVREQ_xxx_FILL macro.  If your operation needs information back
   from the server (beyond 'success' or 'fail'), define a

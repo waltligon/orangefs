@@ -37,7 +37,7 @@ static int initializing_sizes = 0;
 static struct {
     int req;
     int resp;
-} max_size_array[PVFS_MAX_SERVER_OP+1];
+} *max_size_array = NULL;
 
 /* lebf_initialize()
  *
@@ -59,6 +59,11 @@ static void lebf_initialize(void)
     const int init_big_size = 1024 * 1024;
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_initialize\n");
+
+    max_size_array = malloc(PVFS_SERV_NUM_OPS * sizeof(*max_size_array));
+    if (max_size_array == NULL)
+        return;
+
     /*
      * Some messages have extra structures, and even indeterminate sizes
      * which are hand-calculated here.  Also some fields must be initialized
@@ -74,7 +79,8 @@ static void lebf_initialize(void)
     memset(&tmp_req, 0, sizeof(tmp_req));
 
     initializing_sizes = 1;
-    for (i=0; i<=PVFS_MAX_SERVER_OP; i++) {
+
+    for (i=0; i<PVFS_SERV_NUM_OPS; i++) {
 	req.op = resp.op = i;
 	reqsize = 0;
 	respsize = 0;
@@ -368,6 +374,7 @@ static int lebf_encode_req(
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_NUM_OPS:  /* sentinel */
 	    gossip_err("%s: invalid operation %d\n", __func__, req->op);
 	    ret = -PVFS_ENOSYS;
 	    break;
@@ -449,23 +456,24 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
 
-            case PVFS_SERV_REMOVE:
-            case PVFS_SERV_MGMT_REMOVE_OBJECT:
-            case PVFS_SERV_MGMT_REMOVE_DIRENT:
-            case PVFS_SERV_SETATTR:
-            case PVFS_SERV_SETEATTR:
-            case PVFS_SERV_DELEATTR:
-            case PVFS_SERV_CRDIRENT:
-            case PVFS_SERV_TRUNCATE:
-            case PVFS_SERV_FLUSH:
-            case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_REMOVE:
+        case PVFS_SERV_MGMT_REMOVE_OBJECT:
+        case PVFS_SERV_MGMT_REMOVE_DIRENT:
+        case PVFS_SERV_SETATTR:
+        case PVFS_SERV_SETEATTR:
+        case PVFS_SERV_DELEATTR:
+        case PVFS_SERV_CRDIRENT:
+        case PVFS_SERV_TRUNCATE:
+        case PVFS_SERV_FLUSH:
+        case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
             /* nothing else */
             break;
 
         case PVFS_SERV_INVALID:
-            case PVFS_SERV_PERF_UPDATE:
-            case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_err("%s: invalid operation %d\n", __func__, resp->op);
             ret = -PVFS_ENOSYS;
             break;
@@ -560,6 +568,7 @@ static int lebf_decode_req(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
 	case PVFS_SERV_PROTO_ERROR:
+        case PVFS_SERV_NUM_OPS:  /* sentinel */
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, req->op);
 	    ret = -PVFS_EPROTO;
 	    goto out;
@@ -649,6 +658,7 @@ static int lebf_decode_resp(
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_NUM_OPS:  /* sentinel */
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
 	    ret = -PVFS_EPROTO;
 	    goto out;
@@ -766,9 +776,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_PERF_UPDATE:
 	    case PVFS_SERV_JOB_TIMER:
 	    case PVFS_SERV_PROTO_ERROR:
+            case PVFS_SERV_NUM_OPS:  /* sentinel */
 		gossip_lerr("%s: invalid request operation %d.\n",
 		  __func__, req->op);
-		break;
+                break;
 	}
     } else if (input_type == PINT_DECODE_RESP) {
 	struct PVFS_server_resp *resp = &msg->stub_dec.resp;
@@ -848,6 +859,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_PERF_UPDATE:
 	    case PVFS_SERV_JOB_TIMER:
+            case PVFS_SERV_NUM_OPS:  /* sentinel */
 		gossip_lerr("%s: invalid response operation %d.\n",
 		  __func__, resp->op);
 		break;
