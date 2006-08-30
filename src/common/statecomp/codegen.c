@@ -25,6 +25,8 @@ void gen_state_decl(char *state_name);
 void gen_machine(char *machine_name, char *first_state_name);
 void gen_state_start(char *state_name);
 void gen_state_action(char *run_func, int flag, char *state_action);
+void gen_trtbl(char *state_name);
+void gen_pjtbl(char *state_name);
 void gen_return_code(char *return_code);
 void gen_next_state(int flag, char *new_state);
 void gen_state_end(void);

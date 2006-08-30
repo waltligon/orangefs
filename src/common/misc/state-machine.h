@@ -182,6 +182,7 @@ int PINT_state_machine_complete(void *);
 
 /* Prototypes for functions defined in by state machine code */
 int PINT_state_machine_halt(void);
+int PINT_state_machine_terminate(struct PINT_smcb *, job_status_s *);
 int PINT_state_machine_next(struct PINT_smcb *,job_status_s *);
 int PINT_state_machine_invoke(struct PINT_smcb *, job_status_s *);
 int PINT_state_machine_start(struct PINT_smcb *, job_status_s *);
