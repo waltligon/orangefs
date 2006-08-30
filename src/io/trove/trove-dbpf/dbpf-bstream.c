@@ -41,12 +41,14 @@ static int issue_or_delay_io_operation(
     int aiocb_inuse_count, struct sigevent *sig, int dec_first);
 static void start_delayed_ops_if_any(int dec_first);
 
+#ifdef __PVFS2_TROVE_AIO_THREADED__
 static char *list_proc_state_strings[] = {
     "LIST_PROC_INITIALIZED",
     "LIST_PROC_INPROGRESS ",
     "LIST_PROC_ALLCONVERTED",
     "LIST_PROC_ALLPOSTED",
 };
+#endif
 
 static inline int dbpf_bstream_rw_list(
     TROVE_coll_id coll_id,
@@ -73,19 +75,19 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
 
+#ifdef __PVFS2_TROVE_AIO_THREADED__
 struct alt_aio_item
 {   
     struct aiocb *cb_p;
     struct sigevent *sig;
     struct qlist_head list_link;
-};      
+};
 static int alt_lio_listio(int mode, struct aiocb *list[],
     int nent, struct sigevent *sig);
 static void* alt_lio_thread(void*);
 extern int TROVE_alt_aio_mode;
 
 
-#ifdef __PVFS2_TROVE_AIO_THREADED__ 
 /* allow bypassing default lio_listio implementation if user requests it and
  * some conditions are met
  */
@@ -1369,6 +1371,7 @@ struct TROVE_bstream_ops dbpf_bstream_ops =
     dbpf_bstream_flush
 };
 
+#ifdef __PVFS2_TROVE_AIO_THREADED__
 int alt_lio_listio(int mode, struct aiocb *list[],
     int nent, struct sigevent *sig) 
 {   
@@ -1470,6 +1473,7 @@ static void* alt_lio_thread(void* foo)
 
     return(NULL);
 }
+#endif
 
 /*
  * Local variables:
