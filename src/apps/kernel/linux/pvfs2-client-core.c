@@ -2631,6 +2631,28 @@ int main(int argc, char **argv)
     PINT_acache_enable_perf_counter(acache_pc);
 
     /* start a timer to roll over performance counters (acache) */
+    PINT_smcb_alloc(&smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
+            sizeof(struct PINT_client_sm),
+            client_op_state_get_machine,
+            NULL,
+            s_client_dev_context);
+    if (!smcb)
+    {
+        return(-PVFS_ENOMEM);
+    }
+    acach_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    acache_timer_sm_p->u.perf_count_timer.interval_secs = 
+        &s_opts.perf_time_interval_secs;
+    acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
+    ret = PINT_client_state_machine_post(smcb, NULL, NULL);
+    if (ret < 0)
+    {
+        gossip_lerr("Error posting job timer.\n");
+        return(ret);
+    }
+
+#if 0
+    /* old timer code */
     acache_timer_sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
     if(!acache_timer_sm_p)
     {
@@ -2646,6 +2668,8 @@ int main(int argc, char **argv)
     {
         return(ret);
     }
+    /* end of old code */
+#endif
 
     ret = initialize_ops_in_progress_table();
     if (ret)
