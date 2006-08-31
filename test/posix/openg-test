@@ -78,5 +78,5 @@ for c in $clients; do
 
 	echo "    open file (reopen): ${open_deepfile}-$c-clients"
 	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/open \
-		-f ${open_deepfile}-$c-clients
+		-f ${open_deepfile}-$c-clients -u
 done
