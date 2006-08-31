@@ -42,7 +42,7 @@ openg_shallowfile=$PVFS2_MNT/openg-test
 open_deepfile=$base/open-test
 open_shallowfile=$PVFS2_MNT/open-test
 
-clients="1 10 20 30 40 50 60"
+clients="1 2 4 8 16 24"
 
 for c in $clients; do
 
@@ -53,7 +53,7 @@ for c in $clients; do
 	
 	echo "    openg file (reopen): ${openg_shallowfile}-$c-clients"
 	${MPICH2_INSTALL}/bin/mpiexec -n $c $PVFS2_TOPDIR/test/posix/openg-mpi \
-		-f ${openg_shallowfile}-$c-clients
+		-f ${openg_shallowfile}-$c-clients -u
 
 	echo "    openg file (create); ${openg_deepfile}-$c-clients"
 	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
@@ -61,7 +61,7 @@ for c in $clients; do
 
 	echo "    openg file (reopen): ${openg_deepfile}-$c-clients"
 	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
-		-f ${openg_deepfile}-$c-clients
+		-f ${openg_deepfile}-$c-clients -u
 
 	echo "Running open with $c clients"
 	echo "    open file (create): ${open_shallowfile}-$c-clients"
@@ -70,7 +70,7 @@ for c in $clients; do
 	
 	echo "    open file (reopen): ${open_shallowfile}-$c-clients"
 	${MPICH2_INSTALL}/bin/mpiexec -n $c $PVFS2_TOPDIR/test/posix/open \
-		-f ${open_shallowfile}-$c-clients
+		-f ${open_shallowfile}-$c-clients -u
 
 	echo "    open file (create); ${open_deepfile}-$c-clients"
 	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/open \

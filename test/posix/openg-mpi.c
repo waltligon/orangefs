@@ -34,6 +34,9 @@
 #define __NR_openfh 274
 #endif
 
+static long openg(const char *, void *, size_t *, int, int);
+static long openfh(const void *, size_t);
+
 _syscall2(long, openfh, const void *, uhandle, size_t, handle_len);
 _syscall5(long, openg, const char *, pathname, void *, uhandle, size_t *, uhandle_len, int, flags, int, mode);
 
@@ -82,12 +85,6 @@ static double Wtime(void)
     return((double)t.tv_sec * 1e03 + (double)(t.tv_usec) * 1e-03);
 }
 
-enum muck_options_t {
-	DONT_MUCK = 0,
-	DUMB_MUCK = 1,
-	SMART_MUCK = 2,
-};
-
 struct file_handle_generic {
 	/* Filled by VFS */
 	int32_t   fhg_magic; /* magic number */
@@ -97,39 +94,19 @@ struct file_handle_generic {
 	unsigned char fhg_hmac_sha1[24]; /* hmac-sha1 message authentication code */
 };
 
-static void muck_with_buffer(char *buffer, size_t len, 
-		enum muck_options_t muck_options)
-{
-	if (muck_options == DONT_MUCK) {
-		return;
-	}
-	else if (muck_options == DUMB_MUCK) {
-		int pos = rand() % len;
-		int cnt = rand() % (len - pos);
-		memset(buffer + pos, 0, cnt);
-	}
-	else {
-		struct file_handle_generic *fh = (struct file_handle_generic *) buffer;
-
-		/* modify some fields and recalc crc32 */
-		fh->fhg_flags = 1;
-		fh->fhg_crc_csum = compute_check_sum((unsigned char *) buffer, 12);
-		/* purpose is to show that HMACs will catch this kind of behavior */
-	}
-}
-
 int main(int argc, char *argv[])
 {
 	int c, fd, err;
-	int rank, np;
+	int i, rank, np, do_unlink = 0;
 	size_t len;
-	struct stat sbuf;
-	char opt[] = "f:m:c", *fname = NULL;
-	double begin_openg, end_openg, begin_openfh, end_openfh, max_end;
-	enum muck_options_t muck_options = DONT_MUCK;
+	char opt[] = "n:f:cu", *fname = NULL;
+	double begin_openg, end_openg, begin_openfh, end_openfh, begin_bcast, end_bcast;
+	double openg_total = 0.0, openfh_total = 0.0, bcast_total = 0.0, total_time = 0.0;
+	double openg_final, openfh_final, bcast_final, total_final;
+
 	struct hbuf hb;
 	MPI_Datatype d;
-	int openg_flags = 0;
+	int openg_flags = 0, niters = 10;
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -137,33 +114,30 @@ int main(int argc, char *argv[])
 
 	while ((c = getopt(argc, argv, opt)) != EOF) {
 		switch (c) {
+			case 'n':
+				niters = atoi(optarg);
+				break;
 			case 'f':
 				fname = optarg;
-				break;
-			case 'm':
-				muck_options = atoi(optarg);
 				break;
 			case 'c':
 				openg_flags |= O_CREAT;
 				break;
+			case 'u':
+				do_unlink = 1;
+				break;
 			case '?':
 			default:
 				fprintf(stderr, "Invalid arguments\n");
+				fprintf(stderr, "Usage: %s -f <fname> -c -n <number of iterations>\n",
+						argv[0]);
 				MPI_Finalize();
 				exit(1);
 		}
 	}
 	if (fname == NULL)
 	{
-		fprintf(stderr, "Usage: %s -f <fname> -m {muck options 0,1,2} -c\n",
-				argv[0]);
-		MPI_Finalize();
-		exit(1);
-	}
-	if (muck_options != DONT_MUCK && muck_options != DUMB_MUCK
-			&& muck_options != SMART_MUCK)
-	{
-		fprintf(stderr, "Usage: %s -f <fname> -m {muck options 0,1,2}\n",
+		fprintf(stderr, "Usage: %s -f <fname> -c -n <number of iterations>\n",
 				argv[0]);
 		MPI_Finalize();
 		exit(1);
@@ -174,55 +148,72 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	hb.handle_length = MAX_LENGTH;
-	/* Rank 0 does the openg */
-	if (rank == 0)
+	for (i = 0; i < niters; i++)
 	{
-		begin_openg = Wtime();
-		openg_flags |= O_RDONLY;
-		err = openg(fname, (void *) hb.handle, (size_t *) &hb.handle_length, openg_flags, 0775);
-		if (err < 0) {
-			perror("openg error:");
+		begin_openg = end_openg = 0;
+		/* Rank 0 does the openg */
+		if (rank == 0)
+		{
+			openg_flags |= O_RDONLY;
+			begin_openg = Wtime();
+			err = openg(fname, (void *) hb.handle, (size_t *) &hb.handle_length, openg_flags, 0775);
+			if (err < 0) {
+				perror("openg error:");
+				MPI_Finalize();
+				exit(1);
+			}
+			end_openg = Wtime();
+			openg_total += (end_openg - begin_openg);
+		}
+
+		begin_bcast = Wtime();
+		/* Broadcast the handle buffer to everyone */
+		if ((err = MPI_Bcast(&hb, 1, d, 0, MPI_COMM_WORLD)) != MPI_SUCCESS) {
+			char str[256];
+			len = 256;
+			MPI_Error_string(err, str, (int *) &len);
+			fprintf(stderr, "MPI_Bcast failed: %s\n", str);
 			MPI_Finalize();
 			exit(1);
 		}
-		end_openg = Wtime();
-		printf("Rank %d openg on %s yielded length %ld [Time %g msec]\n",
-				rank, fname, (unsigned long) hb.handle_length, msec_diff(&end_openg, &begin_openg));
-	}
+		end_bcast = Wtime();
+		bcast_total += (end_bcast - begin_bcast);
 
-	/* Broadcast the handle buffer to everyone */
-	if ((err = MPI_Bcast(&hb, 1, d, 0, MPI_COMM_WORLD)) != MPI_SUCCESS) {
-		char str[256];
-		len = 256;
-		MPI_Error_string(err, str, (int *) &len);
-		fprintf(stderr, "MPI_Bcast failed: %s\n", str);
-		MPI_Finalize();
-		exit(1);
+		begin_openfh = Wtime();
+		fd = openfh((void *) hb.handle, (size_t) hb.handle_length);
+		if (fd < 0) {
+			char h[256];
+			gethostname(h, 256);
+			fprintf(stderr, "openfh on rank %d (%s) failed: %s\n",
+					rank, h, strerror(errno));
+			MPI_Finalize();
+			exit(1);
+		}
+		end_openfh = Wtime();
+		openfh_total += (end_openfh - begin_openfh);
+
+		total_time += (end_openg - begin_openg + end_bcast - begin_bcast + end_openfh - begin_openfh);
+
+		close(fd);
 	}
-	/* muck with buffers if need be */
-/*	muck_with_buffer(hb.handle, hb.handle_length, muck_options); */
-	begin_openfh = Wtime();
-	fd = openfh((void *) hb.handle, (size_t) hb.handle_length);
-	if (fd < 0) {
-		fprintf(stderr, "openfh on rank %d failed: %s\n",
-				rank, strerror(errno));
-		MPI_Finalize();
-		exit(1);
-	}
-	end_openfh = Wtime();
-	printf("Rank %d:  openfh returned fd: %d [Time %g msec]\n",
-			rank, fd, msec_diff(&end_openfh, &begin_openfh));
-/*	fstat(fd, &sbuf);
-	printf("Rank %d: stat indicates file size %lu\n", rank, (unsigned long) sbuf.st_size);
-	sha1_file_digest(fd); */
-	close(fd);
-	MPI_Allreduce(&end_openfh, &max_end, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+	/* Average of niterations */
+	openg_total = openg_total / niters;
+	bcast_total = bcast_total / niters;
+	openfh_total = openfh_total / niters;
+	total_time = total_time / niters;
+
+	openg_final = openg_total;
+	MPI_Allreduce(&bcast_total, &bcast_final, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+	MPI_Allreduce(&openfh_total, &openfh_final, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+	MPI_Allreduce(&total_time, &total_final, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
 	if(rank == 0)
 	{
-	    printf("Total time for openg/openfh: [Time %g msec]\n",
-		   msec_diff(&max_end, &begin_openg));
+	    printf("Total time for openg/openfh: [Time ( %g %g %g ) %g msec niters %d]\n",
+		   openg_final, bcast_final, openfh_final, total_final, niters);
+	    if (do_unlink)
+		    unlink(fname);
 	}
-
 	MPI_Finalize();
 	return 0;
 }

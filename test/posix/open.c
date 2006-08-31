@@ -1,6 +1,6 @@
 /*
  * Simple test program to demonstrate
- * the functionality of the openg/openfh
+ * the functionality of the open
  * system call!
  */
 #include <stdio.h>
@@ -18,25 +18,6 @@
 #include "crc32c.h"
 #include "mpi.h"
 
-#if defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
-/* FIXME:
- * PLEASE CHANGE THIS SYSTEM
- * CALL NUMBER IN CASE YOUR
- * ARCHITECTURE IS NOT IA-32 
- * OR IF YOUR KERNEL SYSCALL NUMBERS
- * ARE DIFFERENT. YOU HAVE BEEN WARNED!!!!!
- */
-#define __NR_openg  311
-#define __NR_openfh 312
-#elif defined (x86_64) || defined (__x86_64__)
-#define __NR_openg  273 
-#define __NR_openfh 274
-#endif
-
-#define MAX_LENGTH 128
-_syscall2(long, openfh, const void *, uhandle, size_t, handle_len);
-_syscall5(long, openg, const char *, pathname, void *, uhandle, size_t *, uhandle_len, int, flags, int, mode);
-
 static inline double msec_diff(double *end, double *begin)
 {
 	return (*end - *begin);
@@ -49,12 +30,6 @@ static double Wtime(void)
     return((double)t.tv_sec * 1e03 + (double)(t.tv_usec) * 1e-03);
 }
 
-enum muck_options_t {
-	DONT_MUCK = 0,
-	DUMB_MUCK = 1,
-	SMART_MUCK = 2,
-};
-
 struct file_handle_generic {
 	/* Filled by VFS */
 	int32_t   fhg_magic; /* magic number */
@@ -64,38 +39,14 @@ struct file_handle_generic {
 	unsigned char fhg_hmac_sha1[24]; /* hmac-sha1 message authentication code */
 };
 
-static void muck_with_buffer(char *buffer, size_t len, 
-		enum muck_options_t muck_options)
-{
-	if (muck_options == DONT_MUCK) {
-		return;
-	}
-	else if (muck_options == DUMB_MUCK) {
-		int pos = rand() % len;
-		int cnt = rand() % (len - pos);
-		memset(buffer + pos, 0, cnt);
-	}
-	else {
-		struct file_handle_generic *fh = (struct file_handle_generic *) buffer;
-
-		/* modify some fields and recalc crc32 */
-		fh->fhg_flags = 1;
-		fh->fhg_crc_csum = compute_check_sum((unsigned char *) buffer, 12);
-		/* purpose is to show that HMACs will catch this kind of behavior */
-	}
-}
-
 int main(int argc, char *argv[])
 {
 	int c, fd, err, a;
-	size_t len = 0;
-	void *ptr = NULL;
-	struct stat sbuf;
-	char opt[] = "f:m:c", *fname = NULL;
-	double begin, end, tdiff, max_diff;
-	enum muck_options_t muck_options = DONT_MUCK;
+	int niters = 10, do_unlink = 0;
+	char opt[] = "f:n:cu", *fname = NULL;
+	double begin, end, tdiff = 0.0, max_diff;
 	int open_flags = 0;
-	int rank, np;
+	int i, rank, np;
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -103,11 +54,14 @@ int main(int argc, char *argv[])
 
 	while ((c = getopt(argc, argv, opt)) != EOF) {
 		switch (c) {
+			case 'u':
+				do_unlink = 1;
+				break;
+			case 'n':
+				niters = atoi(optarg);
+				break;
 			case 'f':
 				fname = optarg;
-				break;
-			case 'm':
-				muck_options = atoi(optarg);
 				break;
 			case 'c':
 				open_flags |= O_CREAT;
@@ -115,60 +69,43 @@ int main(int argc, char *argv[])
 			case '?':
 			default:
 				fprintf(stderr, "Invalid arguments\n");
+				fprintf(stderr, "Usage: %s -f <fname> -c {create} -u {unlink} -n <num iterations>\n", argv[0]);
+				MPI_Finalize();
 				exit(1);
 		}
 	}
 	if (fname == NULL)
 	{
-		fprintf(stderr, "Usage: %s -f <fname> -m {muck options 0,1,2}\n",
-				argv[0]);
-		exit(1);
-	}
-	if (muck_options != DONT_MUCK && muck_options != DUMB_MUCK
-			&& muck_options != SMART_MUCK)
-	{
-		fprintf(stderr, "Usage: %s -f <fname> -m {muck options 0,1,2}\n",
-				argv[0]);
-		MPI_Finalize();
-		exit(1);
-	}
-	len = MAX_LENGTH;
-	ptr = (void *) calloc(len, sizeof(char));
-	if (ptr == NULL)
-	{
-		perror("calloc failed:");
+		fprintf(stderr, "Usage: %s -f <fname> -c {create} -u {unlink} -n <num iterations>\n", argv[0]);
 		MPI_Finalize();
 		exit(1);
 	}
 
-	a = MPI_Barrier(MPI_COMM_WORLD);
+	for (i = 0; i < niters; i++)
+	{
+		a = MPI_Barrier(MPI_COMM_WORLD);
+		open_flags |= O_RDONLY;
 
-	begin = Wtime();
-	open_flags |= O_RDONLY;
-	err = open(fname, open_flags, 0775);
-	if (err < 0) {
-		perror("open(2) error:");
-		MPI_Finalize();
-		exit(1);
+		begin = Wtime();
+		err = open(fname, open_flags, 0775);
+		if (err < 0) {
+			perror("open(2) error:");
+			MPI_Finalize();
+			exit(1);
+		}
+		end = Wtime();
+		tdiff += (end - begin);
+		close(fd);
 	}
-	end = Wtime();
-	printf("open on %s yielded length %ld [Time %g msec]\n",
-				fname, (unsigned long) len, msec_diff(&end, &begin));
-/*	muck_with_buffer(ptr, len, muck_options);
-	fstat(fd, &sbuf);
-	printf("stat indicates file size %ld\n", (unsigned long) sbuf.st_size);
-*/
-	tdiff = end - begin;
+	tdiff = tdiff / niters;
 	MPI_Allreduce(&tdiff, &max_diff, 1, 
 			MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 	if(rank == 0)
 	{
-	    printf("Total time for open: [Time %g msec]\n", max_diff);
+	    printf("Total time for open: [Time %g msec niters %d]\n", max_diff, niters);
+	    if (do_unlink)
+		    unlink(fname);
 	}
-		   
-/*	sha1_file_digest(fd); */
-	close(fd);
-	free(ptr);
 
 	MPI_Finalize();
 	return 0;

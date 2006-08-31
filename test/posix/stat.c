@@ -223,7 +223,7 @@ static inline void format_size_string(
     free(buf);
 }
 
-void print_entry_stat(
+static void print_entry_stat(
     char *entry_name,
     struct stat *attr, const char *link_target)
 {
@@ -329,7 +329,7 @@ void print_entry_stat(
 	  printf("%s\n",buf);
 }
 
-void print_entry_kernel_stat_lite(
+static void print_entry_kernel_stat_lite(
     char *entry_name,
     struct kernel_stat_lite *attr, const char *link_target)
 {
@@ -433,6 +433,11 @@ void print_entry_kernel_stat_lite(
     }
 	  printf("%s\n",buf);
 }
+
+int newstatlite(const char *, struct kernel_stat_lite *);
+static int newfstatlite(int, struct kernel_stat_lite *);
+static int newlstatlite(const char *, struct kernel_stat_lite *);
+static int getdents(uint, struct dirent *, uint);
 
 _syscall2(int, newstatlite, const char *, path, struct kernel_stat_lite *, buf);
 _syscall2(int, newfstatlite, int, filedes, struct kernel_stat_lite *, buf);
@@ -588,7 +593,7 @@ err:
 	return ret;
 }
 	
-int do_flatten_hierarchy(void)
+static int do_flatten_hierarchy(void)
 {
 	struct files *filp = NULL;
 

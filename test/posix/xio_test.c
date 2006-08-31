@@ -34,6 +34,13 @@ struct xtvec {
 	size_t xtv_len;
 };
 
+static ssize_t readx(unsigned long fd,
+		const struct iovec * iov, unsigned long iovlen, 
+		const struct xtvec * xtv, unsigned long xtvlen);
+static ssize_t writex(unsigned long fd, 
+		const struct iovec * iov, unsigned long iovlen,
+		const struct xtvec * xtv, unsigned long xtvlen);
+
 _syscall5(ssize_t, readx, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
 _syscall5(ssize_t, writex, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
 
@@ -221,7 +228,7 @@ int main(int argc, char *argv[])
 		total += wvec[i].iov_len;
 		mem_total += wvec[i].iov_len;
 		printf("%ld) <%p,%p> WRITE %ld bytes\n", i, wvec[i].iov_base, 
-			wvec[i].iov_base + wvec[i].iov_len, (long) wvec[i].iov_len);
+			(char *) wvec[i].iov_base + wvec[i].iov_len, (long) wvec[i].iov_len);
 	}
 	xtnr_segs = str_ct;
 	xc = (struct xtvec *) malloc(xtnr_segs * sizeof(struct xtvec));
@@ -257,7 +264,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < nr_segs; i++)
 	{
 		printf("%ld) <%p,%p> READ %ld bytes\n", i, rvec[i].iov_base, 
-			rvec[i].iov_base + rvec[i].iov_len, (long) rvec[i].iov_len);
+			(char *) rvec[i].iov_base + rvec[i].iov_len, (long) rvec[i].iov_len);
 		mem_total += rvec[i].iov_len;
 	}
 	if (xt_total != mem_total)

@@ -132,6 +132,11 @@ static inline struct files* clone_filp(struct files *filp)
 	return new_filp;
 }
 
+static int getdents(uint, struct dirent *, uint);
+static int getdents64(uint, struct dirent64 *, uint);
+static int getdents_plus(uint, struct dirent_plus *, uint);
+static int getdents64_plus(uint, struct dirent64_plus *, uint);
+
 /* glibc does not seem to provide a getdents() routine, so we provide one */
 _syscall3(int, getdents, uint, fd, struct dirent *, dirp, uint, count);
 _syscall3(int, getdents64, uint, fd, struct dirent64 *, dirp, uint, count);
@@ -240,7 +245,7 @@ static inline void format_size_string(
     free(buf);
 }
 
-void print_entry_stat64(
+static void print_entry_stat64(
     char *entry_name,
     struct stat64 *attr,
 	 const char *link_target)
@@ -371,7 +376,7 @@ void print_entry_stat64(
 	  printf("%s\n",buf);
 }
 
-void print_entry_stat(
+static void print_entry_stat(
     char *entry_name,
     struct stat *attr, const char *link_target)
 {
@@ -501,7 +506,7 @@ void print_entry_stat(
 	  printf("%s\n",buf);
 }
 
-void print_entry_kernel_stat(
+static void print_entry_kernel_stat(
     char *entry_name,
     struct kernel_stat *attr, const char *link_target)
 {
@@ -959,7 +964,7 @@ err:
 }
 
 
-int do_flatten_hierarchy(void)
+static int do_flatten_hierarchy(void)
 {
 	struct files *filp = NULL;
 

@@ -149,7 +149,8 @@ int main(int argc, char *argv[])
 	printf("openfh returned %d [Time %g msec]\n", fd, msec_diff(&end, &begin));
 	fstat(fd, &sbuf);
 	printf("stat indicates file size %ld\n", (unsigned long) sbuf.st_size);
-	sha1_file_digest(fd);
+	if (sbuf.st_size > 0)
+		sha1_file_digest(fd); 
 	close(fd);
 	free(ptr);
 	return 0;
