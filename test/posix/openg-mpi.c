@@ -97,12 +97,12 @@ struct file_handle_generic {
 int main(int argc, char *argv[])
 {
 	int c, fd, err;
-	int i, rank, np, do_unlink = 0;
+	int i, rank, np, do_unlink = 0, do_create = 0;
 	size_t len;
 	char opt[] = "n:f:cu", *fname = NULL;
-	double begin_openg, end_openg, begin_openfh, end_openfh, begin_bcast, end_bcast;
-	double openg_total = 0.0, openfh_total = 0.0, bcast_total = 0.0, total_time = 0.0;
-	double openg_final, openfh_final, bcast_final, total_final;
+	double begin_openg, end_openg, begin_openfh, end_openfh, begin_total, end_total;
+	double openg_total = 0.0, openfh_total = 0.0, time_total = 0.0;
+	double openg_final, openfh_final, total_final;
 
 	struct hbuf hb;
 	MPI_Datatype d;
@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
 				break;
 			case 'c':
 				openg_flags |= O_CREAT;
+				do_create = 1;
 				break;
 			case 'u':
 				do_unlink = 1;
@@ -150,6 +151,8 @@ int main(int argc, char *argv[])
 	hb.handle_length = MAX_LENGTH;
 	for (i = 0; i < niters; i++)
 	{
+		MPI_Barrier(MPI_COMM_WORLD);
+		begin_total = Wtime();
 		begin_openg = end_openg = 0;
 		/* Rank 0 does the openg */
 		if (rank == 0)
@@ -166,7 +169,6 @@ int main(int argc, char *argv[])
 			openg_total += (end_openg - begin_openg);
 		}
 
-		begin_bcast = Wtime();
 		/* Broadcast the handle buffer to everyone */
 		if ((err = MPI_Bcast(&hb, 1, d, 0, MPI_COMM_WORLD)) != MPI_SUCCESS) {
 			char str[256];
@@ -176,8 +178,6 @@ int main(int argc, char *argv[])
 			MPI_Finalize();
 			exit(1);
 		}
-		end_bcast = Wtime();
-		bcast_total += (end_bcast - begin_bcast);
 
 		begin_openfh = Wtime();
 		fd = openfh((void *) hb.handle, (size_t) hb.handle_length);
@@ -190,27 +190,32 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 		end_openfh = Wtime();
+		end_total = Wtime();
 		openfh_total += (end_openfh - begin_openfh);
-
-		total_time += (end_openg - begin_openg + end_bcast - begin_bcast + end_openfh - begin_openfh);
+		time_total += (end_total - begin_total);
 
 		close(fd);
+		if (rank == 0 && do_create && i < (niters - 1))
+			unlink(fname);
 	}
 	/* Average of niterations */
 	openg_total = openg_total / niters;
-	bcast_total = bcast_total / niters;
 	openfh_total = openfh_total / niters;
-	total_time = total_time / niters;
+	time_total = time_total / niters;
+
+/*	printf("Rank %d  (openg %g, bcast %g, openfh %g, total_time %g\n",
+			rank, openg_total, (time_total - (openfh_total + openg_total)),
+				openfh_total, time_total); */
 
 	openg_final = openg_total;
-	MPI_Allreduce(&bcast_total, &bcast_final, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 	MPI_Allreduce(&openfh_total, &openfh_final, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-	MPI_Allreduce(&total_time, &total_final, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+	MPI_Allreduce(&time_total, &total_final, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
 	if(rank == 0)
 	{
 	    printf("Total time for openg/openfh: [Time ( %g %g %g ) %g msec niters %d]\n",
-		   openg_final, bcast_final, openfh_final, total_final, niters);
+		   openg_final, (total_final - (openg_final + openfh_final)),
+		   openfh_final, total_final, niters);
 	    if (do_unlink)
 		    unlink(fname);
 	}

@@ -42,7 +42,7 @@ struct file_handle_generic {
 int main(int argc, char *argv[])
 {
 	int c, fd, err, a;
-	int niters = 10, do_unlink = 0;
+	int niters = 10, do_unlink = 0, do_create = 0;
 	char opt[] = "f:n:cu", *fname = NULL;
 	double begin, end, tdiff = 0.0, max_diff;
 	int open_flags = 0;
@@ -65,6 +65,7 @@ int main(int argc, char *argv[])
 				break;
 			case 'c':
 				open_flags |= O_CREAT;
+				do_create = 1;
 				break;
 			case '?':
 			default:
@@ -96,6 +97,8 @@ int main(int argc, char *argv[])
 		end = Wtime();
 		tdiff += (end - begin);
 		close(fd);
+		if (rank == 0 && do_create && i < (niters - 1))
+			unlink(fname);
 	}
 	tdiff = tdiff / niters;
 	MPI_Allreduce(&tdiff, &max_diff, 1, 
