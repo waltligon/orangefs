@@ -2527,6 +2527,7 @@ int main(int argc, char **argv)
     struct tm *local_time = NULL;
     uint64_t debug_mask = GOSSIP_NO_DEBUG;
     PINT_client_sm *acache_timer_sm_p = NULL;
+    PINT_smcb *smcb = NULL;
 
 #ifndef STANDALONE_RUN_MODE
     struct rlimit lim = {0,0};
@@ -2640,7 +2641,7 @@ int main(int argc, char **argv)
     {
         return(-PVFS_ENOMEM);
     }
-    acach_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    acache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     acache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
     acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
