@@ -14,6 +14,8 @@ INSTALL = @INSTALL@
 # TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
+LDSHARED = $(CC) -shared
+PICFLAGS = -fPIC
 BUILD_MPI = @BUILD_MPI@
 MPICC = @MPICC@
 GNUC = @GNUC@
@@ -153,6 +155,9 @@ MPITESTSRC :=
 # MPIMISCSRC is a collection of sources that must be built into
 #    object form using MPI
 MPIMISCSRC :=
+# DLLSRC is a collection of sources that must be built into
+# dlls/shared objects.
+DLLSRC := 
 # files generated as part of the build that should be deleted on "make clean"
 CLEANFILES :=
 
@@ -194,6 +199,13 @@ MPIMISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPIMISCSRC)))
 # MPIMISCDEPENDS is a list of dependency files for MPI misc. objects
 MPIMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIMISCSRC)))
 
+# DLLOBJS is a list of misc. objects made into DLLs
+DLLOBJS := $(patsubst %.c,%.po, $(filter %.c,$(DLLSRC)))
+# DLLDEPENDS is a list of dependency files for dll objects
+DLLDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DLLSRC)))
+#DLLS is a list of DLLs
+DLLS := $(patsubst %.c,%.so, $(filter %.c,$(DLLSRC)))
+
 # MPITESTOBJS is a list of MPI test program objects
 MPITESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPITESTSRC)))
 # MPITESTS is a list of MPI test program executables
@@ -211,7 +223,7 @@ MPIIOTESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIIOTESTSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(TESTDEPENDS) $(MISCDEPENDS))
+DEPENDS := $(sort $(TESTDEPENDS) $(MISCDEPENDS) $(DLLDEPENDS))
 ifdef BUILD_MPI
 DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
 endif
@@ -305,6 +317,15 @@ $(MPIIOTESTS): %: %.o $(LIBRARIES)
 	$(Q) "  CC		$@"
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
+# rule for building shared objects 
+%.po: %.c
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+
+%.so: $(DLLOBJS)
+	$(Q) " LDSO		$@"
+	$(E)$(LDSHARED) -o $@ $(DLLOBJS)
+
 # all test programs depend on the pvfs2 library
 $(TESTS): %: %.o $(LIBRARIES)
 
@@ -328,7 +349,7 @@ clean::
 	$(E)rm -f $(TESTOBJS) $(MISCOBJS) $(TESTS)\
 		$(DEPENDS) $(CLEANFILES) $(MPIMISCOBJS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS)\
-		$(MPIIOTESTOBJS) $(MPIIOTESTS)
+		$(MPIIOTESTOBJS) $(MPIIOTESTS) $(DLLDEPENDS) $(DLLS) $(DLLOBJS)
 
 # some stuff that is cleaned in both distclean and dist targets
 cleaner: clean
