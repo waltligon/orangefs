@@ -22,6 +22,8 @@ static int dirent_granularity = 4096;
 static int recurse = 0;
 static char path[256] = ".";
 static int use_lite = 0;
+static int nobjects = 0, nlevels = 0;
+
 #define S_SLITE_SIZET     0x1
 #define S_SLITE_BLKSIZE   0x2
 #define S_SLITE_BLOCKS    0x4
@@ -507,9 +509,11 @@ static int path_walk(struct files *root_filp)
 	}
 	if (ret < 0)
 		goto err;
+	nobjects++;
 	/* Are we looking at a directory? */
 	if (is_dir) 
 	{
+		nlevels++;
 		/* Use plain old getdents interface */
 		if (dir_fd >= 0) 
 		{
@@ -592,11 +596,20 @@ err:
 	if (dir_fd > 0) close(dir_fd);
 	return ret;
 }
+
+static double Wtime(void)
+{
+    struct timeval t;
+    gettimeofday(&t, NULL);
+    return((double)t.tv_sec * 1e03 + (double)(t.tv_usec) * 1e-03);
+}
 	
 static int do_flatten_hierarchy(void)
 {
 	struct files *filp = NULL;
+	double begin, end;
 
+	begin = Wtime();
 	/* traverse the tree and prune out unnecessary files and flatten the hierarchy */
 	path_init(path);
 	/* walk the tree */
@@ -608,6 +621,13 @@ static int do_flatten_hierarchy(void)
 			return -1;
 		}
 	}
+	end = Wtime();
+	if (use_lite) 
+		printf("statlite (%d levels %d objects) took %g msecs\n",
+				nlevels, nobjects, (end - begin));
+	else 
+		printf("stat (%d levels %d objects) took %g msecs\n",
+				nlevels, nobjects, (end - begin));
 	return 0;
 }
 

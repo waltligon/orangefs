@@ -6,6 +6,8 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+#include <time.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <linux/types.h>
 #include <linux/dirent.h>
@@ -24,6 +26,7 @@ static int recurse = 0;
 /* whether to use 64 bit calls or 32 bit ones */
 static int use_64 = 0;
 static char path[256] = ".";
+static int nlevels = 0, nobjects = 0;
 
 #if defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
 /* FIXME:
@@ -685,9 +688,11 @@ static int path_walk(struct files *root_filp)
 	}
 	if (ret < 0)
 		goto err;
+	nobjects++;
 	/* Are we looking at a directory? */
 	if (is_dir) 
 	{
+		nlevels++;
 		/* Use plain old getdents interface */
 		if (dir_fd >= 0 && use_direntplus == 0) 
 		{
@@ -963,11 +968,19 @@ err:
 	return ret;
 }
 
+static double Wtime(void)
+{
+    struct timeval t;
+    gettimeofday(&t, NULL);
+    return((double)t.tv_sec * 1e03 + (double)(t.tv_usec) * 1e-03);
+}
 
 static int do_flatten_hierarchy(void)
 {
 	struct files *filp = NULL;
+	double begin, end;
 
+	begin = Wtime();
 	/* traverse the tree and prune out unnecessary files and flatten the hierarchy */
 	path_init(path);
 	/* walk the tree */
@@ -979,6 +992,13 @@ static int do_flatten_hierarchy(void)
 			return -1;
 		}
 	}
+	end = Wtime();
+	if (use_direntplus)
+			  printf("getdents_plus (%d levels %d objects) took %g msecs\n",
+									nlevels, nobjects, (end - begin));
+	else
+			  printf("getdents (%d levels %d objects) took %g msecs\n",
+									nlevels, nobjects, (end - begin));
 	return 0;
 }
 

@@ -21,6 +21,9 @@ MPIMISCSRC += \
 	$(DIR)/sha1.c \
 	$(DIR)/sockio.c
 
+DLLSRC += \
+	$(DIR)/libstat.c
+
 MPITESTSRC += $(DIR)/openg-mpi.c $(DIR)/open.c
 
 MODCFLAGS_$(DIR)/getdents.c = -D_GNU_SOURCE
