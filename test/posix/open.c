@@ -64,7 +64,8 @@ int main(int argc, char *argv[])
 				fname = optarg;
 				break;
 			case 'c':
-				open_flags |= O_CREAT;
+				if (rank == 0)
+					open_flags |= O_CREAT;
 				do_create = 1;
 				break;
 			case '?':
@@ -84,28 +85,63 @@ int main(int argc, char *argv[])
 
 	for (i = 0; i < niters; i++)
 	{
-		a = MPI_Barrier(MPI_COMM_WORLD);
-		open_flags |= O_RDONLY;
+		if (do_create == 0)
+		{
+			a = MPI_Barrier(MPI_COMM_WORLD);
+			open_flags |= O_RDONLY;
 
-		begin = Wtime();
-		err = open(fname, open_flags, 0775);
-		if (err < 0) {
-			perror("open(2) error:");
-			MPI_Finalize();
-			exit(1);
+			begin = Wtime();
+			err = open(fname, open_flags, 0775);
+			if (err < 0) {
+				perror("open(2) error:");
+				MPI_Finalize();
+				exit(1);
+			}
+			end = Wtime();
+			tdiff += (end - begin);
+			close(fd);
 		}
-		end = Wtime();
-		tdiff += (end - begin);
-		close(fd);
-		if (rank == 0 && do_create && i < (niters - 1))
-			unlink(fname);
+		else
+		{
+			open_flags |= O_RDONLY;
+			if (rank == 0)
+			{
+				begin = Wtime();
+				err = open(fname, open_flags, 0775);
+				if (err < 0) {
+					perror("open(2) error:");
+					MPI_Finalize();
+					exit(1);
+				}
+				end = Wtime();
+				tdiff += (end - begin);
+				MPI_Barrier(MPI_COMM_WORLD);
+			}
+			else {
+				MPI_Barrier(MPI_COMM_WORLD);
+				begin = Wtime();
+				err = open(fname, open_flags, 0775);
+				if (err < 0) {
+					perror("open(2) error:");
+					MPI_Finalize();
+					exit(1);
+				}
+				end = Wtime();
+				tdiff += (end - begin);
+			}
+			MPI_Barrier(MPI_COMM_WORLD);
+			close(fd);
+			if (rank == 0 && i < (niters - 1))
+				unlink(fname);
+		}
 	}
 	tdiff = tdiff / niters;
 	MPI_Allreduce(&tdiff, &max_diff, 1, 
 			MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 	if(rank == 0)
 	{
-	    printf("Total time for open: [Time %g msec niters %d]\n", max_diff, niters);
+	    printf("Total time for open: (create? %s) [Time %g msec niters %d]\n",
+			    do_create ? "yes" : "no", max_diff, niters);
 	    if (do_unlink)
 		    unlink(fname);
 	}

@@ -6,15 +6,17 @@ E_OPTERR=65
 
 usage()
 {
-	echo "Usage: `basename $0` -m <MPICH2 install path> -p <PVFS2 posix extensions path> -d <PVFS2 mount point>"
+	echo "Usage: `basename $0` -m <MPICH2 install path> -p <PVFS2 posix extensions path> -d <PVFS2 mount point> -f <machine file>"
  	exit $E_OPTERR;
 }
 
 MPICH2_INSTALL=/usr/local/mpich2/
+MACHINE_FILE=/homes/vilayann/mpi_hosts
 
-while getopts "m:p:d:" Option
+while getopts "m:p:d:f:" Option
 do
 	case $Option in
+		f) MACHINE_FILE=$OPTARG;;
 		m) MPICH2_INSTALL=$OPTARG;;
 		p) PVFS2_TOPDIR=$OPTARG;;
 		d) PVFS2_MNT=$OPTARG;;
@@ -42,41 +44,41 @@ openg_shallowfile=$PVFS2_MNT/openg-test
 open_deepfile=$base/open-test
 open_shallowfile=$PVFS2_MNT/open-test
 
-clients="1 2 4 8 16 24"
+clients="1 2 4 8 16 24 48 96"
 
 for c in $clients; do
 
 	echo "Running openg-mpi with $c clients"
 	echo "    openg file (create): ${openg_shallowfile}-$c-clients"
-	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
-		-f ${openg_shallowfile}-$c-clients -c
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
+		-f ${openg_shallowfile}-$c-clients -c -n 20
 	
 	echo "    openg file (reopen): ${openg_shallowfile}-$c-clients"
-	${MPICH2_INSTALL}/bin/mpiexec -n $c $PVFS2_TOPDIR/test/posix/openg-mpi \
-		-f ${openg_shallowfile}-$c-clients -u
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c $PVFS2_TOPDIR/test/posix/openg-mpi \
+		-f ${openg_shallowfile}-$c-clients -u -n 20
 
 	echo "    openg file (create); ${openg_deepfile}-$c-clients"
-	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
-		-f ${openg_deepfile}-$c-clients -c
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
+		-f ${openg_deepfile}-$c-clients -c -n 20
 
 	echo "    openg file (reopen): ${openg_deepfile}-$c-clients"
-	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
-		-f ${openg_deepfile}-$c-clients -u
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
+		-f ${openg_deepfile}-$c-clients -u -n 20
 
 	echo "Running open with $c clients"
 	echo "    open file (create): ${open_shallowfile}-$c-clients"
-	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/open \
-		-f ${open_shallowfile}-$c-clients -c
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/open \
+		-f ${open_shallowfile}-$c-clients -c -n 20
 	
 	echo "    open file (reopen): ${open_shallowfile}-$c-clients"
-	${MPICH2_INSTALL}/bin/mpiexec -n $c $PVFS2_TOPDIR/test/posix/open \
-		-f ${open_shallowfile}-$c-clients -u
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c $PVFS2_TOPDIR/test/posix/open \
+		-f ${open_shallowfile}-$c-clients -u -n 20
 
 	echo "    open file (create); ${open_deepfile}-$c-clients"
-	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/open \
-		-f ${open_deepfile}-$c-clients -c
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/open \
+		-f ${open_deepfile}-$c-clients -c -n 20
 
 	echo "    open file (reopen): ${open_deepfile}-$c-clients"
-	${MPICH2_INSTALL}/bin/mpiexec -n $c ${PVFS2_TOPDIR}/test/posix/open \
-		-f ${open_deepfile}-$c-clients -u
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/open \
+		-f ${open_deepfile}-$c-clients -u -n 20
 done

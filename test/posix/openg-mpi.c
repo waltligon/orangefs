@@ -213,7 +213,8 @@ int main(int argc, char *argv[])
 
 	if(rank == 0)
 	{
-	    printf("Total time for openg/openfh: [Time ( %g %g %g ) %g msec niters %d]\n",
+	    printf("Total time for openg/openfh: (create? %s) [Time ( %g %g %g ) %g msec niters %d]\n",
+		   do_create ? "yes" : "no", 
 		   openg_final, (total_final - (openg_final + openfh_final)),
 		   openfh_final, total_final, niters);
 	    if (do_unlink)
