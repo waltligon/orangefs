@@ -693,10 +693,7 @@ static int path_walk(struct files *root_filp)
 	}
 	if (ret < 0)
 		goto err;
-	if (use_direntplus == 0)
-			  nlevels = root_filp->visited;
-	else
-			  nlevels++;
+	nlevels = root_filp->visited;
 	/* Are we looking at a directory? */
 	if (is_dir) 
 	{
@@ -825,7 +822,7 @@ static int path_walk(struct files *root_filp)
 			struct dirent_plus *p = NULL, *next;
 			int dirent_input_count = dirent_granularity, counter = 1;
 			int total_rec_len, i, dirent_total_count = 0, dirent_output_bytes, dirent_total_bytes = 0;
-			char *ptr = NULL;
+			char *ptr = NULL, fname[NAME_MAX];
 
 			lseek(dir_fd, 0, SEEK_SET);
 			do {
@@ -888,17 +885,16 @@ static int path_walk(struct files *root_filp)
 					if (strcmp(next64->dp_dirent.d_name, ".") && strcmp(next64->dp_dirent.d_name, "..")) 
 					{
 						lnk = NULL;
+				 	   snprintf(fname, NAME_MAX, "%s/%s", root_filp->name, next64->dp_dirent.d_name);
 						if (S_ISLNK(next64->dp_stat.st_mode))
 						{
-							char fname[NAME_MAX];
-							snprintf(fname, NAME_MAX, "%s/%s", root_filp->name, next64->dp_dirent.d_name);
 							readlink(fname, link_target, NAME_MAX);
 							lnk = link_target;
 						}
 #if defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
-						print_entry_stat64(next64->dp_dirent.d_name, &next64->dp_stat, lnk);
+						print_entry_stat64(fname, &next64->dp_stat, lnk);
 #elif defined (x86_64) || defined (__x86_64__)
-						print_entry_kernel_stat(next64->dp_dirent.d_name, &next64->dp_stat, lnk);
+						print_entry_kernel_stat(fname, &next64->dp_stat, lnk);
 #endif
 						if (recurse && S_ISDIR(next64->dp_stat.st_mode))
 						{
@@ -922,14 +918,13 @@ static int path_walk(struct files *root_filp)
 					if (strcmp(next->dp_dirent.d_name, ".") && strcmp(next->dp_dirent.d_name, "..")) 
 					{
 						lnk = NULL;
+						snprintf(fname, NAME_MAX, "%s/%s", root_filp->name, next->dp_dirent.d_name);
 						if (S_ISLNK(next->dp_stat.st_mode))
 						{
-							char fname[NAME_MAX];
-							snprintf(fname, NAME_MAX, "%s/%s", root_filp->name, next->dp_dirent.d_name);
 							readlink(fname, link_target, NAME_MAX);
 							lnk = link_target;
 						}
-						print_entry_kernel_stat(next->dp_dirent.d_name, &next->dp_stat, lnk);
+						print_entry_kernel_stat(fname, &next->dp_stat, lnk);
 						if (recurse && S_ISDIR(next->dp_stat.st_mode))
 						{
 							filp = (struct files *)calloc(1, sizeof(struct files));
@@ -1008,7 +1003,7 @@ static int do_flatten_hierarchy(void)
 	end = Wtime();
 	if (use_direntplus)
 			  printf("getdents_plus ( %d levels %d objects) took %g secs\n",
-									nlevels - 1, nobjects, (end - begin));
+									nlevels, nobjects, (end - begin));
 	else
 			  printf("getdents ( %d levels %d objects) took %g secs\n",
 									nlevels - 1, nobjects - 1, (end - begin));
