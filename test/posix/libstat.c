@@ -98,6 +98,7 @@ _syscall2(int, newstatlite, const char *, path, struct kernel_stat_lite *, buf);
 _syscall2(int, newfstatlite, int, filedes, struct kernel_stat_lite *, buf);
 _syscall2(int, newlstatlite, const char *, path, struct kernel_stat_lite *, buf);
 
+#if !defined(_FILE_OFFSET_BITS) && !defined(_LARGEFILE64_SOURCE)
 static void copy_statlite_to_stat(struct kernel_stat_lite *slbuf,
 		struct stat *sbuf)
 {
@@ -166,3 +167,79 @@ int fstat(int fd, struct stat *sbuf)
 	copy_statlite_to_stat(&slbuf, sbuf);
 	return 0;
 }
+#else
+static void copy_statlite_to_stat64(struct kernel_stat_lite *slbuf,
+		struct stat64 *sbuf)
+{
+	sbuf->st_dev = slbuf->st_dev;
+	sbuf->st_ino = slbuf->st_ino;
+	sbuf->st_mode = slbuf->st_mode;
+	sbuf->st_nlink = slbuf->st_nlink;
+	sbuf->st_uid = slbuf->st_uid;
+	sbuf->st_gid = slbuf->st_gid;
+	sbuf->st_rdev = slbuf->st_rdev;
+	sbuf->st_size = 0;
+	sbuf->st_blksize = slbuf->st_blksize;
+	sbuf->st_blocks = slbuf->st_blocks;
+	sbuf->st_atime = slbuf->st_atim;
+	sbuf->st_mtime = slbuf->st_mtim;
+	sbuf->st_ctime = slbuf->st_ctim;
+}
+
+int stat64(const char *pathname, struct stat64 *sbuf)
+{
+	struct kernel_stat_lite slbuf;
+	int ret;
+
+	printf("stat64\n");
+	memset(&slbuf, 0, sizeof(slbuf));
+	slbuf.st_litemask = S_SLITE_ATIME | 
+		S_SLITE_MTIME |
+		S_SLITE_CTIME | 
+		S_SLITE_BLKSIZE |
+		S_SLITE_BLOCKS;
+	ret = newstatlite(pathname, &slbuf);
+	if (ret < 0)
+		return ret;
+	copy_statlite_to_stat64(&slbuf, sbuf);
+	return 0;
+}
+
+int lstat64(const char *pathname, struct stat64 *sbuf)
+{
+	struct kernel_stat_lite slbuf;
+	int ret;
+
+	printf("lstat64\n");
+	memset(&slbuf, 0, sizeof(slbuf));
+	slbuf.st_litemask = S_SLITE_ATIME | 
+		S_SLITE_MTIME |
+		S_SLITE_CTIME | 
+		S_SLITE_BLKSIZE |
+		S_SLITE_BLOCKS;
+	ret = newlstatlite(pathname, &slbuf);
+	if (ret < 0)
+		return ret;
+	copy_statlite_to_stat64(&slbuf, sbuf);
+	return 0;
+}
+
+int fstat64(int fd, struct stat64 *sbuf)
+{
+	struct kernel_stat_lite slbuf;
+	int ret;
+
+	printf("fstat64\n");
+	memset(&slbuf, 0, sizeof(slbuf));
+	slbuf.st_litemask = S_SLITE_ATIME | 
+		S_SLITE_MTIME |
+		S_SLITE_CTIME | 
+		S_SLITE_BLKSIZE |
+		S_SLITE_BLOCKS;
+	ret = newfstatlite(fd, &slbuf);
+	if (ret < 0)
+		return ret;
+	copy_statlite_to_stat64(&slbuf, sbuf);
+	return 0;
+}
+#endif
