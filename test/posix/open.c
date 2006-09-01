@@ -41,7 +41,7 @@ struct file_handle_generic {
 
 int main(int argc, char *argv[])
 {
-	int c, fd, err, a;
+	int c, fd, a;
 	int niters = 10, do_unlink = 0, do_create = 0;
 	char opt[] = "f:n:cu", *fname = NULL;
 	double begin, end, tdiff = 0.0, max_diff;
@@ -91,8 +91,8 @@ int main(int argc, char *argv[])
 			open_flags |= O_RDONLY;
 
 			begin = Wtime();
-			err = open(fname, open_flags, 0775);
-			if (err < 0) {
+			fd = open(fname, open_flags, 0775);
+			if (fd < 0) {
 				perror("open(2) error:");
 				MPI_Finalize();
 				exit(1);
@@ -107,8 +107,8 @@ int main(int argc, char *argv[])
 			if (rank == 0)
 			{
 				begin = Wtime();
-				err = open(fname, open_flags, 0775);
-				if (err < 0) {
+				fd = open(fname, open_flags, 0775);
+				if (fd < 0) {
 					perror("open(2) error:");
 					MPI_Finalize();
 					exit(1);
@@ -120,8 +120,8 @@ int main(int argc, char *argv[])
 			else {
 				MPI_Barrier(MPI_COMM_WORLD);
 				begin = Wtime();
-				err = open(fname, open_flags, 0775);
-				if (err < 0) {
+				fd = open(fname, open_flags, 0775);
+				if (fd < 0) {
 					perror("open(2) error:");
 					MPI_Finalize();
 					exit(1);
