@@ -117,7 +117,7 @@ static void copy_statlite_to_stat(struct kernel_stat_lite *slbuf,
 	sbuf->st_ctime = slbuf->st_ctim;
 }
 
-int stat(const char *pathname, struct stat *sbuf)
+int __xstat(int vers, const char *pathname, struct stat *sbuf)
 {
 	struct kernel_stat_lite slbuf;
 	int ret;
@@ -134,7 +134,7 @@ int stat(const char *pathname, struct stat *sbuf)
 	return 0;
 }
 
-int lstat(const char *pathname, struct stat *sbuf)
+int __lxstat(int vers, const char *pathname, struct stat *sbuf)
 {
 	struct kernel_stat_lite slbuf;
 	int ret;
@@ -151,7 +151,7 @@ int lstat(const char *pathname, struct stat *sbuf)
 	return 0;
 }
 
-int fstat(int fd, struct stat *sbuf)
+int __fxstat(int vers, int fd, struct stat *sbuf)
 {
 	struct kernel_stat_lite slbuf;
 	int ret;
@@ -186,7 +186,7 @@ static void copy_statlite_to_stat64(struct kernel_stat_lite *slbuf,
 	sbuf->st_ctime = slbuf->st_ctim;
 }
 
-int stat64(const char *pathname, struct stat64 *sbuf)
+int __xstat64(int vers, const char *pathname, struct stat64 *sbuf)
 {
 	struct kernel_stat_lite slbuf;
 	int ret;
@@ -205,7 +205,7 @@ int stat64(const char *pathname, struct stat64 *sbuf)
 	return 0;
 }
 
-int lstat64(const char *pathname, struct stat64 *sbuf)
+int __lxstat64(int vers, const char *pathname, struct stat64 *sbuf)
 {
 	struct kernel_stat_lite slbuf;
 	int ret;
@@ -224,7 +224,7 @@ int lstat64(const char *pathname, struct stat64 *sbuf)
 	return 0;
 }
 
-int fstat64(int fd, struct stat64 *sbuf)
+int __fxstat64(int vers, int fd, struct stat64 *sbuf)
 {
 	struct kernel_stat_lite slbuf;
 	int ret;
