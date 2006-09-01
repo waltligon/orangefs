@@ -82,6 +82,9 @@
 /* Define if strerror_r is GNU-specific */
 #undef HAVE_GNU_STRERROR_R
 
+/* Define if libibverbs has reregister event */
+#undef HAVE_IBV_EVENT_CLIENT_REREGISTER
+
 /* Define if libibverbs has ibv_get_devices */
 #undef HAVE_IBV_GET_DEVICES
 

@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.4 2006-08-18 21:27:30 pw Exp $
+ * $Id: openib.c,v 1.5 2006-09-01 15:33:35 pw Exp $
  */
 #include <string.h>
 #include <errno.h>
@@ -851,6 +851,9 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
 	CASE(IBV_EVENT_SRQ_ERR);
 	CASE(IBV_EVENT_SRQ_LIMIT_REACHED);
 	CASE(IBV_EVENT_QP_LAST_WQE_REACHED);
+#ifdef HAVE_IBV_EVENT_CLIENT_REREGISTER
+	CASE(IBV_EVENT_CLIENT_REREGISTER);
+#endif
     }
     return s;
 }
