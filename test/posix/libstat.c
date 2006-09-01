@@ -191,7 +191,6 @@ int __xstat64(int vers, const char *pathname, struct stat64 *sbuf)
 	struct kernel_stat_lite slbuf;
 	int ret;
 
-	printf("stat64\n");
 	memset(&slbuf, 0, sizeof(slbuf));
 	slbuf.st_litemask = S_SLITE_ATIME | 
 		S_SLITE_MTIME |
@@ -210,7 +209,6 @@ int __lxstat64(int vers, const char *pathname, struct stat64 *sbuf)
 	struct kernel_stat_lite slbuf;
 	int ret;
 
-	printf("lstat64\n");
 	memset(&slbuf, 0, sizeof(slbuf));
 	slbuf.st_litemask = S_SLITE_ATIME | 
 		S_SLITE_MTIME |
@@ -229,7 +227,6 @@ int __fxstat64(int vers, int fd, struct stat64 *sbuf)
 	struct kernel_stat_lite slbuf;
 	int ret;
 
-	printf("fstat64\n");
 	memset(&slbuf, 0, sizeof(slbuf));
 	slbuf.st_litemask = S_SLITE_ATIME | 
 		S_SLITE_MTIME |
