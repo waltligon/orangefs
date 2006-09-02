@@ -26,7 +26,7 @@ static int recurse = 0;
 /* whether to use 64 bit calls or 32 bit ones */
 static int use_64 = 0;
 static char path[256] = ".";
-static int nlevels = 0, nobjects = 0;
+static int nlevels = 0, nobjects = 0, verbose = 0;
 
 #if defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
 /* FIXME:
@@ -379,6 +379,7 @@ static void print_entry_stat64(
         free(formatted_group);
     }
 	nobjects++;
+	if (verbose)
 	printf("%s\n",buf);
 }
 
@@ -510,6 +511,7 @@ static void print_entry_stat(
         free(formatted_group);
     }
 	nobjects++;
+	if (verbose)
 	 printf("%s\n",buf);
 }
 
@@ -640,6 +642,7 @@ static void print_entry_kernel_stat(
         free(formatted_group);
     }
 	nobjects++;
+	if (verbose)
 	printf("%s\n",buf);
 }
 
@@ -1012,7 +1015,7 @@ static int do_flatten_hierarchy(void)
 
 static void usage(char *str)
 {
-	fprintf(stderr, "Usage: %s -f <directory/file path> -n <dirent read granularity> -r {recurse} -s {use 64 bit dirent calls} -p {use direntplus interface} -h {this help message}\n", str);
+	fprintf(stderr, "Usage: %s -f <directory/file path> -n <dirent read granularity> -r {recurse} -s {use 64 bit dirent calls} -p {use direntplus interface} -v {verbose} -h {this help message}\n", str);
 	return;
 }
 
@@ -1020,9 +1023,12 @@ int main(int argc, char *argv[])
 {
 	char c;
 
-	while ((c = getopt(argc, argv, "n:f:rsph")) != EOF)
+	while ((c = getopt(argc, argv, "n:f:rsphv")) != EOF)
 	{
 		switch(c) {
+		   case 'v':
+		      verbose = 1;
+		      break;
 			case 's':
 				use_64 = 1;
 				break;

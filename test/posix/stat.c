@@ -22,7 +22,7 @@ static int dirent_granularity = 4096;
 static int recurse = 0;
 static char path[256] = ".";
 static int use_lite = 0;
-static int nobjects = 0, nlevels = 0;
+static int nobjects = 0, nlevels = 0, verbose = 0;
 
 #define S_SLITE_SIZET     0x1
 #define S_SLITE_BLKSIZE   0x2
@@ -331,6 +331,7 @@ static void print_entry_stat(
         free(formatted_group);
     }
     nobjects++;
+    if (verbose)
 	  printf("%s\n",buf);
 }
 
@@ -437,6 +438,7 @@ static void print_entry_kernel_stat_lite(
         free(formatted_group);
     }
     nobjects++;
+    if (verbose)
 	  printf("%s\n",buf);
 }
 
@@ -639,7 +641,7 @@ static int do_flatten_hierarchy(void)
 static void usage(char *str)
 {
 	fprintf(stderr, "Usage: %s -f <directory/file path> -n <dirent read "
-			"granularity> -r {recurse} -l {use stat lite} -h {this help message}\n",
+			"granularity> -r {recurse} -v {verbose} -l {use stat lite} -h {this help message}\n",
 			str);
 
 	return;
@@ -649,9 +651,12 @@ int main(int argc, char *argv[])
 {
 	char c;
 
-	while ((c = getopt(argc, argv, "n:f:lrh")) != EOF)
+	while ((c = getopt(argc, argv, "n:f:lrhv")) != EOF)
 	{
 		switch(c) {
+			case 'v':
+				verbose = 1;
+				break;
 			case 'l':
 				use_lite = 1;
 				break;

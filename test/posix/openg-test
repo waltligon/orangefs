@@ -44,7 +44,7 @@ openg_shallowfile=$PVFS2_MNT/openg-test
 open_deepfile=$base/open-test
 open_shallowfile=$PVFS2_MNT/open-test
 
-clients="1 2 4 8 16 24 48 96"
+clients="1 4 9 16 25 36 49 64 90"
 
 for c in $clients; do
 

@@ -227,8 +227,8 @@ int main(int argc, char *argv[])
 		rvec[i].iov_base = (char *) rdptr[i];
 		total += wvec[i].iov_len;
 		mem_total += wvec[i].iov_len;
-		printf("%ld) <%p,%p> WRITE %ld bytes\n", i, wvec[i].iov_base, 
-			(char *) wvec[i].iov_base + wvec[i].iov_len, (long) wvec[i].iov_len);
+		/* printf("%ld) <%p,%p> WRITE %ld bytes\n", i, wvec[i].iov_base, 
+			(char *) wvec[i].iov_base + wvec[i].iov_len, (long) wvec[i].iov_len); */
 	}
 	xtnr_segs = str_ct;
 	xc = (struct xtvec *) malloc(xtnr_segs * sizeof(struct xtvec));
@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 		else
 			break;
 		total -= xc[i].xtv_len;
-		printf("%ld) <%ld> FOR %ld bytes\n", i, (long) xc[i].xtv_off, (long) xc[i].xtv_len);
+		/* printf("%ld) <%ld> FOR %ld bytes\n", i, (long) xc[i].xtv_off, (long) xc[i].xtv_len); */
 		xt_total += xc[i].xtv_len;
 	}
 	if (xt_total != mem_total)
@@ -263,8 +263,8 @@ int main(int argc, char *argv[])
 	total_written = do_writex(wvec, nr_segs, xc, xtnr_segs);
 	for (i = 0; i < nr_segs; i++)
 	{
-		printf("%ld) <%p,%p> READ %ld bytes\n", i, rvec[i].iov_base, 
-			(char *) rvec[i].iov_base + rvec[i].iov_len, (long) rvec[i].iov_len);
+		/* printf("%ld) <%p,%p> READ %ld bytes\n", i, rvec[i].iov_base, 
+			(char *) rvec[i].iov_base + rvec[i].iov_len, (long) rvec[i].iov_len); */
 		mem_total += rvec[i].iov_len;
 	}
 	if (xt_total != mem_total)
