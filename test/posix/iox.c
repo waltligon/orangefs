@@ -35,7 +35,7 @@
 #define BUFSIZE 65536
 
 static int amode = O_RDWR | O_CREAT | O_LARGEFILE;
-static int niters = 1, do_unlink = 0, correctness = 0;
+static int niters = 1, do_unlink = 0, correctness = 0, verbose = 0;
 
 enum {
 	MODE_RDWR = 0,
@@ -134,11 +134,8 @@ static ssize_t do_readx_writex(int type, int file,
 			goto out;
 		}
 	}
-	ret = -EFAULT;
-	if (memcpy(iov, uvector, nr_segs * sizeof(*uvector)))
-		goto out;
-	if (memcpy(xtv, xtuvector, xtnr_segs * sizeof(*xtuvector)))
-		goto out;
+	memcpy(iov, uvector, nr_segs * sizeof(*uvector));
+	memcpy(xtv, xtuvector, xtnr_segs * sizeof(*xtuvector));
 
 	tot_len = 0;
 	ret = -EINVAL;
@@ -214,6 +211,7 @@ static ssize_t do_readx_writex(int type, int file,
 			ssize_t nr, tot_nr;
 
 			pos = copied_xtvector[xtiov_index].xtv_off;
+			lseek(file, pos, SEEK_SET);
 			op_iov_index = 0;
 			tot_nr = 0;
 			
@@ -280,6 +278,7 @@ err_out1:
 			void  *base;
 
 			pos = copied_xtvector[str_ct].xtv_off;
+			lseek(file, pos, SEEK_SET);
 			base = copied_iovector[mem_ct].iov_base;
 			min_len = min(copied_xtvector[str_ct].xtv_len, copied_iovector[mem_ct].iov_len);
 			copied_xtvector[str_ct].xtv_len -= min_len;
@@ -312,11 +311,21 @@ out:
 	return ret;
 }
 
+static void usage(char *str)
+{
+	fprintf(stderr, "Usage: %s -f <filename> -s <stream count max> -b <buffer size> -m <mode> "
+			"-c {correctness} -u {unlink file} -v {verbose}\n", str);
+	return;
+}
+
 static void parse(int argc, char *argv[])
 {
 	int c;
-	while ((c = getopt(argc, argv, "n:m:f:b:s:uc")) != EOF) {
+	while ((c = getopt(argc, argv, "n:m:f:b:s:ucv")) != EOF) {
 		switch (c) {
+			case 'v':
+				verbose = 1;
+				break;
 			case 'c':
 				correctness = 1;
 				break;
@@ -339,23 +348,26 @@ static void parse(int argc, char *argv[])
 				stream_ct = atoi(optarg);
 				break;
 			default:
-				fprintf(stderr, "Usage: %s -f <filename> -s <stream count max> -b <buffer size> -m <mode> -c {correctness} -u {unlink file}\n", argv[0]);
+				usage(argv[0]);
 				exit(1);
 		}
 	}
 	if (stream_ct <= 0 || bufsize <= 0)
 	{
-		fprintf(stderr, "Usage: %s -f <filename> -s <stream count max> -b <buffer size> -m <mode> -c {correctness} -u {unlink file}\n", argv[0]);
+		fprintf(stderr, "Invalid stream count/buffer size\n");
+		usage(argv[0]);
 		exit(1);
 	}
 	if (mode != MODE_RDWR_X && mode != MODE_RDWR_VEC && mode != MODE_RDWR)
 	{
-		fprintf(stderr, "Usage: %s -f <filename> -s <stream count max> -b <buffer size> -m <mode> -c {correctness} -u {unlink file}\n", argv[0]);
+		fprintf(stderr, "Invalid mode specified %d\n", mode);
+		usage(argv[0]);
 		exit(1);
 	}
 	if (correctness != 0 && correctness != 1)
 	{
-		fprintf(stderr, "Usage: %s -f <filename> -s <stream count max> -b <buffer size> -m <mode> -c {correctness} -u {unlink file}\n", argv[0]);
+		fprintf(stderr, "Invalid values\n");
+		usage(argv[0]);
 		exit(1);
 	}
 	return;
@@ -390,9 +402,46 @@ static void free_buffers(char **ptr, int nr_segs)
 	free(ptr);
 }
 
+static int compare_buffers(struct iovec *iov1, struct iovec *iov2, int count)
+{
+	int i, j;
+	for (i = 0; i < count; i++) 
+	{
+		if (iov1[i].iov_len != iov2[i].iov_len)
+		{
+			fprintf(stderr, "length mismatch\n");
+			break;
+		}
+		for (j = 0; j < iov1[i].iov_len; j++)
+		{
+			if (*((char *)iov1[i].iov_base + j) != *((char *) iov2[i].iov_base + j))
+			{
+				fprintf(stderr, "index %d, char %d in streamsize %ld\n",
+						i, j, (long) iov1[i].iov_len);
+				break;
+			}
+		}
+		if (j != iov1[i].iov_len)
+			break;
+		/*
+		if (memcmp(iov1[i].iov_base, iov2[i].iov_base, iov1[i].iov_len) == 0)
+			continue;
+		break;
+		*/
+	}
+	if (i != count)
+	{
+		return 0;
+	}
+	else {
+		return 1;
+	}
+}
+
 int main(int argc, char *argv[])
 {
-	int fd, i, j, mynod=0, nprocs=1;
+	int fd, i, j, mynod=0, nprocs=1, err;
+	int my_correct = 1, correct;
 	unsigned long iter_jump = 0;
 	double stim, etim;
 	double write_tim = 0;
@@ -420,7 +469,7 @@ int main(int argc, char *argv[])
 
 	iter_jump = nprocs * bufsize;
 	nr_segs = memory_ct;
-	fillup_buffers(&wrptr, memory_ct, 0);
+	fillup_buffers(&wrptr, memory_ct, correctness);
 	fillup_buffers(&rdptr, memory_ct, 0);
 	wvec = (struct iovec *) malloc(nr_segs * sizeof(struct iovec));
 	rvec = (struct iovec *) malloc(nr_segs * sizeof(struct iovec));
@@ -438,6 +487,9 @@ int main(int argc, char *argv[])
 		rvec[i].iov_len = wvec[i].iov_len;
 		rvec[i].iov_base = (char *) rdptr[i];
 		mem_total += wvec[i].iov_len;
+		if (verbose)
+			printf("%d) <%p,%p> WRITE %ld bytes\n", i, wvec[i].iov_base, 
+				(char *) wvec[i].iov_base + wvec[i].iov_len, (long) wvec[i].iov_len); 
 	}
 	xtnr_segs = stream_ct;
 	xc = (struct xtvec *) malloc(xtnr_segs * sizeof(struct xtvec));
@@ -459,7 +511,7 @@ int main(int argc, char *argv[])
 		goto err;
 	}
 
-	fd = open(fname, amode, 0644);
+	fd = open(fname, O_TRUNC | amode, 0644);
 	if (fd < 0) {
 		fprintf(stderr, "node %d, open error: %s\n", mynod,
 			  strerror(errno));
@@ -467,6 +519,7 @@ int main(int argc, char *argv[])
 	}
 	/* repeat write number of times specified on the command line */
 	for (j=0; j < niters; j++) {
+		ssize_t cnt = 0;
 		/* seek to an appropriate position depending on the iteration and
 		 * rank of the current process */
 		loc = j * iter_jump + (mynod * bufsize);
@@ -476,10 +529,17 @@ int main(int argc, char *argv[])
 		/* Adjust the file offset */
 		for (i = 0; i < xtnr_segs; i++)
 		{
-			xc[i].xtv_off = loc + i * bufsize / xtnr_segs;
+			xc[i].xtv_off = loc + cnt;
+			cnt += xc[i].xtv_len;
+			if (verbose)
+				printf("%d) WRITE offset %ld length %zd\n", i, xc[i].xtv_off, xc[i].xtv_len);
 		}
-		do_readx_writex(WRITE, fd, wvec, nr_segs,
-				xc, xtnr_segs);
+		if ((err = do_readx_writex(WRITE, fd, wvec, nr_segs,
+				xc, xtnr_segs)) < 0) {
+			fprintf(stderr, "(Write) readx_writex failed with error %s\n", strerror(-err));
+			close(fd);
+			goto err;
+		}
 		etim = MPI_Wtime();
 		write_tim += (etim - stim);
 	}
@@ -494,6 +554,7 @@ int main(int argc, char *argv[])
 	}
 	/* repeat read, number of times specified on the command line */
 	for (j=0; j < niters; j++) {
+		ssize_t cnt = 0;
 		/* seek to an appropriate position depending on the iteration and
 		 * rank of the current process */
 		loc = j * iter_jump + (mynod * bufsize);
@@ -503,14 +564,25 @@ int main(int argc, char *argv[])
 		/* Adjust the file offset */
 		for (i = 0; i < xtnr_segs; i++)
 		{
-			xc[i].xtv_off = loc + i * bufsize / xtnr_segs;
+			xc[i].xtv_off = loc + cnt;
+			cnt += xc[i].xtv_len;
+			if (verbose)
+				printf("%d) READ offset %ld length %zd\n", i, xc[i].xtv_off, xc[i].xtv_len);
 		}
-		do_readx_writex(READ, fd, rvec, nr_segs,
-				xc, xtnr_segs);
+		if ((err = do_readx_writex(READ, fd, rvec, nr_segs,
+				xc, xtnr_segs)) < 0) {
+			fprintf(stderr, "(Read) readx_writex failed with error %s\n", strerror(-err));
+			close(fd);
+			goto err;
+		}
 		etim = MPI_Wtime();
 		read_tim += (etim - stim);
 	}
 	close(fd);
+
+	if (do_unlink) {
+		unlink(fname);
+	}
 
 	MPI_Allreduce(&read_tim, &max_read_tim, 1, MPI_DOUBLE, MPI_MAX,
 		MPI_COMM_WORLD);
@@ -554,7 +626,9 @@ int main(int argc, char *argv[])
 	   write_bw = ((int64_t)(bufsize*nprocs*niters))/
 			(max_write_tim*1000000.0);
 		
-		printf("nr_procs = %d, nr_iter = %d, blk_sz = %ld, stream_ct = %d\n",
+		printf("# Using %s mode\n", 
+				(mode == MODE_RDWR) ? "read/write" : (mode == MODE_RDWR_VEC) ? "readv/writev" : "readx/writex");
+		printf("# nr_procs = %d, nr_iter = %d, blk_sz = %ld, stream_ct = %d\n",
 			nprocs, niters, bufsize, stream_ct);
 		
 		printf("# total_size = %ld\n", (bufsize*nprocs*niters));
@@ -566,6 +640,17 @@ int main(int argc, char *argv[])
 		
 		printf("Write bandwidth = %g Mbytes/sec\n", write_bw);
 		printf("Read bandwidth = %g Mbytes/sec\n", read_bw);
+	}
+	if (correctness) {
+		my_correct = compare_buffers(rvec, wvec, nr_segs);
+		MPI_Allreduce(&my_correct, &correct, 1, MPI_INT, MPI_MIN,
+						  MPI_COMM_WORLD);
+		if (mynod == 0) {
+			if (correct == 1)
+				printf("Tests passed!\n");
+			else 
+				printf("Tests failed!\n");
+		}
 	}
 	free_buffers(rdptr, memory_ct);
 	free_buffers(wrptr, memory_ct);
