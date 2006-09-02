@@ -231,7 +231,7 @@ static ssize_t do_readx_writex(int type, int file,
 				op_iov[op_iov_index++].iov_len = min_len;
 				copied_xtvector[xtiov_index].xtv_len -= min_len;
 				copied_iovector[iov_index].iov_len -= min_len;
-				copied_iovector[iov_index].iov_base += min_len;
+				copied_iovector[iov_index].iov_base = (char *) copied_iovector[iov_index].iov_base + min_len;
 				tot_nr += min_len;
 				/* Advance memory stream if we have exhausted it */
 				if (copied_iovector[iov_index].iov_len <= 0) {
@@ -285,7 +285,7 @@ err_out1:
 			copied_xtvector[str_ct].xtv_len -= min_len;
 			copied_xtvector[str_ct].xtv_off += min_len;
 			copied_iovector[mem_ct].iov_len -= min_len;
-			copied_iovector[mem_ct].iov_base += min_len;
+			copied_iovector[mem_ct].iov_base = (char *) copied_iovector[mem_ct].iov_base + min_len;
 			if (copied_iovector[mem_ct].iov_len <= 0)
 				mem_ct++;
 			if (copied_xtvector[str_ct].xtv_len <= 0)
