@@ -24,7 +24,7 @@ MPIMISCSRC += \
 DLLSRC += \
 	$(DIR)/libstat.c
 
-MPITESTSRC += $(DIR)/openg-mpi.c $(DIR)/open.c $(DIR)/iox.c
+MPITESTSRC += $(DIR)/openg-mpi.c $(DIR)/open.c $(DIR)/iox.c $(DIR)/io.c
 
 MODCFLAGS_$(DIR)/getdents.c = -D_GNU_SOURCE
 MODCFLAGS_$(DIR)/stat.c = -D_GNU_SOURCE
