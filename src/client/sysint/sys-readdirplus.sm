@@ -232,6 +232,7 @@ PVFS_error PVFS_sys_readdirplus(
 static int get_handle_index(struct handle_to_index *input_handle_array, int nhandles, PVFS_handle given_handle, int *primary_index, int *secondary_index)
 {
     int i;
+
     for (i = 0; i < nhandles; i++) {
         if (input_handle_array[i].handle == given_handle) {
             if (primary_index)
@@ -245,23 +246,29 @@ static int get_handle_index(struct handle_to_index *input_handle_array, int nhan
         *primary_index = -1;
     if (secondary_index)
         *secondary_index = -1;
+
     return -1;
 }
 
 static int is_unique_server(PVFS_BMI_addr_t svr_addr, int svr_count, 
     PVFS_BMI_addr_t *svr_addr_array, int *svr_index)
 {
-    int i;
-    if (svr_count == 0 || svr_addr_array == NULL)
-        return 1;
+    int i, ret;
+
+    ret = 1;
+    if (svr_count == 0 || svr_addr_array == NULL) {
+        goto out;
+    }
     for (i = 0; i < svr_count; i++) {
         if (svr_addr_array[i] == svr_addr) {
             if (svr_index)
                 *svr_index = i;
-            return 0;
+            ret = 0;
+            goto out;
         }
     }
-    return 1;
+out:
+    return ret;
 }
 
 static int destroy_partition_handles(int *svr_count,
@@ -552,6 +559,7 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
     {
         /* fetch all errors from the servresp structure and copy the object attributes */
         int i, handle_index;
+
         /* make sure that we get back responses for all handles that we sent out */
         assert(resp_p->u.listattr.nhandles == sm_p->u.readdirplus.handle_count[index]);
         for (i = 0; i < sm_p->u.readdirplus.handle_count[index]; i++) 
@@ -675,6 +683,7 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
                             &sm_p->u.readdirplus.server_addresses, /* array of server addresses */
                             &sm_p->u.readdirplus.handle_count, /* array of counts of handles to each server */
                             &sm_p->u.readdirplus.handles); /* actual per-server handle array */
+
     return ret;
 }
 
@@ -733,6 +742,7 @@ static int readdirplus_fetch_sizes_setup_msgpair(PINT_client_sm *sm_p,
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = readdirplus_fetch_sizes_comp_fn;
         msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];
+
      }
      /* immediate return. next state jumps to msgpairarray machine */
      js_p->error_code = 0;
@@ -768,6 +778,7 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
     {
         /* fetch all errors from the servresp structure and copy the object attributes */
         int i, handle_index, aux_index;
+
         /* make sure that we get back responses for all handles that we sent out */
         assert(resp_p->u.listattr.nhandles == sm_p->u.readdirplus.handle_count[index]);
         for (i = 0; i < sm_p->u.readdirplus.handle_count[index]; i++) 

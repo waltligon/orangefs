@@ -41,9 +41,9 @@ int main(int argc, char *argv[])
 	if ((ret = db->open(db, 
 			    NULL, fname, NULL, DB_UNKNOWN,  
 #ifdef HAVE_DB_DIRTY_READ
-			    DB_DIRTY_READ | 
+			    DB_DIRTY_READ,
 #endif
-			    DB_THREAD, 0)) != 0)
+			    0)) != 0)
 	{
 		fprintf(stderr, "db->open: %s\n", db_strerror(ret));
 		exit(1);
