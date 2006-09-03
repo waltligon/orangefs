@@ -12,7 +12,7 @@ static int pvfs2_readlink(
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    pvfs2_print("pvfs2_readlink called on inode %d\n",
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readlink called on inode %d\n",
                 (int)dentry->d_inode->i_ino);
 
     /*
@@ -28,7 +28,7 @@ static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    pvfs2_print("pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
                 (char *)dentry->d_name.name, pvfs2_inode->link_target);
 
     return vfs_follow_link(nd, pvfs2_inode->link_target);
@@ -38,7 +38,7 @@ static void *pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    pvfs2_print("pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
                 (char *)dentry->d_name.name, pvfs2_inode->link_target);
 
     return ERR_PTR(vfs_follow_link(nd, pvfs2_inode->link_target));

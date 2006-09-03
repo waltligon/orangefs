@@ -15,7 +15,6 @@
 #include "gen-locks.h"
 #include "pint-cached-config.h"
 #include "pint-dist-utils.h"
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config-mgr.h"
 #include "PINT-reqproto-encode.h"

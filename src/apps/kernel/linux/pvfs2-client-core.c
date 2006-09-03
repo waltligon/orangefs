@@ -2491,6 +2491,9 @@ static inline void package_downcall_members(
                             val_sz);
                 }
             }
+            else {
+                PVFS_perror("getxattr: ", *error_code);
+            }
             /* free up the memory allocate to response.geteattr */
             free(vfs_request->response.geteattr.val_array[0].buffer);
             vfs_request->response.geteattr.val_array[0].buffer = NULL;
@@ -3073,12 +3076,12 @@ int main(int argc, char **argv)
     parse_args(argc, argv, &s_opts);
 
     /* convert gossip mask if provided on command line */
-    if(s_opts.gossip_mask)
+    if (s_opts.gossip_mask)
     {
         debug_mask = PVFS_debug_eventlog_to_mask(s_opts.gossip_mask);
     }
 
-    if(s_opts.logstamp_type_set)
+    if (s_opts.logstamp_type_set)
     {
         gossip_set_logstamp(s_opts.logstamp_type);
     }

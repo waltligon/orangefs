@@ -12,7 +12,6 @@
 
 #include "pvfs2-sysint.h"
 #include "pint-sysint-utils.h"
-#include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 

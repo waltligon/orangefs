@@ -129,7 +129,7 @@ ssize_t pvfs2_listxattr(struct dentry *dentry, char *buffer, size_t size)
 int pvfs2_removexattr(struct dentry *dentry, const char *name)
 {
     struct inode *inode = dentry->d_inode;
-    return pvfs2_inode_removexattr(inode, NULL, name);
+    return pvfs2_inode_removexattr(inode, NULL, name, XATTR_REPLACE);
 }
 
 #endif

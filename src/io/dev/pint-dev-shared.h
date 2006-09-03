@@ -76,15 +76,17 @@ struct PVFS_dev_map_desc
 #define DEV_GET_MAX_DOWNSIZE    0x3
 #define DEV_MAP                 0x4
 #define DEV_REMOUNT_ALL         0x5
-#define DEV_MAX_NR              0x6
+#define DEV_DEBUG               0x6
+#define DEV_MAX_NR              0x7
 
 /* supported ioctls, codes are with respect to user-space */
 enum {
-PVFS_DEV_GET_MAGIC          = _IOW(PVFS_DEV_MAGIC, DEV_GET_MAGIC, int32_t),
-PVFS_DEV_GET_MAX_UPSIZE     = _IOW(PVFS_DEV_MAGIC, DEV_GET_MAX_UPSIZE, int32_t),
-PVFS_DEV_GET_MAX_DOWNSIZE   = _IOW(PVFS_DEV_MAGIC, DEV_GET_MAX_DOWNSIZE, int32_t),
-PVFS_DEV_MAP                =  _IO(PVFS_DEV_MAGIC, DEV_MAP),
-PVFS_DEV_REMOUNT_ALL        =  _IO(PVFS_DEV_MAGIC, DEV_REMOUNT_ALL),
+PVFS_DEV_GET_MAGIC          = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAGIC, int32_t),
+PVFS_DEV_GET_MAX_UPSIZE     = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_UPSIZE, int32_t),
+PVFS_DEV_GET_MAX_DOWNSIZE   = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_DOWNSIZE, int32_t),
+PVFS_DEV_MAP                =  _IO(PVFS_DEV_MAGIC , DEV_MAP),
+PVFS_DEV_REMOUNT_ALL        =  _IO(PVFS_DEV_MAGIC , DEV_REMOUNT_ALL),
+PVFS_DEV_DEBUG              =  _IOR(PVFS_DEV_MAGIC, DEV_DEBUG, int32_t),
 PVFS_DEV_MAXNR              =  DEV_MAX_NR,
 };
 

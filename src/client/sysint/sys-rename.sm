@@ -22,7 +22,6 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
-#include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
@@ -902,6 +901,21 @@ static int rename_cleanup(PINT_client_sm *sm_p,
     {
         PINT_acache_invalidate(sm_p->object_ref);
     }
+    else
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "rename state: updating ncache with entry [%s] "
+            "ref.handle=%llu ref.fsid=%d\n",
+            sm_p->u.rename.entries[1],
+            llu(sm_p->u.rename.refns[0].handle),
+            sm_p->u.rename.parent_refns[0].fs_id);
+
+        PINT_ncache_update((const char*) sm_p->u.rename.entries[1],
+            (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
+    }
+        
+
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 

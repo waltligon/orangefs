@@ -35,7 +35,7 @@ int op_cache_initialize(void)
 
     if (!op_cache)
     {
-        pvfs2_panic("Cannot create pvfs2_op_cache\n");
+        gossip_err("Cannot create pvfs2_op_cache\n");
         return -ENOMEM;
     }
 
@@ -50,7 +50,7 @@ int op_cache_finalize(void)
 {
     if (kmem_cache_destroy(op_cache) != 0)
     {
-        pvfs2_panic("Failed to destroy pvfs2_op_cache\n");
+        gossip_err("Failed to destroy pvfs2_op_cache\n");
         return -EINVAL;
     }
     return 0;
@@ -139,14 +139,14 @@ static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
         spin_unlock(&next_tag_value_lock);
         new_op->upcall.type = type;
         new_op->attempts = 0;
-        pvfs2_print("Alloced OP (%p: %ld %s)\n", new_op, (unsigned long) new_op->tag, get_opname_string(new_op));
+        gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %ld %s)\n", new_op, (unsigned long) new_op->tag, get_opname_string(new_op));
 
         pvfs2_gen_credentials(&new_op->upcall.credentials);
         new_op->op_linger = new_op->op_linger_tmp = op_linger;
     }
     else
     {
-        pvfs2_panic("op_alloc_common: kmem_cache_alloc failed!\n");
+        gossip_err("op_alloc: kmem_cache_alloc failed!\n");
     }
     return new_op;
 }
@@ -165,13 +165,13 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
 {
     if (pvfs2_op)
     {
-        pvfs2_print("Releasing OP (%p: %ld)\n", pvfs2_op, (unsigned long) pvfs2_op->tag);
+        gossip_debug(GOSSIP_CACHE_DEBUG, "Releasing OP (%p: %ld)\n", pvfs2_op, (unsigned long) pvfs2_op->tag);
         pvfs2_op_initialize(pvfs2_op);
         kmem_cache_free(op_cache, pvfs2_op);
     }
     else 
     {
-        pvfs2_panic("NULL pointer in op_release\n");
+        gossip_err("NULL pointer in op_release\n");
     }
 }
 
@@ -186,7 +186,7 @@ static void dev_req_cache_ctor(
     }
     else
     {
-        pvfs2_panic("WARNING!! devreq_ctor called without ctor flag\n");
+        gossip_err("WARNING!! devreq_ctor called without ctor flag\n");
     }
 }
 
@@ -198,7 +198,7 @@ int dev_req_cache_initialize(void)
 
     if (!dev_req_cache)
     {
-        pvfs2_panic("Cannot create pvfs2_dev_req_cache\n");
+        gossip_err("Cannot create pvfs2_dev_req_cache\n");
         return -ENOMEM;
     }
     return 0;
@@ -208,7 +208,7 @@ int dev_req_cache_finalize(void)
 {
     if (kmem_cache_destroy(dev_req_cache) != 0)
     {
-        pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
+        gossip_err("Failed to destroy pvfs2_devreqcache\n");
         return -EINVAL;
     }
     return 0;
@@ -221,7 +221,7 @@ void *dev_req_alloc(void)
     buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (buffer == NULL)
     {
-        pvfs2_panic("Failed to allocate from dev_req_cache\n"); 
+        gossip_err("Failed to allocate from dev_req_cache\n"); 
     }
     return buffer;
 }
@@ -234,7 +234,7 @@ void dev_req_release(void *buffer)
     }
     else 
     {
-        pvfs2_panic("NULL pointer passed to dev_req_release\n");
+        gossip_err("NULL pointer passed to dev_req_release\n");
     }
     return;
 }
@@ -268,7 +268,7 @@ static void pvfs2_inode_cache_ctor(
     }
     else
     {
-        pvfs2_panic("WARNING!! inode_ctor called without ctor flag\n");
+        gossip_err("WARNING!! inode_ctor called without ctor flag\n");
     }
 }
 
@@ -311,7 +311,7 @@ int pvfs2_inode_cache_initialize(void)
 
     if (!pvfs2_inode_cache)
     {
-        pvfs2_panic("Cannot create pvfs2_inode_cache\n");
+        gossip_err("Cannot create pvfs2_inode_cache\n");
         return -ENOMEM;
     }
     return 0;
@@ -321,7 +321,7 @@ int pvfs2_inode_cache_finalize(void)
 {
     if (!list_empty(&pvfs2_inode_list))
     {
-        pvfs2_error("pvfs2_inode_cache_finalize: WARNING: releasing unreleased pvfs2 inode objects!\n");
+        gossip_err("pvfs2_inode_cache_finalize: WARNING: releasing unreleased pvfs2 inode objects!\n");
         while (pvfs2_inode_list.next != &pvfs2_inode_list)
         {
             pvfs2_inode_t *pinode = list_entry(pvfs2_inode_list.next, pvfs2_inode_t, list);
@@ -331,7 +331,7 @@ int pvfs2_inode_cache_finalize(void)
     }
     if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
     {
-        pvfs2_panic("Failed to destroy pvfs2_inode_cache\n");
+        gossip_err("Failed to destroy pvfs2_inode_cache\n");
         return -EINVAL;
     }
     return 0;
@@ -351,7 +351,7 @@ pvfs2_inode_t* pvfs2_inode_alloc(void)
                                    PVFS2_CACHE_ALLOC_FLAGS);
     if (pvfs2_inode == NULL) 
     {
-        pvfs2_panic("Failed to allocate pvfs2_inode\n");
+        gossip_err("Failed to allocate pvfs2_inode\n");
     }
     else {
         add_to_pinode_list(pvfs2_inode);
@@ -368,7 +368,7 @@ void pvfs2_inode_release(pvfs2_inode_t *pinode)
     }
     else
     {
-        pvfs2_panic("NULL pointer in pvfs2_inode_release\n");
+        gossip_err("NULL pointer in pvfs2_inode_release\n");
     }
 }
 
@@ -385,7 +385,7 @@ static void kiocb_ctor(
     }
     else
     {
-        pvfs2_panic("WARNING!! kiocb_ctor called without ctor flag\n");
+        gossip_err("WARNING!! kiocb_ctor called without ctor flag\n");
     }
 }
 
@@ -398,7 +398,7 @@ int kiocb_cache_initialize(void)
 
     if (!pvfs2_kiocb_cache)
     {
-        pvfs2_panic("Cannot create pvfs2_kiocb_cache!\n");
+        gossip_err("Cannot create pvfs2_kiocb_cache!\n");
         return -ENOMEM;
     }
     return 0;
@@ -408,7 +408,7 @@ int kiocb_cache_finalize(void)
 {
     if (kmem_cache_destroy(pvfs2_kiocb_cache) != 0)
     {
-        pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
+        gossip_err("Failed to destroy pvfs2_devreqcache\n");
         return -EINVAL;
     }
     return 0;
@@ -421,7 +421,7 @@ pvfs2_kiocb* kiocb_alloc(void)
     x = kmem_cache_alloc(pvfs2_kiocb_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (x == NULL)
     {
-        pvfs2_panic("kiocb_alloc: kmem_cache_alloc failed!\n");
+        gossip_err("kiocb_alloc: kmem_cache_alloc failed!\n");
     }
     return x;
 }
@@ -434,7 +434,7 @@ void kiocb_release(pvfs2_kiocb *x)
     }
     else 
     {
-        pvfs2_panic("kiocb_release: kmem_cache_free NULL pointer!\n");
+        gossip_err("kiocb_release: kmem_cache_free NULL pointer!\n");
     }
 }
 

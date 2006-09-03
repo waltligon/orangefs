@@ -87,9 +87,9 @@ static int fillup_buffer(cm_frame_t *frame, int *nr_segs, struct iovec **wr_iove
 			tmp_start = rand() % chunk_size;
 			frame->cf_valid_start[c] = c * chunk_size + tmp_start;
 			frame->cf_valid_size[c] = (rand() % (chunk_size - tmp_start)) + 1;
-			rd_vector[c].iov_base = frame->rd_buffer + frame->cf_valid_start[c];
+			rd_vector[c].iov_base = (char *) frame->rd_buffer + frame->cf_valid_start[c];
 			rd_vector[c].iov_len  = frame->cf_valid_size[c];
-			wr_vector[c].iov_base = frame->wr_buffer + frame->cf_valid_start[c];
+			wr_vector[c].iov_base = (char *) frame->wr_buffer + frame->cf_valid_start[c];
 			wr_vector[c].iov_len  = frame->cf_valid_size[c];
 			assert(frame->cf_valid_start[c] + frame->cf_valid_size[c] <= frame->buf_size);
 			
@@ -99,14 +99,14 @@ static int fillup_buffer(cm_frame_t *frame, int *nr_segs, struct iovec **wr_iove
 	 {
 			printf("(%d): Writing %p to %p [%d start %ld bytes]\n", 
 					c, wr_vector[c].iov_base, 
-					wr_vector[c].iov_base + wr_vector[c].iov_len, 
+					(char *) wr_vector[c].iov_base + wr_vector[c].iov_len, 
 					frame->cf_valid_start[c], (long) wr_vector[c].iov_len);
 	 }
 	 for (c = 0; c < frame->cf_valid_count; c++)
 	 {
 			printf("(%d): Reading %p to %p [%d start %ld bytes]\n", 
 					c, rd_vector[c].iov_base, 
-					rd_vector[c].iov_base + rd_vector[c].iov_len, 
+					(char *) rd_vector[c].iov_base + rd_vector[c].iov_len, 
 					frame->cf_valid_start[c], (long) rd_vector[c].iov_len);
 	 }
     printf("writev and readv should write %d bytes\n", should_be);
@@ -224,3 +224,4 @@ int main(int argc, char *argv[])
 	}
 	return 0;
 }
+

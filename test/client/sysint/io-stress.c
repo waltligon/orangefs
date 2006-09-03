@@ -23,7 +23,6 @@
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2.h"
 #include "str-utils.h"
-#include "xattr-utils.h"
 #include "pint-sysint-utils.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"

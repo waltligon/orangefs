@@ -79,6 +79,9 @@ struct bmi_method_ops
     int (*BMI_meth_memfree) (void *,
 			     bmi_size_t,
 			     enum bmi_op_type);
+
+    int (*BMI_meth_unexpected_free) (void *);
+
     int (*BMI_meth_post_send) (bmi_op_id_t *,
 			       method_addr_p,
 			       const void *,

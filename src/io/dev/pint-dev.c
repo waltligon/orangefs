@@ -23,6 +23,7 @@
 
 #include "pint-mem.h"
 #include "pvfs2-types.h"
+#include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pint-dev.h"
 #include "pvfs2-dev-proto.h"
@@ -51,6 +52,8 @@ int PINT_dev_initialize(
     int flags)
 {
     int ret = -1;
+    char *debug_string = getenv("PVFS2_KMODMASK");
+    int32_t debug_mask = 0;
 
     /* we have to be root to access the device */
     if ((getuid() != 0) && (geteuid() != 0))
@@ -104,6 +107,20 @@ int PINT_dev_initialize(
         gossip_err("Error: ioctl() PVFS_DEV_GET_MAX_DOWNSIZE failure.\n");
         close(pdev_fd);
         return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+    }
+
+    /* set the debug mask through an ioctl */
+    if (!debug_string)
+        return 0;
+
+    /* truncate it to a 32 bit mask since we dont have a need for more than that anyways */
+    debug_mask = (int32_t) PVFS_kmod_eventlog_to_mask(debug_string);
+    ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &debug_mask);
+    if (ret < 0)
+    {
+        gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (debug mask to %x)\n", debug_mask);
+        close(pdev_fd);
+        return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
     return 0;
 }

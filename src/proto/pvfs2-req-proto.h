@@ -74,11 +74,9 @@ enum PVFS_server_op
     PVFS_SERV_LISTEATTR = 32,
     PVFS_SERV_SMALL_IO = 33,
     PVFS_SERV_LISTATTR = 34,
-    /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define
-     * (below) if you add a new operation to this list
-     */
+    /* leave this entry last */
+    PVFS_SERV_NUM_OPS
 };
-#define PVFS_MAX_SERVER_OP 35
 
 /*
  * These ops must always work, even if the server is in admin mode.
@@ -907,7 +905,7 @@ struct PVFS_servreq_small_io
     PVFS_size sizes[SMALL_IO_MAX_SEGMENTS];
 
     PVFS_size total_bytes; /* changed from int32_t */
-    void * buffer;
+    char * buffer;
 };
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1010,7 +1008,7 @@ struct PVFS_servresp_small_io
     /* for writes, this is the amount written.  
      * for reads, this is the number of bytes read */
     PVFS_size result_size; 
-    void * buffer;
+    char * buffer;
 };
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

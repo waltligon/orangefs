@@ -113,8 +113,11 @@ extern struct PINT_server_req_params PINT_server_req_table[];
  */
 static inline const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
-    return (((op < 0) || (op > PVFS_MAX_SERVER_OP)) ? NULL :
-            PINT_server_req_table[op].string_name);
+    const char *s = NULL;
+
+    if (op >= 0 && op < PVFS_SERV_NUM_OPS)
+        s = PINT_server_req_table[op].string_name;
+    return s;
 }
 
 extern const char *PINT_eattr_namespaces[];
@@ -390,6 +393,10 @@ typedef struct PINT_server_op
     PINT_sm_msgpair_state *msgarray;
     PINT_sm_msgpair_params msgarray_params;
 
+    PVFS_handle target_handle;
+    PVFS_fs_id target_fs_id;
+    PVFS_object_attr *target_object_attr;
+
     union
     {
 	/* request-specific scratch spaces for use during processing */
@@ -514,7 +521,8 @@ int server_state_machine_start_noreq(
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_server_op
 #define PINT_OP_STATE_GET_MACHINE(_op) \
-    ((_op <= PVFS_MAX_SERVER_OP) ? (PINT_server_req_table[_op].sm) : NULL)
+    ((_op >= 0 && _op < PVFS_SERV_NUM_OPS) ? \
+    PINT_server_req_table[_op].sm : NULL)
 
 #include "state-machine.h"
 #include "pvfs2-internal.h"

@@ -11,7 +11,7 @@
 make_pbs_script() {
 
 	echo "#!/bin/sh
-#PBS -l walltime=0:30:0
+#PBS -l walltime=0:10:0
 #PBS -l nodes=8
 #PBS -j oe
 #PBS -q shared

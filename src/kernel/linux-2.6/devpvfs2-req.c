@@ -18,17 +18,17 @@
 static int open_access_count = 0;
 
 #define DUMP_DEVICE_ERROR()                                            \
-pvfs2_error("*****************************************************\n");\
-pvfs2_error("PVFS2 Device Error:  You cannot open the device file ");  \
-pvfs2_error("\n/dev/%s more than once.  Please make sure that\nthere " \
+gossip_err("*****************************************************\n");\
+gossip_err("PVFS2 Device Error:  You cannot open the device file ");  \
+gossip_err("\n/dev/%s more than once.  Please make sure that\nthere " \
             "are no ", PVFS2_REQDEVICE_NAME);                          \
-pvfs2_error("instances of a program using this device\ncurrently "     \
+gossip_err("instances of a program using this device\ncurrently "     \
             "running. (You must verify this!)\n");                     \
-pvfs2_error("For example, you can use the lsof program as follows:\n");\
-pvfs2_error("'lsof | grep %s' (run this as root)\n",                   \
+gossip_err("For example, you can use the lsof program as follows:\n");\
+gossip_err("'lsof | grep %s' (run this as root)\n",                   \
             PVFS2_REQDEVICE_NAME);                                     \
-pvfs2_error("  open_access_count = %d\n", open_access_count);          \
-pvfs2_error("*****************************************************\n")
+gossip_err("  open_access_count = %d\n", open_access_count);          \
+gossip_err("*****************************************************\n")
 
 static int pvfs2_devreq_open(
     struct inode *inode,
@@ -38,11 +38,11 @@ static int pvfs2_devreq_open(
 
     if (!(file->f_flags & O_NONBLOCK))
     {
-        pvfs2_error("pvfs2: device cannot be opened in blocking mode\n");
+        gossip_err("pvfs2: device cannot be opened in blocking mode\n");
         return ret;
     }
     ret = -EACCES;
-    pvfs2_print("pvfs2-client-core: opening device\n");
+    gossip_debug(GOSSIP_DEV_DEBUG, "pvfs2-client-core: opening device\n");
     down(&devreq_semaphore);
 
     if (open_access_count == 0)
@@ -61,7 +61,7 @@ static int pvfs2_devreq_open(
             }
             else
             {
-                pvfs2_error("PVFS2 Device Error: Cannot obtain reference "
+                gossip_err("PVFS2 Device Error: Cannot obtain reference "
                             "for device file\n");
             }
         }
@@ -72,7 +72,7 @@ static int pvfs2_devreq_open(
     }
     up(&devreq_semaphore);
 
-    pvfs2_print("pvfs2-client-core: open device complete (ret = %d)\n", ret);
+    gossip_debug(GOSSIP_DEV_DEBUG, "pvfs2-client-core: open device complete (ret = %d)\n", ret);
     return ret;
 }
 
@@ -91,7 +91,7 @@ static ssize_t pvfs2_devreq_read(
     if (!(file->f_flags & O_NONBLOCK))
     {
         /* We do not support blocking reads/opens any more */
-        pvfs2_error("pvfs2: blocking reads are not supported! (pvfs2-client-core bug)\n");
+        gossip_err("pvfs2: blocking reads are not supported! (pvfs2-client-core bug)\n");
         return -EINVAL;
     }
     else
@@ -105,7 +105,7 @@ static ssize_t pvfs2_devreq_read(
             /* Check if this op's fsid is known and needs remounting */
             if (fsid != PVFS_FS_ID_NULL && fs_mount_pending(fsid) == 1)
             {
-                pvfs2_print("Skipping op tag %lld %s\n", lld(op->tag), get_opname_string(op));
+                gossip_debug(GOSSIP_DEV_DEBUG, "Skipping op tag %lld %s\n", lld(op->tag), get_opname_string(op));
                 continue;
             }
             /* op does not belong to any particular fsid or already 
@@ -120,7 +120,7 @@ static ssize_t pvfs2_devreq_read(
                 {
                     if (cur_op->upcall.trailer_size <= 0 || cur_op->upcall.trailer_buf == NULL) 
                     {
-                        pvfs2_error("BUG:trailer_size is %ld and trailer buf is %p\n",
+                        gossip_err("BUG:trailer_size is %ld and trailer buf is %p\n",
                                 (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
                     }
                     /* readd it to the head of the list */
@@ -136,11 +136,11 @@ static ssize_t pvfs2_devreq_read(
     {
         spin_lock(&cur_op->lock);
 
-        pvfs2_print("client-core: reading op tag %lld %s\n", lld(cur_op->tag), get_opname_string(cur_op));
+        gossip_debug(GOSSIP_DEV_DEBUG, "client-core: reading op tag %lld %s\n", lld(cur_op->tag), get_opname_string(cur_op));
         if (op_state_in_progress(cur_op) || op_state_serviced(cur_op))
         {
             if (cur_op->op_linger == 1)
-                pvfs2_error("WARNING: Current op already queued...skipping\n");
+                gossip_err("WARNING: Current op already queued...skipping\n");
         }
         else if (cur_op->op_linger == 1 
                 || (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0)) 
@@ -184,13 +184,13 @@ static ssize_t pvfs2_devreq_read(
 
                 if (ret)
                 {
-                    pvfs2_error("Failed to copy data to user space\n");
+                    gossip_err("Failed to copy data to user space\n");
                     len = -EFAULT;
                 }
             }
             else
             {
-                pvfs2_error("Read buffer is too small to copy pvfs2 op\n");
+                gossip_err("Failed to copy data to user space\n");
                 len = -EIO;
             }
         }
@@ -203,18 +203,18 @@ static ssize_t pvfs2_devreq_read(
                 ret = copy_to_user(buf, cur_op->upcall.trailer_buf, len);
                 if (ret)
                 {
-                    pvfs2_error("Failed to copy trailer to user space\n");
+                    gossip_err("Failed to copy trailer to user space\n");
                     len = -EFAULT;
                 }
             }
             else {
-                pvfs2_error("Read buffer for trailer is too small (%ld as opposed to %ld)\n",
+                gossip_err("Read buffer for trailer is too small (%ld as opposed to %ld)\n",
                         (long) count, (long) len);
                 len = -EIO;
             }
         }
         else {
-            pvfs2_error("cur_op: %p (op_linger %d), (op_linger_tmp %d),"
+            gossip_err("cur_op: %p (op_linger %d), (op_linger_tmp %d),"
                     "erroneous request list?\n", cur_op, 
                     cur_op->op_linger, cur_op->op_linger_tmp);
             len = 0;
@@ -254,7 +254,7 @@ static ssize_t pvfs2_devreq_writev(
     /* Either there is a trailer or there isn't */
     if (count != notrailer_count && count != (notrailer_count + 1))
     {
-        pvfs2_error("Error: Number of iov vectors is (%ld) and notrailer count is %d\n",
+        gossip_err("Error: Number of iov vectors is (%ld) and notrailer count is %d\n",
                 count, notrailer_count);
         return -EPROTO;
     }
@@ -269,14 +269,14 @@ static ssize_t pvfs2_devreq_writev(
     {
 	if (iov[i].iov_len > num_remaining)
 	{
-	    pvfs2_error("writev error: Freeing buffer and returning\n");
+	    gossip_err("writev error: Freeing buffer and returning\n");
 	    dev_req_release(buffer);
 	    return -EMSGSIZE;
 	}
 	ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
         if (ret)
         {
-            pvfs2_error("Failed to copy data from user space\n");
+            gossip_err("Failed to copy data from user space\n");
 	    dev_req_release(buffer);
             return -EIO;
         }
@@ -300,14 +300,14 @@ static ssize_t pvfs2_devreq_writev(
 
     if (magic != PVFS2_DEVREQ_MAGIC)
     {
-        pvfs2_error("Error: Device magic number does not match.\n");
+        gossip_err("Error: Device magic number does not match.\n");
         dev_req_release(buffer);
         return -EPROTO;
     }
     if (proto_ver != PVFS_KERNEL_PROTO_VERSION)
     {
-        pvfs2_error("Error: Device protocol version numbers do not match.\n");
-        pvfs2_error("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
+        gossip_err("Error: Device protocol version numbers do not match.\n");
+        gossip_err("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
         dev_req_release(buffer);
         return -EPROTO;
     }
@@ -331,16 +331,16 @@ static ssize_t pvfs2_devreq_writev(
 	    }
 	    else
 	    {
-		pvfs2_print("writev: Ignoring %d bytes\n", payload_size);
+		gossip_debug(GOSSIP_DEV_DEBUG, "writev: Ignoring %d bytes\n", payload_size);
 	    }
 
             /* Do not allocate needlessly if client-core forgets to reset trailer size on op errors */
             if (op->downcall.status == 0 && op->downcall.trailer_size > 0)
             {
-                pvfs2_print("writev: trailer size %ld\n", (unsigned long) op->downcall.trailer_size);
+                gossip_debug(GOSSIP_DEV_DEBUG, "writev: trailer size %ld\n", (unsigned long) op->downcall.trailer_size);
                 if (count != (notrailer_count + 1))
                 {
-                    pvfs2_error("Error: trailer size (%ld) is non-zero, no trailer elements though? (%ld)\n",
+                    gossip_err("Error: trailer size (%ld) is non-zero, no trailer elements though? (%ld)\n",
                             (unsigned long) op->downcall.trailer_size, count);
                     dev_req_release(buffer);
                     put_op(op);
@@ -348,7 +348,7 @@ static ssize_t pvfs2_devreq_writev(
                 }
                 if (iov[notrailer_count].iov_len > op->downcall.trailer_size)
                 {
-                    pvfs2_error("writev error: trailer size (%ld) != iov_len (%ld)\n",
+                    gossip_err("writev error: trailer size (%ld) != iov_len (%ld)\n",
                             (unsigned long) op->downcall.trailer_size, 
                             (unsigned long) iov[notrailer_count].iov_len);
                     dev_req_release(buffer);
@@ -359,14 +359,14 @@ static ssize_t pvfs2_devreq_writev(
                 op->downcall.trailer_buf = (void *) vmalloc(op->downcall.trailer_size);
                 if (op->downcall.trailer_buf != NULL) 
                 {
-                    pvfs2_print("vmalloc: %p\n", op->downcall.trailer_buf);
+                    gossip_debug(GOSSIP_DEV_DEBUG, "vmalloc: %p\n", op->downcall.trailer_buf);
                     ret = copy_from_user(op->downcall.trailer_buf, iov[notrailer_count].iov_base,
                             iov[notrailer_count].iov_len);
                     if (ret)
                     {
-                        pvfs2_error("Failed to copy trailer data from user space\n");
+                        gossip_err("Failed to copy trailer data from user space\n");
                         dev_req_release(buffer);
-                        pvfs2_print("vfree: %p\n", op->downcall.trailer_buf);
+                        gossip_debug(GOSSIP_DEV_DEBUG, "vfree: %p\n", op->downcall.trailer_buf);
                         vfree(op->downcall.trailer_buf);
                         op->downcall.trailer_buf = NULL;
                         put_op(op);
@@ -376,7 +376,7 @@ static ssize_t pvfs2_devreq_writev(
                 else {
                     /* Change downcall status */
                     op->downcall.status = -ENOMEM;
-                    pvfs2_error("writev: could not vmalloc for trailer!\n");
+                    gossip_err("writev: could not vmalloc for trailer!\n");
                 }
             }
 
@@ -430,14 +430,14 @@ static ssize_t pvfs2_devreq_writev(
                             1000 * op_timeout_secs);
                         if (!schedule_timeout(timeout))
                         {
-                            pvfs2_print("*** I/O wait time is up\n");
+                            gossip_debug(GOSSIP_DEV_DEBUG, "*** I/O wait time is up\n");
                             timed_out = 1;
                             break;
                         }
                         continue;
                     }
 
-                    pvfs2_print("*** signal on I/O wait -- aborting\n");
+                    gossip_debug(GOSSIP_DEV_DEBUG, "*** signal on I/O wait -- aborting\n");
                     break;
                 }
 
@@ -467,13 +467,13 @@ static ssize_t pvfs2_devreq_writev(
                 {
                     if (x)
                     {
-                        pvfs2_print("WARNING: pvfs2_iocb from op"
+                        gossip_debug(GOSSIP_DEV_DEBUG, "WARNING: pvfs2_iocb from op"
                                 "has invalid fields! %p, %p(%p), %d\n",
                                 x->buffer, x->op, op, (int) x->bytes_to_be_copied);
                     }
                     else
                     {
-                        pvfs2_print("WARNING: cannot retrieve the "
+                        gossip_debug(GOSSIP_DEV_DEBUG, "WARNING: cannot retrieve the "
                                 "pvfs2_iocb pointer from op!\n");
                     }
                     /* Most likely means that it was cancelled! */
@@ -491,7 +491,7 @@ static ssize_t pvfs2_devreq_writev(
                     else {
                         bytes_copied = op->downcall.resp.io.amt_complete;
                     }
-                    pvfs2_print("[AIO] status of transfer: %d\n", bytes_copied);
+                    gossip_debug(GOSSIP_DEV_DEBUG, "[AIO] status of transfer: %d\n", bytes_copied);
                     if (x->rw == PVFS_IO_READ
                             && bytes_copied > 0)
                     {
@@ -505,7 +505,7 @@ static ssize_t pvfs2_devreq_writev(
                     spin_lock(&op->lock);
                     /* we tell VFS that the op is now serviced! */
                     set_op_state_serviced(op);
-                    pvfs2_print("Setting state of %p to %d [SERVICED]\n",
+                    gossip_debug(GOSSIP_DEV_DEBUG, "Setting state of %p to %d [SERVICED]\n",
                             op, op->op_state);
                     x->bytes_copied = bytes_copied;
                     /* call aio_complete to finish the operation to wake up regular aio waiters */
@@ -537,7 +537,7 @@ static ssize_t pvfs2_devreq_writev(
     else
     {
         /* ignore downcalls that we're not interested in */
-	pvfs2_print("WARNING: No one's waiting for tag %llu\n", llu(tag));
+	gossip_debug(GOSSIP_DEV_DEBUG, "WARNING: No one's waiting for tag %llu\n", llu(tag));
     }
     dev_req_release(buffer);
 
@@ -598,7 +598,7 @@ static int pvfs2_devreq_release(
 {
     int unmounted = 0;
 
-    pvfs2_print("pvfs2-client-core: exiting, closing device\n");
+    gossip_debug(GOSSIP_DEV_DEBUG, "pvfs2-client-core: exiting, closing device\n");
 
     down(&devreq_semaphore);
     pvfs_bufmap_finalize();
@@ -612,7 +612,7 @@ static int pvfs2_devreq_release(
 #endif
 
     unmounted = mark_all_pending_mounts();
-    pvfs2_print("PVFS2 Device Close: Filesystem(s) %s\n",
+    gossip_debug(GOSSIP_DEV_DEBUG, "PVFS2 Device Close: Filesystem(s) %s\n",
                 (unmounted ? "UNMOUNTED" : "MOUNTED"));
     /*
       prune dcache here to get rid of entries that may no longer exist
@@ -630,7 +630,7 @@ static int pvfs2_devreq_release(
     purge_waiting_ops();
     /* Walk through the hash table of in progress operations; mark them as purged and wake them up */
     purge_inprogress_ops();
-    pvfs2_print("pvfs2-client-core: device close complete\n");
+    gossip_debug(GOSSIP_DEV_DEBUG, "pvfs2-client-core: device close complete\n");
     return 0;
 }
 
@@ -653,7 +653,7 @@ static inline long check_ioctl_command(unsigned int command)
     /* Check for valid ioctl codes */
     if (_IOC_TYPE(command) != PVFS_DEV_MAGIC) 
     {
-        pvfs2_error("device ioctl magic numbers don't match! "
+        gossip_err("device ioctl magic numbers don't match! "
                 "did you rebuild pvfs2-client-core/libpvfs2?"
                 "[cmd %x, magic %x != %x]\n",
                 command,
@@ -664,7 +664,7 @@ static inline long check_ioctl_command(unsigned int command)
     /* and valid ioctl commands */
     if (_IOC_NR(command) >= PVFS_DEV_MAXNR || _IOC_NR(command) <= 0) 
     {
-        pvfs2_error("Invalid ioctl command number [%d >= %d]\n",
+        gossip_err("Invalid ioctl command number [%d >= %d]\n",
                 _IOC_NR(command), PVFS_DEV_MAXNR);
         return -ENOIOCTLCMD;
     }
@@ -703,7 +703,7 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
             struct list_head *tmp = NULL;
             pvfs2_sb_info_t *pvfs2_sb = NULL;
 
-            pvfs2_print("pvfs2_devreq_ioctl: got PVFS_DEV_REMOUNT_ALL\n");
+            gossip_debug(GOSSIP_DEV_DEBUG, "pvfs2_devreq_ioctl: got PVFS_DEV_REMOUNT_ALL\n");
 
             /*
               remount all mounted pvfs2 volumes to regain the lost
@@ -719,28 +719,31 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
             {
                 return(ret);
             }
-            pvfs2_print("pvfs2_devreq_ioctl: priority remount "
+            gossip_debug(GOSSIP_DEV_DEBUG, "pvfs2_devreq_ioctl: priority remount "
                         "in progress\n");
             list_for_each(tmp, &pvfs2_superblocks) {
                 pvfs2_sb = list_entry(tmp, pvfs2_sb_info_t, list);
                 if (pvfs2_sb && (pvfs2_sb->sb))
                 {
-                    pvfs2_print("Remounting SB %p\n", pvfs2_sb);
+                    gossip_debug(GOSSIP_DEV_DEBUG, "Remounting SB %p\n", pvfs2_sb);
 
                     ret = pvfs2_remount(pvfs2_sb->sb, NULL,
                                         pvfs2_sb->data);
                     if (ret)
                     {
-                        pvfs2_print("Failed to remount SB %p\n", pvfs2_sb);
+                        gossip_debug(GOSSIP_DEV_DEBUG, "Failed to remount SB %p\n", pvfs2_sb);
                         break;
                     }
                 }
             }
-            pvfs2_print("pvfs2_devreq_ioctl: priority remount "
+            gossip_debug(GOSSIP_DEV_DEBUG, "pvfs2_devreq_ioctl: priority remount "
                         "complete\n");
             up(&request_semaphore);
             return ret;
         }
+        case PVFS_DEV_DEBUG:
+            return (get_user(gossip_debug_mask, (int32_t __user *)arg) ==
+                     -EFAULT) ? -EIO : 0;
         break;
     default:
 	return -ENOIOCTLCMD;
@@ -846,7 +849,7 @@ static long pvfs2_devreq_compat_ioctl(
         arg = translate_dev_map26(args, &ret);
         if (ret < 0)
         {
-            pvfs2_error("Could not translate dev map\n");
+            gossip_err("Could not translate dev map\n");
             return ret;
         }
     }
@@ -873,7 +876,7 @@ static int pvfs2_translate_dev_map(
     p = translate_dev_map26(arg, &ret);
     if (ret < 0)
     {
-        pvfs2_error("Could not translate dev map structure\n");
+        gossip_err("Could not translate dev map structure\n");
         return ret;
     }
     /* p is still a user space address */
@@ -914,6 +917,7 @@ static struct ioctl_trans pvfs2_ioctl32_trans[] = {
     {PVFS_DEV_GET_MAX_DOWNSIZE, NULL},
     {PVFS_DEV_MAP,              pvfs2_translate_dev_map},
     {PVFS_DEV_REMOUNT_ALL,      NULL},
+    {PVFS_DEV_DEBUG,            NULL},
     /* Please add stuff above this line and retain the entry below */
     {0, },
 };
@@ -929,7 +933,7 @@ int pvfs2_ioctl32_init(void)
                     pvfs2_ioctl32_trans[i].cmd, pvfs2_ioctl32_trans[i].handler);
         if (error) 
             goto fail;
-        pvfs2_print("Registered ioctl32 command %08x with handler %p\n",
+        gossip_debug(GOSSIP_DEV_DEBUG, "Registered ioctl32 command %08x with handler %p\n",
                 (unsigned int) pvfs2_ioctl32_trans[i].cmd, pvfs2_ioctl32_trans[i].handler);
     }
     return 0;
@@ -945,7 +949,7 @@ void pvfs2_ioctl32_cleanup(void)
     int i;
     for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
     {
-        pvfs2_print("Deregistered ioctl32 command %08x\n",
+        gossip_debug(GOSSIP_DEV_DEBUG, "Deregistered ioctl32 command %08x\n",
                (unsigned int) pvfs2_ioctl32_trans[i].cmd);
         unregister_ioctl32_conversion(pvfs2_ioctl32_trans[i].cmd);
     }

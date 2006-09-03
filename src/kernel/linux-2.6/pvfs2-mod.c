@@ -24,8 +24,7 @@ static int hash_compare(void *key, struct qhash_head *link);
 
 /* the size of the hash tables for ops in progress */
 static int hash_table_size = 509;
-int debug = 0;
-int timing = 0;
+int gossip_debug_mask = 0;
 int op_timeout_secs = PVFS2_DEFAULT_OP_TIMEOUT_SECS;
 
 MODULE_LICENSE("GPL");
@@ -42,8 +41,7 @@ MODULE_PARM_DESC(hash_table_size, "size of hash table for operations in progress
 DECLARE_FSTYPE(pvfs2_fs_type, "pvfs2", pvfs2_get_sb, 0);
 
 MODULE_PARM(hash_table_size, "i");
-MODULE_PARM(debug, "i");
-MODULE_PARM(timing, "i");
+MODULE_PARM(gossip_debug_mask, "i");
 MODULE_PARM(op_timeout_secs, "i");
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
@@ -64,8 +62,7 @@ struct file_system_type pvfs2_fs_type =
 };
 
 module_param(hash_table_size, int, 0);
-module_param(debug, bool, 0);
-module_param(timing, bool, 0);
+module_param(gossip_debug_mask, int, 0);
 module_param(op_timeout_secs, int, 0);
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
@@ -99,13 +96,7 @@ DECLARE_WAIT_QUEUE_HEAD(pvfs2_request_list_waitq);
 static int __init pvfs2_init(void)
 {
     int ret = -1;
-    pvfs2_print("pvfs2: pvfs2_init called\n");
-
-    if(debug)
-    {
-        debug=1; /* normalize any non-zero value to 1 */
-        pvfs2_error("pvfs2: verbose debug mode\n");
-    }
+    gossip_debug(GOSSIP_INIT_DEBUG, "pvfs2: pvfs2_init called with debug mask 0x%x\n", gossip_debug_mask);
 
     if(op_timeout_secs < 0)
     {
@@ -129,7 +120,7 @@ static int __init pvfs2_init(void)
     /* Initialize the ioctl32 subsystem. This could be a noop too */
     if ((ret = pvfs2_ioctl32_init()) < 0)
     {
-        pvfs2_error("pvfs2: could not register ioctl32 handlers? %d!\n",
+        gossip_err("pvfs2: could not register ioctl32 handlers? %d!\n",
                 ret);
         goto cleanup_kiocb;
     }
@@ -139,15 +130,15 @@ static int __init pvfs2_init(void)
                                       &pvfs2_devreq_file_operations);
     if (pvfs2_dev_major < 0)
     {
-	pvfs2_error("Failed to register /dev/%s (error %d)\n",
+	gossip_debug(GOSSIP_INIT_DEBUG, "Failed to register /dev/%s (error %d)\n",
 		    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
         ret = pvfs2_dev_major;
         goto cleanup_ioctl;
     }
 
-    pvfs2_print("*** /dev/%s character device registered ***\n",
+    gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device registered ***\n",
 		PVFS2_REQDEVICE_NAME);
-    pvfs2_print("'mknod /dev/%s c %d 0'.\n", PVFS2_REQDEVICE_NAME,
+    gossip_debug(GOSSIP_INIT_DEBUG, "'mknod /dev/%s c %d 0'.\n", PVFS2_REQDEVICE_NAME,
                 pvfs2_dev_major);
 
     sema_init(&devreq_semaphore, 1);
@@ -157,7 +148,7 @@ static int __init pvfs2_init(void)
 	qhash_init(hash_compare, hash_func, hash_table_size);
     if (!htable_ops_in_progress)
     {
-	pvfs2_error("Failed to initialize op hashtable");
+	gossip_err("Failed to initialize op hashtable");
         ret = -ENOMEM;
         goto cleanup_device;
     }
@@ -166,8 +157,8 @@ static int __init pvfs2_init(void)
         goto cleanup_progress_table;
     }
     pvfs2_proc_initialize();
-
     ret = register_filesystem(&pvfs2_fs_type);
+
     if(ret == 0)
     {
         printk("pvfs2: module version %s loaded\n", PVFS2_VERSION);
@@ -199,12 +190,20 @@ static void __exit pvfs2_exit(void)
     pvfs2_kernel_op_t *cur_op = NULL;
     struct qhash_head *hash_link = NULL;
 
-    pvfs2_print("pvfs2: pvfs2_exit called\n");
+    gossip_debug(GOSSIP_INIT_DEBUG, "pvfs2: pvfs2_exit called\n");
 
     unregister_filesystem(&pvfs2_fs_type);
     pvfs2_proc_finalize();
     fsid_key_table_finalize();
-
+    if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
+    {
+	gossip_err("Failed to unregister pvfs2 device /dev/%s\n",
+		    PVFS2_REQDEVICE_NAME);
+    }
+    else {
+        gossip_debug(GOSSIP_INIT_DEBUG, "Unregistered pvfs2 device /dev/%s\n",
+                    PVFS2_REQDEVICE_NAME);
+    }
     /* clear out all pending upcall op requests */
     spin_lock(&pvfs2_request_list_lock);
     while (!list_empty(&pvfs2_request_list))
@@ -212,7 +211,7 @@ static void __exit pvfs2_exit(void)
 	cur_op = list_entry(pvfs2_request_list.next,
                             pvfs2_kernel_op_t, list);
 	list_del(&cur_op->list);
-	pvfs2_print("Freeing unhandled upcall request type %d\n",
+	gossip_debug(GOSSIP_INIT_DEBUG, "Freeing unhandled upcall request type %d\n",
 		    cur_op->upcall.type);
 	op_release(cur_op);
     }
@@ -231,17 +230,6 @@ static void __exit pvfs2_exit(void)
 	    }
 	} while (hash_link);
     }
-    qhash_finalize(htable_ops_in_progress);
-
-    if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
-    {
-	pvfs2_error("Failed to unregister pvfs2 device /dev/%s\n",
-		    PVFS2_REQDEVICE_NAME);
-    }
-    else {
-        pvfs2_print("Unregistered pvfs2 device /dev/%s\n",
-                    PVFS2_REQDEVICE_NAME);
-    }
     /* cleans up all ioctl32 handlers */
     pvfs2_ioctl32_cleanup();
     kiocb_cache_finalize();
@@ -249,6 +237,8 @@ static void __exit pvfs2_exit(void)
     dev_req_cache_finalize();
     op_cache_finalize();
 
+    qhash_finalize(htable_ops_in_progress);
+    
     printk("pvfs2: module version %s unloaded\n", PVFS2_VERSION);
 }
 
@@ -284,7 +274,8 @@ void purge_inprogress_ops(void)
         {
             pvfs2_kernel_op_t *op = qhash_entry(tmp_link, pvfs2_kernel_op_t, list);
             spin_lock(&op->lock);
-            pvfs2_print("pvfs2-client-core: purging in-progress op tag %lld %s\n", lld(op->tag), get_opname_string(op));
+            gossip_debug(GOSSIP_INIT_DEBUG, "pvfs2-client-core: purging in-progress op tag %lld %s\n",
+                    lld(op->tag), get_opname_string(op));
             set_op_state_purged(op);
             spin_unlock(&op->lock);
             wake_up_interruptible(&op->waitq);

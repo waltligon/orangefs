@@ -176,8 +176,7 @@ static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
     return 1;
 }
 
-static __req_resp_type_desc_t s_req_resp_type_map[
-    PVFS_MAX_SERVER_OP + 1] =
+static __req_resp_type_desc_t s_req_resp_type_map[] =
 {
     { PVFS_SERV_INVALID, "PVFS_SERV_INVALID"},
     { PVFS_SERV_CREATE, "PVFS_SERV_CREATE" },
@@ -223,7 +222,7 @@ static void PINT_gossip_err_server_resp(
 {
     if (resp)
     {
-        if (((int)resp->op > -1) && ((int)resp->op < PVFS_MAX_SERVER_OP))
+        if (resp->op >= 0 && resp->op < PVFS_SERV_NUM_OPS)
         {
             gossip_err("Server Response %p is of type: %s\n",
                        resp, s_req_resp_type_map[resp->op].type_str);

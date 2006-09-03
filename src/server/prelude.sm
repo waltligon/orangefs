@@ -28,15 +28,25 @@ static int prelude_perm_check(
     PINT_server_op *s_op, job_status_s *js_p);
 static int prelude_getattr_if_needed(
     PINT_server_op *s_op, job_status_s *js_p);
+static int prelude_check_acls_if_needed(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int prelude_check_acls(
+    PINT_server_op *s_op, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
+
+enum {
+    PRELUDE_RUN_ACL_CHECKS = 1,
+};
 
 %%
 
 nested machine pvfs2_prelude_sm(
     req_sched,
     getattr_if_needed,
-    perm_check)
+    perm_check,
+    check_acls_if_needed,
+    check_acls)
 {
     state req_sched
     {
@@ -54,6 +64,19 @@ nested machine pvfs2_prelude_sm(
     state perm_check
     {
         run prelude_perm_check;
+        PRELUDE_RUN_ACL_CHECKS => check_acls_if_needed;
+        default => return;
+    }
+
+    state check_acls_if_needed
+    {
+        run prelude_check_acls_if_needed;
+        default => check_acls;
+    }
+
+    state check_acls
+    {
+        run prelude_check_acls;
         default => return;
     }
 }
@@ -107,8 +130,6 @@ static int prelude_getattr_if_needed(
     PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, readonly_flag = 0;
-    PVFS_handle target_handle = PVFS_HANDLE_NULL;
-    PVFS_fs_id target_fs_id = PVFS_FS_ID_NULL;
     job_id_t tmp_id;
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
@@ -121,13 +142,14 @@ static int prelude_getattr_if_needed(
      * what handle this request will operate on
      */
     ret = PINT_req_sched_target_handle(
-        s_op->req, 0, &target_handle, &target_fs_id, &readonly_flag);
+        s_op->req, 0, &s_op->target_handle, 
+        &s_op->target_fs_id, &readonly_flag);
 
     if (ret < 0)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "PINT_req_sched_target_handle "
                      "returned %d ret, skipping getattr on handle %llu\n",
-                     ret, llu(target_handle));
+                     ret, llu(s_op->target_handle));
 
         js_p->error_code = ret;
         return 1;
@@ -137,7 +159,7 @@ static int prelude_getattr_if_needed(
      * operate on a specific handle, so there is nothing we can do
      * here
      */
-    if (target_handle == PVFS_HANDLE_NULL)
+    if (s_op->target_handle == PVFS_HANDLE_NULL)
     {
         js_p->error_code = 0;
         return 1;
@@ -149,10 +171,11 @@ static int prelude_getattr_if_needed(
     memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
-                 "for handle %llu\n", llu(target_handle));
+                 "for handle %llu\n", llu(s_op->target_handle));
 
     ret = job_trove_dspace_getattr(
-        target_fs_id, target_handle, s_op, &(s_op->ds_attr),
+        s_op->target_fs_id, s_op->target_handle,
+        s_op, &(s_op->ds_attr),
         0, js_p, &tmp_id, server_job_context);
 
     return ret;
@@ -182,6 +205,8 @@ static int prelude_perm_check(
     obj_attr = &s_op->attr;
     PVFS_ds_attr_to_object_attr(ds_attr, obj_attr);
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
+    /* Set the target object attribute pointer.. used later by the acl check */
+    s_op->target_object_attr = obj_attr;
 
     /* Commenting out the below block for now.  I think this code is
      * deprecated?  Even if not all of the attributes have been filled in
@@ -283,7 +308,7 @@ static int prelude_perm_check(
                 }
                 else
                 {
-                    js_p->error_code = -PVFS_EPERM;
+                    js_p->error_code = -PVFS_EACCES;
                 }
             }
             break;
@@ -305,6 +330,126 @@ static int prelude_perm_check(
 	s_op,
         PINT_map_server_op_to_string(s_op->req->op),
 	js_p->error_code);
+    /* If regular checks fail, we need to run acl checks */
+    if (js_p->error_code == -PVFS_EACCES)
+        js_p->error_code = PRELUDE_RUN_ACL_CHECKS;
+    return 1;
+}
+
+
+static int prelude_check_acls_if_needed(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: prelude_check_acls_if_needed\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+
+    /* If we get here with an invalid fsid and handle, we have to
+     * return -PVFS_EACCESS 
+     */
+    if (s_op->target_fs_id == PVFS_FS_ID_NULL
+        || s_op->target_handle == PVFS_HANDLE_NULL)
+    {
+        js_p->error_code = -PVFS_EACCES;
+        return 1;
+    }
+    js_p->error_code = 0;
+
+    memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
+    memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
+    s_op->key.buffer = "system.posix_acl_access";
+    s_op->key.buffer_sz = strlen(s_op->key.buffer) + 1;
+    s_op->val.buffer = (char *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
+    if (!s_op->val.buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
+
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "About to retrieve acl keyvals "
+                 "for handle %llu\n", llu(s_op->target_handle));
+
+    /* Read acl keys */
+    ret = job_trove_keyval_read(
+        s_op->target_fs_id,
+        s_op->target_handle,
+        &s_op->key,
+        &s_op->val,
+        0,
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &i,
+        server_job_context);
+    return ret;
+}
+
+static int prelude_check_acls(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    PVFS_object_attr *obj_attr = NULL;
+    int want = 0;
+
+    /* The dspace attr must have been read at this point */
+    obj_attr = s_op->target_object_attr;
+    assert(obj_attr);
+
+    /* anything non-zero we treat as a real error */
+    if (js_p->error_code)
+    {
+        goto cleanup;
+    }
+    /* make sure that we hit here only for metafiles, dirs and symlink objects */
+    if (obj_attr->objtype != PVFS_TYPE_METAFILE
+        && obj_attr->objtype != PVFS_TYPE_DIRECTORY
+        && obj_attr->objtype != PVFS_TYPE_SYMLINK)
+    {
+        gossip_err("prelude_check_acls hit invalid object type %d\n",
+            obj_attr->objtype);
+        js_p->error_code = -PVFS_EINVAL;
+        goto cleanup;
+    }
+    switch (PINT_server_req_table[s_op->req->op].perm)
+    {
+        case PINT_SERVER_CHECK_WRITE:
+        default:
+            want = PVFS2_ACL_WRITE;
+            break;
+        case PINT_SERVER_CHECK_READ:
+            want = PVFS2_ACL_READ;
+            break;
+        case PINT_SERVER_CHECK_CRDIRENT:
+            want = PVFS2_ACL_WRITE | PVFS2_ACL_EXECUTE;
+            break;
+        case PINT_SERVER_CHECK_NONE:
+            want = 0;
+            break;
+        case PINT_SERVER_CHECK_INVALID:
+            js_p->error_code = -PVFS_EINVAL;
+            goto cleanup;
+    }
+    js_p->error_code = PINT_check_acls(s_op->val.buffer,
+                        s_op->val.read_sz,
+                        obj_attr, 
+                        s_op->req->credentials.uid,
+                        s_op->req->credentials.gid,
+                        want);
+cleanup:
+    gossip_debug(
+        GOSSIP_PERMISSIONS_DEBUG, "Final permission check (after acls) \"%s\" set "
+        "error code to %d (want %x)\n",
+            PINT_map_server_op_to_string(s_op->req->op),
+            js_p->error_code, want);
+
+    if (s_op->val.buffer) 
+        free(s_op->val.buffer);
+    memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
+    memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
     return 1;
 }
 

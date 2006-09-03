@@ -38,7 +38,6 @@
 #include "pint-cached-config.h"
 #include "job.h"
 #include "gossip.h"
-#include "pint-servreq.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-util.h"
 #include "pint-util.h"

@@ -31,6 +31,8 @@ struct xtvec {
     size_t xtv_len;
 };
 
+static ssize_t readx(unsigned long, const struct iovec *, unsigned long, const struct xtvec *, unsigned long);
+static ssize_t writex(unsigned long, const struct iovec *, unsigned long, const struct xtvec *, unsigned long);
 _syscall5(ssize_t, readx, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
 _syscall5(ssize_t, writex, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
 

@@ -832,6 +832,19 @@ if test -n "$BUILD_OPENIB" ; then
 	AC_MSG_RESULT(no)
     )
     LDFLAGS="$save_ldflags"
+
+    dnl Check for existence of reregister event; it's somewhat new.
+    AC_MSG_CHECKING(for IBV_EVENT_CLIENT_REREGISTER)
+    AC_TRY_COMPILE([
+	#include "infiniband/verbs.h"
+    ], [
+	enum ibv_event_type x = IBV_EVENT_CLIENT_REREGISTER;
+    ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_IBV_EVENT_CLIENT_REREGISTER, 1,
+	          Define if libibverbs has reregister event),
+	AC_MSG_RESULT(no)
+    )
 fi
 
 dnl

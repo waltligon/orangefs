@@ -14,12 +14,10 @@
 #include <assert.h>
 
 #include "client-state-machine.h"
-#include "pvfs2-types-debug.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
-#include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
@@ -1028,12 +1026,30 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
         sm_p->u.io.flow_completion_count--;
         assert(sm_p->u.io.flow_completion_count > -1);
 
-        /* if error, restart; but if this is a write, let write ack catch */
+        /* look for flow error when no write ack is in progress (usually a
+         * read case) 
+         */
         if (js_p->error_code < 0 && !cur_ctx->write_ack_in_progress) {
-            gossip_debug(GOSSIP_IO_DEBUG,
-              "%s: flow failed, retrying from msgpair\n", __func__);
-            cur_ctx->msg_send_has_been_posted = 0;
-            cur_ctx->msg_recv_has_been_posted = 0;
+            if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) ||
+                 (PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_FLOW) ||
+                 (js_p->error_code == -ECONNRESET) || 
+                 (js_p->error_code == -PVFS_EPROTO))
+            {
+                /* if this is a an error that we can retry */
+                gossip_debug(GOSSIP_IO_DEBUG,
+                   "%s: flow failed, retrying from msgpair\n", __func__);
+                cur_ctx->msg_send_has_been_posted = 0;
+                cur_ctx->msg_recv_has_been_posted = 0;
+            }
+            else
+            {
+                /* do not retry on remaining error codes */
+                gossip_debug(GOSSIP_IO_DEBUG,
+                   "%s: flow failed, not retrying\n", __func__);
+
+                /* forcing the count high insures that the sm won't restart */
+                sm_p->u.io.retry_count = sm_p->msgarray_params.retry_limit;
+            }
         }
     }
     else if (STATUS_USER_TAG_TYPE(status_user_tag, IO_SM_PHASE_FINAL_ACK))
@@ -1639,6 +1655,7 @@ static inline int io_post_flow(
     PVFS_object_attr *attr = NULL;
     struct server_configuration_s *server_config = NULL;
     unsigned long status_user_tag = 0;
+    struct filesystem_configuration_s * fs_config;
 
     gossip_debug(GOSSIP_IO_DEBUG, "- build_context_flow called\n");
 
@@ -1703,7 +1720,16 @@ static inline int io_post_flow(
 
     status_user_tag = ((4 * cur_ctx->index) + IO_SM_PHASE_FLOW);
 
-    server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
+    server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);    
+
+    fs_config = PINT_config_find_fs_id(server_config, cur_ctx->msg.fs_id);
+    if(fs_config)
+    {
+        /* pick up any buffer settings overrides from fs conf */
+        cur_ctx->flow_desc.buffer_size = fs_config->fp_buffer_size;
+        cur_ctx->flow_desc.buffers_per_flow = fs_config->fp_buffers_per_flow;
+    }
+
     ret = job_flow(
         &cur_ctx->flow_desc, sm_p, status_user_tag,
         &cur_ctx->flow_status, &cur_ctx->flow_job_id,
@@ -1711,26 +1737,46 @@ static inline int io_post_flow(
         server_config->client_job_flow_timeout);
     PINT_put_server_config_struct(server_config);
 
-    if (ret < 0)
+    /* if the flow fails immediately, then we have to do some special
+     * handling.  This function is not equiped to handle the failure
+     * directly, so we instead post a null job that will propigate the error
+     * to the normal state where we interpret flow errors
+     */
+    if((ret < 0) || (ret == 1 && cur_ctx->flow_status.error_code != 0))
     {
-        gossip_err("job_flow failed\n");
-        return ret;
-    }
-    else if (ret == 1)
-    {
-        gossip_debug(GOSSIP_IO_DEBUG, "  flow for context %p "
-                     "completed immediately\n", cur_ctx);
-        assert(cur_ctx->flow_status.error_code == 0);
+        /* make sure the error code is stored in the flow descriptor */
+        if(ret == 1)
+        {
+            cur_ctx->flow_desc.error_code = cur_ctx->flow_status.error_code;
+        }
+        else
+        {
+            cur_ctx->flow_desc.error_code = ret;
+        }
+
+        gossip_debug(GOSSIP_IO_DEBUG, "  immediate flow failure for "
+                     "context %p, error code: %d\n", cur_ctx,
+                     cur_ctx->flow_desc.error_code);
+        gossip_debug(GOSSIP_IO_DEBUG, "  posting job_null() to propigate.\n");
+
+        /* post a fake job to propigate the flow failure to a later state */
+        ret = job_null(cur_ctx->flow_desc.error_code, sm_p, 
+            status_user_tag, &cur_ctx->flow_status,
+            &cur_ctx->flow_job_id, pint_client_sm_context);
+        if(ret !=0)
+        {
+            return(ret);
+        }
     }
     else
     {
         gossip_debug(GOSSIP_IO_DEBUG, "  posted flow for "
                      "context %p\n", cur_ctx);
-
-        cur_ctx->flow_has_been_posted = 1;
-        cur_ctx->flow_in_progress = 1;
-        sm_p->u.io.flow_completion_count++;
     }
+
+    cur_ctx->flow_has_been_posted = 1;
+    cur_ctx->flow_in_progress = 1;
+    sm_p->u.io.flow_completion_count++;
 
     return 0;
 }

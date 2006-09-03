@@ -67,6 +67,7 @@ void *BMI_tcp_memalloc(bmi_size_t size,
 int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
 		    enum bmi_op_type send_recv);
+int BMI_tcp_unexpected_free(void *buffer);
 int BMI_tcp_post_send(bmi_op_id_t * id,
 		      method_addr_p dest,
 		      const void *buffer,
@@ -285,28 +286,29 @@ static void bmi_set_sock_buffers(int socket);
 
 /* exported method interface */
 struct bmi_method_ops bmi_tcp_ops = {
-    BMI_tcp_method_name,
-    BMI_tcp_initialize,
-    BMI_tcp_finalize,
-    BMI_tcp_set_info,
-    BMI_tcp_get_info,
-    BMI_tcp_memalloc,
-    BMI_tcp_memfree,
-    BMI_tcp_post_send,
-    BMI_tcp_post_sendunexpected,
-    BMI_tcp_post_recv,
-    BMI_tcp_test,
-    BMI_tcp_testsome,
-    BMI_tcp_testcontext,
-    BMI_tcp_testunexpected,
-    BMI_tcp_method_addr_lookup,
-    BMI_tcp_post_send_list,
-    BMI_tcp_post_recv_list,
-    BMI_tcp_post_sendunexpected_list,
-    BMI_tcp_open_context,
-    BMI_tcp_close_context,
-    BMI_tcp_cancel,
-    BMI_tcp_addr_rev_lookup_unexpected
+    .method_name = BMI_tcp_method_name,
+    .BMI_meth_initialize = BMI_tcp_initialize,
+    .BMI_meth_finalize = BMI_tcp_finalize,
+    .BMI_meth_set_info = BMI_tcp_set_info,
+    .BMI_meth_get_info = BMI_tcp_get_info,
+    .BMI_meth_memalloc = BMI_tcp_memalloc,
+    .BMI_meth_memfree  = BMI_tcp_memfree,
+    .BMI_meth_unexpected_free = BMI_tcp_unexpected_free,
+    .BMI_meth_post_send = BMI_tcp_post_send,
+    .BMI_meth_post_sendunexpected = BMI_tcp_post_sendunexpected,
+    .BMI_meth_post_recv = BMI_tcp_post_recv,
+    .BMI_meth_test = BMI_tcp_test,
+    .BMI_meth_testsome = BMI_tcp_testsome,
+    .BMI_meth_testcontext = BMI_tcp_testcontext,
+    .BMI_meth_testunexpected = BMI_tcp_testunexpected,
+    .BMI_meth_method_addr_lookup = BMI_tcp_method_addr_lookup,
+    .BMI_meth_post_send_list = BMI_tcp_post_send_list,
+    .BMI_meth_post_recv_list = BMI_tcp_post_recv_list,
+    .BMI_meth_post_sendunexpected_list = BMI_tcp_post_sendunexpected_list,
+    .BMI_meth_open_context = BMI_tcp_open_context,
+    .BMI_meth_close_context = BMI_tcp_close_context,
+    .BMI_meth_cancel = BMI_tcp_cancel,
+    .BMI_meth_rev_lookup_unexpected = BMI_tcp_addr_rev_lookup_unexpected
 };
 
 /* module parameters */
@@ -641,6 +643,21 @@ int BMI_tcp_memfree(void *buffer,
     return (0);
 }
 
+/* BMI_tcp_unexpected_free()
+ * 
+ * Frees memory that was returned from BMI_tcp_test_unexpected()
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_tcp_unexpected_free(void *buffer)
+{
+    if (buffer)
+    {
+	free(buffer);
+    }
+    return (0);
+}
+
 /* BMI_tcp_set_info()
  * 
  * Pass in optional parameters.
@@ -677,19 +694,10 @@ int BMI_tcp_set_info(int option,
             tcp_method_params.listen_addr->method_data)->socket);
 #endif
        break;
-    /*
-     * Used after changing buffer sizes to force the connection to
-     * the server used for the config to close so it can be reopened
-     * with the new buffer sizes as the rest of the future server
-     * connections will be.
-     */
-    case BMI_TCP_CLOSE_SOCKET: {
-        struct method_addr *map = inout_parameter;
-        if (tcp_socket_collection_p)
-            BMI_socket_collection_remove(tcp_socket_collection_p, map);
-        ret = tcp_shutdown_addr(map);
+    case BMI_TCP_CLOSE_SOCKET: 
+        /* this should no longer make it to the bmi_tcp method; see bmi.c */
+        ret = 0;
         break;
-    }
     case BMI_FORCEFUL_CANCEL_MODE:
 	forceful_cancel_mode = 1;
 	ret = 0;
@@ -1464,11 +1472,19 @@ void BMI_tcp_close_context(bmi_context_id context_id)
  */
 int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
 {
-    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
-
-    assert(query_op);
-
+    method_op_p query_op = NULL;
+    
     gen_mutex_lock(&interface_mutex);
+
+    query_op = (method_op_p)id_gen_safe_lookup(id);
+    if(!query_op)
+    {
+        /* if we can't find the operattion, then assume that it has already
+         * completed naturally
+         */
+        gen_mutex_unlock(&interface_mutex);
+        return(0);
+    }
 
     /* easy case: is the operation already completed? */
     if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==

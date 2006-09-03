@@ -60,6 +60,7 @@ int PVFS_util_init_defaults(void);
 /* client side config file / option management */
 const PVFS_util_tab* PVFS_util_parse_pvfstab(
     const char* tabfile);
+void PINT_release_pvfstab(void);
 int PVFS_util_resolve(
     const char* local_path,
     PVFS_fs_id* out_fs_id,

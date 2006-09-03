@@ -280,7 +280,7 @@ int bench_initialize_bmi_addresses_server(
 	    return (-1);
 	}
 	client_array[i] = this_info.addr;
-	free(this_info.buffer);
+	BMI_unexpected_free(this_info.addr, this_info.buffer);
     }
 
     return (0);

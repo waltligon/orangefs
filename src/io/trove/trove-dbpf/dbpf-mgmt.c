@@ -63,8 +63,6 @@ static void dbpf_db_error_callback(
 #endif
     char * msg);
 
-int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
-
 DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 {
     int ret;

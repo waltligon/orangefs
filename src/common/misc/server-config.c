@@ -14,7 +14,7 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include "dotconf.h"
+#include "src/common/dotconf/dotconf.h"
 #include "server-config.h"
 #include "pvfs2.h"
 #include "job.h"
@@ -71,12 +71,16 @@ static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
 static DOTCONF_CB(get_handle_recycle_timeout_seconds);
+static DOTCONF_CB(get_flow_buffer_size_bytes);
+static DOTCONF_CB(get_flow_buffers_per_flow);
 static DOTCONF_CB(get_attr_cache_keywords_list);
 static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
+static DOTCONF_CB(get_trove_alt_aio);
 static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_db_cache_size_bytes);
+static DOTCONF_CB(get_trove_max_concurrent_io);
 static DOTCONF_CB(get_db_cache_type);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
@@ -428,6 +432,12 @@ static const configoption_t options[] =
     {"ID",ARG_INT, get_filesystem_collid,NULL,
         CTX_FILESYSTEM,NULL},
 
+    /* maximum number of AIO operations that Trove will allow to run
+     * concurrently 
+     */
+    {"TroveMaxConcurrentIO", ARG_INT, get_trove_max_concurrent_io, NULL,
+        CTX_DEFAULTS|CTX_GLOBAL,"16"},
+
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  The output of these
      * different log levels is written to a file, which is specified in
@@ -578,6 +588,14 @@ static const configoption_t options[] =
     {"FlowModules",ARG_LIST, get_flow_module_list,NULL,
         CTX_DEFAULTS|CTX_GLOBAL,"flowproto_multiqueue,"},
 
+    /* buffer size to use for bulk data transfers */
+    {"FlowBufferSizeBytes", ARG_INT,
+         get_flow_buffer_size_bytes, NULL, CTX_FILESYSTEM,"262144"},
+
+    /* number of buffers to use for bulk data transfers */
+    {"FlowBuffersPerFlow", ARG_INT,
+         get_flow_buffers_per_flow, NULL, CTX_FILESYSTEM,"8"},
+
     /* The TROVE storage layer has a management component that deals with
      * allocating handle values for new metafiles and datafiles.  The underlying
      * trove module can be given a hint to tell it how long to wait before
@@ -660,6 +678,12 @@ static const configoption_t options[] =
      */
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
+
+    /* enable alternate AIO implementation for certain types of I/O
+     * operations (experimental 
+     */
+    {"TroveAltAIOMode",ARG_STR, get_trove_alt_aio, NULL, 
+        CTX_DEFAULTS|CTX_GLOBAL,"no"},
 
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
@@ -752,6 +776,7 @@ int PINT_parse_config(
     config_s->client_job_flow_timeout = PVFS2_CLIENT_JOB_FLOW_TIMEOUT_DEFAULT;
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
+    config_s->trove_max_concurrent_io = 16;
 
     if (cache_config_files(
             config_s, global_config_filename, server_config_filename))
@@ -989,6 +1014,8 @@ DOTCONF_CB(enter_filesystem_context)
     fs_conf->encoding = ENCODING_DEFAULT;
     fs_conf->trove_sync_meta = TROVE_SYNC;
     fs_conf->trove_sync_data = TROVE_SYNC;
+    fs_conf->fp_buffer_size = -1;
+    fs_conf->fp_buffers_per_flow = -1;
 
     if (!config_s->file_systems)
     {
@@ -1200,6 +1227,9 @@ DOTCONF_CB(get_logfile)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    /* free whatever was added in set_defaults phase */
+    if (config_s->logfile)
+        free(config_s->logfile);
     config_s->logfile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
@@ -1392,6 +1422,31 @@ static const char * replace_old_keystring(const char * oldkey)
 }
 
 
+DOTCONF_CB(get_flow_buffer_size_bytes)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    fs_conf->fp_buffer_size = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_flow_buffers_per_flow)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    fs_conf->fp_buffers_per_flow = cmd->data.value;
+
+    return NULL;
+}
+
 DOTCONF_CB(get_attr_cache_keywords_list)
 {
     int i = 0, len = 0;
@@ -1488,6 +1543,28 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
     return NULL;
 }
 
+DOTCONF_CB(get_trove_alt_aio)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if(strcasecmp(cmd->data.str, "yes") == 0)
+    {
+        config_s->trove_alt_aio_mode = 1;
+    }
+    else if(strcasecmp(cmd->data.str, "no") == 0)
+    {
+        config_s->trove_alt_aio_mode = 0;
+    }
+    else
+    {
+        return("TroveAltAIOMode value must be 'yes' or 'no'.\n");
+    }
+
+    return NULL;
+}
+
+
 DOTCONF_CB(get_trove_sync_meta)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -1558,6 +1635,14 @@ DOTCONF_CB(get_db_cache_size_bytes)
     return NULL;
 }
 
+DOTCONF_CB(get_trove_max_concurrent_io)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->trove_max_concurrent_io = cmd->data.value;
+    return NULL;
+}
+
 DOTCONF_CB(get_db_cache_type)
 {
     struct server_configuration_s *config_s =
@@ -1569,6 +1654,8 @@ DOTCONF_CB(get_db_cache_type)
                "be either \"sys\" or \"mmap\"\n";
     }
 
+    if (config_s->db_cache_type)
+        free(config_s->db_cache_type);
     config_s->db_cache_type = strdup(cmd->data.str);
     if(!config_s->db_cache_type)
     {
@@ -1825,6 +1912,10 @@ DOTCONF_CB(get_default_num_dfiles)
         PINT_llist_head(config_s->file_systems);
 
     fs_conf->default_num_dfiles = (int)cmd->data.value;
+    if(fs_conf->default_num_dfiles < 0)
+    {
+        return("Error DefaultNumDFiles must be positive.\n");
+    }
     return NULL;
 }
 
@@ -1963,6 +2054,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
             free(config_s->bmi_modules);
             config_s->bmi_modules = NULL;
         }
+
+        if (config_s->flow_modules)
+        {
+            free(config_s->flow_modules);
+            config_s->flow_modules = NULL;
+        }
 #ifdef USE_TRUSTED
         if (config_s->allowed_network)
         {
@@ -1992,6 +2089,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             PINT_llist_free(config_s->host_aliases,free_host_alias);
             config_s->host_aliases = NULL;
+        }
+
+        if (config_s->db_cache_type)
+        {
+            free(config_s->db_cache_type);
+            config_s->db_cache_type = NULL;
         }
     }
 }
@@ -2252,17 +2355,9 @@ static void copy_filesystem(
                 malloc(sizeof(struct host_handle_mapping_s));
             assert(new_h_mapping);
 
-            new_h_mapping->alias_mapping = (struct host_alias_s *)
-                malloc(sizeof(struct host_alias_s));
-            assert(new_h_mapping->alias_mapping);
-
-            new_h_mapping->alias_mapping->host_alias =
-                strdup(cur_h_mapping->alias_mapping->host_alias);
-            assert(new_h_mapping->alias_mapping->host_alias);
-
-            new_h_mapping->alias_mapping->bmi_address =
-                strdup(cur_h_mapping->alias_mapping->bmi_address);
-            assert(new_h_mapping->alias_mapping->bmi_address);
+            /* these are pointers into another struct with a different
+             * lifetime, do not copy */
+            new_h_mapping->alias_mapping = cur_h_mapping->alias_mapping;
 
             new_h_mapping->handle_range =
                 strdup(cur_h_mapping->handle_range);
@@ -2291,17 +2386,7 @@ static void copy_filesystem(
                 malloc(sizeof(struct host_handle_mapping_s));
             assert(new_h_mapping);
 
-            new_h_mapping->alias_mapping = (struct host_alias_s *)
-                malloc(sizeof(struct host_alias_s));
-            assert(new_h_mapping->alias_mapping);
-
-            new_h_mapping->alias_mapping->host_alias =
-                strdup(cur_h_mapping->alias_mapping->host_alias);
-            assert(new_h_mapping->alias_mapping->host_alias);
-
-            new_h_mapping->alias_mapping->bmi_address =
-                strdup(cur_h_mapping->alias_mapping->bmi_address);
-            assert(new_h_mapping->alias_mapping->bmi_address);
+            new_h_mapping->alias_mapping = cur_h_mapping->alias_mapping;
 
             new_h_mapping->handle_range =
                 strdup(cur_h_mapping->handle_range);
@@ -2331,6 +2416,9 @@ static void copy_filesystem(
             src_fs->attr_cache_max_num_elems;
         dest_fs->trove_sync_meta = src_fs->trove_sync_meta;
         dest_fs->trove_sync_data = src_fs->trove_sync_data;
+
+        dest_fs->fp_buffer_size = src_fs->fp_buffer_size;
+        dest_fs->fp_buffers_per_flow = src_fs->fp_buffers_per_flow;
     }
 }
 

@@ -67,7 +67,7 @@ pull_and_build_mpich2 () {
 	cd mpich2-snap-*
 	mkdir build
 	cd build
-	CFLAGS="-I${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/include"
+	CFLAGS="-g -I${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/include"
 	LDFLAGS="-L${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib"
 	LIBS="-lpvfs2 -lpthread -lgm"
 	export CFLAGS LDFLAGS LIBS

@@ -33,6 +33,8 @@
 #endif
 
 #define MAX_LENGTH 128
+static long openfh(const void *, size_t);
+static long openg(const char *, void *, size_t *, int, int);
 _syscall2(long, openfh, const void *, uhandle, size_t, handle_len);
 _syscall5(long, openg, const char *, pathname, void *, uhandle, size_t *, uhandle_len, int, flags, int, mode);
 

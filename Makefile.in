@@ -121,7 +121,6 @@ INCLUDES := \
     src/common/misc \
     src/common/quickhash \
     src/common/quicklist \
-    src/common/dotconf \
     src/common/id-generator \
     src/common/gossip \
     src/common/gen-locks \
@@ -147,6 +146,7 @@ LDFLAGS = -Llib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -Llib
 SERVER_LDFLAGS += @SERVER_LDFLAGS@
+DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LIBS += -lpvfs2 @LIBS@ 
@@ -763,7 +763,7 @@ nodep:; @:
 # default rule for generating dependency files
 %.d: %.c
 	$(Q) "  DEP		$@"
-	$(E)CC="$(CC)" $(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
+	$(E)CC="$(CC)" $(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< > $@
 
 # default rules for building documents in .tex format:
 # TODO: these documentation rules are a big hack!
