@@ -26,11 +26,17 @@ COUNT="10 100 250 500 1000 5000";
 
 for c in ${COUNT}
 do
-	echo "Uncached: directory listing $c objects (getdents) "
+	echo "Uncached: directory listing $c objects (getdents + stat) "
 	$PVFS2_TOPDIR/test/posix/getdents -f $PVFS2_MNT/$c
 
-	echo "Cached: directory listing $c objects (getdents) "
+	echo "Cached: directory listing $c objects (getdents + stat) "
 	$PVFS2_TOPDIR/test/posix/getdents -f $PVFS2_MNT/$c
+
+	echo "Uncached: (lite) directory listing $c objects (getdents + stat_lite) "
+	$PVFS2_TOPDIR/test/posix/getdents -f $PVFS2_MNT/$c -l
+
+	echo "Cached: (lite) directory listing $c objects (getdents + stat_lite) "
+	$PVFS2_TOPDIR/test/posix/getdents -f $PVFS2_MNT/$c -l
 
 	echo "Uncached: directory listing $c objects (getdents_plus) "
 	$PVFS2_TOPDIR/test/posix/getdents -p -f $PVFS2_MNT/$c
@@ -38,5 +44,10 @@ do
 	echo "Cached: directory listing $c objects (getdents_plus) "
 	$PVFS2_TOPDIR/test/posix/getdents -p -f $PVFS2_MNT/$c
 
+	echo "Uncached: (lite) directory listing $c objects (getdents_plus_lite) "
+	$PVFS2_TOPDIR/test/posix/getdents -p -f $PVFS2_MNT/$c -l
+
+	echo "Cached: (lite) directory listing $c objects (getdents_plus_lite) "
+	$PVFS2_TOPDIR/test/posix/getdents -p -f $PVFS2_MNT/$c -l
 done
 
