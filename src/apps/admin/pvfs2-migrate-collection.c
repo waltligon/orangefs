@@ -966,7 +966,7 @@ static int translate_coll_eattr_0_0_1(
             {
                 ret = trove_dspace_test(
                     coll_id, op_id, trove_context, &count, NULL, NULL,
-                    &state, 10);
+                    &state, 1000);
             }
             if ((ret < 0) || (ret == 1 && state != 0))
             {
@@ -1106,7 +1106,7 @@ static int translate_dspace_attr_0_0_1(
             {
                 ret = trove_dspace_test(coll_id, op_id, trove_context,
                                         &count, NULL, NULL, &state,
-                                        10);
+                                        1000);
             }
             if ((ret < 0) || (ret == 1 && state != 0))
             {
@@ -1149,7 +1149,7 @@ static int translate_dspace_attr_0_0_1(
             {
                 ret = trove_dspace_test( 
                     coll_id, op_id, trove_context, &count, NULL, NULL,
-                    &state, 10);
+                    &state, 1000);
             }
             if ((ret < 0) || (ret == 1 && state != 0))
             {
@@ -1383,6 +1383,8 @@ static int translate_keyval_db_0_0_1(
                 /* assume its a component name of a directory entry */
                 t_key.buffer = key.data;
                 t_key.buffer_sz = key.size;
+		t_val.buffer = data.data;
+		t_val.buffer_sz = data.size;
                 trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
                 trove_flags |= TROVE_NOOVERWRITE;
             }
@@ -1432,7 +1434,7 @@ static int translate_keyval_db_0_0_1(
             {   
                 ret = trove_dspace_test(
                     coll_id, op_id, trove_context, &count, NULL, NULL,
-                    &state, 10);
+                    &state, 1000);
             }
             
             if(tvalbuf_free)
