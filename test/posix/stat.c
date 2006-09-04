@@ -23,6 +23,7 @@ static int recurse = 0;
 static char path[256] = ".";
 static int use_lite = 0;
 static int nobjects = 0, nlevels = 0, verbose = 0;
+static double total = 0.0;
 
 #define S_SLITE_SIZET     0x1
 #define S_SLITE_BLKSIZE   0x2
@@ -106,6 +107,7 @@ struct kernel_stat_lite {
 #endif
 
 static QLIST_HEAD(TREE);
+static double Wtime(void);
 
 /* Information about each file in the hierarchy */
 struct files {
@@ -467,6 +469,7 @@ static int path_walk(struct files *root_filp)
 	static int invoke_count = 0;
 	int is_dir, is_link;
 	char link_target[NAME_MAX], *lnk = NULL;
+	double begin, end;
 
 	invoke_count++;
 	ret = 0;
@@ -480,6 +483,7 @@ static int path_walk(struct files *root_filp)
 		/* lets just statlite the file here, it might be some sort 
 		 * of stale or special file or symbolic link 
 		 */
+		begin = Wtime();
 		if (use_lite) {
 			statbuflite.st_litemask = S_SLITE_ATIME | 
 										 S_SLITE_MTIME |
@@ -495,8 +499,11 @@ static int path_walk(struct files *root_filp)
 			is_dir = S_ISDIR(statbuf.st_mode);
 			is_link = S_ISLNK(statbuf.st_mode);
 		}
+		end = Wtime();
+		total += (end - begin);
 	}
 	else {
+		begin = Wtime();
 		if (use_lite) {
 			statbuflite.st_litemask = S_SLITE_ATIME | 
 										 S_SLITE_MTIME |
@@ -512,6 +519,8 @@ static int path_walk(struct files *root_filp)
 			is_dir = S_ISDIR(statbuf.st_mode);
 			is_link = S_ISLNK(statbuf.st_mode);
 		}
+		end = Wtime();
+		total += (end - begin);
 	}
 	if (ret < 0)
 		goto err;
@@ -614,9 +623,7 @@ static double Wtime(void)
 static int do_flatten_hierarchy(void)
 {
 	struct files *filp = NULL;
-	double begin, end;
 
-	begin = Wtime();
 	/* traverse the tree and prune out unnecessary files and flatten the hierarchy */
 	path_init(path);
 	/* walk the tree */
@@ -628,13 +635,12 @@ static int do_flatten_hierarchy(void)
 			return -1;
 		}
 	}
-	end = Wtime();
 	if (use_lite) 
 		printf("statlite ( %d levels %d objects) took %g secs\n",
-				nlevels - 1, nobjects - 1, (end - begin));
+				nlevels - 1, nobjects - 1, total);
 	else 
 		printf("stat ( %d levels %d objects) took %g secs\n",
-				nlevels - 1, nobjects - 1, (end - begin));
+				nlevels - 1, nobjects - 1, total);
 	return 0;
 }
 
