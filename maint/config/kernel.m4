@@ -184,6 +184,22 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	    )
 
+	dnl checking if we have a readdirplus_lite callback in file_operations
+	AC_MSG_CHECKING(for readdirplus_lite member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readdirplus_lite = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READDIRPLUSLITE_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readdirplus_lite callback),
+	    AC_MSG_RESULT(no)
+	    )
+
+
 	dnl checking if we have a readx callback in file_operations
 	AC_MSG_CHECKING(for readx member in file_operations structure)
 	AC_TRY_COMPILE([

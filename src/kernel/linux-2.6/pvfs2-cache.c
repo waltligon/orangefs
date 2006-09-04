@@ -75,6 +75,8 @@ char *get_opname_string(pvfs2_kernel_op_t *new_op)
             return "OP_MKDIR";
         else if (type == PVFS2_VFS_OP_READDIR)
             return "OP_READDIR";
+        else if (type == PVFS2_VFS_OP_READDIRPLUS)
+            return "OP_READDIRPLUS";
         else if (type == PVFS2_VFS_OP_SETATTR)
             return "OP_SETATTR";
         else if (type == PVFS2_VFS_OP_SYMLINK)

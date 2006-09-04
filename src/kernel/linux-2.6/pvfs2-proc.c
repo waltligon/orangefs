@@ -340,6 +340,7 @@ void pvfs2_proc_initialize(void)
         fs_table_header = register_sysctl_table(fs_table, 0);
     }
 #endif
+
     return;
 }
 
@@ -352,7 +353,6 @@ void pvfs2_proc_finalize(void)
         fs_table_header = NULL;
     }
 #endif
-
     return;
 }
 

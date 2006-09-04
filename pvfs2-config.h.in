@@ -171,6 +171,9 @@
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_SIX_ARG
 
+/* Define if struct file_operations in kernel has readdirplus_lite callback */
+#undef HAVE_READDIRPLUSLITE_FILE_OPERATIONS
+
 /* Define if struct file_operations in kernel has readdirplus callback */
 #undef HAVE_READDIRPLUS_FILE_OPERATIONS
 

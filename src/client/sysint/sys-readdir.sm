@@ -296,7 +296,6 @@ static int readdir_msg_comp_fn(void *v_p,
     }
 
     /* convert servresp_readdir response to a sysresp_readdir obj */
-    assert(sm_p->u.readdir.readdir_resp);
 
     *(sm_p->readdir.token) = resp_p->u.readdir.token;
     *(sm_p->readdir.directory_version) =

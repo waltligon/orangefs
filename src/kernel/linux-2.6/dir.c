@@ -347,6 +347,23 @@ err:
 
 #ifdef HAVE_READDIRPLUS_FILE_OPERATIONS
 
+typedef struct
+{
+    void *direntplus;
+    uint32_t lite;
+    union {
+        struct {
+            filldirplus_t filldirplus;
+            struct kstat  ks;
+        } plus;
+        struct {
+            unsigned long mask;
+            filldirpluslite_t filldirplus_lite;
+            struct kstat_lite ks;
+        } plus_lite;
+    } u;
+} readdirplus_info_t;
+
 typedef struct 
 {
     int buffer_index;
@@ -474,32 +491,31 @@ static void readdirplus_handle_dtor(readdirplus_handle_t *rhandle)
     return;
 }
 
-
-/** Read directory entries from an instance of an open directory 
- *  and the associated attributes for every entry in one-shot.
- *
- * \param filldir callback function called for each entry read.
- *
- * \retval <0 on error
- * \retval 0  when directory has been completely traversed
- * \retval >0 if we don't call filldir for all entries
- *
- * \note If the filldirplus call-back returns non-zero, then readdirplus should
- *       assume that it has had enough, and should return as well.
- */
-static int pvfs2_readdirplus(
+static int pvfs2_readdirplus_common(
     struct file *file,
-    void *direntplus,
-    filldirplus_t filldirplus)
+    readdirplus_info_t *info)
 {
     int ret = 0, buffer_index, token_set = 0;
     PVFS_ds_position pos = 0;
+    void *direntplus;
     ino_t ino = 0;
     struct dentry *dentry = file->f_dentry;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
+    filldirplus_t filldirplus = NULL;
+    filldirpluslite_t filldirplus_lite = NULL;
 
-  restart_readdir:
+    direntplus = info->direntplus;
+    if (info->lite == 0)
+    {
+        filldirplus = info->u.plus.filldirplus;
+    }
+    else
+    {
+        filldirplus_lite = info->u.plus_lite.filldirplus_lite;
+    }
+
+restart_readdir:
 
     pos = (PVFS_ds_position)file->f_pos;
     /* are we done? */
@@ -511,8 +527,6 @@ static int pvfs2_readdirplus(
             PVFS2_NUM_READDIR_RETRIES;
         return 0;
     }
-    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir about to update_atime %p\n", dentry->d_inode);
-
     gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdirplus called on %s (pos=%d, "
                 "retry=%d, v=%llu)\n", dentry->d_name.name, (int)pos,
                 (int)pvfs2_inode->num_readdir_retries,
@@ -520,7 +534,6 @@ static int pvfs2_readdirplus(
 
     switch (pos)
     {
-        struct kstat ks;
 	/*
 	   if we're just starting, populate the "." and ".." entries
 	   of the current directory; these always appear
@@ -535,12 +548,29 @@ static int pvfs2_readdirplus(
                 inode = iget(dentry->d_inode->i_sb, ino);
                 if (inode)
                 {
-                    generic_fillattr(inode, &ks);
+                    if (info->lite == 0)
+                    {
+                        generic_fillattr(inode, &info->u.plus.ks);
+                    }
+                    else
+                    {
+                        generic_fillattr_lite(inode, &info->u.plus_lite.ks);
+                    }
                     iput(inode);
                     gossip_debug(GOSSIP_DIR_DEBUG, "calling filldirplus of . with pos = %d\n", pos);
-                    if (filldirplus(direntplus, ".", 1, pos, ino, DT_DIR, &ks) < 0)
+                    if (info->lite == 0)
                     {
-                        break;
+                        if (filldirplus(direntplus, ".", 1, pos, ino, DT_DIR, &info->u.plus.ks) < 0)
+                        {
+                            break;
+                        }
+                    }
+                    else 
+                    {
+                        if (filldirplus_lite(direntplus, ".", 1, pos, ino, DT_DIR, &info->u.plus_lite.ks) < 0)
+                        {
+                            break;
+                        }
                     }
                 }
             }
@@ -558,12 +588,29 @@ static int pvfs2_readdirplus(
                 inode = iget(dentry->d_inode->i_sb, ino);
                 if (inode) 
                 {
-                    generic_fillattr(inode, &ks);
+                    if (info->lite == 0)
+                    {
+                        generic_fillattr(inode, &info->u.plus.ks);
+                    }
+                    else
+                    {
+                        generic_fillattr_lite(inode, &info->u.plus_lite.ks);
+                    }
                     iput(inode);
                     gossip_debug(GOSSIP_DIR_DEBUG, "calling filldirplus of .. with pos = %d\n", pos);
-                    if (filldirplus(direntplus, "..", 2, pos, ino, DT_DIR, &ks) < 0)
+                    if (info->lite == 0)
                     {
-                        break;
+                        if (filldirplus(direntplus, "..", 2, pos, ino, DT_DIR, &info->u.plus.ks) < 0)
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        if (filldirplus_lite(direntplus, "..", 2, pos, ino, DT_DIR, &info->u.plus_lite.ks) < 0)
+                        {
+                            break;
+                        }
                     }
                 }
             }
@@ -574,10 +621,12 @@ static int pvfs2_readdirplus(
         default:
         {
             readdirplus_handle_t rhandle;
+            uint32_t pvfs2_mask;
 
             rhandle.buffer_index = -1;
             rhandle.dentsplus_buf = NULL;
             memset(&rhandle.readdirplus_response, 0, sizeof(rhandle.readdirplus_response));
+            pvfs2_mask = (info->lite == 0) ? PVFS_ATTR_SYS_ALL : convert_to_pvfs2_mask(info->u.plus_lite.mask);
 
             /* handle the normal cases here */
             new_op = op_alloc(PVFS2_VFS_OP_READDIRPLUS);
@@ -597,7 +646,7 @@ static int pvfs2_readdirplus(
                 new_op->upcall.req.readdirplus.refn.fs_id =
                     PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
             }
-            new_op->upcall.req.readdirplus.mask = PVFS_ATTR_SYS_ALL;
+            new_op->upcall.req.readdirplus.mask = pvfs2_mask;
             new_op->upcall.req.readdirplus.max_dirent_count = MAX_DIRENT_COUNT;
 
             /* NOTE:
@@ -721,7 +770,14 @@ static int pvfs2_readdirplus(
                                 iput(filled_inode);
                                 goto err;
                             }
-                            generic_fillattr(filled_inode, &ks);
+                            if (info->lite == 0)
+                            {
+                                generic_fillattr(filled_inode, &info->u.plus.ks);
+                            }
+                            else
+                            {
+                                generic_fillattr_lite(filled_inode, &info->u.plus_lite.ks);
+                            }
                             if (filled_inode->i_state & I_NEW) {
                                 pvfs2_inode_t *filled_pvfs2_inode = PVFS2_I(filled_inode);
                                 pvfs2_inode_initialize(filled_pvfs2_inode);
@@ -740,7 +796,14 @@ static int pvfs2_readdirplus(
                             }
                             iput(filled_inode);
                         }
-                        ptr = &ks;
+                        if (info->lite == 0)
+                        {
+                            ptr = &info->u.plus.ks;
+                        }
+                        else
+                        {
+                            ptr = &info->u.plus_lite.ks;
+                        }
                         if (attrs->objtype == PVFS_TYPE_METAFILE) 
                         {
                             dt_type = DT_REG;
@@ -768,9 +831,18 @@ static int pvfs2_readdirplus(
                             current_entry, (unsigned long) handle,
                             len, (unsigned long) pos, ptr);
                     
+                    if (info->lite == 0)
+                    {
+                        ret = filldirplus(direntplus, current_entry, len, pos,
+                                current_ino, dt_type, ptr);
+                    }
+                    else 
+                    {
+                        ret = filldirplus_lite(direntplus, current_entry, len, pos,
+                                current_ino, dt_type, ptr);
+                    }
                     /* filldirplus has had enough */
-                    if (filldirplus(direntplus, current_entry, len, pos,
-                                current_ino, dt_type, ptr) < 0)
+                    if (ret < 0)
                     {
 graceful_termination_path:
                         pvfs2_inode->directory_version = 0;
@@ -816,6 +888,62 @@ err:
     gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdirplus returning %d\n",ret);
     return ret;
 }
+
+/** Read directory entries from an instance of an open directory 
+ *  and the associated attributes for every entry in one-shot.
+ *
+ * \param filldirplus callback function called for each entry read.
+ *
+ * \retval <0 on error
+ * \retval 0  when directory has been completely traversed
+ * \retval >0 if we don't call filldir for all entries
+ *
+ * \note If the filldirplus call-back returns non-zero, then readdirplus should
+ *       assume that it has had enough, and should return as well.
+ */
+static int pvfs2_readdirplus(
+    struct file *file,
+    void *direntplus,
+    filldirplus_t filldirplus)
+{
+    readdirplus_info_t info;
+
+    memset(&info, 0, sizeof(info));
+    info.direntplus = direntplus;
+    info.lite = 0;
+    info.u.plus.filldirplus = filldirplus;
+    return pvfs2_readdirplus_common(file, &info);
+}
+
+/** Read directory entries from an instance of an open directory 
+ *  and the associated attributes for every entry in one-shot.
+ *
+ * \param filldirplus_lite callback function called for each entry read.
+ *
+ * \retval <0 on error
+ * \retval 0  when directory has been completely traversed
+ * \retval >0 if we don't call filldir for all entries
+ *
+ * \note If the filldirplus_lite call-back returns non-zero, then readdirplus_lite should
+ *       assume that it has had enough, and should return as well.
+ *  The only difference is that stat information is not returned uptodate!
+ */
+static int pvfs2_readdirplus_lite(
+    struct file *file,
+    unsigned long lite_mask,
+    void *direntplus_lite,
+    filldirpluslite_t filldirplus_lite)
+{
+    readdirplus_info_t info;
+
+    memset(&info, 0, sizeof(info));
+    info.direntplus = direntplus_lite;
+    info.lite = 1;
+    info.u.plus_lite.mask = lite_mask;
+    info.u.plus_lite.filldirplus_lite = filldirplus_lite;
+    info.u.plus_lite.ks.lite_mask = lite_mask;
+    return pvfs2_readdirplus_common(file, &info);
+}
 #endif
 
 /** PVFS2 implementation of VFS directory operations */
@@ -831,6 +959,9 @@ struct file_operations pvfs2_dir_operations =
     .readdir = pvfs2_readdir,
 #ifdef HAVE_READDIRPLUS_FILE_OPERATIONS
     .readdirplus = pvfs2_readdirplus,
+#endif
+#ifdef HAVE_READDIRPLUSLITE_FILE_OPERATIONS
+    .readdirplus_lite = pvfs2_readdirplus_lite,
 #endif
     .open = pvfs2_file_open,
     .release = pvfs2_file_release

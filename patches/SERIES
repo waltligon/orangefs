@@ -9,3 +9,5 @@ of system calls and the corresponding VFS hooks for FS specific implementations.
 e) posix-readwritex.patch: Implements the sys call stubs for the readx/writex family of system calls and
 the corresponding VFS hooks for FS specific implementations.
 f) posix-statlite-fix.patch: Bug fix for the statlite system call.
+g) posix-direntplus-lite.patch: Implements the syscall stubs for the readdir_plus_lite() family of
+system calls and the corresponding VFS hooks for FS specific implementations.
