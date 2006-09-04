@@ -508,7 +508,8 @@ static void print_entry_stat64(
     {
         free(formatted_group);
     }
-	nobjects++;
+	 if ((use_direntplus == 0 && f_type != 'd') || use_direntplus != 0)
+			  nobjects++;
 	if (verbose)
 	printf("%s\n",buf);
 }
@@ -640,7 +641,8 @@ static void print_entry_stat(
     {
         free(formatted_group);
     }
-	nobjects++;
+	 if ((use_direntplus == 0 && f_type != 'd') || use_direntplus != 0)
+			  nobjects++;
 	if (verbose)
 	 printf("%s\n",buf);
 }
@@ -771,7 +773,8 @@ static void print_entry_kernel_stat(
     {
         free(formatted_group);
     }
-	nobjects++;
+	 if ((use_direntplus == 0 && f_type != 'd') || use_direntplus != 0)
+			  nobjects++;
 	if (verbose)
 	printf("%s\n",buf);
 }
@@ -878,7 +881,8 @@ static void print_entry_kernel_stat_lite(
     {
         free(formatted_group);
     }
-    nobjects++;
+	 if ((use_direntplus == 0 && f_type != 'd') || use_direntplus != 0)
+				nobjects++;
     if (verbose)
 	  printf("%s\n",buf);
 }
@@ -985,7 +989,8 @@ static void print_entry_stat64_lite(
     {
         free(formatted_group);
     }
-    nobjects++;
+	 if ((use_direntplus == 0 && f_type != 'd') || use_direntplus != 0)
+				nobjects++;
     if (verbose)
 	  printf("%s\n",buf);
 }
