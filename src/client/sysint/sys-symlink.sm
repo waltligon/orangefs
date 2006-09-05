@@ -413,6 +413,7 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_SYMLINK,
+        0,
         meta_handle_extent_array,
         sm_p->hints);
 

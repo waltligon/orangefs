@@ -30,6 +30,7 @@
 #include <string.h>
 
 #include "request-scheduler.h"
+#include "scheduler-logger.h"
 #include "quickhash.h"
 #include "pvfs2-types.h"
 #include "pvfs2-req-proto.h"
@@ -162,6 +163,8 @@ int PINT_req_sched_initialize(
     {
 	return (-ENOMEM);
     }
+    
+    scheduler_logger_initalize();
 
     return (0);
 }
@@ -210,6 +213,9 @@ int PINT_req_sched_finalize(
 
     /* tear down hash table */
     qhash_finalize(req_sched_table);
+    
+    scheduler_logger_finalize();
+    
     return (0);
 }
 
@@ -263,13 +269,17 @@ int PINT_req_sched_target_handle(
 	return (0);
     case PVFS_SERV_IO:
 	if(req->u.io.io_type == PVFS_IO_WRITE)
+    {
 	    *readonly_flag = 0;
+    }
 	*handle = req->u.io.handle;
 	*fs_id = req->u.io.fs_id;
 	return (0);
     case PVFS_SERV_SMALL_IO:
     if(req->u.small_io.io_type == PVFS_IO_WRITE)
+    {
         *readonly_flag = 0;
+    }
     *handle = req->u.small_io.handle;
     *fs_id = req->u.small_io.fs_id;
     return (0);
@@ -326,6 +336,8 @@ int PINT_req_sched_target_handle(
     *handle = req->u.mgmt_migrate.handle;
     *fs_id = req->u.mgmt_migrate.fs_id;
     return (0);
+    case PVFS_SERV_GET_SCHEDULER_STATS:
+    return (1);
     case PVFS_SERV_MGMT_NOOP:
 	return (1);
     case PVFS_SERV_MGMT_PERF_MON:

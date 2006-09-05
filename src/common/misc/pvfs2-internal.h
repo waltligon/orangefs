@@ -45,6 +45,7 @@
 #define DATAFILE_HANDLES_KEYSTR "dh"
 #define METAFILE_DIST_KEYSTR    "md"
 #define SYMLINK_TARGET_KEYSTR   "st"
+#define PARENT_HANDLE_KEYSTR    "ph"
 
 #define IO_MAX_REGIONS 64
 /*

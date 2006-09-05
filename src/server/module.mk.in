@@ -35,6 +35,7 @@ ifdef BUILD_SERVER
 		$(DIR)/mgmt-remove-dirent.c \
 		$(DIR)/mgmt-get-dirdata-handle.c \
 		$(DIR)/mgmt-migrate.c \
+		$(DIR)/mgmt-get-scheduler-stats.c \
 		$(DIR)/get-eattr.c \
 		$(DIR)/set-eattr.c \
 		$(DIR)/del-eattr.c \

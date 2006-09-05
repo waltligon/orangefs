@@ -156,6 +156,10 @@ static void lebf_initialize(void)
 		resp.u.readdir.dirent_count = 0;
 		respsize = extra_size_PVFS_servresp_readdir;
 		break;
+        case PVFS_SERV_GET_SCHEDULER_STATS:
+        resp.u.get_sched_stats.handle_stats.count = 0;
+        respsize = extra_size_PVFS_servresp_getscheduler_stats;
+        break;
         case PVFS_SERV_MGMT_MIGRATE:
         break;
 	    case PVFS_SERV_FLUSH:
@@ -339,6 +343,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_CREATE, create);
 	CASE(PVFS_SERV_REMOVE, remove);
     CASE(PVFS_SERV_MGMT_MIGRATE, mgmt_migrate);
+    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
@@ -454,6 +459,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
+        CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);
             
             case PVFS_SERV_MGMT_MIGRATE:
             case PVFS_SERV_REMOVE:
@@ -557,6 +563,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
+    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);        
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -639,7 +646,8 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
-
+    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);
+    
         case PVFS_SERV_MGMT_MIGRATE:
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -744,6 +752,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		    decode_free(req->u.setattr.attr.u.meta.dfile_array);
 		break;
         
+        case PVFS_SERV_GET_SCHEDULER_STATS:
         case PVFS_SERV_MGMT_MIGRATE:
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
@@ -814,7 +823,11 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
 		    decode_free(resp->u.getattr.attr.u.meta.dfile_array);
 		break;
-
+        
+        case PVFS_SERV_GET_SCHEDULER_STATS:
+            decode_free(resp->u.get_sched_stats.handle_stats.stats);
+        break;
+         
 	    case PVFS_SERV_MGMT_EVENT_MON:
 		decode_free(resp->u.mgmt_event_mon.event_array);
 		break;

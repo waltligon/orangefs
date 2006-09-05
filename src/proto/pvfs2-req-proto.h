@@ -19,16 +19,17 @@
 #include "pvfs2-request.h"
 #include "pint-request.h"
 #include "pvfs2-mgmt.h"
+#include "scheduler-logger.h"
 
 /* update PVFS2_PROTO_MAJOR on wire protocol changes that break backwards
  * compatibility (such as changing the semantics or protocol fields for an
  * existing request type)
  */
-#define PVFS2_PROTO_MAJOR 2
+#define PVFS2_PROTO_MAJOR 3
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
-#define PVFS2_PROTO_MINOR 3
+#define PVFS2_PROTO_MINOR 0
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 /* we set the maximum possible size of a small I/O packed message as 64K.  This
@@ -75,12 +76,13 @@ enum PVFS_server_op
     PVFS_SERV_DELEATTR = 31,
     PVFS_SERV_LISTEATTR = 32,
     PVFS_SERV_SMALL_IO = 33,
-    PVFS_SERV_MGMT_MIGRATE = 34
+    PVFS_SERV_MGMT_MIGRATE = 34,
+    PVFS_SERV_GET_SCHEDULER_STATS = 35
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define
      * (below) if you add a new operation to this list
      */
 };
-#define PVFS_MAX_SERVER_OP 34
+#define PVFS_MAX_SERVER_OP 35
 
 /*
  * For debugging purpose, currently the mapping is in PINT.reqproto-encode.c
@@ -158,6 +160,7 @@ struct PVFS_servreq_create
 {
     PVFS_fs_id fs_id;
     PVFS_ds_type object_type;
+    PVFS_handle  parent_handle;
 
     /*
       an array of handle extents that we use to suggest to
@@ -167,10 +170,11 @@ struct PVFS_servreq_create
     */
     PVFS_handle_extent_array handle_extent_array;
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_create,
     PVFS_fs_id, fs_id,
     PVFS_ds_type, object_type,
+    PVFS_handle, parent_handle, 
     PVFS_handle_extent_array, handle_extent_array)
 #define extra_size_PVFS_servreq_create \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
@@ -179,6 +183,7 @@ endecode_fields_3_struct(
                                  __creds,              \
                                  __fsid,               \
                                  __objtype,            \
+                                 __parent,             \
                                  __ext_array,          \
                                  __hints)              \
 do {                                                   \
@@ -187,6 +192,7 @@ do {                                                   \
     (__req).hints = (__hints);                         \
     (__req).credentials = (__creds);                   \
     (__req).u.create.fs_id = (__fsid);                 \
+    (__req).u.create.parent_handle = (__parent);       \
     (__req).u.create.object_type = (__objtype);        \
     (__req).u.create.handle_extent_array.extent_count =\
         (__ext_array).extent_count;                    \
@@ -925,6 +931,42 @@ endecode_fields_1_struct(
 #define SMALL_IO_MAX_SEGMENTS 64
 
 
+struct PVFS_servreq_get_sched_stats
+{
+    PVFS_fs_id fs_id;
+    int32_t    count;
+};
+endecode_fields_2_struct(
+    PVFS_servreq_get_sched_stats,
+    PVFS_fs_id, fs_id,
+    int32_t, count)    
+#define PINT_SERVREQ_GET_SCHED_STATS_FILL(__req,      \
+                             __creds,                 \
+                             __fsid,                  \
+                             __count,                 \
+                             __hints)                 \
+do {                                                  \
+    memset(&(__req), 0, sizeof(__req));               \
+    (__req).op                 = PVFS_SERV_GET_SCHEDULER_STATS;\
+    (__req).credentials        = (__creds);           \
+    (__req).hints              = (__hints);           \
+    (__req).u.get_sched_stats.fs_id  = (__fsid);      \
+    (__req).u.get_sched_stats.count  = (__count);     \
+} while (0)               
+
+struct PVFS_servresp_get_sched_stats
+{
+    PVFS_request_statistics              fs_stat;
+    PVFS_handle_request_statistics_array handle_stats;
+};
+endecode_fields_2_struct(
+    PVFS_servresp_get_sched_stats,
+    PVFS_request_statistics, fs_stat,
+    PVFS_handle_request_statistics_array, handle_stats
+    )
+#define extra_size_PVFS_servresp_getscheduler_stats  \
+    MAX_LOGGED_HANDLES_PER_FS * sizeof(PVFS_handle_request_statistics)
+
 struct PVFS_servreq_mgmt_migrate
 {
     PVFS_fs_id  fs_id;   
@@ -1595,12 +1637,13 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_remove_object mgmt_remove_object;
         struct PVFS_servreq_mgmt_remove_dirent mgmt_remove_dirent;
         struct PVFS_servreq_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
-        struct PVFS_servreq_mgmt_migrate mgmt_migrate;
         struct PVFS_servreq_geteattr geteattr;
         struct PVFS_servreq_seteattr seteattr;
         struct PVFS_servreq_deleattr deleattr;
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
+        struct PVFS_servreq_get_sched_stats get_sched_stats;
+        struct PVFS_servreq_mgmt_migrate mgmt_migrate;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1657,6 +1700,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_geteattr geteattr;
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
+        struct PVFS_servresp_get_sched_stats get_sched_stats;
     } u;
 };
 endecode_fields_2_struct(

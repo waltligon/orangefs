@@ -118,7 +118,8 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {DIRECTORY_ENTRY_KEYSTR, sizeof(DIRECTORY_ENTRY_KEYSTR)},
     {DATAFILE_HANDLES_KEYSTR, sizeof(DATAFILE_HANDLES_KEYSTR)},
     {METAFILE_DIST_KEYSTR, sizeof(METAFILE_DIST_KEYSTR)},
-    {SYMLINK_TARGET_KEYSTR, sizeof(SYMLINK_TARGET_KEYSTR)}
+    {SYMLINK_TARGET_KEYSTR, sizeof(SYMLINK_TARGET_KEYSTR)},
+    {PARENT_HANDLE_KEYSTR, sizeof(PARENT_HANDLE_KEYSTR)}
 };
 
 /* extended attribute name spaces supported in PVFS2 */
@@ -405,12 +406,19 @@ struct PINT_server_req_params PINT_server_req_table[] =
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_small_io_sm},
         
-      /* 34 */
+    /* 34 */
     {PVFS_SERV_MGMT_MIGRATE,
         "mgmt_migrate",
         PINT_SERVER_CHECK_ATTR,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_mgmt_migrate_sm},      
+        
+    /* 35 */
+    {PVFS_SERV_GET_SCHEDULER_STATS,
+        "mgmt_get_scheduler_stats",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_mgmt_get_scheduler_stats_sm}     
 };
 
 int main(int argc, char **argv)

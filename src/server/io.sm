@@ -18,6 +18,7 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 #include "pvfs2-internal.h"
+#include "scheduler-logger.h"
 
 static int io_send_ack(
     PINT_server_op *s_op, job_status_s* js_p);
@@ -313,6 +314,17 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 
     if (s_op->u.io.flow_d)
     {
+        if(s_op->req->u.io.io_type == PVFS_IO_WRITE)
+        {
+            scheduler_logger_log_io(s_op->req->u.io.fs_id, s_op->req->u.io.handle, 
+                 s_op->u.io.flow_d->total_transferred, SCHED_LOG_WRITE);
+        }
+        else
+        {
+            scheduler_logger_log_io(s_op->req->u.io.fs_id, s_op->req->u.io.handle, 
+                 s_op->u.io.flow_d->total_transferred, SCHED_LOG_READ);
+        }
+        
         PINT_flow_free(s_op->u.io.flow_d);
     }
 

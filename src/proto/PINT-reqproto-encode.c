@@ -390,7 +390,8 @@ static char PVFS_server_op_name[][PVFS_MAX_SERVER_OP+2]={
     "PVFS_SERV_DELEATTR",
     "PVFS_SERV_LISTEATTR",
     "PVFS_SERV_SMALL_IO",
-    "PVFS_SERV_MGMT_MIGRATE"
+    "PVFS_SERV_MGMT_MIGRATE",
+    "PVFS_SERV_GETSCHEDULER_STATS"
 };
 
 char * server_op_to_str(enum PVFS_server_op sop){

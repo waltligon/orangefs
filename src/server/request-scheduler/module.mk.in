@@ -2,9 +2,15 @@ BUILD_SERVER = @BUILD_SERVER@
 
 DIR := src/server/request-scheduler
 LIBSRC += \
- 	$(DIR)/request-scheduler.c
-
+ 	$(DIR)/request-scheduler.c \
+	$(DIR)/scheduler-logger.c \
+	$(DIR)/red-black-tree.c \
+	$(DIR)/simplequeue.c
+		
 ifdef BUILD_SERVER
 	SERVERSRC += \
-		$(DIR)/request-scheduler.c 
+		$(DIR)/request-scheduler.c \
+		$(DIR)/scheduler-logger.c \
+		$(DIR)/red-black-tree.c \
+		$(DIR)/simplequeue.c
 endif

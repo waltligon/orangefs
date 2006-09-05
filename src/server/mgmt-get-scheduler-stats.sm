@@ -1,0 +1,93 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "pvfs2-server.h"
+
+static int get_scheduler_stats_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int get_scheduler_stats_work(PINT_server_op *s_op, job_status_s* js_p);
+
+
+%%
+
+machine pvfs2_mgmt_get_scheduler_stats_sm(
+    prelude, 
+    work, 
+    final_response, 
+    cleanup)
+{
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		default => work;
+	}
+
+    state work
+    {
+        run get_scheduler_stats_work;
+        default => final_response;
+    }
+
+	state final_response
+	{
+		jump pvfs2_final_response_sm;
+		default => cleanup;
+	}
+
+	state cleanup
+	{
+		run get_scheduler_stats_cleanup;
+		default => terminate;
+	}
+}
+
+%%
+
+/*****************************************************************************/
+
+static int get_scheduler_stats_work(PINT_server_op *s_op, job_status_s* js_p)
+{
+    int ret;
+    int inout_count = s_op->req->u.get_sched_stats.count;
+    
+    s_op->resp.u.get_sched_stats.handle_stats.stats = 
+        (PVFS_handle_request_statistics * ) malloc(
+            sizeof(PVFS_handle_request_statistics) * inout_count); 
+
+    ret = scheduler_logger_fetch_data( s_op->req->u.get_sched_stats.fs_id, 
+        &inout_count, & s_op->resp.u.get_sched_stats.fs_stat,  
+        s_op->resp.u.get_sched_stats.handle_stats.stats );
+    
+    s_op->resp.status = ret;
+    s_op->resp.u.get_sched_stats.handle_stats.count = inout_count;
+    return 1;
+}
+
+/* 
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static int get_scheduler_stats_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+{
+    
+    return(server_state_machine_complete(s_op));
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

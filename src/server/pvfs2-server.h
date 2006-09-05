@@ -153,7 +153,8 @@ enum
     DIR_ENT_KEY          = 1,
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
-    SYMLINK_TARGET_KEY   = 4
+    SYMLINK_TARGET_KEY   = 4,
+    PARENT_HANDLE_KEY    = 5
 };
 
 typedef enum
@@ -480,6 +481,7 @@ extern struct PINT_state_machine_s pvfs2_io_sm;
 extern struct PINT_state_machine_s pvfs2_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_remove_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_migrate_sm;
+extern struct PINT_state_machine_s pvfs2_mgmt_get_scheduler_stats_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_object_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_get_dirdata_handle_sm;

@@ -632,6 +632,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_METAFILE,
+        0,
         meta_handle_extent_array,
         sm_p->hints);
 
@@ -779,12 +780,12 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     for(i = 0; i < sm_p->u.create.num_data_files; i++)
     {
         PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
-
         PINT_SERVREQ_CREATE_FILL(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             PVFS_TYPE_DATAFILE,
+            sm_p->u.create.metafile_handle,
             sm_p->u.create.io_handle_extent_array[i],
             sm_p->hints);
 

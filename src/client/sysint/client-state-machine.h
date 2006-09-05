@@ -304,6 +304,14 @@ struct PINT_client_mgmt_migrate_sm
     int stored_error_code;    
 };
 
+struct PINT_client_mgmt_get_scheduler_stats_sm
+{
+    PVFS_fs_id fs_id;
+    int max_count;
+    PVFS_sysresp_mgmt_get_scheduler_stats * resp;
+    int stored_error_code;
+};
+
 struct PINT_client_mgmt_statfs_list_sm
 {
     PVFS_fs_id fs_id;
@@ -535,6 +543,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_mgmt_setparam_list_sm setparam_list;
 	struct PINT_client_truncate_sm  truncate;
     struct PINT_client_mgmt_migrate_sm migrate;
+    struct PINT_client_mgmt_get_scheduler_stats_sm mgmt_get_scheduler_stats;
 	struct PINT_client_mgmt_statfs_list_sm statfs_list;
 	struct PINT_client_mgmt_perf_mon_list_sm perf_mon_list;
 	struct PINT_client_mgmt_event_mon_list_sm event_mon_list;
@@ -623,6 +632,7 @@ enum
     PVFS_SYS_SMALL_IO              = 17,
     PVFS_SYS_STATFS                = 18,
     PVFS_SYS_FS_ADD                = 19,
+    
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -635,6 +645,8 @@ enum
     PVFS_MGMT_CREATE_DIRENT        = 79,
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
     PVFS_MGMT_MIGRATE              = 81,
+    PVFS_MGMT_GET_SCHEDULER_STATS  = 82,
+    
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
@@ -720,6 +732,7 @@ extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
 extern struct PINT_state_machine_s pvfs2_client_perf_count_timer_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_migrate_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_get_scheduler_stats_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;

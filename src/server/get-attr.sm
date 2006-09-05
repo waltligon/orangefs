@@ -47,6 +47,7 @@ PINT_server_trove_keys_s Trove_Special_Keys[] =
 enum
 {
     STATE_METAFILE = 7,
+    STATE_PARENT_HANDLE = 8,
     STATE_SYMLINK  = 9,
     STATE_DIR      = 10,
     STATE_DIR_HINT = 11,
@@ -57,6 +58,8 @@ static int getattr_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_verify_attribs(
     PINT_server_op *s_op, job_status_s *js_p);
+static int getattr_read_parent_handle(
+    PINT_server_op *s_op, job_status_s *js_p);    
 static int getattr_read_symlink_target(
     PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_get_dirdata_handle(
@@ -84,6 +87,7 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 nested machine pvfs2_get_attr_work_sm(
     verify_attribs,
+    read_parent_handle, 
     read_symlink_target,
     read_metafile_datafile_handles_if_required,
     read_metafile_distribution_if_required,
@@ -97,9 +101,16 @@ nested machine pvfs2_get_attr_work_sm(
     state verify_attribs
     {
         run getattr_verify_attribs;
+        STATE_PARENT_HANDLE => read_parent_handle;
         STATE_SYMLINK => read_symlink_target;
         STATE_METAFILE => read_metafile_datafile_handles_if_required;
         STATE_DIR => get_dirdata_handle;
+        default => setup_resp;
+    }
+
+    state read_parent_handle
+    {
+        run getattr_read_parent_handle;
         default => setup_resp;
     }
 
@@ -344,10 +355,11 @@ static int getattr_verify_attribs(
         resp_attr->u.data.size = s_op->ds_attr.b_size;
         resp_attr->mask |= PVFS_ATTR_DATA_ALL;
 
-	gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
+	    gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
                      "a datafile (size = %lld).\n",
                      llu(s_op->u.getattr.handle),
                      lld(resp_attr->u.data.size));
+        js_p->error_code = STATE_PARENT_HANDLE;
     }
     else if (resp_attr->objtype == PVFS_TYPE_DIRECTORY)
     {
@@ -416,6 +428,33 @@ static int getattr_verify_attribs(
         js_p->error_code = -PVFS_ENXIO;
     }
     return 1;
+}
+
+static int getattr_read_parent_handle(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret;
+    job_id_t i;
+    
+    /* set up key and value structure for keyval write */
+    s_op->key.buffer = Trove_Common_Keys[PARENT_HANDLE_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[PARENT_HANDLE_KEY].size;
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "  object %lld has parent %lld associated with it\n",
+                 lld(s_op->req->u.create.parent_handle), lld(js_p->handle));
+
+    s_op->val.buffer = & s_op->resp.u.getattr.attr.u.data.parent_metafile;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+    
+    ret = job_trove_keyval_read(
+        s_op->u.getattr.fs_id, s_op->u.getattr.handle,
+        &(s_op->key), &(s_op->val), 
+        0, 
+        NULL, s_op, 0, js_p,
+        &i, server_job_context);
+
+    return ret;
 }
 
 static int getattr_read_symlink_target(

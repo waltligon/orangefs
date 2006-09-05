@@ -38,6 +38,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/server-get-config.c \
 	$(DIR)/fs-add.c \
 	$(DIR)/mgmt-migrate.c \
+	$(DIR)/mgmt-get-scheduler-stats.c \
 	$(DIR)/mgmt-noop.c \
 	$(DIR)/mgmt-setparam-list.c \
 	$(DIR)/mgmt-statfs-list.c \

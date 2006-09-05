@@ -17,14 +17,19 @@ static int create_cleanup(
     PINT_server_op *s_op, job_status_s* js_p);
 static int create_create(
     PINT_server_op *s_op, job_status_s* js_p);
+static int create_set_parent_if_necessary(
+    PINT_server_op *s_op, job_status_s* js_p);    
 static int create_setup_resp(
     PINT_server_op *s_op, job_status_s* js_p);
+
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
 machine pvfs2_create_sm(
     prelude,
     create,
+    set_parent_if_necessary,
     setup_resp,
     final_response,
     cleanup)
@@ -39,9 +44,15 @@ machine pvfs2_create_sm(
     state create
     {
         run create_create;
-        default => setup_resp;
+        default => set_parent_if_necessary;
     }
 
+    state set_parent_if_necessary
+    {
+        run create_set_parent_if_necessary;
+        default => setup_resp;
+    }
+    
     state setup_resp
     {
         run create_setup_resp;
@@ -89,7 +100,7 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
 	if(request_id != NULL){
 		gossip_err("Create request ID received: %s\n", request_id);
 	}
-
+    
     ret = job_trove_dspace_create(
         s_op->req->u.create.fs_id,
         &s_op->req->u.create.handle_extent_array,
@@ -101,8 +112,50 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
         js_p,
         &i,
         server_job_context);
-
+    
     return(ret);
+}
+
+static int create_set_parent_if_necessary(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    int ret;
+    job_id_t i;
+    
+    if (js_p->error_code != 0 )
+    {
+        return 1;
+    }
+    s_op->resp.u.create.handle = js_p->handle;
+    if ( s_op->req->u.create.parent_handle == 0)
+    {
+        return 1;
+    }
+    
+    /* set up key and value structure for keyval write */
+    s_op->key.buffer = Trove_Common_Keys[PARENT_HANDLE_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[PARENT_HANDLE_KEY].size;
+
+    gossip_debug(GOSSIP_SETATTR_DEBUG,
+                 " New object %lld has parent %lld associated with it\n",
+                  lld(js_p->handle), lld(s_op->req->u.create.parent_handle));
+
+    s_op->val.buffer = & s_op->req->u.create.parent_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+    
+    js_p->error_code = 0;
+    ret = job_trove_keyval_write(
+        s_op->req->u.create.fs_id, js_p->handle,
+        &(s_op->key), &(s_op->val),
+        TROVE_SYNC,
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &i,
+        server_job_context);
+
+    return (ret);
 }
 
 /* create_setup_resp()
@@ -113,9 +166,9 @@ static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
     if (js_p->error_code == 0)
     {
-	gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
+       js_p->handle = s_op->resp.u.create.handle;
+	   gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
                      llu(js_p->handle));
-	s_op->resp.u.create.handle = js_p->handle;
         switch(s_op->req->u.create.object_type)
         {
             case PVFS_TYPE_NONE:
