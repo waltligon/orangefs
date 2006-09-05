@@ -511,7 +511,16 @@ int main(int argc, char *argv[])
 		goto err;
 	}
 
-	fd = open(fname, O_TRUNC | amode, 0644);
+	if (mynod == 0)
+	{
+		fd = open(fname, O_TRUNC | amode, 0644);
+		MPI_Barrier(MPI_COMM_WORLD);
+	}
+	else
+	{
+		MPI_Barrier(MPI_COMM_WORLD);
+		fd = open(fname, O_RDWR | O_LARGEFILE);
+	}
 	if (fd < 0) {
 		fprintf(stderr, "node %d, open error: %s\n", mynod,
 			  strerror(errno));
@@ -546,7 +555,16 @@ int main(int argc, char *argv[])
 	close(fd);
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	fd = open(fname, amode, 0644);
+	if (mynod == 0)
+	{
+		fd = open(fname, amode, 0644);
+		MPI_Barrier(MPI_COMM_WORLD);
+	}
+	else
+	{
+		MPI_Barrier(MPI_COMM_WORLD);
+		fd = open(fname, O_RDONLY | O_LARGEFILE);
+	}
 	if (fd < 0) {
 		fprintf(stderr, "node %d, open error: %s\n", mynod,
 			  strerror(errno));
@@ -580,7 +598,7 @@ int main(int argc, char *argv[])
 	}
 	close(fd);
 
-	if (do_unlink) {
+	if (do_unlink && mynod == 0) {
 		unlink(fname);
 	}
 
