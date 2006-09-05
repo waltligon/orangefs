@@ -213,7 +213,8 @@ static int small_io_completion_fn(void * user_args,
                                   struct PVFS_server_resp * resp_p,
                                   int index)
 {
-    PINT_client_sm * sm_p = (PINT_client_sm *)user_args;
+    struct PINT_smcb *smcb = (struct PINT_smcb *)user_args;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
 
     assert(resp_p->op == PVFS_SERV_SMALL_IO);
