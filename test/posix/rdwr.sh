@@ -1,9 +1,6 @@
 #!/bin/bash
 
-STREAMS="1 4 16";
-MODE="0 1 2";
-BLKSIZE="8388608 16777216";
-#BLKSIZE="262144 524288 1048576 2097152 4194304";
+BLKSIZE="262144 524288 1048576 2097152 4194304";
 E_OPTERR=65
 
 usage()
@@ -35,8 +32,8 @@ fi
 		do
 			for b in $BLKSIZE
 			do
-				echo "$MPICH2_INSTALL/bin/mpiexec -machinefile $MACHINE_FILE -n 90 $PVFS2_TOPDIR/test/posix/iox -f $PVFS2_MNT/rdwr_test -n 4 -m $m -u -b $b -s $s"
-				$MPICH2_INSTALL/bin/mpiexec -machinefile $MACHINE_FILE -n 90 $PVFS2_TOPDIR/test/posix/iox -f $PVFS2_MNT/rdwr_test -n 4 -m $m -u -b $b -s $s
+				echo "$MPICH2_INSTALL/bin/mpiexec -machinefile $MACHINE_FILE -n 90 $PVFS2_TOPDIR/test/posix/io -f $PVFS2_MNT/rdwr -i 4 -u -b $b"
+				$MPICH2_INSTALL/bin/mpiexec -machinefile $MACHINE_FILE -n 90 $PVFS2_TOPDIR/test/posix/iox -f $PVFS2_MNT/rdwr_test -n 4 -u -b $b 
 			done
 		done
 	done
