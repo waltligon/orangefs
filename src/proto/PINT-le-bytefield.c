@@ -576,12 +576,11 @@ static int lebf_decode_req(
 
 #undef CASE
 
-    if (ptr != ((char *)input_buffer + input_size))
+    if (ptr != (char *) input_buffer + input_size)
     {
-	gossip_lerr("%s: improper input buffer size: %p != %p + %d\n",
-                    __func__, ptr, input_buffer, input_size);
+	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
+                    __func__, req->op, ptr - (char *) input_buffer, input_size);
 	ret = -PVFS_EPROTO;
-        assert(0);
     }
 
   out:
@@ -666,9 +665,10 @@ static int lebf_decode_resp(
 
 #undef CASE
 
-    if (ptr != (char *)input_buffer + input_size) {
-	gossip_lerr("%s: improper input buffer size [%p + %d != %p]\n", __func__,
-                input_buffer, input_size, ptr);
+    if (ptr != (char *) input_buffer + input_size) {
+	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
+                    __func__, resp->op, ptr - (char *) input_buffer,
+                    input_size);
 	ret = -PVFS_EPROTO;
     }
 
