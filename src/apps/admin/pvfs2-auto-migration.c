@@ -25,8 +25,22 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
+#include "red-black-tree.h"
+
+/*
+ * TODO: 
+ * - load should also represent the number of currently enqueued but unprocessed ops.
+ * - short term scheduling
+ * - datastructure for metaserver 
+ */
 
 #define DFILE_KEY "system.pvfs2." DATAFILE_HANDLES_KEYSTR
+
+#define HISTORY_SIZE 5
+
+#define FATAL_ERR(x) fprintf(stderr, x); exit(1);
+#define CONTINUE sleep(user_opts->refresh_time); \
+            continue
 
 /* optional parameters, filled in by parse_args() */
 struct options
@@ -35,6 +49,11 @@ struct options
     int refresh_time;
     int override;
     int verbose;
+    
+    float simulate_load;
+    int simulate_server_no;
+    
+    int remove_old_entries_after_iterations; 
     
     float load_tolerance;    
 };
@@ -45,6 +64,9 @@ const struct options default_options =
     30,
     0,
     0,
+    5.0,
+    0,
+    100,
     0.5
 };
 
@@ -63,17 +85,105 @@ static void usage(
             x                   \
         }                       
 
+#define debugV(x)                   \
+        if (user_opts->verbose > 1) \
+        {                           \
+            x                       \
+        }                       
 
+
+/*
+ * needed for parallelization of requests to multiple servers 
+ * with system interface test functions.  
+ */
+
+enum dataserver_status
+{
+    STATUS_READY,
+    STATUS_MIGRATION_IN_PROGRESS
+};
+
+/* store a number of snapshots for later referal */
+typedef struct 
+{
+    /*
+     * iteration of 0 is not valid !
+     */
+    int age_iteration;
+    int age_stats[HISTORY_SIZE];
+    PVFS_handle handle;
+    
+    int current_stat_pos;
+    PVFS_request_statistics stats[HISTORY_SIZE];
+} handle_history_t;
+
+
+
+typedef struct 
+{ 
+    char * alias;
+    PVFS_BMI_addr_t bmi_address; 
+    PVFS_handle_extent_array extend;
+    
+    enum dataserver_status status;
+    
+    struct PVFS_mgmt_server_stat * stats;
+    
+    red_black_tree                        handle_history;
+    
+    int attr_age_iteration;
+    PVFS_sysresp_mgmt_get_scheduler_stats getschedstats_resp;
+    PVFS_sysresp_getattr                  getattr_stats;
+} dataserver_details;
+
+
+struct history_free_iterator_t{
+    red_black_tree * tree;
+    int oldest_iteration_no;
+};
+
+static dataserver_details * servers = NULL;
+static struct options *user_opts = NULL;
+    
+/* function protypes */
 int lookup(
     char *pvfs2_file,
     PVFS_credentials * credentials,
     PVFS_fs_id * out_fs_id,
     PVFS_object_ref * out_object_ref,
     PVFS_sysresp_getattr * out_resp_getattr);
+
+int free_history_iterator(tree_node * node, 
+    struct history_free_iterator_t* iter_data);
+    
+void try_to_free_history_tree(red_black_tree * handle_history, 
+    int oldest_iteration_no);
+
+
+
+void put_sched_resp_into_history_tree_and_sort(PVFS_sysresp_mgmt_get_scheduler_stats * stats,
+    red_black_tree * handle_history, int current_iteration, int * inout_max_interesting_cnt, 
+    handle_history_t ** out_array);
     
 void print_servers(const char * prefix, 
     int cnt, PVFS_BMI_addr_t * bmi, char ** aliases, 
     PVFS_handle_extent_array * extends);
+
+void print_data_servers(const char * prefix, 
+    int cnt, dataserver_details * servers);
+
+int handle_history_cmp ( const handle_history_t ** stat_1, 
+    const handle_history_t ** stat_2);
+
+int server_stat_cmp ( const dataserver_details * stat_1, 
+    const dataserver_details * stat_2);
+
+int compare_internal( handle_history_t * stat_1, 
+    handle_history_t * stat_2 );
+    
+int compare_lookup(handle_history_t * stat_1, PVFS_handle* key);
+
+/* end function protypes */
 
 void print_servers(const char * prefix, 
     int cnt, PVFS_BMI_addr_t * bmi, char ** aliases, 
@@ -89,38 +199,219 @@ void print_servers(const char * prefix,
             lld(extends[i].extent_array[0].last));
     }
 }
-int server_stat_cmp ( const struct PVFS_mgmt_server_stat * stat_1, 
-    const struct PVFS_mgmt_server_stat * stat_2);
 
-int server_stat_cmp ( const struct PVFS_mgmt_server_stat * stat_1, 
-    const struct PVFS_mgmt_server_stat * stat_2)
+int server_stat_cmp ( const dataserver_details * stat_1, 
+    const dataserver_details * stat_2)
 {
-    return stat_1->load_1 < stat_2->load_1;
+    return stat_1->stats[0].load_1 < stat_2->stats[0].load_1;
 }
+
+int compare_lookup(handle_history_t * stat_1, PVFS_handle* key)
+{
+    if( stat_1->handle > *key)
+    {
+        return -1;
+    }
+    else if(stat_1->handle < *key)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+int compare_internal( handle_history_t * stat_1, 
+    handle_history_t * stat_2 )
+{
+    if( stat_1->handle > stat_2->handle )
+    {
+        return -1;
+    }
+    else if(stat_1->handle < stat_2->handle )
+    {
+        return 1;
+    }
+    return 0;
+}
+
+
+void print_data_servers(const char * prefix, 
+    int cnt, dataserver_details * servers)
+{
+    int i;
+    printf("%s - count: %d\n", prefix, cnt);
+    for(i=0; i < cnt; i++)
+    {
+        printf(" %s - %s - extends: %d (%lld-%lld)\n", servers[i].alias, 
+            BMI_addr_rev_lookup(servers[i].bmi_address),
+            servers[i].extend.extent_count, lld(servers[i].extend.extent_array[0].first), 
+            lld(servers[i].extend.extent_array[0].last));
+    }
+}
+
+
+int free_history_iterator(tree_node * node, 
+    struct history_free_iterator_t* iter_data)
+{
+    handle_history_t * handle_info = node->data;
+    
+    if( handle_info->age_iteration < iter_data->oldest_iteration_no )
+    {
+        debugV ( printf("Freed: %lld\n", lld(handle_info->handle) ); ) 
+        deleteNodeFromTree(node, iter_data->tree);
+        free(handle_info);
+        return 0;
+    }
+    return 0;
+}
+
+void try_to_free_history_tree(red_black_tree * handle_history,
+    int oldest_iteration_no)
+{
+    struct history_free_iterator_t iter_data;
+    iter_data.oldest_iteration_no = oldest_iteration_no;
+    iter_data.tree = handle_history;
+    iterate_red_black_tree_nodes((int(*)(tree_node*,void*)) free_history_iterator, 
+        handle_history, & iter_data);
+}
+
+inline int get_old_pos(int pos)
+{
+    if (pos -1 != -1) 
+    {
+        return pos - 1;
+    }
+    else
+    {
+       return HISTORY_SIZE-1;
+    }
+}
+
+inline double get_size_diff(int pos, int oldpos, const handle_history_t * history){
+    return (double) (history->stats[pos].acc_multiplier[SCHED_LOG_READ] - 
+        history->stats[oldpos].acc_multiplier[SCHED_LOG_READ]) * (double) ((uint64_t) -1) + 
+        history->stats[pos].acc_size[SCHED_LOG_READ] - 
+        history->stats[oldpos].acc_size[SCHED_LOG_READ] +
+        (history->stats[pos].acc_multiplier[SCHED_LOG_WRITE] - 
+        history->stats[oldpos].acc_multiplier[SCHED_LOG_WRITE]) * (double) ((uint64_t) -1) + 
+        history->stats[pos].acc_size[SCHED_LOG_WRITE] - 
+        history->stats[oldpos].acc_size[SCHED_LOG_WRITE];
+}
+
+int handle_history_cmp ( const handle_history_t ** stat_1, 
+    const handle_history_t ** stat_2)
+{
+    int oldpos_1 = get_old_pos((*stat_1)->current_stat_pos);
+    int oldpos_2 = get_old_pos((*stat_2)->current_stat_pos);
+    double size_1;
+    double size_2;
+    /*
+     * first argument < than second one => return -1
+     */
+    size_1 = get_size_diff( (*stat_1)->current_stat_pos, oldpos_1, *stat_1 )
+        / ((*stat_1)->age_stats[((*stat_1)->current_stat_pos)] - 
+            (*stat_1)->age_stats[oldpos_1]);
+    size_2 = get_size_diff( (*stat_2)->current_stat_pos, oldpos_2, *stat_2 )
+        / ((*stat_2)->age_stats[((*stat_2)->current_stat_pos)] - 
+            (*stat_2)->age_stats[oldpos_2]);    
+    if( size_1 < size_2)
+    {
+        return -1;
+    }
+    else
+    {
+        return +1;
+    }
+}
+
+void put_sched_resp_into_history_tree_and_sort(
+    PVFS_sysresp_mgmt_get_scheduler_stats * stats,
+    red_black_tree * tree,
+    int current_iteration,
+    int * inout_max_interesting_cnt, 
+    handle_history_t ** out_array
+    )
+{
+    int i;
+    tree_node * node;
+    PVFS_handle_request_statistics * stat;
+    handle_history_t * h_history;
+    
+    int max_out = * inout_max_interesting_cnt;
+    int cur_out = 0;
+    
+    for(i=0; i < stats->handle_stats.count; i++)
+    {
+        stat = & stats->handle_stats.stats[i];
+        
+        node = lookupTree(& stat->handle, tree);
+        if ( node == NULL )
+        {
+            h_history = (handle_history_t *) malloc(sizeof(handle_history_t));
+            memset(h_history, 0, sizeof(handle_history_t));
+            
+            if( h_history == NULL) 
+            {
+                FATAL_ERR("Could not malloc !\n")
+            }
+            
+            h_history->age_iteration = current_iteration;
+            h_history->handle = stat->handle;
+            h_history->current_stat_pos = 0;
+            
+            insertKeyIntoTree(h_history, tree);
+        }
+        else
+        {
+            h_history = (handle_history_t *) node->data;            
+            h_history->age_iteration = current_iteration;
+            h_history->current_stat_pos = 
+                (h_history->current_stat_pos + 1) % HISTORY_SIZE; 
+        }
+        h_history->age_stats[h_history->current_stat_pos] = current_iteration;
+        memcpy(& h_history->stats[h_history->current_stat_pos], & stat->stat, 
+            sizeof(PVFS_request_statistics));
+        
+        if ( cur_out < max_out) 
+        {
+            /*
+             * only think about files which access statistics have changed.
+             */
+            int oldpos = get_old_pos(h_history->current_stat_pos);
+            if ( h_history->stats[h_history->current_stat_pos].io_number[SCHED_LOG_READ] != 
+                 h_history->stats[oldpos].io_number[SCHED_LOG_READ] ||
+                 h_history->stats[h_history->current_stat_pos].io_number[SCHED_LOG_WRITE] != 
+                 h_history->stats[oldpos].io_number[SCHED_LOG_WRITE] )
+            {
+                out_array[cur_out] = h_history;
+                cur_out++;
+            }
+        }
+    }
+    
+    *inout_max_interesting_cnt = cur_out;
+    
+    qsort(out_array, cur_out, sizeof(handle_history_t*), 
+         (int(*)(const void *, const void *)) handle_history_cmp);
+}
+
 
 int main(
     int argc,
     char **argv)
 {
-    struct options *user_opts = NULL;
     int64_t ret;
     int i;
     PVFS_credentials credentials;
-
+    int iteration = 0;
+    
     PVFS_fs_id fsid = 0;
     int dataserver_cnt = 0;
     int metaserver_cnt = 0;
-    PVFS_BMI_addr_t * dataserver_array = NULL;
     PVFS_BMI_addr_t * metaserver_array = NULL;
-    char ** dataserver_aliases = NULL;
+    PVFS_BMI_addr_t * dataserver_array = NULL;
     char ** metaserver_aliases = NULL;
-    PVFS_handle_extent_array * dataserver_extend_array = NULL;
     PVFS_handle_extent_array * metaserver_extend_array = NULL;
-    double tmp_double;
-    
-    PVFS_sysresp_mgmt_get_scheduler_stats resp;
-    PVFS_sysresp_getattr                  getattr_stats;
-    
+        
     struct server_configuration_s *config;
     PVFS_hint * hints = NULL;
     struct PVFS_mgmt_server_stat *stat_array = NULL;
@@ -158,6 +449,7 @@ int main(
              exit(1);
         }
     }
+    
     if (ret < 0)
     {
         PVFS_perror("PVFS_util_resolve error\n", ret);
@@ -186,28 +478,31 @@ int main(
         exit(1);
     }
 
-    dataserver_array = (PVFS_BMI_addr_t *) malloc(
-         dataserver_cnt * sizeof(PVFS_BMI_addr_t));
     metaserver_array = (PVFS_BMI_addr_t *) malloc(
          metaserver_cnt * sizeof(PVFS_BMI_addr_t));
-    dataserver_aliases = (char ** ) malloc(sizeof(char*) 
-        * dataserver_cnt);
     metaserver_aliases = (char ** ) malloc(sizeof(char*) 
         * metaserver_cnt);
         
-    dataserver_extend_array = (PVFS_handle_extent_array *) malloc(
-        sizeof(PVFS_handle_extent_array) * dataserver_cnt);
     metaserver_extend_array = (PVFS_handle_extent_array *) malloc(
         sizeof(PVFS_handle_extent_array) * metaserver_cnt);
-            
-    if ( metaserver_array == NULL || dataserver_array == NULL ||
-        dataserver_aliases == NULL || metaserver_aliases == NULL ||
-        dataserver_extend_array == NULL || metaserver_extend_array == NULL )
+
+    servers = (dataserver_details*) malloc( sizeof(dataserver_details) 
+        * dataserver_cnt);
+    dataserver_array = (PVFS_BMI_addr_t *) malloc(
+         dataserver_cnt * sizeof(PVFS_BMI_addr_t));
+
+    stat_array = (struct PVFS_mgmt_server_stat *) malloc(
+        sizeof(struct PVFS_mgmt_server_stat) * dataserver_cnt );
+    if ( metaserver_array == NULL || dataserver_array == NULL || 
+        metaserver_aliases == NULL || stat_array == NULL ||
+        metaserver_extend_array == NULL || servers == NULL )
     {
         fprintf(stderr,"Could not malloc arrays for addresses\n");
         exit(1);
-    }             
-
+    }
+    
+    memset(servers,0, sizeof(dataserver_details) * dataserver_cnt);
+      
     ret = PVFS_mgmt_get_server_array(fsid, & credentials, 
         PVFS_MGMT_IO_SERVER, dataserver_array, & dataserver_cnt);
     if (ret < 0)
@@ -215,7 +510,19 @@ int main(
         PVFS_perror("PVFS_mgmt_get_server_array getting IO servers error\n", ret);
         exit(1);
     }
-   
+    
+    for(i=0; i < dataserver_cnt; i++)
+    {
+        servers[i].bmi_address = dataserver_array[i];
+        servers[i].getschedstats_resp.handle_stats.stats = (PVFS_handle_request_statistics*) 
+            malloc(sizeof(PVFS_handle_request_statistics) * MAX_LOGGED_HANDLES_PER_FS );
+        servers[i].getschedstats_resp.handle_stats.stats = (PVFS_handle_request_statistics*) 
+            malloc(sizeof(PVFS_handle_request_statistics) * MAX_LOGGED_HANDLES_PER_FS );
+        servers[i].stats = & stat_array[i];
+        initRedBlackTree( & servers[i].handle_history, (int(*)(void *,void*)) compare_lookup, 
+            (int(*)(void *,void*))compare_internal ); 
+    }
+
    ret = PVFS_mgmt_get_server_array(fsid, & credentials, 
         PVFS_MGMT_META_SERVER, metaserver_array , & metaserver_cnt);
     if (ret < 0)
@@ -251,11 +558,11 @@ int main(
     for( i=0; i < dataserver_cnt; i++ )
     {
         ret = PINT_cached_config_get_one_server_alias(
-            BMI_addr_rev_lookup( dataserver_array[i] ), 
+            BMI_addr_rev_lookup( servers[i].bmi_address ), 
             config,
             fsid,
-            & dataserver_extend_array[i],
-            & dataserver_aliases[i],
+            & servers[i].extend,
+            & servers[i].alias,
             1);
         if( ret != 0 )
         {
@@ -269,8 +576,7 @@ int main(
     {   
         print_servers("Metaservers", metaserver_cnt, metaserver_array, 
             metaserver_aliases, metaserver_extend_array); 
-        print_servers("Dataservers", dataserver_cnt, dataserver_array, 
-            dataserver_aliases, dataserver_extend_array);
+        print_data_servers("Dataservers", dataserver_cnt, servers);
     }
     
     if ( dataserver_cnt < 2 )
@@ -284,33 +590,34 @@ int main(
     }
     
     /* now call mgmt functions to determine per-server statistics */
-    stat_array = (struct PVFS_mgmt_server_stat *)
-        malloc( dataserver_cnt *
-               sizeof(struct PVFS_mgmt_server_stat));
-    if (stat_array == NULL)
-    {
-        perror("Error in malloc of stat_array");
-        exit(1);
-    }
-  
-    resp.handle_stats.stats = (PVFS_handle_request_statistics*) 
-        malloc(sizeof(PVFS_handle_request_statistics) * MAX_LOGGED_HANDLES_PER_FS );
- 
+
     while(1)
     {
-    /* gather intelligence */
+    int interesting_server_cnt;
+    handle_history_t * sorted_history[MAX_LOGGED_HANDLES_PER_FS];
+    int sorted_history_size ;
+
+    iteration++;
+    if( iteration < 0) {
+        printf("Error, wrapping iteration number, fixme !!!\n");
+        /* currently wrapping between int max is not handled properly 
+         * throughout the code !*/
+        iteration = 1;
+    }
     
     if( user_opts->verbose )
     {
-        printf("Iteration \n");
+        printf("Iteration %d\n",iteration);
     }
     
+    /* gather intelligence */
     ret = PVFS_mgmt_statfs_list(
         fsid, &credentials, stat_array, dataserver_array,
         dataserver_cnt, NULL, hints);
     if( ret != 0 )
     {
         /* todo proper error handling, e.g. sleep for a while and retry etc... */
+        PVFS_perror("PVFS_mgmt_statfs_list error\n", ret);
         return (ret);
     }
     
@@ -320,75 +627,132 @@ int main(
      *      if the server is under high load now, then get detailed statistics,
      *      if the sample statistics show that some files are hit repetative, migrate a
      *      couple of these... 
+     * 
      */
     /* step 1: server with load > 1 are potential candidates, however sort the list */
     
-    qsort(stat_array, dataserver_cnt, sizeof(struct PVFS_mgmt_server_stat), 
+    qsort(servers, dataserver_cnt, sizeof(dataserver_details), 
          (int(*)(const void *, const void *)) server_stat_cmp);
       
+    /* for debugging purposes simulate */
+    if( user_opts->simulate_server_no )
+    {
+        debug( printf("Simulation activated !\n"); )
+        if ( user_opts->simulate_server_no > dataserver_cnt )
+        {
+            fprintf(stderr, "For simulation are only %d dataservers available, "
+                "however %d are selected\n Abort!!!\n", 
+                dataserver_cnt, user_opts->simulate_server_no);
+            exit(1);
+        }
+        
+        for(i=0; i < user_opts->simulate_server_no; i++)
+        {
+            stat_array[i].load_1 = (long)(60000 * user_opts->simulate_load);
+        }
+    }
+      
     /* figure out load gradient between servers */
-    tmp_double = ((double) stat_array[0].load_1 - 
-        (double) stat_array[dataserver_cnt-1].load_1 ) ;
 
-    debug( printf("Load: highest: %f lowest: %f diff:%f \n",
-            print_load(stat_array[0].load_1), 
-            print_load(stat_array[dataserver_cnt-1].load_1), 
-            print_load(tmp_double)); )
-    
-    if ( print_load(tmp_double) < 1.0  || (double) (stat_array[0].load_1) /
-        (double) stat_array[dataserver_cnt-1].load_1 < 
-            1.0 + user_opts->load_tolerance || 
-        stat_array[0].load_1 == 0 )
+       
+    /* figure out how much servers possibly migrate, right now, move from 
+     * server with the highest load to the server with the smallest load */
+    for (i = 0; i < dataserver_cnt /2 ; i++)
+    {
+        double tmp_double;
+        double quotient;
+        tmp_double = ((double) stat_array[i].load_1 - 
+        (double) stat_array[dataserver_cnt-1-i].load_1 ) ;
+        quotient = (double) (stat_array[i].load_1) /
+            (double) stat_array[dataserver_cnt-i-1].load_1;
+
+        debug( printf("%i: Load: highest: %f lowest: %f diff:%f quot:%f\n",
+            i,
+            print_load(stat_array[i].load_1), 
+            print_load(stat_array[dataserver_cnt-1-i].load_1), 
+            print_load(tmp_double),
+            quotient); )
+        if ( print_load(tmp_double) < 1.0  || quotient < 
+                1.0 + user_opts->load_tolerance || 
+            stat_array[i].load_1 == 0 )
+        {
+            break;
+        }
+    }
+    interesting_server_cnt = i;
+    if ( interesting_server_cnt == 0 )
     {
         debug( printf("Load gradient not sufficient, do nothing\n"); )
-        /* wait for next iteration if nothing to do */
-idle:        
-        sleep(user_opts->refresh_time);
-        continue;
+        /* wait for next iteration if nothing to do */ 
+        CONTINUE;
     }
-        
-/*
-    memset(& getattr_stats, 0, sizeof(PVFS_sysresp_getattr));
-    ret = PVFS_sys_getattr(*out_object_ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                           & credentials, & getattr_stats, NULL);
-
-    for( i = 0; i < dataserver_cnt ; i++)
-    {
-        PVFS_error ret;
-        int j;
-        
-        ret = PVFS_mgmt_get_scheduler_stats(
-                fsid, &credentials,
-                dataserver_array[i],
-                MAX_LOGGED_HANDLES_PER_FS,
-                & resp,
-                hints);        
-        if( user_opts->verbose )
-        {
-            printf("- %s: Load: %f accessed-read:%lld -write:%lld\n", dataserver_aliases[i] , 
-                (double)(stat_array[i].load_1) ,
-                lld(resp.fs_stats.acc_size[SCHED_LOG_READ]),
-                lld(resp.fs_stats.acc_size[SCHED_LOG_WRITE]) );
-        }
-            
-        for(j = 0; j < resp.handle_stats.count ; j++)
-        {
-            printf(" handle:%lld read:%lld write:%lld\n",
-                lld(resp.handle_stats.stats->handle),
-                lld(resp.handle_stats.stats->stat.acc_size[SCHED_LOG_READ]),
-                lld(resp.handle_stats.stats->stat.acc_size[SCHED_LOG_WRITE])
-                );
-        }
-    }
- */
     
+    debug( printf("Interesting servers: %d\n", interesting_server_cnt); )
+    
+    for(i = 0 ; i < interesting_server_cnt ; i ++ )
+    {
+        /* figure out which files have a high access statistic for interesting servers */
+
+        ret = PVFS_mgmt_get_scheduler_stats(
+            fsid, &credentials,
+            servers[i].bmi_address,
+            MAX_LOGGED_HANDLES_PER_FS,
+            & servers[i].getschedstats_resp,
+            hints);
+        debug(
+            printf("High loaded server: %s: Load: %f accessed-read:%lld -write:%lld\n", 
+            servers[i].alias, 
+            (double)(servers[i].stats->load_1) ,
+            lld(servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_READ]),
+            lld(servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_WRITE]) );
+        )
+        
+        sorted_history_size =  MAX_LOGGED_HANDLES_PER_FS;
+        
+        put_sched_resp_into_history_tree_and_sort(& servers[i].getschedstats_resp,
+            & servers[i].handle_history, iteration, & sorted_history_size , sorted_history);
+        
+        /* now start with the files which have the biggest change since the last update 
+         * actually the history might be used to reduce the sampling effects or to adapt 
+         * long term scheduling... 
+         */
+        
+        /*
+         * get concrete file size to approximate migration time. 
+         * 
+        memset(& getattr_stats, 0, sizeof(PVFS_sysresp_getattr));
+        ret = PVFS_sys_getattr(*out_object_ref, PVFS_ATTR_SYS_ALL_NOHINT,
+                               & credentials, & getattr_stats, NULL);
+                
+            for(j = 0; j < resp.handle_stats.count ; j++)
+            {
+                printf(" handle:%lld read:%lld write:%lld\n",
+                    lld(resp.handle_stats.stats->handle),
+                    lld(resp.handle_stats.stats->stat.acc_size[SCHED_LOG_READ]),
+                    lld(resp.handle_stats.stats->stat.acc_size[SCHED_LOG_WRITE])
+                    );
+            }
+        */
+        
+        /*
+         * Free data from old iterations !
+         */ 
+        if( servers[i].attr_age_iteration + user_opts->remove_old_entries_after_iterations
+            < iteration )
+        {
+            debug ( printf("Try to free history for server: %s\n", servers[i].alias ); ) 
+            try_to_free_history_tree(& servers[i].handle_history,
+                iteration - user_opts->remove_old_entries_after_iterations);
+                
+            servers[i].attr_age_iteration = iteration;                
+        }
+    }
     
     /* time if a possible merge pos is found */
     sleep(user_opts->refresh_time);
     } /* end_while */
     
     PVFS_sys_finalize();
-    free(resp.handle_stats.stats);
     free(user_opts);
     return (ret);
 }
@@ -404,6 +768,7 @@ static struct options *parse_args(
     char *argv[])
 {
     int one_opt = 0;
+    int tmp;
 
     struct options *tmp_opts = NULL;
 
@@ -417,10 +782,23 @@ static struct options *parse_args(
     
 
     /* look at command line arguments */
-    while ((one_opt = getopt(argc, argv, "r:t:voV")) != EOF)
+    while ((one_opt = getopt(argc, argv, "r:t:s:d:voV")) != EOF)
     {
         switch (one_opt)
         {
+        case ('d'):
+            tmp_opts->remove_old_entries_after_iterations = atoi(optarg);
+            break;
+        case ('s'):
+            tmp = sscanf(optarg, "%f:%d", & tmp_opts->simulate_load, 
+                & tmp_opts->simulate_server_no);
+            if( tmp != 2)
+            {
+                fprintf(stderr, "Parameter s with unsuplied options %s\n", optarg);
+                usage(argc,argv);
+                exit(1);
+            }
+            break;
         case ('t'):
             tmp_opts->load_tolerance = (float) atof(optarg);
             break;
@@ -464,15 +842,22 @@ static void usage(
             "default mount point: %s \n"
             "Where ARGS is one or more of\n"
             "\t-o\t override (default: %d)\n"
-            "\t-r\t refresh rate (default: %d)\n"
-            "\t-t\t load tolerance in percent (default: %.3f)\n"
+            "\t-r\t <rate> refresh rate, time between iterations (default: %d)\n"
+            "\t-d\t <iterations> remove old entries after iterations \n"
+            "\t-t\t <tolerance> load tolerance in percent (default: %.3f)\n"
             "\t-v\t verbose output (default: %d)\n"
-            "\t-V\t print version number and exit\n",
+            "\t-V\t print version number and exit\n"
+            "\t-s\t <load>:<serverNo> simulate load (default:%f) on servers (default:%d)\n"
+            "Explaination: \n"
+            "\t Load tolerance means the percentage the load of a high loaded server might\n"
+            "\t be higher than a low loaded server\n",
             default_options.filesystem,
             default_options.override,
             default_options.refresh_time,
             default_options.load_tolerance,
-            default_options.verbose
+            default_options.verbose,
+            default_options.simulate_load,
+            default_options.simulate_server_no
             );
     return;
 }

@@ -46,10 +46,39 @@ static int inorderWalkthrough(int (*callback)(RBData* data, void* funcData),tree
     return 0;	
 }
 
+static int inorder_walkthrough_nodes(int (*callback)(tree_node* node, void* funcData),tree_node* node,void* funcData){
+    int ret;
+    tree_node * tmp_node = node->right;
+    if(node->left != NULL){
+        ret = inorder_walkthrough_nodes(callback,node->left,funcData);
+        if ( ret != 0 )
+        {
+            return ret;
+        }
+    }
+    
+    ret = (*callback)(node,funcData);
+    if ( ret != 0 )
+    {
+        return ret;
+    }
+    if(tmp_node != NULL){
+            return inorder_walkthrough_nodes(callback,tmp_node,funcData);
+    }
+    return 0;   
+}
+
 int iterateRedBlackTree(int (*callback)(RBData* data, void* funcData), red_black_tree* tree,void* funcData){
 	if(tree == NULL || tree->head == NULL) 
 		return 0;
 	return inorderWalkthrough(callback,tree->head,funcData);
+}
+
+int iterate_red_black_tree_nodes(int (*callback)(tree_node * node, void* funcData), red_black_tree* tree,void* funcData)
+{
+    if(tree == NULL || tree->head == NULL) 
+        return 0;
+    return inorder_walkthrough_nodes(callback,tree->head,funcData);    
 }
 
 /* take care of memory managment of the data by yourself ! */

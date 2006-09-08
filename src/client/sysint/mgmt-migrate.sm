@@ -26,10 +26,7 @@ static int mgmt_migrate_create_setup_msgpair(
     
 static int mgmt_migrate_delete_new_datafile(
     PINT_client_sm *sm_p, job_status_s *js_p);
-        
-static int mgmt_migrate_delete_old_datafile(
-    PINT_client_sm *sm_p, job_status_s *js_p);    
-        
+                
 static int mgmt_migrate_notify_metadata_server(
     PINT_client_sm *sm_p, job_status_s *js_p);  
 
@@ -55,22 +52,33 @@ static int create_datafile_comp_fn(
  */
 
 machine pvfs2_client_mgmt_migrate_sm(
+    get_datafile_array,
+    find_target_datafile,
     create_msgpair,
     create_xfer_msgpair,
-    notify_metadata_server,
-    notify_metadata_server_xfer_msgpair,    
-/*    
-    delete_old_datafile_msgpair,
-    delete_old_datafile_xfer_msgpair,
-*/    
-    delete_new_datafile_msgpair,
-    delete_new_datafile_xfer_msgpair,
-    /*
     start_transfer,
     start_transfer_xfer_msgpair,
-    */
+    notify_metadata_server,
+    notify_metadata_server_xfer_msgpair,
+    acknowledge_delete_old_datafile, 
+    delete_new_datafile_msgpair,
+    delete_new_datafile_xfer_msgpair,
     cleanup)
 {
+    state get_datafile_array
+    {
+        run mgmt_migrate_get_datafile_array;
+        success => find_target_datafile;
+        default => cleanup;
+    }
+    
+    state find_target_datafile
+    {
+        run mgmt_migrate_find_target_datafile;
+        success => create_msgpair;
+        default => cleanup;
+    }
+    
     state create_msgpair
     {
         run mgmt_migrate_create_setup_msgpair;
@@ -81,8 +89,22 @@ machine pvfs2_client_mgmt_migrate_sm(
     state create_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => notify_metadata_server;
+        success => start_transfer;
         default => cleanup; /* failure */
+    }
+    
+    state start_transfer
+    {
+        run mgmt_migrate_start_transfer;
+        success => start_transfer_xfer_msgpair;
+        default => delete_new_datafile_msgpair;
+    }
+    
+    state start_transfer_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => notify_metadata_server;
+        default => delete_new_datafile_msgpair;
     }
     
     state notify_metadata_server
@@ -95,25 +117,16 @@ machine pvfs2_client_mgmt_migrate_sm(
     state notify_metadata_server_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => cleanup; /* delete_old_datafile_msgpair;*/
+        success => acknowledge_delete_old_datafile;
         default => delete_new_datafile_msgpair; /* failure */
     }
     
-    /* remove old data file after stuff is done*/
-    /*    
-    state delete_old_datafile_msgpair
+    state acknowledge_delete_old_datafile
     {
-        run mgmt_migrate_delete_old_datafile;
-        default => delete_old_datafile_xfer_msgpair;
-    }
-    
-   state delete_old_datafile_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
+        run mgmt_migrate_acknowledge_delete_old_datafile;
         success => cleanup;
-        default => cleanup;
-    } 
-    */   
+        default => delete_new_datafile_msgpair;        
+    }
     
     /* if an error occurs delete new create new created datafile */
     state delete_new_datafile_msgpair
@@ -128,7 +141,6 @@ machine pvfs2_client_mgmt_migrate_sm(
         success => cleanup;
         default => cleanup; /* failure */
     }
-    /***************************************************************/
     
     state cleanup
     {
@@ -139,7 +151,7 @@ machine pvfs2_client_mgmt_migrate_sm(
 
 %%
 
-/* */
+/***********************************************************+*/
 
 static int mgmt_migrate_notify_metadata_server(PINT_client_sm *sm_p,
                                    job_status_s *js_p)
@@ -225,44 +237,6 @@ static int mgmt_migrate_create_setup_msgpair(PINT_client_sm *sm_p,
 
     return 1;
 }
-
-static int mgmt_migrate_delete_old_datafile(PINT_client_sm *sm_p,
-                          job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL;
-    PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: mgmt_migrate_delete_old_datafile\n");
-
-    js_p->error_code = 0;
-
-    PINT_init_msgpair(sm_p, msg_p);
-
-    PINT_SERVREQ_REMOVE_FILL(
-        msg_p->req,
-        *sm_p->cred_p,
-        sm_p->u.migrate.fs_id,
-        sm_p->u.migrate.target_datafile,
-        sm_p->hints);
-
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->u.migrate.target_datafile;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = NULL;
-    msg_p->svr_addr = sm_p->u.migrate.source_dataserver;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-    }
-    return 1;    
-}
-
 
 static int mgmt_migrate_delete_new_datafile(PINT_client_sm *sm_p,
                           job_status_s *js_p)

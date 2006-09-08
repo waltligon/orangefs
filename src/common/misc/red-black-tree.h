@@ -33,6 +33,10 @@ typedef struct red_black_tree_ red_black_tree;
 tree_node* lookupTree(RBKey *key, red_black_tree* tree);
 red_black_tree *newRedBlackTree(int (*compare)(RBData * data, RBKey * key),
     int (*compare2)(RBData * data, RBData* data2));
+
+/*
+ * compare 1 used for lookups, 2 for internal stuff...
+ */    
 void initRedBlackTree(red_black_tree * tree, 
     int (*compare)(RBData * data, RBKey * key),
     int (*compare2)(RBData * data, RBData* data2));
@@ -49,6 +53,8 @@ tree_node * deleteNodeFromTree2(tree_node*node , red_black_tree* tree);
 
 /* callback function returns 0 if it wants to continue iterating */ 
 int iterateRedBlackTree(int (*callback)(RBData* data, void* funcData), red_black_tree* tree,void* funcData);
+int iterate_red_black_tree_nodes(int (*callback)(tree_node * node, void* funcData), red_black_tree* tree,void* funcData);
+
 
 /* example compare functions: */
 int compareInt64(RBData * data, RBKey * key);
