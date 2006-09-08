@@ -247,6 +247,29 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
     return ret;
 }
 
+/*
+  do an atomic update of the attr's b_size in the cache
+  for this key if necessary
+*/
+int dbpf_attr_cache_ds_attr_change_cached_data_bsize_if_necessary(
+    TROVE_object_ref key, PVFS_size b_size)
+{
+    int ret = 0;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
+
+    cache_elem = dbpf_attr_cache_elem_lookup(key);
+    if (cache_elem && cache_elem->attr.b_size < b_size)
+    {
+        cache_elem->attr.b_size = b_size;
+        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
+                    "cached b_size for key %llu\n",
+                     llu(key.handle));
+        ret = 1;
+    }
+    return ret;
+}
+
+
 int dbpf_attr_cache_ds_attr_fetch_cached_data(
     TROVE_object_ref key, TROVE_ds_attributes *target_ds_attr)
 {

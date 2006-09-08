@@ -45,6 +45,13 @@ enum
     TROVE_DIR,
 };
 
+
+enum trove_meta_sync_mode{
+    TROVE_SYNC_MODE_NONE,
+    TROVE_SYNC_MODE,
+    TROVE_TRANS_MODE
+};
+
 /* TROVE_ds_flags */
 /* TROVE operation flags */
 enum
@@ -78,6 +85,7 @@ enum
     TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
     TROVE_COLLECTION_META_SYNC_MODE,
     TROVE_COLLECTION_IMMEDIATE_COMPLETION,
+    TROVE_IO_THREAD_COUNT,
     TROVE_SHM_KEY_HINT
 };
 

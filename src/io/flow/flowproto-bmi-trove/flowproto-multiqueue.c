@@ -47,8 +47,8 @@ struct result_chain_entry
     PVFS_id_gen_t posted_id;
     char *buffer_offset;
     PINT_Request_result result;
-    PVFS_size size_list[MAX_REGIONS];
-    PVFS_offset offset_list[MAX_REGIONS];
+    PVFS_size size_list[IO_MAX_REGIONS];
+    PVFS_offset offset_list[IO_MAX_REGIONS];
     struct result_chain_entry *next;
     struct fp_queue_item *q_item;
     struct PINT_thread_mgr_trove_callback trove_callback;
@@ -84,7 +84,7 @@ struct fp_private_data
     int dest_pending;
     int dest_last_posted;
     int initial_posts;
-    void *tmp_buffer_list[MAX_REGIONS];
+    void *tmp_buffer_list[IO_MAX_REGIONS];
     void *intermediate;
     int cleanup_pending_count;
     int req_proc_done;
@@ -810,7 +810,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
             result_tmp->result.bytemax = flow_data->parent->buffer_size - 
                 bytes_processed;
             result_tmp->result.bytes = 0;
-            result_tmp->result.segmax = MAX_REGIONS;
+            result_tmp->result.segmax = IO_MAX_REGIONS;
             result_tmp->result.segs = 0;
             result_tmp->buffer_offset = tmp_buffer;
             ret = PINT_process_request(q_item->parent->file_req_state,
@@ -1120,7 +1120,7 @@ static int bmi_send_callback_fn(void *user_ptr,
         result_tmp->result.bytemax = q_item->parent->buffer_size 
             - bytes_processed;
         result_tmp->result.bytes = 0;
-        result_tmp->result.segmax = MAX_REGIONS;
+        result_tmp->result.segmax = IO_MAX_REGIONS;
         result_tmp->result.segs = 0;
         result_tmp->buffer_offset = tmp_buffer;
         ret = PINT_process_request(q_item->parent->file_req_state,
@@ -1388,7 +1388,7 @@ static void trove_write_callback_fn(void *user_ptr,
             result_tmp->result.bytemax = flow_data->parent->buffer_size 
                 - bytes_processed;
             result_tmp->result.bytes = 0;
-            result_tmp->result.segmax = MAX_REGIONS;
+            result_tmp->result.segmax = IO_MAX_REGIONS;
             result_tmp->result.segs = 0;
             result_tmp->buffer_offset = tmp_buffer;
             assert(!PINT_REQUEST_DONE(q_item->parent->file_req_state));
@@ -1604,7 +1604,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         q_item->result_chain.size_list;
     q_item->result_chain.result.bytemax = flow_data->parent->buffer_size;
     q_item->result_chain.result.bytes = 0;
-    q_item->result_chain.result.segmax = MAX_REGIONS;
+    q_item->result_chain.result.segmax = IO_MAX_REGIONS;
     q_item->result_chain.result.segs = 0;
     q_item->result_chain.buffer_offset = NULL;
     ret = PINT_process_request(q_item->parent->file_req_state,
@@ -1616,7 +1616,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     /* TODO: error handling */ 
     assert(ret >= 0);
 
-    /* was MAX_REGIONS enough to satisfy this step? */
+    /* was IO_MAX_REGIONS enough to satisfy this step? */
     if(!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
         q_item->result_chain.result.bytes < flow_data->parent->buffer_size)
     {
@@ -1645,7 +1645,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
             q_item->result_chain.result.bytemax =
                 (flow_data->parent->buffer_size - bytes_processed);
             q_item->result_chain.result.bytes = 0;
-            q_item->result_chain.result.segmax = MAX_REGIONS;
+            q_item->result_chain.result.segmax = IO_MAX_REGIONS;
             q_item->result_chain.result.segs = 0;
             q_item->result_chain.buffer_offset = NULL;
             /* process ahead */
@@ -1791,7 +1791,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
             q_item->result_chain.result.bytemax =
                 (q_item->parent->buffer_size - bytes_processed);
             q_item->result_chain.result.bytes = 0;
-            q_item->result_chain.result.segmax = MAX_REGIONS;
+            q_item->result_chain.result.segmax = IO_MAX_REGIONS;
             q_item->result_chain.result.segs = 0;
             q_item->result_chain.buffer_offset = NULL;
             /* process ahead */
@@ -1837,7 +1837,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         q_item->result_chain.size_list;
     q_item->result_chain.result.bytemax = flow_data->parent->buffer_size;
     q_item->result_chain.result.bytes = 0;
-    q_item->result_chain.result.segmax = MAX_REGIONS;
+    q_item->result_chain.result.segmax = IO_MAX_REGIONS;
     q_item->result_chain.result.segs = 0;
     q_item->result_chain.buffer_offset = NULL;
     ret = PINT_process_request(q_item->parent->file_req_state,
@@ -1848,7 +1848,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     /* TODO: error handling */ 
     assert(ret >= 0);
 
-    /* was MAX_REGIONS enough to satisfy this step? */
+    /* was IO_MAX_REGIONS enough to satisfy this step? */
     if(!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
         q_item->result_chain.result.bytes < flow_data->parent->buffer_size)
     {

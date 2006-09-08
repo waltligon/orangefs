@@ -51,7 +51,7 @@ extern int TROVE_shm_key_hint;
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 
-#define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
+void dbpf_set_sync_mode(int mode, struct dbpf_collection* coll);
 
 static void dbpf_db_error_callback(
 #ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
@@ -62,6 +62,8 @@ static void dbpf_db_error_callback(
     const 
 #endif
     char * msg);
+
+int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
 
 DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 {
@@ -122,8 +124,7 @@ retry:
     if(my_storage_p && (my_storage_p->flags & TROVE_DB_CACHE_MMAP))
     {
         /* user wants the standard db cache which uses mmap */
-        ret = dbenv->open(dbenv, path, 
-                          DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+        ret = dbenv->open(dbenv, path, COLL_ENV_FLAGS, 0);
         if(ret != 0)
         {
             gossip_err("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
@@ -146,7 +147,7 @@ retry:
         }
 
         ret = dbenv->open(dbenv, path, 
-                             DB_INIT_MPOOL|DB_CREATE|DB_THREAD|DB_SYSTEM_MEM, 0);
+                             COLL_ENV_FLAGS |DB_SYSTEM_MEM, 0);
         /* In some cases (oddly configured systems with pvfs2-server running as
          * non-root) DB_SYSTEM_MEM, which uses sysV shared memory, can fail
          * with EAGAIN (resource temporarily unavailable).   berkely DB can use
@@ -318,7 +319,12 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
 	struct dbpf_collection* coll;
 	coll = dbpf_collection_find_registered(coll_id);
 	
-	assert(coll);
+    if(coll_id != 0){
+        /*
+         * Can be 0 to set global ops
+         */
+        assert(coll);
+    }
 	
     switch(option)
     {
@@ -394,7 +400,7 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
                          "dbpf collection %d - %s sync mode\n",
                          (int) coll_id,
                          (*(int *)parameter) ? "Enabling" : "Disabling");
-            dbpf_queued_op_set_sync_mode(*(int *)parameter, coll);
+            dbpf_set_sync_mode(*(int *) parameter, coll);
             ret = 0;
             break;
         case TROVE_COLLECTION_IMMEDIATE_COMPLETION:
@@ -405,6 +411,20 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
             coll->immediate_completion = *(int *)parameter;
             ret = 0;
             break;
+        case TROVE_IO_THREAD_COUNT:
+#ifdef __PVFS2_USE_AIO__
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "dbpf I/O thread count %d IGNORED !\n"
+                         " compiled with AIO I/O mode!\n",
+                         (*(int *) parameter));
+#else
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "dbpf I/O thread count %d\n",
+                         (*(int *) parameter));
+            dbpf_bstream_threaded_set_thread_count((*(int *) parameter));
+#endif
+            ret = 0;
+            break;            
     }
     return ret;
 }
@@ -541,8 +561,10 @@ static int dbpf_initialize(char *stoname,
         gossip_err("dbpf_initialize failure: cannot allocate memory\n");
         return -TROVE_ENOMEM;
     }
-
+    
+#ifdef __PVFS2_USE_AIO__
     dbpf_open_cache_initialize();
+#endif    
 
     return dbpf_thread_initialize();
 }
@@ -554,7 +576,9 @@ static int dbpf_finalize(void)
     dbpf_method_id = -TROVE_EINVAL;
 
     dbpf_thread_finalize();
+#ifdef __PVFS2_USE_AIO__    
     dbpf_open_cache_finalize();
+#endif    
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_finalize();
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
@@ -613,6 +637,10 @@ static int dbpf_storage_create(char *stoname,
     char storage_dirname[PATH_MAX] = {0};
     char sto_attrib_dbname[PATH_MAX] = {0};
     char collections_dbname[PATH_MAX] = {0};
+    char deletion_path_name[PATH_MAX];
+    DB_ENV * env;
+    int error;
+    
 
     DBPF_GET_STORAGE_DIRNAME(storage_dirname, PATH_MAX, stoname);
     ret = dbpf_mkpath(storage_dirname, 0755);
@@ -620,7 +648,13 @@ static int dbpf_storage_create(char *stoname,
     {
         return ret;
     }
-
+    
+    env = dbpf_getdb_env(storage_dirname, 0, &error);
+    if (error)
+    {
+        return error;
+    }
+    
     DBPF_GET_STO_ATTRIB_DBNAME(sto_attrib_dbname, PATH_MAX, stoname);
     ret = dbpf_db_create(storage_dirname, sto_attrib_dbname, NULL);
     if (ret != 0)
@@ -636,6 +670,22 @@ static int dbpf_storage_create(char *stoname,
 	unlink(sto_attrib_dbname);
         return ret;
     }
+    
+    /*
+     * Make sure deletion directoy exists:
+     */
+    DBPF_GET_SHADOW_REMOVE_BSTREAM_DIRNAME(deletion_path_name, PATH_MAX, 
+        stoname);
+        
+    dbpf_putdb_env(env, storage_dirname);
+    
+    ret = DBPF_MKDIR(deletion_path_name, 0755);
+    if(ret != 0)
+    {
+        gossip_err("DBPF_MKDIR failed on bstream directory %s\n", 
+            deletion_path_name);            
+        return -trove_errno_to_trove_error(errno);
+      }
 
     return 1;
 }
@@ -646,7 +696,10 @@ static int dbpf_storage_remove(char *stoname,
 {
     int ret = -TROVE_EINVAL;
     char path_name[PATH_MAX] = {0};
-
+    int error;
+    DB_ENV * env;
+    char storage_dirname[PATH_MAX] = {0};
+    
     if (my_storage_p) {
         db_close(my_storage_p->sto_attr_db);
         db_close(my_storage_p->coll_db);
@@ -654,23 +707,35 @@ static int dbpf_storage_remove(char *stoname,
         free(my_storage_p);
         my_storage_p = NULL;
     }
-    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
-    gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
-
-    if (unlink(path_name) != 0)
+    
+    DBPF_GET_STORAGE_DIRNAME(storage_dirname, PATH_MAX, stoname);  
+    env = dbpf_getdb_env(storage_dirname, 0 , & error);
+    if (error)
+    {
+        return error;
+    }
+    
+    if(env->dbremove(env,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN 
+    NULL,
+#endif 
+        NULL, COLLECTIONS_DBNAME, 0))
     {
         ret = -trove_errno_to_trove_error(errno);
         goto storage_remove_failure;
     }
-
-    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
-    gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
-
-    if (unlink(path_name) != 0)
+    
+    if(env->dbremove(env, 
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN 
+    NULL,
+#endif
+        NULL, STO_ATTRIB_DBNAME, 0))
     {
         ret = -trove_errno_to_trove_error(errno);
         goto storage_remove_failure;
     }
+    
+    dbpf_putdb_env(env, storage_dirname);    
     
     DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, stoname);
     if (rmdir(path_name) != 0)
@@ -712,6 +777,8 @@ static int dbpf_collection_create(char *collname,
     struct stat dirstat;
     struct stat dbstat;
     char path_name[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
+    char coll_path[PATH_MAX] = {0};
+    DB_ENV * env = NULL;
 
     if (my_storage_p == NULL)
     {
@@ -770,19 +837,25 @@ static int dbpf_collection_create(char *collname,
     }
     else if (ret < 0)
     {
-        ret = mkdir(path_name, 0755);
+        ret = DBPF_MKDIR(path_name, 0755);
         if (ret != 0)
         {
-            gossip_err("mkdir failed on storage directory %s\n", path_name);
+            gossip_err("DBPF_MKDIR failed on storage directory %s\n", path_name);
             return -trove_errno_to_trove_error(errno);
         }
     }
     
-    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    ret = mkdir(path_name, 0755);
+    /* per-collection environment */
+    if ((env = dbpf_getdb_env(coll_path, COLL_ENV_FLAGS, &ret)) == NULL)
+    {
+         return -trove_errno_to_trove_error(errno);
+    }
+    
+    DBPF_GET_COLL_DIRNAME(coll_path, PATH_MAX, sto_p->name, new_coll_id);
+    ret = DBPF_MKDIR(coll_path, 0755);
     if (ret != 0)
     {
-        gossip_err("mkdir failed on collection directory %s\n", path_name);
+        gossip_err("DBPF_MKDIR failed on collection directory %s\n", coll_path);
         return -trove_errno_to_trove_error(errno);
     }
 
@@ -886,21 +959,23 @@ static int dbpf_collection_create(char *collname,
             return ret;
         }
     }
+    
+    dbpf_putdb_env(env, coll_path);   
 
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    ret = mkdir(path_name, 0755);
+    ret = DBPF_MKDIR(path_name, 0755);
     if(ret != 0)
     {
-        gossip_err("mkdir failed on bstream directory %s\n", path_name);
+        gossip_err("DBPF_MKDIR failed on bstream directory %s\n", path_name);
         return -trove_errno_to_trove_error(errno);
     }
 
     for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
     {
         snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
-        if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
+        if ((DBPF_MKDIR(dir, 0755) == -1) && (errno != EEXIST))
         {
-            gossip_err("mkdir failed on bstream bucket directory %s\n",
+            gossip_err("DBPF_MKDIR failed on bstream bucket directory %s\n",
                        dir);
             return -trove_errno_to_trove_error(errno);
         }
@@ -908,13 +983,13 @@ static int dbpf_collection_create(char *collname,
 
     DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name,
                                       new_coll_id);
-    ret = mkdir(path_name, 0755);
+    ret = DBPF_MKDIR(path_name, 0755);
     if(ret != 0)
     {
-        gossip_err("mkdir failed on bstream directory %s\n", path_name);
+        gossip_err("DBPF_MKDIR failed on bstream directory %s\n", path_name);
         return -trove_errno_to_trove_error(errno);
     }
-
+    
     return 1;
 }
 
@@ -1379,9 +1454,9 @@ static int dbpf_collection_lookup(char *collname,
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
-                                sto_p->name, coll_p->coll_id);
-    coll_p->coll_attr_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, NULL);
+    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, coll_p->coll_id);
+    coll_p->coll_attr_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, 
+        &ret, NULL);
     if (coll_p->coll_attr_db == NULL)
     {
         dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
@@ -1435,7 +1510,8 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
                               sto_p->name, coll_p->coll_id);
-    coll_p->ds_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, &PINT_trove_dbpf_ds_attr_compare);
+    coll_p->ds_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, 
+        PINT_trove_dbpf_ds_attr_compare);
     if (coll_p->ds_db == NULL)
     {
         db_close(coll_p->coll_attr_db);
@@ -1448,7 +1524,8 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
                            sto_p->name, coll_p->coll_id);
-    coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, 
+    coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, 
+                                     coll_p->coll_env, &ret, 
                                      PINT_trove_dbpf_keyval_compare);
     if(coll_p->keyval_db == NULL)
     {
@@ -1481,8 +1558,15 @@ static int dbpf_collection_lookup(char *collname,
      */
     coll_p->c_high_watermark = 10;
     coll_p->c_low_watermark = 1;
-    coll_p->meta_sync_enabled = 1; /* MUST be 1 !*/
+    /*
+     * Start with safest mode !
+     */
     
+#ifdef HAVE_TROVE_TRANSACTION_SUPPORT
+    coll_p->meta_sync_mode = TROVE_TRANS_MODE;
+#else
+    coll_p->meta_sync_mode = TROVE_SYNC_MODE;
+#endif
     
     dbpf_collection_register(coll_p);
     *out_coll_id_p = coll_p->coll_id;
@@ -1547,8 +1631,16 @@ static struct dbpf_storage *dbpf_storage_lookup(
     sto_p->refct = 0;
     sto_p->flags = flags;
 
-    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
+    sto_p->env = dbpf_getdb_env(sto_p->name, 0, error_p);
+    if (*error_p)
+    {
+        free(sto_p->name);
+        free(sto_p);
+        my_storage_p = NULL;
+        return NULL;
+    }
 
+    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
     sto_p->sto_attr_db = dbpf_db_open(sto_p->name, path_name, NULL, error_p, NULL);
     if (sto_p->sto_attr_db == NULL)
     {
@@ -1559,7 +1651,6 @@ static struct dbpf_storage *dbpf_storage_lookup(
     }
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
-
     sto_p->coll_db = dbpf_db_open(sto_p->name, path_name, NULL, error_p, NULL);
     if (sto_p->coll_db == NULL)
     {
@@ -1569,7 +1660,8 @@ static struct dbpf_storage *dbpf_storage_lookup(
         my_storage_p = NULL;
         return NULL;
     }
-
+    
+    dbpf_putdb_env(sto_p->env, path_name);
     my_storage_p = sto_p;
     return sto_p;
 }
@@ -1621,7 +1713,7 @@ static int dbpf_mkpath(char *pathname, mode_t mode)
 
             if (ret != 0)
             {
-                ret = mkdir(pathname, mode);
+                ret = DBPF_MKDIR(pathname, mode);
                 if (ret != 0)
                 {
                     return -trove_errno_to_trove_error(errno);
@@ -1840,6 +1932,50 @@ char *dbpf_op_type_to_str(enum dbpf_op_type op_type)
         }
     }
     return ret;
+}
+
+
+void dbpf_set_sync_mode(int mode, struct dbpf_collection* coll)
+{
+    /*
+     * Right now we don't have to check if there are operations queued in the
+     * coalesync queue, because the mode is set on startup...
+     */
+    if (coll->meta_sync_mode == TROVE_TRANS_MODE || mode == TROVE_TRANS_MODE )
+       {
+       int flag = (mode == TROVE_TRANS_MODE) ? TROVE_DB_OPEN_TXN : 0 ;
+       int ret;
+       char path_name[PATH_MAX] = {0};
+        gossip_debug(GOSSIP_TROVE_DEBUG, "Setting db flags for coll %llu to"
+        " trans mode %d\n",
+            llu((long long unsigned) coll->coll_id), flag == TROVE_DB_OPEN_TXN);
+            
+       db_close(coll->keyval_db);
+       db_close(coll->ds_db);
+       coll->keyval_db = 0;
+       coll->ds_db = 0;
+       
+        DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
+                               my_storage_p->name, coll->coll_id);
+        coll->keyval_db = dbpf_db_open(my_storage_p->name,
+                                       path_name, coll->coll_env, &ret, 
+                                       PINT_trove_dbpf_keyval_compare);
+        if (coll->keyval_db == NULL)
+        {
+            gossip_err("Could not change db flags %s !\n", db_strerror(ret));
+            exit(1); 
+        }
+        DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
+                                  my_storage_p->name, coll->coll_id);
+        coll->ds_db = dbpf_db_open(my_storage_p->name,
+                                   path_name, coll->coll_env, &ret, 
+                                   PINT_trove_dbpf_ds_attr_compare);
+        if (coll->ds_db == NULL){
+            gossip_err("Could not change db flags %s !\n", db_strerror(ret));
+            exit(1); 
+        }            
+    }
+    coll->meta_sync_mode = mode;
 }
 
 /*

@@ -63,6 +63,7 @@ static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_trusted_portlist);
 static DOTCONF_CB(get_trusted_network);
 #endif
+
 static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
@@ -90,6 +91,8 @@ static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
 static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
+static DOTCONF_CB(get_trove_io_thread_count);
+
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -580,8 +583,15 @@ static const configoption_t options[] =
      * know what you're doing.
      *
      */
-    {"FlowModules",ARG_LIST, get_flow_module_list,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"flowproto_multiqueue,"},
+    {"FlowModules", ARG_LIST, get_flow_module_list, NULL,
+     CTX_DEFAULTS | CTX_GLOBAL, "flowproto_multiqueue,"},
+     
+     /*
+      * Number of I/O threads doing parallel blocking I/O for the 
+      * trove threaded I/O variant (without aio).
+      */
+     {"TroveIOThreads", ARG_INT, get_trove_io_thread_count, NULL,
+     CTX_DEFAULTS | CTX_GLOBAL, "1"},
 
     /* buffer size to use for bulk data transfers */
     {"FlowBufferSizeBytes", ARG_INT,
@@ -653,7 +663,8 @@ static const configoption_t options[] =
      * synchronization with every metadata write.  This can greatly improve
      * performance.  In general, this value should probably be set to yes,
      * otherwise metadata transaction could be lost in the event of server
-     * failover.
+     * failover. Available is also the mode trans in which real db transactions 
+     * are done.
      */
     {"TroveSyncMeta",ARG_STR, get_trove_sync_meta, NULL, 
         CTX_STORAGEHINTS,"yes"},
@@ -1567,15 +1578,23 @@ DOTCONF_CB(get_trove_sync_meta)
 
     if(strcasecmp(cmd->data.str, "yes") == 0)
     {
-        fs_conf->trove_sync_meta = TROVE_SYNC;
+        fs_conf->trove_sync_meta = TROVE_SYNC_MODE;
     }
+    else if(strcasecmp(cmd->data.str, "trans") == 0)
+    {
+#ifdef HAVE_TROVE_TRANSACTION_SUPPORT
+        fs_conf->trove_sync_meta = TROVE_TRANS_MODE;
+#else
+        return("Trove transaction mode is not available with this db library.\n");
+#endif
+    }    
     else if(strcasecmp(cmd->data.str, "no") == 0)
     {
-        fs_conf->trove_sync_meta = 0;
+        fs_conf->trove_sync_meta = TROVE_SYNC_MODE_NONE;
     }
     else
     {
-        return("TroveSyncMeta value must be 'yes' or 'no'.\n");
+        return("TroveSyncMeta value must be 'yes', 'no' or 'trans'.\n");
     }
 #ifndef HAVE_DB_DIRTY_READ
     if (fs_conf->trove_sync_meta != TROVE_SYNC)
@@ -1963,6 +1982,14 @@ DOTCONF_CB(get_coalescing_low_watermark)
     return NULL;
 }
 
+DOTCONF_CB(get_trove_io_thread_count)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *) cmd->context;
+        
+    config_s->trove_io_thread_count = cmd->data.value;
+    return NULL;
+}
 /*
  * Function: PINT_config_release
  *

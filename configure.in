@@ -63,6 +63,7 @@ if test "x$GCC" = "x"; then
 fi
 
 CFLAGS=$USR_CFLAGS
+MISC_TROVE_FLAGS=""
 
 AC_PROG_CPP
 AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
@@ -303,22 +304,35 @@ if test "$use_nptl_workaround" = 1 ; then
 fi
 AC_SUBST(NPTL_WORKAROUND)
 
-use_aio_thcb=1
-AC_ARG_ENABLE([aio-threaded-callbacks],
-[  --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks],
-    if test "$enableval" = no ; then use_aio_thcb=0 ; fi)
+AX_CHECK_ODIRECT_AVAILABLE()
+AX_CHECK_PWRITE_AVAILABLE()
 
-dnl there used to be a big hairy test in here, back when glibc-2.3.0 and
-dnl glibc-2.3.1 had buggy aio callbacks.  That test was broken because it
-dnl assumed just linux, and could not handle glibc-2.4.x (or newer).  Rely on
-dnl aio-threaded-callbacks, perhaps with a blacklist of distros that have the
-dnl broken glibc.
+dnl use AIO and not threaded I/O
+AC_MSG_CHECKING(if aio is enabled in dbpf)
+    AC_ARG_ENABLE([aio],
+        [AS_HELP_STRING([--enable-aio],
+        [use asynchronous I/O instead of threaded @<:@default=yes@:>@])],
+        [with_aio=$enableval],
+        [with_aio=yes])
+        
 
-MISC_TROVE_FLAGS=""
-if test $use_aio_thcb = 1 ; then
-	MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+if test "x$with_aio" == xyes ; then
+   MISC_TROVE_FLAGS="$MISC_TROVE_FLAGS -D__PVFS2_USE_AIO__"
+   HAVE_TROVE_AIO=1
+   AC_SUBST(HAVE_TROVE_AIO)
+   AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+fi   
+
+
+
+if test "x$HAVE_TROVE_PWRITE" = "x" ; then
+if test "x$HAVE_TROVE_AIO" = "x" ; then
+  AC_MSG_ERROR(Pwrite is not available on your system, thus threaded 
+    TROVE version not available!)
 fi
-AC_SUBST(MISC_TROVE_FLAGS)
+fi
 
 dnl Check byte ordering
 AC_C_BIGENDIAN
@@ -630,7 +644,9 @@ dnl end of NEED_BERKELEY_DB section
 
 if test "x$BUILD_SERVER" = "x1"; then
 	dnl check if -lrt is required
-	AX_CHECK_NEEDS_LIBRT
+    if test "x$with_aio" == xyes ; then
+         AX_CHECK_NEEDS_LIBRT
+    fi
 fi
 
 case "$host_os" in
@@ -1002,6 +1018,8 @@ for d in src/apps src/io src/common src/client src/kernel \
        install -d $d;
 done
 
+AC_SUBST(MISC_TROVE_FLAGS)
+
 dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
 AC_OUTPUT(Makefile
@@ -1073,10 +1091,10 @@ else
    AC_MSG_RESULT([PVFS2 configured to perform coverage analysis     :  no])
 fi
 
-if test "x$MISC_TROVE_FLAGS" = "x" ; then
-   AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       :  no])
+if test "x$HAVE_TROVE_TRANSACTION_SUPPORT" = "x" ; then
+   AC_MSG_RESULT([PVFS2 configured with TROVE transaction support   :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       : yes])
+   AC_MSG_RESULT([PVFS2 configured with TROVE transaction support   : yes])
 fi
 
 if test "x$LINUX_KERNEL_SRC" = "x" ; then

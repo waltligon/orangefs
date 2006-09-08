@@ -9,7 +9,6 @@
  * db references than will fit in the cache, then the overflow references
  * will all get new fds that are closed on put
  */
-
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -309,6 +308,7 @@ int dbpf_open_cache_remove(
     struct open_cache_entry* tmp_entry = NULL;
     int found = 0;
     char filename[PATH_MAX];
+    char new_tmp_filename[PATH_MAX*2];
     int ret = -1;
     struct qlist_head* scratch;
     int tmp_error = 0;
@@ -371,15 +371,25 @@ int dbpf_open_cache_remove(
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
                               my_storage_p->name, coll_id, llu(handle));
 
-    ret = DBPF_UNLINK(filename);
-    if ((ret != 0) && (errno != ENOENT))
+    /*
+     * Do not remove the file instead move it to new directory
+     * Add a random number to minimize collisions between recreation and
+     * deletion of same handles.
+     */
+    DBPF_GET_SHADOW_REMOVE_BSTREAM_FILENAME(new_tmp_filename, 
+        PATH_MAX, my_storage_p->name, coll_id, llu(handle), rand()%50000);
+        
+    ret = DBPF_RENAME(filename, new_tmp_filename);
+    if (ret == 0)
     {
-	tmp_error = -trove_errno_to_trove_error(errno); 
-    }
-
-    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "Unlinked filename: "
+        gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "Renamed filename: "
                  "(ret=%d, errno=%d)\n%s\n", ret, errno, filename);
-
+    }
+    else
+    {
+       tmp_error = -trove_errno_to_trove_error(errno); 
+    }
+    
     gen_mutex_unlock(&cache_mutex);
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
