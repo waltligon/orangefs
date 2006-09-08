@@ -591,6 +591,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_METAFILE,
+        0,
         meta_handle_extent_array);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
@@ -697,6 +698,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             PVFS_TYPE_DATAFILE,
+            sm_p->u.create.metafile_handle,
             sm_p->u.create.io_handle_extent_array[i]);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,  "posting datafile[%d] create "

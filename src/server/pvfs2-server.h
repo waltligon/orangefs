@@ -156,7 +156,8 @@ enum
     DIR_ENT_KEY          = 1,
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
-    SYMLINK_TARGET_KEY   = 4
+    SYMLINK_TARGET_KEY   = 4,
+    PARENT_HANDLE_KEY    = 5
 };
 
 typedef enum
@@ -256,6 +257,29 @@ struct PINT_server_remove_op
     int index;
     int remove_keyvals_state;
     PVFS_ds_keyval_handle_info keyval_handle_info;
+};
+
+typedef struct PINT_server_sm_recv_state_s
+{
+    int max_resp_sz;
+    void *encoded_resp_p;
+    job_id_t recv_id;
+    job_status_s recv_status;
+    PVFS_BMI_addr_t address;
+} PINT_server_sm_recv_state;
+
+struct PINT_server_mgmt_migrate
+{
+    /* metaserver */
+    int32_t                     dfile_to_replace;  
+    
+    /* dataserver */
+    
+    PVFS_size                   file_size;
+    PVFS_Request                file_request;
+    PINT_server_sm_recv_state   write_ack;
+
+    flow_descriptor            *flow_d;    
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -402,6 +426,7 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+        struct PINT_server_mgmt_migrate mgmt_migrate;
     } u;
 
 } PINT_server_op;
@@ -458,6 +483,8 @@ extern struct PINT_state_machine_s pvfs2_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_io_sm;
 extern struct PINT_state_machine_s pvfs2_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_remove_sm;
+extern struct PINT_state_machine_s pvfs2_mgmt_migrate_sm;
+extern struct PINT_state_machine_s pvfs2_mgmt_get_scheduler_stats_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_object_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_get_dirdata_handle_sm;

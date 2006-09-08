@@ -41,7 +41,7 @@ typedef struct PINT_sm_msgpair_state_s
 
     /* don't use this -- internal msgpairarray use only */
     int retry_count;
-
+    
     int (* comp_fn)(void *sm_p, struct PVFS_server_resp *resp_p, int i);
 
     /* server address */
@@ -51,6 +51,8 @@ typedef struct PINT_sm_msgpair_state_s
     struct PVFS_server_req req;
     struct PINT_encoded_msg encoded_req;
 
+    PVFS_msg_tag_t session_tag; /*can be prefilled to reuse the same session tag*/
+    
     /* the encoding type to use for the req */
     enum PVFS_encoding_type enc_type;
 
@@ -129,6 +131,63 @@ do {                                                                \
     gossip_err("***********************************************"    \
                "********************\n");                           \
 } while(0)
+
+
+#define PINT_init_msgpair(sm_p, msg_p)                         \
+do {                                                           \
+    msg_p = &sm_p->msgpair;                                    \
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));           \
+    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))\
+    {                                                          \
+        free(sm_p->msgarray);                                  \
+        sm_p->msgarray = NULL;                                 \
+    }                                                          \
+    sm_p->msgarray = msg_p;                                    \
+    sm_p->msgarray_count = 1;                                  \
+} while(0)
+
+
+#define PINT_init_msgarray_params(msgarray_params_ptr, __fsid)     \
+do {                                                               \
+    PINT_sm_msgpair_params *mpp = msgarray_params_ptr;             \
+    struct server_configuration_s *server_config =                 \
+        PINT_get_server_config_struct(__fsid);                     \
+    mpp->job_context = pint_client_sm_context;                     \
+    if (server_config)                                             \
+    {                                                              \
+        mpp->job_timeout = server_config->client_job_bmi_timeout;  \
+        mpp->retry_limit = server_config->client_retry_limit;      \
+        mpp->retry_delay = server_config->client_retry_delay_ms;   \
+    }                                                              \
+    else                                                           \
+    {                                                              \
+        mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;   \
+        mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;       \
+        mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;    \
+    }                                                              \
+    PINT_put_server_config_struct(server_config);                  \
+} while(0)
+
+#define PINT_init_msgarray_params_server(msgarray_params_ptr)      \
+do {                                                               \
+    PINT_sm_msgpair_params *mpp = msgarray_params_ptr;             \
+    struct server_configuration_s *server_config =                 \
+        get_server_config_struct();                                \
+    mpp->job_context = server_job_context;                         \
+    if (server_config)                                             \
+    {                                                              \
+        mpp->job_timeout = server_config->client_job_bmi_timeout;  \
+        mpp->retry_limit = server_config->client_retry_limit;      \
+        mpp->retry_delay = server_config->client_retry_delay_ms;   \
+    }                                                              \
+    else                                                           \
+    {                                                              \
+        mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;   \
+        mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;       \
+        mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;    \
+    }                                                              \
+} while(0)
+
 
 #endif /* __MSGPAIRARRAY_H */
 

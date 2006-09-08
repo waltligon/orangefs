@@ -27,8 +27,10 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <string.h>
 
 #include "request-scheduler.h"
+#include "scheduler-logger.h"
 #include "quickhash.h"
 #include "pvfs2-types.h"
 #include "pvfs2-req-proto.h"
@@ -128,6 +130,8 @@ int PINT_req_sched_initialize(
     {
 	return (-ENOMEM);
     }
+    
+    scheduler_logger_initalize();
 
     return (0);
 }
@@ -176,6 +180,9 @@ int PINT_req_sched_finalize(
 
     /* tear down hash table */
     qhash_finalize(req_sched_table);
+    
+    scheduler_logger_finalize();
+    
     return (0);
 }
 
@@ -307,6 +314,14 @@ int PINT_req_sched_target_handle(
 	*handle = req->u.mgmt_get_dirdata_handle.handle;
 	*fs_id = req->u.mgmt_get_dirdata_handle.fs_id;
 	return (0);
+    case PVFS_SERV_MGMT_MIGRATE:
+        /* for testing allow on metadataserver parallel ops */
+        *readonly_flag = 0;
+        *handle = req->u.mgmt_migrate.handle;
+        *fs_id = req->u.mgmt_migrate.fs_id;
+        return (0);
+    case PVFS_SERV_GET_SCHEDULER_STATS:
+        return (1);
     case PVFS_SERV_GETEATTR:
 	*handle = req->u.geteattr.handle;
 	*fs_id = req->u.geteattr.fs_id;

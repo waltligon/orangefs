@@ -105,10 +105,11 @@ typedef struct
     int server_remove_storage_space;
     int server_create_storage_space;
     int server_background;
+    int server_conf_add_hostname;
     char *pidfile;
 } options_t;
 
-static options_t s_server_options = { 0, 0, 1, NULL };
+static options_t s_server_options = { 0, 0, 1, 0, NULL };
 
 /* each of the elements in this array consists of a string and its length.
  * we're able to use sizeof here because sizeof an inlined string ("") gives
@@ -120,7 +121,8 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {DIRECTORY_ENTRY_KEYSTR, sizeof(DIRECTORY_ENTRY_KEYSTR)},
     {DATAFILE_HANDLES_KEYSTR, sizeof(DATAFILE_HANDLES_KEYSTR)},
     {METAFILE_DIST_KEYSTR, sizeof(METAFILE_DIST_KEYSTR)},
-    {SYMLINK_TARGET_KEYSTR, sizeof(SYMLINK_TARGET_KEYSTR)}
+    {SYMLINK_TARGET_KEYSTR, sizeof(SYMLINK_TARGET_KEYSTR)},
+    {PARENT_HANDLE_KEYSTR, sizeof(PARENT_HANDLE_KEYSTR)}
 };
 
 /* extended attribute name spaces supported in PVFS2 */
@@ -405,7 +407,21 @@ struct PINT_server_req_params PINT_server_req_table[] =
         "small_io",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_small_io_sm}
+        &pvfs2_small_io_sm},
+        
+    /* 34 */
+    {PVFS_SERV_MGMT_MIGRATE,
+        "mgmt_migrate",
+        PINT_SERVER_CHECK_ATTR,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_mgmt_migrate_sm},      
+        
+    /* 35 */
+    {PVFS_SERV_GET_SCHEDULER_STATS,
+        "mgmt_get_scheduler_stats",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_mgmt_get_scheduler_stats_sm}     
 };
 
 int main(int argc, char **argv)
@@ -447,7 +463,25 @@ int main(int argc, char **argv)
                  "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
 
     fs_conf = ((argc >= optind) ? argv[optind] : NULL);
-    server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
+    
+    
+    
+    if (s_server_options.server_conf_add_hostname)
+    {
+        char hostname[200];
+        server_conf = (char *) malloc(sizeof(char)* 200);
+        ret = gethostname(hostname,200);
+        if( ret != 0)
+        {
+            gossip_err("Could not get hostname with gethostname\n");
+            goto server_shutdown;
+        }
+        sprintf(server_conf, "%s-%s", argv[optind + 1], hostname);
+    }
+    else
+    {
+        server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);        
+    }
 
     ret = PINT_parse_config(&server_config, fs_conf, server_conf);
     if (ret < 0)
@@ -691,6 +725,10 @@ int main(int argc, char **argv)
     /* NOTE: the server_shutdown() function does not return; it always ends
      * by calling exit.  This point in the code should never be reached.
      */
+    if(s_server_options.server_conf_add_hostname && server_conf)
+    {
+        free(server_conf);
+    }
     return -1;
 }
 
@@ -1582,6 +1620,7 @@ static void usage(int argc, char **argv)
 {
     gossip_err("Usage: %s: [OPTIONS] <global_config_file> "
                "<server_config_file>\n\n", argv[0]);
+    gossip_err("  -n, \t adds hostname to server_config_file as prefix\n");           
     gossip_err("  -d, --foreground\t"
                "will keep server in the foreground\n");
     gossip_err("  -f, --mkfs\t\twill cause server to "
@@ -1609,7 +1648,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         {0,0,0,0}
     };
 
-    while ((ret = getopt_long(argc, argv,"dfhrvp:",
+    while ((ret = getopt_long(argc, argv,"ndfhrvp:",
                               long_opts, &option_index)) != -1)
     {
         switch (ret)
@@ -1642,6 +1681,9 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                 {
                     goto do_pidfile;
                 }
+                break;
+            case 'n':
+                s_server_options.server_conf_add_hostname = 1;
                 break;
             case 'v':
           do_version:

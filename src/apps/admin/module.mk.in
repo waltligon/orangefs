@@ -23,7 +23,9 @@ ADMINSRC := \
 	$(DIR)/pvfs2-touch.c \
 	$(DIR)/pvfs2-remove-object.c \
 	$(DIR)/pvfs2-ln.c \
-	$(DIR)/pvfs2-perror.c
+	$(DIR)/pvfs2-perror.c \
+	$(DIR)/pvfs2-auto-migration.c \
+	$(DIR)/pvfs2-migrate.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \

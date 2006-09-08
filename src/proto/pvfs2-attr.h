@@ -89,10 +89,13 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 /* attributes specific to datafile objects */
 struct PVFS_datafile_attr_s
 {
-    PVFS_size size;
+    PVFS_size   size;
+    PVFS_handle parent_metafile;
 };
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
-endecode_fields_1(PVFS_datafile_attr, PVFS_size, size)
+endecode_fields_2(PVFS_datafile_attr, 
+    PVFS_size, size,
+    PVFS_handle, parent_metafile)
 
 /* extended hint attributes for a directory object */
 struct PVFS_directory_hint_s

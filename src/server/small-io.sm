@@ -18,6 +18,8 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 
+#include "scheduler-logger.h"
+
 static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p);
 static int small_io_check_size(PINT_server_op *s_op, job_status_s *js_p);
 static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p);
@@ -239,6 +241,19 @@ static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
     {
         BMI_memfree(s_op->addr, s_op->resp.u.small_io.buffer, 
                     s_op->req->u.small_io.total_bytes, BMI_SEND);
+    }
+
+    if(s_op->req->u.small_io.io_type == PVFS_IO_WRITE)
+    {
+        scheduler_logger_log_io( s_op->req->u.small_io.fs_id,
+            s_op->req->u.small_io.handle,
+            s_op->resp.u.small_io.result_size, SCHED_LOG_WRITE);
+    }
+    else
+    {
+        scheduler_logger_log_io( s_op->req->u.small_io.fs_id,
+            s_op->req->u.small_io.handle,
+            s_op->resp.u.small_io.result_size, SCHED_LOG_READ);
     }
 
     return server_state_machine_complete(s_op);

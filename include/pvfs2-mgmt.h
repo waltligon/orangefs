@@ -24,6 +24,7 @@
 #define __PVFS2_MGMT_H
 
 #include "pvfs2-types.h"
+#include "scheduler-logger.h"
 
 /* non-blocking mgmt operation handle */
 typedef PVFS_id_gen_t PVFS_mgmt_op_id;
@@ -148,6 +149,48 @@ PVFS_error PVFS_mgmt_noop(
     PVFS_fs_id,
     PVFS_credentials *credentials,
     PVFS_BMI_addr_t addr);
+     
+PVFS_error PVFS_imgmt_migrate(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t metaserver_addr,
+    PVFS_handle     target_metafile,
+    PVFS_handle     target_datafile,    
+    PVFS_BMI_addr_t source_dataserver,
+    PVFS_BMI_addr_t target_dataserver, 
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+    
+PVFS_error PVFS_mgmt_migrate(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t metaserver_addr,
+    PVFS_handle     target_metafile,
+    PVFS_handle     target_datafile,    
+    PVFS_BMI_addr_t source_dataserver,
+    PVFS_BMI_addr_t target_dataserver);
+
+typedef struct 
+{
+    PVFS_request_statistics              fs_stats;
+    PVFS_handle_request_statistics_array handle_stats;
+} PVFS_sysresp_mgmt_get_scheduler_stats;
+  
+PVFS_error PVFS_imgmt_get_scheduler_stats(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t addr,
+    int max_count,
+    PVFS_sysresp_mgmt_get_scheduler_stats * resp,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+    
+PVFS_error PVFS_mgmt_get_scheduler_stats(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t addr,
+    int max_count,
+    PVFS_sysresp_mgmt_get_scheduler_stats * resp);
 
 const char* PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,

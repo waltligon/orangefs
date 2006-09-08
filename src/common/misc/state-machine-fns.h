@@ -12,6 +12,7 @@
 #include "gossip.h"
 #include "pvfs2-debug.h"
 
+
 /* STATE-MACHINE-FNS.H
  *
  * This file implements a small collection of functions used when
@@ -257,6 +258,10 @@ static inline void PINT_push_state(struct PINT_OP_STATE *s,
     s->state_stack[s->stackptr++] = p;
 }
 
+
+#endif
+
+
 /*
  * Local variables:
  *  c-indent-level: 4
@@ -265,5 +270,3 @@ static inline void PINT_push_state(struct PINT_OP_STATE *s,
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
-#endif

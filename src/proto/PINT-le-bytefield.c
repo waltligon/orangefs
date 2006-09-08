@@ -192,6 +192,12 @@ static void lebf_initialize(void)
 		reqsize = extra_size_PVFS_servreq_mgmt_dspace_info_list;
 		respsize = extra_size_PVFS_servresp_mgmt_dspace_info_list;
 		break;
+        case PVFS_SERV_GET_SCHEDULER_STATS:
+            resp.u.get_sched_stats.handle_stats.count = 0;
+            respsize = extra_size_PVFS_servresp_getscheduler_stats;
+        break;
+        case PVFS_SERV_MGMT_MIGRATE:
+            break;        
 	    case PVFS_SERV_MGMT_EVENT_MON:
 		resp.u.mgmt_event_mon.event_count = 0;
 		respsize = extra_size_PVFS_servresp_mgmt_event_mon;
@@ -342,6 +348,8 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
+    CASE(PVFS_SERV_MGMT_MIGRATE, mgmt_migrate);
+    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);    
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
@@ -455,25 +463,27 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
-
-        case PVFS_SERV_REMOVE:
-        case PVFS_SERV_MGMT_REMOVE_OBJECT:
-        case PVFS_SERV_MGMT_REMOVE_DIRENT:
-        case PVFS_SERV_SETATTR:
-        case PVFS_SERV_SETEATTR:
-        case PVFS_SERV_DELEATTR:
-        case PVFS_SERV_CRDIRENT:
-        case PVFS_SERV_TRUNCATE:
-        case PVFS_SERV_FLUSH:
-        case PVFS_SERV_MGMT_NOOP:
+        CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);
+            
+            case PVFS_SERV_MGMT_MIGRATE:
+            case PVFS_SERV_REMOVE:
+            case PVFS_SERV_MGMT_REMOVE_OBJECT:
+            case PVFS_SERV_MGMT_REMOVE_DIRENT:
+            case PVFS_SERV_SETATTR:
+            case PVFS_SERV_SETEATTR:
+            case PVFS_SERV_DELEATTR:
+            case PVFS_SERV_CRDIRENT:
+            case PVFS_SERV_TRUNCATE:
+            case PVFS_SERV_FLUSH:
+            case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
             /* nothing else */
             break;
 
         case PVFS_SERV_INVALID:
-        case PVFS_SERV_PERF_UPDATE:
-        case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
+            case PVFS_SERV_PERF_UPDATE:
+            case PVFS_SERV_JOB_TIMER:
             gossip_err("%s: invalid operation %d\n", __func__, resp->op);
             ret = -PVFS_ENOSYS;
             break;
@@ -553,10 +563,12 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
 	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
 	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
+    CASE(PVFS_SERV_MGMT_MIGRATE, mgmt_migrate);
 	CASE(PVFS_SERV_GETEATTR, geteattr);
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
+    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);        
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -639,7 +651,9 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
-
+    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);
+    
+        case PVFS_SERV_MGMT_MIGRATE:
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
@@ -722,10 +736,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		decode_free(req->u.io.file_req);
 		break;
 
-            case PVFS_SERV_SMALL_IO:
-                decode_free(req->u.small_io.dist);
-                decode_free(req->u.small_io.file_req);
-                break;
+        case PVFS_SERV_SMALL_IO:
+            decode_free(req->u.small_io.dist);
+            decode_free(req->u.small_io.file_req);
+            break;
 
 	    case PVFS_SERV_MKDIR:
 		decode_free(req->u.mkdir.handle_extent_array.extent_array);
@@ -752,6 +766,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
 	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
+        case PVFS_SERV_GET_SCHEDULER_STATS:
+        case PVFS_SERV_MGMT_MIGRATE:        
 	    case PVFS_SERV_GETATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:
@@ -810,6 +826,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		decode_free(resp->u.mgmt_dspace_info_list.dspace_info_array);
 		break;
 
+        case PVFS_SERV_GET_SCHEDULER_STATS:
+            decode_free(resp->u.get_sched_stats.handle_stats.stats);
+            break;
 	    case PVFS_SERV_GETATTR:
 		if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
 		    decode_free(resp->u.getattr.attr.u.meta.dist);
@@ -850,6 +869,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_FLUSH:
 	    case PVFS_SERV_MGMT_SETPARAM:
 	    case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_MGMT_MIGRATE:        
 	    case PVFS_SERV_STATFS:
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PROTO_ERROR:
