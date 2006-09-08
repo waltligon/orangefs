@@ -75,6 +75,7 @@ int main(int argc, char **argv)
 				 PVFS_SERV_PARAM_MODE,
 				 user_opts->mode,
 				 NULL,
+                 NULL,
 				 NULL /* detailed errors */);
 
     PVFS_sys_finalize();

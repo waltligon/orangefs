@@ -79,6 +79,7 @@ int main(int argc, char **argv)
 				 &creds,
 				 PVFS_SERV_PARAM_SYNC_META,
 				 user_opts->meta_sync,
+                 NULL,
 				 NULL,
 				 NULL /* detailed errors */);
     if(ret < 0)
@@ -92,6 +93,7 @@ int main(int argc, char **argv)
 				 PVFS_SERV_PARAM_SYNC_DATA,
 				 user_opts->data_sync,
 				 NULL,
+                 NULL,
 				 NULL /* detailed errors */);
     if(ret < 0)
     {

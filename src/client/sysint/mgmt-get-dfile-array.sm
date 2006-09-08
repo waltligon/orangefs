@@ -60,6 +60,7 @@ PVFS_error PVFS_imgmt_get_dfile_array(
     PVFS_handle *dfile_array,
     int dfile_count,
     PVFS_mgmt_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -85,6 +86,7 @@ PVFS_error PVFS_imgmt_get_dfile_array(
     sm_p->object_ref = ref;
     sm_p->u.get_dfile_array.dfile_array = dfile_array;
     sm_p->u.get_dfile_array.dfile_count = dfile_count;
+    sm_p->hints = hints;
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
@@ -103,7 +105,8 @@ PVFS_error PVFS_mgmt_get_dfile_array(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_handle *dfile_array,
-    int dfile_count)
+    int dfile_count,
+    PVFS_hint * hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -112,7 +115,7 @@ PVFS_error PVFS_mgmt_get_dfile_array(
                  "PVFS_mgmt_get_dfile_array entered\n");
 
     ret = PVFS_imgmt_get_dfile_array(
-        ref, credentials, dfile_array, dfile_count, &op_id, NULL);
+        ref, credentials, dfile_array, dfile_count, &op_id, hints, NULL);
 
     if (ret)
     {

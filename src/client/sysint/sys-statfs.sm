@@ -60,6 +60,7 @@ PVFS_error PVFS_isys_statfs(
     PVFS_credentials *credentials,
     PVFS_sysresp_statfs *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint *hints,
     void *user_ptr)
 {
     PINT_client_sm *sm_p = NULL;
@@ -142,6 +143,8 @@ PVFS_error PVFS_isys_statfs(
         free(sm_p);
         return -PVFS_ENOMEM;
     }
+    
+    sm_p->hints = hints;
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_STATFS, op_id, user_ptr);
@@ -152,7 +155,8 @@ PVFS_error PVFS_isys_statfs(
 PVFS_error PVFS_sys_statfs(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    PVFS_sysresp_statfs* resp)
+    PVFS_sysresp_statfs* resp,
+    PVFS_hint * hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -160,7 +164,7 @@ PVFS_error PVFS_sys_statfs(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_statfs entered\n");
 
     ret = PVFS_isys_statfs(
-        fs_id, credentials, resp, &op_id, NULL);
+        fs_id, credentials, resp, &op_id, hints, NULL);
 
     if (ret)
     {

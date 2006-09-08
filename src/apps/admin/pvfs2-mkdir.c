@@ -237,7 +237,7 @@ static int make_directory(PVFS_credentials     * credentials,
                           parentdir_ptr, 
                           credentials, 
                           &resp_lookup, 
-                          PVFS2_LOOKUP_LINK_FOLLOW);
+                          PVFS2_LOOKUP_LINK_FOLLOW, NULL);
 
     if( ret < 0 &&
         !make_parent_dirs)
@@ -275,7 +275,7 @@ static int make_directory(PVFS_credentials     * credentials,
                                   parentdir_ptr, 
                                   credentials, 
                                   &resp_lookup, 
-                                  PVFS2_LOOKUP_LINK_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_FOLLOW, NULL);
         
             if(ret < 0)
             {
@@ -314,7 +314,7 @@ static int make_directory(PVFS_credentials     * credentials,
                          parent_ref, 
                          attr,
                          credentials, 
-                         &resp_mkdir);
+                         &resp_mkdir, NULL);
 
     if (ret < 0)
     {

@@ -209,7 +209,7 @@ int do_smallmem_noncontig_read(
     reset_buff();
 
     res = PVFS_sys_read(
-	ref, readreq, 0, buff, memreq, creds, &io_resp);
+	ref, readreq, 0, buff, memreq, creds, &io_resp, NULL);
     if(res < 0)
     {
 	PVFS_perror("read failed with errcode", res);
@@ -284,7 +284,7 @@ int do_noncontig_read(
     reset_buff();
 
     res = PVFS_sys_read(
-	ref, readreq, 0, buff, memreq, creds, &io_resp);
+	ref, readreq, 0, buff, memreq, creds, &io_resp, NULL);
     if(res < 0)
     {
 	PVFS_perror("read failed with errcode", res);
@@ -348,7 +348,7 @@ int do_contig_read(
     reset_buff();
 
     res = PVFS_sys_read(
-	ref, readreq, offset, buff, memreq, creds, &io_resp);
+	ref, readreq, offset, buff, memreq, creds, &io_resp, NULL);
     if(res < 0)
     {
 	PVFS_perror("read failed with errcode", res);
@@ -402,7 +402,7 @@ int do_write(PVFS_object_ref ref, PVFS_credentials * creds,
 
     res = PVFS_sys_write(
 	ref, filereq, 
-	offset, buff, memreq, creds, &io_resp);
+	offset, buff, memreq, creds, &io_resp, NULL);
     if(res < 0)
     {
 	PVFS_perror("write failed with errcode", res);
@@ -502,7 +502,7 @@ int main(int argc, char * argv[])
 		before_len, dashes, after_len, dashes);
     }
 
-    res = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0);
+    res = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0, NULL);
     if(res < 0)
     {
 	PVFS_perror("lookup failed with errcode", res);
@@ -533,7 +533,7 @@ int main(int argc, char * argv[])
     }
 
     res = PVFS_sys_create(
-	zerofill_fname, lookup_resp.ref, attr, &creds, dist, &create_resp);
+	zerofill_fname, lookup_resp.ref, attr, &creds, dist, &create_resp, NULL);
     if(res < 0)
     {
 	PVFS_perror("create failed with errcode", res);
@@ -796,7 +796,7 @@ int main(int argc, char * argv[])
     PVFS_sys_remove(
 	zerofill_fname,
 	lookup_resp.ref,
-	&creds);
+	&creds, NULL);
 
 exit:
     

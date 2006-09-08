@@ -3645,7 +3645,7 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
 }
 
 static void bmi_set_sock_buffers(int socket){
-	//Set socket buffer sizes:
+	/*Set socket buffer sizes: */
 	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Default socket buffers send:%d receive:%d\n",
 		GET_SENDBUFSIZE(socket), GET_RECVBUFSIZE(socket));
 	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Setting socket buffer size for send:%d receive:%d \n",

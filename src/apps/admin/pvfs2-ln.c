@@ -187,7 +187,7 @@ static int make_link(PVFS_credentials     * pCredentials,
                            (char *) pszLinkTarget,
                            attr, 
                            pCredentials, 
-                           &resp_sym);
+                           &resp_sym, NULL);
 
     if (ret < 0)
     {

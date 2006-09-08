@@ -230,12 +230,14 @@ PVFS_error PVFS_isys_create(
     PVFS_sys_dist *dist,
     PVFS_sysresp_create *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,    
     void *user_ptr)
 {
     int num_dfiles_req = 0;
     PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-
+    char * hintvalue;
+    
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
 
     if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
@@ -283,6 +285,7 @@ PVFS_error PVFS_isys_create(
     PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
+    sm_p->hints = hints;
 
     sm_p->object_ref = parent_ref;
 
@@ -318,9 +321,21 @@ PVFS_error PVFS_isys_create(
     /* If an application hint has been provided, use that to request dfile
        else, if a tabfile hint has been provided, use that instead*/
     num_dfiles_req = 0;
+    /* hints allow to override this behavior, e.g. for MPI */
+    hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_DATAFILE_NODES);
+    
     if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
         num_dfiles_req = attr.dfile_count;
+    }
+    else if (hintvalue)
+    { 
+        while( (hintvalue = rindex(hintvalue, ',')))
+        {    
+            hintvalue++;
+            num_dfiles_req++;
+        }
+        num_dfiles_req++;
     }
     else
     {
@@ -365,7 +380,9 @@ PVFS_error PVFS_sys_create(
     PVFS_sys_attr attr,
     PVFS_credentials *credentials,
     PVFS_sys_dist *dist,
-    PVFS_sysresp_create *resp)
+    PVFS_sysresp_create *resp,
+    PVFS_hint * hints
+    )
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -373,7 +390,7 @@ PVFS_error PVFS_sys_create(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
 
     ret = PVFS_isys_create(object_name, parent_ref, attr, credentials,
-                           dist, resp, &op_id, NULL);
+                           dist, resp, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_create call", ret);
@@ -550,6 +567,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
     struct server_configuration_s *server_config = NULL;
+    char * hintvalue;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
@@ -573,10 +591,32 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     server_config = PINT_get_server_config_struct(
         sm_p->object_ref.fs_id);
 
-    ret = PINT_cached_config_get_next_meta(
-        server_config, sm_p->object_ref.fs_id,
-        &msg_p->svr_addr, &meta_handle_extent_array);
 
+    /*
+     * If the user parses a hint to explicity set the hostnames for the 
+     * metaserver use this value!
+     */
+    hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_METAFILE_NODE);
+    if ( hintvalue ){
+        ret = PINT_cached_config_get_one_server_str(
+            hintvalue,
+            server_config,
+            sm_p->object_ref.fs_id,
+            & msg_p->svr_addr,
+            & meta_handle_extent_array,
+            0 /* metaserver ! */); 
+        if (ret){
+            gossip_err("Metafile given by hint are not valid! "
+                        " hostname: %s\n", hintvalue);
+            js_p->error_code = ret;
+            return 1;
+        }  
+    }else{  
+        ret = PINT_cached_config_get_next_meta(
+            server_config, sm_p->object_ref.fs_id,
+            &msg_p->svr_addr, &meta_handle_extent_array);
+    }
+    
     PINT_put_server_config_struct(server_config);
 
     if (ret)
@@ -591,7 +631,8 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_METAFILE,
-        meta_handle_extent_array);
+        meta_handle_extent_array,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
@@ -617,12 +658,15 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL, i = 0;
     struct server_configuration_s *server_config = NULL;
     int server_type;
+    char * hintvalue;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "datafiles_setup_msgpair_array\n");
 
     js_p->error_code = 0;
 
+    hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_DATAFILE_NODES);
+    
     memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
     /* allocate msgarray and set msgarray_count */
@@ -671,13 +715,56 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     server_config = PINT_get_server_config_struct(
         sm_p->object_ref.fs_id);
 
-    ret = PINT_cached_config_get_next_io(
-        server_config,
-        sm_p->object_ref.fs_id,
-        sm_p->u.create.num_data_files,
-        sm_p->u.create.data_server_addrs,
-        sm_p->u.create.io_handle_extent_array);
-
+	/*
+	 * If the user parses a hint to explicity set the hostnames for the 
+	 * datafiles use these values!
+	 */
+    if ( hintvalue ){
+        int tokens = 0;
+        char * hintcpy;
+        char * act_hostname;    
+        char * save_ptr;
+        char * hintbuff;
+        hintbuff = (char *) malloc((strlen(hintvalue)+1)*sizeof(char));
+        hintcpy = hintbuff;
+        strcpy(hintcpy, hintvalue);    
+        
+        act_hostname = strtok_r(hintcpy, ",", & save_ptr);         
+        while ( act_hostname ){
+            if ( tokens >= sm_p->u.create.num_data_files){
+                gossip_err("Datafiles given by hint are not valid, "
+                            "given by hints: %d set by create data_file_no: %d\n", 
+                    tokens + 1, sm_p->u.create.num_data_files);
+                js_p->error_code = -PVFS_EINVAL;
+                return 1;                
+            }
+            ret = PINT_cached_config_get_one_server_str(
+                act_hostname,
+                server_config,
+                sm_p->object_ref.fs_id,
+                & sm_p->u.create.data_server_addrs[tokens],
+                & sm_p->u.create.io_handle_extent_array[tokens],
+                1 /*dataserver !*/); 
+            if (ret){
+                gossip_err("Datafiles given by hint are not valid! "
+                            "Current hostname: %s\n", 
+                    act_hostname);
+                js_p->error_code = ret;
+                return 1;
+            }
+            act_hostname = strtok_r(NULL, ",", & save_ptr);
+            tokens++;
+        }  
+        free(hintbuff);
+    }else{	
+        ret = PINT_cached_config_get_next_io(
+            server_config,
+            sm_p->object_ref.fs_id,
+            sm_p->u.create.num_data_files,
+            sm_p->u.create.data_server_addrs,
+            sm_p->u.create.io_handle_extent_array);	
+    }
+	
     PINT_put_server_config_struct(server_config);
 
     if (ret)
@@ -691,13 +778,13 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     for(i = 0; i < sm_p->u.create.num_data_files; i++)
     {
         PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
-
         PINT_SERVREQ_CREATE_FILL(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             PVFS_TYPE_DATAFILE,
-            sm_p->u.create.io_handle_extent_array[i]);
+            sm_p->u.create.io_handle_extent_array[i],
+            sm_p->hints);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,  "posting datafile[%d] create "
                      "with extents %llu-%llu\n", i,
@@ -753,7 +840,9 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.create.metafile_handle,
         PVFS_TYPE_METAFILE,
         sm_p->u.create.sys_attr,
-        PVFS_ATTR_META_ALL);
+        PVFS_ATTR_META_ALL,
+        sm_p->hints
+        );
 
     msg_p->req.u.setattr.attr.u.meta.dfile_array =
         sm_p->u.create.datafile_handles;
@@ -811,7 +900,8 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
         sm_p->object_ref.handle,
-        sm_p->object_ref.fs_id);
+        sm_p->object_ref.fs_id,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
@@ -921,7 +1011,8 @@ static int create_delete_handles_setup_msgpair_array(
                 msg_p->req,
                 *sm_p->cred_p,
                 sm_p->object_ref.fs_id,
-                sm_p->u.create.metafile_handle);
+                sm_p->u.create.metafile_handle,
+                sm_p->hints);
 
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->u.create.metafile_handle;
@@ -938,7 +1029,8 @@ static int create_delete_handles_setup_msgpair_array(
                 msg_p->req,
                 *sm_p->cred_p,
                 sm_p->object_ref.fs_id,
-                sm_p->u.create.datafile_handles[i]);
+                sm_p->u.create.datafile_handles[i],
+                sm_p->hints);
 
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->u.create.datafile_handles[i];

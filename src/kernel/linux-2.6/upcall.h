@@ -203,6 +203,8 @@ typedef struct
     int32_t type;
     int32_t __pad1;
     PVFS_credentials credentials;
+    int pid;
+    int tgid;
 
     union
     {

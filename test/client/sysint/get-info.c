@@ -55,7 +55,7 @@ int main(int argc,char **argv)
 
     PVFS_util_gen_credentials(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
@@ -73,7 +73,7 @@ int main(int argc,char **argv)
     pinode_refn.fs_id = fs_id;
     attrmask = PVFS_ATTR_SYS_ALL;
 
-    ret = PVFS_sys_getattr(pinode_refn, attrmask, &credentials, resp_gattr);
+    ret = PVFS_sys_getattr(pinode_refn, attrmask, &credentials, resp_gattr, NULL);
     if (ret < 0)
     {
         printf("getattr failed with errcode = %d\n", ret);

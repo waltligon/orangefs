@@ -1651,6 +1651,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             case 'r':
           do_rmfs:
                 s_server_options.server_remove_storage_space = 1;
+                break;
             case 'f':
           do_mkfs:
                 s_server_options.server_create_storage_space = 1;
@@ -1933,6 +1934,8 @@ int server_state_machine_complete(PINT_server_op *s_op)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
+        PVFS_free_hint(& s_op->decoded.stub_dec.req.hints);
+        
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 

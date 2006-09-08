@@ -95,6 +95,7 @@ PVFS_error PVFS_imgmt_statfs_list(
     int count,
     PVFS_error_details *details,
     PVFS_mgmt_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr)
 {
     PINT_client_sm *sm_p = NULL;
@@ -121,6 +122,7 @@ PVFS_error PVFS_imgmt_statfs_list(
     sm_p->u.statfs_list.count = count;
     sm_p->u.statfs_list.addr_array = addr_array;
     sm_p->u.statfs_list.details = details;
+    sm_p->hints = hints;
 
     memset(sm_p->u.statfs_list.stat_array, 0,
            (count * sizeof(struct PVFS_mgmt_server_stat)));
@@ -147,7 +149,8 @@ PVFS_error PVFS_mgmt_statfs_list(
     struct PVFS_mgmt_server_stat *stat_array,
     PVFS_BMI_addr_t *addr_array,
     int count,
-    PVFS_error_details *details)
+    PVFS_error_details *details,
+    PVFS_hint * hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -156,7 +159,7 @@ PVFS_error PVFS_mgmt_statfs_list(
 
     ret = PVFS_imgmt_statfs_list(
         fs_id, credentials, stat_array, addr_array, count,
-        details, &op_id, NULL);
+        details, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -198,7 +201,8 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
 	PINT_SERVREQ_STATFS_FILL(
             msg_p->req,
             *sm_p->cred_p,
-            sm_p->u.statfs_list.fs_id);
+            sm_p->u.statfs_list.fs_id,
+            sm_p->hints);
 
 	msg_p->fs_id = sm_p->u.statfs_list.fs_id;
 	msg_p->handle = PVFS_HANDLE_NULL;

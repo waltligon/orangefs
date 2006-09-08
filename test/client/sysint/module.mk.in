@@ -14,6 +14,7 @@ TESTSRC += \
 	$(DIR)/ls.c \
 	$(DIR)/path-test.c\
 	$(DIR)/create.c\
+	$(DIR)/create-hints.c\
 	$(DIR)/create-with-dist.c\
 	$(DIR)/symlink.c\
 	$(DIR)/flush-1.c\
@@ -37,7 +38,8 @@ TESTSRC += \
 	$(DIR)/list-eattr.c \
 	$(DIR)/test-accesses.c \
 	$(DIR)/test-hindexed-test.c \
-	$(DIR)/io-stress.c
+	$(DIR)/pvfs2-ping-benchmark.c \
+	$(DIR)/io-stress.c 
 
 MODCFLAGS_$(DIR)/io-stress.c := -D_GNU_SOURCE
 MODLDFLAGS_$(DIR) := -lrt

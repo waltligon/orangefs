@@ -15,7 +15,8 @@ int PVFS_sys_getparent(
     PVFS_fs_id fs_id,
     char *entry_name,
     PVFS_credentials *credentials,
-    PVFS_sysresp_getparent *resp)
+    PVFS_sysresp_getparent *resp,
+    PVFS_hint *hints)
 {
     int ret = -PVFS_EINVAL;
     char parent_buf[PVFS_NAME_MAX] = {0};
@@ -38,7 +39,7 @@ int PVFS_sys_getparent(
 
     memset(&resp_look,0,sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_lookup(fs_id, parent_buf, credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW, hints);
     if (ret)
     {
         gossip_err("Lookup failed on %s\n",parent_buf);

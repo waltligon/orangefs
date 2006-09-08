@@ -112,7 +112,7 @@ void print_entry(
     pinode_refn.fs_id = fs_id;
 
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
-                         &credentials, &getattr_response))
+                         &credentials, &getattr_response, NULL))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08llx "
                 "(fs_id is %d)\n",llu(handle),fs_id);
@@ -144,7 +144,7 @@ int do_list(
     PVFS_util_gen_credentials(&credentials);
 
     if (PVFS_sys_lookup(fs_id, name, &credentials,
-                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW))
+                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
                 start_dir,fs_id);
@@ -157,7 +157,7 @@ int do_list(
     PVFS_util_gen_credentials(&credentials);
 
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
-                         &credentials, &getattr_response) == 0)
+                         &credentials, &getattr_response, NULL) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
             (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK))
@@ -175,7 +175,7 @@ int do_list(
         memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));
         if (PVFS_sys_readdir(pinode_refn,
                              (!token ? PVFS_READDIR_START : token),
-                             pvfs_dirent_incount, &credentials, &rd_response))
+                             pvfs_dirent_incount, &credentials, &rd_response, NULL))
         {
             fprintf(stderr,"readdir failed\n");
             return -1;

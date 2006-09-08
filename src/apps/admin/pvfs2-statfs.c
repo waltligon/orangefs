@@ -84,7 +84,7 @@ int main(int argc, char **argv)
     PVFS_util_gen_credentials(&creds);
 
     /* gather normal statfs statistics from system interface */
-    ret = PVFS_sys_statfs(cur_fs, &creds, &resp_statfs);
+    ret = PVFS_sys_statfs(cur_fs, &creds, &resp_statfs, NULL);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_statfs", ret);
@@ -146,7 +146,7 @@ int main(int argc, char **argv)
 
     outcount = resp_statfs.server_count;
     ret = PVFS_mgmt_statfs_all(cur_fs, &creds, stat_array,
-                               &outcount, NULL);
+                               &outcount, NULL, NULL);
 
     for(j = 0; j<2; j++)
     {

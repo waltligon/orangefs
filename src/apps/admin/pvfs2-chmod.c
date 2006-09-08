@@ -108,7 +108,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_lookup(cur_fs, pvfs_path,
                           &credentials, &resp_lookup,
-                          PVFS2_LOOKUP_LINK_FOLLOW);
+                          PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)
     {
       PVFS_perror("PVFS_sys_lookup", ret);
@@ -147,7 +147,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
 
   ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
                             parent_ref, &credentials, &resp_lookup,
-                            PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
   if (ret != 0)
   {
     fprintf(stderr, "Target '%s' does not exist!\n", str_buf);
@@ -156,7 +156,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   memset(&resp_getattr,0,sizeof(PVFS_sysresp_getattr));
   attrmask = (PVFS_ATTR_SYS_ALL_SETABLE);
     
-  ret = PVFS_sys_getattr(resp_lookup.ref,attrmask,&credentials,&resp_getattr);
+  ret = PVFS_sys_getattr(resp_lookup.ref,attrmask,&credentials,&resp_getattr, NULL);
   if (ret < 0) 
   {
     PVFS_perror("PVFS_sys_getattr",ret);
@@ -168,7 +168,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   new_attr.perms = perms;
   new_attr.mask = PVFS_ATTR_SYS_PERM;
  
-  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,&credentials);
+  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,&credentials, NULL);
   if (ret < 0) 
   {
     PVFS_perror("PVFS_sys_setattr",ret);

@@ -129,7 +129,8 @@ int main(int argc, char **argv)
 				   addr_array, 
 				   io_server_count,
 				   EVENT_DEPTH,
-				   NULL /* detailed errors */);
+				   NULL /* detailed errors */
+                   , NULL);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_event_mon_list", EVENT_DEPTH);

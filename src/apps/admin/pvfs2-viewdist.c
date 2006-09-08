@@ -114,7 +114,7 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
         val.buffer = buffer;
         val.buffer_sz = 4096;
         if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
-                creds, &key, &val)) < 0)
+                creds, &key, &val, NULL)) < 0)
         {
             PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
@@ -160,7 +160,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
         val.buffer = buffer;
         val.buffer_sz = 4096;
         if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
-                creds, &key, &val)) < 0)
+                creds, &key, &val, NULL)) < 0)
         {
             PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
@@ -212,6 +212,7 @@ int main(int argc, char ** argv)
     PVFS_credentials credentials;
     char *servers[256];
     PVFS_handle handles[256];
+    char metadataserver[256];
     int i, nservers = 256;
 
     memset(&dist, 0, sizeof(dist));
@@ -263,6 +264,17 @@ int main(int argc, char ** argv)
         printf("strip_size = %ld\n", (unsigned long)(params.strip_size));
     }
     PINT_dist_free(dist);
+    
+    
+    ret = PINT_cached_config_get_server_name(metadataserver, 256, 
+        src.u.pvfs2.ref.handle, src.u.pvfs2.ref.fs_id);
+    if( ret != 0)
+    {
+        fprintf(stderr, "Error, could not get metadataserver name\n");
+        return (-1);
+    }
+    printf("Metadataserver: %s\n", metadataserver);
+      
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)
     {
@@ -396,7 +408,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
                               (char *) obj->u.pvfs2.pvfs2_path,
                               credentials, 
                               &resp_lookup,
-                              PVFS2_LOOKUP_LINK_FOLLOW);
+                              PVFS2_LOOKUP_LINK_FOLLOW, NULL);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_lookup", ret);
@@ -407,7 +419,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
         ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                               credentials, &resp_getattr);
+                               credentials, &resp_getattr, NULL);
         if (ret)
         {
             fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",

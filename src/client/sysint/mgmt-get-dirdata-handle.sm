@@ -82,6 +82,7 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
     PVFS_handle *out_dirdata_handle,
     PVFS_credentials *credentials,
     PVFS_mgmt_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -108,6 +109,7 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_get_dirdata_handle.dirdata_handle = out_dirdata_handle;
+    sm_p->hints = hints;
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Trying to get dirdata object of parent "
@@ -122,7 +124,8 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
 PVFS_error PVFS_mgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,
-    PVFS_credentials *credentials)
+    PVFS_credentials *credentials,
+    PVFS_hint * hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -131,7 +134,7 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
                  "PVFS_mgmt_get_dirdata_handle entered\n");
 
     ret = PVFS_imgmt_get_dirdata_handle(
-        parent_ref, out_dirdata_handle, credentials, &op_id, NULL);
+        parent_ref, out_dirdata_handle, credentials, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_get_dirdata_handle call", ret);
@@ -175,7 +178,8 @@ static int mgmt_get_dirdata_handle_setup_msgpair(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
-        sm_p->parent_ref.handle);
+        sm_p->parent_ref.handle,
+        sm_p->hints);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "- doing MGMT_GET_DIRDATA_HANDLE "
                  "under %llu,%d\n", llu(sm_p->parent_ref.handle),

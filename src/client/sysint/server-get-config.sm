@@ -101,7 +101,9 @@ machine pvfs2_server_get_config_sm(
 */
 int PINT_server_get_config(
     struct server_configuration_s *config,
-    struct PVFS_sys_mntent* mntent_p)
+    struct PVFS_sys_mntent* mntent_p,
+    PVFS_hint *hints
+    )
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
@@ -144,6 +146,8 @@ int PINT_server_get_config(
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
     sm_p->u.get_config.mntent = mntent_p;
     sm_p->u.get_config.config = config;
+    
+    sm_p->hints = hints;
 
     ret = PINT_client_state_machine_post(
         sm_p, PVFS_SERVER_GET_CONFIG, &op_id, NULL);
@@ -270,7 +274,7 @@ static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
         return ret;
     }
 
-    PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p);
+    PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p, sm_p->hints);
 
     msg_p->fs_id = PVFS_FS_ID_NULL;
     msg_p->handle = PVFS_HANDLE_NULL;

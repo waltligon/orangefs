@@ -175,7 +175,7 @@ int main(int argc, char **argv)
      */
     ret = PVFS_mgmt_setparam_all(
         cur_fs, &creds, PVFS_SERV_PARAM_FSID_CHECK,
-        (uint64_t)cur_fs, NULL, error_details);
+        (uint64_t)cur_fs, NULL, error_details, NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_setparam_all", ret);
@@ -193,7 +193,7 @@ int main(int argc, char **argv)
     printf("\n(7) Verifying that root handle is owned by one server...\n");    
 
     ret = PVFS_sys_lookup(cur_fs, "/", &creds,
-                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if(ret != 0)
     {
 	PVFS_perror("PVFS_sys_lookup", ret);
@@ -208,7 +208,7 @@ int main(int argc, char **argv)
      */
     ret = PVFS_mgmt_setparam_all(
         cur_fs, &creds, PVFS_SERV_PARAM_ROOT_CHECK,
-	(uint64_t)resp_lookup.ref.handle, NULL, error_details);
+	(uint64_t)resp_lookup.ref.handle, NULL, error_details, NULL);
 
     if(ret < 0)
     {
@@ -294,7 +294,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     {
 	printf("   %s ",
                PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i]);
+	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
 	if (ret == 0)
 	{
 	    printf("Ok\n");
@@ -336,7 +336,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     {
 	printf("   %s ",
                PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i]);
+	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
 	if (ret == 0)
 	{
 	    printf("Ok\n");

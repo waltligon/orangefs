@@ -495,7 +495,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
                               (char *) obj->u.pvfs2.pvfs2_path,
                               credentials, 
                               &resp_lookup,
-                              PVFS2_LOOKUP_LINK_FOLLOW);
+                              PVFS2_LOOKUP_LINK_FOLLOW, NULL);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_lookup", ret);
@@ -506,7 +506,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
         ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
-                               credentials, &resp_getattr);
+                               credentials, &resp_getattr, NULL);
         if (ret)
         {
             fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",
@@ -555,7 +555,7 @@ static PVFS_error post_generic_read(io_request *req)
 	}
 	ret = PVFS_isys_io(req->src->u.pvfs2.ref, req->file_req, req->offset,
 		req->buffer, req->mem_req, &req->credentials, &req->resp_io,
-                PVFS_IO_READ, &req->op_id, req);
+                PVFS_IO_READ, &req->op_id, NULL, req);
 	if (ret != 0)
 	{
             PVFS_perror("PVFS_isys_io", ret);
@@ -593,7 +593,7 @@ static PVFS_error post_generic_write(io_request *req)
 	}
 	ret = PVFS_isys_io(req->src->u.pvfs2.ref, req->file_req, req->offset,
 		req->buffer, req->mem_req, &req->credentials, &req->resp_io,
-                PVFS_IO_WRITE, &req->op_id, req);
+                PVFS_IO_WRITE, &req->op_id, NULL, req);
 	if (ret != 0)
 	{
             PVFS_perror("PVFS_isys_io", ret);

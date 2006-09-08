@@ -80,7 +80,7 @@ int main(int argc, char **argv)
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          &credentials, NULL, &resp_create);
+                          &credentials, NULL, &resp_create, NULL);
     if (ret < 0)
     {
         printf("create failed with errcode = %d\n", ret);
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
     printf("--create--\n"); 
     printf("Handle: %lld\n",lld(resp_create.ref.handle));
 
-    ret = PVFS_sys_flush(resp_create.ref, &credentials);
+    ret = PVFS_sys_flush(resp_create.ref, &credentials, NULL);
     if (ret < 0)
     {
 	    PVFS_perror_gossip("flush failed", ret);

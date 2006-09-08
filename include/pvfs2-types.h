@@ -57,6 +57,7 @@
 
 /* empty stubs to turn off encoding definition generation */
 #include "pvfs2-encode-stubs.h"
+#include "pvfs2-hint.h"
 
 /* Basic types used throughout the code. */
 typedef uint8_t PVFS_boolean;

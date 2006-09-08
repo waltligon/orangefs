@@ -216,7 +216,7 @@ int main(int argc, char **argv)
         fprintf(stderr,"Attempting to remove object %llu,%d\n",
                 llu(ref.handle), ref.fs_id);
 
-        ret = PVFS_mgmt_remove_object(ref, &credentials);
+        ret = PVFS_mgmt_remove_object(ref, &credentials, NULL);
         if (ret)
         {
             PVFS_perror("PVFS_mgmt_remove_object", ret);
@@ -228,7 +228,7 @@ int main(int argc, char **argv)
                 "\n", user_opts->dirent_name, llu(ref.handle), ref.fs_id);
 
         ret = PVFS_mgmt_remove_dirent(
-            ref, user_opts->dirent_name, &credentials);
+            ref, user_opts->dirent_name, &credentials, NULL);
         if (ret)
         {
             PVFS_perror("PVFS_mgmt_remove_dirent", ret);

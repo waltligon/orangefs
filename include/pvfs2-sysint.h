@@ -232,6 +232,7 @@ PVFS_error PVFS_isys_ref_lookup(
     PVFS_sysresp_lookup * resp,
     int32_t follow_link,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_ref_lookup(
@@ -240,14 +241,16 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_object_ref parent_ref,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup * resp,
-    int32_t follow_link);
+    int32_t follow_link,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id,
     char *name,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup * resp,
-    int32_t follow_link);
+    int32_t follow_link,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_getattr(
     PVFS_object_ref ref,
@@ -255,25 +258,29 @@ PVFS_error PVFS_isys_getattr(
     PVFS_credentials *credentials,
     PVFS_sysresp_getattr *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask,
     PVFS_credentials *credentials,
-    PVFS_sysresp_getattr *resp);
+    PVFS_sysresp_getattr *resp,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
     PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials);
+    PVFS_credentials *credentials,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_mkdir(
     char *entry_name,
@@ -282,6 +289,7 @@ PVFS_error PVFS_isys_mkdir(
     PVFS_credentials *credentials,
     PVFS_sysresp_mkdir *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_mkdir(
@@ -289,7 +297,8 @@ PVFS_error PVFS_sys_mkdir(
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
     PVFS_credentials *credentials,
-    PVFS_sysresp_mkdir *resp);
+    PVFS_sysresp_mkdir *resp,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_readdir(
     PVFS_object_ref ref,
@@ -298,6 +307,7 @@ PVFS_error PVFS_isys_readdir(
     PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_readdir(
@@ -305,7 +315,8 @@ PVFS_error PVFS_sys_readdir(
     PVFS_ds_position token,
     int32_t pvfs_dirent_incount,
     PVFS_credentials *credentials,
-    PVFS_sysresp_readdir *resp);
+    PVFS_sysresp_readdir *resp,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_create(
     char *entry_name,
@@ -315,6 +326,7 @@ PVFS_error PVFS_isys_create(
     PVFS_sys_dist *dist,
     PVFS_sysresp_create *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_create(
@@ -323,19 +335,22 @@ PVFS_error PVFS_sys_create(
     PVFS_sys_attr attr,
     PVFS_credentials *credentials,
     PVFS_sys_dist *dist,
-    PVFS_sysresp_create *resp);
+    PVFS_sysresp_create *resp,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_remove(
     char *entry_name,
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_remove(
     char *entry_name,
     PVFS_object_ref ref,
-    PVFS_credentials *credentials);
+    PVFS_credentials *credentials,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_rename(
     char *old_entry,
@@ -344,6 +359,7 @@ PVFS_error PVFS_isys_rename(
     PVFS_object_ref new_parent_ref,
     PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_rename(
@@ -351,7 +367,8 @@ PVFS_error PVFS_sys_rename(
     PVFS_object_ref old_parent_ref,
     char *new_entry,
     PVFS_object_ref new_parent_ref,
-    PVFS_credentials *credentials);
+    PVFS_credentials *credentials,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_symlink(
     char *entry_name,
@@ -361,6 +378,7 @@ PVFS_error PVFS_isys_symlink(
     PVFS_credentials *credentials,
     PVFS_sysresp_symlink *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_symlink(
@@ -369,7 +387,8 @@ PVFS_error PVFS_sys_symlink(
     char *target,
     PVFS_sys_attr attr,
     PVFS_credentials *credentials,
-    PVFS_sysresp_symlink *resp);
+    PVFS_sysresp_symlink *resp,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_io(
     PVFS_object_ref ref,
@@ -381,6 +400,7 @@ PVFS_error PVFS_isys_io(
     PVFS_sysresp_io *resp,
     enum PVFS_io_type type,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_io(
@@ -391,53 +411,61 @@ PVFS_error PVFS_sys_io(
     PVFS_Request mem_req,
     PVFS_credentials *credentials,
     PVFS_sysresp_io *resp,
-    enum PVFS_io_type type);
+    enum PVFS_io_type type,
+    PVFS_hint * hints);
 
-#define PVFS_sys_read(x1,x2,x3,x4,x5,x6,y) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ)
+#define PVFS_sys_read(x1,x2,x3,x4,x5,x6,y,z) \
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,z)
 
-#define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE)
+#define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y,z) \
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,z)
 
 PVFS_error PVFS_isys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
     PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
-    PVFS_credentials *credentials);
+    PVFS_credentials *credentials,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_sys_getparent(
     PVFS_fs_id fs_id,
     char *entry_name,
     PVFS_credentials *credentials,
-    PVFS_sysresp_getparent *resp);
+    PVFS_sysresp_getparent *resp,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_flush(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_flush(
     PVFS_object_ref ref,
-    PVFS_credentials *credentials);
+    PVFS_credentials *credentials,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_statfs(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     PVFS_sysresp_statfs *statfs,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_statfs(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    PVFS_sysresp_statfs *resp);
+    PVFS_sysresp_statfs *resp,
+    PVFS_hint * hints);
 
 PVFS_sys_dist* PVFS_sys_dist_lookup(
     const char* dist_identifier);
@@ -456,13 +484,15 @@ PVFS_error PVFS_isys_geteattr(
     PVFS_ds_keyval *key_p,
     PVFS_sysresp_geteattr *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_geteattr(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_ds_keyval *key_p,
-    PVFS_ds_keyval *val_p);
+    PVFS_ds_keyval *val_p,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_geteattr_list(
     PVFS_object_ref ref,
@@ -471,6 +501,7 @@ PVFS_error PVFS_isys_geteattr_list(
     PVFS_ds_keyval *key_p,
     PVFS_sysresp_geteattr *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_geteattr_list(
@@ -478,7 +509,8 @@ PVFS_error PVFS_sys_geteattr_list(
     PVFS_credentials *credentials,
     int32_t nkey,
     PVFS_ds_keyval *key_p,
-    PVFS_sysresp_geteattr *resp);
+    PVFS_sysresp_geteattr *resp,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_seteattr(
     PVFS_object_ref ref,
@@ -487,6 +519,7 @@ PVFS_error PVFS_isys_seteattr(
     PVFS_ds_keyval *val_p,
     int32_t flags,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_seteattr(
@@ -494,7 +527,8 @@ PVFS_error PVFS_sys_seteattr(
     PVFS_credentials *credentials,
     PVFS_ds_keyval *key_p,
     PVFS_ds_keyval *val_p,
-    int32_t flags);
+    int32_t flags,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_seteattr_list(
     PVFS_object_ref ref,
@@ -504,6 +538,7 @@ PVFS_error PVFS_isys_seteattr_list(
     PVFS_ds_keyval *val_array,
     int32_t flags,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_seteattr_list(
@@ -512,19 +547,22 @@ PVFS_error PVFS_sys_seteattr_list(
     int32_t nkey,
     PVFS_ds_keyval *key_array,
     PVFS_ds_keyval *val_array,
-    int32_t flags);
+    int32_t flags,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_deleattr(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_ds_keyval *key_p,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_deleattr(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
-    PVFS_ds_keyval *key_p);
+    PVFS_ds_keyval *key_p,
+    PVFS_hint * hints);
 
 PVFS_error PVFS_isys_listeattr(
     PVFS_object_ref ref,
@@ -533,6 +571,7 @@ PVFS_error PVFS_isys_listeattr(
     PVFS_credentials *credentials,
     PVFS_sysresp_listeattr *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint * hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_listeattr(
@@ -540,7 +579,8 @@ PVFS_error PVFS_sys_listeattr(
     PVFS_ds_position token,
     int32_t nkey,
     PVFS_credentials *credentials,
-    PVFS_sysresp_listeattr *resp);
+    PVFS_sysresp_listeattr *resp,
+    PVFS_hint * hints);
 
 /* exported test functions for isys calls */
 

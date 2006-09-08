@@ -79,6 +79,7 @@ PVFS_error PVFS_imgmt_setparam_list(
     int count,
     PVFS_error_details *details,
     PVFS_mgmt_op_id *op_id,
+    PVFS_hint *hints, 
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -143,7 +144,8 @@ PVFS_error PVFS_mgmt_setparam_list(
     PVFS_BMI_addr_t *addr_array,
     uint64_t *old_value_array,
     int count,
-    PVFS_error_details *details)
+    PVFS_error_details *details,
+    PVFS_hint *hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -152,7 +154,7 @@ PVFS_error PVFS_mgmt_setparam_list(
 
     ret = PVFS_imgmt_setparam_list(
         fs_id, credentials, param, value, addr_array, old_value_array,
-        count, details, &op_id, NULL);
+        count, details, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -195,7 +197,8 @@ static int mgmt_setparam_list_setup_msgpair(PINT_client_sm *sm_p,
             *sm_p->cred_p,
             sm_p->u.setparam_list.fs_id,
             sm_p->u.setparam_list.param,
-            sm_p->u.setparam_list.value);
+            sm_p->u.setparam_list.value,
+            sm_p->hints);
         
         msg_p->fs_id = sm_p->u.setparam_list.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;

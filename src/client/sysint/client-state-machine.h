@@ -492,6 +492,12 @@ typedef struct PINT_client_sm
     void *user_ptr;
 
     PVFS_credentials *cred_p;
+    
+    /*
+     * hints for specific client action, for example request_ID...
+     */ 
+    PVFS_hint *hints;
+    
     union
     {
 	struct PINT_client_remove_sm remove;

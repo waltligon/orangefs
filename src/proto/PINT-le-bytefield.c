@@ -318,9 +318,12 @@ static int lebf_encode_req(
     struct PINT_encoded_msg *target_msg)
 {
     int ret = 0;
+    int hint_size;
+    hint_size = PINT_hint_calc_size(req->hints);
     char **p;
 
-    ret = encode_common(target_msg, max_size_array[req->op].req);
+    ret = encode_common(target_msg, max_size_array[req->op].req + 
+        hint_size);
 
     if (ret)
 	goto out;
@@ -387,7 +390,7 @@ static int lebf_encode_req(
       - (char *) target_msg->buffer_list[0];
     target_msg->size_list[0] = target_msg->total_size;
 
-    if (target_msg->total_size > max_size_array[req->op].req)
+    if (target_msg->total_size > max_size_array[req->op].req + hint_size)
     {
 	ret = -PVFS_ENOMEM;
 	gossip_err("%s: op %d needed %lld bytes but alloced only %d\n",

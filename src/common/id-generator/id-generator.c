@@ -62,13 +62,13 @@ int id_gen_safe_register(
         }
     }
 
-    gen_mutex_lock(s_id_gen_safe_mutex);
-
     id_elem = (id_gen_safe_t *)malloc(sizeof(id_gen_safe_t));
     if (!id_elem)
     {
         return -PVFS_ENOMEM;
     }
+    
+    gen_mutex_lock(s_id_gen_safe_mutex);
 
     id_elem->id = ++s_id_gen_safe_tag;
     id_elem->item = item;

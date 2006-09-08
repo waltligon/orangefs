@@ -200,7 +200,7 @@ static int do_stat(const char             * pszFile,
                             (char *) pszRelativeFile, 
                             (PVFS_credentials *) credentials, 
                             &lk_response, 
-                            PVFS2_LOOKUP_LINK_FOLLOW);
+                            PVFS2_LOOKUP_LINK_FOLLOW, NULL);
    }
    else
    {
@@ -208,7 +208,7 @@ static int do_stat(const char             * pszFile,
                             (char *) pszRelativeFile, 
                             (PVFS_credentials *) credentials, 
                             &lk_response, 
-                            PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
    }
    
    if(ret < 0)
@@ -227,7 +227,7 @@ static int do_stat(const char             * pszFile,
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
                           (PVFS_credentials *) credentials, 
-                          &getattr_response);
+                          &getattr_response, NULL);
 
    if(ret < 0)
    {                          

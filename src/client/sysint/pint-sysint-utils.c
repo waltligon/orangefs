@@ -66,7 +66,7 @@ int PINT_lookup_parent(
     }
 
     ret = PVFS_sys_lookup(fs_id, buf, credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)
     {
         gossip_err("Lookup failed on %s\n", buf);

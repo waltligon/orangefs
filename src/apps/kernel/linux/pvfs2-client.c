@@ -53,6 +53,7 @@ typedef struct
     char *path;
     char *logfile;
     char *logstamp;
+    int create_request_id;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -336,6 +337,11 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->logstamp;
                 arg_index+=2;
             }
+            if(opts->create_request_id)
+            {
+                arg_list[arg_index] = "--create-request-id";
+                arg_index+=1;                
+            }
 
             ret = execvp(opts->path, arg_list);
 
@@ -372,6 +378,7 @@ static void print_help(char *progname)
     printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
     printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
+    printf("--create-request-id           create a id which is transfered to the server\n");
     printf("-p PATH, --path PATH          execute pvfs2-client at "
            "PATH\n");
 }
@@ -401,6 +408,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"gossip-mask",1,0,0},
         {"path",1,0,0},
         {"logstamp",1,0,0},
+        {"create-request-id",0,0,0},
         {0,0,0,0}
     };
 
@@ -494,6 +502,11 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     opts->gossip_mask = optarg;
                     break;
+                }
+                else if (strcmp("create-request-id", cur_option) == 0)
+                {
+                    opts->create_request_id = 1;
+                    break;   
                 }
                 break;
             case 'h':
