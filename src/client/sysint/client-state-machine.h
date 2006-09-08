@@ -613,7 +613,9 @@ enum
     PVFS_DEV_UNEXPECTED            = 400
 };
 
+#define PVFS_OP_SYS_MAXVALID  20
 #define PVFS_OP_SYS_MAXVAL 69
+#define PVFS_OP_MGMT_MAXVALID 81
 #define PVFS_OP_MGMT_MAXVAL 199
 
 int PINT_client_io_cancel(job_id_t id);

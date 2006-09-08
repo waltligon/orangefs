@@ -257,7 +257,6 @@ static PINT_sm_action mgmt_statfs_list_cleanup(
     }
 
     sm_p->error_code  = error;
-    PINT_SET_OP_COMPLETE;
 
     return SM_ACTION_COMPLETE;
 }

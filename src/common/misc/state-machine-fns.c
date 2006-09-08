@@ -14,6 +14,7 @@
 #include "gossip.h"
 #include "pvfs2-debug.h"
 #include "state-machine.h"
+#include "client-state-machine.h"
 
 /* STATE-MACHINE-FNS.C
  *
@@ -223,6 +224,11 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
     do {
         /* loop while returning from nested SM */
         do {
+            if (!smcb->current_state || !smcb->current_state->trtbl)
+            {
+                gossip_err("SM current state or trtbl is invalid\n");
+                return -1;
+            }
             transtbl = smcb->current_state->trtbl;
     
 	    /* for each entry in the transition table there is a return
@@ -346,6 +352,35 @@ int PINT_smcb_set_op(struct PINT_smcb *smcb, int op)
 int PINT_smcb_op(struct PINT_smcb *smcb)
 {
     return smcb->op;
+}
+
+static int PINT_smcb_sys_op(struct PINT_smcb *smcb)
+{
+    if (smcb->op > 0 && smcb->op < PVFS_OP_SYS_MAXVALID)
+        return 1;
+    return 0;
+}
+
+static int PINT_smcb_mgmt_op(struct PINT_smcb *smcb)
+{
+    if (smcb->op > PVFS_OP_SYS_MAXVAL && smcb->op < PVFS_OP_MGMT_MAXVALID)
+        return 1;
+    return 0;
+}
+
+static int PINT_smcb_misc_op(struct PINT_smcb *smcb)
+{
+    return smcb->op == PVFS_SERVER_GET_CONFIG 
+        || smcb->op == PVFS_CLIENT_JOB_TIMER 
+        || smcb->op == PVFS_CLIENT_PERF_COUNT_TIMER 
+        || smcb->op == PVFS_DEV_UNEXPECTED;
+}
+
+int PINT_smcb_invalid_op(struct PINT_smcb *smcb)
+{
+    if (!PINT_smcb_sys_op(smcb) && !PINT_smcb_mgmt_op(smcb) && !PINT_smcb_misc_op(smcb))
+        return 1;
+    return 0;
 }
 
 /* Function: PINT_smcb_set_complete

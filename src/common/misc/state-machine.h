@@ -66,6 +66,7 @@ typedef struct PINT_smcb
     int op_terminate; /* indicates SM is ready to terminate */
     int op_cancelled; /* indicates SM operation was cancelled */
     int children_running; /* the number of child SMs running */
+    int op_completed;  /* indicates SM operation was added to completion Q */
     /* add a lock here */
     job_context_id context; /* job context when waiting for children */
     int (*terminate_fn)(struct PINT_smcb *, job_status_s *);
@@ -190,6 +191,7 @@ int PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
 int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
 int PINT_smcb_op(struct PINT_smcb *smcb);
 void PINT_smcb_set_complete(struct PINT_smcb *smcb);
+int PINT_smcb_invalid_op(struct PINT_smcb *smcb);
 int PINT_smcb_complete(struct PINT_smcb *smcb);
 void PINT_smcb_set_cancelled(struct PINT_smcb *smcb);
 int PINT_smcb_cancelled(struct PINT_smcb *smcb);

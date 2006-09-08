@@ -56,7 +56,11 @@ static PVFS_error add_sm_to_completion_list(PINT_smcb *smcb)
 {
     gen_mutex_lock(&s_completion_list_mutex);
     assert(s_completion_list_index < MAX_RETURNED_JOBS);
-    s_completion_list[s_completion_list_index++] = smcb;
+    if (!smcb->op_completed)
+    {
+        smcb->op_completed = 1;
+        s_completion_list[s_completion_list_index++] = smcb;
+    }
     gen_mutex_unlock(&s_completion_list_mutex);
     return 0;
 }
@@ -146,7 +150,7 @@ static PVFS_error completion_list_retrieve_completed(
             tmp_completion_list[new_list_index++] = smcb;
         }
     }
-    *out_count = i;
+    *out_count = PVFS_util_min(i, limit);
 
     /* clean up and adjust the list and it's book keeping */
     s_completion_list_index = new_list_index;
@@ -294,6 +298,8 @@ int client_state_machine_terminate(
             (PINT_smcb_cancelled(smcb)) &&
             (cancelled_io_jobs_are_pending(smcb))))
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                "client_state_machine_terminate smcb %p\n", smcb);
         ret = add_sm_to_completion_list(smcb);
         assert(ret == 0);
     }
@@ -378,8 +384,8 @@ PVFS_error PINT_client_state_machine_post(
     if (PINT_smcb_complete(smcb))
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "Posted %s (immediate completion)\n",
-            PINT_client_get_name_str(pvfs_sys_op));
+            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) (immediate completion)\n",
+            PINT_client_get_name_str(pvfs_sys_op), (op_id ? *op_id : -1));
 
         ret = add_sm_to_completion_list(smcb);
         assert(ret == 0);
@@ -387,8 +393,8 @@ PVFS_error PINT_client_state_machine_post(
     else
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "Posted %s (waiting for test)\n",
-            PINT_client_get_name_str(pvfs_sys_op));
+            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) (waiting for test)\n",
+            PINT_client_get_name_str(pvfs_sys_op), (op_id ? *op_id : -1));
     }
     return ret;
 }
@@ -631,13 +637,22 @@ PVFS_error PINT_client_state_machine_test(
         {
             PINT_smcb_set_complete(tmp_smcb);
         }
+        if (PINT_smcb_invalid_op(tmp_smcb))
+        {
+            gossip_err("Invalid sm control block op %d\n", PINT_smcb_op(tmp_smcb));
+            continue;
+        }
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "sm control op %d\n", PINT_smcb_op(tmp_smcb));
 
         if (!PINT_smcb_complete(tmp_smcb))
         {
             ret = PINT_state_machine_next(tmp_smcb, &job_status_array[i]);
 
-            assert(ret == SM_ACTION_DEFERRED ||
-                    ret == SM_ACTION_TERMINATE); /* ret == 0 */
+            if (ret != SM_ACTION_DEFERRED &&
+                    ret != SM_ACTION_TERMINATE); /* ret == 0 */
+            {
+                continue;
+            }
         }
 
         /* make sure we don't return internally cancelled I/O jobs */
@@ -655,13 +670,14 @@ PVFS_error PINT_client_state_machine_test(
           being tested here, we add it to our local completion list so
           that later calls to the sysint test/testsome can find it
         */
-        /*  This is handled in terminate fn now
+        /* add_sm_to_completion_list() does the right thing in determining whether
+         * smcb has already been added to completion Q or not 
+         */
         if ((tmp_smcb != smcb) && (PINT_smcb_complete(tmp_smcb)))
         {
             ret = add_sm_to_completion_list(tmp_smcb);
             assert(ret == 0);
         }
-        */
     }
 
     if (PINT_smcb_complete(smcb))
@@ -691,9 +707,6 @@ PVFS_error PINT_client_state_machine_testsome(
     job_id_t job_id_array[MAX_RETURNED_JOBS];
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_client_state_machine_testsome\n");
 
     CLIENT_SM_ASSERT_INITIALIZED();
 
@@ -753,8 +766,11 @@ PVFS_error PINT_client_state_machine_testsome(
              * itself; the return value of the underlying operation is
              * kept in the job status structure.
              */
-            assert(ret == SM_ACTION_DEFERRED ||
-                    ret == SM_ACTION_TERMINATE);
+            if (ret != SM_ACTION_DEFERRED &&
+                    ret != SM_ACTION_TERMINATE)
+            {
+                continue;
+            }
         }
 
         /* make sure we don't return internally cancelled I/O jobs */
@@ -773,13 +789,15 @@ PVFS_error PINT_client_state_machine_testsome(
           grab all completed operations when we're finished
           (i.e. outside of this loop).
         */
-        /* now done in terminate function
+
+        /* add_sm_to_completion_list(smcb) does the right thing if an smcb
+         *  was already added to the completion list
+         */
         if (PINT_smcb_complete(smcb))
         {
             ret = add_sm_to_completion_list(smcb);
             assert(ret == 0);
         }
-        */
     }
 
     return completion_list_retrieve_completed(
@@ -833,48 +851,69 @@ PVFS_error PINT_client_wait_internal(
  */
 void PVFS_sys_release(PVFS_sys_op_id op_id)
 {
-    PINT_smcb *smcb = PINT_id_gen_safe_lookup(op_id);
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_credentials *cred_p = sm_p->cred_p;
+    PINT_smcb *smcb; 
+    PINT_client_sm *sm_p; 
+    PVFS_credentials *cred_p; 
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
               "PVFS_sys_release id %lld\n",op_id);
-
-    if (smcb)
+    smcb = PINT_id_gen_safe_lookup(op_id);
+    if (smcb == NULL) 
     {
-        PINT_id_gen_safe_unregister(op_id);
-
-        if (PINT_smcb_op(smcb) && cred_p)
-        {
-            PVFS_util_release_credentials(cred_p);
-            sm_p->cred_p = NULL;
-        }
-
-        PINT_smcb_free(&smcb);
+        return;
     }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (sm_p == NULL) 
+    {
+        cred_p = NULL;
+    }
+    else 
+    {
+        cred_p = sm_p->cred_p;
+    }
+    PINT_id_gen_safe_unregister(op_id);
+
+    if (PINT_smcb_op(smcb) && cred_p)
+    {
+        PVFS_util_release_credentials(cred_p);
+        if (sm_p) sm_p->cred_p = NULL;
+    }
+
+    PINT_smcb_free(&smcb);
 }
 
 /* why is this different??? */
 void PVFS_mgmt_release(PVFS_mgmt_op_id op_id)
 {
-    PINT_smcb *smcb = PINT_id_gen_safe_lookup(op_id);
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_smcb *smcb; 
+    PINT_client_sm *sm_p; 
+    PVFS_credentials *cred_p; 
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
               "PVFS_mgmt_release id %lld\n",op_id);
-
-    if (smcb)
+    smcb = PINT_id_gen_safe_lookup(op_id);
+    if (smcb == NULL)
     {
-        PINT_id_gen_safe_unregister(op_id);
-
-        if (PINT_smcb_op(smcb) && sm_p->cred_p)
-        {
-            PVFS_util_release_credentials(sm_p->cred_p);
-            sm_p->cred_p = NULL;
-        }
-
-        PINT_smcb_free(&smcb);
+        return;
     }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (sm_p == NULL)
+    {
+        cred_p = NULL;
+    }
+    else
+    {
+        cred_p = sm_p->cred_p;
+    }
+    PINT_id_gen_safe_unregister(op_id);
+
+    if (PINT_smcb_op(smcb) && cred_p)
+    {
+        PVFS_util_release_credentials(cred_p);
+        if (sm_p) sm_p->cred_p = NULL;
+    }
+
+    PINT_smcb_free(&smcb);
 }
 
 const char *PINT_client_get_name_str(int op_type)
@@ -920,6 +959,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_CLIENT_JOB_TIMER, "PVFS_CLIENT_JOB_TIMER" },
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },
         { PVFS_SYS_FS_ADD, "PVFS_SYS_FS_ADD" },
+        { PVFS_SYS_STATFS, "PVFS_SYS_STATFS" },
         { 0, "UNKNOWN" }
     };
 
