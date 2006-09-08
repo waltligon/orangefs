@@ -125,6 +125,12 @@ int dbpf_attr_cache_keyval_pair_fetch_cached_data(
     dbpf_keyval_pair_cache_elem_t *keyval_pair,
     void *target_data, int *target_data_sz);
 
+/*
+  do an atomic update of the attr's b_size in the cache
+  for this key if necessary
+*/
+int dbpf_attr_cache_ds_attr_change_cached_data_bsize_if_necessary(
+    TROVE_object_ref key, PVFS_size b_size);
 
 /***********************************************
  * dbpf-attr-cache to trove setinfo hooks

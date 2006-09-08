@@ -48,14 +48,10 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#ifdef __PVFS2_TROVE_THREADED__
-#ifdef __PVFS2_TROVE_AIO_THREADED__
-#define SERVER_STORAGE_MODE "aio-threaded"
+#ifdef __PVFS2_USE_AIO__
+#define SERVER_STORAGE_MODE "dbpf-aio"
 #else
-#define SERVER_STORAGE_MODE "threaded"
-#endif
-#else
-#define SERVER_STORAGE_MODE "non-threaded"
+#define SERVER_STORAGE_MODE "dbpf-threaded"
 #endif
 
 #define PVFS2_VERSION_REQUEST 0xFF
@@ -444,7 +440,8 @@ int main(int argc, char **argv)
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
+                 "PVFS2 Server version %s (%s) starting.\n", PVFS2_VERSION,
+                       SERVER_STORAGE_MODE);
 
     fs_conf = ((argc >= optind) ? argv[optind] : NULL);
     server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
@@ -1012,6 +1009,9 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_TROVE_INIT;
 
+    ret = trove_collection_setinfo(0, 0, TROVE_IO_THREAD_COUNT,
+                                   & server_config.trove_io_thread_count);
+                                   
     ret = PINT_cached_config_initialize();
     if(ret < 0)
     {
