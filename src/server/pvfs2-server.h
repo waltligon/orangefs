@@ -270,9 +270,6 @@ typedef struct PINT_server_sm_recv_state_s
 
 struct PINT_server_mgmt_migrate
 {
-    /* metaserver */
-    int32_t                     dfile_to_replace;  
-    
     /* dataserver */
     
     PVFS_size                   file_size;

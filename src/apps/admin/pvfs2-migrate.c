@@ -23,6 +23,7 @@
 #include "pvfs2-internal.h"
 
 #define DFILE_KEY "system.pvfs2." DATAFILE_HANDLES_KEYSTR
+#define VERSION "1.1"
 
 /* optional parameters, filled in by parse_args() */
 struct options
@@ -336,7 +337,7 @@ static struct options *parse_args(
             tmp_opts->override_restrictions = 1;
             break;
         case ('V'):
-            printf("%s\n", PVFS2_VERSION);
+            printf("%s, migration-tool:%s\n", PVFS2_VERSION, VERSION);
             exit(0);
         case ('?'):
             usage(argc, argv);

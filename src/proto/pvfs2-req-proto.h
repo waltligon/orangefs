@@ -936,16 +936,18 @@ struct PVFS_servreq_mgmt_migrate
     PVFS_handle old_datafile_handle;
     PVFS_handle new_datafile_handle;
     PVFS_handle metafile_handle;
+    int32_t     target_datafile_number;
     int32_t     role; /* metaserver, source or target*/ 
 };
 
-endecode_fields_6_struct(
+endecode_fields_7_struct(
     PVFS_servreq_mgmt_migrate,
     PVFS_fs_id,  fs_id,
     PVFS_handle, handle,
     PVFS_handle, old_datafile_handle,
     PVFS_handle, new_datafile_handle,
     PVFS_handle, metafile_handle,
+    int32_t,     target_datafile_number,
     int32_t,     role)
 
 enum migrate_role{
@@ -959,12 +961,15 @@ enum migrate_role{
                                  __metafile_handle,    \
                                  __old_datafile_handle,\
                                  __new_datafile_handle,\
+                                 __target_dfile_no,    \
                                  __role)               \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_MGMT_MIGRATE;               \
     (__req).credentials = (__creds);                   \
     (__req).u.mgmt_migrate.fs_id = (__fsid);           \
+    (__req).u.mgmt_migrate.target_datafile_number =    \
+        (__target_dfile_no);                           \
     (__req).u.mgmt_migrate.old_datafile_handle =       \
         (__old_datafile_handle);                       \
     (__req).u.mgmt_migrate.new_datafile_handle =       \

@@ -15,8 +15,9 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-req-proto.h"
 #include "pint-cached-config.h"
-#include "pint-util.h"
 #include "msgpairarray.h"
+#include "pint-util.h"
+#include "pvfs2-request.h"
 
 extern PINT_dist basic_dist;
 
@@ -25,8 +26,6 @@ static int migrate_decide_role(
 
 /*****************************/    
 static int mgmt_migrate_metaserver_init(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int mgmt_migrate_metaserver_notify_old_dataserver_prepare(
     PINT_server_op *s_op, job_status_s *js_p);
 static int mgmt_migrate_metaserver_find_target_handle_number(
     PINT_server_op *s_op, job_status_s *js_p);    
@@ -54,8 +53,6 @@ enum{
     STATE_SOURCE_DATASERVER = PVFS_MIGRATE_ROLE_SOURCE_DATA_SERVER
 };
 
-#define STATUS_ACK_RCVD 100
-
 static int mgmt_migrate_io_start_cmp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
     
@@ -74,9 +71,7 @@ machine pvfs2_mgmt_migrate_sm(
     decide_role,
     metaserver_init,
     metaserver_read_handles,
-    metadataserver_find_target_handle_number,    
-    metaserver_notify_old_dataserver_prepare,
-    metaserver_notify_old_dataserver_prepare_xfer_msgpair,  
+    metaserver_find_target_handle_number,
     metaserver_rewrite_handles,
     source_dataserver_prepare_io_write,
     source_dataserver_start_io_write,
@@ -122,32 +117,15 @@ machine pvfs2_mgmt_migrate_sm(
     state metaserver_read_handles
     {
         jump pvfs2_get_attr_work_sm;
-        success => metadataserver_find_target_handle_number;
+        success => metaserver_find_target_handle_number;
         default => final_response; 
     }
     
-    state metadataserver_find_target_handle_number
+    state metaserver_find_target_handle_number
     {
         run mgmt_migrate_metaserver_find_target_handle_number;
-        success => metaserver_notify_old_dataserver_prepare;
-        default => final_response; 
+        default => metaserver_rewrite_handles; 
     }
-    
-    state metaserver_notify_old_dataserver_prepare
-    {
-        run mgmt_migrate_metaserver_notify_old_dataserver_prepare;
-        success => metaserver_notify_old_dataserver_prepare_xfer_msgpair;
-        default => final_response;
-    }
-   
-    
-    state metaserver_notify_old_dataserver_prepare_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
-        success => metaserver_rewrite_handles;
-        default => final_response; /* failure */
-    }
-    
     /*
      * Once the message pair finishes we know the datatransfer is completed.
      */
@@ -394,7 +372,7 @@ static int mgmt_migrate_source_dataserver_prepare_io_read(
     ret = job_bmi_recv(
         target_dataserver, write_ack->encoded_resp_p,
         write_ack->max_resp_sz, s_op->msgpair.session_tag,
-        BMI_PRE_ALLOC, s_op, STATUS_ACK_RCVD,
+        BMI_PRE_ALLOC, s_op, 0,
         & write_ack->recv_status, & write_ack->recv_id,
         server_job_context, JOB_TIMEOUT_INF);
 
@@ -502,6 +480,7 @@ static int mgmt_migrate_source_dataserver_wait_for_write_ack(
     struct PINT_decoded_msg decoded_resp;
     PINT_server_sm_recv_state * write_ack;
     write_ack = & s_op->u.mgmt_migrate.write_ack;
+    struct PVFS_server_resp * resp;
     
     gossip_debug(GOSSIP_SERVER_DEBUG, 
         "mgmt_migrate_source_dataserver_wait_for_write_ack\n");
@@ -514,9 +493,11 @@ static int mgmt_migrate_source_dataserver_wait_for_write_ack(
     {
         PVFS_perror_gossip("msgpairarray decode error", ret);
     }
-    js_p->error_code = ret;
+    js_p->error_code = 0;
+
+    resp = (struct PVFS_server_resp *) decoded_resp.buffer;
     
-    assert(js_p->status_user_tag == STATUS_ACK_RCVD);
+    assert( resp->op == PVFS_SERV_WRITE_COMPLETION); 
     
     if( write_ack->recv_status.error_code != 0 )
     {
@@ -590,7 +571,11 @@ static int mgmt_migrate_metaserver_find_target_handle_number(
             
             gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Migration found datafile on pos %i with new datafile\n", i);
-            s_op->u.mgmt_migrate.dfile_to_replace = i;
+            if( s_op->req->u.mgmt_migrate.target_datafile_number != i )
+            {
+                js_p->error_code = -PVFS_EALREADY;
+                return 1;
+            }
             break;
         }
     }    
@@ -608,47 +593,6 @@ static int mgmt_migrate_metaserver_find_target_handle_number(
     return 1;  
 }    
 
-
-static int mgmt_migrate_metaserver_notify_old_dataserver_prepare(
-    PINT_server_op *s_op, job_status_s *js_p){
-    PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_BMI_addr_t  old_dataserver;
-    int ret;
-    
-    js_p->error_code = 0;
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "migrate state: mgmt_migrate_metaserver_notify_old_dataserver_prepare\n");
-    PVFS_handle handle = s_op->req->u.mgmt_migrate.old_datafile_handle;
-    PVFS_fs_id  fs_id = s_op->req->u.mgmt_migrate.fs_id ;
-
-    ret = PINT_cached_config_map_to_server( & old_dataserver,
-        handle, fs_id);
-    if( ret != 0)
-    {
-        js_p->error_code = ret;
-        return 1;        
-    }
-    
-    PINT_init_msgpair(s_op, msg_p);
-
-    PINT_SERVREQ_MGMT_MIGRATE_FILL(
-        msg_p->req,
-        s_op->req->credentials,
-        fs_id,
-        s_op->req->u.mgmt_migrate.metafile_handle,
-        s_op->req->u.mgmt_migrate.old_datafile_handle,
-        s_op->req->u.mgmt_migrate.new_datafile_handle,
-        PVFS_MIGRATE_ROLE_SOURCE_DATA_SERVER);
-            
-    msg_p->fs_id = fs_id;
-    msg_p->handle = s_op->req->u.mgmt_migrate.new_datafile_handle;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn =  NULL;    
-    msg_p->svr_addr = old_dataserver;
-    return 1;         
-}
-
-
 static int mgmt_migrate_metaserver_rewrite_handles(
     PINT_server_op *s_op, job_status_s *js_p)
 {
@@ -660,7 +604,7 @@ static int mgmt_migrate_metaserver_rewrite_handles(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "migrate state: mgmt_migrate_metaserver_rewrite_handles\n");    
 
-    s_op->attr.u.meta.dfile_array[s_op->u.mgmt_migrate.dfile_to_replace] = 
+    s_op->attr.u.meta.dfile_array[s_op->req->u.mgmt_migrate.target_datafile_number] = 
                 s_op->req->u.mgmt_migrate.new_datafile_handle;
 
     /* set up key and value structure for keyval write */

@@ -300,7 +300,9 @@ struct PINT_client_mgmt_migrate_sm
     
     /* data needed during the process*/
     PVFS_handle     new_datafile;
+    
     int stored_error_code;    
+    int32_t target_datafile_number;
 };
 
 struct PINT_client_mgmt_get_scheduler_stats_sm
@@ -543,7 +545,7 @@ typedef struct PINT_client_sm
     struct PINT_client_mgmt_remove_dirent_sm mgmt_remove_dirent;
     struct PINT_client_mgmt_create_dirent_sm mgmt_create_dirent;
     struct PINT_client_mgmt_get_dirdata_handle_sm mgmt_get_dirdata_handle;
-    struct PINT_client_mgmt_migrate_sm migrate;
+    struct PINT_client_mgmt_migrate_sm mgmt_migrate;
     struct PINT_client_mgmt_get_scheduler_stats_sm mgmt_get_scheduler_stats;
 	struct PINT_server_get_config_sm get_config;
 	struct PINT_client_geteattr_sm geteattr;
