@@ -274,7 +274,12 @@ static int mgmt_migrate_start_transfer(
     msg_p->svr_addr = old_dataserver;
     return 1;
 }
-  
+
+/* TODO: successful write of datafile to new server should
+ * initiate metadata server rewrite first. And once datafile array is 
+ * rewritten acknowledge deletion to old datafile server. 
+ * Right now there is a possible race condition between other clients 
+ * and the update of the datafile array. */  
 static int mgmt_migrate_acknowledge_delete_old_datafile(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
