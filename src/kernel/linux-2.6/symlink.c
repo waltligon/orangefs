@@ -52,11 +52,21 @@ struct inode_operations pvfs2_symlink_inode_operations =
     follow_link : pvfs2_follow_link,
     setattr : pvfs2_setattr,
     revalidate : pvfs2_revalidate,
+#ifdef HAVE_XATTR
+    setxattr: pvfs2_setxattr,
+    listxattr: pvfs2_listxattr,
+#endif
 #else
     .readlink = pvfs2_readlink,
     .follow_link = pvfs2_follow_link,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
+    .listxattr = pvfs2_listxattr,
+#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+    .setxattr = generic_setxattr,
+#else
+    .setxattr = pvfs2_setxattr,
+#endif
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
 #endif

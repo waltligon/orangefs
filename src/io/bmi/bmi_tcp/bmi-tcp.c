@@ -1720,6 +1720,7 @@ static int tcp_server_init(void)
     int oldfl = 0;		/* old socket flags */
     struct tcp_addr *tcp_addr_data = NULL;
     int tmp_errno = bmi_tcp_errno_to_pvfs(-EINVAL);
+    int ret = 0;
 
     /* create a socket */
     tcp_addr_data = tcp_method_params.listen_addr->method_data;
@@ -1741,7 +1742,19 @@ static int tcp_server_init(void)
     BMI_sockio_set_sockopt(tcp_addr_data->socket, SO_REUSEADDR, 1);
 
     /* bind it to the appropriate port */
-    if (BMI_sockio_bind_sock(tcp_addr_data->socket, tcp_addr_data->port) < 0)
+    if(tcp_method_params.method_flags & BMI_TCP_BIND_SPECIFIC)
+    {
+        ret = BMI_sockio_bind_sock_specific(tcp_addr_data->socket,
+            tcp_addr_data->hostname,
+            tcp_addr_data->port);
+    }
+    else
+    {
+        ret = BMI_sockio_bind_sock(tcp_addr_data->socket,
+            tcp_addr_data->port);
+    }
+    
+    if (ret < 0)
     {
 	tmp_errno = errno;
 	gossip_err("Error: BMI_sockio_bind_sock: %s\n", strerror(tmp_errno));

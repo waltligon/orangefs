@@ -52,6 +52,7 @@ static DOTCONF_CB(exit_distribution_context);
 static DOTCONF_CB(get_unexp_req);
 static DOTCONF_CB(get_tcp_buffer_send);
 static DOTCONF_CB(get_tcp_buffer_receive);
+static DOTCONF_CB(get_tcp_bind_specific);
 static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_name);
@@ -503,6 +504,12 @@ static const configoption_t options[] =
       */
       {"TCPBufferReceive",ARG_INT, get_tcp_buffer_receive,NULL,
          CTX_DEFAULTS|CTX_GLOBAL,"0"},
+
+     /* If enabled, specifies that the server should bind its port only on
+      * the specified address (rather than INADDR_ANY)
+      */
+     {"TCPBindSpecific",ARG_STR, get_tcp_bind_specific,NULL,
+        CTX_DEFAULTS|CTX_GLOBAL,"no"},
 
      /* Specifies the timeout value in seconds for BMI jobs on the server.
       */
@@ -1155,6 +1162,28 @@ DOTCONF_CB(get_tcp_buffer_send)
     config_s->tcp_buffer_size_send = cmd->data.value;
     return NULL;
 }
+
+DOTCONF_CB(get_tcp_bind_specific)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    if(strcasecmp(cmd->data.str, "yes") == 0)
+    {
+        config_s->tcp_bind_specific = 1;
+    }
+    else if(strcasecmp(cmd->data.str, "no") == 0)
+    {
+        config_s->tcp_bind_specific = 0;
+    }
+    else
+    {
+        return("TCPBindSpecific value must be 'yes' or 'no'.\n");
+    }
+
+    return NULL;
+}
+
 
 
 DOTCONF_CB(get_server_job_bmi_timeout)

@@ -512,6 +512,10 @@ static int getattr_read_metafile_datafile_handles_if_required(
 	    llu(s_op->u.getattr.handle), llu(s_op->u.getattr.handle),
 	    (int)s_op->u.getattr.fs_id);
 
+        /*If we hit an error the DIST & DFILES are no longer valid*/
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
+        
 	js_p->error_code = -PVFS_EOVERFLOW;
 	return 1;
     }
@@ -623,6 +627,14 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
          * transitions
          */
         js_p->error_code = 0;
+    }
+    if(js_p->error_code < 0)
+    {
+        if(s_op->val.buffer)
+        {
+            free(s_op->val.buffer);
+        }
+        return 1;
     }
 
     gossip_debug(

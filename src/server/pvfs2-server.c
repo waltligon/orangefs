@@ -915,6 +915,7 @@ static int server_initialize_subsystems(
     PVFS_fs_id orig_fsid;
     PVFS_ds_flags init_flags = 0;
     int port_num = 0;
+    int bmi_flags = BMI_INIT_SERVER;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -938,8 +939,15 @@ static int server_initialize_subsystems(
                  "Passing %s as BMI listen address.\n",
                  server_config.host_id);
 
+    /* does the configuration dictate that we bind to a specific address? */
+    if(server_config.tcp_bind_specific)
+    {
+        bmi_flags |= BMI_TCP_BIND_SPECIFIC;
+    }
+
     ret = BMI_initialize(server_config.bmi_modules, 
-                         server_config.host_id, BMI_INIT_SERVER);
+                         server_config.host_id,
+                         bmi_flags);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: BMI_initialize", ret);

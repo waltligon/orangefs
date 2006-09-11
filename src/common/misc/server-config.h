@@ -133,6 +133,9 @@ typedef struct server_configuration_s
     int tcp_buffer_size_receive;    /* Size of TCP receive buffer, is set
                                        later with setsockopt */
     int tcp_buffer_size_send;       /* Size of TCP send buffer */
+    int tcp_bind_specific;          /* Flag indicates if we should bind to
+                                     * specific server address
+                                     */
 #ifdef USE_TRUSTED
     int           ports_enabled;    /* Should we enable trusted port connections at all? */
     unsigned long allowed_ports[2]; /* {Min, Max} value of ports from which connections will be allowed */
