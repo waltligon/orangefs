@@ -149,6 +149,12 @@
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
 
+/* Define to 1 if you have the <openssl/crypto.h> header file. */
+#undef HAVE_OPENSSL_CRYPTO_H
+
+/* Define to 1 if you have the <openssl/evp.h> header file. */
+#undef HAVE_OPENSSL_EVP_H
+
 /* Define if Pablo library is used */
 #undef HAVE_PABLO
 
@@ -280,6 +286,9 @@
 
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
+
+/* Define if openssl exists */
+#undef WITH_OPENSSL
 
 /* Define to 1 if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */

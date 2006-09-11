@@ -38,6 +38,13 @@ static int server_get_config_parse(
 static int server_get_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
+static int server_fetch_config_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int server_fetch_config_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int server_fetch_config_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
+
 %%
 
 nested machine pvfs2_server_get_config_nested_sm(
@@ -89,6 +96,32 @@ machine pvfs2_server_get_config_sm(
         default => terminate;
     }
 }
+
+machine pvfs2_server_fetch_config_sm(
+    fetch_setup_msgpair,
+    fetch_xfer_msgpair,
+    fetch_cleanup)
+{
+    state fetch_setup_msgpair
+    {
+        run server_fetch_config_setup_msgpair;
+        success => fetch_xfer_msgpair;
+        default => fetch_cleanup;
+    }
+
+    state fetch_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => fetch_cleanup;
+    }
+
+    state fetch_cleanup
+    {
+        run server_fetch_config_cleanup;
+        default => terminate;
+    }
+}
+
 
 %%
 
@@ -157,7 +190,7 @@ int PINT_server_get_config(
         ret = PVFS_sys_wait(op_id, "X-get_config", &error);
         if (ret)
         {
-            PVFS_perror_gossip("PINT_sys_wait call", ret);
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
     }
@@ -402,6 +435,162 @@ static int server_get_config_comp_fn(
     return 0;
 }
 
+/*
+ * Force a fetch the configuration file from a given set of servers
+ * This is different from get_config() in that we do not depend on the
+ * configuration server specified in the mnt tab file
+ * Assumes that servers specified in the array are unique!
+ */
+int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
+                char **fs_config_bufs, char **server_config_bufs,
+                int *fs_config_buf_size, int *server_config_buf_size)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
+    PVFS_error error = 0;
+    PVFS_credentials creds;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_fetch_config_list entered\n");
+    if (nservers < 0 || !servers || !fs_config_bufs || !server_config_bufs
+        || !fs_config_buf_size || !server_config_buf_size)
+    {
+        return ret;
+    }
+
+    PVFS_util_gen_credentials(&creds);
+
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    /* NOTE: we set these fields manually here rather than use
+     * PINT_init_msgarray_params(), because we don't yet have a server
+     * configuration file to override default parameters.
+     */
+    sm_p->msgarray_params.job_context = pint_client_sm_context;
+    sm_p->msgarray_params.job_timeout = 30;   /* 30 second job timeout */
+    sm_p->msgarray_params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_params.retry_limit = 5;    /* retry up to 5 times */
+    PINT_init_sysint_credentials(sm_p->cred_p, &creds);
+    sm_p->u.fetch_config.nservers = nservers;
+    sm_p->u.fetch_config.addr_array = servers;
+    sm_p->u.fetch_config.fs_config_bufs = fs_config_bufs;
+    sm_p->u.fetch_config.server_config_bufs = server_config_bufs;
+    sm_p->u.fetch_config.fs_config_buf_size = fs_config_buf_size;
+    sm_p->u.fetch_config.server_config_buf_size = server_config_buf_size;
+    sm_p->msgarray_count = nservers;
+    sm_p->msgarray = (PINT_sm_msgpair_state *) malloc(
+        nservers * sizeof(PINT_sm_msgpair_state));
+    if (!sm_p->msgarray)
+    {
+        free(sm_p);
+        return -PVFS_ENOMEM;
+    }
+
+
+    ret = PINT_client_state_machine_post(
+        sm_p, PVFS_SERVER_FETCH_CONFIG, &op_id, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PINT_client_state_machine_post call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_sys_wait(op_id, "X-fetch_config", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PVFS_sys_release(op_id);
+    return(error);
+}
+
+static int server_fetch_config_setup_msgpair(PINT_client_sm *sm_p,
+                                           job_status_s *js_p)
+{
+    int i;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"fetch_config state: server_fetch_config_setup_msgpair\n");
+
+    for (i = 0; i < sm_p->msgarray_count; i++)
+    {
+        msg_p = &sm_p->msgarray[i];
+        PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p);
+
+        msg_p->fs_id = PVFS_FS_ID_NULL;
+        msg_p->handle = PVFS_HANDLE_NULL;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = server_fetch_config_comp_fn;
+        msg_p->svr_addr = sm_p->u.fetch_config.addr_array[i];
+    }
+
+    js_p->error_code = 0;
+    return 1;
+}
+
+static int server_fetch_config_cleanup(PINT_client_sm *sm_p,
+                                    job_status_s *js_p)
+{
+    sm_p->error_code  = js_p->error_code;
+    sm_p->op_complete = 1;
+    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
+    {
+        free(sm_p->msgarray);
+    }
+
+    return 0;
+}
+
+static int server_fetch_config_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i)
+{
+    int j = 0;
+    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+
+    /* if this particular request was successful, then store the server
+     * response and let the caller sort it out */
+
+    if (sm_p->msgarray[i].op_status == 0)
+    {
+	sm_p->u.fetch_config.fs_config_bufs[i] = 
+		strdup(resp_p->u.getconfig.fs_config_buf);
+	sm_p->u.fetch_config.fs_config_buf_size[i] = 
+		resp_p->u.getconfig.fs_config_buf_size;
+	sm_p->u.fetch_config.server_config_bufs[i] = 
+		strdup(resp_p->u.getconfig.server_config_buf);
+	sm_p->u.fetch_config.server_config_buf_size[i] = 
+		resp_p->u.getconfig.server_config_buf_size;
+    }
+
+    /* if this is the last response, check all of the status values
+     * and return error code if any requests failed
+     */
+    if (i == (sm_p->msgarray_count -1))
+    {
+	for (j=0; j < sm_p->msgarray_count; j++)
+	{
+	    if (sm_p->msgarray[j].op_status != 0)
+	    {
+		return(sm_p->msgarray[j].op_status);
+	    }
+	}
+    }
+    return 0;
+}
+        
 /*
  * Local variables:
  *  mode: c

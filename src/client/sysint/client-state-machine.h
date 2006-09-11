@@ -348,6 +348,16 @@ struct PINT_server_get_config_sm
     int persist_config_buffers;
 };
 
+struct PINT_server_fetch_config_sm
+{
+    int nservers;
+    PVFS_BMI_addr_t *addr_array;
+    char **fs_config_bufs;
+    char **server_config_bufs;
+    int32_t *fs_config_buf_size;
+    int32_t *server_config_buf_size;
+};
+
 /* flag to disable cached lookup during getattr nested sm */
 #define PINT_SM_GETATTR_BYPASS_CACHE 1
 
@@ -516,6 +526,7 @@ typedef struct PINT_client_sm
         struct PINT_client_mgmt_create_dirent_sm mgmt_create_dirent;
         struct PINT_client_mgmt_get_dirdata_handle_sm mgmt_get_dirdata_handle;
 	struct PINT_server_get_config_sm get_config;
+	struct PINT_server_fetch_config_sm fetch_config;
 	struct PINT_client_geteattr_sm geteattr;
 	struct PINT_client_seteattr_sm seteattr;
 	struct PINT_client_deleattr_sm deleattr;
@@ -607,6 +618,7 @@ enum
     PVFS_MGMT_CREATE_DIRENT        = 79,
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
     PVFS_SERVER_GET_CONFIG         = 200,
+    PVFS_SERVER_FETCH_CONFIG         = 201,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
     PVFS_DEV_UNEXPECTED            = 400
@@ -692,6 +704,7 @@ do {                                                           \
      ((_op <= PVFS_OP_MGMT_MAXVAL) ?  \
       (PINT_client_sm_mgmt_table[_op - PVFS_OP_SYS_MAXVAL - 1].sm) : \
       ((_op == PVFS_SERVER_GET_CONFIG) ? (&pvfs2_server_get_config_sm) : \
+      (_op == PVFS_SERVER_FETCH_CONFIG) ? (&pvfs2_server_fetch_config_sm) : \
        ((_op == PVFS_CLIENT_JOB_TIMER) ? (&pvfs2_client_job_timer_sm) : \
         ((_op == PVFS_CLIENT_PERF_COUNT_TIMER) ? (&pvfs2_client_perf_count_timer_sm) : NULL)))))
 
@@ -722,6 +735,7 @@ extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
 extern struct PINT_state_machine_s pvfs2_client_perf_count_timer_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
+extern struct PINT_state_machine_s pvfs2_server_fetch_config_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;

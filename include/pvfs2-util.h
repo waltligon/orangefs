@@ -150,6 +150,16 @@ inline static PVFS_time PVFS_util_mkversion_time(PVFS_time version)
 {
     return (PVFS_time)(version >> 32);
 }
+
+void PINT_util_digest_init(void);
+void PINT_util_digest_finalize(void);
+
+int PINT_util_digest_sha1(const void *input_message, size_t input_length,
+		char **output, size_t *output_length);
+
+int PINT_util_digest_md5(const void *input_message, size_t input_length,
+		char **output, size_t *output_length);
+
 #endif /* __KERNEL__ */
 
 static inline char *get_object_type(int objtype)

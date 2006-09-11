@@ -31,6 +31,7 @@ struct options
     char* fs_path_hack;
     char* fs_path_real;
     char* mnt_point;
+    int do_config_checks;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -39,6 +40,7 @@ static void print_mntent(
     struct PVFS_sys_mntent *entries, int num_entries);
 static int print_config(PVFS_fs_id fsid);
 static int noop_all_servers(PVFS_fs_id fsid);
+static int check_config_all_servers(PVFS_fs_id fsid);
 static void print_error_details(PVFS_error_details * error_details);
 static void print_root_check_error_details(PVFS_error_details * error_details);
 
@@ -227,8 +229,21 @@ int main(int argc, char **argv)
     if (!err)
     {
         /* if we hit this point, then everything is ok */
-        printf("   Ok; root handle is owned by exactly one server.\n");
+        printf("     Ok; root handle is owned by exactly one server.\n");
         printf("\n");
+    }
+    if (user_opts->do_config_checks)
+    {
+        ret = check_config_all_servers(cur_fs);
+        if (ret == 0)
+        {
+            printf("\n   Ok; config files are all consistent!\n");
+        }
+        else 
+        {
+            printf("\n   Failure; config files have inconsistencies\n");
+            err = 1;
+        }
     }
 
     PVFS_sys_finalize();
@@ -352,6 +367,177 @@ static int noop_all_servers(PVFS_fs_id fsid)
     return(0);
 }
 
+static void hash2str(unsigned char *hash, int hash_length, unsigned char *str)
+{
+    int i, count = 0;
+
+    if (!str || !hash || hash_length < 0) 
+    {
+        return;
+    }
+    for (i = 0; i < hash_length; i++) 
+    {
+        int cnt;
+        cnt = sprintf((char *)str + count, "%02x", hash[i]);
+        count += cnt;
+    }
+    return;
+}
+
+/* check_config_all_servers()
+ *
+ * sends a getconfig to all servers listed in the config file 
+ *
+ * returns -PVFS_error on failure, 0 on success
+ */
+static int check_config_all_servers(PVFS_fs_id fsid)
+{
+    PVFS_credentials creds;
+    int ret = -1;
+    size_t digest_len;
+    int count;
+    PVFS_BMI_addr_t* addr_array;
+    int i;
+    int tmp;
+    char **fs_configs = NULL, **svc_configs = NULL;
+    int *fs_sizes = NULL, *svc_sizes = NULL;
+    char **sha1_fs_digests = NULL;
+    int fs_conf_failed = 0;
+ 
+    PVFS_util_gen_credentials(&creds);
+
+    printf("(8)  Config Files Integrity Checks\n");
+    ret = PVFS_mgmt_count_servers(
+        fsid, &creds, PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, &count);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_count_servers()", ret);
+	return ret;
+    }
+    if (count == 1)
+    {
+        printf("ok;\n");
+        return 0;
+    }
+    addr_array = (PVFS_BMI_addr_t *) malloc(
+        count * sizeof(PVFS_BMI_addr_t));
+    if (addr_array == NULL)
+    {
+	perror("malloc");
+	return -PVFS_ENOMEM;
+    }
+
+    ret = PVFS_mgmt_get_server_array(
+        fsid, &creds, PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, addr_array, &count);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
+        free(addr_array);
+	return ret;
+    }
+    fs_configs = (char **) calloc(count, sizeof(char *));
+    if (fs_configs == NULL)
+    {
+        fprintf(stderr, "Could not allocate fs_configs\n");
+        free(addr_array);
+        return -PVFS_ENOMEM;
+    }
+    svc_configs = (char **) calloc(count, sizeof(char *));
+    if (svc_configs == NULL)
+    {
+        fprintf(stderr, "Could not allocate svc_configs\n");
+        free(addr_array);
+        free(fs_configs);
+        return -PVFS_ENOMEM;
+    }
+    fs_sizes = (int *) calloc(count, sizeof(int));
+    if (fs_sizes == NULL)
+    {
+        fprintf(stderr, "Could not allocate fs_sizes\n");
+        free(addr_array);
+        free(fs_configs);
+        free(svc_configs);
+        return -PVFS_ENOMEM;
+    }
+    svc_sizes = (int *) calloc(count, sizeof(int));
+    if (svc_sizes == NULL)
+    {
+        fprintf(stderr, "Could not allocate svc_sizes\n");
+        free(addr_array);
+        free(fs_configs);
+        free(svc_configs);
+        free(fs_sizes);
+        return -PVFS_ENOMEM;
+    }
+    sha1_fs_digests = (char **) calloc(count, sizeof(char *));
+    if (sha1_fs_digests == NULL)
+    {
+        fprintf(stderr, "Could not allocate sha1digests\n");
+        free(addr_array);
+        free(fs_configs);
+        free(svc_configs);
+        free(fs_sizes);
+        free(svc_sizes);
+        return -PVFS_ENOMEM;
+    }
+    /* fetch the fs_config and server configuration files for all servers associated with this fsid */
+    ret = PINT_fetch_config_list(count, addr_array, fs_configs, svc_configs, fs_sizes, svc_sizes);
+    if (ret < 0)
+    {
+        PVFS_perror("PINT_fetch_config_list", ret);
+        free(addr_array);
+        free(fs_configs);
+        free(svc_configs);
+        free(fs_sizes);
+        free(svc_sizes);
+        free(sha1_fs_digests);
+        return ret;
+    }
+    for (i = 0; i < count; i++)
+    {
+        ret = PINT_util_digest_sha1(fs_configs[i], fs_sizes[i], &sha1_fs_digests[i], &digest_len);
+        if (ret < 0)
+            goto out;
+    }
+    ret = 0;
+    for (i = 1; i < count; i++) 
+    {
+        if (memcmp(sha1_fs_digests[0], sha1_fs_digests[i], digest_len))
+        {
+            fs_conf_failed = 1;
+        }
+    }
+    if (fs_conf_failed)
+    {
+        for (i = 0; i < count; i++)
+        {
+            unsigned char str[256];
+            hash2str((unsigned char *) sha1_fs_digests[i], digest_len, str);
+            printf("     FS config file on %s -> (SHA1) %s\n", 
+                   PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp), str);
+        }
+        ret = -PVFS_EINVAL;
+        goto out;
+    }
+out:
+    for (i = 0; i < count; i++)
+    {
+        if (fs_configs && fs_configs[i])
+            free(fs_configs[i]);
+        if (svc_configs && svc_configs[i])
+            free(svc_configs[i]);
+        if (sha1_fs_digests && sha1_fs_digests[i])
+            free(sha1_fs_digests[i]);
+    }
+    free(sha1_fs_digests);
+    free(addr_array);
+    free(fs_configs);
+    free(svc_configs);
+    free(fs_sizes);
+    free(svc_sizes);
+    return (ret == -PVFS_EOPNOTSUPP) ? 0 : ret;
+}
+
 
 /* print_config()
  *
@@ -473,7 +659,7 @@ static void print_mntent(struct PVFS_sys_mntent *entries, int num_entries)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    char flags[] = "vm:";
+    char flags[] = "vcm:";
     int one_opt = 0;
     int len;
 
@@ -502,6 +688,9 @@ static struct options* parse_args(int argc, char* argv[])
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
+            case 'c':
+                tmp_opts->do_config_checks = 1;
+                break;
 	    case('m'):
 		/* taken from pvfs2-statfs.c */
 		len = strlen(optarg)+1;
