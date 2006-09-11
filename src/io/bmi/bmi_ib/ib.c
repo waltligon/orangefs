@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.38 2006-08-28 17:33:11 pw Exp $
+ * $Id: ib.c,v 1.39 2006-09-11 20:22:03 vilayann Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -2018,5 +2018,6 @@ const struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_close_context = BMI_ib_close_context,
     .BMI_meth_cancel = BMI_ib_cancel,
     .BMI_meth_rev_lookup_unexpected = BMI_ib_rev_lookup,
+	 .BMI_meth_query_addr_range = NULL,
 };
 

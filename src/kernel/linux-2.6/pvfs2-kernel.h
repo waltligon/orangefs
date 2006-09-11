@@ -399,6 +399,11 @@ typedef struct
      * requires the file system to honor acl's 
      */
     int acl;
+    /** suid option (if set) is inspired by the nfs mount option
+    * that requires the file system to honor the setuid bit of a 
+    * file if set. NOTE: this is disabled by default.
+    */
+    int suid;
 } pvfs2_mount_options_t;
 
 /** per superblock private pvfs2 info */
@@ -851,6 +856,9 @@ do {                                                      \
 #define get_acl_flag(inode)                               \
 (PVFS2_SB(inode->i_sb)->mnt_options.acl)
 
+#define get_suid_flag(inode)                              \
+(PVFS2_SB(inode->i_sb)->mnt_options.suid)
+
 #ifdef USE_MMAP_RA_CACHE
 #define clear_inode_mmap_ra_cache(inode)                  \
 do {                                                      \
@@ -925,7 +933,7 @@ do                                                \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
     sys_attr.size = 0;                            \
-    sys_attr.perms = PVFS2_translate_mode(mode);  \
+    sys_attr.perms = PVFS2_translate_mode(mode,0);  \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
@@ -949,7 +957,7 @@ do                                                \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
     sys_attr.size = 0;                            \
-    sys_attr.perms = PVFS2_translate_mode(mode);  \
+    sys_attr.perms = PVFS2_translate_mode(mode,0);  \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)

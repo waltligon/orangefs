@@ -1034,7 +1034,7 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
     attr.owner = creds->uid;
     attr.owner = creds->uid;
     attr.group = creds->gid;
-    attr.perms = PVFS2_translate_mode(0755);
+    attr.perms = PVFS2_translate_mode(0755, 0);
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
     ret = PVFS_sys_lookup(cur_fs,

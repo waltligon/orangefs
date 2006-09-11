@@ -682,7 +682,7 @@ void make_attribs(PVFS_sys_attr *attr, PVFS_credentials *credentials,
 {
     attr->owner = credentials->uid; 
     attr->group = credentials->gid;
-    attr->perms = PVFS2_translate_mode(mode);
+    attr->perms = PVFS2_translate_mode(mode, 0);
     attr->mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     attr->dfile_count = nr_datafiles;
 

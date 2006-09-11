@@ -171,7 +171,8 @@ struct bmi_method_ops bmi_gm_ops = {
     .BMI_meth_open_context = BMI_gm_open_context,
     .BMI_meth_close_context = BMI_gm_close_context,
     .BMI_meth_cancel = BMI_gm_cancel,
-    .BMI_meth_rev_lookup_unexpected = NULL
+    .BMI_meth_rev_lookup_unexpected = NULL,
+    .BMI_meth_query_addr_range = NULL,
 };
 
 /* module parameters */

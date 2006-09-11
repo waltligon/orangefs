@@ -31,7 +31,6 @@ struct options
     char* fs_path_hack;
     char* fs_path_real;
     char* mnt_point;
-    int do_config_checks;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -232,18 +231,15 @@ int main(int argc, char **argv)
         printf("     Ok; root handle is owned by exactly one server.\n");
         printf("\n");
     }
-    if (user_opts->do_config_checks)
+    ret = check_config_all_servers(cur_fs);
+    if (ret == 0)
     {
-        ret = check_config_all_servers(cur_fs);
-        if (ret == 0)
-        {
-            printf("\n   Ok; config files are all consistent!\n");
-        }
-        else 
-        {
-            printf("\n   Failure; config files have inconsistencies\n");
-            err = 1;
-        }
+        printf("\n   Ok; config files are all consistent!\n");
+    }
+    else 
+    {
+        printf("\n   Failure; config files have inconsistencies\n");
+        err = 1;
     }
 
     PVFS_sys_finalize();
@@ -406,7 +402,7 @@ static int check_config_all_servers(PVFS_fs_id fsid)
  
     PVFS_util_gen_credentials(&creds);
 
-    printf("(8)  Config Files Integrity Checks\n");
+    printf("(8) Config Files Integrity Checks\n");
     ret = PVFS_mgmt_count_servers(
         fsid, &creds, PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, &count);
     if (ret < 0)
@@ -416,7 +412,6 @@ static int check_config_all_servers(PVFS_fs_id fsid)
     }
     if (count == 1)
     {
-        printf("ok;\n");
         return 0;
     }
     addr_array = (PVFS_BMI_addr_t *) malloc(
@@ -659,7 +654,7 @@ static void print_mntent(struct PVFS_sys_mntent *entries, int num_entries)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    char flags[] = "vcm:";
+    char flags[] = "vm:";
     int one_opt = 0;
     int len;
 
@@ -688,9 +683,6 @@ static struct options* parse_args(int argc, char* argv[])
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
-            case 'c':
-                tmp_opts->do_config_checks = 1;
-                break;
 	    case('m'):
 		/* taken from pvfs2-statfs.c */
 		len = strlen(optarg)+1;

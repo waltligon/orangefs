@@ -14,6 +14,7 @@
 #include <string.h>
 #include <assert.h>
 #include <sys/time.h>
+#include <stdio.h>
 
 #include "bmi.h"
 #include "bmi-method-support.h"
@@ -1320,6 +1321,83 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 	return (bmi_errno_to_pvfs(-ENOSYS));
     }
     return (0);
+}
+
+/** Given a string representation of a host/network address and a BMI
+ * address handle, return whether the BMI address handle is part of the wildcard
+ * address range specified by the string.
+ * \return 1 on success, -errno on failure and 0 if it is not part of
+ * the specified range
+ */
+int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netmask)
+{
+    int ret = -1;
+    int i = 0, failed = 1;
+    int provided_method_length = 0;
+    char *ptr, *provided_method_name = NULL;
+    ref_st_p tmp_ref = NULL;
+
+    if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
+    {
+	return(bmi_errno_to_pvfs(-ENAMETOOLONG));
+    }
+    /* lookup the provided address */
+    gen_mutex_lock(&ref_mutex);
+    tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+    if (!tmp_ref)
+    {
+	gen_mutex_unlock(&ref_mutex);
+	return (bmi_errno_to_pvfs(-EPROTO));
+    }
+    gen_mutex_unlock(&ref_mutex);
+
+    ptr = strchr(id_string, ':');
+    if (ptr == NULL)
+    {
+        return (bmi_errno_to_pvfs(-EINVAL));
+    }
+    ret = -EPROTO;
+    provided_method_length = (unsigned long) ptr - (unsigned long) id_string;
+    provided_method_name = (char *) calloc(provided_method_length + 1, sizeof(char));
+    if (provided_method_name == NULL)
+    {
+        return bmi_errno_to_pvfs(-ENOMEM);
+    }
+    strncpy(provided_method_name, id_string, provided_method_length);
+
+    /* Now we will run through each method looking for one that
+     * matches the specified wildcard address. 
+     */
+    i = 0;
+    gen_mutex_lock(&active_method_count_mutex);
+    while (i < active_method_count)
+    {
+        char *active_method_name = (char *) active_method_table[i]->method_name + 4;
+        /* provided name matches this interface */
+        if (!strncmp(active_method_name, provided_method_name, provided_method_length))
+        {
+            int (*meth_fnptr)(method_addr_p, const char *, int);
+            failed = 0;
+            if ((meth_fnptr = active_method_table[i]->BMI_meth_query_addr_range) == NULL)
+            {
+                ret = -ENOSYS;
+                gossip_lerr("Error: method doesn't implement querying address range/wildcards! Cannot implement FS export options!\n");
+                failed = 1;
+                break;
+            }
+            /* pass it into the specific bmi layer */
+            ret = meth_fnptr(tmp_ref->method_addr, id_string, netmask);
+            if (ret < 0)
+                failed = 1;
+            break;
+        }
+	i++;
+    }
+    gen_mutex_unlock(&active_method_count_mutex);
+    free(provided_method_name);
+    if (failed)
+        return bmi_errno_to_pvfs(ret);
+    return ret;
 }
 
 /** Resolves the string representation of a host address into a BMI
