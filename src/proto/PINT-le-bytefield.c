@@ -578,7 +578,7 @@ static int lebf_decode_req(
 
     if (ptr != (char *) input_buffer + input_size)
     {
-	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
+	gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
                     __func__, req->op, ptr - (char *) input_buffer, input_size);
 	ret = -PVFS_EPROTO;
     }
@@ -666,7 +666,7 @@ static int lebf_decode_resp(
 #undef CASE
 
     if (ptr != (char *) input_buffer + input_size) {
-	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
+	gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
                     __func__, resp->op, ptr - (char *) input_buffer,
                     input_size);
 	ret = -PVFS_EPROTO;
