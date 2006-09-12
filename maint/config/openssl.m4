@@ -15,7 +15,7 @@ AC_DEFUN([AX_OPENSSL],
     AC_COMPILE_IFELSE(
 	[#include "openssl/bio.h"],
 	[],
-	[AC_MSG_ERROR(Invalid openssl path specified.  No openssl/evp.h found.)])
+	[AC_MSG_ERROR(Invalid openssl path specified.  No openssl/bio.h found.)])
 
     AC_TRY_LINK(
 	[#include "openssl/bio.h"],
