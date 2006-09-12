@@ -12,7 +12,9 @@ LIST_HEAD(pvfs2_superblocks);
 /* used to protect the above superblock list */
 spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
 
+#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
 static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keylen);
+#endif
 static atomic_t pvfs2_inode_alloc_count, pvfs2_inode_dealloc_count;
 
 static int parse_mount_options(
@@ -550,6 +552,8 @@ int pvfs2_remount(
     return ret;
 }
 
+#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
+
 static int fskey_table_size = 11;
 /* hash table for mapping fsids to keys */
 struct qhash_table *fskey_table;
@@ -645,7 +649,6 @@ void fsid_key_table_finalize(void)
     return;
 }
 
-#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
 
 /* Issue an upcall in case we dont have the fsid<->key mappings */
 static int pvfs2_get_fs_key(PVFS_fs_id fsid, char *fs_key, int *fs_keylen)
@@ -758,6 +761,18 @@ static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keyle
         *keylen = entry->fs_keylen;
     }
     gossip_debug(GOSSIP_SUPER_DEBUG, "Uncached key for FSID %d - %d\n", entry->fsid, entry->fs_keylen);
+    return;
+}
+
+#else
+
+int fsid_key_table_initialize(void)
+{
+    return 0;
+}
+
+void fsid_key_table_finalize(void)
+{
     return;
 }
 
@@ -1122,8 +1137,10 @@ struct super_block *pvfs2_get_sb(
                 strncpy(PVFS2_SB(sb)->data, data,
                         PVFS2_MAX_MOUNT_OPT_LEN);
             }
+#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
             /* Issue an upcall to pre-fetch the fs key so that subsequent calls would be hits */
             pvfs2_sb_get_fs_key(sb, NULL, NULL);
+#endif
 
             /* mount_pending must be cleared */
             PVFS2_SB(sb)->mount_pending = 0;
