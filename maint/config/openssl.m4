@@ -26,3 +26,23 @@ AC_DEFUN([AX_OPENSSL],
     AC_DEFINE(WITH_OPENSSL, 1, [Define if openssl exists])
 ])
 
+AC_DEFUN([AX_OPENSSL_OPTIONAL],
+[
+    AC_MSG_CHECKING([for openssl library])
+    LIBS="$LIBS -lcrypt -lssl"
+
+    AC_COMPILE_IFELSE(
+      [#include "openssl/bio.h"],
+      [],
+      [AC_MSG_WARN(No openssl headers found.)])
+
+    AC_TRY_LINK(
+      [#include "openssl/bio.h"],
+      [BIO * b;],
+      [AC_MSG_RESULT(yes)
+       AC_DEFINE(WITH_OPENSSL, 1, [Define if openssl exists])
+      ],
+      [AC_MSG_WARN(No openssl headers found.)])
+
+])
+

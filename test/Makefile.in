@@ -146,6 +146,8 @@ TESTSRC :=
 # MISCSRC is a grab bag of other sources that must be built into
 #    object form (for example, shared test components)
 MISCSRC := 
+# SHAREDSRC is a hack to get things to build when mpi is not passed to configure.
+SHAREDSRC :=
 # MPIIOTESTSRC is the source for test programs that must be compiled 
 #    with MPI-IO
 MPIIOTESTSRC :=
@@ -193,6 +195,11 @@ TESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(TESTSRC)))
 MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
 # MISCDEPENDS is a list of dependency files for misc. objects
 MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
+
+# SHAREDOBJS is a list of shared. objects not in the above categories
+SHAREDOBJS := $(patsubst %.c,%.o, $(filter %.c,$(SHAREDSRC)))
+# SHAREDDEPENDS is a list of dependency files for shared. objects
+SHAREDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SHAREDSRC)))
 
 # MPIMISCOBJS is a list of misc. MPI objects not in the above categories
 MPIMISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPIMISCSRC)))
@@ -297,7 +304,7 @@ else
 endif
 
 # rule for building MPI executables from object files
-$(MPITESTS): %: %.o $(MPIMISCOBJS) $(LIBRARIES)
+$(MPITESTS): %: %.o $(MPIMISCOBJS) $(SHAREDOBJS) $(LIBRARIES)
 	$(Q) "  MPILD		$@"
 	$(E)$(MPICC) $^ $(LDFLAGS) $(call modldflags,$<) $(LIBS) -lm -o $@
 
@@ -308,9 +315,9 @@ $(MPIIOTESTS): %: %.o $(LIBRARIES)
 	$(E)$(MPICC) $^ $(LDFLAGS) $(call modldflags,$<) $(LIBS) -lm -o $@
 
 # default rule for building executables from object files
-%: %.o $(LIBRARIES) $(MISCOBJS)
+%: %.o $(LIBRARIES) $(MISCOBJS) $(SHAREDOBJS)
 	$(Q) "  LD		$@"
-	$(E)$(LD) $(LDFLAGS) $(call modldflags,$<) $< $(MISCOBJS) $(LIBS) -o $@
+	$(E)$(LD) $(LDFLAGS) $(call modldflags,$<) $< $(MISCOBJS) $(SHAREDOBJS) $(LIBS) -o $@
 
 # default rule for building objects 
 %.o: %.c
@@ -344,10 +351,10 @@ tags:
 	) | ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
 
 # top rule for cleaning up tree
-clean:: 
+clean: 
 	$(Q) "  CLEAN"
-	$(E)rm -f $(TESTOBJS) $(MISCOBJS) $(TESTS)\
-		$(DEPENDS) $(CLEANFILES) $(MPIMISCOBJS)\
+	$(E)rm -f $(TESTOBJS) $(MISCOBJS) $(TESTS) $(MISCDEPENDS)\
+		$(DEPENDS) $(CLEANFILES) $(MPIMISCOBJS) $(SHAREDOBJS) $(SHAREDDEPENDS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS)\
 		$(MPIIOTESTOBJS) $(MPIIOTESTS) $(DLLDEPENDS) $(DLLS) $(DLLOBJS)
 
@@ -380,9 +387,11 @@ nodep:; @:
 #
 # note: mpi-depend.sh is automatically generated, so it is in
 #       the build directory already.
+ifdef BUILD_MPI
 $(MPITESTDEPENDS) $(MPIMISCDEPENDS): %.d: %.c
 	$(Q) "  DEP		$@"
 	$(E)sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $(call modcflags,$<) $< > $@
+endif
 
 # default rule for generating dependency files
 %.d: %.c

@@ -1,6 +1,6 @@
 DIR := posix
 
-MISCSRC += \
+SHAREDSRC += \
 	$(DIR)/crc32c.c \
 	$(DIR)/libcrc32c.c \
 	$(DIR)/sha1.c \
@@ -14,12 +14,6 @@ TESTSRC += \
 	$(DIR)/vecio_test.c \
 	$(DIR)/stat.c \
 	$(DIR)/xio_test.c
-
-MPIMISCSRC += \
-	$(DIR)/crc32c.c \
-	$(DIR)/libcrc32c.c \
-	$(DIR)/sha1.c \
-	$(DIR)/sockio.c
 
 DLLSRC += \
 	$(DIR)/libstat.c
