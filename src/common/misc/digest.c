@@ -71,6 +71,7 @@ static void callback_finalize(void)
 {
 	free(mutex);
 	mutex = NULL;
+	EVP_cleanup();
 }
 
 void PINT_util_digest_finalize(void)
@@ -89,6 +90,7 @@ void PINT_util_digest_init(void)
 
 void PINT_util_digest_finalize(void)
 {
+	EVP_cleanup();
 	return;
 }
 

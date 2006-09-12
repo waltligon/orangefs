@@ -482,7 +482,7 @@ int client_handle_next(struct svr_xfer_state* state, bmi_context_id context)
 
             for(i=0; i<state->list_factor; i++)
             {
-                state->buffer_list[i] = state->buffer_array[state->step-3] +
+                state->buffer_list[i] = (char *) state->buffer_array[state->step-3] +
                     ((MSG_SIZE/state->list_factor)*i);
             }
             ret = BMI_post_recv_list(&tmp_id, state->addr,

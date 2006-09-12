@@ -348,7 +348,7 @@ struct PINT_server_get_config_sm
     int persist_config_buffers;
 };
 
-struct PINT_server_fetch_config_sm
+struct PINT_server_fetch_config_sm_state
 {
     int nservers;
     PVFS_BMI_addr_t *addr_array;
@@ -481,6 +481,9 @@ typedef struct PINT_client_sm
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
 
+    /* fetch_config state used by the nested fetch config state machines */
+    struct PINT_server_fetch_config_sm_state fetch_config;
+
     /* msgpair scratch space used within msgpairarray substatemachine */
     /* if you have only a single msg pair you may point sm_p->msgarray */
     /* at this.  Otherwise leave it alone */
@@ -526,7 +529,6 @@ typedef struct PINT_client_sm
         struct PINT_client_mgmt_create_dirent_sm mgmt_create_dirent;
         struct PINT_client_mgmt_get_dirdata_handle_sm mgmt_get_dirdata_handle;
 	struct PINT_server_get_config_sm get_config;
-	struct PINT_server_fetch_config_sm fetch_config;
 	struct PINT_client_geteattr_sm geteattr;
 	struct PINT_client_seteattr_sm seteattr;
 	struct PINT_client_deleattr_sm deleattr;
@@ -759,6 +761,7 @@ extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_nested_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_nested_sm;
+extern struct PINT_state_machine_s pvfs2_server_fetch_config_nested_sm;
 
 #include "state-machine.h"
 

@@ -657,6 +657,11 @@ struct super_block* pvfs2_get_sb(
 
   error_exit:
     gossip_err("pvfs2_get_sb: mount request failed with %d\n", ret);
+    if (ret == -EINVAL)
+    {
+        gossip_err("Ensure that all pvfs2-servers have the same FS configuration files\n");
+        gossip_err("Look at pvfs2-client-core log file (typically /tmp/pvfs2-client.log) for more details\n");
+    }
 
     if (sb)
     {
@@ -884,6 +889,11 @@ error_exit:
 free_op:
 #endif
     gossip_err("pvfs2_get_sb: mount request failed with %d\n", ret);
+    if (ret == -EINVAL)
+    {
+        gossip_err("Ensure that all pvfs2-servers have the same FS configuration files\n");
+        gossip_err("Look at pvfs2-client-core log file (typically /tmp/pvfs2-client.log) for more details\n");
+    }
 
     if (new_op)
     {

@@ -42,6 +42,8 @@ static int server_fetch_config_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int server_fetch_config_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
+static int server_fetch_config_parent_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 static int server_fetch_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
@@ -97,7 +99,7 @@ machine pvfs2_server_get_config_sm(
     }
 }
 
-machine pvfs2_server_fetch_config_sm(
+nested machine pvfs2_server_fetch_config_nested_sm(
     fetch_setup_msgpair,
     fetch_xfer_msgpair,
     fetch_cleanup)
@@ -118,10 +120,26 @@ machine pvfs2_server_fetch_config_sm(
     state fetch_cleanup
     {
         run server_fetch_config_cleanup;
-        default => terminate;
+        default => return;
     }
 }
 
+machine pvfs2_server_fetch_config_sm(
+    run_fetch_nested,
+    parent_fetch_cleanup)
+{
+    state run_fetch_nested 
+    {
+        jump pvfs2_server_fetch_config_nested_sm;
+        default => parent_fetch_cleanup;
+    }
+
+    state parent_fetch_cleanup
+    {
+        run server_fetch_config_parent_cleanup;
+        default => terminate;
+    }
+}
 
 %%
 
@@ -440,8 +458,15 @@ static int server_get_config_comp_fn(
  * This is different from get_config() in that we do not depend on the
  * configuration server specified in the mnt tab file
  * Assumes that servers specified in the array are unique!
+ * CURRENTLY UNUSED
  */
-int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
+#ifdef __GNUC__
+static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
+                char **fs_config_bufs, char **server_config_bufs,
+                int *fs_config_buf_size, int *server_config_buf_size) __attribute__((unused));
+#endif
+
+static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
                 char **fs_config_bufs, char **server_config_bufs,
                 int *fs_config_buf_size, int *server_config_buf_size)
 {
@@ -477,12 +502,12 @@ int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
     sm_p->msgarray_params.retry_delay = 2000; /* 2 second retry delay */
     sm_p->msgarray_params.retry_limit = 5;    /* retry up to 5 times */
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
-    sm_p->u.fetch_config.nservers = nservers;
-    sm_p->u.fetch_config.addr_array = servers;
-    sm_p->u.fetch_config.fs_config_bufs = fs_config_bufs;
-    sm_p->u.fetch_config.server_config_bufs = server_config_bufs;
-    sm_p->u.fetch_config.fs_config_buf_size = fs_config_buf_size;
-    sm_p->u.fetch_config.server_config_buf_size = server_config_buf_size;
+    sm_p->fetch_config.nservers = nservers;
+    sm_p->fetch_config.addr_array = servers;
+    sm_p->fetch_config.fs_config_bufs = fs_config_bufs;
+    sm_p->fetch_config.server_config_bufs = server_config_bufs;
+    sm_p->fetch_config.fs_config_buf_size = fs_config_buf_size;
+    sm_p->fetch_config.server_config_buf_size = server_config_buf_size;
     sm_p->msgarray_count = nservers;
     sm_p->msgarray = (PINT_sm_msgpair_state *) malloc(
         nservers * sizeof(PINT_sm_msgpair_state));
@@ -526,13 +551,14 @@ static int server_fetch_config_setup_msgpair(PINT_client_sm *sm_p,
     for (i = 0; i < sm_p->msgarray_count; i++)
     {
         msg_p = &sm_p->msgarray[i];
+        sm_p->msgarray[i].enc_type = sm_p->msgpair.enc_type;
         PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p);
 
         msg_p->fs_id = PVFS_FS_ID_NULL;
         msg_p->handle = PVFS_HANDLE_NULL;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = server_fetch_config_comp_fn;
-        msg_p->svr_addr = sm_p->u.fetch_config.addr_array[i];
+        msg_p->svr_addr = sm_p->fetch_config.addr_array[i];
     }
 
     js_p->error_code = 0;
@@ -542,14 +568,13 @@ static int server_fetch_config_setup_msgpair(PINT_client_sm *sm_p,
 static int server_fetch_config_cleanup(PINT_client_sm *sm_p,
                                     job_status_s *js_p)
 {
-    sm_p->error_code  = js_p->error_code;
-    sm_p->op_complete = 1;
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
     }
+    /* preserve js_p->error_code */
 
-    return 0;
+    return 1;
 }
 
 static int server_fetch_config_comp_fn(
@@ -565,13 +590,13 @@ static int server_fetch_config_comp_fn(
 
     if (sm_p->msgarray[i].op_status == 0)
     {
-	sm_p->u.fetch_config.fs_config_bufs[i] = 
+	sm_p->fetch_config.fs_config_bufs[i] = 
 		strdup(resp_p->u.getconfig.fs_config_buf);
-	sm_p->u.fetch_config.fs_config_buf_size[i] = 
+	sm_p->fetch_config.fs_config_buf_size[i] = 
 		resp_p->u.getconfig.fs_config_buf_size;
-	sm_p->u.fetch_config.server_config_bufs[i] = 
+	sm_p->fetch_config.server_config_bufs[i] = 
 		strdup(resp_p->u.getconfig.server_config_buf);
-	sm_p->u.fetch_config.server_config_buf_size[i] = 
+	sm_p->fetch_config.server_config_buf_size[i] = 
 		resp_p->u.getconfig.server_config_buf_size;
     }
 
@@ -588,6 +613,15 @@ static int server_fetch_config_comp_fn(
 	    }
 	}
     }
+    return 0;
+}
+
+static int server_fetch_config_parent_cleanup(PINT_client_sm *sm_p,
+                                    job_status_s *js_p)
+{
+    sm_p->error_code  = js_p->error_code;
+    sm_p->op_complete = 1;
+
     return 0;
 }
         
