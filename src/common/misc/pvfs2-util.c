@@ -370,6 +370,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             char *cp;
             int cur_server;
 
+            /* Enable integrity checks by default */
+            me->integrity_check = 1;
             /* comma-separated list of ways to contact a config server */
             me->num_pvfs_config_servers = 1;
             for (cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++)

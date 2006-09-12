@@ -68,6 +68,7 @@ machine pvfs2_fs_add_sm(
     state parent_cleanup
     {
         run fs_add_parent_cleanup;
+        SKIP_INTEGRITY_CHECK => final_cleanup;
         success => config_integrity_checks;
         default => final_cleanup;
     }
@@ -558,7 +559,8 @@ static int fs_add_parent_cleanup(
 
     gen_mutex_unlock(&mt_config);
 
-    js_p->error_code = 0;
+    /* If fs_add indicates a need for checking integrity of conf files do so, else skip */
+    js_p->error_code = (sm_p->u.get_config.mntent->integrity_check == 0) ? SKIP_INTEGRITY_CHECK : 0;
     return 1;
 }
 

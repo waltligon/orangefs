@@ -993,6 +993,8 @@ static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
     if (!mount)                                           
         mntent->fs_id = in_upcall->req.fs_umount.fs_id;     
     
+    /* By default, the VFS does not wish to perform integrity checks */
+    mntent->integrity_check = 0;
     return 0;
 }
 

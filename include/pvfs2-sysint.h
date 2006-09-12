@@ -60,7 +60,8 @@ struct PVFS_sys_mntent
 
     /* Default number of dfiles mount option value */
     int32_t default_num_dfiles; /* int32_t for portable, fixed size structure */
-
+    /* Check to determine whether the mount process must perform the integrity checks on the config files */
+    int32_t integrity_check;
     /* the following fields are included for convenience;
      * useful if the file system is "mounted" */
     char *mnt_dir;		/* local mount path */
