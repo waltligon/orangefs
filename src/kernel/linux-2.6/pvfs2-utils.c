@@ -223,6 +223,9 @@ int copy_attributes_to_inode(
 
         if (attrs->perms & PVFS_G_SGID)
             perm_mode |= S_ISGID;
+        /* Should we honor the suid bit of the file? */
+        if (get_suid_flag(inode) == 1 && (attrs->perms & PVFS_U_SUID))
+            perm_mode |= S_ISUID;
 
         inode->i_mode |= perm_mode;
 
@@ -294,9 +297,10 @@ int copy_attributes_to_inode(
 
 static inline void convert_attribute_mode_to_pvfs_sys_attr(
     int mode,
-    PVFS_sys_attr *attrs)
+    PVFS_sys_attr *attrs,
+    int suid)
 {
-    attrs->perms = PVFS2_translate_mode(mode);
+    attrs->perms = PVFS2_translate_mode(mode, suid);
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
     gossip_debug(GOSSIP_UTILS_DEBUG, "mode is %d | translated perms is %d\n", mode,
@@ -397,7 +401,7 @@ static inline int copy_attributes_from_inode(
         }
 
         convert_attribute_mode_to_pvfs_sys_attr(
-            tmp_mode, attrs);
+            tmp_mode, attrs, get_suid_flag(inode));
     }
 
     return 0;
@@ -1684,7 +1688,7 @@ static int do_encode_opaque_handle(char *dst, struct inode *inode)
     h.fsid   = pvfs2_inode->refn.fs_id;
     h.owner  = inode->i_uid;
     h.group  = inode->i_gid;
-    h.perms  = PVFS2_translate_mode(inode->i_mode);
+    h.perms  = PVFS2_translate_mode(inode->i_mode, 0);
     h.mask   |= PVFS_ATTR_SYS_PERM;
     h.atime  = pvfs2_convert_time_field(&inode->i_atime);
     h.mtime  = pvfs2_convert_time_field(&inode->i_mtime);

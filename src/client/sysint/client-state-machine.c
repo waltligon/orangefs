@@ -144,7 +144,7 @@ static PVFS_error completion_list_retrieve_completed(
             tmp_completion_list[new_list_index++] = sm_p;
         }
     }
-    *out_count = i;
+    *out_count = PVFS_util_min(i, limit);
 
     /* clean up and adjust the list and it's book keeping */
     s_completion_list_index = new_list_index;

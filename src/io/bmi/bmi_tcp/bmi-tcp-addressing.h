@@ -34,8 +34,9 @@ struct tcp_allowed_connection_s {
     int                 port_enforce;
     unsigned long       ports[2];
     int                 network_enforce;
-    struct in_addr      network;
-    struct in_addr      netmask;
+    int                 network_count;
+    struct in_addr      *network;
+    struct in_addr      *netmask;
 };
 
 #endif

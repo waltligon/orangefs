@@ -34,6 +34,7 @@ extern PINT_client_sm *g_sm_p;
  */
 int PVFS_sys_finalize()
 {
+    PINT_util_digest_finalize();
     PINT_ncache_finalize();
     PINT_acache_finalize();
     PINT_cached_config_finalize();

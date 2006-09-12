@@ -111,6 +111,15 @@ AC_ARG_WITH(openssl,
 	    [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)],
 	    [AX_OPENSSL(${withval})])
 
+dnl a mechanism to turn off memory usage statistics in karma (may be
+dnl confusing for some classes of users)
+AC_ARG_ENABLE(karma-mem-usage-stats,
+[  --disable-karma-mem-usage-stats Disables memory usage stats in karma],
+[if test "x$enableval" = "xno" ; then
+    CFLAGS="$CFLAGS -D__KARMA_DISABLE_MEM_USAGE__"
+fi]
+,)
+
 dnl a mechanism to turn off perf counters
 AC_ARG_ENABLE(perf-counters,
 [  --disable-perf-counters Disables pvfs2-server performance counters],
@@ -645,6 +654,8 @@ esac
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(arpa/inet.h)
 AC_CHECK_HEADERS(sys/socket.h)
+AC_CHECK_HEADERS(openssl/evp.h)
+AC_CHECK_HEADERS(openssl/crypto.h)
 dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)
 oldcflags="$CFLAGS"

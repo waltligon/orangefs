@@ -60,6 +60,27 @@ int BMI_sockio_bind_sock(int sockd,
     return (sockd);
 }
 
+int BMI_sockio_bind_sock_specific(int sockd,
+              const char *name,
+	      int service)
+{
+    struct sockaddr saddr;
+    int ret;
+
+    if ((ret = BMI_sockio_init_sock(&saddr, name, service)) != 0)
+	return (ret); /* converted to PVFS error code below */
+
+  bind_sock_restart:
+    if (bind(sockd, &saddr, sizeof(saddr)) < 0)
+    {
+	if (errno == EINTR)
+	    goto bind_sock_restart;
+	return (-1);
+    }
+    return (sockd);
+}
+
+
 int BMI_sockio_connect_sock(int sockd,
 		 const char *name,
 		 int service)

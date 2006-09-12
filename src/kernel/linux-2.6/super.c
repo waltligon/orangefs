@@ -22,8 +22,8 @@ static int parse_mount_options(
     pvfs2_sb_info_t *pvfs2_sb = NULL;
     int i = 0, j = 0, num_keywords = 0, got_device = 0;
 
-    static char *keywords[] = {"intr", "acl"};
-    static int num_possible_keywords = 2;
+    static char *keywords[] = {"intr", "acl", "suid"};
+    static int num_possible_keywords = 3;
     static char options[PVFS2_MAX_NUM_OPTIONS][PVFS2_MAX_MOUNT_OPT_LEN];
 
     if (!silent)
@@ -108,6 +108,16 @@ static int parse_mount_options(
                                         "acl specified\n");
                         }
                         pvfs2_sb->mnt_options.acl = 1;
+                        break;
+                    }
+                    else if (strncmp(options[i], "suid", 4) == 0)
+                    {
+                        if (!silent)
+                        {
+                            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: mount option "
+                                        "suid specified\n");
+                        }
+                        pvfs2_sb->mnt_options.suid = 1;
                         break;
                     }
                 }
@@ -912,6 +922,11 @@ struct super_block* pvfs2_get_sb(
 
   error_exit:
     gossip_err("pvfs2_get_sb: mount request failed with %d\n", ret);
+    if (ret == -EINVAL)
+    {
+        gossip_err("Ensure that all pvfs2-servers have the same FS configuration files\n");
+        gossip_err("Look at pvfs2-client-core log file (typically /tmp/pvfs2-client.log) for more details\n");
+    }
 
     if (sb)
     {
@@ -1141,6 +1156,11 @@ error_exit:
 free_op:
 #endif
     gossip_err("pvfs2_get_sb: mount request failed with %d\n", ret);
+    if (ret == -EINVAL)
+    {
+        gossip_err("Ensure that all pvfs2-servers have the same FS configuration files\n");
+        gossip_err("Look at pvfs2-client-core log file (typically /tmp/pvfs2-client.log) for more details\n");
+    }
 
     if (new_op)
     {

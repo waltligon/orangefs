@@ -415,6 +415,11 @@ struct PINT_server_req_params PINT_server_req_table[] =
         &pvfs2_list_attr_sm},
 };
 
+struct server_configuration_s *PINT_get_server_config(void)
+{
+    return &server_config;
+}
+
 int main(int argc, char **argv)
 {
     int ret = -1, siglevel = 0;
@@ -922,6 +927,7 @@ static int server_initialize_subsystems(
     PVFS_fs_id orig_fsid;
     PVFS_ds_flags init_flags = 0;
     int port_num = 0;
+    int bmi_flags = BMI_INIT_SERVER;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -945,8 +951,15 @@ static int server_initialize_subsystems(
                  "Passing %s as BMI listen address.\n",
                  server_config.host_id);
 
+    /* does the configuration dictate that we bind to a specific address? */
+    if(server_config.tcp_bind_specific)
+    {
+        bmi_flags |= BMI_TCP_BIND_SPECIFIC;
+    }
+
     ret = BMI_initialize(server_config.bmi_modules, 
-                         server_config.host_id, BMI_INIT_SERVER);
+                         server_config.host_id,
+                         bmi_flags);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: BMI_initialize", ret);
@@ -1234,6 +1247,14 @@ static int server_initialize_subsystems(
                          "for %s: %s\n", cur_fs->file_system_name,
                          ((cur_fs->trove_sync_data == TROVE_SYNC) ?
                           "yes" : "no"));
+
+            gossip_debug(GOSSIP_SERVER_DEBUG, "Export options for "
+                         "%s:\n RootSquash %s\n AllSquash %s\n ReadOnly %s\n"
+                         " AnonUID %u\n AnonGID %u\n", cur_fs->file_system_name,
+                         (cur_fs->exp_flags & TROVE_EXP_ROOT_SQUASH) ? "yes" : "no",
+                         (cur_fs->exp_flags & TROVE_EXP_ALL_SQUASH)  ? "yes" : "no",
+                         (cur_fs->exp_flags & TROVE_EXP_READ_ONLY)   ? "yes" : "no",
+                         cur_fs->exp_anon_uid, cur_fs->exp_anon_gid);
 
             /* format and pass sync mode to the flow implementation */
             snprintf(buf, 16, "%d,%d", cur_fs->coll_id,

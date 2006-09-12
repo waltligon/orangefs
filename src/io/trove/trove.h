@@ -62,6 +62,13 @@ enum
     TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7
 };
 
+enum
+{
+    TROVE_EXP_ROOT_SQUASH = 1,
+    TROVE_EXP_READ_ONLY   = 2,
+    TROVE_EXP_ALL_SQUASH  = 4,
+};
+
 /* get/setinfo option flags */
 enum
 {
