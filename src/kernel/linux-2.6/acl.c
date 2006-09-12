@@ -75,7 +75,7 @@ pvfs2_acl_decode(const void *value, size_t size)
         gossip_err("pvfs2_acl_decode: Could not allocate acl!\n");
         return ERR_PTR(-ENOMEM);
     }
-    gossip_debug(GOSSIP_ACL_DEBUG, "acl decoded %d bytes (%d acl entries)\n",
+    gossip_debug(GOSSIP_ACL_DEBUG, "acl decoded %zd bytes (%d acl entries)\n",
             size, count);
     for (n = 0; n < count; n++) 
     {
@@ -172,7 +172,7 @@ pvfs2_acl_encode(const struct posix_acl *acl, size_t *size)
                         acl->a_entries[n].e_tag);
                 goto fail;
         }
-        gossip_debug(GOSSIP_ACL_DEBUG, "Encoded acl entry %d "
+        gossip_debug(GOSSIP_ACL_DEBUG, "Encoded acl entry %zd "
                 "(p_tag %d, p_perm %d, p_id %d)\n",
                 n, acl->a_entries[n].e_tag, acl->a_entries[n].e_perm, 
                 acl->a_entries[n].e_id);
@@ -328,7 +328,7 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
             return (int) PTR_ERR(value);
         }
     }
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: name %s, value %p, size %d, "
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: name %s, value %p, size %zd, "
             " acl %p\n", name, value, size, acl);
     /* Go ahead and set the extended attribute now 
      * NOTE: Suppose acl was NULL, then value will be NULL and 
