@@ -22,7 +22,8 @@ fi
 if [ -f $PAV_CONFIG ] ; then 
 	# write out a pbs script
 	pbs_script=${CLUSTER_DIR}/ior2.sh
-	make_pbs_script ${IOR} -a MPIIO -C -e -i 3 -o pvfs2:\${MOUNTPOINT}/iortest > $pbs_script
+	# the '-e' (fsync after write) option is not avaliable to MPIIO
+	make_pbs_script ${IOR} -a MPIIO -C -i 3 -o pvfs2:\${MOUNTPOINT}/iortest > $pbs_script
 
 	# submit it
 	job_id=$(qsub -N ior2 $pbs_script | cut -d . -f1)
