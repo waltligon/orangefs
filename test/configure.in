@@ -203,6 +203,12 @@ AC_ARG_WITH(db,
 	[AX_BERKELEY_DB(${withval})],
 	[AX_BERKELEY_DB("")])
 
+AC_ARG_WITH(openssl,
+	    [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)],
+	    [AX_OPENSSL(${withval})],
+		 [AX_OPENSSL_OPTIONAL])
+AC_SUBST(OPENSSL)
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in common io client correctness/pts kernel ; do

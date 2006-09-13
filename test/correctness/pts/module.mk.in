@@ -49,4 +49,3 @@ MODCFLAGS_$(DIR) = -I$(srcdir)/client/sysint
 #	$(Q) "  MPILD		$@"
 #	$(E)$(MPICC) $^ $(LDFLAGS) $(LIBS) -o $@
 
-MODLDFLAGS_$(DIR) = -lssl -lcrypto

@@ -8,4 +8,3 @@ MPITESTSRC += \
 	$(DIR)/create-subdir-test.c \
 	$(DIR)/create-test.c \
 	$(DIR)/readdir-end-test.c
-MODLDFLAGS_$(DIR) = -lssl -lcrypto

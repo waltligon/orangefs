@@ -1,3 +1,2 @@
 DIR := common/quicklist
 TESTSRC += $(DIR)/example.c
-MODLDFLAGS_$(DIR) = -lssl -lcrypto

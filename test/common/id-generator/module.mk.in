@@ -1,3 +1,2 @@
 DIR := common/id-generator
 TESTSRC += $(DIR)/test.c
-MODLDFLAGS_$(DIR) = -lssl -lcrypto

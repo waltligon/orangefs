@@ -5,4 +5,3 @@ TESTSRC += \
 	$(DIR)/test-event-summary.c \
         $(DIR)/test-tcache.c \
  	$(DIR)/test-perf-counter.c
-MODLDFLAGS_$(DIR) = -lssl -lcrypto

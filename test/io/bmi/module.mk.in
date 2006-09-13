@@ -34,4 +34,3 @@ MPITESTSRC += $(LOCAL_MPITESTSRC)
 #$(LOCALMPITESTS): %: %.o $(LOCALMPIOBJS) lib/libpvfs2.a
 #	$(Q) "  MPILD		$@"
 #	$(E)$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
-MODLDFLAGS_$(DIR) = -lssl -lcrypto
