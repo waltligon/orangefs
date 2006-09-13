@@ -933,7 +933,7 @@ do                                                \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
     sys_attr.size = 0;                            \
-    sys_attr.perms = PVFS2_translate_mode(mode,0);  \
+    sys_attr.perms = PVFS_translate_mode(mode,0);  \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
@@ -957,7 +957,7 @@ do                                                \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
     sys_attr.size = 0;                            \
-    sys_attr.perms = PVFS2_translate_mode(mode,0);  \
+    sys_attr.perms = PVFS_translate_mode(mode,0);  \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)

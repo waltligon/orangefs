@@ -300,7 +300,7 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
     PVFS_sys_attr *attrs,
     int suid)
 {
-    attrs->perms = PVFS2_translate_mode(mode, suid);
+    attrs->perms = PVFS_translate_mode(mode, suid);
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
     gossip_debug(GOSSIP_UTILS_DEBUG, "mode is %d | translated perms is %d\n", mode,

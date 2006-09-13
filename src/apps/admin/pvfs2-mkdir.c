@@ -456,7 +456,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
     if(!mode_requested)
     {
         mode_t mode = S_IRWXO | S_IRWXG | S_IRWXU; /* 0777 */
-        opts->mode = PVFS2_translate_mode(mode & ~PVFS_util_get_umask(), 0);
+        opts->mode = PVFS_translate_mode(mode & ~PVFS_util_get_umask(), 0);
     }
     
     /* Allocate memory to hold the filenames */
