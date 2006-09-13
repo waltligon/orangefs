@@ -23,6 +23,7 @@
 #include "extent-utils.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 
 static char *dir_ent_string = DIRECTORY_ENTRY_KEYSTR;
 static char *root_handle_string = ROOT_HANDLE_KEYSTR;
@@ -328,8 +329,8 @@ int pvfs2_mkspace(
         attr.gid = getgid();
         attr.mode = 0777;
         attr.type = PVFS_TYPE_DIRECTORY;
-	attr.atime = attr.ctime = PVFS_util_get_current_time();
-        attr.mtime = PVFS_util_mktime_version(attr.ctime);
+	attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ctime);
 
         ret = trove_dspace_setattr(
             coll_id, new_root_handle, &attr, TROVE_SYNC, NULL,
@@ -487,8 +488,8 @@ int pvfs2_mkspace(
         attr.gid = getgid();
         attr.mode = 0777;
         attr.type = PVFS_TYPE_DIRECTORY;
-	attr.atime = attr.ctime = PVFS_util_get_current_time();
-        attr.mtime = PVFS_util_mktime_version(attr.ctime);
+	attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ctime);
 
         ret = trove_dspace_setattr(
             coll_id, lost_and_found_handle, &attr, TROVE_SYNC, NULL,

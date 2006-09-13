@@ -300,7 +300,7 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
     PVFS_sys_attr *attrs,
     int suid)
 {
-    attrs->perms = PVFS_translate_mode(mode, suid);
+    attrs->perms = PVFS_util_translate_mode(mode, suid);
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
     gossip_debug(GOSSIP_UTILS_DEBUG, "mode is %d | translated perms is %d\n", mode,
@@ -1670,6 +1670,40 @@ int pvfs2_normalize_to_errno(PVFS_error error_code)
         error_code = -PVFS_ERROR_TO_ERRNO(-error_code);
     }
     return(error_code);
+}
+
+int32_t PVFS_util_translate_mode(int mode, int suid)
+{
+    int ret = 0, i = 0;
+#define NUM_MODES 11
+    static int modes[NUM_MODES] =
+    {
+        S_IXOTH, S_IWOTH, S_IROTH,
+        S_IXGRP, S_IWGRP, S_IRGRP,
+        S_IXUSR, S_IWUSR, S_IRUSR,
+        S_ISGID, S_ISUID
+    };
+    static int pvfs2_modes[NUM_MODES] =
+    {
+        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
+        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
+        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+        PVFS_G_SGID,    PVFS_U_SUID
+    };
+
+    for(i = 0; i < NUM_MODES; i++)
+    {
+        if (mode & modes[i])
+        {
+            ret |= pvfs2_modes[i];
+        }
+    }
+    if (suid == 0 && (ret & PVFS_U_SUID))
+    {
+         ret &= ~PVFS_U_SUID;
+    }
+    return ret;
+#undef NUM_MODES
 }
 
 /*

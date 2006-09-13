@@ -49,7 +49,6 @@ csrc = \
     xattr-trusted.c \
     xattr-default.c \
     waitqueue.c \
-	 ../../common/misc/pvfs2-shared.c \
     pvfs2-proc.c
 hsrc = \
     pvfs2-kernel.h \

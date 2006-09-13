@@ -4,6 +4,7 @@
 #include <string.h>
 #include "pvfs2-types.h"
 #include "pvfs2-util.h"
+#include "pint-util.h"
 
 #ifdef WITH_OPENSSL
 

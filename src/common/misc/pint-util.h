@@ -132,6 +132,21 @@ int PINT_check_mode(
 
 #endif
 
+char *PINT_util_get_object_type(int objtype);
+PVFS_time PINT_util_get_current_time(void);
+
+PVFS_time PINT_util_mktime_version(PVFS_time time);
+PVFS_time PINT_util_mkversion_time(PVFS_time version);
+
+void PINT_util_digest_init(void);
+void PINT_util_digest_finalize(void);
+
+int PINT_util_digest_sha1(const void *input_message, size_t input_length,
+		char **output, size_t *output_length);
+
+int PINT_util_digest_md5(const void *input_message, size_t input_length,
+		char **output, size_t *output_length);
+
 #endif /* __PINT_UTIL_H */
 
 /*

@@ -27,6 +27,7 @@
 #include "client-state-machine.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 

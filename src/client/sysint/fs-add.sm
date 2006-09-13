@@ -35,6 +35,7 @@
 #include "trove.h"
 #include "server-config-mgr.h"
 #include "client-state-machine.h"
+#include "pint-util.h"
 
 enum {
     SKIP_INTEGRITY_CHECK = 1

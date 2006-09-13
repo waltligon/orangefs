@@ -230,7 +230,7 @@ static int getattr_verify_attribs(
     resp_attr->perms = s_op->attr.perms;
     resp_attr->atime = s_op->attr.atime;
 
-    resp_attr->mtime = PVFS_util_mkversion_time(s_op->attr.mtime);
+    resp_attr->mtime = PINT_util_mkversion_time(s_op->attr.mtime);
     if (resp_attr->mtime == 0)
     {
         /*
@@ -732,7 +732,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,"@ End %s attributes: sending "
                  "status %d (error = %d)\n",
-                 get_object_type(resp_attr->objtype),
+                 PINT_util_get_object_type(resp_attr->objtype),
 		 s_op->resp.status, js_p->error_code);
 
 #if 0

@@ -11,6 +11,8 @@
 #ifndef __PVFS2_UTIL_H
 #define __PVFS2_UTIL_H
 
+#define _GNU_SOURCE
+
 #include "pvfs2.h"
 #include "pvfs2-types.h"
 
@@ -95,22 +97,7 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
 uint32_t PVFS_util_object_to_sys_attr_mask( 
     uint32_t obj_mask);
 
-int32_t PVFS_translate_mode(int mode, int suid);
-
-#ifndef __KERNEL__
-
-PVFS_time PVFS_util_get_current_time(void);
-PVFS_time PVFS_util_mktime_version(PVFS_time time);
-PVFS_time PVFS_util_mkversion_time(PVFS_time version);
-void PINT_util_digest_init(void);
-void PINT_util_digest_finalize(void);
-int PINT_util_digest_sha1(const void *input_message, size_t input_length,
-		char **output, size_t *output_length);
-int PINT_util_digest_md5(const void *input_message, size_t input_length,
-		char **output, size_t *output_length);
-#endif /* __KERNEL__ */
-
-char *get_object_type(int objtype);
+int32_t PVFS_util_translate_mode(int mode, int suid);
 
 #endif /* __PVFS2_UTIL_H */
 

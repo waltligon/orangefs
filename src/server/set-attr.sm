@@ -12,6 +12,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 
 enum
 {
@@ -282,7 +283,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
      if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
      {
          PVFS_time orig_mtime = a_p->mtime;
-         a_p->mtime = PVFS_util_mktime_version(orig_mtime);
+         a_p->mtime = PINT_util_mktime_version(orig_mtime);
          gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
                  "to %llu\n\tmtime is %llu\n",
                  llu(a_p->mtime), llu(orig_mtime));
@@ -316,7 +317,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
         "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
         dspace_a_p->objtype, llu(dspace_a_p->atime),
-        llu(PVFS_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
+        llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
         (int)dspace_a_p->u.meta.dfile_count,
         (int)dspace_a_p->u.meta.dist_size);
 
