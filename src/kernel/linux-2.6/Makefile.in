@@ -71,8 +71,6 @@ EXTRA_CFLAGS = \
     -I$(absolute_src_dir)/include \
     -I$(absolute_src_dir)/src/io/dev \
     -I$(absolute_src_dir)/src/io/bmi \
-    -I$(absolute_src_dir)/src/kernel/linux-2.6 \
-    -I$(absolute_src_dir)/src/kernel/linux-2.4 \
     -I$(absolute_src_dir)/src/common/quickhash \
     -I$(absolute_src_dir)/src/common/gossip \
     -I$(absolute_src_dir)/src/common/misc
