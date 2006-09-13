@@ -106,7 +106,7 @@ static PVFS_error completion_list_retrieve_completed(
     void **user_ptr_array,
     int *error_code_array,
     int limit,
-    int *out_count)
+    int *out_count)  /* what exactly is this supposed to return */
 {
     int i = 0, new_list_index = 0;
     PINT_smcb *smcb = NULL;
@@ -130,10 +130,10 @@ static PVFS_error completion_list_retrieve_completed(
 
         smcb = s_completion_list[i];
         assert(smcb);
-        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
         if (i < limit)
         {
+            sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
             op_id_array[i] = sm_p->sys_op_id;
             error_code_array[i] = sm_p->error_code;
 
@@ -299,7 +299,7 @@ int client_state_machine_terminate(
             (cancelled_io_jobs_are_pending(smcb))))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
-                "client_state_machine_terminate smcb %p\n", smcb);
+                "add smcb %p to completion list\n", smcb);
         ret = add_sm_to_completion_list(smcb);
         assert(ret == 0);
     }
@@ -384,11 +384,14 @@ PVFS_error PINT_client_state_machine_post(
     if (PINT_smcb_complete(smcb))
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) (immediate completion)\n",
+            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) (ran to termination)\n",
             PINT_client_get_name_str(pvfs_sys_op), (op_id ? *op_id : -1));
 
+        /* this is done in client_state_machine_terminate now */
+        /*
         ret = add_sm_to_completion_list(smcb);
         assert(ret == 0);
+        */
     }
     else
     {
@@ -590,7 +593,7 @@ PVFS_error PINT_client_state_machine_test(
     PINT_client_sm *sm_p = NULL;
     job_id_t job_id_array[MAX_RETURNED_JOBS];
     job_status_s job_status_array[MAX_RETURNED_JOBS];
-    void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
+    void *smcb_p_array[MAX_RETURNED_JOBS] = {NULL};
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_client_state_machine_test id %lld\n",op_id);
@@ -620,7 +623,7 @@ PVFS_error PINT_client_state_machine_test(
 
     ret = job_testcontext(job_id_array,
 			  &job_count, /* in/out parameter */
-			  client_sm_p_array,
+			  smcb_p_array,
 			  job_status_array,
 			  10,
 			  pint_client_sm_context);
@@ -629,12 +632,14 @@ PVFS_error PINT_client_state_machine_test(
     /* do as much as we can on every job that has completed */
     for(i = 0; i < job_count; i++)
     {
-	tmp_smcb = (PINT_smcb *)client_sm_p_array[i];
+	tmp_smcb = (PINT_smcb *)smcb_p_array[i];
         assert(tmp_smcb);
 
         /* why is this here - why doesn't an unexpected just terminate? */
         if (PINT_smcb_op(tmp_smcb) == PVFS_DEV_UNEXPECTED)
         {
+            /* this is bad - we are using this to skip over some logic */
+            /* below - needs to be reworked - WBL */
             PINT_smcb_set_complete(tmp_smcb);
         }
         if (PINT_smcb_invalid_op(tmp_smcb))
@@ -666,12 +671,15 @@ PVFS_error PINT_client_state_machine_test(
         */
 
         /*
-          if we've found a completed operation and it's NOT the op
-          being tested here, we add it to our local completion list so
-          that later calls to the sysint test/testsome can find it
-        */
-        /* add_sm_to_completion_list() does the right thing in determining whether
-         * smcb has already been added to completion Q or not 
+         * If we've found a completed operation and it's NOT the op
+         * being tested here, we add it to our local completion list so
+         * that later calls to the sysint test/testsome can find it.
+         * Unexpected messages need to go on the list but are not
+         * automatically put there, thus we need this code until
+         * we rework the unexpected stuff - WBL
+         * add_sm_to_completion_list() does the right thing in
+         * determining whether smcb has already been added to
+         * completion Q or not 
          */
         if ((tmp_smcb != smcb) && (PINT_smcb_complete(tmp_smcb)))
         {
@@ -706,7 +714,7 @@ PVFS_error PINT_client_state_machine_testsome(
     PINT_smcb *smcb = NULL;
     job_id_t job_id_array[MAX_RETURNED_JOBS];
     job_status_s job_status_array[MAX_RETURNED_JOBS];
-    void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
+    void *smcb_p_array[MAX_RETURNED_JOBS] = {NULL};
 
     CLIENT_SM_ASSERT_INITIALIZED();
 
@@ -726,17 +734,20 @@ PVFS_error PINT_client_state_machine_testsome(
     limit = *op_count;
     *op_count = 0;
 
+    /* check for requests completed previously */
     ret = completion_list_retrieve_completed(
         op_id_array, user_ptr_array, error_code_array, limit, op_count);
 
+    /* return them if found */
     if ((ret == 0) && (*op_count > 0))
     {
         return ret;
     }
 
+    /* see if there are requests ready to make progress */
     ret = job_testcontext(job_id_array,
 			  &job_count, /* in/out parameter */
-			  client_sm_p_array,
+			  smcb_p_array,
 			  job_status_array,
 			  timeout_ms,
 			  pint_client_sm_context);
@@ -745,7 +756,7 @@ PVFS_error PINT_client_state_machine_testsome(
     /* do as much as we can on every job that has completed */
     for(i = 0; i < job_count; i++)
     {
-	smcb = (PINT_smcb *)client_sm_p_array[i];
+	smcb = (PINT_smcb *)smcb_p_array[i];
         assert(smcb);
 
         /*
@@ -788,6 +799,9 @@ PVFS_error PINT_client_state_machine_testsome(
           keep progressing on operations in progress here and just
           grab all completed operations when we're finished
           (i.e. outside of this loop).
+
+          Again, this is here to get the unexpected stuff added to
+          the list - we really should not do it this way
         */
 
         /* add_sm_to_completion_list(smcb) does the right thing if an smcb
@@ -800,6 +814,7 @@ PVFS_error PINT_client_state_machine_testsome(
         }
     }
 
+    /* terminated SMs have added themselves to the completion list */
     return completion_list_retrieve_completed(
         op_id_array, user_ptr_array, error_code_array, limit, op_count);
 }

@@ -62,19 +62,10 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
     if (smcb->parent_smcb)
     {
         job_id_t id;
-#if 0
-        /* acquire lock here */
-        if (--smcb->parent_smcb->children_running == 0)
-        {
-#endif
-            /* wake up parent, through job interface */
-            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                "SM job_null called smcb %p\n", smcb->parent_smcb);
-            job_null(0, smcb->parent_smcb, 0, r, &id, smcb->context);
-#if 0
-        }
-        /* release lock here */
-#endif
+        /* wake up parent, through job interface */
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "SM job_null called smcb %p\n", smcb->parent_smcb);
+        job_null(0, smcb->parent_smcb, 0, r, &id, smcb->context);
     }
     /* call state machine completion function */
     if (smcb->terminate_fn)
@@ -243,7 +234,7 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
             }
 	    /* we expect the last state action function to return
             * SM_ACTION_TERMINATE which sets the smcb->op_terminate
-            * flag.  ALSO the state machine mush direct the next state
+            * flag.  ALSO the state machine must direct the next state
             * to be terminate, which sets loc->flag to SM_TERMINATE.
 	    * We'll terminate for EITHER, but print an error if not
             * both.
@@ -259,6 +250,7 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
                 {
 	            gossip_lerr("Error: state machine reached terminate"
                             " without returning SM_ACTION_TERMINATE\n");
+                    smcb->op_terminate = 1;
                 }
                 /* process terminating SM */
                 PINT_state_machine_terminate(smcb, r);

@@ -2635,7 +2635,7 @@ int main(int argc, char **argv)
     PINT_smcb_alloc(&smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
             sizeof(struct PINT_client_sm),
             client_op_state_get_machine,
-            NULL,
+            client_state_machine_terminate,
             s_client_dev_context);
     if (!smcb)
     {
