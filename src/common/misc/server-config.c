@@ -3799,6 +3799,13 @@ int PINT_config_get_fs_key(
         gossip_err("Could not locate fs_conf for fs_id %d\n", fs_id);
         return -PVFS_EINVAL;
     }
+    /* This is actually ok since an FS may not have secret key */
+    if (!fs_conf->secret_key)
+    {
+        *length = 0;
+        *key = NULL;
+        return 0;
+    }
     
     b64len = strlen(fs_conf->secret_key);
     b64buf = malloc(b64len+1);

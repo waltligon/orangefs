@@ -1387,7 +1387,11 @@ static PVFS_error service_fs_key_request(vfs_request_t *vfs_request)
             &key, &key_len);
     /* drop reference to the server configuration */
     PINT_put_server_config_struct(sconfig);
-
+    if (key_len == 0)
+    {
+        ret = 0;
+        goto out;
+    }
     if (key_len < 0 || key == NULL)
     {
         gossip_err("PINT_config_get_fs_key failed:\n");

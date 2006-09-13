@@ -757,6 +757,7 @@ static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keyle
     if (ppkey) {
         *ppkey  = entry->fs_key;
     }
+    /* NOTE: fs_keylen can be 0 in case the FS does not have a secret key */
     if (keylen) {
         *keylen = entry->fs_keylen;
     }
