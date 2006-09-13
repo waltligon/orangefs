@@ -7,8 +7,8 @@ AC_DEFUN([AX_OPENSSL],
 
     if test "x${opensslpath}" != "x"; then
     	CFLAGS="${CFLAGS} -I${opensslpath}/include"
-      LDFLAGS="$LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
-		SERVER_LDFLAGS="$SERVER_LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
+        LDFLAGS="$LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
+	SERVER_LDFLAGS="$SERVER_LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
    fi
    LIBS="$LIBS -lcrypt -lssl"
 
@@ -24,5 +24,25 @@ AC_DEFUN([AX_OPENSSL],
 	[AC_MSG_ERROR(could not find openssl libs)])
 
     AC_DEFINE(WITH_OPENSSL, 1, [Define if openssl exists])
+])
+
+AC_DEFUN([AX_OPENSSL_OPTIONAL],
+[
+    AC_MSG_CHECKING([for openssl library])
+    LIBS="$LIBS -lcrypt -lssl"
+
+    AC_COMPILE_IFELSE(
+      [#include "openssl/bio.h"],
+      [],
+      [AC_MSG_WARN(No openssl headers found.)])
+
+    AC_TRY_LINK(
+      [#include "openssl/bio.h"],
+      [BIO * b;],
+      [AC_MSG_RESULT(yes)
+       AC_DEFINE(WITH_OPENSSL, 1, [Define if openssl exists])
+      ],
+      [AC_MSG_WARN(No openssl headers found.)])
+
 ])
 

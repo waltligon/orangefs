@@ -26,6 +26,10 @@
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
 
+#ifdef WITH_OPENSSL
+#include "openssl/evp.h"
+#endif
+
 static const char * replace_old_keystring(const char * oldkey);
 
 static DOTCONF_CB(get_pvfs_server_id);
@@ -98,6 +102,7 @@ static DOTCONF_CB(get_client_job_bmi_timeout);
 static DOTCONF_CB(get_client_job_flow_timeout);
 static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
+static DOTCONF_CB(get_secret_key);
 static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
 
@@ -796,6 +801,11 @@ static const configoption_t options[] =
 
     {"CoalescingLowWatermark", ARG_INT, get_coalescing_low_watermark, NULL,
         CTX_STORAGEHINTS, "1"},
+
+    /* Specifies the file system's key for use in HMAC-based digests of
+     * client operations.
+     */
+    {"SecretKey",ARG_STR, get_secret_key,NULL,CTX_FILESYSTEM,NULL},
 
     LAST_OPTION
 };
@@ -2310,6 +2320,19 @@ DOTCONF_CB(get_default_num_dfiles)
     return NULL;
 }
 
+DOTCONF_CB(get_secret_key)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->secret_key = strdup(cmd->data.str);
+    return NULL;
+}
+
 DOTCONF_CB(get_immediate_completion)
 {
     struct server_configuration_s *config_s =
@@ -2683,6 +2706,10 @@ static void free_filesystem(void *ptr)
             free(fs->attr_cache_keywords);
             fs->attr_cache_keywords = NULL;
         }
+        if(fs->secret_key)
+        {
+            free(fs->secret_key);
+        }
         /* free all ro_hosts specifications */
         if (fs->ro_hosts)
         {
@@ -2743,6 +2770,11 @@ static void copy_filesystem(
 
         dest_fs->meta_handle_ranges = PINT_llist_new();
         dest_fs->data_handle_ranges = PINT_llist_new();
+
+        if(src_fs->secret_key)
+        {
+            dest_fs->secret_key = strdup(src_fs->secret_key);
+        }
 
         assert(dest_fs->meta_handle_ranges);
         assert(dest_fs->data_handle_ranges);
@@ -3737,6 +3769,67 @@ int PINT_config_trim_filesystems_except(
         }
     }
     return ret;
+}
+
+int PINT_config_get_fs_key(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id,
+    char ** key,
+    int * length)
+{
+#ifndef WITH_OPENSSL
+    *key = NULL;
+    *length = 0;
+    return -PVFS_ENOSYS;
+#else
+    int len, b64len;
+    char *b64buf;
+    struct filesystem_configuration_s *fs_conf = NULL;
+    BIO *b64 = NULL;
+    BIO *mem = NULL;
+    BIO *bio = NULL;
+
+    if (config)
+    {
+        fs_conf = PINT_config_find_fs_id(config, fs_id);
+    }
+    
+    if(!fs_conf)
+    {
+        gossip_err("Could not locate fs_conf for fs_id %d\n", fs_id);
+        return -PVFS_EINVAL;
+    }
+    
+    b64len = strlen(fs_conf->secret_key);
+    b64buf = malloc(b64len+1);
+    if(!b64buf)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memcpy(b64buf, fs_conf->secret_key, b64len);
+
+    /* for some reason openssl's base64 decoding needs a newline at the end */
+    b64buf[b64len] = '\n';
+
+    b64 = BIO_new(BIO_f_base64());
+    mem = BIO_new_mem_buf(b64buf, b64len+1);
+    bio = BIO_push(b64, mem);
+
+    len = BIO_pending(bio);
+    *key = malloc(len);
+    if(!*key)
+    {
+        BIO_free_all(bio);
+        return -PVFS_ENOMEM;
+   }
+    
+    *length = BIO_read(bio, *key, len);
+
+    free(b64buf);
+    
+    BIO_free_all(bio);
+    return 0;
+#endif /* WITH_OPENSSL */
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__

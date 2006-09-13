@@ -263,6 +263,17 @@ struct TROVE_dspace_ops
 			  void *user_ptr,
 			  TROVE_context_id context_id,
 			  TROVE_op_id *out_op_id_p);
+
+    int (*dspace_getattr_list)(
+			  TROVE_coll_id coll_id,
+                          int nhandles,
+			  TROVE_handle *handle_array,
+			  TROVE_ds_attributes_s *ds_attr_p,
+                          TROVE_ds_state *error_array,
+			  TROVE_ds_flags flags,
+			  void *user_ptr,
+			  TROVE_context_id context_id,
+			  TROVE_op_id *out_op_id_p);
     
     int (*dspace_setattr)(
 			  TROVE_coll_id coll_id,

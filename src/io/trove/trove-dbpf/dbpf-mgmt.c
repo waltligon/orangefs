@@ -204,7 +204,6 @@ retry:
             return NULL;
         }
     }
-        
     return dbenv;
 }
 
@@ -1059,7 +1058,6 @@ static int dbpf_collection_remove(char *collname,
     {
         gossip_err("failure removing bstream directory %s\n", path_name);
         ret = -trove_errno_to_trove_error(errno);
-        goto collection_remove_failure;
     }
 
     DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX,

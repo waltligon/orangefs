@@ -82,7 +82,8 @@ static ssize_t pvfs2_devreq_read(
     size_t count,
     loff_t *offset)
 {
-    int ret = 0, len = 0;
+    int ret = 0;
+    ssize_t len = 0;
     pvfs2_kernel_op_t *cur_op = NULL;
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
@@ -107,10 +108,24 @@ static ssize_t pvfs2_devreq_read(
                 gossip_debug(GOSSIP_DEV_DEBUG, "Skipping op tag %lld %s\n", lld(op->tag), get_opname_string(op));
                 continue;
             }
-            /* op does not belong to any particular fsid or already mounted.. let it through */
+            /* op does not belong to any particular fsid or already 
+             * mounted.. let it through
+             */
             else {
                 cur_op = op;
                 list_del(&cur_op->list);
+                cur_op->op_linger_tmp--;
+                /* if there is a trailer, re-add it to the request list */
+                if (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 1)
+                {
+                    if (cur_op->upcall.trailer_size <= 0 || cur_op->upcall.trailer_buf == NULL) 
+                    {
+                        gossip_err("BUG:trailer_size is %ld and trailer buf is %p\n",
+                                (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
+                    }
+                    /* readd it to the head of the list */
+                    list_add(&cur_op->list, &pvfs2_request_list);
+                }
                 break;
             }
         }
@@ -124,46 +139,85 @@ static ssize_t pvfs2_devreq_read(
         gossip_debug(GOSSIP_DEV_DEBUG, "client-core: reading op tag %lld %s\n", lld(cur_op->tag), get_opname_string(cur_op));
         if (op_state_in_progress(cur_op) || op_state_serviced(cur_op))
         {
-            gossip_err("WARNING: Current op already queued...skipping\n");
+            if (cur_op->op_linger == 1)
+                gossip_err("WARNING: Current op already queued...skipping\n");
         }
-        set_op_state_inprogress(cur_op);
+        else if (cur_op->op_linger == 1 
+                || (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0)) 
+        {
+            set_op_state_inprogress(cur_op);
 
-        /* atomically move the operation to the htable_ops_in_progress */
-        qhash_add(htable_ops_in_progress,
-                  (void *) &(cur_op->tag), &cur_op->list);
+            /* atomically move the operation to the htable_ops_in_progress */
+            qhash_add(htable_ops_in_progress,
+                      (void *) &(cur_op->tag), &cur_op->list);
+        }
 
         spin_unlock(&cur_op->lock);
 
-        len = MAX_ALIGNED_DEV_REQ_UPSIZE;
-        if ((size_t) len <= count)
+        /* 2 cases
+         * a) OPs with no trailers
+         * b) OPs with trailers, Stage 1
+         * Either way push the upcall out
+         */
+        if (cur_op->op_linger == 1 
+                || (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 1))
         {
-            ret = copy_to_user(buf, &proto_ver, sizeof(int32_t));
-            if(ret == 0)
+            len = MAX_ALIGNED_DEV_REQ_UPSIZE;
+            if ((size_t) len <= count)
             {
-                ret = copy_to_user(buf + sizeof(int32_t), &magic, sizeof(int32_t));
-                if (ret == 0)
+                ret = copy_to_user(buf, &proto_ver, sizeof(int32_t));
+                if(ret == 0)
                 {
-                    ret = copy_to_user(buf + 2*sizeof(int32_t),
-                                       &cur_op->tag, sizeof(uint64_t));
+                    ret = copy_to_user(buf + sizeof(int32_t), &magic, sizeof(int32_t));
                     if (ret == 0)
                     {
-                        ret = copy_to_user(
-                            buf + 2*sizeof(int32_t) + sizeof(uint64_t),
-                            &cur_op->upcall, sizeof(pvfs2_upcall_t));
+                        ret = copy_to_user(buf + 2*sizeof(int32_t),
+                                           &cur_op->tag, sizeof(uint64_t));
+                        if (ret == 0)
+                        {
+                            ret = copy_to_user(
+                                buf + 2*sizeof(int32_t) + sizeof(uint64_t),
+                                &cur_op->upcall, sizeof(pvfs2_upcall_t));
+                        }
                     }
                 }
-            }
 
-            if (ret)
+                if (ret)
+                {
+                    gossip_err("Failed to copy data to user space\n");
+                    len = -EFAULT;
+                }
+            }
+            else
             {
                 gossip_err("Failed to copy data to user space\n");
                 len = -EIO;
             }
         }
-        else
+        /* Stage 2: Push the trailer out */
+        else if (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0)
         {
-            gossip_err("Read buffer is too small to copy pvfs2 op\n");
-            len = -EIO;
+            len = cur_op->upcall.trailer_size;
+            if ((size_t) len <= count)
+            {
+                ret = copy_to_user(buf, cur_op->upcall.trailer_buf, len);
+                if (ret)
+                {
+                    gossip_err("Failed to copy trailer to user space\n");
+                    len = -EFAULT;
+                }
+            }
+            else {
+                gossip_err("Read buffer for trailer is too small (%ld as opposed to %ld)\n",
+                        (long) count, (long) len);
+                len = -EIO;
+            }
+        }
+        else {
+            gossip_err("cur_op: %p (op_linger %d), (op_linger_tmp %d),"
+                    "erroneous request list?\n", cur_op, 
+                    cur_op->op_linger, cur_op->op_linger_tmp);
+            len = 0;
         }
     }
     else if (file->f_flags & O_NONBLOCK)
@@ -191,11 +245,19 @@ static ssize_t pvfs2_devreq_writev(
     unsigned long i = 0;
     static int max_downsize = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
     int ret = 0, num_remaining = max_downsize;
+    int notrailer_count = 4; /* number of elements in the iovec without the trailer */
     int payload_size = 0;
     int32_t magic = 0;
     int32_t proto_ver = 0;
     uint64_t tag = 0;
 
+    /* Either there is a trailer or there isn't */
+    if (count != notrailer_count && count != (notrailer_count + 1))
+    {
+        gossip_err("Error: Number of iov vectors is (%ld) and notrailer count is %d\n",
+                count, notrailer_count);
+        return -EPROTO;
+    }
     buffer = dev_req_alloc();
     if (!buffer)
     {
@@ -203,7 +265,7 @@ static ssize_t pvfs2_devreq_writev(
     }
     ptr = buffer;
 
-    for (i = 0; i < count; i++)
+    for (i = 0; i < notrailer_count; i++)
     {
 	if (iov[i].iov_len > num_remaining)
 	{
@@ -272,6 +334,51 @@ static ssize_t pvfs2_devreq_writev(
 		gossip_debug(GOSSIP_DEV_DEBUG, "writev: Ignoring %d bytes\n", payload_size);
 	    }
 
+            /* Do not allocate needlessly if client-core forgets to reset trailer size on op errors */
+            if (op->downcall.status == 0 && op->downcall.trailer_size > 0)
+            {
+                gossip_debug(GOSSIP_DEV_DEBUG, "writev: trailer size %ld\n", (unsigned long) op->downcall.trailer_size);
+                if (count != (notrailer_count + 1))
+                {
+                    gossip_err("Error: trailer size (%ld) is non-zero, no trailer elements though? (%ld)\n",
+                            (unsigned long) op->downcall.trailer_size, count);
+                    dev_req_release(buffer);
+                    put_op(op);
+                    return -EPROTO;
+                }
+                if (iov[notrailer_count].iov_len > op->downcall.trailer_size)
+                {
+                    gossip_err("writev error: trailer size (%ld) != iov_len (%ld)\n",
+                            (unsigned long) op->downcall.trailer_size, 
+                            (unsigned long) iov[notrailer_count].iov_len);
+                    dev_req_release(buffer);
+                    put_op(op);
+                    return -EMSGSIZE;
+                }
+                /* Allocate a buffer large enough to hold the trailer bytes */
+                op->downcall.trailer_buf = (void *) vmalloc(op->downcall.trailer_size);
+                if (op->downcall.trailer_buf != NULL) 
+                {
+                    gossip_debug(GOSSIP_DEV_DEBUG, "vmalloc: %p\n", op->downcall.trailer_buf);
+                    ret = copy_from_user(op->downcall.trailer_buf, iov[notrailer_count].iov_base,
+                            iov[notrailer_count].iov_len);
+                    if (ret)
+                    {
+                        gossip_err("Failed to copy trailer data from user space\n");
+                        dev_req_release(buffer);
+                        gossip_debug(GOSSIP_DEV_DEBUG, "vfree: %p\n", op->downcall.trailer_buf);
+                        vfree(op->downcall.trailer_buf);
+                        op->downcall.trailer_buf = NULL;
+                        put_op(op);
+                        return -EIO;
+                    }
+                }
+                else {
+                    /* Change downcall status */
+                    op->downcall.status = -ENOMEM;
+                    gossip_err("writev: could not vmalloc for trailer!\n");
+                }
+            }
 
             /*
               if this operation is an I/O operation and if it was
@@ -286,8 +393,9 @@ static ssize_t pvfs2_devreq_writev(
               application reading/writing this device to return until
               the buffers are done being used.
             */
-            if (op->upcall.type == PVFS2_VFS_OP_FILE_IO 
-                    && op->upcall.req.io.async_vfs_io == PVFS_VFS_SYNC_IO)
+            if ((op->upcall.type == PVFS2_VFS_OP_FILE_IO 
+                    && op->upcall.req.io.async_vfs_io == PVFS_VFS_SYNC_IO) 
+                    || op->upcall.type == PVFS2_VFS_OP_FILE_IOX)
             {
                 int timed_out = 0;
                 DECLARE_WAITQUEUE(wait_entry, current);
@@ -412,6 +520,7 @@ static ssize_t pvfs2_devreq_writev(
 #endif
             else
             {
+                
                 /* tell the vfs op waiting on a waitqueue that this op is done */
                 spin_lock(&op->lock);
                 set_op_state_serviced(op);

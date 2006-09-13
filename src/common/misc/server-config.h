@@ -86,6 +86,8 @@ typedef struct filesystem_configuration_s
     int coalescing_high_watermark;
     int coalescing_low_watermark;
 
+    char *secret_key;
+
     int fp_buffer_size;
     int fp_buffers_per_flow;
 
@@ -255,6 +257,12 @@ PINT_llist *PINT_config_get_filesystems(
 int PINT_config_trim_filesystems_except(
     struct server_configuration_s *config_s,
     PVFS_fs_id fs_id);
+
+int PINT_config_get_fs_key(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id,
+    char ** key,
+    int * length);
 
 struct server_configuration_s *PINT_get_server_config(void);
 

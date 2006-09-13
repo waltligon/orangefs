@@ -40,4 +40,4 @@ TESTSRC += \
 	$(DIR)/io-stress.c
 
 MODCFLAGS_$(DIR)/io-stress.c := -D_GNU_SOURCE
-MODLDFLAGS_$(DIR) := -lrt
+MODLDFLAGS_$(DIR) := -lrt -lssl -lcrypto

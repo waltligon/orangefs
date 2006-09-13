@@ -26,7 +26,7 @@
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
-#define PVFS2_PROTO_MINOR 3
+#define PVFS2_PROTO_MINOR 4
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 /* we set the maximum possible size of a small I/O packed message as 64K.  This
@@ -73,6 +73,7 @@ enum PVFS_server_op
     PVFS_SERV_DELEATTR = 31,
     PVFS_SERV_LISTEATTR = 32,
     PVFS_SERV_SMALL_IO = 33,
+    PVFS_SERV_LISTATTR = 34,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -140,6 +141,8 @@ typedef struct
 #define PVFS_REQ_LIMIT_VAL_LEN 4096
 /* max number of key/value pairs to set or get in a list operation */
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
+/* max number of handles for which we return attributes */
+#define PVFS_REQ_LIMIT_LISTATTR 64
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
@@ -1037,6 +1040,59 @@ struct PVFS_servresp_small_io
 #endif
 
 #define extra_size_PVFS_servresp_small_io PINT_SMALL_IO_MAXSIZE
+
+/* listattr ****************************************************/
+/* - retrieves attributes for a list of handles based on mask of PVFS_ATTR_XXX values */
+
+struct PVFS_servreq_listattr
+{
+    PVFS_fs_id  fs_id;   /* file system */
+    uint32_t    attrmask;  /* mask of desired attributes */
+    uint32_t    nhandles; /* number of handles */
+    PVFS_handle *handles; /* handle of target object */
+};
+endecode_fields_3a_struct(
+    PVFS_servreq_listattr,
+    PVFS_fs_id, fs_id,
+    uint32_t, attrmask, 
+    skip4,,
+    uint32_t, nhandles,
+    PVFS_handle, handles)
+#define extra_size_PVFS_servreq_listattr \
+    (PVFS_REQ_LIMIT_LISTATTR * sizeof(PVFS_handle))
+
+#define PINT_SERVREQ_LISTATTR_FILL(__req,   \
+                                  __creds, \
+                                  __fsid,  \
+                                  __amask, \
+                                  __nhandles, \
+                                  __handle_array) \
+do {                                       \
+    memset(&(__req), 0, sizeof(__req));    \
+    (__req).op = PVFS_SERV_LISTATTR;        \
+    (__req).credentials = (__creds);       \
+    (__req).u.listattr.fs_id = (__fsid);    \
+    (__req).u.listattr.attrmask = (__amask);\
+    (__req).u.listattr.nhandles = (__nhandles);    \
+    (__req).u.listattr.handles = (__handle_array); \
+} while (0)
+
+struct PVFS_servresp_listattr
+{
+    uint32_t nhandles;
+    PVFS_error       *error;
+    PVFS_object_attr *attr;
+};
+endecode_fields_1aa_struct(
+    PVFS_servresp_listattr,
+    skip4,,
+    uint32_t, nhandles,
+    PVFS_error, error,
+    PVFS_object_attr, attr)
+#define extra_size_PVFS_servresp_listattr \
+    ((PVFS_REQ_LIMIT_LISTATTR * sizeof(PVFS_error)) + (PVFS_REQ_LIMIT_LISTATTR * extra_size_PVFS_object_attr))
+
+
 /* mgmt_setparam ****************************************************/
 /* - management operation for setting runtime parameters */
 
@@ -1477,6 +1533,7 @@ struct PVFS_server_req
         struct PVFS_servreq_deleattr deleattr;
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
+        struct PVFS_servreq_listattr listattr;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1523,6 +1580,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_geteattr geteattr;
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
+        struct PVFS_servresp_listattr listattr;
     } u;
 };
 endecode_fields_2_struct(

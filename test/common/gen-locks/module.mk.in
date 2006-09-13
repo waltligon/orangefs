@@ -17,3 +17,4 @@ $(DIR)/test-pthread-lock: $(DIR)/test-pthread-lock.o
 	$(Q) "  LD		$@"
 	$(E)$(LD) $< $(LDFLAGS) $(LIBS) -lpthread -o $@
 
+MODLDFLAGS_$(DIR) = -lssl -lcrypto

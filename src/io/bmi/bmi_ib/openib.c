@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.5 2006-09-01 15:33:35 pw Exp $
+ * $Id: openib.c,v 1.6 2006-09-13 20:22:50 vilayann Exp $
  */
 #include <string.h>
 #include <errno.h>
@@ -851,9 +851,6 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
 	CASE(IBV_EVENT_SRQ_ERR);
 	CASE(IBV_EVENT_SRQ_LIMIT_REACHED);
 	CASE(IBV_EVENT_QP_LAST_WQE_REACHED);
-#ifdef HAVE_IBV_EVENT_CLIENT_REREGISTER
-	CASE(IBV_EVENT_CLIENT_REREGISTER);
-#endif
     }
     return s;
 }
@@ -1008,7 +1005,7 @@ int openib_ib_initialize(void)
 
     /* get the lid and verify port state */
     ret = ibv_query_port(od->ctx, od->nic_port, &hca_port);
-    if (ret)
+    if(ret)
 	error_xerrno(ret, "%s: ibv_query_port", __func__);
     od->nic_lid = hca_port.lid;
 

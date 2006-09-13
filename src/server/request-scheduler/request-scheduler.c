@@ -286,6 +286,11 @@ int PINT_req_sched_target_handle(
 	*handle = req->u.flush.handle;
 	*fs_id = req->u.flush.fs_id;
 	return (0);
+    case PVFS_SERV_LISTATTR:
+        *readonly_flag = 1;
+        *fs_id = req->u.listattr.fs_id;
+	*handle = PVFS_HANDLE_NULL;
+        return 0;
     case PVFS_SERV_MGMT_NOOP:
 	return (1);
     case PVFS_SERV_MGMT_PERF_MON:

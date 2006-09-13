@@ -11,7 +11,6 @@
  *
  *  Definitions of types used throughout PVFS2.
  */
-
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
@@ -27,6 +26,10 @@
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
 #define INT32_MAX (2147483647)
+#endif
+
+#ifndef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 #endif
 
 /* figure out the size of a pointer */

@@ -259,6 +259,54 @@ int pvfs2_getattr(
     }
     return ret;
 }
+
+#ifdef HAVE_GETATTR_LITE_INODE_OPERATIONS
+
+uint32_t convert_to_pvfs2_mask(unsigned long lite_mask)
+{
+    uint32_t mask = 0;
+
+    if (SLITE_SIZET(lite_mask))
+        mask |= PVFS_ATTR_SYS_SIZE;
+    if (SLITE_ATIME(lite_mask))
+        mask |= PVFS_ATTR_SYS_ATIME;
+    if (SLITE_MTIME(lite_mask))
+        mask |= PVFS_ATTR_SYS_MTIME;
+    if (SLITE_CTIME(lite_mask))
+        mask |= PVFS_ATTR_SYS_CTIME;
+    return mask;
+}
+
+int pvfs2_getattr_lite(
+    struct vfsmount *mnt,
+    struct dentry *dentry,
+    struct kstat_lite *kstat_lite)
+{
+    int ret = -ENOENT;
+    struct inode *inode = dentry->d_inode;
+    uint32_t mask;
+
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_getattr_lite: called on %s\n", dentry->d_name.name);
+
+    /*
+     * ->getattr_lite needs to refresh only certain fields 
+     * of the inode and that is indicated by the lite_mask
+     * field of kstat_lite structure. 
+     */
+    mask = convert_to_pvfs2_mask(kstat_lite->lite_mask);
+    ret = pvfs2_inode_getattr(inode, mask);
+    if (ret == 0)
+    {
+        generic_fillattr_lite(inode, kstat_lite);
+    }
+    else
+    {
+        /* assume an I/O error and flag inode as bad */
+        pvfs2_make_bad_inode(inode);
+    }
+    return ret;
+}
+#endif
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 /** PVFS2 implementation of VFS inode operations for files */
@@ -278,6 +326,9 @@ struct inode_operations pvfs2_file_inode_operations =
     .truncate = pvfs2_truncate,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
+#ifdef HAVE_GETATTR_LITE_INODE_OPERATIONS
+    .getattr_lite = pvfs2_getattr_lite,
+#endif
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .setxattr = generic_setxattr,
     .getxattr = generic_getxattr,
@@ -290,6 +341,9 @@ struct inode_operations pvfs2_file_inode_operations =
     .listxattr = pvfs2_listxattr,
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
+#endif
+#ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
+    .fill_handle = pvfs2_fill_handle,
 #endif
 #endif
 };

@@ -61,6 +61,13 @@
 /* Define if system provides fgtxattr prototype */
 #undef HAVE_FGETXATTR_PROTOTYPE
 
+/* Define if struct inode_operations in kernel has fill_handle callback */
+#undef HAVE_FILL_HANDLE_INODE_OPERATIONS
+
+/* Define if struct super_operations in kernel has find_inode_handle callback
+   */
+#undef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
 
@@ -70,6 +77,9 @@
 /* Define if kernel has generic_permission */
 #undef HAVE_GENERIC_PERMISSION
 
+/* Define if struct inode_operations in kernel has getattr_lite callback */
+#undef HAVE_GETATTR_LITE_INODE_OPERATIONS
+
 /* Define if gethostbyaddr function exists */
 #undef HAVE_GETHOSTBYADDR
 
@@ -78,6 +88,9 @@
 
 /* Define to 1 if you have the `getmntent' function. */
 #undef HAVE_GETMNTENT
+
+/* Define if struct super_operations in kernel has get_fs_key callback */
+#undef HAVE_GET_FS_KEY_SUPER_OPERATIONS
 
 /* Define if strerror_r is GNU-specific */
 #undef HAVE_GNU_STRERROR_R
@@ -164,6 +177,15 @@
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_SIX_ARG
 
+/* Define if struct file_operations in kernel has readdirplus_lite callback */
+#undef HAVE_READDIRPLUSLITE_FILE_OPERATIONS
+
+/* Define if struct file_operations in kernel has readdirplus callback */
+#undef HAVE_READDIRPLUS_FILE_OPERATIONS
+
+/* Define if struct file_operations in kernel has readx callback */
+#undef HAVE_READX_FILE_OPERATIONS
+
 /* Define if kernel has register_ioctl32_conversion */
 #undef HAVE_REGISTER_IOCTL32_CONVERSION
 
@@ -178,6 +200,9 @@
 
 /* Define if kernel setxattr has const void* argument */
 #undef HAVE_SETXATTR_CONST_ARG
+
+/* Define if struct super_operations in kernel has statfs_lite callback */
+#undef HAVE_STATFS_LITE_SUPER_OPERATIONS
 
 /* Define to 1 if you have the <stdarg.h> header file. */
 #undef HAVE_STDARG_H
@@ -241,6 +266,9 @@
 
 /* Define if get_sb callback has struct vfsmount argument */
 #undef HAVE_VFSMOUNT_GETSB
+
+/* Define if struct file_operations in kernel has writex callback */
+#undef HAVE_WRITEX_FILE_OPERATIONS
 
 /* Define if kernel has xattr support */
 #undef HAVE_XATTR

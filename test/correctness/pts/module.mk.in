@@ -48,3 +48,5 @@ MODCFLAGS_$(DIR) = -I$(srcdir)/client/sysint
 #$(LOCALMPITESTS): %: %.o $(LOCALMPIOBJS) lib/libpvfs2.a
 #	$(Q) "  MPILD		$@"
 #	$(E)$(MPICC) $^ $(LDFLAGS) $(LIBS) -o $@
+
+MODLDFLAGS_$(DIR) = -lssl -lcrypto

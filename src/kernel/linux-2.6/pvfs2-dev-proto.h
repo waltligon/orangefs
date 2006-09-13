@@ -1,8 +1,12 @@
+
 /*
  * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
+
+#ifndef _PVFS2_DEV_PROTO_H
+#define _PVFS2_DEV_PROTO_H
 
 /* types and constants shared between user space and kernel space for
  * device interaction using a common protocol
@@ -35,11 +39,15 @@
 #define PVFS2_VFS_OP_PERF_COUNT        0xFF000015
 #define PVFS2_VFS_OP_CANCEL            0xFF00EE00
 #define PVFS2_VFS_OP_FSYNC             0xFF00EE01
+#define PVFS2_VFS_OP_FSKEY             0xFF00EE02
+#define PVFS2_VFS_OP_READDIRPLUS       0xFF00EE03
+#define PVFS2_VFS_OP_FILE_IOX          0xFF00EE04
 
 /* Misc constants. Please retain them as multiples of 8!
  * Otherwise 32-64 bit interactions will be messed up :)
  */
 #define PVFS2_NAME_LEN                 0x00000100
+/* MAX_DIRENT_COUNT cannot be larger than PVFS_REQ_LIMIT_LISTATTR */
 #define MAX_DIRENT_COUNT               0x00000020
 
 #include "pvfs2.h"
@@ -48,6 +56,41 @@
 #include "downcall.h"
 #include "quickhash.h"
 
+/*
+ * These macros differ from proto macros in that they don't do any
+ * byte-swappings and are used to ensure that kernel-clientcore interactions
+ * don't cause any unaligned accesses etc on 64 bit machines
+ */
+#ifndef roundup4
+#define roundup4(x) (((x)+3) & ~3)
+#endif
+
+#ifndef roundup8
+#define roundup8(x) (((x)+7) & ~7)
+#endif
+
+/* strings; decoding just points into existing character data */
+#define enc_string(pptr,pbuf) do { \
+    u_int32_t len = strlen(*pbuf); \
+    *(u_int32_t *) *(pptr) = (len); \
+    memcpy(*(pptr)+4, *pbuf, len+1); \
+    *(pptr) += roundup8(4 + len + 1); \
+} while (0)
+
+#define dec_string(pptr,pbuf, plen) do { \
+    u_int32_t len = (*(u_int32_t *) *(pptr)); \
+    *pbuf = *(pptr) + 4; \
+    *(pptr) += roundup8(4 + len + 1); \
+    if (plen) \
+    *plen = len;\
+} while (0)
+
+struct read_write_x {
+    PVFS_offset off;
+    PVFS_size   len;
+};
+
+#endif
 /*
  * Local variables:
  *  c-indent-level: 4

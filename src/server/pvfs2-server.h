@@ -317,6 +317,20 @@ struct PINT_server_getattr_op
     PVFS_handle dirent_handle;
 };
 
+struct PINT_server_listattr_op
+{
+    uint32_t nhandles;
+    PVFS_handle *handles;
+    PVFS_size dirent_count;
+    PVFS_fs_id fs_id;
+    PVFS_object_attr *attr_a;
+    PVFS_ds_attributes *ds_attr_a;
+    PVFS_error *errors;
+    uint32_t attrmask;
+    uint32_t handle_index;
+    PVFS_ds_keyval_handle_info keyval_handle_info;
+};
+
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
@@ -388,6 +402,7 @@ typedef struct PINT_server_op
 	/* request-specific scratch spaces for use during processing */
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
+        struct PINT_server_listattr_op listattr;
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
 	struct PINT_server_crdirent_op crdirent;
@@ -449,6 +464,7 @@ do {                                                                        \
 /* server operation state machines */
 extern struct PINT_state_machine_s pvfs2_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_sm;
+extern struct PINT_state_machine_s pvfs2_list_attr_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_sm;
 extern struct PINT_state_machine_s pvfs2_create_sm;
 extern struct PINT_state_machine_s pvfs2_crdirent_sm;

@@ -26,6 +26,7 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pint-dev.h"
+#include "pvfs2-dev-proto.h"
 
 static int setup_dev_entry(
     const char *dev_name);
@@ -139,61 +140,85 @@ void PINT_dev_finalize(void)
     }
 }
 
-/* PINT_dev_get_mapped_region()
+/* PINT_dev_get_mapped_regions()
  *
- * creates a memory buffer that is shared between user space and 
+ * creates a set of memory buffers that are shared between user space and 
  * kernel space
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
+int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc, int *size)
 {
-    int ret;
+    int i, ret = -1;
     int page_count = 0;
     long page_size = sysconf(_SC_PAGE_SIZE);
     void *ptr = NULL;
+    int ioctl_cmd[2] = {PVFS_DEV_MAP, 0};
 
-    /* we would like to use a memaligned region that is a multiple
-     * of the system page size
-     */
-    page_count = (int)(size / page_size);
-    if ((size % page_size) != 0)
+    for (i = 0; i < ndesc; i++)
     {
-        page_count++;
+        /* we would like to use a memaligned region that is a multiple
+         * of the system page size
+         */
+        page_count = (int)(size[i] / page_size);
+        if ((size[i] % page_size) != 0)
+        {
+            page_count++;
+        }
+
+        ptr = PINT_mem_aligned_alloc(
+            (page_count * page_size), page_size);
+        if (!ptr)
+        {
+            desc[i].ptr = NULL;
+            break;
+        }
+        desc[i].ptr  = ptr;
+        desc[i].size = (page_count * page_size);
+
+        /* ioctl to ask driver to map pages if needed */
+        if (ioctl_cmd[i] != 0)
+        {
+            ret = ioctl(pdev_fd, ioctl_cmd[i], &desc[i]);
+            if (ret < 0)
+            {
+                break;
+            }
+        }
     }
-
-    ptr = PINT_mem_aligned_alloc(
-        (page_count * page_size), page_size);
-    if (!ptr)
-    {
-        return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
-    }
-    desc->ptr  = ptr;
-    desc->size = (page_count * page_size);
-
-    /* ioctl to ask driver to map pages */
-    ret = ioctl(pdev_fd, PVFS_DEV_MAP, desc);
-    if (ret < 0)
-    {
-        free(ptr);
+    if (i != ndesc) {
+        int j;
+        for (j = 0; j < i; j++) {
+            if (desc[j].ptr) {
+                PINT_mem_aligned_free(desc[j].ptr);
+                desc[j].ptr = NULL;
+            }
+        }
         return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
     }
     return 0;
 }
 
-/* PINT_dev_put_mapped_region()
+/* PINT_dev_put_mapped_regions()
  *
- * frees the memory buffer that was shared between user space and
+ * frees the set of memory buffers that were shared between user space and
  * kernel space.  MUST be called only after device is closed
  * (i.e. PINT_dev_finalize)
  */
-void PINT_dev_put_mapped_region(struct PVFS_dev_map_desc *desc)
+void PINT_dev_put_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc)
 {
-    void *ptr = (void *) desc->ptr;
+    void *ptr;
+    int i;
+    
     assert(desc);
-    assert(ptr);
 
-    PINT_mem_aligned_free(ptr);
+    for (i = 0; i < ndesc; i++)
+    {
+        ptr = (void *) desc[i].ptr;
+        assert(ptr);
+
+        PINT_mem_aligned_free(ptr);
+    }
 }
 
 /* PINT_dev_get_mapped_buffer()
@@ -204,14 +229,27 @@ void PINT_dev_put_mapped_region(struct PVFS_dev_map_desc *desc)
  * returns a valid desc addr on success, NULL on failure
  */
 void *PINT_dev_get_mapped_buffer(
+    enum pvfs_bufmap_type bm_type,
     struct PVFS_dev_map_desc *desc,
     int buffer_index)
 {
-    char *ptr = (char *) desc->ptr;
+    char *ptr;
+    int desc_count, desc_size;
+
+    if (bm_type != BM_IO && bm_type != BM_READDIR)
+        return NULL;
+
+    desc_count = (bm_type == BM_IO) ? 
+                PVFS2_BUFMAP_DESC_COUNT :
+                PVFS2_READDIR_DESC_COUNT;
+    desc_size  = (bm_type == BM_IO) ? 
+                PVFS2_BUFMAP_DEFAULT_DESC_SIZE : 
+                PVFS2_READDIR_DEFAULT_DESC_SIZE;
+    ptr =  (char *) desc[bm_type].ptr;
     return ((desc && ptr &&
              ((buffer_index > -1) &&
-              (buffer_index < PVFS2_BUFMAP_DESC_COUNT))) ?
-            (ptr + (buffer_index * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)) :
+              (buffer_index < desc_count))) ?
+            (ptr + (buffer_index * desc_size)) :
             NULL);
 }
 
@@ -234,6 +272,7 @@ int PINT_dev_test_unexpected(
     int32_t *proto_ver = NULL;
     uint64_t *tag = NULL;
     void *buffer = NULL;
+    pvfs2_upcall_t *upc = NULL;
 
     /* prepare to read max upcall size (magic nr and tag included) */
     int read_size = pdev_max_upsize;
@@ -364,6 +403,24 @@ int PINT_dev_test_unexpected(
             ((unsigned long)buffer + 2*sizeof(int32_t) + sizeof(uint64_t));
         info_array[*outcount].tag = *tag;
 
+        upc = (pvfs2_upcall_t *) info_array[*outcount].buffer;
+        /* if there is a trailer, allocate a buffer and issue another read */
+        if (upc->trailer_size > 0)
+        {
+            upc->trailer_buf = malloc(upc->trailer_size);
+            if (upc->trailer_buf == NULL)
+            {
+                ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
+                goto dev_test_unexp_error;
+            }
+            ret = read(pdev_fd, upc->trailer_buf, upc->trailer_size);
+            if (ret < 0)
+            {
+                ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+                goto dev_test_unexp_error;
+            }
+        }
+
         (*outcount)++;
 
         /*
@@ -380,6 +437,11 @@ dev_test_unexp_error:
     /* release resources we created up to this point */
     for(i = 0; i < *outcount; i++)
     {
+        upc = (pvfs2_upcall_t *) info_array[i].buffer;
+        if (upc->trailer_buf)
+        {
+            free(upc->trailer_buf);
+        }
         if (buffer)
         {
             free(buffer);
@@ -438,15 +500,21 @@ int PINT_dev_write_list(
     
     /* lets be reasonable about list size :) */
     /* two vecs are taken up by magic nr and tag */
-    assert(list_count < 7);
+    if (list_count > 7)
+    {
+        return (-(PVFS_EINVAL|PVFS_ERROR_DEV));
+    }
 
     /* even though we are ignoring the buffer_type for now, 
      * make sure that the caller set it to a sane value 
      */
-    assert(buffer_type == PINT_DEV_EXT_ALLOC || 
-        buffer_type == PINT_DEV_PRE_ALLOC);
+    if (buffer_type != PINT_DEV_EXT_ALLOC &&
+        buffer_type != PINT_DEV_PRE_ALLOC)
+    {
+        return (-(PVFS_EINVAL|PVFS_ERROR_DEV));
+    }
 
-    if (total_size > pdev_max_downsize)
+    if (size_list[0] > pdev_max_downsize)
     {
         return(-(PVFS_EMSGSIZE|PVFS_ERROR_DEV));
     }

@@ -11,7 +11,6 @@
 #ifndef __PVFS2_UTIL_H
 #define __PVFS2_UTIL_H
 
-#define _GNU_SOURCE
 
 #include "pvfs2.h"
 #include "pvfs2-types.h"

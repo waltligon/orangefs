@@ -44,6 +44,8 @@ my $opt_metaspec = undef;
 
 my %all_endpoints = ();
 
+my $opt_gen_key = 0;
+
 my $META_ENDPOINT = 0x1;
 my $IO_ENDPOINT   = 0x2;
 
@@ -288,6 +290,11 @@ sub emit_filesystem
 
     print $target "\t</StorageHints>\n";
 
+    if($opt_gen_key ne "0")
+    {
+        emit_fs_key($target);
+    }
+
     print $target "</Filesystem>\n";
 }
 
@@ -298,6 +305,34 @@ sub emit_server_conf
     print $target "StorageSpace $storage\n";
     print $target "HostID \"" . get_bmi_endpoint($node) . "\"\n";
     print $target "LogFile $logfile\n";
+}
+
+sub emit_fs_key
+{
+    my ($target, @path, $openssl_cmd, $b64_rand);
+
+    $target = $_[0];
+
+    $openssl_cmd = undef;
+
+    @path = split(/:/, $ENV{PATH});
+    for my $p (@path)
+    {
+        if( -x "$p/openssl" )
+        {
+            $openssl_cmd = "$p/openssl";
+        }
+    }
+
+    if(!defined($openssl_cmd))
+    {
+        print STDERR "\n\nFailed to find openssl executable in PATH\n\n";
+        exit 1;
+    }
+
+    $b64_rand = `$openssl_cmd rand -base64 20 2> /dev/null`;
+    chomp($b64_rand);
+    print $target "\tSecretKey $b64_rand\n";
 }
 
 sub confirm
@@ -431,11 +466,12 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
      --default-num-dfiles <NUM>        number of datafiles to use per file
                                        (defaults to number of I/O servers)
      --trusted      <0|1>              indicate whether trusted connection options need to be emitted
+     --genkey                          optionally generates a secret key for the 
+                                       filesystem(s).
 
      --help                            This message
      --spec-usage                      Show the usage info for --iospec 
                                        and --metaspec options
-
 THIS
 
 }
@@ -1083,6 +1119,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'iospec=s'     => \$opt_iospec,
     'metaspec=s'   => \$opt_metaspec, 
     'spec-usage!'  => \$show_specusage,
+    'genkey!'       => \$opt_gen_key,
     '-'           => \$using_stdout)
     or die "Could not parse arguments.  See -h for help.\n";
 

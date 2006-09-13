@@ -9,7 +9,6 @@
  *
  *  PVFS2 system interface routines for reading entries from a directory.
  */
-
 #include <string.h>
 #include <assert.h>
 
@@ -34,13 +33,15 @@ static int readdir_msg_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int readdir_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
+static int do_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 static int readdir_msg_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 %%
 
-machine pvfs2_client_readdir_sm(
+nested machine pvfs2_client_readdir_sm(
     init,
     readdir_getattr,
     readdir_msg_setup_msgpair,
@@ -84,6 +85,22 @@ machine pvfs2_client_readdir_sm(
     state cleanup
     {
         run readdir_cleanup;
+        default => return;
+    }
+}
+
+machine pvfs2_client_sysint_readdir_sm(
+    dowork,
+    do_cleanup)
+{
+    state dowork
+    {
+        jump pvfs2_client_readdir_sm;
+        default => do_cleanup;
+    }
+    state do_cleanup
+    {
+        run do_cleanup;
         default => terminate;
     }
 }
@@ -135,10 +152,16 @@ PVFS_error PVFS_isys_readdir(
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
-    sm_p->u.readdir.pos_token = token;
-    sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
     sm_p->u.readdir.readdir_resp = resp;
     sm_p->object_ref = ref;
+    /* point the sm dirent array and outcount to the readdir response field */
+    sm_p->readdir.dirent_array = &resp->dirent_array;
+    sm_p->readdir.dirent_outcount = &resp->pvfs_dirent_outcount;
+    sm_p->readdir.token = &resp->token;
+    sm_p->readdir.directory_version = &resp->directory_version;
+
+    sm_p->readdir.pos_token = sm_p->u.readdir.pos_token = token;
+    sm_p->readdir.dirent_limit = sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on handle "
                  "%llu on fs %d\n", llu(ref.handle), ref.fs_id);
@@ -227,8 +250,8 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         GOSSIP_READDIR_DEBUG, "%llu|%d | token is %d | limit is %d\n",
         llu(sm_p->object_ref.handle),
         sm_p->object_ref.fs_id,
-        sm_p->u.readdir.pos_token,
-        sm_p->u.readdir.dirent_limit);
+        sm_p->readdir.pos_token,
+        sm_p->readdir.dirent_limit);
 
     PINT_init_msgpair(sm_p, msg_p);
 
@@ -237,8 +260,8 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
-        sm_p->u.readdir.pos_token,
-        sm_p->u.readdir.dirent_limit);
+        sm_p->readdir.pos_token,
+        sm_p->readdir.dirent_limit);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
@@ -273,31 +296,30 @@ static int readdir_msg_comp_fn(void *v_p,
     }
 
     /* convert servresp_readdir response to a sysresp_readdir obj */
-    assert(sm_p->u.readdir.readdir_resp);
 
-    sm_p->u.readdir.readdir_resp->token = resp_p->u.readdir.token;
-    sm_p->u.readdir.readdir_resp->directory_version =
+    *(sm_p->readdir.token) = resp_p->u.readdir.token;
+    *(sm_p->readdir.directory_version) =
         resp_p->u.readdir.directory_version;
-    sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount =
+    *(sm_p->readdir.dirent_outcount) =
         resp_p->u.readdir.dirent_count;
-    if (sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount > 0)
+    if (*(sm_p->readdir.dirent_outcount) > 0)
     {
         int dirent_array_len =
-            (sizeof(PVFS_dirent) *
-             sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount);
-        /* this dirent_array MUST be freed by caller */
-        sm_p->u.readdir.readdir_resp->dirent_array =
-            malloc(dirent_array_len);
-        assert(sm_p->u.readdir.readdir_resp->dirent_array);
+            (sizeof(PVFS_dirent) * *(sm_p->readdir.dirent_outcount));
 
-        memcpy(sm_p->u.readdir.readdir_resp->dirent_array,
+        /* this dirent_array MUST be freed by caller */
+        *(sm_p->readdir.dirent_array) =
+            (PVFS_dirent *) malloc(dirent_array_len);
+        assert(*(sm_p->readdir.dirent_array));
+
+        memcpy(*(sm_p->readdir.dirent_array),
                resp_p->u.readdir.dirent_array, dirent_array_len);
     }
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
                  "[version %lld]\n",
-                 sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount,
-                 lld(sm_p->u.readdir.readdir_resp->directory_version));
+                 *(sm_p->readdir.dirent_outcount),
+                 lld(*(sm_p->readdir.directory_version)));
 
     return 0;
 }
@@ -321,12 +343,11 @@ static int readdir_cleanup(PINT_client_sm *sm_p,
     {
         /* insert all handles into the ncache while we have them */
         tmp_ref.fs_id = sm_p->object_ref.fs_id;
-        for(i = 0;
-            i < sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount; i++)
+        for(i = 0; i < *(sm_p->readdir.dirent_outcount); i++)
         {
-            tmp_ref.handle = sm_p->u.readdir.readdir_resp->dirent_array[i].handle;
+            tmp_ref.handle = (*(sm_p->readdir.dirent_array))[i].handle;
             PINT_ncache_update(
-                (const char *) sm_p->u.readdir.readdir_resp->dirent_array[i].d_name,
+                (const char *) (*(sm_p->readdir.dirent_array))[i].d_name,
                 (const PVFS_object_ref *) &(tmp_ref),
                 (const PVFS_object_ref *) &(sm_p->object_ref));
         }
@@ -334,17 +355,27 @@ static int readdir_cleanup(PINT_client_sm *sm_p,
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    sm_p->error_code = js_p->error_code;
-    if(sm_p->error_code != 0)
+    if(js_p->error_code != 0)
     {
         PINT_acache_invalidate(sm_p->object_ref);
     }
+    return 1;
+}
+
+static int do_cleanup(PINT_client_sm *sm_p,
+                           job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: do_cleanup\n");
+
+    sm_p->error_code = js_p->error_code;
     gossip_debug(GOSSIP_READDIR_DEBUG, " final return code is %d\n",
                  sm_p->error_code);
 
     sm_p->op_complete = 1;
     return 0;
 }
+
+
 
 /*
  * Local variables:

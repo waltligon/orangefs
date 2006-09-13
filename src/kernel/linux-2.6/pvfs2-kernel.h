@@ -57,6 +57,7 @@ typedef unsigned long sector_t;
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/fs.h>
+#include <linux/vmalloc.h>
 
 #include "pvfs2-config.h"
 #include "pvfs2-debug.h"
@@ -144,6 +145,7 @@ typedef unsigned long sector_t;
 #define PVFS2_MAX_NUM_OPTIONS          0x00000004
 #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
 #define PVFS2_NUM_READDIR_RETRIES      0x0000000A
+#define PVFS2_MAX_FSKEY_LEN            64
 
 #define MAX_DEV_REQ_UPSIZE (2*sizeof(int32_t) +   \
 sizeof(uint64_t) + sizeof(pvfs2_upcall_t))
@@ -331,6 +333,19 @@ typedef struct
 
     int io_completed;
     wait_queue_head_t io_completion_waitq;
+
+    /* upcalls requiring variable length trailers require that this struct
+     * be in the request list even after client-core does a read() on the device
+     * to dequeue the upcall 
+     * if op_linger field goes to 0, we dequeue this op off the list.
+     * else we let it stay. What gets passed to the read() is 
+     * a) if op_linger field is = 1, pvfs2_kernel_op_t itself
+     * b) else if = 0, we pass ->upcall.trailer_buf
+     * We expect to have only a single upcall trailer buffer, so we expect callers with trailers
+     * to set this field to 2 and others to set it to 1.
+     */
+    int32_t op_linger, op_linger_tmp;
+    /* VFS aio fields */
     void *priv;/* used by the async I/O code to stash the pvfs2_kiocb structure */
     atomic_t aio_ref_count; /* used again for the async I/O code for deallocation */
 
@@ -432,6 +447,88 @@ typedef struct
     int id;
 } pvfs2_mount_sb_info_t;
 
+/** PVFS2 specific structure that we use for constructing an opaque handle at the time 
+ * an openg() system call that will be used at subsequent openfh system call
+ * We stuff in enough information into this buffer that subsequent
+ * openfh calls don't have to communicate with server. Padding is inserted so that
+ * size of structure is the same and offset is also same on both 32 and 64
+ * bit machines.
+ */
+typedef struct 
+{
+    PVFS_handle handle;
+    PVFS_fs_id  fsid;
+    int32_t     __pad1;
+    PVFS_uid    owner;
+    PVFS_gid    group;
+    PVFS_permissions perms;
+    int32_t     __pad2;
+    PVFS_time   atime;
+    PVFS_time   mtime;
+    PVFS_time   ctime;
+    PVFS_size   size;
+    PVFS_ds_type objtype;
+    uint32_t    mask;
+} pvfs2_opaque_handle_t;
+#ifdef __PINT_PROTO_ENCODE_OPAQUE_HANDLE
+#define encode_int64_t(pptr,x) do { \
+    *(int64_t*) *(pptr) = cpu_to_le64(*(x)); \
+    *(pptr) += 8; \
+} while (0)
+#define decode_int64_t(pptr,x) do { \
+    *(x) = le64_to_cpu(*(int64_t*) *(pptr)); \
+    *(pptr) += 8; \
+} while (0)
+
+#define encode_int32_t(pptr,x) do { \
+    *(int32_t*) *(pptr) = cpu_to_le32(*(x)); \
+    *(pptr) += 4; \
+} while (0)
+#define decode_int32_t(pptr,x) do { \
+    *(x) = le32_to_cpu(*(int32_t*) *(pptr)); \
+    *(pptr) += 4; \
+} while (0)
+
+/* skip 4 bytes */
+#define encode_skip4(pptr,x) do { \
+    *(pptr) += 4; \
+} while (0)
+#define decode_skip4(pptr,x) do { \
+    *(pptr) += 4; \
+} while (0)
+
+#define encode_pvfs2_opaque_handle_t(pptr,x) do {\
+    encode_int64_t(pptr, &(x)->handle);\
+    encode_int32_t(pptr, &(x)->fsid);\
+    encode_skip4(pptr,);\
+    encode_int32_t(pptr, &(x)->owner);\
+    encode_int32_t(pptr, &(x)->group);\
+    encode_int32_t(pptr, &(x)->perms);\
+    encode_skip4(pptr,);\
+    encode_int64_t(pptr, &(x)->atime);\
+    encode_int64_t(pptr, &(x)->mtime);\
+    encode_int64_t(pptr, &(x)->ctime);\
+    encode_int64_t(pptr, &(x)->size);\
+    encode_int32_t(pptr, &(x)->objtype);\
+    encode_int32_t(pptr, &(x)->mask);\
+} while (0)
+#define decode_pvfs2_opaque_handle_t(pptr,x) do {\
+    decode_int64_t(pptr, &(x)->handle);\
+    decode_int32_t(pptr, &(x)->fsid);\
+    decode_skip4(pptr,);\
+    decode_int32_t(pptr, &(x)->owner);\
+    decode_int32_t(pptr, &(x)->group);\
+    decode_int32_t(pptr, &(x)->perms);\
+    decode_skip4(pptr,);\
+    decode_int64_t(pptr, &(x)->atime);\
+    decode_int64_t(pptr, &(x)->mtime);\
+    decode_int64_t(pptr, &(x)->ctime);\
+    decode_int64_t(pptr, &(x)->size);\
+    decode_int32_t(pptr, &(x)->objtype);\
+    decode_int32_t(pptr, &(x)->mask);\
+} while (0)
+#endif
+
 #ifdef HAVE_AIO_VFS_SUPPORT
 
 /** structure that holds the state of any async I/O operation issued 
@@ -484,8 +581,9 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
  ****************************/
 int op_cache_initialize(void);
 int op_cache_finalize(void);
-char *get_opname_string(pvfs2_kernel_op_t *new_op);
 pvfs2_kernel_op_t *op_alloc(int32_t type);
+pvfs2_kernel_op_t *op_alloc_trailer(int32_t type);
+char *get_opname_string(pvfs2_kernel_op_t *new_op);
 void op_release(pvfs2_kernel_op_t *op);
 
 int dev_req_cache_initialize(void);
@@ -533,6 +631,10 @@ void purge_waiting_ops(void);
 /****************************
  * defined in super.c
  ****************************/
+#ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+extern struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb, 
+        const struct file_handle *handle);
+#endif
 #ifdef PVFS2_LINUX_KERNEL_2_4
 struct super_block* pvfs2_get_sb(
     struct super_block *sb,
@@ -557,9 +659,13 @@ int pvfs2_remount(
     int *flags,
     char *data);
 
+int fsid_key_table_initialize(void);
+void fsid_key_table_finalize(void);
+
 /****************************
  * defined in inode.c
  ****************************/
+uint32_t convert_to_pvfs2_mask(unsigned long lite_mask);
 struct inode *pvfs2_get_custom_inode(
     struct super_block *sb,
     struct inode *dir,
@@ -640,6 +746,11 @@ int pvfs2_gen_credentials(
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
 int pvfs2_flush_inode(struct inode *inode);
 
+int copy_attributes_to_inode(
+    struct inode *inode,
+    PVFS_sys_attr *attrs,
+    char *symname);
+
 ssize_t pvfs2_inode_getxattr(
         struct inode *inode, const char* prefix,
         const char *name, void *buffer, size_t size);
@@ -703,6 +814,10 @@ int pvfs2_cancel_op_in_progress(
 
 PVFS_time pvfs2_convert_time_field(
     void *time_ptr);
+
+#ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
+int pvfs2_fill_handle(struct inode *inode, struct file_handle *handle);
+#endif
 
 int pvfs2_normalize_to_errno(PVFS_error error_code);
 
@@ -845,7 +960,9 @@ do {                                                      \
     {                                                     \
         wake_up_daemon_for_return(new_op);                \
     }                                                     \
+    new_op = NULL;                                        \
     pvfs_bufmap_put(buffer_index);                        \
+    buffer_index = -1;                                    \
 } while(0)
 
 #endif
@@ -905,8 +1022,13 @@ do { inode->i_mtime = inode->i_ctime = CURRENT_TIME; } while(0)
 #define get_block_block_type long
 #define pvfs2_lock_inode(inode) do {} while(0)
 #define pvfs2_unlock_inode(inode) do {} while(0)
-#define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
 #define pvfs2_kernel_readpage block_read_full_page
+
+static inline struct dentry *pvfs2_d_splice_alias(struct dentry *dentry, struct inode *inode)
+{ 
+    d_add(dentry, inode); 
+    return dentry;
+}
 
 /*
   redhat 9 2.4.x kernels have to be treated almost like 2.6.x kernels
@@ -946,10 +1068,14 @@ do                                                \
 #define pvfs2_current_signal_lock current->sighand->siglock
 #define pvfs2_current_sigaction current->sighand->action
 #define pvfs2_recalc_sigpending recalc_sigpending
-#define pvfs2_d_splice_alias(dentry, inode) d_splice_alias(inode, dentry)
 #define pvfs2_kernel_readpage mpage_readpage
 #define pvfs2_set_page_reserved(page) do {} while(0)
 #define pvfs2_clear_page_reserved(page) do {} while(0)
+
+static inline struct dentry* pvfs2_d_splice_alias(struct dentry *dentry, struct inode *inode)
+{
+    return d_splice_alias(inode, dentry);
+}
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
@@ -1067,6 +1193,16 @@ static inline ino_t parent_ino(struct dentry *dentry)
 #endif
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+static inline unsigned int diff(struct timeval *end, struct timeval *begin)
+{
+    if (end->tv_usec < begin->tv_usec) {
+        end->tv_usec += 1000000; end->tv_sec--;
+    }
+    end->tv_sec  -= begin->tv_sec;
+    end->tv_usec -= begin->tv_usec;
+    return ((end->tv_sec * 1000000) + end->tv_usec);
+}
 
 #endif /* __PVFS2KERNEL_H */
 

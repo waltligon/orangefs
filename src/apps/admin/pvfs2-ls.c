@@ -58,6 +58,7 @@ struct options
 static struct options* parse_args(int argc, char* argv[]);
 
 static void usage(int argc, char** argv);
+static int do_timing = 0;
 
 static void print_entry(
     char *entry_name,
@@ -379,6 +380,13 @@ void print_entry(
     print_entry_attr(handle, entry_name, &getattr_response.attr, opts);
 }
 
+static double Wtime(void)
+{
+    struct timeval t;
+    gettimeofday(&t, NULL);
+    return((double)t.tv_sec * 1e03 + (double)(t.tv_usec) * 1e-03);
+}
+
 int do_list(
     char *start,
     int fs_id,
@@ -396,6 +404,7 @@ int do_list(
     PVFS_object_ref ref;
     PVFS_ds_position token;
     uint64_t dir_version = 0;
+    double begin, end;
 
     name = start;
 
@@ -454,6 +463,8 @@ int do_list(
         }
     }
 
+    if (do_timing)
+        begin = Wtime();
     token = 0;
     do
     {
@@ -507,6 +518,11 @@ int do_list(
         }
 
     } while(rd_response.pvfs_dirent_outcount == pvfs_dirent_incount);
+    if (do_timing) {
+        end = Wtime();
+        printf("PVFS_sys_readdir+sys_getattr took %g msecs\n",
+                (end - begin));
+    }
 
     if (rd_response.pvfs_dirent_outcount)
     {
@@ -551,7 +567,7 @@ static struct options* parse_args(int argc, char* argv[])
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
-    while((ret = getopt_long(argc, argv, "hVndGoAaigl",
+    while((ret = getopt_long(argc, argv, "hVndGoAaiglt",
                              long_opts, &option_index)) != -1)
     {
 	switch(ret)
@@ -619,6 +635,9 @@ static struct options* parse_args(int argc, char* argv[])
             case 'V':
           list_verbose:
                 tmp_opts->list_verbose = 1;
+                break;
+            case 't':
+                do_timing = 1;
                 break;
 	    case 'l':
                 tmp_opts->list_long = 1;

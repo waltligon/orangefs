@@ -405,7 +405,14 @@ struct PINT_server_req_params PINT_server_req_table[] =
         "small_io",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_small_io_sm}
+        &pvfs2_small_io_sm},
+
+    /* 34 */
+    {PVFS_SERV_LISTATTR,
+        "listattr",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_list_attr_sm},
 };
 
 struct server_configuration_s *PINT_get_server_config(void)

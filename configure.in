@@ -109,7 +109,8 @@ AC_SUBST(BUILD_SERVER)
 
 AC_ARG_WITH(openssl,
 	    [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)],
-	    [AX_OPENSSL(${withval})])
+	    [AX_OPENSSL(${withval})],
+		 [AX_OPENSSL_OPTIONAL])
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)

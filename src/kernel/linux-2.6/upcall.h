@@ -27,6 +27,15 @@ typedef struct
 
 typedef struct
 {
+    int32_t buf_index;
+    int32_t count;
+    PVFS_object_ref refn;
+    enum PVFS_io_type io_type;
+    int32_t __pad1;
+} pvfs2_iox_request_t;
+
+typedef struct
+{
     int32_t sym_follow;
     int32_t __pad1;
     PVFS_object_ref parent_refn;
@@ -79,7 +88,18 @@ typedef struct
     PVFS_object_ref refn;
     PVFS_ds_position token;
     int32_t max_dirent_count;
+    int32_t buf_index;
+    uint32_t __pad1;
 } pvfs2_readdir_request_t;
+
+typedef struct
+{
+    PVFS_object_ref refn;
+    PVFS_ds_position token;
+    int32_t max_dirent_count;
+    uint32_t mask;
+    int32_t  buf_index;
+} pvfs2_readdirplus_request_t;
 
 typedef struct
 {
@@ -200,13 +220,23 @@ typedef struct
 
 typedef struct
 {
+    PVFS_fs_id fsid;
+    int32_t    __pad1;
+} pvfs2_fs_key_request_t;
+
+typedef struct
+{
     int32_t type;
     int32_t __pad1;
     PVFS_credentials credentials;
+    /* currently trailer is used only by readx/writex (iox) */
+    PVFS_size  trailer_size;
+    PVFS2_ALIGN_VAR(char *, trailer_buf);
 
     union
     {
 	pvfs2_io_request_t io;
+        pvfs2_iox_request_t iox;
 	pvfs2_lookup_request_t lookup;
 	pvfs2_create_request_t create;
 	pvfs2_symlink_request_t sym;
@@ -215,6 +245,7 @@ typedef struct
 	pvfs2_remove_request_t remove;
 	pvfs2_mkdir_request_t mkdir;
 	pvfs2_readdir_request_t readdir;
+	pvfs2_readdirplus_request_t readdirplus;
 	pvfs2_rename_request_t rename;
         pvfs2_statfs_request_t statfs;
         pvfs2_truncate_request_t truncate;
@@ -229,6 +260,7 @@ typedef struct
         pvfs2_fsync_request_t fsync;
         pvfs2_param_request_t param;
         pvfs2_perf_count_request_t perf_count;
+        pvfs2_fs_key_request_t fs_key;
     } req;
 } pvfs2_upcall_t;
 
