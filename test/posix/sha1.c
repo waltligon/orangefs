@@ -36,6 +36,7 @@ static int sha1(char *input_message, size_t input_length, unsigned char **output
 {
 	EVP_MD_CTX *digest = NULL;
 	const EVP_MD *type = EVP_sha1();
+	unsigned int olen;
 
 	/* OpenSSL_add_all_digests(); */
 	if (*output_hash == NULL) {
@@ -50,8 +51,9 @@ static int sha1(char *input_message, size_t input_length, unsigned char **output
 	}
 	EVP_DigestInit(digest, type);
 	EVP_DigestUpdate(digest, input_message, input_length);
-	EVP_DigestFinal(digest, *output_hash, output_length); 
+	EVP_DigestFinal(digest, *output_hash, &olen); 
 	EVP_MD_CTX_destroy(digest);
+	*output_length = olen;
 	return 0;
 }
 

@@ -203,6 +203,8 @@ struct kernel_stat_lite {
   	long		__unused[3];
 };
 
+#define stat64_lite kernel_stat_lite
+
 /* stat64 of kernel is the same as kernel_stat on opteron 64 */
 struct dirent64_plus {
 	struct kernel_stat   dp_stat;

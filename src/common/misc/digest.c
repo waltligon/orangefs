@@ -109,7 +109,7 @@ static int digest(const char *digest_name,
 {
     EVP_MD_CTX mdctx;
     const EVP_MD *md;
-    size_t digest_len;
+    unsigned int digest_len;
 	 void *digest_value;
 
 	 if (!digest_name)
