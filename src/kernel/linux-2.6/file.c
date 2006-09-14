@@ -142,6 +142,11 @@ static ssize_t do_read_write(struct rw_options *rw)
     if (!rw)
         goto out;
     count = rw->count;
+    if (count == 0)
+    {
+        ret = 0;
+        goto out;
+    }
     current_buf = (char *) rw->buf;
     if (!current_buf)
         goto out;
@@ -580,6 +585,10 @@ static ssize_t do_readv_writev(int type, struct file *file,
     if ((max_new_nr_segs = estimate_max_iovecs(iov, nr_segs, &count)) < 0)
     {
         return -EINVAL;
+    }
+    if (count == 0)
+    {
+        return 0;
     }
     if (type == IO_WRITEV)
     {
@@ -1071,6 +1080,10 @@ static ssize_t do_readx_writex(int type, struct file *file,
     if ((max_new_nr_segs_mem = estimate_max_iovecs(iov, nr_segs, &count_mem)) < 0)
     {
         return -EINVAL;
+    }
+    if (count_mem == 0)
+    {
+        return 0;
     }
     /* Calculate the total stream length to read and max number of segments after split of the stream vector */
     count_stream = 0;
