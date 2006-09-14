@@ -258,7 +258,7 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
     case PVFS_CLIENT_PERF_COUNT_TIMER :
         return &pvfs2_client_perf_count_timer_sm;
     case PVFS_DEV_UNEXPECTED :
-        return &pvfs2_void_sm;
+        return &pvfs2_sysdev_unexp_sm;
     default:
         /* now check range for sys functions */
         if (op <= PVFS_OP_SYS_MAXVAL)
@@ -360,12 +360,14 @@ PVFS_error PINT_client_state_machine_post(
     /* save operation type; mark operation as unfinished */
     sm_p->user_ptr = user_ptr;
 
+#if 0
     if(pvfs_sys_op == PVFS_DEV_UNEXPECTED)
     {
         gossip_err("FAILURE: You should be using PINT_sys_dev_unexp for "
                    "posting this type of operation!\n");
         return ret;
     }
+#endif
 
     if (op_id)
     {
@@ -402,6 +404,7 @@ PVFS_error PINT_client_state_machine_post(
     return ret;
 }
 
+#if 0
 PVFS_error PINT_sys_dev_unexp(
     struct PINT_dev_unexp_info *info,
     job_status_s *jstat,
@@ -454,6 +457,7 @@ PVFS_error PINT_sys_dev_unexp(
     }
     return ret;
 }
+#endif
 
 /** Cancels in progress I/O operations.
  *
@@ -635,6 +639,7 @@ PVFS_error PINT_client_state_machine_test(
 	tmp_smcb = (PINT_smcb *)smcb_p_array[i];
         assert(tmp_smcb);
 
+#if 0
         /* why is this here - why doesn't an unexpected just terminate? */
         if (PINT_smcb_op(tmp_smcb) == PVFS_DEV_UNEXPECTED)
         {
@@ -642,6 +647,7 @@ PVFS_error PINT_client_state_machine_test(
             /* below - needs to be reworked - WBL */
             PINT_smcb_set_complete(tmp_smcb);
         }
+#endif
         if (PINT_smcb_invalid_op(tmp_smcb))
         {
             gossip_err("Invalid sm control block op %d\n", PINT_smcb_op(tmp_smcb));
@@ -759,6 +765,7 @@ PVFS_error PINT_client_state_machine_testsome(
 	smcb = (PINT_smcb *)smcb_p_array[i];
         assert(smcb);
 
+#if 0
         /*
           note that dev unexp messages found here are treated as
           complete since if we see them at all in here, they're ready
@@ -768,6 +775,7 @@ PVFS_error PINT_client_state_machine_testsome(
         {
             PINT_smcb_set_complete(smcb);
         }
+#endif
 
         if (!PINT_smcb_complete(smcb))
         {

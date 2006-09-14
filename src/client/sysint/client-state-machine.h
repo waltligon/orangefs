@@ -438,30 +438,16 @@ struct PINT_client_perf_count_timer_sm
     struct PINT_perf_counter *pc;
 };
 
+struct PINT_sysdev_unexp_sm
+{
+    struct PINT_dev_unexp_info *info;
+};
+
 typedef struct PINT_client_sm
 {
     /* this code removed and corresponding fields added to the generic
      * state machine code in the PINT_smcb struct
      */
-#if 0
-    /*
-      internal state machine values; the stack is used for tracking
-      movement through nested state machines
-    */
-    int stackptr;
-    union PINT_state_array_values *current_state;
-    union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
-
-    /* the system interface operation type (defined below) */
-    int op;
-
-    /* indicates when the operation as a whole is finished */
-    int op_complete;
-
-    /* indicates when the operation has been cancelled */
-    int op_cancelled;
-
-#endif
     /* used internally by client-state-machine.c */
     PVFS_sys_op_id sys_op_id;
     void *user_ptr;
@@ -523,6 +509,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_deleattr_sm deleattr;
 	struct PINT_client_listeattr_sm listeattr;
         struct PINT_client_perf_count_timer_sm perf_count_timer;
+        struct PINT_sysdev_unexp_sm sysdev_unexp;
     } u;
 } PINT_client_sm;
 
@@ -724,6 +711,7 @@ extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_client_rename_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
+extern struct PINT_state_machine_s pvfs2_sysdev_unexp_sm;
 extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
 extern struct PINT_state_machine_s pvfs2_client_perf_count_timer_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
