@@ -53,6 +53,7 @@
 # define a few generic variables that we need to use
 srcdir = @srcdir@
 prefix = @prefix@
+datarootdir = @datarootdir@
 mandir = @mandir@
 exec_prefix = @exec_prefix@
 
