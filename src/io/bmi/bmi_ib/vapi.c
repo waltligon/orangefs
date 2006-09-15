@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.6 2006-09-13 23:11:21 vilayann Exp $
+ * $Id: vapi.c,v 1.7 2006-09-15 21:23:56 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -767,20 +767,29 @@ static int vapi_prepare_cq_block(void)
 {
     struct vapi_device_priv *vd = ib_device->priv;
     int ret;
-    char buf[16];
-
     /* ask for the next notfication */
     ret = VAPI_req_comp_notif(vd->nic_handle, vd->nic_cq, VAPI_NEXT_COMP);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_req_comp_notif", __func__);
 
-    /* flush the pipe of any outstanding items, no need to be exact */
-    (void) read(vd->cq_event_pipe[0], buf, sizeof(buf));
-
     /* return the fd that can be fed to poll() */
     return vd->cq_event_pipe[0];
 }
 
+/*
+ * Read an event that tells us there is some action on the CQ.  In
+ * reality, just read the int from the pipe that connects us to the
+ * event handler thread.
+ */
+static void vapi_ack_cq_completion_event(void)
+{
+    struct vapi_device_priv *vd = ib_device->priv;
+    int i, ret;
+
+    ret = read(vd->cq_event_pipe[0], &i, sizeof(i));
+    if (ret != sizeof(i))
+	error_errno("%s: read cq event pipe", __func__);
+}
 
 /*
  * Return string form of work completion status field.
@@ -1042,6 +1051,7 @@ int vapi_ib_initialize(void)
     ib_device->func.post_sr_rdmaw = vapi_post_sr_rdmaw;
     ib_device->func.check_cq = vapi_check_cq;
     ib_device->func.prepare_cq_block = vapi_prepare_cq_block;
+    ib_device->func.ack_cq_completion_event = vapi_ack_cq_completion_event;
     ib_device->func.wc_status_string = vapi_wc_status_string;
     ib_device->func.mem_register = vapi_mem_register;
     ib_device->func.mem_deregister = vapi_mem_deregister;

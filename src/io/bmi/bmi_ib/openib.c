@@ -6,10 +6,11 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.7 2006-09-13 23:11:21 vilayann Exp $
+ * $Id: openib.c,v 1.8 2006-09-15 21:23:56 pw Exp $
  */
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include <fcntl.h>
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/io/bmi/bmi-byteswap.h>  /* bmitoh64 */
@@ -781,6 +782,23 @@ static int openib_prepare_cq_block(void)
 }
 
 /*
+ * As poll says there is something to read, get the event, but
+ * ignore the contents as we only have one CQ.  But ack it
+ * so that the count is correct and the CQ can be shutdown later.
+ */
+static void openib_ack_cq_completion_event(void)
+{
+    struct openib_device_priv *od = ib_device->priv;
+    struct ibv_cq *cq;
+    void *cq_context;
+    int ret;
+
+    ret = ibv_get_cq_event(od->channel, &cq, &cq_context);
+    if (ret == 0)
+	ibv_ack_cq_events(cq, 1);
+}
+
+/*
  * Return string form of work completion status field.
  */
 #define CASE(e)  case e: s = #e; break
@@ -998,6 +1016,7 @@ int openib_ib_initialize(void)
     ib_device->func.post_sr_rdmaw = openib_post_sr_rdmaw;
     ib_device->func.check_cq = openib_check_cq;
     ib_device->func.prepare_cq_block = openib_prepare_cq_block;
+    ib_device->func.ack_cq_completion_event = openib_ack_cq_completion_event;
     ib_device->func.wc_status_string = openib_wc_status_string;
     ib_device->func.mem_register = openib_mem_register;
     ib_device->func.mem_deregister = openib_mem_deregister;
@@ -1047,12 +1066,18 @@ int openib_ib_initialize(void)
     if (!od->nic_cq)
 	error("%s: ibv_create_cq failed", __func__);
 
-    /* use non-blocking IO on the async fd */
+    /* use non-blocking IO on the async fd and completion fd */
     flags = fcntl(ctx->async_fd, F_GETFL);
     if (flags < 0)
 	error_errno("%s: get async fd flags", __func__);
     if (fcntl(ctx->async_fd, F_SETFL, flags | O_NONBLOCK) < 0)
 	error_errno("%s: set async fd nonblocking", __func__);
+
+    flags = fcntl(od->channel->fd, F_GETFL);
+    if (flags < 0)
+	error_errno("%s: get completion fd flags", __func__);
+    if (fcntl(od->channel->fd, F_SETFL, flags | O_NONBLOCK) < 0)
+	error_errno("%s: set completion fd nonblocking", __func__);
 
     /* will be set on first connection */
     od->sg_tmp_array = 0;

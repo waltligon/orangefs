@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.41 2006-09-13 23:11:21 vilayann Exp $
+ * $Id: ib.c,v 1.42 2006-09-15 21:23:56 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +52,7 @@ ib_device_t *ib_device __hidden = NULL;
 #define post_sr_rdmaw ib_device->func.post_sr_rdmaw
 #define check_cq ib_device->func.check_cq
 #define prepare_cq_block ib_device->func.prepare_cq_block
+#define ack_cq_completion_event ib_device->func.ack_cq_completion_event
 #define wc_status_string ib_device->func.wc_status_string
 #define mem_register ib_device->func.mem_register
 #define mem_deregister ib_device->func.mem_deregister
@@ -1791,7 +1792,10 @@ static int ib_block_for_activity(int timeout_ms)
     }
     ret = poll(pfd, numfd, timeout_ms);
     debug(4, "%s: ret %d rev0 0x%x", __func__, ret, pfd[0].revents);
-    if (ret < 0) {
+    if (ret > 0) {
+	if (pfd[0].revents == POLLIN)
+	    ack_cq_completion_event();
+    } else if (ret < 0) {
 	if (errno == EINTR)  /* normal, ignore but break */
 	    ret = 0;
 	else
