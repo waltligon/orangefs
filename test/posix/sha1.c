@@ -1,3 +1,5 @@
+#include "pvfs2-test-config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,10 +8,15 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/mman.h>
-#include <openssl/evp.h>
-#include <openssl/crypto.h>
 #include <errno.h>
 #include "sha1.h"
+#ifdef WITH_OPENSSL
+#ifdef HAVE_OPENSSL_EVP_H
+#include <openssl/evp.h>
+#endif
+#ifdef HAVE_OPENSSL_CRYPTO_H
+#include <openssl/crypto.h>
+#endif
 
 #if 0
 static unsigned char *digest(unsigned char *mesg, unsigned mesgLen)
@@ -117,6 +124,14 @@ void sha1_file_digest(int fd)
 	free(hash);
 	return;
 }
+#else
+
+void sha1_file_digest(int fd)
+{
+	return; 
+}
+
+#endif
 
 #if 0
 int main(int argc, char *argv[])

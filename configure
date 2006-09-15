@@ -846,6 +846,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-thread-safety Disables thread safety in the client library
   --disable-server Disables building of PVFS2 server
+  --disable-openssl Disables building against the openssl libraries
   --disable-karma-mem-usage-stats Disables memory usage stats in karma
   --disable-perf-counters Disables pvfs2-server performance counters
   --disable-disk-io       Disables pvfs2-server disk I/O (for testing)
@@ -5465,6 +5466,19 @@ else
 fi;
 
 
+# Check whether --enable-openssl or --disable-openssl was given.
+if test "${enable_openssl+set}" = set; then
+  enableval="$enable_openssl"
+  if test "x$enableval" = "xyes" ; then
+	DETECT_OPENSSL=1
+else
+	DETECT_OPENSSL=0
+fi
+else
+  DETECT_OPENSSL=1
+fi;
+
+if test "x$DETECT_OPENSSL" = "x1"; then
 
 # Check whether --with-openssl or --without-openssl was given.
 if test "${with_openssl+set}" = set; then
@@ -5672,6 +5686,7 @@ rm -f conftest.err conftest.$ac_objext \
 
 
 fi;
+fi
 
 # Check whether --enable-karma-mem-usage-stats or --disable-karma-mem-usage-stats was given.
 if test "${enable_karma_mem_usage_stats+set}" = set; then

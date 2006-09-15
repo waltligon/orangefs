@@ -107,10 +107,21 @@ fi],
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
 
-AC_ARG_WITH(openssl,
-	    [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)],
-	    [AX_OPENSSL(${withval})],
-		 [AX_OPENSSL_OPTIONAL])
+AC_ARG_ENABLE(openssl,
+[  --disable-openssl Disables building against the openssl libraries],
+[if test "x$enableval" = "xyes" ; then
+	DETECT_OPENSSL=1
+else
+	DETECT_OPENSSL=0
+fi],
+	DETECT_OPENSSL=1)
+
+if test "x$DETECT_OPENSSL" = "x1"; then
+	AC_ARG_WITH(openssl,
+			 [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)],
+			 [AX_OPENSSL(${withval})],
+			 [AX_OPENSSL_OPTIONAL])
+fi
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
