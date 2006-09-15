@@ -107,21 +107,12 @@ fi],
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
 
-AC_ARG_ENABLE(openssl,
-[  --disable-openssl Disables building against the openssl libraries],
-[if test "x$enableval" = "xyes" ; then
-	DETECT_OPENSSL=1
-else
-	DETECT_OPENSSL=0
-fi],
-	DETECT_OPENSSL=1)
-
-if test "x$DETECT_OPENSSL" = "x1"; then
-	AC_ARG_WITH(openssl,
-			 [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)],
-			 [AX_OPENSSL(${withval})],
-			 [AX_OPENSSL_OPTIONAL])
-fi
+AC_ARG_WITH(openssl,
+	[  --with-openssl=<dir>  Build with openssl (the default).  <dir> defaults to /usr
+	   --without-openssl     Don't build with openssl.
+	],
+	[AX_OPENSSL(${withval})],
+	[AX_OPENSSL_OPTIONAL])
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
@@ -666,8 +657,6 @@ esac
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(arpa/inet.h)
 AC_CHECK_HEADERS(sys/socket.h)
-AC_CHECK_HEADERS(openssl/evp.h)
-AC_CHECK_HEADERS(openssl/crypto.h)
 dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)
 oldcflags="$CFLAGS"
