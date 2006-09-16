@@ -124,13 +124,13 @@ int PVFS_util_get_umask(void)
 }
 
 PVFS_credentials *PVFS_util_dup_credentials(
-    PVFS_credentials *credentials)
+    const PVFS_credentials *credentials)
 {
     PVFS_credentials *ret = NULL;
 
     if (credentials)
     {
-        ret = (PVFS_credentials *)malloc(sizeof(PVFS_credentials));
+        ret = malloc(sizeof(PVFS_credentials));
         if (ret)
         {
             memcpy(ret, credentials, sizeof(PVFS_credentials));

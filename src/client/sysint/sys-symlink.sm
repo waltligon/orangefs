@@ -180,7 +180,7 @@ PVFS_error PVFS_isys_symlink(
     PVFS_object_ref parent_ref,
     char *target,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_symlink *resp,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
@@ -245,7 +245,7 @@ PVFS_error PVFS_sys_symlink(
     PVFS_object_ref parent_ref,
     char *target,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_symlink *resp)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;

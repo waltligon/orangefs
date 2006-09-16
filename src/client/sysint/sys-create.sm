@@ -226,7 +226,7 @@ PVFS_error PVFS_isys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_dist *dist,
     PVFS_sysresp_create *resp,
     PVFS_sys_op_id *op_id,
@@ -363,7 +363,7 @@ PVFS_error PVFS_sys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_dist *dist,
     PVFS_sysresp_create *resp)
 {

@@ -252,7 +252,7 @@ PVFS_error PVFS_isys_io(
     PVFS_offset file_req_offset,
     void *buffer,
     PVFS_Request mem_req,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type,
     PVFS_sys_op_id *op_id,
@@ -339,7 +339,7 @@ PVFS_error PVFS_sys_io(
     PVFS_offset file_req_offset,
     void *buffer,
     PVFS_Request mem_req,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type)
 {

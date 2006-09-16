@@ -118,7 +118,7 @@ PVFS_error PVFS_isys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token, 
     int32_t pvfs_dirent_incount,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
@@ -181,7 +181,7 @@ PVFS_error PVFS_sys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token, 
     int32_t pvfs_dirent_incount,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
