@@ -131,7 +131,7 @@ static int make_link(PVFS_credentials     * pCredentials,
     /* We need to change the PINT_remove_base_dir to an API call (pvfs_util), 
      * and we need to change this to use it 
      */
-    ret = PINT_remove_base_dir( (char *) pszPvfsPath, 
+    ret = PINT_remove_base_dir( pszPvfsPath, 
                                 szBaseName, 
                                 sizeof(szBaseName));
     
@@ -209,7 +209,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
     int    ret             = 0, 
            option_index    = 0,
            create_softlink = 0;
-    char * cur_option      = NULL;
+    const char * cur_option      = NULL;
     char   flags[]         = "hvVs";  /* Options available on command line */
 
     static struct option long_opts[] =
@@ -225,7 +225,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
         switch (ret)
         {
             case 0:
-                cur_option = (char*)long_opts[option_index].name;
+                cur_option = long_opts[option_index].name;
    
                 if(strcmp("help", cur_option) == 0)
                 {

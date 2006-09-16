@@ -334,7 +334,7 @@ static int make_directory(PVFS_credentials     * credentials,
 static int parse_args(int argc, char** argv, struct options * opts)
 {
     int i = 0, ret = 0,option_index = 0, mode_requested = 0;
-    char * cur_option = NULL;
+    const char * cur_option = NULL;
     char flags[] = "hm:pvV";  /* Options available on command line */
 
     static struct option long_opts[] =
@@ -351,7 +351,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
         switch (ret)
         {
             case 0:
-                cur_option = (char*)long_opts[option_index].name;
+                cur_option = long_opts[option_index].name;
    
                 if(strcmp("help", cur_option) == 0)
                 {
