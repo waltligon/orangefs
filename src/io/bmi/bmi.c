@@ -1372,7 +1372,7 @@ int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netma
     gen_mutex_lock(&active_method_count_mutex);
     while (i < active_method_count)
     {
-        char *active_method_name = (char *) active_method_table[i]->method_name + 4;
+        const char *active_method_name = active_method_table[i]->method_name + 4;
         /* provided name matches this interface */
         if (!strncmp(active_method_name, provided_method_name, provided_method_length))
         {
