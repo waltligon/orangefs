@@ -30,8 +30,6 @@ static int io_release(
 static int io_cleanup(
     PINT_server_op *s_op, job_status_s* js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_io_sm(

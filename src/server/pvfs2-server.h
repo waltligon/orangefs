@@ -150,6 +150,8 @@ typedef struct PINT_server_trove_keys
     int size;
 } PINT_server_trove_keys_s;
 
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
+
 enum
 {
     ROOT_HANDLE_KEY      = 0,

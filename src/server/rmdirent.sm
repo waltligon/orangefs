@@ -34,8 +34,6 @@ static int rmdirent_remove_directory_entry_failure(
 static int rmdirent_setup_resp(
     PINT_server_op *s_op, job_status_s* js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_rmdirent_sm(

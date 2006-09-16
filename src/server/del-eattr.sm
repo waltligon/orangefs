@@ -21,8 +21,6 @@ static int deleattr_delobj_eattribs(
 static int deleattr_verify_eattribs(
     PINT_server_op *s_op, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_del_eattr_sm(

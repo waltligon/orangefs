@@ -33,8 +33,6 @@ static int prelude_check_acls_if_needed(
 static int prelude_check_acls(
     PINT_server_op *s_op, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 enum {
     PRELUDE_RUN_ACL_CHECKS = 1,
 };

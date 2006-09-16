@@ -78,8 +78,6 @@ static int getattr_setup_resp(
 static int getattr_setup_op(
     PINT_server_op *s_op, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 nested machine pvfs2_get_attr_work_sm(
