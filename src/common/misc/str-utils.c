@@ -459,12 +459,12 @@ void PINT_free_string_list(char ** list, int len)
  *
  */
 int PINT_remove_base_dir(
-    char *pathname,
+    const char *pathname,
     char *out_dir,
     int out_max_len)
 {
     int ret = -1, len = 0;
-    char *start, *end, *end_ref;
+    const char *start, *end, *end_ref;
 
     if (pathname && out_dir && out_max_len)
     {
@@ -474,7 +474,7 @@ int PINT_remove_base_dir(
         }
 
         start = pathname;
-        end = (char *) (pathname + strlen(pathname));
+        end = pathname + strlen(pathname);
         end_ref = end;
 
         while (end && (end > start) && (*(--end) != '/'));
