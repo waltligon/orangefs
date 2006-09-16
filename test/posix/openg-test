@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# first test open
+
+E_OPTERR=65
+
+usage()
+{
+	echo "Usage: `basename $0` -m <MPICH2 install path> -p <PVFS2 posix extensions path> -d <PVFS2 mount point> -f <machine file>"
+ 	exit $E_OPTERR;
+}
+
+MPICH2_INSTALL=/usr/local/mpich2/
+MACHINE_FILE=/homes/vilayann/mpi_hosts
+
+while getopts "m:p:d:f:" Option
+do
+	case $Option in
+		f) MACHINE_FILE=$OPTARG;;
+		m) MPICH2_INSTALL=$OPTARG;;
+		p) PVFS2_TOPDIR=$OPTARG;;
+		d) PVFS2_MNT=$OPTARG;;
+		*) usage;;	
+	esac
+done
+
+if [ -z "$PVFS2_TOPDIR" -o -z "$PVFS2_MNT" ]
+then
+	echo "Please specify PVFS2 top dir and mount point";
+	usage;
+fi
+
+levels=8
+
+base="$PVFS2_MNT"
+for i in `seq 1 $levels`; do 
+
+	mkdir -p -m 775 $base/$i 
+	base="$base/$i" 
+done
+
+openg_deepfile=$base/openg-test
+openg_shallowfile=$PVFS2_MNT/openg-test
+open_deepfile=$base/open-test
+open_shallowfile=$PVFS2_MNT/open-test
+
+clients="1 4 9 16 25 36 49 64 90"
+
+for c in $clients; do
+
+	echo "Running openg-mpi with $c clients"
+	echo "    openg file (create): ${openg_shallowfile}-$c-clients"
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
+		-f ${openg_shallowfile}-$c-clients -c -n 20
+	
+	echo "    openg file (reopen): ${openg_shallowfile}-$c-clients"
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c $PVFS2_TOPDIR/test/posix/openg-mpi \
+		-f ${openg_shallowfile}-$c-clients -u -n 20
+
+	echo "    openg file (create); ${openg_deepfile}-$c-clients"
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
+		-f ${openg_deepfile}-$c-clients -c -n 20
+
+	echo "    openg file (reopen): ${openg_deepfile}-$c-clients"
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/openg-mpi \
+		-f ${openg_deepfile}-$c-clients -u -n 20
+
+	echo "Running open with $c clients"
+	echo "    open file (create): ${open_shallowfile}-$c-clients"
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/open \
+		-f ${open_shallowfile}-$c-clients -c -n 20
+	
+	echo "    open file (reopen): ${open_shallowfile}-$c-clients"
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c $PVFS2_TOPDIR/test/posix/open \
+		-f ${open_shallowfile}-$c-clients -u -n 20
+
+	echo "    open file (create); ${open_deepfile}-$c-clients"
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/open \
+		-f ${open_deepfile}-$c-clients -c -n 20
+
+	echo "    open file (reopen): ${open_deepfile}-$c-clients"
+	${MPICH2_INSTALL}/bin/mpiexec -machinefile $MACHINE_FILE -n $c ${PVFS2_TOPDIR}/test/posix/open \
+		-f ${open_deepfile}-$c-clients -u -n 20
+done

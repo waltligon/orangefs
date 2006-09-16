@@ -1,0 +1,898 @@
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/i386/kernel/syscall_table.S vanilla-new/arch/i386/kernel/syscall_table.S
+--- vanilla/arch/i386/kernel/syscall_table.S	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/arch/i386/kernel/syscall_table.S	2006-05-24 16:31:20.000000000 -0500
+@@ -320,3 +320,5 @@
+ 	.long sys_fstatlite64
+ 	.long sys_getdents_plus
+ 	.long sys_getdents64_plus /* 320 */
++	.long sys_readx
++	.long sys_writex
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/ia64/kernel/entry.S vanilla-new/arch/ia64/kernel/entry.S
+--- vanilla/arch/ia64/kernel/entry.S	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/arch/ia64/kernel/entry.S	2006-05-24 16:32:28.000000000 -0500
+@@ -1626,5 +1626,7 @@
+ 	data8 sys_newfstatlite
+ 	data8 sys_getdents_plus
+ 	data8 sys_getdents64_plus
++	data8 sys_readx
++	data8 sys_writex
+ 
+ 	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/powerpc/kernel/systbl.S vanilla-new/arch/powerpc/kernel/systbl.S
+--- vanilla/arch/powerpc/kernel/systbl.S	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/arch/powerpc/kernel/systbl.S	2006-05-24 16:34:44.000000000 -0500
+@@ -329,3 +329,5 @@
+ SYSCALL(newfstatlite)
+ SYSCALL(sys_getdents_plus)
+ SYSCALL(sys_getdents64_plus)
++SYSCALL(sys_readx)
++SYSCALL(sys_writex)
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/x86_64/ia32/ia32entry.S vanilla-new/arch/x86_64/ia32/ia32entry.S
+--- vanilla/arch/x86_64/ia32/ia32entry.S	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/arch/x86_64/ia32/ia32entry.S	2006-05-24 16:32:01.000000000 -0500
+@@ -698,6 +698,8 @@
+ 	.quad sys32_fstatlite64
+ 	.quad sys_ni_syscall   /* getdents_plus */
+ 	.quad sys_ni_syscall   /* getdents64_plus */
++	.quad compat_sys_readx 
++	.quad compat_sys_writex
+ ia32_syscall_end:		
+ 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
+ 		.quad ni_syscall
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/compat.c vanilla-new/fs/compat.c
+--- vanilla/fs/compat.c	2006-05-09 18:53:48.000000000 -0500
++++ vanilla-new/fs/compat.c	2006-05-24 16:26:00.000000000 -0500
+@@ -1344,6 +1344,322 @@
+ 	return ret;
+ }
+ 
++static ssize_t compat_do_readx_writex(int type, struct file *file,
++			       const struct compat_iovec __user * uvector,
++			       unsigned long nr_segs, 
++					 const struct compat_xtvec __user * xtuvector,
++					 unsigned long xtnr_segs)
++{
++	typedef ssize_t (*io_fn_t)(struct file *, char __user *, size_t, loff_t *);
++	typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, loff_t *);
++	typedef ssize_t (*iox_fn_t)(struct file *, const struct iovec *, unsigned long, 
++			const struct xtvec *, unsigned long);
++
++	compat_ssize_t tot_len, tot_xtlen;
++	struct iovec iovstack[UIO_FASTIOV];
++	struct iovec *iov=iovstack;
++	struct xtvec xtvstack[UIO_FASTIOV];
++	struct xtvec *xtv=xtvstack;
++	ssize_t ret;
++	int seg;
++	io_fn_t fn = NULL;
++	iov_fn_t fnv = NULL;
++	iox_fn_t fnx = NULL;
++
++	/*
++	 * readx does not make much sense if nr_segs <= 0 (OR) xtnr_segs <= 0
++	 * We return 0 similar to how readv/writev do.
++	 */
++	ret = 0;
++	if (nr_segs == 0 || xtnr_segs == 0)
++		goto out;
++
++	/*
++	 * First get the "struct iovec" from user memory and
++	 * verify all the pointers
++	 */
++	ret = -EINVAL;
++	if ((nr_segs > UIO_MAXIOV) || (nr_segs <= 0))
++		goto out;
++	if ((xtnr_segs > UIO_MAXIOV) || (xtnr_segs <= 0))
++		goto out;
++	if (!file->f_op)
++		goto out;
++	if (nr_segs > UIO_FASTIOV) {
++		ret = -ENOMEM;
++		iov = kmalloc(nr_segs * sizeof(struct iovec), GFP_KERNEL);
++		if (!iov)
++			goto out;
++	}
++	if (xtnr_segs > UIO_FASTIOV) {
++		ret = -ENOMEM;
++		xtv = kmalloc(xtnr_segs * sizeof(struct xtvec), GFP_KERNEL);
++		if (!xtv) {
++			goto out;
++		}
++	}
++	ret = -EFAULT;
++	if (!access_ok(VERIFY_READ, uvector, nr_segs * sizeof(*uvector)))
++		goto out;
++	if (!access_ok(VERIFY_READ, xtuvector, xtnr_segs * sizeof(*xtuvector)))
++		goto out;
++
++	/*
++	 * Single unix specification:
++	 * We should -EINVAL if an element length is not >= 0 and fitting an
++	 * ssize_t.  The total length is fitting an ssize_t
++	 *
++	 * Be careful here because iov_len is a size_t not an ssize_t
++	 */
++	tot_len = 0;
++	ret = -EINVAL;
++	for (seg = 0; seg < nr_segs; seg++) {
++		compat_ssize_t tmp = tot_len, len;
++		compat_uptr_t buf;
++
++		if (__get_user(len, &uvector->iov_len) ||
++				__get_user(buf, &uvector->iov_base)) {
++			ret = -EFAULT;
++			goto out;
++		}
++		if (len < 0)	/* size_t not fitting an compat_ssize_t .. */
++			goto out;
++		tot_len += len;
++		if (tot_len < tmp) /* maths overflow on the compat_ssize_t */
++			goto out;
++		iov[seg].iov_base = compat_ptr(buf);
++		iov[seg].iov_len  = (compat_size_t) len;
++		uvector++;
++	}
++	if (tot_len == 0) {
++		ret = 0;
++		goto out;
++	}
++	tot_xtlen = 0;
++	ret = -EINVAL;
++	for (seg = 0; seg < xtnr_segs; seg++) {
++		compat_ssize_t tmp = tot_xtlen, len;
++		compat_off_t off;
++		loff_t foff;
++
++		if (__get_user(off, &xtuvector->xtv_off) ||
++				__get_user(len, &xtuvector->xtv_len)) {
++			ret = -EFAULT;
++			goto out;
++		}
++		if (len < 0)	/* size_t not fitting an compat_ssize_t .. */
++			goto out;
++		if (off < 0)   /* off_t not fitting an loff_t */
++			goto out;
++		tot_xtlen += len;
++		if (tot_xtlen < tmp) /* overflow on the compat_ssize_t */
++			goto out;
++		foff = (loff_t) off;
++		ret = rw_verify_area(type, file, &foff, len);
++		if (ret < 0)
++			goto out;
++		xtv[seg].xtv_off = (compat_off_t) off;
++		xtv[seg].xtv_len = (compat_size_t) len;
++		xtuvector++;
++	}
++	/* if sizes of file and mem don't match up, error out */
++	if (tot_xtlen != tot_len) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	if (type == READ) {
++		fn = (io_fn_t)file->f_op->read;
++		fnv = (iov_fn_t)file->f_op->readv;
++		fnx = (iox_fn_t)file->f_op->readx;
++	} else {
++		fn = (io_fn_t)file->f_op->write;
++		fnv = (iov_fn_t)file->f_op->writev;
++		fnx = (iox_fn_t)file->f_op->writex;
++	}
++	/* if we had a scatter-gather callback in memory and file, go for it */
++	if (fnx) {
++		ret = fnx(file, iov, nr_segs, xtv, xtnr_segs);
++		goto out;
++	}
++	/* else try to do it by hand using readv/writev operations */
++	else if (fnv) {
++		unsigned long xtiov_index = 0, op_iov_index = 0, iov_index = 0;
++		struct iovec *op_iov = NULL, *copied_iovector = NULL;
++		struct xtvec *copied_xtvector = NULL;
++
++		ret = -ENOMEM;
++		op_iov = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec), GFP_KERNEL);
++		if (!op_iov) 
++			goto err_out1;
++		copied_iovector = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec), GFP_KERNEL);
++		if (!copied_iovector) 
++			goto err_out1;
++		copied_xtvector = (struct xtvec *) kmalloc(xtnr_segs * sizeof(struct xtvec), GFP_KERNEL);
++		if (!copied_xtvector)
++			goto err_out1;
++		memcpy(copied_iovector, iov, nr_segs * sizeof(struct iovec));
++		memcpy(copied_xtvector, xtv, xtnr_segs * sizeof(struct xtvec));
++		ret = 0;
++		iov_index = 0;
++		for (xtiov_index = 0; xtiov_index < xtnr_segs; xtiov_index++) {
++			loff_t pos;
++			ssize_t nr, tot_nr;
++
++			pos = copied_xtvector[xtiov_index].xtv_off;
++			op_iov_index = 0;
++			tot_nr = 0;
++			
++			/* Finish an entire stream and .. */
++			while (copied_xtvector[xtiov_index].xtv_len > 0) {
++				size_t min_len;
++				if (unlikely((iov_index >= nr_segs) || (op_iov_index >= nr_segs))) {
++					printk(KERN_ERR "iov_index %ld or op_iov_index %ld cannot exceed number of iov segments (%ld)\n",
++							iov_index, op_iov_index, nr_segs);
++					ret = -EINVAL;
++					goto err_out1;
++				}
++				min_len = min(copied_xtvector[xtiov_index].xtv_len, copied_iovector[iov_index].iov_len);
++				op_iov[op_iov_index].iov_base = copied_iovector[iov_index].iov_base;
++				op_iov[op_iov_index++].iov_len = min_len;
++				copied_xtvector[xtiov_index].xtv_len -= min_len;
++				copied_iovector[iov_index].iov_len -= min_len;
++				copied_iovector[iov_index].iov_base += min_len;
++				tot_nr += min_len;
++				/* Advance memory stream if we have exhausted it */
++				if (copied_iovector[iov_index].iov_len <= 0) {
++					iov_index++;
++				}
++			}
++			/* .. issue a vectored operation for that region */
++			nr = fnv(file, op_iov, op_iov_index, &pos);
++			if (nr < 0) {
++				if (!ret) ret = nr;
++				break;
++			}
++			ret += nr;
++			if (nr != tot_nr)
++				break;
++		}
++err_out1:
++		kfree(op_iov);
++		kfree(copied_iovector);
++		kfree(copied_xtvector);
++		goto out;
++	}
++	/* Do it by hand, with plain read/write operations */
++	else {
++		unsigned long mem_ct = 0, str_ct = 0;
++		struct xtvec *copied_xtvector = NULL;
++		struct iovec *copied_iovector = NULL;
++
++		ret = -ENOMEM;
++		copied_iovector = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec), GFP_KERNEL);
++		if (!copied_iovector)
++			goto err_out2;
++		copied_xtvector = (struct xtvec *) kmalloc(xtnr_segs * sizeof(struct xtvec), GFP_KERNEL);
++		if (!copied_xtvector)
++			goto err_out2;
++		memcpy(copied_iovector, iov, nr_segs * sizeof(struct iovec));
++		memcpy(copied_xtvector, xtv, xtnr_segs * sizeof(struct xtvec));
++
++		ret = 0;
++		mem_ct = 0;
++		str_ct = 0;
++		while ((mem_ct < nr_segs) && (str_ct < xtnr_segs)) {
++			size_t min_len;
++			loff_t pos;
++			ssize_t nr;
++			void __user *base;
++
++			pos = copied_xtvector[str_ct].xtv_off;
++			base = copied_iovector[mem_ct].iov_base;
++			min_len = min(copied_xtvector[str_ct].xtv_len, copied_iovector[mem_ct].iov_len);
++			copied_xtvector[str_ct].xtv_len -= min_len;
++			copied_xtvector[str_ct].xtv_off += min_len;
++			copied_iovector[mem_ct].iov_len -= min_len;
++			copied_iovector[mem_ct].iov_base += min_len;
++			if (copied_iovector[mem_ct].iov_len <= 0)
++				mem_ct++;
++			if (copied_xtvector[str_ct].xtv_len <= 0)
++				str_ct++;
++			/* Issue the smallest region that is contiguous in memory and on file */
++			nr = fn(file, base, min_len, &pos);
++			if (nr < 0) {
++				if (!ret) ret = nr;
++				break;
++			}
++			ret += nr;
++			if (nr != min_len)
++				break;
++		}
++err_out2:
++		kfree(copied_xtvector);
++		kfree(copied_iovector);
++	}
++out:
++	if (iov != iovstack)
++		kfree(iov);
++	if (xtv != xtvstack)
++		kfree(xtv);
++	if ((ret + (type == READ)) > 0) {
++		if (type == READ)
++			fsnotify_access(file->f_dentry);
++		else
++			fsnotify_modify(file->f_dentry);
++	}
++	return ret;
++}
++
++asmlinkage ssize_t
++compat_sys_readx(unsigned long fd, const struct compat_iovec __user *vec, unsigned long vlen,
++		const struct compat_xtvec __user *xtv, unsigned long xtvlen)
++{
++	struct file *file;
++	ssize_t ret = -EBADF;
++
++	file = fget(fd);
++	if (!file)
++		return -EBADF;
++
++	if (!(file->f_mode & FMODE_READ))
++		goto out;
++
++	ret = -EINVAL;
++	if (!file->f_op || (!file->f_op->readx && !file->f_op->readv && !file->f_op->read))
++		goto out;
++
++	ret = compat_do_readx_writex(READ, file, vec, vlen, xtv, xtvlen);
++
++out:
++	fput(file);
++	return ret;
++}
++
++asmlinkage ssize_t
++compat_sys_writex(unsigned long fd, const struct compat_iovec __user *vec, unsigned long vlen,
++		const struct compat_xtvec __user *xtv, unsigned long xtvlen)
++{
++	struct file *file;
++	ssize_t ret = -EBADF;
++
++	file = fget(fd);
++	if (!file)
++		return -EBADF;
++	if (!(file->f_mode & FMODE_WRITE))
++		goto out;
++
++	ret = -EINVAL;
++	if (!file->f_op || (!file->f_op->writex && !file->f_op->writev && !file->f_op->write))
++		goto out;
++
++	ret = compat_do_readx_writex(WRITE, file, vec, vlen, xtv, xtvlen);
++
++out:
++	fput(file);
++	return ret;
++}
++
+ /*
+  * Exactly like fs/open.c:sys_open(), except that it doesn't set the
+  * O_LARGEFILE flag.
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/read_write.c vanilla-new/fs/read_write.c
+--- vanilla/fs/read_write.c	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/fs/read_write.c	2006-05-24 16:22:20.000000000 -0500
+@@ -374,6 +374,8 @@
+ 	return ret;
+ }
+ 
++EXPORT_SYMBOL_GPL(sys_write);
++
+ asmlinkage ssize_t sys_pread64(unsigned int fd, char __user *buf,
+ 			     size_t count, loff_t pos)
+ {
+@@ -636,6 +638,334 @@
+ 	return ret;
+ }
+ 
++static ssize_t do_readx_writex(int type, struct file *file,
++			       const struct iovec __user * uvector,
++			       unsigned long nr_segs, 
++					 const struct xtvec __user * xtuvector,
++					 unsigned long xtnr_segs)
++{
++	typedef ssize_t (*io_fn_t)(struct file *, char __user *, size_t, loff_t *);
++	typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, loff_t *);
++	typedef ssize_t (*iox_fn_t)(struct file *, const struct iovec *, unsigned long, 
++			const struct xtvec *, unsigned long);
++
++	size_t tot_len, tot_xtlen;
++	struct iovec iovstack[UIO_FASTIOV];
++	struct iovec *iov=iovstack;
++	struct xtvec xtvstack[UIO_FASTIOV];
++	struct xtvec *xtv=xtvstack;
++	ssize_t ret;
++	int seg;
++	io_fn_t fn = NULL;
++	iov_fn_t fnv = NULL;
++	iox_fn_t fnx = NULL;
++
++	/*
++	 * readx does not make much sense if nr_segs <= 0 (OR) xtnr_segs <= 0
++	 * We return 0 similar to how readv/writev do.
++	 */
++	ret = 0;
++	if (nr_segs == 0 || xtnr_segs == 0)
++		goto out;
++
++	/*
++	 * First get the "struct iovec" from user memory and
++	 * verify all the pointers
++	 */
++	ret = -EINVAL;
++	if ((nr_segs > UIO_MAXIOV) || (nr_segs <= 0))
++		goto out;
++	if ((xtnr_segs > UIO_MAXIOV) || (xtnr_segs <= 0))
++		goto out;
++	if (!file->f_op)
++		goto out;
++	if (nr_segs > UIO_FASTIOV) {
++		ret = -ENOMEM;
++		iov = kmalloc(nr_segs * sizeof(struct iovec), GFP_KERNEL);
++		if (!iov)
++			goto out;
++	}
++	if (xtnr_segs > UIO_FASTIOV) {
++		ret = -ENOMEM;
++		xtv = kmalloc(xtnr_segs * sizeof(struct xtvec), GFP_KERNEL);
++		if (!xtv) {
++			goto out;
++		}
++	}
++	ret = -EFAULT;
++	if (copy_from_user(iov, uvector, nr_segs * sizeof(*uvector)))
++		goto out;
++	if (copy_from_user(xtv, xtuvector, xtnr_segs * sizeof(*xtuvector)))
++		goto out;
++
++	/*
++	 * Single unix specification:
++	 * We should -EINVAL if an element length is not >= 0 and fitting an
++	 * ssize_t.  The total length is fitting an ssize_t
++	 *
++	 * Be careful here because iov_len is a size_t not an ssize_t
++	 */
++	tot_len = 0;
++	ret = -EINVAL;
++	for (seg = 0; seg < nr_segs; seg++) {
++		void __user *buf = iov[seg].iov_base;
++		ssize_t len = (ssize_t)iov[seg].iov_len;
++
++		if (len < 0)	/* size_t not fitting an ssize_t .. */
++			goto out;
++		if (unlikely(!access_ok(vrfy_dir(type), buf, len)))
++			goto Efault;
++		tot_len += len;
++		if ((ssize_t)tot_len < 0) /* maths overflow on the ssize_t */
++			goto out;
++	}
++	if (tot_len == 0) {
++		ret = 0;
++		goto out;
++	}
++	tot_xtlen = 0;
++	ret = -EINVAL;
++	for (seg = 0; seg < xtnr_segs; seg++) {
++		loff_t off = (loff_t) xtv[seg].xtv_off;
++		ssize_t len = (ssize_t)xtv[seg].xtv_len;
++
++		if (len < 0)	/* size_t not fitting an ssize_t .. */
++			goto out;
++		if (off < 0)   /* off_t not fitting an loff_t */
++			goto out;
++		tot_xtlen += len;
++		if ((ssize_t)tot_xtlen < 0) /* overflow on the ssize_t */
++			goto out;
++		ret = rw_verify_area(type, file, &off, len);
++		if (ret < 0)
++			goto out;
++	}
++	/* if sizes of file and mem don't match up, error out */
++	if (tot_xtlen != tot_len) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	ret = security_file_permission(file, type == READ ? MAY_READ : MAY_WRITE);
++	if (ret)
++		goto out;
++
++	if (type == READ) {
++		fn = (io_fn_t)file->f_op->read;
++		fnv = (iov_fn_t)file->f_op->readv;
++		fnx = (iox_fn_t)file->f_op->readx;
++	} else {
++		fn = (io_fn_t)file->f_op->write;
++		fnv = (iov_fn_t)file->f_op->writev;
++		fnx = (iox_fn_t)file->f_op->writex;
++	}
++	/* if we had a scatter-gather callback in memory and file, go for it */
++	if (fnx) {
++		ret = fnx(file, iov, nr_segs, xtv, xtnr_segs);
++		goto out;
++	}
++	/* else try to do it by hand using readv/writev operations */
++	else if (fnv) {
++		unsigned long xtiov_index = 0, op_iov_index = 0, iov_index = 0;
++		struct iovec *op_iov = NULL, *copied_iovector = NULL;
++		struct xtvec *copied_xtvector = NULL;
++
++		ret = -ENOMEM;
++		op_iov = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec), GFP_KERNEL);
++		if (!op_iov) 
++			goto err_out1;
++		copied_iovector = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec), GFP_KERNEL);
++		if (!copied_iovector) 
++			goto err_out1;
++		copied_xtvector = (struct xtvec *) kmalloc(xtnr_segs * sizeof(struct xtvec), GFP_KERNEL);
++		if (!copied_xtvector)
++			goto err_out1;
++		memcpy(copied_iovector, iov, nr_segs * sizeof(struct iovec));
++		memcpy(copied_xtvector, xtv, xtnr_segs * sizeof(struct xtvec));
++		ret = 0;
++		iov_index = 0;
++		for (xtiov_index = 0; xtiov_index < xtnr_segs; xtiov_index++) {
++			loff_t pos;
++			ssize_t nr, tot_nr;
++
++			pos = copied_xtvector[xtiov_index].xtv_off;
++			op_iov_index = 0;
++			tot_nr = 0;
++			
++			/* Finish an entire stream and .. */
++			while (copied_xtvector[xtiov_index].xtv_len > 0) {
++				size_t min_len;
++				if (unlikely((iov_index >= nr_segs) || (op_iov_index >= nr_segs))) {
++					printk(KERN_ERR "iov_index %ld or op_iov_index %ld cannot exceed number of iov segments (%ld)\n",
++							iov_index, op_iov_index, nr_segs);
++					ret = -EINVAL;
++					goto err_out1;
++				}
++				min_len = min(copied_xtvector[xtiov_index].xtv_len, copied_iovector[iov_index].iov_len);
++				op_iov[op_iov_index].iov_base = copied_iovector[iov_index].iov_base;
++				op_iov[op_iov_index++].iov_len = min_len;
++				copied_xtvector[xtiov_index].xtv_len -= min_len;
++				copied_iovector[iov_index].iov_len -= min_len;
++				copied_iovector[iov_index].iov_base += min_len;
++				tot_nr += min_len;
++				/* Advance memory stream if we have exhausted it */
++				if (copied_iovector[iov_index].iov_len <= 0) {
++					iov_index++;
++				}
++			}
++			/* .. issue a vectored operation for that region */
++			nr = fnv(file, op_iov, op_iov_index, &pos);
++			if (nr < 0) {
++				if (!ret) ret = nr;
++				break;
++			}
++			ret += nr;
++			if (nr != tot_nr)
++				break;
++		}
++err_out1:
++		kfree(op_iov);
++		kfree(copied_iovector);
++		kfree(copied_xtvector);
++		goto out;
++	}
++	/* Do it by hand, with plain read/write operations */
++	else {
++		unsigned long mem_ct = 0, str_ct = 0;
++		struct xtvec *copied_xtvector = NULL;
++		struct iovec *copied_iovector = NULL;
++
++		ret = -ENOMEM;
++		copied_iovector = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec), GFP_KERNEL);
++		if (!copied_iovector)
++			goto err_out2;
++		copied_xtvector = (struct xtvec *) kmalloc(xtnr_segs * sizeof(struct xtvec), GFP_KERNEL);
++		if (!copied_xtvector)
++			goto err_out2;
++		memcpy(copied_iovector, iov, nr_segs * sizeof(struct iovec));
++		memcpy(copied_xtvector, xtv, xtnr_segs * sizeof(struct xtvec));
++
++		ret = 0;
++		mem_ct = 0;
++		str_ct = 0;
++		while ((mem_ct < nr_segs) && (str_ct < xtnr_segs)) {
++			size_t min_len;
++			loff_t pos;
++			ssize_t nr;
++			void __user *base;
++
++			pos = copied_xtvector[str_ct].xtv_off;
++			base = copied_iovector[mem_ct].iov_base;
++			min_len = min(copied_xtvector[str_ct].xtv_len, copied_iovector[mem_ct].iov_len);
++			copied_xtvector[str_ct].xtv_len -= min_len;
++			copied_xtvector[str_ct].xtv_off += min_len;
++			copied_iovector[mem_ct].iov_len -= min_len;
++			copied_iovector[mem_ct].iov_base += min_len;
++			if (copied_iovector[mem_ct].iov_len <= 0)
++				mem_ct++;
++			if (copied_xtvector[str_ct].xtv_len <= 0)
++				str_ct++;
++			/* Issue the smallest region that is contiguous in memory and on file */
++			nr = fn(file, base, min_len, &pos);
++			if (nr < 0) {
++				if (!ret) ret = nr;
++				break;
++			}
++			ret += nr;
++			if (nr != min_len)
++				break;
++		}
++err_out2:
++		kfree(copied_xtvector);
++		kfree(copied_iovector);
++	}
++out:
++	if (iov != iovstack)
++		kfree(iov);
++	if (xtv != xtvstack)
++		kfree(xtv);
++	if ((ret + (type == READ)) > 0) {
++		if (type == READ)
++			fsnotify_access(file->f_dentry);
++		else
++			fsnotify_modify(file->f_dentry);
++	}
++	return ret;
++Efault:
++	ret = -EFAULT;
++	goto out;
++}
++
++ssize_t vfs_readx(struct file *file, const struct iovec __user *vec,
++		  unsigned long vlen, const struct xtvec __user *xtvec, unsigned long xtvlen)
++{
++	if (!(file->f_mode & FMODE_READ))
++		return -EBADF;
++	if (!file->f_op || (!file->f_op->readx && !file->f_op->readv && !file->f_op->read))
++		return -EINVAL;
++
++	return do_readx_writex(READ, file, vec, vlen, xtvec, xtvlen);
++}
++
++EXPORT_SYMBOL_GPL(vfs_readx);
++
++ssize_t vfs_writex(struct file *file, const struct iovec __user *vec,
++		   unsigned long vlen, const struct xtvec __user *xtvec, unsigned long xtvlen)
++{
++	if (!(file->f_mode & FMODE_WRITE))
++		return -EBADF;
++	if (!file->f_op || (!file->f_op->writex && !file->f_op->writev && !file->f_op->write))
++		return -EINVAL;
++
++	return do_readx_writex(WRITE, file, vec, vlen, xtvec, xtvlen);
++}
++
++EXPORT_SYMBOL_GPL(vfs_writex);
++
++asmlinkage ssize_t sys_readx(unsigned long fd,
++				const struct iovec __user *vec,
++				unsigned long vlen,
++				const struct xtvec __user *xtvec,
++				unsigned long xtvlen)
++{
++	struct file *file;
++	ssize_t ret = -EBADF;
++	int fput_needed;
++
++	file = fget_light(fd, &fput_needed);
++	if (file) {
++		ret = vfs_readx(file, vec, vlen, xtvec, xtvlen);
++		fput_light(file, fput_needed);
++	}
++
++	if (ret > 0)
++		current->rchar += ret;
++	current->syscr++;
++	return ret;
++}
++
++asmlinkage ssize_t sys_writex(unsigned long fd,
++				const struct iovec __user *vec,
++				unsigned long vlen,
++				const struct xtvec __user *xtvec,
++				unsigned long xtvlen)
++{
++	struct file *file;
++	ssize_t ret = -EBADF;
++	int fput_needed;
++
++	file = fget_light(fd, &fput_needed);
++	if (file) {
++		ret = vfs_writex(file, vec, vlen, xtvec, xtvlen);
++		fput_light(file, fput_needed);
++	}
++
++	if (ret > 0)
++		current->wchar += ret;
++	current->syscw++;
++	return ret;
++}
++
+ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
+ 			   size_t count, loff_t max)
+ {
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-i386/unistd.h vanilla-new/include/asm-i386/unistd.h
+--- vanilla/include/asm-i386/unistd.h	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/include/asm-i386/unistd.h	2006-05-24 16:27:28.000000000 -0500
+@@ -326,8 +326,10 @@
+ #define __NR_fstatlite64 318
+ #define __NR_getdents_plus 319
+ #define __NR_getdents64_plus 320
++#define __NR_readx      321
++#define __NR_writex     322
+ 
+-#define NR_syscalls 321
++#define NR_syscalls 323
+ 
+ /*
+  * user-visible error numbers are in the range -1 - -128: see
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-ia64/unistd.h vanilla-new/include/asm-ia64/unistd.h
+--- vanilla/include/asm-ia64/unistd.h	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/include/asm-ia64/unistd.h	2006-05-24 16:29:19.000000000 -0500
+@@ -292,12 +292,14 @@
+ #define __NR_fstatlite     1301
+ #define __NR_getdents_plus 1302
+ #define __NR_getdents64_plus 1303
++#define __NR_readx         1304
++#define __NR_writex        1305
+ 
+ #ifdef __KERNEL__
+ 
+ #include <linux/config.h>
+ 
+-#define NR_syscalls			280 /* length of syscall table */
++#define NR_syscalls			282 /* length of syscall table */
+ 
+ #define __ARCH_WANT_SYS_RT_SIGACTION
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-powerpc/unistd.h vanilla-new/include/asm-powerpc/unistd.h
+--- vanilla/include/asm-powerpc/unistd.h	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/include/asm-powerpc/unistd.h	2006-05-24 16:30:04.000000000 -0500
+@@ -308,8 +308,10 @@
+ #define __NR_fstatlite     287
+ #define __NR_getdents_plus 288
+ #define __NR_getdents64_plus 289
++#define __NR_readx         290
++#define __NR_writex        291
+ 
+-#define __NR_syscalls		290
++#define __NR_syscalls		292
+ 
+ #ifdef __KERNEL__
+ #define __NR__exit __NR_exit
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/unistd.h vanilla-new/include/asm-x86_64/unistd.h
+--- vanilla/include/asm-x86_64/unistd.h	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/include/asm-x86_64/unistd.h	2006-05-24 16:28:26.000000000 -0500
+@@ -619,8 +619,12 @@
+ __SYSCALL(__NR_getdents_plus, sys_getdents_plus)
+ #define __NR_getdents64_plus 279
+ __SYSCALL(__NR_getdents64_plus, sys_getdents64_plus)
++#define __NR_readx  280
++__SYSCALL(__NR_readx, sys_readx)
++#define __NR_writex 281
++__SYSCALL(__NR_writex, sys_writex)
+ 
+-#define __NR_syscall_max __NR_getdents64_plus
++#define __NR_syscall_max __NR_writex
+ 
+ #ifndef __NO_STUBS
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/compat.h vanilla-new/include/linux/compat.h
+--- vanilla/include/linux/compat.h	2006-05-09 18:53:48.000000000 -0500
++++ vanilla-new/include/linux/compat.h	2006-05-24 16:26:29.000000000 -0500
+@@ -61,6 +61,11 @@
+ 	compat_size_t	iov_len;
+ };
+ 
++struct compat_xtvec {
++	compat_off_t  xtv_off;
++	compat_size_t xtv_len;
++};
++
+ struct compat_rlimit {
+ 	compat_ulong_t	rlim_cur;
+ 	compat_ulong_t	rlim_max;
+@@ -141,6 +146,13 @@
+ asmlinkage ssize_t compat_sys_writev(unsigned long fd,
+ 		const struct compat_iovec __user *vec, unsigned long vlen);
+ 
++asmlinkage ssize_t compat_sys_readx(unsigned long fd,
++		const struct compat_iovec __user *vec, unsigned long vlen,
++		const struct compat_xtvec __user *xtvec, unsigned long xtvlen);
++asmlinkage ssize_t compat_sys_writex(unsigned long fd,
++		const struct compat_iovec __user *vec, unsigned long vlen,
++		const struct compat_xtvec __user *xtvec, unsigned long xtvlen);
++
+ int compat_do_execve(char * filename, compat_uptr_t __user *argv,
+ 	        compat_uptr_t __user *envp, struct pt_regs * regs);
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/fs.h vanilla-new/include/linux/fs.h
+--- vanilla/include/linux/fs.h	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/include/linux/fs.h	2006-05-24 16:20:15.000000000 -0500
+@@ -226,6 +226,7 @@
+ 
+ struct hd_geometry;
+ struct iovec;
++struct xtvec;
+ struct nameidata;
+ struct kiocb;
+ struct pipe_inode_info;
+@@ -1048,6 +1049,8 @@
+ 	int (*lock) (struct file *, int, struct file_lock *);
+ 	ssize_t (*readv) (struct file *, const struct iovec *, unsigned long, loff_t *);
+ 	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long, loff_t *);
++	ssize_t (*readx) (struct file *, const struct iovec *, unsigned long, const struct xtvec *, unsigned long);
++	ssize_t (*writex) (struct file *, const struct iovec *, unsigned long, const struct xtvec *, unsigned long);
+ 	ssize_t (*sendfile) (struct file *, loff_t *, size_t, read_actor_t, void *);
+ 	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
+ 	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+@@ -1092,6 +1095,11 @@
+ 		unsigned long, loff_t *);
+ extern ssize_t vfs_writev(struct file *, const struct iovec __user *,
+ 		unsigned long, loff_t *);
++extern ssize_t vfs_readx(struct file *, const struct iovec __user *,
++		unsigned long, const struct xtvec __user *, unsigned long);
++extern ssize_t vfs_writex(struct file *, const struct iovec __user *,
++		unsigned long, const struct xtvec __user *, unsigned long);
++
+ 
+ /*
+  * NOTE: write_inode, delete_inode, clear_inode, put_inode can be called
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/syscalls.h vanilla-new/include/linux/syscalls.h
+--- vanilla/include/linux/syscalls.h	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/include/linux/syscalls.h	2006-05-24 16:23:31.000000000 -0500
+@@ -17,6 +17,7 @@
+ struct iocb;
+ struct io_event;
+ struct iovec;
++struct xtvec;
+ struct itimerspec;
+ struct itimerval;
+ struct kexec_segment;
+@@ -402,6 +403,16 @@
+ asmlinkage ssize_t sys_writev(unsigned long fd,
+ 				const struct iovec __user *vec,
+ 				unsigned long vlen);
++asmlinkage ssize_t sys_readx(unsigned long fd,
++				const struct iovec __user *vec,
++				unsigned long vlen,
++				const struct xtvec __user *xtvec,
++				unsigned long xtvlen);
++asmlinkage ssize_t sys_writex(unsigned long fd,
++				const struct iovec __user *vec,
++				unsigned long vlen,
++				const struct xtvec __user *xtvec,
++				unsigned long xtvlen);
+ asmlinkage ssize_t sys_pread64(unsigned int fd, char __user *buf,
+ 				size_t count, loff_t pos);
+ asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char __user *buf,
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/uio.h vanilla-new/include/linux/uio.h
+--- vanilla/include/linux/uio.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/linux/uio.h	2006-05-24 16:24:20.000000000 -0500
+@@ -23,6 +23,12 @@
+ 	__kernel_size_t iov_len; /* Must be size_t (1003.1g) */
+ };
+ 
++struct xtvec 
++{
++	__kernel_off_t xtv_off;  /* must be off_t */
++	__kernel_size_t xtv_len; /* must be size_t */
++};
++
+ #ifdef __KERNEL__
+ 
+ struct kvec {
+@@ -30,6 +36,12 @@
+ 	size_t iov_len;
+ };
+ 
++struct kxtvec
++{
++	off_t xtv_off;
++	size_t xtv_len;
++};
++
+ #endif
+ 
+ /*
