@@ -109,8 +109,12 @@ char *get_opname_string(pvfs2_kernel_op_t *new_op)
             return "OP_CANCEL";
         else if (type == PVFS2_VFS_OP_FSYNC)
             return "OP_FSYNC";
+        else if (type == PVFS2_VFS_OP_FSKEY)
+            return "OP_FSKEY";
+        else if (type == PVFS2_VFS_OP_FILE_IOX)
+            return "OP_FILE_IOX";
     }
-    return "OP_INVALID";
+    return "OP_UNKNOWN?";
 }
 
 static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
