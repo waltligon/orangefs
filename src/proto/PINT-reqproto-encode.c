@@ -38,8 +38,6 @@ do { \
     PVFS_EVENT_FLAG_END); \
 } while(0)
 
-extern PINT_encoding_table_values le_bytefield_table;
-
 static PINT_encoding_table_values *PINT_encoding_table[
     ENCODING_TABLE_SIZE] = {NULL};
 
