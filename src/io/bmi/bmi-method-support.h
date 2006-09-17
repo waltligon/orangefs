@@ -135,7 +135,7 @@ struct bmi_method_ops
 				    int *,
 				    struct method_unexpected_info *,
 				    int);
-      method_addr_p(*BMI_meth_method_addr_lookup) (const char *);
+    method_addr_p (*BMI_meth_method_addr_lookup) (const char *);
     int (*BMI_meth_post_send_list) (bmi_op_id_t *,
 				    method_addr_p,
 				    const void *const *,
