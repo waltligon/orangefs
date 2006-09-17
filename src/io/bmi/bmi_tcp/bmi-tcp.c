@@ -1707,7 +1707,7 @@ int BMI_tcp_query_addr_range(method_addr_p map, const char *wildcard_string, int
     struct tcp_addr *tcp_addr_data = map->method_data;
     struct sockaddr_in map_addr;
     socklen_t map_addr_len = sizeof(map_addr);
-    char *tcp_wildcard = (char *) wildcard_string + 6 /* strlen("tcp://") */;
+    const char *tcp_wildcard = wildcard_string + 6 /* strlen("tcp://") */;
 
     memset(&map_addr, 0, sizeof(map_addr));
     getsockname(tcp_addr_data->socket, (struct sockaddr *) &map_addr, &map_addr_len);
