@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.43 2006-09-18 13:52:15 pw Exp $
+ * $Id: ib.c,v 1.44 2006-09-18 17:35:35 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -787,7 +787,7 @@ BMI_ib_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
   enum bmi_buffer_type buffer_flag __unused,
   bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
-    debug(3, "%s: len %d tag %d", __func__, (int) size, tag);
+    debug(2, "%s: len %d tag %d", __func__, (int) size, tag);
     /* references here will not be saved after this func returns */
     return generic_post_send(id, remote_map, 0, &buffer, &size, size,
       tag, user_ptr, context_id, 0);
