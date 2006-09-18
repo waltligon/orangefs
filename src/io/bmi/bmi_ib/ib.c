@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.42 2006-09-15 21:23:56 pw Exp $
+ * $Id: ib.c,v 1.43 2006-09-18 13:52:15 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,7 +79,6 @@ static void encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh,
                                     u_int32_t byte_len);
 static void encourage_recv_incoming_cts_ack(ib_recv_t *rq);
 static int send_cts(ib_recv_t *rq);
-static void maybe_free_connection(ib_connection_t *c);
 static void ib_close_connection(ib_connection_t *c);
 #ifndef __PVFS2_SERVER__
 static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
@@ -1038,7 +1037,6 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	free(sq->mop);
 	free(sq);
 	--c->refcnt;
-	maybe_free_connection(c);
 	if (c->closed)
 	    ib_close_connection(c);
 	return 1;
@@ -1109,7 +1107,6 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	qlist_del(&rq->list);
 	c = rq->c;
 	free(rq);
-	maybe_free_connection(c);
 	--c->refcnt;
 	if (c->closed)
 	    ib_close_connection(c);
@@ -1444,28 +1441,6 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
     return 0;
 }
 
-/*
- * For connections that are being cancelled, maybe delete them if no
- * more send or recvq entries remain.
- */
-static void
-maybe_free_connection(ib_connection_t *c)
-{
-    list_t *l;
-
-    if (!c->cancelled)
-	return;
-    qlist_for_each(l, &ib_device->sendq) {
-	ib_send_t *sq = qlist_upcast(l);
-	if (sq->c == c) return;
-    }
-    qlist_for_each(l, &ib_device->recvq) {
-	ib_recv_t *rq = qlist_upcast(l);
-	if (rq->c == c) return;
-    }
-    ib_close_connection(c);
-}
-
 static const char *
 BMI_ib_rev_lookup(struct method_addr *meth)
 {
@@ -1612,6 +1587,10 @@ static ib_connection_t *ib_new_connection(int sock, const char *peername,
     return c;
 }
 
+/*
+ * Try to close and free a connection, but only do it if refcnt has
+ * gone to zero.
+ */
 static void ib_close_connection(ib_connection_t *c)
 {
     ib_method_addr_t *ibmap;
