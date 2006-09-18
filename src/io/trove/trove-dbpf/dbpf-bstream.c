@@ -166,10 +166,8 @@ static void aio_progress_notification(union sigval sig)
 
             gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %s complete: "
                          "aio_return() says %d [fd = %d]\n",
-                         __func__,
-                         ((op_p->type == BSTREAM_WRITE_LIST) ||
-                          (op_p->type == BSTREAM_WRITE_AT) ?
-                          "WRITE" : "READ"), ret, op_p->u.b_rw_list.fd);
+                         __func__, dbpf_op_type_to_str(op_p->type),
+                         ret, op_p->u.b_rw_list.fd);
 
             *(op_p->u.b_rw_list.out_size_p) += ret;
 
