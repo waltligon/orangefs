@@ -57,8 +57,12 @@ typedef unsigned long sector_t;
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/fs.h>
+#include <linux/vmalloc.h>
 
 #include "pvfs2-config.h"
+#include "pvfs2-debug.h"
+#include "gossip.h"
+
 #ifdef HAVE_AIO
 #include <linux/aio.h>
 #endif
@@ -76,6 +80,9 @@ typedef unsigned long sector_t;
 #endif
 #ifdef HAVE_LINUX_SYSCALLS_H
 #include <linux/syscalls.h>
+#endif
+#ifdef HAVE_LINUX_MOUNT_H
+#include <linux/mount.h>
 #endif
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
@@ -114,28 +121,6 @@ typedef unsigned long sector_t;
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-types.h"
 
-#define pvfs2_error printk
-
-#ifdef PVFS2_KERNEL_DEBUG
-#define pvfs2_print printk
-#define pvfs2_panic(msg)                                       \
-do {                                                           \
-    pvfs2_error("BUG! Please contact pvfs2-developers@beowulf-"\
-                "underground.org\n");                          \
-    panic(msg);                                                \
-} while(0)
-#else
-#define pvfs2_print(format...) do{                             \
-    if(debug) printk(format);                                  \
-}while(0)
-#define pvfs2_panic(msg)                                       \
-do {                                                           \
-    pvfs2_error("BUG! Please contact pvfs2-developers@beowulf-"\
-                "underground.org\n");                          \
-    pvfs2_error(msg);                                          \
-} while(0)
-#endif
-
 /*
   this attempts to disable the annotations used by the 'sparse' kernel
   source utility on systems that can't understand it by defining the
@@ -146,20 +131,21 @@ do {                                                           \
 #endif
 
 #ifdef PVFS2_KERNEL_DEBUG
-#define PVFS2_DEFAULT_OP_TIMEOUT_SECS       30
+#define PVFS2_DEFAULT_OP_TIMEOUT_SECS       10
 #else
-#define PVFS2_DEFAULT_OP_TIMEOUT_SECS       60
+#define PVFS2_DEFAULT_OP_TIMEOUT_SECS       20
 #endif
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
 
 #define PVFS2_DEVREQ_MAGIC             0x20030529
 #define PVFS2_LINK_MAX                 0x000000FF
-#define PVFS2_OP_RETRY_COUNT           0x00000005
+#define PVFS2_PURGE_RETRY_COUNT        0x00000005
 #define PVFS2_SEEK_END                 0x00000002
 #define PVFS2_MAX_NUM_OPTIONS          0x00000004
 #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
 #define PVFS2_NUM_READDIR_RETRIES      0x0000000A
+#define PVFS2_MAX_FSKEY_LEN            64
 
 #define MAX_DEV_REQ_UPSIZE (2*sizeof(int32_t) +   \
 sizeof(uint64_t) + sizeof(pvfs2_upcall_t))
@@ -200,11 +186,26 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
  * waiting  - op is on request_list (upward bound)
  * inprogr  - op is in progress (waiting for downcall)
  * serviced - op has matching downcall; ok
+ * purged   - op has to start a timer since client-core
+              exited uncleanly before servicing op
  ************************************/
-#define PVFS2_VFS_STATE_UNKNOWN        0x00FF0000
-#define PVFS2_VFS_STATE_WAITING        0x00FF0001
-#define PVFS2_VFS_STATE_INPROGR        0x00FF0002
-#define PVFS2_VFS_STATE_SERVICED       0x00FF0003
+enum pvfs2_vfs_op_states {
+    OP_VFS_STATE_UNKNOWN = 0,
+    OP_VFS_STATE_WAITING = 1,
+    OP_VFS_STATE_INPROGR = 2,
+    OP_VFS_STATE_SERVICED = 4,
+    OP_VFS_STATE_PURGED  = 8,
+};
+
+#define set_op_state_waiting(op)     ((op)->op_state = OP_VFS_STATE_WAITING)
+#define set_op_state_inprogress(op)  ((op)->op_state = OP_VFS_STATE_INPROGR)
+#define set_op_state_serviced(op)    ((op)->op_state = OP_VFS_STATE_SERVICED)
+#define set_op_state_purged(op)      ((op)->op_state |= OP_VFS_STATE_PURGED)
+
+#define op_state_waiting(op)     ((op)->op_state & OP_VFS_STATE_WAITING)
+#define op_state_in_progress(op) ((op)->op_state & OP_VFS_STATE_INPROGR)
+#define op_state_serviced(op)    ((op)->op_state & OP_VFS_STATE_SERVICED)
+#define op_state_purged(op)      ((op)->op_state & OP_VFS_STATE_PURGED)
 
 /* Defines for incrementing aio_ref_count */
 #ifndef HAVE_AIO_VFS_SUPPORT
@@ -215,12 +216,12 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 #define get_op(op) \
     do {\
         atomic_inc(&(op)->aio_ref_count);\
-        pvfs2_print("Alloced OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+        gossip_debug(GOSSIP_CACHE_DEBUG, "(get) Alloced OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
     } while(0)
 #define put_op(op) \
     do {\
         if (atomic_sub_and_test(1, &(op)->aio_ref_count) == 1) {\
-            pvfs2_print("Releasing OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+            gossip_debug(GOSSIP_CACHE_DEBUG, "(put) Releasing OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
             op_release(op);\
         }\
     } while(0)
@@ -285,12 +286,6 @@ extern struct xattr_handler pvfs2_xattr_acl_default_handler, pvfs2_xattr_acl_acc
 extern struct xattr_handler pvfs2_xattr_trusted_handler;
 extern struct xattr_handler pvfs2_xattr_default_handler;
 
-typedef struct {
-    int32_t p_tag;
-    uint32_t p_perm;
-    uint32_t p_id;
-} pvfs2_acl_entry;
-
 #endif
 
 static inline int convert_to_internal_xattr_flags(int setxattr_flags)
@@ -327,7 +322,7 @@ int pvfs2_xattr_get_default(struct inode *inode,
  ************************************/
 typedef struct
 {
-    int op_state;
+    enum pvfs2_vfs_op_states op_state;
     uint64_t tag;
 
     pvfs2_upcall_t upcall;
@@ -338,8 +333,23 @@ typedef struct
 
     int io_completed;
     wait_queue_head_t io_completion_waitq;
+
+    /* upcalls requiring variable length trailers require that this struct
+     * be in the request list even after client-core does a read() on the device
+     * to dequeue the upcall 
+     * if op_linger field goes to 0, we dequeue this op off the list.
+     * else we let it stay. What gets passed to the read() is 
+     * a) if op_linger field is = 1, pvfs2_kernel_op_t itself
+     * b) else if = 0, we pass ->upcall.trailer_buf
+     * We expect to have only a single upcall trailer buffer, so we expect callers with trailers
+     * to set this field to 2 and others to set it to 1.
+     */
+    int32_t op_linger, op_linger_tmp;
+    /* VFS aio fields */
     void *priv;/* used by the async I/O code to stash the pvfs2_kiocb structure */
     atomic_t aio_ref_count; /* used again for the async I/O code for deallocation */
+
+    int attempts;
 
     struct list_head list;
 } pvfs2_kernel_op_t;
@@ -364,9 +374,32 @@ typedef struct
 #endif
     sector_t last_failed_block_index_read;
     int error_code;
+
+    unsigned long pinode_flags;
     /* All allocated pvfs2_inode_t objects are chained to a list */
     struct list_head list;
 } pvfs2_inode_t;
+
+#define P_ATIME_FLAG 0
+#define P_MTIME_FLAG 1
+#define P_CTIME_FLAG 2
+#define P_MODE_FLAG  3
+
+#define ClearAtimeFlag(pinode) clear_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
+#define SetAtimeFlag(pinode)   set_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
+#define AtimeFlag(pinode)      test_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
+
+#define ClearMtimeFlag(pinode) clear_bit(P_MTIME_FLAG, &(pinode)->pinode_flags)
+#define SetMtimeFlag(pinode)   set_bit(P_MTIME_FLAG, &(pinode)->pinode_flags)
+#define MtimeFlag(pinode)      test_bit(P_MTIME_FLAG, &(pinode)->pinode_flags)
+
+#define ClearCtimeFlag(pinode) clear_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
+#define SetCtimeFlag(pinode)   set_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
+#define CtimeFlag(pinode)      test_bit(P_CTIME_FLAG, &(pinode)->pinode_flags)
+
+#define ClearModeFlag(pinode) clear_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define SetModeFlag(pinode)   set_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+#define ModeFlag(pinode)      test_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
 
 /** mount options.  only accepted mount options are listed.
  */
@@ -381,6 +414,11 @@ typedef struct
      * requires the file system to honor acl's 
      */
     int acl;
+    /** suid option (if set) is inspired by the nfs mount option
+    * that requires the file system to honor the setuid bit of a 
+    * file if set. NOTE: this is disabled by default.
+    */
+    int suid;
 } pvfs2_mount_options_t;
 
 /** per superblock private pvfs2 info */
@@ -393,7 +431,7 @@ typedef struct
     char data[PVFS2_MAX_MOUNT_OPT_LEN];
     char devname[PVFS_MAX_SERVER_ADDR_LEN];
     struct super_block *sb;
-
+    int    mount_pending;
     struct list_head list;
 } pvfs2_sb_info_t;
 
@@ -408,6 +446,88 @@ typedef struct
     PVFS_fs_id fs_id;
     int id;
 } pvfs2_mount_sb_info_t;
+
+/** PVFS2 specific structure that we use for constructing an opaque handle at the time 
+ * an openg() system call that will be used at subsequent openfh system call
+ * We stuff in enough information into this buffer that subsequent
+ * openfh calls don't have to communicate with server. Padding is inserted so that
+ * size of structure is the same and offset is also same on both 32 and 64
+ * bit machines.
+ */
+typedef struct 
+{
+    PVFS_handle handle;
+    PVFS_fs_id  fsid;
+    int32_t     __pad1;
+    PVFS_uid    owner;
+    PVFS_gid    group;
+    PVFS_permissions perms;
+    int32_t     __pad2;
+    PVFS_time   atime;
+    PVFS_time   mtime;
+    PVFS_time   ctime;
+    PVFS_size   size;
+    PVFS_ds_type objtype;
+    uint32_t    mask;
+} pvfs2_opaque_handle_t;
+#ifdef __PINT_PROTO_ENCODE_OPAQUE_HANDLE
+#define encode_int64_t(pptr,x) do { \
+    *(int64_t*) *(pptr) = cpu_to_le64(*(x)); \
+    *(pptr) += 8; \
+} while (0)
+#define decode_int64_t(pptr,x) do { \
+    *(x) = le64_to_cpu(*(int64_t*) *(pptr)); \
+    *(pptr) += 8; \
+} while (0)
+
+#define encode_int32_t(pptr,x) do { \
+    *(int32_t*) *(pptr) = cpu_to_le32(*(x)); \
+    *(pptr) += 4; \
+} while (0)
+#define decode_int32_t(pptr,x) do { \
+    *(x) = le32_to_cpu(*(int32_t*) *(pptr)); \
+    *(pptr) += 4; \
+} while (0)
+
+/* skip 4 bytes */
+#define encode_skip4(pptr,x) do { \
+    *(pptr) += 4; \
+} while (0)
+#define decode_skip4(pptr,x) do { \
+    *(pptr) += 4; \
+} while (0)
+
+#define encode_pvfs2_opaque_handle_t(pptr,x) do {\
+    encode_int64_t(pptr, &(x)->handle);\
+    encode_int32_t(pptr, &(x)->fsid);\
+    encode_skip4(pptr,);\
+    encode_int32_t(pptr, &(x)->owner);\
+    encode_int32_t(pptr, &(x)->group);\
+    encode_int32_t(pptr, &(x)->perms);\
+    encode_skip4(pptr,);\
+    encode_int64_t(pptr, &(x)->atime);\
+    encode_int64_t(pptr, &(x)->mtime);\
+    encode_int64_t(pptr, &(x)->ctime);\
+    encode_int64_t(pptr, &(x)->size);\
+    encode_int32_t(pptr, &(x)->objtype);\
+    encode_int32_t(pptr, &(x)->mask);\
+} while (0)
+#define decode_pvfs2_opaque_handle_t(pptr,x) do {\
+    decode_int64_t(pptr, &(x)->handle);\
+    decode_int32_t(pptr, &(x)->fsid);\
+    decode_skip4(pptr,);\
+    decode_int32_t(pptr, &(x)->owner);\
+    decode_int32_t(pptr, &(x)->group);\
+    decode_int32_t(pptr, &(x)->perms);\
+    decode_skip4(pptr,);\
+    decode_int64_t(pptr, &(x)->atime);\
+    decode_int64_t(pptr, &(x)->mtime);\
+    decode_int64_t(pptr, &(x)->ctime);\
+    decode_int64_t(pptr, &(x)->size);\
+    decode_int32_t(pptr, &(x)->objtype);\
+    decode_int32_t(pptr, &(x)->mask);\
+} while (0)
+#endif
 
 #ifdef HAVE_AIO_VFS_SUPPORT
 
@@ -461,7 +581,9 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
  ****************************/
 int op_cache_initialize(void);
 int op_cache_finalize(void);
-pvfs2_kernel_op_t *op_alloc(void);
+pvfs2_kernel_op_t *op_alloc(int32_t type);
+pvfs2_kernel_op_t *op_alloc_trailer(int32_t type);
+char *get_opname_string(pvfs2_kernel_op_t *new_op);
 void op_release(pvfs2_kernel_op_t *op);
 
 int dev_req_cache_initialize(void);
@@ -491,6 +613,11 @@ static inline int kiocb_cache_finalize(void)
 #endif
 
 /****************************
+ * defined in pvfs2-mod.c
+ ****************************/
+void purge_inprogress_ops(void);
+
+/****************************
  * defined in waitqueue.c
  ****************************/
 int wait_for_matching_downcall(
@@ -499,29 +626,46 @@ int wait_for_cancellation_downcall(
     pvfs2_kernel_op_t * op);
 void clean_up_interrupted_operation(
     pvfs2_kernel_op_t * op);
+void purge_waiting_ops(void);
 
 /****************************
  * defined in super.c
  ****************************/
+#ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+extern struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb, 
+        const struct file_handle *handle);
+#endif
 #ifdef PVFS2_LINUX_KERNEL_2_4
 struct super_block* pvfs2_get_sb(
     struct super_block *sb,
     void *data,
     int silent);
 #else
+#ifdef HAVE_VFSMOUNT_GETSB
+int pvfs2_get_sb(
+    struct file_system_type *fst, int flags,
+    const char *devname, void *data, 
+    struct vfsmount *mnt);
+#else
 struct super_block *pvfs2_get_sb(
     struct file_system_type *fst, int flags,
     const char *devname, void *data);
 #endif
+#endif
 
+void pvfs2_kill_sb(struct super_block *sb);
 int pvfs2_remount(
     struct super_block *sb,
     int *flags,
     char *data);
 
+int fsid_key_table_initialize(void);
+void fsid_key_table_finalize(void);
+
 /****************************
  * defined in inode.c
  ****************************/
+uint32_t convert_to_pvfs2_mask(unsigned long lite_mask);
 struct inode *pvfs2_get_custom_inode(
     struct super_block *sb,
     struct inode *dir,
@@ -562,18 +706,28 @@ int pvfs2_removexattr(struct dentry *dentry, const char *name);
  * defined in namei.c
  ****************************/
 #ifdef PVFS2_LINUX_KERNEL_2_4
-struct dentry *pvfs2_lookup(
-    struct inode *dir,
-    struct dentry *dentry);
 int pvfs2_permission(struct inode *, int);
 #else
-struct dentry *pvfs2_lookup(
-    struct inode *dir,
-    struct dentry *dentry,
-    struct nameidata *nd);
 int pvfs2_permission(struct inode *inode, 
         int mask, struct nameidata *nd);
 #endif
+
+/*****************************
+ * defined in file.c (shared file/dir operations)
+ ****************************/
+int pvfs2_file_open(
+    struct inode *inode,
+    struct file *file);
+int pvfs2_file_release(
+    struct inode *inode,
+    struct file *file);
+ssize_t pvfs2_inode_read(
+    struct inode *inode,
+    char *buf,
+    size_t count,
+    loff_t *offset,
+    int copy_to_user,
+    loff_t readahead_size);
 
 /*****************************
  * defined in devpvfs2-req.c
@@ -581,13 +735,21 @@ int pvfs2_permission(struct inode *inode,
 
 int     pvfs2_ioctl32_init(void);
 void    pvfs2_ioctl32_cleanup(void);
-
+int     is_daemon_in_service(void);
+int     fs_mount_pending(PVFS_fs_id fsid);
 
 /****************************
  * defined in pvfs2-utils.c
  ****************************/
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
+PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
+int pvfs2_flush_inode(struct inode *inode);
+
+int copy_attributes_to_inode(
+    struct inode *inode,
+    PVFS_sys_attr *attrs,
+    char *symname);
 
 ssize_t pvfs2_inode_getxattr(
         struct inode *inode, const char* prefix,
@@ -595,7 +757,7 @@ ssize_t pvfs2_inode_getxattr(
 int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         const char *name, const void *value, size_t size, int flags);
 int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
-        const char *name);
+        const char *name, int flags);
 int pvfs2_inode_listxattr(struct inode *inode, char *, size_t);
 
 int pvfs2_inode_getattr(
@@ -653,22 +815,45 @@ int pvfs2_cancel_op_in_progress(
 PVFS_time pvfs2_convert_time_field(
     void *time_ptr);
 
+#ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
+int pvfs2_fill_handle(struct inode *inode, struct file_handle *handle);
+#endif
+
 int pvfs2_normalize_to_errno(PVFS_error error_code);
+
+extern struct semaphore devreq_semaphore;
+extern struct semaphore request_semaphore;
+extern int debug;
+extern int op_timeout_secs;
+extern struct list_head pvfs2_superblocks;
+extern spinlock_t pvfs2_superblocks_lock;
+extern struct list_head pvfs2_request_list;
+extern spinlock_t pvfs2_request_list_lock;
+extern wait_queue_head_t pvfs2_request_list_waitq;
+extern struct qhash_table *htable_ops_in_progress;
+
+extern struct file_system_type pvfs2_fs_type;
+extern struct address_space_operations pvfs2_address_operations;
+extern struct backing_dev_info pvfs2_backing_dev_info;
+extern struct inode_operations pvfs2_file_inode_operations;
+extern struct file_operations pvfs2_file_operations;
+extern struct inode_operations pvfs2_symlink_inode_operations;
+extern struct inode_operations pvfs2_dir_inode_operations;
+extern struct file_operations pvfs2_dir_operations;
+extern struct dentry_operations pvfs2_dentry_operations;
+extern struct file_operations pvfs2_devreq_file_operations;
 
 /************************************
  * misc convenience macros
  ************************************/
-extern struct semaphore request_semaphore;
-
 #define add_op_to_request_list(op)                           \
 do {                                                         \
     spin_lock(&op->lock);                                    \
-    op->op_state = PVFS2_VFS_STATE_WAITING;                  \
+    set_op_state_waiting(op);                                \
                                                              \
     spin_lock(&pvfs2_request_list_lock);                     \
     list_add_tail(&op->list, &pvfs2_request_list);           \
     spin_unlock(&pvfs2_request_list_lock);                   \
-                                                             \
     spin_unlock(&op->lock);                                  \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
@@ -676,12 +861,11 @@ do {                                                         \
 #define add_priority_op_to_request_list(op)                  \
 do {                                                         \
     spin_lock(&op->lock);                                    \
-    op->op_state = PVFS2_VFS_STATE_WAITING;                  \
+    set_op_state_waiting(op);                                \
                                                              \
     spin_lock(&pvfs2_request_list_lock);                     \
     list_add(&op->list, &pvfs2_request_list);                \
     spin_unlock(&pvfs2_request_list_lock);                   \
-                                                             \
     spin_unlock(&op->lock);                                  \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
@@ -708,13 +892,14 @@ do {                                                         \
                             &(op->tag));                     \
 } while(0)
 
-#define PVFS2_OP_INTERRUPTIBLE 1  /**< service_operation() is interruptible */
-#define PVFS2_OP_PRIORITY 2       /**< service_operation() is high priority */
-#define PVFS2_OP_CANCELLATION 4   /**< this is a cancellation */
-#define PVFS2_OP_NO_SEMAPHORE 8   /**< don't acquire semaphore */
+#define PVFS2_OP_INTERRUPTIBLE 1   /**< service_operation() is interruptible */
+#define PVFS2_OP_PRIORITY      2   /**< service_operation() is high priority */
+#define PVFS2_OP_CANCELLATION  4   /**< this is a cancellation */
+#define PVFS2_OP_NO_SEMAPHORE  8   /**< don't acquire semaphore */
+#define PVFS2_OP_ASYNC         16  /* Queue it, but don't wait */
 
 int service_operation(pvfs2_kernel_op_t* op, const char* op_name, 
-    int num_retries, int flags);
+    int flags);
 
 /** handles two possible error cases, depending on context.
  *
@@ -729,7 +914,7 @@ int service_operation(pvfs2_kernel_op_t* op, const char* op_name,
  *
  *  FIXME: POSSIBLE OPTIMIZATION:
  *  However, if we timed out or if we got a signal AND our upcall was never
- *  picked off the queue (i.e. we were in PVFS2_VFS_STATE_WAITING), then we don't
+ *  picked off the queue (i.e. we were in OP_VFS_STATE_WAITING), then we don't
  *  need to send a cancellation upcall. The way we can handle this is set error_exit
  *  to 2 in such cases and 1 whenever cancellation has to be sent and have handle_error
  *  take care of this situation as well..
@@ -745,14 +930,14 @@ int service_operation(pvfs2_kernel_op_t* op, const char* op_name,
  */
 #define handle_io_error()                                 \
 do {                                                      \
-    if(new_op->op_state != PVFS2_VFS_STATE_SERVICED)      \
+    if(!op_state_serviced(new_op))                        \
     {                                                     \
         pvfs2_cancel_op_in_progress(new_op->tag);         \
         op_release(new_op);                               \
     }                                                     \
     else                                                  \
     {                                                     \
-        wake_up_device_for_return(new_op);                \
+        wake_up_daemon_for_return(new_op);                \
     }                                                     \
     new_op = NULL;                                        \
     pvfs_bufmap_put(buffer_index);                        \
@@ -766,29 +951,18 @@ do {                                                      \
  */
 #define handle_sync_aio_error()                           \
 do {                                                      \
-    if(new_op->op_state != PVFS2_VFS_STATE_SERVICED)      \
+    if(!op_state_serviced(new_op))                        \
     {                                                     \
         pvfs2_cancel_op_in_progress(new_op->tag);         \
         op_release(new_op);                               \
     }                                                     \
     else                                                  \
     {                                                     \
-        wake_up_device_for_return(new_op);                \
+        wake_up_daemon_for_return(new_op);                \
     }                                                     \
+    new_op = NULL;                                        \
     pvfs_bufmap_put(buffer_index);                        \
-} while(0)
-
-
-/** All this function does is that it tries to issue the operation and return
- * by queuing it up in the device queue.
- *  \note used in pvfs_file_aio_read/pvfs_file_aio_write functions
- *  alone
- */
-#define service_async_vfs_op(op)                          \
-do {                                                      \
-    down(&request_semaphore);                             \
-    add_op_to_request_list(op);                           \
-    up(&request_semaphore);                               \
+    buffer_index = -1;                                    \
 } while(0)
 
 #endif
@@ -799,13 +973,16 @@ do {                                                      \
 #define get_acl_flag(inode)                               \
 (PVFS2_SB(inode->i_sb)->mnt_options.acl)
 
+#define get_suid_flag(inode)                              \
+(PVFS2_SB(inode->i_sb)->mnt_options.suid)
+
 #ifdef USE_MMAP_RA_CACHE
 #define clear_inode_mmap_ra_cache(inode)                  \
 do {                                                      \
-  pvfs2_print("calling clear_inode_mmap_ra_cache on %d\n",\
+  gossip_debug(GOSSIP_INODE_DEBUG, "calling clear_inode_mmap_ra_cache on %d\n",\
               (int)inode->i_ino);                         \
   pvfs2_flush_mmap_racache(inode);                        \
-  pvfs2_print("clear_inode_mmap_ra_cache finished\n");    \
+  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_mmap_ra_cache finished\n");    \
 } while(0)
 #else
 #define clear_inode_mmap_ra_cache(inode)
@@ -813,7 +990,7 @@ do {                                                      \
 
 #define add_pvfs2_sb(sb)                                             \
 do {                                                                 \
-    pvfs2_print("Adding SB %p to pvfs2 superblocks\n", PVFS2_SB(sb));\
+    gossip_debug(GOSSIP_SUPER_DEBUG, "Adding SB %p to pvfs2 superblocks\n", PVFS2_SB(sb));\
     spin_lock(&pvfs2_superblocks_lock);                              \
     list_add_tail(&PVFS2_SB(sb)->list, &pvfs2_superblocks);          \
     spin_unlock(&pvfs2_superblocks_lock);                            \
@@ -828,7 +1005,7 @@ do {                                                                 \
     list_for_each(tmp, &pvfs2_superblocks) {                         \
         pvfs2_sb = list_entry(tmp, pvfs2_sb_info_t, list);           \
         if (pvfs2_sb && (pvfs2_sb->sb == sb)) {                      \
-            pvfs2_print("Removing SB %p from pvfs2 superblocks\n",   \
+            gossip_debug(GOSSIP_SUPER_DEBUG, "Removing SB %p from pvfs2 superblocks\n",   \
                         pvfs2_sb);                                   \
             list_del(&pvfs2_sb->list);                               \
             break;                                                   \
@@ -845,8 +1022,13 @@ do { inode->i_mtime = inode->i_ctime = CURRENT_TIME; } while(0)
 #define get_block_block_type long
 #define pvfs2_lock_inode(inode) do {} while(0)
 #define pvfs2_unlock_inode(inode) do {} while(0)
-#define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
 #define pvfs2_kernel_readpage block_read_full_page
+
+static inline struct dentry *pvfs2_d_splice_alias(struct dentry *dentry, struct inode *inode)
+{ 
+    d_add(dentry, inode); 
+    return dentry;
+}
 
 /*
   redhat 9 2.4.x kernels have to be treated almost like 2.6.x kernels
@@ -870,17 +1052,10 @@ do { ClearPageReserved(page); put_page(page); } while(0)
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
-    time_t cur_time = CURRENT_TIME;               \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
-    sys_attr.atime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.mtime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.ctime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
     sys_attr.size = 0;                            \
-    sys_attr.perms = PVFS2_translate_mode(mode);  \
+    sys_attr.perms = PVFS_util_translate_mode(mode,0); \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
@@ -893,25 +1068,22 @@ do                                                \
 #define pvfs2_current_signal_lock current->sighand->siglock
 #define pvfs2_current_sigaction current->sighand->action
 #define pvfs2_recalc_sigpending recalc_sigpending
-#define pvfs2_d_splice_alias(dentry, inode) d_splice_alias(inode, dentry)
 #define pvfs2_kernel_readpage mpage_readpage
 #define pvfs2_set_page_reserved(page) do {} while(0)
 #define pvfs2_clear_page_reserved(page) do {} while(0)
 
+static inline struct dentry* pvfs2_d_splice_alias(struct dentry *dentry, struct inode *inode)
+{
+    return d_splice_alias(inode, dentry);
+}
+
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
-    struct timespec cur_time = CURRENT_TIME;      \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
-    sys_attr.atime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.mtime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
-    sys_attr.ctime =                              \
-      pvfs2_convert_time_field((void *)&cur_time);\
     sys_attr.size = 0;                            \
-    sys_attr.perms = PVFS2_translate_mode(mode);  \
+    sys_attr.perms = PVFS_util_translate_mode(mode,0); \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
@@ -1021,6 +1193,16 @@ static inline ino_t parent_ino(struct dentry *dentry)
 #endif
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+static inline unsigned int diff(struct timeval *end, struct timeval *begin)
+{
+    if (end->tv_usec < begin->tv_usec) {
+        end->tv_usec += 1000000; end->tv_sec--;
+    }
+    end->tv_sec  -= begin->tv_sec;
+    end->tv_usec -= begin->tv_usec;
+    return ((end->tv_sec * 1000000) + end->tv_usec);
+}
 
 #endif /* __PVFS2KERNEL_H */
 

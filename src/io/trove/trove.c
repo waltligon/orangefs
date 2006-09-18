@@ -30,7 +30,9 @@ extern struct TROVE_mgmt_ops    *mgmt_method_table[];
 struct PINT_perf_counter* PINT_server_pc = NULL;
 
 int TROVE_db_cache_size_bytes = 0;
+int TROVE_alt_aio_mode = 0;
 int TROVE_shm_key_hint = 0;
+int TROVE_max_concurrent_io = 16;
 
 /** Initiate reading from a contiguous region in a bstream into a
  *  contiguous region in memory.
@@ -748,6 +750,37 @@ int trove_dspace_getattr(
            out_op_id_p);
 }
 
+/** Initiate retrieval of attributes for a list of handles.
+ */
+int trove_dspace_getattr_list(
+    TROVE_coll_id coll_id,
+	 int nhandles,
+    TROVE_handle *handle_array,
+    TROVE_ds_attributes_s *ds_attr_p,
+	 TROVE_ds_state  *error_array,
+    TROVE_ds_flags flags,
+    void* user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id* out_op_id_p)
+{
+    int method_id;
+
+    method_id = map_coll_id_to_method(coll_id);
+    if (method_id < 0) {
+        return -1; /* NEED STATUS TYPE FOR THIS */
+    }
+    return dspace_method_table[method_id]->dspace_getattr_list(
+           coll_id,
+			  nhandles,
+           handle_array,
+           ds_attr_p,
+			  error_array,
+           flags,
+           user_ptr,
+           context_id,
+           out_op_id_p);
+}
+
 int trove_dspace_setattr(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -962,6 +995,16 @@ int trove_collection_setinfo(
     if(option == TROVE_SHM_KEY_HINT)
     {
         TROVE_shm_key_hint = *((int*)parameter);
+	return(0);
+    }
+    if(option == TROVE_ALT_AIO_MODE)
+    {
+        TROVE_alt_aio_mode = *((int*)parameter);
+	return(0);
+    }
+    if(option == TROVE_MAX_CONCURRENT_IO)
+    {
+        TROVE_max_concurrent_io = *((int*)parameter);
 	return(0);
     }
 

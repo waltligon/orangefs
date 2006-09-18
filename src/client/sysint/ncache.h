@@ -1,60 +1,134 @@
 /*
- * (C) 2001 Clemson University and The University of Chicago
+ * Copyright © Acxiom Corporation, 2006
  *
  * See COPYING in top-level directory.
- *
  */
 
-#ifndef _PINT_NCACHE_H
-#define _PINT_NCACHE_H
+#ifndef __NCACHE_H
+#define __NCACHE_H
 
-#include "pint-sysint-utils.h"
+#include "pvfs2-types.h"
+#include "pvfs2-attr.h"
+#include "gen-locks.h"
+#include "quicklist.h"
+#include "quickhash.h"
+#include "tcache.h"
+#include "pint-perf-counter.h"
 
-/* number of entries allowed in the cache */
-#define PINT_NCACHE_MAX_ENTRIES 1024
+/** \defgroup ncache Name Cache (ncache)
+ *
+ * The ncache implements a simple client side cache for PVFS2 files.
+ * A timeout is associated with each entry to dictate when it will expire. 
+ * The ncache is built on top of the generic tcache caching component. The NCACHE
+ * component will cache the following:
+ * - parent handle
+ * - entry for a specific file OR directory within the parent directory
+ * - entry handle
+ * .
+ *
+ * The tcache implements a simple component for caching data structures that
+ * can be referenced by unique, opaque keys.  A timeout is associated with each 
+ * entry to dictate when it will expire.  Specific caches such as the
+ * attribute or name cache may be built on top of this one.
+ *
+ * Notes:
+ * - See tcache for policy documentation
+ * .
+ *
+ * Operations that may retrieve items from ncache:
+ * - lookup
+ * - rename  (Current implementation does not yet use ncache)
+ * .
+ *
+ * Operations that may insert items into the cache:
+ * - pvfs2-lookup
+ * - pvfs2-rename  (Current implementation does not yet use ncache)
+ * - pvfs2-symlink
+ * - pvfs2-readdir
+ * - pvfs2-mkdir
+ * - pvfs2-create
+ * .
+ *
+ * Operations that may DELETE items from the cache:
+ * - pvfs2-remove
+ * - pvfs2-rename
+ * - any failed sysint operation from the list of operations that retrieve
+ *   items from NCACHE
+ * .
+ *
+ * @{
+ */
 
-/* number of milliseconds that cache entries will remain valid */
-#define PINT_NCACHE_TIMEOUT_MS 30000
+/** \file
+ * Declarations for the Name Cache (ncache) component.
+ */
 
-/* value passed out to indicate lookups that didn't find a match */
-#define PINT_NCACHE_HANDLE_INVALID 0
+/** @see PINT_tcache_options */
+#define PINT_ncache_options PINT_tcache_options
+enum {
+NCACHE_TIMEOUT_MSECS = TCACHE_TIMEOUT_MSECS,
+NCACHE_NUM_ENTRIES = TCACHE_NUM_ENTRIES,
+NCACHE_HARD_LIMIT = TCACHE_HARD_LIMIT,
+NCACHE_SOFT_LIMIT = TCACHE_SOFT_LIMIT,
+NCACHE_ENABLE = TCACHE_ENABLE,
+NCACHE_RECLAIM_PERCENTAGE = TCACHE_RECLAIM_PERCENTAGE,
+};
 
-int PINT_ncache_lookup(
-        char *name,
-        int want_resolved,
-        PVFS_object_ref parent,
-        PVFS_object_ref *entry);
+enum 
+{
+   PERF_NCACHE_NUM_ENTRIES = 0,
+   PERF_NCACHE_SOFT_LIMIT = 1,
+   PERF_NCACHE_HARD_LIMIT = 2,
+   PERF_NCACHE_HITS = 3,
+   PERF_NCACHE_MISSES = 4,
+   PERF_NCACHE_UPDATES = 5,
+   PERF_NCACHE_PURGES = 6,
+   PERF_NCACHE_REPLACEMENTS = 7,
+   PERF_NCACHE_DELETIONS = 8, 
+   PERF_NCACHE_ENABLED = 9,
+};
 
-int PINT_ncache_insert(
-        char *name, 
-        int abs_resolved,
-        PVFS_object_ref entry,
-        PVFS_object_ref parent);
+/** ncache performance counter keys */
+extern struct PINT_perf_key ncache_keys[];
 
-int PINT_ncache_flush(void);
-
-int PINT_ncache_remove(
-        char *name, 
-        int abs_resolved,
-        PVFS_object_ref parent,
-        int *item_found);
+void PINT_ncache_enable_perf_counter(struct PINT_perf_counter* pc);
 
 int PINT_ncache_initialize(void);
 
-int PINT_ncache_finalize(void);
+void PINT_ncache_finalize(void);
 
-int PINT_ncache_get_timeout(void);
+int PINT_ncache_get_info(
+    enum PINT_ncache_options option,
+    unsigned int* arg);
 
-void PINT_ncache_set_timeout(int max_timeout_ms);
+int PINT_ncache_set_info(
+    enum PINT_ncache_options option,
+    unsigned int arg);
 
-#endif 
+int PINT_ncache_get_cached_entry(
+    const char* entry, 
+    PVFS_object_ref* entry_ref,
+    const PVFS_object_ref* parent_ref); 
+
+int PINT_ncache_update(
+    const char* entry, 
+    const PVFS_object_ref* entry_ref, 
+    const PVFS_object_ref* parent_ref); 
+
+void PINT_ncache_invalidate(
+    const char* entry, 
+    const PVFS_object_ref* parent_ref); 
+
+#endif /* __NCACHE_H */
+
+/* @} */
 
 /*
  * Local variables:
- *  mode: c
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
  *
- * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */
+

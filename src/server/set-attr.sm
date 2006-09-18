@@ -12,6 +12,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 
 enum
 {
@@ -119,8 +120,10 @@ static PINT_sm_action setattr_verify_attribs(
 
     gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from request:\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
-                 req_a_p->owner, req_a_p->group, req_a_p->perms,
-                 req_a_p->objtype);
+                 (req_a_p->mask & PVFS_ATTR_COMMON_UID)  ? req_a_p->owner : -1,
+                 (req_a_p->mask & PVFS_ATTR_COMMON_GID)  ? req_a_p->group : -1,
+                 (req_a_p->mask & PVFS_ATTR_COMMON_PERM) ? req_a_p->perms : -1,
+                 (req_a_p->mask & PVFS_ATTR_COMMON_TYPE) ? req_a_p->objtype : -1);
     /*
       here we're enforcing that no one can change the type of the
       handle/object already stored once it's been set to a non-zero
@@ -139,7 +142,7 @@ static PINT_sm_action setattr_verify_attribs(
         js_p->error_code = -PVFS_EACCES;
         return SM_ACTION_COMPLETE;
     }
-    else if(!req_a_p->objtype)
+    else if (req_a_p->objtype == PVFS_TYPE_NONE)
     {
         /* if the requested object type is PVFS_TYPE_NONE, then the
          * setattr is only on the common attributes, so we use the
@@ -261,7 +264,6 @@ static PINT_sm_action setattr_setobj_attribs(
     PVFS_object_attr *a_p = NULL;
     PVFS_object_attr *dspace_a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     dspace_a_p = &s_op->attr;
     a_p = &s_op->req->u.setattr.attr;
@@ -281,10 +283,10 @@ static PINT_sm_action setattr_setobj_attribs(
      * It is better to do it here than change the PVFS_object_attr_overwrite_setable
      * macro, since there are many more users of it, I think.
      */
-     if (a_p->mask & PVFS_ATTR_COMMON_MTIME)
+     if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
      {
          PVFS_time orig_mtime = a_p->mtime;
-         a_p->mtime = PVFS_util_mktime_version(orig_mtime);
+         a_p->mtime = PINT_util_mktime_version(orig_mtime);
          gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
                  "to %llu\n\tmtime is %llu\n",
                  llu(a_p->mtime), llu(orig_mtime));
@@ -295,8 +297,9 @@ static PINT_sm_action setattr_setobj_attribs(
      */
     if(dspace_a_p->objtype == PVFS_TYPE_SYMLINK)
     {
-        if(dspace_a_p->perms != 0 && dspace_a_p->perms != a_p->perms)
+        if (dspace_a_p->perms != 0 && ((a_p->mask & PVFS_ATTR_COMMON_PERM) && (dspace_a_p->perms != a_p->perms)))
         {
+            gossip_debug(GOSSIP_SETATTR_DEBUG, "Cannot change perms of symlink: Permission denied\n");
             js_p->error_code = -PVFS_EPERM;
             return SM_ACTION_COMPLETE;
         }
@@ -317,7 +320,7 @@ static PINT_sm_action setattr_setobj_attribs(
         "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
         dspace_a_p->objtype, llu(dspace_a_p->atime),
-        llu(PVFS_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
+        llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
         (int)dspace_a_p->u.meta.dfile_count,
         (int)dspace_a_p->u.meta.dist_size);
 
@@ -328,10 +331,7 @@ static PINT_sm_action setattr_setobj_attribs(
     ret = job_trove_dspace_setattr(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         ds_attr, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.setattr.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.setattr.fs_id),
+        TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
@@ -382,8 +382,7 @@ static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.setattr.fs_id),
+        0,
         NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
@@ -395,7 +394,6 @@ static PINT_sm_action setattr_write_metafile_distribution_if_required(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
@@ -435,10 +433,7 @@ static PINT_sm_action setattr_write_metafile_distribution_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.setattr.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.setattr.fs_id),
+        TROVE_SYNC,
         NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
@@ -450,7 +445,6 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     /* if we don't need to fill in the symlink target, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET))
@@ -484,10 +478,7 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.setattr.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.setattr.fs_id),
+        TROVE_SYNC,
         NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;

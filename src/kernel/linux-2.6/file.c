@@ -22,23 +22,16 @@ enum {
     IO_WRITE = 1,
     IO_READV = 0,
     IO_WRITEV = 1,
+    IO_READX = 0,
+    IO_WRITEX = 1,
 };
-
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-extern int debug;
-extern int op_timeout_secs;
-
-extern struct address_space_operations pvfs2_address_operations;
-extern struct backing_dev_info pvfs2_backing_dev_info;
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
     size_t *count, loff_t *ppos);
 #endif
 
-#define wake_up_device_for_return(op)             \
+#define wake_up_daemon_for_return(op)             \
 do {                                              \
   spin_lock(&op->lock);                           \
   op->io_completed = 1;                           \
@@ -55,7 +48,7 @@ int pvfs2_file_open(
 {
     int ret = -EINVAL;
 
-    pvfs2_print("pvfs2_file_open: called on %s (inode is %d)\n",
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open: called on %s (inode is %d)\n",
                 file->f_dentry->d_name.name, (int)inode->i_ino);
 
     inode->i_mapping->host = inode;
@@ -87,12 +80,12 @@ int pvfs2_file_open(
             if (ret == 0)
             {
                 file->f_pos = i_size_read(inode);
-                pvfs2_print("f_pos = %ld\n", (unsigned long)file->f_pos);
+                gossip_debug(GOSSIP_FILE_DEBUG, "f_pos = %ld\n", (unsigned long)file->f_pos);
             }
             else
             {
                 pvfs2_make_bad_inode(inode);
-                pvfs2_print("pvfs2_file_open returning error: %d\n", ret);
+                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning error: %d\n", ret);
                 return(ret);
             }
         }
@@ -104,7 +97,7 @@ int pvfs2_file_open(
         ret = generic_file_open(inode, file);
     }
 
-    pvfs2_print("pvfs2_file_open returning normally: %d\n", ret);
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning normally: %d\n", ret);
     return ret;
 }
 
@@ -149,6 +142,11 @@ static ssize_t do_read_write(struct rw_options *rw)
     if (!rw)
         goto out;
     count = rw->count;
+    if (count == 0)
+    {
+        ret = 0;
+        goto out;
+    }
     current_buf = (char *) rw->buf;
     if (!current_buf)
         goto out;
@@ -196,10 +194,10 @@ static ssize_t do_read_write(struct rw_options *rw)
 #endif
         if (ret != 0 || count == 0)
         {
-            pvfs2_print("pvfs2_file_write: failed generic argument checks.\n");
+            gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_write: failed generic argument checks.\n");
             goto out;
         }
-        pvfs2_print("%s: proceeding with offset : %ld, size %ld\n",
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: proceeding with offset : %ld, size %ld\n",
                 fnstr, (unsigned long) *offset, (unsigned long) count);
     }
     pvfs2_inode = PVFS2_I(inode);
@@ -208,14 +206,13 @@ static ssize_t do_read_write(struct rw_options *rw)
     {
         size_t each_count, amt_complete;
 
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FILE_IO);
         if (!new_op)
         {
             ret = -ENOMEM;
             goto out;
         }
 
-        new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
         new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         new_op->upcall.req.io.readahead_size = readahead_size;
         new_op->upcall.req.io.io_type = 
@@ -225,10 +222,11 @@ static ssize_t do_read_write(struct rw_options *rw)
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)
         {
-            pvfs2_error("do_read_write: pvfs_bufmap_get() "
+            gossip_err("do_read_write: pvfs_bufmap_get() "
                         "failure (%ld)\n", (long) ret);
             goto out;
         }
+        gossip_debug(GOSSIP_FILE_DEBUG, "GET op %p -> buffer_index %d\n", new_op, buffer_index);
         /* how much to transfer in this loop iteration */
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
@@ -242,12 +240,12 @@ static ssize_t do_read_write(struct rw_options *rw)
             ret = pvfs_bufmap_copy_from_user(buffer_index, current_buf, each_count);
             if(ret < 0)
             {
-                pvfs2_print("%s: Failed to copy user buffer.\n", fnstr);
+                gossip_debug(GOSSIP_FILE_DEBUG, "%s: Failed to copy user buffer.\n", fnstr);
                 goto out;
             }
         }
         ret = service_operation(
-            new_op, fnstr, PVFS2_OP_RETRY_COUNT,
+            new_op, fnstr, 
             get_interruptible_flag(inode));
 
         if (ret < 0)
@@ -262,11 +260,11 @@ static ssize_t do_read_write(struct rw_options *rw)
             */
             if (ret == -EINTR)
             {
-                pvfs2_print("%s: returning error %ld\n", fnstr, (long) ret);
+                gossip_debug(GOSSIP_FILE_DEBUG, "%s: returning error %ld\n", fnstr, (long) ret);
             }
             else
             {
-                pvfs2_error(
+                gossip_err(
                     "%s: error writing to handle %llu, "
                     "-- returning %ld\n",
                     fnstr,
@@ -294,7 +292,7 @@ static ssize_t do_read_write(struct rw_options *rw)
                 }
                 if (ret)
                 {
-                    pvfs2_print("Failed to copy user buffer.\n");
+                    gossip_debug(GOSSIP_FILE_DEBUG, "Failed to copy user buffer.\n");
                     /* put error code in downcall so that handle_io_error()
                      * preserves properly
                      */
@@ -311,10 +309,10 @@ static ssize_t do_read_write(struct rw_options *rw)
         /*
           tell the device file owner waiting on I/O that this read has
           completed and it can return now.  in this exact case, on
-          wakeup the device will free the op, so we *cannot* touch it
+          wakeup the daemon will free the op, so we *cannot* touch it
           after this.
         */
-        wake_up_device_for_return(new_op);
+        wake_up_daemon_for_return(new_op);
         new_op = NULL;
         pvfs_bufmap_put(buffer_index);
         buffer_index = -1;
@@ -330,17 +328,24 @@ static ssize_t do_read_write(struct rw_options *rw)
         ret = total_count;
     }
 out:
+    if (buffer_index >= 0) {
+        pvfs_bufmap_put(buffer_index);
+        gossip_debug(GOSSIP_FILE_DEBUG, "PUT buffer_index %d\n", buffer_index);
+    }
     if (new_op) 
         op_release(new_op);
-    if (buffer_index >= 0) 
-        pvfs_bufmap_put(buffer_index);
-    if (ret > 0 && file != NULL && inode != NULL)
+    if (ret > 0 && inode != NULL && pvfs2_inode != NULL)
     {
-#ifdef HAVE_TOUCH_ATIME
-        touch_atime(file->f_vfsmnt, file->f_dentry);
-#else
-        update_atime(inode);
-#endif
+        if (rw->type == IO_READ)
+        {
+            SetAtimeFlag(pvfs2_inode);
+            inode->i_atime = CURRENT_TIME;
+        }
+        else {
+            SetMtimeFlag(pvfs2_inode);
+            inode->i_mtime = CURRENT_TIME;
+        }
+        mark_inode_dirty_sync(inode);
     }
     return ret;
 }
@@ -375,7 +380,7 @@ ssize_t pvfs2_file_read(
     size_t count,
     loff_t *offset)
 {
-    pvfs2_print("pvfs2_file_read: called on %s [off %lu size %lu]\n",
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_read: called on %s [off %lu size %lu]\n",
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
                  (char *)file->f_dentry->d_name.name : "UNKNOWN"),
                 (unsigned long) *offset, (unsigned long) count);
@@ -430,7 +435,7 @@ static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
             || new_nr_segs == NULL || new_vec == NULL
             || seg_count == NULL || seg_array == NULL || max_new_nr_segs <= 0)
     {
-        pvfs2_error("Invalid parameters to split_iovecs\n");
+        gossip_err("Invalid parameters to split_iovecs\n");
         return -EINVAL;
     }
     *new_nr_segs = 0;
@@ -442,7 +447,7 @@ static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
             PVFS2_BUFMAP_GFP_FLAGS);
     if (orig_iovec == NULL)
     {
-        pvfs2_error("split_iovecs: Could not allocate memory for %lu bytes!\n", 
+        gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
                 (unsigned long)(nr_segs * sizeof(struct iovec)));
         return -ENOMEM;
     }
@@ -451,7 +456,7 @@ static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
     if (new_iovec == NULL)
     {
         kfree(orig_iovec);
-        pvfs2_error("split_iovecs: Could not allocate memory for %lu bytes!\n", 
+        gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
                 (unsigned long)(max_new_nr_segs * sizeof(struct iovec)));
         return -ENOMEM;
     }
@@ -461,7 +466,7 @@ static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
     {
         kfree(new_iovec);
         kfree(orig_iovec);
-        pvfs2_error("split_iovecs: Could not allocate memory for %lu bytes!\n", 
+        gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
                 (unsigned long)(max_new_nr_segs * sizeof(int)));
         return -ENOMEM;
     }
@@ -478,7 +483,7 @@ repeat:
             kfree(sizes);
             kfree(orig_iovec);
             kfree(new_iovec);
-            pvfs2_error("split_iovecs: exceeded the index limit (%d)\n", 
+            gossip_err("split_iovecs: exceeded the index limit (%d)\n", 
                     tmpnew_nr_segs);
             return -EINVAL;
         }
@@ -581,6 +586,10 @@ static ssize_t do_readv_writev(int type, struct file *file,
     {
         return -EINVAL;
     }
+    if (count == 0)
+    {
+        return 0;
+    }
     if (type == IO_WRITEV)
     {
         /* perform generic linux kernel tests for sanity of write arguments */
@@ -592,7 +601,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 #endif
         if (ret != 0 || count == 0)
         {
-            pvfs2_print("%s: failed generic argument checks.\n", fnstr);
+            gossip_debug(GOSSIP_FILE_DEBUG, "%s: failed generic argument checks.\n", fnstr);
             goto out;
         }
     }
@@ -616,11 +625,11 @@ static ssize_t do_readv_writev(int type, struct file *file,
                         &new_nr_segs, &iovecptr, /* OUT */
                         &seg_count, &seg_array)  /* OUT */ ) < 0)
         {
-            pvfs2_error("%s: Failed to split iovecs to satisfy larger "
+            gossip_err("%s: Failed to split iovecs to satisfy larger "
                     " than blocksize readv/writev request %zd\n", fnstr, ret);
             goto out;
         }
-        pvfs2_print("%s: Splitting iovecs from %lu to %lu [max_new %lu]\n", 
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: Splitting iovecs from %lu to %lu [max_new %lu]\n", 
                 fnstr, nr_segs, new_nr_segs, max_new_nr_segs);
         /* We must free seg_array and iovecptr */
         to_free = 1;
@@ -638,13 +647,13 @@ static ssize_t do_readv_writev(int type, struct file *file,
     }
     ptr = iovecptr;
 
-    pvfs2_print("%s %d@%llu\n", fnstr, (int) count, *offset);
-    pvfs2_print("%s: new_nr_segs: %lu, seg_count: %u\n", 
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s %d@%llu\n", fnstr, (int) count, *offset);
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s: new_nr_segs: %lu, seg_count: %u\n", 
             fnstr, new_nr_segs, seg_count);
 #ifdef PVFS2_KERNEL_DEBUG
     for (seg = 0; seg < new_nr_segs; seg++)
     {
-        pvfs2_print("%s: %d) %p to %p [%d bytes]\n", 
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: %d) %p to %p [%d bytes]\n", 
                 fnstr,
                 seg + 1, iovecptr[seg].iov_base, 
                 iovecptr[seg].iov_base + iovecptr[seg].iov_len, 
@@ -652,19 +661,18 @@ static ssize_t do_readv_writev(int type, struct file *file,
     }
     for (seg = 0; seg < seg_count; seg++)
     {
-        pvfs2_print("%s: %d) %u\n", fnstr, seg + 1, seg_array[seg]);
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: %d) %u\n", fnstr, seg + 1, seg_array[seg]);
     }
 #endif
     seg = 0;
     while (total_count < count)
     {
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FILE_IO);
         if (!new_op)
         {
             ret = -ENOMEM;
             goto out;
         }
-        new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
         new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         /* disable read-ahead */
         new_op->upcall.req.io.readahead_size = 0;
@@ -676,9 +684,10 @@ static ssize_t do_readv_writev(int type, struct file *file,
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)
         {
-            pvfs2_error("%s: pvfs_bufmap_get() failure (%zd)\n", fnstr, ret);
+            gossip_err("%s: pvfs_bufmap_get() failure (%zd)\n", fnstr, ret);
             goto out;
         }
+        gossip_debug(GOSSIP_FILE_DEBUG, "GET op %p -> buffer_index %d\n", new_op, buffer_index);
 
         /* how much to transfer in this loop iteration */
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
@@ -696,19 +705,19 @@ static ssize_t do_readv_writev(int type, struct file *file,
              * beginning of the iovec from where data needs to be copied out,
              * and each_count indicates the size in bytes that needs to be pulled
              * out.  */
-            pvfs2_print("%s nr_segs %u, offset: %llu each_count: %d\n",
+            gossip_debug(GOSSIP_FILE_DEBUG, "%s nr_segs %u, offset: %llu each_count: %d\n",
                     fnstr, seg_array[seg], *offset, (int) each_count);
             ret = pvfs_bufmap_copy_iovec_from_user(
                     buffer_index, ptr, seg_array[seg], each_count);
             if (ret < 0)
             {
-                pvfs2_error("%s: Failed to copy user buffer.  Please make sure "
+                gossip_err("%s: Failed to copy user buffer.  Please make sure "
                             "that the pvfs2-client is running. %zd\n", fnstr, ret);
                 goto out;
             }
         }
         ret = service_operation(new_op, fnstr,
-            PVFS2_OP_RETRY_COUNT, get_interruptible_flag(inode));
+             get_interruptible_flag(inode));
 
         if (ret < 0)
         {
@@ -722,11 +731,11 @@ static ssize_t do_readv_writev(int type, struct file *file,
               */
               if (ret == -EINTR)
               {
-                  pvfs2_print("%s: returning error %zd\n", fnstr, ret);
+                  gossip_debug(GOSSIP_FILE_DEBUG, "%s: returning error %zd\n", fnstr, ret);
               }
               else
               {
-                  pvfs2_error(
+                  gossip_err(
                         "%s: error on handle %llu, "
                         "FILE: %s\n  -- returning %zd\n",
                         fnstr, llu(pvfs2_ino_to_handle(inode->i_ino)),
@@ -739,7 +748,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 
         if (type == IO_READV)
         {
-            pvfs2_print("%s: nr_segs %u, offset: %llu each_count:%d\n",
+            gossip_debug(GOSSIP_FILE_DEBUG, "%s: nr_segs %u, offset: %llu each_count:%d\n",
                 fnstr, (int) seg_array[seg], *offset, (int) each_count);
             /*
              * copy data to application by pushing it out to the iovec.
@@ -756,7 +765,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
                         new_op->downcall.resp.io.amt_complete);
                 if (ret < 0)
                 {
-                    pvfs2_error("Failed to copy user buffer.  Please make sure "
+                    gossip_err("Failed to copy user buffer.  Please make sure "
                                 "that the pvfs2-client is running.\n");
                     /* put error codes in downcall so that handle_io_error()
                      * preserves it properly */
@@ -776,10 +785,10 @@ static ssize_t do_readv_writev(int type, struct file *file,
         /*
           tell the device file owner waiting on I/O that this read has
           completed and it can return now.  in this exact case, on
-          wakeup the device will free the op, so we *cannot* touch it
+          wakeup the daemon will free the op, so we *cannot* touch it
           after this.
         */
-        wake_up_device_for_return(new_op);
+        wake_up_daemon_for_return(new_op);
         new_op = NULL;
         pvfs_bufmap_put(buffer_index);
         buffer_index = -1;
@@ -797,22 +806,30 @@ static ssize_t do_readv_writev(int type, struct file *file,
         ret = total_count;
     }
 out:
+    if (buffer_index >= 0) {
+        pvfs_bufmap_put(buffer_index);
+        gossip_debug(GOSSIP_FILE_DEBUG, "PUT buffer_index %d\n", buffer_index);
+    }
     if (new_op)
         op_release(new_op);
-    if (buffer_index >= 0)
-        pvfs_bufmap_put(buffer_index);
     if (to_free) 
     {
         kfree(iovecptr);
         kfree(seg_array);
     }
-    if (ret > 0 && file != NULL && inode != NULL)
+    if (ret > 0 && inode != NULL && pvfs2_inode != NULL)
     {
-#ifdef HAVE_TOUCH_ATIME
-        touch_atime(file->f_vfsmnt, file->f_dentry);
-#else
-        update_atime(inode);
-#endif
+        if (type == IO_READV)
+        {
+            SetAtimeFlag(pvfs2_inode);
+            inode->i_atime = CURRENT_TIME;
+        }
+        else 
+        {
+            SetMtimeFlag(pvfs2_inode);
+            inode->i_mtime = CURRENT_TIME;
+        }
+        mark_inode_dirty_sync(inode);
     }
     return ret;
 }
@@ -842,6 +859,532 @@ static ssize_t pvfs2_file_writev(
 {
     return do_readv_writev(IO_WRITEV, file, iov, nr_segs, offset);
 }
+
+
+#if defined(HAVE_READX_FILE_OPERATIONS) || defined(HAVE_WRITEX_FILE_OPERATIONS)
+
+/* Construct a trailer of <file offsets, length pairs> in a buffer that we
+ * pass in as an upcall trailer to client-core. This is used by clientcore
+ * to construct a Request_hindexed type to stage the non-contiguous I/O
+ * to file
+ */
+static int construct_file_offset_trailer(char **trailer, 
+        PVFS_size *trailer_size, int seg_count, struct xtvec *xptr)
+{
+    int i;
+    struct read_write_x *rwx;
+
+    *trailer_size = seg_count * sizeof(struct read_write_x);
+    *trailer = (char *) vmalloc(*trailer_size);
+    if (*trailer == NULL)
+    {
+        *trailer_size = 0;
+        return -ENOMEM;
+    }
+    rwx = (struct read_write_x *) *trailer;
+    for (i = 0; i < seg_count; i++) 
+    {
+        rwx->off = xptr[i].xtv_off;
+        rwx->len = xptr[i].xtv_len;
+        rwx++;
+    }
+    return 0;
+}
+
+/*
+ * The reason we need to do this is to be able to support readx() and writex()
+ * of larger than PVFS_DEFAULT_DESC_SIZE (4 MB). What that means is that
+ * we will create a new xtvec descriptor for those file offsets that 
+ * go beyond the limit
+ * Return value for this routine is -ve in case of errors
+ * and 0 in case of success.
+ * Further, the new_nr_segs pointer is updated to hold the new value
+ * of number of xtvecs, the new_xtvec pointer is updated to hold the pointer
+ * to the new split xtvec, and the size array is an array of integers holding
+ * the number of xtvecs that straddle PVFS_DEFAULT_DESC_SIZE.
+ * The max_new_nr_segs value is computed by the caller and passed in.
+ * (It will be (count of all xtv_len/ block_size) + 1).
+ */
+static int split_xtvecs(unsigned long max_new_nr_segs,  /* IN */
+        unsigned long nr_segs,              /* IN */
+        const struct xtvec *original_xtvec, /* IN */
+        unsigned long *new_nr_segs, struct xtvec **new_vec,  /* OUT */
+        unsigned int *seg_count, unsigned int **seg_array)   /* OUT */
+{
+    int seg, count, begin_seg, tmpnew_nr_segs;
+    struct xtvec *new_xtvec = NULL, *orig_xtvec;
+    unsigned int *sizes = NULL, sizes_count = 0;
+
+    if (nr_segs <= 0 || original_xtvec == NULL 
+            || new_nr_segs == NULL || new_vec == NULL
+            || seg_count == NULL || seg_array == NULL || max_new_nr_segs <= 0)
+    {
+        gossip_err("Invalid parameters to split_xtvecs\n");
+        return -EINVAL;
+    }
+    *new_nr_segs = 0;
+    *new_vec = NULL;
+    *seg_count = 0;
+    *seg_array = NULL;
+    /* copy the passed in xtvec descriptor to a temp structure */
+    orig_xtvec = (struct xtvec *) kmalloc(nr_segs * sizeof(struct xtvec),
+            PVFS2_BUFMAP_GFP_FLAGS);
+    if (orig_xtvec == NULL)
+    {
+        gossip_err("split_xtvecs: Could not allocate memory for %lu bytes!\n", 
+                (unsigned long)(nr_segs * sizeof(struct xtvec)));
+        return -ENOMEM;
+    }
+    new_xtvec = (struct xtvec *) kmalloc(max_new_nr_segs * sizeof(struct xtvec), 
+            PVFS2_BUFMAP_GFP_FLAGS);
+    if (new_xtvec == NULL)
+    {
+        kfree(orig_xtvec);
+        gossip_err("split_xtvecs: Could not allocate memory for %lu bytes!\n", 
+                (unsigned long)(max_new_nr_segs * sizeof(struct xtvec)));
+        return -ENOMEM;
+    }
+    sizes = (unsigned int *) kmalloc(max_new_nr_segs * sizeof(unsigned int), 
+            PVFS2_BUFMAP_GFP_FLAGS);
+    if (sizes == NULL)
+    {
+        kfree(new_xtvec);
+        kfree(orig_xtvec);
+        gossip_err("split_xtvecs: Could not allocate memory for %lu bytes!\n", 
+                (unsigned long)(max_new_nr_segs * sizeof(int)));
+        return -ENOMEM;
+    }
+    /* copy the passed in xtvec to a temp structure */
+    memcpy(orig_xtvec, original_xtvec, nr_segs * sizeof(struct xtvec));
+    memset(new_xtvec, 0, max_new_nr_segs * sizeof(struct xtvec));
+    memset(sizes, 0, max_new_nr_segs * sizeof(int));
+    begin_seg = 0;
+    count = 0;
+    tmpnew_nr_segs = 0;
+repeat:
+    for (seg = begin_seg; seg < nr_segs; seg++)
+    {
+        if (tmpnew_nr_segs >= max_new_nr_segs || sizes_count >= max_new_nr_segs)
+        {
+            kfree(sizes);
+            kfree(orig_xtvec);
+            kfree(new_xtvec);
+            gossip_err("split_xtvecs: exceeded the index limit (%d)\n", 
+                    tmpnew_nr_segs);
+            return -EINVAL;
+        }
+        if (count + orig_xtvec[seg].xtv_len < pvfs_bufmap_size_query())
+        {
+            count += orig_xtvec[seg].xtv_len;
+            
+            memcpy(&new_xtvec[tmpnew_nr_segs], &orig_xtvec[seg], 
+                    sizeof(struct xtvec));
+            tmpnew_nr_segs++;
+            sizes[sizes_count]++;
+        }
+        else
+        {
+            new_xtvec[tmpnew_nr_segs].xtv_off = orig_xtvec[seg].xtv_off;
+            new_xtvec[tmpnew_nr_segs].xtv_len = 
+                (pvfs_bufmap_size_query() - count);
+            tmpnew_nr_segs++;
+            sizes[sizes_count]++;
+            sizes_count++;
+            begin_seg = seg;
+            orig_xtvec[seg].xtv_off += (pvfs_bufmap_size_query() - count);
+            orig_xtvec[seg].xtv_len -= (pvfs_bufmap_size_query() - count);
+            count = 0;
+            break;
+        }
+    }
+    if (seg != nr_segs) {
+        goto repeat;
+    }
+    else
+    {
+        sizes_count++;
+    }
+    *new_nr_segs = tmpnew_nr_segs;
+    /* new_xtvec is freed by the caller */
+    *new_vec = new_xtvec;
+    *seg_count = sizes_count;
+    /* seg_array is also freed by the caller */
+    *seg_array = sizes;
+    kfree(orig_xtvec);
+    return 0;
+}
+
+static long 
+estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, ssize_t *total_count)
+{
+    unsigned long i;
+    long max_nr_xtvecs;
+    ssize_t total, count;
+
+    total = 0;
+    count = 0;
+    max_nr_xtvecs = 0;
+    for (i = 0; i < nr_segs; i++) 
+    {
+        const struct xtvec *xv = &curr[i];
+        count += xv->xtv_len;
+	if (unlikely((ssize_t)(count|xv->xtv_len) < 0))
+            return -EINVAL;
+        if (total + xv->xtv_len < pvfs_bufmap_size_query())
+        {
+            total += xv->xtv_len;
+            max_nr_xtvecs++;
+        }
+        else 
+        {
+            total = (total + xv->xtv_len - pvfs_bufmap_size_query());
+            max_nr_xtvecs += (total / pvfs_bufmap_size_query() + 2);
+        }
+    }
+    *total_count = count;
+    return max_nr_xtvecs;
+}
+
+
+static ssize_t do_readx_writex(int type, struct file *file,
+        const struct iovec *iov, unsigned long nr_segs,
+        const struct xtvec *xtvec, unsigned long xtnr_segs)
+{
+    ssize_t ret;
+    unsigned int to_free;
+    unsigned long seg;
+    ssize_t total_count, count_mem, count_stream;
+    size_t  each_count;
+    long max_new_nr_segs_mem, max_new_nr_segs_stream;
+    unsigned long new_nr_segs_mem = 0, new_nr_segs_stream = 0;
+    unsigned int seg_count_mem, *seg_array_mem = NULL;
+    unsigned int seg_count_stream, *seg_array_stream = NULL;
+    struct inode *inode = file->f_dentry->d_inode;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    struct iovec *iovecptr = NULL, *ptr = NULL;
+    struct xtvec *xtvecptr = NULL, *xptr = NULL;
+    pvfs2_kernel_op_t *new_op = NULL;
+    int buffer_index = -1;
+    size_t amt_complete = 0;
+    char *fnstr = (type == IO_READX) ? "pvfs2_file_readx" : "pvfs2_file_writex";
+
+    ret = -EINVAL;
+    to_free = 0;
+
+    /* Calculate the total memory length to read by adding up the length of each io
+     * segment */
+    count_mem = 0;
+    max_new_nr_segs_mem = 0;
+
+    /* Compute total and max number of segments after split of the memory vector */
+    if ((max_new_nr_segs_mem = estimate_max_iovecs(iov, nr_segs, &count_mem)) < 0)
+    {
+        return -EINVAL;
+    }
+    if (count_mem == 0)
+    {
+        return 0;
+    }
+    /* Calculate the total stream length to read and max number of segments after split of the stream vector */
+    count_stream = 0;
+    max_new_nr_segs_stream = 0;
+    if ((max_new_nr_segs_stream = estimate_max_xtvecs(xtvec, xtnr_segs, &count_stream)) < 0)
+    {
+        return -EINVAL;
+    }
+    if (count_mem != count_stream) 
+    {
+        gossip_err("%s: mem count %ld != stream count %ld\n",
+                fnstr, (long) count_mem, (long) count_stream);
+        goto out;
+    }
+    total_count = 0;
+    /*
+     * if the total size of data transfer requested is greater than
+     * the kernel-set blocksize of PVFS2, then we split the iovecs
+     * such that no iovec description straddles a block size limit
+     */
+    if (count_mem > pvfs_bufmap_size_query())
+    {
+        /*
+         * Split up the given iovec description such that
+         * no iovec descriptor straddles over the block-size limitation.
+         * This makes us our job easier to stage the I/O.
+         * In addition, this function will also compute an array with seg_count
+         * entries that will store the number of segments that straddle the
+         * block-size boundaries.
+         */
+        if ((ret = split_iovecs(max_new_nr_segs_mem, nr_segs, iov, /* IN */
+                        &new_nr_segs_mem, &iovecptr, /* OUT */
+                        &seg_count_mem, &seg_array_mem)  /* OUT */ ) < 0)
+        {
+            gossip_err("%s: Failed to split iovecs to satisfy larger "
+                    " than blocksize readx request %ld\n", fnstr, (long) ret);
+            goto out;
+        }
+        /* We must free seg_array_mem and iovecptr, xtvecptr and seg_array_stream */
+        to_free = 1;
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: Splitting iovecs from %lu to %lu [max_new %lu]\n", 
+                fnstr, nr_segs, new_nr_segs_mem, max_new_nr_segs_mem);
+        /* 
+         * Split up the given xtvec description such that
+         * no xtvec descriptor straddles over the block-size limitation.
+         */
+        if ((ret = split_xtvecs(max_new_nr_segs_stream, xtnr_segs, xtvec, /* IN */
+                        &new_nr_segs_stream, &xtvecptr, /* OUT */
+                        &seg_count_stream, &seg_array_stream) /* OUT */) < 0)
+        {
+            gossip_err("Failed to split iovecs to satisfy larger "
+                    " than blocksize readx request %ld\n", (long) ret);
+            goto out;
+        }
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: Splitting xtvecs from %lu to %lu [max_new %lu]\n", 
+                fnstr, xtnr_segs, new_nr_segs_stream, max_new_nr_segs_stream);
+    }
+    else {
+        new_nr_segs_mem = nr_segs;
+        /* use the given iovec description */
+        iovecptr = (struct iovec *) iov;
+        /* There is only 1 element in the seg_array_mem */
+        seg_count_mem = 1;
+        /* and its value is the number of segments passed in */
+        seg_array_mem = (unsigned int *) &nr_segs;
+        
+        new_nr_segs_stream = xtnr_segs;
+        /* use the given file description */
+        xtvecptr = (struct xtvec *) xtvec;
+        /* There is only 1 element in the seg_array_stream */
+        seg_count_stream = 1;
+        /* and its value is the number of segments passed in */
+        seg_array_stream = (unsigned int *) &xtnr_segs;
+        /* We dont have to free up anything */
+        to_free = 0;
+    }
+#ifdef PVFS2_KERNEL_DEBUG
+    for (seg = 0; seg < new_nr_segs_mem; seg++)
+    {
+        pvfs2_print("%s: %d) %p to %p [%ld bytes]\n",
+                fnstr,
+                seg + 1, iovecptr[seg].iov_base,
+                iovecptr[seg].iov_base + iovecptr[seg].iov_len,
+                (long) iovecptr[seg].iov_len);
+    }
+    for (seg = 0; seg < new_nr_segs_stream; seg++)
+    {
+        pvfs2_print("%s: %d) %ld to %ld [%ld bytes]\n",
+                fnstr,
+                seg + 1, (long) xtvecptr[seg].xtv_off,
+                (long) xtvecptr[seg].xtv_off + xtvecptr[seg].xtv_len,
+                (long) xtvecptr[seg].xtv_len);
+    }
+#endif
+    seg = 0;
+    ptr = iovecptr;
+    xptr = xtvecptr;
+
+    while (total_count < count_mem)
+    {
+        new_op = op_alloc_trailer(PVFS2_VFS_OP_FILE_IOX);
+        if (!new_op)
+        {
+            ret = -ENOMEM;
+            goto out;
+        }
+        new_op->upcall.req.iox.io_type = 
+            (type == IO_READX) ? PVFS_IO_READ : PVFS_IO_WRITE;
+        new_op->upcall.req.iox.refn = pvfs2_inode->refn;
+
+        /* get a shared buffer index */
+        ret = pvfs_bufmap_get(&buffer_index);
+        if (ret < 0)
+        {
+            gossip_err("%s: pvfs_bufmap_get() "
+                        "failure (%ld)\n", fnstr, (long) ret);
+            goto out;
+        }
+
+        /* how much to transfer in this loop iteration */
+        each_count = (((count_mem - total_count) > pvfs_bufmap_size_query()) ?
+                      pvfs_bufmap_size_query() : (count_mem - total_count));
+
+        new_op->upcall.req.iox.buf_index = buffer_index;
+        new_op->upcall.req.iox.count     = each_count;
+
+        /* construct the upcall trailer buffer */
+        if ((ret = construct_file_offset_trailer(&new_op->upcall.trailer_buf, 
+                        &new_op->upcall.trailer_size, seg_array_stream[seg], xptr)) < 0)
+        {
+            gossip_err("%s: construct_file_offset_trailer() "
+                    "failure (%ld)\n", fnstr, (long) ret);
+            goto out;
+        }
+        if (type == IO_WRITEX)
+        {
+            /* copy data from application by pulling it out of the iovec.
+             * Number of segments to copy so that we don't overflow the
+             * block-size is set in seg_array_mem[] and ptr points to the
+             * appropriate iovec from where data needs to be copied out,
+             * and each_count indicates size in bytes that needs to be
+             * pulled out
+             */
+            ret = pvfs_bufmap_copy_iovec_from_user(
+                    buffer_index, ptr, seg_array_mem[seg], each_count);
+            if (ret < 0)
+            {
+                gossip_err("%s: failed to copy user buffer. Please make sure "
+                        " that the pvfs2-client is running. %ld\n", fnstr, (long) ret);
+                goto out;
+            }
+        }
+        /* whew! finally service this operation */
+        ret = service_operation(new_op, fnstr,
+                get_interruptible_flag(inode));
+        if (ret < 0)
+        {
+              /* this macro is defined in pvfs2-kernel.h */
+              handle_io_error();
+
+              /*
+                don't write an error to syslog on signaled operation
+                termination unless we've got debugging turned on, as
+                this can happen regularly (i.e. ctrl-c)
+              */
+              if (ret == -EINTR)
+              {
+                  gossip_debug(GOSSIP_FILE_DEBUG, "%s: returning error %ld\n", fnstr, (long) ret);
+              }
+              else
+              {
+                  gossip_err(
+                        "%s: error on handle %llu, "
+                        "FILE: %s\n  -- returning %ld\n",
+                        fnstr, llu(pvfs2_ino_to_handle(inode->i_ino)),
+                        (file && file->f_dentry && file->f_dentry->d_name.name ?
+                         (char *)file->f_dentry->d_name.name : "UNKNOWN"),
+                        (long) ret);
+              }
+              goto out;
+        }
+        if (type == IO_READX)
+        {
+            /* copy data to application by pushing it out to the iovec.
+             * Number of segments to copy so that we don't overflow the
+             * block-size is set in seg_array_mem[] and ptr points to
+             * the appropriate iovec from where data needs to be copied
+             * in, and each count indicates size in bytes that needs to be
+             * pulled in
+             */
+            if (new_op->downcall.resp.iox.amt_complete)
+            {
+                ret = pvfs_bufmap_copy_to_user_iovec(
+                        buffer_index, ptr, seg_array_mem[seg], new_op->downcall.resp.iox.amt_complete);
+                if (ret < 0)
+                {
+                    gossip_err("%s: failed to copy user buffer. Please make sure "
+                            " that the pvfs2-client is running. %ld\n", fnstr, (long) ret);
+                    /* put error codes in downcall so that handle_io_error()
+                     * preserves it properly */
+                    new_op->downcall.status = ret;
+                    handle_io_error();
+                    goto out;
+                }
+            }
+        }
+        /* Advance the iovec pointer */
+        ptr += seg_array_mem[seg];
+        /* Advance the xtvec pointer */
+        xptr += seg_array_stream[seg];
+        seg++;
+        amt_complete = new_op->downcall.resp.iox.amt_complete;
+        total_count += amt_complete;
+
+        /*
+          tell the device file owner waiting on I/O that this I/O has
+          completed and it can return now.  in this exact case, on
+          wakeup the device will free the op, so we *cannot* touch it
+          after this.
+        */
+        wake_up_daemon_for_return(new_op);
+        new_op = NULL;
+        pvfs_bufmap_put(buffer_index);
+        buffer_index = -1;
+
+        /* if we got a short I/O operations,
+         * fall out and return what we got so far 
+         */
+        if (amt_complete < each_count)
+        {
+            break;
+        }
+    }
+    if (total_count > 0)
+    {
+        ret = total_count;
+    }
+out:
+    if (buffer_index >= 0) {
+        pvfs_bufmap_put(buffer_index);
+        gossip_debug(GOSSIP_FILE_DEBUG, "PUT buffer_index %d\n", buffer_index);
+    }
+    if (new_op)
+    {
+        if (new_op->upcall.trailer_buf)
+            vfree(new_op->upcall.trailer_buf);
+        op_release(new_op);
+    }
+    if (to_free)
+    {
+        kfree(iovecptr);
+        kfree(seg_array_mem);
+        kfree(xtvecptr);
+        kfree(seg_array_stream);
+    }
+    if (ret > 0 && inode != NULL && pvfs2_inode != NULL)
+    {
+        if (type == IO_READV)
+        {
+            SetAtimeFlag(pvfs2_inode);
+            inode->i_atime = CURRENT_TIME;
+        }
+        else 
+        {
+            SetMtimeFlag(pvfs2_inode);
+            inode->i_mtime = CURRENT_TIME;
+        }
+        mark_inode_dirty_sync(inode);
+    }
+    return ret;
+}
+
+#endif
+
+#ifdef HAVE_READX_FILE_OPERATIONS
+
+static ssize_t pvfs2_file_readx(
+    struct file *file,
+    const struct iovec *iov,
+    unsigned long nr_segs,
+    const struct xtvec *xtvec,
+    unsigned long xtnr_segs)
+{
+    return do_readx_writex(IO_READX, file, iov, nr_segs, xtvec, xtnr_segs);
+}
+
+#endif
+
+#ifdef HAVE_WRITEX_FILE_OPERATIONS
+
+static ssize_t pvfs2_file_writex(
+    struct file *file,
+    const struct iovec *iov,
+    unsigned long nr_segs,
+    const struct xtvec *xtvec,
+    unsigned long xtnr_segs)
+{
+    return do_readx_writex(IO_WRITEX, file, iov, nr_segs, xtvec, xtnr_segs);
+}
+
+#endif
 
 #ifdef HAVE_AIO_VFS_SUPPORT
 /*
@@ -890,7 +1433,7 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
 
     if ((x = (pvfs2_kiocb *) iocb->private) == NULL)
     {
-        pvfs2_error("pvfs2_aio_retry: could not "
+        gossip_err("pvfs2_aio_retry: could not "
                 " retrieve pvfs2_kiocb!\n");
         return -EINVAL;
     }
@@ -903,7 +1446,7 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
          * Well, if this happens, we are toast!
          * What should we cleanup if such a thing happens? 
          */
-        pvfs2_error("pvfs2_aio_retry: critical error "
+        gossip_err("pvfs2_aio_retry: critical error "
                 " x->op = %p, iocb = %p, buffer_index = %d\n",
                 x->op, x->kiocb, x->buffer_index);
         return -EINVAL;
@@ -911,8 +1454,7 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
     /* lock up the op */
     spin_lock(&op->lock);
     /* check the state of the op */
-    if (op->op_state == PVFS2_VFS_STATE_WAITING 
-            || op->op_state == PVFS2_VFS_STATE_INPROGR)
+    if (op_state_waiting(op) || op_state_in_progress(op))
     {
         spin_unlock(&op->lock);
         return -EIOCBQUEUED;
@@ -932,21 +1474,24 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
         error = x->bytes_copied;
         op->priv = NULL;
         spin_unlock(&op->lock);
-        pvfs2_print("pvfs2_aio_retry: buffer %p,"
+        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_aio_retry: buffer %p,"
                 " size %d return %d bytes\n",
                     x->buffer, (int) x->bytes_to_be_copied, (int) error);
-        if ((x->rw == PVFS_IO_WRITE) && error > 0)
+        if (error > 0)
         {
-#ifndef HAVE_TOUCH_ATIME
             struct inode *inode = iocb->ki_filp->f_mapping->host;
-#endif
-            struct file *filp = iocb->ki_filp;
-            /* update atime if need be */
-#ifdef HAVE_TOUCH_ATIME
-            touch_atime(filp->f_vfsmnt, filp->f_dentry);
-#else
-            update_atime(inode);
-#endif
+            pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+            if (x->rw == PVFS_IO_READ)
+            {
+                SetAtimeFlag(pvfs2_inode);
+                inode->i_atime = CURRENT_TIME;
+            }
+            else 
+            {
+                SetMtimeFlag(pvfs2_inode);
+                inode->i_mtime = CURRENT_TIME;
+            }
+            mark_inode_dirty_sync(inode);
         }
         /* 
          * Now we can happily free up the op,
@@ -954,7 +1499,7 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
          */
         if (x->buffer_index >= 0)
         {
-            pvfs2_print("pvfs2_aio_retry: put bufmap_index "
+            gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_aio_retry: put bufmap_index "
                     " %d\n", x->buffer_index);
             pvfs_bufmap_put(x->buffer_index);
             x->buffer_index = -1;
@@ -984,14 +1529,14 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
     pvfs2_kiocb *x = NULL;
     if (iocb == NULL || event == NULL)
     {
-        pvfs2_error("pvfs2_aio_cancel: Invalid parameters "
+        gossip_err("pvfs2_aio_cancel: Invalid parameters "
                 " %p, %p!\n", iocb, event);
         return -EINVAL;
     }
     x = (pvfs2_kiocb *) iocb->private;
     if (x == NULL)
     {
-        pvfs2_error("pvfs2_aio_cancel: cannot retrieve "
+        gossip_err("pvfs2_aio_cancel: cannot retrieve "
                 " pvfs2_kiocb structure!\n");
         return -EINVAL;
     }
@@ -1004,13 +1549,13 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
          */
         if (x->kiocb != iocb)
         {
-            pvfs2_error("pvfs2_aio_cancel: kiocb structures "
+            gossip_err("pvfs2_aio_cancel: kiocb structures "
                     "don't match %p %p!\n", x->kiocb, iocb);
             return -EINVAL;
         }
         if ((op = x->op) == NULL)
         {
-            pvfs2_error("pvfs2_aio_cancel: cannot retreive "
+            gossip_err("pvfs2_aio_cancel: cannot retreive "
                     "pvfs2_kernel_op structure!\n");
             return -EINVAL;
         }
@@ -1057,7 +1602,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
                     int timeout = MSECS_TO_JIFFIES(1000 * op_timeout_secs);
                     if (!schedule_timeout(timeout))
                     {
-                        pvfs2_print("Timed out on I/O cancellation - aborting\n");
+                        gossip_debug(GOSSIP_FILE_DEBUG, "Timed out on I/O cancellation - aborting\n");
                         timed_out_or_signal = 1;
                         spin_lock(&op->lock);
                         break;
@@ -1065,7 +1610,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
                     spin_lock(&op->lock);
                     continue;
                 }
-                pvfs2_print("signal on Async I/O cancellation - aborting\n");
+                gossip_debug(GOSSIP_FILE_DEBUG, "signal on Async I/O cancellation - aborting\n");
                 timed_out_or_signal = 1;
                 spin_lock(&op->lock);
                 break;
@@ -1076,18 +1621,18 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
         } while (0);
 
         /* We need to fill up event->res and event->res2 if at all */
-        if (op->op_state == PVFS2_VFS_STATE_SERVICED)
+        if (op_state_serviced(op))
         {
             op->priv = NULL;
             spin_unlock(&op->lock);
             event->res = x->bytes_copied;
             event->res2 = 0;
         }
-        else if (op->op_state == PVFS2_VFS_STATE_INPROGR)
+        else if (op_state_in_progress(op))
         {
             op->priv = NULL;
             spin_unlock(&op->lock);
-            pvfs2_print("Trying to cancel operation in "
+            gossip_debug(GOSSIP_FILE_DEBUG, "Trying to cancel operation in "
                     " progress %ld\n", (unsigned long) op->tag);
             /* 
              * if operation is in progress we need to send 
@@ -1110,7 +1655,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
          */
         if (x->buffer_index >= 0)
         {
-            pvfs2_print("pvfs2_aio_cancel: put bufmap_index "
+            gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_aio_cancel: put bufmap_index "
                     " %d\n", x->buffer_index);
             pvfs_bufmap_put(x->buffer_index);
             x->buffer_index = -1;
@@ -1153,7 +1698,7 @@ static void pvfs2_aio_dtor(struct kiocb *iocb)
         /* do a cleanup of the buffers and possibly op */
         if (x->buffer_index >= 0)
         {
-            pvfs2_print("pvfs2_aio_dtor: put bufmap_index "
+            gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_aio_dtor: put bufmap_index "
                     " %d\n", x->buffer_index);
             pvfs_bufmap_put(x->buffer_index);
             x->buffer_index = -1;
@@ -1165,7 +1710,7 @@ static void pvfs2_aio_dtor(struct kiocb *iocb)
         }
         x->needs_cleanup = 0;
     }
-    pvfs2_print("pvfs2_aio_dtor: kiocb_release %p\n", x);
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_aio_dtor: kiocb_release %p\n", x);
     kiocb_release(x);
     iocb->private = NULL;
     return;
@@ -1236,7 +1781,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     /* Each I/O operation is not allowed to be greater than our block size */
     if (count > pvfs_bufmap_size_query())
     {
-        pvfs2_error("aio_read: cannot transfer (%d) bytes"
+        gossip_err("aio_read: cannot transfer (%d) bytes"
                 " (larger than block size %d)\n",
                 (int) count, pvfs_bufmap_size_query());
         return -EINVAL;
@@ -1258,7 +1803,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
             char __user *current_buf = buffer;
             pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
             
-            new_op = op_alloc();
+            new_op = op_alloc(PVFS2_VFS_OP_FILE_IO);
             if (!new_op)
             {
                 error = -ENOMEM;
@@ -1266,7 +1811,6 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
             }
             /* Increase ref count */
             get_op(new_op);
-            new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
             /* (A)synchronous I/O */
             new_op->upcall.req.io.async_vfs_io = 
                 is_sync_kiocb(iocb) ? PVFS_VFS_SYNC_IO 
@@ -1277,13 +1821,13 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
             error = pvfs_bufmap_get(&buffer_index);
             if (error < 0)
             {
-                pvfs2_error("pvfs2_file_aio_read: pvfs_bufmap_get() "
+                gossip_err("pvfs2_file_aio_read: pvfs_bufmap_get() "
                         " failure %d\n", (int) ret);
                 /* drop ref count and possibly de-allocate */
                 put_op(new_op);
                 goto out_error;
             }
-            pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_get %d\n",
+            gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: pvfs_bufmap_get %d\n",
                     buffer_index);
             new_op->upcall.req.io.buf_index = buffer_index;
             new_op->upcall.req.io.count = count;
@@ -1304,13 +1848,13 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                     error = -ENOMEM;
                     /* drop the buffer index */
                     pvfs_bufmap_put(buffer_index);
-                    pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
                             buffer_index);
                     /* drop the reference count and deallocate */
                     put_op(new_op);
                     goto out_error;
                 }
-                pvfs2_print("kiocb_alloc: %p\n", x);
+                gossip_debug(GOSSIP_FILE_DEBUG, "kiocb_alloc: %p\n", x);
                 /* 
                  * destructor function to make sure that we free
                  * up this allocated piece of memory 
@@ -1324,7 +1868,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                  * Stage the operation!
                  */
                 ret = service_operation(
-                        new_op, "pvfs2_file_aio_read", PVFS2_OP_RETRY_COUNT, 
+                        new_op, "pvfs2_file_aio_read",  
                         get_interruptible_flag(inode));
                 if (ret < 0)
                 {
@@ -1336,12 +1880,12 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                     */
                     if (ret == -EINTR)
                     {
-                        pvfs2_print("pvfs2_file_aio_read: returning error %d\n" 
+                        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: returning error %d\n" 
                                 , (int) ret);
                     }
                     else
                     {
-                        pvfs2_error(
+                        gossip_err(
                             "pvfs2_file_aio_read: error reading from "
                             " handle %llu, "
                             "\n  -- returning %d\n",
@@ -1360,17 +1904,23 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                 }
                 if (ret)
                 {
-                    pvfs2_print("Failed to copy user buffer %d\n", (int) ret);
+                    gossip_debug(GOSSIP_FILE_DEBUG, "Failed to copy user buffer %d\n", (int) ret);
                     new_op->downcall.status = ret;
                     handle_sync_aio_error();
                     error = ret;
                     goto out_error;
                 }
                 error = new_op->downcall.resp.io.amt_complete;
-                wake_up_device_for_return(new_op);
+                wake_up_daemon_for_return(new_op);
                 pvfs_bufmap_put(buffer_index);
-                pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
                         buffer_index);
+                if (error > 0)
+                {
+                    SetAtimeFlag(pvfs2_inode);
+                    inode->i_atime = CURRENT_TIME;
+                    mark_inode_dirty_sync(inode);
+                }
                 /* new_op is freed by the client-daemon */
                 goto out_error;
             }
@@ -1399,8 +1949,9 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                  * but don't wait for it to be serviced. 
                  * Return immediately 
                  */
-                service_async_vfs_op(new_op);
-                pvfs2_print("pvfs2_file_aio_read: queued "
+                service_operation(new_op, "pvfs2_file_aio_read", 
+                        PVFS2_OP_ASYNC);
+                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: queued "
                         " read operation [%ld for %d]\n",
                             (unsigned long) offset, (int) count);
                 error = -EIOCBQUEUED;
@@ -1478,7 +2029,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
 #endif
         if (ret != 0 || count == 0)
         {
-            pvfs2_error("pvfs2_file_aio_write: failed generic "
+            gossip_err("pvfs2_file_aio_write: failed generic "
                     " argument checks.\n");
             return(ret);
         }
@@ -1486,7 +2037,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     /* Each I/O operation is not allowed to be greater than our block size */
     if (count > pvfs_bufmap_size_query())
     {
-        pvfs2_error("aio_write: cannot transfer (%d) bytes"
+        gossip_err("aio_write: cannot transfer (%d) bytes"
                 " (larger than block size %d)\n",
                 (int) count, pvfs_bufmap_size_query());
         return -EINVAL;
@@ -1506,7 +2057,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
             char __user *current_buf = (char *) buffer;
             pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
             
-            new_op = op_alloc();
+            new_op = op_alloc(PVFS2_VFS_OP_FILE_IO);
             if (!new_op)
             {
                 error = -ENOMEM;
@@ -1514,7 +2065,6 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
             }
             /* Increase ref count */
             get_op(new_op);
-            new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
             /* (A)synchronous I/O */
             new_op->upcall.req.io.async_vfs_io = 
                 is_sync_kiocb(iocb) ? PVFS_VFS_SYNC_IO 
@@ -1524,13 +2074,13 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
             error = pvfs_bufmap_get(&buffer_index);
             if (error < 0)
             {
-                pvfs2_error("pvfs2_file_aio_write: pvfs_bufmap_get()"
+                gossip_err("pvfs2_file_aio_write: pvfs_bufmap_get()"
                         " failure %d\n", (int) ret);
                 /* drop ref count and possibly de-allocate */
                 put_op(new_op);
                 goto out_error;
             }
-            pvfs2_print("pvfs2_file_aio_write: pvfs_bufmap_put %d\n",
+            gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_write: pvfs_bufmap_put %d\n",
                     buffer_index);
             new_op->upcall.req.io.buf_index = buffer_index;
             new_op->upcall.req.io.count = count;
@@ -1546,10 +2096,10 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                     buffer_index, current_buf, count);
             if (error < 0)
             {
-                pvfs2_print("Failed to copy user buffer %d\n", (int) ret);
+                gossip_debug(GOSSIP_FILE_DEBUG, "Failed to copy user buffer %d\n", (int) ret);
                 /* drop the buffer index */
                 pvfs_bufmap_put(buffer_index);
-                pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
                         buffer_index);
                 /* drop the reference count and deallocate */
                 put_op(new_op);
@@ -1572,13 +2122,13 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                     error = -ENOMEM;
                     /* drop the buffer index */
                     pvfs_bufmap_put(buffer_index);
-                    pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
                             buffer_index);
                     /* drop the reference count and deallocate */
                     put_op(new_op);
                     goto out_error;
                 }
-                pvfs2_print("kiocb_alloc: %p\n", x);
+                gossip_debug(GOSSIP_FILE_DEBUG, "kiocb_alloc: %p\n", x);
                 /* 
                  * destructor function to make sure that we free 
                  * up this allocated piece of memory 
@@ -1592,7 +2142,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                  * Stage the operation!
                  */
                 ret = service_operation(
-                        new_op, "pvfs2_file_aio_write", PVFS2_OP_RETRY_COUNT, 
+                        new_op, "pvfs2_file_aio_write",  
                         get_interruptible_flag(inode));
                 if (ret < 0)
                 {
@@ -1604,12 +2154,12 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                     */
                     if (ret == -EINTR)
                     {
-                        pvfs2_print("pvfs2_file_aio_write: returning error %d\n", 
+                        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_write: returning error %d\n", 
                                 (int) ret);
                     }
                     else
                     {
-                        pvfs2_error(
+                        gossip_err(
                             "pvfs2_file_aio_write: error writing to "
                             " handle %llu, "
                             "FILE: %s\n  -- "
@@ -1624,17 +2174,15 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                     goto out_error;
                 }
                 error = new_op->downcall.resp.io.amt_complete;
-                wake_up_device_for_return(new_op);
+                wake_up_daemon_for_return(new_op);
                 pvfs_bufmap_put(buffer_index);
-                pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
                         (int) buffer_index);
                 if (error > 0)
                 {
-#ifdef HAVE_TOUCH_ATIME
-                    touch_atime(filp->f_vfsmnt, filp->f_dentry);
-#else
-                    update_atime(inode);
-#endif
+                    SetMtimeFlag(pvfs2_inode);
+                    inode->i_mtime = CURRENT_TIME;
+                    mark_inode_dirty_sync(inode);
                 }
                 /* new_op is freed by the client-daemon */
                 goto out_error;
@@ -1664,8 +2212,9 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                  * but don't wait for it to be serviced. 
                  * Return immediately 
                  */
-                service_async_vfs_op(new_op);
-                pvfs2_print("pvfs2_file_aio_write: queued "
+                service_operation(new_op, "pvfs2_file_aio_write", 
+                        PVFS2_OP_ASYNC);
+                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_write: queued "
                         " write operation [%ld for %d]\n",
                             (unsigned long) offset, (int) count);
                 error = -EIOCBQUEUED;
@@ -1696,7 +2245,7 @@ int pvfs2_ioctl(
 {
     int ret = -ENOTTY;
 
-    pvfs2_print("pvfs2_ioctl: called with cmd %d\n", cmd);
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: called with cmd %d\n", cmd);
     return ret;
 }
 
@@ -1706,7 +2255,7 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
     struct inode *inode = file->f_dentry->d_inode;
 
-    pvfs2_print("pvfs2_file_mmap: called on %s\n",
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_mmap: called on %s\n",
                 (file ? (char *)file->f_dentry->d_name.name :
                  (char *)"Unknown"));
 
@@ -1747,15 +2296,10 @@ int pvfs2_file_release(
     struct inode *inode,
     struct file *file)
 {
-    pvfs2_print("pvfs2_file_release: called on %s\n",
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_release: called on %s\n",
                 file->f_dentry->d_name.name);
 
-#ifdef HAVE_TOUCH_ATIME
-    touch_atime(file->f_vfsmnt, file->f_dentry);
-#else
-    update_atime(inode);
-#endif
-
+    pvfs2_flush_inode(inode);
     if (S_ISDIR(inode->i_mode))
     {
         return dcache_dir_close(inode, file);
@@ -1787,20 +2331,21 @@ int pvfs2_fsync(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(file->f_dentry->d_inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_FSYNC);
     if (!new_op)
     {
         return -ENOMEM;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_FSYNC;
     new_op->upcall.req.fsync.refn = pvfs2_inode->refn;
 
-    ret = service_operation(new_op, "pvfs2_fsync", 0,
-                      get_interruptible_flag(file->f_dentry->d_inode));
+    ret = service_operation(new_op, "pvfs2_fsync", 
+            get_interruptible_flag(file->f_dentry->d_inode));
 
-    pvfs2_print("pvfs2_fsync got return value of %d\n",ret);
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_fsync got return value of %d\n",ret);
 
     op_release(new_op);
+
+    pvfs2_flush_inode(file->f_dentry->d_inode);
     return ret;
 }
 
@@ -1816,7 +2361,7 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
 
     if (!inode)
     {
-        pvfs2_error("pvfs2_file_llseek: invalid inode (NULL)\n");
+        gossip_err("pvfs2_file_llseek: invalid inode (NULL)\n");
         return ret;
     }
 
@@ -1833,7 +2378,7 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
         }
     }
 
-    pvfs2_print("pvfs2_file_llseek: offset is %ld | origin is %d | "
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_llseek: offset is %ld | origin is %d | "
                 "inode size is %lu\n", (long)offset, origin,
                 (unsigned long)file->f_dentry->d_inode->i_size);
 
@@ -1903,7 +2448,7 @@ static void do_bypass_page_cache_read(struct file *filp, loff_t *ppos,
             }
             to_free = 1;
             uncached_page = virt_to_page(kaddr);
-            pvfs2_print("begin_index = %lu offset = %lu file_offset = %ld\n",
+            gossip_debug(GOSSIP_FILE_DEBUG, "begin_index = %lu offset = %lu file_offset = %ld\n",
                     (unsigned long) begin_index, (unsigned long) offset, (unsigned long)file_offset);
 
             error = pvfs2_inode_read(inode, (void *) kaddr, PAGE_CACHE_SIZE, &file_offset, 0, 0);
@@ -1939,7 +2484,7 @@ static void do_bypass_page_cache_read(struct file *filp, loff_t *ppos,
         nr = nr - offset;
 
         ret = actor(desc, uncached_page, offset, nr);
-        pvfs2_print("actor with offset %lu nr %lu return %lu desc->count %lu\n", 
+        gossip_debug(GOSSIP_FILE_DEBUG, "actor with offset %lu nr %lu return %lu desc->count %lu\n", 
                 (unsigned long) offset, (unsigned long) nr, (unsigned long) ret, (unsigned long) desc->count);
 
         offset += ret;
@@ -2028,6 +2573,12 @@ struct file_operations pvfs2_file_operations =
     .fsync = pvfs2_fsync,
 #ifdef HAVE_SENDFILE_VFS_SUPPORT
     .sendfile = pvfs2_sendfile,
+#endif
+#ifdef HAVE_READX_FILE_OPERATIONS
+    .readx = pvfs2_file_readx,
+#endif
+#ifdef HAVE_WRITEX_FILE_OPERATIONS
+    .writex = pvfs2_file_writex,
 #endif
 #endif
 };
@@ -2120,6 +2671,7 @@ static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
     } else {
         if (is_read_only(inode->i_rdev)) {
             err = -EPERM;
+            gossip_err("Operation not permitted on read only file system\n");
             goto out;
         }
         if (pos >= inode->i_size) {

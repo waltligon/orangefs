@@ -11,16 +11,16 @@ which he can install wherever.  So that's not a problem.
 
 [snip]
 
-If you look at the test programs in src/io/trove/test/, in particular
+If you look at the test programs in test/io/trove/, in particular
 trove-mkfs.c, you'll see how the functions get called.  The functions
 available for the most part match exactly with what is described in
-doc/pvfs2-design-storageint/storage-interface.tex.  There are some
+doc/design/storage-interface.tex.  There are some
 management operations that are NOT described in that document, and that
 might be confusing.
 
 The code in src/io/trove/ is basically wrapper code to handle mapping
 to a particular instance of a trove implementation.  The code in
-src/io/trove/trove_dbpf is the only existing implementation.  It is
-described in doc/pvfs2-trove-dbpf/trove-dbpf.tex.
+src/io/trove/trove-dbpf/ is the only existing implementation.  It is
+described in doc/design/trove-dbpf.tex.
 
 [snip]

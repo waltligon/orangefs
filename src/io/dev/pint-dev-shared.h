@@ -11,6 +11,7 @@
 #ifndef __PINT_DEV_SHARED_H
 #define __PINT_DEV_SHARED_H
 
+
 #ifdef __KERNEL__
 #include <linux/ioctl.h>
 #else
@@ -46,6 +47,12 @@
 #define PVFS2_BUFMAP_TOTAL_SIZE \
 (PVFS2_BUFMAP_DESC_COUNT * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)
 
+#define PVFS2_READDIR_DESC_COUNT  5
+#define PVFS2_READDIR_DEFAULT_DESC_SIZE  (128 * 1024)
+#define PVFS2_READDIR_DEFAULT_DESC_SHIFT 17
+#define PVFS2_READDIR_TOTAL_SIZE \
+(PVFS2_READDIR_DESC_COUNT * PVFS2_READDIR_DEFAULT_DESC_SIZE)
+
 /* pvfs2-client-core can cache readahead data up to this size in bytes */
 #define PVFS2_MMAP_RACACHE_MAX_SIZE ((loff_t)(8 * (1024 * 1024)))
 
@@ -69,15 +76,17 @@ struct PVFS_dev_map_desc
 #define DEV_GET_MAX_DOWNSIZE    0x3
 #define DEV_MAP                 0x4
 #define DEV_REMOUNT_ALL         0x5
-#define DEV_MAX_NR              0x6
+#define DEV_DEBUG               0x6
+#define DEV_MAX_NR              0x7
 
 /* supported ioctls, codes are with respect to user-space */
 enum {
-PVFS_DEV_GET_MAGIC          = _IOW(PVFS_DEV_MAGIC, DEV_GET_MAGIC, int32_t),
-PVFS_DEV_GET_MAX_UPSIZE     = _IOW(PVFS_DEV_MAGIC, DEV_GET_MAX_UPSIZE, int32_t),
-PVFS_DEV_GET_MAX_DOWNSIZE   = _IOW(PVFS_DEV_MAGIC, DEV_GET_MAX_DOWNSIZE, int32_t),
-PVFS_DEV_MAP                =  _IO(PVFS_DEV_MAGIC, DEV_MAP),
-PVFS_DEV_REMOUNT_ALL        =  _IO(PVFS_DEV_MAGIC, DEV_REMOUNT_ALL),
+PVFS_DEV_GET_MAGIC          = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAGIC, int32_t),
+PVFS_DEV_GET_MAX_UPSIZE     = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_UPSIZE, int32_t),
+PVFS_DEV_GET_MAX_DOWNSIZE   = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_DOWNSIZE, int32_t),
+PVFS_DEV_MAP                =  _IO(PVFS_DEV_MAGIC , DEV_MAP),
+PVFS_DEV_REMOUNT_ALL        =  _IO(PVFS_DEV_MAGIC , DEV_REMOUNT_ALL),
+PVFS_DEV_DEBUG              =  _IOR(PVFS_DEV_MAGIC, DEV_DEBUG, int32_t),
 PVFS_DEV_MAXNR              =  DEV_MAX_NR,
 };
 

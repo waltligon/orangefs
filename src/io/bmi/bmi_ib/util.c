@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.7 2006-05-30 20:24:57 pw Exp $
+ * $Id: util.c,v 1.7.4.1 2006-09-18 15:05:12 vilayann Exp $
  */
 #include <stdio.h>
 #include <string.h>

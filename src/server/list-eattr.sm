@@ -21,7 +21,6 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "pvfs2-types.h"
-#include "pvfs2-types-debug.h"
 #include "pvfs2-util.h"
 #include "pint-util.h"
 
@@ -152,8 +151,7 @@ static PINT_sm_action listeattr_list_eattrib(
         s_op->req->u.listeattr.token,
         s_op->resp.u.listeattr.key,
         s_op->req->u.listeattr.nkey,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.listeattr.fs_id),
+        0,
         NULL,
         smcb,
         0,

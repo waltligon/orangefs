@@ -92,6 +92,11 @@ static struct server_configuration_s server_config;
 static int signal_recvd_flag = 0;
 static pid_t server_controlling_pid = 0;
 
+/* A list of all serv_op's posted for unexpected message alone */
+static QLIST_HEAD(posted_sop_list);
+/* A list of all serv_op's posted for expected messages alone */
+static QLIST_HEAD(inprogress_sop_list);
+
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
 
@@ -143,6 +148,7 @@ static int server_initialize(
 static int server_initialize_subsystems(
     PINT_server_status_flag *server_status_flag);
 static int server_setup_signal_handlers(void);
+static int server_purge_unexpected_recv_machines(void);
 static int server_setup_process_environment(int background);
 static int server_shutdown(
     PINT_server_status_flag status,
@@ -399,8 +405,20 @@ struct PINT_server_req_params PINT_server_req_table[] =
         "small_io",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_small_io_sm}
+        &pvfs2_small_io_sm},
+
+    /* 34 */
+    {PVFS_SERV_LISTATTR,
+        "listattr",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_list_attr_sm},
 };
+
+struct server_configuration_s *PINT_get_server_config(void)
+{
+    return &server_config;
+}
 
 int main(int argc, char **argv)
 {
@@ -570,11 +588,23 @@ int main(int argc, char **argv)
     {
         int i, comp_ct = PVFS_SERVER_TEST_COUNT;
 
+        /* IF a signal was received and we have drained all the state machines
+         * that were in progress, then we initiate shutdown of the server
+         */
         if (signal_recvd_flag != 0)
         {
-            ret = 0;
-            siglevel = signal_recvd_flag;
-            goto server_shutdown;
+            /*
+             * If we received a signal, then find out if we can exit now
+             * by checking if all s_ops (for expected messages) have either 
+             * finished or timed out,
+             */
+            if (qlist_empty(&inprogress_sop_list))
+            {
+                ret = 0;
+                siglevel = signal_recvd_flag;
+                goto server_shutdown;
+            }
+            /* not completed. continue... */
         }
 
         ret = job_testcontext(server_job_id_array,
@@ -613,11 +643,7 @@ int main(int argc, char **argv)
                     smcb, &server_job_status_array[i]);
                 if (ret < 0)
                 {
-                    struct PINT_server_op *s_op;
                     PVFS_perror_gossip("Error: server_state_machine_start", ret);
-                    
-                    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-                    free(s_op->unexp_bmi_buff.buffer);
                     /* TODO: tell BMI to drop this address? */
                     /* set return code to zero to allow server to continue
                      * processing 
@@ -794,14 +820,6 @@ static int server_initialize(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Initialization completed successfully.\n");
 
-    /* make sure that stdin/stdout/stderr are disconnected */
-    if (s_server_options.server_background)
-    {
-        freopen("/dev/null", "r", stdin);
-        freopen("/dev/null", "w", stdout);
-        freopen("/dev/null", "w", stderr);
-    }
-
     return ret;
 }
 
@@ -903,6 +921,7 @@ static int server_initialize_subsystems(
     PVFS_fs_id orig_fsid;
     PVFS_ds_flags init_flags = 0;
     int port_num = 0;
+    int bmi_flags = BMI_INIT_SERVER;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -926,8 +945,15 @@ static int server_initialize_subsystems(
                  "Passing %s as BMI listen address.\n",
                  server_config.host_id);
 
+    /* does the configuration dictate that we bind to a specific address? */
+    if(server_config.tcp_bind_specific)
+    {
+        bmi_flags |= BMI_TCP_BIND_SPECIFIC;
+    }
+
     ret = BMI_initialize(server_config.bmi_modules, 
-                         server_config.host_id, BMI_INIT_SERVER);
+                         server_config.host_id,
+                         bmi_flags);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: BMI_initialize", ret);
@@ -945,6 +971,14 @@ static int server_initialize_subsystems(
 
     ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
                                    &server_config.db_cache_size_bytes);
+    /* this should never fail */
+    assert(ret == 0);
+    ret = trove_collection_setinfo(0, 0, TROVE_ALT_AIO_MODE,
+        &server_config.trove_alt_aio_mode);
+    /* this should never fail */
+    assert(ret == 0);
+    ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
+        &server_config.trove_max_concurrent_io);
     /* this should never fail */
     assert(ret == 0);
 
@@ -1173,6 +1207,26 @@ static int server_initialize_subsystems(
                 gossip_lerr("Error setting coalescing low watermark\n");
                 return ret;
             }
+            
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_META_SYNC_MODE,
+                (void *)&cur_fs->trove_sync_meta);
+            if(ret < 0)
+            {
+                gossip_lerr("Error setting coalescing low watermark\n");
+                return ret;
+            } 
+            
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_IMMEDIATE_COMPLETION,
+                (void *)&cur_fs->immediate_completion);
+            if(ret < 0)
+            {
+                gossip_lerr("Error setting trove immediate completion\n");
+                return ret;
+            } 
 
             gossip_debug(GOSSIP_SERVER_DEBUG, "File system %s using "
                          "handles:\n\t%s\n", cur_fs->file_system_name,
@@ -1187,6 +1241,14 @@ static int server_initialize_subsystems(
                          "for %s: %s\n", cur_fs->file_system_name,
                          ((cur_fs->trove_sync_data == TROVE_SYNC) ?
                           "yes" : "no"));
+
+            gossip_debug(GOSSIP_SERVER_DEBUG, "Export options for "
+                         "%s:\n RootSquash %s\n AllSquash %s\n ReadOnly %s\n"
+                         " AnonUID %u\n AnonGID %u\n", cur_fs->file_system_name,
+                         (cur_fs->exp_flags & TROVE_EXP_ROOT_SQUASH) ? "yes" : "no",
+                         (cur_fs->exp_flags & TROVE_EXP_ALL_SQUASH)  ? "yes" : "no",
+                         (cur_fs->exp_flags & TROVE_EXP_READ_ONLY)   ? "yes" : "no",
+                         cur_fs->exp_anon_uid, cur_fs->exp_anon_gid);
 
             /* format and pass sync mode to the flow implementation */
             snprintf(buf, 16, "%d,%d", cur_fs->coll_id,
@@ -1527,6 +1589,14 @@ static void server_sig_handler(int sig)
          * server to exit gracefully on the next work cycle
          */
         signal_recvd_flag = sig;
+        /*
+         * iterate through all the machines that we had posted for
+         * unexpected BMI messages and deallocate them.
+         * From now the server will only try and finish operations
+         * that are already in progress, wait for them to timeout
+         * or complete before initiating shutdown
+         */
+        server_purge_unexpected_recv_machines();
     }
 }
 
@@ -1667,6 +1737,12 @@ static int server_post_unexpected_recv(job_status_s *js_p)
             return ret;
         }
         s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+        memset(s_op, 0, sizeof(PINT_server_op));
+        s_op->op = BMI_UNEXPECTED_OP;
+        s_op->target_handle = PVFS_HANDLE_NULL;
+        s_op->target_fs_id = PVFS_FS_ID_NULL;
+        /* Add an unexpected s_ops to the list */
+        qlist_add_tail(&s_op->next, &posted_sop_list);
 
         /*
           TODO: Consider the optimization of enabling immediate
@@ -1686,6 +1762,34 @@ static int server_post_unexpected_recv(job_status_s *js_p)
         }
     }
     return ret;
+}
+
+/* server_purge_unexpected_recv_machines()
+ *
+ * removes any s_ops that were posted to field unexpected BMI messages
+ *
+ * returns 0 on success and -PVFS_errno on failure.
+ */
+static int server_purge_unexpected_recv_machines(void)
+{
+    struct qlist_head *tmp = NULL, *tmp2 = NULL;
+
+    if (qlist_empty(&posted_sop_list))
+    {
+        gossip_err("WARNING: Found empty posted operation list!\n");
+        return -PVFS_EINVAL;
+    }
+    qlist_for_each_safe (tmp, tmp2, &posted_sop_list)
+    {
+        PINT_server_op *s_op = qlist_entry(tmp, PINT_server_op, next);
+
+        /* Remove s_op from the posted_sop_list */
+        qlist_del(&s_op->next);
+
+        /* free the operation structure itself */
+        free(s_op);
+    }
+    return 0;
 }
 
 /* server_state_machine_start()
@@ -1712,6 +1816,10 @@ static int server_state_machine_start(
                       s_op->unexp_bmi_buff.addr,
                       s_op->unexp_bmi_buff.size);
 
+    /* acknowledge that the unexpected buffer has been used up.
+     * If *someone* decides to do in-place decoding, then we will have to move
+     * this back to state_machine_complete().
+     */
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     if (ret == -PVFS_EPROTONOSUPPORT)
     {
@@ -1730,6 +1838,9 @@ static int server_state_machine_start(
         PVFS_perror_gossip("Error: PINT_decode failure", ret);
         return ret;
     }
+    /* Remove s_op from posted_sop_list and move it to the inprogress_sop_list */
+    qlist_del(&s_op->next);
+    qlist_add_tail(&s_op->next, &inprogress_sop_list);
 
     /* set timestamp on the beginning of this state machine */
     id_gen_fast_register(&tmp_id, s_op);
@@ -1769,6 +1880,7 @@ int server_state_machine_alloc_noreq(
 
     if (new_op)
     {
+        PINT_server_op *tmp_op;
         ret = PINT_smcb_alloc(new_op, op, 
                 sizeof(struct PINT_server_op),
                 server_op_state_get_machine,
@@ -1780,6 +1892,14 @@ int server_state_machine_alloc_noreq(
                         "of op type %x\n", op);
             return ret;
         }
+        tmp_op = PINT_sm_frame(*new_op, PINT_FRAME_CURRENT);
+        tmp_op->op = op;
+        tmp_op->target_handle = PVFS_HANDLE_NULL;
+        tmp_op->target_fs_id = PVFS_FS_ID_NULL;
+
+        /* NOTE: We do not add these state machines to the 
+         * in-progress or posted sop lists 
+         */
 
         ret = 0;
     }
@@ -1849,11 +1969,12 @@ int server_state_machine_complete(PINT_smcb *smcb)
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
-    /* free the buffer that the unexpected request came in on */
-    if (s_op->unexp_bmi_buff.buffer)
-    {
-        free(s_op->unexp_bmi_buff.buffer);
-    }
+    BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
+                        s_op->unexp_bmi_buff.buffer);
+    s_op->unexp_bmi_buff.buffer = NULL;
+
+   /* Remove s_op from the inprogress_sop_list */
+    qlist_del(&s_op->next);
 
     return SM_ACTION_TERMINATE;
 }
@@ -1925,7 +2046,7 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op)
         }
     default :
         {
-            if (op <= PVFS_MAX_SERVER_OP)
+            if (op >= 0 && op < PVFS_SERV_NUM_OPS)
                 return PINT_server_req_table[op].sm;
             else
                 return NULL;

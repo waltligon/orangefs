@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.32 2006-06-16 19:23:53 pw Exp $
+ * $Id: ib.c,v 1.32.2.1 2006-09-18 15:05:12 vilayann Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,6 +51,7 @@ ib_device_t *ib_device __hidden = NULL;
 #define post_rr_ack ib_device->func.post_rr_ack
 #define post_sr_rdmaw ib_device->func.post_sr_rdmaw
 #define check_cq ib_device->func.check_cq
+#define prepare_cq_block ib_device->func.prepare_cq_block
 #define wc_status_string ib_device->func.wc_status_string
 #define mem_register ib_device->func.mem_register
 #define mem_deregister ib_device->func.mem_deregister
@@ -72,24 +73,19 @@ static const bmi_size_t reg_send_buflist_len = 256 * 1024;
 static const bmi_size_t reg_recv_buflist_len = 256 * 1024;
 #endif
 
-static int send_cts(ib_recv_t *rq);
-static void encourage_send_waiting_buffer(ib_send_t *sq);
 static void encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len);
-
 static void encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh,
-  u_int32_t byte_len);
+                                    u_int32_t byte_len);
 static void encourage_recv_incoming_cts_ack(ib_recv_t *rq);
+static int send_cts(ib_recv_t *rq);
 static void maybe_free_connection(ib_connection_t *c);
-
 static void ib_close_connection(ib_connection_t *c);
-
 #ifndef __PVFS2_SERVER__
 static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
                                  struct method_addr *remote_map);
 #endif
-static void ib_tcp_server_init_listen_socket(struct method_addr *addr);
 static int ib_tcp_server_check_new_connections(void);
-static int ib_tcp_server_block_new_connections(int timeout_ms);
+static int ib_block_for_activity(int timeout_ms);
 
 /*
  * Return string form of work completion opcode field.
@@ -124,7 +120,7 @@ static int ib_check_cq(void)
 	if (vret == 0)
 	    break;  /* empty */
 
-	debug(2, "%s: found something", __func__);
+	debug(4, "%s: found something", __func__);
 	++ret;
 	if (wc.status != 0) {
 	    if (wc.opcode == BMI_IB_OP_SEND) {
@@ -160,7 +156,7 @@ static int ib_check_cq(void)
 		int bufnum = bmitoh32(wc.imm_data);
 		ib_send_t *sq;
 
-		debug(2, "%s: ack message %s my bufnum %d", __func__,
+		debug(3, "%s: ack message %s my bufnum %d", __func__,
 		      bh->c->peername, bufnum);
 
 		/*
@@ -184,7 +180,7 @@ static int ib_check_cq(void)
 		    sq->state = SQ_WAITING_USER_TEST;
 		    qlist_add_tail(&sq->bh->list, &sq->c->eager_send_buf_free);
 
-		    debug(2, "%s: sq %p"
+		    debug(3, "%s: sq %p"
 		      " SQ_WAITING_EAGER_ACK -> SQ_WAITING_USER_TEST",
 		      __func__, sq);
 		}
@@ -198,7 +194,7 @@ static int ib_check_cq(void)
 
 		decode_msg_header_common_t(&ptr, &mh_common);
 
-		debug(1, "%s: found len %d at %s my bufnum %d type %s",
+		debug(3, "%s: found len %d at %s my bufnum %d type %s",
 		  __func__, byte_len, bh->c->peername, bh->num,
 		  msg_type_name(mh_common.type));
 		if (mh_common.type == MSG_CTS) {
@@ -216,7 +212,7 @@ static int ib_check_cq(void)
 	     * to signal memory unpin etc. */
 	    ib_send_t *sq = ptr_from_int64(wc.id);
 
-	    debug(2, "%s: sq %p %s", __func__, sq, sq_state_name(sq->state));
+	    debug(3, "%s: sq %p %s", __func__, sq, sq_state_name(sq->state));
 
 	    assert(sq->state == SQ_WAITING_DATA_LOCAL_SEND_COMPLETE,
 	      "%s: wrong send state %s", __func__, sq_state_name(sq->state));
@@ -235,7 +231,7 @@ static int ib_check_cq(void)
 	} else if (wc.opcode == BMI_IB_OP_SEND) {
 
 	    /* periodic send queue flush, qp or qp_ack */
-	    debug(2, "%s: sr (ack?) to %s send completed", __func__,
+	    debug(2, "%s: send to %s completed locally", __func__,
 	      ((ib_connection_t *) ptr_from_int64(wc.id))->peername);
 
 	} else {
@@ -259,7 +255,7 @@ encourage_send_waiting_buffer(ib_send_t *sq)
      */
     buf_head_t *bh;
 
-    debug(2, "%s: sq %p", __func__, sq);
+    debug(3, "%s: sq %p", __func__, sq);
     assert(sq->state == SQ_WAITING_BUFFER, "%s: wrong send state %s",
       __func__, sq_state_name(sq->state));
 
@@ -296,7 +292,7 @@ encourage_send_waiting_buffer(ib_send_t *sq)
 
 	/* wait for ack saying remote has received and recycled his buf */
 	sq->state = SQ_WAITING_EAGER_ACK;
-	debug(2, "%s: sq %p sent EAGER now %s", __func__, sq,
+	debug(3, "%s: sq %p sent EAGER now %s", __func__, sq,
 	  sq_state_name(sq->state));
 
     } else {
@@ -324,7 +320,7 @@ encourage_send_waiting_buffer(ib_send_t *sq)
 #endif
 
 	sq->state = SQ_WAITING_CTS;
-	debug(2, "%s: sq %p sent RTS now %s", __func__, sq,
+	debug(3, "%s: sq %p sent RTS now %s", __func__, sq,
 	  sq_state_name(sq->state));
     }
 }
@@ -776,7 +772,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
     mop->context_id = context_id;
     *id = mop->op_id;
     sq->mop = mop;
-    debug(2, "%s: new sq %p", __func__, sq);
+    debug(3, "%s: new sq %p", __func__, sq);
 
     /* and start sending it if possible */
     encourage_send_waiting_buffer(sq);
@@ -791,7 +787,7 @@ BMI_ib_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
   enum bmi_buffer_type buffer_flag __unused,
   bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
-    debug(2, "%s: len %d tag %d", __func__, (int) size, tag);
+    debug(3, "%s: len %d tag %d", __func__, (int) size, tag);
     /* references here will not be saved after this func returns */
     return generic_post_send(id, remote_map, 0, &buffer, &size, size,
       tag, user_ptr, context_id, 0);
@@ -1158,7 +1154,51 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
 }
 
 /*
- * Used by testcontext and testunexpected to block if not much is going on
+ * Test just the particular list of op ids, returning the list of indices
+ * that completed.
+ */
+static int BMI_ib_testsome(int incount, bmi_op_id_t *ids, int *outcount,
+  int *index_array, bmi_error_code_t *errs, bmi_size_t *sizes, void **user_ptrs,
+  int max_idle_time __unused, bmi_context_id context_id __unused)
+{
+    struct method_op *mop;
+    ib_send_t *sq;
+    bmi_op_id_t tid;
+    int i, n;
+
+    gen_mutex_lock(&interface_mutex);
+    ib_check_cq();
+
+    n = 0;
+    for (i=0; i<incount; i++) {
+	if (!ids[i])
+	    continue;
+	mop = id_gen_safe_lookup(ids[i]);
+	sq = mop->method_data;
+
+	if (sq->type == BMI_SEND) {
+	    if (test_sq(sq, &tid, &errs[n], &sizes[n], &user_ptrs[n], 1)) {
+		index_array[n] = i;
+		++n;
+	    }
+	} else {
+	    /* actually a recv */
+	    ib_recv_t *rq = mop->method_data;
+	    if (test_rq(rq, &tid, &errs[n], &sizes[n], &user_ptrs[n], 1)) {
+		index_array[n] = i;
+		++n;
+	    }
+	}
+    }
+
+    gen_mutex_unlock(&interface_mutex);
+
+    *outcount = n;
+    return 0;
+}
+
+/*
+ * Used by the test functions to block if not much is going on
  * since the timeouts at the BMI job layer are too coarse.
  */
 static struct timeval last_action = { 0, 0 };
@@ -1209,39 +1249,34 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
     gen_mutex_unlock(&interface_mutex);
 
     *outcount = n;
-#if 0
-    /* possible spinless hack */
-    if (n == 0 && max_idle_time > 0 && ib_device->listen_sock >= 0) 
-	ib_tcp_server_block_new_connections(1);  /* 1 ms only */
-#else
+
     if (n > 0) {
-	gettimeofday(&last_action, 0);
+	gettimeofday(&last_action, 0);  /* remember this action */
     } else if (max_idle_time > 0) {
 	/*
-	 * Block for up to max_idle_time to avoid spinning from BMI.  In the
-	 * server, instead of sleeping, watch the accept socket for something
-	 * new.  No way to blockingly poll in standard VAPI.
+	 * Spin for an interval after some activity, then go to a
+	 * blocking interface by using poll() on the IB completion channel
+	 * and TCP listen socket.
 	 */
-	if (ib_device->listen_sock >= 0) {
-	    struct timeval now;
-	    gettimeofday(&now, 0);
-	    now.tv_sec -= last_action.tv_sec;
-	    if (now.tv_sec == 1) {
-		now.tv_usec -= last_action.tv_usec;
-		if (now.tv_usec < 0)
-		    --now.tv_sec;
-	    }
-	    if (now.tv_sec > 0) {  /* spin for 1 sec following any activity */
-		if (ib_tcp_server_block_new_connections(max_idle_time))
-		    gettimeofday(&last_action, 0);
-	    } else {
-		/* totally helps on Lee's old 2.4.21 machine, but may cause
-		 * big delays on modern kernels; do not make default */
-		/* sched_yield(); */
-	    }
+	struct timeval now;
+
+	gettimeofday(&now, 0);
+	timersub(&now, &last_action, &now);
+
+	/* if time since last activity is > 10ms, block */
+	if (now.tv_sec > 0 || now.tv_usec > 10000) {
+	    /* block */
+	    n = ib_block_for_activity(max_idle_time);
+	    if (n)
+		gettimeofday(&last_action, 0);  /* had some action */
+	} else {
+	    /* whee, spin */
+	    /* totally helps on Lee's old 2.4.21 machine, but may cause
+	     * big delays on modern kernels; do not make default */
+	    /* sched_yield(); */
+	    ;
 	}
     }
-#endif
     return 0;
 }
 
@@ -1444,7 +1479,7 @@ BMI_ib_rev_lookup(struct method_addr *meth)
  * Build and fill an IB-specific method_addr structure.
  */
 static struct method_addr *ib_alloc_method_addr(ib_connection_t *c,
-                                                const char *hostname, int port)
+                                                char *hostname, int port)
 {
     struct method_addr *map;
     ib_method_addr_t *ibmap;
@@ -1470,7 +1505,7 @@ static struct method_addr *BMI_ib_method_addr_lookup(const char *id)
 {
     char *s, *hostname, *cp, *cq;
     int port;
-    struct method_addr *map = 0;
+    struct method_addr *map = NULL;
 
     /* parse hostname */
     s = string_key("ib", id);  /* allocs a string */
@@ -1618,7 +1653,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
     s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
 	warning("%s: create tcp socket: %m", __func__);
-	return bmi_errno_to_pvfs(errno);
+	return bmi_errno_to_pvfs(-errno);
     }
     hp = gethostbyname(ibmap->hostname);
     if (!hp) {
@@ -1636,7 +1671,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
 	    goto retry;
 	else {
 	    warning("%s: connect to server %s: %m", __func__, peername);
-	    return bmi_errno_to_pvfs(errno);
+	    return bmi_errno_to_pvfs(-errno);
 	}
     }
     ibmap->c = ib_new_connection(s, peername, 0);
@@ -1646,7 +1681,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
 
     if (close(s) < 0) {
 	warning("%s: close sock: %m", __func__);
-	return bmi_errno_to_pvfs(errno);
+	return bmi_errno_to_pvfs(-errno);
     }
     return 0;
 }
@@ -1734,20 +1769,30 @@ static int ib_tcp_server_check_new_connections(void)
 }
 
 /*
- * Watch the listen_sock for activity, but do not actually respond to it.  A
- * later call to testunexpected will pick up the new connection.  Returns >0
- * if an accept would work on another call (later _unexpected will find it).
+ * Ask the device to write to its FD if a CQ event happens, and poll on it
+ * as well as the listen_sock for activity, but do not actually respond to
+ * anything.  A later ib_check_cq will handle CQ events, and a later call to
+ * testunexpected will pick up new connections.  Returns >0 if something is
+ * ready.
  */
-static int ib_tcp_server_block_new_connections(int timeout_ms)
+static int ib_block_for_activity(int timeout_ms)
 {
-    struct pollfd pfd;
+    struct pollfd pfd[2];
+    int numfd;
     int ret;
 
-    pfd.fd = ib_device->listen_sock;
-    pfd.events = POLLIN;
-    ret = poll(&pfd, 1, timeout_ms);
+    pfd[0].fd = prepare_cq_block();
+    pfd[0].events = POLLIN;
+    numfd = 1;
+    if (ib_device->listen_sock >= 0) {
+	pfd[1].fd = ib_device->listen_sock;
+	pfd[1].events = POLLIN;
+	numfd = 2;
+    }
+    ret = poll(pfd, numfd, timeout_ms);
+    debug(4, "%s: ret %d rev0 0x%x", __func__, ret, pfd[0].revents);
     if (ret < 0) {
-	if (errno == EINTR)  /* these are okay, debugging or whatever */
+	if (errno == EINTR)  /* normal, ignore but break */
 	    ret = 0;
 	else
 	    error_errno("%s: poll listen sock", __func__);
@@ -1755,8 +1800,8 @@ static int ib_tcp_server_block_new_connections(int timeout_ms)
     return ret;
 }
 
-static void * BMI_ib_memalloc(bmi_size_t len,
-                              enum bmi_op_type send_recv __unused)
+static void *BMI_ib_memalloc(bmi_size_t len,
+                             enum bmi_op_type send_recv __unused)
 {
     return memcache_memalloc(ib_device->memcache, len,
                              ib_device->eager_buf_payload);
@@ -1766,6 +1811,12 @@ static int BMI_ib_memfree(void *buf, bmi_size_t len,
                           enum bmi_op_type send_recv __unused)
 {
     return memcache_memfree(ib_device->memcache, buf, len);
+}
+
+static int BMI_ib_unexpected_free(void *buf)
+{
+    free(buf);
+    return 0;
 }
 
 /*
@@ -1791,12 +1842,22 @@ static int BMI_ib_get_info(int option, void *param)
 }
 
 /*
- * Used to set some optional parameters.  Just ignore.
+ * Used to set some optional parameters and random functions, like ioctl.
  */
-static int BMI_ib_set_info(int option __unused, void *param __unused)
+static int BMI_ib_set_info(int option, void *param __unused)
 {
-    /* XXX: should return -ENOSYS, but 0 now until callers handle
-     * that correctly. */
+    switch (option) {
+    case BMI_DROP_ADDR: {
+	struct method_addr *map = param;
+	ib_method_addr_t *ibmap = map->method_data;
+	free(ibmap->hostname);
+	free(map);
+	break;
+    }
+    default:
+	/* Should return -ENOSYS, but return 0 for caller ease. */
+	break;
+    }
     return 0;
 }
 
@@ -1932,7 +1993,7 @@ static int BMI_ib_finalize(void)
     return 0;
 }
 
-struct bmi_method_ops bmi_ib_ops = 
+const struct bmi_method_ops bmi_ib_ops = 
 {
     .method_name = "bmi_ib",
     .BMI_meth_initialize = BMI_ib_initialize,
@@ -1941,11 +2002,12 @@ struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_get_info = BMI_ib_get_info,
     .BMI_meth_memalloc = BMI_ib_memalloc,
     .BMI_meth_memfree = BMI_ib_memfree,
+    .BMI_meth_unexpected_free = BMI_ib_unexpected_free,
     .BMI_meth_post_send = BMI_ib_post_send,
     .BMI_meth_post_sendunexpected = BMI_ib_post_sendunexpected,
     .BMI_meth_post_recv = BMI_ib_post_recv,
     .BMI_meth_test = BMI_ib_test,
-    .BMI_meth_testsome = 0,  /* never used */
+    .BMI_meth_testsome = BMI_ib_testsome,
     .BMI_meth_testcontext = BMI_ib_testcontext,
     .BMI_meth_testunexpected = BMI_ib_testunexpected,
     .BMI_meth_method_addr_lookup = BMI_ib_method_addr_lookup,
@@ -1956,5 +2018,6 @@ struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_close_context = BMI_ib_close_context,
     .BMI_meth_cancel = BMI_ib_cancel,
     .BMI_meth_rev_lookup_unexpected = BMI_ib_rev_lookup,
+	 .BMI_meth_query_addr_range = NULL,
 };
 

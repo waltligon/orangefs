@@ -26,6 +26,12 @@ int pvfs2_xattr_set_default(struct inode *inode,
 
     if (strcmp(name, "") == 0)
         return -EINVAL;
+    if ( !S_ISREG(inode->i_mode) &&
+       (!S_ISDIR(inode->i_mode) || inode->i_mode & S_ISVTX))
+    {
+       return -EPERM;
+    }
+    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_setxattr_default %s\n", name);
     internal_flag = convert_to_internal_xattr_flags(flags);
     return pvfs2_inode_setxattr(inode, PVFS2_XATTR_NAME_DEFAULT_PREFIX,
         name, buffer, size, internal_flag);
@@ -36,6 +42,7 @@ int pvfs2_xattr_get_default(struct inode *inode,
 {
     if (strcmp(name, "") == 0)
         return -EINVAL;
+    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_getxattr_default %s\n", name);
     return pvfs2_inode_getxattr(inode, PVFS2_XATTR_NAME_DEFAULT_PREFIX,
         name, buffer, size);
 }

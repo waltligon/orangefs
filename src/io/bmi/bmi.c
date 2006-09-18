@@ -14,6 +14,7 @@
 #include <string.h>
 #include <assert.h>
 #include <sys/time.h>
+#include <stdio.h>
 
 #include "bmi.h"
 #include "bmi-method-support.h"
@@ -516,8 +517,8 @@ int BMI_post_recv(bmi_op_id_t * id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-                 "BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld\n",
-                 (long)src, (long)buffer, (long)expected_size);
+                 "BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
+                 (long)src, (long)buffer, (long)expected_size, (int)tag);
 
     *id = 0;
 
@@ -554,8 +555,8 @@ int BMI_post_send(bmi_op_id_t * id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-                 "BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld\n",
-                 (long)dest, (long)buffer, (long)size);
+                 "BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
+                 (long)dest, (long)buffer, (long)size, (int)tag);
 
     *id = 0;
 
@@ -592,8 +593,8 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_sendunexpected: addr: %ld, offset: 0x%lx, size: %ld\n", 
-	(long)dest, (long)buffer, (long)size);
+	"BMI_post_sendunexpected: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n", 
+	(long)dest, (long)buffer, (long)size, (int)tag);
 
     *id = 0;
 
@@ -1092,6 +1093,38 @@ int BMI_memfree(PVFS_BMI_addr_t addr,
     return (ret);
 }
 
+/** Acknowledge that an unexpected message has been
+ * serviced that was returned from BMI_test_unexpected().
+ *
+ *  \return 0 on success, -errno on failure.
+ */
+int BMI_unexpected_free(PVFS_BMI_addr_t addr,
+		void *buffer)
+{
+    ref_st_p tmp_ref = NULL;
+    int ret = -1;
+
+    /* find a reference that matches this address */
+    gen_mutex_lock(&ref_mutex);
+    tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+    if (!tmp_ref)
+    {
+	gen_mutex_unlock(&ref_mutex);
+	return (bmi_errno_to_pvfs(-EINVAL));
+    }
+    gen_mutex_unlock(&ref_mutex);
+
+    if (!tmp_ref->interface->BMI_meth_unexpected_free)
+    {
+        gossip_err("unimplemented BMI_meth_unexpected_free callback\n");
+        return bmi_errno_to_pvfs(-EOPNOTSUPP);
+    }
+    /* free the memory */
+    ret = tmp_ref->interface->BMI_meth_unexpected_free(buffer);
+
+    return (ret);
+}
+
 /** Pass in optional parameters.
  *
  *  \return 0 on success, -errno on failure.
@@ -1177,6 +1210,24 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	}
 	gen_mutex_unlock(&ref_mutex);
 	return(0);
+    }
+
+    /* if the caller requests a TCP specific close socket action */
+    if (option == BMI_TCP_CLOSE_SOCKET) 
+    {
+        /* check to see if the address is in fact a tcp address */
+        if(strcmp(tmp_ref->interface->method_name, "bmi_tcp") == 0)
+        {
+            /* take the same action as in the BMI_DEC_ADDR_REF case to clean
+             * out the entire address structure and anything linked to it so 
+             * that the next addr_lookup starts from scratch
+             */
+	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "Closing bmi_tcp connection at caller's request.\n"); 
+            ref_list_rem(cur_ref_list, addr);
+            dealloc_ref_st(tmp_ref);
+        }
+        gen_mutex_unlock(&ref_mutex);
+        return 0;
     }
 
     gen_mutex_unlock(&ref_mutex);
@@ -1270,6 +1321,83 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 	return (bmi_errno_to_pvfs(-ENOSYS));
     }
     return (0);
+}
+
+/** Given a string representation of a host/network address and a BMI
+ * address handle, return whether the BMI address handle is part of the wildcard
+ * address range specified by the string.
+ * \return 1 on success, -errno on failure and 0 if it is not part of
+ * the specified range
+ */
+int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netmask)
+{
+    int ret = -1;
+    int i = 0, failed = 1;
+    int provided_method_length = 0;
+    char *ptr, *provided_method_name = NULL;
+    ref_st_p tmp_ref = NULL;
+
+    if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
+    {
+	return(bmi_errno_to_pvfs(-ENAMETOOLONG));
+    }
+    /* lookup the provided address */
+    gen_mutex_lock(&ref_mutex);
+    tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+    if (!tmp_ref)
+    {
+	gen_mutex_unlock(&ref_mutex);
+	return (bmi_errno_to_pvfs(-EPROTO));
+    }
+    gen_mutex_unlock(&ref_mutex);
+
+    ptr = strchr(id_string, ':');
+    if (ptr == NULL)
+    {
+        return (bmi_errno_to_pvfs(-EINVAL));
+    }
+    ret = -EPROTO;
+    provided_method_length = (unsigned long) ptr - (unsigned long) id_string;
+    provided_method_name = (char *) calloc(provided_method_length + 1, sizeof(char));
+    if (provided_method_name == NULL)
+    {
+        return bmi_errno_to_pvfs(-ENOMEM);
+    }
+    strncpy(provided_method_name, id_string, provided_method_length);
+
+    /* Now we will run through each method looking for one that
+     * matches the specified wildcard address. 
+     */
+    i = 0;
+    gen_mutex_lock(&active_method_count_mutex);
+    while (i < active_method_count)
+    {
+        char *active_method_name = (char *) active_method_table[i]->method_name + 4;
+        /* provided name matches this interface */
+        if (!strncmp(active_method_name, provided_method_name, provided_method_length))
+        {
+            int (*meth_fnptr)(method_addr_p, const char *, int);
+            failed = 0;
+            if ((meth_fnptr = active_method_table[i]->BMI_meth_query_addr_range) == NULL)
+            {
+                ret = -ENOSYS;
+                gossip_lerr("Error: method doesn't implement querying address range/wildcards! Cannot implement FS export options!\n");
+                failed = 1;
+                break;
+            }
+            /* pass it into the specific bmi layer */
+            ret = meth_fnptr(tmp_ref->method_addr, id_string, netmask);
+            if (ret < 0)
+                failed = 1;
+            break;
+        }
+	i++;
+    }
+    gen_mutex_unlock(&active_method_count_mutex);
+    free(provided_method_name);
+    if (failed)
+        return bmi_errno_to_pvfs(ret);
+    return ret;
 }
 
 /** Resolves the string representation of a host address into a BMI
@@ -1428,8 +1556,8 @@ int BMI_post_send_list(bmi_op_id_t * id,
     int i;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_send_list: addr: %ld, count: %d, total_size: %ld\n", 
-	(long)dest, list_count, (long)total_size);
+	"BMI_post_send_list: addr: %ld, count: %d, total_size: %ld, tag: %d\n", 
+	(long)dest, list_count, (long)total_size, (int)tag);
 
     for(i=0; i<list_count; i++)
     {
@@ -1495,8 +1623,8 @@ int BMI_post_recv_list(bmi_op_id_t * id,
     int i;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_recv_list: addr: %ld, count: %d, total_size: %ld\n", 
-	(long)src, list_count, (long)total_expected_size);
+	"BMI_post_recv_list: addr: %ld, count: %d, total_size: %ld, tag: %d\n", 
+	(long)src, list_count, (long)total_expected_size, (int)tag);
 
     for(i=0; i<list_count; i++)
     {
@@ -1561,8 +1689,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
 	"BMI_post_sendunexpected_list: addr: %ld, count: %d, "
-                 "total_size: %ld\n",  (long)dest, list_count,
-                 (long)total_size);
+                 "total_size: %ld, tag: %d\n",  (long)dest, list_count,
+                 (long)total_size, (int)tag);
 
     for(i=0; i<list_count; i++)
     {
@@ -1616,6 +1744,14 @@ int BMI_cancel(bmi_op_id_t id,
                  "%s: cancel id %llu\n", __func__, llu(id));
 
     target_op = id_gen_safe_lookup(id);
+    if(target_op == NULL)
+    {
+        /* if we can't find the operation, then assume it has already
+         * completed naturally.
+         */
+        return(0);
+    }
+
     assert(target_op->op_id == id);
 
     if(active_method_table[target_op->addr->method_type]->BMI_meth_cancel)

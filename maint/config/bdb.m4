@@ -31,11 +31,11 @@ AC_DEFUN([AX_BERKELEY_DB],
 	fi
 
         DB_LDFLAGS="-L${dbpath}/lib"
-	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
+	LDFLAGS="$DB_LDFLAGS ${LDFLAGS}"
 
 	LIBS="${oldlibs} -ldb -lpthread"
 	DB_LIB="-ldb"
-	CFLAGS="$oldcflags $DB_CFLAGS"
+	CFLAGS="$DB_CFLAGS $oldcflags"
 	AC_TRY_LINK(
 		[#include <db.h>],
 		[DB *dbp; db_create(&dbp, NULL, 0);],

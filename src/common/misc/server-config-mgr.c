@@ -119,7 +119,8 @@ int PINT_server_config_mgr_finalize(void)
                     assert(config);
                     assert(config->server_config);
 
-                    config->server_config = NULL;
+                    PINT_config_release(config->server_config);
+                    free(config->server_config);
                     gen_mutex_destroy(config->server_config_mutex);
                     free(config);
                 }

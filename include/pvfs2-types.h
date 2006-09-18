@@ -11,7 +11,6 @@
  *
  *  Definitions of types used throughout PVFS2.
  */
-
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
@@ -27,6 +26,10 @@
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
 #define INT32_MAX (2147483647)
+#endif
+
+#ifndef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 #endif
 
 /* figure out the size of a pointer */
@@ -190,13 +193,13 @@ endecode_fields_1a(
 #define PVFS_U_READ    (1 << 8)
 /* no PVFS_U_VTX (sticky bit) */
 #define PVFS_G_SGID    (1 << 10)
-/* no PVFS_U_SGID */
+#define PVFS_U_SUID    (1 << 11)
 
 /* valid permission mask */
 #define PVFS_PERM_VALID \
 (PVFS_O_EXECUTE | PVFS_O_WRITE | PVFS_O_READ | PVFS_G_EXECUTE | \
  PVFS_G_WRITE | PVFS_G_READ | PVFS_U_EXECUTE | PVFS_U_WRITE | \
- PVFS_U_READ | PVFS_G_SGID)
+ PVFS_U_READ | PVFS_G_SGID | PVFS_U_SUID)
 
 #define PVFS_USER_ALL  (PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ)
 #define PVFS_GROUP_ALL (PVFS_G_EXECUTE|PVFS_G_WRITE|PVFS_G_READ)
@@ -258,6 +261,8 @@ typedef struct
 #define PVFS_ATTR_SYS_CTIME                 (1 << 4)
 #define PVFS_ATTR_SYS_MTIME                 (1 << 5)
 #define PVFS_ATTR_SYS_TYPE                  (1 << 6)
+#define PVFS_ATTR_SYS_ATIME_SET             (1 << 7)
+#define PVFS_ATTR_SYS_MTIME_SET             (1 << 8)
 #define PVFS_ATTR_SYS_COMMON_ALL \
 (PVFS_ATTR_SYS_UID   | PVFS_ATTR_SYS_GID   | \
  PVFS_ATTR_SYS_PERM  | PVFS_ATTR_SYS_ATIME | \
@@ -276,7 +281,10 @@ typedef struct
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
-(PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE)
+(PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
+#define PVFS_ATTR_SYS_ALL_TIMES \
+((PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) | PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
+
 
 /* Extended attribute flags */
 #define PVFS_XATTR_CREATE  0x1
@@ -396,6 +404,29 @@ enum PVFS_server_mode
     PVFS_SERVER_NORMAL_MODE = 1,      /* default server operating mode */
     PVFS_SERVER_ADMIN_MODE = 2        /* administrative mode */
 };
+
+/* PVFS2 ACL structures */
+typedef struct {
+    int32_t  p_tag;
+    uint32_t p_perm;
+    uint32_t p_id;
+} pvfs2_acl_entry;
+
+/* These defines match that of the POSIX defines */
+#define PVFS2_ACL_UNDEFINED_ID   (-1)
+
+/* p_tag entry in struct posix_acl_entry */
+#define PVFS2_ACL_USER_OBJ    (0x01)
+#define PVFS2_ACL_USER        (0x02)
+#define PVFS2_ACL_GROUP_OBJ   (0x04)
+#define PVFS2_ACL_GROUP       (0x08)
+#define PVFS2_ACL_MASK        (0x10)
+#define PVFS2_ACL_OTHER       (0x20)
+
+/* permissions in the p_perm field */
+#define PVFS2_ACL_READ       (0x04)
+#define PVFS2_ACL_WRITE      (0x02)
+#define PVFS2_ACL_EXECUTE    (0x01)
 
 /* PVFS2 errors
  *

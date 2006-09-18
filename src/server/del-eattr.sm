@@ -12,6 +12,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-util.h"
+#include "pint-util.h"
 
 static PINT_sm_action deleattr_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
@@ -87,7 +88,7 @@ static PINT_sm_action deleattr_verify_eattribs(
                  "  ext attr delete from handle %llu refers to a %s\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
                  llu(s_op->req->u.deleattr.handle),
-                 get_object_type(a_p->objtype),
+                 PINT_util_get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
     switch (a_p->objtype)
@@ -150,7 +151,6 @@ static PINT_sm_action deleattr_delobj_eattribs(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     /* set up key and value structure for keyval write */
     s_op->key.buffer = s_op->req->u.deleattr.key.buffer;
@@ -174,10 +174,7 @@ static PINT_sm_action deleattr_delobj_eattribs(
         s_op->req->u.deleattr.handle,
         &(s_op->key),
         NULL,
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.deleattr.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.deleattr.fs_id),
+        TROVE_SYNC ,
         NULL,
         smcb,
         0,

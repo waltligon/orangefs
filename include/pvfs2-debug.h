@@ -65,9 +65,10 @@
 #define GOSSIP_PERFCOUNTER_DEBUG       ((uint64_t)1 << 43)
 #define GOSSIP_STATE_MACHINE_DEBUG     ((uint64_t)1 << 44)
 #define GOSSIP_DBPF_KEYVAL_DEBUG       ((uint64_t)1 << 45)
-#define GOSSIP_DBPF_COALESCE_DEBUG     ((uint64_t)1 << 46)
+#define GOSSIP_LISTATTR_DEBUG          ((uint64_t)1 << 46)
+#define GOSSIP_DBPF_COALESCE_DEBUG     ((uint64_t)1 << 47)
 
-/* NOTE: if you want your gossip flag to be controlable from 
+/* NOTE: if you want your gossip flag to be controllable from 
  * pvfs2-set-debugmask you have to add it in
  * src/common/misc/pvfs2-debug.c
  */
@@ -81,6 +82,33 @@ uint64_t PVFS_debug_eventlog_to_mask(
 
 const char *PVFS_debug_get_next_debug_keyword(
     int position);
+
+#define GOSSIP_SUPER_DEBUG            ((uint64_t)1 << 0)
+#define GOSSIP_INODE_DEBUG            ((uint64_t)1 << 1)
+#define GOSSIP_FILE_DEBUG             ((uint64_t)1 << 2)
+#define GOSSIP_DIR_DEBUG              ((uint64_t)1 << 3)
+#define GOSSIP_UTILS_DEBUG            ((uint64_t)1 << 4)
+#define GOSSIP_WAIT_DEBUG             ((uint64_t)1 << 5)
+#define GOSSIP_ACL_DEBUG              ((uint64_t)1 << 6)
+#define GOSSIP_DCACHE_DEBUG           ((uint64_t)1 << 7)
+#define GOSSIP_DEV_DEBUG              ((uint64_t)1 << 8)
+#define GOSSIP_NAME_DEBUG             ((uint64_t)1 << 9)
+#define GOSSIP_BUFMAP_DEBUG           ((uint64_t)1 << 10)
+#define GOSSIP_CACHE_DEBUG            ((uint64_t)1 << 11)
+#define GOSSIP_PROC_DEBUG             ((uint64_t)1 << 12)
+#define GOSSIP_XATTR_DEBUG            ((uint64_t)1 << 13)
+#define GOSSIP_INIT_DEBUG             ((uint64_t)1 << 14)
+
+#define GOSSIP_MAX_NR                 15
+#define GOSSIP_MAX_DEBUG              (((uint64_t)1 << GOSSIP_MAX_NR) - 1)
+
+/*
+ * To allow these masks to be settable from pvfs2-client-core,
+ * edit pvfs2-debug.c to add human readable event mask strings
+ * in s_kmod_keyword_mask_map[] array.
+ */
+uint64_t PVFS_kmod_eventlog_to_mask(
+    const char *event_logging);
 
 #endif /* __PVFS2_DEBUG_H */
 

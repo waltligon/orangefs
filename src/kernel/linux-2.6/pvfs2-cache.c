@@ -14,6 +14,8 @@ static LIST_HEAD(pvfs2_inode_list);
 static uint64_t next_tag_value;
 static spinlock_t next_tag_value_lock = SPIN_LOCK_UNLOCKED;
 
+/* the pvfs2 memory caches */
+
 /* a cache for pvfs2 upcall/downcall operations */
 static kmem_cache_t *op_cache = NULL;
 /* a cache for device (/dev/pvfs2-req) communication */
@@ -25,11 +27,6 @@ static kmem_cache_t *pvfs2_inode_cache = NULL;
 static kmem_cache_t *pvfs2_kiocb_cache = NULL;
 #endif
 
-extern int debug;
-extern int pvfs2_gen_credentials(
-    PVFS_credentials *credentials);
-
-
 int op_cache_initialize(void)
 {
     op_cache = kmem_cache_create(
@@ -38,7 +35,7 @@ int op_cache_initialize(void)
 
     if (!op_cache)
     {
-        pvfs2_panic("Cannot create pvfs2_op_cache\n");
+        gossip_err("Cannot create pvfs2_op_cache\n");
         return -ENOMEM;
     }
 
@@ -53,13 +50,70 @@ int op_cache_finalize(void)
 {
     if (kmem_cache_destroy(op_cache) != 0)
     {
-        pvfs2_panic("Failed to destroy pvfs2_op_cache\n");
+        gossip_err("Failed to destroy pvfs2_op_cache\n");
         return -EINVAL;
     }
     return 0;
 }
 
-pvfs2_kernel_op_t *op_alloc(void)
+char *get_opname_string(pvfs2_kernel_op_t *new_op)
+{
+    if (new_op)
+    {
+        int32_t type = new_op->upcall.type;
+        if (type == PVFS2_VFS_OP_FILE_IO)
+            return "OP_FILE_IO";
+        else if (type == PVFS2_VFS_OP_LOOKUP)
+            return "OP_LOOKUP";
+        else if (type == PVFS2_VFS_OP_CREATE)
+            return "OP_CREATE";
+        else if (type == PVFS2_VFS_OP_GETATTR)
+            return "OP_GETATTR";
+        else if (type == PVFS2_VFS_OP_REMOVE)
+            return "OP_REMOVE";
+        else if (type == PVFS2_VFS_OP_MKDIR)
+            return "OP_MKDIR";
+        else if (type == PVFS2_VFS_OP_READDIR)
+            return "OP_READDIR";
+        else if (type == PVFS2_VFS_OP_READDIRPLUS)
+            return "OP_READDIRPLUS";
+        else if (type == PVFS2_VFS_OP_SETATTR)
+            return "OP_SETATTR";
+        else if (type == PVFS2_VFS_OP_SYMLINK)
+            return "OP_SYMLINK";
+        else if (type == PVFS2_VFS_OP_RENAME)
+            return "OP_RENAME";
+        else if (type == PVFS2_VFS_OP_STATFS)
+            return "OP_STATFS";
+        else if (type == PVFS2_VFS_OP_TRUNCATE)
+            return "OP_TRUNCATE";
+        else if (type == PVFS2_VFS_OP_MMAP_RA_FLUSH)
+            return "OP_MMAP_RA_FLUSH";
+        else if (type == PVFS2_VFS_OP_FS_MOUNT)
+            return "OP_FS_MOUNT";
+        else if (type == PVFS2_VFS_OP_FS_UMOUNT)
+            return "OP_FS_UMOUNT";
+        else if (type == PVFS2_VFS_OP_GETXATTR)
+            return "OP_GETXATTR";
+        else if (type == PVFS2_VFS_OP_SETXATTR)
+            return "OP_SETXATTR";
+        else if (type == PVFS2_VFS_OP_LISTXATTR)
+            return "OP_LISTXATTR";
+        else if (type == PVFS2_VFS_OP_REMOVEXATTR)
+            return "OP_REMOVEXATTR";
+        else if (type == PVFS2_VFS_OP_PARAM)
+            return "OP_PARAM";
+        else if (type == PVFS2_VFS_OP_PERF_COUNT)
+            return "OP_PERF_COUNT";
+        else if (type == PVFS2_VFS_OP_CANCEL)
+            return "OP_CANCEL";
+        else if (type == PVFS2_VFS_OP_FSYNC)
+            return "OP_FSYNC";
+    }
+    return "OP_INVALID";
+}
+
+static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
 {
     pvfs2_kernel_op_t *new_op = NULL;
 
@@ -85,26 +139,41 @@ pvfs2_kernel_op_t *op_alloc(void)
             next_tag_value = 100;
         }
         spin_unlock(&next_tag_value_lock);
+        new_op->upcall.type = type;
+        new_op->attempts = 0;
+        gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %ld %s)\n", new_op, (unsigned long) new_op->tag, get_opname_string(new_op));
 
         pvfs2_gen_credentials(&new_op->upcall.credentials);
+        new_op->op_linger = new_op->op_linger_tmp = op_linger;
     }
     else
     {
-        pvfs2_panic("op_alloc: kmem_cache_alloc failed!\n");
+        gossip_err("op_alloc: kmem_cache_alloc failed!\n");
     }
     return new_op;
+}
+
+pvfs2_kernel_op_t *op_alloc(int32_t type)
+{
+    return op_alloc_common(1, type);
+}
+
+pvfs2_kernel_op_t *op_alloc_trailer(int32_t type)
+{
+    return op_alloc_common(2, type);
 }
 
 void op_release(pvfs2_kernel_op_t *pvfs2_op)
 {
     if (pvfs2_op)
     {
+        gossip_debug(GOSSIP_CACHE_DEBUG, "Releasing OP (%p: %ld)\n", pvfs2_op, (unsigned long) pvfs2_op->tag);
         pvfs2_op_initialize(pvfs2_op);
         kmem_cache_free(op_cache, pvfs2_op);
     }
-    else
+    else 
     {
-        pvfs2_panic("NULL pointer in op_release\n");
+        gossip_err("NULL pointer in op_release\n");
     }
 }
 
@@ -119,7 +188,7 @@ static void dev_req_cache_ctor(
     }
     else
     {
-        pvfs2_panic("WARNING!! devreq_ctor called without ctor flag\n");
+        gossip_err("WARNING!! devreq_ctor called without ctor flag\n");
     }
 }
 
@@ -131,7 +200,7 @@ int dev_req_cache_initialize(void)
 
     if (!dev_req_cache)
     {
-        pvfs2_panic("Cannot create pvfs2_dev_req_cache\n");
+        gossip_err("Cannot create pvfs2_dev_req_cache\n");
         return -ENOMEM;
     }
     return 0;
@@ -141,7 +210,7 @@ int dev_req_cache_finalize(void)
 {
     if (kmem_cache_destroy(dev_req_cache) != 0)
     {
-        pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
+        gossip_err("Failed to destroy pvfs2_devreqcache\n");
         return -EINVAL;
     }
     return 0;
@@ -154,7 +223,7 @@ void *dev_req_alloc(void)
     buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (buffer == NULL)
     {
-        pvfs2_panic("Failed to allocate from dev_req_cache\n"); 
+        gossip_err("Failed to allocate from dev_req_cache\n"); 
     }
     return buffer;
 }
@@ -167,7 +236,7 @@ void dev_req_release(void *buffer)
     }
     else 
     {
-        pvfs2_panic("NULL pointer passed to dev_req_release\n");
+        gossip_err("NULL pointer passed to dev_req_release\n");
     }
     return;
 }
@@ -201,7 +270,7 @@ static void pvfs2_inode_cache_ctor(
     }
     else
     {
-        pvfs2_panic("WARNING!! inode_ctor called without ctor flag\n");
+        gossip_err("WARNING!! inode_ctor called without ctor flag\n");
     }
 }
 
@@ -244,7 +313,7 @@ int pvfs2_inode_cache_initialize(void)
 
     if (!pvfs2_inode_cache)
     {
-        pvfs2_panic("Cannot create pvfs2_inode_cache\n");
+        gossip_err("Cannot create pvfs2_inode_cache\n");
         return -ENOMEM;
     }
     return 0;
@@ -254,7 +323,7 @@ int pvfs2_inode_cache_finalize(void)
 {
     if (!list_empty(&pvfs2_inode_list))
     {
-        pvfs2_error("pvfs2_inode_cache_finalize: WARNING: releasing unreleased pvfs2 inode objects!\n");
+        gossip_err("pvfs2_inode_cache_finalize: WARNING: releasing unreleased pvfs2 inode objects!\n");
         while (pvfs2_inode_list.next != &pvfs2_inode_list)
         {
             pvfs2_inode_t *pinode = list_entry(pvfs2_inode_list.next, pvfs2_inode_t, list);
@@ -264,7 +333,7 @@ int pvfs2_inode_cache_finalize(void)
     }
     if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
     {
-        pvfs2_panic("Failed to destroy pvfs2_inode_cache\n");
+        gossip_err("Failed to destroy pvfs2_inode_cache\n");
         return -EINVAL;
     }
     return 0;
@@ -284,7 +353,7 @@ pvfs2_inode_t* pvfs2_inode_alloc(void)
                                    PVFS2_CACHE_ALLOC_FLAGS);
     if (pvfs2_inode == NULL) 
     {
-        pvfs2_panic("Failed to allocate pvfs2_inode\n");
+        gossip_err("Failed to allocate pvfs2_inode\n");
     }
     else {
         add_to_pinode_list(pvfs2_inode);
@@ -301,7 +370,7 @@ void pvfs2_inode_release(pvfs2_inode_t *pinode)
     }
     else
     {
-        pvfs2_panic("NULL pointer in pvfs2_inode_release\n");
+        gossip_err("NULL pointer in pvfs2_inode_release\n");
     }
 }
 
@@ -318,7 +387,7 @@ static void kiocb_ctor(
     }
     else
     {
-        pvfs2_panic("WARNING!! kiocb_ctor called without ctor flag\n");
+        gossip_err("WARNING!! kiocb_ctor called without ctor flag\n");
     }
 }
 
@@ -331,7 +400,7 @@ int kiocb_cache_initialize(void)
 
     if (!pvfs2_kiocb_cache)
     {
-        pvfs2_panic("Cannot create pvfs2_kiocb_cache!\n");
+        gossip_err("Cannot create pvfs2_kiocb_cache!\n");
         return -ENOMEM;
     }
     return 0;
@@ -341,7 +410,7 @@ int kiocb_cache_finalize(void)
 {
     if (kmem_cache_destroy(pvfs2_kiocb_cache) != 0)
     {
-        pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
+        gossip_err("Failed to destroy pvfs2_devreqcache\n");
         return -EINVAL;
     }
     return 0;
@@ -354,7 +423,7 @@ pvfs2_kiocb* kiocb_alloc(void)
     x = kmem_cache_alloc(pvfs2_kiocb_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (x == NULL)
     {
-        pvfs2_panic("kiocb_alloc: kmem_cache_alloc failed!\n");
+        gossip_err("kiocb_alloc: kmem_cache_alloc failed!\n");
     }
     return x;
 }
@@ -367,7 +436,7 @@ void kiocb_release(pvfs2_kiocb *x)
     }
     else 
     {
-        pvfs2_panic("kiocb_release: kmem_cache_free NULL pointer!\n");
+        gossip_err("kiocb_release: kmem_cache_free NULL pointer!\n");
     }
 }
 

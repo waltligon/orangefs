@@ -22,11 +22,11 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
-#include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "ncache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -399,7 +399,17 @@ PVFS_error PVFS_sys_rename(
 static PINT_sm_action rename_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     assert(js_p->error_code == 0);
+
+    /* Invalidate the old entry in ncache */
+    PINT_ncache_invalidate(
+            (const char*) sm_p->u.rename.entries[0],
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
+    /* Invalidate the new entry in ncache in case it already exists */
+    PINT_ncache_invalidate(
+            (const char*) sm_p->u.rename.entries[1],
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
 
     return SM_ACTION_COMPLETE;
 }
@@ -641,10 +651,7 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
         sm_p->u.rename.entries[1],
         sm_p->u.rename.refns[0].handle,
         sm_p->u.rename.parent_refns[1].handle,
-        sm_p->u.rename.parent_refns[1].fs_id,
-        0,
-        PVFS_util_get_current_time(),
-        PVFS_util_get_current_time());
+        sm_p->u.rename.parent_refns[1].fs_id);
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
@@ -692,10 +699,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
-        sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
-        0,
-        PVFS_util_get_current_time(),
-        PVFS_util_get_current_time());
+        sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index]);
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[
         sm_p->u.rename.rmdirent_index].fs_id;
@@ -821,10 +825,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
         sm_p->u.rename.parent_refns[1].fs_id,
         sm_p->u.rename.parent_refns[1].handle,
         sm_p->u.rename.refns[0].handle,
-        sm_p->u.rename.entries[1],
-        0,
-        PVFS_util_get_current_time(),
-        PVFS_util_get_current_time());
+        sm_p->u.rename.entries[1]);
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
@@ -889,6 +890,21 @@ static PINT_sm_action rename_cleanup(
     {
         PINT_acache_invalidate(sm_p->object_ref);
     }
+    else
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "rename state: updating ncache with entry [%s] "
+            "ref.handle=%llu ref.fsid=%d\n",
+            sm_p->u.rename.entries[1],
+            llu(sm_p->u.rename.refns[0].handle),
+            sm_p->u.rename.parent_refns[0].fs_id);
+
+        PINT_ncache_update((const char*) sm_p->u.rename.entries[1],
+            (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
+    }
+        
+
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 

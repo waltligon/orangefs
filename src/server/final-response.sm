@@ -179,9 +179,11 @@ static PINT_sm_action final_response_cleanup(
     return SM_ACTION_COMPLETE;
 }
 
-static __req_resp_type_desc_t s_req_resp_type_map[
-    PVFS_MAX_SERVER_OP + 1] =
-{
+
+static const struct {
+    enum PVFS_server_op type;
+    const char *type_str;
+} s_req_resp_type_map[] = {
     { PVFS_SERV_INVALID, "PVFS_SERV_INVALID"},
     { PVFS_SERV_CREATE, "PVFS_SERV_CREATE" },
     { PVFS_SERV_REMOVE, "PVFS_SERV_REMOVE" },
@@ -198,6 +200,7 @@ static __req_resp_type_desc_t s_req_resp_type_map[
     { PVFS_SERV_GETCONFIG, "PVFS_SERV_GETCONFIG" },
     { PVFS_SERV_WRITE_COMPLETION, "PVFS_SERV_WRITE_COMPLETION" },
     { PVFS_SERV_FLUSH, "PVFS_SERV_FLUSH" },
+    { PVFS_SERV_LISTATTR, "PVFS_SERV_LISTATTR" },
     { PVFS_SERV_MGMT_SETPARAM, "PVFS_SERV_MGMT_SETPARAM" },
     { PVFS_SERV_MGMT_NOOP, "PVFS_SERV_MGMT_NOOP" },
     { PVFS_SERV_STATFS, "PVFS_SERV_STATFS" },
@@ -225,7 +228,7 @@ static void PINT_gossip_err_server_resp(
 {
     if (resp)
     {
-        if (((int)resp->op > -1) && ((int)resp->op < PVFS_MAX_SERVER_OP))
+        if (resp->op >= 0 && resp->op < PVFS_SERV_NUM_OPS)
         {
             gossip_err("Server Response %p is of type: %s\n",
                        resp, s_req_resp_type_map[resp->op].type_str);

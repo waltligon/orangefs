@@ -38,7 +38,6 @@
 #include "pint-cached-config.h"
 #include "job.h"
 #include "gossip.h"
-#include "pint-servreq.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-util.h"
 #include "pint-util.h"
@@ -805,7 +804,7 @@ int PINT_serv_msgpairarray_resolve_addrs(
     }
     return ret;
 }
-  
+
 /*
  * Local variables:
  *  mode: c
@@ -815,3 +814,4 @@ int PINT_serv_msgpairarray_resolve_addrs(
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
+

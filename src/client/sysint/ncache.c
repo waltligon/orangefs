@@ -1,594 +1,531 @@
 /*
- * (C) 2001 Clemson University and The University of Chicago
+ * Copyright © Acxiom Corporation, 2006
  *
  * See COPYING in top-level directory.
  */
-
-/* PVFS directory cache implementation */
-
+  
 #include <assert.h>
+  
+#include "pvfs2-attr.h"
 #include "ncache.h"
+#include "tcache.h"
+#include "pint-util.h"
+#include "pvfs2-debug.h"
+#include "gossip.h"
 #include "pvfs2-internal.h"
-
-typedef struct
-{
-    PVFS_object_ref parent;       /* parent directory */
-    char name[PVFS_SEGMENT_MAX];  /* segment name */
-    PVFS_object_ref entry;        /* entry in parent */
-    struct timeval tstamp_valid;  /* timestamp of validity period */
-    int abs_resolved;             /* if this entry is a symlink, is it
-                                     the resolved object, or the
-                                     symlink object itself? */
-} ncache_entry;
-
-struct ncache_t
-{
-    ncache_entry dentry;
-    int prev;
-    int next;
-    int status;        /*whether the entry is in use or not*/
+#include <string.h>
+  
+/** \file
+ *  \ingroup ncache
+ * Implementation of the Name Cache (ncache) component.
+ */
+  
+/* compile time defaults */
+enum {
+NCACHE_DEFAULT_TIMEOUT_MSECS  =  3000,
+NCACHE_DEFAULT_SOFT_LIMIT     =  5120,
+NCACHE_DEFAULT_HARD_LIMIT     = 10240,
+NCACHE_DEFAULT_RECLAIM_PERCENTAGE = 25,
+NCACHE_DEFAULT_REPLACE_ALGORITHM = LEAST_RECENTLY_USED,
 };
 
-/* Cache Management structure */
-typedef struct
+struct PINT_perf_key ncache_keys[] = 
 {
-    struct ncache_t element[PINT_NCACHE_MAX_ENTRIES];
-    int count;
-    int top;
-    int bottom;
-    gen_mutex_t *mt_lock;
-} ncache;
+   {"NCACHE_NUM_ENTRIES", PERF_NCACHE_NUM_ENTRIES, PINT_PERF_PRESERVE},
+   {"NCACHE_SOFT_LIMIT", PERF_NCACHE_SOFT_LIMIT, PINT_PERF_PRESERVE},
+   {"NCACHE_HARD_LIMIT", PERF_NCACHE_HARD_LIMIT, PINT_PERF_PRESERVE},
+   {"NCACHE_HITS", PERF_NCACHE_HITS, 0},
+   {"NCACHE_MISSES", PERF_NCACHE_MISSES, 0},
+   {"NCACHE_UPDATES", PERF_NCACHE_UPDATES, 0},
+   {"NCACHE_PURGES", PERF_NCACHE_PURGES, 0},
+   {"NCACHE_REPLACEMENTS", PERF_NCACHE_REPLACEMENTS, 0},
+   {"NCACHE_DELETIONS", PERF_NCACHE_DELETIONS, 0},
+   {"NCACHE_ENABLED", PERF_NCACHE_ENABLED, PINT_PERF_PRESERVE},
+   {NULL, 0, 0},
+};
 
-#define BAD_LINK -1
-#define STATUS_UNUSED 0
-#define STATUS_USED 1
+/* data to be stored in a cached entry */
+struct ncache_payload
+{
+    PVFS_object_ref entry_ref;      /* PVFS2 object reference to entry */
+    PVFS_object_ref parent_ref;     /* PVFS2 object reference to parent */
+    int entry_status;               /* is the entry valid? */
+    char* entry_name;
+};
 
-/* uncomment to enable ncache */
-/* #define ENABLE_NCACHE 1 */
+struct ncache_key
+{
+    PVFS_object_ref parent_ref;
+    char* entry_name;
+};
+  
+static struct PINT_tcache* ncache = NULL;
+static gen_mutex_t ncache_mutex = GEN_MUTEX_INITIALIZER;
+  
+static int ncache_compare_key_entry(void* key, struct qhash_head* link);
+static int ncache_hash_key(void* key, int table_size);
+static int ncache_free_payload(void* payload);
+static struct PINT_perf_counter* ncache_pc = NULL;
 
-#ifdef ENABLE_NCACHE
-static void ncache_remove_dentry(int item);
-static void ncache_rotate_dentry(int item);
-static int ncache_get_lru(void);
-static int ncache_update_dentry_timestamp(
-    ncache_entry* entry); 
-static int ncache_add_dentry(
-    char *name,
-    int abs_resolved,
-    PVFS_object_ref parent,
-    PVFS_object_ref entry);
-
-static ncache *cache = NULL;
-#endif
-
-static int s_pint_ncache_timeout_ms = PINT_NCACHE_TIMEOUT_MS;
-
-#ifdef ENABLE_NCACHE
-/* compare
- *
- * compares a ncache entry to the search key
- *
- * returns 1 on an equal comparison (match), 0 otherwise
+/**
+ * Enables perf counter instrumentation of the ncache
  */
-static inline int compare(
-    struct ncache_t element,
-    char *name,
-    int abs_resolved,
-    PVFS_object_ref refn)
+void PINT_ncache_enable_perf_counter(
+    struct PINT_perf_counter* pc)     /**< perf counter instance to use */
 {
-    int ret = 0, len = 0;
+    gen_mutex_lock(&ncache_mutex);
 
-    if ((element.dentry.parent.handle == refn.handle) &&
-        (element.dentry.parent.fs_id == refn.fs_id) &&
-        (element.dentry.abs_resolved == abs_resolved))
-    {
-        int len1 = strlen(name);
-        int len2 = strlen(element.dentry.name);
+    ncache_pc = pc;
+    assert(ncache_pc);
 
-        if (len1 == len2)
-        {
-            len = ((len1 < len2) ? len1 : len2);
-            ret = (strncmp(name, element.dentry.name, len) == 0);
-        }
-    }
-    return ret;
+    /* set initial values */
+    PINT_perf_count(ncache_pc, PERF_NCACHE_SOFT_LIMIT,
+        ncache->soft_limit, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc, PERF_NCACHE_HARD_LIMIT,
+        ncache->hard_limit, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc, PERF_NCACHE_ENABLED,
+        ncache->enable, PINT_PERF_SET);
+
+    gen_mutex_unlock(&ncache_mutex);
+
+    return;
 }
 
-/* check_dentry_expiry
- *
- * need to validate the dentry against the timestamp
- *
- * returns 0 if dentry timestamp is valid, -PVFS_errno if dentry is
- * expired
- */
-static inline int check_dentry_expiry(struct timeval time_stamp)
-{
-    int ret = 0;
-    struct timeval cur_time;
-
-    ret = gettimeofday(&cur_time,NULL);
-    if (ret == 0)
-    {
-        /* does timestamp exceed current time?  if so, entry is valid */
-        ret = (((time_stamp.tv_sec > cur_time.tv_sec) ||
-                ((time_stamp.tv_sec == cur_time.tv_sec) &&
-                 (time_stamp.tv_usec > cur_time.tv_usec))) ? 0 : -1);
-    }
-    return ret;
-}
-#endif  /* ENABLE_NCACHE */
-
-/* ncache_lookup
- *
- * search PVFS directory cache for specific entry
- *
- * returns 0 on success, -PVFS_errno on failure,
- * -PVFS_ENOENT if entry is not present.
- */
-int PINT_ncache_lookup(
-    char *name,
-    int want_resolved,
-    PVFS_object_ref parent,
-    PVFS_object_ref *entry)
-{
-#ifdef ENABLE_NCACHE
-    int ret = -PVFS_EINVAL, i = 0;
-
-    if (!name || !entry)
-    {
-        return ret;
-    }
-
-    gossip_debug(GOSSIP_NCACHE_DEBUG, "PINT_ncache_lookup called on "
-                 "segment %s\n\tunder %llu,%d [%d]\n", name,
-                 llu(parent.handle), parent.fs_id, want_resolved);
-
-    gen_mutex_lock(cache->mt_lock);
-    entry->handle = PINT_NCACHE_HANDLE_INVALID;
-
-    for(i = cache->top; i != BAD_LINK; i = cache->element[i].next)
-    {
-        if (compare(cache->element[i],name,want_resolved,parent))
-        {
-            /* match found; check to see if it is still valid */
-            ret = check_dentry_expiry(
-                cache->element[i].dentry.tstamp_valid);
-
-            if (ret < 0)
-            {
-                /* entry is stale, remove from cache */
-                gossip_debug(GOSSIP_NCACHE_DEBUG,
-                             "ncache entry expired.\n");
-                ncache_remove_dentry(i);
-
-                /* we never have more than one entry for the same
-                 * object in the cache, so we can assume we have no
-                 * up-to-date one at this point.
-                 */
-                gen_mutex_unlock(cache->mt_lock);
-                return -PVFS_ENOENT;
-            }
-            gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache entry valid.\n");
-
-            /*
-              update links so that this dentry is at the top of our
-              list; update the time stamp on the ncache entry
-            */
-            ncache_rotate_dentry(i);
-            ret = ncache_update_dentry_timestamp(
-                &cache->element[i].dentry);
-            if (ret < 0)
-            {
-                gen_mutex_unlock(cache->mt_lock);
-                return -PVFS_ENOENT;
-            }
-
-            entry->handle = cache->element[i].dentry.entry.handle;
-            entry->fs_id = cache->element[i].dentry.entry.fs_id;        
-            gen_mutex_unlock(cache->mt_lock);
-            return 0;
-        }
-    }
-
-    /* passed through entire cache with no matches */
-    gen_mutex_unlock(cache->mt_lock);
-    return -PVFS_ENOENT;
-#else
-    return -PVFS_ENOENT;
-#endif
-}
-
-/* ncache_rotate_dentry()
- *
- * moves the specified item to the top of the ncache linked list to prevent it
- * from being identified as the least recently used item in the cache.
- *
- * no return value
- */
-#ifdef ENABLE_NCACHE
-static void ncache_rotate_dentry(int item)
-{
-    int prev = 0, next = 0, new_bottom;
-
-    if (cache->top != cache->bottom) 
-    {
-        if (cache->top != item)
-        {
-            /*
-              only move links if there's more than one thing in the
-              list
-            */
-            if (cache->bottom == item)
-            {
-                new_bottom = cache->element[cache->bottom].prev;
-
-                cache->element[new_bottom].next = BAD_LINK;
-                cache->bottom = new_bottom;
-            }
-            else
-            {
-                /*somewhere in the middle*/
-                next = cache->element[item].next;
-                prev = cache->element[item].prev;
-
-                cache->element[prev].next = next;
-                cache->element[next].prev = prev;
-            }
-
-            cache->element[cache->top].prev = item;
-
-            cache->element[item].next = cache->top;
-            cache->element[item].prev = BAD_LINK;
-            cache->top = item;
-        }
-    }
-}
-#endif
-
-/* ncache_insert
- *
- * insert an entry into PVFS directory cache
- *
- * returns 0 on success, -1 on failure
- */
-int PINT_ncache_insert(
-    char *name,
-    int abs_resolved,
-    PVFS_object_ref entry,
-    PVFS_object_ref parent)
-{
-#ifdef ENABLE_NCACHE
-    int i = 0, index = 0, ret = 0;
-    unsigned char entry_found = 0;
-        
-    gen_mutex_lock(cache->mt_lock);
-
-    gossip_debug(
-        GOSSIP_NCACHE_DEBUG, "PINT_ncache_insert: inserting segment "
-        "%s\n\t(%llu,%d) under parent (%llu,%d) [%d]\n", name,
-        llu(entry.handle), entry.fs_id, llu(parent.handle),
-        parent.fs_id, abs_resolved);
-
-    for (i = cache->top; i != BAD_LINK; i = cache->element[i].next)
-    {
-        if (compare(cache->element[i],name,abs_resolved,parent))
-        {
-            entry_found = 1;
-            index = i;
-            break;
-        }
-    }
-        
-    /* add/merge element to the cache */
-    if (entry_found == 0)
-    {
-        /* Element not in cache, add it */
-        ncache_add_dentry(name,abs_resolved,parent,entry);
-    }
-    else
-    {
-        /* move entry to the top of the list and update its timestamp */
-        gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: inserting entry "
-                     "already present; timestamp update.\n");
-
-        ncache_rotate_dentry(index);
-        ret = ncache_update_dentry_timestamp(
-            &cache->element[index].dentry); 
-        if (ret < 0)
-        {
-            gen_mutex_unlock(cache->mt_lock);
-            return(ret);
-        }
-    }
-    gen_mutex_unlock(cache->mt_lock);
-#endif
-    return 0;
-}
-
-/* ncache_remove
- *
- * remove a particular entry from the PVFS directory cache
- *
- * returns 0 on success, -1 on failure
- */
-int PINT_ncache_remove(
-    char *name,
-    int abs_resolved,
-    PVFS_object_ref parent,
-    int *item_found)
-{
-#ifdef ENABLE_NCACHE
-    int i = 0;
-
-    if (!name)
-    {
-        return -PVFS_EINVAL;
-    }
-
-    if (item_found)
-    {
-        *item_found = 0;
-    }
-
-    gen_mutex_lock(cache->mt_lock);
-    for(i = cache->top; i != BAD_LINK; i = cache->element[i].next)
-    {
-        if (compare(cache->element[i],name,abs_resolved,parent))
-        {
-            ncache_remove_dentry(i);
-
-            if (item_found)
-            {
-                *item_found = 1;
-            }
-            break;
-        }
-    }
-    gen_mutex_unlock(cache->mt_lock);
-#endif
-    return 0;
-}
-
-/* ncache_flush
- * 
- * remove all entries from the PVFS directory cache
- *
- * returns 0 on success, -1 on failure
- */
-int PINT_ncache_flush(void)
-{
-    return -PVFS_ENOSYS;
-}
-
-/* pint_ncache_initialize
- *
- * initialize the PVFS directory cache
- *
- * returns 0 on success, -1 on failure
+/**
+ * Initializes the ncache 
+ * \return pointer to tcache on success, NULL on failure
  */
 int PINT_ncache_initialize(void)
 {
-#ifdef ENABLE_NCACHE
-    int ret = 0, i = 0;
-
-    if (cache == NULL)
+    int ret = -1;
+    unsigned int ncache_timeout_msecs;
+    char * ncache_timeout_str = NULL;
+  
+    gen_mutex_lock(&ncache_mutex);
+  
+    /* create tcache instance */
+    ncache = PINT_tcache_initialize(ncache_compare_key_entry,
+                                    ncache_hash_key,
+                                    ncache_free_payload,
+                                    -1 /* default tcache table size */);
+    if(!ncache)
     {
-        cache = (ncache*)malloc(sizeof(ncache));
-        if (cache)
-        {
-            cache->mt_lock = gen_mutex_build();
-            cache->top = BAD_LINK;
-            cache->bottom = 0;
-            cache->count = 0;
+        gen_mutex_unlock(&ncache_mutex);
+        return(-PVFS_ENOMEM);
+    }
+  
+    /* fill in defaults that are specific to ncache */
+    ncache_timeout_str = getenv("PVFS2_NCACHE_TIMEOUT");
+    if (ncache_timeout_str != NULL) 
+        ncache_timeout_msecs = (unsigned int)strtoul(ncache_timeout_str,NULL,0);
+    else
+        ncache_timeout_msecs = NCACHE_DEFAULT_TIMEOUT_MSECS;
 
-            for(i = 0;i < PINT_NCACHE_MAX_ENTRIES; i++)
-            {
-                cache->element[i].prev = BAD_LINK;
-                cache->element[i].next = BAD_LINK;
-                cache->element[i].status = STATUS_UNUSED;
-            }
+    ret = PINT_tcache_set_info(ncache, TCACHE_TIMEOUT_MSECS,
+                               ncache_timeout_msecs);
+                
+    if(ret < 0)
+    {
+        PINT_tcache_finalize(ncache);
+        gen_mutex_unlock(&ncache_mutex);
+        return(ret);
+    }
+    ret = PINT_tcache_set_info(ncache, TCACHE_HARD_LIMIT, 
+                               NCACHE_DEFAULT_HARD_LIMIT);
+    if(ret < 0)
+    {
+        PINT_tcache_finalize(ncache);
+        gen_mutex_unlock(&ncache_mutex);
+        return(ret);
+    }
+    ret = PINT_tcache_set_info(ncache, TCACHE_SOFT_LIMIT, 
+                               NCACHE_DEFAULT_SOFT_LIMIT);
+    if(ret < 0)
+    {
+        PINT_tcache_finalize(ncache);
+        gen_mutex_unlock(&ncache_mutex);
+        return(ret);
+    }
+    ret = PINT_tcache_set_info(ncache, TCACHE_RECLAIM_PERCENTAGE,
+                               NCACHE_DEFAULT_RECLAIM_PERCENTAGE);
+    if(ret < 0)
+    {
+        PINT_tcache_finalize(ncache);
+        gen_mutex_unlock(&ncache_mutex);
+        return(ret);
+    }
+  
+    gen_mutex_unlock(&ncache_mutex);
+    return(0);
+}
+  
+/** Finalizes and destroys the ncache, frees all cached entries */
+void PINT_ncache_finalize(void)
+{
+    gen_mutex_lock(&ncache_mutex);
+
+    assert(ncache != NULL);
+    PINT_tcache_finalize(ncache);
+    ncache = NULL;
+
+    gen_mutex_unlock(&ncache_mutex);
+    return;
+}
+  
+/**
+ * Retrieves parameters from the ncache 
+ * @see PINT_tcache_options
+ * \return 0 on success, -PVFS_error on failure
+ */
+int PINT_ncache_get_info(
+    enum PINT_ncache_options option, /**< option to read */
+    unsigned int* arg)               /**< output value */
+{
+    int ret = -1;
+  
+    gen_mutex_lock(&ncache_mutex);
+    ret = PINT_tcache_get_info(ncache, option, arg);
+    gen_mutex_unlock(&ncache_mutex);
+  
+    return(ret);
+}
+  
+/**
+ * Sets optional parameters in the ncache
+ * @see PINT_tcache_options
+ * @return 0 on success, -PVFS_error on failure
+ */
+int PINT_ncache_set_info(
+    enum PINT_ncache_options option, /**< option to modify */
+    unsigned int arg)                /**< input value */
+{
+    int ret = -1;
+  
+    gen_mutex_lock(&ncache_mutex);
+    ret = PINT_tcache_set_info(ncache, option, arg);
+
+    /* record any resulting parameter changes */
+    PINT_perf_count(ncache_pc, PERF_NCACHE_SOFT_LIMIT,
+        ncache->soft_limit, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc, PERF_NCACHE_HARD_LIMIT,
+        ncache->hard_limit, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc, PERF_NCACHE_ENABLED,
+        ncache->enable, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc, PERF_NCACHE_NUM_ENTRIES,
+        ncache->num_entries, PINT_PERF_SET);
+
+    gen_mutex_unlock(&ncache_mutex);
+
+    return(ret);
+}
+  
+/** 
+ * Retrieves a _copy_ of a cached object reference, and reports the
+ * status to indicate if they are valid or  not
+ * @return 0 on success, -PVFS_error on failure
+ */
+int PINT_ncache_get_cached_entry(
+    const char* entry,                 /**< path of obect to look up*/
+    PVFS_object_ref* entry_ref,        /**< PVFS2 object looked up */
+    const PVFS_object_ref* parent_ref) /**< Parent of PVFS2 object */
+{
+    int ret = -1;
+    struct PINT_tcache_entry* tmp_entry;
+    struct ncache_payload* tmp_payload;
+    struct ncache_key entry_key;
+    int status;
+
+    gossip_debug(GOSSIP_NCACHE_DEBUG, 
+                 "ncache: get_cached_entry(): [%s]\n",entry);
+  
+    entry_key.entry_name = (char *) entry;
+    entry_key.parent_ref.handle = parent_ref->handle;
+    entry_key.parent_ref.fs_id = parent_ref->fs_id;
+
+    gen_mutex_lock(&ncache_mutex);
+
+    /* lookup entry */
+    ret = PINT_tcache_lookup(ncache, (void *) &entry_key, &tmp_entry, &status);
+    if(ret < 0 || status != 0)
+    {
+        gossip_debug(GOSSIP_NCACHE_DEBUG, 
+            "ncache: miss: name=[%s]\n", entry_key.entry_name);
+        PINT_perf_count(ncache_pc, PERF_NCACHE_MISSES, 1, PINT_PERF_ADD);
+        gen_mutex_unlock(&ncache_mutex);
+        /* Return -PVFS_ENOENT if the entry has expired */
+        if(status != 0)
+        {   
+            return(-PVFS_ENOENT);
         }
-        ret = (cache ? 0 : -PVFS_ENOMEM);
+        return(ret);
+    }
+    tmp_payload = tmp_entry->payload;
+  
+    gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: status=%d, entry_status=%d\n",
+                 status, tmp_payload->entry_status);
+
+    /* copy out entry ref if valid */
+    if(tmp_payload->entry_status == 0 && 
+       tmp_payload->parent_ref.handle == parent_ref->handle)
+    {
+        gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: copying out ref.\n");
+        *entry_ref = tmp_payload->entry_ref;
+    }
+  
+    if(tmp_payload->entry_status == 0) 
+    {
+        /* return success if we got _anything_ out of the cache */
+        PINT_perf_count(ncache_pc, PERF_NCACHE_HITS, 1, PINT_PERF_ADD);
+        gen_mutex_unlock(&ncache_mutex);
+        return(0);
     }
 
-    gossip_debug(GOSSIP_NCACHE_DEBUG,
-                 "PINT_ncache_initialize returning %d\n", ret);
-    return ret;
-#else
-    return 0;
-#endif
+    gen_mutex_unlock(&ncache_mutex);
+  
+    PINT_perf_count(ncache_pc, PERF_NCACHE_MISSES, 1, PINT_PERF_ADD);
+    return(-PVFS_ETIME);
 }
-
-/* pint_ncache_finalize
- *
- * close down the PVFS directory cache framework
- *
- * returns 0
+  
+/**
+ * Invalidates a cache entry (if present)
  */
-int PINT_ncache_finalize(void)
+void PINT_ncache_invalidate(
+    const char* entry,                  /**< path of obect */
+    const PVFS_object_ref* parent_ref)  /**< Parent of PVFS2 object */
 {
-#ifdef ENABLE_NCACHE
+    int ret = -1;
+    struct PINT_tcache_entry* tmp_entry;
+    struct ncache_key entry_key;
+    int tmp_status;
+  
+    gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: invalidate(): entry=%s\n",
+                 entry);
+  
+    gen_mutex_lock(&ncache_mutex);
+  
+    entry_key.entry_name = (char *) entry;
+    entry_key.parent_ref.handle = parent_ref->handle;
+    entry_key.parent_ref.fs_id = parent_ref->fs_id;
 
-    if (cache)
+    /* find out if the entry is in the cache */
+    ret = PINT_tcache_lookup(ncache, 
+                             &entry_key,
+                             &tmp_entry,
+                             &tmp_status);
+    if(ret == 0)
     {
-        gen_mutex_destroy(cache->mt_lock);
-        free(cache);
-        cache = NULL;
+        PINT_tcache_delete(ncache, tmp_entry);
+        PINT_perf_count(ncache_pc, PERF_NCACHE_DELETIONS, 1,
+                        PINT_PERF_ADD);
     }
 
-    gossip_debug(GOSSIP_NCACHE_DEBUG, "PINT_ncache_finalize complete\n");
-#endif
-    return 0;
+    PINT_perf_count(ncache_pc, PERF_NCACHE_NUM_ENTRIES,
+                    ncache->num_entries, PINT_PERF_SET);
+
+    gen_mutex_unlock(&ncache_mutex);
+    return;
 }
-
-int PINT_ncache_get_timeout(void)
-{
-    return s_pint_ncache_timeout_ms;
-}
-
-void PINT_ncache_set_timeout(int max_timeout_ms)
-{
-    s_pint_ncache_timeout_ms = max_timeout_ms;
-}
-
-
-/* ncache_add_dentry
+  
+/** 
+ * Adds a name to the cache, or updates it if already present.  
+ * The given name is _copied_ into the cache.   
  *
- * add a dentry to the ncache
+ * \note NOTE: All previous information for the object will be discarded,
+ * even if there is still time remaining before it expires.
  *
- * returns 0 on success, -PVFS_errno on failure
+ * \return 0 on success, -PVFS_error on failure
  */
-#ifdef ENABLE_NCACHE
-static int ncache_add_dentry(
-    char *name,
-    int abs_resolved,
-    PVFS_object_ref parent,
-    PVFS_object_ref entry)
+int PINT_ncache_update(
+    const char* entry,                     /**< entry to update */
+    const PVFS_object_ref* entry_ref,      /**< entry ref to update */
+    const PVFS_object_ref* parent_ref)     /**< parent ref to update */
 {
-    int new = 0, ret = 0;
-    int size = strlen(name) + 1; /* size includes null terminator*/
+    int ret = -1;
+    struct PINT_tcache_entry* tmp_entry;
+    struct ncache_payload* tmp_payload;
+    struct ncache_key entry_key;
+    int status;
+    int purged;
+    unsigned int enabled;
 
-    new = ncache_get_lru();
-
-    /* add element to cache */
-    cache->element[new].status = STATUS_USED;
-    cache->element[new].dentry.parent = parent;
-    cache->element[new].dentry.entry = entry;
-    cache->element[new].dentry.abs_resolved = abs_resolved;
-    memcpy(cache->element[new].dentry.name,name,size);
-
-    /* set timestamp */
-    ret = ncache_update_dentry_timestamp(
-        &cache->element[new].dentry);
-
-    if (ret < 0)
+    /* skip out immediately if the cache is disabled */
+    PINT_tcache_get_info(ncache, TCACHE_ENABLE, &enabled);
+    if(!enabled)
     {
-        return ret;
+        return(0);
     }
-    cache->element[new].prev = BAD_LINK;
-    cache->element[new].next = cache->top;
-
-    /* make previous element point to new entry */
-    if (cache->top != BAD_LINK)
+    
+    gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: update(): name [%s]\n",entry);
+  
+    if(!entry_ref->handle)
     {
-        cache->element[cache->top].prev = new;
+        return(-PVFS_EINVAL);
     }
-    cache->top = new;
-    return 0;
-}
-
-/* ncache_get_lru
- *
- * this function gets the least recently used cache entry (assuming a
- * full cache) or searches through the cache for the first unused slot
- * (if there are some free slots)
- *
- * returns 0 on success, -PVFS_errno on failure
- */
-static int ncache_get_lru(void)
-{
-    int new = 0, i = 0;
-
-    if (cache->count == PINT_NCACHE_MAX_ENTRIES)
+  
+    /* create new payload with updated information */
+    tmp_payload = (struct ncache_payload*) 
+                        calloc(1,sizeof(struct ncache_payload));
+    if(tmp_payload == NULL)
     {
-        new = cache->bottom;
-        cache->bottom = cache->element[new].prev;
-        cache->element[cache->bottom].next = BAD_LINK;
-        return new;
+        return(-PVFS_ENOMEM);
+    }
+
+    tmp_payload->parent_ref.handle = parent_ref->handle;
+    tmp_payload->parent_ref.fs_id = parent_ref->fs_id;
+    tmp_payload->entry_ref.handle = entry_ref->handle;
+    tmp_payload->entry_ref.fs_id = entry_ref->fs_id;
+
+    tmp_payload->entry_status = 0;
+    tmp_payload->entry_name = (char*) calloc(1, strlen(entry) + 1);
+    if(tmp_payload->entry_name == NULL)
+    {
+        free(tmp_payload);
+        return(-PVFS_ENOMEM);
+    }
+    memcpy(tmp_payload->entry_name, entry, strlen(entry) + 1);
+
+    gen_mutex_lock(&ncache_mutex);
+
+    entry_key.entry_name = (char *) entry;
+    entry_key.parent_ref.handle = parent_ref->handle;
+    entry_key.parent_ref.fs_id = parent_ref->fs_id;
+
+    /* find out if the entry is already in the cache */
+    ret = PINT_tcache_lookup(ncache, 
+                             &entry_key,
+                             &tmp_entry,
+                             &status);
+    if(ret == 0)
+    {
+        /* found match in cache; destroy old payload, replace, and
+         * refresh time stamp
+         */
+        ncache_free_payload(tmp_entry->payload);
+        tmp_entry->payload = tmp_payload;
+        ret = PINT_tcache_refresh_entry(ncache, tmp_entry);
+        PINT_perf_count(ncache_pc, PERF_NCACHE_UPDATES, 1, PINT_PERF_ADD);
     }
     else
     {
-        for(i = 0; i < PINT_NCACHE_MAX_ENTRIES; i++)
+        /* not found in cache; insert new payload*/
+        ret = PINT_tcache_insert_entry(ncache, 
+                                       &entry_key,
+                                       tmp_payload, 
+                                       &purged);
+        /* the purged variable indicates how many entries had to be purged
+         * from the tcache to make room for this new one
+         */
+        if(purged == 1)
         {
-            if (cache->element[i].status == STATUS_UNUSED)
-            {
-                cache->count++;
-                return i;
-            }
+            /* since only one item was purged, we count this as one item being
+             * replaced rather than as a purge and an insert
+             */
+            PINT_perf_count(ncache_pc, PERF_NCACHE_REPLACEMENTS,purged,
+                PINT_PERF_ADD);
+        }
+        else
+        {
+            /* otherwise we just purged as part of reclaimation */
+            /* if we didn't purge anything, then the "purged" variable will
+             * be zero and this counter call won't do anything.
+             */
+            PINT_perf_count(ncache_pc, PERF_NCACHE_PURGES, purged,
+                PINT_PERF_ADD);
         }
     }
+    
+    PINT_perf_count(ncache_pc, PERF_NCACHE_NUM_ENTRIES,
+        ncache->num_entries, PINT_PERF_SET);
 
-    gossip_debug(GOSSIP_NCACHE_DEBUG,
-                  "error getting least recently used dentry.\n");
-    gossip_debug(GOSSIP_NCACHE_DEBUG,
-                  "cache->count = %d max_entries = %d.\n",
-                  cache->count, PINT_NCACHE_MAX_ENTRIES);
-
-    return -PVFS_ENOENT;
-}
-
-/* ncache_remove_dentry
- *
- * Handles the actual manipulation of the cache to handle removal
- *
- * returns nothing
- */
-static void ncache_remove_dentry(int item)
-{
-    int prev = 0,next = 0;
-
-    cache->element[item].status = STATUS_UNUSED;
-    memset(&cache->element[item].dentry.name, 0, PVFS_SEGMENT_MAX);
-    cache->count--;
-
-    /* if there's exactly one item in the list, just get rid of it*/
-    if (cache->top == cache->bottom)
+    gen_mutex_unlock(&ncache_mutex);
+  
+    /* cleanup if we did not succeed for some reason */
+    if(ret < 0)
     {
-        cache->top = 0;
-        cache->bottom = 0;
-        cache->element[item].prev = BAD_LINK;
-        cache->element[item].next = BAD_LINK;
-        return;
+        ncache_free_payload(tmp_payload);
     }
+  
+    gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: update(): return=%d\n", ret);
+    return(ret);
+}
+  
+/* ncache_compare_key_entry()
+ *
+ * compares an opaque key (char* in this case) against a payload to see
+ * if there is a match
+ *
+ * returns 1 on match, 0 otherwise
+ */
+static int ncache_compare_key_entry(void* key, struct qhash_head* link)
+{
+    struct ncache_key* real_key = (struct ncache_key*)key;
+    struct ncache_payload* tmp_payload = NULL;
+    struct PINT_tcache_entry* tmp_entry = NULL;
+  
+    tmp_entry = qhash_entry(link, struct PINT_tcache_entry, hash_link);
+    assert(tmp_entry);
 
-    /* depending on where the dentry is in the list, we have to do
-     * different things if its the first, last, or somewhere in the
-     * middle.
+    tmp_payload = (struct ncache_payload*)tmp_entry->payload;
+     /* If the following aren't equal, we know we don't have a match... Maybe
+     * these integer comparisons will be quicker than a strcmp each time?
+     *   - parent_ref.handle 
+     *   - parent_ref.fs_id
+     *   - entry_name length
      */
-    if (item == cache->top)
+    if( real_key->parent_ref.handle  != tmp_payload->parent_ref.handle ||
+        real_key->parent_ref.fs_id   != tmp_payload->parent_ref.fs_id  ||
+        strlen(real_key->entry_name) != strlen(tmp_payload->entry_name) )
     {
-        /* Adjust top */
-        cache->top = cache->element[item].next;
-        cache->element[cache->top].prev = BAD_LINK;
+        /* One of the above cases failed, so we know these aren't a match */
+        return(0);
     }
-    else if (item == cache->bottom)
+    
+    if( strcmp(real_key->entry_name, tmp_payload->entry_name) == 0 )
     {
-        /* Adjust bottom */
-        cache->bottom = cache->element[item].prev;
-        cache->element[cache->bottom].next = -1;
+        /* The strings matches */
+        return(1);
     }
-    else
-    {
-        /* Item in the middle */
-        prev = cache->element[item].prev;
-        next = cache->element[item].next;
-        cache->element[prev].next = next;
-        cache->element[next].prev = prev;
-    }
-}
 
-/* ncache_update_dentry_timestamp
+    return(0);
+}
+  
+/* ncache_hash_key()
  *
- * updates the timestamp of the ncache entry
+ * hash function for character pointers
  *
- * returns 0 on success, -PVFS_errno on failure
+ * returns hash index 
  */
-static int ncache_update_dentry_timestamp(ncache_entry* entry) 
+static int ncache_hash_key(void* key, int table_size)
 {
-    int ret = 0;
+    struct ncache_key* real_key = (struct ncache_key*) key;
+    int tmp_ret = 0;
+    unsigned int sum = 0, i = 0;
 
-    ret = gettimeofday(&entry->tstamp_valid,NULL);
-    if (ret == 0)
+    while(real_key->entry_name[i] != '\0')
     {
-        entry->tstamp_valid.tv_sec +=
-            (int)(s_pint_ncache_timeout_ms / 1000);
-        entry->tstamp_valid.tv_usec +=
-            (int)((s_pint_ncache_timeout_ms % 1000) * 1000);
+        sum += (unsigned int) real_key->entry_name[i];
+        i++;
     }
-    return ret;
+    sum += real_key->parent_ref.handle + real_key->parent_ref.fs_id;
+    tmp_ret =  sum % table_size;
+    return(tmp_ret);
 }
-#endif /* ENABLE_NCACHE */
-
+  
+/* ncache_free_payload()
+ *
+ * frees payload that has been stored in the ncache 
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int ncache_free_payload(void* payload)
+{
+    struct ncache_payload* tmp_payload = (struct ncache_payload*)payload;
+  
+    free(tmp_payload->entry_name);
+    free(tmp_payload);
+    return(0);
+}
+  
 /*
  * Local variables:
  *  c-indent-level: 4
@@ -597,3 +534,4 @@ static int ncache_update_dentry_timestamp(ncache_entry* entry)
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
+

@@ -39,7 +39,8 @@ typedef int32_t bmi_error_code_t; /**< error code information */
 /** BMI method initialization flags */
 enum
 {
-    BMI_INIT_SERVER = 1 /**< set up to listen for unexpected messages */
+    BMI_INIT_SERVER = 1, /**< set up to listen for unexpected messages */
+    BMI_TCP_BIND_SPECIFIC = 2 /**< bind to a specific IP address if INIT_SERVER */
 };
 
 enum bmi_op_type
@@ -73,7 +74,8 @@ enum
 #endif
     BMI_GET_UNEXP_SIZE = 10,     /**< get the maximum unexpected payload */
     BMI_TCP_BUFFER_SEND_SIZE = 11,
-    BMI_TCP_BUFFER_RECEIVE_SIZE = 12
+    BMI_TCP_BUFFER_RECEIVE_SIZE = 12,
+    BMI_TCP_CLOSE_SOCKET = 13,
 };
 
 /* mappings from PVFS errors to BMI errors */

@@ -23,6 +23,7 @@
 #include "extent-utils.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 
 static char *dir_ent_string = DIRECTORY_ENTRY_KEYSTR;
 static char *root_handle_string = ROOT_HANDLE_KEYSTR;
@@ -328,8 +329,8 @@ int pvfs2_mkspace(
         attr.gid = getgid();
         attr.mode = 0777;
         attr.type = PVFS_TYPE_DIRECTORY;
-	attr.atime = attr.ctime = PVFS_util_get_current_time();
-        attr.mtime = PVFS_util_mktime_version(attr.ctime);
+	attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ctime);
 
         ret = trove_dspace_setattr(
             coll_id, new_root_handle, &attr, TROVE_SYNC, NULL,
@@ -487,8 +488,8 @@ int pvfs2_mkspace(
         attr.gid = getgid();
         attr.mode = 0777;
         attr.type = PVFS_TYPE_DIRECTORY;
-	attr.atime = attr.ctime = PVFS_util_get_current_time();
-        attr.mtime = PVFS_util_mktime_version(attr.ctime);
+	attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ctime);
 
         ret = trove_dspace_setattr(
             coll_id, lost_and_found_handle, &attr, TROVE_SYNC, NULL,
@@ -615,7 +616,7 @@ int pvfs2_mkspace(
         mkspace_print(verbose, "info: adding lost+found directory to "
                       "the root directory.\n");
     }
-
+    	
     if (trove_context != -1)
     {
         trove_close_context(coll_id, trove_context);
@@ -665,21 +666,18 @@ int pvfs2_rmspace(
 
     if (!remove_collection_only)
     {
+		  /*
+		  * it is a bit weird to do a trove_finaliz() prior to blowing away
+		  * the storage space, but this allows the __db files of the DB env
+		  * to be blown away for the rmdir() to work correctly!
+		  */
+		  trove_finalize();
         ret = trove_storage_remove(storage_space, NULL, &op_id);
         mkspace_print(
             verbose, "PVFS2 Storage Space %s removed %s\n",
             storage_space, (((ret == 1) || (ret == -TROVE_ENOENT)) ?
                             "successfully" : "with errors"));
 
-        /*
-          we should be doing a trove finalize here, but for now we
-          can't because it will fail horribly during the sync/close
-          calls to files that we've just removed.
-     
-          an extra flag to finalize, or a static var in the dbpf-mgmt
-          methods could resolve this.
-        */
-/*         trove_finalize(); */
         trove_is_initialized = 0;
     }
     return ret;

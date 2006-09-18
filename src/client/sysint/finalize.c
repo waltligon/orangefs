@@ -15,13 +15,13 @@
 #include "gen-locks.h"
 #include "pint-cached-config.h"
 #include "pint-dist-utils.h"
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config-mgr.h"
 #include "PINT-reqproto-encode.h"
 #include "client-state-machine.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -35,6 +35,7 @@ extern PINT_smcb *g_smcb;
  */
 int PVFS_sys_finalize()
 {
+    PINT_util_digest_finalize();
     PINT_ncache_finalize();
     PINT_acache_finalize();
     PINT_cached_config_finalize();

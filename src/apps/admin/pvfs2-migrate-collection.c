@@ -940,7 +940,8 @@ static int translate_coll_eattr_0_0_1(
             return(-1);
         }
         /* skip the version attribute- we don't want to copy that one */
-        if(ret == 0 && strcmp(key.data, "trove-dbpf-version") != 0)
+        if(ret == 0 && strncmp(key.data, "trove-dbpf-version", 
+                               strlen("trove-dbpf-version")) != 0)
         {
             if(verbose) printf("VERBOSE Migrating collection eattr: %s\n", (char*)key.data);
 
@@ -1245,30 +1246,31 @@ static int translate_keyvals_0_0_1(
 
 static int translate_keyval_key_0_0_1(TROVE_keyval_s * keyval, DBT * db_key)
 {
-    if(!strcmp(db_key->data, "root_handle"))
+    if(!strncmp(db_key->data, "root_handle", strlen("root_handle")))
     {
         keyval->buffer = ROOT_HANDLE_KEYSTR;
-        keyval->buffer_sz = sizeof(ROOT_HANDLE_KEYSTR);
+        keyval->buffer_sz = strlen(ROOT_HANDLE_KEYSTR);
     }
-    else if(!strcmp(db_key->data, "dir_ent"))
+    else if(!strncmp(db_key->data, "dir_ent", strlen("dir_ent")))
     {
         keyval->buffer = DIRECTORY_ENTRY_KEYSTR;
-        keyval->buffer_sz = sizeof(DIRECTORY_ENTRY_KEYSTR);
+        keyval->buffer_sz = strlen(DIRECTORY_ENTRY_KEYSTR);
     }
-    else if(!strcmp(db_key->data, "datafile_handles"))
+    else if(!strncmp(db_key->data, 
+                     "datafile_handles", strlen("datafile_handles")))
     {
         keyval->buffer = DATAFILE_HANDLES_KEYSTR;
-        keyval->buffer_sz = sizeof(DATAFILE_HANDLES_KEYSTR);
+        keyval->buffer_sz = strlen(DATAFILE_HANDLES_KEYSTR);
     }
-    else if(!strcmp(db_key->data, "metafile_dist"))
+    else if(!strncmp(db_key->data, "metafile_dist", strlen("metafile_dist")))
     {
         keyval->buffer = METAFILE_DIST_KEYSTR;
-        keyval->buffer_sz = sizeof(METAFILE_DIST_KEYSTR);
+        keyval->buffer_sz = strlen(METAFILE_DIST_KEYSTR);
     }
-    else if(!strcmp(db_key->data, "symlink_target"))
+    else if(!strncmp(db_key->data, "symlink_target", strlen("symlink_target")))
     {
         keyval->buffer = SYMLINK_TARGET_KEYSTR;
-        keyval->buffer_sz = sizeof(SYMLINK_TARGET_KEYSTR);
+        keyval->buffer_sz = strlen(SYMLINK_TARGET_KEYSTR);
     }
     else
     {
@@ -1382,9 +1384,10 @@ static int translate_keyval_db_0_0_1(
                 t_key.buffer = key.data;
                 t_key.buffer_sz = key.size;
                 trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
+                trove_flags |= TROVE_NOOVERWRITE;
             }
             
-            if(!strcmp(t_key.buffer, "md")) /* metafile_dist */
+            if(!strncmp(t_key.buffer, "md", 2)) /* metafile_dist */
             {
                 PINT_dist *newdist;
                 newdist = data.data;

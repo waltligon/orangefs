@@ -14,155 +14,27 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-types.h"
 
-/* defined in file.c */
-extern ssize_t pvfs2_inode_read(
-    struct inode *inode,
-    char *buf,
-    size_t count,
-    loff_t *offset,
-    int copy_to_user,
-    loff_t readahead_size);
-
-extern struct file_operations pvfs2_file_operations;
-extern struct inode_operations pvfs2_symlink_inode_operations;
-extern struct inode_operations pvfs2_dir_inode_operations;
-extern struct file_operations pvfs2_dir_operations;
-extern int debug;
-
-
-/** Read page-sized blocks from file.  This code is only used in the mmap
- *  path.
- *
- *  \note Current implementation ignores max_blocks parameter and always
- *        reads exactly one block.  Because the only time this function
- *        seems to be called is from pvfs2_get_block(), this appears to be
- *        ok.
- */
-static int pvfs2_get_blocks(
-    struct inode *inode,
-    sector_t lblock,
-    unsigned long max_blocks,
-    struct buffer_head *bh_result,
-    int create)
+static int read_one_page(struct page *page)
 {
-    int ret = -EIO;
-    uint32_t max_block = 0;
+    void *page_data;
+    int ret, max_block;
     ssize_t bytes_read = 0;
-    struct page *page = NULL;
-    void *page_data = NULL;
-    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-
-    /*
-      We're faking our inode block size to be PAGE_CACHE_SIZE
-      to play nicely with the page cache.
-
-      In some reality, inode->i_blksize != PAGE_CACHE_SIZE and
-      inode->i_blkbits != PAGE_CACHE_SHIFT
-    */
+    struct inode *inode = page->mapping->host;
     const uint32_t blocksize = PAGE_CACHE_SIZE;  /* inode->i_blksize */
     const uint32_t blockbits = PAGE_CACHE_SHIFT; /* inode->i_blkbits */
 
-    /* check assumption before continuing */
-    if (max_blocks != 1) {
-	pvfs2_error("pvfs2_get_blocks called with invalid max_blocks (%lu)\n",
-		    max_blocks);
-    }
-
-    pvfs2_print("pvfs2_get_blocks called for lblock %lu\n",
-                (unsigned long)lblock);
-
-    /*
-      this is a quick workaround for the case when a sequence
-      of sequential blocks are needed to be read, but the
-      operation that issued it was cancelled by a signal.
-      if we detect a sequential pattern of failures, don't
-      even bother issuing the upcall since that's way more
-      expensive to do and it will also fail due to the signal
-      raised.
-
-      the first failure will have the failed block as lblock-1,
-      but the mpage code (the caller) tries twice in a row, so the
-      second time, the failed block index will be == to lblock.
-
-      NOTE: the easiest way to test this is to run a program
-      from a pvfs2 volume and ctrl-c it before it's fully
-      read into memory.
-    */
-    if ((pvfs2_inode->last_failed_block_index_read > 0) &&
-        ((pvfs2_inode->last_failed_block_index_read == (lblock - 1)) ||
-         (pvfs2_inode->last_failed_block_index_read == lblock)))
-    {
-        pvfs2_print("pvfs2: skipping get_block on index %d due "
-                    "to previous failure.\n", (int)lblock);
-        pvfs2_inode->last_failed_block_index_read = lblock;
-        /*
-          NOTE: we don't need to worry about cleaning up the
-          mmap_ra_cache in userspace from here because on I/O
-          failure, the pvfs2-client-core will be restarted
-        */
-        return -EIO;
-    }
-
-    page = bh_result->b_page;
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readpage called with page %p\n",page);
     page_data = pvfs2_kmap(page);
 
-    /*
-      NOTE: this unsafely *assumes* that the size stored in the inode
-      is accurate.
-
-      make sure we're not looking for a page block past the end of
-      this file;
-    */
     max_block = ((inode->i_size / blocksize) + 1);
+
     if (page->index < max_block)
     {
         loff_t blockptr_offset =
             (((loff_t)page->index) << blockbits);
-
-        /*
-          NOTE: This is conceptually backwards.  we could be
-          implementing the file_read as generic_file_read and doing
-          the actual i/o here (via readpage).  There are *no* plans to
-          do this.
-
-          The main reason it's not like that now is because of the
-          mismatch of page cache size and the inode blocksize that
-          we're using.  It's more efficient in the general case to use
-          the larger blocksize (~4M rather than ~4K) for reading &
-          writing (via pvfs2_inode_read/pvfs2_file_write).  For now it
-          seems that this call can *only* handle reads of
-          PAGE_CACHE_SIZE blocks, which is terribly slow for us.
-
-          set the readahead size to be the entire file size so that
-          subsequent calls have the opportunity to be userspace read
-          cache hits; any readahead data the client pulls in is
-          flushed (both from userspace and the page cache) on vfs file
-          close
-
-	  ALSO NOTE: This call actually only reads one PAGE_CACHE_SIZE
-	  block (blocksize), even though we might have been asked to
-	  read more than that. -- RobR
-        */
         bytes_read = pvfs2_inode_read(
-            inode, page_data, blocksize, &blockptr_offset, 0,
-            inode->i_size);
-
-        if (bytes_read < 0)
-        {
-            pvfs2_print("pvfs2_get_blocks: failed to read page block %d\n",
-                        (int)page->index);
-            pvfs2_inode->last_failed_block_index_read = page->index;
-        }
-        else
-        {
-            pvfs2_print("pvfs2_get_blocks: read %d bytes | offset is %d | "
-                        "cur_block is %d | max_block is %d\n",
-                        (int)bytes_read, (int)blockptr_offset,
-                        (int)page->index, (int)max_block);
-            pvfs2_inode->last_failed_block_index_read = 0;
-        }
+            inode, page_data, blocksize, &blockptr_offset, 0, inode->i_size);
     }
-
     /* only zero remaining unread portions of the page data */
     if (bytes_read > 0)
     {
@@ -172,11 +44,8 @@ static int pvfs2_get_blocks(
     {
         memset(page_data, 0, blocksize);
     }
-
     /* takes care of potential aliasing */
     flush_dcache_page(page);
-    pvfs2_kunmap(page);
-
     if (bytes_read < 0)
     {
         ret = bytes_read;
@@ -189,44 +58,19 @@ static int pvfs2_get_blocks(
         {
             ClearPageError(page);
         }
-
-        bh_result->b_data = page_data;
-        bh_result->b_size = bytes_read;
-
-#ifdef PVFS2_LINUX_KERNEL_2_4
-        set_bit(BH_Mapped, &(bh_result)->b_state);
-        mark_buffer_uptodate(bh_result, 1);
-        bh_result->b_blocknr = lblock;
-#else
-        map_bh(bh_result, inode->i_sb, lblock);
-        set_buffer_uptodate(bh_result);
-#endif
         ret = 0;
     }
+    pvfs2_kunmap(page);
+    /* unlock the page after the ->readpage() routine completes */
+    unlock_page(page);
     return ret;
 }
 
-/** Passes request for a block on to pvfs2_get_blocks()
- */
-static int pvfs2_get_block(
-    struct inode *ip,
-    get_block_block_type lblock,
-    struct buffer_head *bh_result,
-    int create)
-{
-    pvfs2_print("pvfs2_get_block called with block %lu\n",
-                (unsigned long)lblock);
-    return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
-}
-
-/** Passes request for a page on to pvfs2_get_block()
- */
 static int pvfs2_readpage(
     struct file *file,
     struct page *page)
 {
-    pvfs2_print("pvfs2_readpage called with page %p\n",page);
-    return pvfs2_kernel_readpage(page, pvfs2_get_block);
+    return read_one_page(page);
 }
 
 #ifndef PVFS2_LINUX_KERNEL_2_4
@@ -236,8 +80,25 @@ static int pvfs2_readpages(
     struct list_head *pages,
     unsigned nr_pages)
 {
-    pvfs2_print("pvfs2_readpages called\n");
-    return mpage_readpages(mapping, pages, nr_pages, pvfs2_get_block);
+    int page_idx;
+    int ret;
+
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readpages called\n");
+
+    for (page_idx = 0; page_idx < nr_pages; page_idx++)
+    {
+        struct page *page;
+        page = list_entry(pages->prev, struct page, lru);
+        list_del(&page->lru);
+        if (!add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
+            ret = read_one_page(page);
+        }
+        else {
+            page_cache_release(page);
+        }
+    }
+    BUG_ON(!list_empty(pages));
+    return 0;
 }
 
 #ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
@@ -246,7 +107,7 @@ static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 static void pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #endif
 {
-    pvfs2_print("pvfs2_invalidatepage called on page %p "
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_invalidatepage called on page %p "
                 "(offset is %lu)\n", page, offset);
 
     ClearPageUptodate(page);
@@ -265,8 +126,7 @@ static int pvfs2_releasepage(struct page *page, int foo)
 static int pvfs2_releasepage(struct page *page, gfp_t foo)
 #endif
 {
-    pvfs2_print("pvfs2_releasepage called on page %p\n", page);
-    try_to_free_buffers(page);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_releasepage called on page %p\n", page);
     return 0;
 }
 
@@ -299,10 +159,21 @@ struct address_space_operations pvfs2_address_operations =
  */
 void pvfs2_truncate(struct inode *inode)
 {
-    pvfs2_print("pvfs2: pvfs2_truncate called on inode %d "
-                "with size %d\n",(int)inode->i_ino,(int)inode->i_size);
+    loff_t orig_size = i_size_read(inode);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %d "
+                "with size %ld\n",(int)inode->i_ino, (long) orig_size);
 
-    pvfs2_truncate_inode(inode, inode->i_size);
+    /* successful truncate when size changes also requires mtime updates 
+     * although the mtime updates are propagated lazily!
+     */
+    if (pvfs2_truncate_inode(inode, inode->i_size) == 0
+            && (orig_size != i_size_read(inode)))
+    {
+        pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+        SetMtimeFlag(pvfs2_inode);
+        inode->i_mtime = CURRENT_TIME;
+        mark_inode_dirty_sync(inode);
+    }
 }
 
 /** Change attributes of an object referenced by dentry.
@@ -312,19 +183,19 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     int ret = -EINVAL;
     struct inode *inode = dentry->d_inode;
 
-    pvfs2_print("pvfs2_setattr: called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: called on %s\n", dentry->d_name.name);
 
     ret = inode_change_ok(inode, iattr);
     if (ret == 0)
     {
         ret = inode_setattr(inode, iattr);
-        pvfs2_print("pvfs2_setattr: inode_setattr returned %d\n", ret);
+        gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: inode_setattr returned %d\n", ret);
 
         if (ret == 0)
         {
             ret = pvfs2_inode_setattr(inode, iattr);
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
-            if (!ret && iattr->ia_valid & ATTR_MODE)
+            if (!ret && (iattr->ia_valid & ATTR_MODE))
             {
                 /* change mod on a file that has ACLs */
                 ret = pvfs2_acl_chmod(inode);
@@ -332,7 +203,7 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 #endif
         }
     }
-    pvfs2_print("pvfs2_setattr: returning %d\n", ret);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: returning %d\n", ret);
     return ret;
 }
 
@@ -344,7 +215,7 @@ int pvfs2_revalidate(struct dentry *dentry)
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
 
-    pvfs2_print("pvfs2_revalidate: called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_revalidate: called on %s\n", dentry->d_name.name);
 
     /*
      * A revalidate expects that all fields of the inode would be refreshed
@@ -369,7 +240,7 @@ int pvfs2_getattr(
     int ret = -ENOENT;
     struct inode *inode = dentry->d_inode;
 
-    pvfs2_print("pvfs2_getattr: called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_getattr: called on %s\n", dentry->d_name.name);
 
     /*
      * Similar to the above comment, a getattr also expects that all fields/attributes
@@ -388,6 +259,54 @@ int pvfs2_getattr(
     }
     return ret;
 }
+
+#ifdef HAVE_GETATTR_LITE_INODE_OPERATIONS
+
+uint32_t convert_to_pvfs2_mask(unsigned long lite_mask)
+{
+    uint32_t mask = 0;
+
+    if (SLITE_SIZET(lite_mask))
+        mask |= PVFS_ATTR_SYS_SIZE;
+    if (SLITE_ATIME(lite_mask))
+        mask |= PVFS_ATTR_SYS_ATIME;
+    if (SLITE_MTIME(lite_mask))
+        mask |= PVFS_ATTR_SYS_MTIME;
+    if (SLITE_CTIME(lite_mask))
+        mask |= PVFS_ATTR_SYS_CTIME;
+    return mask;
+}
+
+int pvfs2_getattr_lite(
+    struct vfsmount *mnt,
+    struct dentry *dentry,
+    struct kstat_lite *kstat_lite)
+{
+    int ret = -ENOENT;
+    struct inode *inode = dentry->d_inode;
+    uint32_t mask;
+
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_getattr_lite: called on %s\n", dentry->d_name.name);
+
+    /*
+     * ->getattr_lite needs to refresh only certain fields 
+     * of the inode and that is indicated by the lite_mask
+     * field of kstat_lite structure. 
+     */
+    mask = convert_to_pvfs2_mask(kstat_lite->lite_mask);
+    ret = pvfs2_inode_getattr(inode, mask);
+    if (ret == 0)
+    {
+        generic_fillattr_lite(inode, kstat_lite);
+    }
+    else
+    {
+        /* assume an I/O error and flag inode as bad */
+        pvfs2_make_bad_inode(inode);
+    }
+    return ret;
+}
+#endif
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 /** PVFS2 implementation of VFS inode operations for files */
@@ -407,6 +326,9 @@ struct inode_operations pvfs2_file_inode_operations =
     .truncate = pvfs2_truncate,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
+#ifdef HAVE_GETATTR_LITE_INODE_OPERATIONS
+    .getattr_lite = pvfs2_getattr_lite,
+#endif
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .setxattr = generic_setxattr,
     .getxattr = generic_getxattr,
@@ -419,6 +341,9 @@ struct inode_operations pvfs2_file_inode_operations =
     .listxattr = pvfs2_listxattr,
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
+#endif
+#ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
+    .fill_handle = pvfs2_fill_handle,
 #endif
 #endif
 };
@@ -436,7 +361,7 @@ struct inode *pvfs2_get_custom_inode(
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    pvfs2_print("pvfs2_get_custom_inode: called\n  (sb is %p | "
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: called\n  (sb is %p | "
                 "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
                 MINOR(dev));
 
@@ -448,7 +373,7 @@ struct inode *pvfs2_get_custom_inode(
 	if (!pvfs2_inode)
         {
             iput(inode);
-            pvfs2_panic("pvfs2_get_custom_inode: PRIVATE "
+            gossip_err("pvfs2_get_custom_inode: PRIVATE "
                         "DATA NOT ALLOCATED\n");
             return NULL;
         }
@@ -473,7 +398,7 @@ struct inode *pvfs2_get_custom_inode(
         inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 
-	pvfs2_print("pvfs2_get_custom_inode: inode %p allocated\n  "
+	gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: inode %p allocated\n  "
 		    "(pvfs2_inode is %p | sb is %p)\n", inode,
 		    pvfs2_inode, inode->i_sb);
 
@@ -500,10 +425,12 @@ struct inode *pvfs2_get_custom_inode(
         }
         else
         {
-	    pvfs2_print("pvfs2_get_custom_inode: unsupported mode\n");
+	    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: unsupported mode\n");
             goto error;
 	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %ld\n", 
+                (long) inode->i_ino);
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);
 #endif

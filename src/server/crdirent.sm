@@ -225,8 +225,7 @@ static PINT_sm_action crdirent_read_directory_entry_handle(
         s_op->u.crdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->u.crdirent.fs_id),
+        0,
         NULL,
         smcb,
         0,
@@ -293,15 +292,7 @@ static PINT_sm_action crdirent_write_directory_entry(
                  s_op->u.crdirent.name, llu(s_op->u.crdirent.new_handle),
                  llu(s_op->u.crdirent.dirent_handle));
 
-    /* get the flags from the config file, such as immediate completion
-     * or sync coalescing. 
-     */
-    keyval_flags = PINT_config_get_trove_meta_flags(
-        get_server_config_struct(), s_op->u.crdirent.fs_id);
-    
-    /* here we add the sync flag if its specified in the config file */
-    keyval_flags |= PINT_config_get_trove_sync_meta(
-        get_server_config_struct(), s_op->u.crdirent.fs_id);
+    keyval_flags = TROVE_SYNC;
         
     /* Specify that we want an error returned if the entry already exists.
      * This allows us to return an EEXIST error back to the client
@@ -320,15 +311,9 @@ static PINT_sm_action crdirent_write_directory_entry(
         NULL, smcb, 0, js_p, &i, server_job_context);
 
     /*
-      check if any attributes have changed on the parent that require
-      an update; object times only are considered
-    */
-    if (s_op->req->u.crdirent.parent_atime ||
-        s_op->req->u.crdirent.parent_mtime ||
-        s_op->req->u.crdirent.parent_ctime)
-    {
-        s_op->u.crdirent.dir_attr_update_required = 1;
-    }
+     * creating an entry will cause directory times to be updated.
+     */
+    s_op->u.crdirent.dir_attr_update_required = 1;
     return ret;
 }
 
@@ -353,7 +338,6 @@ static PINT_sm_action crdirent_update_directory_attr(
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
     {
@@ -364,48 +348,16 @@ static PINT_sm_action crdirent_update_directory_attr(
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->attr;
-    ds_attr = &(s_op->ds_attr);
+    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | PVFS_ATTR_COMMON_CTIME);
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
-
-    /* overwrite all non-null attribute time fields */
-    if (s_op->req->u.crdirent.parent_atime)
-    {
-        tmp_attr_ptr->atime = s_op->req->u.crdirent.parent_atime;
-    }
-
-    if (s_op->req->u.crdirent.parent_mtime)
-    {
-        /*
-          directory mtime is stored as a version, but converted to a
-          normal mtime on getattr; the mtime version is passed back on
-          readdir operations
-        */
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, "updating parent dir version "
-            "to %llu\n\tmtime is %llu\n",
-            llu(PVFS_util_mktime_version(s_op->req->u.crdirent.parent_mtime)),
-            llu(s_op->req->u.crdirent.parent_mtime));
-
-        tmp_attr_ptr->mtime = PVFS_util_mktime_version(
-                    s_op->req->u.crdirent.parent_mtime);
-    }
-
-    if (s_op->req->u.crdirent.parent_ctime)
-    {
-        tmp_attr_ptr->ctime = s_op->req->u.crdirent.parent_ctime;
-    }
-
     ds_attr = &(s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.parent_handle,
         ds_attr, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.crdirent.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.crdirent.fs_id),
+        TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;

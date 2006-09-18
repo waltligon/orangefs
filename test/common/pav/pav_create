@@ -97,6 +97,20 @@ sub create_nodefiles {
 
     close(FH);
 
+    my $ofile = $href->{'WORKINGDIR'} . "/metanodes";
+
+    if (!open(FH, ">$ofile")) {
+	print STDERR "ERROR: cannot open file: $ofile\n";
+	return(2);
+    }
+
+    my @metanodes = @{$href->{'MGR'}};
+    foreach $node (@metanodes) {
+	print FH "$node\n";
+    }
+
+    close(FH);
+
     $ofile = $href->{'WORKINGDIR'} . "/compnodes";
 
     if (!open(FH, ">$ofile")) {

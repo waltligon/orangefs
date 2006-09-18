@@ -17,12 +17,6 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-extern int debug;
-extern int op_timeout_secs;
-extern spinlock_t pvfs2_request_list_lock;
-extern struct list_head pvfs2_request_list;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 /* extra parameters provided to pvfs2 param proc handlers */
@@ -67,7 +61,7 @@ static int pvfs2_param_proc_handler(
     tmp_ctl.extra2 = &extra->max;
 
     /* build an op structure to send request to pvfs2-client */
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_PARAM);
     if (!new_op)
     {
         return -ENOMEM;
@@ -86,7 +80,7 @@ static int pvfs2_param_proc_handler(
             op_release(new_op);
             return(ret);
         }
-        pvfs2_print("pvfs2: proc write %d\n", val);
+        gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc write %d\n", val);
         new_op->upcall.req.param.value = val;
         new_op->upcall.req.param.type = PVFS2_PARAM_REQUEST_SET;
     }
@@ -96,18 +90,17 @@ static int pvfs2_param_proc_handler(
         new_op->upcall.req.param.type = PVFS2_PARAM_REQUEST_GET;
     }
 
-    new_op->upcall.type = PVFS2_VFS_OP_PARAM;
     new_op->upcall.req.param.op = extra->op;
 
     /* perform operation (get or set) */
-    ret = service_operation(new_op, "pvfs2_param", PVFS2_OP_RETRY_COUNT, 
+    ret = service_operation(new_op, "pvfs2_param",  
         PVFS2_OP_INTERRUPTIBLE);
     
     if(ret == 0 && !write)
     {
         /* use generic proc handling function to output value */
         val = (int)new_op->downcall.resp.param.value;
-        pvfs2_print("pvfs2: proc read %d\n", val);
+        gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc read %d\n", val);
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
 #else
@@ -120,7 +113,7 @@ static int pvfs2_param_proc_handler(
 }
 
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
-static int pvfs2_acache_pc_proc_handler(
+static int pvfs2_pc_proc_handler(
     ctl_table       *ctl,
     int             write,
     struct file     *filp,
@@ -128,7 +121,7 @@ static int pvfs2_acache_pc_proc_handler(
     size_t          *lenp,
     loff_t          *ppos)
 #else
-static int pvfs2_acache_pc_proc_handler(
+static int pvfs2_pc_proc_handler(
     ctl_table       *ctl,
     int             write,
     struct file     *filp,
@@ -155,17 +148,16 @@ static int pvfs2_acache_pc_proc_handler(
     }
 
     /* build an op structure to send request to pvfs2-client */
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_PERF_COUNT);
     if (!new_op)
     {
         return -ENOMEM;
     }
     new_op->upcall.req.perf_count.type = *pc_type;
-    new_op->upcall.type = PVFS2_VFS_OP_PERF_COUNT;
 
     /* retrieve performance counters */
     ret = service_operation(new_op, "pvfs2_perf_count",
-        PVFS2_OP_RETRY_COUNT, PVFS2_OP_INTERRUPTIBLE);
+         PVFS2_OP_INTERRUPTIBLE);
 
     if(ret == 0)
     {
@@ -231,6 +223,26 @@ static struct pvfs2_param_extra acache_rec_extra = {
     .min = 0,
     .max = 100,
 };
+static struct pvfs2_param_extra ncache_timeout_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_NCACHE_TIMEOUT_MSECS,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra ncache_hard_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_NCACHE_HARD_LIMIT,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra ncache_soft_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_NCACHE_SOFT_LIMIT,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra ncache_rec_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_NCACHE_RECLAIM_PERCENTAGE,
+    .min = 0,
+    .max = 100,
+};
 static struct pvfs2_param_extra perf_time_interval_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_PERF_TIME_INTERVAL_SECS,
     .min = 0,
@@ -246,7 +258,7 @@ static struct pvfs2_param_extra perf_reset_extra = {
     .min = 0,
     .max = 1,
 };
-static int min_debug[] = {0}, max_debug[] = {1};
+static int min_debug[] = {0}, max_debug[] = {GOSSIP_MAX_DEBUG};
 static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
 static ctl_table pvfs2_acache_table[] = {
     /* controls acache timeout */
@@ -264,15 +276,34 @@ static ctl_table pvfs2_acache_table[] = {
         &pvfs2_param_proc_handler, NULL, NULL, &acache_rec_extra, NULL},
     {0}
 };
+static ctl_table pvfs2_ncache_table[] = {
+    /* controls ncache timeout */
+    {1, "timeout-msecs", NULL, sizeof(int), 0644, NULL,
+        &pvfs2_param_proc_handler, NULL, NULL, &ncache_timeout_extra, NULL},
+    /* controls ncache hard limit */
+    {2, "hard-limit", NULL, sizeof(int), 0644, NULL,
+        &pvfs2_param_proc_handler, NULL, NULL, &ncache_hard_extra, NULL},
+    /* controls ncache soft limit */
+    {3, "soft-limit", NULL, sizeof(int), 0644, NULL,
+        &pvfs2_param_proc_handler, NULL, NULL, &ncache_soft_extra, NULL},
+    /* controls ncache reclaim percentage */
+    {4, "reclaim-percentage", NULL, sizeof(int), 
+        0644, NULL,
+        &pvfs2_param_proc_handler, NULL, NULL, &ncache_rec_extra, NULL},
+    {0}
+};
 static int acache_perf_count = PVFS2_PERF_COUNT_REQUEST_ACACHE;
+static int ncache_perf_count = PVFS2_PERF_COUNT_REQUEST_NCACHE;
 static ctl_table pvfs2_pc_table[] = {
     {1, "acache", NULL, 4096, 0444, NULL,
-        pvfs2_acache_pc_proc_handler, NULL, NULL, &acache_perf_count, NULL},
+        pvfs2_pc_proc_handler, NULL, NULL, &acache_perf_count, NULL},
+    {2, "ncache", NULL, 4096, 0444, NULL,
+        pvfs2_pc_proc_handler, NULL, NULL, &ncache_perf_count, NULL},
     {0}
 };
 static ctl_table pvfs2_table[] = {
     /* controls debugging level */
-    {1, "debug", &debug, sizeof(int), 0644, NULL,
+    {1, "debug", &gossip_debug_mask, sizeof(int), 0644, NULL,
         &proc_dointvec_minmax, &sysctl_intvec,
         NULL, &min_debug, &max_debug},
     /* operation timeout */
@@ -291,6 +322,8 @@ static ctl_table pvfs2_table[] = {
     /* subdir for acache control */
     {6, "acache", NULL, 0, 0555, pvfs2_acache_table},
     {7, "perf-counters", NULL, 0, 0555, pvfs2_pc_table},
+    /* subdir for ncache control */
+    {8, "ncache", NULL, 0, 0555, pvfs2_ncache_table},
     {0}
 };
 static ctl_table fs_table[] = {

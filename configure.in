@@ -17,7 +17,7 @@ dnl PVFS2 versioning information.
 dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=1
-PVFS2_MINOR=4
+PVFS2_MINOR=5
 PVFS2_SUB=1
 #PVFS2_PRE=""
 PVFS2_PRE="pre1-$CONFIGURE_TIME"
@@ -106,6 +106,13 @@ fi],
     BUILD_SERVER=1
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
+
+AC_ARG_WITH(openssl,
+	[  --with-openssl=<dir>  Build with openssl (the default).  <dir> defaults to /usr
+	   --without-openssl     Don't build with openssl.
+	],
+	[AX_OPENSSL(${withval})],
+	[AX_OPENSSL_OPTIONAL])
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
@@ -399,7 +406,10 @@ AC_ARG_WITH(kernel,
     fi
     vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
     if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
-       AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
+    	# 2.6.18 moves UTS_RELEASE into its own header
+	if ! grep -q  UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h ; then
+	       AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
+	fi
     fi
     # At least up through 2.6.3 needed to write .__modpost.cmd; this changed
     # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
@@ -834,6 +844,19 @@ if test -n "$BUILD_OPENIB" ; then
 	AC_MSG_RESULT(no)
     )
     LDFLAGS="$save_ldflags"
+
+    dnl Check for existence of reregister event; it's somewhat new.
+    AC_MSG_CHECKING(for IBV_EVENT_CLIENT_REREGISTER)
+    AC_TRY_COMPILE([
+	#include "infiniband/verbs.h"
+    ], [
+	enum ibv_event_type x = IBV_EVENT_CLIENT_REREGISTER;
+    ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_IBV_EVENT_CLIENT_REREGISTER, 1,
+	          Define if libibverbs has reregister event),
+	AC_MSG_RESULT(no)
+    )
 fi
 
 dnl

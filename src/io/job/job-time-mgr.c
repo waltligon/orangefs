@@ -118,8 +118,8 @@ static int __job_time_mgr_add(struct job_desc* jd, int timeout_sec)
             break;
         }
 
-        tmp_bucket = NULL;
         prev_bucket = tmp_bucket;
+        tmp_bucket = NULL;
     }
 
     if(!tmp_bucket || tmp_bucket->expire_time_sec != expire_time_sec)
@@ -257,6 +257,7 @@ int job_time_mgr_expire(void)
 	    case JOB_BMI:
 		gossip_err("Job time out: cancelling bmi operation, job_id: %llu.\n", llu(jd->job_id));
 		ret = job_bmi_cancel(jd->job_id, jd->context_id);
+	        jd->time_bucket = NULL;
 		break;
 	    case JOB_FLOW:
 		/* have we made any progress since last time we checked? */
@@ -274,22 +275,23 @@ int job_time_mgr_expire(void)
 		    /* otherwise kill the flow */
 		    gossip_err("Job time out: cancelling flow operation, job_id: %llu.\n", llu(jd->job_id));
 		    ret = job_flow_cancel(jd->job_id, jd->context_id);
+	            jd->time_bucket = NULL;
 		}
 		break;
 	    case JOB_TROVE:
 		gossip_err("Job time out: cancelling trove operation, job_id: %llu.\n", llu(jd->job_id));
 		ret = job_trove_dspace_cancel(
                     jd->u.trove.fsid, jd->job_id, jd->context_id);
+	        jd->time_bucket = NULL;
                 break;
 	    default:
 		ret = 0;
+	        jd->time_bucket = NULL;
 		break;
 	    }
 
 	    /* FIXME: error handling */
 	    assert(ret == 0);
-
-	    jd->time_bucket = NULL;
 	}
 	qlist_del(&tmp_bucket->bucket_link);
         INIT_QLIST_HEAD(&tmp_bucket->jd_queue);

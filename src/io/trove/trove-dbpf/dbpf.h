@@ -191,6 +191,14 @@ struct dbpf_collection
 
     /* used by dbpf_collection.c calls to maintain list of collections */
     struct dbpf_collection *next_p;
+    
+    int c_low_watermark;
+    int c_high_watermark;
+    int meta_sync_enabled;
+    /*
+     * If this option is on we don't queue ops or use threads.
+     */
+    int immediate_completion;
 };
 
 /* Structure stored as data in collections database with collection
@@ -240,6 +248,14 @@ struct dbpf_dspace_setattr_op
 struct dbpf_dspace_getattr_op
 {
     TROVE_ds_attributes_s *attr_p;
+};
+
+struct dbpf_dspace_getattr_list_op
+{
+    int count;
+    TROVE_handle          *handle_array;
+    TROVE_ds_attributes_s *attr_p;
+    TROVE_ds_state        *error_p;
 };
 
 struct dbpf_keyval_read_op
@@ -388,7 +404,8 @@ enum dbpf_op_type
     DSPACE_ITERATE_HANDLES,
     DSPACE_VERIFY,
     DSPACE_GETATTR,
-    DSPACE_SETATTR
+    DSPACE_SETATTR,
+    DSPACE_GETATTR_LIST,
 };
 
 #define DBPF_OP_IS_BSTREAM(__type) (__type < KEYVAL_READ)
@@ -396,10 +413,7 @@ enum dbpf_op_type
 #define DBPF_OP_IS_DSPACE(__type) (__type >= DSPACE_CREATE)
 
 #define DBPF_OP_DOES_SYNC(__op)    \
-    (__op == BSTREAM_WRITE_AT   || \
-     __op == BSTREAM_RESIZE     || \
-     __op == BSTREAM_WRITE_LIST || \
-     __op == KEYVAL_WRITE       || \
+    (__op == KEYVAL_WRITE       || \
      __op == KEYVAL_REMOVE_KEY  || \
      __op == KEYVAL_WRITE_LIST  || \
      __op == DSPACE_CREATE      || \
@@ -462,6 +476,7 @@ struct dbpf_op
         struct dbpf_keyval_iterate_keys_op k_iterate_keys;
         struct dbpf_keyval_read_list_op k_read_list;
         struct dbpf_keyval_read_list_op k_write_list;
+        struct dbpf_dspace_getattr_list_op d_getattr_list;
         struct dbpf_keyval_get_handle_info_op k_get_handle_info;
     } u;
 };
@@ -476,17 +491,6 @@ void dbpf_collection_deregister(struct dbpf_collection *entry);
 
 /* function for mapping db errors to trove errors */
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
-
-/* db error reporting callback function; defined in dbpf-mgmt.c */
-void dbpf_error_report(
-#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
-		       const DB_ENV *dbenv,
-#endif
-		       const char *errpfx,
-#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
-		       const
-#endif
-		       char *msg);
 
 #define DBPF_OPEN   open
 #define DBPF_WRITE  write

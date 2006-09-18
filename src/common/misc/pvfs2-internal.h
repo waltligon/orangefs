@@ -46,4 +46,6 @@
 #define METAFILE_DIST_KEYSTR    "md"
 #define SYMLINK_TARGET_KEYSTR   "st"
 
+#define IO_MAX_REGIONS 64
+
 #endif /* PVFS2_INTERNAL_H */

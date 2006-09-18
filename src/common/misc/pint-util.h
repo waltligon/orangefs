@@ -14,16 +14,52 @@
 #include "pvfs2-attr.h"
 
 /* converts common fields between sys attr and obj attr structures */
-#define PINT_CONVERT_ATTR(dest, src, attrmask)  \
-do{                                             \
-    (dest)->owner = (src)->owner;               \
-    (dest)->group = (src)->group;               \
-    (dest)->perms = (src)->perms;               \
-    (dest)->atime = (src)->atime;               \
-    (dest)->mtime = (src)->mtime;               \
-    (dest)->ctime = (src)->ctime;               \
-    (dest)->objtype = (src)->objtype;           \
-    (dest)->mask = ((src)->mask & attrmask);    \
+#define PINT_CONVERT_ATTR(dest, src, extra_amask)       \
+do{                                                     \
+    (dest)->mask = 0;                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_UID)                \
+    {                                                   \
+        (dest)->owner = (src)->owner;                   \
+        (dest)->mask  |= PVFS_ATTR_COMMON_UID;          \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_GID)                \
+    {                                                   \
+        (dest)->group = (src)->group;                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_GID;           \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_PERM)               \
+    {                                                   \
+        (dest)->perms = (src)->perms;                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_PERM;          \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_ATIME)              \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_ATIME;         \
+        if ((src)->mask & PVFS_ATTR_SYS_ATIME_SET)      \
+        {                                               \
+            (dest)->atime = (src)->atime;               \
+            (dest)->mask |= PVFS_ATTR_COMMON_ATIME_SET; \
+        }                                               \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_MTIME)              \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_MTIME;         \
+        if ((src)->mask & PVFS_ATTR_SYS_MTIME_SET)      \
+        {                                               \
+            (dest)->mtime = (src)->mtime;               \
+            (dest)->mask |= PVFS_ATTR_COMMON_MTIME_SET; \
+        }                                               \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_CTIME)              \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_CTIME;         \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_TYPE)               \
+    {                                                   \
+        (dest)->objtype = (src)->objtype;               \
+        (dest)->mask |= PVFS_ATTR_COMMON_TYPE;          \
+    }                                                   \
+    (dest)->mask |= (extra_amask);                      \
 }while(0)
 
 struct PINT_time_marker_s
@@ -39,6 +75,9 @@ typedef struct PINT_time_marker_s PINT_time_marker;
 
 PVFS_msg_tag_t PINT_util_get_next_tag(void);
 
+int PINT_check_acls(void *acl_buf, size_t acl_size, 
+    PVFS_object_attr *attr,
+    PVFS_uid uid, PVFS_gid gid, int want);
 int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src);
 void PINT_free_object_attr(PVFS_object_attr *attr);
 void PINT_time_mark(PINT_time_marker* out_marker);
@@ -92,6 +131,21 @@ int PINT_check_mode(
 #error Cant stat mounted filesystems
 
 #endif
+
+char *PINT_util_get_object_type(int objtype);
+PVFS_time PINT_util_get_current_time(void);
+
+PVFS_time PINT_util_mktime_version(PVFS_time time);
+PVFS_time PINT_util_mkversion_time(PVFS_time version);
+
+void PINT_util_digest_init(void);
+void PINT_util_digest_finalize(void);
+
+int PINT_util_digest_sha1(const void *input_message, size_t input_length,
+		char **output, size_t *output_length);
+
+int PINT_util_digest_md5(const void *input_message, size_t input_length,
+		char **output, size_t *output_length);
 
 #endif /* __PINT_UTIL_H */
 

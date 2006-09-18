@@ -103,7 +103,7 @@ static PINT_sm_action small_io_start_job(
     fdata.dist = s_op->req->u.small_io.dist;
     result.offset_array = s_op->u.small_io.offsets;
     result.size_array = s_op->u.small_io.sizes;
-    result.segmax = SMALL_IO_MAX_REGIONS;
+    result.segmax = IO_MAX_REGIONS;
     result.bytemax = s_op->req->u.small_io.aggregate_size;
     result.bytes = 0;
     result.segs = 0;

@@ -111,6 +111,9 @@ int BMI_memfree(PVFS_BMI_addr_t addr,
 		bmi_size_t size,
 		enum bmi_op_type send_recv);
 
+int BMI_unexpected_free(PVFS_BMI_addr_t addr,
+		void *buffer);
+
 int BMI_set_info(PVFS_BMI_addr_t addr,
 		 int option,
 		 void *inout_parameter);
@@ -125,6 +128,8 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 const char* BMI_addr_rev_lookup(PVFS_BMI_addr_t addr);
 
 const char* BMI_addr_rev_lookup_unexpected(PVFS_BMI_addr_t addr);
+
+int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netmask);
 
 int BMI_post_send_list(bmi_op_id_t * id,
 		       PVFS_BMI_addr_t dest,

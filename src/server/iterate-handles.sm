@@ -101,8 +101,7 @@ static PINT_sm_action iterate_handles_do_work(
 	s_op->resp.u.mgmt_iterate_handles.position,
 	s_op->resp.u.mgmt_iterate_handles.handle_array,
 	s_op->req->u.mgmt_iterate_handles.handle_count,
-	PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.mgmt_iterate_handles.fs_id),
+	0,
 	NULL,
 	s_op,
 	0,

@@ -34,6 +34,13 @@
  *
  * TODO: sometimes we will get new attributes back with the lookup
  * response.  we should add these into the pcache as appropriate.
+ *
+ * TODO: This state machine does not handle resolving multiple segments.
+ * It simply tries to resolve the first segment of the path in the msgpair or
+ * sends the whole path to the msgpairarray_sm. This sm relies on sys-lookup 
+ * to handle its responses and server responses and keep up with how much of 
+ * the path has been resolved. That funcitonality might be better placed here 
+ * since all sys-lookup cares about is the final resolved handle.
  */
 
 #include <string.h>
@@ -45,7 +52,6 @@
 #include "gossip.h"
 #include "str-utils.h"
 
-#include "pint-servreq.h"
 #include "ncache.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
@@ -85,7 +91,9 @@ static int lookup_ncache_lookup(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_object_ref parent_ref, object_ref;
-
+    char segment[PVFS_NAME_MAX + 1] = {0};
+    char* temp;
+    
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_ncache state: lookup\n");
 
     assert(js_p->error_code == 0);
@@ -95,10 +103,28 @@ static int lookup_ncache_lookup(struct PINT_smcb *smcb,
 
     assert(parent_ref.handle != PVFS_HANDLE_NULL);
     assert(parent_ref.fs_id != PVFS_FS_ID_NULL);
+    
+    /* Stripping out first segment for ncache lookup */
+    strncpy(segment,sm_p->msgpair.req.u.lookup_path.path,PVFS_NAME_MAX);
 
-    ret = PINT_ncache_lookup(
-        sm_p->u.lookup.orig_pathname, 0 /* sm_p->u.lookup.follow_link */,
-        parent_ref, &object_ref);
+    assert(segment[0] != '/');
+    temp = index(segment,'/');
+    if(temp != NULL)
+    {
+        temp[0] = '\0';
+    }
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                 "lookup_ncache state: "
+                 "lookup_ncache_lookup on segment [%s]\n",
+                 segment);
+
+    sm_p->ncache_hit = 0;
+
+    ret = PINT_ncache_get_cached_entry(
+                (const char*)segment, 
+                &object_ref,
+                (const PVFS_object_ref*) &parent_ref);
 
     if (ret == 0)
     {

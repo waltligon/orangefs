@@ -110,3 +110,4 @@ __bswap_32 (unsigned int __bsx)
 #define bmitoh64(x) htobmi64(x)
 
 #endif /* __BMI_BYTESWAP_H */
+

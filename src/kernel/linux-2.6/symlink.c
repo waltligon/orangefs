@@ -7,17 +7,12 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern struct dentry_operations pvfs2_dentry_operations;
-extern int debug;
-
 static int pvfs2_readlink(
     struct dentry *dentry, char __user *buffer, int buflen)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    pvfs2_print("pvfs2_readlink called on inode %d\n",
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readlink called on inode %d\n",
                 (int)dentry->d_inode->i_ino);
 
     /*
@@ -33,7 +28,7 @@ static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    pvfs2_print("pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
                 (char *)dentry->d_name.name, pvfs2_inode->link_target);
 
     return vfs_follow_link(nd, pvfs2_inode->link_target);
@@ -43,7 +38,7 @@ static void *pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    pvfs2_print("pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
                 (char *)dentry->d_name.name, pvfs2_inode->link_target);
 
     return ERR_PTR(vfs_follow_link(nd, pvfs2_inode->link_target));
@@ -57,11 +52,21 @@ struct inode_operations pvfs2_symlink_inode_operations =
     follow_link : pvfs2_follow_link,
     setattr : pvfs2_setattr,
     revalidate : pvfs2_revalidate,
+#ifdef HAVE_XATTR
+    setxattr: pvfs2_setxattr,
+    listxattr: pvfs2_listxattr,
+#endif
 #else
     .readlink = pvfs2_readlink,
     .follow_link = pvfs2_follow_link,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
+    .listxattr = pvfs2_listxattr,
+#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+    .setxattr = generic_setxattr,
+#else
+    .setxattr = pvfs2_setxattr,
+#endif
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
 #endif

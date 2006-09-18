@@ -213,7 +213,7 @@ int main(
 	fprintf(stderr, "waitunexpected failure.\n");
 	return (-1);
     }
-    free(request_info.buffer);
+    BMI_unexpected_free(request_info.addr, request_info.buffer);
 
 	/******************************************************/
     /* setup request/dist stuff */

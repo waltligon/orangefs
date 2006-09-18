@@ -36,24 +36,26 @@ enum
     MORE_WORK = 1,
 };
 
-static int listattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listattr_read_symlink_target(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listattr_get_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listattr_interpret_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listattr_read_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listattr_read_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listattr_setup_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listattr_setup_op(
-    PINT_server_op *s_op, job_status_s *js_p);
+static PINT_sm_action listattr_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listattr_verify_attribs(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listattr_read_symlink_target(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listattr_get_dirent_count(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listattr_interpret_dirent_count(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listattr_read_metafile_datafile_handles_if_required(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listattr_read_metafile_distribution_if_required(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listattr_setup_resp(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listattr_setup_op(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
@@ -162,9 +164,10 @@ machine pvfs2_list_attr_sm(
  * We initialize the attribute mask that will be returned in this
  * function.  This mask can be augmented in some of the other states.
  */
-static int listattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listattr_verify_attribs(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = NULL, *obj_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
     int *resp_error = NULL, *ds_error = NULL;
@@ -368,12 +371,13 @@ static int listattr_verify_attribs(
                      llu(*handle),
                      lld(resp_attr->u.data.size));
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int listattr_read_symlink_target(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listattr_read_symlink_target(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t i;
     PVFS_object_attr *resp_attr = NULL;
@@ -388,7 +392,7 @@ static int listattr_read_symlink_target(
     if (!(s_op->u.listattr.attrmask & PVFS_ATTR_SYMLNK_TARGET))
     {
         gossip_debug(GOSSIP_LISTATTR_DEBUG, "skipping symlink target read\n");
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     s_op->key.buffer    = Trove_Common_Keys[SYMLINK_TARGET_KEY].key;
@@ -406,7 +410,7 @@ static int listattr_read_symlink_target(
     if (!resp_attr->u.sym.target_path)
     {
         js_p->error_code = -PVFS_ENOMEM;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     s_op->val.buffer = resp_attr->u.sym.target_path;
@@ -415,16 +419,17 @@ static int listattr_read_symlink_target(
     ret = job_trove_keyval_read(
         s_op->u.listattr.fs_id, *handle,
         &(s_op->key), &(s_op->val), 
-        0, NULL, s_op, 0, js_p,
+        0, NULL, smcb, 0, js_p,
         &i, server_job_context);
 
     return ret;
 }
 
 
-static int listattr_read_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listattr_read_metafile_datafile_handles_if_required(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     int dfile_count = 0;
     job_id_t i;
@@ -442,7 +447,7 @@ static int listattr_read_metafile_datafile_handles_if_required(
     if (!(s_op->u.listattr.attrmask & PVFS_ATTR_META_DFILES))
     {
         gossip_debug(GOSSIP_LISTATTR_DEBUG, "skipping data handle read\n");
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     dfile_count = resp_attr->u.meta.dfile_count;
@@ -476,7 +481,7 @@ static int listattr_read_metafile_datafile_handles_if_required(
 	    (int)s_op->u.listattr.fs_id);
 
         js_p->error_code = -PVFS_EOVERFLOW;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     s_op->key.buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
@@ -492,7 +497,7 @@ static int listattr_read_metafile_datafile_handles_if_required(
         gossip_err("Cannot allocate dfile array of count %d\n",
                    dfile_count);
 	js_p->error_code = -PVFS_ENOMEM;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     s_op->val.buffer = resp_attr->u.meta.dfile_array;
@@ -509,15 +514,16 @@ static int listattr_read_metafile_datafile_handles_if_required(
     ret = job_trove_keyval_read(
         s_op->u.listattr.fs_id, *handle,
         &s_op->key, &s_op->val, 
-        0, NULL, s_op, 0, js_p,
+        0, NULL, smcb, 0, js_p,
         &i, server_job_context);
 
     return ret;
 }
 
-static int listattr_read_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listattr_read_metafile_distribution_if_required(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
     PVFS_object_attr *resp_attr = NULL;
@@ -535,7 +541,7 @@ static int listattr_read_metafile_distribution_if_required(
     {
         gossip_debug(GOSSIP_LISTATTR_DEBUG, "skipping data handle "
                      "distribution read\n");
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     s_op->key.buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
@@ -552,7 +558,7 @@ static int listattr_read_metafile_distribution_if_required(
                    "handle %llu,%d\n",llu(*handle),
                    s_op->u.listattr.fs_id);
         js_p->error_code = -PVFS_EINVAL;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     assert(resp_attr->u.meta.dist_size > 0);
 
@@ -566,20 +572,21 @@ static int listattr_read_metafile_distribution_if_required(
         gossip_err("Cannot allocate dist of size %d\n",
                    s_op->val.buffer_sz);
 	js_p->error_code = -PVFS_ENOMEM;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     ret = job_trove_keyval_read(
         s_op->u.listattr.fs_id, *handle,
         &(s_op->key), &(s_op->val), 
         0, NULL,
-        s_op, 0, js_p, &i, server_job_context);
+        smcb, 0, js_p, &i, server_job_context);
 
     return ret;
 }
 
-static int listattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listattr_setup_resp(struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr;
     PVFS_handle *handle;
     int *resp_error;
@@ -628,7 +635,7 @@ static int listattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
                     PVFS_perror("Metafile listattr_setup_resp",js_p->error_code);
                     *resp_error = -PVFS_EIO;
                     js_p->error_code = s_op->u.listattr.nhandles == 0 ? 0 : MORE_WORK;
-                    return 1;
+                    return SM_ACTION_COMPLETE;
                 }
                 
                 gossip_debug(GOSSIP_LISTATTR_DEBUG,
@@ -640,7 +647,7 @@ static int listattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
             PVFS_perror("Metafile listattr_setup_resp", js_p->error_code);
             *resp_error = js_p->error_code;
             js_p->error_code = s_op->u.listattr.nhandles == 0 ? 0 : MORE_WORK;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
     }
     else if ((resp_attr->objtype == PVFS_TYPE_DATAFILE) &&
@@ -656,7 +663,7 @@ static int listattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
             PVFS_perror("Datafile listattr_setup_resp", js_p->error_code);
             *resp_error = js_p->error_code;
             js_p->error_code = s_op->u.listattr.nhandles == 0 ? 0 : MORE_WORK;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
     }
     else if ((resp_attr->objtype == PVFS_TYPE_SYMLINK) &&
@@ -687,7 +694,7 @@ static int listattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 
             *resp_error = js_p->error_code;
             js_p->error_code = s_op->u.listattr.nhandles == 0 ? 0 : MORE_WORK;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
     }
 
@@ -702,12 +709,13 @@ static int listattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
                         resp_attr->mask);
 #endif
     js_p->error_code = s_op->u.listattr.nhandles == 0 ? 0 : MORE_WORK;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int listattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listattr_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int i;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     if (s_op->u.listattr.attr_a)
     {
@@ -720,13 +728,14 @@ static int listattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
         free(s_op->u.listattr.ds_attr_a);
     if (s_op->u.listattr.errors) 
         free(s_op->u.listattr.errors);
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
-static int listattr_setup_op(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listattr_setup_op(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
     s_op->u.listattr.handles = s_op->req->u.listattr.handles;
@@ -738,32 +747,32 @@ static int listattr_setup_op(
         calloc(s_op->u.listattr.nhandles * sizeof(PVFS_object_attr), 1);
     if (s_op->u.listattr.attr_a == NULL) {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     s_op->u.listattr.ds_attr_a = (PVFS_ds_attributes *) 
         calloc(s_op->u.listattr.nhandles * sizeof(PVFS_ds_attributes), 1);
     if (s_op->u.listattr.ds_attr_a == NULL) {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     s_op->u.listattr.errors = (PVFS_error *) 
         calloc(s_op->u.listattr.nhandles * sizeof(PVFS_error), 1);
     if (s_op->u.listattr.errors  == NULL) {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     /* Listattr response has to be allocated extra memory */
     s_op->resp.u.listattr.error = (PVFS_error *)
         calloc(s_op->u.listattr.nhandles * sizeof(PVFS_error), 1);
     if (s_op->resp.u.listattr.error == NULL) {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.listattr.attr = (PVFS_object_attr *)
         calloc(s_op->u.listattr.nhandles * sizeof(PVFS_object_attr), 1);
     if (s_op->resp.u.listattr.attr == NULL) {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
     /* initiate retrieval of the attributes from the dspace */
@@ -771,7 +780,7 @@ static int listattr_setup_op(
             s_op->u.listattr.fs_id,
             s_op->u.listattr.nhandles,
             s_op->u.listattr.handles,
-            s_op,
+            smcb,
             s_op->u.listattr.errors,
             s_op->u.listattr.ds_attr_a,
             0,
@@ -782,9 +791,10 @@ static int listattr_setup_op(
     return ret;
 }
 
-static int listattr_get_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listattr_get_dirent_count(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
     PVFS_handle *handle = NULL;
@@ -798,7 +808,7 @@ static int listattr_get_dirent_count(
             *handle,
             TROVE_KEYVAL_HANDLE_COUNT,
             &s_op->u.listattr.keyval_handle_info,
-            s_op,
+            smcb,
             0,
             js_p,
             &tmp_id,
@@ -807,9 +817,10 @@ static int listattr_get_dirent_count(
     return ret;
 }
 
-static int listattr_interpret_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listattr_interpret_dirent_count(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = NULL;
 
     /* from the keyval_handle_info, retrieve the dirent_count */
@@ -821,7 +832,7 @@ static int listattr_interpret_dirent_count(
         lld(resp_attr->u.dir.dirent_count));
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*

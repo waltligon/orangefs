@@ -10,19 +10,16 @@
  *  PVFS2 system interface routines for obtaining attributes of an object
  *  (file or directory).
  */
-
 #include <string.h>
 #include <assert.h>
 
 #include "client-state-machine.h"
-#include "pvfs2-types-debug.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
 #include "pint-util.h"
 #include "pvfs2-util.h"
-#include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"

@@ -12,7 +12,6 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
-#include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
@@ -23,7 +22,6 @@ extern job_context_id pint_client_sm_context;
 enum
 {
     REMOVE_MUST_REMOVE_DATAFILES = 1,
-    MSGPAIR_RETURN_SUCCESS
 };
 
 static PINT_sm_action remove_getattr_init(
@@ -119,7 +117,6 @@ nested machine pvfs2_client_remove_helper_sm(
     {
         jump pvfs2_msgpairarray_sm;
         success => remove_helper_cleanup;
-        MSGPAIR_RETURN_SUCCESS => remove_helper_cleanup;
         default => object_remove_failure;
     }
 

@@ -38,6 +38,7 @@
 #include "gossip.h"
 #include "dbpf-open-cache.h"
 #include "pint-util.h"
+#include "dbpf-sync.h"
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
@@ -51,6 +52,16 @@ struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
+
+static void dbpf_db_error_callback(
+#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
+    const DB_ENV *dbenv, 
+#endif
+    const char *errpfx, 
+#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
+    const 
+#endif
+    char * msg);
 
 DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 {
@@ -69,7 +80,9 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
     ret = db_env_create(&dbenv, 0);
     if (ret != 0) 
     {
-        gossip_err("dbpf_putdb_env: could not create any environment handle: %s\n", db_strerror(ret));
+        gossip_err("dbpf_env_create: could not create "
+                   "any environment handle: %s\n", 
+                   db_strerror(ret));
         return 0;
     }
     /* don't check return code here; we don't care if it fails */
@@ -83,6 +96,9 @@ retry:
         *error = ret;
         return NULL;
     }
+
+    /* set the error callback for all databases opened with this environment */
+    dbenv->set_errcall(dbenv, dbpf_db_error_callback);
 
     if(TROVE_db_cache_size_bytes != 0)
     {
@@ -107,7 +123,7 @@ retry:
     {
         /* user wants the standard db cache which uses mmap */
         ret = dbenv->open(dbenv, path, 
-                             DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+                          DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
         if(ret != 0)
         {
             gossip_err("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
@@ -147,13 +163,29 @@ retry:
             ret = dbenv->remove(dbenv, path, DB_FORCE);
             if (ret != 0)
             {
-                gossip_lerr("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
+                gossip_lerr("dbpf_remove(%s): %s\n", path, db_strerror(ret));
                 *error = ret;
                 return NULL;
             }
             assert(my_storage_p != NULL);
             my_storage_p->flags |= TROVE_DB_CACHE_MMAP;
             goto retry;
+        }
+
+        /* berkeley db is sometimes configured without shared memory.  If
+         * open returns an EINVAL, retry with DB_PRIVATE.
+         */
+        if(ret == EINVAL) {
+
+            ret = dbenv->remove(dbenv, path, DB_FORCE);
+            if(ret != 0)
+            {
+                gossip_lerr("dbpf_remove(%s): %s\n", path, db_strerror(ret));
+                *error = ret;
+                return NULL;
+            }
+            assert(my_storage_p != NULL);
+            ret = dbenv->open(dbenv, path, DB_CREATE|DB_THREAD|DB_PRIVATE, 0);
         }
 
         if(ret == DB_RUNRECOVERY)
@@ -172,7 +204,6 @@ retry:
             return NULL;
         }
     }
-        
     return dbenv;
 }
 
@@ -190,46 +221,33 @@ int dbpf_putdb_env(DB_ENV *dbenv, const char *path)
         gossip_err("dbpf_putdb_env: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
-    /* Remove any db env backing log etc. Sadly we cannot make use of the same dbenv for removing stuff */
+
+    /* Remove any db env backing log etc. 
+     * Sadly we cannot make use of the same dbenv for removing stuff */
     ret = db_env_create(&dbenv, 0);
     if (ret != 0) 
     {
-        gossip_err("dbpf_putdb_env: could not create any environment handle: %s\n", db_strerror(ret));
+        gossip_err("dbpf_putdb_env: could not create "
+                   "any environment handle: %s\n", 
+                   db_strerror(ret));
         return 0;
     }
     ret = dbenv->remove(dbenv, path, DB_FORCE);
     if (ret != 0) 
     {
-        gossip_err("dbpf_putdb_env: could not remove environment handle: %s\n", db_strerror(ret));
+        gossip_err("dbpf_putdb_env: could not remove "
+                   "environment handle: %s\n", 
+                   db_strerror(ret));
     }
     return 0;
 }
 
-void dbpf_error_report(
-#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
-		       const DB_ENV *dbenv,
-#endif
-		       const char *errpfx,
-#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
-		       const
-#endif
-		       char *msg)
-{
-#ifdef BERKDB_ERROR_REPORTING
-    char buf[512] = {0};
-
-    if (errpfx && msg)
-    {
-        snprintf(buf, 512, "%s: %s\n", errpfx, msg);
-        gossip_err(buf);
-    }
-#endif
-}
-
-static struct dbpf_storage *dbpf_storage_lookup(char *stoname, int *err_p, TROVE_ds_flags flags);
+static struct dbpf_storage *dbpf_storage_lookup(
+    char *stoname, int *err_p, TROVE_ds_flags flags);
 static int dbpf_db_create(const char *sto_path, char *dbname, DB_ENV *envp);
-static DB *dbpf_db_open(const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
-                        int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2));
+static DB *dbpf_db_open(
+    const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
+    int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2));
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 
@@ -296,43 +314,94 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
                                    void *parameter)
 {
     int ret = -TROVE_EINVAL;
-
+	struct dbpf_collection* coll;
+	coll = dbpf_collection_find_registered(coll_id);
+	
+	assert(coll);
+	
     switch(option)
     {
         case TROVE_COLLECTION_HANDLE_RANGES:
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - Setting collection handle "
+                         "ranges to %s\n", 
+                         (int) coll_id, (char *)parameter);
             ret = trove_set_handle_ranges(
                 coll_id, context_id, (char *)parameter);
             break;
         case TROVE_COLLECTION_HANDLE_TIMEOUT:
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - Setting handle timeout to "
+                         "%ld microseconds\n",
+                         (int) coll_id, 
+                         (long)((((struct timeval *)parameter)->tv_sec * 1e6) +
+                                ((struct timeval *)parameter)->tv_usec));
             ret = trove_set_handle_timeout(
                 coll_id, context_id, (struct timeval *)parameter);
             break;
         case TROVE_COLLECTION_ATTR_CACHE_KEYWORDS:
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - Setting cache keywords "
+                         "of attribute cache to %s\n",
+                         (int) coll_id, (char *)parameter);
             gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_set_keywords((char *)parameter);
             gen_mutex_unlock(&dbpf_attr_cache_mutex);
             break;
         case TROVE_COLLECTION_ATTR_CACHE_SIZE:
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - Setting "
+                         "cache size of attribute cache to %d\n", 
+                         (int) coll_id,*(int *)parameter);
             gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_set_size(*((int *)parameter));
             gen_mutex_unlock(&dbpf_attr_cache_mutex);
             break;
         case TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS:
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - Setting maximum elements of "
+                         "attribute cache to %d\n",
+                         (int) coll_id, *(int *)parameter);
             gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_set_max_num_elems(*((int *)parameter));
             gen_mutex_unlock(&dbpf_attr_cache_mutex);
             break;
         case TROVE_COLLECTION_ATTR_CACHE_INITIALIZE:
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - Initialize collection attr. "
+                         "cache\n", (int) coll_id);
             gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_do_initialize();
             gen_mutex_unlock(&dbpf_attr_cache_mutex);
             break;
         case TROVE_COLLECTION_COALESCING_HIGH_WATERMARK:
-            dbpf_queued_op_set_sync_high_watermark(*(int *)parameter);
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - Setting HIGH_WATERMARK to %d\n",
+                         (int) coll_id, *(int *)parameter);
+            dbpf_queued_op_set_sync_high_watermark(*(int *)parameter, coll);
             ret = 0;
             break;
         case TROVE_COLLECTION_COALESCING_LOW_WATERMARK:
-            dbpf_queued_op_set_sync_low_watermark(*(int *)parameter);
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - Setting LOW_WATERMARK to %d\n",
+                         (int) coll_id, *(int *)parameter);
+            dbpf_queued_op_set_sync_low_watermark(*(int *)parameter, coll);
+            ret = 0;
+            break;
+        case TROVE_COLLECTION_META_SYNC_MODE:
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - %s sync mode\n",
+                         (int) coll_id,
+                         (*(int *)parameter) ? "Enabling" : "Disabling");
+            dbpf_queued_op_set_sync_mode(*(int *)parameter, coll);
+            ret = 0;
+            break;
+        case TROVE_COLLECTION_IMMEDIATE_COMPLETION:
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - %s immediate completion\n",
+                         (int) coll_id,
+                         (*(int *)parameter) ? "Enabling" : "Disabling");
+            coll->immediate_completion = *(int *)parameter;
             ret = 0;
             break;
     }
@@ -989,7 +1058,6 @@ static int dbpf_collection_remove(char *collname,
     {
         gossip_err("failure removing bstream directory %s\n", path_name);
         ret = -trove_errno_to_trove_error(errno);
-        goto collection_remove_failure;
     }
 
     DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX,
@@ -1223,6 +1291,7 @@ static int dbpf_collection_lookup(char *collname,
                                   void *user_ptr,
                                   TROVE_op_id *out_op_id_p)
 {
+	gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_lookup of coll: %s\n", collname);
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -1404,6 +1473,15 @@ static int dbpf_collection_lookup(char *collname,
     }
 
     coll_p->next_p = NULL;
+    
+    /*
+     * Initialize defaults to ensure working
+     */
+    coll_p->c_high_watermark = 10;
+    coll_p->c_low_watermark = 1;
+    coll_p->meta_sync_enabled = 1; /* MUST be 1 !*/
+    
+    
     dbpf_collection_register(coll_p);
     *out_coll_id_p = coll_p->coll_id;
     return 1;
@@ -1640,8 +1718,9 @@ static int dbpf_db_create(const char *sto_path, char *dbname, DB_ENV *envp)
  * Returns NULL on error, passing a trove error type back in the
  * integer pointed to by error_p.
  */
-static DB *dbpf_db_open(const char *sto_path, char *dbname, DB_ENV *envp, int *error_p,
-                        int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2))
+static DB *dbpf_db_open(
+    const char *sto_path, char *dbname, DB_ENV *envp, int *error_p,
+    int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2))
 {
     int ret = -TROVE_EINVAL;
     DB *db_p = NULL;
@@ -1652,8 +1731,7 @@ static DB *dbpf_db_open(const char *sto_path, char *dbname, DB_ENV *envp, int *e
         return NULL;
     }
 
-    db_p->set_errfile(db_p, stderr);
-    db_p->set_errpfx(db_p, "pvfs2-trove-dbpf");
+    db_p->set_errpfx(db_p, "TROVE:DBPF:Berkeley DB");
 
     if(compare_fn)
     {
@@ -1676,6 +1754,19 @@ static DB *dbpf_db_open(const char *sto_path, char *dbname, DB_ENV *envp, int *e
         return NULL;
     }
     return db_p;
+}
+
+static void dbpf_db_error_callback(
+#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
+    const DB_ENV *dbenv, 
+#endif
+    const char *errpfx, 
+#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
+    const 
+#endif
+    char *msg)
+{
+    gossip_err("%s: %s\n", errpfx, msg);
 }
 
 /* dbpf_mgmt_ops

@@ -213,7 +213,7 @@ int main(
     /* free up the message buffers */
     BMI_memfree(client_addr, recv_buffer, my_req->size, BMI_RECV);
     BMI_memfree(client_addr, my_ack, sizeof(struct server_ack), BMI_SEND);
-    free(my_req);
+    BMI_unexpected_free(client_addr, my_req);
 
     /* try out rev lookup */
     printf("rev_lookup() output: %s\n", BMI_addr_rev_lookup(client_addr));

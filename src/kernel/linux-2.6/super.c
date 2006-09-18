@@ -6,23 +6,15 @@
 
 #include "pvfs2-kernel.h"
 
-extern struct file_system_type pvfs2_fs_type;
-extern struct dentry_operations pvfs2_dentry_operations;
-
-
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-
-extern void pvfs2_kill_sb(struct super_block *sb);
-extern int debug;
-
 /* list for storing pvfs2 specific superblocks in use */
 LIST_HEAD(pvfs2_superblocks);
 
 /* used to protect the above superblock list */
 spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
 
+#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
+static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keylen);
+#endif
 static atomic_t pvfs2_inode_alloc_count, pvfs2_inode_dealloc_count;
 
 static int parse_mount_options(
@@ -32,27 +24,27 @@ static int parse_mount_options(
     pvfs2_sb_info_t *pvfs2_sb = NULL;
     int i = 0, j = 0, num_keywords = 0, got_device = 0;
 
-    static char *keywords[] = {"intr", "acl"};
-    static int num_possible_keywords = 2;
+    static char *keywords[] = {"intr", "acl", "suid"};
+    static int num_possible_keywords = 3;
     static char options[PVFS2_MAX_NUM_OPTIONS][PVFS2_MAX_MOUNT_OPT_LEN];
 
     if (!silent)
     {
         if (option_str) 
         {
-            pvfs2_print("pvfs2: parse_mount_options called with:\n");
-            pvfs2_print(" %s\n", option_str);
+            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: parse_mount_options called with:\n");
+            gossip_debug(GOSSIP_SUPER_DEBUG, " %s\n", option_str);
         }
         else 
         {
             /* We need a non-NULL option string */
 #ifdef PVFS2_LINUX_KERNEL_2_4
-            pvfs2_error("*******************************************\n");
-            pvfs2_error("Please pass the device name in the options "
+            gossip_err("*******************************************\n");
+            gossip_err("Please pass the device name in the options "
                         "string of the mount program in 2.4.x kernels\n");
-            pvfs2_error("e.g. mount -t pvfs2 pvfs2 /mnt/pvfs2 "
+            gossip_err("e.g. mount -t pvfs2 pvfs2 /mnt/pvfs2 "
                         "-o tcp://localhost:3334/pvfs2-fs\n");
-            pvfs2_error("*******************************************\n");
+            gossip_err("*******************************************\n");
 #endif
             goto exit;
         }
@@ -72,7 +64,7 @@ static int parse_mount_options(
     
             if (j == PVFS2_MAX_MOUNT_OPT_LEN)
             {
-                pvfs2_error("Cannot parse mount time options (length "
+                gossip_err("Cannot parse mount time options (length "
                             "exceeded)\n");
                 got_device = 0;
                 goto exit;
@@ -83,7 +75,7 @@ static int parse_mount_options(
                 options[num_keywords++][j-1] = '\0';
                 if (num_keywords == PVFS2_MAX_NUM_OPTIONS)
                 {
-                    pvfs2_error("Cannot parse mount time options (option "
+                    gossip_err("Cannot parse mount time options (option "
                                 "number exceeded)\n");
                     got_device = 0;
                     goto exit;
@@ -104,7 +96,7 @@ static int parse_mount_options(
                     {
                         if (!silent)
                         {
-                            pvfs2_print("pvfs2: mount option "
+                            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: mount option "
                                         "intr specified\n");
                         }
                         pvfs2_sb->mnt_options.intr = 1;
@@ -114,10 +106,20 @@ static int parse_mount_options(
                     {
                         if (!silent)
                         {
-                            pvfs2_print("pvfs2: mount option "
+                            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: mount option "
                                         "acl specified\n");
                         }
                         pvfs2_sb->mnt_options.acl = 1;
+                        break;
+                    }
+                    else if (strncmp(options[i], "suid", 4) == 0)
+                    {
+                        if (!silent)
+                        {
+                            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: mount option "
+                                        "suid specified\n");
+                        }
+                        pvfs2_sb->mnt_options.suid = 1;
                         break;
                     }
                 }
@@ -131,7 +133,7 @@ static int parse_mount_options(
                 {
                     if (strlen(options[i]) >= PVFS_MAX_SERVER_ADDR_LEN)
                     {
-                        pvfs2_error("Cannot parse mount time option %s "
+                        gossip_err("Cannot parse mount time option %s "
                                     "(length exceeded)\n",options[i]);
                         goto exit;
                     }
@@ -141,7 +143,7 @@ static int parse_mount_options(
                 }
                 else
                 {
-                    pvfs2_print("pvfs2: multiple device names specified: "
+                    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: multiple device names specified: "
                                 "ignoring %s\n", options[i]);
                 }
             }
@@ -169,7 +171,7 @@ static struct inode *pvfs2_alloc_inode(struct super_block *sb)
     if (pvfs2_inode)
     {
         new_inode = &pvfs2_inode->vfs_inode;
-        pvfs2_print("pvfs2_alloc_inode: allocated %p\n", pvfs2_inode);
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_alloc_inode: allocated %p\n", pvfs2_inode);
         atomic_inc(&pvfs2_inode_alloc_count);
     }
     return new_inode;
@@ -181,8 +183,9 @@ static void pvfs2_destroy_inode(struct inode *inode)
 
     if (pvfs2_inode)
     {
-        pvfs2_print("pvfs2_destroy_inode: deallocated %p destroying inode %ld\n",
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_destroy_inode: deallocated %p destroying inode %ld\n",
                     pvfs2_inode, (long)inode->i_ino);
+
         atomic_inc(&pvfs2_inode_dealloc_count);
         pvfs2_inode_finalize(pvfs2_inode);
         pvfs2_inode_release(pvfs2_inode);
@@ -194,7 +197,7 @@ static void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2_read_inode: %p (inode = %lu | ct = %d)\n",
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_read_inode: %p (inode = %lu | ct = %d)\n",
                 pvfs2_inode, inode->i_ino, (int)atomic_read(&inode->i_count));
 
     /*
@@ -229,7 +232,7 @@ static void pvfs2_read_inode(
 
     if (inode->u.generic_ip)
     {
-        pvfs2_panic("Found an initialized inode in pvfs2_read_inode! "
+        gossip_err("ERROR! Found an initialized inode in pvfs2_read_inode! "
                     "Should not have been initialized?\n");
         return;
     }
@@ -242,7 +245,7 @@ static void pvfs2_read_inode(
         inode->u.generic_ip = pvfs2_inode;
         pvfs2_inode->vfs_inode = inode;
 
-        pvfs2_print("pvfs2: pvfs2_read_inode: allocated %p (inode = %lu | "
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: pvfs2_read_inode: allocated %p (inode = %lu | "
                 "ct = %d)\n", pvfs2_inode, inode->i_ino,
                 (int)atomic_read(&inode->i_count));
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
@@ -252,7 +255,7 @@ static void pvfs2_read_inode(
     }
     else
     {
-        pvfs2_error("Could not allocate pvfs2_inode from "
+        gossip_err("Could not allocate pvfs2_inode from "
                     "pvfs2_inode_cache\n");
         pvfs2_make_bad_inode(inode);
     }
@@ -262,8 +265,9 @@ static void pvfs2_clear_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2_clear_inode: deallocated %p, destroying inode %ld\n",
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_clear_inode: deallocated %p, destroying inode %ld\n",
                 pvfs2_inode, (long)inode->i_ino);
+
     pvfs2_inode_finalize(pvfs2_inode);
     pvfs2_inode_release(pvfs2_inode);
     inode->u.generic_ip = NULL;
@@ -276,9 +280,9 @@ static void pvfs2_put_inode(
     struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-    pvfs2_print("pvfs2_put_inode: pvfs2_inode: %p (i_ino %d) = %d (nlink=%d)\n",
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_put_inode: pvfs2_inode: %p (i_ino %d) = %d (nlink=%d)\n",
                 pvfs2_inode, (int)inode->i_ino, (int)atomic_read(&inode->i_count),
-                 (int)inode->i_nlink);
+                (int)inode->i_nlink);
 
     if (atomic_read(&inode->i_count) == 1)
     {
@@ -301,33 +305,85 @@ static void pvfs2_put_inode(
     }
 }
 
+#ifdef HAVE_STATFS_LITE_SUPER_OPERATIONS
+static int pvfs2_statfs_lite(
+        struct super_block *sb,
+        struct kstatfs *buf,
+        int statfs_mask)
+{
+    /* 
+     * statfs_mask indicates the fields that we are expected to fill up.
+     * We do not need a network message for the following masks,
+     * STATFS_M_TYPE, STATFS_M_FSID, STATFS_M_NAMELEN, STATFS_M_FRSIZE, STATFS_M_BSIZE.
+     * Everything else use the regular statfs call.
+     */
+    if ((statfs_mask & STATFS_M_BLOCKS)     ||
+            (statfs_mask & STATFS_M_BFREE)  ||
+            (statfs_mask & STATFS_M_BAVAIL) ||
+            (statfs_mask & STATFS_M_FILES)  ||
+            (statfs_mask & STATFS_M_FFREE))
+        return -ENOSYS;
+
+    if (statfs_mask & STATFS_M_TYPE) {
+        buf->f_type = sb->s_magic;
+    }
+    if (statfs_mask & STATFS_M_FSID) {
+        /* stash the fsid as well */
+        memcpy(&buf->f_fsid, &(PVFS2_SB(sb)->fs_id), 
+               sizeof(PVFS2_SB(sb)->fs_id));      
+    }
+    if (statfs_mask & STATFS_M_BSIZE) {
+        buf->f_bsize = sb->s_blocksize;
+    }
+    if (statfs_mask & STATFS_M_NAMELEN) {
+        buf->f_namelen = PVFS2_NAME_LEN;
+    }
+    if (statfs_mask & STATFS_M_FRSIZE) {
+        buf->f_frsize = sb->s_blocksize;
+    }
+    return 0;
+}
+#endif
+
 /*
   NOTE: information filled in here is typically reflected in the
   output of the system command 'df'
 */
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_statfs(
-    struct super_block *sb,
+    struct super_block *psb,
     struct statfs *buf)
 #else
+#ifdef HAVE_DENTRY_STATFS_SOP
 static int pvfs2_statfs(
-    struct super_block *sb,
+    struct dentry *dentry,
     struct kstatfs *buf)
+#else
+static int pvfs2_statfs(
+    struct super_block *psb,
+    struct kstatfs *buf)
+#endif
 #endif
 {
     int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     int flags = 0;
+    struct super_block *sb = NULL;
 
-    pvfs2_print("pvfs2_statfs: called on sb %p (fs_id is %d)\n",
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_DENTRY_STATFS_SOP)
+    sb = dentry->d_sb;
+#else
+    sb = psb;
+#endif
+
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_statfs: called on sb %p (fs_id is %d)\n",
                 sb, (int)(PVFS2_SB(sb)->fs_id));
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_STATFS);
     if (!new_op)
     {
         return ret;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_STATFS;
     new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->fs_id;
 
     if(PVFS2_SB(sb)->mnt_options.intr)
@@ -336,11 +392,11 @@ static int pvfs2_statfs(
     }
 
     ret = service_operation(
-        new_op, "pvfs2_statfs", PVFS2_OP_RETRY_COUNT, flags);
+        new_op, "pvfs2_statfs",  flags);
 
     if (new_op->downcall.status > -1)
     {
-        pvfs2_print("pvfs2_statfs: got %ld blocks available | "
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_statfs: got %ld blocks available | "
                     "%ld blocks total\n",
                     (long) new_op->downcall.resp.statfs.blocks_avail,
                     (long) new_op->downcall.resp.statfs.blocks_total);
@@ -370,15 +426,15 @@ static int pvfs2_statfs(
 
             buf->f_frsize = sb->s_blocksize;
 
-            pvfs2_print("sizeof(kstatfs)=%d\n",
+            gossip_debug(GOSSIP_SUPER_DEBUG, "sizeof(kstatfs)=%d\n",
                         (int)sizeof(struct kstatfs));
-            pvfs2_print("sizeof(kstatfs->f_blocks)=%d\n",
+            gossip_debug(GOSSIP_SUPER_DEBUG, "sizeof(kstatfs->f_blocks)=%d\n",
                         (int)sizeof(buf->f_blocks));
-            pvfs2_print("sizeof(statfs)=%d\n",
+            gossip_debug(GOSSIP_SUPER_DEBUG, "sizeof(statfs)=%d\n",
                         (int)sizeof(struct statfs));
-            pvfs2_print("sizeof(statfs->f_blocks)=%d\n",
+            gossip_debug(GOSSIP_SUPER_DEBUG, "sizeof(statfs->f_blocks)=%d\n",
                         (int)sizeof(tmp_statfs.f_blocks));
-            pvfs2_print("sizeof(sector_t)=%d\n",
+            gossip_debug(GOSSIP_SUPER_DEBUG, "sizeof(sector_t)=%d\n",
                         (int)sizeof(sector_t));
 
             if ((sizeof(struct statfs) != sizeof(struct kstatfs)) &&
@@ -397,13 +453,13 @@ static int pvfs2_statfs(
                 buf->f_files &= 0x00000000FFFFFFFFULL;
                 buf->f_ffree &= 0x00000000FFFFFFFFULL;
                 
-                pvfs2_print("pvfs2_statfs (T) got %lu files total | %lu "
+                gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_statfs (T) got %lu files total | %lu "
                             "files_avail\n", (unsigned long)buf->f_files,
                             (unsigned long)buf->f_ffree);
             }
             else
             {
-                pvfs2_print("pvfs2_statfs (N) got %lu files total | %lu "
+                gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_statfs (N) got %lu files total | %lu "
                             "files_avail\n", (unsigned long)buf->f_files,
                             (unsigned long)buf->f_ffree);
             }
@@ -413,7 +469,7 @@ static int pvfs2_statfs(
 
     op_release(new_op);
 
-    pvfs2_print("pvfs2_statfs: returning %d\n", ret);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_statfs: returning %d\n", ret);
     return ret;
 }
 
@@ -437,7 +493,7 @@ int pvfs2_remount(
     int ret = -EINVAL;
     pvfs2_kernel_op_t *new_op = NULL;
 
-    pvfs2_print("pvfs2_remount: called\n");
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_remount: called\n");
 
     if (sb && PVFS2_SB(sb))
     {
@@ -456,26 +512,25 @@ int pvfs2_remount(
 #endif
         }
 
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
         if (!new_op)
         {
             return -ENOMEM;
         }
-        new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
         strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
                 PVFS2_SB(sb)->devname, PVFS_MAX_SERVER_ADDR_LEN);
 
-        pvfs2_print("Attempting PVFS2 Remount via host %s\n",
+        gossip_debug(GOSSIP_SUPER_DEBUG, "Attempting PVFS2 Remount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
         /* we assume that the calling function has already acquire the
          * request_semaphore to prevent other operations from bypassing this
          * one
          */
-        ret = service_operation(new_op, "pvfs2_remount", 0, 
+        ret = service_operation(new_op, "pvfs2_remount", 
             (PVFS2_OP_PRIORITY|PVFS2_OP_NO_SEMAPHORE));
 
-        pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_remount: mount got return value of %d\n", ret);
         if (ret == 0)
         {
             /*
@@ -489,11 +544,251 @@ int pvfs2_remount(
             {
                 strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
             }
+            PVFS2_SB(sb)->mount_pending = 0;
         }
 
         op_release(new_op);
     }
     return ret;
+}
+
+#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
+
+static int fskey_table_size = 11;
+/* hash table for mapping fsids to keys */
+struct qhash_table *fskey_table;
+
+struct fskey_entry {
+    PVFS_fs_id      fsid;
+    char            *fs_key;
+    int             fs_keylen;
+    struct list_head list;
+};
+
+static struct fskey_entry *fskey_entry_ctor(PVFS_fs_id fsid)
+{
+    struct fskey_entry * entry;
+
+    entry = (struct fskey_entry *) kmalloc(sizeof(struct fskey_entry), PVFS2_GFP_FLAGS);
+    if (entry) {
+        entry->fsid = fsid;
+        entry->fs_keylen = PVFS2_MAX_FSKEY_LEN;
+        entry->fs_key = (char *) kmalloc(entry->fs_keylen, PVFS2_GFP_FLAGS);
+        if (!entry->fs_key) {
+            kfree(entry);
+            entry = NULL;
+            goto out;
+        }
+    }
+out:
+    return entry;
+}
+
+static void fskey_entry_dtor(struct fskey_entry * entry)
+{
+    if (entry) {
+        if (entry->fs_key) {
+            kfree(entry->fs_key);
+            entry->fs_key = NULL;
+        }
+        entry->fs_keylen = 0;
+        kfree(entry);
+    }
+    return;
+}
+
+static int fskey_fsid_func(void *key, int table_size)
+{
+    int tmp = 0;
+    PVFS_fs_id *fsid = (PVFS_fs_id *)key;
+    tmp += (int)(*fsid);
+    tmp = (tmp % table_size);
+    return tmp;
+}
+
+static int fskey_fsid_compare(void *key, struct qhash_head *link)
+{
+    PVFS_fs_id *fsid = (PVFS_fs_id *)key;
+    struct fskey_entry *entry = qhash_entry(
+            link, struct fskey_entry, list);
+    return (entry->fsid == *fsid);
+}
+
+int fsid_key_table_initialize(void)
+{
+    fskey_table = qhash_init(fskey_fsid_compare, fskey_fsid_func, fskey_table_size);
+    if (!fskey_table)
+    {
+        gossip_err("Failed to initialize fsid/fskey hashtable");
+        return -ENOMEM;
+    }
+    return 0;
+}
+
+void fsid_key_table_finalize(void)
+{
+    int i;
+
+    if (fskey_table == NULL)
+        return;
+    for (i = 0; i < fskey_table_size; i++) {
+        struct qhash_head *hash_link;
+        do {
+            hash_link = qhash_search_and_remove_at_index(
+                    fskey_table, i);
+            if (hash_link)
+            {
+                struct fskey_entry *entry;
+                entry = qhash_entry(hash_link, struct fskey_entry, list);
+                fskey_entry_dtor(entry);
+            }
+        } while (hash_link);
+    }
+    qhash_finalize(fskey_table);
+    fskey_table = NULL;
+    return;
+}
+
+
+/* Issue an upcall in case we dont have the fsid<->key mappings */
+static int pvfs2_get_fs_key(PVFS_fs_id fsid, char *fs_key, int *fs_keylen)
+{
+    pvfs2_kernel_op_t *new_op = NULL;
+    int ret;
+
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: pvfs2_get_fs_key fsid is %d\n", fsid);
+
+    new_op = op_alloc(PVFS2_VFS_OP_FSKEY);
+    if (!new_op)
+    {
+        return -ENOMEM;
+    }
+    new_op->upcall.req.fs_key.fsid = fsid;
+
+    ret = service_operation(new_op, "pvfs2_get_fs_key", PVFS2_OP_INTERRUPTIBLE);
+
+    /* copy the keys and key lengths */
+    if (ret == 0)
+    {
+        int copy_fskeylen;
+
+        copy_fskeylen = new_op->downcall.resp.fs_key.fs_keylen > *fs_keylen 
+                        ? *fs_keylen : new_op->downcall.resp.fs_key.fs_keylen;
+        memcpy(fs_key, new_op->downcall.resp.fs_key.fs_key, copy_fskeylen);
+        *fs_keylen = copy_fskeylen;
+    }
+
+    op_release(new_op);
+    return ret;
+}
+
+/*
+ * VFS requests us to fetch a key for a particular superblock/file-system.
+ * We lookup our hash-table to determine if we have cached the keys for the 
+ * file system and if not we issue an upcall to retrieve the key.
+ */
+static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keylen)
+{
+    struct qhash_head *hash_link;
+    PVFS_fs_id fsid = PVFS2_SB(sb)->fs_id;
+    struct fskey_entry *entry;
+
+    if (fskey_table == NULL) {
+        gossip_err("fskey_table not initialized?\n");
+        if (ppkey) {
+            *ppkey = NULL;
+        }
+        if (keylen) {
+            *keylen = 0;
+        }
+        return;
+    }
+    gossip_debug(GOSSIP_SUPER_DEBUG, "Search fskey_table for fsid %d\n", fsid);
+    hash_link = qhash_search(fskey_table, &fsid);
+    if (hash_link)
+    {
+        /* Found an entry in the hash table */
+        entry = qhash_entry(hash_link, struct fskey_entry, list);
+        if (entry->fsid != fsid) {
+            gossip_err("pvfs2_sb_get_fs_key: fsid did not match!?\n");
+            if (ppkey) {
+                *ppkey = NULL;
+            }
+            if (keylen) {
+                *keylen = 0;
+            }
+            return;
+        }
+        if (ppkey) {
+            *ppkey = entry->fs_key;
+        }
+        if (keylen) {
+            *keylen = entry->fs_keylen;
+        }
+        gossip_debug(GOSSIP_SUPER_DEBUG, "Cached key for FSID %d - %d\n", fsid, entry->fs_keylen);
+        return;
+    }
+    /* Allocate an entry for this fsid */
+    if ((entry = fskey_entry_ctor(fsid)) == NULL) {
+        if (ppkey) {
+            *ppkey = NULL;
+        }
+        if (keylen) {
+            *keylen = 0;
+        }
+        return;
+    }
+    /* Send an upcall to retrieve the key for this fsid */
+    if (pvfs2_get_fs_key(fsid, entry->fs_key, &entry->fs_keylen) < 0) {
+        fskey_entry_dtor(entry);
+        if (ppkey) {
+            *ppkey = NULL;
+        }
+        if (keylen) {
+            *keylen = 0;
+        }
+        return;
+    }
+    /*
+     * Finally add it to the hash table. NOTE: struct fskey_entry's are freed
+     * only when the fskey_table is finalized at module unload time.
+     */
+    qhash_add(fskey_table, (void *) &(entry->fsid), &(entry->list));
+    if (ppkey) {
+        *ppkey  = entry->fs_key;
+    }
+    /* NOTE: fs_keylen can be 0 in case the FS does not have a secret key */
+    if (keylen) {
+        *keylen = entry->fs_keylen;
+    }
+    gossip_debug(GOSSIP_SUPER_DEBUG, "Uncached key for FSID %d - %d\n", entry->fsid, entry->fs_keylen);
+    return;
+}
+
+#else
+
+int fsid_key_table_initialize(void)
+{
+    return 0;
+}
+
+void fsid_key_table_finalize(void)
+{
+    return;
+}
+
+#endif
+
+/* Called whenever the VFS dirties the inode in response to atime updates */
+static void pvfs2_dirty_inode(struct inode *inode)
+{
+    if (inode)
+    {
+        pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_dirty_inode: %ld\n", (long) inode->i_ino);
+        SetAtimeFlag(pvfs2_inode);
+    }
+    return;
 }
 
 struct super_operations pvfs2_s_ops =
@@ -503,6 +798,7 @@ struct super_operations pvfs2_s_ops =
     statfs : pvfs2_statfs,
     remount_fs : pvfs2_remount,
     put_super : pvfs2_kill_sb,
+    dirty_inode : pvfs2_dirty_inode,
     clear_inode: pvfs2_clear_inode,
     put_inode: pvfs2_put_inode,
 #else
@@ -510,9 +806,19 @@ struct super_operations pvfs2_s_ops =
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,
     .read_inode = pvfs2_read_inode,
+    .dirty_inode = pvfs2_dirty_inode,
     .put_inode = pvfs2_put_inode,
     .statfs = pvfs2_statfs,
-    .remount_fs = pvfs2_remount
+    .remount_fs = pvfs2_remount,
+#ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+    .find_inode_handle = pvfs2_sb_find_inode_handle,
+#endif
+#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
+    .get_fs_key = pvfs2_sb_get_fs_key,
+#endif
+#ifdef HAVE_STATFS_LITE_SUPER_OPERATIONS
+    .statfs_lite = pvfs2_statfs_lite,
+#endif
 #endif
 };
 
@@ -533,7 +839,7 @@ struct super_block* pvfs2_get_sb(
     {
         if (!silent)
         {
-            pvfs2_print("pvfs2_get_sb: no data parameter!\n");
+            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: no data parameter!\n");
         }
         goto error_exit;
     }
@@ -553,28 +859,27 @@ struct super_block* pvfs2_get_sb(
         ret = parse_mount_options(data, sb, silent);
         if (ret)
         {
-            pvfs2_error("Failed to parse mount time options\n");
+            gossip_err("Failed to parse mount time options\n");
             goto error_exit;
         }
         dev_name = PVFS2_SB(sb)->devname;
     }
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
     if (!new_op)
     {
         ret = -ENOMEM;
         goto error_exit;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
     strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
             dev_name, PVFS_MAX_SERVER_ADDR_LEN);
 
-    pvfs2_print("Attempting PVFS2 Mount via host %s\n",
+    gossip_debug(GOSSIP_SUPER_DEBUG, "Attempting PVFS2 Mount via host %s\n",
                 new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-    ret = service_operation(new_op, "pvfs2_get_sb", 0, 0);
+    ret = service_operation(new_op, "pvfs2_get_sb", 0);
 
-    pvfs2_print("%s: mount got return value of %d\n", __func__, ret);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "%s: mount got return value of %d\n", __func__, ret);
     if (ret)
     {
         goto error_exit;
@@ -584,7 +889,7 @@ struct super_block* pvfs2_get_sb(
         (new_op->downcall.resp.fs_mount.root_handle ==
          PVFS_HANDLE_NULL))
     {
-        pvfs2_error("ERROR: Retrieved null fs_id or root_handle\n");
+        gossip_err("ERROR: Retrieved null fs_id or root_handle\n");
         ret = -EINVAL;
         goto error_exit;
     }
@@ -611,7 +916,7 @@ struct super_block* pvfs2_get_sb(
         ret = -ENOMEM;
         goto error_exit;
     }
-    pvfs2_print("Allocated root inode [%p] with mode %x\n", root, root->i_mode);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "Allocated root inode [%p] with mode %x\n", root, root->i_mode);
     PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
 
     /* allocates and places root dentry in dcache */
@@ -632,7 +937,12 @@ struct super_block* pvfs2_get_sb(
     return sb;
 
   error_exit:
-    pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
+    gossip_err("pvfs2_get_sb: mount request failed with %d\n", ret);
+    if (ret == -EINVAL)
+    {
+        gossip_err("Ensure that all pvfs2-servers have the same FS configuration files\n");
+        gossip_err("Look at pvfs2-client-core log file (typically /tmp/pvfs2-client.log) for more details\n");
+    }
 
     if (sb)
     {
@@ -651,7 +961,7 @@ struct super_block* pvfs2_get_sb(
     {
         op_release(new_op);
     }
-    pvfs2_print("pvfs2_get_sb: returning sb %p\n", sb);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: returning sb %p\n", sb);
     return sb;
 }
 
@@ -718,7 +1028,7 @@ int pvfs2_fill_sb(
     {
         return -ENOMEM;
     }
-    pvfs2_print("Allocated root inode [%p] with mode %x\n", root, root->i_mode);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "Allocated root inode [%p] with mode %x\n", root, root->i_mode);
     PVFS2_I(root)->refn.handle = PVFS2_SB(sb)->root_handle;
     PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
 
@@ -736,36 +1046,49 @@ int pvfs2_fill_sb(
     return 0;
 }
 
+#ifdef HAVE_VFSMOUNT_GETSB
+int pvfs2_get_sb(
+    struct file_system_type *fst,
+    int flags,
+    const char *devname,
+    void *data,
+    struct vfsmount *mnt)
+#else
 struct super_block *pvfs2_get_sb(
     struct file_system_type *fst,
     int flags,
     const char *devname,
     void *data)
+#endif
 {
     int ret = -EINVAL;
     struct super_block *sb = ERR_PTR(-EINVAL);
-    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_kernel_op_t *new_op;
     pvfs2_mount_sb_info_t mount_sb_info;
 
-    pvfs2_print("pvfs2_get_sb: called with devname %s\n", devname);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: called with devname %s\n", devname);
 
     if (devname)
     {
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
         if (!new_op)
         {
-            return ERR_PTR(-ENOMEM);
+            ret = -ENOMEM;
+#ifdef HAVE_VFSMOUNT_GETSB
+            return ret;
+#else
+            return ERR_PTR(ret);
+#endif
         }
-        new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
         strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
                 devname, PVFS_MAX_SERVER_ADDR_LEN);
 
-        pvfs2_print("Attempting PVFS2 Mount via host %s\n",
+        gossip_debug(GOSSIP_SUPER_DEBUG, "Attempting PVFS2 Mount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-        ret = service_operation(new_op, "pvfs2_get_sb", 0, 0);
+        ret = service_operation(new_op, "pvfs2_get_sb", 0);
 
-        pvfs2_print("pvfs2_get_sb: mount got return value of %d\n", ret);
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: mount got return value of %d\n", ret);
         if (ret)
         {
             goto error_exit;
@@ -775,7 +1098,7 @@ struct super_block *pvfs2_get_sb(
             (new_op->downcall.resp.fs_mount.root_handle ==
              PVFS_HANDLE_NULL))
         {
-            pvfs2_error("ERROR: Retrieved null fs_id or root_handle\n");
+            gossip_err("ERROR: Retrieved null fs_id or root_handle\n");
             ret = -EINVAL;
             goto error_exit;
         }
@@ -794,8 +1117,16 @@ struct super_block *pvfs2_get_sb(
           here.  so we store it temporarily and pass all of the info
           to fill_sb where it's properly copied out
         */
+#ifdef HAVE_VFSMOUNT_GETSB
+        ret = get_sb_nodev(
+            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb, mnt);
+        if (ret)
+            goto free_op;
+        sb = mnt->mnt_sb;
+#else
         sb = get_sb_nodev(
             fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
+#endif
 
         if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {
@@ -807,43 +1138,88 @@ struct super_block *pvfs2_get_sb(
                 strncpy(PVFS2_SB(sb)->data, data,
                         PVFS2_MAX_MOUNT_OPT_LEN);
             }
+#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
+            /* Issue an upcall to pre-fetch the fs key so that subsequent calls would be hits */
+            pvfs2_sb_get_fs_key(sb, NULL, NULL);
+#endif
 
+            /* mount_pending must be cleared */
+            PVFS2_SB(sb)->mount_pending = 0;
             /* finally, add this sb to our list of known pvfs2 sb's */
             add_pvfs2_sb(sb);
         }
+        else {
+            ret = -EINVAL;
+            gossip_err("Invalid superblock obtained from get_sb_nodev (%p)\n", sb);
+        }
+        op_release(new_op);
     }
     else
     {
-        pvfs2_error("ERROR: device name not specified.\n");
+        gossip_err("ERROR: device name not specified.\n");
     }
 
-    op_release(new_op);
+#ifdef HAVE_VFSMOUNT_GETSB
+    return ret;
+#else
     return sb;
+#endif
 
-  error_exit:
-    pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
-
+error_exit:
     if (ret || IS_ERR(sb))
     {
         sb = ERR_PTR(ret);
+    }
+#ifdef HAVE_VFSMOUNT_GETSB
+free_op:
+#endif
+    gossip_err("pvfs2_get_sb: mount request failed with %d\n", ret);
+    if (ret == -EINVAL)
+    {
+        gossip_err("Ensure that all pvfs2-servers have the same FS configuration files\n");
+        gossip_err("Look at pvfs2-client-core log file (typically /tmp/pvfs2-client.log) for more details\n");
     }
 
     if (new_op)
     {
         op_release(new_op);
     }
-    pvfs2_print("pvfs2_get_sb: returning sb %p\n", sb);
+#ifdef HAVE_VFSMOUNT_GETSB
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: returning %d\n", ret);
+    return ret;
+#else
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: returning sb %p\n", sb);
     return sb;
+#endif
 }
+
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+static void pvfs2_flush_sb(
+        struct super_block *sb)
+{
+    if (!list_empty(&sb->s_dirty))
+    {
+        struct inode *inode = NULL;
+        list_for_each_entry (inode, &sb->s_dirty, i_list)
+        {
+            pvfs2_flush_inode(inode);
+        }
+    }
+    return;
+}
 
 void pvfs2_kill_sb(
     struct super_block *sb)
 {
-    pvfs2_print("pvfs2_kill_sb: called\n");
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_kill_sb: called\n");
 
     if (sb && !IS_ERR(sb))
     {
+        /*
+         * Flush any dirty inodes atimes, mtimes to server
+         */
+        pvfs2_flush_sb(sb);
         /*
           issue the unmount to userspace to tell it to remove the
           dynamic mount info it has for this superblock
@@ -877,21 +1253,21 @@ void pvfs2_kill_sb(
             count2 = atomic_read(&pvfs2_inode_dealloc_count);
             if (count1 != count2) 
             {
-                pvfs2_error("pvfs2_kill_sb: (WARNING) number of inode allocs (%d) != number of inode deallocs (%d)\n",
+                gossip_err("pvfs2_kill_sb: (WARNING) number of inode allocs (%d) != number of inode deallocs (%d)\n",
                         count1, count2);
             }
             else
             {
-                pvfs2_print("pvfs2_kill_sb: (OK) number of inode allocs (%d) = number of inode deallocs (%d)\n",
+                gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_kill_sb: (OK) number of inode allocs (%d) = number of inode deallocs (%d)\n",
                         count1, count2);
             }
         }
     }
     else
     {
-        pvfs2_print("pvfs2_kill_sb: skipping due to invalid sb\n");
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_kill_sb: skipping due to invalid sb\n");
     }
-    pvfs2_print("pvfs2_kill_sb: returning normally\n");
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_kill_sb: returning normally\n");
 }
 
 /*

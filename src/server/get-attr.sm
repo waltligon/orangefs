@@ -231,7 +231,7 @@ static PINT_sm_action getattr_verify_attribs(
     resp_attr->perms = s_op->attr.perms;
     resp_attr->atime = s_op->attr.atime;
 
-    resp_attr->mtime = PVFS_util_mkversion_time(s_op->attr.mtime);
+    resp_attr->mtime = PINT_util_mkversion_time(s_op->attr.mtime);
     if (resp_attr->mtime == 0)
     {
         /*
@@ -458,8 +458,7 @@ static PINT_sm_action getattr_read_symlink_target(
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &(s_op->key), &(s_op->val), 
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->u.getattr.fs_id), 
+        0, 
         NULL, smcb, 0, js_p,
         &i, server_job_context);
 
@@ -516,6 +515,10 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
 	    llu(s_op->u.getattr.handle), llu(s_op->u.getattr.handle),
 	    (int)s_op->u.getattr.fs_id);
 
+        /*If we hit an error the DIST & DFILES are no longer valid*/
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
+        
 	js_p->error_code = -PVFS_EOVERFLOW;
 	return SM_ACTION_COMPLETE;
     }
@@ -550,8 +553,7 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &s_op->key, &s_op->val, 
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->u.getattr.fs_id), 
+        0, 
         NULL, smcb, 0, js_p,
         &i, server_job_context);
 
@@ -611,9 +613,7 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &(s_op->key), &(s_op->val), 
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(),
-            s_op->u.getattr.fs_id), 
+        0, 
         NULL,
         smcb, 0, js_p, &i, server_job_context);
 
@@ -634,16 +634,23 @@ static PINT_sm_action getattr_setup_resp(
          */
         js_p->error_code = 0;
     }
+    if(js_p->error_code < 0)
+    {
+        if(s_op->val.buffer)
+        {
+            free(s_op->val.buffer);
+        }
+        return SM_ACTION_COMPLETE;
+    }
 
     gossip_debug(
         GOSSIP_GETATTR_DEBUG,
         "- RETURNING retrieved attrs: [owner = %d, group = %d\n\t"
         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-        "ctime = %llu, dfile_count = %d, dist_size = %d]\n",
+        "ctime = %llu, dist_size = %d]\n",
         resp_attr->owner, resp_attr->group, resp_attr->perms,
         resp_attr->objtype, llu(resp_attr->atime),
         llu(resp_attr->mtime), llu(resp_attr->ctime),
-        (int)resp_attr->u.meta.dfile_count,
         (int)resp_attr->u.meta.dist_size);
 
     if (resp_attr->objtype == PVFS_TYPE_METAFILE)
@@ -661,6 +668,7 @@ static PINT_sm_action getattr_setup_resp(
 
         if (resp_attr->mask & PVFS_ATTR_META_DIST)
         {
+            assert(s_op->val.buffer);
             PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
             free(s_op->val.buffer);
 
@@ -718,9 +726,11 @@ static PINT_sm_action getattr_setup_resp(
             (resp_attr->mask & PVFS_ATTR_DIR_HINT))
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG, " server returning "
+            "dirent_count = %llu "
             "dfile_count = %d "
             "dist_name_len    = %d "
             "dist_params_len  = %d\n",
+            llu(resp_attr->u.dir.dirent_count),
             resp_attr->u.dir.hint.dfile_count,
             resp_attr->u.dir.hint.dist_name_len,
             resp_attr->u.dir.hint.dist_params_len);
@@ -728,7 +738,7 @@ static PINT_sm_action getattr_setup_resp(
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,"@ End %s attributes: sending "
                  "status %d (error = %d)\n",
-                 get_object_type(resp_attr->objtype),
+                 PINT_util_get_object_type(resp_attr->objtype),
 		 s_op->resp.status, js_p->error_code);
 
 #if 0
@@ -795,8 +805,7 @@ static PINT_sm_action getattr_get_dirdata_handle(
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &s_op->key, &s_op->val,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->u.getattr.fs_id),
+        0,
         NULL,
         smcb,
         0,
@@ -826,8 +835,7 @@ static PINT_sm_action getattr_get_dirent_count(
         s_op->u.getattr.fs_id,
         s_op->u.getattr.dirent_handle,
         TROVE_KEYVAL_HANDLE_COUNT |
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->u.getattr.fs_id),
+        0,
         &s_op->u.getattr.keyval_handle_info,
         smcb,
         0,
@@ -875,8 +883,7 @@ static PINT_sm_action getattr_get_dir_hint(
    
     if (!(s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT))
     {
-        /* the caller didn't really want the dirent count; skip to get
-         * directory hints
+        /* the caller didn't really want the dir hints; skip
          */
         js_p->error_code = STATE_DONE;
         return SM_ACTION_COMPLETE;
@@ -1033,7 +1040,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
 
         s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
 
-        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dfile_count: %d\n",
+        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dir hint dfile_count: %d\n",
             s_op->resp.u.getattr.attr.u.dir.hint.dfile_count);
 
         js_p->error_code = 0;

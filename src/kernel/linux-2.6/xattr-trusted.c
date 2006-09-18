@@ -22,10 +22,15 @@ int pvfs2_xattr_set_trusted(struct inode *inode,
 {
     int internal_flag = 0;
 
+    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_xattr_set_trusted: name %s, buffer_size %zd\n",
+            name, size);
     if (strcmp(name, "") == 0)
         return -EINVAL;
     if(!capable(CAP_SYS_ADMIN))
+    {
+        gossip_err("pvfs2_xattr_set_trusted: operation not permitted\n");
         return -EPERM;
+    }
     internal_flag = convert_to_internal_xattr_flags(flags);
     return pvfs2_inode_setxattr(inode, PVFS2_XATTR_NAME_TRUSTED_PREFIX,
         name, buffer, size, internal_flag);
@@ -34,10 +39,15 @@ int pvfs2_xattr_set_trusted(struct inode *inode,
 int pvfs2_xattr_get_trusted(struct inode *inode,
     const char *name, void *buffer, size_t size)
 {
+    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_xattr_get_trusted: name %s, buffer_size %zd\n",
+            name, size);
     if (strcmp(name, "") == 0)
         return -EINVAL;
     if(!capable(CAP_SYS_ADMIN))
+    {
+        gossip_err("pvfs2_xattr_get_trusted: operation not permitted\n");
         return -EPERM;
+    }
     return pvfs2_inode_getxattr(inode, PVFS2_XATTR_NAME_TRUSTED_PREFIX,
         name, buffer, size);
 }

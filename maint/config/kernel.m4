@@ -15,7 +15,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
-	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
 
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
@@ -99,6 +99,137 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		)
 	fi
 
+	dnl checking if we have a find_inode_handle callback in super_operations 
+	AC_MSG_CHECKING(for find_inode_handle callback in struct super_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct super_operations sop = {
+		    .find_inode_handle = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has find_inode_handle callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a statfs_lite callback in super_operations 
+	AC_MSG_CHECKING(for statfs_lite callback in struct super_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct super_operations sop = {
+		    .statfs_lite = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STATFS_LITE_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has statfs_lite callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a fill_handle callback in inode_operations 
+	AC_MSG_CHECKING(for fill_handle callback in struct inode_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode_operations iop = {
+		    .fill_handle = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_FILL_HANDLE_INODE_OPERATIONS, 1, Define if struct inode_operations in kernel has fill_handle callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a getattr_lite callback in inode_operations 
+	AC_MSG_CHECKING(for getattr_lite callback in struct inode_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode_operations iop = {
+		    .getattr_lite = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GETATTR_LITE_INODE_OPERATIONS, 1, Define if struct inode_operations in kernel has getattr_lite callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a get_fs_key callback in super_operations 
+	AC_MSG_CHECKING(for get_fs_key callback in struct super_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct super_operations sop = {
+		    .get_fs_key = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GET_FS_KEY_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has get_fs_key callback),
+		AC_MSG_RESULT(no)
+	)
+	
+	dnl checking if we have a readdirplus callback in file_operations
+	AC_MSG_CHECKING(for readdirplus member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readdirplus = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READDIRPLUS_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readdirplus callback),
+	    AC_MSG_RESULT(no)
+	    )
+
+	dnl checking if we have a readdirplus_lite callback in file_operations
+	AC_MSG_CHECKING(for readdirplus_lite member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readdirplus_lite = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READDIRPLUSLITE_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readdirplus_lite callback),
+	    AC_MSG_RESULT(no)
+	    )
+
+
+	dnl checking if we have a readx callback in file_operations
+	AC_MSG_CHECKING(for readx member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readx = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READX_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readx callback),
+	    AC_MSG_RESULT(no)
+	    )
+
+	dnl checking if we have a writex callback in file_operations
+	AC_MSG_CHECKING(for writex member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.writex = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_WRITEX_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has writex callback),
+	    AC_MSG_RESULT(no)
+	    )
+
 	AC_MSG_CHECKING(for aio support in kernel)
 	dnl if this test passes, the kernel has it
 	dnl if this test fails, the kernel does not have it
@@ -115,21 +246,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		have_aio=no
 	)
 
-	AC_MSG_CHECKING(for touch_atime support in kernel)
-	AC_TRY_COMPILE([
-		#define __KERNEL__
-		#include <linux/fs.h>
-		void stuff()
-		{
-			struct vfsmnount *mnt;
-			struct dentry *dentry; 
-			touch_atime(mnt, dentry);
-		}
-		], [],
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_TOUCH_ATIME, 1, Define if kernel has touch_atime routine),
-		AC_MSG_RESULT(no)
-	)
 	if test "x$have_aio" = "xyes" -a "x$enable_kernel_aio" = "xyes"; then
 		AC_MSG_CHECKING(for ki_dtor in kiocb structure of kernel)
 		dnl if this test passes, the kernel does have it and we enable
@@ -148,6 +264,43 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			AC_MSG_RESULT(no)
 		)
 	fi
+
+	tmp_cflags=$CFLAGS
+	dnl if this test passes, there is a struct dentry* argument
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(if statfs callbacks' arguments in kernel has struct dentry argument)
+	dnl if this test passes, the kernel has it
+	dnl if this test fails, the kernel does not have it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		extern int pvfs_statfs(struct dentry *, struct kstatfs *);
+			  static struct super_operations s_op = {
+				  .statfs = pvfs_statfs,
+			  };
+		], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if statfs callback has struct dentry argument),
+		AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(if get_sb callbacks' in kernel has struct vfsmount argument)
+	dnl if this test passes, the kernel has it
+	dnl if this test fails, the kernel does not have it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/mount.h>
+		extern int pvfs_get_sb(struct file_system_type *fst, int flags, const char *devname, void *data, struct vfsmount *);
+			  static struct file_system_type fst = {
+				  .get_sb = pvfs_get_sb,
+			  };
+		], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if get_sb callback has struct vfsmount argument),
+		AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(for xattr support in kernel)
 	dnl if this test passes, the kernel has it
@@ -228,6 +381,10 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		 #endif
 		 ] )
 
+	AC_CHECK_HEADERS([linux/mount.h], [], [], 
+		[#define __KERNEL__
+		 #include <linux/mount.h>
+		 ] )
 	AC_CHECK_HEADERS([linux/ioctl32.h], [], [], 
 		[#define __KERNEL__
 		 #include <linux/ioctl32.h>

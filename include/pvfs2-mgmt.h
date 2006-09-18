@@ -263,10 +263,6 @@ PVFS_error PVFS_mgmt_event_mon_list(
     int event_count,
     PVFS_error_details *details);
 
-PVFS_error PVFS_mgmt_toggle_admin_mode(
-    PVFS_credentials *credentials,
-    int on_flag);
-
 PVFS_error PVFS_imgmt_iterate_handles_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,

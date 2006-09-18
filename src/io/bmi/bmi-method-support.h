@@ -79,6 +79,9 @@ struct bmi_method_ops
     int (*BMI_meth_memfree) (void *,
 			     bmi_size_t,
 			     enum bmi_op_type);
+
+    int (*BMI_meth_unexpected_free) (void *);
+
     int (*BMI_meth_post_send) (bmi_op_id_t *,
 			       method_addr_p,
 			       const void *,
@@ -168,6 +171,7 @@ struct bmi_method_ops
     void (*BMI_meth_close_context)(bmi_context_id);
     int (*BMI_meth_cancel)(bmi_op_id_t, bmi_context_id);
     const char* (*BMI_meth_rev_lookup_unexpected)(method_addr_p);
+    int (*BMI_meth_query_addr_range)(method_addr_p, const char *, int);
 };
 
 

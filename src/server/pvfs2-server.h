@@ -22,6 +22,7 @@
 #include <string.h>
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
+#include "pvfs2-internal.h"
 #include "job.h"
 #include "bmi.h"
 #include "src/server/request-scheduler/request-scheduler.h"
@@ -111,8 +112,11 @@ extern struct PINT_server_req_params PINT_server_req_table[];
  */
 static inline const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
-    return (((op < 0) || (op > PVFS_MAX_SERVER_OP)) ? NULL :
-            PINT_server_req_table[op].string_name);
+    const char *s = NULL;
+
+    if (op >= 0 && op < PVFS_SERV_NUM_OPS)
+        s = PINT_server_req_table[op].string_name;
+    return s;
 }
 
 extern const char *PINT_eattr_namespaces[];
@@ -274,12 +278,10 @@ struct PINT_server_io_op
     flow_descriptor* flow_d;
 };
 
-#define SMALL_IO_MAX_REGIONS 64
-
 struct PINT_server_small_io_op
 {
-    PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
-    PVFS_size sizes[SMALL_IO_MAX_REGIONS];
+    PVFS_offset offsets[IO_MAX_REGIONS];
+    PVFS_size sizes[IO_MAX_REGIONS];
     PVFS_size result_bytes;
 };
 
@@ -314,6 +316,20 @@ struct PINT_server_getattr_op
     PVFS_handle dirent_handle;
 };
 
+struct PINT_server_listattr_op
+{
+    uint32_t nhandles;
+    PVFS_handle *handles;
+    PVFS_size dirent_count;
+    PVFS_fs_id fs_id;
+    PVFS_object_attr *attr_a;
+    PVFS_ds_attributes *ds_attr_a;
+    PVFS_error *errors;
+    uint32_t attrmask;
+    uint32_t handle_index;
+    PVFS_ds_keyval_handle_info keyval_handle_info;
+};
+
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
@@ -326,6 +342,7 @@ struct PINT_server_eattr_op
  */
 typedef struct PINT_server_op
 {
+    struct qlist_head   next; /* used to queue structures used for unexp style messages */
     enum PVFS_server_op op;  /* type of operation that we are servicing */
     /* the following fields are used in state machine processing to keep
      * track of the current state
@@ -370,11 +387,24 @@ typedef struct PINT_server_op
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
 
+    /* generic msgpair used with msgpair substate */
+    PINT_sm_msgpair_state msgpair;
+
+    /* state information for msgpairarray nested state machine */
+    int msgarray_count;
+    PINT_sm_msgpair_state *msgarray;
+    PINT_sm_msgpair_params msgarray_params;
+
+    PVFS_handle target_handle;
+    PVFS_fs_id target_fs_id;
+    PVFS_object_attr *target_object_attr;
+
     union
     {
 	/* request-specific scratch spaces for use during processing */
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
+        struct PINT_server_listattr_op listattr;
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
 	struct PINT_server_crdirent_op crdirent;
@@ -436,6 +466,7 @@ do {                                                                        \
 /* server operation state machines */
 extern struct PINT_state_machine_s pvfs2_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_sm;
+extern struct PINT_state_machine_s pvfs2_list_attr_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_sm;
 extern struct PINT_state_machine_s pvfs2_create_sm;
 extern struct PINT_state_machine_s pvfs2_crdirent_sm;
@@ -494,7 +525,8 @@ int server_state_machine_start_noreq(
 #if 0
 #define PINT_OP_STATE       PINT_server_op
 #define PINT_OP_STATE_GET_MACHINE(_op) \
-    ((_op <= PVFS_MAX_SERVER_OP) ? (PINT_server_req_table[_op].sm) : NULL)
+    ((_op >= 0 && _op < PVFS_SERV_NUM_OPS) ? \
+    PINT_server_req_table[_op].sm : NULL)
 #endif
 
 #include "pvfs2-internal.h"

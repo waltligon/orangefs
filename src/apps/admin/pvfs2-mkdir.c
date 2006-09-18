@@ -228,9 +228,6 @@ static int make_directory(PVFS_credentials     * credentials,
     attr.owner = credentials->uid;
     attr.group = credentials->gid;
     attr.perms = mode;
-    attr.atime = time(NULL);
-    attr.mtime = attr.atime;
-    attr.ctime = attr.atime;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
         
     /* Clear out any info from previous calls */
@@ -311,9 +308,6 @@ static int make_directory(PVFS_credentials     * credentials,
         fprintf(stdout, "\t owner [%d]\n",  attr.owner);
         fprintf(stdout, "\t group [%d]\n",  attr.group);
         fprintf(stdout, "\t perms [%o]\n",  attr.perms);
-        fprintf(stdout, "\t atime [%llu]\n", llu(attr.atime));
-        fprintf(stdout, "\t mtime [%llu]\n", llu(attr.mtime));
-        fprintf(stdout, "\t ctime [%llu]\n", llu(attr.ctime));
     }
 
     ret = PVFS_sys_mkdir(basename_ptr, 
@@ -462,7 +456,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
     if(!mode_requested)
     {
         mode_t mode = S_IRWXO | S_IRWXG | S_IRWXU; /* 0777 */
-        opts->mode = PVFS2_translate_mode(mode & ~PVFS_util_get_umask());
+        opts->mode = PVFS_util_translate_mode(mode & ~PVFS_util_get_umask(), 0);
     }
     
     /* Allocate memory to hold the filenames */

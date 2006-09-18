@@ -60,7 +60,8 @@ struct PVFS_sys_mntent
 
     /* Default number of dfiles mount option value */
     int32_t default_num_dfiles; /* int32_t for portable, fixed size structure */
-
+    /* Check to determine whether the mount process must perform the integrity checks on the config files */
+    int32_t integrity_check;
     /* the following fields are included for convenience;
      * useful if the file system is "mounted" */
     char *mnt_dir;		/* local mount path */
@@ -143,11 +144,27 @@ typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 struct PVFS_sysresp_readdir_s
 {
     PVFS_ds_position token;
-    uint64_t directory_version;
-    int32_t pvfs_dirent_outcount; /* int32_t for portable, fixed size structure */
     PVFS_dirent *dirent_array;
+    uint32_t pvfs_dirent_outcount; /* uint32_t for portable, fixed size structure */
+    uint64_t directory_version;
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
+
+/** Holds results of a readdirplus operation (position token, directory version
+ *  information, array of directory entries, array of stat error codes and array of
+ *  attribute information).
+ */
+struct PVFS_sysresp_readdirplus_s
+{
+    PVFS_ds_position token;
+    PVFS_dirent   *dirent_array;
+    uint32_t        pvfs_dirent_outcount; /* uint32_t for portable, fixed size structure */
+    uint64_t       directory_version;
+    PVFS_error    *stat_err_array; 
+    PVFS_sys_attr *attr_array;
+};
+typedef struct PVFS_sysresp_readdirplus_s PVFS_sysresp_readdirplus;
+
 
 /* truncate */
 /* no data returned in truncate response */
@@ -306,6 +323,24 @@ PVFS_error PVFS_sys_readdir(
     int32_t pvfs_dirent_incount,
     PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp);
+
+PVFS_error PVFS_isys_readdirplus(
+    PVFS_object_ref ref,
+    PVFS_ds_position token,
+    int32_t pvfs_dirent_incount,
+    PVFS_credentials *credentials,
+    uint32_t attrmask,
+    PVFS_sysresp_readdirplus *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_readdirplus(
+    PVFS_object_ref ref,
+    PVFS_ds_position token,
+    int32_t pvfs_dirent_incount,
+    PVFS_credentials *credentials,
+    uint32_t attrmask,
+    PVFS_sysresp_readdirplus *resp);
 
 PVFS_error PVFS_isys_create(
     char *entry_name,

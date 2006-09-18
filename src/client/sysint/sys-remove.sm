@@ -19,7 +19,6 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
-#include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "ncache.h"
@@ -44,8 +43,7 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    MSGPAIR_RETURN_SUCCESS = 1,
-    RMDIRENT_RETRY,
+    RMDIRENT_RETRY = 1,
     CRDIRENT_RETRY,
     RETURN_STORED_ERROR_CODE
 };
@@ -112,7 +110,6 @@ machine pvfs2_client_remove_sm(
     {
         jump pvfs2_msgpairarray_sm;
         success => do_remove;
-        MSGPAIR_RETURN_SUCCESS => do_remove;
         default => rmdirent_retry_or_fail;
     }
 
@@ -160,7 +157,6 @@ machine pvfs2_client_remove_sm(
     {
         jump pvfs2_msgpairarray_sm;
         success => cleanup;
-        MSGPAIR_RETURN_SUCCESS => cleanup;
         default => crdirent_retry_or_fail;
     }
 
@@ -301,10 +297,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        sm_p->u.remove.object_name,
-        0,
-        PVFS_util_get_current_time(),
-        PVFS_util_get_current_time());
+        sm_p->u.remove.object_name);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
                  "under %llu,%d\n", sm_p->u.remove.object_name,
@@ -349,10 +342,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
         sm_p->parent_ref.handle,
-        sm_p->parent_ref.fs_id,
-        0,
-        PVFS_util_get_current_time(),
-        PVFS_util_get_current_time());
+        sm_p->parent_ref.fs_id);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%llu,%d) "
                  "under %llu,%d\n", sm_p->u.remove.object_name,
@@ -459,10 +449,12 @@ static PINT_sm_action remove_cleanup(
                         js_p->error_code);
 
     /* NOTE: acache is invalidated by remove_helper now */
-
-    PINT_ncache_remove(sm_p->u.remove.object_name,
-                       0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,
-                       sm_p->parent_ref, NULL);
+    
+    /* The ncache invalidate must be done from this function, because the 
+     * remove_helper may not  have all the information needed
+     */
+    PINT_ncache_invalidate((const char*) sm_p->u.remove.object_name,
+                           (const PVFS_object_ref*) &(sm_p->parent_ref));
 
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {

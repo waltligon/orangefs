@@ -10,11 +10,9 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-req-proto.h"
 #include "pint-sysint-utils.h"
-#include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "acache.h"
 #include "PINT-reqproto-encode.h"
-#include "dotconf.h"
 #include "trove.h"
 #include "server-config-mgr.h"
 #include "str-utils.h"
@@ -35,20 +33,6 @@ struct server_configuration_s *PINT_get_server_config_struct(
 void PINT_put_server_config_struct(struct server_configuration_s *config)
 {
     PINT_server_config_mgr_put_config(config);
-}
-
-/* check permissions of a PVFS object against the access mode
- *
- * returns 0 on success, -1 on error
- */
-int PINT_check_perms(
-    PVFS_object_attr attr,
-    PVFS_permissions mode,
-    int uid, int gid)
-{
-    return ((((attr.perms & mode) == mode) ||
-             ((attr.group == gid) && (attr.perms & mode) == mode) ||
-             (attr.owner == uid)) ? 0 : -1);
 }
 
 /* PINT_lookup_parent()

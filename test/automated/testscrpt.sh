@@ -67,7 +67,7 @@ pull_and_build_mpich2 () {
 	cd mpich2-snap-*
 	mkdir build
 	cd build
-	CFLAGS="-I${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/include"
+	CFLAGS="-g -I${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/include"
 	LDFLAGS="-L${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib"
 	LIBS="-lpvfs2 -lpthread -lgm"
 	export CFLAGS LDFLAGS LIBS
@@ -266,6 +266,8 @@ exec 2<&7 7<&-
 if [ -f $PVFS2_DEST/pvfs2-built-with-warnings -o \
 	-f ${PVFS2_DEST}/pvfs2-test-built-with-warnings ] ; then
 	tinder_report successwarn
+	rm -f $PVFS2_DEST/pvfs2-built-with-warnings
+	rm -f ${PVFS2_DEST}/pvfs2-test-built-with-warnings
 
 elif [ $nr_failed -gt 0 ]; then
 	tinder_report test_failed

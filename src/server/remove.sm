@@ -274,8 +274,7 @@ static PINT_sm_action remove_read_dirdata_handle(
     ret = job_trove_keyval_read(
         s_op->u.remove.fs_id, s_op->u.remove.handle,
         &s_op->key, &s_op->val, 
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->u.remove.fs_id), 
+        0, 
         NULL, smcb, 0, js_p,
         &j_id, server_job_context);
 
@@ -298,9 +297,7 @@ static PINT_sm_action remove_get_dirent_count(
     ret = job_trove_keyval_get_handle_info(
         s_op->u.remove.fs_id,
         s_op->u.remove.dirdata_handle,
-        TROVE_KEYVAL_HANDLE_COUNT |
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->u.remove.fs_id),
+        TROVE_KEYVAL_HANDLE_COUNT,
         &s_op->u.remove.keyval_handle_info,
         smcb,
         0,
@@ -353,8 +350,6 @@ static PINT_sm_action remove_remove_dirdata_dspace(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
-
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  removing dirdata dspace %llu\n",
 		 llu(s_op->u.remove.dirdata_handle));
@@ -362,10 +357,7 @@ static PINT_sm_action remove_remove_dirdata_dspace(
     ret = job_trove_dspace_remove(
         s_op->u.remove.fs_id,
         s_op->u.remove.dirdata_handle,
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->u.remove.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->u.remove.fs_id),
+        TROVE_SYNC,
         smcb,
         0,
         js_p,
@@ -387,18 +379,13 @@ static PINT_sm_action remove_remove_dspace(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
-
     gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) remove: removing dspace "
                  "object %llu,%d\n", s_op, llu(s_op->u.remove.handle),
                  s_op->u.remove.fs_id);
 
     ret = job_trove_dspace_remove(
         s_op->u.remove.fs_id, s_op->u.remove.handle,
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->u.remove.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->u.remove.fs_id), 
+        TROVE_SYNC, 
         smcb, 0, js_p,
         &j_id, server_job_context);
 

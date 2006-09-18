@@ -482,7 +482,7 @@ int client_handle_next(struct svr_xfer_state* state, bmi_context_id context)
 
             for(i=0; i<state->list_factor; i++)
             {
-                state->buffer_list[i] = state->buffer_array[state->step-3] +
+                state->buffer_list[i] = (char *) state->buffer_array[state->step-3] +
                     ((MSG_SIZE/state->list_factor)*i);
             }
             ret = BMI_post_recv_list(&tmp_id, state->addr,
@@ -511,7 +511,7 @@ int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context)
     {
         case 0:
             /* received a request */
-            free(state->unexp_buffer);
+            BMI_unexpected_free(state->addr, state->unexp_buffer);
             /* post a response send */
             ret = BMI_post_send(&tmp_id, state->addr, state->resp,
                 sizeof(struct response), BMI_PRE_ALLOC, state->tag,

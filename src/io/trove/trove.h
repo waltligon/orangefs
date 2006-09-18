@@ -59,11 +59,14 @@ enum
 
     TROVE_DB_CACHE_MMAP          = 1 << 5,
     TROVE_DB_CACHE_SYS           = 1 << 6,
-    TROVE_IMMEDIATE_COMPLETION   = 1 << 7,
-    TROVE_DSPACE_SYNC_COALESCE   = 1 << 8,
-    TROVE_KEYVAL_SYNC_COALESCE   = 1 << 9,
+    TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7
+};
 
-    TROVE_KEYVAL_HANDLE_COUNT    = 1 << 10
+enum
+{
+    TROVE_EXP_ROOT_SQUASH = 1,
+    TROVE_EXP_READ_ONLY   = 2,
+    TROVE_EXP_ALL_SQUASH  = 4,
 };
 
 /* get/setinfo option flags */
@@ -76,8 +79,12 @@ enum
     TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
     TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
     TROVE_DB_CACHE_SIZE_BYTES,
+    TROVE_ALT_AIO_MODE,
+    TROVE_MAX_CONCURRENT_IO,
     TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
     TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
+    TROVE_COLLECTION_META_SYNC_MODE,
+    TROVE_COLLECTION_IMMEDIATE_COMPLETION,
     TROVE_SHM_KEY_HINT
 };
 
@@ -367,6 +374,15 @@ int trove_dspace_getattr(TROVE_coll_id coll_id,
 			 TROVE_context_id context_id,
 			 TROVE_op_id *out_op_id_p);
 
+int trove_dspace_getattr_list(TROVE_coll_id coll_id,
+                         int nhandles,
+                         TROVE_handle *handle_array,
+                         TROVE_ds_attributes_s *ds_attr_p,
+                	 TROVE_ds_state  *error_array,
+                         TROVE_ds_flags flags,
+                         void* user_ptr,
+                         TROVE_context_id context_id,
+                         TROVE_op_id* out_op_id_p);
 
 int trove_dspace_setattr(TROVE_coll_id coll_id,
 			 TROVE_handle handle,

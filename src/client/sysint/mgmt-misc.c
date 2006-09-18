@@ -22,8 +22,6 @@
 #include "server-config.h"
 #include "client-state-machine.h"
 
-extern int g_admin_mode;
-
 /** Maps a given opaque server address back to a string address.  Also
  *  fills in server type.
  *
@@ -244,25 +242,6 @@ PVFS_error PVFS_mgmt_count_servers(
         server_config, fs_id, server_type, count);
     PINT_put_server_config_struct(server_config);
     return ret;
-}
-
-/** Turns on/off admin mode of system/mgmt interface.  This changes
- *  a local variable that determines the "mode" of subsequent server
- *  requests.
- *
- *  \return 0 on success, -PVFS_error on failure.
- */
-PVFS_error PVFS_mgmt_toggle_admin_mode(
-    PVFS_credentials *credentials,
-    int on_flag)
-{
-    if(on_flag != 1 && on_flag != 0)
-    {	
-	return -PVFS_EINVAL;
-    }
-
-    g_admin_mode = on_flag;
-    return 0;
 }
 
 /*
