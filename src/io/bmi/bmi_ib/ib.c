@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.44 2006-09-18 17:35:35 pw Exp $
+ * $Id: ib.c,v 1.45 2006-09-19 21:34:19 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1015,7 +1015,7 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    free(sq->mop);
 	    free(sq);
 	    --c->refcnt;
-	    if (c->closed)
+	    if (c->closed || c->cancelled)
 		ib_close_connection(c);
 	    return 1;
 	}
@@ -1037,7 +1037,7 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	free(sq->mop);
 	free(sq);
 	--c->refcnt;
-	if (c->closed)
+	if (c->closed || c->cancelled)
 	    ib_close_connection(c);
 	return 1;
     } else {
@@ -1079,7 +1079,7 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    c = rq->c;
 	    free(rq);
 	    --c->refcnt;
-	    if (c->closed)
+	    if (c->closed || c->cancelled)
 		ib_close_connection(c);
 	    return 1;
 	}
@@ -1108,7 +1108,7 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	c = rq->c;
 	free(rq);
 	--c->refcnt;
-	if (c->closed)
+	if (c->closed || c->cancelled)
 	    ib_close_connection(c);
 	return 1;
     } else {
@@ -1324,7 +1324,7 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	    c = rq->c;
 	    free(rq);
 	    --c->refcnt;
-	    if (c->closed)
+	    if (c->closed || c->cancelled)
 		ib_close_connection(c);
 	    goto out;
 	}
