@@ -289,8 +289,9 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
                 }
                 else /* okay, go ahead and do just that */
                 {
+                    if (inode->i_mode != mode)
+                        SetModeFlag(pvfs2_inode);
                     inode->i_mode = mode;
-                    SetModeFlag(pvfs2_inode);
                     mark_inode_dirty_sync(inode);
                     if (error == 0) /* equivalent. so dont set acl! */
                         acl = NULL;
@@ -527,7 +528,8 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
             inode->i_mode &= ~current->fs->umask;
             gossip_debug(GOSSIP_ACL_DEBUG, "inode->i_mode before %o and "
                     "after %o\n", old_mode, inode->i_mode);
-            SetModeFlag(pvfs2_inode);
+            if (old_mode != inode->i_mode)
+                SetModeFlag(pvfs2_inode);
         }
     }
     if (get_acl_flag(inode) == 1 && acl)

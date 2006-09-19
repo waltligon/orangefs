@@ -303,7 +303,7 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
     attrs->perms = PVFS_util_translate_mode(mode, suid);
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "mode is %d | translated perms is %d\n", mode,
+    gossip_debug(GOSSIP_UTILS_DEBUG, "mode is %o | translated perms is %o\n", mode,
                 attrs->perms);
 
     /* NOTE: this function only called during setattr.  Setattr must not mess
