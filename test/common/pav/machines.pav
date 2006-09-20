@@ -1,6 +1,0 @@
-# fill this up with hostnames of machines.  it will be the name of every host
-# (compute, io, metadata) involved with PAV
-foo.localhost
-grumpy.localnet
-kwijybo.localhost.localnet
-werqwerqwer
