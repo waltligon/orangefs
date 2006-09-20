@@ -113,27 +113,27 @@ static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
         {
             case PVFS_TYPE_NONE:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, 
-                    "new handle: %llu, type unknown.\n", js_p->handle);
+                    "new handle: %llu, type unknown.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_METAFILE:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, 
-                    "new handle: %llu, type metafile.\n", js_p->handle);
+                    "new handle: %llu, type metafile.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_DATAFILE:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,    
-                    "new handle: %llu, type datafile.\n", js_p->handle);
+                    "new handle: %llu, type datafile.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_DIRECTORY:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, 
-                    "new handle: %llu, type directory.\n", js_p->handle);
+                    "new handle: %llu, type directory.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_SYMLINK:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,    
-                    "new handle: %llu, type symlink.\n", js_p->handle);
+                    "new handle: %llu, type symlink.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_DIRDATA:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,    
-                    "new handle: %llu, type dirdata.\n", js_p->handle);
+                    "new handle: %llu, type dirdata.\n", llu(js_p->handle));
                 break;
         }
     }
