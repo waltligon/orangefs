@@ -157,7 +157,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
     if ( ! coll->meta_sync_enabled )
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]: meta sync disalbed, "
+                     "[SYNC_COALESCE]: meta sync disabled, "
                      "moving operation to completion queue\n");
 
         ret = dbpf_queued_op_complete(qop_p, retcode, OP_COMPLETED);
