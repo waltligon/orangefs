@@ -1,0 +1,125 @@
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/stat.c vanilla-new/fs/stat.c
+--- vanilla/fs/stat.c	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/fs/stat.c	2006-08-29 17:58:48.000000000 -0500
+@@ -345,6 +345,15 @@
+ 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
+ }
+ 
++static long get_stat_lite_mask(struct stat_lite __user *statlitebuf)
++{
++	struct stat_lite tmp;
++
++	if (copy_from_user(&tmp,statlitebuf,sizeof(tmp)))
++		return -EFAULT;
++	return tmp.st_litemask;
++}
++
+ int cp_new_statlite(struct kstat_lite *stat_lite, struct stat_lite __user *statlitebuf)
+ {
+ 	struct stat_lite tmp;
+@@ -434,7 +443,13 @@
+ asmlinkage long sys_newstatlite(char __user *filename, struct stat_lite __user *statlitebuf)
+ {
+ 	struct kstat_lite stat_lite;
+-	int error = vfs_statlite_fd(AT_FDCWD, filename, &stat_lite);
++	int error;
++
++	stat_lite.lite_mask = get_stat_lite_mask(statlitebuf);
++	if (stat_lite.lite_mask < 0)
++		return stat_lite.lite_mask;
++
++	error = vfs_statlite_fd(AT_FDCWD, filename, &stat_lite);
+ 
+ 	if (!error)
+ 		error = cp_new_statlite(&stat_lite, statlitebuf);
+@@ -456,7 +471,13 @@
+ asmlinkage long sys_newlstatlite(char __user *filename, struct stat_lite __user *statlitebuf)
+ {
+ 	struct kstat_lite stat_lite;
+-	int error = vfs_lstatlite_fd(AT_FDCWD, filename, &stat_lite);
++	int error;
++	
++	stat_lite.lite_mask = get_stat_lite_mask(statlitebuf);
++	if (stat_lite.lite_mask < 0)
++		return stat_lite.lite_mask;
++
++	error = vfs_lstatlite_fd(AT_FDCWD, filename, &stat_lite);
+ 
+ 	if (!error)
+ 		error = cp_new_statlite(&stat_lite, statlitebuf);
+@@ -501,7 +522,13 @@
+ asmlinkage long sys_newfstatlite(unsigned int fd, struct stat_lite __user *statlitebuf)
+ {
+ 	struct kstat_lite stat_lite;
+-	int error = vfs_fstatlite(fd, &stat_lite);
++	int error;
++
++	stat_lite.lite_mask = get_stat_lite_mask(statlitebuf);
++	if (stat_lite.lite_mask < 0)
++		return stat_lite.lite_mask;
++
++	error = vfs_fstatlite(fd, &stat_lite);
+ 
+ 	if (!error)
+ 		error = cp_new_statlite(&stat_lite, statlitebuf);
+@@ -580,6 +607,15 @@
+ 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
+ }
+ 
++static long get_stat64_lite_mask(struct stat64_lite __user *statlitebuf)
++{
++	struct stat64_lite tmp;
++
++	if (copy_from_user(&tmp,statlitebuf,sizeof(tmp)))
++		return -EFAULT;
++	return tmp.st_litemask;
++}
++
+ long cp_new_stat64_lite(struct kstat_lite *stat_lite, struct stat64_lite __user *statlitebuf)
+ {
+ 	struct stat64_lite tmp;
+@@ -648,7 +684,13 @@
+ asmlinkage long sys_statlite64(char __user * filename, struct stat64_lite __user * statlitebuf)
+ {
+ 	struct kstat_lite stat_lite;
+-	int error = vfs_statlite(filename, &stat_lite);
++	int error;
++
++	stat_lite.lite_mask = get_stat64_lite_mask(statlitebuf);
++	if (stat_lite.lite_mask < 0)
++		return stat_lite.lite_mask;
++
++	error = vfs_statlite(filename, &stat_lite);
+ 
+ 	if (!error)
+ 		error = cp_new_stat64_lite(&stat_lite, statlitebuf);
+@@ -670,7 +712,13 @@
+ asmlinkage long sys_lstatlite64(char __user * filename, struct stat64_lite __user * statlitebuf)
+ {
+ 	struct kstat_lite stat_lite;
+-	int error = vfs_lstatlite(filename, &stat_lite);
++	int error;
++	
++	stat_lite.lite_mask = get_stat64_lite_mask(statlitebuf);
++	if (stat_lite.lite_mask < 0)
++		return stat_lite.lite_mask;
++
++	error = vfs_lstatlite(filename, &stat_lite);
+ 
+ 	if (!error)
+ 		error = cp_new_stat64_lite(&stat_lite, statlitebuf);
+@@ -692,7 +740,13 @@
+ asmlinkage long sys_fstatlite64(unsigned long fd, struct stat64_lite __user * statlitebuf)
+ {
+ 	struct kstat_lite stat_lite;
+-	int error = vfs_fstatlite(fd, &stat_lite);
++	int error;
++
++	stat_lite.lite_mask = get_stat64_lite_mask(statlitebuf);
++	if (stat_lite.lite_mask < 0)
++		return stat_lite.lite_mask;
++
++	error = vfs_fstatlite(fd, &stat_lite);
+ 
+ 	if (!error)
+ 		error = cp_new_stat64_lite(&stat_lite, statlitebuf);
