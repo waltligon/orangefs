@@ -18,23 +18,7 @@ typedef struct
     uint64_t mask_val;
 } __keyword_mask_t;
 
-#define __DEBUG_ALL                                               \
-(GOSSIP_TROVE_DEBUG | GOSSIP_BMI_DEBUG_ALL | GOSSIP_SERVER_DEBUG |\
-GOSSIP_CLIENT_DEBUG | GOSSIP_JOB_DEBUG | GOSSIP_REQUEST_DEBUG |   \
-GOSSIP_REQ_SCHED_DEBUG | GOSSIP_FLOW_PROTO_DEBUG |                \
-GOSSIP_FLOW_DEBUG | GOSSIP_NCACHE_DEBUG | GOSSIP_ACACHE_DEBUG |   \
-GOSSIP_DIST_DEBUG | GOSSIP_DBPF_ATTRCACHE_DEBUG |                 \
-GOSSIP_MMAP_RCACHE_DEBUG | GOSSIP_LOOKUP_DEBUG |                  \
-GOSSIP_REMOVE_DEBUG | GOSSIP_GETATTR_DEBUG | GOSSIP_READDIR_DEBUG|\
-GOSSIP_IO_DEBUG | GOSSIP_DBPF_OPEN_CACHE_DEBUG |                  \
-GOSSIP_PERMISSIONS_DEBUG | GOSSIP_CANCEL_DEBUG |                  \
-GOSSIP_MSGPAIR_DEBUG | GOSSIP_CLIENTCORE_DEBUG |                  \
-GOSSIP_SETATTR_DEBUG | GOSSIP_MKDIR_DEBUG |                       \
-GOSSIP_SETEATTR_DEBUG | GOSSIP_GETEATTR_DEBUG |                   \
-GOSSIP_LISTEATTR_DEBUG | GOSSIP_LISTATTR_DEBUG |                  \
-GOSSIP_DBPF_KEYVAL_DEBUG |                                        \
-GOSSIP_ACCESS_DEBUG | GOSSIP_ACCESS_DETAIL_DEBUG |                \
-GOSSIP_PERFCOUNTER_DEBUG)
+#define __DEBUG_ALL ((uint64_t) -1)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -118,8 +102,10 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "keyval", GOSSIP_DBPF_KEYVAL_DEBUG },
     /* Debug the metadata sync coalescing code */
     { "coalesce", GOSSIP_DBPF_COALESCE_DEBUG },
-    /* Everything except the perf counter.  Useful for debugging */
-    { "verbose",  (__DEBUG_ALL & ~GOSSIP_PERFCOUNTER_DEBUG)},
+    /* Everything except the periodic events.  Useful for debugging */
+    { "verbose",
+      (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG))
+    },
     /* No debug output */
     { "none", GOSSIP_NO_DEBUG },
     /* Everything */
