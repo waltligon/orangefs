@@ -51,20 +51,52 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_I_SIZE_READ, 1, Define if kernel has i_size_read),
 	)
 
-	AC_MSG_CHECKING(for parent_ino in kernel)
+	AC_MSG_CHECKING(for iget_locked function in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel already defined it
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		ino_t parent_ino(struct dentry *dentry)
+		loff_t iget_locked(struct inode *inode)
 		{
-			return (ino_t)0;
+			return 0;
 		}
 	], [],
 		AC_MSG_RESULT(no),
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_PARENT_INO, 1, Define if kernel has parent_ino),
+		AC_DEFINE(HAVE_IGET_LOCKED, 1, Define if kernel has iget_locked),
+	)
+
+	AC_MSG_CHECKING(for iget4_locked function in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel already defined it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		loff_t iget4_locked(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IGET4_LOCKED, 1, Define if kernel has iget4_locked),
+	)
+
+	AC_MSG_CHECKING(for iget5_locked function in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel already defined it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		loff_t iget5_locked(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IGET5_LOCKED, 1, Define if kernel has iget5_locked),
 	)
 
 	dnl The name of this field changed from memory_backed to capabilities

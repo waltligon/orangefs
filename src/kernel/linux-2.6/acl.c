@@ -18,6 +18,7 @@
 #include "pvfs2-bufmap.h"
 
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+#include "pvfs2-internal.h"
 
 #ifdef HAVE_POSIX_ACL_H
 #include <linux/posix_acl.h>
@@ -225,8 +226,8 @@ pvfs2_get_acl(struct inode *inode, int type)
         gossip_err("pvfs2_get_acl: Could not allocate value ptr\n");
         return ERR_PTR(-ENOMEM);
     }
-    gossip_debug(GOSSIP_ACL_DEBUG, "inode %ld, key %s, type %d\n", 
-            (long) inode->i_ino, key, type);
+    gossip_debug(GOSSIP_ACL_DEBUG, "inode %llu, key %s, type %d\n", 
+            llu(get_handle_from_ino(inode)), key, type);
     ret = pvfs2_inode_getxattr(inode, "", key, value, PVFS_MAX_XATTR_VALUELEN);
     /* if the key exists, convert it to an in-memory rep */
     if (ret > 0)
@@ -238,8 +239,8 @@ pvfs2_get_acl(struct inode *inode, int type)
         acl = NULL;
     }
     else {
-        gossip_err("inode %ld retrieving acl's failed with error %d\n",
-                (long) inode->i_ino, ret);
+        gossip_err("inode %llu retrieving acl's failed with error %d\n",
+                llu(get_handle_from_ino(inode)), ret);
         acl = ERR_PTR(ret);
     }
     if (value) {
@@ -318,8 +319,8 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
             return -EINVAL;
         }
     }
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: inode %ld, key %s type %d\n",
-            (long) inode->i_ino, name, type);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: inode %llu, key %s type %d\n",
+            llu(get_handle_from_ino(inode)), name, type);
     /* If we do have an access control list, then we need to encode that! */
     if (acl) 
     {
@@ -641,8 +642,8 @@ static int pvfs2_check_acl(struct inode *inode, int mask)
 {
     struct posix_acl *acl = NULL;
 
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: called on inode %ld\n",
-            (long) inode->i_ino);
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: called on inode %llu\n",
+            llu(get_handle_from_ino(inode)));
 
     acl = pvfs2_get_acl(inode, ACL_TYPE_ACCESS);
 
@@ -657,8 +658,8 @@ static int pvfs2_check_acl(struct inode *inode, int mask)
         int error = posix_acl_permission(inode, acl, mask);
         posix_acl_release(acl);
         gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl: posix_acl_permission "
-                " (inode %ld, acl %p, mask %x) returned %d\n",
-                (long) inode->i_ino, acl, mask, error);
+                " (inode %llu, acl %p, mask %x) returned %d\n",
+                 llu(get_handle_from_ino(inode)), acl, mask, error);
         return error;
     }
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl returning EAGAIN\n");
@@ -673,12 +674,12 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
     ret = generic_permission(inode, mask, pvfs2_check_acl);
     if (ret != 0)
     {
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission failed: inode: %ld mask = %o"
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission failed: inode: %llu mask = %o"
                 "mode = %o current->fsuid = %d "
                 "inode->i_uid = %d, inode->i_gid = %d "
                 "in_group_p = %d "
                 "(ret = %d)\n",
-                (long) inode->i_ino, mask, inode->i_mode, current->fsuid, 
+                llu(get_handle_from_ino(inode)), mask, inode->i_mode, current->fsuid, 
                 inode->i_uid, inode->i_gid, 
                 in_group_p(inode->i_gid),
                 ret);
@@ -690,8 +691,8 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
                 inode->i_mode & S_IRWXG);
     }
     else {
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission succeeded on inode %ld\n",
-                (long) inode->i_ino);
+        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission succeeded on inode %llu\n",
+                llu(get_handle_from_ino(inode)));
     }
     return ret;
 #else
@@ -699,11 +700,11 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
     int mode = inode->i_mode;
     int error;
 
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: inode: %ld mask = %o"
+    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: inode: %llu mask = %o"
             "mode = %o current->fsuid = %d "
             "inode->i_uid = %d, inode->i_gid = %d"
             "in_group_p = %d\n", 
-            (long) inode->i_ino, mask, mode, current->fsuid,
+            llu(get_handle_from_ino(inode)), mask, mode, current->fsuid,
             inode->i_uid, inode->i_gid,
             in_group_p(inode->i_gid));
 

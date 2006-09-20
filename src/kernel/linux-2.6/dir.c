@@ -153,7 +153,7 @@ static int pvfs2_readdir(
         token_set = 1;
         if (pvfs2_inode->directory_version == 0)
         {
-            ino = dentry->d_inode->i_ino;
+            ino = get_ino_from_handle(dentry->d_inode);
             gossip_debug(GOSSIP_DIR_DEBUG, "calling filldir of . with pos = %d\n", pos);
             if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
             {
@@ -167,7 +167,7 @@ static int pvfs2_readdir(
         token_set = 1;
         if (pvfs2_inode->directory_version == 0)
         {
-            ino = parent_ino(dentry);
+            ino = get_parent_ino_from_dentry(dentry);
             gossip_debug(GOSSIP_DIR_DEBUG, "calling filldir of .. with pos = %d\n", pos);
             if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
             {
@@ -192,15 +192,20 @@ static int pvfs2_readdir(
 	    return -ENOMEM;
 	}
 
-	if (pvfs2_inode && pvfs2_inode->refn.handle &&
-            pvfs2_inode->refn.fs_id)
+	if (pvfs2_inode && pvfs2_inode->refn.handle != PVFS_HANDLE_NULL &&
+            pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL)
 	{
 	    new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
 	}
 	else
 	{
+#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
+            gossip_lerr("Critical error: i_ino cannot be relied on when using iget4/5\n");
+            op_release(new_op);
+            return -EINVAL;
+#endif
 	    new_op->upcall.req.readdir.refn.handle =
-		pvfs2_ino_to_handle(dentry->d_inode->i_ino);
+		get_handle_from_ino(dentry->d_inode);
 	    new_op->upcall.req.readdir.refn.fs_id =
 		PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
 	}
@@ -504,6 +509,7 @@ static int pvfs2_readdirplus_common(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
     filldirplus_t filldirplus = NULL;
     filldirpluslite_t filldirplus_lite = NULL;
+    PVFS_object_ref ref;
 
     direntplus = info->direntplus;
     if (info->lite == 0)
@@ -544,8 +550,10 @@ restart_readdir:
             token_set = 1;
             if (pvfs2_inode->directory_version == 0)
             {
-                ino = dentry->d_inode->i_ino;
-                inode = iget(dentry->d_inode->i_sb, ino);
+                ino = get_ino_from_handle(dentry->d_inode);
+                ref.fs_id = get_fsid_from_ino(dentry->d_inode);
+                ref.handle = get_handle_from_ino(dentry->d_inode);
+                inode = pvfs2_iget(dentry->d_inode->i_sb, &ref);
                 if (inode)
                 {
                     if (info->lite == 0)
@@ -584,8 +592,10 @@ restart_readdir:
             token_set = 1;
             if (pvfs2_inode->directory_version == 0)
             {
-                ino = parent_ino(dentry);
-                inode = iget(dentry->d_inode->i_sb, ino);
+                ino = get_parent_ino_from_dentry(dentry);
+                ref.fs_id = get_fsid_from_ino(dentry->d_parent->d_inode);
+                ref.handle = get_handle_from_ino(dentry->d_parent->d_inode);
+                inode = pvfs2_iget(dentry->d_inode->i_sb, &ref);
                 if (inode) 
                 {
                     if (info->lite == 0)
@@ -634,15 +644,20 @@ restart_readdir:
             {
                 return -ENOMEM;
             }
-            if (pvfs2_inode && pvfs2_inode->refn.handle &&
-                pvfs2_inode->refn.fs_id)
+            if (pvfs2_inode && pvfs2_inode->refn.handle != PVFS_HANDLE_NULL
+                    && pvfs2_inode->refn.fs_id != PVFS_FS_ID_NULL)
             {
                 new_op->upcall.req.readdirplus.refn = pvfs2_inode->refn;
             }
             else
             {
+#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
+                gossip_lerr("Critical error: i_ino cannot be relied on when using iget4/5\n");
+                op_release(new_op);
+                return -EINVAL;
+#endif
                 new_op->upcall.req.readdirplus.refn.handle =
-                    pvfs2_ino_to_handle(dentry->d_inode->i_ino);
+                    get_handle_from_ino(dentry->d_inode);
                 new_op->upcall.req.readdirplus.refn.fs_id =
                     PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
             }
@@ -750,8 +765,10 @@ restart_readdir:
 
                     if (stat_error == 0)
                     {
+                        ref.fs_id = get_fsid_from_ino(dentry->d_inode);
+                        ref.handle = handle;
                         /* locate inode in the icache, but don't getattr() */
-                        filled_inode = iget_locked(dentry->d_inode->i_sb, current_ino);
+                        filled_inode = pvfs2_iget_locked(dentry->d_inode->i_sb, &ref);
                         if (filled_inode == NULL) {
                             gossip_err("Could not allocate inode\n");
                             ret = -ENOMEM;
@@ -788,9 +805,7 @@ restart_readdir:
                                 filled_inode->i_bdev = NULL;
                                 filled_inode->i_cdev = NULL;
                                 filled_inode->i_mapping->a_ops = &pvfs2_address_operations;
-#ifndef PVFS2_LINUX_KERNEL_2_4
                                 filled_inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
-#endif
                                 /* Make sure that we unlock the inode */
                                 unlock_new_inode(filled_inode);
                             }

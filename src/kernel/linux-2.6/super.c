@@ -5,6 +5,7 @@
  */
 
 #include "pvfs2-kernel.h"
+#include "pvfs2-internal.h"
 
 /* list for storing pvfs2 specific superblocks in use */
 LIST_HEAD(pvfs2_superblocks);
@@ -183,8 +184,8 @@ static void pvfs2_destroy_inode(struct inode *inode)
 
     if (pvfs2_inode)
     {
-        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_destroy_inode: deallocated %p destroying inode %ld\n",
-                    pvfs2_inode, (long)inode->i_ino);
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_destroy_inode: deallocated %p destroying inode %llu\n",
+                    pvfs2_inode, llu(get_handle_from_ino(inode)));
 
         atomic_inc(&pvfs2_inode_dealloc_count);
         pvfs2_inode_finalize(pvfs2_inode);
@@ -197,8 +198,8 @@ static void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_read_inode: %p (inode = %lu | ct = %d)\n",
-                pvfs2_inode, inode->i_ino, (int)atomic_read(&inode->i_count));
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_read_inode: %p (inode = %llu | ct = %d)\n",
+                pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
 
     /*
       at this point we know the private inode data handle/fs_id can't
@@ -245,12 +246,14 @@ static void pvfs2_read_inode(
         inode->u.generic_ip = pvfs2_inode;
         pvfs2_inode->vfs_inode = inode;
 
-        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: pvfs2_read_inode: allocated %p (inode = %lu | "
-                "ct = %d)\n", pvfs2_inode, inode->i_ino,
-                (int)atomic_read(&inode->i_count));
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
             pvfs2_make_bad_inode(inode);
+        }
+        else {
+            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: pvfs2_read_inode: allocated %p (inode = %llu | "
+                    "ct = %d)\n", pvfs2_inode, llu(get_handle_from_ino(inode)),
+                                  (int)atomic_read(&inode->i_count));
         }
     }
     else
@@ -265,8 +268,8 @@ static void pvfs2_clear_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_clear_inode: deallocated %p, destroying inode %ld\n",
-                pvfs2_inode, (long)inode->i_ino);
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_clear_inode: deallocated %p, destroying inode %llu\n",
+                pvfs2_inode, llu(get_handle_from_ino(inode)));
 
     pvfs2_inode_finalize(pvfs2_inode);
     pvfs2_inode_release(pvfs2_inode);
@@ -280,8 +283,8 @@ static void pvfs2_put_inode(
     struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_put_inode: pvfs2_inode: %p (i_ino %d) = %d (nlink=%d)\n",
-                pvfs2_inode, (int)inode->i_ino, (int)atomic_read(&inode->i_count),
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_put_inode: pvfs2_inode: %p (inode = %llu) = %d (nlink=%d)\n",
+                pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count),
                 (int)inode->i_nlink);
 
     if (atomic_read(&inode->i_count) == 1)
@@ -785,7 +788,7 @@ static void pvfs2_dirty_inode(struct inode *inode)
     if (inode)
     {
         pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_dirty_inode: %ld\n", (long) inode->i_ino);
+        gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_dirty_inode: %llu\n", llu(get_handle_from_ino(inode)));
         SetAtimeFlag(pvfs2_inode);
     }
     return;
@@ -834,6 +837,7 @@ struct super_block* pvfs2_get_sb(
     pvfs2_kernel_op_t *new_op = NULL;
     char *dev_name = NULL;
     int ret = -EINVAL;
+    PVFS_object_ref root_object;
 
     if (!data || !sb)
     {
@@ -907,17 +911,20 @@ struct super_block* pvfs2_get_sb(
     sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
+    root_object.handle = PVFS2_SB(sb)->root_handle;
+    root_object.fs_id  = PVFS2_SB(sb)->fs_id;
+
     /* alloc and initialize our root directory inode by explicitly requesting
      * the sticky bit to be set */
     root = pvfs2_get_custom_inode(
-        sb, NULL, (S_IFDIR | 0755 | S_ISVTX), 0, PVFS2_SB(sb)->root_handle);
+        sb, NULL, (S_IFDIR | 0755 | S_ISVTX), 0, root_object);
     if (!root)
     {
         ret = -ENOMEM;
         goto error_exit;
     }
-    gossip_debug(GOSSIP_SUPER_DEBUG, "Allocated root inode [%p] with mode %x\n", root, root->i_mode);
-    PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
+    gossip_debug(GOSSIP_SUPER_DEBUG, "Allocated root inode [%p] with mode %o\n",
+            root, root->i_mode);
 
     /* allocates and places root dentry in dcache */
     root_dentry = d_alloc_root(root);
@@ -978,6 +985,7 @@ int pvfs2_fill_sb(
     struct inode *root = NULL;
     struct dentry *root_dentry = NULL;
     pvfs2_mount_sb_info_t *mount_sb_info = (pvfs2_mount_sb_info_t *)data;
+    PVFS_object_ref root_object;
 
     /* alloc and init our private pvfs2 sb info */
     sb->s_fs_info = kmalloc(sizeof(pvfs2_sb_info_t), PVFS2_GFP_FLAGS);
@@ -1020,17 +1028,17 @@ int pvfs2_fill_sb(
     sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
+    root_object.handle = PVFS2_SB(sb)->root_handle;
+    root_object.fs_id  = PVFS2_SB(sb)->fs_id;
     /* alloc and initialize our root directory inode. be explicit about sticky
      * bit */
     root = pvfs2_get_custom_inode(sb, NULL, (S_IFDIR | 0755 | S_ISVTX),
-                                  0, PVFS2_SB(sb)->root_handle);
+                                  0, root_object);
     if (!root)
     {
         return -ENOMEM;
     }
     gossip_debug(GOSSIP_SUPER_DEBUG, "Allocated root inode [%p] with mode %x\n", root, root->i_mode);
-    PVFS2_I(root)->refn.handle = PVFS2_SB(sb)->root_handle;
-    PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
 
     /* allocates and places root dentry in dcache */
     root_dentry = d_alloc_root(root);

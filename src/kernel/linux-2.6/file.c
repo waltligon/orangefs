@@ -48,8 +48,8 @@ int pvfs2_file_open(
 {
     int ret = -EINVAL;
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open: called on %s (inode is %d)\n",
-                file->f_dentry->d_name.name, (int)inode->i_ino);
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open: called on %s (inode is %llu)\n",
+                file->f_dentry->d_name.name, llu(get_handle_from_ino(inode)));
 
     inode->i_mapping->host = inode;
     inode->i_mapping->a_ops = &pvfs2_address_operations;
@@ -265,10 +265,11 @@ static ssize_t do_read_write(struct rw_options *rw)
             else
             {
                 gossip_err(
-                    "%s: error writing to handle %llu, "
+                    "%s: error %s handle %llu, "
                     "-- returning %ld\n",
                     fnstr,
-                    llu(pvfs2_ino_to_handle(inode->i_ino)),
+                    rw->type == IO_READ ? "reading from" : "writing to",
+                    llu(get_handle_from_ino(inode)),
                     (long) ret);
             }
             goto out;
@@ -736,9 +737,11 @@ static ssize_t do_readv_writev(int type, struct file *file,
               else
               {
                   gossip_err(
-                        "%s: error on handle %llu, "
+                        "%s: error in %s handle %llu, "
                         "FILE: %s\n  -- returning %zd\n",
-                        fnstr, llu(pvfs2_ino_to_handle(inode->i_ino)),
+                        fnstr, 
+                        type == IO_READV ? "vectored read from" : "vectored write to",
+                        llu(get_handle_from_ino(inode)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
                         ret);
@@ -1256,9 +1259,11 @@ static ssize_t do_readx_writex(int type, struct file *file,
               else
               {
                   gossip_err(
-                        "%s: error on handle %llu, "
+                        "%s: error in %s handle %llu, "
                         "FILE: %s\n  -- returning %ld\n",
-                        fnstr, llu(pvfs2_ino_to_handle(inode->i_ino)),
+                        fnstr, 
+                        type == IO_READX ? "noncontig read from" : "noncontig write to",
+                        llu(get_handle_from_ino(inode)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
                         (long) ret);
@@ -1889,7 +1894,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                             "pvfs2_file_aio_read: error reading from "
                             " handle %llu, "
                             "\n  -- returning %d\n",
-                            llu(pvfs2_ino_to_handle(inode->i_ino)),
+                            llu(get_handle_from_ino(inode)),
                             (int) ret);
                     }
                     error = ret;
@@ -2164,7 +2169,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                             " handle %llu, "
                             "FILE: %s\n  -- "
                             "returning %d\n",
-                            llu(pvfs2_ino_to_handle(inode->i_ino)),
+                            llu(get_handle_from_ino(inode)),
                             (filp && filp->f_dentry 
                              && filp->f_dentry->d_name.name ?
                              (char *)filp->f_dentry->d_name.name : "UNKNOWN"),

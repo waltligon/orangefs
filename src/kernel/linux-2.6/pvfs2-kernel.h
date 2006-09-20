@@ -170,15 +170,6 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 #define MSECS_TO_JIFFIES(ms) (((ms)*HZ+999)/1000)
 #endif
 
-/* translates an inode number to a pvfs2 handle */
-#define pvfs2_ino_to_handle(ino) (PVFS_handle)ino
-
-/* translates a pvfs2 handle to an inode number */
-#define pvfs2_handle_to_ino(handle) (ino_t)pvfs2_handle_l32(handle)
-
-#define pvfs2_handle_l32(handle) (__u32)(handle)
-#define pvfs2_handle_h32(handle) (__u32)(handle >> 32)
-
 /************************************
  * valid pvfs2 kernel operation states
  *
@@ -384,6 +375,7 @@ typedef struct
 #define P_MTIME_FLAG 1
 #define P_CTIME_FLAG 2
 #define P_MODE_FLAG  3
+#define P_INIT_FLAG  4
 
 #define ClearAtimeFlag(pinode) clear_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
 #define SetAtimeFlag(pinode)   set_bit(P_ATIME_FLAG, &(pinode)->pinode_flags)
@@ -400,6 +392,10 @@ typedef struct
 #define ClearModeFlag(pinode) clear_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
 #define SetModeFlag(pinode)   set_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
 #define ModeFlag(pinode)      test_bit(P_MODE_FLAG, &(pinode)->pinode_flags)
+
+#define ClearInitFlag(pinode) clear_bit(P_INIT_FLAG, &(pinode)->pinode_flags)
+#define SetInitFlag(pinode)   set_bit(P_INIT_FLAG, &(pinode)->pinode_flags)
+#define InitFlag(pinode)      test_bit(P_INIT_FLAG, &(pinode)->pinode_flags)
 
 /** mount options.  only accepted mount options are listed.
  */
@@ -576,6 +572,60 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
 #endif
 }
 
+static inline PVFS_handle ino_to_pvfs2_handle(ino_t ino)
+{
+    return (PVFS_handle) ino;
+}
+
+static inline ino_t pvfs2_handle_to_ino(PVFS_handle handle)
+{
+    ino_t ino;
+
+    ino = (ino_t) handle;
+    if (sizeof(ino_t) < sizeof(PVFS_handle))
+        ino ^= handle >> (sizeof(PVFS_handle) - sizeof(ino_t)) * 8;
+    return ino;
+}
+
+static inline PVFS_handle get_handle_from_ino(struct inode *inode)
+{
+#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
+    return PVFS2_I(inode)->refn.handle;
+#else
+    return ino_to_pvfs2_handle(inode->i_ino);
+#endif
+}
+
+static inline PVFS_fs_id get_fsid_from_ino(struct inode *inode)
+{
+    return PVFS2_I(inode)->refn.fs_id;
+}
+
+static inline ino_t get_ino_from_handle(struct inode *inode)
+{
+    PVFS_handle handle;
+    ino_t ino;
+
+    handle = get_handle_from_ino(inode);
+    ino = pvfs2_handle_to_ino(handle);
+    return ino;
+}
+
+static inline ino_t get_parent_ino_from_dentry(struct dentry *dentry)
+{
+    return get_ino_from_handle(dentry->d_parent->d_inode);
+}
+
+static inline int is_root_handle(struct inode *inode)
+{
+    return PVFS2_SB(inode->i_sb)->root_handle == get_handle_from_ino(inode);
+}
+
+static inline int match_handle(PVFS_handle resp_handle, struct inode *inode)
+{
+    return resp_handle == get_handle_from_ino(inode);
+}
+
 /****************************
  * defined in pvfs2-cache.c
  ****************************/
@@ -671,7 +721,7 @@ struct inode *pvfs2_get_custom_inode(
     struct inode *dir,
     int mode,
     dev_t dev,
-    unsigned long ino);
+    PVFS_object_ref ref);
 
 int pvfs2_setattr(
     struct dentry *dentry,
@@ -705,6 +755,12 @@ int pvfs2_removexattr(struct dentry *dentry, const char *name);
 /****************************
  * defined in namei.c
  ****************************/
+struct inode *pvfs2_iget_common(
+        struct super_block *sb,
+        PVFS_object_ref *ref, int keep_locked);
+#define pvfs2_iget(sb, ref)        pvfs2_iget_common(sb, ref, 0)
+#define pvfs2_iget_locked(sb, ref) pvfs2_iget_common(sb, ref, 1)
+
 #ifdef PVFS2_LINUX_KERNEL_2_4
 int pvfs2_permission(struct inode *, int);
 #else
@@ -979,8 +1035,8 @@ do {                                                      \
 #ifdef USE_MMAP_RA_CACHE
 #define clear_inode_mmap_ra_cache(inode)                  \
 do {                                                      \
-  gossip_debug(GOSSIP_INODE_DEBUG, "calling clear_inode_mmap_ra_cache on %d\n",\
-              (int)inode->i_ino);                         \
+  gossip_debug(GOSSIP_INODE_DEBUG, "calling clear_inode_mmap_ra_cache on %llu\n",\
+              llu(get_handle_from_ino(inode)));                         \
   pvfs2_flush_mmap_racache(inode);                        \
   gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_mmap_ra_cache finished\n");    \
 } while(0)
@@ -1182,13 +1238,6 @@ static inline loff_t i_size_read(struct inode *inode)
 static inline void i_size_write(struct inode *inode, loff_t i_size)
 {
     inode->i_size = i_size;
-}
-#endif
-
-#ifndef HAVE_PARENT_INO
-static inline ino_t parent_ino(struct dentry *dentry)
-{
-    return dentry->d_parent->d_inode->i_ino;
 }
 #endif
 

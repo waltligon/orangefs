@@ -255,6 +255,7 @@ static void pvfs2_inode_cache_ctor(
     if (flags & SLAB_CTOR_CONSTRUCTOR)
     {
         memset(pvfs2_inode, 0, sizeof(pvfs2_inode_t));
+        ClearInitFlag(pvfs2_inode);
 
         pvfs2_inode_initialize(pvfs2_inode);
 

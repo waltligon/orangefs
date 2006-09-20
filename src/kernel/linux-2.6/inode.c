@@ -13,6 +13,7 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 #include "pvfs2-types.h"
+#include "pvfs2-internal.h"
 
 static int read_one_page(struct page *page)
 {
@@ -160,8 +161,8 @@ struct address_space_operations pvfs2_address_operations =
 void pvfs2_truncate(struct inode *inode)
 {
     loff_t orig_size = i_size_read(inode);
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %d "
-                "with size %ld\n",(int)inode->i_ino, (long) orig_size);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %llu "
+                "with size %ld\n", llu(get_handle_from_ino(inode)), (long) orig_size);
 
     /* successful truncate when size changes also requires mtime updates 
      * although the mtime updates are propagated lazily!
@@ -348,6 +349,106 @@ struct inode_operations pvfs2_file_inode_operations =
 #endif
 };
 
+#if defined(HAVE_IGET5_LOCKED) || defined (HAVE_IGET4_LOCKED)
+
+/*
+ * Given a PVFS2 object identifier (fsid, handle), convert it into a ino_t type
+ * that will be used as a hash-index from where the handle will
+ * be searched for in the VFS hash table of inodes.
+ */
+static inline ino_t pvfs2_handle_hash(PVFS_object_ref *ref)
+{
+    if (!ref)
+        return 0;
+    return pvfs2_handle_to_ino(ref->handle);
+}
+
+/* the ->set callback of iget5_locked and friends. Sorta equivalent to the ->read_inode()
+ * callback if we are using iget and friends 
+ */
+static int pvfs2_set_inode(struct inode *inode, void *data)
+{
+    /* callbacks to set inode number handle */
+    PVFS_object_ref *ref = (PVFS_object_ref *) data;
+    pvfs2_inode_t *pvfs2_inode = NULL;
+
+    pvfs2_inode = PVFS2_I(inode);
+    pvfs2_inode_initialize(pvfs2_inode);
+    pvfs2_inode->refn.fs_id  = ref->fs_id;
+    pvfs2_inode->refn.handle = ref->handle;
+    return 0;
+}
+
+#ifdef HAVE_IGET5_LOCKED
+static int
+pvfs2_test_inode(struct inode *inode, void *data)
+#elif defined(HAVE_IGET4_LOCKED)
+static int 
+pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
+#endif
+{
+    /* callbacks to determine if handles match */
+    PVFS_object_ref *ref = (PVFS_object_ref *) data;
+    pvfs2_inode_t *pvfs2_inode = NULL;
+
+    pvfs2_inode = PVFS2_I(inode);
+    return (pvfs2_inode->refn.handle == ref->handle && pvfs2_inode->refn.fs_id == ref->fs_id);
+}
+#endif
+
+/*
+ * Front-end to lookup the inode-cache maintained by the VFS using the PVFS2
+ * file handle instead of the inode number.
+ * Problem with iget() is well-documented in that it can lead to possible
+ * collissions especially for a file-system with 64 bit handles since inode->i_ino
+ * is only a scalar field (32 bits). So the trick now is to use iget4_locked (OR) iget5_locked
+ * if the kernel defines one and set inode number to be just a hash for the
+ * handle
+ * @sb: the file system super block instance
+ * @ref: The PVFS2 object for which we are trying to locate an inode structure
+ * @keep_locked : indicates whether the inode must be simply allocated and not filled
+ * in with the results from a ->getattr. i.e. if keep_locked is set to 0, we do a getattr() and
+ * unlock the inode and if set to 1, we do not issue a getattr() and keep it locked
+ * 
+ * Boy, this function is so ugly with all these macros. I wish I could find a better
+ * way to reduce the macro clutter.
+ */
+struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, int keep_locked)
+{
+    struct inode *inode = NULL;
+    unsigned long hash;
+
+#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
+    hash = pvfs2_handle_hash(ref);
+#if defined(HAVE_IGET5_LOCKED)
+    inode = iget5_locked(sb, hash, pvfs2_test_inode, pvfs2_set_inode, ref);
+#elif defined(HAVE_IGET4_LOCKED)
+    inode = iget4_locked(sb, hash, pvfs2_test_inode, ref);
+#endif
+#else
+    hash = (unsigned long) ref->handle;
+#ifdef HAVE_IGET_LOCKED
+    inode = iget_locked(sb, hash);
+#else
+    /* iget() internally issues a call to read_inode() */
+    inode = iget(sb, hash);
+#endif
+#endif
+    if (!keep_locked)
+    {
+#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET_LOCKED)
+        if (inode && (inode->i_state & I_NEW))
+        {
+            inode->i_ino = hash; /* needed for stat etc */
+            /* issue a call to read the inode */
+            sb->s_op->read_inode(inode);
+            unlock_new_inode(inode);
+        }
+#endif
+    }
+    return inode;
+}
+
 /** Allocates a Linux inode structure with additional PVFS2-specific
  *  private data (I think -- RobR).
  */
@@ -356,7 +457,7 @@ struct inode *pvfs2_get_custom_inode(
     struct inode *dir,
     int mode,
     dev_t dev,
-    unsigned long ino)
+    PVFS_object_ref object)
 {
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
@@ -365,7 +466,7 @@ struct inode *pvfs2_get_custom_inode(
                 "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
                 MINOR(dev));
 
-    inode = iget(sb, ino);
+    inode = pvfs2_iget(sb, &object);
     if (inode)
     {
 	/* initialize pvfs2 specific private data */
@@ -378,10 +479,7 @@ struct inode *pvfs2_get_custom_inode(
             return NULL;
         }
 
-        if (inode->i_ino != PVFS2_SB(inode->i_sb)->root_handle)
-        {
-            inode->i_mode = mode;
-        }
+        inode->i_mode = mode;
         inode->i_mapping->host = inode;
         inode->i_uid = current->fsuid;
         inode->i_gid = current->fsgid;
@@ -429,8 +527,8 @@ struct inode *pvfs2_get_custom_inode(
             goto error;
 	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
-        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %ld\n", 
-                (long) inode->i_ino);
+        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %llu\n", 
+                llu(get_handle_from_ino(inode)));
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);
 #endif

@@ -69,6 +69,10 @@ do {                                                       \
 } while(0)
 
 #define gossip_err printk
+#define gossip_lerr(format, f...)                  \
+do {                                               \
+    gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
+} while(0)
 
 #else
 
