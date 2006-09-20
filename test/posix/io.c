@@ -98,15 +98,7 @@ int main(int argc, char **argv)
 
 	if (opt_write) {
 		/* open the file for writing */
-		if (mynod == 0)
-		{
-			fd = open(opt_file, amode, 0644);
-			MPI_Barrier(MPI_COMM_WORLD);
-		}
-		else {
-			MPI_Barrier(MPI_COMM_WORLD);
-			fd = open(opt_file, O_LARGEFILE | O_RDWR);
-		}
+		fd = open(opt_file, amode, 0644);
 
 		if (fd < 0) {
 			fprintf(stderr, "node %d, open error: %s\n", mynod,
@@ -164,15 +156,8 @@ int main(int argc, char **argv)
 
 	if (opt_read) {
 		/* open the file to read the data back out */
-		if (mynod == 0)
-		{
-			fd = open(opt_file, amode, 0644);
-			MPI_Barrier(MPI_COMM_WORLD);
-		}
-		else {
-			MPI_Barrier(MPI_COMM_WORLD);
-			fd = open(opt_file, O_RDONLY | O_LARGEFILE);
-		}
+		fd = open(opt_file, amode, 0644);
+
 		if (fd < 0) {
 			fprintf(stderr, "node %d, open error: %s\n", mynod,
 					  strerror(errno));

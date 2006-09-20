@@ -64,8 +64,7 @@ int main(int argc, char *argv[])
 				fname = optarg;
 				break;
 			case 'c':
-				if (rank == 0)
-					open_flags |= O_CREAT;
+				open_flags |= O_CREAT;
 				do_create = 1;
 				break;
 			case '?':
@@ -85,8 +84,6 @@ int main(int argc, char *argv[])
 
 	for (i = 0; i < niters; i++)
 	{
-		if (do_create == 0)
-		{
 			a = MPI_Barrier(MPI_COMM_WORLD);
 			open_flags |= O_RDONLY;
 
@@ -100,40 +97,8 @@ int main(int argc, char *argv[])
 			end = Wtime();
 			tdiff += (end - begin);
 			close(fd);
-		}
-		else
-		{
-			open_flags |= O_RDONLY;
-			if (rank == 0)
-			{
-				begin = Wtime();
-				fd = open(fname, open_flags, 0775);
-				if (fd < 0) {
-					perror("open(2) error:");
-					MPI_Finalize();
-					exit(1);
-				}
-				end = Wtime();
-				tdiff += (end - begin);
-				MPI_Barrier(MPI_COMM_WORLD);
-			}
-			else {
-				MPI_Barrier(MPI_COMM_WORLD);
-				begin = Wtime();
-				fd = open(fname, open_flags, 0775);
-				if (fd < 0) {
-					perror("open(2) error:");
-					MPI_Finalize();
-					exit(1);
-				}
-				end = Wtime();
-				tdiff += (end - begin);
-			}
-			MPI_Barrier(MPI_COMM_WORLD);
-			close(fd);
 			if (rank == 0 && i < (niters - 1))
 				unlink(fname);
-		}
 	}
 	tdiff = tdiff / niters;
 	MPI_Allreduce(&tdiff, &max_diff, 1, 
