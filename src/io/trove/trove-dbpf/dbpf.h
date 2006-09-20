@@ -408,9 +408,34 @@ enum dbpf_op_type
     DSPACE_GETATTR_LIST,
 };
 
-#define DBPF_OP_IS_BSTREAM(__type) (__type < KEYVAL_READ)
-#define DBPF_OP_IS_KEYVAL(__type) (__type >= KEYVAL_READ && __type < DSPACE_CREATE)
-#define DBPF_OP_IS_DSPACE(__type) (__type >= DSPACE_CREATE)
+#define DBPF_OP_IS_BSTREAM(__type)    \
+    (__type == BSTREAM_READ_AT ||     \
+     __type == BSTREAM_WRITE_AT ||    \
+     __type == BSTREAM_RESIZE ||      \
+     __type == BSTREAM_READ_LIST ||   \
+     __type == BSTREAM_WRITE_LIST ||  \
+     __type == BSTREAM_VALIDATE ||    \
+     __type == BSTREAM_FLUSH)
+
+#define DBPF_OP_IS_KEYVAL(__type)     \
+    (__type == KEYVAL_READ ||         \
+     __type == KEYVAL_WRITE ||        \
+     __type == KEYVAL_REMOVE_KEY ||   \
+     __type == KEYVAL_VALIDATE ||     \
+     __type == KEYVAL_ITERATE_KEYS || \
+     __type == KEYVAL_READ_LIST ||    \
+     __type == KEYVAL_WRITE_LIST ||   \
+     __type == KEYVAL_FLUSH ||        \
+     __type == KEYVAL_GET_HANDLE_INFO)
+    
+#define DBPF_OP_IS_DSPACE(__type)         \
+    (__type == DSPACE_CREATE ||           \
+     __type == DSPACE_REMOVE ||           \
+     __type == DSPACE_ITERATE_HANDLES ||  \
+     __type == DSPACE_VERIFY ||           \
+     __type == DSPACE_GETATTR ||          \
+     __type == DSPACE_SETATTR ||          \
+     __type == DSPACE_GETATTR_LIST)
 
 #define DBPF_OP_DOES_SYNC(__op)    \
     (__op == KEYVAL_WRITE       || \

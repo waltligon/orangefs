@@ -124,7 +124,6 @@ static void aio_progress_notification(union sigval sig)
     struct dbpf_op *op_p = NULL;
     int ret, i, aiocb_inuse_count, state = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
-    gen_mutex_t *context_mutex = NULL;
 
     cur_op = (dbpf_queued_op_t *)sig.sival_ptr;
     assert(cur_op);
@@ -204,7 +203,7 @@ static void aio_progress_notification(union sigval sig)
                      "(state is %s)\n", list_proc_state_strings[op_p->u.b_rw_list.list_proc_state]);
 
         /* this is a macro defined in dbpf-thread.h */
-        move_op_to_completion_queue(
+        dbpf_queued_op_complete(
             cur_op, ret,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
 

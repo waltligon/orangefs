@@ -338,6 +338,9 @@ static int setattr_write_metafile_datafile_handles_if_required(
     int ret = 0, dfile_count = 0;
     job_id_t j_id;
 
+    /* reset from jump to here with STATE_METAFILE */
+    js_p->error_code = 0;
+
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  " request has dfile_count of %d | dspace has %d\n",
                  s_op->req->u.setattr.attr.u.meta.dfile_count,
@@ -387,6 +390,8 @@ static int setattr_write_metafile_distribution_if_required(
 {
     int ret = 0;
     job_id_t j_id;
+
+    assert(js_p->error_code == 0);
 
     /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))

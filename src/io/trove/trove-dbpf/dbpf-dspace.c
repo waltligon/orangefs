@@ -36,6 +36,9 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
+#include <stdio.h>
+#include <string.h>
+
 extern pthread_cond_t dbpf_op_completed_cond;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
@@ -250,7 +253,8 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     ret = op_p->coll_p->ds_db->get(op_p->coll_p->ds_db, NULL, &key, &data, 0);
     if (ret == 0)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "handle already exists...\n");
+        gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%llu) already exists.\n",
+                     new_handle);
         ret = -TROVE_EEXIST;
         goto return_error;
     }
@@ -317,7 +321,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
                     1, PINT_PERF_SUB);
 
     *op_p->u.d_create.out_handle_p = new_handle;
-    return DBPF_OP_NEEDS_SYNC;
+    return DBPF_OP_COMPLETE;
 
 return_error:
     if (new_handle != TROVE_HANDLE_NULL)
@@ -441,7 +445,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 
     /* return handle to free list */
     trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
-    return DBPF_OP_NEEDS_SYNC;
+    return DBPF_OP_COMPLETE;
 
 return_error:
     return ret;
@@ -975,7 +979,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
-    return DBPF_OP_NEEDS_SYNC;
+    return DBPF_OP_COMPLETE;
     
 return_error:
     return ret;
@@ -1172,7 +1176,6 @@ static int dbpf_dspace_cancel(
     int ret = -TROVE_ENOSYS;
 #ifdef __PVFS2_TROVE_THREADED__
     int state = 0;
-    gen_mutex_t *context_mutex = NULL;
     dbpf_queued_op_t *cur_op = NULL;
 #endif
 
@@ -1181,9 +1184,6 @@ static int dbpf_dspace_cancel(
 
 #ifdef __PVFS2_TROVE_THREADED__
 
-    assert(dbpf_completion_queue_array[context_id]);
-    context_mutex = dbpf_completion_queue_array_mutex[context_id];
-    assert(context_mutex);
     cur_op = id_gen_fast_lookup(id);
     if (cur_op == NULL)
     {
@@ -1211,7 +1211,7 @@ static int dbpf_dspace_cancel(
             assert(cur_op->op.state == OP_DEQUEUED);
 
             /* this is a macro defined in dbpf-thread.h */
-            move_op_to_completion_queue(cur_op, 0, OP_CANCELED);
+            dbpf_queued_op_complete(cur_op, 0, OP_CANCELED);
 
             gossip_debug(
                 GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);

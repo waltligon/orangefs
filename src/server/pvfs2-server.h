@@ -25,7 +25,6 @@
 #include "pvfs2-internal.h"
 #include "job.h"
 #include "bmi.h"
-#include "src/server/request-scheduler/request-scheduler.h"
 #include "trove.h"
 #include "gossip.h"
 #include "PINT-reqproto-encode.h"
@@ -103,22 +102,7 @@ struct PINT_server_req_params
 
 extern struct PINT_server_req_params PINT_server_req_table[];
 
-/*
- * PINT_map_server_op_to_string()
- *
- * provides a string representation of the server operation number
- *
- * returns a pointer to a static string (DONT FREE IT) on success,
- * null on failure
- */
-static inline const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
-{
-    const char *s = NULL;
-
-    if (op >= 0 && op < PVFS_SERV_NUM_OPS)
-        s = PINT_server_req_table[op].string_name;
-    return s;
-}
+const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
 
 extern const char *PINT_eattr_namespaces[];
 /* PINT_eattr_is_prefixed()
@@ -433,36 +417,13 @@ typedef struct PINT_server_op
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
 #else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
-do {                                                                        \
-    PVFS_handle __handle;                                                   \
-    PVFS_fs_id __fsid;                                                      \
-    int __flag;                                                             \
-    static char __pint_access_buffer[GOSSIP_BUF_SIZE];                      \
-    struct passwd* __pw;                                                    \
-    struct group* __gr;                                                     \
-                                                                            \
-    if ((gossip_debug_on) &&                                                \
-        (gossip_debug_mask & __mask) &&                                     \
-        (gossip_facility))                                                  \
-    {                                                                       \
-        PINT_req_sched_target_handle(__s_op->req, 0, &__handle,             \
-            &__fsid, &__flag);                                              \
-        __pw = getpwuid(__s_op->req->credentials.uid);                      \
-        __gr = getgrgid(__s_op->req->credentials.gid);                      \
-        snprintf(__pint_access_buffer, GOSSIP_BUF_SIZE,                     \
-            "%s.%s@%s H=%llu S=%p: %s: %s",                                  \
-            ((__pw) ? __pw->pw_name : "UNKNOWN"),                           \
-            ((__gr) ? __gr->gr_name : "UNKNOWN"),                           \
-            BMI_addr_rev_lookup_unexpected(__s_op->addr),                   \
-            llu(__handle),                                                   \
-            __s_op,                                                         \
-            PINT_map_server_op_to_string(__s_op->req->op),                  \
-            format);                                                        \
-        __gossip_debug(__mask, 'A', __pint_access_buffer, ##f);             \
-    }                                                                       \
-} while(0);
+    PINT_server_access_debug(__s_op, __mask, format, ##f)
 #endif
 
+void PINT_server_access_debug(PINT_server_op * s_op,
+                              int64_t debug_mask,
+                              const char * format,
+                              ...) __attribute__((format(printf, 3, 4)));
 /* server operation state machines */
 extern struct PINT_state_machine_s pvfs2_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_sm;

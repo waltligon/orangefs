@@ -760,9 +760,11 @@ static const configoption_t options[] =
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
      *
-     * usec: [%H:%M:%S
+     * usec: [%H:%M:%S.%U]
      *
      * datetime: [%m/%d %H:%M]
+     *
+     * thread: [%H:%M:%S.%U (%lu)]
      *
      * none
      *
@@ -988,6 +990,10 @@ DOTCONF_CB(get_logstamp)
     else if(!strcmp(cmd->data.str, "datetime"))
     {
         config_s->logstamp_type = GOSSIP_LOGSTAMP_DATETIME;
+    }
+    else if(!strcmp(cmd->data.str, "thread"))
+    {
+        config_s->logstamp_type = GOSSIP_LOGSTAMP_THREAD;
     }
     else
     {

@@ -30,7 +30,6 @@
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "PINT-reqproto-encode.h"
-#include "src/server/request-scheduler/request-scheduler.h"
 #include "pvfs2-server.h"
 #include "state-machine-fns.h"
 #include "mkspace.h"
@@ -43,6 +42,7 @@
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
 #include "pvfs2-internal.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -2011,6 +2011,61 @@ static int parse_port_from_host_id(char* host_id)
     }
     
     return(port_num);
+}
+
+void PINT_server_access_debug(PINT_server_op * s_op,
+                              int64_t debug_mask,
+                              const char * format,
+                              ...)
+{
+    PVFS_handle handle;    
+    PVFS_fs_id fsid;
+    int flag;
+    static char pint_access_buffer[GOSSIP_BUF_SIZE];
+    struct passwd* pw;
+    struct group* gr;
+    va_list ap;
+
+    if ((gossip_debug_on) &&
+        (gossip_debug_mask & debug_mask) &&
+        (gossip_facility))
+    {
+        va_start(ap, format);
+
+        PINT_req_sched_target_handle(s_op->req, 0, &handle, &fsid, &flag);
+        pw = getpwuid(s_op->req->credentials.uid);
+        gr = getgrgid(s_op->req->credentials.gid);
+        snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
+            "%s.%s@%s H=%llu S=%p: %s: %s",
+            ((pw) ? pw->pw_name : "UNKNOWN"),
+            ((gr) ? gr->gr_name : "UNKNOWN"),
+            BMI_addr_rev_lookup_unexpected(s_op->addr),
+            llu(handle),
+            s_op,
+            PINT_map_server_op_to_string(s_op->req->op),
+            format);
+
+        __gossip_debug_va(debug_mask, 'A', pint_access_buffer, ap);
+
+        va_end(ap);
+    }
+}
+
+/*
+ * PINT_map_server_op_to_string()
+ *
+ * provides a string representation of the server operation number
+ *
+ * returns a pointer to a static string (DONT FREE IT) on success,
+ * null on failure
+ */
+const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
+{
+    const char *s = NULL;
+
+    if (op >= 0 && op < PVFS_SERV_NUM_OPS)
+        s = PINT_server_req_table[op].string_name;
+    return s;
 }
 
 /*
