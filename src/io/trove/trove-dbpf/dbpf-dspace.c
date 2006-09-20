@@ -254,7 +254,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     if (ret == 0)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%llu) already exists.\n",
-                     new_handle);
+                     llu(new_handle));
         ret = -TROVE_EEXIST;
         goto return_error;
     }
