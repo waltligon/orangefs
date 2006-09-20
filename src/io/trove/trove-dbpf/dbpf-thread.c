@@ -163,7 +163,7 @@ int dbpf_do_one_work_cycle(int *out_count)
             if(DBPF_OP_IS_KEYVAL(cur_op->op.type)) 
             {
                 --synccount;
-                fprintf(stderr, "[KEYVAL -1]: %d\n", synccount);
+                gossip_debug(GOSSIP_TROVE_DEBUG, "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount);
             }
 
             cur_op->op.state = OP_IN_SERVICE;
