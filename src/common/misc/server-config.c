@@ -680,8 +680,9 @@ static const configoption_t options[] =
          get_handle_recycle_timeout_seconds, NULL, 
          CTX_STORAGEHINTS,"360"},
     
-    /* The TROVE layer has an attribute caching component that handles
-     * caching of stored attributes.  This is used to improve the performance of
+    /* The TROVE layer (server side storage layer) 
+     * has an attribute caching component that 
+     * caches stored attributes.  This is used to improve the performance of
      * metadata accesses.  The AttrCacheKeywords option is a list of the
      * object types that should get cached in the attribute cache.  
      * The possible values for this option are:

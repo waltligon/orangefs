@@ -965,7 +965,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
         op_p->coll_p->ds_db->err(
-            op_p->coll_p->ds_db, ret, "DB->put setattr");
+            op_p->coll_p->ds_db, ret, "dspace_db->put setattr");
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
@@ -1029,7 +1029,10 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
                                    NULL, &key, &data, 0);
     if (ret != 0)
     {
-        op_p->coll_p->ds_db->err(op_p->coll_p->ds_db, ret, "DB->get");
+        if(ret != DB_NOTFOUND)
+        {
+            op_p->coll_p->ds_db->err(op_p->coll_p->ds_db, ret, "DB->get");
+        }
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }

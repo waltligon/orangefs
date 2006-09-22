@@ -1064,6 +1064,8 @@ static int lookup_segment_lookup_comp_fn(
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
                  resp_p->u.lookup_path.handle_count);
 
+    memset(&last_resolved_refn, 0, sizeof(PVFS_object_ref));
+
     /*
       at this point we have 1 or more resolved handles so we're going
       to advance through all of them and populate the segments with

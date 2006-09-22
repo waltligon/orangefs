@@ -403,6 +403,11 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
             }
             else
             {
+                if(ret != DB_NOTFOUND)
+                {
+                    op_p->coll_p->keyval_db->err(
+                        op_p->coll_p->keyval_db, ret, "keyval_db->get");
+                }
                 ret = -dbpf_db_error_to_trove_error(ret);
             }
         }
@@ -428,7 +433,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     if (ret != 0 )
     {
         /*op_p->coll_p->keyval_db->err(
-            op_p->coll_p->keyval_db, ret, "DB->put keyval write");
+            op_p->coll_p->keyval_db, ret, "keyval_db->put keyval write");
 	*/
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
@@ -934,8 +939,9 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
         if (ret != 0)
         {
-            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "keyval get %s failed with error %s\n",
-                    key_entry.key, db_strerror(ret));
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
+                         "keyval get %s failed with error %s\n",
+                         key_entry.key, db_strerror(ret));
             op_p->u.k_read_list.err_array[i] = 
                 -dbpf_db_error_to_trove_error(ret);
             op_p->u.k_read_list.val_array[i].read_sz = 0;
@@ -1087,7 +1093,8 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         if (ret != 0)
         {
             op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->put keyval write list");
+                op_p->coll_p->keyval_db, ret, 
+                "keyval_db->put keyval write list");
             ret = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         }
@@ -1685,6 +1692,12 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
         op_p->coll_p->keyval_db, NULL, &key, &data, 0);
     if(ret != 0)
     {
+        if(ret != DB_NOTFOUND)
+        {
+            op_p->coll_p->keyval_db->err(
+                op_p->coll_p->keyval_db, ret, "keyval_db->get (handle info)");
+        }
+
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1780,7 +1793,8 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         if(ret != 0)
         {
             op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->put keyval handle info ops");
+                op_p->coll_p->keyval_db, ret, 
+                "keyval_db->put keyval handle info ops");
             return -dbpf_db_error_to_trove_error(ret);
         }
     }

@@ -261,11 +261,9 @@ int path_lookup(TROVE_coll_id coll_id,
     TROVE_op_id op_id;
     TROVE_handle handle;
 
-    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
-
     /* get root */
-    key.buffer = root_handle_string;
-    key.buffer_sz = strlen(root_handle_string) + 1;
+    key.buffer = ROOT_HANDLE_KEYSTR; 
+    key.buffer_sz = ROOT_HANDLE_KEYLEN;
     val.buffer = &handle;
     val.buffer_sz = sizeof(handle);
 
