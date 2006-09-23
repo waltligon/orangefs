@@ -165,8 +165,7 @@ machine pvfs2_mgmt_migrate_sm(
     state source_dataserver_start_io_read
     {
         run mgmt_migrate_source_dataserver_prepare_io_read;
-        success => source_dataserver_flow_finished;
-        default => final_response;
+        default => source_dataserver_flow_finished;
     }
     
     state source_dataserver_flow_finished
@@ -318,6 +317,8 @@ static int mgmt_migrate_io_start_cmp_fn(
             return -PVFS_EBADF;
        } 
     }
+    
+    
     
     return resp_p->status;
 }
@@ -485,10 +486,37 @@ static int mgmt_migrate_source_dataserver_flow_finished(
         js_p->error_code = s_op->u.mgmt_migrate.flow_d->error_code;
         gossip_debug(GOSSIP_SERVER_DEBUG, 
             "Migrate flow desc error: %d\n",(js_p->error_code));
-       return 1;
     }
-        
-    return 0;
+    
+    /* free used ressources */
+    PVFS_Request_free(& s_op->u.mgmt_migrate.file_request);
+
+    if (s_op->u.mgmt_migrate.flow_d != 0)
+    {
+        if (s_op->u.mgmt_migrate.flow_d->error_code != 0)
+        {
+            js_p->error_code = s_op->u.mgmt_migrate.flow_d->error_code;
+            gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "cleanup migrate flow desc error: %d\n",(js_p->error_code));
+        }
+        PINT_flow_free(s_op->u.mgmt_migrate.flow_d);
+    }
+    
+    if( s_op->u.mgmt_migrate.write_ack.recv_id != -1 )
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "cleanup migrate bmi cancel recv\n");
+        job_bmi_cancel(s_op->u.mgmt_migrate.write_ack.recv_id, 
+            server_job_context);
+    }
+    
+    if ( js_p->error_code == 0 )
+    {            
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
 }
 
 
@@ -707,31 +735,7 @@ static int mgmt_migrate_cleanup(
     if ( s_op->req->u.mgmt_migrate.role == PVFS_MIGRATE_ROLE_METASERVER )
     {
         PINT_free_object_attr(& s_op->attr);
-    }else if(s_op->req->u.mgmt_migrate.role == PVFS_MIGRATE_ROLE_SOURCE_DATA_SERVER &&
-        s_op->u.mgmt_migrate.file_request != 0 )
-    {
-        PVFS_Request_free(& s_op->u.mgmt_migrate.file_request);
-    
-        if (s_op->u.mgmt_migrate.flow_d != 0)
-        {
-            if (s_op->u.mgmt_migrate.flow_d->error_code != 0)
-            {
-                js_p->error_code = s_op->u.mgmt_migrate.flow_d->error_code;
-                gossip_debug(GOSSIP_SERVER_DEBUG, 
-                    "cleanup migrate flow desc error: %d\n",(js_p->error_code));
-            }
-            PINT_flow_free(s_op->u.mgmt_migrate.flow_d);
-        }
-        
-        if( s_op->u.mgmt_migrate.write_ack.recv_id != -1 )
-        {
-            gossip_debug(GOSSIP_SERVER_DEBUG, "cleanup migrate bmi cancel recv\n");
-            job_bmi_cancel(s_op->u.mgmt_migrate.write_ack.recv_id, 
-                server_job_context);
-        }
     }
-    
-    
 
     return(server_state_machine_complete(s_op));
 }
