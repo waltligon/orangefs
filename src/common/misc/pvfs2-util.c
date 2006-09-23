@@ -1497,7 +1497,12 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
     {
         attrmask |= PVFS_ATTR_META_DFILES;
     }
-
+    
+    if (sys_attrmask & PVFS_ATTR_SYS_PARENT_HANDLE )
+    {
+        attrmask |= PVFS_ATTR_PARENT_HANDLE;
+    }
+    
     if (sys_attrmask & PVFS_ATTR_SYS_DIRENT_COUNT)
     {
         attrmask |= PVFS_ATTR_DIR_DIRENT_COUNT;
@@ -1565,6 +1570,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     {
         sys_mask |= PVFS_ATTR_SYS_DIRENT_COUNT;
     }
+    if (obj_mask & PVFS_ATTR_PARENT_HANDLE)
+    {
+        sys_mask |= PVFS_ATTR_SYS_PARENT_HANDLE;
+    }    
     if (obj_mask & PVFS_ATTR_META_DFILES)
     {
         sys_mask |= PVFS_ATTR_SYS_DFILE_COUNT;

@@ -56,6 +56,8 @@ enum
 
 static int getattr_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
+static int getattr_init_attribs(
+    PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_verify_attribs(
     PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_read_parent_handle(
@@ -86,8 +88,9 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 %%
 
 nested machine pvfs2_get_attr_work_sm(
+    init_attribs,
     verify_attribs,
-    read_parent_handle, 
+    read_parent_handle,
     read_symlink_target,
     read_metafile_datafile_handles_if_required,
     read_metafile_distribution_if_required,
@@ -98,6 +101,17 @@ nested machine pvfs2_get_attr_work_sm(
     interpret_dir_hint,
     setup_resp)
 {
+    state init_attribs
+    {
+        run getattr_init_attribs;
+        success => verify_attribs;
+        default => setup_resp;
+    }
+    
+    /*
+     * for later easier modification to include parent handles to other objects
+     * add handling in verify_attribs
+     */
     state verify_attribs
     {
         run getattr_verify_attribs;
@@ -111,6 +125,7 @@ nested machine pvfs2_get_attr_work_sm(
     state read_parent_handle
     {
         run getattr_read_parent_handle;
+        success => verify_attribs;
         default => setup_resp;
     }
 
@@ -214,19 +229,18 @@ machine pvfs2_get_attr_sm(
 
 %%
 
-/* getattr_verify_attribs()
+
+/* getattr_init_attribs()
  *
  * We initialize the attribute mask that will be returned in this
  * function.  This mask can be augmented in some of the other states.
  */
-static int getattr_verify_attribs(
+static int getattr_init_attribs(
     PINT_server_op *s_op, job_status_s *js_p)
 {
     PVFS_object_attr *resp_attr = NULL;
-
     js_p->error_code = 0;
-
-    /*
+   /*
       explicitly copy basic attributes structure (read in from the
       prelude.sm for the matching dspace) into response to be sent
       back to the client.  this is mostly for readability here to be
@@ -281,6 +295,31 @@ static int getattr_verify_attribs(
         (int)resp_attr->u.meta.dist_size);
 #endif
 
+    return 1;
+}
+
+/* getattr_verify_attribs()
+ *
+ * Determine which attributes have to be fetched next
+ */
+static int getattr_verify_attribs(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    PVFS_object_attr *resp_attr = NULL;
+    resp_attr = &s_op->resp.u.getattr.attr;
+    
+    js_p->error_code = 0;
+
+    /* additional things to fetch for all objects */
+    if ( s_op->u.getattr.attrmask & PVFS_ATTR_PARENT_HANDLE
+        &&  resp_attr->objtype == PVFS_TYPE_DATAFILE
+        /* right now only for datafiles */ )
+    {
+        resp_attr->mask |= PVFS_ATTR_PARENT_HANDLE;
+        js_p->error_code = STATE_PARENT_HANDLE;     
+        return 1;   
+    }
+    
     /*
       weed out the attr mask of the response based on what the client
       request asked for.  also, check if we need to retrieve more
@@ -353,9 +392,9 @@ static int getattr_verify_attribs(
           ds_attribute the prelude used)
         */
         resp_attr->u.data.size = s_op->ds_attr.b_size;
-        resp_attr->mask |= PVFS_ATTR_DATA_ALL;
+        resp_attr->mask |= PVFS_ATTR_DATA_SIZE;
         
-        js_p->error_code = STATE_PARENT_HANDLE;
+        js_p->error_code = 0;
         
 	    gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
                      "a datafile (size = %lld).\n",
@@ -428,6 +467,7 @@ static int getattr_verify_attribs(
             llu(s_op->u.getattr.handle));
         js_p->error_code = -PVFS_ENXIO;
     }
+    
     return 1;
 }
 
@@ -436,6 +476,11 @@ static int getattr_read_parent_handle(
 {
     int ret;
     job_id_t i;
+    assert ( (s_op->u.getattr.attrmask & PVFS_ATTR_PARENT_HANDLE) != 0 );
+    /* we will be done with the gettatr of the parent so remove this for 
+     * future fetching
+     */
+    s_op->u.getattr.attrmask &= ~ PVFS_ATTR_PARENT_HANDLE;
     
     /* set up key and value structure for keyval write */
     s_op->key.buffer = Trove_Common_Keys[PARENT_HANDLE_KEY].key;
@@ -445,7 +490,7 @@ static int getattr_read_parent_handle(
                  "  object %lld has parent %lld associated with it\n",
                  lld(s_op->req->u.create.parent_handle), lld(js_p->handle));
 
-    s_op->val.buffer = & s_op->resp.u.getattr.attr.u.data.parent_metafile;
+    s_op->val.buffer = & s_op->resp.u.getattr.attr.u.data.parent_object;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
     
     ret = job_trove_keyval_read(

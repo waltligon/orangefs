@@ -99,6 +99,11 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
     if (dest && src)
     {
+    if (src->mask & PVFS_ATTR_PARENT_HANDLE)
+    {
+        dest->u.data.parent_object = src->u.data.parent_object;
+    }        
+        
 	if (src->mask & PVFS_ATTR_COMMON_UID)
         {
             dest->owner = src->owner;
@@ -242,7 +247,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 return ret;
             }
         }
-
+        
 	dest->mask = src->mask;
         ret = 0;
     }

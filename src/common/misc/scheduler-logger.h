@@ -34,16 +34,13 @@ typedef struct{
      * if acc_size overflows increment acc_multiplier and put rest
      *  in acc_size with io_number => avg. access size
      */
-    uint64_t     acc_multiplier[SCHED_LOG_MAX];
     uint64_t     acc_size[SCHED_LOG_MAX];
 } PVFS_request_statistics;
 
-endecode_fields_6(
+endecode_fields_4(
     PVFS_request_statistics,
     uint64_t, io_number[SCHED_LOG_READ],
     uint64_t, io_number[SCHED_LOG_WRITE],
-    uint64_t, acc_multiplier[SCHED_LOG_READ],
-    uint64_t, acc_multiplier[SCHED_LOG_WRITE],
     uint64_t, acc_size[SCHED_LOG_READ],
     uint64_t, acc_size[SCHED_LOG_WRITE]
     );

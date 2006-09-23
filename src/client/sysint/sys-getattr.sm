@@ -853,6 +853,13 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
     {
         sysresp->attr.dfile_count = attr->u.meta.dfile_count;
     }
+    
+    if(attr->objtype == PVFS_TYPE_DATAFILE &&
+       sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
+    {
+        sm_p->getattr.size = attr->u.data.size; 
+    }
+    
     if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "dfile_count: %d\n", 
@@ -912,6 +919,12 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
         {
             sysresp->attr.size = sm_p->getattr.size;
             sysresp->attr.mask |= PVFS_ATTR_SYS_SIZE;
+        }
+
+       if (sm_p->getattr.req_attrmask & PVFS_ATTR_PARENT_HANDLE )
+        {
+            sysresp->attr.parent_handle = sm_p->getattr.attr.u.data.parent_object;
+            sysresp->attr.mask |= PVFS_ATTR_SYS_PARENT_HANDLE;
         }
 
         /* if this is a symlink, add the link target */

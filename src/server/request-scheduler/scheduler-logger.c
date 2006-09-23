@@ -143,8 +143,8 @@ void scheduler_logger_initalize(void)
     initRedBlackTree(& fs_tree, compare_fs, compare2_fs);
 }
 
-#define req_p(p) ((double) ((fs_info_p->req.acc_multiplier[p] * \
-    ((int64_t)-1) + fs_info_p->req.acc_size[ p ])))/1024.0 /1024.0  
+#define req_p(p) ((double) ((/*fs_info_p->req.acc_multiplier[p] * \
+    ((int64_t)-1) +*/ fs_info_p->req.acc_size[ p ])))/1024.0 /1024.0  
 
 static int print_fs_stat(RBData* data, void* funcData)
 {
@@ -278,18 +278,23 @@ inline void increase_stats(
     uint64_t         access_size
     )
 {
-    stats->io_number[type]++;
+    stats->io_number[type]++; 
     
+    /*
     if ( (stats->acc_size[type] + access_size) >= stats->acc_size[type] ) 
     {
         stats->acc_size[type]+= access_size;
     }
     else
+    */
     /* rollover */
+    /*
     {
         stats->acc_multiplier[type]++;
         stats->acc_size[type]+= access_size;
     }
+    */
+    stats->acc_size[type]+= access_size;
 }
 
 

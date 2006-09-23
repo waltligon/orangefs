@@ -19,13 +19,16 @@
 #include <time.h>
 #include <libgen.h>
 #include <getopt.h>
+#include <signal.h>
 
 #include "pvfs2.h"
+#include "pthread.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
 #include "red-black-tree.h"
+#include "simplequeue.h"
 
 /*
  * TODO: 
@@ -56,18 +59,20 @@ struct options
     int remove_old_entries_after_iterations; 
     
     float load_tolerance;    
+    uint64_t    min_accessed_data;
 };
 
 const struct options default_options = 
 {
     "/pvfs2", 
-    30,
+    30, /* refresh time */
     0,
     0,
-    5.0,
+    5.0, /* simulated load */
     0,
     100,
-    0.5
+    0.5,
+    64*1024 /* min accessed data per iteration*/
 };
 
 
@@ -97,10 +102,11 @@ static void usage(
  * with system interface test functions.  
  */
 
-enum dataserver_status
+enum dataserver_state
 {
-    STATUS_READY,
-    STATUS_MIGRATION_IN_PROGRESS
+    STATE_READY,
+    STATE_MIGRATION_IN_PROGRESS,
+    STATE_MIGRATION_RECENTLY_DONE
 };
 
 /* store a number of snapshots for later referal */
@@ -121,11 +127,12 @@ typedef struct
 
 typedef struct 
 { 
+    pthread_mutex_t       state_mutex;
+    enum dataserver_state state;
+        
     char * alias;
     PVFS_BMI_addr_t bmi_address; 
     PVFS_handle_extent_array extend;
-    
-    enum dataserver_status status;
     
     struct PVFS_mgmt_server_stat * stats;
     
@@ -133,7 +140,12 @@ typedef struct
     
     int attr_age_iteration;
     PVFS_sysresp_mgmt_get_scheduler_stats getschedstats_resp;
+    double fs_old_accessed_size;
+    
     PVFS_sysresp_getattr                  getattr_stats;
+    
+    PVFS_mgmt_op_id                       migration_id; 
+    simplequeue_elem                    * migration_queue_link;
 } dataserver_details;
 
 
@@ -143,9 +155,27 @@ struct history_free_iterator_t{
 };
 
 static dataserver_details * servers = NULL;
+
 static struct options *user_opts = NULL;
+
+static int shutdown = 0;
+
+static int dataserver_cnt = 0;
+
+static pthread_mutex_t  migrating_dataservers_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t   migration_in_progress_cond = PTHREAD_COND_INITIALIZER;
+static int              migrating_dataservers_cnt = 0;
+static simplequeue      migrating_dataservers;
+
+static pthread_t        migration_thread;
+
     
 /* function protypes */
+
+static void migration_sig_handler(int sig);
+static int migration_setup_signal_handlers(void);
+void * background_migration_thread_func( void *ptr );
+
 int lookup(
     char *pvfs2_file,
     PVFS_credentials * credentials,
@@ -287,14 +317,41 @@ inline int get_old_pos(int pos)
 }
 
 inline double get_size_diff(int pos, int oldpos, const handle_history_t * history){
-    return (double) (history->stats[pos].acc_multiplier[SCHED_LOG_READ] - 
-        history->stats[oldpos].acc_multiplier[SCHED_LOG_READ]) * (double) ((uint64_t) -1) + 
+    return (double) /*(history->stats[pos].acc_multiplier[SCHED_LOG_READ] - 
+        history->stats[oldpos].acc_multiplier[SCHED_LOG_READ]) * (double) ((uint64_t) -1) +
+         
         history->stats[pos].acc_size[SCHED_LOG_READ] - 
         history->stats[oldpos].acc_size[SCHED_LOG_READ] +
         (history->stats[pos].acc_multiplier[SCHED_LOG_WRITE] - 
         history->stats[oldpos].acc_multiplier[SCHED_LOG_WRITE]) * (double) ((uint64_t) -1) + 
         history->stats[pos].acc_size[SCHED_LOG_WRITE] - 
         history->stats[oldpos].acc_size[SCHED_LOG_WRITE];
+        */
+        (history->stats[pos].acc_size[SCHED_LOG_READ] - 
+        history->stats[oldpos].acc_size[SCHED_LOG_READ]) +
+        (double) (history->stats[pos].acc_size[SCHED_LOG_WRITE] - 
+        history->stats[oldpos].acc_size[SCHED_LOG_WRITE]);
+}
+
+inline double get_size(const handle_history_t * hist)
+{
+    return get_size_diff( hist->current_stat_pos, 
+        get_old_pos(hist->current_stat_pos), hist);
+}
+
+int get_concrete_attributes_for_datafile(dataserver_details * server, 
+    PVFS_fs_id fsid, PVFS_handle handle, PVFS_credentials * credentials)
+{
+    PVFS_object_ref ref = {handle, fsid};
+    int ret;
+    /*
+     * get concrete file size to approximate migration time. 
+     */
+    memset(& server->getattr_stats, 0, sizeof(PVFS_sysresp_getattr));
+    ret = PVFS_sys_getattr(ref, 
+            PVFS_ATTR_SYS_PARENT_HANDLE | PVFS_ATTR_SYS_SIZE,
+            credentials, & server->getattr_stats);
+    return ret;
 }
 
 int handle_history_cmp ( const handle_history_t ** stat_1, 
@@ -313,7 +370,7 @@ int handle_history_cmp ( const handle_history_t ** stat_1,
     size_2 = get_size_diff( (*stat_2)->current_stat_pos, oldpos_2, *stat_2 )
         / ((*stat_2)->age_stats[((*stat_2)->current_stat_pos)] - 
             (*stat_2)->age_stats[oldpos_2]);    
-    if( size_1 < size_2)
+    if( size_1 > size_2)
     {
         return -1;
     }
@@ -357,7 +414,7 @@ void put_sched_resp_into_history_tree_and_sort(
             h_history->age_iteration = current_iteration;
             h_history->handle = stat->handle;
             h_history->current_stat_pos = 0;
-            
+                        
             insertKeyIntoTree(h_history, tree);
         }
         else
@@ -371,7 +428,10 @@ void put_sched_resp_into_history_tree_and_sort(
         memcpy(& h_history->stats[h_history->current_stat_pos], & stat->stat, 
             sizeof(PVFS_request_statistics));
         
-        if ( cur_out < max_out) 
+        if ( cur_out < max_out && current_iteration != 1 )
+        /*
+         * avoid to migrate stuff in the first iteration !
+         */ 
         {
             /*
              * only think about files which access statistics have changed.
@@ -395,6 +455,153 @@ void put_sched_resp_into_history_tree_and_sort(
 }
 
 
+static int migration_setup_signal_handlers(void)
+{
+    struct sigaction new_action;
+    struct sigaction ign_action;
+
+    /* Set up the structure to specify the new action. */
+    new_action.sa_handler = migration_sig_handler;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    ign_action.sa_handler = SIG_IGN;
+    sigemptyset (&ign_action.sa_mask);
+    ign_action.sa_flags = 0;
+
+    /* catch these */
+    sigaction (SIGILL, &new_action, NULL);
+    sigaction (SIGTERM, &new_action, NULL);
+    sigaction (SIGHUP, &new_action, NULL);
+    sigaction (SIGINT, &new_action, NULL);
+    sigaction (SIGQUIT, &new_action, NULL);
+    sigaction (SIGSEGV, &new_action, NULL);
+
+    /* ignore these */
+    sigaction (SIGPIPE, &ign_action, NULL);
+    sigaction (SIGUSR1, &ign_action, NULL);
+    sigaction (SIGUSR2, &ign_action, NULL);
+
+    return 0;
+}
+
+/*
+ * Signal handler allows safe shutdown...
+ */
+static void migration_sig_handler(int sig)
+{
+    printf("Caught signal %d, shutdown automigration tool!\n", sig);
+    shutdown = 1;
+}
+
+/*
+ * This function drives the incomplete pvfs2 operations !
+ */
+void * background_migration_thread_func( void *ptr )
+{
+    int queue_empty = 0;
+    int inout_count;
+    
+    simplequeue_elem * q_elem;
+    
+    int ret;
+    int i;
+    
+    /* depending on currently processed objects allocate arrays*/
+    PVFS_sys_op_id *op_id_array;
+    /* user_ptr points to dataserevr_struct */
+    void **user_ptr_array;
+    int *error_code_array;
+    
+    while(! shutdown || ! queue_empty)
+    {
+        pthread_mutex_lock(& migrating_dataservers_mutex);
+        queue_empty =  simple_queue_is_empty(& migrating_dataservers);
+        if( queue_empty )
+        {
+            pthread_cond_wait( & migration_in_progress_cond, 
+                & migrating_dataservers_mutex );
+            queue_empty =  simple_queue_is_empty(& migrating_dataservers);
+            continue;
+        }
+        
+        assert(migrating_dataservers_cnt);
+        
+        /* allocate memory for enqueued migrations elements */
+        op_id_array = (PVFS_sys_op_id*) malloc(sizeof(PVFS_sys_op_id) 
+            * migrating_dataservers_cnt);
+        user_ptr_array = malloc(sizeof(void*) 
+            * migrating_dataservers_cnt);
+        error_code_array = (int*) malloc(sizeof(int) 
+            * migrating_dataservers_cnt);
+        
+        /* put information into arrays */
+        inout_count = 0;
+        
+        ITERATE_SIMPLEQUE( migrating_dataservers, q_elem,
+            op_id_array[inout_count] = ((dataserver_details *) q_elem->data)->migration_id;
+            inout_count++;
+         )
+         
+        assert(migrating_dataservers_cnt == inout_count);
+        
+        pthread_mutex_unlock(& migrating_dataservers_mutex);
+    
+        ret = PVFS_sys_testsome(op_id_array, & inout_count, user_ptr_array, 
+            error_code_array, 500);
+        if (ret < 0 )
+        {
+            /* this should never happen */
+            PVFS_perror("PVFS_sys_testsome error \n", ret);
+            exit(1);
+        }
+        
+        if ( inout_count == 0 )
+        {
+            free(op_id_array);
+            free(user_ptr_array);
+            free(error_code_array);
+            continue;
+        }
+        
+        /* some guys finished up !*/
+        pthread_mutex_lock(& migrating_dataservers_mutex);
+        for(i=0; i < inout_count; i++)
+        {
+            dataserver_details * finished_server;
+            finished_server= (dataserver_details *) user_ptr_array[i];
+            
+            pthread_mutex_lock(& finished_server->state_mutex);
+            
+            if( error_code_array[i] == 0 )
+            {
+                finished_server->state = STATE_MIGRATION_RECENTLY_DONE;
+                debug( printf("Migration finished sucessful for server %s\n",
+                    finished_server->alias); )
+            }else{
+                fprintf(stderr,  "Error migration finished with error for server %s\n",
+                    finished_server->alias);
+                PVFS_perror("Migration errorcode\n", error_code_array[i]);  
+                finished_server->state = STATE_READY;
+            }
+            /* remove from migration queue */
+            migrating_dataservers_cnt--;
+            delete_element_from_simple(
+                  finished_server->migration_queue_link, 
+                  & migrating_dataservers );            
+            
+            pthread_mutex_unlock(& finished_server->state_mutex);
+        }
+        pthread_mutex_unlock(& migrating_dataservers_mutex);
+                
+        free(op_id_array);
+        free(user_ptr_array);
+        free(error_code_array);
+    }
+    return NULL;
+}
+
+
 int main(
     int argc,
     char **argv)
@@ -405,7 +612,6 @@ int main(
     int iteration = 0;
     
     PVFS_fs_id fsid = 0;
-    int dataserver_cnt = 0;
     int metaserver_cnt = 0;
     PVFS_BMI_addr_t * metaserver_array = NULL;
     PVFS_BMI_addr_t * dataserver_array = NULL;
@@ -414,7 +620,11 @@ int main(
         
     struct server_configuration_s *config;
     struct PVFS_mgmt_server_stat *stat_array = NULL;
-
+    
+    migration_setup_signal_handlers();
+    
+    init_simple_queue( & migrating_dataservers);
+    
 /*
     PVFS_hint * hints = NULL;    
     
@@ -522,7 +732,9 @@ int main(
             malloc(sizeof(PVFS_handle_request_statistics) * MAX_LOGGED_HANDLES_PER_FS );
         servers[i].stats = & stat_array[i];
         initRedBlackTree( & servers[i].handle_history, (int(*)(void *,void*)) compare_lookup, 
-            (int(*)(void *,void*))compare_internal ); 
+            (int(*)(void *,void*))compare_internal );
+        pthread_mutex_init(& servers[i].state_mutex, NULL );
+        servers[i].state = STATE_READY;
     }
 
    ret = PVFS_mgmt_get_server_array(fsid, & credentials, 
@@ -591,13 +803,27 @@ int main(
         }
     }
     
+    ret = pthread_create( & migration_thread, NULL, 
+        background_migration_thread_func, NULL );
+    if( ret != 0 ){
+        printf("Could not creat background migration thread ! Abort!\n");
+        exit(1);
+    }
+    
     /* now call mgmt functions to determine per-server statistics */
 
-    while(1)
+    if( user_opts->simulate_server_no )
+    {
+        debug( printf("WARNING: Simulation activated !\n"); )
+    }
+
+    while(! shutdown)
     {
     int interesting_server_cnt;
     handle_history_t * sorted_history[MAX_LOGGED_HANDLES_PER_FS];
     int sorted_history_size ;
+    int interesting_servers_migration_started = 0; 
+    int j;
 
     iteration++;
     if( iteration < 0) {
@@ -609,7 +835,7 @@ int main(
     
     if( user_opts->verbose )
     {
-        printf("Iteration %d\n",iteration);
+        printf("\nIteration %d\n",iteration);
     }
     
     /* gather intelligence */
@@ -639,7 +865,6 @@ int main(
     /* for debugging purposes simulate */
     if( user_opts->simulate_server_no )
     {
-        debug( printf("Simulation activated !\n"); )
         if ( user_opts->simulate_server_no > dataserver_cnt )
         {
             fprintf(stderr, "For simulation are only %d dataservers available, "
@@ -693,6 +918,27 @@ int main(
     
     for(i = 0 ; i < interesting_server_cnt ; i ++ )
     {
+        debug( printf("%s\n", servers[i].alias); )         
+        /* if the server is currently migrating, ignore the server */
+        pthread_mutex_lock(& servers[i].state_mutex);
+        switch ( servers[i].state )
+        {
+           case STATE_MIGRATION_IN_PROGRESS:
+                pthread_mutex_unlock(& servers[i].state_mutex);
+                debug( printf("Server is currently migrating load %f\n", 
+                    print_load(servers[i].stats->load_1)  ); )
+                continue;
+           case STATE_MIGRATION_RECENTLY_DONE:
+                 servers[i].state = STATE_READY;
+                 pthread_mutex_unlock(& servers[i].state_mutex);
+                 debug( printf("Server recently migrates load %f\n", 
+                    print_load(servers[i].stats->load_1) ); )
+                 continue;
+            case STATE_READY:
+                break;
+        }
+        pthread_mutex_unlock(& servers[i].state_mutex);
+        
         /* figure out which files have a high access statistic for interesting servers */
 
         ret = PVFS_mgmt_get_scheduler_stats(
@@ -701,11 +947,10 @@ int main(
             MAX_LOGGED_HANDLES_PER_FS,
             & servers[i].getschedstats_resp);
         debug(
-            printf("High loaded server: %s: Load: %f accessed-read:%lld -write:%lld\n", 
-            servers[i].alias, 
-            (double)(servers[i].stats->load_1) ,
-            lld(servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_READ]),
-            lld(servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_WRITE]) );
+            printf("Server ready to migrate: load: %f total MByte read:%f -write:%f\n", 
+            print_load(servers[i].stats->load_1) ,
+            (double)(servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_READ])/1024.0/1024.0,
+            (double) (servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_WRITE]) / 1024.0/1024.0);
         )
         
         sorted_history_size =  MAX_LOGGED_HANDLES_PER_FS;
@@ -713,45 +958,129 @@ int main(
         put_sched_resp_into_history_tree_and_sort(& servers[i].getschedstats_resp,
             & servers[i].handle_history, iteration, & sorted_history_size , sorted_history);
         
+        
         /* now start with the files which have the biggest change since the last update 
          * actually the history might be used to reduce the sampling effects or to adapt 
          * long term scheduling... 
          */
-        
-        /*
-         * get concrete file size to approximate migration time. 
-         * 
-        memset(& getattr_stats, 0, sizeof(PVFS_sysresp_getattr));
-        ret = PVFS_sys_getattr(*out_object_ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                               & credentials, & getattr_stats, NULL);
+        for (j=0; j < sorted_history_size; j++)
+        {
+                int oldpos = get_old_pos(sorted_history[j]->current_stat_pos);
+                double size;
+                size = get_size_diff( sorted_history[j]->current_stat_pos, 
+                    oldpos, sorted_history[j] );
+                    
+                debugV( printf("History element: %lld - accessed: %f MByte\n", 
+                    sorted_history[j]->handle , size / 1024.0 / 1024.0 ); )
                 
-            for(j = 0; j < resp.handle_stats.count ; j++)
-            {
-                printf(" handle:%lld read:%lld write:%lld\n",
-                    lld(resp.handle_stats.stats->handle),
-                    lld(resp.handle_stats.stats->stat.acc_size[SCHED_LOG_READ]),
-                    lld(resp.handle_stats.stats->stat.acc_size[SCHED_LOG_WRITE])
-                    );
-            }
-        */
+                if ( size < user_opts->min_accessed_data )
+                {
+                    /* not longer interesting access size */
+                    break;
+                }
+        }
         
+        if( j == 1 || sorted_history_size == 1)
+        {
+            debug( printf("Only one file is accessed during iteration, no migration possible!\n"); )        
+        }
+        else if ( j == 0 ) 
+        { 
+            debug( printf("Minimum accessed data for all handles not achieved!\n"); )
+        } 
+        else
+        {
+            PVFS_handle best_match_handle;
+            double      best_match_access_difference;
+            /* now find best possible migration candidate 
+             * use total calculate accessed size as a limit, file which accesses
+             * ~ 50% of the total calculated accessed size wins right now. 
+             */
+            double fs_current_accessed_size = (double) servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_READ] 
+               + (double) servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_WRITE];
+            double look_for_accessed_size;
+               
+            if ( fs_current_accessed_size <  servers[i].fs_old_accessed_size )
+            { /* overflow */
+                fs_current_accessed_size = (double)(((uint64_t) -1) - 
+                    servers[i].fs_old_accessed_size) + (double) fs_current_accessed_size;  
+            }
+            else
+            {
+                fs_current_accessed_size = fs_current_accessed_size - servers[i].fs_old_accessed_size;
+            }
+            debug( printf("server total accessed size MB:%f \n", 
+                fs_current_accessed_size/1024.0/1024.0); )
+            
+            /* now find the guy which is closest to 50% accessed size */
+            look_for_accessed_size = fs_current_accessed_size/2.0;
+            best_match_handle = sorted_history[0]->handle;
+            best_match_access_difference = abs(look_for_accessed_size - 
+                get_size(sorted_history[0])); 
+            for (j=1; j < sorted_history_size; j++)
+            {
+                double current_size_diff;
+                current_size_diff =  abs(look_for_accessed_size - 
+                    get_size(sorted_history[j])); 
+                if ( current_size_diff < best_match_access_difference )
+                {
+                    best_match_access_difference = current_size_diff;
+                    best_match_handle = sorted_history[j]->handle;
+                }
+            }
+            
+            debug( printf("best migration candidate handle:%lld access diff to optimum:%f \n",
+                lld(best_match_handle) , 
+                best_match_access_difference/1024.0/1024.0); )                
+            
+            ret = get_concrete_attributes_for_datafile(& servers[i], fsid, 
+                best_match_handle, & credentials);
+            if ( ret != 0 )
+            {
+                debug ( PVFS_perror("migration not possible, dfile attribute fetching returned an error\n",
+                    ret); ) 
+            }
+            else
+            {   
+                debug ( printf("File size: %lld parent object: %lld \n", 
+                    servers[i].getattr_stats.attr.size, 
+                    lld(servers[i].getattr_stats.attr.parent_handle)); )
+                interesting_servers_migration_started++;
+            }
+        }
+
         /*
          * Free data from old iterations !
          */ 
         if( servers[i].attr_age_iteration + user_opts->remove_old_entries_after_iterations
             < iteration )
         {
-            debug ( printf("Try to free history for server: %s\n", servers[i].alias ); ) 
+            debug ( printf("Try to free history\n"); ) 
             try_to_free_history_tree(& servers[i].handle_history,
                 iteration - user_opts->remove_old_entries_after_iterations);
                 
             servers[i].attr_age_iteration = iteration;                
         }
+        
+        servers[i].fs_old_accessed_size = servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_READ] 
+               + (double) servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_WRITE];
     }
     
     /* time if a possible merge pos is found */
     sleep(user_opts->refresh_time);
     } /* end_while */
+    
+    /* make sure that background migration thread finishes up */
+    pthread_mutex_lock(& migrating_dataservers_mutex);
+    pthread_cond_signal( & migration_in_progress_cond );
+    if ( ! simple_queue_is_empty(& migrating_dataservers) )
+    {
+        printf("Please wait, finish migrations in the background!\n");
+    }
+    pthread_mutex_unlock(& migrating_dataservers_mutex);
+    
+    pthread_join(migration_thread, NULL);
+    /* background thread has now finished */
     
     PVFS_sys_finalize();
     free(user_opts);
@@ -783,10 +1112,13 @@ static struct options *parse_args(
     
 
     /* look at command line arguments */
-    while ((one_opt = getopt(argc, argv, "r:t:s:d:voV")) != EOF)
+    while ((one_opt = getopt(argc, argv, "r:t:s:d:m:voV")) != EOF)
     {
         switch (one_opt)
         {
+        case ('m'):
+            tmp_opts->min_accessed_data = atoi(optarg) * 1024;
+            break;
         case ('d'):
             tmp_opts->remove_old_entries_after_iterations = atoi(optarg);
             break;
@@ -810,7 +1142,7 @@ static struct options *parse_args(
             tmp_opts->refresh_time = atoi(optarg);
             break;
         case ('v'):
-            tmp_opts->verbose = 1;
+            tmp_opts->verbose++;
             break;
         case ('V'):
             printf("%s\n", PVFS2_VERSION);
@@ -846,9 +1178,11 @@ static void usage(
             "\t-r\t <rate> refresh rate, time between iterations (default: %d)\n"
             "\t-d\t <iterations> remove old entries after iterations \n"
             "\t-t\t <tolerance> load tolerance in percent (default: %.3f)\n"
-            "\t-v\t verbose output (default: %d)\n"
+            "\t-m\t <size> min accessed size in Kbyte (default: %.1f)\n"
+            "\t-v\t verbose output (default: %d), multiple v increase verbosity\n"
             "\t-V\t print version number and exit\n"
-            "\t-s\t <load>:<serverNo> simulate load (default:%f) on servers (default:%d)\n"
+            "\t-s\t <load>:<serverNo> simulate load (default:%f) \n" 
+            "\t\t\t on a number of servers(default:%d)\n"
             "Explaination: \n"
             "\t Load tolerance means the percentage the load of a high loaded server might\n"
             "\t be higher than a low loaded server\n",
@@ -856,6 +1190,7 @@ static void usage(
             default_options.override,
             default_options.refresh_time,
             default_options.load_tolerance,
+            (double) default_options.min_accessed_data/1024.0,
             default_options.verbose,
             default_options.simulate_load,
             default_options.simulate_server_no

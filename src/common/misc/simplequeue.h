@@ -34,4 +34,9 @@ void * pop_back_simple(simplequeue* queue);
 /*remove data from current possition and push it to head of queue,*/
 void relink_front_simple(simplequeue_elem * elem, simplequeue* queue);
 
+#define ITERATE_SIMPLEQUE(queue, q_elem, x) \
+    for(q_elem = queue.head; q_elem != NULL; q_elem = q_elem->next) \
+    { x \
+    }
+
 #endif /*ALTSIMPLEQUEUE_H_*/

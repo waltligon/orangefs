@@ -24,6 +24,8 @@
 #define PVFS_ATTR_COMMON_TYPE  (1 << 6)
 #define PVFS_ATTR_COMMON_ATIME_SET (1 << 7)
 #define PVFS_ATTR_COMMON_MTIME_SET (1 << 8)
+#define PVFS_ATTR_PARENT_HANDLE    (1 << 9)
+
 #define PVFS_ATTR_COMMON_ALL                       \
 (PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
  PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_ATIME | \
@@ -38,7 +40,8 @@
 
 /* internal attribute masks for datafile objects */
 #define PVFS_ATTR_DATA_SIZE            (1 << 15)
-#define PVFS_ATTR_DATA_ALL   PVFS_ATTR_DATA_SIZE
+#define PVFS_ATTR_DATA_ALL   (PVFS_ATTR_DATA_SIZE | \
+    PVFS_ATTR_PARENT_HANDLE)
 
 /* internal attribute masks for symlink objects */
 #define PVFS_ATTR_SYMLNK_TARGET            (1 << 18)
@@ -90,12 +93,12 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 struct PVFS_datafile_attr_s
 {
     PVFS_size   size;
-    PVFS_handle parent_metafile;
+    PVFS_handle parent_object;
 };
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
 endecode_fields_2(PVFS_datafile_attr, 
     PVFS_size, size,
-    PVFS_handle, parent_metafile)
+    PVFS_handle, parent_object)
 
 /* extended hint attributes for a directory object */
 struct PVFS_directory_hint_s
