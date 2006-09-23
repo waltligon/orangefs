@@ -522,6 +522,8 @@ void * background_migration_thread_func( void *ptr )
             pthread_cond_wait( & migration_in_progress_cond, 
                 & migrating_dataservers_mutex );
             queue_empty =  simple_queue_is_empty(& migrating_dataservers);
+            
+            pthread_mutex_unlock(& migrating_dataservers_mutex);
             continue;
         }
         
@@ -539,6 +541,7 @@ void * background_migration_thread_func( void *ptr )
         inout_count = 0;
         
         ITERATE_SIMPLEQUE( migrating_dataservers, q_elem,
+            assert( ((dataserver_details *) q_elem->data)->state == STATE_MIGRATION_IN_PROGRESS);
             op_id_array[inout_count] = ((dataserver_details *) q_elem->data)->migration_id;
             inout_count++;
          )
@@ -1042,10 +1045,40 @@ int main(
             }
             else
             {   
+                PVFS_mgmt_op_id op_id;
                 debug ( printf("File size: %lld parent object: %lld \n", 
                     servers[i].getattr_stats.attr.size, 
                     lld(servers[i].getattr_stats.attr.parent_handle)); )
-                interesting_servers_migration_started++;
+                /* now we initiate a migration to unbusiest server*/
+                
+                interesting_servers_migration_started++;                
+                ret = PVFS_imgmt_migrate(fsid, & credentials, 
+                    servers[i].getattr_stats.attr.parent_handle, 
+                    best_match_handle, 
+                    servers[dataserver_cnt - 
+                        interesting_servers_migration_started].bmi_address,
+                    & op_id, & servers[i]);
+                if ( ret == 0 )
+                {
+                    /*
+                     * Add object to processing queue
+                     */
+                    pthread_mutex_lock(& migrating_dataservers_mutex);
+                    migrating_dataservers_cnt++;
+                    servers[i].migration_queue_link = 
+                        push_front_simple( &servers[i],  
+                        & migrating_dataservers);
+                    servers[i].migration_id = op_id;
+                    servers[i].state = STATE_MIGRATION_IN_PROGRESS;
+                    
+                    pthread_cond_signal( & migration_in_progress_cond); 
+                    pthread_mutex_unlock(& migrating_dataservers_mutex);
+                            
+                }
+                else
+                {
+                    PVFS_perror("PVFS_imgmt_migrate error", ret); 
+                }
             }
         }
 
