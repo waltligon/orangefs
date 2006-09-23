@@ -34,11 +34,6 @@ static int mgmt_migrate_find_target_datafile(
     PINT_client_sm *sm_p, job_status_s *js_p);  
 static int mgmt_migrate_start_transfer(
     PINT_client_sm *sm_p, job_status_s *js_p);  
-static int mgmt_migrate_acknowledge_delete_old_datafile(
-    PINT_client_sm *sm_p, job_status_s *js_p);  
-
-static int mgmt_migrate_notify_metadata_server(
-    PINT_client_sm *sm_p, job_status_s *js_p);  
 
 static int mgmt_migrate_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
@@ -66,9 +61,6 @@ machine pvfs2_client_mgmt_migrate_sm(
     create_xfer_msgpair,
     start_transfer,
     start_transfer_xfer_msgpair,
-    notify_metadata_server,
-    notify_metadata_server_xfer_msgpair,
-    acknowledge_delete_old_datafile, 
     delete_new_datafile_msgpair,
     delete_new_datafile_xfer_msgpair,
     cleanup)
@@ -123,29 +115,8 @@ machine pvfs2_client_mgmt_migrate_sm(
     state start_transfer_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => notify_metadata_server;
-        default => delete_new_datafile_msgpair;
-    }
-    
-    state notify_metadata_server
-    {
-        run mgmt_migrate_notify_metadata_server;
-        success => notify_metadata_server_xfer_msgpair;
-        default => delete_new_datafile_msgpair;
-    }
-
-    state notify_metadata_server_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
-        success => acknowledge_delete_old_datafile;
-        default => delete_new_datafile_msgpair; /* failure */
-    }
-    
-    state acknowledge_delete_old_datafile
-    {
-        run mgmt_migrate_acknowledge_delete_old_datafile;
         success => cleanup;
-        default => delete_new_datafile_msgpair;        
+        default => delete_new_datafile_msgpair;  
     }
     
     /* if an error occurs delete new create new created datafile */
@@ -238,6 +209,7 @@ static int mgmt_migrate_start_transfer(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
     PINT_sm_msgpair_state *msg_p = NULL;
+    
     PVFS_BMI_addr_t  old_dataserver;
     int ret;
     
@@ -274,53 +246,6 @@ static int mgmt_migrate_start_transfer(
     msg_p->svr_addr = old_dataserver;
     return 1;
 }
-
-/* TODO: successful write of datafile to new server should
- * initiate metadata server rewrite first. And once datafile array is 
- * rewritten acknowledge deletion to old datafile server. 
- * Right now there is a possible race condition between other clients 
- * and the update of the datafile array. */  
-static int mgmt_migrate_acknowledge_delete_old_datafile(
-    PINT_client_sm *sm_p, job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "migrate state: mgmt_migrate_acknowledge_delete_old_datafile\n");
-                     
-    js_p->error_code = 0;
-    return 1;
-}  
-
-
-static int mgmt_migrate_notify_metadata_server(PINT_client_sm *sm_p,
-                                   job_status_s *js_p)
-{
-    PINT_sm_msgpair_state *msg_p = NULL;
-
-    js_p->error_code = 0;
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "migrate state: mgmt_migrate_notify_metadata_server\n");
-
-    PINT_init_msgpair(sm_p, msg_p);
-    
-    PINT_SERVREQ_MGMT_MIGRATE_FILL(
-        msg_p->req,
-        *sm_p->cred_p,
-        sm_p->u.mgmt_migrate.fs_id,
-        sm_p->u.mgmt_migrate.target_metafile,
-        sm_p->u.mgmt_migrate.target_datafile,
-        sm_p->u.mgmt_migrate.new_datafile,
-        sm_p->u.mgmt_migrate.target_datafile_number,
-        PVFS_MIGRATE_ROLE_METASERVER);    
-    
-    msg_p->fs_id = sm_p->u.mgmt_migrate.fs_id;
-    msg_p->handle = sm_p->u.mgmt_migrate.target_metafile;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn =  NULL;    
-    msg_p->svr_addr = sm_p->u.mgmt_migrate.metaserver_addr;
-
-    return 1;
-}
-
 
 static int mgmt_migrate_create_setup_msgpair(PINT_client_sm *sm_p,
                                    job_status_s *js_p)
@@ -457,10 +382,8 @@ static int mgmt_migrate_cleanup(PINT_client_sm *sm_p,
 PVFS_error PVFS_imgmt_migrate(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    PVFS_BMI_addr_t metaserver_addr,
     PVFS_handle     target_metafile,
     PVFS_handle     target_datafile,
-    PVFS_BMI_addr_t source_dataserver,
     PVFS_BMI_addr_t target_dataserver, 
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
@@ -482,10 +405,8 @@ PVFS_error PVFS_imgmt_migrate(
     sm_p->object_ref.fs_id = fs_id;
         
     sm_p->u.mgmt_migrate.fs_id = fs_id;
-    sm_p->u.mgmt_migrate.metaserver_addr = metaserver_addr;
     sm_p->u.mgmt_migrate.target_datafile = target_datafile;
     sm_p->u.mgmt_migrate.target_metafile = target_metafile;
-    sm_p->u.mgmt_migrate.source_dataserver = source_dataserver;
     sm_p->u.mgmt_migrate.target_dataserver = target_dataserver;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_migrate calling "
@@ -500,10 +421,8 @@ PVFS_error PVFS_imgmt_migrate(
 PVFS_error PVFS_mgmt_migrate(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    PVFS_BMI_addr_t metaserver_addr,
     PVFS_handle     target_metafile,
     PVFS_handle     target_datafile,
-    PVFS_BMI_addr_t source_dataserver,
     PVFS_BMI_addr_t target_dataserver)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -511,8 +430,8 @@ PVFS_error PVFS_mgmt_migrate(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_migrate entered\n");
 
-    ret = PVFS_imgmt_migrate(fs_id, credentials, metaserver_addr,
-        target_metafile, target_datafile, source_dataserver, target_dataserver, 
+    ret = PVFS_imgmt_migrate(fs_id, credentials, 
+        target_metafile, target_datafile, target_dataserver, 
         &op_id, NULL);
     if (ret)
     {

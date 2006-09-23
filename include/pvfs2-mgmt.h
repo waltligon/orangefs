@@ -153,10 +153,8 @@ PVFS_error PVFS_mgmt_noop(
 PVFS_error PVFS_imgmt_migrate(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    PVFS_BMI_addr_t metaserver_addr,
     PVFS_handle     target_metafile,
     PVFS_handle     target_datafile,    
-    PVFS_BMI_addr_t source_dataserver,
     PVFS_BMI_addr_t target_dataserver, 
     PVFS_mgmt_op_id *op_id,
     void *user_ptr);
@@ -164,10 +162,8 @@ PVFS_error PVFS_imgmt_migrate(
 PVFS_error PVFS_mgmt_migrate(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    PVFS_BMI_addr_t metaserver_addr,
     PVFS_handle     target_metafile,
-    PVFS_handle     target_datafile,    
-    PVFS_BMI_addr_t source_dataserver,
+    PVFS_handle     target_datafile,
     PVFS_BMI_addr_t target_dataserver);
 
 typedef struct 

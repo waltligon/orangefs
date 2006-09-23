@@ -131,8 +131,6 @@ int main(
     PVFS_handle handles[1024];
     int nservers = 1024;
     
-    PVFS_BMI_addr_t bmi_metadataserver;
-    PVFS_BMI_addr_t bmi_olddatataserver;
     PVFS_BMI_addr_t bmi_newdatataserver;
     
     /*
@@ -241,15 +239,6 @@ int main(
         return (-1);
     }
     
-    
-    ret = BMI_addr_lookup(&bmi_metadataserver,metadataserver);
-    if (ret < 0)
-    {
-        fprintf(stderr, "Error, BMI_addr_lookup unsuccessful %s\n",
-        metadataserver );
-        return(-1);
-    }
-    
     ret = BMI_addr_lookup(&bmi_newdatataserver, user_opts->new_dataserver);
     if (ret < 0)
     {
@@ -257,14 +246,6 @@ int main(
          user_opts->new_dataserver );
         return(-1);
     }    
-    
-    ret = BMI_addr_lookup(&bmi_olddatataserver,user_opts->old_dataserver);
-    if (ret < 0)
-    {
-        fprintf(stderr, "Error, BMI_addr_lookup unsuccessful %s\n",
-        user_opts->old_dataserver );
-        return(-1);
-    }
     
     if( user_opts->verbose )
     {
@@ -276,10 +257,10 @@ int main(
             lld(user_opts->old_dataserver_handle_number));         
     }
 
-    ret = PVFS_mgmt_migrate(metafile_ref.fs_id, & credentials, bmi_metadataserver
-        , metafile_ref.handle, 
+    ret = PVFS_mgmt_migrate(metafile_ref.fs_id, & credentials, 
+        metafile_ref.handle, 
         user_opts->old_dataserver_handle_number, 
-        bmi_olddatataserver, bmi_newdatataserver);
+        bmi_newdatataserver);
     /*PVFS_free_hint(& hints);*/
     
     if ( ret != 0 )

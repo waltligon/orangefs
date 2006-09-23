@@ -41,6 +41,9 @@ static int mgmt_migrate_source_dataserver_flow_finished(
     PINT_server_op *s_op, job_status_s *js_p);    
 static int mgmt_migrate_source_dataserver_wait_for_write_ack(
     PINT_server_op *s_op, job_status_s *js_p);
+static int mgmt_migrate_source_dataserver_notify_metadata_server(
+    PINT_server_op *sm_p, job_status_s *js_p);      
+    
 static int mgmt_migrate_source_dataserver_remove_datafile_setup(
     PINT_server_op *s_op, job_status_s *js_p);    
 /*****************************/    
@@ -78,6 +81,8 @@ machine pvfs2_mgmt_migrate_sm(
     source_dataserver_start_io_read,
     source_dataserver_flow_finished,
     source_dataserver_wait_for_write_ack,
+    source_dataserver_notify_metadata_server,
+    source_dataserver_notify_metadata_server_xfer_msgpair,
     source_dataserver_remove_datafile_setup,
     source_dataserver_remove_datafile_work,
     final_response,
@@ -175,9 +180,23 @@ machine pvfs2_mgmt_migrate_sm(
     state source_dataserver_wait_for_write_ack
     {
         run mgmt_migrate_source_dataserver_wait_for_write_ack;
-        success => source_dataserver_remove_datafile_setup;
+        success => source_dataserver_notify_metadata_server;
         default => final_response;
     }    
+    
+   state source_dataserver_notify_metadata_server
+    {
+        run mgmt_migrate_source_dataserver_notify_metadata_server;
+        success => source_dataserver_notify_metadata_server_xfer_msgpair;
+        default => final_response;
+    }
+
+    state source_dataserver_notify_metadata_server_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => source_dataserver_remove_datafile_setup;
+        default => final_response; /* failure */
+    }
     
     state source_dataserver_remove_datafile_setup
     {
@@ -509,6 +528,47 @@ static int mgmt_migrate_source_dataserver_wait_for_write_ack(
     
     PINT_decode_release(& decoded_resp, PINT_DECODE_RESP);
                 
+    return 1;
+}
+
+static int mgmt_migrate_source_dataserver_notify_metadata_server(PINT_server_op *s_op,
+                                   job_status_s *js_p)
+{
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_BMI_addr_t  metaserver_addr;
+    int ret;
+    
+    ret = PINT_cached_config_map_to_server( & metaserver_addr,
+        s_op->req->u.mgmt_migrate.metafile_handle, 
+        s_op->req->u.mgmt_migrate.fs_id );
+    if( ret != 0)
+    {
+        js_p->error_code = ret;
+        return 1;        
+    }
+    
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "migrate state: mgmt_migrate_notify_metadata_server\n");
+
+    PINT_init_msgpair(s_op, msg_p);
+    
+    PINT_SERVREQ_MGMT_MIGRATE_FILL(
+        msg_p->req,
+        s_op->req->credentials,
+        s_op->req->u.mgmt_migrate.fs_id,
+        s_op->req->u.mgmt_migrate.metafile_handle,
+        s_op->req->u.mgmt_migrate.old_datafile_handle,
+        s_op->req->u.mgmt_migrate.new_datafile_handle,
+        s_op->req->u.mgmt_migrate.target_datafile_number,
+        PVFS_MIGRATE_ROLE_METASERVER);    
+    
+    msg_p->fs_id = s_op->req->u.mgmt_migrate.fs_id;
+    msg_p->handle = s_op->req->u.mgmt_migrate.metafile_handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn =  NULL;
+    msg_p->svr_addr = metaserver_addr;
+
     return 1;
 }
 

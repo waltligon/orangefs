@@ -289,13 +289,10 @@ struct PINT_client_mgmt_setparam_list_sm
 struct PINT_client_mgmt_migrate_sm
 {
     PVFS_fs_id fs_id;
-    
-    PVFS_BMI_addr_t metaserver_addr;
     PVFS_handle     target_metafile;
     
     PVFS_handle     target_datafile;
     
-    PVFS_BMI_addr_t source_dataserver;
     PVFS_BMI_addr_t target_dataserver;
     
     /* data needed during the process*/
