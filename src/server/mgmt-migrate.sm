@@ -21,6 +21,10 @@
 
 extern PINT_dist basic_dist;
 
+enum {
+    STATE_EMPTY_FILE = 150
+};
+
 static int migrate_decide_role(
     PINT_server_op *s_op, job_status_s *js_p);
 
@@ -152,6 +156,7 @@ machine pvfs2_mgmt_migrate_sm(
     {
         run mgmt_migrate_source_dataserver_prepare_io_write;
         success => source_dataserver_start_io_write;
+        STATE_EMPTY_FILE => source_dataserver_notify_metadata_server;
         default => final_response;
     }
     
@@ -263,6 +268,15 @@ static int mgmt_migrate_source_dataserver_prepare_io_write(
     cur_fs = PINT_config_find_fs_id(server_config, fs_id);
     
     PINT_init_msgpair(s_op, msg_p);
+    
+    if ( s_op->ds_attr.b_size == 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "mgmt_migrate_source_dataserver_prepare_io_write, EMPTY FILE!!\n");
+        /* we are already done, nothing to migrate!*/
+        js_p->error_code = STATE_EMPTY_FILE;
+        return 1;
+    } 
     
     ret = PVFS_Request_contiguous(s_op->u.mgmt_migrate.file_size, PVFS_BYTE, 
         & s_op->u.mgmt_migrate.file_request);
@@ -457,7 +471,7 @@ static int mgmt_migrate_source_dataserver_prepare_io_read(
         js_p, &tmp_id,
         server_job_context,
         server_config->server_job_flow_timeout);
-
+    
     return ret;
 }
 
@@ -574,8 +588,8 @@ static int mgmt_migrate_source_dataserver_notify_metadata_server(PINT_server_op 
         js_p->error_code = ret;
         return 1;        
     }
-    
-    js_p->error_code = 0;
+        
+    js_p->error_code = 0;    
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "migrate state: mgmt_migrate_notify_metadata_server\n");
 
@@ -617,8 +631,6 @@ static int mgmt_migrate_metaserver_init(
     PINT_server_op *s_op, job_status_s *js_p){
     js_p->error_code = 0; 
     gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_migrate_metaserver_init\n");
-    
-    PINT_init_msgarray_params_server(&s_op->msgarray_params);
     
     s_op->u.getattr.handle = s_op->req->u.mgmt_migrate.metafile_handle;
     s_op->u.getattr.fs_id = s_op->req->u.mgmt_migrate.fs_id;
@@ -722,6 +734,8 @@ static int migrate_decide_role(
                      llu(s_op->req->u.mgmt_migrate.role));    
                      
     js_p->error_code = s_op->req->u.mgmt_migrate.role;
+
+    PINT_init_msgarray_params_server(&s_op->msgarray_params);    
     return 1;
 }
 
