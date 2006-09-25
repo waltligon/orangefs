@@ -212,7 +212,13 @@ int compare_internal( handle_history_t * stat_1,
     handle_history_t * stat_2 );
     
 int compare_lookup(handle_history_t * stat_1, PVFS_handle* key);
-
+void print_time_stamp(void);
+int get_concrete_attributes_for_datafile(dataserver_details * server, 
+    PVFS_fs_id fsid, PVFS_handle handle, PVFS_credentials * credentials);
+inline double get_size(const handle_history_t * hist);
+inline double get_size_diff(int pos, int oldpos, 
+    const handle_history_t * history);
+inline int get_old_pos(int pos);    
 /* end function protypes */
 
 void print_servers(const char * prefix, 
@@ -604,6 +610,18 @@ void * background_migration_thread_func( void *ptr )
     return NULL;
 }
 
+void print_time_stamp(){
+    struct timeval tv;
+    time_t tp;
+    char buffer[255];
+    
+    gettimeofday(&tv, 0);
+    tp = tv.tv_sec;
+    
+    strftime(buffer, 10, "[%H:%M:%S", localtime(&tp));
+    sprintf(buffer+9, ".%06ld]", (long)tv.tv_usec);
+    printf("%s", buffer);
+}
 
 int main(
     int argc,
@@ -838,7 +856,9 @@ int main(
     
     if( user_opts->verbose )
     {
-        printf("\nIteration %d\n",iteration);
+        printf("\n");
+        print_time_stamp();
+        printf(" iteration %d\n",iteration);
     }
     
     /* gather intelligence */
@@ -887,28 +907,41 @@ int main(
        
     /* figure out how much servers possibly migrate, right now, move from 
      * server with the highest load to the server with the smallest load */
+    debugV(
+    for (i = 0; i < dataserver_cnt ; i++)
+    {
+        printf("server:%s - load:%f \n",
+            servers[i].alias,
+            print_load(servers[i].stats->load_1));
+    }
+    )
+
     for (i = 0; i < dataserver_cnt /2 ; i++)
     {
         double tmp_double;
         double quotient;
-        tmp_double = ((double) stat_array[i].load_1 - 
-        (double) stat_array[dataserver_cnt-1-i].load_1 ) ;
-        quotient = (double) (stat_array[i].load_1) /
-            (double) stat_array[dataserver_cnt-i-1].load_1;
+        int pair = dataserver_cnt-1-i;
+        tmp_double = ((double) servers[i].stats->load_1 - 
+        (double) servers[pair].stats->load_1 ) ;
+        quotient = (double) (servers[i].stats->load_1) /
+            (double) servers[pair].stats->load_1;
 
-        debug( printf("%i: Load: highest: %f lowest: %f diff:%f quot:%f\n",
-            i,
-            print_load(stat_array[i].load_1), 
-            print_load(stat_array[dataserver_cnt-1-i].load_1), 
+        debug( printf("interesting pairing: %s:%s \n\t"
+            " load: highest:%f lowest:%f diff:%f quot:%f\n", 
+            servers[i].alias,
+            servers[pair].alias,
+            print_load(servers[i].stats->load_1), 
+            print_load(servers[pair].stats->load_1), 
             print_load(tmp_double),
             quotient); )
         if ( print_load(tmp_double) < 1.0  || quotient < 
                 1.0 + user_opts->load_tolerance || 
-            stat_array[i].load_1 == 0 )
+            servers[i].stats->load_1 == 0 )
         {
             break;
         }
     }
+
     interesting_server_cnt = i;
     if ( interesting_server_cnt == 0 )
     {
@@ -917,25 +950,28 @@ int main(
         CONTINUE;
     }
     
-    debug( printf("Interesting servers: %d\n", interesting_server_cnt); )
+    debug( printf("Interesting servers:%d\n", interesting_server_cnt); )
     
     for(i = 0 ; i < interesting_server_cnt ; i ++ )
     {
-        debug( printf("%s\n", servers[i].alias); )         
+        debug( printf("Server:%s load_1:%f load_5:%f, load_15:%f\n", 
+            servers[i].alias,
+            print_load(servers[i].stats->load_1),
+            print_load(servers[i].stats->load_5),
+            print_load(servers[i].stats->load_15)
+            ); )         
         /* if the server is currently migrating, ignore the server */
         pthread_mutex_lock(& servers[i].state_mutex);
         switch ( servers[i].state )
         {
            case STATE_MIGRATION_IN_PROGRESS:
                 pthread_mutex_unlock(& servers[i].state_mutex);
-                debug( printf("Server is currently migrating load %f\n", 
-                    print_load(servers[i].stats->load_1)  ); )
+                debug( printf("\tServer is currently migrating\n" ); )
                 continue;
            case STATE_MIGRATION_RECENTLY_DONE:
                  servers[i].state = STATE_READY;
                  pthread_mutex_unlock(& servers[i].state_mutex);
-                 debug( printf("Server recently migrates load %f\n", 
-                    print_load(servers[i].stats->load_1) ); )
+                 debug( printf("\tServer recently migrates \n"); )
                  continue;
             case STATE_READY:
                 break;
@@ -950,8 +986,8 @@ int main(
             MAX_LOGGED_HANDLES_PER_FS,
             & servers[i].getschedstats_resp);
         debug(
-            printf("Server ready to migrate: load: %f total MByte read:%f -write:%f\n", 
-            print_load(servers[i].stats->load_1) ,
+            printf("\tServer ready to migrate\n"
+                "\ttotal MByte read:%f -write:%f\n", 
             (double)(servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_READ])/1024.0/1024.0,
             (double) (servers[i].getschedstats_resp.fs_stats.acc_size[SCHED_LOG_WRITE]) / 1024.0/1024.0);
         )
@@ -973,7 +1009,7 @@ int main(
                 size = get_size_diff( sorted_history[j]->current_stat_pos, 
                     oldpos, sorted_history[j] );
                     
-                debugV( printf("History element: %lld - accessed: %f MByte\n", 
+                debugV( printf("\tHistory element: %lld - accessed: %f MByte\n", 
                     sorted_history[j]->handle , size / 1024.0 / 1024.0 ); )
                 
                 if ( size < user_opts->min_accessed_data )
@@ -985,11 +1021,11 @@ int main(
         
         if( j == 1 || sorted_history_size == 1)
         {
-            debug( printf("Only one file is accessed during iteration, no migration possible!\n"); )        
+            debug( printf("\tOnly one file is accessed during iteration, no migration possible!\n"); )        
         }
         else if ( j == 0 ) 
         { 
-            debug( printf("Minimum accessed data for all handles not achieved!\n"); )
+            debug( printf("\tMinimum accessed data for all handles not achieved!\n"); )
         } 
         else
         {
@@ -1012,7 +1048,7 @@ int main(
             {
                 fs_current_accessed_size = fs_current_accessed_size - servers[i].fs_old_accessed_size;
             }
-            debug( printf("server total accessed size MB:%f \n", 
+            debug( printf("\tserver total accessed size MB:%f \n", 
                 fs_current_accessed_size/1024.0/1024.0); )
             
             /* now find the guy which is closest to 50% accessed size */
@@ -1032,7 +1068,7 @@ int main(
                 }
             }
             
-            debug( printf("best migration candidate handle:%lld access diff to optimum:%f \n",
+            debug( printf("\tbest migration candidate handle:%lld access diff to optimum:%f \n",
                 lld(best_match_handle) , 
                 best_match_access_difference/1024.0/1024.0); )                
             
@@ -1040,13 +1076,13 @@ int main(
                 best_match_handle, & credentials);
             if ( ret != 0 )
             {
-                debug ( PVFS_perror("migration not possible, dfile attribute fetching returned an error\n",
+                debug ( PVFS_perror("\tmigration not possible, dfile attribute fetching returned an error\n",
                     ret); ) 
             }
             else
             {   
                 PVFS_mgmt_op_id op_id;
-                debug ( printf("File size: %lld parent object: %lld \n", 
+                debug ( printf("\tFile size: %lld parent object: %lld \n", 
                     servers[i].getattr_stats.attr.size, 
                     lld(servers[i].getattr_stats.attr.parent_handle)); )
                 /* now we initiate a migration to unbusiest server*/
@@ -1077,7 +1113,7 @@ int main(
                 }
                 else
                 {
-                    PVFS_perror("PVFS_imgmt_migrate error", ret); 
+                    PVFS_perror("\tPVFS_imgmt_migrate error", ret); 
                 }
             }
         }
@@ -1088,7 +1124,7 @@ int main(
         if( servers[i].attr_age_iteration + user_opts->remove_old_entries_after_iterations
             < iteration )
         {
-            debug ( printf("Try to free history\n"); ) 
+            debug ( printf("\tTry to free history\n"); ) 
             try_to_free_history_tree(& servers[i].handle_history,
                 iteration - user_opts->remove_old_entries_after_iterations);
                 
