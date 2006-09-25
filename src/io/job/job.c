@@ -1198,6 +1198,7 @@ int job_flow(flow_descriptor * flow_d,
     jd->status_user_tag = status_user_tag;
     flow_d->user_ptr = jd;
     flow_d->callback = flow_callback;
+    flow_d->hints = hints;
 
     JOB_EVENT_START(PVFS_EVENT_FLOW, jd->job_id);
 
