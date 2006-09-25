@@ -96,7 +96,7 @@ int main(int argc, char **argv)
    
    if (opt_individual_file)
    {
-        sprintf(file_name, "%s_%d", opt_file, nprocs);
+        sprintf(file_name, "%s_%d", opt_file, mynod);
    }
    else
    {
