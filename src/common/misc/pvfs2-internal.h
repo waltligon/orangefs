@@ -40,11 +40,20 @@
 /* key string definition macros.  These are used by the server and
  * by the client (in the case of xattrs with viewdist, etc).
  */
-#define ROOT_HANDLE_KEYSTR      "rh"
-#define DIRECTORY_ENTRY_KEYSTR  "de"
-#define DATAFILE_HANDLES_KEYSTR "dh"
-#define METAFILE_DIST_KEYSTR    "md"
-#define SYMLINK_TARGET_KEYSTR   "st"
+#define ROOT_HANDLE_KEYSTR      "rh\0"
+#define ROOT_HANDLE_KEYLEN      3
+
+#define DIRECTORY_ENTRY_KEYSTR  "de\0"
+#define DIRECTORY_ENTRY_KEYLEN  3
+
+#define DATAFILE_HANDLES_KEYSTR "dh\0"
+#define DATAFILE_HANDLES_KEYLEN 3
+
+#define METAFILE_DIST_KEYSTR    "md\0"
+#define METAFILE_DIST_KEYLEN    3
+
+#define SYMLINK_TARGET_KEYSTR   "st\0"
+#define SYMLINK_TARGET_KEYLEN   3
 
 #define IO_MAX_REGIONS 64
 

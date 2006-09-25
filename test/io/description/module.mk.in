@@ -44,7 +44,7 @@ TEST_IO_DESC_DIR_SRC := \
 # disabled, broken:
 #	$(DIR)/test-req1.c\
 
-MISCSRC += $(DIR)/debug-main.c
+#MISCSRC += $(DIR)/debug-main.c
 
 TESTSRC += $(TEST_IO_DESC_DIR_SRC)
 TESTSRC += $(DEBUG_IO_DESC_DIR_SRC)

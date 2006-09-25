@@ -53,6 +53,9 @@ typedef struct
     int enc_type;
 } PINT_encoding_table_values;
 
+/* Defined encoders */
+extern PINT_encoding_table_values le_bytefield_table;
+
 #endif /* PINT_ENCODING_MODULE_H */
 
 /*

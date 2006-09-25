@@ -22,7 +22,6 @@ extern "C" {
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
 #define TROVE_DBPF_VERSION_VALUE                                  "0.1.2"
 #define LAST_HANDLE_STRING                                  "last_handle"
-#define ROOT_HANDLE_STRING                                  ROOT_HANDLE_KEYSTR
 
 #ifdef HAVE_DB_DIRTY_READ
 #define TROVE_DB_DIRTY_READ DB_DIRTY_READ
@@ -250,6 +249,14 @@ struct dbpf_dspace_getattr_op
     TROVE_ds_attributes_s *attr_p;
 };
 
+struct dbpf_dspace_getattr_list_op
+{
+    int count;
+    TROVE_handle          *handle_array;
+    TROVE_ds_attributes_s *attr_p;
+    TROVE_ds_state        *error_p;
+};
+
 struct dbpf_keyval_read_op
 {
     TROVE_keyval_s *key;
@@ -396,12 +403,38 @@ enum dbpf_op_type
     DSPACE_ITERATE_HANDLES,
     DSPACE_VERIFY,
     DSPACE_GETATTR,
-    DSPACE_SETATTR
+    DSPACE_SETATTR,
+    DSPACE_GETATTR_LIST,
 };
 
-#define DBPF_OP_IS_BSTREAM(__type) (__type < KEYVAL_READ)
-#define DBPF_OP_IS_KEYVAL(__type) (__type >= KEYVAL_READ && __type < DSPACE_CREATE)
-#define DBPF_OP_IS_DSPACE(__type) (__type >= DSPACE_CREATE)
+#define DBPF_OP_IS_BSTREAM(__type)    \
+    (__type == BSTREAM_READ_AT ||     \
+     __type == BSTREAM_WRITE_AT ||    \
+     __type == BSTREAM_RESIZE ||      \
+     __type == BSTREAM_READ_LIST ||   \
+     __type == BSTREAM_WRITE_LIST ||  \
+     __type == BSTREAM_VALIDATE ||    \
+     __type == BSTREAM_FLUSH)
+
+#define DBPF_OP_IS_KEYVAL(__type)     \
+    (__type == KEYVAL_READ ||         \
+     __type == KEYVAL_WRITE ||        \
+     __type == KEYVAL_REMOVE_KEY ||   \
+     __type == KEYVAL_VALIDATE ||     \
+     __type == KEYVAL_ITERATE_KEYS || \
+     __type == KEYVAL_READ_LIST ||    \
+     __type == KEYVAL_WRITE_LIST ||   \
+     __type == KEYVAL_FLUSH ||        \
+     __type == KEYVAL_GET_HANDLE_INFO)
+    
+#define DBPF_OP_IS_DSPACE(__type)         \
+    (__type == DSPACE_CREATE ||           \
+     __type == DSPACE_REMOVE ||           \
+     __type == DSPACE_ITERATE_HANDLES ||  \
+     __type == DSPACE_VERIFY ||           \
+     __type == DSPACE_GETATTR ||          \
+     __type == DSPACE_SETATTR ||          \
+     __type == DSPACE_GETATTR_LIST)
 
 #define DBPF_OP_DOES_SYNC(__op)    \
     (__op == KEYVAL_WRITE       || \
@@ -467,6 +500,7 @@ struct dbpf_op
         struct dbpf_keyval_iterate_keys_op k_iterate_keys;
         struct dbpf_keyval_read_list_op k_read_list;
         struct dbpf_keyval_read_list_op k_write_list;
+        struct dbpf_dspace_getattr_list_op d_getattr_list;
         struct dbpf_keyval_get_handle_info_op k_get_handle_info;
     } u;
 };

@@ -77,7 +77,6 @@ static int remove_remove_dirdata_dspace(
     PINT_server_op *s_op, job_status_s *js_p);
 static int remove_setup_work(
     PINT_server_op *s_op, job_status_s *js_p);
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 

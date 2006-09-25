@@ -124,7 +124,6 @@ static void aio_progress_notification(union sigval sig)
     struct dbpf_op *op_p = NULL;
     int ret, i, aiocb_inuse_count, state = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
-    gen_mutex_t *context_mutex = NULL;
 
     cur_op = (dbpf_queued_op_t *)sig.sival_ptr;
     assert(cur_op);
@@ -166,10 +165,8 @@ static void aio_progress_notification(union sigval sig)
 
             gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %s complete: "
                          "aio_return() says %d [fd = %d]\n",
-                         __func__,
-                         ((op_p->type == BSTREAM_WRITE_LIST) ||
-                          (op_p->type == BSTREAM_WRITE_AT) ?
-                          "WRITE" : "READ"), ret, op_p->u.b_rw_list.fd);
+                         __func__, dbpf_op_type_to_str(op_p->type),
+                         ret, op_p->u.b_rw_list.fd);
 
             *(op_p->u.b_rw_list.out_size_p) += ret;
 
@@ -206,7 +203,7 @@ static void aio_progress_notification(union sigval sig)
                      "(state is %s)\n", list_proc_state_strings[op_p->u.b_rw_list.list_proc_state]);
 
         /* this is a macro defined in dbpf-thread.h */
-        move_op_to_completion_queue(
+        dbpf_queued_op_complete(
             cur_op, ret,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
 
@@ -1426,9 +1423,6 @@ int alt_lio_listio(int mode, struct aiocb *list[],
     return(0);
 }
 
-/* prototypes for pread and pwrite; _XOPEN_SOURCE causes db.h problems */
-ssize_t pread(int fd, void *buf, size_t count, off_t offset);
-ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 static void* alt_lio_thread(void* foo)
 {
     struct alt_aio_item* tmp_item = (struct alt_aio_item*)foo;

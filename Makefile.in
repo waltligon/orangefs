@@ -53,6 +53,7 @@
 # define a few generic variables that we need to use
 srcdir = @srcdir@
 prefix = @prefix@
+datarootdir = @datarootdir@
 mandir = @mandir@
 exec_prefix = @exec_prefix@
 
@@ -142,13 +143,13 @@ LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
 CFLAGS = @CFLAGS@
+LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
+LDFLAGS += @LDFLAGS@
+SERVER_LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
+SERVER_LDFLAGS += @SERVER_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
-LDFLAGS = @LDFLAGS@
-SERVER_LDFLAGS = @SERVER_LDFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
-LDFLAGS += -Llib 
-SERVER_LDFLAGS += -Llib
 LIBS += -lpvfs2 @LIBS@ 
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@

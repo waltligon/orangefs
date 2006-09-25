@@ -10,7 +10,6 @@
  */
 
 /* This file includes definitions of common internal utility functions */
-
 #include <string.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -695,6 +694,56 @@ check_perm:
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(5) PINT_check_acls: returning"
             "access denied\n");
     return -PVFS_EACCES;
+}
+
+char *PINT_util_get_object_type(int objtype)
+{
+    static char *obj_types[] =
+    {
+         "NONE", "METAFILE", "DATAFILE",
+         "DIRECTORY", "SYMLINK", "DIRDATA", "UNKNOWN"
+    };
+    switch(objtype)
+    {
+    case PVFS_TYPE_NONE:
+         return obj_types[0];
+    case PVFS_TYPE_METAFILE:
+         return obj_types[1];
+    case PVFS_TYPE_DATAFILE:
+         return obj_types[2];
+    case PVFS_TYPE_DIRECTORY:
+         return obj_types[3];
+    case PVFS_TYPE_SYMLINK:
+         return obj_types[4];
+    case PVFS_TYPE_DIRDATA:
+         return obj_types[5];
+    }
+    return obj_types[6];
+}
+
+PVFS_time PINT_util_get_current_time(void)
+{
+    struct timeval t = {0,0};
+    PVFS_time current_time = 0;
+
+    gettimeofday(&t, NULL);
+    current_time = (PVFS_time)t.tv_sec;
+    return current_time;
+}
+
+PVFS_time PINT_util_mktime_version(PVFS_time time)
+{
+    struct timeval t = {0,0};
+    PVFS_time version = (time << 32);
+
+    gettimeofday(&t, NULL);
+    version |= (PVFS_time)t.tv_usec;
+    return version;
+}
+
+PVFS_time PINT_util_mkversion_time(PVFS_time version)
+{
+    return (PVFS_time)(version >> 32);
 }
 
 /*

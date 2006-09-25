@@ -10,7 +10,6 @@
  *  PVFS2 system interface routines for obtaining attributes of an object
  *  (file or directory).
  */
-
 #include <string.h>
 #include <assert.h>
 
@@ -195,7 +194,7 @@ machine pvfs2_client_sysint_getattr_sm(
 PVFS_error PVFS_isys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask, 
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_getattr *resp_p,
     PVFS_sys_op_id *op_id,
     PVFS_hint *hints,
@@ -250,7 +249,7 @@ PVFS_error PVFS_isys_getattr(
 PVFS_error PVFS_sys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask, 
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_getattr *resp_p,
     PVFS_hint *hints)
 {

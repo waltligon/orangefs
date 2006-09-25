@@ -25,7 +25,6 @@
 #include "pvfs2-internal.h"
 
 /* defined later */
-PINT_encoding_table_values le_bytefield_table;
 static int check_req_size(struct PVFS_server_req *req);
 static int check_resp_size(struct PVFS_server_resp *resp);
 
@@ -219,6 +218,12 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_listeattr;
 		respsize = extra_size_PVFS_servresp_listeattr;
                 break;
+            case PVFS_SERV_LISTATTR:
+                resp.u.listattr.nhandles = 0;
+                req.u.listattr.nhandles = 0;
+                reqsize = extra_size_PVFS_servreq_listattr;
+                respsize = extra_size_PVFS_servresp_listattr;
+                break;
 	}
 	/* since these take the max size when mallocing in the encode,
 	 * give them a huge number, then later fix it. */
@@ -366,6 +371,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
+        CASE(PVFS_SERV_LISTATTR,  listattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -458,6 +464,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
+        CASE(PVFS_SERV_LISTATTR, listattr);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -560,6 +567,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
+        CASE(PVFS_SERV_LISTATTR, listattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -581,8 +589,8 @@ static int lebf_decode_req(
 
     if (ptr != (char *) input_buffer + input_size)
     {
-	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
-                    __func__, req->op, ptr - (char *) input_buffer, input_size);
+	gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
+                    __func__, req->op, (long)(ptr - (char *) input_buffer), input_size);
 	ret = -PVFS_EPROTO;
     }
 
@@ -642,6 +650,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
+        CASE(PVFS_SERV_LISTATTR, listattr);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -669,8 +678,8 @@ static int lebf_decode_resp(
 #undef CASE
 
     if (ptr != (char *) input_buffer + input_size) {
-	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
-                    __func__, resp->op, ptr - (char *) input_buffer,
+	gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
+                    __func__, resp->op, (long)(ptr - (char *) input_buffer),
                     input_size);
 	ret = -PVFS_EPROTO;
     }
@@ -748,6 +757,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
 		    decode_free(req->u.setattr.attr.u.meta.dfile_array);
 		break;
+            case PVFS_SERV_LISTATTR:
+                if (req->u.listattr.handles)
+                    decode_free(req->u.listattr.handles);
 
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
@@ -833,7 +845,22 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (resp->u.listeattr.key)
                     decode_free(resp->u.listeattr.key);
                 break;
-
+            case PVFS_SERV_LISTATTR:
+            {
+                int i;
+                if (resp->u.listattr.error)
+                    decode_free(resp->u.listattr.error);
+                if (resp->u.listattr.attr) {
+                    for (i = 0; i < resp->u.listattr.nhandles; i++) {
+                        if (resp->u.listattr.attr[i].mask & PVFS_ATTR_META_DIST)
+                            decode_free(resp->u.listattr.attr[i].u.meta.dist);
+                        if (resp->u.listattr.attr[i].mask & PVFS_ATTR_META_DFILES)
+                            decode_free(resp->u.listattr.attr[i].u.meta.dfile_array);
+                    }
+                    decode_free(resp->u.listattr.attr);
+                }
+                break;
+            }
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_CREATE:
 	    case PVFS_SERV_REMOVE:

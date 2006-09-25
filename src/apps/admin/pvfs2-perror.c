@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    fprintf(stderr, "Error code %d: ", user_opts->error_code);
+    fprintf(stderr, "Error code %d", user_opts->error_code);
     PVFS_perror("", -user_opts->error_code);
 
     return(0);

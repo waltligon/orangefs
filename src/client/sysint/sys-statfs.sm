@@ -57,7 +57,7 @@ machine pvfs2_client_statfs_sm(
  */
 PVFS_error PVFS_isys_statfs(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_statfs *resp,
     PVFS_sys_op_id *op_id,
     PVFS_hint *hints,
@@ -154,7 +154,7 @@ PVFS_error PVFS_isys_statfs(
  */
 PVFS_error PVFS_sys_statfs(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_statfs* resp,
     PVFS_hint * hints)
 {

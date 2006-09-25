@@ -25,7 +25,7 @@ extern PINT_dist basic_dist;
 extern PINT_dist simple_stripe_dist;
 
 /* initial dist table - default dists */
-PINT_dist* PINT_Dist_table[PINT_DIST_TABLE_SZ] = {0};
+static PINT_dist *PINT_Dist_table[PINT_DIST_TABLE_SZ] = {0};
 
 /*
  * add a dist to dist table
@@ -59,7 +59,10 @@ int PINT_unregister_distribution(char *dist_name)
         if (!strncmp(dist_name, PINT_Dist_table[d]->dist_name,
                      PINT_DIST_NAME_SZ))
         {
-            PINT_Dist_table[d]->dist_name[0] = 0; /* bad cheese here-WBL */
+            /* bubble up */
+            --PINT_Dist_count;
+            for (; d<PINT_Dist_count; d++)
+                PINT_Dist_table[d] = PINT_Dist_table[d+1];
             return (0);
         }
     }

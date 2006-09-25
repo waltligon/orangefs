@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <getopt.h>
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -97,9 +98,6 @@ int main(int argc, char **argv)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "vm:w:i:";
     int one_opt = 0;
     int len = 0;

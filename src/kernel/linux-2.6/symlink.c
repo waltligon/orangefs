@@ -6,14 +6,15 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
+#include "pvfs2-internal.h"
 
 static int pvfs2_readlink(
     struct dentry *dentry, char __user *buffer, int buflen)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readlink called on inode %d\n",
-                (int)dentry->d_inode->i_ino);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readlink called on inode %llu\n",
+                llu(get_handle_from_ino(dentry->d_inode)));
 
     /*
       if we're getting called, the vfs has no doubt already done a
@@ -52,11 +53,21 @@ struct inode_operations pvfs2_symlink_inode_operations =
     follow_link : pvfs2_follow_link,
     setattr : pvfs2_setattr,
     revalidate : pvfs2_revalidate,
+#ifdef HAVE_XATTR
+    setxattr: pvfs2_setxattr,
+    listxattr: pvfs2_listxattr,
+#endif
 #else
     .readlink = pvfs2_readlink,
     .follow_link = pvfs2_follow_link,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
+    .listxattr = pvfs2_listxattr,
+#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+    .setxattr = generic_setxattr,
+#else
+    .setxattr = pvfs2_setxattr,
+#endif
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
 #endif

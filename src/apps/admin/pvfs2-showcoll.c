@@ -61,7 +61,6 @@ int main(int argc, char **argv)
     TROVE_keyval_s key, val;
     TROVE_context_id trove_context = -1;
     char *method_name;
-    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -132,8 +131,8 @@ int main(int argc, char **argv)
     }
 
     /* find root handle */
-    key.buffer = root_handle_string;
-    key.buffer_sz = strlen(root_handle_string) + 1;
+    key.buffer = ROOT_HANDLE_KEYSTR;
+    key.buffer_sz = ROOT_HANDLE_KEYLEN;
     val.buffer = &root_handle;
     val.buffer_sz = sizeof(root_handle);
     ret = trove_collection_geteattr(coll_id,

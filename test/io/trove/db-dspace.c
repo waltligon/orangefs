@@ -96,6 +96,7 @@ int main(int argc, char *argv[])
 	}
 	db->set_errfile(db, stderr);
 	db->set_errpfx(db, "pvfs2");
+#if 0
 	/* open the database */
 	if ((ret = db->open(db, 
 			    NULL, fname, NULL, DB_UNKNOWN,  
@@ -105,6 +106,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "db->open: %s\n", db_strerror(ret));
 		exit(1);
 	}
+#endif
 	if ((ret = db->cursor(db, NULL, &db_c, 0)) != 0)
 	{
 		fprintf(stderr, "db->cursor: %s\n", db_strerror(ret));

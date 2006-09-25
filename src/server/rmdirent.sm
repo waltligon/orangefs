@@ -34,15 +34,11 @@ static int rmdirent_remove_directory_entry_failure(
 static int rmdirent_setup_resp(
     PINT_server_op *s_op, job_status_s* js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_rmdirent_sm(
     prelude,
     verify_parent_metadata_and_read_directory_entry_handle,
-    read_directory_entry,
-    read_directory_entry_failure,
     remove_directory_entry,
     remove_directory_entry_failure,
     check_for_req_dir_update,

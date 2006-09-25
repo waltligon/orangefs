@@ -40,6 +40,7 @@
 #include "pint-event.h"
 #ifdef USE_TRUSTED
 #include "server-config.h"
+#include "bmi-tcp-addressing.h"
 #endif
 #include "gen-locks.h"
 
@@ -123,6 +124,7 @@ int BMI_tcp_testcontext(int incount,
 		     bmi_context_id context_id);
 method_addr_p BMI_tcp_method_addr_lookup(const char *id_string);
 const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map);
+int BMI_tcp_query_addr_range(method_addr_p, const char *, int);
 int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   method_addr_p dest,
 			   const void *const *buffer_list,
@@ -308,7 +310,8 @@ struct bmi_method_ops bmi_tcp_ops = {
     .BMI_meth_open_context = BMI_tcp_open_context,
     .BMI_meth_close_context = BMI_tcp_close_context,
     .BMI_meth_cancel = BMI_tcp_cancel,
-    .BMI_meth_rev_lookup_unexpected = BMI_tcp_addr_rev_lookup_unexpected
+    .BMI_meth_rev_lookup_unexpected = BMI_tcp_addr_rev_lookup_unexpected,
+    .BMI_meth_query_addr_range = BMI_tcp_query_addr_range,
 };
 
 /* module parameters */
@@ -616,7 +619,7 @@ void *BMI_tcp_memalloc(bmi_size_t size,
      * preferences about how the memory should be configured.
      */
 
-    return (malloc((size_t) size));
+    return (calloc(1,(size_t) size));
 }
 
 
@@ -656,6 +659,75 @@ int BMI_tcp_unexpected_free(void *buffer)
 	free(buffer);
     }
     return (0);
+}
+
+#ifdef USE_TRUSTED
+
+static struct tcp_allowed_connection_s *
+alloc_trusted_connection_info(int network_count)
+{
+    struct tcp_allowed_connection_s *tcp_allowed_connection_info = NULL;
+
+    tcp_allowed_connection_info = (struct tcp_allowed_connection_s *)
+            calloc(1, sizeof(struct tcp_allowed_connection_s));
+    if (tcp_allowed_connection_info)
+    {
+        tcp_allowed_connection_info->network =
+            (struct in_addr *) calloc(network_count, sizeof(struct in_addr));
+        if (tcp_allowed_connection_info->network == NULL)
+        {
+            free(tcp_allowed_connection_info);
+            tcp_allowed_connection_info = NULL;
+        }
+        else
+        {
+            tcp_allowed_connection_info->netmask =
+                (struct in_addr *) calloc(network_count, sizeof(struct in_addr));
+            if (tcp_allowed_connection_info->netmask == NULL)
+            {
+                free(tcp_allowed_connection_info->network);
+                free(tcp_allowed_connection_info);
+                tcp_allowed_connection_info = NULL;
+            }
+            else {
+                tcp_allowed_connection_info->network_count = network_count;
+            }
+        }
+    }
+    return tcp_allowed_connection_info;
+}
+
+static void 
+dealloc_trusted_connection_info(void* ptcp_allowed_connection_info)
+{
+    struct tcp_allowed_connection_s *tcp_allowed_connection_info =
+        (struct tcp_allowed_connection_s *) ptcp_allowed_connection_info;
+    if (tcp_allowed_connection_info)
+    {
+        free(tcp_allowed_connection_info->network);
+        tcp_allowed_connection_info->network = NULL;
+        free(tcp_allowed_connection_info->netmask);
+        tcp_allowed_connection_info->netmask = NULL;
+        free(tcp_allowed_connection_info);
+    }
+    return;
+}
+
+#endif
+
+/*
+ * This function will convert a mask_bits value to an in_addr
+ * representation. i.e for example if
+ * mask_bits was 24 then it would be 255.255.255.0
+ * if mask_bits was 22 then it would be 255.255.252.0
+ * etc
+ */
+static void convert_mask(int mask_bits, struct in_addr *mask)
+{
+   uint32_t addr = -1;
+   addr = addr & ~~(-1 << (mask_bits ? (32 - mask_bits) : 32));
+   mask->s_addr = htonl(addr);
+   return;
 }
 
 /* BMI_tcp_set_info()
@@ -726,10 +798,13 @@ int BMI_tcp_set_info(int option,
         }
         else 
         {
-            char *bmi_network = NULL, *bmi_netmask = NULL;
-            struct server_configuration_s *svc_config = (struct server_configuration_s *) inout_parameter;
-            tcp_allowed_connection = 
-                (struct tcp_allowed_connection_s *) calloc(1, sizeof(struct tcp_allowed_connection_s));
+            int    bmi_networks_count = 0;
+            char **bmi_networks = NULL;
+            int   *bmi_netmasks = NULL;
+            struct server_configuration_s *svc_config = NULL;
+
+            svc_config = (struct server_configuration_s *) inout_parameter;
+            tcp_allowed_connection = alloc_trusted_connection_info(svc_config->allowed_networks_count);
             if (tcp_allowed_connection == NULL)
             {
                 ret = -ENOMEM;
@@ -740,6 +815,7 @@ int BMI_tcp_set_info(int option,
 #endif
             /* Stash this in the server_configuration_s structure. freed later on */
             svc_config->security = tcp_allowed_connection;
+            svc_config->security_dtor = &dealloc_trusted_connection_info;
             ret = 0;
             /* Fill up the list of allowed ports */
             PINT_config_get_allowed_ports(svc_config, 
@@ -761,40 +837,35 @@ int BMI_tcp_set_info(int option,
                 }
             }
             ret = 0;
-            /* Retrieve the BMI network address and port */
-            PINT_config_get_allowed_network(svc_config,
+            /* Retrieve the list of BMI network addresses and masks  */
+            PINT_config_get_allowed_networks(svc_config,
                     &tcp_allowed_connection->network_enforce,
-                    &bmi_network, &bmi_netmask);
+                    &bmi_networks_count,
+                    &bmi_networks,
+                    &bmi_netmasks);
 
             /* if it was enabled, make sure that we know how to deal with it */
             if (tcp_allowed_connection->network_enforce == 1)
             {
-                char *tcp_string = NULL;
-                /* Convert the network string into an in_addr_t structure */
-                tcp_string = string_key("tcp", bmi_network);
-                if (!tcp_string)
+                int i;
+
+                for (i = 0; i < bmi_networks_count; i++)
                 {
-                    /* the string doesn't even have our info */
-                    gossip_lerr("Error: malformed tcp network address\n");
-                    ret = bmi_tcp_errno_to_pvfs(-EINVAL);
-                }
-                else {
-                    /* convert this into an in_addr_t */
-                    inet_aton(tcp_string, &tcp_allowed_connection->network);
-                    free(tcp_string);
-                    /* Do the same for the netmask as well */
-                    tcp_string = string_key("tcp", bmi_netmask);
+                    char *tcp_string = NULL;
+                    /* Convert the network string into an in_addr_t structure */
+                    tcp_string = string_key("tcp", bmi_networks[i]);
                     if (!tcp_string)
                     {
                         /* the string doesn't even have our info */
-                        gossip_lerr("Error: malformed tcp netmask\n");
+                        gossip_lerr("Error: malformed tcp network address\n");
                         ret = bmi_tcp_errno_to_pvfs(-EINVAL);
                     }
                     else {
                         /* convert this into an in_addr_t */
-                        inet_aton(tcp_string, &tcp_allowed_connection->netmask);
+                        inet_aton(tcp_string, &tcp_allowed_connection->network[i]);
                         free(tcp_string);
                     }
+                    convert_mask(bmi_netmasks[i], &tcp_allowed_connection->netmask[i]);
                 }
                 /* don't enforce anything if there were any errors */
                 if (ret != 0)
@@ -1533,6 +1604,152 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
     return(0);
 }
 
+/*
+ * For now, we only support wildcard strings that are IP addresses
+ * and not *hostnames*!
+ */
+static int check_valid_wildcard(const char *wildcard_string, unsigned long *octets)
+{
+    int i, len = strlen(wildcard_string), last_dot = -1, octet_count = 0;
+    char str[16];
+    for (i = 0; i < len; i++)
+    {
+        char c = wildcard_string[i];
+        memset(str, 0, 16);
+        if ((c < '0' || c > '9') && c != '*' && c != '.')
+            return -EINVAL;
+        if (c == '*') {
+            if (octet_count >= 4)
+                return -EINVAL;
+            octets[octet_count++] = 256;
+        }
+        else if (c == '.')
+        {
+            char *endptr = NULL;
+            if (octet_count >= 4)
+                return -EINVAL;
+            strncpy(str, &wildcard_string[last_dot + 1], (i - last_dot - 1));
+            octets[octet_count++] = strtol(str, &endptr, 10);
+            if (*endptr != '\0' || octets[octet_count-1] >= 256)
+                return -EINVAL;
+            last_dot = i;
+        }
+    }
+    for (i = octet_count; i < 4; i++)
+    {
+         octets[i] = 256;
+    }
+    return 0;
+}
+
+/*
+ * return 1 if the addr specified is part of the wildcard specification of octet
+ * return 0 otherwise.
+ */
+static int check_octets(struct in_addr addr, unsigned long *octets)
+{
+#define B1_MASK  0xff000000
+#define B1_SHIFT 24
+#define B2_MASK  0x00ff0000
+#define B2_SHIFT 16
+#define B3_MASK  0x0000ff00
+#define B3_SHIFT 8
+#define B4_MASK  0x000000ff
+    uint32_t host_addr = ntohl(addr.s_addr);
+    /* * stands for all clients */
+    if (octets[0] == 256)
+    {
+        return 1;
+    }
+    if (((host_addr & B1_MASK) >> B1_SHIFT) != octets[0])
+    {
+        return 0;
+    }
+    if (octets[1] == 256)
+    {
+        return 1;
+    }
+    if (((host_addr & B2_MASK) >> B2_SHIFT) != octets[1])
+    {
+        return 0;
+    }
+    if (octets[2] == 256)
+    {
+        return 1;
+    }
+    if (((host_addr & B3_MASK) >> B3_SHIFT) != octets[2])
+    {
+        return 0;
+    }
+    if (octets[3] == 256)
+    {
+        return 1;
+    }
+    if ((host_addr & B4_MASK) != octets[3])
+    {
+        return 0;
+    }
+    return 1;
+#undef B1_MASK
+#undef B1_SHIFT 
+#undef B2_MASK 
+#undef B2_SHIFT
+#undef B3_MASK
+#undef B3_SHIFT
+#undef B4_MASK
+}
+/* BMI_tcp_query_addr_range()
+ * Check if a given address is within the network specified by the wildcard string!
+ * or if it is part of the subnet mask specified
+ */
+int BMI_tcp_query_addr_range(method_addr_p map, const char *wildcard_string, int netmask)
+{
+    struct tcp_addr *tcp_addr_data = map->method_data;
+    struct sockaddr_in map_addr;
+    socklen_t map_addr_len = sizeof(map_addr);
+    const char *tcp_wildcard = wildcard_string + 6 /* strlen("tcp://") */;
+
+    memset(&map_addr, 0, sizeof(map_addr));
+    getsockname(tcp_addr_data->socket, (struct sockaddr *) &map_addr, &map_addr_len);
+    /* Wildcard specification */
+    if (netmask == -1)
+    {
+        unsigned long octets[4];
+        if (check_valid_wildcard(tcp_wildcard, octets) < 0)
+        {
+            gossip_lerr("Invalid wildcard specification: %s\n", tcp_wildcard);
+            return -EINVAL;
+        }
+        gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Map Address is : %s, Wildcard Octets: %lu.%lu.%lu.%lu\n", inet_ntoa(map_addr.sin_addr),
+                octets[0], octets[1], octets[2], octets[3]);
+        if (check_octets(map_addr.sin_addr, octets) == 1)
+        {
+            return 1;
+        }
+    }
+    /* Netmask specification */
+    else {
+        struct sockaddr_in mask_addr, network_addr;
+        memset(&mask_addr, 0, sizeof(mask_addr));
+        memset(&network_addr, 0, sizeof(network_addr));
+        /* Convert the netmask address */
+        convert_mask(netmask, &mask_addr.sin_addr);
+        /* Invalid network address */
+        if (inet_aton(tcp_wildcard, &network_addr.sin_addr) == 0)
+        {
+            gossip_lerr("Invalid network specification: %s\n", tcp_wildcard);
+            return -EINVAL;
+        }
+        /* Matches the subnet mask! */
+        if ((map_addr.sin_addr.s_addr & mask_addr.sin_addr.s_addr)
+                == network_addr.sin_addr.s_addr)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* BMI_tcp_addr_rev_lookup_unexpected()
  *
  * looks up an address that was initialized unexpectedly and returns a string
@@ -1720,6 +1937,7 @@ static int tcp_server_init(void)
     int oldfl = 0;		/* old socket flags */
     struct tcp_addr *tcp_addr_data = NULL;
     int tmp_errno = bmi_tcp_errno_to_pvfs(-EINVAL);
+    int ret = 0;
 
     /* create a socket */
     tcp_addr_data = tcp_method_params.listen_addr->method_data;
@@ -1741,7 +1959,19 @@ static int tcp_server_init(void)
     BMI_sockio_set_sockopt(tcp_addr_data->socket, SO_REUSEADDR, 1);
 
     /* bind it to the appropriate port */
-    if (BMI_sockio_bind_sock(tcp_addr_data->socket, tcp_addr_data->port) < 0)
+    if(tcp_method_params.method_flags & BMI_TCP_BIND_SPECIFIC)
+    {
+        ret = BMI_sockio_bind_sock_specific(tcp_addr_data->socket,
+            tcp_addr_data->hostname,
+            tcp_addr_data->port);
+    }
+    else
+    {
+        ret = BMI_sockio_bind_sock(tcp_addr_data->socket,
+            tcp_addr_data->port);
+    }
+    
+    if (ret < 0)
     {
 	tmp_errno = errno;
 	gossip_err("Error: BMI_sockio_bind_sock: %s\n", strerror(tmp_errno));
@@ -3128,9 +3358,14 @@ static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data)
     static unsigned short my_requested_port = 1023;
     unsigned short my_local_port = 0;
     struct sockaddr_in my_local_sockaddr;
-    int len = sizeof(struct sockaddr_in);
+    socklen_t len = sizeof(struct sockaddr_in);
     memset(&my_local_sockaddr, 0, sizeof(struct sockaddr_in));
 
+    /* setup for a fast restart to avoid bind addr in use errors */
+    if (BMI_sockio_set_sockopt(tcp_addr_data->socket, SO_REUSEADDR, 1) < 0)
+    {
+        gossip_lerr("Could not set SO_REUSEADDR on local socket (port %hd)\n", my_local_port);
+    }
     if (BMI_sockio_bind_sock(tcp_addr_data->socket, my_requested_port) < 0)
     {
         gossip_lerr("Could not bind to local port %hd: %s\n", 
@@ -3146,11 +3381,6 @@ static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data)
         my_local_port = ntohs(my_local_sockaddr.sin_port);
     }
     gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Bound locally to port: %hd\n", my_local_port);
-    /* setup for a fast restart to avoid bind addr in use errors */
-    if (BMI_sockio_set_sockopt(tcp_addr_data->socket, SO_REUSEADDR, 1) < 0)
-    {
-        gossip_lerr("Could not set SO_REUSEADDR on local socket (port %hd)\n", my_local_port);
-    }
     return 0;
 }
 
@@ -3174,7 +3404,7 @@ static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr)
 {
     char *peer_hostname = inet_ntoa(peer_sockaddr->sin_addr);
     unsigned short peer_port = ntohs(peer_sockaddr->sin_port);
-    int   what_failed   = -1;
+    int   i, what_failed   = -1;
 
     /* Don't refuse connects if there were any
      * parse errors or if it is not enabled in the config file
@@ -3192,12 +3422,20 @@ static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr)
         {
             goto port_check;
         }
-        /* check the masks */
-        if ((peer_sockaddr->sin_addr.s_addr & gtcp_allowed_connection->netmask.s_addr)
-                != gtcp_allowed_connection->network.s_addr)
+        for (i = 0; i < gtcp_allowed_connection->network_count; i++)
         {
-            what_failed = 0;
+            /* check with all the masks */
+            if ((peer_sockaddr->sin_addr.s_addr & gtcp_allowed_connection->netmask[i].s_addr) 
+                    != gtcp_allowed_connection->network[i].s_addr)
+            {
+                continue;
+            }
+            else {
+                goto port_check;
+            }
         }
+        /* not from a trusted network */
+        what_failed = 0;
     }
 port_check:
     /* make sure that the client port numbers are within specified limits */

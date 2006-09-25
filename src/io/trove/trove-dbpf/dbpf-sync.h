@@ -26,7 +26,7 @@ typedef struct
 int dbpf_sync_context_init(int context_index);
 void dbpf_sync_context_destroy(int context_index);
 
-int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p);
+int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount);
 int dbpf_sync_coalesce_dequeue(dbpf_queued_op_t *qop_p);
 int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p);
 

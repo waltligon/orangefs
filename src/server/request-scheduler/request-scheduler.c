@@ -321,6 +321,11 @@ int PINT_req_sched_target_handle(
 	*handle = req->u.flush.handle;
 	*fs_id = req->u.flush.fs_id;
 	return (0);
+    case PVFS_SERV_LISTATTR:
+        *readonly_flag = 1;
+        *fs_id = req->u.listattr.fs_id;
+	*handle = PVFS_HANDLE_NULL;
+        return 0;
     case PVFS_SERV_MGMT_NOOP:
 	return (1);
     case PVFS_SERV_MGMT_PERF_MON:
@@ -642,35 +647,14 @@ int PINT_req_sched_post(
             /* possible dirent optimization: see if all scheduled ops for this
              * handle are for crdirent or rmdirent.  
              * If so, we can allow another concurrent
-             * dirent request to proceed 
+             * dirent request to proceed.
              */
-            tmp_flag = 0;
-            qlist_for_each(iterator, &tmp_list->req_list)
-            {
-                tmp_element2 = qlist_entry(iterator, struct req_sched_element,
-                    list_link);
-                if(tmp_element2->req_ptr->op != PVFS_SERV_CRDIRENT && 
-                   tmp_element2->req_ptr->op != PVFS_SERV_RMDIRENT)
-                {
-                    tmp_flag = 1;
-                    break;
-                }
-            }
-            
-            if(!tmp_flag)
-            {
-                tmp_element->state = REQ_SCHEDULED;
-                ret = 1;
-                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                             "concurrent dirent op, handle: %llu\n", 
-                             llu(handle));
-            }
-            else
-            {
-            
-                tmp_element->state = REQ_QUEUED;
-                ret = 0;
-            }
+            tmp_element->state = REQ_SCHEDULED;
+            tmp_element->readonly_flag = 1;
+            gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
+                         "concurrent dirent op, handle: %llu\n", 
+                         llu(handle));
+            ret = 1;
         }
 	else
 	{
@@ -1326,7 +1310,8 @@ int PINT_req_sched_testworld(
 	tmp_element->state = REQ_SCHEDULED;
 	(*inout_count_p)++;
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		     "REQ SCHED SCHEDULING, handle: %llu, queue_element: %p\n",
+		     "REQ SCHED SCHEDULING, "
+                     "handle: %llu, queue_element: %p\n",
 		     llu(tmp_element->handle), tmp_element);
 	/* if this is a mode change, then transition now */
 	if(tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM &&

@@ -58,7 +58,7 @@ struct file_system_type pvfs2_fs_type =
   get_sb_nodev and we're using kill_litter_super instead of
   kill_block_super.
 */
-    .fs_flags = FS_REQUIRES_DEV
+    .fs_flags = FS_REQUIRES_DEV,
 };
 
 module_param(hash_table_size, int, 0);
@@ -152,6 +152,10 @@ static int __init pvfs2_init(void)
         ret = -ENOMEM;
         goto cleanup_device;
     }
+    if ((ret = fsid_key_table_initialize()) < 0) 
+    {
+        goto cleanup_progress_table;
+    }
     pvfs2_proc_initialize();
     ret = register_filesystem(&pvfs2_fs_type);
 
@@ -161,6 +165,8 @@ static int __init pvfs2_init(void)
         return 0;
     }
     pvfs2_proc_finalize();
+    fsid_key_table_finalize();
+cleanup_progress_table:
     qhash_finalize(htable_ops_in_progress);
 cleanup_device:
     unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
@@ -188,6 +194,7 @@ static void __exit pvfs2_exit(void)
 
     unregister_filesystem(&pvfs2_fs_type);
     pvfs2_proc_finalize();
+    fsid_key_table_finalize();
     if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
     {
 	gossip_err("Failed to unregister pvfs2 device /dev/%s\n",

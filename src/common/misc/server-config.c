@@ -26,6 +26,10 @@
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
 
+#ifdef WITH_OPENSSL
+#include "openssl/evp.h"
+#endif
+
 static const char * replace_old_keystring(const char * oldkey);
 
 static DOTCONF_CB(get_pvfs_server_id);
@@ -43,6 +47,8 @@ static DOTCONF_CB(enter_filesystem_context);
 static DOTCONF_CB(exit_filesystem_context);
 static DOTCONF_CB(enter_storage_hints_context);
 static DOTCONF_CB(exit_storage_hints_context);
+static DOTCONF_CB(enter_export_options_context);
+static DOTCONF_CB(exit_export_options_context);
 static DOTCONF_CB(enter_mhranges_context);
 static DOTCONF_CB(exit_mhranges_context);
 static DOTCONF_CB(enter_dhranges_context);
@@ -52,6 +58,7 @@ static DOTCONF_CB(exit_distribution_context);
 static DOTCONF_CB(get_unexp_req);
 static DOTCONF_CB(get_tcp_buffer_send);
 static DOTCONF_CB(get_tcp_buffer_receive);
+static DOTCONF_CB(get_tcp_bind_specific);
 static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_name);
@@ -66,6 +73,13 @@ static DOTCONF_CB(get_trusted_network);
 static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
+
+static DOTCONF_CB(get_root_squash);
+static DOTCONF_CB(get_read_only);
+static DOTCONF_CB(get_all_squash);
+static DOTCONF_CB(get_anon_gid);
+static DOTCONF_CB(get_anon_uid);
+
 static DOTCONF_CB(get_handle_recycle_timeout_seconds);
 static DOTCONF_CB(get_flow_buffer_size_bytes);
 static DOTCONF_CB(get_flow_buffers_per_flow);
@@ -88,6 +102,7 @@ static DOTCONF_CB(get_client_job_bmi_timeout);
 static DOTCONF_CB(get_client_job_flow_timeout);
 static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
+static DOTCONF_CB(get_secret_key);
 static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
 
@@ -254,11 +269,11 @@ static const configoption_t options[] =
      * which the connections are going to be accepted and serviced.
      * The format of the TrustedNetwork option is:
      *
-     * TrustedNetwork bmi-network-address bmi-network-mask
+     * TrustedNetwork bmi-network-address@bmi-network-mask
      *
      * As an example:
      *
-     * TrustedNetwork tcp://192.168.4.0 tcp://255.255.255.0
+     * TrustedNetwork tcp://192.168.4.0@24
      */
     {"TrustedNetwork",ARG_LIST, get_trusted_network,NULL,
         CTX_SECURITY,NULL},
@@ -301,6 +316,19 @@ static const configoption_t options[] =
     {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_FILESYSTEM,
         NULL},
 
+     /* Specifies the beginning of a ExportOptions context.
+      * This groups options specific to a filesystem and related to the behavior
+      * of how it gets exported to various clients. Most of these options
+      * will affect things like what uids get translated to and so on..
+      */
+     {"<ExportOptions>",ARG_NONE, enter_export_options_context, NULL,CTX_FILESYSTEM,
+         NULL},
+ 
+     /* Specifies the end-tag of the ExportOptions context.
+      */
+     {"</ExportOptions>",ARG_NONE, exit_export_options_context, NULL,CTX_EXPORT,
+         NULL},
+ 
     /* This groups
      * options specific to a filesystem and related to the behavior of the
      * storage system.  Mostly these options are passed directly to the
@@ -343,7 +371,7 @@ static const configoption_t options[] =
      */
     {"</DataHandleRanges>",ARG_NONE, exit_dhranges_context,NULL,
         CTX_DATAHANDLERANGES,NULL},
-    
+
     /* Provides a context for defining the filesystem's default
      * distribution to use and the parameters to be set for that distribution.
      *
@@ -504,6 +532,12 @@ static const configoption_t options[] =
       {"TCPBufferReceive",ARG_INT, get_tcp_buffer_receive,NULL,
          CTX_DEFAULTS|CTX_GLOBAL,"0"},
 
+     /* If enabled, specifies that the server should bind its port only on
+      * the specified address (rather than INADDR_ANY)
+      */
+     {"TCPBindSpecific",ARG_STR, get_tcp_bind_specific,NULL,
+        CTX_DEFAULTS|CTX_GLOBAL,"no"},
+
      /* Specifies the timeout value in seconds for BMI jobs on the server.
       */
      {"ServerJobBMITimeoutSecs",ARG_INT, get_server_job_bmi_timeout,NULL,
@@ -591,6 +625,49 @@ static const configoption_t options[] =
     {"FlowBuffersPerFlow", ARG_INT,
          get_flow_buffers_per_flow, NULL, CTX_FILESYSTEM,"8"},
 
+    /* Define options that will influence the way a file-system gets exported
+     * to the rest of the world.
+     */
+
+    /* RootSquash option specifies whether the exported file-system needs to squash accesses
+     * by root. This is an optional parameter that needs to be specified as part of the ExportOptions
+     * context and is a list of BMI URL specification of client addresses for which RootSquash
+     * has to be enforced. 
+     * RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     */
+    {"RootSquash", ARG_LIST, get_root_squash, NULL,
+        CTX_EXPORT, ""},
+
+    /* ReadOnly option specifies whether the exported file-system needs to disallow write accesses
+     * from clients or anything that modifies the state of the file-system.
+     * This is an optional parameter that needs to be specified as part of the ExportOptions
+     * context and is a list of BMI URL specification of client addresses for which ReadOnly
+     * has to be enforced.
+     * ReadOnly tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     */
+    {"ReadOnly", ARG_LIST,  get_read_only,    NULL,
+        CTX_EXPORT, ""},
+
+    /* AllSquash option specifies whether the exported file-system needs to squash all accesses
+     * to the file-system to a specified uid/gid!
+     * This is an optional parameter that needs to be specified as part of the ExportOptions
+     * context and is a list of BMI URL specification of client addresses for which AllSquash
+     * has to be enforced.
+     * AllSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     */
+    {"AllSquash", ARG_LIST, get_all_squash,   NULL,
+        CTX_EXPORT, ""},
+
+    /* AnonUID and AnonGID are 2 integers that tell the servers to translate the requesting clients'
+     * uid/gid to the specified ones whenever AllSquash is specified!
+     * If these are not specified and AllSquash is specified then the uid used will be
+     * that of nobody and gid that of nobody
+     */
+    {"AnonUID",  ARG_STR,  get_anon_uid,     NULL,
+        CTX_EXPORT, "65534"},
+    {"AnonGID",  ARG_STR,  get_anon_gid,     NULL,
+        CTX_EXPORT, "65534"},
+
     /* The TROVE storage layer has a management component that deals with
      * allocating handle values for new metafiles and datafiles.  The underlying
      * trove module can be given a hint to tell it how long to wait before
@@ -603,8 +680,9 @@ static const configoption_t options[] =
          get_handle_recycle_timeout_seconds, NULL, 
          CTX_STORAGEHINTS,"360"},
     
-    /* The TROVE layer has an attribute caching component that handles
-     * caching of stored attributes.  This is used to improve the performance of
+    /* The TROVE layer (server side storage layer) 
+     * has an attribute caching component that 
+     * caches stored attributes.  This is used to improve the performance of
      * metadata accesses.  The AttrCacheKeywords option is a list of the
      * object types that should get cached in the attribute cache.  
      * The possible values for this option are:
@@ -683,9 +761,11 @@ static const configoption_t options[] =
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
      *
-     * usec: [%H:%M:%S
+     * usec: [%H:%M:%S.%U]
      *
      * datetime: [%m/%d %H:%M]
+     *
+     * thread: [%H:%M:%S.%U (%lu)]
      *
      * none
      *
@@ -724,6 +804,11 @@ static const configoption_t options[] =
 
     {"CoalescingLowWatermark", ARG_INT, get_coalescing_low_watermark, NULL,
         CTX_STORAGEHINTS, "1"},
+
+    /* Specifies the file system's key for use in HMAC-based digests of
+     * client operations.
+     */
+    {"SecretKey",ARG_STR, get_secret_key,NULL,CTX_FILESYSTEM,NULL},
 
     LAST_OPTION
 };
@@ -907,6 +992,10 @@ DOTCONF_CB(get_logstamp)
     {
         config_s->logstamp_type = GOSSIP_LOGSTAMP_DATETIME;
     }
+    else if(!strcmp(cmd->data.str, "thread"))
+    {
+        config_s->logstamp_type = GOSSIP_LOGSTAMP_THREAD;
+    }
     else
     {
         return("LogStamp tag (if specified) must have one of the following values: none, usec, or datetime.\n");
@@ -1063,6 +1152,23 @@ DOTCONF_CB(exit_storage_hints_context)
     return NULL;
 }
 
+DOTCONF_CB(enter_export_options_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_EXPORT;
+
+    return PINT_dotconf_set_defaults(
+        cmd->configfile, CTX_EXPORT);
+}
+
+DOTCONF_CB(exit_export_options_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_FILESYSTEM;
+    return NULL;
+}
 
 DOTCONF_CB(enter_mhranges_context)
 {
@@ -1155,6 +1261,28 @@ DOTCONF_CB(get_tcp_buffer_send)
     config_s->tcp_buffer_size_send = cmd->data.value;
     return NULL;
 }
+
+DOTCONF_CB(get_tcp_bind_specific)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    if(strcasecmp(cmd->data.str, "yes") == 0)
+    {
+        config_s->tcp_bind_specific = 1;
+    }
+    else if(strcasecmp(cmd->data.str, "no") == 0)
+    {
+        config_s->tcp_bind_specific = 0;
+    }
+    else
+    {
+        return("TCPBindSpecific value must be 'yes' or 'no'.\n");
+    }
+
+    return NULL;
+}
+
 
 
 DOTCONF_CB(get_server_job_bmi_timeout)
@@ -1273,6 +1401,286 @@ DOTCONF_CB(get_flow_module_list)
     return NULL;
 }
 
+static void free_list_of_strings(int list_count, char ***new_list)
+{
+    int i;
+
+    if (new_list && *new_list != NULL)
+    {
+        for (i = 0; i < list_count; i++)
+        {
+            free((*new_list)[i]);
+            (*new_list)[i] = NULL;
+        }
+        free(*new_list);
+        *new_list = NULL;
+    }
+    return;
+}
+
+/*
+ * Given a parsed_list containing list_count number of strings,
+ * create a new array of pointers which holds a duplicate list
+ * of all the strings present in the original parsed list.
+ * Used as a helper function by all the routines/keywords that require a list
+ * of strings as their options/arguments.
+ */
+static int get_list_of_strings(int list_count, char **parsed_list,
+        char ***new_list)
+{
+    int i;
+
+    *new_list = (char **) calloc(list_count, sizeof(char *));
+    if (*new_list == NULL)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    for (i = 0; i < list_count; i++)
+    {
+        (*new_list)[i] = strdup(parsed_list[i]);
+        if ((*new_list)[i] == NULL)
+        {
+            break;
+        }
+    }
+    if (i != list_count)
+    {
+        int j;
+        for (j = 0; j < i; j++)
+        {
+            free((*new_list)[j]);
+            (*new_list)[j] = NULL;
+        }
+        free(*new_list);
+        *new_list = NULL;
+        errno = ENOMEM;
+        return -1;
+    }
+    return 0;
+}
+
+/*
+ * Given a set/list of BMI addresses suffixed with @ and a netmask,
+ * this function will populate a netmasks array that contains
+ * the integer subsqeuent to the @ symbol.
+ * i.e given tcp://192.168.2.0@24 we will have tcp://192.168.2.0, 24 as the netmask
+ */
+static int setup_netmasks(int count, char **bmi_address, int *netmasks)
+{
+    int i;
+    for (i = 0; i < count; i++)
+    {
+        /* 
+         * if we find a @ then we parse the 
+         * chars at the end of it and make sure
+         * that it is less than equal to 32,
+         * else we check if there is a wildcard (*)
+         * present in which case we set it to -1
+         * else we assume that it is equal to 32.
+         */
+        char *special_char = strchr(bmi_address[i], '@'), *ptr = NULL;
+        if (special_char == NULL)
+        {
+            special_char = strchr(bmi_address[i], '*');
+            if (special_char == NULL)
+                netmasks[i] = 32;
+            else
+                netmasks[i] = -1;
+        }
+        else
+        {
+            *special_char = '\0';
+            netmasks[i] = strtol(special_char + 1, &ptr, 10);
+            if (*ptr != '\0' || netmasks[i] < 0
+                    || netmasks[i] > 32)
+                return -1;
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %s:%d\n", bmi_address[i], netmasks[i]);
+    }
+    return 0;
+}
+
+DOTCONF_CB(get_root_squash)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (cmd->arg_count == 0)
+    {
+        fs_conf->exp_flags &= ~TROVE_EXP_ROOT_SQUASH;
+    }
+    else 
+    {
+        fs_conf->exp_flags |= TROVE_EXP_ROOT_SQUASH;
+        fs_conf->root_squash_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        if (fs_conf->root_squash_netmasks == NULL)
+        {
+            fs_conf->root_squash_count = 0;
+            return("Could not allocate memory for root_squash_netmasks\n");
+        }
+        if (get_list_of_strings(cmd->arg_count, cmd->data.list,
+                    &fs_conf->root_squash_hosts) < 0)
+        {
+            free(fs_conf->root_squash_netmasks);
+            fs_conf->root_squash_netmasks = NULL;
+            fs_conf->root_squash_count = 0;
+            return("Could not allocate memory for root_squash_hosts\n");
+        }
+        fs_conf->root_squash_count = cmd->arg_count;
+        /* Setup the netmasks */
+        if (setup_netmasks(fs_conf->root_squash_count, fs_conf->root_squash_hosts, 
+                    fs_conf->root_squash_netmasks) < 0)
+        {
+            free(fs_conf->root_squash_netmasks);
+            fs_conf->root_squash_netmasks = NULL;
+            free_list_of_strings(fs_conf->root_squash_count, &fs_conf->root_squash_hosts);
+            fs_conf->root_squash_count = 0;
+            return("Could not setup netmasks for root_squash_hosts\n");
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d RootSquash wildcard entries\n",
+                cmd->arg_count);
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_read_only)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+    
+    if (cmd->arg_count == 0)
+    {
+        fs_conf->exp_flags &= ~TROVE_EXP_READ_ONLY;
+    }
+    else
+    {
+        fs_conf->exp_flags |= TROVE_EXP_READ_ONLY;
+        fs_conf->ro_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        if (fs_conf->ro_netmasks == NULL)
+        {
+            fs_conf->ro_count = 0;
+            return("Could not allocate memory for ro_netmasks\n");
+        }
+        if (get_list_of_strings(cmd->arg_count, cmd->data.list,
+                    &fs_conf->ro_hosts) < 0)
+        {
+            free(fs_conf->ro_netmasks);
+            fs_conf->ro_netmasks = NULL;
+            fs_conf->ro_count = 0;
+            return("Could not allocate memory for ro_hosts\n");
+        }
+        fs_conf->ro_count  = cmd->arg_count;
+        if (setup_netmasks(fs_conf->ro_count, fs_conf->ro_hosts, fs_conf->ro_netmasks) < 0)
+        {
+            free(fs_conf->ro_netmasks);
+            fs_conf->ro_netmasks = NULL;
+            free_list_of_strings(fs_conf->ro_count, &fs_conf->ro_hosts);
+            fs_conf->ro_count = 0;
+            return("Could not setup netmasks for ro_netmasks\n");
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d ro wildcard entries\n",
+                cmd->arg_count);
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_all_squash)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (cmd->arg_count == 0)
+    {
+        fs_conf->exp_flags &= ~TROVE_EXP_ALL_SQUASH;
+    }
+    else 
+    {
+        fs_conf->exp_flags |= TROVE_EXP_ALL_SQUASH;
+        fs_conf->all_squash_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        if (fs_conf->all_squash_netmasks == NULL)
+        {
+            fs_conf->all_squash_count = 0;
+            return("Could not allocate memory for all_squash_netmasks\n");
+        }
+        if (get_list_of_strings(cmd->arg_count, cmd->data.list,
+                    &fs_conf->all_squash_hosts) < 0)
+        {
+            free(fs_conf->all_squash_netmasks);
+            fs_conf->all_squash_netmasks = NULL;
+            fs_conf->all_squash_count = 0;
+            return("Could not allocate memory for all_squash_hosts\n");
+        }
+        fs_conf->all_squash_count = cmd->arg_count;
+        if (setup_netmasks(fs_conf->all_squash_count, fs_conf->all_squash_hosts, 
+                    fs_conf->all_squash_netmasks) < 0)
+        {
+            free(fs_conf->all_squash_netmasks);
+            fs_conf->all_squash_netmasks = NULL;
+            free_list_of_strings(fs_conf->all_squash_count, &fs_conf->all_squash_hosts);
+            fs_conf->all_squash_count = 0;
+            return("Could not setup netmasks for all_squash_hosts\n");
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d AllSquash wildcard entries\n", 
+                cmd->arg_count);
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_anon_uid)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    unsigned int tmp_var;
+    int ret = -1;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+    ret = sscanf(cmd->data.str, "%u", &tmp_var);
+    if(ret != 1)
+    {
+        return("AnonUID does not have a long long unsigned value.\n");
+    }
+    fs_conf->exp_anon_uid = tmp_var;
+    return NULL;
+}
+
+DOTCONF_CB(get_anon_gid)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    unsigned int tmp_var;
+    int ret = -1;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+    ret = sscanf(cmd->data.str, "%u", &tmp_var);
+    if(ret != 1)
+    {
+        return("AnonGID does not have a unsigned value.\n");
+    }
+    fs_conf->exp_anon_gid = tmp_var;
+    return NULL;
+}
 
 DOTCONF_CB(get_bmi_module_list)
 {
@@ -1350,20 +1758,30 @@ DOTCONF_CB(get_trusted_network)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
-    if (cmd->arg_count != 2)
+    config_s->allowed_masks = (int *) calloc(cmd->arg_count, sizeof(int));
+    if (config_s->allowed_masks == NULL)
     {
-        return("TrustedNetwork must be of the form <Network> <Mask>\n");
+        config_s->allowed_networks_count = 0;
+        return("Could not allocate memory for allowed netmasks\n");
     }
-    config_s->allowed_network = strdup(cmd->data.list[0]);
-    if (config_s->allowed_network == NULL)
+    if (get_list_of_strings(cmd->arg_count, cmd->data.list,
+                &config_s->allowed_networks) < 0)
     {
-        return("Could not allocate memory for network\n");
+        free(config_s->allowed_masks);
+        config_s->allowed_masks = NULL;
+        config_s->allowed_networks_count = 0;
+        return("Could not allocate memory for trusted networks\n");
     }
-    config_s->allowed_network_mask = strdup(cmd->data.list[1]);
-    if (config_s->allowed_network_mask == NULL)
+    config_s->allowed_networks_count = cmd->arg_count;
+    /* Setup netmasks */
+    if (setup_netmasks(config_s->allowed_networks_count, config_s->allowed_networks,
+                config_s->allowed_masks) < 0)
     {
-        free(config_s->allowed_network);
-        return("Could not allocate memory for network mask\n");
+        free(config_s->allowed_masks);
+        config_s->allowed_masks = NULL;
+        free_list_of_strings(config_s->allowed_networks_count, &config_s->allowed_networks);
+        config_s->allowed_networks_count = 0;
+        return("Parse error in netmask specification\n");
     }
     /* okay, we enable trusted network as well */
     config_s->network_enabled = 1;
@@ -1909,6 +2327,19 @@ DOTCONF_CB(get_default_num_dfiles)
     return NULL;
 }
 
+DOTCONF_CB(get_secret_key)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->secret_key = strdup(cmd->data.str);
+    return NULL;
+}
+
 DOTCONF_CB(get_immediate_completion)
 {
     struct server_configuration_s *config_s =
@@ -2038,19 +2469,25 @@ void PINT_config_release(struct server_configuration_s *config_s)
             config_s->flow_modules = NULL;
         }
 #ifdef USE_TRUSTED
-        if (config_s->allowed_network)
+        if (config_s->allowed_networks)
         {
-            free(config_s->allowed_network);
-            config_s->allowed_network = NULL;
+            int i;
+            for (i = 0; i < config_s->allowed_networks_count; i++)
+            {
+                free(config_s->allowed_networks[i]);
+                config_s->allowed_networks[i] = NULL;
+            }
+            free(config_s->allowed_networks);
+            config_s->allowed_networks = NULL;
         }
-        if (config_s->allowed_network_mask)
+        if (config_s->allowed_masks)
         {
-            free(config_s->allowed_network_mask);
-            config_s->allowed_network_mask = NULL;
+            free(config_s->allowed_masks);
+            config_s->allowed_masks = NULL;
         }
-        if (config_s->security)
+        if (config_s->security && config_s->security_dtor)
         {
-            free(config_s->security);
+            config_s->security_dtor(config_s->security);
             config_s->security = NULL;
         }
 #endif
@@ -2276,7 +2713,43 @@ static void free_filesystem(void *ptr)
             free(fs->attr_cache_keywords);
             fs->attr_cache_keywords = NULL;
         }
-
+        if(fs->secret_key)
+        {
+            free(fs->secret_key);
+        }
+        /* free all ro_hosts specifications */
+        if (fs->ro_hosts)
+        {
+            free_list_of_strings(fs->ro_count, &fs->ro_hosts);
+            fs->ro_count = 0;
+        }
+        if (fs->ro_netmasks)
+        {
+            free(fs->ro_netmasks);
+            fs->ro_netmasks = NULL;
+        }
+        /* free all root_squash_hosts specifications */
+        if (fs->root_squash_hosts)
+        {
+            free_list_of_strings(fs->root_squash_count, &fs->root_squash_hosts);
+            fs->root_squash_count = 0;
+        }
+        if (fs->root_squash_netmasks)
+        {
+            free(fs->root_squash_netmasks);
+            fs->root_squash_netmasks = NULL;
+        }
+        /* free all all_squash_hosts specifications */
+        if (fs->all_squash_hosts)
+        {
+            free_list_of_strings(fs->all_squash_count, &fs->all_squash_hosts);
+            fs->all_squash_count = 0;
+        }
+        if (fs->all_squash_netmasks)
+        {
+            free(fs->all_squash_netmasks);
+            fs->all_squash_netmasks = NULL;
+        }
         free(fs);
         fs = NULL;
     }
@@ -2304,6 +2777,11 @@ static void copy_filesystem(
 
         dest_fs->meta_handle_ranges = PINT_llist_new();
         dest_fs->data_handle_ranges = PINT_llist_new();
+
+        if(src_fs->secret_key)
+        {
+            dest_fs->secret_key = strdup(src_fs->secret_key);
+        }
 
         assert(dest_fs->meta_handle_ranges);
         assert(dest_fs->data_handle_ranges);
@@ -2383,6 +2861,65 @@ static void copy_filesystem(
             src_fs->attr_cache_max_num_elems;
         dest_fs->trove_sync_meta = src_fs->trove_sync_meta;
         dest_fs->trove_sync_data = src_fs->trove_sync_data;
+ 
+        /* copy all relevant export options */
+        dest_fs->exp_flags    = src_fs->exp_flags;
+        dest_fs->ro_count     = src_fs->ro_count;
+        dest_fs->root_squash_count = src_fs->root_squash_count;
+        dest_fs->all_squash_count = src_fs->all_squash_count;
+        if (src_fs->ro_count > 0 && src_fs->ro_hosts)
+        {
+            int i;
+            dest_fs->ro_hosts = (char **) calloc(src_fs->ro_count, sizeof(char *));
+            assert(dest_fs->ro_hosts);
+            for (i = 0; i < src_fs->ro_count; i++)
+            {
+                dest_fs->ro_hosts[i] = strdup(src_fs->ro_hosts[i]);
+                assert(dest_fs->ro_hosts[i]);
+            }
+        }
+        if (src_fs->ro_count > 0 && src_fs->ro_netmasks)
+        {
+            dest_fs->ro_netmasks = (int *) calloc(src_fs->ro_count, sizeof(int));
+            assert(dest_fs->ro_netmasks);
+            memcpy(dest_fs->ro_netmasks, src_fs->ro_netmasks, src_fs->ro_count * sizeof(int));
+        }
+        if (src_fs->root_squash_count > 0 && src_fs->root_squash_hosts)
+        {
+            int i;
+            dest_fs->root_squash_hosts = (char **) calloc(src_fs->root_squash_count, sizeof(char *));
+            assert(dest_fs->root_squash_hosts);
+            for (i = 0; i < src_fs->root_squash_count; i++)
+            {
+                dest_fs->root_squash_hosts[i] = strdup(src_fs->root_squash_hosts[i]);
+                assert(dest_fs->root_squash_hosts[i]);
+            }
+        }
+        if (src_fs->root_squash_count > 0 && src_fs->root_squash_netmasks)
+        {
+            dest_fs->root_squash_netmasks = (int *) calloc(src_fs->root_squash_count, sizeof(int));
+            assert(dest_fs->root_squash_netmasks);
+            memcpy(dest_fs->root_squash_netmasks, src_fs->root_squash_netmasks, src_fs->root_squash_count * sizeof(int));
+        }
+        if (src_fs->all_squash_count > 0 && src_fs->all_squash_hosts)
+        {
+            int i;
+            dest_fs->all_squash_hosts = (char **) calloc(src_fs->all_squash_count, sizeof(char *));
+            assert(dest_fs->all_squash_hosts);
+            for (i = 0; i < src_fs->all_squash_count; i++)
+            {
+                dest_fs->all_squash_hosts[i] = strdup(src_fs->all_squash_hosts[i]);
+                assert(dest_fs->all_squash_hosts[i]);
+            }
+        }
+        if (src_fs->all_squash_count > 0 && src_fs->all_squash_netmasks)
+        {
+            dest_fs->all_squash_netmasks = (int *) calloc(src_fs->all_squash_count, sizeof(int));
+            assert(dest_fs->all_squash_netmasks);
+            memcpy(dest_fs->all_squash_netmasks, src_fs->all_squash_netmasks, src_fs->all_squash_count * sizeof(int));
+        }
+        dest_fs->exp_anon_uid = src_fs->exp_anon_uid;
+        dest_fs->exp_anon_gid = src_fs->exp_anon_gid;
 
         dest_fs->fp_buffer_size = src_fs->fp_buffer_size;
         dest_fs->fp_buffers_per_flow = src_fs->fp_buffers_per_flow;
@@ -2541,24 +3078,26 @@ int PINT_config_get_allowed_ports(
 }
 
 /*
- * Function: PINT_config_get_allowed_network
+ * Function: PINT_config_get_allowed_networks
  *
  * Params:   struct server_configuration_s *server_config
  *           int  *enabled
- *           char **allowed_network (OUT)
- *           char **allowed_netmask (OUT)
+ *           int  *allowed_network_count (OUT)
+ *           char **allowed_networks (OUT)
+ *           int *allowed_netmasks (OUT)
  *
- * Returns:  Fills up *allowed_network and *allowed_netmask
+ * Returns:  Fills up *allowed_network_count, *allowed_networks and *allowed_netmasks
  *           and returns 0 on success and -1 on failure
  *
- * Synopsis: Retrieve the allowed network address and netmask.
+ * Synopsis: Retrieve the list of allowed network addresses and netmasks
  */
 
-int PINT_config_get_allowed_network(
+int PINT_config_get_allowed_networks(
     struct server_configuration_s *config_s,
     int  *enabled,
-    char **allowed_network,
-    char **allowed_mask)
+    int  *allowed_networks_count,
+    char ***allowed_networks,
+    int  **allowed_masks)
 {
     int ret = -1;
 
@@ -2567,8 +3106,9 @@ int PINT_config_get_allowed_network(
         *enabled = config_s->network_enabled;
         if (*enabled == 1)
         {
-            *allowed_network = config_s->allowed_network;
-            *allowed_mask    = config_s->allowed_network_mask;
+            *allowed_networks_count = config_s->allowed_networks_count;
+            *allowed_networks = config_s->allowed_networks;
+            *allowed_masks    = config_s->allowed_masks;
         }
         ret = 0;
     }
@@ -3236,6 +3776,74 @@ int PINT_config_trim_filesystems_except(
         }
     }
     return ret;
+}
+
+int PINT_config_get_fs_key(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id,
+    char ** key,
+    int * length)
+{
+#ifndef WITH_OPENSSL
+    *key = NULL;
+    *length = 0;
+    return -PVFS_ENOSYS;
+#else
+    int len, b64len;
+    char *b64buf;
+    struct filesystem_configuration_s *fs_conf = NULL;
+    BIO *b64 = NULL;
+    BIO *mem = NULL;
+    BIO *bio = NULL;
+
+    if (config)
+    {
+        fs_conf = PINT_config_find_fs_id(config, fs_id);
+    }
+    
+    if(!fs_conf)
+    {
+        gossip_err("Could not locate fs_conf for fs_id %d\n", fs_id);
+        return -PVFS_EINVAL;
+    }
+    /* This is actually ok since an FS may not have secret key */
+    if (!fs_conf->secret_key)
+    {
+        *length = 0;
+        *key = NULL;
+        return 0;
+    }
+    
+    b64len = strlen(fs_conf->secret_key);
+    b64buf = malloc(b64len+1);
+    if(!b64buf)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memcpy(b64buf, fs_conf->secret_key, b64len);
+
+    /* for some reason openssl's base64 decoding needs a newline at the end */
+    b64buf[b64len] = '\n';
+
+    b64 = BIO_new(BIO_f_base64());
+    mem = BIO_new_mem_buf(b64buf, b64len+1);
+    bio = BIO_push(b64, mem);
+
+    len = BIO_pending(bio);
+    *key = malloc(len);
+    if(!*key)
+    {
+        BIO_free_all(bio);
+        return -PVFS_ENOMEM;
+   }
+    
+    *length = BIO_read(bio, *key, len);
+
+    free(b64buf);
+    
+    BIO_free_all(bio);
+    return 0;
+#endif /* WITH_OPENSSL */
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__

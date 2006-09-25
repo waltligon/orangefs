@@ -13,6 +13,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 
 static int mkdir_create(
     PINT_server_op *s_op, job_status_s *js_p);
@@ -28,8 +29,6 @@ static int mkdir_error(
     PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_prep_sm(
     PINT_server_op *s_op, job_status_s *js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
@@ -181,7 +180,7 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " setting directory version to "
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
-                 llu(PVFS_util_mkversion_time(ds_attr->mtime)));
+                 llu(PINT_util_mkversion_time(ds_attr->mtime)));
 
     ret = job_trove_dspace_setattr(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,

@@ -197,7 +197,7 @@ static inline void list_splice_init(struct list_head *list,
  *
  */
 #define container_of(ptr, type, member) ({                      \
-        const __typeof__( ((type *)0)->member ) *__mptr = (ptr);    \
+        __typeof__( ((type *)0)->member ) *__mptr = (ptr);    \
         (type *)( (char *)__mptr - offsetof(type,member) );})
 
 

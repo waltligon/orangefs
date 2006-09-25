@@ -84,7 +84,7 @@ machine pvfs2_client_truncate_sm(
 PVFS_error PVFS_isys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
     PVFS_hint *hints,
     void *user_ptr)
@@ -135,7 +135,7 @@ PVFS_error PVFS_isys_truncate(
 PVFS_error PVFS_sys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_hint *hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;

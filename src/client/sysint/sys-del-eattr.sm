@@ -58,7 +58,7 @@ machine pvfs2_client_del_eattr_sm(
 
 PVFS_error PVFS_isys_deleattr(
         PVFS_object_ref ref,
-        PVFS_credentials *credentials,
+        const PVFS_credentials *credentials,
         PVFS_ds_keyval *key_p,
         PVFS_sys_op_id *op_id,
         PVFS_hint *hints,
@@ -96,7 +96,7 @@ PVFS_error PVFS_isys_deleattr(
 
 PVFS_error PVFS_sys_deleattr(
         PVFS_object_ref ref,
-        PVFS_credentials *credentials,
+        const PVFS_credentials *credentials,
         PVFS_ds_keyval *key_p, 
         PVFS_hint *hints)
 {

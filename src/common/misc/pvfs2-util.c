@@ -124,13 +124,13 @@ int PVFS_util_get_umask(void)
 }
 
 PVFS_credentials *PVFS_util_dup_credentials(
-    PVFS_credentials *credentials)
+    const PVFS_credentials *credentials)
 {
     PVFS_credentials *ret = NULL;
 
     if (credentials)
     {
-        ret = (PVFS_credentials *)malloc(sizeof(PVFS_credentials));
+        ret = malloc(sizeof(PVFS_credentials));
         if (ret)
         {
             memcpy(ret, credentials, sizeof(PVFS_credentials));
@@ -164,6 +164,11 @@ int PVFS_util_copy_sys_attr(
         dest_attr->dfile_count = src_attr->dfile_count;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
+
+        if (src_attr->mask & PVFS_ATTR_SYS_SIZE)
+        {
+            dest_attr->size = src_attr->size;
+        }
 
         if((src_attr->mask & PVFS_ATTR_SYS_LNK_TARGET) &&
             src_attr->link_target)
@@ -370,6 +375,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             char *cp;
             int cur_server;
 
+            /* Enable integrity checks by default */
+            me->integrity_check = 1;
             /* comma-separated list of ways to contact a config server */
             me->num_pvfs_config_servers = 1;
             for (cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++)
@@ -1797,6 +1804,40 @@ static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry)
     }
 }
 #endif /* DEFINE_MY_GET_NEXT_FSENT */
+
+int32_t PVFS_util_translate_mode(int mode, int suid)
+{
+    int ret = 0, i = 0;
+#define NUM_MODES 11
+    static int modes[NUM_MODES] =
+    {
+        S_IXOTH, S_IWOTH, S_IROTH,
+        S_IXGRP, S_IWGRP, S_IRGRP,
+        S_IXUSR, S_IWUSR, S_IRUSR,
+        S_ISGID, S_ISUID
+    };
+    static int pvfs2_modes[NUM_MODES] =
+    {
+        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
+        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
+        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+        PVFS_G_SGID,    PVFS_U_SUID
+    };
+
+    for(i = 0; i < NUM_MODES; i++)
+    {
+        if (mode & modes[i])
+        {
+            ret |= pvfs2_modes[i];
+        }
+    }
+    if (suid == 0 && (ret & PVFS_U_SUID))
+    {
+         ret &= ~PVFS_U_SUID;
+    }
+    return ret;
+#undef NUM_MODES
+}
 
 /*
  * Local variables:

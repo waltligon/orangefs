@@ -364,6 +364,18 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 			     job_id_t * id,
 			     job_context_id context_id);
 
+/* read generic dspace attributes for a set of handles */
+int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
+                             int nhandles,
+                             PVFS_handle *handle_array,
+                             void *user_ptr,
+                             PVFS_error *out_error_array,
+                             PVFS_ds_attributes *out_ds_attr_ptr,
+                             job_aint status_user_tag,
+                             job_status_s *out_status_p,
+                             job_id_t *id,
+                             job_context_id context_id);
+
 /* write generic dspace attributes */
 int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,

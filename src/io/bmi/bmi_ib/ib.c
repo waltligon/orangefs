@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.38 2006-08-28 17:33:11 pw Exp $
+ * $Id: ib.c,v 1.38.2.1 2006-09-25 12:39:49 kunkel Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +52,7 @@ ib_device_t *ib_device __hidden = NULL;
 #define post_sr_rdmaw ib_device->func.post_sr_rdmaw
 #define check_cq ib_device->func.check_cq
 #define prepare_cq_block ib_device->func.prepare_cq_block
+#define ack_cq_completion_event ib_device->func.ack_cq_completion_event
 #define wc_status_string ib_device->func.wc_status_string
 #define mem_register ib_device->func.mem_register
 #define mem_deregister ib_device->func.mem_deregister
@@ -78,7 +79,6 @@ static void encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh,
                                     u_int32_t byte_len);
 static void encourage_recv_incoming_cts_ack(ib_recv_t *rq);
 static int send_cts(ib_recv_t *rq);
-static void maybe_free_connection(ib_connection_t *c);
 static void ib_close_connection(ib_connection_t *c);
 #ifndef __PVFS2_SERVER__
 static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
@@ -787,7 +787,7 @@ BMI_ib_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
   enum bmi_buffer_type buffer_flag __unused,
   bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
-    debug(3, "%s: len %d tag %d", __func__, (int) size, tag);
+    debug(2, "%s: len %d tag %d", __func__, (int) size, tag);
     /* references here will not be saved after this func returns */
     return generic_post_send(id, remote_map, 0, &buffer, &size, size,
       tag, user_ptr, context_id, 0);
@@ -1015,7 +1015,7 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    free(sq->mop);
 	    free(sq);
 	    --c->refcnt;
-	    if (c->closed)
+	    if (c->closed || c->cancelled)
 		ib_close_connection(c);
 	    return 1;
 	}
@@ -1037,8 +1037,7 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	free(sq->mop);
 	free(sq);
 	--c->refcnt;
-	maybe_free_connection(c);
-	if (c->closed)
+	if (c->closed || c->cancelled)
 	    ib_close_connection(c);
 	return 1;
     } else {
@@ -1080,7 +1079,7 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    c = rq->c;
 	    free(rq);
 	    --c->refcnt;
-	    if (c->closed)
+	    if (c->closed || c->cancelled)
 		ib_close_connection(c);
 	    return 1;
 	}
@@ -1108,9 +1107,8 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	qlist_del(&rq->list);
 	c = rq->c;
 	free(rq);
-	maybe_free_connection(c);
 	--c->refcnt;
-	if (c->closed)
+	if (c->closed || c->cancelled)
 	    ib_close_connection(c);
 	return 1;
     } else {
@@ -1326,7 +1324,7 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	    c = rq->c;
 	    free(rq);
 	    --c->refcnt;
-	    if (c->closed)
+	    if (c->closed || c->cancelled)
 		ib_close_connection(c);
 	    goto out;
 	}
@@ -1441,28 +1439,6 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 
     gen_mutex_unlock(&interface_mutex);
     return 0;
-}
-
-/*
- * For connections that are being cancelled, maybe delete them if no
- * more send or recvq entries remain.
- */
-static void
-maybe_free_connection(ib_connection_t *c)
-{
-    list_t *l;
-
-    if (!c->cancelled)
-	return;
-    qlist_for_each(l, &ib_device->sendq) {
-	ib_send_t *sq = qlist_upcast(l);
-	if (sq->c == c) return;
-    }
-    qlist_for_each(l, &ib_device->recvq) {
-	ib_recv_t *rq = qlist_upcast(l);
-	if (rq->c == c) return;
-    }
-    ib_close_connection(c);
 }
 
 static const char *
@@ -1611,6 +1587,10 @@ static ib_connection_t *ib_new_connection(int sock, const char *peername,
     return c;
 }
 
+/*
+ * Try to close and free a connection, but only do it if refcnt has
+ * gone to zero.
+ */
 static void ib_close_connection(ib_connection_t *c)
 {
     ib_method_addr_t *ibmap;
@@ -1791,7 +1771,10 @@ static int ib_block_for_activity(int timeout_ms)
     }
     ret = poll(pfd, numfd, timeout_ms);
     debug(4, "%s: ret %d rev0 0x%x", __func__, ret, pfd[0].revents);
-    if (ret < 0) {
+    if (ret > 0) {
+	if (pfd[0].revents == POLLIN)
+	    ack_cq_completion_event();
+    } else if (ret < 0) {
 	if (errno == EINTR)  /* normal, ignore but break */
 	    ret = 0;
 	else
@@ -2018,5 +2001,6 @@ const struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_close_context = BMI_ib_close_context,
     .BMI_meth_cancel = BMI_ib_cancel,
     .BMI_meth_rev_lookup_unexpected = BMI_ib_rev_lookup,
+	 .BMI_meth_query_addr_range = NULL,
 };
 

@@ -25,7 +25,8 @@ enum
     CTX_DATAHANDLERANGES = (1 << 6),
     CTX_STORAGEHINTS     = (1 << 7),
     CTX_DISTRIBUTION     = (1 << 8),
-    CTX_SECURITY         = (1 << 9)
+    CTX_SECURITY         = (1 << 9),
+    CTX_EXPORT           = (1 << 10),
 };
 
 typedef struct phys_server_desc
@@ -85,9 +86,28 @@ typedef struct filesystem_configuration_s
     int coalescing_high_watermark;
     int coalescing_low_watermark;
 
+    char *secret_key;
+
     int fp_buffer_size;
     int fp_buffers_per_flow;
 
+    /* Export flags bitwise OR of flags specified */
+    int exp_flags;
+
+    int    ro_count;
+    char **ro_hosts;
+    int   *ro_netmasks;
+
+    int    root_squash_count;
+    char **root_squash_hosts;
+    int   *root_squash_netmasks;
+
+    int    all_squash_count;
+    char **all_squash_hosts;
+    int   *all_squash_netmasks;
+
+    PVFS_uid exp_anon_uid;
+    PVFS_gid exp_anon_gid;
 } filesystem_configuration_s;
 
 typedef struct distribution_param_configuration_s
@@ -133,13 +153,18 @@ typedef struct server_configuration_s
     int tcp_buffer_size_receive;    /* Size of TCP receive buffer, is set
                                        later with setsockopt */
     int tcp_buffer_size_send;       /* Size of TCP send buffer */
+    int tcp_bind_specific;          /* Flag indicates if we should bind to
+                                     * specific server address
+                                     */
 #ifdef USE_TRUSTED
     int           ports_enabled;    /* Should we enable trusted port connections at all? */
     unsigned long allowed_ports[2]; /* {Min, Max} value of ports from which connections will be allowed */
     int          network_enabled;   /* Should we enable trusted network connections at all? */
-    char  *allowed_network;         /* BMI address of the trusted network */
-    char  *allowed_network_mask;    /* BMI address of the trusted network mask */
+    int   allowed_networks_count;   /* Number of trusted networks parsed */
+    char  **allowed_networks;       /* BMI addresses of the trusted networks */
+    int   *allowed_masks;            /* Netmasks for each of the specified trusted network */
     void  *security;                /* BMI module specific information */
+    void  (*security_dtor)(void *); /* Destructor to free BMI module specific information */
 #endif
     int  configuration_context;
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
@@ -173,11 +198,12 @@ int PINT_config_get_allowed_ports(
     int  *enabled,
     unsigned long *allowed_ports);
 
-int PINT_config_get_allowed_network(
+int PINT_config_get_allowed_networks(
     struct server_configuration_s *config,
     int  *enabled,
-    char **allowed_network,
-    char **allowed_mask);
+    int   *allowed_networks_count,
+    char  ***allowed_networks,
+    int   **allowed_masks);
 
 #endif
 
@@ -231,6 +257,14 @@ PINT_llist *PINT_config_get_filesystems(
 int PINT_config_trim_filesystems_except(
     struct server_configuration_s *config_s,
     PVFS_fs_id fs_id);
+
+int PINT_config_get_fs_key(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id,
+    char ** key,
+    int * length);
+
+struct server_configuration_s *PINT_get_server_config(void);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(

@@ -28,6 +28,7 @@
 #include "server-config-mgr.h"
 #include "client-state-machine.h"
 #include "pint-perf-counter.h"
+#include "pvfs2-encode-stubs.h"
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
@@ -43,6 +44,7 @@
 */
 #define MAX_NUM_OPS                 64
 #define MAX_LIST_SIZE      MAX_NUM_OPS
+#define IOX_HINDEXED_COUNT          64
 
 #define REMOUNT_PENDING     0xFFEEFF33
 #define OP_IN_PROGRESS      0xFFEEFF34
@@ -132,7 +134,10 @@ typedef struct
     struct PINT_dev_unexp_info info;
     PVFS_hint * hints;
     
+    /* iox requests may post multiple operations at one shot */
+    int num_ops, num_incomplete_ops;
     PVFS_sys_op_id op_id;
+    PVFS_sys_op_id *op_ids;
 
 #ifdef USE_MMAP_RA_CACHE
     void *io_tmp_buf;
@@ -144,6 +149,12 @@ typedef struct
     PVFS_ds_keyval  key;/* used only by geteattr, seteattr */
     PVFS_ds_keyval  val;
     void *io_kernel_mapped_buf;
+    /* The next few fields are used only by readx, writex */
+    int32_t  iox_count;
+    int32_t  *iox_sizes;
+    PVFS_size *iox_offsets;
+    PVFS_Request *file_req_a;
+    PVFS_Request *mem_req_a;
 
     struct PVFS_sys_mntent* mntent; /* used only by mount */
 
@@ -164,6 +175,8 @@ typedef struct
         PVFS_sysresp_io io;
         PVFS_sysresp_geteattr geteattr;
         PVFS_sysresp_listeattr listeattr;
+        PVFS_sysresp_readdirplus readdirplus;
+        PVFS_sysresp_io *iox;
     } response;
 
 #ifdef CLIENT_CORE_OP_TIMING
@@ -177,7 +190,11 @@ static options_t s_opts;
 
 static job_context_id s_client_dev_context;
 static int s_client_is_processing = 1;
-static struct PVFS_dev_map_desc s_io_desc;
+
+/* We have 2 set of description buffers, one used for staging I/O and one for readdir/readdirplus */
+#define NUM_MAP_DESC 2
+static struct PVFS_dev_map_desc s_io_desc[NUM_MAP_DESC];
+static int s_desc_size[NUM_MAP_DESC] = {PVFS2_BUFMAP_TOTAL_SIZE, PVFS2_READDIR_TOTAL_SIZE};
 
 static struct PINT_perf_counter* acache_pc = NULL;
 static struct PINT_perf_counter* ncache_pc = NULL;
@@ -707,6 +724,32 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
     return ret;
 }
 
+static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdirplus request "
+                 "for %llu,%d (token %d)\n",
+                 llu(vfs_request->in_upcall.req.readdirplus.refn.handle),
+                 vfs_request->in_upcall.req.readdirplus.refn.fs_id,
+                 vfs_request->in_upcall.req.readdirplus.token);
+
+    ret = PVFS_isys_readdirplus(
+        vfs_request->in_upcall.req.readdirplus.refn,
+        vfs_request->in_upcall.req.readdirplus.token,
+        vfs_request->in_upcall.req.readdirplus.max_dirent_count,
+        &vfs_request->in_upcall.credentials,
+        vfs_request->in_upcall.req.readdirplus.mask,
+        &vfs_request->response.readdirplus,
+        &vfs_request->op_id, (void *)vfs_request);
+
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Posting readdirplus failed", ret);
+    }
+    return ret;
+}
+
 static PVFS_error post_rename_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -1067,6 +1110,8 @@ static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
     if (!mount)                                           
         mntent->fs_id = in_upcall->req.fs_umount.fs_id;     
     
+    /* By default, the VFS does not wish to perform integrity checks */
+    mntent->integrity_check = 0;
     return 0;
 }
 
@@ -1392,6 +1437,57 @@ static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
     return ret;
 }
 
+static PVFS_error service_fs_key_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = 0;
+    int  key_len;
+    char *key;
+    struct server_configuration_s *sconfig;
+
+    gossip_debug(
+            GOSSIP_CLIENTCORE_DEBUG,
+            "service_fs_key_request called for fsid %d\n",
+            vfs_request->in_upcall.req.fs_key.fsid);
+    /* get a pointer to the server configuration */
+    sconfig = PINT_get_server_config_struct(
+            vfs_request->in_upcall.req.fs_key.fsid);
+    if (sconfig == NULL)
+    {
+        gossip_err("PINT_get_server_config_struct failed:\n");
+        ret = -PVFS_ENOENT;
+        goto out;
+    }
+    /* get a secure shared key for this file system */
+    PINT_config_get_fs_key(
+            sconfig,
+            vfs_request->in_upcall.req.fs_key.fsid, 
+            &key, &key_len);
+    /* drop reference to the server configuration */
+    PINT_put_server_config_struct(sconfig);
+    if (key_len == 0)
+    {
+        ret = 0;
+        goto out;
+    }
+    if (key_len < 0 || key == NULL)
+    {
+        gossip_err("PINT_config_get_fs_key failed:\n");
+        ret = -PVFS_EINVAL;
+        goto out;
+    }
+    /* Copy the key length of the FS */
+    vfs_request->out_downcall.resp.fs_key.fs_keylen = 
+        key_len > FS_KEY_BUF_SIZE ? FS_KEY_BUF_SIZE : key_len;
+    /* Copy the secret key of the FS */
+    memcpy(vfs_request->out_downcall.resp.fs_key.fs_key, key,
+            vfs_request->out_downcall.resp.fs_key.fs_keylen); 
+out:
+    vfs_request->out_downcall.status = ret;
+    vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+    write_inlined_device_response(vfs_request);
+    return 0;
+}
+
 #ifdef USE_MMAP_RA_CACHE
 static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 {
@@ -1555,8 +1651,9 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
             PVFS2_BUFMAP_DESC_COUNT));
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
-    vfs_request->io_kernel_mapped_buf = PINT_dev_get_mapped_buffer(
-        &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
+    vfs_request->io_kernel_mapped_buf = 
+        PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
+            vfs_request->in_upcall.req.io.buf_index);
     assert(vfs_request->io_kernel_mapped_buf);
 
     ret = PVFS_Request_contiguous(
@@ -1589,8 +1686,8 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     vfs_request->out_downcall.resp.io.amt_complete = amt_returned;
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
-    buf = PINT_dev_get_mapped_buffer(
-        &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
+    buf = PINT_dev_get_mapped_buffer(BM_IO, s_io_desc,
+            vfs_request->in_upcall.req.io.buf_index);
     assert(buf);
 
     /* copy cached data into the shared user/kernel space */
@@ -1609,6 +1706,190 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     return 0;
 #endif /* USE_MMAP_RA_CACHE */
 }
+
+static PVFS_error post_iox_request(vfs_request_t *vfs_request)
+{
+    int32_t i, num_ops_posted, iox_count, iox_index;
+    int32_t *mem_sizes = NULL;
+    PVFS_error ret = -PVFS_EINVAL;
+    struct read_write_x *rwx = (struct read_write_x *) vfs_request->in_upcall.trailer_buf;
+
+    if (vfs_request->in_upcall.trailer_size <= 0 || rwx == NULL)
+    {
+        gossip_err("post_iox_request: did not receive any offset-length trailers\n");
+        goto out;
+    }
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s: size %ld\n",
+            vfs_request->in_upcall.req.iox.io_type == PVFS_IO_READ ? "readx" : "writex",
+            (unsigned long) vfs_request->in_upcall.req.iox.count);
+
+    if ((vfs_request->in_upcall.req.iox.buf_index < 0) ||
+           (vfs_request->in_upcall.req.iox.buf_index >= PVFS2_BUFMAP_DESC_COUNT))
+    {
+        gossip_err("post_iox_request: invalid buffer index %d\n",
+                vfs_request->in_upcall.req.iox.buf_index);
+        goto out;
+    }
+
+    /* get a shared kernel/userspace buffer for the I/O transfer */
+    vfs_request->io_kernel_mapped_buf = 
+        PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
+            vfs_request->in_upcall.req.iox.buf_index);
+    if (vfs_request->io_kernel_mapped_buf == NULL)
+    {
+        gossip_err("post_iox_request: PINT_dev_get_mapped_buffer failed\n");
+        goto out;
+    }
+
+    /* trailer is interpreted as struct read_write_x */
+    if (vfs_request->in_upcall.trailer_size % sizeof(struct read_write_x) != 0)
+    {
+        gossip_err("post_iox_request: trailer size (%Ld) is not a multiple of read_write_x structure (%ld)\n",
+            lld(vfs_request->in_upcall.trailer_size),
+            (long) sizeof(struct read_write_x));
+        goto out;
+    }
+    vfs_request->iox_count = vfs_request->in_upcall.trailer_size / sizeof(struct read_write_x);
+    /* We will split this in units of IOX_HINDEXED_COUNT */
+    num_ops_posted = (vfs_request->iox_count / IOX_HINDEXED_COUNT);
+    if (vfs_request->iox_count % IOX_HINDEXED_COUNT != 0)
+        num_ops_posted++;
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "iox: iox_count %d, num_ops_posted %d\n",
+            vfs_request->iox_count, num_ops_posted);
+    vfs_request->num_ops = vfs_request->num_incomplete_ops = num_ops_posted;
+    ret = -PVFS_ENOMEM;
+    mem_sizes = (int32_t *) calloc(num_ops_posted, sizeof(int32_t));
+    if (mem_sizes == NULL)
+    {
+        gossip_err("post_iox_request: mem_sizes allocation failed\n");
+        goto out;
+    }
+    vfs_request->iox_sizes = (int32_t *) calloc(vfs_request->iox_count, sizeof(int32_t));
+    if (vfs_request->iox_sizes == NULL)
+    {
+        gossip_err("post_iox_request: iox_sizes allocation failed\n");
+        goto out;
+    }
+    vfs_request->iox_offsets = (PVFS_size *) calloc(vfs_request->iox_count, sizeof(PVFS_size));
+    if (vfs_request->iox_offsets == NULL)
+    {
+        gossip_err("post_iox_request: iox_offsets allocation failed\n");
+        goto err_sizes;
+    }
+    for (i = 0; i < vfs_request->iox_count; i++)
+    {
+        vfs_request->iox_sizes[i] = (int32_t) rwx->len;
+        vfs_request->iox_offsets[i] = rwx->off;
+        mem_sizes[i/IOX_HINDEXED_COUNT] += (int32_t) rwx->len;
+        rwx++;
+    }
+    vfs_request->op_ids = (PVFS_sys_op_id *) malloc(num_ops_posted * sizeof(PVFS_sys_op_id));
+    if (vfs_request->op_ids == NULL)
+    {
+        gossip_err("post_iox_request: op_ids allocation failed\n");
+        goto err_offsets;
+    }
+    vfs_request->file_req_a = (PVFS_Request *) malloc(num_ops_posted * sizeof(PVFS_Request));
+    if (vfs_request->file_req_a == NULL)
+    {
+        gossip_err("post_iox_request: file_req_a allocation failed\n");
+        goto err_opids;
+    }
+    vfs_request->mem_req_a  = (PVFS_Request *) malloc(num_ops_posted * sizeof(PVFS_Request));
+    if (vfs_request->mem_req_a == NULL)
+    {
+        gossip_err("post_iox_request: mem_req_a allocation failed\n");
+        goto err_filereq;
+    }
+    vfs_request->response.iox = (PVFS_sysresp_io *) malloc(num_ops_posted * sizeof(PVFS_sysresp_io)); 
+    if (vfs_request->response.iox == NULL)
+    {
+        gossip_err("post_iox_request: iox response allocation failed\n");
+        goto err_memreq;
+    }
+    iox_index = 0;
+    iox_count = vfs_request->iox_count;
+    ret = 0;
+    for (i = 0; i < num_ops_posted; i++)
+    {
+        int32_t iox_stage;
+
+        assert(iox_count >= 0);
+        assert(iox_index >= 0 && iox_index < vfs_request->iox_count);
+        iox_stage = PVFS_util_min(IOX_HINDEXED_COUNT, iox_count);
+        /* Construct a mem request type for this portion */
+        ret = PVFS_Request_contiguous(mem_sizes[i], PVFS_BYTE,
+                &vfs_request->mem_req_a[i]);
+        if (ret != 0)
+        {
+            gossip_err("post_iox_request: request_contiguous failed mem_sizes[%d] = %d\n",
+                    i, mem_sizes[i]);
+            break;
+        }
+        /* file request is now a hindexed request type */
+        ret = PVFS_Request_hindexed(iox_stage, 
+                &vfs_request->iox_sizes[iox_index],
+                &vfs_request->iox_offsets[iox_index],
+                PVFS_BYTE, 
+                &vfs_request->file_req_a[i]);
+        if (ret != 0)
+        {
+            gossip_err("post_iox_request: request_hindexed failed\n");
+            break;
+        }
+        /* post the I/O */
+        ret = PVFS_isys_io(
+            vfs_request->in_upcall.req.iox.refn, vfs_request->file_req_a[i],
+            0, 
+            vfs_request->io_kernel_mapped_buf, vfs_request->mem_req_a[i],
+            &vfs_request->in_upcall.credentials,
+            &vfs_request->response.iox[i],
+            vfs_request->in_upcall.req.iox.io_type,
+            &vfs_request->op_ids[i],
+            (void *)vfs_request);
+
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("Posting file I/O failed", ret);
+            break;
+        }
+        iox_count -= iox_stage;
+        iox_index += iox_stage;
+    }
+    if (i != num_ops_posted)
+    {
+        int j;
+        for (j = 0; j < i; j++)
+        {
+            /* cancel previously posted I/O's */
+            PINT_client_io_cancel(vfs_request->op_ids[j]);
+            PVFS_Request_free(&vfs_request->mem_req_a[j]);
+            PVFS_Request_free(&vfs_request->file_req_a[j]);
+        }
+        free(vfs_request->in_upcall.trailer_buf);
+        vfs_request->in_upcall.trailer_buf = NULL;
+        goto err_iox;
+    }
+    vfs_request->op_id = vfs_request->op_ids[0];
+    ret = 0;
+out:
+    free(mem_sizes);
+    return ret;
+err_iox:
+    free(vfs_request->response.iox);
+err_memreq:
+    free(vfs_request->mem_req_a);
+err_filereq:
+    free(vfs_request->file_req_a);
+err_opids:
+    free(vfs_request->op_ids);
+err_offsets:
+    free(vfs_request->iox_offsets);
+err_sizes:
+    free(vfs_request->iox_sizes);
+    goto out;
+}
+
 
 #ifdef USE_MMAP_RA_CACHE
 static PVFS_error service_mmap_ra_flush_request(
@@ -1754,44 +2035,138 @@ PVFS_error write_device_response(
     return ret;
 }
 
-static inline void copy_dirents_to_downcall(vfs_request_t *vfs_request)
+/* encoding needed by client-core to copy readdir entries to the shared page */
+static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *readdir)
 {
-    int i = 0, len = 0;
+    int i; 
+    char *buf = (char *) ptr;
+    char **pptr = &buf;
 
-    vfs_request->out_downcall.resp.readdir.token =
-        vfs_request->response.readdir.token;
-    vfs_request->out_downcall.resp.readdir.directory_version =
-        vfs_request->response.readdir.directory_version;
-
-    for(; i < vfs_request->response.readdir.pvfs_dirent_outcount; i++)
+    ptr->token = readdir->token;
+    ptr->directory_version = readdir->directory_version;
+    ptr->pvfs_dirent_outcount = readdir->pvfs_dirent_outcount;
+    *pptr += offsetof(pvfs2_readdir_response_t, dirent_array);
+    for (i = 0; i < readdir->pvfs_dirent_outcount; i++) 
     {
-        vfs_request->out_downcall.resp.readdir.refn[i].handle =
-            vfs_request->response.readdir.dirent_array[i].handle;
-        vfs_request->out_downcall.resp.readdir.refn[i].fs_id =
-            vfs_request->in_upcall.req.readdir.refn.fs_id;
+        enc_string(pptr, &readdir->dirent_array[i].d_name);
+        *(int64_t *) *pptr = readdir->dirent_array[i].handle;
+        *pptr += 8;
+    }
+    return ((unsigned long) *pptr - (unsigned long) ptr);
+}
 
-        len = strlen(
-            vfs_request->response.readdir.dirent_array[i].d_name);
-        vfs_request->out_downcall.resp.readdir.d_name_len[i] = len;
-
-        strncpy(
-            &vfs_request->out_downcall.resp.readdir.d_name[i][0],
-            vfs_request->response.readdir.dirent_array[i].d_name, len);
-
-        vfs_request->out_downcall.resp.readdir.dirent_count++;
+static int copy_dirents_to_downcall(vfs_request_t *vfs_request)
+{
+    int ret = 0;
+    /* get a buffer for xfer of dirents */
+    vfs_request->out_downcall.trailer_buf = 
+        PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 
+            vfs_request->in_upcall.req.readdir.buf_index);
+    if (vfs_request->out_downcall.trailer_buf == NULL)
+    {
+        ret = -PVFS_EINVAL;
+        goto err;
     }
 
-    if (vfs_request->out_downcall.resp.readdir.dirent_count !=
-        vfs_request->response.readdir.pvfs_dirent_outcount)
-    {
-        gossip_err("Error! readdir counts don't match! (%d != %d)\n",
-                   vfs_request->out_downcall.resp.readdir.dirent_count,
-                   vfs_request->response.readdir.pvfs_dirent_outcount);
-    }
+    /* Simply encode the readdir system response into the shared buffer */
+    vfs_request->out_downcall.trailer_size = 
+        encode_dirents((pvfs2_readdir_response_t *) vfs_request->out_downcall.trailer_buf,
+                &vfs_request->response.readdir);
 
+    if (vfs_request->out_downcall.trailer_size <= 0) 
+    {
+        gossip_err("copy_dirents_to_downcall: invalid trailer size %ld\n",
+                (long) vfs_request->out_downcall.trailer_size);
+        ret = -PVFS_EINVAL;
+    }
+err:
     /* free sysresp dirent array */
     free(vfs_request->response.readdir.dirent_array);
     vfs_request->response.readdir.dirent_array = NULL;
+    return ret;
+}
+
+static long encode_sys_attr(char *ptr, PVFS_sysresp_readdirplus *readdirplus) 
+{
+    char *buf = ptr;
+    char **pptr = &buf;
+    int i;
+
+    memcpy(buf, readdirplus->stat_err_array, sizeof(PVFS_error) * readdirplus->pvfs_dirent_outcount);
+    *pptr += sizeof(PVFS_error) * readdirplus->pvfs_dirent_outcount;
+    if (readdirplus->pvfs_dirent_outcount % 2) 
+    {
+        *pptr += 4;
+    }
+    for (i = 0; i < readdirplus->pvfs_dirent_outcount; i++)
+    {
+        memcpy(*pptr, &readdirplus->attr_array[i], sizeof(PVFS_sys_attr));
+        *pptr += sizeof(PVFS_sys_attr);
+        if (readdirplus->attr_array[i].link_target)
+        {
+            enc_string(pptr, &readdirplus->attr_array[i].link_target);
+        }
+    }
+    return ((unsigned long) *pptr - (unsigned long) ptr);
+}
+
+static long encode_readdirplus_to_buffer(char *ptr, PVFS_sysresp_readdirplus *readdirplus)
+{
+    long amt;
+    char *buf = (char *) ptr;
+
+   /* encode the dirent part of the response */
+    amt = encode_dirents((pvfs2_readdir_response_t *) buf, (PVFS_sysresp_readdir *) readdirplus);
+    if (amt < 0)
+        return amt;
+    buf += amt;
+    /* and then we encode the stat part of the response */
+    amt = encode_sys_attr(buf, readdirplus);
+    if (amt < 0)
+        return amt;
+    buf += amt;
+
+    return ((unsigned long) buf - (unsigned long) ptr);
+}
+
+static int copy_direntplus_to_downcall(vfs_request_t *vfs_request)
+{
+    int i, ret = 0;
+    /* get a buffer for xfer of direntplus */
+    vfs_request->out_downcall.trailer_buf = 
+        PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 
+        vfs_request->in_upcall.req.readdirplus.buf_index);
+    if (vfs_request->out_downcall.trailer_buf == NULL)
+    {
+        ret = -PVFS_EINVAL;
+        goto err;
+    }
+
+    /* Simply encode the readdirplus system response into the shared buffer */
+    vfs_request->out_downcall.trailer_size = 
+        encode_readdirplus_to_buffer(vfs_request->out_downcall.trailer_buf,
+                &vfs_request->response.readdirplus);
+    if (vfs_request->out_downcall.trailer_size <= 0)
+    {
+        gossip_err("copy_direntplus_to_downcall: invalid trailer size %ld\n",
+                (long) vfs_request->out_downcall.trailer_size);
+        ret = -PVFS_EINVAL;
+    }
+err:
+    /* free sysresp dirent array */
+    free(vfs_request->response.readdirplus.dirent_array);
+    vfs_request->response.readdirplus.dirent_array = NULL;
+    /* free sysresp stat error array */
+    free(vfs_request->response.readdirplus.stat_err_array);
+    vfs_request->response.readdirplus.stat_err_array = NULL;
+    /* free sysresp attribute array */
+    for (i = 0; i < vfs_request->response.readdirplus.pvfs_dirent_outcount; i++) 
+    {
+        PVFS_util_release_sys_attr(&vfs_request->response.readdirplus.attr_array[i]);
+    }
+    free(vfs_request->response.readdirplus.attr_array);
+    vfs_request->response.readdirplus.attr_array = NULL;
+    return ret;
 }
 
 /* 
@@ -1957,7 +2332,17 @@ static inline void package_downcall_members(
             }
             else
             {
-                copy_dirents_to_downcall(vfs_request);
+                *error_code = copy_dirents_to_downcall(vfs_request);
+            }
+            break;
+        case PVFS2_VFS_OP_READDIRPLUS:
+            if (*error_code)
+            {
+                vfs_request->out_downcall.status = *error_code;
+            }
+            else
+            {
+                *error_code = copy_direntplus_to_downcall(vfs_request);
             }
             break;
         case PVFS2_VFS_OP_STATFS:
@@ -2074,8 +2459,8 @@ static inline void package_downcall_members(
                       get a shared kernel/userspace buffer for the I/O
                       transfer
                     */
-                    buf = PINT_dev_get_mapped_buffer(
-                        &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
+                    buf = PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
+                        vfs_request->in_upcall.req.io.buf_index);
                     assert(buf);
 
                     /* copy cached data into the shared user/kernel space */
@@ -2143,6 +2528,37 @@ static inline void package_downcall_members(
                 *error_code = -PVFS_EINTR;
             }
             break;
+        case PVFS2_VFS_OP_FILE_IOX:
+        {
+            int j;
+
+            vfs_request->out_downcall.resp.iox.amt_complete = 0;
+            for (j = 0; j < vfs_request->num_ops; j++)
+            {
+                vfs_request->out_downcall.resp.iox.amt_complete +=
+                    vfs_request->response.iox[j].total_completed;
+            }
+            free(vfs_request->response.iox);
+            for (j = 0; j < vfs_request->num_ops; j++)
+            {
+                PVFS_Request_free(&vfs_request->mem_req_a[j]);
+                PVFS_Request_free(&vfs_request->file_req_a[j]);
+            }
+            free(vfs_request->mem_req_a);
+            free(vfs_request->file_req_a);
+            free(vfs_request->op_ids);
+            free(vfs_request->iox_offsets);
+            free(vfs_request->iox_sizes);
+            free(vfs_request->in_upcall.trailer_buf);
+            vfs_request->in_upcall.trailer_buf = NULL;
+            
+            /* replace non-errno error code to avoid passing to kernel */
+            if (*error_code == -PVFS_ECANCEL)
+            {
+                *error_code = -PVFS_EINTR;
+            }
+            break;
+        }
         case PVFS2_VFS_OP_GETXATTR:
             if (*error_code == 0)
             {
@@ -2342,6 +2758,9 @@ static inline PVFS_error handle_unexp_vfs_request(
     PINT_time_mark(&vfs_request->start);
 #endif
 
+    vfs_request->num_ops = 1;
+    vfs_request->num_incomplete_ops = 1;
+    vfs_request->op_ids  = NULL;
     switch(vfs_request->in_upcall.type)
     {
         case PVFS2_VFS_OP_LOOKUP:
@@ -2375,6 +2794,10 @@ static inline PVFS_error handle_unexp_vfs_request(
         case PVFS2_VFS_OP_READDIR:
             posted_op = 1;
             ret = post_readdir_request(vfs_request);
+            break;
+        case PVFS2_VFS_OP_READDIRPLUS:
+            posted_op = 1;
+            ret = post_readdirplus_request(vfs_request);
             break;
         case PVFS2_VFS_OP_RENAME:
             posted_op = 1;
@@ -2421,6 +2844,9 @@ static inline PVFS_error handle_unexp_vfs_request(
         case PVFS2_VFS_OP_PARAM:
             ret = service_param_request(vfs_request);
             break;
+        case PVFS2_VFS_OP_FSKEY:
+            ret = service_fs_key_request(vfs_request);
+            break;
             /*
               if the mmap-readahead-cache is enabled and we
               get a cache hit for data, the io call is
@@ -2429,6 +2855,10 @@ static inline PVFS_error handle_unexp_vfs_request(
         case PVFS2_VFS_OP_FILE_IO:
             posted_op = 1;
             ret = post_io_request(vfs_request);
+            break;
+        case PVFS2_VFS_OP_FILE_IOX:
+            posted_op = 1;
+            ret = post_iox_request(vfs_request);
             break;
 #ifdef USE_MMAP_RA_CACHE
             /*
@@ -2574,9 +3004,27 @@ static PVFS_error process_vfs_requests(void)
             vfs_request = vfs_request_array[i];
             assert(vfs_request);
 /*             assert(vfs_request->op_id == op_id_array[i]); */
-            if (vfs_request->op_id != op_id_array[i])
+            if (vfs_request->num_ops == 1 &&
+                    vfs_request->op_id != op_id_array[i])
             {
+                gossip_err("op_id %Ld != completed op id %Ld\n",
+                        lld(vfs_request->op_id), lld(op_id_array[i]));
                 continue;
+            }
+            else if (vfs_request->num_ops > 1)
+            {
+                int j;
+                /* assert that completed op is one that we posted earlier */
+                for (j = 0; j < vfs_request->num_ops; j++) {
+                    if (op_id_array[i] == vfs_request->op_ids[j])
+                        break;
+                }
+                if (j == vfs_request->num_ops)
+                {
+                    gossip_err("completed op id (%Ld) is weird\n",
+                            lld(op_id_array[i]));
+                    continue;
+                }
             }
 
             /* check if this is a new dev unexp request */
@@ -2595,6 +3043,10 @@ static PVFS_error process_vfs_requests(void)
             }
             else
             {
+                vfs_request->num_incomplete_ops--;
+                /* if operation is not complete, we gotta continue */
+                if (vfs_request->num_incomplete_ops != 0)
+                    continue;
                 log_operation_timing(vfs_request);
 
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
@@ -2634,9 +3086,14 @@ static PVFS_error process_vfs_requests(void)
                 {
                     buffer_list[0] = &vfs_request->out_downcall;
                     size_list[0] = sizeof(pvfs2_downcall_t);
-                    total_size = sizeof(pvfs2_downcall_t);
                     list_size = 1;
-
+                    total_size = sizeof(pvfs2_downcall_t);
+                    if (vfs_request->out_downcall.trailer_size > 0) {
+                        buffer_list[1] = vfs_request->out_downcall.trailer_buf;
+                        size_list[1] = vfs_request->out_downcall.trailer_size;
+                        list_size++;
+                        total_size += vfs_request->out_downcall.trailer_size;
+                    }
                     ret = write_device_response(
                         buffer_list,size_list,list_size, total_size,
                         vfs_request->info.tag,
@@ -2873,8 +3330,8 @@ int main(int argc, char **argv)
     }
 
     /* setup a mapped region for I/O transfers */
-    memset(&s_io_desc, 0 , sizeof(struct PVFS_dev_map_desc));
-    ret = PINT_dev_get_mapped_region(&s_io_desc, PVFS2_BUFMAP_TOTAL_SIZE);
+    memset(s_io_desc, 0 , NUM_MAP_DESC * sizeof(struct PVFS_dev_map_desc));
+    ret = PINT_dev_get_mapped_regions(NUM_MAP_DESC, s_io_desc, s_desc_size);
     if (ret < 0)
     {
 	PVFS_perror("PINT_dev_get_mapped_region", ret);
@@ -2933,7 +3390,7 @@ int main(int argc, char **argv)
 #endif
 
     PINT_dev_finalize();
-    PINT_dev_put_mapped_region(&s_io_desc);
+    PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");
@@ -3280,6 +3737,7 @@ static char *get_vfs_op_name_str(int op_type)
         { PVFS2_VFS_OP_REMOVE, "PVFS2_VFS_OP_REMOVE" },
         { PVFS2_VFS_OP_MKDIR, "PVFS2_VFS_OP_MKDIR" },
         { PVFS2_VFS_OP_READDIR, "PVFS2_VFS_OP_READDIR" },
+        { PVFS2_VFS_OP_READDIRPLUS, "PVFS2_VFS_OP_READDIRPLUS" },
         { PVFS2_VFS_OP_SETATTR, "PVFS2_VFS_OP_SETATTR" },
         { PVFS2_VFS_OP_SYMLINK, "PVFS2_VFS_OP_SYMLINK" },
         { PVFS2_VFS_OP_RENAME, "PVFS2_VFS_OP_RENAME" },
@@ -3295,6 +3753,9 @@ static char *get_vfs_op_name_str(int op_type)
         { PVFS2_VFS_OP_CANCEL, "PVFS2_VFS_OP_CANCEL" },
         { PVFS2_VFS_OP_FSYNC,  "PVFS2_VFS_OP_FSYNC" },
         { PVFS2_VFS_OP_PARAM,  "PVFS2_VFS_OP_PARAM" },
+        { PVFS2_VFS_OP_PERF_COUNT, "PVFS2_VFS_OP_PERF_COUNT" },
+        { PVFS2_VFS_OP_FSKEY,  "PVFS2_VFS_OP_FSKEY" },
+        { PVFS2_VFS_OP_FILE_IOX, "PVFS2_VFS_OP_FILE_IOX" },
         { 0, "UNKNOWN" }
     };
 

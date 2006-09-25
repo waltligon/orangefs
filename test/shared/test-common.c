@@ -1069,7 +1069,7 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
    
     attr.owner = credentials->uid; 
     attr.group = credentials->gid;
-    attr.perms = PVFS2_translate_mode(mode);
+    attr.perms = PVFS_util_translate_mode(mode,0);
     attr.atime = time(NULL);
     attr.mtime = attr.atime;
     attr.ctime = attr.atime;
@@ -1547,4 +1547,3 @@ void display_common_usage(char* exeName)
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-

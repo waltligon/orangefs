@@ -228,6 +228,29 @@ struct PINT_client_readdir_sm
     PVFS_sysresp_readdir *readdir_resp; /* in/out parameter*/
 };
 
+struct handle_to_index {
+    PVFS_handle handle;
+    int         handle_index;/* This is the index into the dirent array itself */
+    int         aux_index; /* this is used to store the ordinality of the dfile handles */
+};
+
+struct PINT_client_readdirplus_sm
+{
+    PVFS_ds_position pos_token;         /* input parameter */
+    int dirent_limit;                   /* input parameter */
+    int attrmask;                       /* input parameter */
+    PVFS_sysresp_readdirplus *readdirplus_resp; /* in/out parameter*/
+    /* scratch variables */
+    int nhandles;  
+    int svr_count;
+    PVFS_size        **size_array;
+    PVFS_object_attr *obj_attr_array;
+    struct handle_to_index *input_handle_array;
+    PVFS_BMI_addr_t *server_addresses;
+    int  *handle_count;
+    PVFS_handle     **handles;
+};
+
 typedef struct
 {
     char *seg_name;
@@ -348,6 +371,16 @@ struct PINT_server_get_config_sm
     int persist_config_buffers;
 };
 
+struct PINT_server_fetch_config_sm_state
+{
+    int nservers;
+    PVFS_BMI_addr_t *addr_array;
+    char **fs_config_bufs;
+    char **server_config_bufs;
+    int32_t *fs_config_buf_size;
+    int32_t *server_config_buf_size;
+};
+
 /* flag to disable cached lookup during getattr nested sm */
 #define PINT_SM_GETATTR_BYPASS_CACHE 1
 
@@ -439,6 +472,16 @@ struct PINT_client_perf_count_timer_sm
     struct PINT_perf_counter *pc;
 };
 
+typedef struct 
+{
+    PVFS_dirent **dirent_array;
+    uint32_t      *dirent_outcount;
+    PVFS_ds_position *token;
+    uint64_t         *directory_version;
+    PVFS_ds_position pos_token;     /* input parameter */
+    int32_t      dirent_limit;      /* input parameter */
+} PINT_sm_readdir_state;
+
 typedef struct PINT_client_sm
 {
     /*
@@ -470,6 +513,11 @@ typedef struct PINT_client_sm
 
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
+    /* generic dirent array used by both readdir and readdirplus state machines */
+    PINT_sm_readdir_state readdir;
+
+    /* fetch_config state used by the nested fetch config state machines */
+    struct PINT_server_fetch_config_sm_state fetch_config;
 
     /* msgpair scratch space used within msgpairarray substatemachine */
     /* if you have only a single msg pair you may point sm_p->msgarray */
@@ -509,6 +557,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_io_sm io;
 	struct PINT_client_flush_sm flush;
 	struct PINT_client_readdir_sm readdir;
+        struct PINT_client_readdirplus_sm readdirplus;
 	struct PINT_client_lookup_sm lookup;
 	struct PINT_client_rename_sm rename;
 	struct PINT_client_mgmt_setparam_list_sm setparam_list;
@@ -601,6 +650,7 @@ enum
     PVFS_SYS_SMALL_IO              = 17,
     PVFS_SYS_STATFS                = 18,
     PVFS_SYS_FS_ADD                = 19,
+    PVFS_SYS_READDIRPLUS           = 20,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -613,6 +663,7 @@ enum
     PVFS_MGMT_CREATE_DIRENT        = 79,
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
     PVFS_SERVER_GET_CONFIG         = 200,
+    PVFS_SERVER_FETCH_CONFIG         = 201,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
     PVFS_DEV_UNEXPECTED            = 400
@@ -698,6 +749,7 @@ do {                                                           \
      ((_op <= PVFS_OP_MGMT_MAXVAL) ?  \
       (PINT_client_sm_mgmt_table[_op - PVFS_OP_SYS_MAXVAL - 1].sm) : \
       ((_op == PVFS_SERVER_GET_CONFIG) ? (&pvfs2_server_get_config_sm) : \
+      (_op == PVFS_SERVER_FETCH_CONFIG) ? (&pvfs2_server_fetch_config_sm) : \
        ((_op == PVFS_CLIENT_JOB_TIMER) ? (&pvfs2_client_job_timer_sm) : \
         ((_op == PVFS_CLIENT_PERF_COUNT_TIMER) ? (&pvfs2_client_perf_count_timer_sm) : NULL)))))
 
@@ -721,13 +773,16 @@ extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
+extern struct PINT_state_machine_s pvfs2_client_readdirplus_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_client_rename_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
 extern struct PINT_state_machine_s pvfs2_client_perf_count_timer_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
+extern struct PINT_state_machine_s pvfs2_server_fetch_config_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;
@@ -751,6 +806,7 @@ extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_nested_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_nested_sm;
+extern struct PINT_state_machine_s pvfs2_server_fetch_config_nested_sm;
 
 #include "state-machine.h"
 

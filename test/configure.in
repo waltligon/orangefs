@@ -203,6 +203,13 @@ AC_ARG_WITH(db,
 	[AX_BERKELEY_DB(${withval})],
 	[AX_BERKELEY_DB("")])
 
+AC_ARG_WITH(openssl,
+		 [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)
+		 	 --without-openssl     Don't build with openssl.
+		 ],
+		 [AX_OPENSSL(${withval})],
+		 [AX_OPENSSL_OPTIONAL])
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in common io client correctness/pts kernel ; do
@@ -236,6 +243,6 @@ kernel/linux-2.6/module.mk
 maint/mpi-depend.sh
 shared/module.mk
 perfbase/benchmarks/module.mk
-
+posix/module.mk
 )
 

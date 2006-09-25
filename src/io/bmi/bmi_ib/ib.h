@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.20 2006-08-18 21:27:30 pw Exp $
+ * $Id: ib.h,v 1.20.2.1 2006-09-25 12:39:49 kunkel Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -332,6 +332,7 @@ struct ib_device_func {
     void (*post_sr_rdmaw)(ib_send_t *sq, msg_header_cts_t *mh_cts,
                           void *mh_cts_buf);
     int (*prepare_cq_block)(void);
+    void (*ack_cq_completion_event)(void);
     int (*check_cq)(struct bmi_ib_wc *wc);
     const char *(*wc_status_string)(int status);
     void (*mem_register)(memcache_entry_t *c);

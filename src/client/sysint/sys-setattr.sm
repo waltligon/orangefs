@@ -87,7 +87,7 @@ machine pvfs2_client_setattr_sm(
 PVFS_error PVFS_isys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
     PVFS_hint *hints,
     void *user_ptr)
@@ -156,7 +156,7 @@ PVFS_error PVFS_isys_setattr(
 PVFS_error PVFS_sys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_hint *hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;

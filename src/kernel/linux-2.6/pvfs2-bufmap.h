@@ -32,6 +32,12 @@ int pvfs_bufmap_get(
 void pvfs_bufmap_put(
     int buffer_index);
 
+int readdir_index_get(
+    int *buffer_index);
+
+void readdir_index_put(
+    int buffer_index);
+
 int pvfs_bufmap_copy_from_user(
     int buffer_index,
     void __user *from,

@@ -14,6 +14,8 @@ static LIST_HEAD(pvfs2_inode_list);
 static uint64_t next_tag_value;
 static spinlock_t next_tag_value_lock = SPIN_LOCK_UNLOCKED;
 
+/* the pvfs2 memory caches */
+
 /* a cache for pvfs2 upcall/downcall operations */
 static kmem_cache_t *op_cache = NULL;
 /* a cache for device (/dev/pvfs2-req) communication */
@@ -73,6 +75,8 @@ char *get_opname_string(pvfs2_kernel_op_t *new_op)
             return "OP_MKDIR";
         else if (type == PVFS2_VFS_OP_READDIR)
             return "OP_READDIR";
+        else if (type == PVFS2_VFS_OP_READDIRPLUS)
+            return "OP_READDIRPLUS";
         else if (type == PVFS2_VFS_OP_SETATTR)
             return "OP_SETATTR";
         else if (type == PVFS2_VFS_OP_SYMLINK)
@@ -105,11 +109,15 @@ char *get_opname_string(pvfs2_kernel_op_t *new_op)
             return "OP_CANCEL";
         else if (type == PVFS2_VFS_OP_FSYNC)
             return "OP_FSYNC";
+        else if (type == PVFS2_VFS_OP_FSKEY)
+            return "OP_FSKEY";
+        else if (type == PVFS2_VFS_OP_FILE_IOX)
+            return "OP_FILE_IOX";
     }
-    return "OP_INVALID";
+    return "OP_UNKNOWN?";
 }
 
-pvfs2_kernel_op_t *op_alloc(int32_t type)
+static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
 {
     pvfs2_kernel_op_t *new_op = NULL;
 
@@ -140,12 +148,23 @@ pvfs2_kernel_op_t *op_alloc(int32_t type)
         gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %ld %s)\n", new_op, (unsigned long) new_op->tag, get_opname_string(new_op));
 
         pvfs2_gen_credentials(&new_op->upcall.credentials);
+        new_op->op_linger = new_op->op_linger_tmp = op_linger;
     }
     else
     {
         gossip_err("op_alloc: kmem_cache_alloc failed!\n");
     }
     return new_op;
+}
+
+pvfs2_kernel_op_t *op_alloc(int32_t type)
+{
+    return op_alloc_common(1, type);
+}
+
+pvfs2_kernel_op_t *op_alloc_trailer(int32_t type)
+{
+    return op_alloc_common(2, type);
 }
 
 void op_release(pvfs2_kernel_op_t *pvfs2_op)
@@ -156,7 +175,7 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
         pvfs2_op_initialize(pvfs2_op);
         kmem_cache_free(op_cache, pvfs2_op);
     }
-    else
+    else 
     {
         gossip_err("NULL pointer in op_release\n");
     }
@@ -236,6 +255,7 @@ static void pvfs2_inode_cache_ctor(
     if (flags & SLAB_CTOR_CONSTRUCTOR)
     {
         memset(pvfs2_inode, 0, sizeof(pvfs2_inode_t));
+        ClearInitFlag(pvfs2_inode);
 
         pvfs2_inode_initialize(pvfs2_inode);
 

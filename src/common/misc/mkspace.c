@@ -23,9 +23,9 @@
 #include "extent-utils.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 
 static char *dir_ent_string = DIRECTORY_ENTRY_KEYSTR;
-static char *root_handle_string = ROOT_HANDLE_KEYSTR;
 static char *lost_and_found_string = "lost+found";
 
 static TROVE_handle s_used_handles[4] =
@@ -302,8 +302,8 @@ int pvfs2_mkspace(
         s_used_handles[0] = new_root_handle;
 
         /* set collection attribute for root handle */
-        key.buffer = root_handle_string;
-        key.buffer_sz = strlen(root_handle_string) + 1;
+        key.buffer = ROOT_HANDLE_KEYSTR;
+        key.buffer_sz = ROOT_HANDLE_KEYLEN;
         val.buffer = &new_root_handle;
         val.buffer_sz = sizeof(new_root_handle);
         ret = trove_collection_seteattr(coll_id, &key, &val, 0,
@@ -328,8 +328,8 @@ int pvfs2_mkspace(
         attr.gid = getgid();
         attr.mode = 0777;
         attr.type = PVFS_TYPE_DIRECTORY;
-	attr.atime = attr.ctime = PVFS_util_get_current_time();
-        attr.mtime = PVFS_util_mktime_version(attr.ctime);
+	attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ctime);
 
         ret = trove_dspace_setattr(
             coll_id, new_root_handle, &attr, TROVE_SYNC, NULL,
@@ -404,8 +404,8 @@ int pvfs2_mkspace(
                       "with handle %llu\n", llu(root_dirdata_handle));
         s_used_handles[1] = root_dirdata_handle;
 
-        key.buffer = dir_ent_string;
-        key.buffer_sz = strlen(dir_ent_string) + 1;
+        key.buffer = DIRECTORY_ENTRY_KEYSTR;
+        key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
         val.buffer = &root_dirdata_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 
@@ -487,8 +487,8 @@ int pvfs2_mkspace(
         attr.gid = getgid();
         attr.mode = 0777;
         attr.type = PVFS_TYPE_DIRECTORY;
-	attr.atime = attr.ctime = PVFS_util_get_current_time();
-        attr.mtime = PVFS_util_mktime_version(attr.ctime);
+	attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ctime);
 
         ret = trove_dspace_setattr(
             coll_id, lost_and_found_handle, &attr, TROVE_SYNC, NULL,
@@ -625,7 +625,7 @@ int pvfs2_mkspace(
     mkspace_print(verbose, "collection created:\n"
                   "\troot handle = %llu, coll id = %d, "
                   "root string = \"%s\"\n",
-                  llu(root_handle), coll_id, root_handle_string);
+                  llu(root_handle), coll_id, ROOT_HANDLE_KEYSTR);
     return 0;
 }
 
@@ -665,21 +665,18 @@ int pvfs2_rmspace(
 
     if (!remove_collection_only)
     {
+		  /*
+		  * it is a bit weird to do a trove_finaliz() prior to blowing away
+		  * the storage space, but this allows the __db files of the DB env
+		  * to be blown away for the rmdir() to work correctly!
+		  */
+		  trove_finalize();
         ret = trove_storage_remove(storage_space, NULL, &op_id);
         mkspace_print(
             verbose, "PVFS2 Storage Space %s removed %s\n",
             storage_space, (((ret == 1) || (ret == -TROVE_ENOENT)) ?
                             "successfully" : "with errors"));
 
-        /*
-          we should be doing a trove finalize here, but for now we
-          can't because it will fail horribly during the sync/close
-          calls to files that we've just removed.
-     
-          an extra flag to finalize, or a static var in the dbpf-mgmt
-          methods could resolve this.
-        */
-/*         trove_finalize(); */
         trove_is_initialized = 0;
     }
     return ret;

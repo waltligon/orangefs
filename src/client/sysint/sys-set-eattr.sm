@@ -58,7 +58,7 @@ machine pvfs2_client_set_eattr_sm(
 
 PVFS_error PVFS_isys_seteattr_list(
         PVFS_object_ref ref,
-        PVFS_credentials *credentials,
+        const PVFS_credentials *credentials,
         int32_t nkey,
         PVFS_ds_keyval *key_array,
         PVFS_ds_keyval *val_array,
@@ -103,7 +103,7 @@ PVFS_error PVFS_isys_seteattr_list(
 
 PVFS_error PVFS_sys_seteattr_list(
         PVFS_object_ref ref,
-        PVFS_credentials *credentials,
+        const PVFS_credentials *credentials,
         int32_t nkey,
         PVFS_ds_keyval *key_array,
         PVFS_ds_keyval *val_array,
@@ -139,7 +139,7 @@ PVFS_error PVFS_sys_seteattr_list(
 
 PVFS_error PVFS_sys_seteattr(
         PVFS_object_ref ref,
-        PVFS_credentials *credentials,
+        const PVFS_credentials *credentials,
         PVFS_ds_keyval *key_p,
         PVFS_ds_keyval *val_p,
         int32_t flags,

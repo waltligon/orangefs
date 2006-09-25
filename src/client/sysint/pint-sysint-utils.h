@@ -30,7 +30,7 @@
 
 int PINT_server_get_config(
     struct server_configuration_s *config,
-    struct PVFS_sys_mntent* mntent,
+    struct PVFS_sys_mntent* mntent_p,
     PVFS_hint * hints);
 
 struct server_configuration_s *PINT_get_server_config_struct(
