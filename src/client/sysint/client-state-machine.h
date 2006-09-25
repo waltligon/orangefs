@@ -181,7 +181,8 @@ typedef struct
     int msg_recv_in_progress;
     int flow_in_progress;
     int write_ack_in_progress;
-
+    
+    int migration_in_progress;
 } PINT_client_io_ctx;
 
 struct PINT_client_io_sm
@@ -218,6 +219,8 @@ struct PINT_client_io_sm
 
     PVFS_size * dfile_size_array;
     int small_io;
+    
+    int migration_in_progress;
 };
 
 struct PINT_client_flush_sm

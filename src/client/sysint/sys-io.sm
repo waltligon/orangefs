@@ -34,7 +34,8 @@ enum
     IO_RETRY,
     IO_GET_DATAFILE_SIZE,
     IO_ANALYZE_SIZE_RESULTS,
-    IO_DO_SMALL_IO
+    IO_DO_SMALL_IO,
+    IO_MIGRATION_RETRY = -PVFS_ENOENT
 };
 
 static int io_init(
@@ -186,6 +187,7 @@ machine pvfs2_client_io_sm(
     {
         jump pvfs2_client_small_io_sm;
         success => io_analyze_results;
+        IO_MIGRATION_RETRY => init;
         default => io_cleanup;
     }
 
@@ -215,6 +217,7 @@ machine pvfs2_client_io_sm(
     {
         run io_analyze_results;
         IO_RETRY => init;
+        IO_MIGRATION_RETRY => init;
         IO_ANALYZE_SIZE_RESULTS => io_analyze_size_results;
         IO_GET_DATAFILE_SIZE => io_datafile_size;
         default => io_cleanup;
@@ -381,7 +384,9 @@ static int io_init(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", sm_p);
 
     assert((js_p->error_code == 0) ||
-           (js_p->error_code == IO_RETRY));
+           (js_p->error_code == IO_RETRY) ||
+           (js_p->error_code == IO_MIGRATION_RETRY)
+           );
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
@@ -393,7 +398,8 @@ static int io_init(PINT_client_sm *sm_p,
     if (js_p->error_code == IO_RETRY)
     {
         js_p->error_code = 0;
-
+        sm_p->u.io.migration_in_progress = 0;
+        
         io_datafile_index_array_destroy(sm_p);
         io_contexts_destroy(sm_p);
 
@@ -407,6 +413,20 @@ static int io_init(PINT_client_sm *sm_p,
             sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
+    else if( js_p->error_code == IO_MIGRATION_RETRY )
+    {
+        if (sm_p->op_cancelled)
+        {
+            js_p->error_code = -PVFS_ECANCEL;
+            return 1;
+        }
+        sm_p->u.io.migration_in_progress = 1;
+        /* invalidate attribute cache */
+        PINT_acache_invalidate(sm_p->object_ref);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "io migration detected "
+            " refetching metadata information.\n" );                
+    }
+    
     return 1;
 }
 
@@ -418,6 +438,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     int target_datafile_count = 0;
     int * sio_array;
     int sio_count;
+    int forbit_small_io = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_datafile_setup_msgpairs\n", sm_p);
@@ -428,11 +449,74 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
         goto exit;
     }
 
-    js_p->error_code = 0;
-
     attr = &sm_p->getattr.attr;
     assert(attr);
-
+    
+    if ( sm_p->u.io.migration_in_progress && 
+        sm_p->u.io.small_io )
+    {
+        /* disable small I/O once a migration took place to avoid 
+         * endless checking for dfile array changes..*/
+        forbit_small_io = 1;
+        sm_p->u.io.small_io = 0;
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "io migration detected in small-io disabling"
+            " small-io and retry.\n" );
+    }
+    else if (sm_p->u.io.migration_in_progress)
+    {
+        /* 
+         * modify targets for contexts which have a migration_in_progress flag 
+         */
+        for( i=0; i < sm_p->u.io.context_count ; i++)
+        {
+            PINT_client_io_ctx * ctx = & sm_p->u.io.contexts[i]; 
+            if ( ctx->migration_in_progress )
+            {
+                PVFS_handle new_handle;
+                
+                ctx->migration_in_progress = 0;
+                new_handle =  attr->u.meta.dfile_array[ctx->server_nr];
+                if ( new_handle == ctx->data_handle )
+                {
+                    /* this means we have a real error, migration ensures 
+                     * consistancy */
+                    js_p->error_code = -PVFS_ENOENT;
+                    return 1;
+                }
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "  Migrate refilling I/O request "
+                             "for old datafile %llu with new datafile %llu\n", 
+                             llu(ctx->data_handle),
+                             llu(new_handle)  );
+/*                
+                ctx->data_handle = new_handle;
+                        
+                PINT_SERVREQ_IO_FILL(
+                    ctx->msg.req,
+                    *sm_p->cred_p,
+                    sm_p->object_ref.fs_id,
+                    ctx->data_handle,
+                    sm_p->u.io.io_type,
+                    sm_p->u.io.flowproto_type,
+                    ctx->server_nr,
+                    attr->u.meta.dfile_count,
+                    attr->u.meta.dist,
+                    sm_p->u.io.file_req,
+                    sm_p->u.io.file_req_offset,
+                    PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
+*/                    
+            }
+        }  
+    
+        /*
+         * cleanup and safely recreate I/O streams
+         */
+        io_datafile_index_array_destroy(sm_p);
+        io_contexts_destroy(sm_p);
+    }
+    
+    sm_p->u.io.migration_in_progress = 0;
+    js_p->error_code = 0;
+    
     switch(attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
@@ -523,10 +607,11 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
      * percentage of the target_datafile_count, then do small I/O to
      * the sio_array servers, etc.
      */
-    if(sio_count == target_datafile_count)
+     
+    if(sio_count == target_datafile_count && ! forbit_small_io)
     {
-        gossip_debug(GOSSIP_IO_DEBUG, "  %s: doing small I/O\n", __func__);
-
+       gossip_debug(GOSSIP_IO_DEBUG, "  %s: doing small I/O\n", __func__);
+    
         sm_p->u.io.small_io = 1;
         js_p->error_code = IO_DO_SMALL_IO;
         goto sio_array_destroy;
@@ -919,6 +1004,22 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
     if (ret == IO_RECV_COMPLETED)
     {
         ret = io_process_context_recv(sm_p, js_p, &cur_ctx);
+        if (ret == IO_MIGRATION_RETRY)
+        {
+            js_p->error_code = ret;
+            /*
+            cur_ctx->msg_send_has_been_posted = 0;
+            cur_ctx->msg_recv_has_been_posted = 0;
+            */
+            cur_ctx->migration_in_progress = 1;
+            
+            /* we are definitly not finished */
+            gossip_debug(GOSSIP_IO_DEBUG, "Possible migration during I/O, retry I/O\n");
+            
+            sm_p->u.io.migration_in_progress = 1;
+            goto check_next_step;
+        }
+        
         if (ret < 0)
         {
             char buf[64] = {0};
@@ -1156,6 +1257,15 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 
     attr = &sm_p->getattr.attr;
 
+    if (sm_p->u.io.migration_in_progress)
+    {
+        js_p->error_code = IO_MIGRATION_RETRY;
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io migration detected: "
+                 "io_analyze_results\n", sm_p);
+                 
+        return 1;
+    }
+
     /* I/O op failed or cancelled if the transfers didn't complete or
      * the error code is non-zero when returning from small I/O sm
      */
@@ -1269,7 +1379,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
         js_p->error_code = IO_RETRY;
         goto analyze_results_exit;
     }
-
+    
     /* all other errors we should just propigate immediately */
     if(ret != 0)
     {
@@ -1285,7 +1395,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
         js_p->error_code = 0;
         sm_p->u.io.io_resp_p->total_completed = sm_p->u.io.total_size;
 
-        /* we don't know if the file size has changed here so we invalidate
+        /* we don't know if the file size has changed here so we 
          * the size in the attribute cache.  The only sure-fire way to
          * recompute the file size (if our write was past eof) is to
          * get all the datafile sizes (we could have written to what was
@@ -1629,9 +1739,16 @@ static inline int io_decode_ack_response(
         }
         else if (cur_ctx->msg.op_status)
         {
-            PVFS_perror_gossip("io_process_context_recv (op_status)",
+            if ( cur_ctx->msg.op_status == -PVFS_ENOENT )
+            {
+                ret = IO_MIGRATION_RETRY;
+            }
+            else
+            {
+                PVFS_perror_gossip("io_process_context_recv (op_status)",
                                cur_ctx->msg.op_status);
-            ret = cur_ctx->msg.op_status;
+                ret = cur_ctx->msg.op_status;
+            }
         }
 
         PINT_serv_free_msgpair_resources(
@@ -1958,6 +2075,11 @@ static inline int io_process_context_recv(
 
     /* decode the response from the server */
     ret = io_decode_ack_response(cur_ctx, &decoded_resp, &resp);
+    if (ret == IO_MIGRATION_RETRY)
+    {
+        return ret;
+    }
+    
     if (ret)
     {
         {
