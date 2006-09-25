@@ -174,7 +174,7 @@ static int prelude_getattr_if_needed(
     ret = job_trove_dspace_getattr(
         s_op->target_fs_id, s_op->target_handle,
         s_op, &(s_op->ds_attr),
-        0, js_p, &tmp_id, server_job_context);
+        0, js_p, &tmp_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -690,7 +690,7 @@ static int prelude_check_acls_if_needed(
         0,
         js_p,
         &i,
-        server_job_context);
+        server_job_context, s_op->req->hints);
     return ret;
 }
 

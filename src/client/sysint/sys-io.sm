@@ -698,7 +698,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             msg->svr_addr, msg->encoded_resp_p, msg->max_resp_sz,
             cur_ctx->session_tag, BMI_PRE_ALLOC, sm_p, status_user_tag,
             &msg->recv_status, &msg->recv_id, pint_client_sm_context,
-            server_config->client_job_bmi_timeout);
+            server_config->client_job_bmi_timeout, sm_p->hints);
         PINT_put_server_config_struct(server_config);
 
         /* ret -1: problem, do not look at msg recv_status */
@@ -773,7 +773,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             msg->encoded_req.total_size, cur_ctx->session_tag,
             msg->encoded_req.buffer_type, 1, sm_p, status_user_tag,
             &msg->send_status, &msg->send_id, pint_client_sm_context,
-            server_config->client_job_bmi_timeout);
+            server_config->client_job_bmi_timeout, sm_p->hints);
         PINT_put_server_config_struct(server_config);
 
         if (ret < 0) {
@@ -1738,7 +1738,7 @@ static inline int io_post_flow(
         &cur_ctx->flow_desc, sm_p, status_user_tag,
         &cur_ctx->flow_status, &cur_ctx->flow_job_id,
         pint_client_sm_context,
-        server_config->client_job_flow_timeout);
+        server_config->client_job_flow_timeout, sm_p->hints);
     PINT_put_server_config_struct(server_config);
 
     /* if the flow fails immediately, then we have to do some special
@@ -1827,7 +1827,7 @@ static inline int io_post_write_ack_recv(
         cur_ctx->write_ack.max_resp_sz, cur_ctx->session_tag,
         BMI_PRE_ALLOC, sm_p, status_user_tag,
         &cur_ctx->write_ack.recv_status, &cur_ctx->write_ack.recv_id,
-        pint_client_sm_context, JOB_TIMEOUT_INF);
+        pint_client_sm_context, JOB_TIMEOUT_INF, sm_p->hints);
 
     if (ret < 0)
     {

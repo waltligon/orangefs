@@ -175,7 +175,7 @@ static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
         0,
         js_p,
         &j_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }

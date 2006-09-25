@@ -92,7 +92,7 @@ static int mgmt_get_dirdata_handle_from_parent(
         &s_op->key, &s_op->val, 
         0, 
         NULL, s_op, 0, js_p, &i,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }

@@ -327,7 +327,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         ds_attr, 
         TROVE_SYNC,
-        s_op, 0, js_p, &j_id, server_job_context);
+        s_op, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -380,7 +380,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         0,
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, s_op, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -432,7 +432,7 @@ static int setattr_write_metafile_distribution_if_required(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         TROVE_SYNC,
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, s_op, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -476,7 +476,7 @@ static int setattr_write_symlink_target_if_required(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         TROVE_SYNC,
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, s_op, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }

@@ -147,7 +147,7 @@ static int flush_keyval_flush(PINT_server_op *s_op, job_status_s *js_p)
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -194,7 +194,7 @@ static int flush_bstream_flush(PINT_server_op *s_op, job_status_s *js_p)
         0,
         js_p,
         &i,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }

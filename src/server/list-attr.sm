@@ -416,7 +416,7 @@ static int listattr_read_symlink_target(
         s_op->u.listattr.fs_id, *handle,
         &(s_op->key), &(s_op->val), 
         0, NULL, s_op, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -510,7 +510,7 @@ static int listattr_read_metafile_datafile_handles_if_required(
         s_op->u.listattr.fs_id, *handle,
         &s_op->key, &s_op->val, 
         0, NULL, s_op, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -573,7 +573,7 @@ static int listattr_read_metafile_distribution_if_required(
         s_op->u.listattr.fs_id, *handle,
         &(s_op->key), &(s_op->val), 
         0, NULL,
-        s_op, 0, js_p, &i, server_job_context);
+        s_op, 0, js_p, &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -777,7 +777,7 @@ static int listattr_setup_op(
             0,
             js_p,
             &tmp_id,
-            server_job_context);
+            server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -802,7 +802,7 @@ static int listattr_get_dirent_count(
             0,
             js_p,
             &tmp_id,
-            server_job_context);
+            server_job_context, s_op->req->hints);
 
     return ret;
 }

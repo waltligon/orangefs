@@ -80,7 +80,7 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
 			    js_p,
 			    &tmp_id,
 			    server_job_context,
-			    user_opts->server_job_bmi_timeout);
+			    user_opts->server_job_bmi_timeout, s_op->req->hints);
 
     return ret;
 }

@@ -272,7 +272,7 @@ static int remove_read_dirdata_handle(PINT_server_op *s_op,
         &s_op->key, &s_op->val, 
         0, 
         NULL, s_op, 0, js_p,
-        &j_id, server_job_context);
+        &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -298,7 +298,7 @@ static int remove_get_dirent_count(
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -355,7 +355,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
         0,
         js_p,
         &j_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -379,7 +379,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
         s_op->u.remove.fs_id, s_op->u.remove.handle,
         TROVE_SYNC, 
         s_op, 0, js_p,
-        &j_id, server_job_context);
+        &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }

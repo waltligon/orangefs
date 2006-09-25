@@ -164,7 +164,7 @@ static int seteattr_setobj_eattribs(
         0,
         js_p,
         &j_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }

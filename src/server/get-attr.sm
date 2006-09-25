@@ -456,7 +456,7 @@ static int getattr_read_symlink_target(
         &(s_op->key), &(s_op->val), 
         0, 
         NULL, s_op, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -550,7 +550,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
         &s_op->key, &s_op->val, 
         0, 
         NULL, s_op, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -609,7 +609,7 @@ static int getattr_read_metafile_distribution_if_required(
         &(s_op->key), &(s_op->val), 
         0, 
         NULL,
-        s_op, 0, js_p, &i, server_job_context);
+        s_op, 0, js_p, &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -800,7 +800,7 @@ static int getattr_get_dirdata_handle(
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -829,7 +829,7 @@ static int getattr_get_dirent_count(
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -954,7 +954,7 @@ static int getattr_get_dir_hint(
         s_op->req->u.getattr.handle,
         s_op->key_a, s_op->val_a, s_op->u.getattr.err_array, NUM_SPECIAL_KEYS,
         0, NULL, s_op, 0, js_p, &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }

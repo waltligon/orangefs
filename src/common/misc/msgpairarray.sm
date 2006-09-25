@@ -22,9 +22,11 @@
 #if defined(__PVFS2_CLIENT__)
 #include "client-state-machine.h"
 #define PARENT_SM PINT_client_sm
+#define HINT_STRUCT sm_p->hints
 #elif defined(__PVFS2_SERVER__)
 #include "src/server/pvfs2-server.h"
 #define PARENT_SM PINT_server_op 
+#define HINT_STRUCT sm_p->req->hints
 #else
 /* this condition is only included for dependency building step; will not
  * actually compile cleanly
@@ -32,6 +34,7 @@
 #define __SM_CHECK_DEP
 #include "client-state-machine.h"
 #include "src/server/pvfs2-server.h"
+#define HINT_STRUCT sm_p->req->hints
 #endif
 #include "msgpairarray.h"
 #include "pvfs2-debug.h"
@@ -277,7 +280,9 @@ static int msgpairarray_post(PARENT_SM *sm_p,
                            &msg_p->recv_status,
                            &msg_p->recv_id,
                            sm_p->msgarray_params.job_context,
-                           sm_p->msgarray_params.job_timeout);
+                           sm_p->msgarray_params.job_timeout, 
+                           HINT_STRUCT
+                           );
         if (ret == 0)
         {
             /* perform a quick test to see if the recv failed before posting
@@ -349,7 +354,8 @@ static int msgpairarray_post(PARENT_SM *sm_p,
                                 &msg_p->send_status,
                                 &msg_p->send_id,
                                 sm_p->msgarray_params.job_context,
-                                sm_p->msgarray_params.job_timeout);
+                                sm_p->msgarray_params.job_timeout, 
+                                HINT_STRUCT);
 
          if ((ret < 0) ||
             ((ret == 1) && (msg_p->send_status.error_code != 0)))

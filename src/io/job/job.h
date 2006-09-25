@@ -78,7 +78,8 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
 		 job_status_s * out_status_p,
 		 job_id_t * id,
 		 job_context_id context_id,
-		 int timeout_sec);
+		 int timeout_sec,
+         PVFS_hint * hints);
 
 /* network send (list of buffers) */
 int job_bmi_send_list(PVFS_BMI_addr_t addr,
@@ -94,7 +95,8 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
 		      job_status_s * out_status_p,
 		      job_id_t * id,
 		      job_context_id context_id,
-		      int timeout_sec);
+		      int timeout_sec,
+              PVFS_hint * hints);
 
 /* network receive */
 int job_bmi_recv(PVFS_BMI_addr_t addr,
@@ -107,7 +109,8 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
 		 job_status_s * out_status_p,
 		 job_id_t * id,
 		 job_context_id context_id,
-		 int timeout_sec);
+		 int timeout_sec,
+         PVFS_hint * hints);
 
 /* network receive (list of buffers) */
 int job_bmi_recv_list(PVFS_BMI_addr_t addr,
@@ -122,7 +125,8 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
 		      job_status_s * out_status_p,
 		      job_id_t * id,
 		      job_context_id context_id,
-		      int timeout_sec);
+		      int timeout_sec,
+              PVFS_hint * hints);
 
 /* unexpected network receive */
 int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
@@ -201,7 +205,8 @@ int job_flow(flow_descriptor * flow_d,
 	     job_status_s * out_status_p,
 	     job_id_t * id,
 	     job_context_id context_id,
-	     int timeout_sec);
+	     int timeout_sec,
+         PVFS_hint * hints);
 
 int job_flow_cancel(job_id_t id, job_context_id context_id);
 
@@ -217,7 +222,8 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 			       job_aint status_user_tag,
 			       job_status_s * out_status_p,
 			       job_id_t * id,
-			       job_context_id context_id);
+			       job_context_id context_id,
+                   PVFS_hint * hints);
 
 int job_trove_bstream_write_list(PVFS_fs_id coll_id,
                                  PVFS_handle handle,
@@ -234,7 +240,8 @@ int job_trove_bstream_write_list(PVFS_fs_id coll_id,
                                  job_aint status_user_tag,
                                  job_status_s * out_status_p,
                                  job_id_t * id,
-                                 job_context_id context_id);
+                                 job_context_id context_id,
+                                 PVFS_hint * hints);
 
 
 /* storage byte stream read */
@@ -249,7 +256,8 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 			      job_aint status_user_tag,
 			      job_status_s * out_status_p,
 			      job_id_t * id,
-			      job_context_id context_id);
+			      job_context_id context_id,
+                  PVFS_hint * hints);
 
 int job_trove_bstream_read_list(PVFS_fs_id coll_id,
                                 PVFS_handle handle,
@@ -266,7 +274,8 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
                                 job_aint status_user_tag,
                                 job_status_s * out_status_p,
                                 job_id_t * id,
-                                job_context_id context_id);
+                                job_context_id context_id,
+                                PVFS_hint * hints);
 
 /* byte stream flush to storage */
 int job_trove_bstream_flush(PVFS_fs_id coll_id,
@@ -276,7 +285,8 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
 			    job_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
-			    job_context_id context_id);
+			    job_context_id context_id,
+                PVFS_hint * hints);
 	
 /* storage key/value read */
 int job_trove_keyval_read(PVFS_fs_id coll_id,
@@ -289,7 +299,8 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 			  job_aint status_user_tag,
 			  job_status_s * out_status_p,
 			  job_id_t * id,
-			  job_context_id context_id);
+			  job_context_id context_id,
+              PVFS_hint * hints);
 
 /* storage key/value read list */
 int job_trove_keyval_read_list(PVFS_fs_id coll_id,
@@ -304,7 +315,8 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 			       job_aint status_user_tag,
 			       job_status_s * out_status_p,
 			       job_id_t * id,
-			       job_context_id context_id);
+			       job_context_id context_id,
+                   PVFS_hint * hints);
 
 /* storage key/value write */
 int job_trove_keyval_write(PVFS_fs_id coll_id,
@@ -317,7 +329,8 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 			   job_aint status_user_tag,
 			   job_status_s * out_status_p,
 			   job_id_t * id,
-			   job_context_id context_id);
+			   job_context_id context_id,
+               PVFS_hint * hints);
 
 /* storage key/value write list */
 int job_trove_keyval_write_list(PVFS_fs_id coll_id,
@@ -331,7 +344,8 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
 			        job_aint status_user_tag,
 			        job_status_s * out_status_p,
 			        job_id_t * id,
-			        job_context_id context_id);
+			        job_context_id context_id,
+                    PVFS_hint * hints);
 
 /* flush keyval data to storage */
 int job_trove_keyval_flush(PVFS_fs_id coll_id,
@@ -341,7 +355,8 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 			    job_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
-			    job_context_id context_id);
+			    job_context_id context_id,
+                PVFS_hint * hints);
 
 /* get handle info for a keyval */
 int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
@@ -352,7 +367,8 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
                                      job_aint status_user_tag,
                                      job_status_s * out_status_p,
                                      job_id_t * id,
-                                     job_context_id context_id);
+                                     job_context_id context_id,
+                                     PVFS_hint * hints);
 
 /* read generic dspace attributes */
 int job_trove_dspace_getattr(PVFS_fs_id coll_id,
@@ -362,7 +378,8 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 			     job_aint status_user_tag,
 			     job_status_s * out_status_p,
 			     job_id_t * id,
-			     job_context_id context_id);
+			     job_context_id context_id,
+                 PVFS_hint * hints);
 
 /* read generic dspace attributes for a set of handles */
 int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
@@ -374,7 +391,8 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
                              job_aint status_user_tag,
                              job_status_s *out_status_p,
                              job_id_t *id,
-                             job_context_id context_id);
+                             job_context_id context_id,
+                             PVFS_hint * hints);
 
 /* write generic dspace attributes */
 int job_trove_dspace_setattr(PVFS_fs_id coll_id,
@@ -385,7 +403,8 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 			     job_aint status_user_tag,
 			     job_status_s * out_status_p,
 			     job_id_t * id,
-			     job_context_id context_id);
+			     job_context_id context_id,
+                 PVFS_hint * hints);
 
 /* resize (truncate or preallocate) a storage byte stream */
 int job_trove_bstream_resize(PVFS_fs_id coll_id,
@@ -397,7 +416,8 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
 			     job_aint status_user_tag,
 			     job_status_s * out_status_p,
 			     job_id_t * id,
-			     job_context_id context_id);
+			     job_context_id context_id,
+                 PVFS_hint * hints);
 
 /* check consistency of a bytestream for a given vtag */
 int job_trove_bstream_validate(PVFS_fs_id coll_id,
@@ -407,7 +427,8 @@ int job_trove_bstream_validate(PVFS_fs_id coll_id,
 			       job_aint status_user_tag,
 			       job_status_s * out_status_p,
 			       job_id_t * id,
-			       job_context_id context_id);
+			       job_context_id context_id,
+                   PVFS_hint * hints);
 
 /* remove a key/value entry */
 int job_trove_keyval_remove(PVFS_fs_id coll_id,
@@ -420,7 +441,8 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
 			    job_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
-			    job_context_id context_id);
+			    job_context_id context_id,
+                PVFS_hint * hints);
 
 /* check consistency of a key/value pair for a given vtag */
 int job_trove_keyval_validate(PVFS_fs_id coll_id,
@@ -430,7 +452,8 @@ int job_trove_keyval_validate(PVFS_fs_id coll_id,
 			      job_aint status_user_tag,
 			      job_status_s * out_status_p,
 			      job_id_t * id,
-			      job_context_id context_id);
+			      job_context_id context_id,
+                  PVFS_hint * hints);
 
 /* iterate through all of the key/value pairs for a data space */
 int job_trove_keyval_iterate(PVFS_fs_id coll_id,
@@ -445,7 +468,8 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 			     job_aint status_user_tag,
 			     job_status_s * out_status_p,
 			     job_id_t * id,
-			     job_context_id context_id);
+			     job_context_id context_id,
+                 PVFS_hint * hints);
 
 /* iterate through all of the keys for a data space */
 int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
@@ -459,7 +483,8 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 				  job_aint status_user_tag,
 				  job_status_s * out_status_p,
 				  job_id_t * id,
-				  job_context_id context_id);
+				  job_context_id context_id,
+                  PVFS_hint * hints);
 
 /* iterates through all handles in a collection */
 int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
@@ -472,7 +497,8 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 				     job_aint status_user_tag,
 				     job_status_s* out_status_p,
 				     job_id_t* id,
-				     job_context_id context_id);
+				     job_context_id context_id,
+                     PVFS_hint * hints);
 
 /* create a new data space object */
 int job_trove_dspace_create(PVFS_fs_id coll_id,
@@ -484,7 +510,8 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 			    job_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
-			    job_context_id context_id);
+			    job_context_id context_id,
+                PVFS_hint * hints);
 
 /* remove an entire data space object (byte stream and key/value) */
 int job_trove_dspace_remove(PVFS_fs_id coll_id,
@@ -494,7 +521,8 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 			    job_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
-			    job_context_id context_id);
+			    job_context_id context_id,
+                PVFS_hint * hints);
 
 /* verify that a given dataspace exists and discover its type */
 int job_trove_dspace_verify(PVFS_fs_id coll_id,
@@ -504,7 +532,8 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 			    job_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
-			    job_context_id context_id);
+			    job_context_id context_id,
+                PVFS_hint * hints);
 
 int job_trove_dspace_cancel(PVFS_fs_id coll_id,
 			    job_id_t id,
@@ -544,7 +573,8 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
 			  job_aint status_user_tag,
 			  job_status_s * out_status_p,
 			  job_id_t * id,
-			  job_context_id context_id);
+			  job_context_id context_id,
+              PVFS_hint * hints);
 
 /* read extended attributes for a file system */
 int job_trove_fs_geteattr(PVFS_fs_id coll_id,
@@ -555,7 +585,8 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 			  job_aint status_user_tag,
 			  job_status_s * out_status_p,
 			  job_id_t * id,
-			  job_context_id context_id);
+			  job_context_id context_id,
+              PVFS_hint * hints);
 
 int job_null(
     int error_code,
