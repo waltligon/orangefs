@@ -142,7 +142,8 @@ CC = @CC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
-CFLAGS = @CFLAGS@
+# make sure the srcdir include gets included first
+CFLAGS = -I$(srcdir)/include @CFLAGS@
 LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
@@ -168,8 +169,8 @@ CFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
 CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
   # include current directory (for pvfs2-config.h)
 CFLAGS += -I .
-  # setup general warning levels and gcc options
-CFLAGS += -I $(srcdir)/include -I include -I $(srcdir)
+  # include toplevel source dir
+CFLAGS += -I $(srcdir)
   # add selected include directories
 CFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
   # add package version information
