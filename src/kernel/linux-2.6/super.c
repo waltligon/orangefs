@@ -18,6 +18,9 @@ static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keyle
 #endif
 static atomic_t pvfs2_inode_alloc_count, pvfs2_inode_dealloc_count;
 
+static char *keywords[] = {"intr", "acl", "suid", "noatime", "nodiratime"};
+static int num_possible_keywords = sizeof(keywords)/sizeof(char *);
+
 static int parse_mount_options(
    char *option_str, struct super_block *sb, int silent)
 {
@@ -25,8 +28,6 @@ static int parse_mount_options(
     pvfs2_sb_info_t *pvfs2_sb = NULL;
     int i = 0, j = 0, num_keywords = 0, got_device = 0;
 
-    static char *keywords[] = {"intr", "acl", "suid"};
-    static int num_possible_keywords = 3;
     static char options[PVFS2_MAX_NUM_OPTIONS][PVFS2_MAX_MOUNT_OPT_LEN];
 
     if (!silent)
@@ -123,6 +124,24 @@ static int parse_mount_options(
                         pvfs2_sb->mnt_options.suid = 1;
                         break;
                     }
+                    else if (strncmp(options[i], "noatime", 7) == 0)
+                    {
+                        if (!silent)
+                        {
+                            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: mount option "
+                                       "noatime specified\n");
+                        }
+                        pvfs2_sb->mnt_options.noatime = 1;
+                    }
+                    else if (strncmp(options[i], "nodiratime", 10) == 0)
+                    {
+                        if (!silent)
+                        {
+                            gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: mount option "
+                                       "nodiratime specified\n");
+                        }
+                        pvfs2_sb->mnt_options.nodiratime = 1;
+                    }
                 }
             }
 
@@ -174,6 +193,7 @@ static struct inode *pvfs2_alloc_inode(struct super_block *sb)
         new_inode = &pvfs2_inode->vfs_inode;
         gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_alloc_inode: allocated %p\n", pvfs2_inode);
         atomic_inc(&pvfs2_inode_alloc_count);
+        new_inode->i_flags &= ~(S_APPEND|S_IMMUTABLE|S_NOATIME);
     }
     return new_inode;
 }
@@ -245,6 +265,7 @@ static void pvfs2_read_inode(
         pvfs2_inode_initialize(pvfs2_inode);
         inode->u.generic_ip = pvfs2_inode;
         pvfs2_inode->vfs_inode = inode;
+        inode->i_flags &= ~(S_APPEND|S_IMMUTABLE|S_NOATIME);
 
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
@@ -513,6 +534,10 @@ int pvfs2_remount(
                 ((PVFS2_SB(sb)->mnt_options.acl == 1) ? MS_POSIXACL : 0));
             sb->s_xattr = pvfs2_xattr_handlers;
 #endif
+            sb->s_flags = ((sb->s_flags & ~MS_NOATIME)  |
+                ((PVFS2_SB(sb)->mnt_options.noatime == 1) ? MS_NOATIME : 0));
+            sb->s_flags = ((sb->s_flags & ~MS_NODIRATIME) |
+                ((PVFS2_SB(sb)->mnt_options.nodiratime == 1) ? MS_NODIRATIME : 0));
         }
 
         new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
@@ -866,6 +891,10 @@ struct super_block* pvfs2_get_sb(
             gossip_err("Failed to parse mount time options\n");
             goto error_exit;
         }
+        sb->s_flags = ((sb->s_flags & ~MS_NOATIME)  |
+            ((PVFS2_SB(sb)->mnt_options.noatime == 1) ? MS_NOATIME : 0));
+        sb->s_flags = ((sb->s_flags & ~MS_NODIRATIME) |
+            ((PVFS2_SB(sb)->mnt_options.nodiratime == 1) ? MS_NODIRATIME : 0));
         dev_name = PVFS2_SB(sb)->devname;
     }
 
@@ -1011,9 +1040,13 @@ int pvfs2_fill_sb(
         /* mark the superblock as whether it supports acl's or not */
         sb->s_flags = ((sb->s_flags & ~MS_POSIXACL) | 
             ((PVFS2_SB(sb)->mnt_options.acl == 1) ? MS_POSIXACL : 0));
+        sb->s_flags = ((sb->s_flags & ~MS_NOATIME)  |
+            ((PVFS2_SB(sb)->mnt_options.noatime == 1) ? MS_NOATIME : 0));
+        sb->s_flags = ((sb->s_flags & ~MS_NODIRATIME) |
+            ((PVFS2_SB(sb)->mnt_options.nodiratime == 1) ? MS_NODIRATIME : 0));
     }
     else {
-        sb->s_flags = (sb->s_flags & ~MS_POSIXACL);
+        sb->s_flags = (sb->s_flags & ~(MS_POSIXACL | MS_NOATIME | MS_NODIRATIME));
     }
 
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)

@@ -434,6 +434,25 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		 #include <asm/ioctl32.h>
 		 ] )
 
+	AC_MSG_CHECKING(for generic_file_readv api in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel has it defined with a different
+	dnl signature!  deliberately, the signature for this method has been
+	dnl changed for it to give a compiler error.
+
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		int generic_file_readv(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GENERIC_FILE_READV, 1, Define if kernel has generic_file_readv),
+	)
+
 	AC_MSG_CHECKING(for generic_permission api in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel has it defined with a different

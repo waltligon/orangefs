@@ -119,7 +119,7 @@ struct rw_options {
     } io;
 };
 
-static ssize_t do_read_write(struct rw_options *rw)
+static ssize_t do_direct_read_write(struct rw_options *rw)
 {
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
@@ -222,7 +222,7 @@ static ssize_t do_read_write(struct rw_options *rw)
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)
         {
-            gossip_err("do_read_write: pvfs_bufmap_get() "
+            gossip_err("do_direct_read_write: pvfs_bufmap_get() "
                         "failure (%ld)\n", (long) ret);
             goto out;
         }
@@ -370,7 +370,7 @@ ssize_t pvfs2_inode_read(
     rw.io.read.inode = inode;
     rw.io.read.copy_to_user = copy_to_user;
     rw.io.read.readahead_size = readahead_size;
-    return do_read_write(&rw); 
+    return do_direct_read_write(&rw); 
 }
 
 /** Read data from a specified offset in a file into a user buffer.
@@ -385,9 +385,14 @@ ssize_t pvfs2_file_read(
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
                  (char *)file->f_dentry->d_name.name : "UNKNOWN"),
                 (unsigned long) *offset, (unsigned long) count);
-
-    return pvfs2_inode_read(
-        file->f_dentry->d_inode, buf, count, offset, 1, 0);
+    /* Reads from immutable files are staged through the page-cache */
+    if (IS_IMMUTABLE(file->f_dentry->d_inode)) {
+        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_read: invoking generic_file_read\n");
+        return generic_file_read(file, buf, count, offset);
+    }
+    else {
+        return pvfs2_inode_read(file->f_dentry->d_inode, buf, count, offset, 1, 0);
+    }
 }
 
 /** Write data from a contiguous user buffer into a file at a specified
@@ -405,7 +410,7 @@ static ssize_t pvfs2_file_write(
     rw.count = count;
     rw.offset = offset;
     rw.io.write.file = file;
-    return do_read_write(&rw);
+    return do_direct_read_write(&rw);
 }
 
 /*
@@ -559,7 +564,7 @@ static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs,
     return max_nr_iovecs;
 }
 
-static ssize_t do_readv_writev(int type, struct file *file,
+static ssize_t do_direct_readv_writev(int type, struct file *file,
         const struct iovec *iov, unsigned long nr_segs, loff_t *offset)
 {
     ssize_t ret;
@@ -847,7 +852,29 @@ static ssize_t pvfs2_file_readv(
     unsigned long nr_segs,
     loff_t *offset)
 {
-    return do_readv_writev(IO_READV, file, iov, nr_segs, offset);
+    if (IS_IMMUTABLE(file->f_dentry->d_inode))
+    {
+#ifdef HAVE_GENERIC_FILE_READV
+        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_readv: invoking generic_file_readv\n");
+        return generic_file_readv(file, iov, nr_segs, offset);
+#else
+        ssize_t tot = 0;
+        unsigned long i;
+        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_readv: invoking generic_file_read %ld\n", nr_segs);
+        for (i = 0; i < nr_segs; i++)
+        {
+            ssize_t tmp;
+            if ((tmp = generic_file_read(file, iov[i].iov_base, iov[i].iov_len, offset)) < 0)
+            {
+                return tmp;
+            }
+            tot += tmp;
+        }
+        return tot;
+#endif
+    }
+    else
+        return do_direct_readv_writev(IO_READV, file, iov, nr_segs, offset);
 }
 
 
@@ -860,7 +887,7 @@ static ssize_t pvfs2_file_writev(
     unsigned long nr_segs,
     loff_t *offset)
 {
-    return do_readv_writev(IO_WRITEV, file, iov, nr_segs, offset);
+    return do_direct_readv_writev(IO_WRITEV, file, iov, nr_segs, offset);
 }
 
 
@@ -1049,7 +1076,7 @@ estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, ssize_t *to
 }
 
 
-static ssize_t do_readx_writex(int type, struct file *file,
+static ssize_t do_direct_readx_writex(int type, struct file *file,
         const struct iovec *iov, unsigned long nr_segs,
         const struct xtvec *xtvec, unsigned long xtnr_segs)
 {
@@ -1346,7 +1373,7 @@ out:
     }
     if (ret > 0 && inode != NULL && pvfs2_inode != NULL)
     {
-        if (type == IO_READV)
+        if (type == IO_READX)
         {
             SetAtimeFlag(pvfs2_inode);
             inode->i_atime = CURRENT_TIME;
@@ -1372,7 +1399,7 @@ static ssize_t pvfs2_file_readx(
     const struct xtvec *xtvec,
     unsigned long xtnr_segs)
 {
-    return do_readx_writex(IO_READX, file, iov, nr_segs, xtvec, xtnr_segs);
+    return do_direct_readx_writex(IO_READX, file, iov, nr_segs, xtvec, xtnr_segs);
 }
 
 #endif
@@ -1386,7 +1413,7 @@ static ssize_t pvfs2_file_writex(
     const struct xtvec *xtvec,
     unsigned long xtnr_segs)
 {
-    return do_readx_writex(IO_WRITEX, file, iov, nr_segs, xtvec, xtnr_segs);
+    return do_direct_readx_writex(IO_WRITEX, file, iov, nr_segs, xtvec, xtnr_segs);
 }
 
 #endif
@@ -2104,7 +2131,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                 gossip_debug(GOSSIP_FILE_DEBUG, "Failed to copy user buffer %d\n", (int) ret);
                 /* drop the buffer index */
                 pvfs_bufmap_put(buffer_index);
-                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_write: pvfs_bufmap_put %d\n",
                         buffer_index);
                 /* drop the reference count and deallocate */
                 put_op(new_op);
@@ -2127,7 +2154,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                     error = -ENOMEM;
                     /* drop the buffer index */
                     pvfs_bufmap_put(buffer_index);
-                    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_write: pvfs_bufmap_put %d\n",
                             buffer_index);
                     /* drop the reference count and deallocate */
                     put_op(new_op);
@@ -2181,7 +2208,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                 error = new_op->downcall.resp.io.amt_complete;
                 wake_up_daemon_for_return(new_op);
                 pvfs_bufmap_put(buffer_index);
-                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_aio_write: pvfs_bufmap_put %d\n",
                         (int) buffer_index);
                 if (error > 0)
                 {

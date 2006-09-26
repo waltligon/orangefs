@@ -71,6 +71,9 @@
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
 
+/* Define if kernel has generic_file_readv */
+#undef HAVE_GENERIC_FILE_READV
+
 /* Define if kernel has generic_getxattr */
 #undef HAVE_GENERIC_GETXATTR
 

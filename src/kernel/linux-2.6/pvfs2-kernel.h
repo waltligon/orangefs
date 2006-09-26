@@ -366,6 +366,7 @@ typedef struct
     sector_t last_failed_block_index_read;
     int error_code;
 
+    /* State of in-memory attributes not yet flushed to disk associated with this object */
     unsigned long pinode_flags;
     /* All allocated pvfs2_inode_t objects are chained to a list */
     struct list_head list;
@@ -415,6 +416,16 @@ typedef struct
     * file if set. NOTE: this is disabled by default.
     */
     int suid;
+    /** noatime option (if set) is inspired by the nfs mount option
+    * that requires the file system to disable atime updates for all
+    * files if set. NOTE: this is disabled by default.
+    */
+    int noatime;
+    /** nodiratime option (if set) is inspired by the nfs mount option
+    * that requires the file system to disable atime updates for
+    * directories alone if set. NOTE: this is disabled by default.
+    */
+    int nodiratime;
 } pvfs2_mount_options_t;
 
 /** per superblock private pvfs2 info */

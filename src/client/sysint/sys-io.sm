@@ -449,7 +449,13 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
             js_p->error_code = -PVFS_EBADF;
             goto exit;
     }
-
+    /* cannot write to an immutable file */
+    if (sm_p->u.io.io_type == PVFS_IO_WRITE
+        && (attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL))
+    {
+        js_p->error_code = -PVFS_EPERM;
+        goto exit;
+    }
     ret = PINT_dist_lookup(attr->u.meta.dist);
     if (ret)
     {

@@ -161,6 +161,9 @@ struct address_space_operations pvfs2_address_operations =
 void pvfs2_truncate(struct inode *inode)
 {
     loff_t orig_size = i_size_read(inode);
+
+    if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
+        return;
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %llu "
                 "with size %ld\n", llu(get_handle_from_ino(inode)), (long) orig_size);
 

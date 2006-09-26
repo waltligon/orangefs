@@ -136,6 +136,7 @@ typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
 typedef uint64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
+typedef uint64_t PVFS_flags;
 #define encode_PVFS_uid encode_uint32_t
 #define decode_PVFS_uid decode_uint32_t
 #define encode_PVFS_gid encode_uint32_t
@@ -144,6 +145,8 @@ typedef uint32_t PVFS_permissions;
 #define decode_PVFS_time decode_int64_t
 #define encode_PVFS_permissions encode_uint32_t
 #define decode_PVFS_permissions decode_uint32_t
+#define encode_PVFS_flags encode_uint64_t
+#define decode_PVFS_flags decode_uint64_t
 
 /* contiguous range of handles */
 typedef struct
@@ -222,6 +225,11 @@ typedef enum
 
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
+
+/* PVFS Object Flags (PVFS_flags); Add more as we implement them */
+#define PVFS_IMMUTABLE_FL 0x1ULL
+#define PVFS_APPEND_FL    0x2ULL
+#define PVFS_NOATIME_FL   0x4ULL
 
 /* Key/Value Pairs */
 /* Extended attributes are stored on objects with */

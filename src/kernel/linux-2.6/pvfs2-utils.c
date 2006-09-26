@@ -98,6 +98,24 @@ PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op)
     return fsid;
 }
 
+static void pvfs2_set_inode_flags(struct inode *inode, 
+        PVFS_sys_attr *attrs)
+{
+    if (attrs->flags & PVFS_IMMUTABLE_FL)
+        inode->i_flags |= S_IMMUTABLE;
+    else 
+        inode->i_flags &= ~S_IMMUTABLE;
+    if (attrs->flags & PVFS_APPEND_FL)
+        inode->i_flags |= S_APPEND;
+    else
+        inode->i_flags &= ~S_APPEND;
+    if (attrs->flags & PVFS_NOATIME_FL)
+        inode->i_flags |= S_NOATIME;
+    else
+        inode->i_flags &= ~S_NOATIME;
+    return;
+}
+
 /* NOTE: symname is ignored unless the inode is a sym link */
 int copy_attributes_to_inode(
     struct inode *inode,
@@ -136,32 +154,34 @@ int copy_attributes_to_inode(
                 attrs->objtype == PVFS_TYPE_SYMLINK ? "symlink" :
                  "invalid/unknown");
                 
-
-        if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
-            (attrs->mask & PVFS_ATTR_SYS_SIZE))
+        if (attrs->objtype == PVFS_TYPE_METAFILE)
         {
-            inode_size = (loff_t)attrs->size;
-            rounded_up_size =
-                (inode_size + (4096 - (inode_size % 4096)));
+            pvfs2_set_inode_flags(inode, attrs);
+            if (attrs->mask & PVFS_ATTR_SYS_SIZE)
+            {
+                inode_size = (loff_t)attrs->size;
+                rounded_up_size =
+                    (inode_size + (4096 - (inode_size % 4096)));
 
-            pvfs2_lock_inode(inode);
+                pvfs2_lock_inode(inode);
 #ifdef PVFS2_LINUX_KERNEL_2_4
 #if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER > 21)
-            inode->i_bytes = inode_size;
+                inode->i_bytes = inode_size;
 #endif
 #else
-            /* this is always ok for 2.6.x */
-            inode->i_bytes = inode_size;
+                /* this is always ok for 2.6.x */
+                inode->i_bytes = inode_size;
 #endif
-            inode->i_blocks = (unsigned long)(rounded_up_size / 512);
-            pvfs2_unlock_inode(inode);
+                inode->i_blocks = (unsigned long)(rounded_up_size / 512);
+                pvfs2_unlock_inode(inode);
 
-            /*
-              NOTE: make sure all the places we're called from have
-              the inode->i_sem lock.  we're fine in 99% of the cases
-              since we're mostly called from a lookup.
-            */
-            inode->i_size = inode_size;
+                /*
+                  NOTE: make sure all the places we're called from have
+                  the inode->i_sem lock.  we're fine in 99% of the cases
+                  since we're mostly called from a lookup.
+                */
+                inode->i_size = inode_size;
+            }
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))
@@ -592,8 +612,18 @@ int pvfs2_flush_inode(struct inode *inode)
         wbattr.ia_valid |= ATTR_MTIME;
     if (CtimeFlag(pvfs2_inode))
         wbattr.ia_valid |= ATTR_CTIME;
-    if (AtimeFlag(pvfs2_inode))
+    /*
+     * We do not need to honor atime flushes if
+     * a) object has a noatime marker
+     * b) object is a directory and has a nodiratime marker on the fs
+     * c) entire file system is mounted with noatime option
+     */
+    if (!((inode->i_flags & S_NOATIME)
+            || (inode->i_sb->s_flags & MS_NOATIME)
+            || ((inode->i_sb->s_flags & MS_NODIRATIME) && S_ISDIR(inode->i_mode))) && AtimeFlag(pvfs2_inode))
+    {
         wbattr.ia_valid |= ATTR_ATIME;
+    }
     if (ModeFlag(pvfs2_inode)) 
     {
         wbattr.ia_mode = inode->i_mode;
@@ -843,7 +873,8 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         }
         if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
         {
-            gossip_err("pvfs2_inode_setxattr: Immutable inode or append-only inode; operation not permitted\n");
+            gossip_err("pvfs2_inode_setxattr: Immutable inode or append-only "
+                    "inode; operation not permitted\n");
             return -EPERM;
         }
         pvfs2_inode = PVFS2_I(inode);
