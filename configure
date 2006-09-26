@@ -7236,7 +7236,7 @@ echo "$as_me: error: --with-mpe must be given a pathname" >&2;}
     else
         CFLAGS="$CFLAGS -I$withval/include"
         LDFLAGS="$LDFLAGS -L$withval/lib"
-        LIBS="$LIBS -lmpe -lmpich"
+        LIBS="$LIBS -lmpe -lmpich -lpthread"
         echo "$as_me:$LINENO: checking for valid mpe install" >&5
 echo $ECHO_N "checking for valid mpe install... $ECHO_C" >&6
 	cat >conftest.$ac_ext <<_ACEOF

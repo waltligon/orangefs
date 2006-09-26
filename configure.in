@@ -369,7 +369,7 @@ AC_ARG_WITH(mpe,
     else
         CFLAGS="$CFLAGS -I$withval/include"
         LDFLAGS="$LDFLAGS -L$withval/lib"
-        LIBS="$LIBS -lmpe -lmpich"
+        LIBS="$LIBS -lmpe -lmpich -lpthread"
         AC_MSG_CHECKING(for valid mpe install)
 	AC_TRY_LINK(
               [#include <mpe.h>],
