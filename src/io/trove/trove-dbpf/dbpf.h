@@ -479,6 +479,7 @@ struct dbpf_op
     void *user_ptr;
     TROVE_ds_flags flags;
     TROVE_context_id context_id;
+    PVFS_hint * hints;
     union
     {
         /* all the op types go in here; structs are all

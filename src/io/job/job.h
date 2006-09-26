@@ -497,8 +497,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 				     job_aint status_user_tag,
 				     job_status_s* out_status_p,
 				     job_id_t* id,
-				     job_context_id context_id,
-                     PVFS_hint * hints);
+				     job_context_id context_id);
 
 /* create a new data space object */
 int job_trove_dspace_create(PVFS_fs_id coll_id,

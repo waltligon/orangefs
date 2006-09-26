@@ -750,7 +750,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
             NULL,
             &result_tmp->trove_callback,
             global_trove_context,
-            &result_tmp->posted_id);
+            &result_tmp->posted_id,
+            flow_data->parent->hints);
 
         result_tmp = result_tmp->next;
 
@@ -1246,7 +1247,9 @@ static int bmi_send_callback_fn(void *user_ptr,
             NULL,
             &result_tmp->trove_callback,
             global_trove_context,
-            &result_tmp->posted_id);
+            &result_tmp->posted_id,
+            flow_data->parent->hints
+            );
 
         result_tmp = result_tmp->next;
 
