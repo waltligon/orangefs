@@ -141,7 +141,7 @@ int main(
     file_req_offset = 3;
 
     ret = PVFS_sys_lock(pinode_refn, file_req, file_req_offset, mem_req,
-			&credentials, &resp_lock, PVFS_ACQUIRE);
+			&credentials, &resp_lock, PVFS_IO_WRITE, PVFS_ACQUIRE);
 
     if (ret < 0)
     {
