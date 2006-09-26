@@ -1,0 +1,1651 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for acquiring/releasing locks 
+ *  on PVFS2 datatypes.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+
+#define LOCK_MAX_SEGMENT_NUM 64
+
+extern job_context_id pint_client_sm_context;
+
+enum
+{
+    LOCK_NO_DATA = 232,
+    LOCK_RETRY,
+    LOCK_TRANSFERS_COMPLETE,
+};
+
+static int lock_init(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_setup_msgpairs(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_post_msgpairs(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_post_msgpairs_retry(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_complete_operations(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_analyze_results(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+
+/* Helper functions local to sys-lock.sm */
+
+static inline int lock_complete_context_send_or_recv(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+
+static inline int lock_decode_ack_response(
+    PINT_client_lock_ctx *cur_ctx,
+    struct PINT_decoded_msg *decoded_resp,
+    struct PVFS_server_resp **resp);
+
+static inline int lock_check_context_status(
+    PINT_client_lock_ctx *cur_ctx, int lock_type,
+    PVFS_size *total_size);
+
+static inline int lock_process_context_recv(
+    PINT_client_sm *sm_p,
+    job_status_s *js_p,
+    PINT_client_lock_ctx **out_ctx);
+
+static int lock_find_target_datafiles(
+    PVFS_Request mem_req,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PINT_dist *dist_p,
+    PVFS_handle *input_handle_array,
+    int input_handle_count,
+    int *handle_index_array,
+    int *handle_index_out_count);
+
+static int lock_find_total_size(
+    PINT_client_sm * sm_p,
+    PVFS_offset final_offset,
+    PVFS_size * total_return_size);
+
+static int lock_find_offset(
+    PINT_client_sm * sm_p,
+    PVFS_size contig_size,
+    PVFS_size * total_return_offset);
+
+static int lock_contexts_init(
+    PINT_client_sm *sm_p,
+    int context_count,
+    PVFS_object_attr *attr);
+
+static void lock_contexts_destroy(PINT_client_sm *sm_p);
+
+/* misc constants and helper macros */
+#define LOCK_RECV_COMPLETED                                    1
+
+/* possible lock state machine phases (status_user_tag) */
+#define LOCK_SM_PHASE_REQ_MSGPAIR_RECV                         0
+#define LOCK_SM_PHASE_REQ_MSGPAIR_SEND                         1
+#define LOCK_SM_PHASE_FINAL_ACK                                2
+#define LOCK_SM_NUM_PHASES                                     3
+
+#define STATUS_USER_TAG_TYPE(tag, type)                      \
+((tag % LOCK_SM_NUM_PHASES) == type)
+#define STATUS_USER_TAG_GET_INDEX(tag, type)                 \
+(tag / LOCK_SM_NUM_PHASES)
+#define STATUS_USER_TAG_IS_SEND_OR_RECV(tag)                 \
+(STATUS_USER_TAG_TYPE(tag, LOCK_SM_PHASE_REQ_MSGPAIR_RECV) ||  \
+ STATUS_USER_TAG_TYPE(tag, LOCK_SM_PHASE_REQ_MSGPAIR_SEND))
+
+static int lock_datafile_index_array_init(
+    PINT_client_sm *sm_p,
+    int datafile_count);
+
+static void lock_datafile_index_array_destroy(
+    PINT_client_sm *sm_p);
+
+%%
+
+machine pvfs2_client_lock_sm(
+    init,
+    lock_getattr,
+    lock_setup_msgpairs,
+    lock_post_msgpairs,
+    lock_post_msgpairs_retry,
+    lock_complete_operations,
+    lock_analyze_results,
+    lock_cleanup)
+{
+    state init
+    {
+	run lock_init;
+	default => lock_getattr;
+    }
+    
+    state lock_getattr
+    {
+	jump pvfs2_client_getattr_sm;
+	success => lock_setup_msgpairs;
+        default => lock_cleanup;
+    }
+
+    state lock_setup_msgpairs
+    {
+	run lock_setup_msgpairs;
+	LOCK_NO_DATA => lock_cleanup;
+	success => lock_post_msgpairs;
+	default => lock_cleanup;
+    }
+
+    state lock_post_msgpairs
+    {
+	run lock_post_msgpairs;
+	LOCK_RETRY => lock_post_msgpairs_retry;
+	default => lock_complete_operations;
+    }
+
+    state lock_post_msgpairs_retry
+    {
+	run lock_post_msgpairs_retry;
+	LOCK_TRANSFERS_COMPLETE => lock_complete_operations;
+	default => lock_post_msgpairs;
+    }
+
+    state lock_complete_operations
+    {
+	run lock_complete_operations;
+	LOCK_TRANSFERS_COMPLETE => lock_analyze_results;
+	LOCK_RETRY => lock_post_msgpairs_retry;
+	default => lock_complete_operations;
+    }
+
+    state lock_analyze_results
+    {
+	run lock_analyze_results;
+	LOCK_RETRY => init;
+	default => lock_cleanup;
+    }
+    
+    state lock_cleanup 
+    {
+        run lock_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** Initiates acquiring or releasing locks on a file datatype
+ *
+ * \lock type specifies if the operations is an acquire or release
+ */
+
+PVFS_error PVFS_isys_lock(
+    PVFS_object_ref ref,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PVFS_Request mem_req,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_lock *resp_p,
+    enum PVFS_io_type io_type,
+    enum PVFS_lock_type lock_type,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+    struct server_configuration_s *server_config = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_lock entered [%llu]\n]",
+		 llu(ref.handle));
+
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+	(ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
+    {
+	gossip_err("invalid (NULL) required argumen\n");
+	return ret;
+    }
+
+    if ((lock_type != PVFS_ACQUIRE) && (lock_type != PVFS_RELEASE))
+    {
+	gossip_err("invalid (unknown) lock type specified\n");
+	return ret;
+    }
+
+    server_config = PINT_get_server_config_struct(ref.fs_id);
+    cur_fs = PINT_config_find_fs_id(server_config, ref.fs_id);
+    PINT_put_server_config_struct(server_config);
+
+    if (!cur_fs)
+    {
+	gossip_err("invalid (unknown) fs id specified\n");
+	return ret;
+    }
+
+    /* Make sure the lock request is not for a size of 0 */
+    if (PINT_REQUEST_TOTAL_BYTES(file_req) == 0)
+    {
+	gossip_ldebug(GOSSIP_LOCK_DEBUG, "Warning: 0 byte lock operation "
+		      "attempted.\n");
+	resp_p->granted_bytes = 0;
+	return 1;
+    }
+    resp_p->granted_bytes = 0;
+
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+
+    sm_p->u.lock.io_type = io_type;
+    sm_p->u.lock.lock_type = lock_type;
+    sm_p->u.lock.mem_req = mem_req;
+    sm_p->u.lock.file_req = file_req;
+    sm_p->u.lock.file_req_offset = file_req_offset;
+    sm_p->u.lock.lock_resp_p = resp_p;
+    sm_p->u.lock.encoding = cur_fs->encoding;
+    sm_p->u.lock.stored_error_code = 0;
+    sm_p->u.lock.retry_count = 0;
+    sm_p->msgarray = NULL;
+    sm_p->u.lock.datafile_index_array = NULL;
+    sm_p->u.lock.datafile_count = 0;
+    sm_p->u.lock.total_size = 0;
+    sm_p->object_ref = ref;
+
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_LOCK, op_id, user_ptr);
+}
+
+/** Acquires or releases locks on a file datatype
+ *
+ * \lock_type specifies if the operations is an acquire or release
+ */
+
+PVFS_error PVFS_sys_lock(
+    PVFS_object_ref ref,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PVFS_Request mem_req,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_lock *resp_p,
+    enum PVFS_io_type io_type,
+    enum PVFS_lock_type lock_type)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_lock entered\n");
+    
+    ret = PVFS_isys_lock(ref, file_req, file_req_offset, mem_req,
+			 credentials, resp_p, io_type,
+			 lock_type, &op_id, NULL);
+    if (ret == 1)
+	return 0;
+    else if (ret < 0)
+    {
+	PVFS_perror_gossip("PVFS_isys_lock call", ret);
+	error = ret;
+    }
+    else
+    {
+	ret = PVFS_sys_wait(op_id, "lock", &error);
+	if (ret)
+	{
+	    PVFS_perror_gossip("PVFS_sys_wait call", ret);
+	    error = ret;
+	}
+	PVFS_sys_release(op_id);
+    }
+
+    return error;
+}
+
+/*******************************************************************/
+
+static int lock_init(PINT_client_sm *sm_p,
+		     job_status_s *js_p)
+{
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) lock state: lock_init\n", sm_p);
+
+    assert((js_p->error_code == 0) || 
+	   (js_p->error_code == LOCK_RETRY));
+
+    PINT_SM_GETATTR_STATE_FILL(
+	sm_p->getattr,
+	sm_p->object_ref,
+	PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
+	PVFS_TYPE_METAFILE,
+	0);
+
+    if (js_p->error_code == LOCK_RETRY)
+    {
+	js_p->error_code = 0;
+	
+	lock_datafile_index_array_destroy(sm_p);
+	lock_contexts_destroy(sm_p);
+
+	if (sm_p->op_cancelled)
+	{
+	    js_p->error_code = -PVFS_ECANCEL;
+	    return 1;
+	}
+
+	return job_req_sched_post_timer(
+	    sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
+	    pint_client_sm_context);
+    }
+
+    return 1;
+}
+
+static int lock_setup_msgpairs(PINT_client_sm *sm_p,
+			       job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL, i = 0;
+    PVFS_object_attr *attr = NULL;
+    int target_datafile_count = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) lock state: "
+		 "lock_setup_msgpairs\n", sm_p);
+
+    if (sm_p->op_cancelled)
+    {
+	js_p->error_code = -PVFS_ECANCEL;
+	goto exit;
+    }
+    
+    js_p->error_code = 0;
+
+    attr = &(sm_p->getattr.attr);
+    assert(attr);
+
+    switch(attr->objtype)
+    {
+	case PVFS_TYPE_METAFILE:
+	    assert(attr->mask & PVFS_ATTR_META_DFILES);
+	    assert(attr->mask & PVFS_ATTR_META_DIST);
+	    assert(attr->u.meta.dist_size > 0);
+	    assert(attr->u.meta.dfile_count > 0);
+	    break;
+	case PVFS_TYPE_DIRECTORY:
+	    js_p->error_code = -PVFS_EISDIR;
+	    goto exit;
+	default:
+	    js_p->error_code = -PVFS_EBADF;
+	    goto exit;
+    }
+
+    ret = PINT_dist_lookup(attr->u.meta.dist);
+    if (ret)
+    {
+	PVFS_perror_gossip("PINT_dist_lookup failed: aborting lock request",
+			   ret);
+	js_p->error_code = -PVFS_EBADF;
+	goto exit;
+    }
+
+    ret = lock_datafile_index_array_init(sm_p, attr->u.meta.dfile_count);
+    if (ret < 0)
+    {
+	js_p->error_code = ret;
+	goto error_exit;
+    }
+
+    PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
+	&(sm_p->u.lock.dfile_size_array),
+	attr->u.meta.dfile_count);
+
+    ret = lock_find_target_datafiles(
+	sm_p->u.lock.mem_req,
+	sm_p->u.lock.file_req,
+	sm_p->u.lock.file_req_offset,
+	attr->u.meta.dist,
+	attr->u.meta.dfile_array,
+	attr->u.meta.dfile_count,
+	sm_p->u.lock.datafile_index_array,
+	&target_datafile_count);
+    if (ret < 0)
+    {
+	gossip_debug(GOSSIP_LOCK_DEBUG, "   lock_find_target_datafiles: ret "
+		     "< 0 (%d); aborting\n", ret);
+	js_p->error_code = ret;
+	goto error_exit;
+    }
+
+    sm_p->u.lock.datafile_count = target_datafile_count;
+    if (target_datafile_count == 0)
+    {
+	gossip_debug(GOSSIP_LOCK_DEBUG, "   datafile_setup_msg_pairs: no "
+		     "datafiles have data; aborting\n");
+	js_p->error_code = LOCK_NO_DATA;
+	goto error_exit;
+    }
+    
+    gossip_debug(GOSSIP_LOCK_DEBUG,
+		 "  %s: %d datafiles might have had data\n", __func__, 
+		 target_datafile_count);
+
+    ret = lock_contexts_init(sm_p, target_datafile_count, attr);
+    if (ret < 0)
+    {
+	js_p->error_code = ret;
+	goto error_exit;
+    }
+
+    sm_p->u.lock.total_cancellations_remaining = 0;
+
+    for (i = 0; i < target_datafile_count; i++)
+    {
+	gossip_debug(GOSSIP_LOCK_DEBUG, "  filling lock request for %llu\n",
+		     llu(sm_p->u.lock.contexts[i].data_handle));
+	
+	PINT_SERVREQ_LOCK_FILL(
+	    sm_p->u.lock.contexts[i].msg.req,
+	    *(sm_p->cred_p),
+	    sm_p->object_ref.fs_id,
+	    sm_p->u.lock.contexts[i].data_handle,
+	    sm_p->u.lock.io_type,
+	    sm_p->u.lock.lock_type,
+	    sm_p->u.lock.datafile_index_array[i],
+            attr->u.meta.dfile_count,
+            attr->u.meta.dist,
+            sm_p->u.lock.file_req,
+            sm_p->u.lock.file_req_offset,
+            PINT_REQUEST_TOTAL_BYTES(sm_p->u.lock.mem_req));
+    }
+    
+    js_p->error_code = 0;
+
+    lock_datafile_index_array_destroy(sm_p);
+  error_exit:
+  exit:
+
+    return 1;
+}
+
+/*
+  This is based on msgpairarray_post() in msgpairarray.c.  It's
+  different enough in that we don't have to wait on the msgpairarray
+  operations to all complete before posting flows as we can do so for each
+  server individually when we're ready.  this avoids the msgpairarray
+  sync point implicit in the design
+*/
+
+static int lock_post_msgpairs(PINT_client_sm *sm_p,
+			      job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL, i = 0;
+    unsigned long status_user_tag = 0;
+    int must_loop_encodings = 0;
+    struct server_configuration_s *server_config = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lock_post_msgpairs "
+                 "state: post (%d message(s))\n", sm_p->u.lock.datafile_count);
+
+    if (sm_p->op_cancelled)
+    {
+        js_p->error_code = -PVFS_ECANCEL;
+        return 1;
+    }
+
+    js_p->error_code = 0;
+
+    /* completion count tracks sends/recvs separately, will increment
+     * as we go through the loop to maintain a count of outstanding msgpairs */
+
+    sm_p->u.lock.msgpair_completion_count = 0;
+    
+    for(i = 0; i < sm_p->u.lock.context_count; i++)
+    {
+        PINT_client_lock_ctx *cur_ctx = &sm_p->u.lock.contexts[i];
+        PINT_sm_msgpair_state *msg = &cur_ctx->msg;
+
+        /* do not do this one again in retry case */
+	if (cur_ctx->msg_recv_has_been_posted &&
+	    cur_ctx->msg_recv_in_progress)
+	{
+	    ++sm_p->u.lock.msgpair_completion_count;
+	    goto recv_already_posted;
+	}
+
+	if (!ENCODING_IS_VALID(sm_p->u.lock.encoding))
+	{
+	    PRINT_ENCODING_ERROR("supported", sm_p->u.lock.encoding);
+	    must_loop_encodings = 1;
+	    sm_p->u.lock.encoding = (ENCODING_INVALID_MIN + 1);
+	}
+	else if (!ENCODING_IS_SUPPORTED(sm_p->u.lock.encoding))
+	{
+	    PRINT_ENCODING_ERROR("supported", sm_p->u.lock.encoding);
+	    must_loop_encodings = 1;
+	    sm_p->u.lock.encoding = ENCODING_SUPPORTED_MIN;
+	}
+
+      try_next_encoding:
+	assert(ENCODING_IS_VALID(sm_p->u.lock.encoding));
+    
+	ret = PINT_encode(&msg->req, PINT_ENCODE_REQ, &msg->encoded_req,
+			  msg->svr_addr, sm_p->u.lock.encoding);
+	if (ret)
+	{
+	    if (must_loop_encodings)
+	    {
+		gossip_debug(GOSSIP_CLIENT_DEBUG, "Looping through "
+			     "encodings [%d/%d]\n", sm_p->u.lock.encoding,
+			     ENCODING_INVALID_MAX);
+		
+		sm_p->u.lock.encoding++;
+		if (ENCODING_IS_VALID(sm_p->u.lock.encoding))
+		{
+		    goto try_next_encoding;
+		}
+	    }
+	    /*
+              FIXME: make this a clean error transition by adjusting
+              the completion count and/or (not) exiting
+	    */
+	    PVFS_perror_gossip("PINT_encode failed", ret);
+	    js_p->error_code = ret;
+	    return 1;
+	}
+
+	/* calculate maximum response message size and allocate it */
+	msg->max_resp_sz = PINT_encode_calc_max_size(
+	    PINT_ENCODE_RESP, msg->req.op, sm_p->u.lock.encoding);
+	msg->encoded_resp_p = BMI_memalloc(
+	    msg->svr_addr, msg->max_resp_sz, BMI_RECV);
+	if (!msg->encoded_resp_p)
+	{
+	    /* FIXME: see above FIXME */
+	    js_p->error_code = -PVFS_ENOMEM;
+	    return 1;
+	}
+
+	/*
+	  recalculate the status user tag based on this the progress
+	  of the current context like this: status_user_tag = (4 *
+	  (context index) + context phase)
+	*/
+	assert(cur_ctx->index == i);
+	status_user_tag = ((4 * i) + LOCK_SM_PHASE_REQ_MSGPAIR_RECV);
+
+	gossip_debug(GOSSIP_LOCK_DEBUG," posting recv with "
+		     "status_user_tag=%lu (max_size %d)\n",
+		     status_user_tag, msg->max_resp_sz);
+	
+	cur_ctx->session_tag = PINT_util_get_next_tag();
+
+	cur_ctx->msg_recv_has_been_posted = 0;
+	cur_ctx->msg_recv_in_progress = 0;
+
+	server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
+	ret = job_bmi_recv(
+	    msg->svr_addr, msg->encoded_resp_p, msg->max_resp_sz,
+	    cur_ctx->session_tag, BMI_PRE_ALLOC, sm_p, status_user_tag,
+	    &msg->recv_status, &msg->recv_id, pint_client_sm_context,
+	    server_config->client_job_bmi_timeout);
+	PINT_put_server_config_struct(server_config);
+
+	/* ret -1: problem, do not look at msg recv_status */
+	/* ret 1: immediate completion, see status */
+	/* ret 0: okay */
+
+	if (ret < 0) {
+	    PVFS_perror_gossip("Post of receive failed", ret);
+	    js_p->error_code = ret;
+	    continue;
+
+	}
+
+	if (ret == 0) {
+	    int tmp = 0;
+	    /* perform a quick test to see if the recv failed before
+	     * posting the send; if it reports an error quickly then
+	     * we can save the confusion of sending a request for
+	     * which we can't recv a response
+	     */
+	    ret = job_test(msg->recv_id, &tmp, NULL,
+			   &msg->recv_status, 0,
+			   pint_client_sm_context);
+	    if (ret < 0) {
+		PVFS_perror_gossip("Post of receive failed", ret);
+		js_p->error_code = ret;
+		continue;
+	    }
+	}
+	
+	/* either from job_bmi_recv or from job_test finding something */
+        if (ret == 1) {
+            /*
+             * This recv must have completed with an error because the
+             * server has not yet been sent our request.
+             */
+            PVFS_perror_gossip("Receive immediately failed",
+                               msg->recv_status.error_code);
+	    
+            ret = msg->recv_status.error_code;
+            js_p->error_code = ret;
+            continue;
+        }
+	
+        cur_ctx->msg_recv_has_been_posted = 1;
+        cur_ctx->msg_recv_in_progress = 1;
+	
+        /* posted the receive okay */
+        ++sm_p->u.lock.msgpair_completion_count;
+
+      recv_already_posted:
+
+        if (cur_ctx->msg_send_has_been_posted &&
+            cur_ctx->msg_send_in_progress)
+        {
+            ++sm_p->u.lock.msgpair_completion_count;
+            continue;
+        }
+	
+        status_user_tag = ((4 * i) + LOCK_SM_PHASE_REQ_MSGPAIR_SEND);
+	
+        cur_ctx->msg_send_has_been_posted = 0;
+        cur_ctx->msg_send_in_progress = 0;
+	
+	gossip_debug(GOSSIP_LOCK_DEBUG," posting send with "
+                     "status_user_tag=%lu\n", status_user_tag);
+	
+        server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
+        ret = job_bmi_send_list(
+            msg->encoded_req.dest, msg->encoded_req.buffer_list,
+            msg->encoded_req.size_list, msg->encoded_req.list_count,
+            msg->encoded_req.total_size, cur_ctx->session_tag,
+            msg->encoded_req.buffer_type, 1, sm_p, status_user_tag,
+            &msg->send_status, &msg->send_id, pint_client_sm_context,
+            server_config->client_job_bmi_timeout);
+        PINT_put_server_config_struct(server_config);
+	
+        if (ret < 0) {
+            PVFS_perror_gossip("Post of send failed, cancelling recv", ret);
+            msg->op_status = msg->send_status.error_code;
+            msg->send_id = 0;
+            job_bmi_cancel(msg->recv_id, pint_client_sm_context);
+	    
+            js_p->error_code = ret;
+            continue;
+        }
+	
+	if (ret == 1) {
+            if (msg->send_status.error_code == 0) {
+                gossip_debug(GOSSIP_LOCK_DEBUG, 
+			     "  lock_post_msgpairs: "
+			     "send completed immediately.\n");
+		
+                /* 0 is the valid "completed job id" value */
+                cur_ctx->msg_send_has_been_posted = 1;
+                msg->send_id = 0;
+		
+            } else {
+                PVFS_perror_gossip("Send immediately failed, cancelling recv",
+				   msg->recv_status.error_code);
+		
+                msg->op_status = msg->send_status.error_code;
+                msg->send_id = 0;
+		
+                /* still wait for the recv to complete */
+                job_bmi_cancel(msg->recv_id, pint_client_sm_context);
+		
+                js_p->error_code = msg->send_status.error_code;
+                continue;
+            }
+        } else {
+            /* posted the send */
+            cur_ctx->msg_send_in_progress = 1;
+            cur_ctx->msg_send_has_been_posted = 1;
+            ++sm_p->u.lock.msgpair_completion_count;
+        }
+    }
+    
+    gossip_debug(GOSSIP_LOCK_DEBUG, "lock_post_msgpairs: "
+                 "completion count is %d\n",
+                 sm_p->u.lock.msgpair_completion_count);
+
+    /* if anything posted, just wait for that to complete, else
+     * go sleep then try the remaining msgpairs again */
+    if (sm_p->u.lock.msgpair_completion_count
+	|| sm_p->u.lock.ack_completion_count)
+        return 0;  /* means go find another machine to run */
+    else {
+        js_p->error_code = LOCK_RETRY;
+        return 1;  /* means look at error_code and run my machine again */
+    }
+}
+
+/*
+ * For lock retry, come here to sleep a bit then go back and post
+ * some more msgpairs.
+ */
+
+static int lock_post_msgpairs_retry(PINT_client_sm *sm_p,
+				    job_status_s *js_p)
+{
+    /* give up if beyond retry limit */
+    ++sm_p->u.lock.retry_count;
+    if (sm_p->u.lock.retry_count > sm_p->msgarray_params.retry_limit) {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d exceeds limit %d\n",
+		     __func__, sm_p->u.lock.retry_count, 
+		     sm_p->msgarray_params.retry_delay);
+	js_p->error_code = LOCK_TRANSFERS_COMPLETE;
+	return 1;
+    }
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d, wait %d ms\n", __func__,
+		 sm_p->u.lock.retry_count, sm_p->msgarray_params.retry_delay);
+
+    return job_req_sched_post_timer(sm_p->msgarray_params.retry_delay,
+        sm_p, 0, js_p, NULL, pint_client_sm_context);
+}
+
+/*
+  This state allows us to make sure all posted operations complete and
+  are accounted for.  since this handles ALL operation completions,
+  there's special case handling of completing the msgpair recv.  in
+  this case we post the flow operations as soon as we see them (the
+  main motivation for not using the common msgpairarray code).
+*/
+
+static int lock_complete_operations(
+    PINT_client_sm *sm_p, job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL, index = 0, i;
+    unsigned long status_user_tag = (unsigned long)
+        js_p->status_user_tag;
+    PINT_client_lock_ctx *cur_ctx = NULL;
+    PVFS_object_attr * attr;
+    int matched_send_or_recv = 0;
+
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "(%p) lock_datafile_complete_operations "
+        "(tag %lu)\n", sm_p, status_user_tag);
+
+    assert(sm_p->u.lock.msgpair_completion_count > -1);
+    assert(sm_p->u.lock.ack_completion_count > -1);
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    /* check if we're completing a send or recv msgpair */
+    if (STATUS_USER_TAG_IS_SEND_OR_RECV(status_user_tag))
+    {
+        /*
+         * The completion count might validly be zero when recovering from
+         * a cancellation.
+         */
+        if (sm_p->u.lock.msgpair_completion_count)
+        {
+            ret = lock_complete_context_send_or_recv(sm_p, js_p);
+            if (ret < 0) {
+                /* problem */
+                PVFS_perror_gossip(
+                    "io_complete_context_send_or_recv failed", ret);
+                js_p->error_code = ret;
+                return 1;
+            } else if (ret == 0) {
+                /* is a send */
+                gossip_debug(GOSSIP_LOCK_DEBUG, "  matched send in context "
+                             "%d; continuing.\n", index);
+                js_p->error_code = 0;
+                /* If send had problem, BMI will apparently ensure that the
+                 * recv will fail too, so handle the retry stuff there.
+                 */
+                return 0;
+            } else {
+                /* is a recv */
+                assert(ret == LOCK_RECV_COMPLETED);
+                matched_send_or_recv = 1;
+            }
+        }
+    }
+
+    /* if we've just completed a recv above, process the receive
+     * and post the flow if we're doing a read
+     */
+    if (ret == LOCK_RECV_COMPLETED)
+    {
+        ret = lock_process_context_recv(sm_p, js_p, &cur_ctx);
+        if (ret < 0)
+        {
+            char buf[64] = {0};
+            PVFS_strerror_r(ret, buf, 64);
+
+            gossip_debug(GOSSIP_LOCK_DEBUG,
+              "%s: lock_process_context_recv failed: "
+			 "%s (%d remaining msgpairs)\n",
+			 __func__, buf, sm_p->u.lock.msgpair_completion_count);
+
+            js_p->error_code = ret;
+            /* if recv failed, probably have to do the send again too */
+            cur_ctx->msg_send_has_been_posted = 0;
+            cur_ctx->msg_recv_has_been_posted = 0;
+            goto check_next_step;
+        }
+    }
+
+    /* check if we've completed all msgpairs and posted all flows */
+    if (matched_send_or_recv)
+    {
+        if (sm_p->u.lock.msgpair_completion_count == 0)
+        {
+            gossip_debug(GOSSIP_LOCK_DEBUG, "*** all msgpairs complete "
+                         "\n");
+        }
+        else
+        {
+            gossip_debug(
+                GOSSIP_LOCK_DEBUG, "*** %d msgpair completions "
+                "pending\n", sm_p->u.lock.msgpair_completion_count);
+        }
+    }
+
+  check_next_step:
+
+    /*
+     * If something is pending, return 0 to let SM find the next thing
+     * to do.
+     */
+
+    if (sm_p->u.lock.msgpair_completion_count
+	|| sm_p->u.lock.ack_completion_count) {
+        if (sm_p->op_cancelled)
+            gossip_debug(GOSSIP_LOCK_DEBUG, "detected lock cancellation with "
+                         " %d write acks pending\n",
+                         sm_p->u.lock.ack_completion_count);
+        else
+            gossip_debug(GOSSIP_LOCK_DEBUG, " %d acks "
+                         "pending, %d msgpair\n",
+                         sm_p->u.lock.ack_completion_count,
+                         sm_p->u.lock.msgpair_completion_count);
+        return 0;
+    }
+
+    /*
+     * Else either we've finished it all or have some msgpairs to retry
+     * that failed earlier.
+     */
+    for (i=0; i < sm_p->u.lock.datafile_count; i++) {
+        PINT_client_lock_ctx *cur_ctx = &sm_p->u.lock.contexts[i];
+        if (!cur_ctx->msg_recv_has_been_posted)
+            break;
+        if (!cur_ctx->msg_send_has_been_posted)
+            break;
+    }
+    if (i < sm_p->u.lock.datafile_count && !sm_p->op_cancelled) {
+        gossip_debug(GOSSIP_LOCK_DEBUG,
+		     "*** %s: some msgpairs to repost\n", __func__);
+        js_p->error_code = LOCK_RETRY;
+    } else {
+        gossip_debug(GOSSIP_LOCK_DEBUG, "*** all operations %s "
+                     "(msgpairs, acks)\n",
+                     (sm_p->op_cancelled ? "cancelled" : "completed"));
+        js_p->error_code = LOCK_TRANSFERS_COMPLETE;
+    }
+    return 1;
+}
+
+
+static int lock_analyze_results(PINT_client_sm *sm_p,
+				job_status_s *js_p)
+{
+    /* Now that we have all the datafile sizes,
+     * this state allows us to finish our check that the file request
+     * is not beyond EOF, and return the appropriate value for bytes
+     * read to the sysint caller.
+     *
+     * The check iterates through all the datafiles and compares
+     * their logical sizes with the upper bound of the file request.
+     * If one of the datafile's logical sizes is >= than the ub,
+     * we know the request is not past EOF.  Otherwise it must be, and
+     * the return value for bytes read is calculated from the size
+     * of the file request and the greatest logical offset of
+     * the datafiles (the actual EOF).
+     */
+    
+    PVFS_offset eof = 0;
+    PVFS_offset eor;
+    PVFS_offset filereq_ub_offset;
+    int ret;
+    PVFS_object_attr * attr;
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    ret = lock_find_offset(
+        sm_p,
+        PINT_REQUEST_TOTAL_BYTES(sm_p->u.lock.mem_req),
+        &filereq_ub_offset);
+    if(ret < 0)
+    {
+        js_p->error_code = ret;
+        goto error_exit;
+    }
+    
+    eor = filereq_ub_offset + sm_p->u.lock.file_req_offset;
+    
+    eof = attr->u.meta.dist->methods->
+	logical_file_size(
+	    attr->u.meta.dist->params,
+	    attr->u.meta.dfile_count,
+	    sm_p->u.lock.dfile_size_array);
+    if(eof > eor)
+    {
+	eor = eof;
+	
+	/* we found a logical offset that is past the end of the
+	 * request, so we know the request is not past EOF
+	 */
+/*	sm_p->u.lock.lock_resp_p->granted_bytes =
+	PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req); */
+    }
+    else
+    {
+        PVFS_size total_size;
+	
+        ret = lock_find_total_size(sm_p, eof, &total_size);
+        if(ret < 0)
+        {
+            js_p->error_code = ret;
+            goto error_exit;
+        }
+	
+        /* sm_p->u.lock.lock_resp_p->total_completed = total_size;*/
+    }
+    
+    
+    js_p->error_code = 0;
+    
+  error_exit:
+    return 1;
+}
+
+static int lock_cleanup(PINT_client_sm *sm_p,
+			job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "(%p) lock state: lock_cleanup\n", sm_p);
+
+    lock_contexts_destroy(sm_p);
+
+    lock_datafile_index_array_destroy(sm_p);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    if(sm_p->u.lock.dfile_size_array)
+    {
+        PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.lock.dfile_size_array);
+    }
+
+    sm_p->error_code = js_p->error_code;
+
+    if (sm_p->error_code)
+    {
+        char buf[64] = {0};
+        PINT_acache_invalidate(sm_p->object_ref);
+
+        PVFS_strerror_r(sm_p->error_code, buf, 64);
+        gossip_debug(GOSSIP_LOCK_DEBUG,
+                     "*** Final lock operation error is %s\n", buf);
+    }
+    
+    sm_p->op_complete = 1;
+    return 0;
+}
+
+/*******************************************************************/
+
+/*
+  returns 0 on send completion; IO_RECV_COMPLETED on recv completion,
+  and -PVFS_error on failure
+*/
+static inline int lock_complete_context_send_or_recv(
+    PINT_client_sm *sm_p,
+    job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL, index = 0;
+    unsigned long status_user_tag = 0;
+    PINT_client_lock_ctx *cur_ctx = NULL;
+    PINT_sm_msgpair_state *msg = NULL;
+
+    gossip_debug(GOSSIP_LOCK_DEBUG,
+                 "- lock_complete_context_send_or_recv called\n");
+    
+    assert(sm_p && js_p);
+    assert(sm_p->op == PVFS_SYS_LOCK);
+
+    status_user_tag = (unsigned long)js_p->status_user_tag;
+
+    if (STATUS_USER_TAG_TYPE(
+            status_user_tag, LOCK_SM_PHASE_REQ_MSGPAIR_RECV))
+    {
+        index = STATUS_USER_TAG_GET_INDEX(
+            status_user_tag, LOCK_SM_PHASE_REQ_MSGPAIR_RECV);
+
+        gossip_debug(GOSSIP_LOCK_DEBUG, "got a recv completion with "
+                     "context index %d\n", index);
+
+        cur_ctx = &sm_p->u.lock.contexts[index];
+        assert(cur_ctx);
+
+        msg = &cur_ctx->msg;
+
+        msg->recv_id = 0;
+        msg->recv_status = *js_p;
+
+        assert(msg->recv_status.error_code <= 0);
+        assert(msg->recv_status.actual_size <= msg->max_resp_sz);
+
+        cur_ctx->msg_recv_in_progress = 0;
+        sm_p->u.lock.msgpair_completion_count--;
+
+        ret = LOCK_RECV_COMPLETED;
+    }
+    else if (STATUS_USER_TAG_TYPE(
+                 status_user_tag, LOCK_SM_PHASE_REQ_MSGPAIR_SEND))
+    {
+        index = STATUS_USER_TAG_GET_INDEX(
+            status_user_tag, LOCK_SM_PHASE_REQ_MSGPAIR_RECV);
+
+        gossip_debug(GOSSIP_LOCK_DEBUG, "got a send completion with "
+                     "context index %d\n", index);
+
+        cur_ctx = &sm_p->u.lock.contexts[index];
+        assert(cur_ctx);
+
+        msg = &cur_ctx->msg;
+
+        msg->send_id = 0;
+        msg->send_status = *js_p;
+
+        assert(msg->send_status.error_code <= 0);
+
+        cur_ctx->msg_send_in_progress = 0;
+        sm_p->u.lock.msgpair_completion_count--;
+
+        ret = 0;
+    }
+    return ret;
+}
+
+static inline int lock_decode_ack_response(
+    PINT_client_lock_ctx *cur_ctx,
+    struct PINT_decoded_msg *decoded_resp,
+    struct PVFS_server_resp **resp)
+{
+    int ret = -PVFS_EINVAL;
+    
+    gossip_debug(GOSSIP_LOCK_DEBUG,  "- lock_decode_ack_response called\n");
+    assert(cur_ctx && decoded_resp && resp);
+    
+    ret = PINT_serv_decode_resp(
+	cur_ctx->msg.fs_id, cur_ctx->msg.encoded_resp_p, decoded_resp,
+        &cur_ctx->msg.svr_addr,
+        cur_ctx->msg.recv_status.actual_size, resp);
+
+    if (ret)
+    {
+	PVFS_perror("PINT_server_decode_resp failed", ret);
+	return ret;
+    }
+
+    assert((*resp)->status < 1);
+    cur_ctx->msg.op_status = (*resp)->status;
+
+    if (cur_ctx->msg.recv_status.error_code || cur_ctx->msg.op_status)
+    {
+	gossip_debug(
+	    GOSSIP_LOCK_DEBUG, "  error %d with status %d related "
+            "to response from context %p.\n",
+            cur_ctx->msg.recv_status.error_code,
+            cur_ctx->msg.op_status, cur_ctx);
+	
+        if (cur_ctx->msg.recv_status.error_code)
+        {
+            PVFS_perror_gossip(
+                "lock_decode_ack_response (recv_status.error_code)",
+                cur_ctx->msg.recv_status.error_code);
+            ret = cur_ctx->msg.recv_status.error_code;
+        }
+        else if (cur_ctx->msg.op_status)
+        {
+            PVFS_perror_gossip("lock_decode_ask_response (op_status)",
+                               cur_ctx->msg.op_status);
+            ret = cur_ctx->msg.op_status;
+        }
+
+        PINT_serv_free_msgpair_resources(
+            &cur_ctx->msg.encoded_req, cur_ctx->msg.encoded_resp_p,
+            decoded_resp, &cur_ctx->msg.svr_addr,
+            cur_ctx->msg.max_resp_sz);
+    }
+    return ret;
+}
+
+static inline int lock_check_context_status(
+    PINT_client_lock_ctx *cur_ctx, int lock_type,
+    PVFS_size *total_size)
+{
+    int ret = 0;
+    
+    gossip_debug(GOSSIP_LOCK_DEBUG,  "- lock_check_context_status called\n");
+
+    assert(cur_ctx && total_size);
+
+    if (cur_ctx->msg.send_status.error_code)
+    {
+        gossip_debug(GOSSIP_LOCK_DEBUG,
+                     "  error (%d) in msgpair send for context %p\n",
+                     cur_ctx->msg.send_status.error_code, cur_ctx);
+        ret = cur_ctx->msg.send_status.error_code;
+    }
+    else if (cur_ctx->msg.recv_status.error_code)
+    {
+        gossip_debug(GOSSIP_LOCK_DEBUG,
+                     "  error (%d) in msgpair recv for context %p\n",
+                     cur_ctx->msg.recv_status.error_code, cur_ctx);
+        ret = cur_ctx->msg.recv_status.error_code;
+    }
+    else if (lock_type == PVFS_ACQUIRE)
+    {
+	gossip_debug(
+	    GOSSIP_LOCK_DEBUG, "  %lld bytes acquired from context %p\n",
+	    cur_ctx->bytes_granted, cur_ctx);
+        *total_size += cur_ctx->bytes_granted;
+    }
+    else if (lock_type == PVFS_RELEASE)
+    {
+        gossip_debug(
+            GOSSIP_LOCK_DEBUG, "  %lld bytes released from context %p\n",
+            cur_ctx->bytes_granted, cur_ctx);
+	
+        *total_size += cur_ctx->bytes_granted;
+    }
+    
+    return ret;
+}
+
+/**
+ * process_context_recv handles the ack or nack from the server
+ * in response to the I/O request.  This is called for each I/O context
+ * i.e. each specific server response for each datafile.
+ */
+static inline int lock_process_context_recv(
+    PINT_client_sm *sm_p,
+    job_status_s *js_p,
+    PINT_client_lock_ctx **out_ctx)
+{
+    int ret = -PVFS_EINVAL, index = 0;
+    unsigned long status_user_tag = 0;
+    struct PINT_decoded_msg decoded_resp;
+    struct PVFS_server_resp *resp = NULL;
+    PINT_client_lock_ctx *cur_ctx = NULL;
+    
+    gossip_debug(GOSSIP_LOCK_DEBUG,
+                 "- io_process_context_recv called\n");
+    
+    assert(sm_p && js_p);
+    assert(STATUS_USER_TAG_TYPE(
+               status_user_tag, LOCK_SM_PHASE_REQ_MSGPAIR_RECV));
+    
+    status_user_tag = (unsigned long)js_p->status_user_tag;
+    
+    index = STATUS_USER_TAG_GET_INDEX(
+        status_user_tag, LOCK_SM_PHASE_REQ_MSGPAIR_RECV);
+    
+    cur_ctx = &sm_p->u.lock.contexts[index];
+    assert(cur_ctx);
+    *out_ctx = cur_ctx;
+    
+    if (js_p->error_code)
+    {
+        {
+	    char buf[1024];
+	    PVFS_strerror_r(js_p->error_code, buf, sizeof(buf));
+	    buf[sizeof(buf)-1] = '\0';
+	    gossip_debug(GOSSIP_LOCK_DEBUG, "%s: entered with error: %s\n",
+			 __func__, buf);
+	}
+	return js_p->error_code;
+    }
+    
+    /* decode the response from the server */
+    ret = lock_decode_ack_response(cur_ctx, &decoded_resp, &resp);
+    if (ret)
+    {
+	{
+	    char buf[1024];
+	    PVFS_strerror_r(js_p->error_code, buf, sizeof(buf));
+	    buf[sizeof(buf)-1] = '\0';
+	    gossip_debug(GOSSIP_LOCK_DEBUG, "%s: failed: %s\n", __func__, buf);
+	}
+	return ret;
+    }
+
+    /* Modify the client response based on the server response. */
+    sm_p->u.lock.lock_resp_p->lock_id = resp->u.lock.lock_id; 
+    sm_p->u.lock.lock_resp_p->bstream_size = resp->u.lock.bstream_size;
+    sm_p->u.lock.lock_resp_p->granted_bytes +=resp->u.lock.granted_bytes;
+
+    /* save the datafile size */
+    sm_p->u.lock.dfile_size_array[cur_ctx->index] = resp->u.io.bstream_size;
+
+    /* now we can destroy I/O request response resources */
+    ret = PINT_serv_free_msgpair_resources(
+        &cur_ctx->msg.encoded_req, cur_ctx->msg.encoded_resp_p,
+        &decoded_resp, &cur_ctx->msg.svr_addr,
+        cur_ctx->msg.max_resp_sz);
+
+    if (ret)
+    {
+        PVFS_perror_gossip("PINT_serv_free_msgpair_resources "
+                           "failed", ret);
+        return ret;
+    }
+    
+    return ret;
+}
+
+
+/*
+  determines what subset of the datafiles actually contain data that
+  we are interested in for this request. returns 0 on success,
+  -PVFS_error on failure
+*/
+
+static int lock_find_target_datafiles(
+    PVFS_Request mem_req,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PINT_dist *dist_p,
+    PVFS_handle *input_handle_array,
+    int input_handle_count,
+    int *handle_index_array,
+    int *handle_index_out_count)
+{
+    int ret = -PVFS_EINVAL, i = 0;
+    struct PINT_Request_state *req_state = NULL;
+    struct PINT_Request_state *mem_req_state = NULL;
+    PINT_request_file_data tmp_file_data;
+    PINT_Request_result tmp_result;
+
+    gossip_debug(GOSSIP_LOCK_DEBUG, "- lock_find_target_datafiles called\n");
+    
+    if (!handle_index_array || !handle_index_out_count)
+    {
+	gossip_err("  invalid handle_index_array or handle_index_out_count\n");
+	return ret;
+    }
+    *handle_index_out_count = 0;
+    
+    req_state = PINT_new_request_state(file_req);
+    if (!req_state)
+    {
+	return -PVFS_ENOMEM;
+    }
+    mem_req_state = PINT_new_request_state(mem_req);
+    if (!mem_req_state)
+    {
+	PINT_free_request_state(req_state);
+	return -PVFS_ENOMEM;
+    }
+    
+    tmp_file_data.dist = dist_p;
+    tmp_file_data.server_ct = input_handle_count;
+    tmp_file_data.extend_flag = 1;
+
+    /* for each datafile handle, calculate the unexp request or
+     * response size (may be different for each server), and then
+     * calculate if any data exists on that server (in the case of
+     * reads) or if any data should be written (in the case of
+     * writes).
+     */
+
+    for (i = 0; i < input_handle_count; i++)
+    {
+	/* NOTE: we don't have to give an accurate file size here, as
+         * long as we set the extend flag to tell the I/O req
+         * processor to continue past eof if needed
+         */
+	tmp_file_data.fsize = 0;
+	tmp_file_data.server_nr = i;
+
+	PINT_REQUEST_STATE_RESET(req_state);
+	PINT_REQUEST_STATE_RESET(mem_req_state);
+	
+	/* if a file datatype offset was specified, go ahead and skip
+         * ahead before calculating
+         */
+        if (file_req_offset)
+        {
+            PINT_REQUEST_STATE_SET_TARGET(req_state, file_req_offset);
+        }
+	
+        PINT_REQUEST_STATE_SET_FINAL(req_state,
+	    file_req_offset+PINT_REQUEST_TOTAL_BYTES(mem_req));
+
+        memset(&tmp_result, 0, sizeof(PINT_Request_result));
+        tmp_result.bytemax = 1;
+        tmp_result.segmax = 1;
+
+	/* PINT_process_request() returns number of bytes processed */
+	ret = PINT_process_request(
+	    req_state, mem_req_state, &tmp_file_data,
+	    &tmp_result, PINT_CKSIZE);
+	if (ret < 0)
+	{
+	    PINT_free_request_state(mem_req_state);
+	    PINT_free_request_state(req_state);
+	    return ret;
+	}
+	    
+        /* check if we found data that belongs to this handle */
+        if (tmp_result.bytes != 0)
+        {
+	    assert(tmp_result.bytes > 0);
+
+            handle_index_array[(*handle_index_out_count)++] = i;
+
+            gossip_debug(GOSSIP_LOCK_DEBUG, "%s: "
+                         "datafile[%d] might have data (out=%d)\n",
+                         __func__, i, *handle_index_out_count);
+        }
+    }
+    PINT_free_request_state(req_state);
+    PINT_free_request_state(mem_req_state);
+    
+    return 0;
+}
+
+/* If there are no datafiles that have a logical
+ * offset past the upper bound of the file request, we know that
+ * the request is beyond the EOF of the file.  We compute
+ * the return value for bytes read by finding the upper bound of the
+ * memory request *within* the logical file (before EOF).  This is
+ * the end of the contiguous segment in the file request < EOF.
+ * The number of bytes read is then the length of the file request
+ * from start to this point.
+ */
+
+static int lock_find_total_size(
+    PINT_client_sm * sm_p,
+    PVFS_offset final_offset,
+    PVFS_size * total_return_size)
+{
+    int res;
+    PVFS_offset current_offset;
+    PVFS_offset offsets[LOCK_MAX_SEGMENT_NUM];
+    PVFS_size sizes[LOCK_MAX_SEGMENT_NUM];
+    PINT_Request_state * filereq_state;
+    PINT_Request_state * memreq_state;
+    PINT_request_file_data rfdata;
+    PINT_Request_result result;
+    PVFS_size total_size = 0;
+    PVFS_object_attr * attr;
+    int index = 0;
+
+    /* if the final offset is zero, then the file size is zero */
+    if(final_offset == 0)
+    {
+        *total_return_size = 0;
+        return 0;
+    }
+
+    attr = &sm_p->getattr.attr;
+
+    filereq_state = PINT_new_request_state(sm_p->u.lock.file_req);
+    memreq_state = PINT_new_request_state(sm_p->u.lock.mem_req);
+
+    rfdata.server_nr = 0;
+    rfdata.server_ct = 1;
+    rfdata.fsize = final_offset;
+    rfdata.dist = attr->u.meta.dist;
+    rfdata.extend_flag = 0;
+
+    result.offset_array = offsets;
+    result.size_array = sizes;
+    result.segmax = LOCK_MAX_SEGMENT_NUM;
+    result.bytemax = final_offset;
+
+    PINT_REQUEST_STATE_SET_FINAL(
+        filereq_state, final_offset);
+    
+    do
+    {
+        result.segs = 0;
+        result.bytes = 0;
+	
+        res = PINT_process_request(filereq_state, memreq_state,
+                                   &rfdata, &result, PINT_SERVER);
+        if(res < 0)
+        {
+            goto exit;
+        }
+	
+        for(index = 0; index < result.segs; ++index)
+        {
+            current_offset = sm_p->u.lock.file_req_offset + offsets[index];
+            if((final_offset >= current_offset) &&
+               (final_offset <= (current_offset + sizes[index])))
+            {
+                total_size += (final_offset - current_offset);
+                break;
+            }
+            else if(final_offset < current_offset)
+            {
+                break;
+            }
+            else
+            {
+                total_size += sizes[index];
+            }
+        }
+
+    } while(!PINT_REQUEST_DONE(filereq_state) && result.segs);
+
+    *total_return_size = total_size;
+
+  exit:
+
+    PINT_free_request_state(filereq_state);
+    PINT_free_request_state(memreq_state);
+    return 0;
+}
+
+/* computes the logical offset in the file request from the size
+ * of contiguous buffer.  This function acts only on the file request
+ * since the actual size of the file doesn't matter.
+ */
+
+static int lock_find_offset(
+    PINT_client_sm * sm_p,
+    PVFS_size contig_size,
+    PVFS_offset * total_return_offset)
+{
+    PINT_Request_state * filereq_state;
+    PINT_Request_state * memreq_state;
+    PINT_request_file_data rfdata;
+    PINT_Request_result result;
+    int res;
+    PVFS_offset offsets[LOCK_MAX_SEGMENT_NUM];
+    PVFS_size sizes[LOCK_MAX_SEGMENT_NUM];
+    PVFS_offset total_offset = 0;
+    PVFS_size total_size = 0;
+    PVFS_object_attr * attr;
+    int index = 0;
+
+    attr = &sm_p->getattr.attr;
+
+    filereq_state = PINT_new_request_state(sm_p->u.lock.file_req);
+    memreq_state = PINT_new_request_state(sm_p->u.lock.mem_req);
+
+    rfdata.server_nr = 0;
+    rfdata.server_ct = 1;
+    rfdata.fsize = 0;
+    rfdata.dist = attr->u.meta.dist;
+    rfdata.extend_flag = 1;
+
+    result.offset_array = offsets;
+    result.size_array = sizes;
+    result.segmax = LOCK_MAX_SEGMENT_NUM;
+    result.bytemax = contig_size;
+
+    PINT_REQUEST_STATE_SET_FINAL(
+        filereq_state, contig_size);
+    do
+    {
+        result.segs = 0;
+        result.bytes = 0;
+
+        res = PINT_process_request(filereq_state, memreq_state,
+                                   &rfdata, &result, PINT_SERVER);
+        if(res < 0)
+        {
+            PINT_free_request_state(filereq_state);
+            PINT_free_request_state(memreq_state);
+            return res;
+        }
+
+        for(index = 0; index < result.segs; ++index)
+        {
+            if(contig_size <= (total_size + sizes[index]))
+            {
+                total_offset = offsets[index] + (contig_size - total_size);
+                break;
+            }
+            else
+            {
+                total_offset = offsets[index] + sizes[index];
+                total_size += sizes[index];
+            }
+        }
+
+    } while(!PINT_REQUEST_DONE(filereq_state) && result.segs);
+
+    *total_return_offset = total_offset;
+
+    PINT_free_request_state(filereq_state);
+    PINT_free_request_state(memreq_state);
+    return 0;
+}
+    
+static int lock_datafile_index_array_init(
+    PINT_client_sm *sm_p,
+    int datafile_count)
+{
+    sm_p->u.lock.datafile_index_array = 
+	(int *) malloc(datafile_count * sizeof(int));
+    if (!(sm_p->u.lock.datafile_index_array))
+    {
+	return -PVFS_ENOMEM;
+    }
+    
+    memset(sm_p->u.lock.datafile_index_array, 0,
+	   datafile_count * sizeof(int));
+    sm_p->u.lock.datafile_count = datafile_count;
+    return 0;
+}
+
+static void lock_datafile_index_array_destroy(
+    PINT_client_sm *sm_p)
+{
+    free(sm_p->u.lock.datafile_index_array);
+    sm_p->u.lock.datafile_index_array = NULL;
+    sm_p->u.lock.datafile_count = 0;
+}
+
+static int lock_contexts_init(
+    PINT_client_sm *sm_p,
+    int context_count,
+    PVFS_object_attr *attr)
+{
+    int ret;
+    int i = 0;
+
+    sm_p->u.lock.contexts = (PINT_client_lock_ctx *)malloc(
+        context_count * sizeof(PINT_client_lock_ctx));
+    if(!sm_p->u.lock.contexts)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    memset(sm_p->u.lock.contexts, 0,
+           (context_count * sizeof(PINT_client_lock_ctx)));
+    sm_p->u.lock.context_count = context_count;
+
+    for(i = 0; i < context_count; ++i)
+    {
+        PINT_client_lock_ctx * cur_ctx = &sm_p->u.lock.contexts[i];
+        PINT_sm_msgpair_state *msg = &cur_ctx->msg;
+
+        msg->fs_id = sm_p->object_ref.fs_id;
+        msg->handle =
+            attr->u.meta.dfile_array[
+                sm_p->u.lock.datafile_index_array[i]];
+        msg->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+        msg->comp_fn = NULL;
+
+        ret = PINT_cached_config_map_to_server(
+            &msg->svr_addr, msg->handle, msg->fs_id);
+        if(ret)
+        {
+            gossip_err("Failed to map meta server address\n");
+            free(sm_p->u.lock.contexts);
+            return ret;
+        }
+
+        gossip_debug(GOSSIP_LOCK_DEBUG, "initializing context[%d] %p\n",
+                     i, cur_ctx);
+
+        cur_ctx->index = i;
+        cur_ctx->server_nr = sm_p->u.lock.datafile_index_array[i];
+        cur_ctx->data_handle =
+            attr->u.meta.dfile_array[cur_ctx->server_nr];
+    }
+
+    return 0;
+}
+
+static void lock_contexts_destroy(PINT_client_sm *sm_p)
+{
+    free(sm_p->u.lock.contexts);
+    sm_p->u.lock.contexts = NULL;
+    sm_p->u.lock.context_count = 0;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
