@@ -104,7 +104,8 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
                               TROVE_ds_flags flags,
                               void *user_ptr,
                               TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p)
+                              TROVE_op_id *out_op_id_p,
+                              PVFS_hint * hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -147,6 +148,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         extent_array->extent_count;
     op_p->u.d_create.extent_array.extent_array =
         malloc(extent_array->extent_count * sizeof(TROVE_extent));
+    op_p->hints = hints;
 
     if (op_p->u.d_create.extent_array.extent_array == NULL)
     {
@@ -336,7 +338,8 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
                               TROVE_ds_flags flags,
                               void *user_ptr,
                               TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p)
+                              TROVE_op_id *out_op_id_p,
+                              PVFS_hint * hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -365,6 +368,8 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     {
         return ret;
     }
+   /* initialize op-specific members */
+    op_p->hints = hints;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
@@ -657,7 +662,8 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
                               TROVE_ds_flags flags,
                               void *user_ptr,
                               TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p)
+                              TROVE_op_id *out_op_id_p,
+                              PVFS_hint * hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -689,6 +695,7 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
     }
 
    /* initialize op-specific members */
+    op_p->hints = hints;
     op_p->u.d_verify.type_p = type_p;
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
@@ -743,7 +750,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
                                TROVE_ds_flags flags,
                                void *user_ptr,
                                TROVE_context_id context_id,
-                               TROVE_op_id *out_op_id_p)
+                               TROVE_op_id *out_op_id_p,
+                               PVFS_hint * hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -801,6 +809,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 
    /* initialize op-specific members */
     op_p->u.d_getattr.attr_p = ds_attr_p;
+    op_p->hints = hints;
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
@@ -813,7 +822,8 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
                                TROVE_ds_flags flags,
                                void *user_ptr,
                                TROVE_context_id context_id,
-                               TROVE_op_id *out_op_id_p)
+                               TROVE_op_id *out_op_id_p,
+                               PVFS_hint * hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -882,7 +892,8 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
     q_op_p->op.u.d_getattr_list.handle_array = &handle_array[i];
     q_op_p->op.u.d_getattr_list.attr_p = &ds_attr_p[i];
     q_op_p->op.u.d_getattr_list.error_p = &error_array[i];
-
+    q_op_p->op.hints = hints;
+    
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
@@ -895,7 +906,8 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
                                TROVE_ds_flags flags,
                                void *user_ptr,
                                TROVE_context_id context_id,
-                               TROVE_op_id *out_op_id_p)
+                               TROVE_op_id *out_op_id_p,
+                               PVFS_hint * hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -927,6 +939,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 
    /* initialize op-specific members */
     op_p->u.d_setattr.attr_p = ds_attr_p;
+    op_p->hints = hints;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
