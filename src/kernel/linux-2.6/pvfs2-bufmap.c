@@ -376,7 +376,7 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, size_t size)
 
         if (ret)
         {
-            gossip_debug(GOSSIP_BUFMAP_DEBUG, "Failed to copy data to user space %d\n", ret);
+            gossip_debug(GOSSIP_BUFMAP_DEBUG, "Failed to copy data to user space %zd\n", ret);
             return -EFAULT;
         }
 
