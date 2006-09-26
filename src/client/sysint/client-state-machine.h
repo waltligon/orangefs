@@ -154,6 +154,77 @@ typedef struct
     /* a reference to the msgpair we're using for communication */
     PINT_sm_msgpair_state msg;
 
+    /* First 'x' amount of bytes granted to the lock */
+    PVFS_size bytes_granted;
+    PVFS_msg_tag_t session_tag;
+
+    PINT_client_sm_recv_state req_ack;
+
+    /*
+      all *_has_been_posted fields are used at lock_analyze_results time
+      to know if we should be checking for errors on particular fields
+    */
+    int msg_send_has_been_posted;
+    int msg_recv_has_been_posted;
+    int write_ack_has_been_posted;
+
+    /*
+      all *_in_progress fields are used at cancellation time to
+      determine what operations are currently in flight
+    */
+    int msg_send_in_progress;
+    int msg_recv_in_progress;
+    int write_ack_in_progress;
+
+} PINT_client_lock_ctx;
+
+struct PINT_client_lock_sm
+{
+    /* input parameters */
+    enum PVFS_io_type io_type;
+    enum PVFS_lock_type lock_type;
+    PVFS_Request file_req;
+    PVFS_offset file_req_offset;
+    PVFS_Request mem_req;
+
+    /* output parameter */
+    PVFS_sysresp_lock *lock_resp_p;
+
+    enum PVFS_encoding_type encoding;
+
+    int *datafile_index_array;
+    int datafile_count;
+
+    int msgpair_completion_count;
+    int ack_completion_count;
+
+    PINT_client_lock_ctx *contexts;
+    int context_count;
+
+    int total_cancellations_remaining;
+
+    int retry_count;
+    int stored_error_code;
+
+    PVFS_size total_size;
+
+    PVFS_size * dfile_size_array;
+};
+
+typedef struct
+{
+    /* the index of the current context (in the context array) */
+    int index;
+
+    /* the metafile's dfile server index we're communicating with */
+    int server_nr;
+
+    /* the data handle we're responsible for doing I/O on */
+    PVFS_handle data_handle;
+
+    /* a reference to the msgpair we're using for communication */
+    PINT_sm_msgpair_state msg;
+
     job_id_t flow_job_id;
     job_status_s flow_status;
     flow_descriptor flow_desc;
@@ -510,6 +581,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_symlink_sm sym;
 	struct PINT_client_getattr_sm getattr;
 	struct PINT_client_setattr_sm setattr;
+	struct PINT_client_lock_sm lock;
 	struct PINT_client_io_sm io;
 	struct PINT_client_flush_sm flush;
 	struct PINT_client_readdir_sm readdir;
@@ -606,6 +678,7 @@ enum
     PVFS_SYS_SMALL_IO              = 17,
     PVFS_SYS_STATFS                = 18,
     PVFS_SYS_FS_ADD                = 19,
+    PVFS_SYS_LOCK                  = 20,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -725,6 +798,7 @@ extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_lock_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
