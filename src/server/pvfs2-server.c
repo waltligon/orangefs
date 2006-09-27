@@ -43,6 +43,7 @@
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
 #include "pvfs2-internal.h"
+#include "lock-storage.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -405,7 +406,14 @@ struct PINT_server_req_params PINT_server_req_table[] =
         "small_io",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_small_io_sm}
+     &pvfs2_small_io_sm},
+
+    /* 34 */
+    {PVFS_SERV_LOCK,
+     "lock",
+     PINT_SERVER_CHECK_NONE,
+     PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+     &pvfs2_lock_sm}
 };
 
 struct server_configuration_s *PINT_get_server_config(void)
@@ -1321,6 +1329,14 @@ static int server_initialize_subsystems(
         return (ret);
     }
     *server_status_flag |= SERVER_EVENT_INIT;
+
+    /* initialize the lock table */
+    ret = init_lock_file_table();
+    if (ret < 0)
+    {
+	gossip_err("Error initializing the lock inteface\n");
+	return ret;
+    }
 
     return ret;
 }

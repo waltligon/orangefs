@@ -274,6 +274,11 @@ struct PINT_server_getconfig_op
                   * processing */
 };
 
+struct PINT_server_lock_op
+{
+    PVFS_id_gen_t lock_id;
+};
+
 struct PINT_server_io_op
 {
     flow_descriptor* flow_d;
@@ -455,6 +460,7 @@ extern struct PINT_state_machine_s pvfs2_crdirent_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_lookup_sm;
+extern struct PINT_state_machine_s pvfs2_lock_sm;
 extern struct PINT_state_machine_s pvfs2_io_sm;
 extern struct PINT_state_machine_s pvfs2_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_remove_sm;
