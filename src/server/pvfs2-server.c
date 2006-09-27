@@ -1348,8 +1348,10 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_PERF_COUNTER_INIT;
 #endif
 
+    /* start logging if start_event is specified in the event logging list */
     ret = PINT_event_initialize(PINT_EVENT_DEFAULT_RING_SIZE, 
-        server_config.event_logging[0] != 0);
+        (server_config.event_logging[0] != 0 && 
+        strstr(server_config.event_logging,"start_event_logging") != 0) );
     if (ret < 0)
     {
         gossip_err("Error initializing event interface.\n");
