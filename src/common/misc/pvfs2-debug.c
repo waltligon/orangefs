@@ -33,7 +33,7 @@ GOSSIP_SETATTR_DEBUG | GOSSIP_MKDIR_DEBUG |                       \
 GOSSIP_SETEATTR_DEBUG | GOSSIP_GETEATTR_DEBUG |                   \
 GOSSIP_LISTEATTR_DEBUG | GOSSIP_DBPF_KEYVAL_DEBUG |               \
 GOSSIP_ACCESS_DEBUG | GOSSIP_ACCESS_DETAIL_DEBUG |                \
-GOSSIP_PERFCOUNTER_DEBUG)
+GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_LOCK_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -115,6 +115,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "keyval", GOSSIP_DBPF_KEYVAL_DEBUG },
     /* Debug the metadata sync coalescing code */
     { "coalesce", GOSSIP_DBPF_COALESCE_DEBUG },
+    /* Debug the lock syscall */
+    { "lock", GOSSIP_LOCK_DEBUG},
     /* Everything except the perf counter.  Useful for debugging */
     { "verbose",  (__DEBUG_ALL & ~GOSSIP_PERFCOUNTER_DEBUG)},
     /* No debug output */
