@@ -712,6 +712,15 @@ typedef struct
 PVFS_error_details *PVFS_error_details_new(int count);
 void PVFS_error_details_free(PVFS_error_details *details);
 
+/* PVFS lock operation types, used in both system and server
+ * interfaces. */
+
+enum PVFS_lock_type
+{
+    PVFS_ACQUIRE = 1,
+    PVFS_RELEASE = 2
+};
+
 /** PVFS I/O operation types, used in both system and server interfaces.
  */
 enum PVFS_io_type
