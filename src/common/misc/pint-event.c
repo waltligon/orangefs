@@ -127,7 +127,7 @@ void PINT_event_init_mpe_log_file(void)
             "white", "value=%l");
     }
 
-    formatString ="comm:%d,call-id:%d,op=%d,value=%l"; /*,job-id=%l*/
+    formatString ="comm:%d,rank:%d,cid:%d,op=%d,value=%l"; /*,job-id=%l*/
 #else 
     formatString ="";
 #endif
@@ -502,6 +502,7 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 
     /* now log stuff to bytebuffer */
     MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &comm );
+    MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &rank );    
     MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &call_id );
     /* MPE_Log_pack( bytebuf, &bytebuf_pos, 's', strlen(io_type), io_type ); */    
 
