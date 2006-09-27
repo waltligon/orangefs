@@ -171,7 +171,7 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
      */     
 #if defined(HAVE_MPE)
     for(i=0; i < PINT_server_pc->key_count; i++){
-        if(current_mask & GOSSIP_PERFCOUNTER_DEBUG)
+        if(current_debug_on)
         { 
             PINT_event_timestamp(PVFS_EVENT_API_PERFORMANCE_COUNTER, i, 
                 PINT_server_pc->value_matrix[i][0], 

@@ -9,6 +9,7 @@
 #include <sys/time.h>
 
 #include <stdio.h>
+#include <assert.h>
 
 #include "pint-event.h"
 #include "pvfs2-types.h"
@@ -441,7 +442,7 @@ void __PINT_event_mpe(enum PVFS_event_api api,
     if(api == PVFS_EVENT_API_PERFORMANCE_COUNTER){
         MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &value );
 
-        if(operation > PINT_event_perf_counter_keys) return;
+        assert(operation <= PINT_event_perf_counter_keys);
         MPE_Log_event(PINT_event_perf_counter_update[operation], 0, bytebuf);
         return;
     }    
