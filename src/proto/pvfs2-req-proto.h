@@ -73,6 +73,7 @@ enum PVFS_server_op
     PVFS_SERV_DELEATTR = 31,
     PVFS_SERV_LISTEATTR = 32,
     PVFS_SERV_SMALL_IO = 33,
+    PVFS_SERV_LOCK = 34,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -773,6 +774,111 @@ endecode_fields_1_struct(
     PVFS_servresp_statfs,
     PVFS_statfs, stat)
 
+/* lock req - Makes a request to I/O servers to lock/unlock file
+ * regions
+ */
+struct PVFS_servreq_lock
+{
+    PVFS_handle handle;        /* target datafile */
+    PVFS_fs_id fs_id;          /* file system */
+    /* type of I/O operation to perform */
+    enum PVFS_io_type io_type; /* enum defined in pvfs2-types.h */
+
+    /* type of lock operation to perform */
+    enum PVFS_lock_type lock_type; /* enum defined in pvfs2-types.h */
+
+    /* relative number of this I/O server in distribution */
+    uint32_t server_nr;
+    /* total number of I/O servers involved in distribution */
+    uint32_t server_ct;
+
+    /* distribution */
+    PINT_dist *io_dist;
+    /* file datatype */
+    struct PINT_Request * file_req;
+    /* offset into file datatype */
+    PVFS_offset file_req_offset;
+    /* aggregate size of data to transfer */
+    PVFS_size aggregate_size;
+};
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servreq_lock(pptr,x) do { \
+    encode_PVFS_handle(pptr, &(x)->handle); \
+    encode_PVFS_fs_id(pptr, &(x)->fs_id); \
+    encode_skip4(pptr,); \
+    encode_enum(pptr, &(x)->io_type); \
+    encode_enum(pptr, &(x)->lock_type); \
+    encode_uint32_t(pptr, &(x)->server_nr); \
+    encode_uint32_t(pptr, &(x)->server_ct); \
+    encode_PINT_dist(pptr, &(x)->io_dist); \
+    encode_PINT_Request(pptr, &(x)->file_req); \
+    encode_PVFS_offset(pptr, &(x)->file_req_offset); \
+    encode_PVFS_size(pptr, &(x)->aggregate_size); \
+} while (0)
+#define decode_PVFS_servreq_lock(pptr,x) do { \
+    decode_PVFS_handle(pptr, &(x)->handle); \
+    decode_PVFS_fs_id(pptr, &(x)->fs_id); \
+    decode_skip4(pptr,); \
+    decode_enum(pptr, &(x)->io_type); \
+    decode_enum(pptr, &(x)->lock_type); \
+    decode_uint32_t(pptr, &(x)->server_nr); \
+    decode_uint32_t(pptr, &(x)->server_ct); \
+    decode_PINT_dist(pptr, &(x)->io_dist); \
+    decode_PINT_Request(pptr, &(x)->file_req); \
+    PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
+    decode_PVFS_offset(pptr, &(x)->file_req_offset); \
+    decode_PVFS_size(pptr, &(x)->aggregate_size); \
+} while (0)
+/* could be huge, limit to max ioreq size beyond struct itself */
+#define extra_size_PVFS_servreq_lock roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES) \
+  + roundup8(PVFS_REQ_LIMIT_PINT_REQUEST_NUM * sizeof(PINT_Request))
+#endif
+
+#define PINT_SERVREQ_LOCK_FILL(__req,                   \
+                               __creds,                 \
+                               __fsid,                  \
+                               __handle,                \
+                               __io_type,               \
+                               __lock_type,             \
+                               __datafile_nr,           \
+                               __datafile_ct,           \
+                               __io_dist,               \
+                               __file_req,              \
+                               __file_req_off,          \
+                               __aggregate_size)        \
+do {                                                    \
+    memset(&(__req), 0, sizeof(__req));                 \
+    (__req).op                 = PVFS_SERV_LOCK;        \
+    (__req).credentials        = (__creds);             \
+    (__req).u.lock.fs_id         = (__fsid);            \
+    (__req).u.lock.handle        = (__handle);          \
+    (__req).u.lock.io_type       = (__io_type);         \
+    (__req).u.lock.lock_type       = (__lock_type);     \
+    (__req).u.lock.server_nr       = (__datafile_nr);   \
+    (__req).u.lock.server_ct     = (__datafile_ct);     \
+    (__req).u.lock.io_dist       = (__io_dist);         \
+    (__req).u.lock.file_req        = (__file_req);      \
+    (__req).u.lock.file_req_offset = (__file_req_off);  \
+    (__req).u.lock.aggregate_size  = (__aggregate_size);\
+} while (0)
+
+/* Lock server resp is the size of the bstream and the lock_id.  */
+
+struct PVFS_servresp_lock
+{
+    PVFS_id_gen_t lock_id; /* unique lock request ID */
+    enum PVFS_lock_type lock_type;
+    PVFS_size bstream_size;  /* size of datafile */
+    PVFS_size granted_bytes; /* amount of locks immediately granted */
+};
+
+endecode_fields_4_struct(
+    PVFS_servresp_lock,
+    PVFS_id_gen_t, lock_id,
+    enum, lock_type,
+    PVFS_size, bstream_size,
+    PVFS_size, granted_bytes)
+
 /* io **********************************************************/
 /* - performs a read or write operation */
 
@@ -1452,6 +1558,7 @@ struct PVFS_server_req
     {
         struct PVFS_servreq_create create;
         struct PVFS_servreq_remove remove;
+	struct PVFS_servreq_lock lock;
         struct PVFS_servreq_io io;
         struct PVFS_servreq_getattr getattr;
         struct PVFS_servreq_setattr setattr;
@@ -1511,6 +1618,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_rmdirent rmdirent;
         struct PVFS_servresp_chdirent chdirent;
         struct PVFS_servresp_getconfig getconfig;
+	struct PVFS_servresp_lock lock;
         struct PVFS_servresp_io io;
         struct PVFS_servresp_write_completion write_completion;
         struct PVFS_servresp_statfs statfs;
