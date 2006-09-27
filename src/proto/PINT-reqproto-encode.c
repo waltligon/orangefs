@@ -250,6 +250,9 @@ int PINT_decode(void* input_buffer,
 		tmp_req = target_msg->buffer;
 		ENCODE_EVENT_STOP(PVFS_EVENT_API_DECODE_REQ,
 		    tmp_req->op, input_buffer, size);
+        
+        PINT_event_timestamp_hint(PVFS_EVENT_API_DECODE_UNEXPECTED, tmp_req->op, size,
+                 0, PVFS_EVENT_FLAG_NONE, tmp_req->hints);
 		return(ret);
 	    }
 	    else if(input_type == PINT_DECODE_RESP)

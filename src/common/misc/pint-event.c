@@ -324,7 +324,8 @@ void __PINT_event_timestamp(enum PVFS_event_api api,
 			    int32_t operation,
 			    int64_t value,
 			    PVFS_id_gen_t id,
-			    int8_t flags)
+			    int8_t flags,
+                PVFS_hint * hints)
 {
     gen_mutex_lock(&event_mutex);
 
@@ -333,7 +334,7 @@ void __PINT_event_timestamp(enum PVFS_event_api api,
 #endif
 
 #if defined (HAVE_MPE)
-    __PINT_event_mpe(api, operation, value, id, flags);
+    __PINT_event_mpe(api, operation, value, id, flags, hints);
 #endif
 
     __PINT_event_default(api, operation, value, id, flags);
@@ -422,10 +423,18 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 		      int32_t operation,
 		      int64_t value,
 		      PVFS_id_gen_t id,
-		      int8_t flags)
+		      int8_t flags,
+              PVFS_hint * hints)
 {
     MPE_LOG_BYTES  bytebuf;      /* buffer for logging of flags */
     int    bytebuf_pos = 0;
+    const char * request_id;
+    
+    request_id = PVFS_get_hint( hints, REQUEST_ID);
+    if(request_id != NULL){
+        /* TODO */
+        /* gossip_err("EVENT request ID received: %s\n", request_id); */
+    }        
 
 #ifdef MPE_EXTENDED_LOGGING
     if(api == PVFS_EVENT_API_PERFORMANCE_COUNTER){

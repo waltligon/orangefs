@@ -100,6 +100,7 @@ struct job_desc
     struct PINT_thread_mgr_bmi_callback bmi_callback;  /* callback information */
     struct PINT_thread_mgr_trove_callback trove_callback;  /* callback information */
     enum PVFS_event_op event_type;
+    PVFS_hint * hints;
 
     /* union of information for lower level interfaces */
     union

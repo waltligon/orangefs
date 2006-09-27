@@ -35,7 +35,8 @@ void __PINT_event_timestamp(enum PVFS_event_api api,
 			    int32_t operation,
 			    int64_t value,
 			    PVFS_id_gen_t id,
-			    int8_t flags);
+			    int8_t flags,
+                PVFS_hint * hints);
 
 #if defined(HAVE_PABLO)
 #include "SystemDepend.h"
@@ -66,7 +67,8 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 		      int32_t operation,
 		      int64_t value,
 		      PVFS_id_gen_t id,
-		      int8_t flags);
+		      int8_t flags,
+              PVFS_hint * hints);
 
 #endif
 
@@ -82,13 +84,24 @@ void __PINT_event_default(enum PVFS_event_api api,
 #ifdef __PVFS2_DISABLE_EVENT__
 #define PINT_event_timestamp(__api, __operation, __value, __id, __flags) \
     do {} while(0)
+#define PINT_event_timestamp_hint(__api, __operation, __value, __id, __flags,
+     __hint) \
+    do {} while(0)    
 #else
 #define PINT_event_timestamp(__api, __operation, __value, __id, __flags) \
     do { \
 	if(PINT_event_on && (PINT_event_api_mask & (__api)) && \
 	    ((PINT_event_op_mask & (__operation))||((__operation)==0))){\
 	    __PINT_event_timestamp((__api), (__operation), (__value), (__id), \
-	    (__flags)); }\
+	    (__flags), NULL); }\
+    } while(0)
+#define PINT_event_timestamp_hint(__api, __operation, __value, __id, __flags,\
+     __hint) \
+    do { \
+    if(PINT_event_on && (PINT_event_api_mask & (__api)) && \
+        ((PINT_event_op_mask & (__operation))||((__operation)==0))){\
+        __PINT_event_timestamp((__api), (__operation), (__value), (__id), \
+        (__flags), __hint); }\
     } while(0)
 #endif
 
