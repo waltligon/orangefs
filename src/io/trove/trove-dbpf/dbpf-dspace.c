@@ -51,7 +51,7 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 
 static inline void organize_post_op_statistics(
-    enum dbpf_op_type op_type, TROVE_op_id op_id)
+    enum dbpf_op_type op_type, TROVE_op_id op_id, PVFS_hint * hints)
 {
     switch(op_type)
     {
@@ -74,16 +74,16 @@ static inline void organize_post_op_statistics(
             UPDATE_PERF_METADATA_READ();
             break;
         case BSTREAM_READ_LIST:
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, op_id); 
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, op_id, hints); 
             break;
         case BSTREAM_WRITE_LIST:
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, op_id); 
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, op_id, hints); 
             break;
         default:
             break;
         case DSPACE_CREATE:
             UPDATE_PERF_METADATA_WRITE();
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, op_id); 
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, op_id, hints); 
             break;
     }
 }
@@ -141,7 +141,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, op_p->id);
+    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, op_p->id, hints);
 
     /* this array is freed in dbpf-op.c:dbpf_queued_op_free */
     op_p->u.d_create.extent_array.extent_count =
@@ -1385,7 +1385,8 @@ static int dbpf_dspace_test(
             *returned_user_ptr_p = cur_op->op.user_ptr;
         }
 
-        organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
+        organize_post_op_statistics(cur_op->op.type, cur_op->op.id, 
+            cur_op->op.hints);
         dbpf_queued_op_free(cur_op);
         return 1;
     }
@@ -1428,7 +1429,8 @@ static int dbpf_dspace_test(
             *returned_user_ptr_p = cur_op->op.user_ptr;
         }
 
-        organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
+        organize_post_op_statistics(cur_op->op.type, cur_op->op.id, 
+            cur_op->op.hints);
         dbpf_queued_op_put_and_dequeue(cur_op);
         dbpf_queued_op_free(cur_op);
         return 1;
@@ -1526,7 +1528,8 @@ static int dbpf_dspace_testcontext(
         }
         ds_id_array[out_count] = cur_op->op.id;
 
-        organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
+        organize_post_op_statistics(cur_op->op.type, cur_op->op.id, 
+            cur_op->op.hints);
         dbpf_queued_op_free(cur_op);
 
         out_count++;
@@ -1637,7 +1640,8 @@ static int dbpf_dspace_testsome(
             {
                 *returned_user_ptr_p = cur_op->op.user_ptr;
             }
-            organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
+            organize_post_op_statistics(cur_op->op.type, cur_op->op.id, 
+                cur_op->op.hints);
             dbpf_queued_op_free(cur_op);
         }
         ret = (((state == OP_COMPLETED) ||

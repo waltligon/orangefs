@@ -969,7 +969,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                         flags,
                         context_id);
 
-    DBPF_EVENT_START(event_type, q_op_p->op.id);
+    DBPF_EVENT_START(event_type, q_op_p->op.id, hints);
 
     if(gossip_debug_enabled(GOSSIP_TROVE_DEBUG))
     {
