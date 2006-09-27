@@ -587,11 +587,12 @@ static int lock_post_msgpairs(PINT_client_sm *sm_p,
 
 	/*
 	  recalculate the status user tag based on this the progress
-	  of the current context like this: status_user_tag = (4 *
+	  of the current context like this: status_user_tag = (num_phases *
 	  (context index) + context phase)
 	*/
 	assert(cur_ctx->index == i);
-	status_user_tag = ((4 * i) + LOCK_SM_PHASE_REQ_MSGPAIR_RECV);
+	status_user_tag = ((LOCK_SM_NUM_PHASES * i) + 
+			   LOCK_SM_PHASE_REQ_MSGPAIR_RECV);
 
 	gossip_debug(GOSSIP_LOCK_DEBUG," posting recv with "
 		     "status_user_tag=%lu (max_size %d)\n",
@@ -667,7 +668,8 @@ static int lock_post_msgpairs(PINT_client_sm *sm_p,
             continue;
         }
 	
-        status_user_tag = ((4 * i) + LOCK_SM_PHASE_REQ_MSGPAIR_SEND);
+        status_user_tag = ((LOCK_SM_NUM_PHASES * i) + 
+			   LOCK_SM_PHASE_REQ_MSGPAIR_SEND);
 	
         cur_ctx->msg_send_has_been_posted = 0;
         cur_ctx->msg_send_in_progress = 0;
@@ -726,9 +728,10 @@ static int lock_post_msgpairs(PINT_client_sm *sm_p,
         }
     }
     
-    gossip_debug(GOSSIP_LOCK_DEBUG, "lock_post_msgpairs: "
-                 "completion count is %d\n",
-                 sm_p->u.lock.msgpair_completion_count);
+     gossip_debug(GOSSIP_LOCK_DEBUG, "lock_post_msgpairs: "
+		  "completion count is %d, ack_completion count is %d\n",
+		  sm_p->u.lock.msgpair_completion_count,
+		  sm_p->u.lock.ack_completion_count);
 
     /* if anything posted, just wait for that to complete, else
      * go sleep then try the remaining msgpairs again */
