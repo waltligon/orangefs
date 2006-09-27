@@ -126,7 +126,7 @@ void PINT_event_init_mpe_log_file(void)
             "white", "value=%l");
     }
 
-    formatString ="OP=%d;Size=%l;Job-ID=%l;ID=0x%x" ;
+    formatString ="comm:%d,call-id:%d,op=%d,value=%l"; /*,job-id=%l*/
 #else 
     formatString ="";
 #endif
@@ -426,16 +426,17 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 		      int8_t flags,
               PVFS_hint * hints)
 {
+/*
+ * TODO figure out if the size of the MPE format string
+ *  depends on the architecture.
+ */    
     MPE_LOG_BYTES  bytebuf;      /* buffer for logging of flags */
     int    bytebuf_pos = 0;
     const char * request_id;
-    
-    request_id = PVFS_get_hint( hints, REQUEST_ID);
-    if(request_id != NULL){
-        /* TODO */
-        /* gossip_err("EVENT request ID received: %s\n", request_id); */
-    }        
-
+    char hostname[20] = "";       /* not in log for buffer size limit */
+    int comm = -1, rank = -1, call_id = -1; /* 3 x 4 = 12 bytes in buffer */
+    char io_type[20] = "";        /* longest io_type has 19 characters */
+            
 #ifdef MPE_EXTENDED_LOGGING
     if(api == PVFS_EVENT_API_PERFORMANCE_COUNTER){
         MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &value );
@@ -443,14 +444,69 @@ void __PINT_event_mpe(enum PVFS_event_api api,
         if(operation > PINT_event_perf_counter_keys) return;
         MPE_Log_event(PINT_event_perf_counter_update[operation], 0, bytebuf);
         return;
-    }
-#endif    
+    }    
 
-#ifdef MPE_EXTENDED_LOGGING
+    request_id = PVFS_get_hint( hints, REQUEST_ID);
+    if(request_id != NULL){
+        /* In mpe.h size max 4 * sizeof(double) -> MPE_SIZE_BYTES */         
+        /* gossip_err("EVENT request ID received: %s\n", request_id); */       
+        char *saveptr1, *saveptr2; /* for thread safe strtok_r() */
+    
+        char *alloc_parseid = strdup(request_id);
+        char *parseid = alloc_parseid; /* for free() */
+    
+        char *rid_name, *rid_value;
+    
+        while(1)
+        {
+            rid_name = strtok_r(parseid, ",", &saveptr1);
+    
+            parseid = NULL;
+            if (rid_name == NULL)
+            {
+                break;
+            }
+    
+            strtok_r(rid_name, ":", &saveptr2);
+            rid_value = strtok_r(NULL, ":", &saveptr2);
+    
+            if(!strcmp(rid_name, "host"))
+               sscanf(rid_value, "%20s", hostname);
+            else if(!strcmp(rid_name, "comm"))
+                sscanf(rid_value, "%d", &comm);
+            else if(!strcmp(rid_name, "rank"))
+                sscanf(rid_value, "%d", &rank);
+            else if(!strcmp(rid_name, "id"))
+                sscanf(rid_value, "%d", &call_id);
+            else if(!strcmp(rid_name, "op"))
+                sscanf(rid_value, "%20s", io_type);
+        }
+        free(alloc_parseid);
+        if ( strlen(io_type) > 18 )  /* max 18 + 2 = 20 bytes in buffer */
+           io_type[18] = '\0';
+        
+        if( hostname[0] == 0 )
+        {
+            gossip_err("pint-event.c unparsable request id in hints:%s\n", request_id);
+        }
+/* DEBUG ME IF NECCESSARY        
+        else
+        {
+            gossip_err("pint-event.c: host:%s,comm:%d,rank:%d,id:%d,op:%s\n",
+                hostname, comm, rank, call_id, io_type);
+        }
+*/        
+    }
+
+
+    /* now log stuff to bytebuffer */
+    MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &comm );
+    MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &call_id );
+    /* MPE_Log_pack( bytebuf, &bytebuf_pos, 's', strlen(io_type), io_type ); */    
+
     MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &operation ); 
     MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &value );
-    MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &id );
-    /*MPE_Log_pack( bytebuf, &bytebuf_pos, 'x', 1, &callid );*/
+    /*does not fit... MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &id ); */
 #endif
 
     switch(api) {

@@ -49,7 +49,7 @@ diff -r 9e1df1d6fa98 src/wrappers/src/log_mpi_io.c
 +  {
 +    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 +    snprintf(value, PVFS2_MAX_HINT, "host:%s,comm:%d,rank:%d,id:%d,op:%s", 
-+             hostname,comm, MPI_COMM_WORLD ,pvfs2_increment_id++,io_type);
++             hostname,MPI_COMM_WORLD,rank,pvfs2_increment_id++,io_type);
 +  }
 +  
 +  if (* info == MPI_INFO_NULL)
