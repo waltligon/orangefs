@@ -21,7 +21,11 @@ extern int PINT_event_on;
 extern int32_t PINT_event_api_mask;
 extern int32_t PINT_event_op_mask;
 
-int PINT_event_initialize(int ring_size);
+/* exported to performance counter */
+void PINT_event_initalize_perf_counter_events(int number);
+void PINT_event_register_perf_counter_event(const char * key);
+
+int PINT_event_initialize(int ring_size, int enable_on_startup);
 void PINT_event_finalize(void);
 void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask);
 void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask);

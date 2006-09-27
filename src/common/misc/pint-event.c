@@ -14,6 +14,10 @@
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "gossip.h"
+#include "server-config.h"
+
+/* logs a lot more than default :) */
+#define MPE_EXTENDED_LOGGING
 
 /* variables that provide runtime control over which events are recorded */
 int PINT_event_on = 0;
@@ -33,8 +37,31 @@ int PINT_event_trove_rd_start, PINT_event_trove_rd_stop;
 int PINT_event_trove_wr_start, PINT_event_trove_wr_stop;
 int PINT_event_bmi_start, PINT_event_bmi_stop;
 int PINT_event_flow_start, PINT_event_flow_stop;
+int PINT_event_unexpected_decode;
+
+int * PINT_event_perf_counter_update = 0; /* event number for perf counters*/
+char ** PINT_event_perf_counter_key_names = 0;
+int PINT_event_perf_counter_keys = 0;
+
+extern char * mpe_logfile;
 #endif
 
+void PINT_event_initalize_perf_counter_events(int number){
+    PINT_event_perf_counter_update = calloc(number,sizeof(int));
+    PINT_event_perf_counter_key_names = calloc(number,sizeof(char *));
+}
+
+/*
+ * register the performance counter values:
+ */
+void PINT_event_register_perf_counter_event(const char * keyName){
+    /* add new key name: */ 
+    PINT_event_perf_counter_key_names[PINT_event_perf_counter_keys] = 
+        malloc(strlen(keyName)+1);
+    strcpy(PINT_event_perf_counter_key_names[PINT_event_perf_counter_keys], keyName);
+    
+    PINT_event_perf_counter_keys++;     
+}
 
 /* PINT_event_initialize()
  *
@@ -42,7 +69,7 @@ int PINT_event_flow_start, PINT_event_flow_stop;
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_event_initialize(int ring_size)
+int PINT_event_initialize(int ring_size, int enable_on_startup)
 {
     gen_mutex_lock(&event_mutex);
 
@@ -56,52 +83,100 @@ int PINT_event_initialize(int ring_size)
     PINT_event_default_init(ring_size);
 
     gen_mutex_unlock(&event_mutex);
+    
+    if ( enable_on_startup )
+    {
+       PINT_event_set_masks(1, ~0, ~0);
+    }
     return(0);
 }
 
 #if defined(HAVE_MPE)
+void PINT_event_init_mpe_log_file(void);
+
+void PINT_event_init_mpe_log_file(void)
+{
+    char * formatString;
+    int i;
+    MPE_Init_log();
+
+    MPE_Log_get_solo_eventID(&PINT_event_job_start);
+    MPE_Log_get_solo_eventID(&PINT_event_job_stop);
+
+    MPE_Log_get_solo_eventID(&PINT_event_trove_rd_start);
+    MPE_Log_get_solo_eventID(&PINT_event_trove_rd_stop);
+ 
+    MPE_Log_get_solo_eventID(&PINT_event_trove_wr_start);
+    MPE_Log_get_solo_eventID(&PINT_event_trove_wr_stop);
+     
+    MPE_Log_get_solo_eventID(&PINT_event_bmi_start);
+    MPE_Log_get_solo_eventID(&PINT_event_bmi_stop);
+     
+    MPE_Log_get_solo_eventID(&PINT_event_flow_start);
+    MPE_Log_get_solo_eventID(&PINT_event_flow_stop);
+     
+    MPE_Log_get_solo_eventID(&PINT_event_unexpected_decode);
+    
+#ifdef MPE_EXTENDED_LOGGING
+    for (i = 0 ; i < PINT_event_perf_counter_keys ; i++){
+        char event_name[255];
+        MPE_Log_get_solo_eventID(& PINT_event_perf_counter_update[i]);
+        sprintf(event_name, "PC:%s", PINT_event_perf_counter_key_names[i]);
+        MPE_Describe_info_event(PINT_event_perf_counter_update[i], event_name, 
+            "white", "value=%l");
+    }
+
+    formatString ="OP=%d;Size=%l;Job-ID=%l;ID=0x%x" ;
+#else 
+    formatString ="";
+#endif
+    
+    MPE_Describe_info_event(PINT_event_job_start, "Job (start)", "green1", formatString);
+    MPE_Describe_info_event(PINT_event_job_stop, "Job (end)", "green3", formatString);
+    
+    MPE_Describe_info_event(PINT_event_trove_rd_start, "Trove read (start)", "blue1", formatString);
+    MPE_Describe_info_event(PINT_event_trove_rd_stop, "Trove read (end)", "blue3", formatString);
+    MPE_Describe_info_event(PINT_event_trove_wr_start, "Trove write (start)", "orange1", formatString);
+    MPE_Describe_info_event(PINT_event_trove_wr_stop, "Trove write (end)", "orange3", formatString);
+     
+    
+    MPE_Describe_info_event(PINT_event_bmi_start, "BMI (start)", "yellow3", formatString);
+    MPE_Describe_info_event(PINT_event_bmi_stop, "BMI (end)", "yellow1", formatString);
+    MPE_Describe_info_event(PINT_event_flow_start, "Flow (start)", "red3", formatString);
+    MPE_Describe_info_event(PINT_event_flow_stop, "Flow (end)", "red1", formatString);
+    
+    MPE_Describe_info_event(PINT_event_unexpected_decode, "Request decode", "gray", formatString);
+}
+
+
 /*
  * PINT_event_mpe_init
  *   initialize the mpe profiling interface
  */
 int PINT_event_mpe_init(void)
 {
-    MPI_Init(NULL, NULL);
-    MPE_Init_log();
-
-    PINT_event_job_start = MPE_Log_get_event_number();
-    PINT_event_job_stop = MPE_Log_get_event_number();
-    PINT_event_trove_rd_start = MPE_Log_get_event_number();
-    PINT_event_trove_rd_stop = MPE_Log_get_event_number();
-    PINT_event_trove_wr_start = MPE_Log_get_event_number();
-    PINT_event_trove_wr_stop = MPE_Log_get_event_number();
-    PINT_event_bmi_start = MPE_Log_get_event_number();
-    PINT_event_bmi_stop = MPE_Log_get_event_number();
-    PINT_event_flow_start = MPE_Log_get_event_number();
-    PINT_event_flow_stop = MPE_Log_get_event_number();
-
-
-    MPE_Describe_state(PINT_event_job_start, PINT_event_job_stop, "Job", "red");
-    MPE_Describe_state(PINT_event_trove_rd_start, PINT_event_trove_rd_stop, 
-	    "Trove Read", "orange");
-    MPE_Describe_state(PINT_event_trove_wr_start, PINT_event_trove_wr_stop, 
-	    "Trove Write", "blue");
-    MPE_Describe_state(PINT_event_bmi_start, PINT_event_bmi_stop, 
-	    "BMI", "yellow");
-    MPE_Describe_state(PINT_event_flow_start, PINT_event_flow_stop, 
-	    "Flow", "green");
-
+    PMPI_Init(NULL, NULL);
+    if (mpe_logfile == NULL)
+    {
+        const char buf[] = "/tmp/pvfs2-tmp-log";
+        mpe_logfile = strdup(buf);
+    }
+    PINT_event_init_mpe_log_file();
+    
     return 0;
 }
 
 void PINT_event_mpe_finalize(void)
 {
-    /* TODO: use mkstemp like pablo_finalize does */
-    MPE_Finish_log("/tmp/pvfs2-server");
+    if (PINT_event_on)
+    {
+        gossip_err("Writing clog2 to: %s \n", mpe_logfile);
+        MPE_Finish_log(mpe_logfile);
+    }
     MPI_Finalize();
     return;
 }
-#endif
+#endif /* HAVE_MPE */
 
 #if defined(HAVE_PABLO)
 /* PINT_event_pablo_init
@@ -206,7 +281,13 @@ void PINT_event_finalize(void)
 void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask)
 {
     gen_mutex_lock(&event_mutex);
-
+#if defined(HAVE_MPE)
+     if(PINT_event_on && ! event_on){ 
+        gossip_err("Writing clog2 to: %s \n", mpe_logfile);
+        MPE_Finish_log(mpe_logfile);
+        PINT_event_init_mpe_log_file();
+     }
+#endif
     PINT_event_on = event_on;
     PINT_event_api_mask = api_mask;
     PINT_event_op_mask = op_mask;
@@ -214,7 +295,6 @@ void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask)
     gen_mutex_unlock(&event_mutex);
     return;
 }
-
 
 /* PINT_event_get_masks()
  *
@@ -344,33 +424,75 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 		      PVFS_id_gen_t id,
 		      int8_t flags)
 {
-    switch(api) {
-	case PVFS_EVENT_API_BMI:
-	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_bmi_start, 0, NULL);
-	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_bmi_stop, value, NULL);
-	    }
-	case PVFS_EVENT_API_JOB:
-	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_job_start, 0, NULL);
-	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_job_stop, value, NULL);
-	    }
-	case PVFS_EVENT_API_TROVE:
-	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_trove_wr_start, 0, NULL);
-	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_trove_wr_stop, value, NULL);
-	    }
-        case PVFS_EVENT_API_ENCODE_REQ:
-        case PVFS_EVENT_API_ENCODE_RESP:
-        case PVFS_EVENT_API_DECODE_REQ:
-        case PVFS_EVENT_API_DECODE_RESP:
-        case PVFS_EVENT_API_SM:
-            ; /* XXX: NEEDS SOMETHING */
-    }
+    MPE_LOG_BYTES  bytebuf;      /* buffer for logging of flags */
+    int    bytebuf_pos = 0;
 
+#ifdef MPE_EXTENDED_LOGGING
+    if(api == PVFS_EVENT_API_PERFORMANCE_COUNTER){
+        MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &value );
+
+        if(operation > PINT_event_perf_counter_keys) return;
+        MPE_Log_event(PINT_event_perf_counter_update[operation], 0, bytebuf);
+        return;
+    }
+#endif    
+
+#ifdef MPE_EXTENDED_LOGGING
+    MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &operation ); 
+    MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &value );
+    MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &id );
+    /*MPE_Log_pack( bytebuf, &bytebuf_pos, 'x', 1, &callid );*/
+#endif
+
+    switch(api) {
+    case PVFS_EVENT_API_FLOW:
+        if (flags & PVFS_EVENT_FLAG_START) {
+            MPE_Log_event(PINT_event_flow_start, 0, bytebuf);
+        } else if (flags & PVFS_EVENT_FLAG_END) {
+            MPE_Log_event(PINT_event_flow_stop, 0, bytebuf);
+        }
+       break;
+    case PVFS_EVENT_API_BMI:
+        if (flags & PVFS_EVENT_FLAG_START) {
+            MPE_Log_event(PINT_event_bmi_start, 0, bytebuf); //second parameter seems to be unused in MPE2 !!!
+        } else if (flags & PVFS_EVENT_FLAG_END) {
+            MPE_Log_event(PINT_event_bmi_stop, 0, bytebuf);
+        }
+        break;
+    case PVFS_EVENT_API_JOB:
+        bytebuf_pos = 0;        
+        if (flags & PVFS_EVENT_FLAG_START) {
+            MPE_Log_event(PINT_event_job_start, 0, bytebuf);
+        } else if (flags & PVFS_EVENT_FLAG_END) {
+            MPE_Log_event(PINT_event_job_stop, 0, bytebuf);
+        }
+        break;
+    case PVFS_EVENT_API_TROVE:
+        if (flags & PVFS_EVENT_FLAG_START) {
+            if (operation == PVFS_EVENT_TROVE_READ_LIST) {
+                MPE_Log_event(PINT_event_trove_rd_start, 0, bytebuf);
+            } else if (operation == PVFS_EVENT_TROVE_WRITE_LIST) {
+                MPE_Log_event(PINT_event_trove_wr_start, 0, bytebuf);
+                }
+        } else if (flags & PVFS_EVENT_FLAG_END) {
+            if (operation == PVFS_EVENT_TROVE_READ_LIST) {
+                MPE_Log_event(PINT_event_trove_rd_stop, 0, bytebuf);
+            } else if (operation == PVFS_EVENT_TROVE_WRITE_LIST) {
+                MPE_Log_event(PINT_event_trove_wr_stop, 0, bytebuf);
+            }
+        }
+        break;
+    case PVFS_EVENT_API_DECODE_UNEXPECTED:
+        MPE_Log_event(PINT_event_unexpected_decode, 0, bytebuf);
+        break;
+    case PVFS_EVENT_API_PERFORMANCE_COUNTER:        
+    case PVFS_EVENT_API_DECODE_REQ:
+    case PVFS_EVENT_API_ENCODE_REQ:
+    case PVFS_EVENT_API_ENCODE_RESP:            
+    case PVFS_EVENT_API_DECODE_RESP:
+    case PVFS_EVENT_API_SM:
+        break; /* XXX: NEEDS SOMETHING */
+    }
 }
 #endif
 

@@ -30,6 +30,10 @@
 #include "openssl/evp.h"
 #endif
 
+#ifdef HAVE_MPE
+    char * mpe_logfile = NULL;
+#endif
+
 static const char * replace_old_keystring(const char * oldkey);
 
 static DOTCONF_CB(get_pvfs_server_id);
@@ -63,6 +67,7 @@ static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_name);
 static DOTCONF_CB(get_logfile);
+static DOTCONF_CB(get_mpe_logfile);
 static DOTCONF_CB(get_event_logging_list);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
@@ -471,7 +476,13 @@ static const configoption_t options[] =
      */
     {"LogFile",ARG_STR, get_logfile,NULL,
         CTX_DEFAULTS|CTX_GLOBAL,"/tmp/pvfs2-server.log"},
-
+    /*
+     * MPE log filename which will be used to store the clog2 file,
+     * PVFS2 has to be compiled with MPE.
+     */
+    {"MpeLogFile",ARG_STR, get_mpe_logfile,NULL,
+        CTX_DEFAULTS|CTX_GLOBAL,"/tmp/pvfs2-server"},
+    
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  This option sets that level for
      * either all servers (by being defined in the Defaults context) or for
@@ -1349,6 +1360,17 @@ DOTCONF_CB(get_logfile)
     if (config_s->logfile)
         free(config_s->logfile);
     config_s->logfile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_mpe_logfile)
+{
+#if defined(HAVE_MPE)
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->mpelogfile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    mpe_logfile = config_s->mpelogfile; 
+#endif    
     return NULL;
 }
 
@@ -2449,6 +2471,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->logfile);
             config_s->logfile = NULL;
+        }
+ 
+        if (config_s->mpelogfile)
+        {
+            free(config_s->mpelogfile);
+            config_s->mpelogfile = NULL;
         }
 
         if (config_s->event_logging)

@@ -23,7 +23,12 @@ enum PVFS_event_api
     PVFS_EVENT_API_ENCODE_RESP = (1 << 4), /* protocol response encode */
     PVFS_EVENT_API_DECODE_REQ = (1 << 5),  /* protocol request decode */
     PVFS_EVENT_API_DECODE_RESP = (1 << 6), /* protocol response decode */
-    PVFS_EVENT_API_SM =	   (1 << 7)        /* state machines */
+    PVFS_EVENT_API_SM =	   (1 << 7),        /* state machines */
+    PVFS_EVENT_API_DECODE_UNEXPECTED = (1 << 8),
+    PVFS_EVENT_API_FLOW = (1 << 9),
+    PVFS_EVENT_API_PERFORMANCE_COUNTER = (1 << 10) /* additional stats to be stored 
+                                             * like load, CPU usage, network 
+                                             * etc */   
 };
 
 /* what kind of event */

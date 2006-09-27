@@ -24,6 +24,7 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/errno-mapping.c \
 	     $(DIR)/mkspace.c \
              $(DIR)/pvfs2-debug.c \
+         $(DIR)/perf-stat.c \
 	     $(DIR)/pint-perf-counter.c \
 	     $(DIR)/pint-event.c \
 	     $(DIR)/pvfs2-hint.c \

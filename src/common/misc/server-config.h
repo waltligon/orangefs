@@ -147,6 +147,7 @@ typedef struct server_configuration_s
     char *logfile;
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
     char *event_logging;
+    char *mpelogfile;
     char *bmi_modules;              /* BMI modules                      */
     char *flow_modules;             /* Flow modules                     */
 

@@ -77,6 +77,12 @@ static struct PINT_perf_key server_keys[] =
     {"metadata dspace ops", PINT_PERF_METADATA_DSPACE_OPS, PINT_PERF_PRESERVE},
     {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
     {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
+    {"load_1", PINT_PERF_LOAD, 0},
+    {"cpu usage", PINT_PERF_CPU, 0},
+    {"network read", PINT_PERF_NETWORK_READ, 0},
+    {"network write", PINT_PERF_NETWORK_WRITE, 0},
+    {"disk read", PINT_PERF_DISK_READ, 0},
+    {"disk write", PINT_PERF_DISK_WRITE, 0},
     {NULL, 0, 0},
 };
 
@@ -585,7 +591,7 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 #endif
-
+    
     /* kick off timer for expired jobs */
     ret = server_state_machine_alloc_noreq(
         PVFS_SERV_JOB_TIMER, &(tmp_op));
@@ -1342,7 +1348,8 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_PERF_COUNTER_INIT;
 #endif
 
-    ret = PINT_event_initialize(PINT_EVENT_DEFAULT_RING_SIZE);
+    ret = PINT_event_initialize(PINT_EVENT_DEFAULT_RING_SIZE, 
+        server_config.event_logging[0] != 0);
     if (ret < 0)
     {
         gossip_err("Error initializing event interface.\n");

@@ -14,6 +14,7 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
+#include "pint-event.h"
 #include "gossip.h"
 
 #define PINT_PERF_REALLOC_ARRAY(__pc, __tmp_ptr, __src_ptr, __new_history, __type) \
@@ -115,9 +116,14 @@ struct PINT_perf_counter* PINT_perf_initialize(
         free(pc);
         return(NULL);
     }
+    
+    /* initialize event logging of performance counter */
+    PINT_event_initalize_perf_counter_events(pc->key_count);
 
     for(i=0; i<pc->key_count; i++)
     {
+        PINT_event_register_perf_counter_event(pc->key_array[i].key_name);
+        
         pc->value_matrix[i] =
             (int64_t*)malloc(pc->history_size*sizeof(int64_t));
         if(!pc->value_matrix[i])

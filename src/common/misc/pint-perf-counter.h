@@ -32,7 +32,14 @@ enum PINT_server_perf_keys
     PINT_PERF_METADATA_WRITE = 3,
     PINT_PERF_METADATA_DSPACE_OPS = 4,
     PINT_PERF_METADATA_KEYVAL_OPS = 5,
-    PINT_PERF_REQSCHED = 6
+    PINT_PERF_REQSCHED = 6,
+    PINT_PERF_LOAD = 7,
+    PINT_PERF_CPU = 8,
+    PINT_PERF_NETWORK_READ = 9,
+    PINT_PERF_NETWORK_WRITE = 10,
+    PINT_PERF_DISK_READ = 11, /* even though READ/WRITE are available, 
+                                 delayed read, write may happen*/
+    PINT_PERF_DISK_WRITE = 12
 };
 
 /** enumeration of valid measurement operations */

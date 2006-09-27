@@ -75,6 +75,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "readdir", GOSSIP_READDIR_DEBUG },
     /* Debug the mkdir operation (server only) */
     { "mkdir", GOSSIP_MKDIR_DEBUG },
+    
+    { "perfcounter", GOSSIP_PERFCOUNTER_DEBUG }, 
     /* Debug the io operation (reads and writes) 
      * for both the client and server */
     { "io", GOSSIP_IO_DEBUG },
