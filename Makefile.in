@@ -121,6 +121,8 @@ INCLUDES := \
     src/common/misc \
     src/common/quickhash \
     src/common/quicklist \
+    src/common/itree \
+    src/common/rbtree \
     src/common/id-generator \
     src/common/gossip \
     src/common/gen-locks \
