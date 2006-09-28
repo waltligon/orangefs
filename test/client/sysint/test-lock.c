@@ -231,7 +231,7 @@ int main(
 	   (int) pinode_refn.fs_id);
 #endif
     /* Test 1 MByte of locks */
-    total_locks = 64*1024;
+    total_locks = 128*1024;
 
     MPI_Barrier(MPI_COMM_WORLD);
     
@@ -254,7 +254,7 @@ int main(
 
 	    for (i = 0; i < total_locks; i++)
 	    {
-		file_req_offset = i*2;
+		file_req_offset = i*16;
 		
 		ret = PVFS_sys_lock(pinode_refn, file_req, 
 				    file_req_offset, 
@@ -293,7 +293,7 @@ int main(
 	    {
 		for (j = 0; j < MAX_OL_PAIRS; j++)
 		{
-		    disp_arr[j] = (i * 2 * MAX_OL_PAIRS) + (j * 2);
+		    disp_arr[j] = (i * 16 * MAX_OL_PAIRS) + (j * 16);
 		    blk_arr[j] = 1;
 		}
 	    
@@ -316,7 +316,7 @@ int main(
 	    break;
 	case DATATYPE_LOCK:
 	    PVFS_Request_contiguous(total_locks, PVFS_BYTE, &mem_req);
-	    PVFS_Request_vector(total_locks, 1, 2, PVFS_BYTE, &file_req);
+	    PVFS_Request_vector(total_locks, 1, 16, PVFS_BYTE, &file_req);
 	    
 	    ret = PVFS_sys_lock(pinode_refn, file_req, 
 				file_req_offset, 
@@ -365,7 +365,7 @@ int main(
 	case MULTIPLE_LOCK:
 	    for (i = 0; i < total_locks; i++)
 	    {
-		file_req_offset = i*2;
+		file_req_offset = i*16;
 		
 		ret = PVFS_sys_lock(pinode_refn, file_req, 
 				    file_req_offset, 
@@ -388,7 +388,7 @@ int main(
 	    {
 		for (j = 0; j < MAX_OL_PAIRS; j++)
 		{
-		    disp_arr[j] = (i * 2 * MAX_OL_PAIRS) + (j * 2);
+		    disp_arr[j] = (i * 16 * MAX_OL_PAIRS) + (j * 16);
 		    blk_arr[j] = 1;
 		}
 		
