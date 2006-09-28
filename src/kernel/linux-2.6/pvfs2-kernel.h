@@ -1011,29 +1011,6 @@ do {                                                      \
     buffer_index = -1;                                    \
 } while(0)
 
-#ifdef HAVE_AIO_VFS_SUPPORT
-/* 
- * This macro differs from the above only in that it does not
- * manipulate the offsets.
- */
-#define handle_sync_aio_error()                           \
-do {                                                      \
-    if(!op_state_serviced(new_op))                        \
-    {                                                     \
-        pvfs2_cancel_op_in_progress(new_op->tag);         \
-        op_release(new_op);                               \
-    }                                                     \
-    else                                                  \
-    {                                                     \
-        wake_up_daemon_for_return(new_op);                \
-    }                                                     \
-    new_op = NULL;                                        \
-    pvfs_bufmap_put(buffer_index);                        \
-    buffer_index = -1;                                    \
-} while(0)
-
-#endif
-
 #define get_interruptible_flag(inode)                     \
 ((PVFS2_SB(inode->i_sb)->mnt_options.intr ? PVFS2_OP_INTERRUPTIBLE : 0))
 
