@@ -1,0 +1,127 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/*
+ *  PVFS2 server state machine for driving lock operations (acquire/release).
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-request.h"
+#include "pint-distribution.h"
+#include "pint-request.h"
+#include "pvfs2-internal.h"
+#include "lock-storage.h"
+
+static int lock_change_lock(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int lock_cleanup(
+    PINT_server_op *s_op, job_status_s* js_p);
+
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
+
+%%
+
+machine pvfs2_lock_sm(
+    prelude,
+    change_lock,
+    send_response,
+    cleanup)
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => change_lock;
+        default => send_response;
+    }
+
+    state change_lock
+    {
+        run lock_change_lock;
+        default => send_response;
+    }
+
+    state send_response
+    {
+	jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run lock_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static int lock_change_lock(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    PVFS_object_ref object_ref;
+    PINT_request_file_data fdata;
+    memset(&s_op->resp.u.lock, 0, sizeof(struct PVFS_servresp_lock));
+    
+    s_op->resp.u.lock.lock_type = s_op->req->u.lock.lock_type;
+    s_op->resp.u.lock.bstream_size = s_op->ds_attr.b_size;
+    
+    object_ref.fs_id = s_op->req->u.lock.fs_id;
+    object_ref.handle = s_op->req->u.lock.handle;
+
+    fdata.server_nr = s_op->req->u.lock.server_nr;
+    fdata.server_ct = s_op->req->u.lock.server_ct;
+    fdata.dist = s_op->req->u.lock.io_dist;
+    fdata.fsize = s_op->ds_attr.b_size;
+    fdata.extend_flag = 1;
+
+    /* print_lock_file_table_all_info(); */
+    if (s_op->req->u.lock.lock_type == PVFS_ACQUIRE)
+    {
+	add_lock_req(&object_ref,
+		     s_op->req->u.lock.io_type,
+		     s_op->req->u.lock.file_req,
+		     s_op->req->u.lock.file_req_offset,
+		     &fdata,
+		     s_op->req->u.lock.aggregate_size,
+		     0,
+		     s_op->req->u.lock.aggregate_size,
+		     &(s_op->resp.u.lock.lock_id),
+		     &(s_op->resp.u.lock.granted_bytes));
+    }
+    else
+    {
+	del_lock_req(&object_ref,
+		     s_op->req->u.lock.file_req_offset,
+		     s_op->req->u.lock.aggregate_size,
+		     &(s_op->resp.u.lock.granted_bytes));
+    }
+#if 0
+    print_lock_file_table_all_info();
+#endif
+    return 1;
+}
+
+static int lock_cleanup(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    return server_state_machine_complete(s_op);
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
