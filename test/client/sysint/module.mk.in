@@ -22,6 +22,8 @@ TESTSRC += \
 	$(DIR)/readdir.c\
 	$(DIR)/test-pint-bucket.c \
 	$(DIR)/test-pint-ncache.c \
+	$(DIR)/test-lock.c \
+	$(DIR)/test-lock2.c \
 	$(DIR)/io-test.c \
 	$(DIR)/io-test-offset.c \
 	$(DIR)/initialize.c \
