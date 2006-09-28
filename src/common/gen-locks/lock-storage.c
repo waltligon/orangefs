@@ -555,11 +555,13 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 }
 
 /* del_lock_req - Remove a certain amount of nb_bytes from the lock
- * req.  If nb_bytes == -1, remove the entire lock request. */
+ * req.  If nb_bytes == -1, remove the entire lock request.  Return -1
+ * for en.  If all n*/
 
 int del_lock_req(PVFS_object_ref *object_ref_p,
 		 PVFS_id_gen_t req_id, 
-		 PVFS_size nb_bytes)
+		 PVFS_size nb_bytes,
+		 PVFS_size *total_bytes_released_p)
 {
     int ret = 0;
     enum PVFS_io_type io_type;
@@ -586,7 +588,8 @@ int del_lock_req(PVFS_object_ref *object_ref_p,
     hash_link_p = qhash_search(lock_file_table, object_ref_p);
     if (!hash_link_p)
     {
-	fprintf(stdout, "del_lock_req: Lock node not found!\n");
+	gossip_debug(GOSSIP_LOCK_DEBUG, 
+		     "del_lock_req: Lock node not found!\n");
 	ret = -1;
 	goto del_unlock_exit;
 
@@ -604,10 +607,10 @@ int del_lock_req(PVFS_object_ref *object_ref_p,
     else
     {
 	lock_req_t *tmp_lock_req_p = NULL;
-#if 0
-	fprintf(stdout, "del_lock_req: req_id=%Ld not found in "
-		"granted list\n", req_id);
-#endif
+
+	gossip_debug(GOSSIP_LOCK_DEBUG, "del_lock_req: req_id=%Ld not "
+		     "found in granted list\n", req_id);
+
 	qhash_for_each(pos, &(lock_node_p->queued_req))
 	{
 	    tmp_lock_req_p = qlist_entry(pos, lock_req_t, queued_req_link); 
@@ -632,7 +635,7 @@ int del_lock_req(PVFS_object_ref *object_ref_p,
 	qlist_for_each_safe(pos, scratch, lock_head_p)
 	{
 	    linked_itree_p = itree_entry(pos, linked_itree_t, list_link);
-	    qlist_del(pos);
+	    qlist_del(&(linked_itree_p->list_link));
 	    itree_delete(
 		((io_type == PVFS_IO_READ) ? 
 		 &(lock_node_p->read_itree) : &(lock_node_p->write_itree)),
@@ -696,8 +699,14 @@ int del_lock_req(PVFS_object_ref *object_ref_p,
 	    rbtree_delete(&lock_node_p->granted_req, &RBTREE_NIL,
 			  &(lock_req_p->granted_req_link), 
 			  rbtree_lock_req_cpy_fn);
-	
+
+	/* Delete the lock req from the all_req queue and possibly
+	 * delete the lock_node if there are no more entries for
+	 * it. */
+	qlist_del(&(lock_req_p->all_req_link));
 	free(lock_req_p);
+	if (qlist_empty(&(lock_node_p->all_req)))
+	    qlist_del(&(lock_node_p->hash_link));
     }
     else
     {
@@ -736,9 +745,14 @@ int del_lock_req(PVFS_object_ref *object_ref_p,
     
   del_unlock_exit:
     gen_mutex_unlock(lock_file_table_mutex);
+
+    if (nb_bytes == -1 && ret == 0)
+	*total_bytes_released_p = -1;
+    else
+	*total_bytes_released_p = bytes_released;
     
     /* If any bytes have been revoked, all queued locks need to be
-     * fixed so that they are doing as best as possible */
+     * progress as far as possible */
     if (nb_bytes > 0)
     {
 	/* This function will make more sense in PVFS2. */
