@@ -51,7 +51,8 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 		 PVFS_size *granted_bytes_p);
 int del_lock_req(PVFS_object_ref *object_ref_p,
                  PVFS_id_gen_t req_id,
-                 PVFS_size nb_bytes);
+                 PVFS_size nb_bytes,
+		 PVFS_size *total_bytes_released_p);
 
 #endif
 
