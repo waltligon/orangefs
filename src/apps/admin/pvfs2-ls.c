@@ -404,7 +404,7 @@ int do_list(
     PVFS_object_ref ref;
     PVFS_ds_position token;
     uint64_t dir_version = 0;
-    double begin, end;
+    double begin = 0.0, end;
 
     name = start;
 

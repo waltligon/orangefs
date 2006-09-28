@@ -385,7 +385,7 @@ static void hash2str(unsigned char *hash, int hash_length, unsigned char *str)
 
 static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    int i, count, ret, fs_conf_failed = 0, fs_conf_size_mismatch = 0, tmp;
+    int i, count, ret = 0, fs_conf_failed = 0, fs_conf_size_mismatch = 0, tmp;
     char **sha1_fs_digests = NULL;
     size_t digest_len;
     PVFS_fs_id fsid;

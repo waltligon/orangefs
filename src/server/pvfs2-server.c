@@ -93,9 +93,9 @@ static int signal_recvd_flag = 0;
 static pid_t server_controlling_pid = 0;
 
 /* A list of all serv_op's posted for unexpected message alone */
-static QLIST_HEAD(posted_sop_list);
+QLIST_HEAD(posted_sop_list);
 /* A list of all serv_op's posted for expected messages alone */
-static QLIST_HEAD(inprogress_sop_list);
+QLIST_HEAD(inprogress_sop_list);
 
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
@@ -154,9 +154,9 @@ static int server_shutdown(
     PINT_server_status_flag status,
     int ret, int sig);
 static void server_sig_handler(int sig);
-static int server_post_unexpected_recv(job_status_s * js_p);
+int server_post_unexpected_recv(job_status_s * js_p);
 static int server_parse_cmd_line_args(int argc, char **argv);
-static int server_state_machine_start(
+int server_state_machine_start(
     struct PINT_smcb *smcb, job_status_s *js_p);
 #ifdef __PVFS2_SEGV_BACKTRACE__
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
@@ -625,7 +625,7 @@ int main(int argc, char **argv)
         */
         for (i = 0; i < comp_ct; i++)
         {
-            int unexpected_msg = 0;
+            /* int unexpected_msg = 0; */
             struct PINT_smcb *smcb = server_completed_job_p_array[i];
             gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: job "
                     "completed smcb %p\n", smcb);
@@ -634,6 +634,7 @@ int main(int argc, char **argv)
              * (unexpected) ones.  We handle the first step of either
              * type here.
              */
+#if 0
             if (smcb->op == BMI_UNEXPECTED_OP)
             {
                 unexpected_msg = 1;
@@ -652,6 +653,7 @@ int main(int argc, char **argv)
                 }
             }
             else
+#endif
             {
                 /* NOTE: PINT_state_machine_next() is a function that
                  * is shared with the client-side state machine
@@ -669,7 +671,7 @@ int main(int argc, char **argv)
             }
 
             /* else ret == SM_ACTION_DEFERED */
-
+#if 0
             if (unexpected_msg)
             {
                 /* If this was a new (unexpected) job, we need to post
@@ -689,6 +691,7 @@ int main(int argc, char **argv)
                     goto server_shutdown;
                 }
             }
+#endif
         }
     }
 
@@ -1713,10 +1716,10 @@ static int server_parse_cmd_line_args(int argc, char **argv)
  *
  * Returns 0 on success, -PVFS_error on failure.
  */
-static int server_post_unexpected_recv(job_status_s *js_p)
+int server_post_unexpected_recv(job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    job_id_t j_id;
+    /* job_id_t j_id; */
     struct PINT_smcb *smcb = NULL;
     struct PINT_server_op *s_op;
 
@@ -1744,6 +1747,9 @@ static int server_post_unexpected_recv(job_status_s *js_p)
         /* Add an unexpected s_ops to the list */
         qlist_add_tail(&s_op->next, &posted_sop_list);
 
+#if 1
+        ret = PINT_state_machine_start(smcb, js_p);
+#else
         /*
           TODO: Consider the optimization of enabling immediate
           completion in this part of the code (see the mailing list
@@ -1760,6 +1766,8 @@ static int server_post_unexpected_recv(job_status_s *js_p)
             PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
             PINT_smcb_free(&smcb);
         }
+#endif
+
     }
     return ret;
 }
@@ -1784,10 +1792,13 @@ static int server_purge_unexpected_recv_machines(void)
         PINT_server_op *s_op = qlist_entry(tmp, PINT_server_op, next);
 
         /* Remove s_op from the posted_sop_list */
-        qlist_del(&s_op->next);
+        /* don't see a reason to remove this */
+        /* will be removed in state machine */
+        /* if and when message completes after cancellation */
+        /* qlist_del(&s_op->next); */
 
-        /* free the operation structure itself */
-        free(s_op);
+        /* mark the message for cancellation */
+        s_op->op_cancelled = 1;
     }
     return 0;
 }
@@ -1799,7 +1810,7 @@ static int server_purge_unexpected_recv_machines(void)
  *
  * returns 0 on success, -PVFS_errno on failure
  */
-static int server_state_machine_start(
+int server_state_machine_start(
     PINT_smcb *smcb,
     job_status_s *js_p)
 {
@@ -1838,9 +1849,6 @@ static int server_state_machine_start(
         PVFS_perror_gossip("Error: PINT_decode failure", ret);
         return ret;
     }
-    /* Remove s_op from posted_sop_list and move it to the inprogress_sop_list */
-    qlist_del(&s_op->next);
-    qlist_add_tail(&s_op->next, &inprogress_sop_list);
 
     /* set timestamp on the beginning of this state machine */
     id_gen_fast_register(&tmp_id, s_op);
@@ -1859,7 +1867,7 @@ static int server_state_machine_start(
     }
 
     s_op->resp.op = s_op->req->op;
-    return PINT_state_machine_start(smcb, js_p);
+    return PINT_state_machine_invoke(smcb, js_p);
 }
 
 /* server_state_machine_alloc_noreq()
@@ -2041,7 +2049,7 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op)
     {
     case BMI_UNEXPECTED_OP :
         {
-            return &pvfs2_void_sm;
+            return &pvfs2_unexpected_sm;
             break;
         }
     default :

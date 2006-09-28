@@ -343,16 +343,8 @@ struct PINT_server_eattr_op
 typedef struct PINT_server_op
 {
     struct qlist_head   next; /* used to queue structures used for unexp style messages */
+    int op_cancelled; /* indicates unexp message was cancelled */
     enum PVFS_server_op op;  /* type of operation that we are servicing */
-    /* the following fields are used in state machine processing to keep
-     * track of the current state
-     */
-
-    /* removed to PINT_state_frame - WBL
-    int stackptr;
-    union PINT_state_array_values *current_state; 
-    union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE]; 
-    */
 
     /* holds id from request scheduler so we can release it later */
     job_id_t scheduled_id; 
@@ -485,6 +477,7 @@ extern struct PINT_state_machine_s pvfs2_flush_sm;
 extern struct PINT_state_machine_s pvfs2_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_setparam_sm;
 extern struct PINT_state_machine_s pvfs2_noop_sm;
+extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_perf_update_sm;
 extern struct PINT_state_machine_s pvfs2_job_timer_sm;
@@ -512,8 +505,14 @@ extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 struct server_configuration_s *get_server_config_struct(void);
 
 /* exported state machine resource reclamation function */
+int server_post_unexpected_recv(job_status_s *js_p);
+int server_state_machine_start( PINT_smcb *smcb, job_status_s *js_p);
 int server_state_machine_complete(PINT_smcb *smcb);
 int server_state_machine_terminate(PINT_smcb *smcb, job_status_s *js_p);
+
+/* lists of server ops */
+extern struct qlist_head posted_sop_list;
+extern struct qlist_head inprogress_sop_list;
 
 /* starts state machines not associated with an incoming request */
 int server_state_machine_alloc_noreq(

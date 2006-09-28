@@ -78,11 +78,11 @@ static PINT_sm_action job_timer_do_work(
 	
     /* post another timer */
     return(job_req_sched_post_timer(1000,
-	smcb,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context));
+	    smcb,
+	    0,
+	    js_p,
+	    &tmp_id,
+	    server_job_context));
 }
 
 
