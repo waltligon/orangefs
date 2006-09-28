@@ -187,8 +187,10 @@ struct PINT_client_lock_sm
     PVFS_offset file_req_offset;
     PVFS_Request mem_req;
 
-    /* output parameter */
+    /* output parameters */
     PVFS_sysresp_lock *lock_resp_p;
+    PVFS_id_gen_t **lock_id_arr_p;
+    int *lock_id_arr_count_p;
 
     enum PVFS_encoding_type encoding;
 
