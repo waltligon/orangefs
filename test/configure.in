@@ -210,6 +210,13 @@ AC_ARG_WITH(openssl,
 		 [AX_OPENSSL(${withval})],
 		 [AX_OPENSSL_OPTIONAL])
 
+AC_ARG_WITH(libaio,
+		 [  --with-libaio=<dir>  Location of installed libaio package (default=/usr)
+		 	 --without-libaio     Don't build with libaio.
+		 ],
+		 [AX_AIO(${withval})],
+		 [AX_AIO_OPTIONAL])
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in common io client correctness/pts kernel ; do

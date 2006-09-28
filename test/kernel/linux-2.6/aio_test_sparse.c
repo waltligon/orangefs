@@ -12,6 +12,7 @@
 
 
 #define _GNU_SOURCE
+#include "pvfs2-test-config.h"
 #include <stdlib.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -34,7 +35,7 @@ int debug;
  *	uninitailized data.
  */
 
-char *check_zero(char *buf, int size)
+static char *check_zero(char *buf, int size)
 {
 	char *p;
 
@@ -57,7 +58,7 @@ char *check_zero(char *buf, int size)
 	return 0;	/* all zeros */
 }
 
-int read_sparse(char *filename, int filesize)
+static int read_sparse(char *filename, int filesize)
 {
 	int fd;
 	int i;
@@ -96,8 +97,7 @@ int read_sparse(char *filename, int filesize)
 
 volatile int got_signal;
 
-void
-sig_term_func(int i, siginfo_t *si, void *p)
+static void sig_term_func(int i, siginfo_t *si, void *p)
 {
 	if (debug)
 		fprintf(stderr, "sig(%d, %p, %p)\n", i, si, p);
@@ -107,7 +107,7 @@ sig_term_func(int i, siginfo_t *si, void *p)
 /*
  * do async writes to a sparse file
  */
-void aio_sparse(char *filename, int align, int writesize, int filesize, int num_aio)
+static void aio_sparse(char *filename, int align, int writesize, int filesize, int num_aio)
 {
 	int fd;
 	int i;
@@ -188,7 +188,7 @@ void aio_sparse(char *filename, int align, int writesize, int filesize, int num_
 
 		if (debug)
 			fprintf(stderr, "aio_test_sparse: offset %ld filesize %d inflight %d\n",
-				offset, filesize, aio_inflight);
+				(long) offset, filesize, aio_inflight);
 
 		if ((n = io_getevents(myctx, 1, 1, &event, 0)) != 1) {
 			if (-n != EINTR)
@@ -220,7 +220,7 @@ void aio_sparse(char *filename, int align, int writesize, int filesize, int num_
 		offset += writesize;
 		if ((w = io_submit(myctx, 1, &iocbp)) < 0) {
 			fprintf(stderr, "io_submit failed at offset %ld\n",
-				offset);
+				(long) offset);
 			perror("");
 			break;
 		}
@@ -259,7 +259,7 @@ void aio_sparse(char *filename, int align, int writesize, int filesize, int num_
 }
 
 
-int usage(void)
+static int usage(void)
 {
 	fprintf(stderr, "usage: aio_test_sparse [-n children] [-s filesize]"
 		" [-w writesize] [-r readsize] [-f fname] \n");
@@ -269,7 +269,7 @@ int usage(void)
 /*
  * Scale value by kilo, mega, or giga.
  */
-long long scale_by_kmg(long long value, char scale)
+static long long scale_by_kmg(long long value, char scale)
 {
 	switch (scale) {
 	case 'g':

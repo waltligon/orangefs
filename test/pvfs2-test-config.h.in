@@ -15,6 +15,9 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define to 1 if you have the <libaio.h> header file. */
+#undef HAVE_LIBAIO_H
+
 /* Define to 1 if you have the `efence' library (-lefence). */
 #undef HAVE_LIBEFENCE
 
@@ -77,6 +80,9 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* Define if libaio exists */
+#undef WITH_AIO
 
 /* Define if openssl exists */
 #undef WITH_OPENSSL
