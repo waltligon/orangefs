@@ -203,6 +203,8 @@ PVFS_error PVFS_isys_lock(
     PVFS_Request mem_req,
     PVFS_credentials *credentials,
     PVFS_sysresp_lock *resp_p,
+    PVFS_id_gen_t **lock_id_arr_p,
+    int *lock_id_arr_count_p,
     enum PVFS_io_type io_type,
     enum PVFS_lock_type lock_type,
     PVFS_sys_op_id *op_id,
@@ -265,6 +267,8 @@ PVFS_error PVFS_isys_lock(
     sm_p->u.lock.file_req = file_req;
     sm_p->u.lock.file_req_offset = file_req_offset;
     sm_p->u.lock.lock_resp_p = resp_p;
+    sm_p->u.lock.lock_id_arr_p = lock_id_arr_p;
+    sm_p->u.lock.lock_id_arr_count_p = lock_id_arr_count_p;
     sm_p->u.lock.encoding = cur_fs->encoding;
     sm_p->u.lock.stored_error_code = 0;
     sm_p->u.lock.retry_count = 0;
@@ -290,6 +294,8 @@ PVFS_error PVFS_sys_lock(
     PVFS_Request mem_req,
     PVFS_credentials *credentials,
     PVFS_sysresp_lock *resp_p,
+    PVFS_id_gen_t **lock_id_arr_p,
+    int *lock_id_arr_count_p,
     enum PVFS_io_type io_type,
     enum PVFS_lock_type lock_type)
 {
@@ -299,7 +305,8 @@ PVFS_error PVFS_sys_lock(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_lock entered\n");
     
     ret = PVFS_isys_lock(ref, file_req, file_req_offset, mem_req,
-			 credentials, resp_p, io_type,
+			 credentials, resp_p, 
+			 lock_id_arr_p, lock_id_arr_count_p, io_type,
 			 lock_type, &op_id, NULL);
     if (ret == 1)
 	return 0;
@@ -458,24 +465,53 @@ static int lock_setup_msgpairs(PINT_client_sm *sm_p,
 
     sm_p->u.lock.total_cancellations_remaining = 0;
 
+    /* Allocate the client's lock_id_arr and set its size if this is
+     * an acquire call. */
+    if (sm_p->u.lock.lock_type == PVFS_ACQUIRE)
+    {
+	*(sm_p->u.lock.lock_id_arr_p) = (PVFS_id_gen_t *) 
+	    calloc(target_datafile_count, sizeof(PVFS_id_gen_t));
+	if (*(sm_p->u.lock.lock_id_arr_p) == NULL)
+	{
+	    js_p->error_code = -PVFS_ENOMEM;
+	    goto error_exit;
+	}
+	*(sm_p->u.lock.lock_id_arr_count_p) = target_datafile_count;
+    }
+
     for (i = 0; i < target_datafile_count; i++)
     {
 	gossip_debug(GOSSIP_LOCK_DEBUG, "  filling lock request for %llu\n",
 		     llu(sm_p->u.lock.contexts[i].data_handle));
 	
-	PINT_SERVREQ_LOCK_FILL(
-	    sm_p->u.lock.contexts[i].msg.req,
-	    *(sm_p->cred_p),
-	    sm_p->object_ref.fs_id,
-	    sm_p->u.lock.contexts[i].data_handle,
-	    sm_p->u.lock.io_type,
-	    sm_p->u.lock.lock_type,
-	    sm_p->u.lock.datafile_index_array[i],
-            attr->u.meta.dfile_count,
-            attr->u.meta.dist,
-            sm_p->u.lock.file_req,
-            sm_p->u.lock.file_req_offset,
-            PINT_REQUEST_TOTAL_BYTES(sm_p->u.lock.mem_req));
+	if (sm_p->u.lock.lock_type == PVFS_ACQUIRE)
+	    PINT_SERVREQ_LOCK_FILL(
+		sm_p->u.lock.contexts[i].msg.req,
+		*(sm_p->cred_p),
+		sm_p->object_ref.fs_id,
+		sm_p->u.lock.contexts[i].data_handle,
+		sm_p->u.lock.io_type,
+		sm_p->u.lock.lock_type,
+		sm_p->u.lock.datafile_index_array[i],
+		attr->u.meta.dfile_count,
+		attr->u.meta.dist,
+		sm_p->u.lock.file_req,
+		sm_p->u.lock.file_req_offset,
+		PINT_REQUEST_TOTAL_BYTES(sm_p->u.lock.mem_req));
+	else
+	    PINT_SERVREQ_LOCK_FILL(
+		sm_p->u.lock.contexts[i].msg.req,
+		*(sm_p->cred_p),
+		sm_p->object_ref.fs_id,
+		sm_p->u.lock.contexts[i].data_handle,
+		sm_p->u.lock.io_type,
+		sm_p->u.lock.lock_type,
+		sm_p->u.lock.datafile_index_array[i],
+		attr->u.meta.dfile_count,
+		attr->u.meta.dist,
+		PVFS_BYTE,
+		(*(sm_p->u.lock.lock_id_arr_p))[i],
+		-1);
     }
     
     js_p->error_code = 0;
@@ -780,7 +816,7 @@ static int lock_post_msgpairs_retry(PINT_client_sm *sm_p,
 static int lock_complete_operations(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    int ret = -PVFS_EINVAL, index = 0, i;
+    int ret = -PVFS_EINVAL, i;
     unsigned long status_user_tag = (unsigned long)
         js_p->status_user_tag;
     PINT_client_lock_ctx *cur_ctx = NULL;
@@ -816,7 +852,10 @@ static int lock_complete_operations(
             } else if (ret == 0) {
                 /* is a send */
                 gossip_debug(GOSSIP_LOCK_DEBUG, "  matched send in context "
-                             "%d; continuing.\n", index);
+                             "%lu; continuing.\n", 
+			     STATUS_USER_TAG_GET_INDEX(
+				 status_user_tag,
+				 LOCK_SM_PHASE_REQ_MSGPAIR_SEND));
                 js_p->error_code = 0;
                 /* If send had problem, BMI will apparently ensure that the
                  * recv will fail too, so handle the retry stuff there.
@@ -995,6 +1034,16 @@ static int lock_cleanup(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) lock state: lock_cleanup\n", sm_p);
+
+    if (sm_p->u.lock.lock_type == PVFS_RELEASE)
+    {
+	if (sm_p->u.lock.lock_resp_p->granted_bytes == -1 *
+	    (*(sm_p->u.lock.lock_id_arr_count_p)))
+	    free(*(sm_p->u.lock.lock_id_arr_p));
+	else
+	    gossip_err("lock_cleanup: Did not free lock_id_arr since "
+		       "releasing was unsuccessful\n");
+    }
 
     lock_contexts_destroy(sm_p);
 
@@ -1253,9 +1302,21 @@ static inline int lock_process_context_recv(
     }
 
     /* Modify the client response based on the server response. */
-    sm_p->u.lock.lock_resp_p->lock_id = resp->u.lock.lock_id; 
-    sm_p->u.lock.lock_resp_p->bstream_size = resp->u.lock.bstream_size;
-    sm_p->u.lock.lock_resp_p->granted_bytes +=resp->u.lock.granted_bytes;
+    if (sm_p->u.lock.lock_type == PVFS_ACQUIRE)
+    {
+	(*(sm_p->u.lock.lock_id_arr_p))[index] = resp->u.lock.lock_id;
+	sm_p->u.lock.lock_resp_p->lock_id = resp->u.lock.lock_id; 
+	sm_p->u.lock.lock_resp_p->bstream_size = resp->u.lock.bstream_size;
+	sm_p->u.lock.lock_resp_p->granted_bytes +=resp->u.lock.granted_bytes;
+    }
+    else
+    {
+	if (resp->u.lock.granted_bytes != -1)
+	    gossip_err("PVFS_RELEASE: Failed to fully release all locks "
+		       "with req.  Released %Ld bytes.\n", 
+		       resp->u.lock.granted_bytes);
+	sm_p->u.lock.lock_resp_p->granted_bytes += resp->u.lock.granted_bytes;
+    }
 
     /* save the datafile size */
     sm_p->u.lock.dfile_size_array[cur_ctx->index] = resp->u.io.bstream_size;
