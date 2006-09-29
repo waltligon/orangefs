@@ -128,7 +128,7 @@ void PINT_event_init_mpe_log_file(void)
             "white", "value=%l");
     }
 
-    formatString ="comm:%d,rank:%d,cid:%d,op=%d,value=%l"; /*,job-id=%l*/
+    formatString ="comm=%d,rank=%d,cid=%d,op=%d,value=%l"; /*,job-id=%l*/
 #else 
     formatString ="";
 #endif
