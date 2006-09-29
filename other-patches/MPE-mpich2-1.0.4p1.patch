@@ -209,7 +209,7 @@ diff -ur mpich2-1.0.4p1/src/mpe2/src/wrappers/src/log_mpi_io.c mpich2-1.0.4p1-pa
 +  int added_info;
 +  MPI_Info info = MPI_INFO_NULL;
 +  pvfs2_set_request_ID(comm, & info, io_type, & added_info);
-+  MPI_File_set_info(fh, info);
++  PMPI_File_set_info(fh, info);
 +  MPI_Info_free(& info);
 +  return 0;
 +}
