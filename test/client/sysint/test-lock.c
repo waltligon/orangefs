@@ -44,6 +44,7 @@ int main(
     PVFS_sysresp_lookup resp_lk;
     PVFS_sysresp_create resp_cr;
     PVFS_sysresp_lock resp_lock;
+    PVFS_sysresp_getattr resp_getattr;
     char *filename;
     int rounds = -1, check = -1, ret = -1, i, j, myid, numprocs;
     PVFS_fs_id fs_id;
@@ -223,6 +224,10 @@ int main(
 	pinode_refn.fs_id = fs_id;
 	pinode_refn.handle = resp_lk.ref.handle;
     }
+
+    /* Need to get the attr in cache */
+    PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
+		     &credentials, &resp_getattr);
     
     /* Do locking */
 #if 0    
