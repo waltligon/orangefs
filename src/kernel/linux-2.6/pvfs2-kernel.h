@@ -308,6 +308,15 @@ int pvfs2_xattr_get_default(struct inode *inode,
 
 #endif
 
+#ifndef HAVE_STRUCT_XTVEC
+/* Redefine xtvec structure so that we could move helper functions out of the define */
+struct xtvec 
+{
+    __kernel_off_t xtv_off;  /* must be off_t */
+    __kernel_size_t xtv_len; /* must be size_t */
+};
+#endif
+
 /************************************
  * pvfs2 data structures
  ************************************/

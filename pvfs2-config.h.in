@@ -237,6 +237,9 @@
 /* Define to 1 if you have the `strtoull' function. */
 #undef HAVE_STRTOULL
 
+/* Define if struct xtvec is defined in the kernel */
+#undef HAVE_STRUCT_XTVEC
+
 /* Define if sysinfo.h is present */
 #undef HAVE_SYSINFO
 

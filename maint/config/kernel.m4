@@ -99,6 +99,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_IGET5_LOCKED, 1, Define if kernel has iget5_locked),
 	)
 
+	dnl Check if the kernel defines the xtvec structure.
+	dnl This was part of a POSIX extension
+	AC_MSG_CHECKING(for struct xtvec in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/uio.h>
+		static struct xtvec xv;
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STRUCT_XTVEC, 1, Define if struct xtvec is defined in the kernel),
+		AC_MSG_RESULT(no)
+	)
+
 	dnl The name of this field changed from memory_backed to capabilities
 	dnl in 2.6.12.
 	AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
