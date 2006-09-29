@@ -94,12 +94,13 @@ int PINT_event_initialize(int ring_size, int enable_on_startup)
 
 #if defined(HAVE_MPE)
 void PINT_event_init_mpe_log_file(void);
+void PINT_event_finish_log(const char * logfile);
 
 void PINT_event_init_mpe_log_file(void)
 {
     char * formatString;
     int i;
-    MPE_Init_log();
+	MPE_Init_log();
 
     MPE_Log_get_solo_eventID(&PINT_event_job_start);
     MPE_Log_get_solo_eventID(&PINT_event_job_stop);
@@ -149,6 +150,10 @@ void PINT_event_init_mpe_log_file(void)
     MPE_Describe_info_event(PINT_event_unexpected_decode, "Request decode", "gray", formatString);
 }
 
+void PINT_event_finish_log(const char * logfile)
+{
+    MPE_Finish_log(logfile);
+}
 
 /*
  * PINT_event_mpe_init
@@ -156,12 +161,13 @@ void PINT_event_init_mpe_log_file(void)
  */
 int PINT_event_mpe_init(void)
 {
-    PMPI_Init(NULL, NULL);
     if (mpe_logfile == NULL)
     {
-        const char buf[] = "/tmp/pvfs2-tmp-log";
+        const char buf[] = "/tmp/pvfs2-mpe-log";
         mpe_logfile = strdup(buf);
     }
+    
+    PMPI_Init(NULL, NULL);    
     PINT_event_init_mpe_log_file();
     
     return 0;
@@ -172,9 +178,9 @@ void PINT_event_mpe_finalize(void)
     if (PINT_event_on)
     {
         gossip_err("Writing clog2 to: %s \n", mpe_logfile);
-        MPE_Finish_log(mpe_logfile);
+        PINT_event_finish_log(mpe_logfile);
     }
-    MPI_Finalize();
+    PMPI_Finalize();
     return;
 }
 #endif /* HAVE_MPE */
@@ -285,7 +291,7 @@ void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask)
 #if defined(HAVE_MPE)
      if(PINT_event_on && ! event_on){ 
         gossip_err("Writing clog2 to: %s \n", mpe_logfile);
-        MPE_Finish_log(mpe_logfile);
+        PINT_event_finish_log(mpe_logfile);
         PINT_event_init_mpe_log_file();
      }
 #endif
