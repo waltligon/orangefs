@@ -143,7 +143,7 @@ diff -ur mpich2-1.0.4p1/src/mpe2/src/wrappers/src/log_mpi_io.c mpich2-1.0.4p1-pa
 +        /*buffer for logging of CallID*/ \
 +        int bytebuf_pos = 0; /* position pointer for buffer */ \
 +        int rank; \
-+        MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
++        PMPI_Comm_rank(MPI_COMM_WORLD, &rank); \
 +        MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, & rank ); \
 +        MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, & pvfs2_increment_id );
 +
@@ -152,7 +152,7 @@ diff -ur mpich2-1.0.4p1/src/mpe2/src/wrappers/src/log_mpi_io.c mpich2-1.0.4p1-pa
 +        /*buffer for logging of CallID*/ \
 +        int bytebuf_pos = 0; /* position pointer for buffer */ \
 +        int rank; \
-+        MPI_Comm_rank(comm, &rank); \
++        PMPI_Comm_rank(comm, &rank); \
 +        MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, & rank ); \
 +        MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, & pvfs2_increment_id );
 +
@@ -176,13 +176,13 @@ diff -ur mpich2-1.0.4p1/src/mpe2/src/wrappers/src/log_mpi_io.c mpich2-1.0.4p1-pa
 +  
 +  if( comm != 0 )
 +  {
-+    MPI_Comm_rank(comm, &rank);
++    PMPI_Comm_rank(comm, &rank);
 +    snprintf(value, PVFS2_MAX_HINT, "host:%s,comm:%d,rank:%d,id:%d,op:%s", 
 +             hostname, comm, rank, pvfs2_increment_id++,io_type);
 +  }
 +  else
 +  {
-+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
++    PMPI_Comm_rank(MPI_COMM_WORLD, &rank);
 +    snprintf(value, PVFS2_MAX_HINT, "host:%s,comm:%d,rank:%d,id:%d,op:%s", 
 +             hostname,MPI_COMM_WORLD,rank,pvfs2_increment_id++,io_type);
 +  }
