@@ -737,7 +737,7 @@ cleaner: clean
 	rm -rf autom4te*.cache
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
 	rm -f config.log config.status config.cache 
-	rm -f pvfs2-@PVFS2_VERSION@.tar.gz
+	rm -f pvfs-@PVFS2_VERSION@.tar.gz
 
 # _really_ clean the tree; should go back to pristine state
 # except, don't remove generated .c files if this is a distributed release
