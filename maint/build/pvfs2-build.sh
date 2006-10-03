@@ -116,7 +116,7 @@ get_cvs $cvs_tag || exit 1
 mkdir $builddir
 mkdir $installdir
 cd $builddir
-if [ $build_kernel == "true" ] ; then
+if [ $build_kernel = "true" ] ; then
 	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure.log 2>&1
 	make_targets="all kmod"
 else
@@ -139,7 +139,7 @@ fi
 
 # look through make output
 PEMM=`which pvfs2-extract-make-msgs.pl 2>/dev/null`
-if [ x$PEMM == "x" ] ; then
+if [ x$PEMM = "x" ] ; then
 	if [ ! -x $old_wd/pvfs2-extract-make-msgs.pl ] ; then
 		echo "Failed to find pvfs2-extract-make-msgs.pl.  Aborting."
 		exit 1
@@ -164,12 +164,12 @@ if [ $? != 0 ] ; then
 	exit 1
 fi
 
-if [ $build_kernel == "true" ] ; then
+if [ $build_kernel = "true" ] ; then
 	make kmod_prefix=${installdir} kmod_install
 fi
 
 # build tests if needed 
-if [ $build_tests == "true" ] ; then
+if [ $build_tests = "true" ] ; then
 	cd $builddir/test
 	$srcdir/test/configure $configureopts > $rootdir/configure-test.log 2>&1
 	if [ $? != 0 ] ; then
@@ -187,7 +187,7 @@ if [ $build_tests == "true" ] ; then
 
 	# look through make output
 	PEMM=`which pvfs2-extract-make-msgs.pl 2>/dev/null`
-	if [ x$PEMM == "x" ] ; then
+	if [ x$PEMM = "x" ] ; then
 		if [ ! -x $old_wd/pvfs2-extract-make-msgs.pl ] ; then
 			echo "Failed to find pvfs2-extract-make-msgs.pl.  Aborting."
 			exit 1
