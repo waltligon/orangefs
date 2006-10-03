@@ -21,7 +21,7 @@ TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/sysint-tests.d
 VFS_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
-REPORT_LOG=${PVFS2_DEST}/alltests.log
+REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
@@ -74,7 +74,7 @@ pull_and_build_mpich2 () {
 
 	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
-		--without-mpe --disable-cxx --disable-f77 >mpich2config.log &&\
+		--without-mpe --disable-cxx --disable-f77 >mpich2config-${CVS_TAG}.log &&\
 	make >/dev/null && make install >/dev/null 
 }
 
@@ -103,11 +103,11 @@ setup_pvfs2() {
 		--iospec="`hostname -s`:{3396-3399}" \
 		--metaspec="`hostname -s`:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
-		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
+		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
 	# clean up any artifacts from earlier runs
-	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2*
-	rm -f ${PVFS2_DEST}/pvfs2-server.log* 
-	failure_logs="${PVFS2_DEST}/pvfs2-server.log* $failure_logs"
+	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
+	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
+	failure_logs="${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* $failure_logs"
 	for server_conf in server.conf*; do 
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid \
@@ -145,7 +145,10 @@ teardown_pvfs2() {
 
 buildfail() {
 	echo "Failure in build process"
-	cat ${PVFS2_DEST}/configure.log ${PVFS2_DEST}/make-extracted.log ${PVFS2_DEST}/make-install.log ${PVFS2_DEST}/make.log | \
+	cat ${PVFS2_DEST}/configure-${CVS_TAG}.log \
+		${PVFS2_DEST}/make-extracted-${CVS_TAG}.log \
+		${PVFS2_DEST}/make-install-${CVS_TAG}.log \
+		${PVFS2_DEST}/make-${CVS_TAG}.log | \
 		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} build_failed $STARTTIME 
 	exit 1
 }
@@ -153,7 +156,7 @@ buildfail() {
 setupfail() {
 	echo "Failure in setup"
 	dmesg | tail -20 > ${PVFS2_DEST}/dmesg
-	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-server.log* | \
+	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* | \
 		${TINDERSCRIPT}  ${TESTNAME}-${CVS_TAG} test_failed $STARTTIME 
 	exit 1
 }
@@ -178,13 +181,13 @@ run_parts() {
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
 			echo -n "====== running $f ..."
-			./$f > ${PVFS2_DEST}/${f}.log
+			./$f > ${PVFS2_DEST}/${f}-${CVS_TAG}.log
 			if [ $? == 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
 				echo "OK"
 			else
 				nr_failed=$((nr_failed + 1))
-				failure_logs="$failure_logs ${PVFS2_DEST}/${f}.log"
+				failure_logs="$failure_logs ${PVFS2_DEST}/${f}-${CVS_TAG}.log"
 				echo "FAILED"
 			fi
 		fi

@@ -117,23 +117,23 @@ mkdir $builddir
 mkdir $installdir
 cd $builddir
 if [ $build_kernel = "true" ] ; then
-	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure.log 2>&1
+	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all kmod"
 else
-	$srcdir/configure $configureopts --prefix=$installdir  > $rootdir/configure.log 2>&1
+	$srcdir/configure $configureopts --prefix=$installdir  > $rootdir/configure-${cvs_tag}.log 2>&1
 	make_targets="all"
 fi
 
 if [ $? != 0 ] ; then
-	echo "Configure failed; see $rootdir/configure.log.  Aborting."
+	echo "Configure failed; see $rootdir/configure-${cvs_tag}.log.  Aborting."
 	exit 1
 fi
 
 # make
-make $make_targets > $rootdir/make.log 2>&1
+make $make_targets > $rootdir/make-${cvs_tag}.log 2>&1
 
 if [ $? != 0 ] ; then
-	echo "Make failed; see $rootdir/make.log.  Aborting."
+	echo "Make failed; see $rootdir/make-${cvs_tag}.log.  Aborting."
 	exit 1
 fi
 
@@ -147,20 +147,20 @@ if [ x$PEMM = "x" ] ; then
 		PEMM=$old_wd/pvfs2-extract-make-msgs.pl 
 	fi
 fi
-$PEMM $rootdir/make.log > $rootdir/make-extracted.log 2>&1
+$PEMM $rootdir/make-${cvs_tag}.log > $rootdir/make-extracted-${cvs_tag}.log 2>&1
 
 if [ $? != 0 ] ; then
 	# warnings used to be fatal.  We still want no warnings, but we'll flag
 	# that we found some instead of bailing out altogether.
-	echo "Unexpected output during make; see $rootdir/make-extracted.log."
+	echo "Unexpected output during make; see $rootdir/make-extracted-${cvs_tag}.log."
 	touch $rootdir/pvfs-built-with-warnings
 fi
 
 # make install
-make install > $rootdir/make-install.log 2>&1
+make install > $rootdir/make-install-${cvs_tag}.log 2>&1
 
 if [ $? != 0 ] ; then
-	echo "Make install failed; see $rootdir/make-install.log.  Aborting."
+	echo "Make install failed; see $rootdir/make-install-${cvs_tag}.log.  Aborting."
 	exit 1
 fi
 
@@ -171,17 +171,17 @@ fi
 # build tests if needed 
 if [ $build_tests = "true" ] ; then
 	cd $builddir/test
-	$srcdir/test/configure $configureopts > $rootdir/configure-test.log 2>&1
+	$srcdir/test/configure $configureopts > $rootdir/configure-test-${cvs_tag}.log 2>&1
 	if [ $? != 0 ] ; then
-		echo "Configure of test programs failed; see $rootdir/configure-test.log.  Aborting."
+		echo "Configure of test programs failed; see $rootdir/configure-test-${cvs_tag}.log.  Aborting."
 		exit 1
 	fi
 
 	# make
-	make  all > $rootdir/make-test.log 2>&1
+	make  all > $rootdir/make-test-${cvs_tag}.log 2>&1
 
 	if [ $? != 0 ] ; then
-		echo "Make failed; see $rootdir/make-test.log.  Aborting."
+		echo "Make failed; see $rootdir/make-test-${cvs_tag}.log.  Aborting."
 		exit 1
 	fi
 
@@ -195,16 +195,16 @@ if [ $build_tests = "true" ] ; then
 			PEMM=$old_wd/pvfs2-extract-make-msgs.pl 
 		fi
 	fi
-	$PEMM $rootdir/make-test.log  > $rootdir/make-test-extracted.log 2>&1
+	$PEMM $rootdir/make-test-${cvs_tag}.log  > $rootdir/make-test-extracted-${cvs_tag}.log 2>&1
 	if [ $? != 0 ] ; then
 		# same as above.  Indicate that we found something, 
 		# but don't abort
-		echo "Unexpected output during test make; see $rootdir/make-test-extracted.log."
+		echo "Unexpected output during test make; see $rootdir/make-test-extracted-${cvs_tag}.log."
 		touch $rootdir/pvfs2-test-built-with-warnings
 	fi
-	make install > $rootdir/make-test-install.log 2>&1
+	make install > $rootdir/make-test-install-${cvs_tag}.log 2>&1
 	if [ $? != 0 ] ; then
-		echo "Make install (tests) failed; see $rootdir/make-test-install.log.  Aborting."
+		echo "Make install (tests) failed; see $rootdir/make-test-install-${cvs_tag}.log.  Aborting."
 		exit 1
 	fi
 fi
