@@ -529,6 +529,9 @@ void PINT_push_state(struct PINT_smcb *smcb,
  */
 void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
 {
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "FRAME smcb %p base %d stack %d\n",
+            smcb, smcb->framebaseptr, smcb->framestackptr);
     assert(smcb->framebaseptr + index < smcb->framestackptr);
     
     return smcb->frame_stack[smcb->framebaseptr + index].frame;
@@ -542,6 +545,9 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
 void PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p)
  {
     int index;
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "PUSH smcb %p base %d stack %d\n",
+            smcb, smcb->framebaseptr, smcb->framestackptr);
     assert(smcb->framestackptr < PINT_FRAME_STACK_SIZE);
 
     index = smcb->framestackptr;
@@ -557,6 +563,9 @@ void PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p)
  */
 void PINT_sm_set_frame(struct PINT_smcb *smcb)
 {
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "SET smcb %p base %d stack %d\n",
+            smcb, smcb->framebaseptr, smcb->framestackptr);
     assert(smcb->framestackptr >= 0);
 
     if (smcb->framestackptr == 0)
@@ -574,6 +583,9 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb)
 {
     int index;
     void *frame;
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "POP smcb %p base %d stack %d\n",
+            smcb, smcb->framebaseptr, smcb->framestackptr);
     assert(smcb->framestackptr > smcb->framebaseptr);
 
     smcb->framestackptr--;
@@ -600,8 +612,7 @@ struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id)
 
     pjmptbl = smcb->current_state->pjtbl;
     for (i = 0; ; i++)
-    {
-        if (pjmptbl[i].return_value == task_id ||
+    { if (pjmptbl[i].return_value == task_id ||
                 pjmptbl[i].return_value == -1)
             return pjmptbl[i].state_machine->first_state;
     }
@@ -640,11 +651,11 @@ void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
         /* locate SM to run */
         new_sm->current_state = PINT_sm_task_map(smcb,
                 smcb->frame_stack[i].task_id);
-
-fprintf(stderr,"child %d task_id %d state %p flag %d func %p\n",
-    i, smcb->frame_stack[i].task_id, new_sm->current_state,
-    new_sm->current_state->flag, new_sm->current_state->action.func);
-
+#if 0
+        fprintf(stderr,"child %d task_id %d state %p flag %d func %p\n",
+            i, smcb->frame_stack[i].task_id, new_sm->current_state,
+            new_sm->current_state->flag, new_sm->current_state->action.func);
+#endif
         /* invoke SM */
         retval = PINT_state_machine_start(new_sm, &r);
     }

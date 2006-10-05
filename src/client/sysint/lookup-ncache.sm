@@ -144,7 +144,7 @@ static int lookup_ncache_lookup(struct PINT_smcb *smcb,
             llu(object_ref.handle), object_ref.fs_id);
 
         sm_p->ncache_hit = 1;
-	ret = sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
+	ret = sm_p->msgpair.comp_fn(smcb, &fake_resp, 0);
 	return 1;
     }
 
