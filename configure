@@ -1309,7 +1309,6 @@ Optional Features:
                           (epoll is enabled by default, this option
 			  ensures no checking is done for x-compiling)
   --disable-epoll         Disable epoll, use poll instead
-  --enable-rev-hostname   Enables hostname resolution in BMI reverse lookups
   --enable-segv-backtrace Enables back traces in segfault signal handler
   --enable-shared         Build shared client library
   --enable-static-server  Builds the server static
@@ -12085,13 +12084,6 @@ if test "${enable_epoll+set}" = set; then
 else
 
   test_for_epoll
-
-fi
-
-
-# Check whether --enable-rev-hostname was given.
-if test "${enable_rev_hostname+set}" = set; then
-  enableval=$enable_rev_hostname; CFLAGS="$CFLAGS -D__PVFS2_BMI_REV_LOOKUP_HOSTNAME__"
 
 fi
 

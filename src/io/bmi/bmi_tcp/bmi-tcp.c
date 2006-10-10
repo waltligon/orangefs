@@ -1760,11 +1760,26 @@ int BMI_tcp_query_addr_range(method_addr_p map, const char *wildcard_string, int
 const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
 {
     struct tcp_addr *tcp_addr_data = map->method_data;
+    int debug_on;
+    uint64_t mask;
 
-#if !defined(__PVFS2_BMI_REV_LOOKUP_HOSTNAME__) || !defined(HAVE_GETHOSTBYADDR)
+    /* return default response if we don't have support for the right socket
+     * calls 
+     */
+#if !defined(HAVE_GETHOSTBYADDR)
     return(tcp_addr_data->peer);
-
 #else 
+
+    /* Only resolve hostnames if a gossip mask is set to request it.
+     * Otherwise we leave it at ip address 
+     */
+    gossip_get_debug_mask(&debug_on, &mask);
+
+    if(!debug_on || (!(mask & GOSSIP_ACCESS_HOSTNAMES)))
+    {
+        return(tcp_addr_data->peer);
+    }
+
     socklen_t peerlen = sizeof(struct sockaddr_in);
     struct sockaddr_in peer;
     int ret;
