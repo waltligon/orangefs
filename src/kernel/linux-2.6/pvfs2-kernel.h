@@ -144,7 +144,6 @@ typedef unsigned long sector_t;
 #define PVFS2_SEEK_END                 0x00000002
 #define PVFS2_MAX_NUM_OPTIONS          0x00000004
 #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
-#define PVFS2_NUM_READDIR_RETRIES      0x0000000A
 #define PVFS2_MAX_FSKEY_LEN            64
 
 #define MAX_DEV_REQ_UPSIZE (2*sizeof(int32_t) +   \
@@ -358,9 +357,8 @@ typedef struct
 typedef struct
 {
     PVFS_object_ref refn;
-    int num_readdir_retries;
-    uint64_t directory_version;
     char *link_target;
+    uint64_t directory_version;
     /*
      * Reading/Writing Extended attributes need to acquire the appropriate
      * reader/writer semaphore on the pvfs2_inode_t structure.
