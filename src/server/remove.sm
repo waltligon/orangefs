@@ -316,7 +316,7 @@ static int remove_check_dirdata_entries(
                          "-- returning error\n",
                          s_op->u.remove.fs_id,
                          llu(s_op->u.remove.handle),
-                         llu(s_op->u.remove.dirent_count));
+                         llu(s_op->u.remove.keyval_handle_info.count));
             js_p->error_code = -PVFS_ENOTEMPTY;
         }
     }
