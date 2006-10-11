@@ -538,7 +538,7 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 #define PVFS_EHOSTDOWN       E(55) /* Host is down */
 #define PVFS_EHOSTUNREACH    E(56) /* No route to host */
 #define PVFS_EALREADY        E(57) /* Operation already in progress */
-#define PVFS_EACCES          E(58) /* Operation already in progress */
+#define PVFS_EACCES          E(58) /* Access not allowed */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
