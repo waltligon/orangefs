@@ -246,11 +246,11 @@ PVFS_error PVFS_isys_create(
         return ret;
     }
 
-    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
-        PVFS_ATTR_SYS_ALL_SETABLE)
+    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
     {
-        gossip_lerr("PVFS_isys_create() failure: invalid attributes "
-                    "specified\n");
+        gossip_lerr("PVFS_isys_create() failure: invalid attribute mask: %d, "
+                    "expected SYS_ALL_SETABLE (%d)\n",
+                    attr.mask, PVFS_ATTR_SYS_ALL_SETABLE);
         return ret;
     }
 
