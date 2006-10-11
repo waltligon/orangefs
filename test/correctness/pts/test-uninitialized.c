@@ -262,7 +262,7 @@ static int test_remove(void)
 static int test_rename(void)
 {
 
-//      return PVFS_sys_rename(old_name, old_parent_refn, new_name, new_parent_refn, credentials);
+/*      return PVFS_sys_rename(old_name, old_parent_refn, new_name, new_parent_refn, credentials); */
     return -2;
 }
 

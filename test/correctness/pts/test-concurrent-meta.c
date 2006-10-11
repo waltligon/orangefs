@@ -270,7 +270,7 @@ int test_concurrent_meta(MPI_Comm * comm __unused,
 		    ret = list_dir("/test_dir",fs_id);
 		    if(ret >= 0){
 			PVFS_perror("list_dir",ret);
-			//return ret;
+			/* return ret; */
 		    }
 		}
 		return 0;
@@ -282,7 +282,7 @@ int test_concurrent_meta(MPI_Comm * comm __unused,
 		    if(ret < 0)
 		    {
 			PVFS_perror("getattr\n",ret);
-			//return ret;
+			/* return ret; */
 		    }
 		}
 		return 0;
@@ -294,7 +294,7 @@ int test_concurrent_meta(MPI_Comm * comm __unused,
 		    if(ret < 0)
 		    {
 			PVFS_perror("lookup\n",ret);
-			//return ret;
+			/* return ret; */
 		    }
 		}
 		return 0;
@@ -306,7 +306,7 @@ int test_concurrent_meta(MPI_Comm * comm __unused,
 		    if(ret < 0)
 		    {
 			PVFS_perror("lookup\n",ret);
-			//return ret;
+			/* return ret; */
 		    }
 		}
 		return 0;
