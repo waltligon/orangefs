@@ -133,7 +133,8 @@ machine pvfs2_mgmt_migrate_sm(
     state metaserver_find_target_handle_number
     {
         run mgmt_migrate_metaserver_find_target_handle_number;
-        default => metaserver_rewrite_handles; 
+        success => metaserver_rewrite_handles
+        default => final_response; 
     }
     /*
      * Once the message pair finishes we know the datatransfer is completed.
