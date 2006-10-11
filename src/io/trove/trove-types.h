@@ -116,6 +116,7 @@ typedef PVFS_object_ref            TROVE_object_ref;
 #define TROVE_ENOMEDIUM       (PVFS_ENOMEDIUM | PVFS_ERROR_TROVE)
 #define TROVE_EMEDIUMTYPE     (PVFS_EMEDIUMTYPE | PVFS_ERROR_TROVE)
 #define TROVE_ECANCEL         (PVFS_ECANCEL | PVFS_ERROR_TROVE)
+#define TROVE_EACCES          (PVFS_EACCES | PVFS_ERROR_TROVE)
 
 #endif
 
