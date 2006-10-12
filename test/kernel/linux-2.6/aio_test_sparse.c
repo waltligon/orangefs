@@ -44,7 +44,7 @@ static char *check_zero(char *buf, int size)
 	while (size > 0) {
 		if (*buf != 0) {
 			fprintf(stderr, "non zero buffer at buf[%d] => 0x%02x,%02x,%02x,%02x\n",
-				buf - p, (unsigned int)buf[0],
+				(int)(buf - p), (unsigned int)buf[0],
 				size > 1 ? (unsigned int)buf[1] : 0,
 				size > 2 ? (unsigned int)buf[2] : 0,
 				size > 3 ? (unsigned int)buf[3] : 0);
@@ -84,7 +84,7 @@ static int read_sparse(char *filename, int filesize)
 			if (r > 0) {
 				if ((badbuf = check_zero(buf, sizeof(buf)))) {
 					fprintf(stderr, "non-zero read at offset %d\n",
-						offset + badbuf - buf);
+						(int)(offset + badbuf - buf));
 					kill(getppid(), SIGTERM);
 					exit(10);
 				}

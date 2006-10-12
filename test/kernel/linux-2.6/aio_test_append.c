@@ -33,7 +33,7 @@ static int check_zero(char *buf, int size)
 	while (size > 0) {
 		if (*iptr++ != 0) {
 			fprintf(stderr, "non zero buffer at buf[%d]\n",
-				((char *)iptr) - buf);
+				(int)(((char *)iptr) - buf));
 			return 1;
 		}
 		size -= 4;
