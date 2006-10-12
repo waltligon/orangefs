@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.7 2006-09-15 21:23:56 pw Exp $
+ * $Id: vapi.c,v 1.8 2006-10-12 20:37:28 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -17,7 +17,6 @@
 #include <src/io/bmi/bmi-method-support.h>   /* struct method_addr */
 #include <src/common/misc/pvfs2-internal.h>
 #include <src/io/bmi/bmi-byteswap.h>  /* bmitoh64 */
-#include <src/common/gossip/gossip.h>
 
 #include "pvfs2-config.h" /* HAVE_IB_WRAP_COMMON_H configure symbol */
 

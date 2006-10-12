@@ -5,13 +5,14 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.23 2006-09-15 21:23:56 pw Exp $
+ * $Id: ib.h,v 1.24 2006-10-12 20:37:27 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
 
 #include <src/io/bmi/bmi-types.h>
 #include <src/common/quicklist/quicklist.h>
+#include <src/common/gossip/gossip.h>
 
 #ifdef __GNUC__
 /* #  define __hidden __attribute__((visibility("hidden"))) */
@@ -436,7 +437,7 @@ void memcache_shutdown(void *md);
 #define debug(lvl,fmt,args...) \
     do { \
 	if (lvl <= DEBUG_LEVEL) \
-	    info(fmt,##args); \
+	    gossip_debug(GOSSIP_BMI_DEBUG_IB, fmt ".\n", ##args); \
     } while (0)
 #else
 #  define debug(lvl,fmt,...) do { } while (0)
