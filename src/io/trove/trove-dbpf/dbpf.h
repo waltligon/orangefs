@@ -377,18 +377,31 @@ struct dbpf_keyval_get_handle_info_op
     TROVE_keyval_handle_info *info;
 };
 
+/*
+ * Keep the various types in one enum, but separate spaces in that
+ * for easy comparions.  Reserve the top two bits in an eight-bit
+ * space, leaving 64 entries in each.
+ */
+#define BSTREAM_OP_TYPE (0<<6)
+#define KEYVAL_OP_TYPE  (1<<6)
+#define DSPACE_OP_TYPE  (2<<6)
+#define OP_TYPE_MASK    (3<<6)
+
+#define DBPF_OP_IS_BSTREAM(t) (((t) & OP_TYPE_MASK) == BSTREAM_OP_TYPE)
+#define DBPF_OP_IS_KEYVAL(t)  (((t) & OP_TYPE_MASK) == KEYVAL_OP_TYPE)
+#define DBPF_OP_IS_DSPACE(t)  (((t) & OP_TYPE_MASK) == DSPACE_OP_TYPE)
 
 /* List of operation types that might be queued */
 enum dbpf_op_type
 {
-    BSTREAM_READ_AT = 1,
+    BSTREAM_READ_AT = BSTREAM_OP_TYPE,
     BSTREAM_WRITE_AT,
     BSTREAM_RESIZE,
     BSTREAM_READ_LIST,
     BSTREAM_WRITE_LIST,
     BSTREAM_VALIDATE,
     BSTREAM_FLUSH,
-    KEYVAL_READ = 8,  /* must change DBPF_OP_IS_BSTREAM also */
+    KEYVAL_READ = KEYVAL_OP_TYPE,
     KEYVAL_WRITE,
     KEYVAL_REMOVE_KEY,
     KEYVAL_VALIDATE,
@@ -398,7 +411,7 @@ enum dbpf_op_type
     KEYVAL_WRITE_LIST,
     KEYVAL_FLUSH,
     KEYVAL_GET_HANDLE_INFO,
-    DSPACE_CREATE = 18, /* must change DBPF_OP_KEYVAL also */
+    DSPACE_CREATE = DSPACE_OP_TYPE,
     DSPACE_REMOVE,
     DSPACE_ITERATE_HANDLES,
     DSPACE_VERIFY,
@@ -406,35 +419,6 @@ enum dbpf_op_type
     DSPACE_SETATTR,
     DSPACE_GETATTR_LIST,
 };
-
-#define DBPF_OP_IS_BSTREAM(__type)    \
-    (__type == BSTREAM_READ_AT ||     \
-     __type == BSTREAM_WRITE_AT ||    \
-     __type == BSTREAM_RESIZE ||      \
-     __type == BSTREAM_READ_LIST ||   \
-     __type == BSTREAM_WRITE_LIST ||  \
-     __type == BSTREAM_VALIDATE ||    \
-     __type == BSTREAM_FLUSH)
-
-#define DBPF_OP_IS_KEYVAL(__type)     \
-    (__type == KEYVAL_READ ||         \
-     __type == KEYVAL_WRITE ||        \
-     __type == KEYVAL_REMOVE_KEY ||   \
-     __type == KEYVAL_VALIDATE ||     \
-     __type == KEYVAL_ITERATE_KEYS || \
-     __type == KEYVAL_READ_LIST ||    \
-     __type == KEYVAL_WRITE_LIST ||   \
-     __type == KEYVAL_FLUSH ||        \
-     __type == KEYVAL_GET_HANDLE_INFO)
-    
-#define DBPF_OP_IS_DSPACE(__type)         \
-    (__type == DSPACE_CREATE ||           \
-     __type == DSPACE_REMOVE ||           \
-     __type == DSPACE_ITERATE_HANDLES ||  \
-     __type == DSPACE_VERIFY ||           \
-     __type == DSPACE_GETATTR ||          \
-     __type == DSPACE_SETATTR ||          \
-     __type == DSPACE_GETATTR_LIST)
 
 #define DBPF_OP_DOES_SYNC(__op)    \
     (__op == KEYVAL_WRITE       || \
