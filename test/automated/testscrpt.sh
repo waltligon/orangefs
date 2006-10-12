@@ -67,14 +67,11 @@ pull_and_build_mpich2 () {
 	cd mpich2-snap-*
 	mkdir build
 	cd build
-	CFLAGS="-g -I${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/include"
-	LDFLAGS="-L${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib"
-	LIBS="-lpvfs2 -lpthread -lgm"
-	export CFLAGS LDFLAGS LIBS
-
 	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
-		--without-mpe --disable-cxx --disable-f77 >mpich2config-${CVS_TAG}.log &&\
+		--with-pvfs2=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG} \
+		--enable-g=dbg --without-mpe \
+		--disable-f77 >mpich2config-${CVS_TAG}.log &&\
 	make >/dev/null && make install >/dev/null 
 }
 
