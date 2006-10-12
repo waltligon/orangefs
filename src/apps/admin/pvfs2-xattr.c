@@ -13,6 +13,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2.h"
@@ -253,9 +254,6 @@ static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "k:v:ts";
     int one_opt = 0;
 
