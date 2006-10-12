@@ -100,12 +100,12 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 
 	dnl Check if the kernel defines the xtvec structure.
-	dnl This was part of a POSIX extension
+	dnl This is part of a POSIX extension.
 	AC_MSG_CHECKING(for struct xtvec in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/uio.h>
-		static struct xtvec xv;
+		static struct xtvec xv = { 0, 0 };
 	], [],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_STRUCT_XTVEC, 1, Define if struct xtvec is defined in the kernel),
