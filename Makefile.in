@@ -290,6 +290,7 @@ ifdef BUILD_GM
 	LDFLAGS += -L @GM_HOME@/lib
 	SERVER_LDFLAGS += -L @GM_HOME@/lib
 	LIBS += -lgm
+	LIBS_THREADED += -lgm
 	SERVERLIBS += -lgm
 endif
 
@@ -311,6 +312,7 @@ ifndef BUILD_IB
 endif
     OPENIBLIBS := -L@OPENIB_LIBDIR@ -libverbs
     LIBS += $(OPENIBLIBS)
+    LIBS_THREADED += $(OPENIBLIBS)
     SERVERLIBS += $(OPENIBLIBS)
 endif
 
