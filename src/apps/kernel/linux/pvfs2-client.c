@@ -383,6 +383,8 @@ static void print_help(char *progname)
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
     printf("-p PATH, --path PATH          execute pvfs2-client at "
            "PATH\n");
+    printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
+    printf("--threaded                    use threaded client\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
