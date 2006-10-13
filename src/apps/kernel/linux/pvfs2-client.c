@@ -53,6 +53,7 @@ typedef struct
     char *path;
     char *logfile;
     char *logstamp;
+    int threaded;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -268,7 +269,15 @@ static int monitor_pvfs2_client(options_t *opts)
                 printf("About to exec %s\n",opts->path);
             }
 
-            arg_list[0] = PVFS2_CLIENT_CORE_NAME;
+            if(opts->threaded)
+            {
+                arg_list[0] = PVFS2_CLIENT_CORE_NAME "-threaded";
+            }
+            else
+            {
+                arg_list[0] = PVFS2_CLIENT_CORE_NAME;
+            }
+
             arg_list[1] = "-a";
             arg_list[2] = opts->acache_timeout;
             arg_list[3] = "-n";
@@ -401,6 +410,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"gossip-mask",1,0,0},
         {"path",1,0,0},
         {"logstamp",1,0,0},
+        {"threaded",0,0,0},
         {0,0,0,0}
     };
 
@@ -495,6 +505,11 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     opts->gossip_mask = optarg;
                     break;
                 }
+                else if (strcmp("threaded", cur_option) == 0)
+                {
+                    opts->threaded = 1;
+                    break;
+                }
                 break;
             case 'h':
           do_help:
@@ -562,7 +577,14 @@ static void parse_args(int argc, char **argv, options_t *opts)
           since they didn't specify a specific path, we're going to
           let execlp() sort things out later
         */
-        opts->path = PVFS2_CLIENT_CORE_NAME;
+        if(opts->threaded)
+        {
+            opts->path = PVFS2_CLIENT_CORE_NAME "-threaded";
+        }
+        else
+        {
+            opts->path = PVFS2_CLIENT_CORE_NAME;
+        }
     }
 
     if (!opts->acache_timeout)

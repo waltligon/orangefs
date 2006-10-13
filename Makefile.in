@@ -152,6 +152,7 @@ DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LIBS += -lpvfs2 @LIBS@ 
+LIBS_THREADED += -lpvfs2-threaded @LIBS@
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
@@ -273,8 +274,9 @@ endif
 #
 # run ./configure --help for information on how to do this cleanly.
 LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
-LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
+LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
 LIBS += @THREAD_LIB@
+LIBS_THREADED += @THREAD_LIB@
 
 ################################################################
 # enable GM if configure detected it
@@ -363,6 +365,8 @@ VISMISCSRC :=
 KARMASRC :=
 # userland helper programs for kernel drivers
 KERNAPPSRC :=
+#
+KERNAPPSTHRSRC :=
 # MISCSRC are sources that don't fall into the other categories
 MISCSRC := 
 # c files generated from state machines
@@ -389,6 +393,8 @@ endif
 ifeq ($(build_static),yes)
 LIBRARIES_STATIC = lib/libpvfs2.a
 LIBRARIES += $(LIBRARIES_STATIC)
+LIBRARIES_THREADED_STATIC = lib/libpvfs2-threaded.a
+LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
 endif
 
 ################################################################
@@ -454,6 +460,8 @@ KERNAPPS := $(patsubst %.c,%, $(filter %.c, $(KERNAPPSRC)))
 # objects
 KERNAPPDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KERNAPPSRC)))
 
+KERNAPPSTHR := $(patsubst %.c,%-threaded, $(filter %.c, $(KERNAPPSTHRSRC)))
+
 # VISOBJS is a list of visualization program objects
 VISOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISSRC)))
 # VISS is a list of visualization program executables
@@ -498,13 +506,13 @@ DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) \
 # Rules and dependencies
 
 # default rule builds server, library, and applications
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) $(LIBRARIES_THREADED) admintools $(VISS) $(KARMA)
 
 # target for building admin tools
 admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 # target for building kernel driver userland programs
-kernapps: $(KERNAPPS)
+kernapps: $(KERNAPPS) $(KERNAPPSTHR)
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -604,6 +612,10 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) $(call modldflags,$<)
 
+%-threaded: %.o $(LIBRARIES)
+	$(Q) "  LD              $@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS_THREADED) $(call modldflags,$<)
+
 # rule for building server objects
 %-server.o: %.c
 	$(Q) "  CC		$@"
@@ -612,7 +624,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 # default rule for building objects for threaded library
 %-threaded.o: %.c
 	$(Q) "  CC		$@"
-	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # rule for building shared objects for threaded library
 %-threaded.po: %.c
