@@ -104,6 +104,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "coalesce", GOSSIP_DBPF_COALESCE_DEBUG },
     /* Display the  hostnames instead of IP addrs in debug output */
     { "access_hostnames", GOSSIP_ACCESS_HOSTNAMES },
+    /* Show the client device events */
+    { "dev", GOSSIP_DEV_DEBUG },
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose",
       (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG))

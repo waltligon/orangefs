@@ -282,6 +282,10 @@ int PINT_dev_test_unexpected(
     pfd.fd = pdev_fd;
     pfd.events = POLLIN;
 
+    gossip_debug(GOSSIP_DEV_DEBUG, 
+                 "[DEV]: Entered %s: incount: %d, timeout: %d\n",
+                 __func__, incount, max_idle_time);
+
     do
     {
         /*
@@ -390,7 +394,8 @@ int PINT_dev_test_unexpected(
         if(*proto_ver != PVFS_KERNEL_PROTO_VERSION)
         {
             gossip_err("Error: protocol versions do not match.\n");
-            gossip_err("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
+            gossip_err("Please check that your pvfs2 module "
+                       "and pvfs2-client versions are consistent.\n");
             ret = -(PVFS_EPROTO|PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
@@ -429,6 +434,11 @@ int PINT_dev_test_unexpected(
         */
 
     } while((*outcount < incount) && avail);
+
+    gossip_debug(GOSSIP_DEV_DEBUG,
+                 "[DEV]: %s Exit: "
+                 "incount: %d, outcount: %d, bytes available: %d\n",
+                 __func__, incount, *outcount, avail);
 
     return ((*outcount > 0) ? 1 : 0);
 
