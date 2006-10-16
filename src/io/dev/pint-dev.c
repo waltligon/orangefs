@@ -321,6 +321,9 @@ int PINT_dev_test_unexpected(
             /* device is emptied */
             if (avail == 0)
             {
+                gossip_debug(GOSSIP_DEV_DEBUG,
+                             "[DEV]: Exiting %s: incount: %d, device empty!\n",
+                             __func__, incount);
                 return ((*outcount > 0) ? 1 : 0);
             }
 
