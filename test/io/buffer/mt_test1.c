@@ -66,7 +66,7 @@ int main(int argc, char * argv[])
         perror("pthread_join"),exit(1);
 
     trove_close_context(coll_id, trove_context);
-    trove_finalize();
+    trove_finalize(TROVE_METHOD_DBPF);
 
     //cache_dump_active_list();
     //cache_dump_inactive_list();

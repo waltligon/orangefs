@@ -615,7 +615,6 @@ static int translate_0_0_1(
      * will create
      */
     char handle_range[] = "4-64000000000";
-    char* method_name = NULL;
     TROVE_op_id op_id;
     TROVE_context_id trove_context = -1;
     char current_path[PATH_MAX];
@@ -681,7 +680,8 @@ static int translate_0_0_1(
     }
 
     /* initialize trove and lookup collection */
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+        TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0)
     {
         PVFS_perror("trove_initialize", ret);
@@ -689,7 +689,8 @@ static int translate_0_0_1(
         pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
         return(-1);
     }
-    ret = trove_collection_lookup(coll_name, &coll_id, NULL, &op_id);
+    ret = trove_collection_lookup(
+        TROVE_METHOD_DBPF, coll_name, &coll_id, NULL, &op_id);
     if (ret != 1)
     {   
         fprintf(stderr, "Error: failed to lookup new collection.\n");
@@ -740,7 +741,7 @@ static int translate_0_0_1(
 
     /* at this point, we are done with the Trove API */
     trove_close_context(coll_id, trove_context);
-    trove_finalize();
+    trove_finalize(TROVE_METHOD_DBPF);
     PINT_dist_finalize();
 
     /* convert bstreams */

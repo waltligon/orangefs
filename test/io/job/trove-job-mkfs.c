@@ -27,7 +27,6 @@ int main(int argc, char **argv)
     TROVE_coll_id coll_id;
     TROVE_handle root_handle;
     TROVE_keyval_s key, val;
-    char *method_name;
     job_status_s job_stat;
     job_id_t foo_id;
     job_context_id context;
@@ -71,20 +70,23 @@ int main(int argc, char **argv)
 
 
     /* try to initialize; fails if storage space isn't there? */
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+        TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "warning: initialize failed.  trying to create storage space.\n");
 
 	/* create the storage space */
 	/* Q: what good is the op_id here if we have to match on coll_id in test fn? */
-	ret = trove_storage_create(storage_space, NULL, &op_id);
+	ret = trove_storage_create(
+            TROVE_METHOD_DBPF, storage_space, NULL, &op_id);
 	if (ret < 0) {
 	    fprintf(stderr, "storage create failed.\n");
 	    return -1;
 	}
 
 	/* second try at initialize, in case it failed first try. */
-	ret = trove_initialize(storage_space, 0, &method_name, 0);
+	ret = trove_initialize(
+            TROVE_METHOD_DBPF, NULL, storage_space, 0);
 	if (ret < 0) {
 	    fprintf(stderr, "initialized failed second time.\n");
 	    return -1;
@@ -232,7 +234,7 @@ int main(int argc, char **argv)
 
 	job_close_context(context);
 	 job_finalize();
-	 trove_finalize();
+	 trove_finalize(TROVE_METHOD_DBPF);
     
     return 0;
 }

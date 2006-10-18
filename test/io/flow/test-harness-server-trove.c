@@ -73,7 +73,7 @@ int main(
     TROVE_coll_id coll_id;
     TROVE_handle file_handle, parent_handle;
     TROVE_ds_state state;
-    char *method_name, *file_name;
+    char *file_name;
     TROVE_keyval_s key, val;
     bmi_context_id context;
     TROVE_context_id trove_context;
@@ -106,7 +106,8 @@ int main(
 	return (-1);
     }
 
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+        TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0)
     {
 	fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
@@ -122,7 +123,8 @@ int main(
     }
 
     /* try to look up collection used to store file system */
-    ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
+    ret = trove_collection_lookup(
+        TROVE_METHOD_DBPF, file_system, &coll_id, NULL, &op_id);
     if (ret < 0)
     {
 	fprintf(stderr, "collection lookup failed.\n");
@@ -303,7 +305,7 @@ int main(
     BMI_finalize();
 
     trove_close_context(coll_id, trove_context);
-    trove_finalize();
+    trove_finalize(TROVE_METHOD_DBPF);
 
     gossip_disable();
     return (0);

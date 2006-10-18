@@ -70,14 +70,16 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
 	TROVE_ds_state state;
 	TROVE_keyval_s key, val;
 
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+	TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0) {
         fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
         return -1;
     }
 
     /* try to look up collection used to store file system */
-    ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
+    ret = trove_collection_lookup(
+	TROVE_METHOD_DBPF, file_system, &coll_id, NULL, &op_id);
     if (ret < 0) {
         fprintf(stderr, "collection lookup failed.\n");
         return -1;

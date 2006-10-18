@@ -3391,7 +3391,9 @@ int job_trove_fs_lookup(char *collname,
     user_ptr_internal = &jd->trove_callback;
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_collection_lookup(collname, &(jd->u.trove.fsid), 
+    ret = trove_collection_lookup(
+        TROVE_METHOD_DBPF,
+        collname, &(jd->u.trove.fsid), 
         user_ptr_internal, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");

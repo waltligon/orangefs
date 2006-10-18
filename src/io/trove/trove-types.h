@@ -48,6 +48,14 @@ typedef PVFS_statfs		   TROVE_statfs;
 typedef PVFS_coll_getinfo_options  TROVE_coll_getinfo_options;
 typedef PVFS_object_ref            TROVE_object_ref;
 
+typedef enum
+{
+    TROVE_METHOD_DBPF = 0,
+    TROVE_METHOD_DBPF_ALTAIO
+} TROVE_method_id;
+
+typedef TROVE_method_id (*TROVE_method_callback)(TROVE_coll_id);
+
 #define TROVE_HANDLE_NULL          PVFS_HANDLE_NULL
 #define TROVE_COLL_ID_NULL         PVFS_FS_ID_NULL
 

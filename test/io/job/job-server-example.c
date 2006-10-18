@@ -39,7 +39,6 @@ int main(int argc, char **argv)
 	struct BMI_unexpected_info req_info;
 	job_id_t job_id;
 	int outcount;
-	char* method_name = NULL;
 	job_id_t tmp_id;
 	job_context_id context;
 
@@ -56,8 +55,8 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	ret = trove_initialize("/tmp/pvfs2-test-space",
-	    0, &method_name, 0);
+	ret = trove_initialize(
+	    TROVE_METHOD_DBPF, NULL, "/tmp/pvfs2-test-space", 0);
 	if(ret < 0)
 	{
 		fprintf(stderr, "trove_initialize failure.\n");
@@ -181,7 +180,7 @@ int main(int argc, char **argv)
 	job_finalize();
 	PINT_flow_finalize();
 	BMI_finalize();
-	trove_finalize();
+	trove_finalize(TROVE_METHOD_DBPF);
 
 	return(0);
 }
