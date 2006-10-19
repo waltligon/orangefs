@@ -46,8 +46,6 @@ static PINT_sm_action lookup_read_directory_entry_handle(
 static PINT_sm_action lookup_setup_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_lookup_sm(
@@ -618,13 +616,16 @@ static PINT_sm_action lookup_setup_resp(
 
     if(js_p->error_code == 0)
     {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, handle: %llu\n",
-            s_op->req->u.lookup_path.path,
-            llu(s_op->resp.u.lookup_path.handle_array[s_op->resp.u.lookup_path.handle_count-1]));
+        PINT_ACCESS_DEBUG(
+            s_op, GOSSIP_ACCESS_DEBUG, "path: %s, handle: %llu\n", 
+            s_op->req->u.lookup_path.path, 
+            llu(s_op->resp.u.lookup_path.handle_array[
+                s_op->resp.u.lookup_path.handle_count-1]));
     }
     else
     {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, lookup failed\n",
+        PINT_ACCESS_DEBUG(
+            s_op, GOSSIP_ACCESS_DEBUG, "path: %s, lookup failed\n", 
             s_op->req->u.lookup_path.path);
     }
 

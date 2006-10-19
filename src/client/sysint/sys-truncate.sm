@@ -84,7 +84,7 @@ machine pvfs2_client_truncate_sm(
 PVFS_error PVFS_isys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
@@ -138,7 +138,7 @@ PVFS_error PVFS_isys_truncate(
 PVFS_error PVFS_sys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
-    PVFS_credentials *credentials)
+    const PVFS_credentials *credentials)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -187,6 +187,13 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
     assert(attr->u.meta.dist_size > 0);
+    /* cannot truncate an append-only or immutable file */
+    if ((attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL)
+        || (attr->u.meta.hint.flags & PVFS_APPEND_FL))
+    {
+        js_p->error_code = -PVFS_EPERM;
+        return 1;
+    }
 
     sm_p->msgarray_count = attr->u.meta.dfile_count;
 

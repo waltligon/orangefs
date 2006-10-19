@@ -565,7 +565,6 @@ static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s
 
     gen_mutex_unlock(&mt_config);
 
-
     /* If fs_add indicates a need for checking integrity of config
        files do so, else skip 
      */

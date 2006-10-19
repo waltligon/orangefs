@@ -5,13 +5,14 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.18.2.1 2006-09-18 15:05:12 vilayann Exp $
+ * $Id: ib.h,v 1.18.2.2 2006-10-19 22:16:55 slang Exp $
  */
 #ifndef __ib_h
 #define __ib_h
 
 #include <src/io/bmi/bmi-types.h>
 #include <src/common/quicklist/quicklist.h>
+#include <src/common/gossip/gossip.h>
 
 #ifdef __GNUC__
 /* #  define __hidden __attribute__((visibility("hidden"))) */
@@ -332,6 +333,7 @@ struct ib_device_func {
     void (*post_sr_rdmaw)(ib_send_t *sq, msg_header_cts_t *mh_cts,
                           void *mh_cts_buf);
     int (*prepare_cq_block)(void);
+    void (*ack_cq_completion_event)(void);
     int (*check_cq)(struct bmi_ib_wc *wc);
     const char *(*wc_status_string)(int status);
     void (*mem_register)(memcache_entry_t *c);
@@ -435,7 +437,7 @@ void memcache_shutdown(void *md);
 #define debug(lvl,fmt,args...) \
     do { \
 	if (lvl <= DEBUG_LEVEL) \
-	    info(fmt,##args); \
+	    gossip_debug(GOSSIP_BMI_DEBUG_IB, fmt ".\n", ##args); \
     } while (0)
 #else
 #  define debug(lvl,fmt,...) do { } while (0)

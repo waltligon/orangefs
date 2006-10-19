@@ -8,6 +8,7 @@
 
 #ifdef WITH_OPENSSL
 
+
 #ifdef HAVE_OPENSSL_EVP_H
 #include <openssl/evp.h>
 #endif
@@ -20,8 +21,10 @@
 #ifdef __GEN_POSIX_LOCKING__
 #include <pthread.h>
 #include <linux/unistd.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
-static _syscall0(pid_t,gettid)
 
 static gen_mutex_t *mutex = NULL;
 static pthread_once_t once_initialize = PTHREAD_ONCE_INIT;
@@ -40,11 +43,14 @@ static void do_lock(int mode, int n, const char *file, int line)
 
 static unsigned long get_tid(void)
 {
-	/* NOTE:
-	 * This could fail on non 2.6 kernels, since gettid()
-	 * probably does not exist?
-	 */
-	return gettid();
+	 /* If gettid syscall does not exist, fall back to getpid, which I
+	  * think will do something similar to gettid on non-ntpl
+	  * implementations */
+#if defined(__NR_gettid)
+	return syscall(__NR_gettid);
+#else
+	return getpid();
+#endif
 }
 
 static void callback_init(void)

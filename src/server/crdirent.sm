@@ -37,8 +37,6 @@ static PINT_sm_action crdirent_cleanup(
 static PINT_sm_action validation_object_type_failure(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_crdirent_sm(

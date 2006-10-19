@@ -91,6 +91,8 @@ typedef struct filesystem_configuration_s
     int fp_buffer_size;
     int fp_buffers_per_flow;
 
+    int trove_method;
+
     /* Export flags bitwise OR of flags specified */
     int exp_flags;
 
@@ -181,6 +183,8 @@ typedef struct server_configuration_s
     int trove_max_concurrent_io;    /* allow the number of aio operations to
                                      * be configurable.
                                      */
+    int trove_method;
+
 } server_configuration_s;
 
 int PINT_parse_config(

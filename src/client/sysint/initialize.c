@@ -212,6 +212,8 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     PINT_util_digest_init();
 
+    PINT_util_digest_init();
+
     return 0;
 
   error_exit:

@@ -84,18 +84,18 @@ static configoption_t dotconf_options[] = {
 static void PINT_dotconf_set_command(
     configfile_t * configfile,
     const configoption_t * option,
-    char *args,
+    const char *args,
     command_t * cmd);
 
 static void PINT_dotconf_free_command(
     command_t * command);
 
 static void skip_whitespace(
-    char **cp,
+    const char **cp,
     int n,
     char term)
 {
-    char *cp1 = *cp;
+    const char *cp1 = *cp;
     while (isspace((int) *cp1) && *cp1 != term && n--)
 	cp1++;
     *cp = cp1;
@@ -421,13 +421,12 @@ const char *PINT_dotconf_set_defaults(
         for (opt_idx = 0;
              configfile->config_options[mod][opt_idx].name[0]; opt_idx++)
         {
-            option =
-                (configoption_t *) & configfile->config_options[mod][opt_idx];
+            option = & configfile->config_options[mod][opt_idx];
             if(option && (context & option->context) && option->default_value)
             {
                 /* set up the command structure (contextchecker wants this) */
                 PINT_dotconf_set_command(configfile, option, 
-                                         (char *)option->default_value, 
+                                         option->default_value, 
                                          &command);
                 if(command.error)
                 {
@@ -451,11 +450,11 @@ const char *PINT_dotconf_set_defaults(
 
 char *PINT_dotconf_read_arg(
     configfile_t * configfile,
-    char **line)
+    const char **line)
 {
     int sq = 0, dq = 0;		/* single quote, double quote */
     int done;
-    char *cp1 = *line;
+    const char *cp1 = *line;
     char *cp2, *eos;
     char buf[CFG_MAX_VALUE];
 
@@ -515,7 +514,7 @@ char *PINT_dotconf_read_arg(
 	     */
 
 	    *cp2 = 0;
-	    *cp1 = 0;
+            for (; *cp1; cp1++) ;  /* skip to eol */
 	    *line = cp1;
 	    return NULL;
 	}
@@ -542,56 +541,20 @@ char *PINT_dotconf_read_arg(
     return buf[0] ? PINT_dotconf_substitute_env(configfile, strdup(buf)) : NULL;
 }
 
-/* PINT_dotconf_find_command remains here for backwards compatability. it's
- * internally unused since dot.conf 1.0.9 because it cannot handle the
- * DUPLICATE_OPTION_NAMES flag
- */
-configoption_t *PINT_dotconf_find_command(
-    configfile_t * configfile,
-    const char *command)
-{
-    configoption_t *option;
-    int i = 0, mod = 0, done = 0;
-
-    for (option = 0, mod = 0; configfile->config_options[mod] && !done; mod++)
-	for (i = 0; configfile->config_options[mod][i].name[0]; i++)
-	{
-	    if (!configfile->cmp_func(name,
-				      configfile->config_options[mod][i].name,
-				      CFG_MAX_OPTION))
-	    {
-		option =
-		    (configoption_t *) & configfile->config_options[mod][i];
-		/* TODO: this could be flagged: option overwriting by modules */
-		done = 1;
-		break;	/* found it; break out */
-	    }
-	}
-
-    /* handle ARG_NAME fallback */
-    if ((option && option->name[0] == 0)
-	|| configfile->config_options[mod - 1][i].type == ARG_NAME)
-    {
-	option = (configoption_t *) & configfile->config_options[mod - 1][i];
-    }
-
-    return option;
-}
-
 static void PINT_dotconf_set_command(
     configfile_t * configfile,
     const configoption_t * option,
-    char *args,
+    const char *args,
     command_t * cmd)
 {
-    char *eob = 0;
+    const char *eob = NULL;
     int ret = -1;
 
     eob = args + strlen(args);
 
     /* fill in the command_t structure with values we already know */
     cmd->name = option->type == ARG_NAME ? name : option->name;
-    cmd->option = (configoption_t *) option;
+    cmd->option = option;
     cmd->context = configfile->context;
     cmd->configfile = configfile;
     cmd->data.list = (char **) calloc(CFG_VALUES, sizeof(char *));
@@ -606,7 +569,7 @@ static void PINT_dotconf_set_command(
     }
     else if (option->type == ARG_STR)
     {
-	char *cp = args;
+	const char *cp = args;
 
 	/* check if it's a here-document and act accordingly */
 	skip_whitespace(&cp, eob - cp, 0);
@@ -749,7 +712,7 @@ const char *PINT_dotconf_handle_command(
     cp1 = buffer;
     eob = cp1 + strlen(cp1);
 
-    skip_whitespace(&cp1, eob - cp1, 0);
+    skip_whitespace((const char **) &cp1, eob - cp1, 0);
 
     /* ignore comments and empty lines */
     if (!cp1 || !*cp1 || *cp1 == '#' || *cp1 == '\n' || *cp1 == (char) EOF)
@@ -780,9 +743,7 @@ const char *PINT_dotconf_handle_command(
 			     CFG_MAX_OPTION))
 		{
 		    /* TODO: this could be flagged: option overwriting by modules */
-		    option =
-			(configoption_t *) & configfile->
-			config_options[mod][opt_idx];
+		    option = &configfile->config_options[mod][opt_idx];
 		    done = 1;
 		    break;	/* found one; break out */
 		}

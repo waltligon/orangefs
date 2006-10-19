@@ -89,7 +89,8 @@ int cache_init(NCAC_info_t *info)
 /* for radix tree if linux radix tree is not used */
 unsigned long radix_get_value(const void *item)
 {
-    return ((struct extent *)item)->index;
+    const struct extent *e = item;
+    return e->index;
 }
 
 static inline void init_free_extent_list(int num)

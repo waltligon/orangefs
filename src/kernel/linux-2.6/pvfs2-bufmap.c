@@ -345,20 +345,20 @@ void readdir_index_put(int buffer_index)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
+int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, size_t size)
 {
-    int ret = 0, amt_copied = 0, amt_remaining = 0;
-    int cur_copy_size = 0, index = 0;
+    size_t ret = 0, amt_copied = 0, amt_remaining = 0, cur_copy_size = 0;
+    int index = 0;
     void __user *offset = to;
     void *from_kaddr = NULL;
     struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_user: to %p, from %p, index %d, "
-                "size %d\n", to, from, buffer_index, size);
+                "size %zd\n", to, from, buffer_index, size);
 
     if (bufmap_init == 0)
     {
-        gossip_err("pvfs2_bufmap_copy_to_user: not yet "
+        gossip_err("pvfs_bufmap_copy_to_user: not yet "
                     "initialized.\n");
         gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
         return -EIO;
@@ -376,7 +376,7 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
 
         if (ret)
         {
-            gossip_debug(GOSSIP_BUFMAP_DEBUG, "Failed to copy data to user space %d\n", ret);
+            gossip_debug(GOSSIP_BUFMAP_DEBUG, "Failed to copy data to user space %zd\n", ret);
             return -EFAULT;
         }
 
@@ -388,19 +388,19 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
 }
 
 int pvfs_bufmap_copy_to_kernel(
-    void *to, int buffer_index, int size)
+    void *to, int buffer_index, size_t size)
 {
-    int amt_copied = 0, amt_remaining = 0;
-    int cur_copy_size = 0, index = 0;
+    size_t amt_copied = 0, amt_remaining = 0, cur_copy_size = 0;
+    int index = 0;
     void *offset = to, *from_kaddr = NULL;
     struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
 
-    gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_kernel: to %p, index %d, size %d\n",
+    gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_kernel: to %p, index %d, size %zd\n",
                 to, buffer_index, size);
 
     if (bufmap_init == 0)
     {
-        gossip_err("pvfs2_bufmap_copy_to_kernel: not yet "
+        gossip_err("pvfs_bufmap_copy_to_kernel: not yet "
                     "initialized.\n");
         gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
         return -EIO;
@@ -430,20 +430,20 @@ int pvfs_bufmap_copy_to_kernel(
  * returns 0 on success, -errno on failure
  */
 int pvfs_bufmap_copy_from_user(
-    int buffer_index, void __user *from, int size)
+    int buffer_index, void __user *from, size_t size)
 {
-    int ret = 0, amt_copied = 0, amt_remaining = 0;
-    int cur_copy_size = 0, index = 0;
+    size_t ret = 0, amt_copied = 0, amt_remaining = 0, cur_copy_size = 0;
+    int index = 0;
     void __user *offset = from;
     void *to_kaddr = NULL;
     struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_from_user: from %p, index %d, "
-                "size %d\n", from, buffer_index, size);
+                "size %zd\n", from, buffer_index, size);
 
     if (bufmap_init == 0)
     {
-        gossip_err("pvfs2_bufmap_copy_from_user: not yet "
+        gossip_err("pvfs_bufmap_copy_from_user: not yet "
                     "initialized.\n");
         gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
         return -EIO;
@@ -488,10 +488,10 @@ int pvfs_bufmap_copy_iovec_from_user(
     int buffer_index,
     const struct iovec *iov,
     unsigned long nr_segs,
-    int size)
+    size_t size)
 {
-    int ret = 0, amt_copied = 0; 
-    int cur_copy_size = 0, index = 0;
+    size_t ret = 0, amt_copied = 0, cur_copy_size = 0;
+    int index = 0;
     void *to_kaddr = NULL;
     void __user *from_addr = NULL;
     struct iovec *copied_iovec = NULL;
@@ -499,11 +499,11 @@ int pvfs_bufmap_copy_iovec_from_user(
     unsigned int seg, page_offset = 0;
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_iovec_from_user: index %d, "
-                "size %d\n", buffer_index, size);
+                "size %zd\n", buffer_index, size);
 
     if (bufmap_init == 0)
     {
-        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_iovec_from_user: not yet "
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_iovec_from_user: not yet "
                     "initialized; returning\n");
         return -EIO;
     }
@@ -528,7 +528,7 @@ int pvfs_bufmap_copy_iovec_from_user(
     }
     if (amt_copied != size)
     {
-        gossip_err("pvfs2_bufmap_copy_iovec_from_user: computed total (%d) is not equal to (%d)\n",
+        gossip_err("pvfs2_bufmap_copy_iovec_from_user: computed total (%zd) is not equal to (%zd)\n",
                 amt_copied, size);
         kfree(copied_iovec);
         return -EINVAL;
@@ -572,7 +572,7 @@ int pvfs_bufmap_copy_iovec_from_user(
         ret = copy_from_user(to_kaddr + page_offset, from_addr, cur_copy_size);
         pvfs2_kunmap(to->page_array[index]);
 #if 0
-        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_iovec_from_user: copying from user %p to kernel %p %d bytes (to_kddr: %p,page_offset: %d)\n",
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_iovec_from_user: copying from user %p to kernel %p %zd bytes (to_kddr: %p,page_offset: %d)\n",
                 from_addr, to_kaddr + page_offset, cur_copy_size, to_kaddr, page_offset); 
 #endif
         if (ret)
@@ -592,12 +592,122 @@ int pvfs_bufmap_copy_iovec_from_user(
         }
     }
     kfree(copied_iovec);
+    return 0;
+}
+
+/* pvfs_bufmap_copy_iovec_from_kernel()
+ *
+ * copies data from several kernel space address's in an iovec
+ * to a mapped buffer
+ *
+ * Note that the mapped buffer is a series of pages and therefore
+ * the copies have to be split by PAGE_SIZE bytes at a time.
+ * Note that this routine checks that summation of iov_len
+ * across all the elements of iov is equal to size.
+ *
+ * returns 0 on success, -errno on failure
+ */
+int pvfs_bufmap_copy_iovec_from_kernel(
+    int buffer_index,
+    const struct iovec *iov,
+    unsigned long nr_segs,
+    size_t size)
+{
+    size_t amt_copied = 0, cur_copy_size = 0;
+    int index = 0;
+    void *to_kaddr = NULL;
+    void *from_kaddr = NULL;
+    struct iovec *copied_iovec = NULL;
+    struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
+    unsigned int seg, page_offset = 0;
+
+    gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_iovec_from_kernel: index %d, "
+                "size %zd\n", buffer_index, size);
+
+    if (bufmap_init == 0)
+    {
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_iovec_from_kernel: not yet "
+                    "initialized; returning\n");
+        return -EIO;
+    }
+    /*
+     * copy the passed in iovec so that we can change some of its fields
+     */
+    copied_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
+            PVFS2_BUFMAP_GFP_FLAGS);
+    if (copied_iovec == NULL)
+    {
+        gossip_err("pvfs2_bufmap_copy_iovec_from_kernel: failed allocating memory\n");
+        return -ENOMEM;
+    }
+    memcpy(copied_iovec, iov, nr_segs * sizeof(struct iovec));
+    /*
+     * Go through each segment in the iovec and make sure that
+     * the summation of iov_len matches the given size.
+     */
+    for (seg = 0, amt_copied = 0; seg < nr_segs; seg++)
+    {
+        amt_copied += copied_iovec[seg].iov_len;
+    }
     if (amt_copied != size)
     {
-	gossip_err("Failed to copy all the data from user space [%d instead of %d]\n",
+        gossip_err("pvfs2_bufmap_copy_iovec_from_kernel: computed total (%zd) is not equal to (%zd)\n",
                 amt_copied, size);
-	return -EIO;
+        kfree(copied_iovec);
+        return -EINVAL;
     }
+
+    index = 0;
+    amt_copied = 0;
+    seg = 0;
+    page_offset = 0;
+    /* Go through each segment in the iovec and copy its
+     * buffer into the mapped buffer one page at a time though
+     */
+    while (amt_copied < size)
+    {
+	struct iovec *iv = &copied_iovec[seg];
+        int inc_index = 0;
+
+        if (iv->iov_len < (PAGE_SIZE - page_offset)) 
+        {
+            cur_copy_size = iv->iov_len;
+            seg++;
+            from_kaddr = iv->iov_base;
+            inc_index = 0;
+        }
+        else if (iv->iov_len == (PAGE_SIZE - page_offset))
+        {
+            cur_copy_size = iv->iov_len;
+            seg++;
+            from_kaddr = iv->iov_base;
+            inc_index = 1;
+        }
+        else 
+        {
+            cur_copy_size = (PAGE_SIZE - page_offset);
+            from_kaddr = iv->iov_base;
+            iv->iov_base += cur_copy_size;
+            iv->iov_len -= cur_copy_size;
+            inc_index = 1;
+        }
+        to_kaddr = pvfs2_kmap(to->page_array[index]);
+        memcpy(to_kaddr + page_offset, from_kaddr, cur_copy_size);
+        pvfs2_kunmap(to->page_array[index]);
+#if 0
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_iovec_from_kernel: copying from kernel %p to kernel %p %zd bytes (to_kddr: %p,page_offset: %d)\n",
+                from_kaddr, to_kaddr + page_offset, cur_copy_size, to_kaddr, page_offset); 
+#endif
+        amt_copied += cur_copy_size;
+        if (inc_index) {
+            page_offset = 0;
+            index++;
+        }
+        else {
+            page_offset += cur_copy_size;
+        }
+    }
+    kfree(copied_iovec);
     return 0;
 }
 
@@ -612,10 +722,11 @@ int pvfs_bufmap_copy_to_user_iovec(
     int buffer_index,
     const struct iovec *iov,
     unsigned long nr_segs,
-    int size)
+    size_t size)
 {
-    int ret = 0, amt_copied = 0;
-    int cur_copy_size = 0, index = 0;
+    size_t ret = 0, amt_copied = 0;
+    size_t cur_copy_size = 0;
+    int index = 0;
     void *from_kaddr = NULL;
     void __user *to_addr = NULL;
     struct iovec *copied_iovec = NULL;
@@ -623,7 +734,7 @@ int pvfs_bufmap_copy_to_user_iovec(
     unsigned int seg, page_offset = 0;
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_user_iovec: index %d, "
-                "size %d\n", buffer_index, size);
+                "size %zd\n", buffer_index, size);
 
     if (bufmap_init == 0)
     {
@@ -652,7 +763,7 @@ int pvfs_bufmap_copy_to_user_iovec(
     }
     if (amt_copied < size)
     {
-        gossip_err("pvfs2_bufmap_copy_to_user_iovec: computed total (%d) is less than (%d)\n",
+        gossip_err("pvfs2_bufmap_copy_to_user_iovec: computed total (%zd) is less than (%zd)\n",
                 amt_copied, size);
         kfree(copied_iovec);
         return -EINVAL;
@@ -720,6 +831,119 @@ int pvfs_bufmap_copy_to_user_iovec(
     return 0;
 }
 
+/* pvfs_bufmap_copy_to_kernel_iovec()
+ *
+ * copies data to several kernel space address's in an iovec
+ * from a mapped buffer
+ *
+ * returns 0 on success, -errno on failure
+ */
+int pvfs_bufmap_copy_to_kernel_iovec(
+    int buffer_index,
+    const struct iovec *iov,
+    unsigned long nr_segs,
+    size_t size)
+{
+    size_t amt_copied = 0;
+    size_t cur_copy_size = 0;
+    int index = 0;
+    void *from_kaddr = NULL;
+    void *to_kaddr = NULL;
+    struct iovec *copied_iovec = NULL;
+    struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
+    unsigned int seg, page_offset = 0;
+
+    gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_kernel_iovec: index %d, "
+                "size %zd\n", buffer_index, size);
+
+    if (bufmap_init == 0)
+    {
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_to_kernel_iovec: not yet "
+                    "initialized; returning\n");
+        return -EIO;
+    }
+    /*
+     * copy the passed in iovec so that we can change some of its fields
+     */
+    copied_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
+            PVFS2_BUFMAP_GFP_FLAGS);
+    if (copied_iovec == NULL)
+    {
+        gossip_err("pvfs2_bufmap_copy_to_kernel_iovec: failed allocating memory\n");
+        return -ENOMEM;
+    }
+    memcpy(copied_iovec, iov, nr_segs * sizeof(struct iovec));
+    /*
+     * Go through each segment in the iovec and make sure that
+     * the summation of iov_len is greater than the given size.
+     */
+    for (seg = 0, amt_copied = 0; seg < nr_segs; seg++)
+    {
+        amt_copied += copied_iovec[seg].iov_len;
+    }
+    if (amt_copied < size)
+    {
+        gossip_err("pvfs2_bufmap_copy_to_kernel_iovec: computed total (%zd) is less than (%zd)\n",
+                amt_copied, size);
+        kfree(copied_iovec);
+        return -EINVAL;
+    }
+
+    index = 0;
+    amt_copied = 0;
+    seg = 0;
+    page_offset = 0;
+    /* 
+     * Go through each segment in the iovec and copy from the mapper buffer,
+     * but make sure that we do so one page at a time.
+     */
+    while (amt_copied < size)
+    {
+	struct iovec *iv = &copied_iovec[seg];
+        int inc_index = 0;
+
+        if (iv->iov_len < (PAGE_SIZE - page_offset))
+        {
+            cur_copy_size = iv->iov_len;
+            seg++;
+            to_kaddr = iv->iov_base;
+            inc_index = 0;
+        }
+        else if (iv->iov_len == (PAGE_SIZE - page_offset))
+        {
+            cur_copy_size = iv->iov_len;
+            seg++;
+            to_kaddr = iv->iov_base;
+            inc_index = 1;
+        }
+        else 
+        {
+            cur_copy_size = (PAGE_SIZE - page_offset);
+            to_kaddr = iv->iov_base;
+            iv->iov_base += cur_copy_size;
+            iv->iov_len  -= cur_copy_size;
+            inc_index = 1;
+        }
+        from_kaddr = pvfs2_kmap(from->page_array[index]);
+        memcpy(to_kaddr, from_kaddr + page_offset, cur_copy_size);
+        pvfs2_kunmap(from->page_array[index]);
+#if 0
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_to_kernel_iovec: copying to kernel %p from kernel %p %d bytes (from_kaddr:%p, page_offset:%d)\n",
+                to_kaddr, from_kaddr + page_offset, cur_copy_size, from_kaddr, page_offset); 
+#endif
+        amt_copied += cur_copy_size;
+        if (inc_index) {
+            page_offset = 0;
+            index++;
+        }
+        else {
+            page_offset += cur_copy_size;
+        }
+    }
+    kfree(copied_iovec);
+    return 0;
+}
+
 #ifdef HAVE_AIO_VFS_SUPPORT
 
 /* pvfs_bufmap_copy_to_user_task()
@@ -734,14 +958,14 @@ int pvfs_bufmap_copy_to_user_iovec(
  * returns number of bytes copied on success,
  * -errno on failure
  */
-int pvfs_bufmap_copy_to_user_task(
+size_t pvfs_bufmap_copy_to_user_task(
         struct task_struct *tsk,
         void __user *to, 
         int buffer_index,
-        int size)
+        size_t size)
 {
-    int ret = 0, amt_copied = 0, amt_remaining = 0;
-    int cur_copy_size = 0, index = 0;
+    size_t ret = 0, amt_copied = 0, amt_remaining = 0, cur_copy_size = 0;
+    int index = 0;
     void *from_kaddr = NULL;
     struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
 
@@ -755,7 +979,7 @@ int pvfs_bufmap_copy_to_user_task(
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_user_task: "
             " PID: %d, to %p, from %p, index %d, "
-            " size %d\n", tsk->pid, to, from, buffer_index, size);
+            " size %zd\n", tsk->pid, to, from, buffer_index, size);
 
     if (bufmap_init == 0)
     {

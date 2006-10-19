@@ -276,7 +276,7 @@ PVFS_error PVFS_isys_rename(
     PVFS_object_ref old_parent_ref,
     char *new_entry,
     PVFS_object_ref new_parent_ref,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
@@ -366,7 +366,7 @@ PVFS_error PVFS_sys_rename(
     PVFS_object_ref old_parent_ref,
     char *new_entry,
     PVFS_object_ref new_parent_ref,
-    PVFS_credentials *credentials)
+    const PVFS_credentials *credentials)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;

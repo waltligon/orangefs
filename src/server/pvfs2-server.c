@@ -30,7 +30,6 @@
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "PINT-reqproto-encode.h"
-#include "src/server/request-scheduler/request-scheduler.h"
 #include "pvfs2-server.h"
 #include "state-machine.h"
 #include "mkspace.h"
@@ -43,6 +42,7 @@
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
 #include "pvfs2-internal.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -116,11 +116,11 @@ static options_t s_server_options = { 0, 0, 1, NULL };
  */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
-    {ROOT_HANDLE_KEYSTR, sizeof(ROOT_HANDLE_KEYSTR)},
-    {DIRECTORY_ENTRY_KEYSTR, sizeof(DIRECTORY_ENTRY_KEYSTR)},
-    {DATAFILE_HANDLES_KEYSTR, sizeof(DATAFILE_HANDLES_KEYSTR)},
-    {METAFILE_DIST_KEYSTR, sizeof(METAFILE_DIST_KEYSTR)},
-    {SYMLINK_TARGET_KEYSTR, sizeof(SYMLINK_TARGET_KEYSTR)}
+    {ROOT_HANDLE_KEYSTR, ROOT_HANDLE_KEYLEN},
+    {DIRECTORY_ENTRY_KEYSTR, DIRECTORY_ENTRY_KEYLEN},
+    {DATAFILE_HANDLES_KEYSTR, DATAFILE_HANDLES_KEYLEN},
+    {METAFILE_DIST_KEYSTR, METAFILE_DIST_KEYLEN},
+    {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN}
 };
 
 /* extended attribute name spaces supported in PVFS2 */
@@ -165,6 +165,8 @@ static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
 static int parse_port_from_host_id(char* host_id);
+
+static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_params PINT_server_req_table[] =
@@ -915,7 +917,6 @@ static int server_initialize_subsystems(
     PINT_server_status_flag *server_status_flag)
 {
     int ret = -PVFS_EINVAL;
-    char *method_name = NULL;
     char *cur_merged_handle_range = NULL;
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
@@ -976,12 +977,8 @@ static int server_initialize_subsystems(
                                    &server_config.db_cache_size_bytes);
     /* this should never fail */
     assert(ret == 0);
-    ret = trove_collection_setinfo(0, 0, TROVE_ALT_AIO_MODE,
-        &server_config.trove_alt_aio_mode);
-    /* this should never fail */
-    assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
-        &server_config.trove_max_concurrent_io);
+                                   &server_config.trove_max_concurrent_io);
     /* this should never fail */
     assert(ret == 0);
 
@@ -1008,8 +1005,11 @@ static int server_initialize_subsystems(
     BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
                  (void *)&server_config.tcp_buffer_size_receive);
 
-    ret = trove_initialize(server_config.storage_path,
-                           init_flags, &method_name, 0);
+    ret = trove_initialize(
+        server_config.trove_method, 
+        trove_coll_to_method_callback,
+        server_config.storage_path,
+        init_flags);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);
@@ -1065,6 +1065,7 @@ static int server_initialize_subsystems(
 
         orig_fsid = cur_fs->coll_id;
         ret = trove_collection_lookup(
+            cur_fs->trove_method,
             cur_fs->file_system_name, &(cur_fs->coll_id), NULL, NULL);
 
         if (ret < 0)
@@ -1514,7 +1515,7 @@ static int server_shutdown(
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting storage "
                      "interface         [   ...   ]\n");
-        trove_finalize();
+        trove_finalize(server_config.trove_method);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         storage "
                      "interface         [ stopped ]\n");
     }
@@ -1849,6 +1850,9 @@ int server_state_machine_start(
         PVFS_perror_gossip("Error: PINT_decode failure", ret);
         return ret;
     }
+    /* Remove s_op from posted_sop_list and move it to the inprogress_sop_list */
+    qlist_del(&s_op->next);
+    qlist_add_tail(&s_op->next, &inprogress_sop_list);
 
     /* set timestamp on the beginning of this state machine */
     id_gen_fast_register(&tmp_id, s_op);
@@ -2061,6 +2065,73 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op)
             break;
         }
     }
+}
+
+static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
+{
+    struct filesystem_configuration_s * fs_conf;
+    
+    fs_conf = PINT_config_find_fs_id(&server_config, coll_id);
+    if(!fs_conf)
+    {
+        return server_config.trove_method;
+    }
+    return fs_conf->trove_method;
+}
+
+void PINT_server_access_debug(PINT_server_op * s_op,
+                              int64_t debug_mask,
+                              const char * format,
+                              ...)
+{
+    PVFS_handle handle;    
+    PVFS_fs_id fsid;
+    int flag;
+    static char pint_access_buffer[GOSSIP_BUF_SIZE];
+    struct passwd* pw;
+    struct group* gr;
+    va_list ap;
+
+    if ((gossip_debug_on) &&
+        (gossip_debug_mask & debug_mask) &&
+        (gossip_facility))
+    {
+        va_start(ap, format);
+
+        PINT_req_sched_target_handle(s_op->req, 0, &handle, &fsid, &flag);
+        pw = getpwuid(s_op->req->credentials.uid);
+        gr = getgrgid(s_op->req->credentials.gid);
+        snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
+            "%s.%s@%s H=%llu S=%p: %s: %s",
+            ((pw) ? pw->pw_name : "UNKNOWN"),
+            ((gr) ? gr->gr_name : "UNKNOWN"),
+            BMI_addr_rev_lookup_unexpected(s_op->addr),
+            llu(handle),
+            s_op,
+            PINT_map_server_op_to_string(s_op->req->op),
+            format);
+
+        __gossip_debug_va(debug_mask, 'A', pint_access_buffer, ap);
+
+        va_end(ap);
+    }
+}
+
+/*
+ * PINT_map_server_op_to_string()
+ *
+ * provides a string representation of the server operation number
+ *
+ * returns a pointer to a static string (DONT FREE IT) on success,
+ * null on failure
+ */
+const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
+{
+    const char *s = NULL;
+
+    if (op >= 0 && op < PVFS_SERV_NUM_OPS)
+        s = PINT_server_req_table[op].string_name;
+    return s;
 }
 
 /*

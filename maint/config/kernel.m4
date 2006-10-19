@@ -51,20 +51,65 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_I_SIZE_READ, 1, Define if kernel has i_size_read),
 	)
 
-	AC_MSG_CHECKING(for parent_ino in kernel)
+	AC_MSG_CHECKING(for iget_locked function in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel already defined it
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		ino_t parent_ino(struct dentry *dentry)
+		loff_t iget_locked(struct inode *inode)
 		{
-			return (ino_t)0;
+			return 0;
 		}
 	], [],
 		AC_MSG_RESULT(no),
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_PARENT_INO, 1, Define if kernel has parent_ino),
+		AC_DEFINE(HAVE_IGET_LOCKED, 1, Define if kernel has iget_locked),
+	)
+
+	AC_MSG_CHECKING(for iget4_locked function in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel already defined it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		loff_t iget4_locked(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IGET4_LOCKED, 1, Define if kernel has iget4_locked),
+	)
+
+	AC_MSG_CHECKING(for iget5_locked function in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel already defined it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		loff_t iget5_locked(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IGET5_LOCKED, 1, Define if kernel has iget5_locked),
+	)
+
+	dnl Check if the kernel defines the xtvec structure.
+	dnl This is part of a POSIX extension.
+	AC_MSG_CHECKING(for struct xtvec in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/uio.h>
+		static struct xtvec xv = { 0, 0 };
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STRUCT_XTVEC, 1, Define if struct xtvec is defined in the kernel),
+		AC_MSG_RESULT(no)
 	)
 
 	dnl The name of this field changed from memory_backed to capabilities
@@ -401,6 +446,25 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		[#define __KERNEL__
 		 #include <asm/ioctl32.h>
 		 ] )
+
+	AC_MSG_CHECKING(for generic_file_readv api in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel has it defined with a different
+	dnl signature!  deliberately, the signature for this method has been
+	dnl changed for it to give a compiler error.
+
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		int generic_file_readv(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GENERIC_FILE_READV, 1, Define if kernel has generic_file_readv),
+	)
 
 	AC_MSG_CHECKING(for generic_permission api in kernel)
 	dnl if this test passes, the kernel does not have it

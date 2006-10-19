@@ -9,8 +9,6 @@
 
 #include "trove-types.h"
 
-int map_coll_id_to_method(int coll_id);
-
 PVFS_error trove_errno_to_trove_error(int errno_value);
 
 
@@ -324,9 +322,7 @@ struct TROVE_mgmt_ops
 {
     int (*initialize)(
 		      char *stoname,
-		      TROVE_ds_flags flags,
-		      char **method_name_p,
-		      int method_id);
+		      TROVE_ds_flags flags);
     
     int (*finalize)(void);
     
@@ -371,6 +367,7 @@ struct TROVE_mgmt_ops
 
     /* Note: setinfo and getinfo always return immediately */
     int (*collection_setinfo)(
+                              TROVE_method_id method_id,
 			      TROVE_coll_id coll_id,
 			      TROVE_context_id context_id,
 			      int option,

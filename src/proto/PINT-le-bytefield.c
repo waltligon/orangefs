@@ -25,7 +25,6 @@
 #include "pvfs2-internal.h"
 
 /* defined later */
-PINT_encoding_table_values le_bytefield_table;
 static int check_req_size(struct PVFS_server_req *req);
 static int check_resp_size(struct PVFS_server_resp *resp);
 

@@ -45,7 +45,7 @@ int PVFS_util_get_umask(void);
   credential object.  returns NULL on failure.
 */
 PVFS_credentials *PVFS_util_dup_credentials(
-    PVFS_credentials *credentials);
+    const PVFS_credentials *credentials);
 
 void PVFS_util_release_credentials(
     PVFS_credentials *credentials);

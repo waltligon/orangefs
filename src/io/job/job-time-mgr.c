@@ -255,7 +255,7 @@ int job_time_mgr_expire(void)
 	    switch(jd->type)
 	    {
 	    case JOB_BMI:
-		gossip_err("Job time out: cancelling bmi operation, job_id: %llu.\n", llu(jd->job_id));
+		gossip_err("%s: job time out: cancelling bmi operation, job_id: %llu.\n", __func__, llu(jd->job_id));
 		ret = job_bmi_cancel(jd->job_id, jd->context_id);
 	        jd->time_bucket = NULL;
 		break;
@@ -273,13 +273,13 @@ int job_time_mgr_expire(void)
 		else
 		{
 		    /* otherwise kill the flow */
-		    gossip_err("Job time out: cancelling flow operation, job_id: %llu.\n", llu(jd->job_id));
+		    gossip_err("%s: job time out: cancelling flow operation, job_id: %llu.\n", __func__, llu(jd->job_id));
 		    ret = job_flow_cancel(jd->job_id, jd->context_id);
 	            jd->time_bucket = NULL;
 		}
 		break;
 	    case JOB_TROVE:
-		gossip_err("Job time out: cancelling trove operation, job_id: %llu.\n", llu(jd->job_id));
+		gossip_err("%s: job time out: cancelling trove operation, job_id: %llu.\n", __func__, llu(jd->job_id));
 		ret = job_trove_dspace_cancel(
                     jd->u.trove.fsid, jd->job_id, jd->context_id);
 	        jd->time_bucket = NULL;

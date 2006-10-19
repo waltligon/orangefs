@@ -26,7 +26,7 @@ int pvfs2_xattr_set_default(struct inode *inode,
 
     if (strcmp(name, "") == 0)
         return -EINVAL;
-    if ( !S_ISREG(inode->i_mode) &&
+    if (!S_ISREG(inode->i_mode) &&
        (!S_ISDIR(inode->i_mode) || inode->i_mode & S_ISVTX))
     {
        return -EPERM;

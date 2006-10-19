@@ -72,6 +72,8 @@ int dbpf_thread_finalize(void)
     return ret;
 }
 
+int synccount = 0;
+
 void *dbpf_thread_function(void *ptr)
 {
 #ifdef __PVFS2_TROVE_THREADED__
@@ -136,7 +138,6 @@ int dbpf_do_one_work_cycle(int *out_count)
     int ret = 1;
     int max_num_ops_to_service = DBPF_OPS_PER_WORK_CYCLE;
     dbpf_queued_op_t *cur_op = NULL;
-    gen_mutex_t *context_mutex = NULL;
 #endif
 
     assert(out_count);
@@ -159,6 +160,11 @@ int dbpf_do_one_work_cycle(int *out_count)
             }
 
             dbpf_queued_op_dequeue_nolock(cur_op);
+            if(DBPF_OP_IS_KEYVAL(cur_op->op.type)) 
+            {
+                --synccount;
+                gossip_debug(GOSSIP_TROVE_DEBUG, "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount);
+            }
 
             cur_op->op.state = OP_IN_SERVICE;
             gen_mutex_unlock(&cur_op->mutex);
@@ -172,31 +178,26 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
 
         /* otherwise, service the current operation now */
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"***** STARTING TROVE "
-                     "SERVICE ROUTINE (%s) *****\n",
+        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: STARTING TROVE "
+                     "SERVICE ROUTINE (%s)\n",
                      dbpf_op_type_to_str(cur_op->op.type));
 
         ret = cur_op->op.svc_fn(&(cur_op->op));
 
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"***** FINISHED TROVE "
-                     "SERVICE ROUTINE (%s) *****\n",
-                     dbpf_op_type_to_str(cur_op->op.type));
+        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: FINISHED TROVE "
+                     "SERVICE ROUTINE (%s) (ret: %d)\n",
+                     dbpf_op_type_to_str(cur_op->op.type),
+                     ret);
         if (ret == DBPF_OP_COMPLETE || ret < 0)
         {
-            /* operation is done and we are telling the caller;
-             * ok to pull off queue now.
-             *
-             * returns error code from operation in queued_op struct
+            /* Some dbpf calls may return non-fatal errors
+             * (for example, a crdirent for an entry that already exists).
+             * If the dbpf call returned an error, we need to call
+             * sync_coalesce, which will sync the database, and return
+             * and move _all_ the ready-to-be-synced operations to the
+             * completion queue.
              */
-            (*out_count)++;
-
-            /* this is a macro defined in dbpf-thread.h */
-            move_op_to_completion_queue(
-                cur_op, ((ret == 1) ? 0 : ret), OP_COMPLETED);
-        }
-        else if(ret == DBPF_OP_NEEDS_SYNC)
-        {
-            ret = dbpf_sync_coalesce(cur_op);
+            ret = dbpf_sync_coalesce(cur_op, (ret == 1 ? 0 : ret), out_count);
             if(ret < 0)
             {
                 return ret; /* not sure how to recover from failure here */
@@ -204,7 +205,6 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
         else
         {
-
 #ifndef __PVFS2_TROVE_AIO_THREADED__
             /*
               check if trove is telling us to NOT mark this as

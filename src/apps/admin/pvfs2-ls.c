@@ -405,7 +405,6 @@ int do_list(
     PVFS_ds_position token;
     uint64_t dir_version = 0;
     double begin = 0.0, end;
-
     name = start;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
@@ -541,7 +540,7 @@ int do_list(
 static struct options* parse_args(int argc, char* argv[])
 {
     int i = 0, ret = 0, option_index = 0;
-    char *cur_option = NULL;
+    const char *cur_option = NULL;
     struct options* tmp_opts = NULL;
     static struct option long_opts[] =
     {
@@ -573,7 +572,7 @@ static struct options* parse_args(int argc, char* argv[])
 	switch(ret)
         {
             case 0:
-                cur_option = (char *)long_opts[option_index].name;
+                cur_option = long_opts[option_index].name;
 
                 if (strcmp("help", cur_option) == 0)
                 {

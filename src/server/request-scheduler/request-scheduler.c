@@ -37,6 +37,16 @@
 #include "id-generator.h"
 #include "pvfs2-internal.h"
 
+/* we need the server header because it defines the operations that
+ * we use to determine whether to schedule or queue.  
+ *
+ * TODO: To make the request scheduler more generic we 
+ * should probably have callbacks that get defined in 
+ * the server code that determine whether to queue or 
+ * schedule, print the operation name, etc.
+ */
+#include "src/server/pvfs2-server.h"
+
 /** request states */
 enum req_sched_states
 {
@@ -609,34 +619,14 @@ int PINT_req_sched_post(
             /* possible dirent optimization: see if all scheduled ops for this
              * handle are for crdirent or rmdirent.  
              * If so, we can allow another concurrent
-             * dirent request to proceed 
+             * dirent request to proceed.
              */
-            tmp_flag = 0;
-            qlist_for_each(iterator, &tmp_list->req_list)
-            {
-                tmp_element2 = qlist_entry(iterator, struct req_sched_element,
-                    list_link);
-                if(tmp_element2->req_ptr->op != PVFS_SERV_CRDIRENT && 
-                   tmp_element2->req_ptr->op != PVFS_SERV_RMDIRENT)
-                {
-                    tmp_flag = 1;
-                    break;
-                }
-            }
-
-            if(!tmp_flag)
-            {
-                tmp_element->state = REQ_SCHEDULED;
-                ret = 1;
-                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                             "concurrent dirent op, handle: %llu\n", 
-                             llu(handle));
-            }
-            else
-            {
-                tmp_element->state = REQ_QUEUED;
-                ret = 0;
-            }
+            tmp_element->state = REQ_SCHEDULED;
+            tmp_element->readonly_flag = 1;
+            gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
+                         "concurrent dirent op, handle: %llu\n", 
+                         llu(handle));
+            ret = 1;
         }
 	else
 	{
@@ -651,7 +641,7 @@ int PINT_req_sched_post(
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		 "REQ SCHED POSTING, handle: %llu, queue_element: %p\n",
-		 llu(handle), tmp_element);
+                 llu(handle), tmp_element);
 
     if (ret == 1)
     {
@@ -1262,7 +1252,8 @@ int PINT_req_sched_testworld(
 	tmp_element->state = REQ_SCHEDULED;
 	(*inout_count_p)++;
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		     "REQ SCHED SCHEDULING, handle: %llu, queue_element: %p\n",
+		     "REQ SCHED SCHEDULING, "
+                     "handle: %llu, queue_element: %p\n",
 		     llu(tmp_element->handle), tmp_element);
 	/* if this is a mode change, then transition now */
 	if(tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM &&

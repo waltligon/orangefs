@@ -33,8 +33,6 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
 static PINT_sm_action setattr_verify_attribs(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_set_attr_sm(
@@ -343,6 +341,9 @@ static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0, dfile_count = 0;
     job_id_t j_id;
+
+    /* reset from jump to here with STATE_METAFILE */
+    js_p->error_code = 0;
 
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  " request has dfile_count of %d | dspace has %d\n",

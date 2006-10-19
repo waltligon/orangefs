@@ -230,6 +230,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 }
                 dest->u.meta.dist_size = src->u.meta.dist_size;
             }
+            memcpy(&dest->u.meta.hint, &src->u.meta.hint, sizeof(dest->u.meta.hint));
         }
 
         if (src->mask & PVFS_ATTR_SYMLNK_TARGET)

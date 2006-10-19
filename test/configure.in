@@ -205,21 +205,19 @@ AC_ARG_WITH(db,
 	[AX_BERKELEY_DB(${withval})],
 	[AX_BERKELEY_DB("")])
 
-AC_ARG_ENABLE(openssl,
-[  --disable-openssl Disables building against the openssl libraries],
-[if test "x$enableval" = "xyes" ; then
-	DETECT_OPENSSL=1
-else
-	DETECT_OPENSSL=0
-fi],
-	DETECT_OPENSSL=1)
+AC_ARG_WITH(openssl,
+		 [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)
+		 	 --without-openssl     Don't build with openssl.
+		 ],
+		 [AX_OPENSSL(${withval})],
+		 [AX_OPENSSL_OPTIONAL])
 
-if test "x$DETECT_OPENSSL" = "x1"; then
-	AC_ARG_WITH(openssl,
-			 [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)],
-			 [AX_OPENSSL(${withval})],
-			 [AX_OPENSSL_OPTIONAL])
-fi
+AC_ARG_WITH(libaio,
+		 [  --with-libaio=<dir>  Location of installed libaio package (default=/usr)
+		 	 --without-libaio     Don't build with libaio.
+		 ],
+		 [AX_AIO(${withval})],
+		 [AX_AIO_OPTIONAL])
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).

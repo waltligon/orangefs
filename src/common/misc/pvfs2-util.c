@@ -124,13 +124,13 @@ int PVFS_util_get_umask(void)
 }
 
 PVFS_credentials *PVFS_util_dup_credentials(
-    PVFS_credentials *credentials)
+    const PVFS_credentials *credentials)
 {
     PVFS_credentials *ret = NULL;
 
     if (credentials)
     {
-        ret = (PVFS_credentials *)malloc(sizeof(PVFS_credentials));
+        ret = malloc(sizeof(PVFS_credentials));
         if (ret)
         {
             memcpy(ret, credentials, sizeof(PVFS_credentials));
@@ -164,6 +164,12 @@ int PVFS_util_copy_sys_attr(
         dest_attr->dfile_count = src_attr->dfile_count;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
+        dest_attr->flags = src_attr->flags;
+
+        if (src_attr->mask & PVFS_ATTR_SYS_SIZE)
+        {
+            dest_attr->size = src_attr->size;
+        }
 
         if (src_attr->mask & PVFS_ATTR_SYS_SIZE)
         {

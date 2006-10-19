@@ -27,6 +27,8 @@
 #include "pint-event.h"
 #include "dbpf-open-cache.h"
 
+#include "dbpf-alt-aio.h"
+
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
 #define AIOCB_ARRAY_SZ 64
@@ -35,6 +37,8 @@ extern int TROVE_max_concurrent_io;
 static int s_dbpf_ios_in_progress = 0;
 static dbpf_op_queue_p s_dbpf_io_ready_queue = NULL;
 static gen_mutex_t s_dbpf_io_mutex = GEN_MUTEX_INITIALIZER;
+
+static struct dbpf_aio_ops aio_ops;
 
 static int issue_or_delay_io_operation(
     dbpf_queued_op_t *cur_op, struct aiocb **aiocb_ptr_array,
@@ -49,23 +53,6 @@ static char *list_proc_state_strings[] = {
     "LIST_PROC_ALLPOSTED",
 };
 #endif
-
-static inline int dbpf_bstream_rw_list(
-    TROVE_coll_id coll_id,
-    TROVE_handle handle,
-    char **mem_offset_array, 
-    TROVE_size *mem_size_array,
-    int mem_count,
-    TROVE_offset *stream_offset_array, 
-    TROVE_size *stream_size_array,
-    int stream_count,
-    TROVE_size *out_size_p,
-    TROVE_ds_flags flags, 
-    TROVE_vtag_s *vtag,
-    void *user_ptr,
-    TROVE_context_id context_id,
-    TROVE_op_id *out_op_id_p,
-    int opcode);
 
 static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p);
@@ -124,7 +111,6 @@ static void aio_progress_notification(union sigval sig)
     struct dbpf_op *op_p = NULL;
     int ret, i, aiocb_inuse_count, state = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
-    gen_mutex_t *context_mutex = NULL;
 
     cur_op = (dbpf_queued_op_t *)sig.sival_ptr;
     assert(cur_op);
@@ -158,18 +144,16 @@ static void aio_progress_notification(union sigval sig)
         }
 
         /* aio_error gets the "errno" value of the individual op */
-        ret = aio_error(&aiocb_p[i]);
+        ret = op_p->u.b_rw_list.aio_ops->aio_error(&aiocb_p[i]);
         if (ret == 0)
         {
             /* aio_return gets the return value of the individual op */
-            ret = aio_return(&aiocb_p[i]);
+            ret = op_p->u.b_rw_list.aio_ops->aio_return(&aiocb_p[i]);
 
             gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %s complete: "
                          "aio_return() says %d [fd = %d]\n",
-                         __func__,
-                         ((op_p->type == BSTREAM_WRITE_LIST) ||
-                          (op_p->type == BSTREAM_WRITE_AT) ?
-                          "WRITE" : "READ"), ret, op_p->u.b_rw_list.fd);
+                         __func__, dbpf_op_type_to_str(op_p->type),
+                         ret, op_p->u.b_rw_list.fd);
 
             *(op_p->u.b_rw_list.out_size_p) += ret;
 
@@ -203,10 +187,12 @@ static void aio_progress_notification(union sigval sig)
         op_p->u.b_rw_list.fd = -1;
         
         gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
-                     "(state is %s)\n", list_proc_state_strings[op_p->u.b_rw_list.list_proc_state]);
+                     "(state is %s)\n", 
+                     list_proc_state_strings[
+                     op_p->u.b_rw_list.list_proc_state]);
 
         /* this is a macro defined in dbpf-thread.h */
-        move_op_to_completion_queue(
+        dbpf_queued_op_complete(
             cur_op, ret,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
 
@@ -215,7 +201,9 @@ static void aio_progress_notification(union sigval sig)
     else
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "*** issuing more aio requests "
-                     "(state is %s)\n", list_proc_state_strings[op_p->u.b_rw_list.list_proc_state]);
+                     "(state is %s)\n", 
+                     list_proc_state_strings[
+                     op_p->u.b_rw_list.list_proc_state]);
 
         /* no operations in progress; convert and post some more */
         op_p->u.b_rw_list.aiocb_array_count = AIOCB_ARRAY_SZ;
@@ -355,8 +343,9 @@ static void start_delayed_ops_if_any(int dec_first)
             }
         }
 
-        ret = LIO_LISTIO(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count,
-                         &cur_op->op.u.b_rw_list.sigev);
+        ret = cur_op->op.u.b_rw_list.aio_ops->lio_listio(
+            LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count,
+            &cur_op->op.u.b_rw_list.sigev);
 
         if (ret != 0)
         {
@@ -457,8 +446,9 @@ static int issue_or_delay_io_operation(
             }
         }
 
-        ret = LIO_LISTIO(LIO_NOWAIT, aiocb_ptr_array,
-                         aiocb_inuse_count, sig);
+        ret = cur_op->op.u.b_rw_list.aio_ops->lio_listio(
+            LIO_NOWAIT, aiocb_ptr_array,
+            aiocb_inuse_count, sig);
         if (ret != 0)
         {
             s_dbpf_ios_in_progress--;
@@ -473,16 +463,16 @@ static int issue_or_delay_io_operation(
     return 0;
 }
 
-static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
-                                TROVE_handle handle,
-                                void *buffer,
-                                TROVE_size *inout_size_p,
-                                TROVE_offset offset,
-                                TROVE_ds_flags flags,
-                                TROVE_vtag_s *vtag, 
-                                void *user_ptr,
-                                TROVE_context_id context_id,
-                                TROVE_op_id *out_op_id_p)
+int dbpf_bstream_read_at(TROVE_coll_id coll_id,
+                         TROVE_handle handle,
+                         void *buffer,
+                         TROVE_size *inout_size_p,
+                         TROVE_offset offset,
+                         TROVE_ds_flags flags,
+                         TROVE_vtag_s *vtag, 
+                         void *user_ptr,
+                         TROVE_context_id context_id,
+                         TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -529,14 +519,16 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     struct open_cache_ref tmp_ref;
 
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 
+        DBPF_FD_BUFFERED_READ, &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
     }
     got_fd = 1;
 
-    ret = DBPF_LSEEK(tmp_ref.fd, op_p->u.b_read_at.offset, SEEK_SET);
+    ret = DBPF_LSEEK(tmp_ref.fd, 
+                     op_p->u.b_read_at.offset, SEEK_SET);
     if (ret < 0)
     {
         ret = -trove_errno_to_trove_error(errno);
@@ -565,16 +557,16 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     return ret;
 }
 
-static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
-                                 TROVE_handle handle,
-                                 void *buffer,
-                                 TROVE_size *inout_size_p,
-                                 TROVE_offset offset,
-                                 TROVE_ds_flags flags,
-                                 TROVE_vtag_s *vtag,
-                                 void *user_ptr,
-                                 TROVE_context_id context_id,
-                                 TROVE_op_id *out_op_id_p)
+int dbpf_bstream_write_at(TROVE_coll_id coll_id,
+                          TROVE_handle handle,
+                          void *buffer,
+                          TROVE_size *inout_size_p,
+                          TROVE_offset offset,
+                          TROVE_ds_flags flags,
+                          TROVE_vtag_s *vtag,
+                          void *user_ptr,
+                          TROVE_context_id context_id,
+                          TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -618,14 +610,16 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 1, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 
+        DBPF_FD_BUFFERED_WRITE, &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
     }
     got_fd = 1;
     
-    ret = DBPF_LSEEK(tmp_ref.fd, op_p->u.b_write_at.offset, SEEK_SET);
+    ret = DBPF_LSEEK(tmp_ref.fd, 
+                     op_p->u.b_write_at.offset, SEEK_SET);
     if (ret < 0)
     {
         ret = -trove_errno_to_trove_error(errno);
@@ -661,12 +655,12 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     return ret;
 }
 
-static int dbpf_bstream_flush(TROVE_coll_id coll_id,
-                              TROVE_handle handle,
-                              TROVE_ds_flags flags,
-                              void *user_ptr,
-                              TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p)
+int dbpf_bstream_flush(TROVE_coll_id coll_id,
+                       TROVE_handle handle,
+                       TROVE_ds_flags flags,
+                       void *user_ptr,
+                       TROVE_context_id context_id,
+                       TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -704,7 +698,8 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
     struct open_cache_ref tmp_ref;
 
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 1, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 
+        DBPF_FD_BUFFERED_WRITE, &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
@@ -728,14 +723,14 @@ return_error:
     return ret;
 }
 
-static int dbpf_bstream_resize(TROVE_coll_id coll_id,
-                               TROVE_handle handle,
-                               TROVE_size *inout_size_p,
-                               TROVE_ds_flags flags,
-                               TROVE_vtag_s *vtag,
-                               void *user_ptr,
-                               TROVE_context_id context_id,
-                               TROVE_op_id *out_op_id_p)
+int dbpf_bstream_resize(TROVE_coll_id coll_id,
+                        TROVE_handle handle,
+                        TROVE_size *inout_size_p,
+                        TROVE_ds_flags flags,
+                        TROVE_vtag_s *vtag,
+                        void *user_ptr,
+                        TROVE_context_id context_id,
+                        TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -777,7 +772,8 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 1, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 
+        DBPF_FD_BUFFERED_WRITE, &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
@@ -813,13 +809,13 @@ return_error:
     return ret;
 }
 
-static int dbpf_bstream_validate(TROVE_coll_id coll_id,
-                                 TROVE_handle handle,
-                                 TROVE_ds_flags flags,
-                                 TROVE_vtag_s *vtag,
-                                 void *user_ptr,
-                                 TROVE_context_id context_id,
-                                 TROVE_op_id *out_op_id_p)
+int dbpf_bstream_validate(TROVE_coll_id coll_id,
+                          TROVE_handle handle,
+                          TROVE_ds_flags flags,
+                          TROVE_vtag_s *vtag,
+                          void *user_ptr,
+                          TROVE_context_id context_id,
+                          TROVE_op_id *out_op_id_p)
 {
     return -TROVE_ENOSYS;
 }
@@ -853,7 +849,8 @@ static int dbpf_bstream_read_list(TROVE_coll_id coll_id,
                                 user_ptr,
                                 context_id,
                                 out_op_id_p,
-                                LIO_READ);
+                                LIO_READ,
+                                &aio_ops);
 }
 
 static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
@@ -885,7 +882,8 @@ static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
                                 user_ptr,
                                 context_id,
                                 out_op_id_p,
-                                LIO_WRITE);
+                                LIO_WRITE,
+                                &aio_ops);
 }
 
 /* dbpf_bstream_rw_list()
@@ -894,21 +892,22 @@ static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
  *
  * opcode parameter should be LIO_READ or LIO_WRITE
  */
-static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
-                                       TROVE_handle handle,
-                                       char **mem_offset_array, 
-                                       TROVE_size *mem_size_array,
-                                       int mem_count,
-                                       TROVE_offset *stream_offset_array,
-                                       TROVE_size *stream_size_array,
-                                       int stream_count,
-                                       TROVE_size *out_size_p,
-                                       TROVE_ds_flags flags, 
-                                       TROVE_vtag_s *vtag,
-                                       void *user_ptr,
-                                       TROVE_context_id context_id,
-                                       TROVE_op_id *out_op_id_p,
-                                       int opcode)
+inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
+                                TROVE_handle handle,
+                                char **mem_offset_array, 
+                                TROVE_size *mem_size_array,
+                                int mem_count,
+                                TROVE_offset *stream_offset_array,
+                                TROVE_size *stream_size_array,
+                                int stream_count,
+                                TROVE_size *out_size_p,
+                                TROVE_ds_flags flags, 
+                                TROVE_vtag_s *vtag,
+                                void *user_ptr,
+                                TROVE_context_id context_id,
+                                TROVE_op_id *out_op_id_p,
+                                int opcode,
+                                struct dbpf_aio_ops * aio_ops)
 {
     int ret = -TROVE_EINVAL;
     dbpf_queued_op_t *q_op_p = NULL;
@@ -1003,6 +1002,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.stream_array_count = stream_count;
     q_op_p->op.u.b_rw_list.stream_offset_array = stream_offset_array;
     q_op_p->op.u.b_rw_list.stream_size_array = stream_size_array;
+    q_op_p->op.u.b_rw_list.aio_ops = aio_ops;
 
     /* initialize the out size to 0 */
     *out_size_p = 0;
@@ -1026,7 +1026,8 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.list_proc_state = LIST_PROC_INITIALIZED;
 
     ret = dbpf_open_cache_get(
-        coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, 
+        coll_id, handle, 
+        (opcode == LIO_WRITE) ? DBPF_FD_BUFFERED_WRITE : DBPF_FD_BUFFERED_READ, 
         &q_op_p->op.u.b_rw_list.open_ref);
     if (ret < 0)
     {
@@ -1228,14 +1229,14 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
             }
 
             /* gets the "errno" value of the individual op */
-            ret = aio_error(&aiocb_p[i]);
+            ret = op_p->u.b_rw_list.aio_ops->aio_error(&aiocb_p[i]);
             if (ret == 0)
             {
                 /*
                   this particular operation completed w/out error.
                   gets the return value of the individual op
                 */
-                ret = aio_return(&aiocb_p[i]);
+                ret = AIO_RETURN(&aiocb_p[i]);
 
                 gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %s complete: "
                              "aio_return() ret %d (fd %d)\n",
@@ -1359,6 +1360,18 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     }
 }
 #endif
+
+static struct dbpf_aio_ops aio_ops =
+{
+    aio_read,
+    aio_write,
+    lio_listio,
+    aio_error,
+    aio_return,
+    aio_cancel,
+    aio_suspend,
+    aio_fsync
+};
 
 struct TROVE_bstream_ops dbpf_bstream_ops =
 {

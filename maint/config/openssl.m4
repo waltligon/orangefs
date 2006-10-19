@@ -35,6 +35,7 @@ AC_DEFUN([AX_OPENSSL],
 AC_DEFUN([AX_OPENSSL_OPTIONAL],
 [
     AC_MSG_CHECKING([for openssl library])
+    TMPLIBS=${LIBS}
     LIBS="$LIBS -lcrypt -lssl"
 
     AC_COMPILE_IFELSE(
@@ -48,7 +49,10 @@ AC_DEFUN([AX_OPENSSL_OPTIONAL],
       [AC_MSG_RESULT(yes)
        AC_DEFINE(WITH_OPENSSL, 1, [Define if openssl exists])
       ],
-      [AC_MSG_WARN(No openssl headers found.)])
+      [
+      	AC_MSG_WARN(No openssl headers found.)
+	LIBS=${TMPLIBS}
+      ])
 
     AC_CHECK_HEADERS(openssl/evp.h)
     AC_CHECK_HEADERS(openssl/crypto.h)

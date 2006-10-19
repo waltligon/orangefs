@@ -22,9 +22,11 @@
 
 #ifndef __KERNEL__
 #include <stdint.h>
+#include <stdarg.h>
 #include "syslog.h"
 #endif
 #include "pvfs2-config.h"
+
 
 /********************************************************************
  * Visible interface
@@ -37,7 +39,8 @@ enum gossip_logstamp
 {
     GOSSIP_LOGSTAMP_NONE = 0,
     GOSSIP_LOGSTAMP_USEC = 1,
-    GOSSIP_LOGSTAMP_DATETIME = 2
+    GOSSIP_LOGSTAMP_DATETIME = 2,
+    GOSSIP_LOGSTAMP_THREAD = 3
 };
 #define GOSSIP_LOGSTAMP_DEFAULT GOSSIP_LOGSTAMP_USEC
 
@@ -66,6 +69,11 @@ do {                                                       \
 } while(0)
 
 #define gossip_err printk
+#define gossip_lerr(format, f...)                  \
+do {                                               \
+    gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
+} while(0)
+
 
 #else
 
@@ -102,6 +110,11 @@ int __gossip_debug(
 int gossip_err(
     const char *format,
     ...) __attribute__ ((format(printf, 1, 2)));
+int __gossip_debug_va(
+    uint64_t mask,
+    char prefix,
+    const char *format,
+    va_list ap);
 
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)

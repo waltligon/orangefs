@@ -25,6 +25,7 @@
 #endif
 
 #include "gossip.h"
+#include "gen-locks.h"
 
 /** controls whether debugging is on or off */
 int gossip_debug_on = 0;
@@ -270,7 +271,23 @@ int __gossip_debug(
     const char *format,
     ...)
 {
+    int ret = -EINVAL;
     va_list ap;
+
+    /* rip out the variable arguments */
+    va_start(ap, format);
+    __gossip_debug_va(mask, prefix, format, ap);
+    va_end(ap);
+
+    return ret;
+}
+
+int __gossip_debug_va(
+    uint64_t mask,
+    char prefix,
+    const char *format,
+    va_list ap)
+{
     int ret = -EINVAL;
 
     /* NOTE: this check happens in the macro (before making a function call)
@@ -291,16 +308,14 @@ int __gossip_debug(
         prefix = 'D';
     }
 
-    /* rip out the variable arguments */
-    va_start(ap, format);
-
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
         ret = gossip_debug_fp(stderr, prefix, format, ap, internal_logstamp);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(internal_log_file, prefix, format, ap, internal_logstamp);
+        ret = gossip_debug_fp(
+            internal_log_file, prefix, format, ap, internal_logstamp);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_debug_syslog(prefix, format, ap);
@@ -308,8 +323,6 @@ int __gossip_debug(
     default:
         break;
     }
-
-    va_end(ap);
 
     return ret;
 }
@@ -451,6 +464,16 @@ static int gossip_debug_fp(FILE *fp, char prefix,
             bptr += 13;
             bsize -= 13;
             break;
+        case GOSSIP_LOGSTAMP_THREAD:
+            gettimeofday(&tv, 0);
+            tp = tv.tv_sec;
+            strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
+            sprintf(bptr+8, ".%06ld (%09lu)] ", (long)tv.tv_usec, 
+                    gen_thread_self());
+            bptr += 30;
+            bsize -= 30;
+            break;
+
         case GOSSIP_LOGSTAMP_NONE:
             bptr--;
             sprintf(bptr, "] ");

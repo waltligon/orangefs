@@ -2,7 +2,7 @@ Notes on the BMI InfiniBand implementation
 
 Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
 
-$Id: README,v 1.5.4.1 2006-09-18 15:05:12 vilayann Exp $
+$Id: README,v 1.5.4.2 2006-10-19 22:16:54 slang Exp $
 
 InifiniBand programming interface
 ---------------------------------

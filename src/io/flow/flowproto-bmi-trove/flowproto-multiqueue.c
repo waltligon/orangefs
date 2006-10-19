@@ -459,7 +459,7 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
 {
     struct fp_private_data *flow_data = PRIVATE_FLOW(flow_d);
 
-    gossip_err("Flow proto cancel called on %p\n", flow_d);
+    gossip_err("%s: flow proto cancel called on %p\n", __func__, flow_d);
     gen_mutex_lock(flow_data->parent->flow_mutex);
     /*
       if the flow is already marked as complete, then there is nothing
@@ -468,9 +468,8 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
     if(flow_d->state != FLOW_COMPLETE)
     {
         gossip_debug(GOSSIP_CANCEL_DEBUG,
-            "PINT_flow_cancel() called on active flow, %lld "
-                     "bytes transferred.\n",
-                     lld(flow_d->total_transferred));
+                     "%s: called on active flow, %lld bytes transferred.\n",
+                     __func__, lld(flow_d->total_transferred));
         assert(flow_d->state == FLOW_TRANSMITTING);
         handle_io_error(-PVFS_ECANCEL, NULL, flow_data);
         if(flow_data->parent->state == FLOW_COMPLETE)
@@ -483,8 +482,8 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
     else
     {
         gossip_debug(GOSSIP_CANCEL_DEBUG,
-                     "PINT_flow_cancel() called on already completed "
-                     "flow; doing nothing.\n");
+                     "%s: called on already completed flow; doing nothing.\n",
+                     __func__);
     }
     gen_mutex_unlock(flow_data->parent->flow_mutex);
 
@@ -1950,7 +1949,7 @@ static void handle_io_error(
     {
         enum flow_endpoint_type src, dest;
     
-        gossip_err("Flow proto error cleanup started on %p, error_code: %d\n", flow_data->parent, error_code);
+        gossip_err("%s: flow proto error cleanup started on %p, error_code: %d\n", __func__, flow_data->parent, error_code);
 
         flow_data->parent->error_code = error_code;
         if(q_item)
@@ -1967,14 +1966,14 @@ static void handle_io_error(
         {
             ret = cancel_pending_bmi(&flow_data->src_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d BMI-mem BMI ops.\n", ret);
+                "flowproto-multiqueue canceled %d bmi-mem BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
         }
         else if (src == MEM_ENDPOINT && dest == BMI_ENDPOINT)
         {
             ret = cancel_pending_bmi(&flow_data->dest_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d mem-BMI BMI ops.\n", ret);
+                "flowproto-multiqueue canceled %d mem-bmi BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
         }
         else if (src == TROVE_ENDPOINT && dest == BMI_ENDPOINT)
@@ -1982,21 +1981,21 @@ static void handle_io_error(
             ret = cancel_pending_trove(&flow_data->src_list);
             flow_data->cleanup_pending_count += ret;
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d trove-bmi Trove ops.\n", ret);
+                "flowproto-multiqueue canceled %d trove-bmi Trove ops.\n", ret);
             ret = cancel_pending_bmi(&flow_data->dest_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d trove-bmi BMI ops.\n", ret);
+                "flowproto-multiqueue canceled %d trove-bmi BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
         }
         else if (src == BMI_ENDPOINT && dest == TROVE_ENDPOINT)
         {
             ret = cancel_pending_bmi(&flow_data->src_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d bmi-trove BMI ops.\n", ret);
+                "flowproto-multiqueue canceled %d bmi-trove BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
             ret = cancel_pending_trove(&flow_data->dest_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d bmi-trove Trove ops.\n", ret);
+                "flowproto-multiqueue canceled %d bmi-trove Trove ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
         }
         else
@@ -2004,8 +2003,9 @@ static void handle_io_error(
             /* impossible condition */
             assert(0);
         }
-        gossip_err("Flow proto %p canceling a total of %d BMI or Trove operations\n",
-            flow_data->parent, flow_data->cleanup_pending_count);
+        gossip_err("%s: flow proto %p canceled %d operations, will clean up.\n",
+                   __func__, flow_data->parent,
+                   flow_data->cleanup_pending_count);
     }
     else
     {
@@ -2019,8 +2019,8 @@ static void handle_io_error(
 
     if(flow_data->cleanup_pending_count == 0)
     {
-        gossip_err("Flow proto error cleanup finished %p, error_code: %d\n",
-            flow_data->parent, flow_data->parent->error_code);
+        gossip_err("%s: flow proto %p error cleanup finished, error_code: %d\n",
+            __func__, flow_data->parent, flow_data->parent->error_code);
 
         /* we are finished, make sure error is marked and state is set */
         assert(flow_data->parent->error_code);

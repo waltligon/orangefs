@@ -252,7 +252,7 @@ PVFS_error PVFS_isys_io(
     PVFS_offset file_req_offset,
     void *buffer,
     PVFS_Request mem_req,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type,
     PVFS_sys_op_id *op_id,
@@ -344,7 +344,7 @@ PVFS_error PVFS_sys_io(
     PVFS_offset file_req_offset,
     void *buffer,
     PVFS_Request mem_req,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type)
 {
@@ -456,7 +456,13 @@ static PINT_sm_action io_datafile_setup_msgpairs(
             js_p->error_code = -PVFS_EBADF;
             goto exit;
     }
-
+    /* cannot write to an immutable file */
+    if (sm_p->u.io.io_type == PVFS_IO_WRITE
+        && (attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL))
+    {
+        js_p->error_code = -PVFS_EPERM;
+        goto exit;
+    }
     ret = PINT_dist_lookup(attr->u.meta.dist);
     if (ret)
     {

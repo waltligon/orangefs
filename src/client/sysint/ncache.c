@@ -56,7 +56,7 @@ struct ncache_payload
 struct ncache_key
 {
     PVFS_object_ref parent_ref;
-    char* entry_name;
+    const char* entry_name;
 };
   
 static struct PINT_tcache* ncache = NULL;
@@ -238,7 +238,7 @@ int PINT_ncache_get_cached_entry(
     gossip_debug(GOSSIP_NCACHE_DEBUG, 
                  "ncache: get_cached_entry(): [%s]\n",entry);
   
-    entry_key.entry_name = (char *) entry;
+    entry_key.entry_name = entry;
     entry_key.parent_ref.handle = parent_ref->handle;
     entry_key.parent_ref.fs_id = parent_ref->fs_id;
 
@@ -303,7 +303,7 @@ void PINT_ncache_invalidate(
   
     gen_mutex_lock(&ncache_mutex);
   
-    entry_key.entry_name = (char *) entry;
+    entry_key.entry_name = entry;
     entry_key.parent_ref.handle = parent_ref->handle;
     entry_key.parent_ref.fs_id = parent_ref->fs_id;
 
@@ -386,7 +386,7 @@ int PINT_ncache_update(
 
     gen_mutex_lock(&ncache_mutex);
 
-    entry_key.entry_name = (char *) entry;
+    entry_key.entry_name = entry;
     entry_key.parent_ref.handle = parent_ref->handle;
     entry_key.parent_ref.fs_id = parent_ref->fs_id;
 

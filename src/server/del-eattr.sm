@@ -21,8 +21,6 @@ static PINT_sm_action deleattr_delobj_eattribs(
 static PINT_sm_action deleattr_verify_eattribs(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_del_eattr_sm(

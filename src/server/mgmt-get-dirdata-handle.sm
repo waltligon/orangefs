@@ -21,8 +21,6 @@ static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
 static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_mgmt_get_dirdata_handle_sm(

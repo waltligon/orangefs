@@ -181,7 +181,7 @@ machine pvfs2_client_remove_sm(
 PVFS_error PVFS_isys_remove(
     char *object_name,
     PVFS_object_ref parent_ref, 
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
@@ -235,7 +235,7 @@ PVFS_error PVFS_isys_remove(
 PVFS_error PVFS_sys_remove(
     char *object_name,
     PVFS_object_ref parent_ref, 
-    PVFS_credentials *credentials)
+    const PVFS_credentials *credentials)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;

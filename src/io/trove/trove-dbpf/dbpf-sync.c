@@ -8,6 +8,7 @@
 #include "gossip.h"
 #include "pint-perf-counter.h"
 #include "dbpf-sync.h"
+#include "dbpf-thread.h"
 
 enum s_sync_context_e
 {
@@ -95,7 +96,7 @@ void dbpf_sync_context_destroy(int context_index)
     }
 }
 
-int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
+int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
 {
 
     int ret = 0;
@@ -106,10 +107,17 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
     struct dbpf_collection* coll = qop_p->op.coll_p;
     int cid = qop_p->op.context_id;
 
-    assert(DBPF_OP_DOES_SYNC(qop_p->op.type));
+    if(!DBPF_OP_DOES_SYNC(qop_p->op.type))
+    {
+        dbpf_queued_op_complete(qop_p, retcode, OP_COMPLETED);
+        (*outcount)++;
+        return 0;
+    }
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                 "[SYNC_COALESCE]: sync_coalesce called\n");
+                 "[SYNC_COALESCE]: sync_coalesce called, "
+                 "handle: %llu, cid: %d\n",
+                 llu(qop_p->op.handle), cid);
 
     sync_context_type = dbpf_sync_get_object_sync_context(qop_p->op.type);
 
@@ -117,33 +125,46 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
         /*
          * No sync needed at all
          */
-        ret = dbpf_queued_op_complete(qop_p, 0, OP_COMPLETED);
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: sync not needed, "
+                     "moving to completion queue: %llu\n",
+                     llu(qop_p->op.handle));
+        dbpf_queued_op_complete(qop_p, retcode, OP_COMPLETED);
         return 0;
     }
 
     /*
-     * Now we now that this particular op is modifying
+     * Now we know that this particular op is modifying
      */
     sync_context = & sync_array[sync_context_type][cid];
 
+    gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                 "[SYNC_COALESCE]: sync_context: %p\n", sync_context);
+
     if( sync_context_type == COALESCE_CONTEXT_DSPACE )
     {
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: sync context type is DSPACE\n");
         dbp = qop_p->op.coll_p->ds_db;
     }
     else if( sync_context_type == COALESCE_CONTEXT_KEYVAL ) 
     {
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: sync context type is KEYVAL\n");
         dbp = qop_p->op.coll_p->keyval_db;
     }
 
     if ( ! coll->meta_sync_enabled )
     {
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: meta sync disabled, "
+                     "moving operation to completion queue\n");
 
-        ret = dbpf_queued_op_complete(qop_p, 0, OP_COMPLETED);
+        ret = dbpf_queued_op_complete(qop_p, retcode, OP_COMPLETED);
         /*
          * Sync periodical if count < lw or if lw = 0 and count > hw 
          */
         int do_sync=0;
-
         gen_mutex_lock(sync_context->mutex);
         sync_context->coalesce_counter++;
         if( (coll->c_high_watermark > 0 && 
@@ -162,6 +183,8 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
         gen_mutex_unlock(sync_context->mutex);
 
         if ( do_sync ) {
+            gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                         "[SYNC_COALESCE]: syncing now!\n");
             ret = dbpf_sync_db(dbp, sync_context_type, sync_context);
         }
 
@@ -170,7 +193,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
 
     /*
      * metadata sync is enabled, either we delay and enqueue this op or we 
-     * coalesync. 
+     * coalesce. 
      */
     gen_mutex_lock(sync_context->mutex);
     if( (sync_context->sync_counter < coll->c_low_watermark) ||
@@ -183,21 +206,17 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
                      sync_context->coalesce_counter,
                      sync_context->sync_counter);
 
-        /* sync this operation.  We don't want to use SYNC_IF_NECESSARY
-         */
-
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: syncing now!\n");
         ret = dbpf_sync_db(dbp, sync_context_type, sync_context);
 
-        gen_mutex_lock(
-            dbpf_completion_queue_array_mutex[cid]);
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: moving op %p with handle: %llu "
+                     "to completion queue\n",
+                     qop_p, llu(qop_p->op.handle));
 
-        dbpf_op_queue_add(
-            dbpf_completion_queue_array[cid], qop_p);
-        gen_mutex_lock(&qop_p->mutex);
-        qop_p->op.state = OP_COMPLETED;
-        qop_p->state = 0;
-        gen_mutex_unlock(&qop_p->mutex);
-
+        DBPF_COMPLETION_START(qop_p, retcode, OP_COMPLETED);
+        (*outcount)++;
 
         /* move remaining ops in queue with ready-to-be-synced state
          * to completion queue
@@ -205,27 +224,30 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
         while(!dbpf_op_queue_empty(sync_context->sync_queue))
         {
             ready_op = dbpf_op_queue_shownext(sync_context->sync_queue);
+
+            gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                         "[SYNC_COALESCE]: moving op: %p with handle: %llu "
+                         "to completion queue\n",
+                         ready_op, llu(ready_op->op.handle));
+
             dbpf_op_queue_remove(ready_op);
-            dbpf_op_queue_add(
-                dbpf_completion_queue_array[cid], 
-                ready_op);
-            gen_mutex_lock(&ready_op->mutex);
-            ready_op->op.state = OP_COMPLETED;
-            ready_op->state = 0;
-            gen_mutex_unlock(&ready_op->mutex);
+            DBPF_COMPLETION_ADD(ready_op, 0, OP_COMPLETED);
+            (*outcount)++;
         }
 
         sync_context->coalesce_counter = 0;
-        pthread_cond_signal(&dbpf_op_completed_cond);
-        gen_mutex_unlock(
-            dbpf_completion_queue_array_mutex[cid]);
+        DBPF_COMPLETION_SIGNAL();
+        DBPF_COMPLETION_FINISH(cid);
         ret = 1;
     }
     else
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]:\tcoalescing %d op: %d\n", 
-                     sync_context_type, sync_context->coalesce_counter);
+                     "[SYNC_COALESCE]:\tcoalescing type: %d "
+                     "coalesce_counter: %d, sync_counter: %d, handle %llu\n", 
+                     sync_context_type, sync_context->coalesce_counter,
+                     sync_context->sync_counter,
+                     llu(qop_p->op.handle));
 
         dbpf_op_queue_add(
             sync_context->sync_queue, qop_p);

@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     TROVE_coll_id coll_id;
     TROVE_handle file_handle, parent_handle;
     TROVE_keyval_s key, val;
-    char *method_name, *file_name;
+    char *file_name;
     char path_name[PATH_SIZE];
     job_id_t foo_id;
     job_status_s job_stat;
@@ -48,7 +48,8 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+        TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
@@ -344,7 +345,7 @@ int main(int argc, char **argv)
 
 	job_close_context(context);
 	job_finalize();
-    trove_finalize();
+        trove_finalize(TROVE_METHOD_DBPF);
 
     return 0;
 }

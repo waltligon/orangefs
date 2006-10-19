@@ -5,14 +5,13 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.7.4.1 2006-09-18 15:05:12 vilayann Exp $
+ * $Id: util.c,v 1.7.4.2 2006-10-19 22:16:55 slang Exp $
  */
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <unistd.h>
-#include <src/common/gossip/gossip.h>
 
 #define __util_c
 #include "ib.h"
@@ -84,18 +83,6 @@ warning_errno(const char *fmt, ...)
     vsprintf(s, fmt, ap);
     va_end(ap);
     gossip_err("Warning: %s: %s.\n", s, strerror(errno));
-}
-
-void __attribute__((format(printf,1,2))) __hidden
-info(const char *fmt, ...)
-{
-    char s[2048];
-    va_list ap;
-
-    va_start(ap, fmt);
-    vsprintf(s, fmt, ap);
-    va_end(ap);
-    gossip_debug(GOSSIP_BMI_DEBUG_IB, "%s.\n", s);
 }
 
 void * __attribute__((malloc)) __hidden

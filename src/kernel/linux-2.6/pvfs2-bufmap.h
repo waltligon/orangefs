@@ -41,36 +41,48 @@ void readdir_index_put(
 int pvfs_bufmap_copy_from_user(
     int buffer_index,
     void __user *from,
-    int size);
+    size_t size);
 
 int pvfs_bufmap_copy_iovec_from_user(
     int buffer_index,
     const struct iovec *iov,
     unsigned long nr_segs,
-    int size);
+    size_t size);
+
+int pvfs_bufmap_copy_iovec_from_kernel(
+    int buffer_index,
+    const struct iovec *iov,
+    unsigned long nr_segs,
+    size_t size);
 
 int pvfs_bufmap_copy_to_user(
     void __user *to,
     int buffer_index,
-    int size);
+    size_t size);
 
 int pvfs_bufmap_copy_to_user_iovec(
     int buffer_index,
     const struct iovec *iov,
     unsigned long nr_segs,
-    int size);
+    size_t size);
+
+int pvfs_bufmap_copy_to_kernel_iovec(
+    int buffer_index,
+    const struct iovec *iov,
+    unsigned long nr_segs,
+    size_t size);
 
 int pvfs_bufmap_copy_to_kernel(
     void *to,
     int buffer_index,
-    int size);
+    size_t size);
 
 #ifdef HAVE_AIO_VFS_SUPPORT
-int pvfs_bufmap_copy_to_user_task(
+size_t pvfs_bufmap_copy_to_user_task(
         struct task_struct *tsk,
         void __user *to,
         int buffer_index, 
-        int size);
+        size_t size);
 #endif
 
 #endif /* __PVFS2_BUFMAP_H */

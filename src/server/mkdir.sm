@@ -30,8 +30,6 @@ static PINT_sm_action mkdir_error(
 static PINT_sm_action mkdir_prep_sm(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 nested machine pvfs2_mkdir_work_sm(create, 

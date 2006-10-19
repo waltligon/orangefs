@@ -3006,7 +3006,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
         return (-errno);
     }
     jd->job_user_ptr = user_ptr;
-    jd->u.trove.handle = 0;
+    jd->u.trove.handle = PVFS_HANDLE_NULL;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->trove_callback.fn = trove_thread_mgr_callback;
@@ -3392,7 +3392,9 @@ int job_trove_fs_lookup(char *collname,
     user_ptr_internal = &jd->trove_callback;
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_collection_lookup(collname, &(jd->u.trove.fsid), 
+    ret = trove_collection_lookup(
+        TROVE_METHOD_DBPF,
+        collname, &(jd->u.trove.fsid), 
         user_ptr_internal, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");

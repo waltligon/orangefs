@@ -33,8 +33,6 @@ static PINT_sm_action geteattr_check_resp(
 static PINT_sm_action geteattr_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_get_eattr_sm(

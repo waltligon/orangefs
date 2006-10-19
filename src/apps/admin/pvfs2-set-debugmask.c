@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 static struct options *parse_args(int argc, char **argv)
 {
     int ret = -1, len = 0, option_index = 0;
-    char *cur_option = NULL;
+    const char *cur_option = NULL;
     struct options *tmp_opts = NULL;
     static struct option long_opts[] =
     {
@@ -136,7 +136,7 @@ static struct options *parse_args(int argc, char **argv)
         switch(ret)
         {
             case 0:
-                cur_option = (char *)long_opts[option_index].name;
+                cur_option = long_opts[option_index].name;
 
                 if (strcmp("help", cur_option) == 0)
                 {

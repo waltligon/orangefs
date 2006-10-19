@@ -318,11 +318,11 @@ static PINT_sm_action remove_check_dirdata_entries(
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, 
                          " detected non-empty "
-                         "directory (fsid: %u, handle: %llu, size %llu) "
+                         "directory (fsid: %u, handle: %llu, size: %d) "
                          "-- returning error\n",
                          s_op->u.remove.fs_id,
                          llu(s_op->u.remove.handle),
-                         llu(s_op->u.remove.dirent_count));
+                         s_op->u.remove.keyval_handle_info.count);
             js_p->error_code = -PVFS_ENOTEMPTY;
         }
     }

@@ -194,7 +194,7 @@ machine pvfs2_client_sysint_getattr_sm(
 PVFS_error PVFS_isys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask, 
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_getattr *resp_p,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
@@ -252,7 +252,7 @@ PVFS_error PVFS_isys_getattr(
 PVFS_error PVFS_sys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask, 
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_getattr *resp_p)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -862,11 +862,15 @@ static PINT_sm_action getattr_set_sys_response(
         }
     }
 
-    /* special case for when users ask for dfile count */
-    if(attr->objtype == PVFS_TYPE_METAFILE &&
-       sm_p->getattr.req_attrmask & PVFS_ATTR_META_DFILES)
+    if(attr->objtype == PVFS_TYPE_METAFILE) 
     {
-        sysresp->attr.dfile_count = attr->u.meta.dfile_count;
+       /* Copy if there are any special object specific flags */
+       sysresp->attr.flags = attr->u.meta.hint.flags;
+       /* special case for when users ask for dfile count */
+       if (sm_p->getattr.req_attrmask & PVFS_ATTR_META_DFILES)
+       {
+           sysresp->attr.dfile_count = attr->u.meta.dfile_count;
+       }
     }
     if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {
@@ -918,7 +922,6 @@ static PINT_sm_action getattr_set_sys_response(
 
     if (js_p->error_code == 0)
     {
- 
         /* convert outgoing attribute mask based on what we got */
         sysresp->attr.mask = PVFS_util_object_to_sys_attr_mask(
             sm_p->getattr.attr.mask);

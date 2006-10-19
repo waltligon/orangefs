@@ -18,6 +18,7 @@
 #include "server-config.h"
 #include "pvfs2.h"
 #include "job.h"
+#include "trove.h"
 #include "gossip.h"
 #include "extent-utils.h"
 #include "mkspace.h"
@@ -105,6 +106,7 @@ static DOTCONF_CB(get_client_retry_delay);
 static DOTCONF_CB(get_secret_key);
 static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
+static DOTCONF_CB(get_trove_method);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -680,8 +682,9 @@ static const configoption_t options[] =
          get_handle_recycle_timeout_seconds, NULL, 
          CTX_STORAGEHINTS,"360"},
     
-    /* The TROVE layer has an attribute caching component that handles
-     * caching of stored attributes.  This is used to improve the performance of
+    /* The TROVE layer (server side storage layer) 
+     * has an attribute caching component that 
+     * caches stored attributes.  This is used to improve the performance of
      * metadata accesses.  The AttrCacheKeywords option is a list of the
      * object types that should get cached in the attribute cache.  
      * The possible values for this option are:
@@ -760,9 +763,11 @@ static const configoption_t options[] =
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
      *
-     * usec: [%H:%M:%S
+     * usec: [%H:%M:%S.%U]
      *
      * datetime: [%m/%d %H:%M]
+     *
+     * thread: [%H:%M:%S.%U (%lu)]
      *
      * none
      *
@@ -801,6 +806,12 @@ static const configoption_t options[] =
 
     {"CoalescingLowWatermark", ARG_INT, get_coalescing_low_watermark, NULL,
         CTX_STORAGEHINTS, "1"},
+
+    /* This option specifies the method used for trove.  Currently the
+     * dbpf method is the default.  Other methods include 'alt-aio'.
+     */
+    {"TroveMethod", ARG_STR, get_trove_method, NULL, 
+        CTX_DEFAULTS|CTX_GLOBAL|CTX_STORAGEHINTS, "dbpf"},
 
     /* Specifies the file system's key for use in HMAC-based digests of
      * client operations.
@@ -988,6 +999,10 @@ DOTCONF_CB(get_logstamp)
     else if(!strcmp(cmd->data.str, "datetime"))
     {
         config_s->logstamp_type = GOSSIP_LOGSTAMP_DATETIME;
+    }
+    else if(!strcmp(cmd->data.str, "thread"))
+    {
+        config_s->logstamp_type = GOSSIP_LOGSTAMP_THREAD;
     }
     else
     {
@@ -2386,6 +2401,40 @@ DOTCONF_CB(get_coalescing_low_watermark)
     fs_conf->coalescing_low_watermark = cmd->data.value;
     return NULL;
 }
+
+DOTCONF_CB(get_trove_method)
+{
+    int * method;
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    method = &config_s->trove_method;
+    if(config_s->configuration_context == CTX_STORAGEHINTS)
+    {
+        /* we must be in a storagehints inside a filesystem context */
+        struct filesystem_configuration_s *fs_conf =
+            (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
+
+        method = &fs_conf->trove_method; 
+    }
+
+    if(!strcmp(cmd->data.str, "dbpf"))
+    {
+        *method = TROVE_METHOD_DBPF;
+    }
+    else if(!strcmp(cmd->data.str, "alt-aio"))
+    {
+        *method = TROVE_METHOD_DBPF_ALTAIO;
+    }
+    else
+    {
+        return "Error unknown TroveMethod option\n";
+    }
+    return NULL;
+}
+
+
 
 /*
  * Function: PINT_config_release

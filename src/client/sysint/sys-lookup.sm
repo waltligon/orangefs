@@ -445,7 +445,7 @@ PVFS_error PVFS_isys_ref_lookup(
     PVFS_fs_id fs_id,
     char* relative_pathname,
     PVFS_object_ref parent,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_sys_op_id *op_id,
@@ -507,7 +507,7 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
     char *relative_pathname,
     PVFS_object_ref parent,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link)
 {
@@ -543,7 +543,7 @@ PVFS_error PVFS_sys_ref_lookup(
  */
 PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id, char *name,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link)
 {
@@ -1078,7 +1078,7 @@ static int lookup_segment_lookup_comp_fn(
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
                  resp_p->u.lookup_path.handle_count);
 
-    memset(&last_resolved_refn, 0, sizeof(last_resolved_refn));
+    memset(&last_resolved_refn, 0, sizeof(PVFS_object_ref));
 
     /*
       at this point we have 1 or more resolved handles so we're going

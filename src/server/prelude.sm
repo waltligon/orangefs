@@ -33,8 +33,6 @@ static PINT_sm_action prelude_check_acls_if_needed(
 static PINT_sm_action prelude_check_acls(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 enum {
     PRELUDE_RUN_ACL_CHECKS = 1,
 };

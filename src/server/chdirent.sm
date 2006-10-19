@@ -38,8 +38,6 @@ static PINT_sm_action chdirent_change_directory_entry_failure(
 static PINT_sm_action chdirent_setup_resp(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_chdirent_sm(

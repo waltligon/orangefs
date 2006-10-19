@@ -136,6 +136,7 @@ typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
 typedef uint64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
+typedef uint64_t PVFS_flags;
 #define encode_PVFS_uid encode_uint32_t
 #define decode_PVFS_uid decode_uint32_t
 #define encode_PVFS_gid encode_uint32_t
@@ -144,6 +145,8 @@ typedef uint32_t PVFS_permissions;
 #define decode_PVFS_time decode_int64_t
 #define encode_PVFS_permissions encode_uint32_t
 #define decode_PVFS_permissions decode_uint32_t
+#define encode_PVFS_flags encode_uint64_t
+#define decode_PVFS_flags decode_uint64_t
 
 /* contiguous range of handles */
 typedef struct
@@ -223,6 +226,11 @@ typedef enum
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
 
+/* PVFS Object Flags (PVFS_flags); Add more as we implement them */
+#define PVFS_IMMUTABLE_FL 0x1ULL
+#define PVFS_APPEND_FL    0x2ULL
+#define PVFS_NOATIME_FL   0x4ULL
+
 /* Key/Value Pairs */
 /* Extended attributes are stored on objects with */
 /* a Key/Value pair.  A key or a value is simply */
@@ -279,7 +287,8 @@ typedef struct
  PVFS_ATTR_SYS_DIRENT_COUNT)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
- PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT)
+ PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT \
+ | PVFS_ATTR_SYS_DIR_HINT)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
 #define PVFS_ATTR_SYS_ALL_TIMES \
@@ -529,7 +538,7 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 #define PVFS_EHOSTDOWN       E(55) /* Host is down */
 #define PVFS_EHOSTUNREACH    E(56) /* No route to host */
 #define PVFS_EALREADY        E(57) /* Operation already in progress */
-#define PVFS_EACCES          E(58) /* Operation already in progress */
+#define PVFS_EACCES          E(58) /* Access not allowed */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))

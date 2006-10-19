@@ -226,7 +226,7 @@ PVFS_error PVFS_isys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_dist *dist,
     PVFS_sysresp_create *resp,
     PVFS_sys_op_id *op_id,
@@ -247,11 +247,11 @@ PVFS_error PVFS_isys_create(
         return ret;
     }
 
-    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
-        PVFS_ATTR_SYS_ALL_SETABLE)
+    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
     {
-        gossip_lerr("PVFS_isys_create() failure: invalid attributes "
-                    "specified\n");
+        gossip_lerr("PVFS_isys_create() failure: invalid attribute mask: %d, "
+                    "expected SYS_ALL_SETABLE (%d)\n",
+                    attr.mask, PVFS_ATTR_SYS_ALL_SETABLE);
         return ret;
     }
 
@@ -368,7 +368,7 @@ PVFS_error PVFS_sys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_dist *dist,
     PVFS_sysresp_create *resp)
 {
@@ -470,7 +470,12 @@ static int create_datafiles_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-        gossip_err("%s: Failed to create data handle %d\n", __func__, index);
+        gossip_err("%s: Failed to create data handle at server: %s "
+                   "for file: %s\n", 
+                   __func__, 
+                   BMI_addr_rev_lookup(
+                       sm_p->u.create.data_server_addrs[index]),
+                   sm_p->u.create.object_name);
         PVFS_perror_gossip("Creation failure", resp_p->status);
 	return resp_p->status;
     }

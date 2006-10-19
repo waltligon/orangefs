@@ -16,6 +16,7 @@
   ext2/ext3
 */
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -116,7 +117,7 @@ static open_info_t oinfo[] =
 
 int main(int argc, char **argv)	
 {
-    int ret = -1, fd = -1, i = 0;
+    int fd = -1, i = 0;
 
     if (argc != 2)
     {
