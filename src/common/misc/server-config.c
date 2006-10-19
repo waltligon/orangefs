@@ -88,7 +88,6 @@ static DOTCONF_CB(get_attr_cache_keywords_list);
 static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
-static DOTCONF_CB(get_trove_alt_aio);
 static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_db_cache_size_bytes);
 static DOTCONF_CB(get_trove_max_concurrent_io);
