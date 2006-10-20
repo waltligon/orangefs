@@ -488,7 +488,9 @@ struct inode *pvfs2_get_custom_inode(
         inode->i_gid = current->fsgid;
         inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
         inode->i_size = PAGE_CACHE_SIZE;
+#ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE
         inode->i_blksize = PAGE_CACHE_SIZE;
+#endif
         inode->i_blkbits = PAGE_CACHE_SHIFT;
         inode->i_blocks = 0;
         inode->i_rdev = dev;
@@ -508,7 +510,9 @@ struct inode *pvfs2_get_custom_inode(
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
 
+#ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE
             inode->i_blksize = pvfs_bufmap_size_query();
+#endif
             inode->i_blkbits = PAGE_CACHE_SHIFT;
         }
         else if ((mode & S_IFMT) == S_IFLNK)
