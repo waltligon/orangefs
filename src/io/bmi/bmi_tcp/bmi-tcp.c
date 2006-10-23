@@ -1763,6 +1763,10 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
     int debug_on;
     uint64_t mask;
     socklen_t peerlen;
+    struct sockaddr_in peer;
+    int ret;
+    struct hostent *peerent;
+    char* tmp_peer;
 
     /* return default response if we don't have support for the right socket
      * calls 
@@ -1782,10 +1786,6 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
     }
 
     peerlen = sizeof(struct sockaddr_in);
-    struct sockaddr_in peer;
-    int ret;
-    struct hostent *peerent;
-    char* tmp_peer;
 
     if(tcp_addr_data->peer_type == BMI_TCP_PEER_HOSTNAME)
     {
