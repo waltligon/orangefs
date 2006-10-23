@@ -152,9 +152,6 @@ static int alt_aio_fsync(int operation, struct aiocb * aiocbp)
     return -1;
 }
 
-/* prototypes for pread and pwrite; _XOPEN_SOURCE causes db.h problems */
-ssize_t pread(int fd, void *buf, size_t count, off_t offset);
-ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 static void* alt_lio_thread(void* foo)
 {
     struct alt_aio_item* tmp_item = (struct alt_aio_item*)foo;
