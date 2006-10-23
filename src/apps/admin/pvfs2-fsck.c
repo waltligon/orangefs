@@ -454,7 +454,9 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 		     &getattr_resp);
 
     assert(getattr_resp.attr.objtype == PVFS_TYPE_DIRECTORY);
-    assert(handlelist_find_handle(hl, pref.handle, &server_idx) == 0);
+
+    ret = handlelist_find_handle(hl, pref.handle, &server_idx);
+    assert(ret == 0);
 
     handlelist_remove_handle(hl, pref.handle, server_idx);
 
