@@ -156,16 +156,16 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
 
     if ( ! coll->meta_sync_enabled )
     {
+        int do_sync=0;
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]: meta sync disabled, "
                      "moving operation to completion queue\n");
 
         ret = dbpf_queued_op_complete(qop_p, retcode, OP_COMPLETED);
+
         /*
          * Sync periodical if count < lw or if lw = 0 and count > hw 
          */
-        int do_sync=0;
-
         gen_mutex_lock(sync_context->mutex);
         sync_context->coalesce_counter++;
         if( (coll->c_high_watermark > 0 && 

@@ -1762,6 +1762,7 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
     struct tcp_addr *tcp_addr_data = map->method_data;
     int debug_on;
     uint64_t mask;
+    socklen_t peerlen;
 
     /* return default response if we don't have support for the right socket
      * calls 
@@ -1780,7 +1781,7 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
         return(tcp_addr_data->peer);
     }
 
-    socklen_t peerlen = sizeof(struct sockaddr_in);
+    peerlen = sizeof(struct sockaddr_in);
     struct sockaddr_in peer;
     int ret;
     struct hostent *peerent;

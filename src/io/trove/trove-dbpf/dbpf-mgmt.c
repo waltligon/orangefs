@@ -1269,7 +1269,6 @@ int dbpf_collection_lookup(char *collname,
                            void *user_ptr,
                            TROVE_op_id *out_op_id_p)
 {
-	gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_lookup of coll: %s\n", collname);
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -1278,6 +1277,8 @@ int dbpf_collection_lookup(char *collname,
     char path_name[PATH_MAX];
     char trove_dbpf_version[32] = {0};
     
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_lookup of coll: %s\n", 
+            collname);
     sto_p = my_storage_p;
     if (!sto_p)
     {
