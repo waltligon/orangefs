@@ -586,6 +586,21 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		)
 	CFLAGS=$tmp_cflags
 
+	dnl In 2.6.18.1 and newer, including <linux/config.h> will throw off a
+	dnl warning 
+	tmp_cflags=${CFLAGS}
+	CFLAGS="${CFLAGS} -Werror"
+	AC_MSG_CHECKING(for warnings when including linux/config.h)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/config.h>
+		], [], 
+		AC_MSG_RESULT(no)
+		AC_DEFINE(HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H, 1, Define if including linux/config.h gives no warnings),
+		AC_MSG_RESULT(yes)
+	)
+	CFLAGS=$tmp_cflags
+
 	AC_MSG_CHECKING(for compat_ioctl member in file_operations structure)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__

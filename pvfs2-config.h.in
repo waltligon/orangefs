@@ -170,6 +170,9 @@
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
 
+/* Define if including linux/config.h gives no warnings */
+#undef HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H
+
 /* Define to 1 if you have the <openssl/crypto.h> header file. */
 #undef HAVE_OPENSSL_CRYPTO_H
 
