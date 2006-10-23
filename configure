@@ -8750,7 +8750,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 int
 main ()
 {
-
+fst.get_sb = 0;
   ;
   return 0;
 }

@@ -354,7 +354,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			  static struct file_system_type fst = {
 				  .get_sb = pvfs_get_sb,
 			  };
-		], [],
+		], [fst.get_sb = 0;],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if get_sb callback has struct vfsmount argument),
 		AC_MSG_RESULT(no)
