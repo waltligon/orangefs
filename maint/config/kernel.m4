@@ -158,6 +158,20 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
+	dnl 2.6.18.1 removed this member
+	AC_MSG_CHECKING(for i_blksize in struct inode)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode i = {
+			.i_blksize = 0,
+			};
+		], [],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_I_BLKSIZE_IN_STRUCT_INODE, 1, Define if struct inode in kernel has i_blksize member),
+			AC_MSG_RESULT(no)
+	)
+
 	dnl checking if we have a statfs_lite callback in super_operations 
 	AC_MSG_CHECKING(for statfs_lite callback in struct super_operations in kernel)
 	AC_TRY_COMPILE([
@@ -323,7 +337,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			  static struct super_operations s_op = {
 				  .statfs = pvfs_statfs,
 			  };
-		], [],
+		], [ s_op.statfs = 0; ],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if statfs callback has struct dentry argument),
 		AC_MSG_RESULT(no)
@@ -340,7 +354,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			  static struct file_system_type fst = {
 				  .get_sb = pvfs_get_sb,
 			  };
-		], [],
+		], [fst.get_sb = 0;],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if get_sb callback has struct vfsmount argument),
 		AC_MSG_RESULT(no)
@@ -570,6 +584,21 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE, 1, Define if return type of invalidatepage should be int),
 		AC_MSG_RESULT(NO)
 		)
+	CFLAGS=$tmp_cflags
+
+	dnl In 2.6.18.1 and newer, including <linux/config.h> will throw off a
+	dnl warning 
+	tmp_cflags=${CFLAGS}
+	CFLAGS="${CFLAGS} -Werror"
+	AC_MSG_CHECKING(for warnings when including linux/config.h)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/config.h>
+		], [], 
+		AC_MSG_RESULT(no)
+		AC_DEFINE(HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H, 1, Define if including linux/config.h gives no warnings),
+		AC_MSG_RESULT(yes)
+	)
 	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(for compat_ioctl member in file_operations structure)
