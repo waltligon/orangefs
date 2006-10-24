@@ -337,7 +337,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			  static struct super_operations s_op = {
 				  .statfs = pvfs_statfs,
 			  };
-		], [],
+		], [ s_op.statfs = 0; ],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if statfs callback has struct dentry argument),
 		AC_MSG_RESULT(no)

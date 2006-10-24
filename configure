@@ -8686,7 +8686,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 int
 main ()
 {
-
+ s_op.statfs = 0;
   ;
   return 0;
 }
