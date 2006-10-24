@@ -88,7 +88,7 @@ CFLAGS = $(CPPFLAGS) -MMD -Wall -Wstrict-prototypes -Wno-trigraphs \
          -fno-common -fomit-frame-pointer $(EXTRA_CFLAGS)
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
 LINK_SETUP := $(shell for i in $(csrc) $(hsrc); do \
-		if [[ ! -f $$i  &&  ! -L $$i ]] ; then \
+		if [ ! -f $$i  -a  ! -L $$i ]] ; then \
 			ln -s $(relative_src_dir)/$(there)/$$i ;\
 		fi ;\
 		done)
