@@ -2952,6 +2952,9 @@ static PVFS_error process_vfs_requests(void)
                   operation handling can be making progress on the
                   other ops in progress
                 */
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
+                             " returned unexp vfs_request %p\n",
+                             vfs_request);
                 ret = handle_unexp_vfs_request(vfs_request);
                 assert(ret == 0);
             }
@@ -2983,7 +2986,13 @@ static PVFS_error process_vfs_requests(void)
                 {
                     PVFS_perror_gossip("Failed to remove op in progress "
                                        "from table", ret);
-                    goto repost_unexp;
+
+                    /* this code relocated to remove an unneccessary goto */
+                    ret = repost_unexp_vfs_request(
+                        vfs_request, "normal completion");
+
+                    assert(ret == 0);
+                    continue;
                 }
 
                 package_downcall_members(
@@ -3036,12 +3045,6 @@ static PVFS_error process_vfs_requests(void)
                     assert(ret == 0);
                     continue;
                 }
-
-              repost_unexp:
-                ret = repost_unexp_vfs_request(
-                    vfs_request, "normal completion");
-
-                assert(ret == 0);
             }
         }
     }

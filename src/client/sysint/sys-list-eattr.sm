@@ -194,9 +194,9 @@ static PINT_sm_action list_eattr_cleanup(
     /* free the array malloc'd above */
     free(sm_p->u.listeattr.size_array);
     sm_p->error_code  = js_p->error_code;
-    PINT_SET_OP_COMPLETE;
 
-    return SM_ACTION_DEFERRED;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 static int list_eattr_comp_fn(

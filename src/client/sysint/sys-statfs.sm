@@ -243,7 +243,7 @@ static PINT_sm_action sys_statfs_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERRED;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

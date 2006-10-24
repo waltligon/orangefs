@@ -213,9 +213,9 @@ static PINT_sm_action get_eattr_cleanup(
     {
         PINT_acache_invalidate(sm_p->object_ref);
     }
-    PINT_SET_OP_COMPLETE;
 
-    return SM_ACTION_DEFERRED;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 static int get_eattr_comp_fn(

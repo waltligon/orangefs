@@ -173,9 +173,9 @@ static PINT_sm_action del_eattr_cleanup(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"del_eattr state: del_eattr_cleanup\n");
     sm_p->error_code  = js_p->error_code;
-    PINT_SET_OP_COMPLETE;
 
-    return SM_ACTION_DEFERRED;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 static int del_eattr_comp_fn(

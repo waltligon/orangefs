@@ -194,9 +194,9 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 {
     int i; /* index for transition table */
     struct PINT_tran_tbl_s *transtbl;
-    int ret;                            /* holes state action return code */
+    int ret;     /* holds state action return code */
 
-    if (!smcb && !smcb->current_state)
+    if (!smcb)
     {
         gossip_err("SM next called on invald smcb\n");
         return -1;

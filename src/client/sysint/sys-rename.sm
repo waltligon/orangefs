@@ -903,19 +903,17 @@ static PINT_sm_action rename_cleanup(
             (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),
             (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
     }
-        
-
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-
-    PINT_SET_OP_COMPLETE;
 
     if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
     {
 	free(sm_p->msgarray);
         sm_p->msgarray = NULL;
     }
-    return SM_ACTION_DEFERRED;
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 static PINT_sm_action rename_generic_timer(

@@ -152,9 +152,10 @@ static PINT_sm_action mgmt_noop_cleanup(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "noop state: mgmt_noop_cleanup\n");
 
-    PINT_SET_OP_COMPLETE;
     sm_p->error_code = js_p->error_code;
-    return SM_ACTION_DEFERRED;
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

@@ -827,7 +827,7 @@ static PINT_sm_action getattr_set_sys_response(
     if(js_p->error_code != 0)
     {
         PINT_SET_OP_COMPLETE;
-        return SM_ACTION_DEFERRED;
+        return SM_ACTION_TERMINATE;
     }
 
     attr = &sm_p->getattr.attr;
@@ -858,7 +858,8 @@ static PINT_sm_action getattr_set_sys_response(
         if (!sysresp->attr.link_target)
         {
            js_p->error_code = -PVFS_ENOMEM;
-           return SM_ACTION_DEFERRED;
+           PINT_SET_OP_COMPLETE;
+           return SM_ACTION_TERMINATE;
         }
     }
 
@@ -890,7 +891,8 @@ static PINT_sm_action getattr_set_sys_response(
             if (!sysresp->attr.dist_name)
             {
                 js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_DEFERRED;
+                PINT_SET_OP_COMPLETE;
+                return SM_ACTION_TERMINATE;
             }
             gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_hint: %s\n", sysresp->attr.dist_name);
         }
@@ -903,7 +905,8 @@ static PINT_sm_action getattr_set_sys_response(
                 free(sysresp->attr.dist_name);
                 sysresp->attr.dist_name = NULL;
                 js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_DEFERRED;
+                PINT_SET_OP_COMPLETE;
+                return SM_ACTION_TERMINATE;
             }
             gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_params: %s\n", sysresp->attr.dist_params);
         }
@@ -952,8 +955,9 @@ static PINT_sm_action getattr_set_sys_response(
     }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERRED;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

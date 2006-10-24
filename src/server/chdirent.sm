@@ -346,7 +346,7 @@ static PINT_sm_action chdirent_setup_resp(
 static PINT_sm_action chdirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(smcb));
+    return (server_state_machine_complete(smcb));
 }
 
 /*

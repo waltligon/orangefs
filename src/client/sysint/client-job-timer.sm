@@ -54,7 +54,7 @@ static int job_timer_error(struct PINT_smcb *smcb, job_status_s* js_p)
     gossip_err("Error: stopping client job timer.\n");
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERRED;
+    return SM_ACTION_TERMINATE;
 }
 
 /* job_timer_do_work()

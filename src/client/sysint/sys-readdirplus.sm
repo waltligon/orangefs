@@ -943,7 +943,7 @@ static PINT_sm_action readdirplus_cleanup(
         sm_p->msgarray = NULL;
     }
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERRED;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

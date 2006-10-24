@@ -283,9 +283,9 @@ static PINT_sm_action mgmt_setparam_list_cleanup(
     }
 
     sm_p->error_code  = error;
-    PINT_SET_OP_COMPLETE;
 
-    return SM_ACTION_DEFERRED;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /* collect_old_values_comp_fn()

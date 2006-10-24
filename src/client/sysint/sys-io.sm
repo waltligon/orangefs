@@ -1604,7 +1604,7 @@ static PINT_sm_action io_cleanup(
     }
 
     PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERRED;
+    return SM_ACTION_TERMINATE;
 }
 
 static inline int io_decode_ack_response(

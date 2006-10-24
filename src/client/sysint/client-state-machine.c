@@ -687,11 +687,13 @@ PVFS_error PINT_client_state_machine_test(
          * determining whether smcb has already been added to
          * completion Q or not 
          */
+#if 0
         if ((tmp_smcb != smcb) && (PINT_smcb_complete(tmp_smcb)))
         {
             ret = add_sm_to_completion_list(tmp_smcb);
             assert(ret == 0);
         }
+#endif
     }
 
     if (PINT_smcb_complete(smcb))
@@ -815,11 +817,13 @@ PVFS_error PINT_client_state_machine_testsome(
         /* add_sm_to_completion_list(smcb) does the right thing if an smcb
          *  was already added to the completion list
          */
+#if 0
         if (PINT_smcb_complete(smcb))
         {
             ret = add_sm_to_completion_list(smcb);
             assert(ret == 0);
         }
+#endif
     }
 
     /* terminated SMs have added themselves to the completion list */

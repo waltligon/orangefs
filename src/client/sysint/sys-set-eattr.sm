@@ -192,9 +192,9 @@ static PINT_sm_action set_eattr_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code  = js_p->error_code;
-    PINT_SET_OP_COMPLETE;
 
-    return SM_ACTION_DEFERRED;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 static int set_eattr_comp_fn(
