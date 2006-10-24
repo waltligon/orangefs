@@ -25,7 +25,6 @@ int main(int argc, char **argv)
     TROVE_handle root_handle;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
-    char *method_name;
     TROVE_extent cur_extent;
     TROVE_handle_extent_array extent_array;
     TROVE_context_id trove_context = -1;
