@@ -628,6 +628,23 @@ inlined kernel routines.  PVFS2-1.3.2 or newer has the configure option
 \texttt{--disable-kernel-aio}.  Passing this option to configure results in a pvfs2
 kernel module that uses only exported symbols.  
 
+\subsection{Everything built fine, but when I try to compile programs that use PVFS, I get undefined references}
+\label{sec:undefined_references}
+
+The \texttt{libpvfs2} library requires a few additional libraries.  Usually
+"-lpthread -lcrypto -lssl" are required.  Further, Myrinet and Infiniband have
+their own libraries.  If you do not link the required libraries, you will
+probably get errors such as \texttt{undefined reference to `BIO\_f\_base64'}.
+
+The easiest and most portable way to ensure that you link in all required
+libraries when you link \texttt{libpvfs2} is to use the \texttt{pvfs2-config}
+utility.  \texttt{pvfs2-config --libs} will give you the full set of linker
+flags needed.  Here's an example of how one might use this tool:
+\begin{verbatim}
+$ gcc -c $(pvfs2-config --cflags) example.c 
+$ gcc example.o -o example $(pvfs2-config --libs) 
+\end{verbatim}
+
 \subsection{Can we run the Apache webserver to serve files off a PVFS2 volume?}
 
 Sure you can! However, we recommend that you turn off the EnableSendfile option in
