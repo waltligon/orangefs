@@ -624,7 +624,6 @@ static int tas_finalize (void){
 
 static int tas_storage_create (char *stoname, 
   void *user_ptr, TROVE_op_id * out_op_id_p){
-  int ret;
 	gossip_debug(GOSSIP_TROVE_DEBUG, "Tas tas_storage_create here: %s \n", 
     stoname);
  	return dbpf_mgmt_ops.storage_create(stoname, user_ptr, out_op_id_p);
@@ -1143,9 +1142,43 @@ tas_keyval_read_list (TROVE_coll_id coll_id,
 		      void *user_ptr,
 		      TROVE_context_id context_id, TROVE_op_id * out_op_id_p)
 {
-	fprintf(stderr, "TROVE MODULE TAS: FUNCTION tas_keyval_read_list not implemented\n");
+    int i;
 	gossip_debug(GOSSIP_TROVE_DEBUG, "Tas tas_keyval_read_list\n");
-	return 1;
+    gen_mutex_lock(&tas_meta_mutex);
+    handleCache * found=findCacheEntry(handle,coll_id);
+    if(found == NULL){ /* abort */
+        gen_mutex_unlock(&tas_meta_mutex);
+        return -TROVE_ENOENT;
+    }
+
+    /* got handle; search for keyval */
+    for (i=0; i < count; i++)
+    {
+        keyvalpair * found_pair = findPairForCacheEntry(found, & key_array[i]);
+        TROVE_keyval_s * val_p;
+        if(found_pair != NULL){
+            err_array[i] = 0;
+        }
+        else
+        {
+            err_array[i] = -TROVE_ENOENT;
+            continue;
+        }
+        val_p = & val_array[i];
+    
+        if( val_p->buffer_sz < found_pair->val.buffer_sz ){
+            gossip_debug(GOSSIP_TROVE_DEBUG, " WARNING buffer to small tas read-keyval got:%d need:%d \n",
+                val_p->buffer_sz, found_pair->val.buffer_sz);
+            memcpy(val_p->buffer,found_pair->val.buffer, val_p->buffer_sz);
+            val_p->read_sz = val_p->buffer_sz;
+        }else{
+            memcpy(val_p->buffer,found_pair->val.buffer, found_pair->val.buffer_sz);
+            val_p->read_sz = found_pair->val.buffer_sz;
+        }
+    }
+    gen_mutex_unlock(&tas_meta_mutex);
+    *out_op_id_p = DUMMY_OPNUM;
+    return RETURN_IMMEDIATE_COMPLETE;
 }
 
 static int
@@ -1161,7 +1194,7 @@ tas_keyval_write_list (TROVE_coll_id coll_id,
 {
   fprintf(stderr, "TROVE MODULE TAS: FUNCTION tas_keyval_write_list not implemented\n");
   gossip_debug(GOSSIP_TROVE_DEBUG, "Tas tas_keyval_write_list\n");
-  return 1;
+  return RETURN_IMMEDIATE_COMPLETE;
 }
 
 static int
