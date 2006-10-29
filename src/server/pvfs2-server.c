@@ -105,10 +105,11 @@ typedef struct
     int server_remove_storage_space;
     int server_create_storage_space;
     int server_background;
+    int server_conf_add_hostname;    
     char *pidfile;
 } options_t;
 
-static options_t s_server_options = { 0, 0, 1, NULL };
+static options_t s_server_options = { 0, 0, 1, 0, NULL };
 
 /* each of the elements in this array consists of a string and its length.
  * we're able to use sizeof here because sizeof an inlined string ("") gives
@@ -461,7 +462,23 @@ int main(int argc, char **argv)
                  "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
 
     fs_conf = ((argc >= optind) ? argv[optind] : NULL);
-    server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
+    
+    if (s_server_options.server_conf_add_hostname)
+    {
+        char hostname[200];
+        server_conf = (char *) malloc(sizeof(char)* 200);
+        ret = gethostname(hostname,200);
+        if( ret != 0)
+        {
+            gossip_err("Could not get hostname with gethostname\n");
+            goto server_shutdown;
+        }
+        sprintf(server_conf, "%s-%s", argv[optind + 1], hostname);
+    }
+    else
+    {
+        server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);        
+    }    
 
     ret = PINT_parse_config(&server_config, fs_conf, server_conf);
     if (ret < 0)
@@ -1613,6 +1630,9 @@ static void usage(int argc, char **argv)
                "<server_config_file>\n\n", argv[0]);
     gossip_err("  -d, --foreground\t"
                "will keep server in the foreground\n");
+    gossip_err("  -n, \t"
+                "adds hostname to server config file as postfix "
+                "(like pvfs2_genconfig)\n");                   
     gossip_err("  -f, --mkfs\t\twill cause server to "
                "create file system storage and exit\n");
     gossip_err("  -h, --help\t\twill show this message\n");
@@ -1638,7 +1658,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         {0,0,0,0}
     };
 
-    while ((ret = getopt_long(argc, argv,"dfhrvp:",
+    while ((ret = getopt_long(argc, argv,"ndfhrvp:",
                               long_opts, &option_index)) != -1)
     {
         switch (ret)
@@ -1672,6 +1692,9 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                     goto do_pidfile;
                 }
                 break;
+            case 'n':
+                s_server_options.server_conf_add_hostname = 1;
+                break;                
             case 'v':
           do_version:
                 printf("%s (mode: %s)\n", PVFS2_VERSION,
