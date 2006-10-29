@@ -319,12 +319,14 @@ int main(int argc, char **argv)
     if (opts.delete_storage)
     {
         ret = pvfs2_rmspace(opts.storage_space, opts.collection,
+                            TROVE_METHOD_DBPF,
                             opts.coll_id, opts.collection_only,
                             opts.verbose);
     }
     else
     {
         ret = pvfs2_mkspace(opts.storage_space, opts.collection,
+                            TROVE_METHOD_DBPF,
                             opts.coll_id, opts.root_handle,
                             opts.meta_ranges, opts.data_ranges,
                             opts.collection_only, opts.verbose);

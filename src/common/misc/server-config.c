@@ -2398,6 +2398,10 @@ DOTCONF_CB(get_trove_method)
     {
         *method = TROVE_METHOD_DBPF_ALTAIO;
     }
+    else if(!strcmp(cmd->data.str, "tas"))
+    {
+        *method = TROVE_METHOD_TAS;
+    }    
     else
     {
         return "Error unknown TroveMethod option\n";
@@ -3990,6 +3994,7 @@ int PINT_config_pvfs2_mkspace(
 
             ret = pvfs2_mkspace(
                 config->storage_path, cur_fs->file_system_name,
+                config->trove_method, 
                 cur_fs->coll_id, root_handle, cur_meta_handle_range,
                 cur_data_handle_range, create_collection_only, 1);
 
@@ -4046,6 +4051,7 @@ int PINT_config_pvfs2_rmspace(
                  "storage space"));
             ret = pvfs2_rmspace(config->storage_path,
                                 cur_fs->file_system_name,
+                                config->trove_method,
                                 cur_fs->coll_id,
                                 remove_collection_only,
                                 1);

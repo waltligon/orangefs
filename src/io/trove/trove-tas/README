@@ -1,0 +1,3 @@
+This is an implementation of the trove interface which will not save persitent data.
+TAS = Trove analysis stub should be used to measure the performance overhead of the 
+pvfs2 layers between application and storage space.

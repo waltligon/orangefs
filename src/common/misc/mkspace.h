@@ -15,6 +15,7 @@
 int pvfs2_mkspace(
     char *storage_space,
     char *collection,
+    TROVE_method_id method_id,
     TROVE_coll_id coll_id,
     TROVE_handle root_handle,
     char *meta_handle_ranges,
@@ -25,6 +26,7 @@ int pvfs2_mkspace(
 int pvfs2_rmspace(
     char *storage_space,
     char *collection,
+    TROVE_method_id method_id,
     TROVE_coll_id coll_id,
     int remove_collection_only,
     int verbose);

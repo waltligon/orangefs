@@ -26,6 +26,11 @@
 #include "pint-util.h"
 
 static char *lost_and_found_string = "lost+found";
+static int global_method = -1;
+
+TROVE_method_id trove_fake_method_callback_mkspace(TROVE_coll_id coll_id){
+  return global_method;
+}
 
 static TROVE_handle s_used_handles[4] =
 {
@@ -112,6 +117,7 @@ static void get_handle_extent_from_ranges(
 int pvfs2_mkspace(
     char *storage_space,
     char *collection,
+    TROVE_method_id method_id,
     TROVE_coll_id coll_id,
     TROVE_handle root_handle,
     char *meta_handle_ranges,
@@ -132,6 +138,8 @@ int pvfs2_mkspace(
     TROVE_handle root_dirdata_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_dirdata_handle = TROVE_HANDLE_NULL;
+  
+    global_method = method_id;
 
     mkspace_print(verbose,"Storage space: %s\n",storage_space);
     mkspace_print(verbose,"Collection   : %s\n",collection);
@@ -156,8 +164,8 @@ int pvfs2_mkspace(
           try to initialize; fails if storage space isn't there, which
           is exactly what we're expecting in this case.
         */
-        ret = trove_initialize(TROVE_METHOD_DBPF, 
-			       NULL, 
+        ret = trove_initialize(method_id, 
+			       trove_fake_method_callback_mkspace, 
 			       storage_space, 
 			       0);
         if (ret > -1)
@@ -167,7 +175,7 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        ret = trove_storage_create(TROVE_METHOD_DBPF, storage_space, NULL, &op_id);
+        ret = trove_storage_create(method_id, storage_space, NULL, &op_id);
         if (ret != 1)
         {
             gossip_err("error: storage create failed; aborting!\n");
@@ -177,7 +185,7 @@ int pvfs2_mkspace(
 
     /* now that the storage space exists, initialize trove properly */
     ret = trove_initialize(
-	TROVE_METHOD_DBPF, NULL, 
+	method_id, trove_fake_method_callback_mkspace, 
 	storage_space, 0);
     if (ret < 0)
     {
@@ -190,12 +198,12 @@ int pvfs2_mkspace(
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(
-	TROVE_METHOD_DBPF, collection, &coll_id, NULL, &op_id);
+	method_id, collection, &coll_id, NULL, &op_id);
     if (ret == 1)
     {
 	mkspace_print(verbose, "warning: collection lookup succeeded "
                       "before it should; aborting!\n");
-	trove_finalize(TROVE_METHOD_DBPF);
+	trove_finalize(method_id);
 	return -1;
     }
 
@@ -210,7 +218,7 @@ int pvfs2_mkspace(
 
     /* make sure a collection lookup succeeds */
     ret = trove_collection_lookup(
-	TROVE_METHOD_DBPF, collection, &coll_id, NULL, &op_id);
+	method_id, collection, &coll_id, NULL, &op_id);
     if (ret != 1)
     {
 	mkspace_print(verbose,"error: collection lookup failed for "
@@ -625,7 +633,7 @@ int pvfs2_mkspace(
     {
         trove_close_context(coll_id, trove_context);
     }
-    trove_finalize(TROVE_METHOD_DBPF);
+    trove_finalize(method_id);
 
     mkspace_print(verbose, "collection created:\n"
                   "\troot handle = %llu, coll id = %d, "
@@ -637,6 +645,7 @@ int pvfs2_mkspace(
 int pvfs2_rmspace(
     char *storage_space,
     char *collection,
+    TROVE_method_id method_id,
     TROVE_coll_id coll_id,
     int remove_collection_only,
     int verbose)
@@ -644,12 +653,13 @@ int pvfs2_rmspace(
     int ret = -1;
     TROVE_op_id op_id;
     static int trove_is_initialized = 0;
+    global_method = method_id;
 
     /* try to initialize; fails if storage space isn't there */
     if (!trove_is_initialized)
     {
         ret = trove_initialize(
-	    TROVE_METHOD_DBPF, NULL,
+	    method_id, trove_fake_method_callback_mkspace,
 	    storage_space, 0);
         if (ret == -1)
         {
@@ -664,7 +674,7 @@ int pvfs2_rmspace(
                   collection);
 
     ret = trove_collection_remove(
-	TROVE_METHOD_DBPF, collection, NULL, &op_id);
+	method_id, collection, NULL, &op_id);
     mkspace_print(
         verbose, "PVFS2 Collection %s removed %s\n", collection,
         (((ret == 1) || (ret == -TROVE_ENOENT)) ? "successfully" :
@@ -673,13 +683,13 @@ int pvfs2_rmspace(
     if (!remove_collection_only)
     {
         ret = trove_storage_remove(
-	    TROVE_METHOD_DBPF, storage_space, NULL, &op_id);
+	    method_id, storage_space, NULL, &op_id);
 	/*
 	 * it is a bit weird to do a trove_finaliz() prior to blowing away
 	 * the storage space, but this allows the __db files of the DB env
 	 * to be blown away for the rmdir() to work correctly!
 	 */
-	trove_finalize(TROVE_METHOD_DBPF);
+	trove_finalize(method_id);
         mkspace_print(
             verbose, "PVFS2 Storage Space %s removed %s\n",
             storage_space, (((ret == 1) || (ret == -TROVE_ENOENT)) ?

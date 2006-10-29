@@ -1,0 +1,10 @@
+DIR := src/io/trove/trove-tas
+LIBSRC += \
+	$(DIR)/red-black-tree.c
+
+SERVERSRC += \
+	$(DIR)/tas.c \
+	$(DIR)/red-black-tree.c	\
+	$(DIR)/tas-handle-manager.c \
+	$(DIR)/tas-queue.c 
+	

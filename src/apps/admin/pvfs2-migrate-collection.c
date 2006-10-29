@@ -656,6 +656,7 @@ static int translate_0_0_1(
     ret = pvfs2_mkspace(
         storage_space, 
         coll_name,
+        TROVE_METHOD_DBPF,
         coll_id, 
         TROVE_HANDLE_NULL,
         handle_range,
@@ -675,7 +676,7 @@ static int translate_0_0_1(
     {
         PVFS_perror("PINT_dist_initialize", ret);
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, TROVE_METHOD_DBPF, coll_id, 1, 0);
         return(-1);
     }
 
@@ -686,7 +687,7 @@ static int translate_0_0_1(
     {
         PVFS_perror("trove_initialize", ret);
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, TROVE_METHOD_DBPF, coll_id, 1, 0);
         return(-1);
     }
     ret = trove_collection_lookup(
@@ -695,7 +696,7 @@ static int translate_0_0_1(
     {   
         fprintf(stderr, "Error: failed to lookup new collection.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, TROVE_METHOD_DBPF, coll_id, 1, 0);
         return -1; 
     }   
 
@@ -713,7 +714,7 @@ static int translate_0_0_1(
     {
         fprintf(stderr, "Error: failed to migrate collection extended attributes.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, TROVE_METHOD_DBPF, coll_id, 1, 0);
         return(-1);
     }
 
@@ -724,7 +725,7 @@ static int translate_0_0_1(
     {
         fprintf(stderr, "Error: failed to migrate dspace attributes.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, TROVE_METHOD_DBPF, coll_id, 1, 0);
         return(-1);
     }
 
@@ -735,7 +736,7 @@ static int translate_0_0_1(
     {
         fprintf(stderr, "Error: failed to migrate keyvals.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, TROVE_METHOD_DBPF, coll_id, 1, 0);
         return(-1);
     }
 
@@ -751,7 +752,7 @@ static int translate_0_0_1(
     {
         fprintf(stderr, "Error: failed to migrate bstreams.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, TROVE_METHOD_DBPF, coll_id, 1, 0);
         return(-1);
     }
 
