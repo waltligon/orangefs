@@ -627,10 +627,7 @@ static int tas_storage_create (char *stoname,
   int ret;
 	gossip_debug(GOSSIP_TROVE_DEBUG, "Tas tas_storage_create here: %s \n", 
     stoname);
-  ret = dbpf_mgmt_ops.storage_create(stoname, user_ptr, out_op_id_p);
-	FILE * file = fopen (storageName, "w");
-	fclose(file);
- 	return ret;
+ 	return dbpf_mgmt_ops.storage_create(stoname, user_ptr, out_op_id_p);
 }
 
 static int
