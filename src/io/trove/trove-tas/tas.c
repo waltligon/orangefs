@@ -1179,7 +1179,27 @@ tas_keyval_flush (TROVE_coll_id coll_id,
   return 1;
 }
 
-
+static int tas_keyval_get_handle_info(
+        TROVE_coll_id coll_id,
+        TROVE_handle handle,
+        TROVE_ds_flags flags,
+        TROVE_keyval_handle_info *info,
+        void *user_ptr,
+        TROVE_context_id context_id,
+        TROVE_op_id *out_op_id_p)
+{
+    gen_mutex_lock(&tas_meta_mutex);
+    handleCache * found=findCacheEntry(handle,coll_id);
+    if(found == NULL){ /* abort */
+        gen_mutex_unlock(&tas_meta_mutex);
+        return -TROVE_ENOENT;
+    }
+    if( flags & TROVE_KEYVAL_HANDLE_COUNT ){
+        info->count = found->k_size;
+    }
+    gen_mutex_unlock(&tas_meta_mutex);
+    return RETURN_IMMEDIATE_COMPLETE;
+}
 
 static int
 tas_dspace_create (TROVE_coll_id coll_id,
@@ -1745,7 +1765,8 @@ struct TROVE_keyval_ops tas_keyval_ops =
     tas_keyval_iterate_keys,
     tas_keyval_read_list,
     tas_keyval_write_list,
-    tas_keyval_flush
+    tas_keyval_flush,
+    tas_keyval_get_handle_info
 };
  
 
