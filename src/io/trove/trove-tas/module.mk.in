@@ -5,6 +5,5 @@ LIBSRC += \
 SERVERSRC += \
 	$(DIR)/tas.c \
 	$(DIR)/red-black-tree.c	\
-	$(DIR)/tas-handle-manager.c \
 	$(DIR)/tas-queue.c 
 	
