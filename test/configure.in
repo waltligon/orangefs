@@ -233,6 +233,7 @@ common/id-generator/module.mk
 common/gossip/module.mk
 common/gen-locks/module.mk
 common/misc/module.mk
+common/red-black-tree/module.mk
 io/bmi/module.mk
 io/description/module.mk
 io/flow/module.mk

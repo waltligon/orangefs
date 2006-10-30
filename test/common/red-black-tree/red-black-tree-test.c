@@ -10,7 +10,7 @@ int inorderCheck(tree_node* node,int depth, int * nodes, int redNodes, int black
 	int maxdepth = depth+1;
 	int retdepth =0;
 
-	if(depth == 0){ //initialise leaf black nodes
+	if(depth == 0){ /* initialise leaf black nodes */
 		*leafBlackNodes = -1;
 	}	
 	
@@ -53,8 +53,8 @@ int inorderCheck(tree_node* node,int depth, int * nodes, int redNodes, int black
 		if(retdepth > maxdepth) maxdepth = retdepth;
 	}	
 	
-	if(node->left == NULL && node->right == NULL){ //leaf, check if blackNodeCondition is held
-		 if(*leafBlackNodes == -1){  //first leaf is reached
+	if(node->left == NULL && node->right == NULL){ /* leaf, check if blackNodeCondition is held */
+		 if(*leafBlackNodes == -1){  /* first leaf is reached */
 		 	*leafBlackNodes = blackNodes;
 		 }
 		 if(blackNodes != *leafBlackNodes){
@@ -93,9 +93,10 @@ int main(int argc, char ** argv){
 	int one=1;
  	data = (RBData*) &one;
  	int two=2;
-	printf("CompareInt64 1,2 %d\n",compareInt64((RBData*) &one,(RBData*) &two));
-	printf("CompareInt64 2,1 %d\n",compareInt64((RBData*) &two,(RBData*) &one));
-	printf("CompareInt64 1,1 %d\n",compareInt64((RBData*) &one,(RBData*) &one));	
+    printf("Testing default comparision function\n");
+	printf("CompareInt64 1,2 result:%d\n",compareInt64((RBData*) &one,(RBData*) &two));
+	printf("CompareInt64 2,1 result:%d\n",compareInt64((RBData*) &two,(RBData*) &one));
+	printf("CompareInt64 1,1 result:%d\n",compareInt64((RBData*) &one,(RBData*) &one));	
 	
 	int seed=3;
 	
@@ -107,7 +108,7 @@ int main(int argc, char ** argv){
 		printf("Syntax: %s randomSeedNum\n",argv[0]);
 		exit(1);
 	}
-	//for debugging purpose take argv as initialisation value
+	/* for debugging purpose take argv as initialisation value */
 	srand(seed);
 	
 	for(i=0; i < 5000; i++){

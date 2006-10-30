@@ -1,0 +1,12 @@
+DIR := common/red-black-tree
+
+LOCALTESTSRC := \
+	$(DIR)/red-black-tree-test.c
+	
+
+TESTSRC += $(LOCALTESTSRC)
+
+LOCALTESTS := $(patsubst %.c,%, $(LOCALTESTSRC))
+$(LOCALTESTS): %: %.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(SERVERLIBS) -lm -o $@

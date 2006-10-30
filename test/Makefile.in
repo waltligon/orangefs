@@ -74,6 +74,7 @@ INCLUDES := \
     ${pvfs2_srcdir}/src/common/gossip \
     ${pvfs2_srcdir}/src/common/gen-locks \
     ${pvfs2_srcdir}/src/common/llist \
+    ${pvfs2_srcdir}/src/io/trove/trove-tas \
     ${pvfs2_srcdir}/src/io/trove \
     ${pvfs2_srcdir}/src/io/bmi \
     ${pvfs2_srcdir}/src/io/description \
