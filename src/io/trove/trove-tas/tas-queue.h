@@ -7,7 +7,7 @@
 #ifndef TASQUEUE_H_
 #define TASQUEUE_H_
 
-#include<stdlib.h>
+#include <stdlib.h>
 
 /*
  * Print a warning if lookup takes more than WARNING_NUM iterations
@@ -15,14 +15,14 @@
  */
 #define WARNING_NUM 40
 
-typedef int64_t queueKey;
+typedef int64_t queue_key;
 
 struct tas_queue_elem_
 {
     struct tas_queue_elem_ *next;
     struct tas_queue_elem_ *prev;
 
-    queueKey key;
+    queue_key key;
     void *data;
 };
 
@@ -34,34 +34,36 @@ typedef struct tas_queue_elem_ *tas_queue;
 
 
 /* functions: */
-tas_queue *newTasQueue(
+tas_queue *new_tas_queue(
     void);
 
-queue_elem *lookupQueue(
-    queueKey key,
+queue_elem *lookup_queue(
+    queue_key key,
     tas_queue * queue);
 
-void deleteElementFromList(
+void delete_element_from_list(
     queue_elem * elem,
     tas_queue * queue);
-void *deleteKeyFromList(
-    queueKey key,
+    
+void *delete_key_from_list(
+    queue_key key,
     tas_queue * queue);
+    
 /* lookup key and replace data if possible, else pushfront.
  * returns replaced data (if key exists)
  * Queue element is put to head of queue */
-void *insertKeyIntoQueue(
-    queueKey key,
+void *insert_key_into_queue(
+    queue_key key,
     void *data,
     tas_queue * queue);
 
-queue_elem *pushFrontKey(
-    queueKey key,
+queue_elem *push_front_key(
+    queue_key key,
     void *data,
     tas_queue * queue);
 
 /* remove data from current possition and push it to head of queue, */
-void relinkFront(
+void relink_front(
     queue_elem * elem,
     tas_queue * queue);
 

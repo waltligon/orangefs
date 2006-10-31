@@ -1,3 +1,8 @@
 This is an implementation of the trove interface which will not save persitent data.
 TAS = Trove analysis stub should be used to measure the performance overhead of the 
-pvfs2 layers between application and storage space.
+pvfs2 layers between application and storage space. 
+
+Notes:
+The implementation is not completed and does not intend to provide all 
+functionality and a well defined or even correct error handling as DBPF.
+It is intendet to be used for performance evualuation only.

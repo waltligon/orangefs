@@ -1,10 +1,14 @@
 /*
  * Author: Julian Kunkel 2005
  */
+ 
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 
 #include "red-black-tree.h"
 
-int compareInt64(
+int compare_int64(
     RBData * data,
     RBKey * key)
 {
@@ -39,7 +43,7 @@ static void inorderWalkthrough(
     }
 }
 
-void iterateRedBlackTree(
+void iterate_red_black_tree(
     void (*callback) (RBData * data,
                       void *funcData),
     red_black_tree * tree,
@@ -51,7 +55,7 @@ void iterateRedBlackTree(
 }
 
 /* take care of memory managment of the data by yourself ! */
-tree_node *lookupTree(
+tree_node *lookup_tree(
     RBKey * key,
     red_black_tree * tree)
 {
@@ -77,7 +81,7 @@ tree_node *lookupTree(
 }
 
 
-red_black_tree *newRedBlackTree(
+red_black_tree *new_red_black_tree(
     int (*compare) (RBData * data,
                     RBKey * key),
     int (*compare2) (RBData * data,
@@ -90,7 +94,7 @@ red_black_tree *newRedBlackTree(
     return tree;
 }
 
-void freeEmptyRedBlackTree(
+void free_empty_red_black_tree(
     red_black_tree ** tree)
 {
     if (*tree != NULL)
@@ -251,7 +255,7 @@ static void rebuildRBTree(
     }
 }
 
-tree_node *insertKeyIntoTree(
+tree_node *insert_key_into_tree(
     RBData * data,
     red_black_tree * tree)
 {
@@ -409,18 +413,18 @@ static void rebuildTreeAfterDeletion(
     }   
 }
 
-void deleteNodeFromTree(
+void delete_node_from_tree(
     tree_node * node,
     red_black_tree * tree)
 {
-    tree_node *changed = deleteNodeFromTree2(node, tree);
+    tree_node *changed = delete_node_from_tree2(node, tree);
     if (changed != NULL)
     {
-        deleteNodeFromTree2(changed, tree);
+        delete_node_from_tree2(changed, tree);
     }
 }
 
-tree_node *deleteNodeFromTree2(
+tree_node *delete_node_from_tree2(
     tree_node * node,
     red_black_tree * tree)
 {
@@ -437,14 +441,14 @@ tree_node *deleteNodeFromTree2(
     }
 
     tree_node *child = node->left == NULL ? node->right : node->left;
-    int createdChild = FALSE;
+    int createdChild = 0;
     /* delete node which now has at most one child
      * use node as dummy child  */
     if (node->color == BLACK && node->parent != NULL && child == NULL)
     {
         child = node;
         child->data = NULL;
-        createdChild = TRUE;
+        createdChild = 1;
     }
 
     /* relink nodes  */

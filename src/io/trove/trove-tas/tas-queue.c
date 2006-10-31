@@ -1,7 +1,11 @@
 #include<stdio.h>
 #include "tas-queue.h"
 
-tas_queue *newTasQueue(
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+
+tas_queue *new_tas_queue(
     void)
 {
     tas_queue *ret = malloc(sizeof(tas_queue));
@@ -9,7 +13,7 @@ tas_queue *newTasQueue(
     return ret;
 }
 
-void relinkFront(
+void relink_front(
     queue_elem * elem,
     tas_queue * queue)
 {
@@ -30,29 +34,29 @@ void relinkFront(
     }
 }
 
-void *insertKeyIntoQueue(
-    queueKey key,
+void *insert_key_into_queue(
+    queue_key key,
     void *data,
     tas_queue * queue)
 {
-    queue_elem *elem = lookupQueue(key, queue);
+    queue_elem *elem = lookup_queue(key, queue);
     void *olddata = NULL;
     if (elem == NULL)
     {
-        pushFrontKey(key, data, queue);
+        push_front_key(key, data, queue);
     }
     else
     {
         /* replace existing data  */
         olddata = elem->data;
         elem->data = data;
-        relinkFront(elem, queue);
+        relink_front(elem, queue);
     }
     return olddata;
 }
 
-queue_elem *pushFrontKey(
-    queueKey key,
+queue_elem *push_front_key(
+    queue_key key,
     void *data,
     tas_queue * queue)
 {
@@ -69,8 +73,8 @@ queue_elem *pushFrontKey(
     return elem;
 }
 
-queue_elem *lookupQueue(
-    queueKey key,
+queue_elem *lookup_queue(
+    queue_key key,
     tas_queue * queue)
 {
     queue_elem *found = *queue;
@@ -96,7 +100,7 @@ queue_elem *lookupQueue(
     return NULL;
 }
 
-void deleteElementFromList(
+void delete_element_from_list(
     queue_elem * found,
     tas_queue * queue)
 {
@@ -118,14 +122,14 @@ void deleteElementFromList(
     }
 }
 
-void *deleteKeyFromList(
-    queueKey key,
+void *delete_key_from_list(
+    queue_key key,
     tas_queue * queue)
 {
-    queue_elem *found = lookupQueue(key, queue);
+    queue_elem *found = lookup_queue(key, queue);
     if (found == NULL)
         return NULL;
-    deleteElementFromList(found, queue);
+    delete_element_from_list(found, queue);
     void *data;
     data = found->data;
     free(found);

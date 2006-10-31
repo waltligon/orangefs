@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 /* for unlink: */
 #include <unistd.h>
 #include <assert.h>
@@ -346,10 +349,10 @@ static void insert_cache_element(
 #if defined(TAS_USE_RED_BLACKTREE)
     found->pair_list = NULL;
     found->pair_tree = NULL;
-    insertKeyIntoTree((RBData *) found, tas_meta_cache);
+    insert_key_into_tree((RBData *) found, tas_meta_cache);
 #elif defined(TAS_USE_QUEUE)
     found->pairs = NULL;
-    pushFrontKey(new_handle, found, tas_meta_cache);
+    push_front_key(new_handle, found, tas_meta_cache);
 #endif
 
     meta_count++;
@@ -364,7 +367,7 @@ static keyvalpair *find_pair_of_cached_entry(
     {
         return FALSE;
     }
-    tree_node *node = (tree_node *) (lookupTree(key_p, cache_entry->pair_tree));
+    tree_node *node = (tree_node *) (lookup_tree(key_p, cache_entry->pair_tree));
 
     if (node == NULL)
         return FALSE;
@@ -421,7 +424,7 @@ static int remove_pair_of_cached_entry(
     {
         return FALSE;
     }
-    tree_node *node = lookupTree(key_p, cache_entry->pair_tree);
+    tree_node *node = lookup_tree(key_p, cache_entry->pair_tree);
     if( node == NULL )
     {
         return FALSE;
@@ -434,7 +437,7 @@ static int remove_pair_of_cached_entry(
         keyval_copy(key_p, val_p, 0, found_pair);
     
         /* delete Node from Tree: */
-        deleteNodeFromTree(node, cache_entry->pair_tree);
+        delete_node_from_tree(node, cache_entry->pair_tree);
 
         /* relink pair_list: */
         if (found_pair->next != NULL)
@@ -448,7 +451,7 @@ static int remove_pair_of_cached_entry(
             if (found_pair->next == NULL)
             {
                 /* The Tree is now empty */
-                freeEmptyRedBlackTree(&cache_entry->pair_tree);
+                free_empty_red_black_tree(&cache_entry->pair_tree);
             }
             else
             {
@@ -523,19 +526,19 @@ static inline handle_cache *find_cached_entry(
     handle_fsid key;
     key.handle = handle;
     key.fs_id = fs_id;
-    tree_node *node = lookupTree(&key, tas_meta_cache);
+    tree_node *node = lookup_tree(&key, tas_meta_cache);
     if (node == NULL)
     {
         return NULL;
     }
     return (handle_cache *) node->data;
 #elif defined(TAS_USE_QUEUE)
-    queue_elem *elem = lookupQueue(handle, tas_meta_cache);
+    queue_elem *elem = lookup_queue(handle, tas_meta_cache);
     if (elem == NULL)
     {
         return NULL;
     }
-    relinkFront(elem, tas_meta_cache);  /* push element to front of cache */
+    relink_front(elem, tas_meta_cache);  /* push element to front of cache */
     return (handle_cache *) elem->data;
 #endif
 }
@@ -551,13 +554,13 @@ static int remove_cached_entry(
     handle_fsid key;
     key.handle = handle;
     key.fs_id = fs_id;
-    tree_node *node = lookupTree(&key, tas_meta_cache);
+    tree_node *node = lookup_tree(&key, tas_meta_cache);
     if (node == NULL)
         return FALSE;
     result = node->data;
-    deleteNodeFromTree(node, tas_meta_cache);
+    delete_node_from_tree(node, tas_meta_cache);
 #elif defined(TAS_USE_QUEUE)
-    result = deleteKeyFromList(handle, tas_meta_cache);
+    result = delete_key_from_list(handle, tas_meta_cache);
 #endif
     if (result != NULL)
     {
@@ -577,7 +580,7 @@ static inline void insert_keyval_pair(
     if (found->pair_tree == NULL)
     {   /* create new RedBlackTree */
         found->pair_tree =
-            newRedBlackTree(compare_keyval_pairs, compare_keyval_pairs2);
+            new_red_black_tree(compare_keyval_pairs, compare_keyval_pairs2);
 
         pair->next = NULL;
         found->pair_list = pair;
@@ -589,7 +592,7 @@ static inline void insert_keyval_pair(
         found->pair_list = pair;
     }
     pair->prev = NULL;
-    insertKeyIntoTree((void *) pair, found->pair_tree);
+    insert_key_into_tree((void *) pair, found->pair_tree);
 
 #elif defined(TAS_USE_QUEUE)
     int64_t key_hash = queue_key_hash_func(pair->key.buffer, pair->key.buffer_sz);
@@ -612,9 +615,9 @@ static int tas_initialize(
         return -1;
     }
 #if defined(TAS_USE_RED_BLACKTREE)
-    tas_meta_cache = newRedBlackTree(compare_handle, compare_handle2);
+    tas_meta_cache = new_red_black_tree(compare_handle, compare_handle2);
 #elif defined(TAS_USE_QUEUE)
-    tas_meta_cache = newTasQueue();
+    tas_meta_cache = new_tas_queue();
 #endif
 
     fclose(file);
@@ -705,7 +708,7 @@ static void datawrite(
     if (found->pair_tree != NULL)
     {
         fdata->keyval_mem_size += sizeof(red_black_tree);
-        iterateRedBlackTree(keyvalwrite, found->pair_tree, fdata);
+        iterate_red_black_tree(keyvalwrite, found->pair_tree, fdata);
     }
 #elif defined(TAS_USE_QUEUE)
     keyvalpair *pair = found->pairs;
@@ -740,7 +743,7 @@ static int tas_finalize(
     fdata->keyval_mem_size = 0;
 
 #if defined(TAS_USE_RED_BLACKTREE)
-    iterateRedBlackTree(datawrite, tas_meta_cache, fdata);
+    iterate_red_black_tree(datawrite, tas_meta_cache, fdata);
 #elif defined(TAS_USE_QUEUE)
     iterate_tas_queue(datawrite(elem->data, &elem->key, fdata), elem,
                       tas_meta_cache);
@@ -1908,12 +1911,12 @@ static int tas_collection_setinfo(TROVE_method_id method_id,
                     keyvalpair *akt_pair;
 
 #if defined(TAS_USE_RED_BLACKTREE)
-                    insertKeyIntoTree((RBData *) found, tas_meta_cache);
+                    insert_key_into_tree((RBData *) found, tas_meta_cache);
                     found->pair_list = NULL;
                     found->pair_tree = NULL;
 #elif defined(TAS_USE_QUEUE)
                     found->pairs = NULL;
-                    pushFrontKey(found->handle, found, tas_meta_cache);
+                    push_front_key(found->handle, found, tas_meta_cache);
 #endif
 
                     akt_pair = NULL;
