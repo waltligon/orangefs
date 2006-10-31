@@ -2817,11 +2817,13 @@ static inline PVFS_error handle_unexp_vfs_request(
     switch(ret)
     {
         case SM_ACTION_TERMINATE:
+        {
            /* This should be set to the return value of the isys_* call */
-           int error = XX <error code of the SM>;
-           package_downcall_members(vfs_request,  &error)
+           int error = ret; /* error code of the SM> */
+           package_downcall_members(vfs_request,  &error);
            write_inlined_device_response(vfs_request); 
            /* This code falls through */ 
+        }
         case 0:
         {
             /*
