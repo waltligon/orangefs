@@ -5,7 +5,9 @@
 
 #include "red-black-tree.h"
 
-int inorderCheck(tree_node* node,int depth, int * nodes, int redNodes, int blackNodes, int * leafBlackNodes){
+int64_t numexists=0;
+
+static int inorder_check(tree_node* node,int depth, int * nodes, int redNodes, int blackNodes, int * leafBlackNodes){
 	if(node == NULL) return 0;
 	int maxdepth = depth+1;
 	int retdepth =0;
@@ -24,13 +26,13 @@ int inorderCheck(tree_node* node,int depth, int * nodes, int redNodes, int black
 			printf("WARNING two red nodes ...");
 			assert(0);
 		}
-		retdepth=inorderCheck(node->left,depth+1, nodes,redNodes,blackNodes, leafBlackNodes);
+		retdepth=inorder_check(node->left,depth+1, nodes,redNodes,blackNodes, leafBlackNodes);
 		if(retdepth > maxdepth) maxdepth = retdepth;
 		if(node->left->parent != node){
 			printf("ERROR wrong parent node %lld parent %lld", *((int64_t*) node->left->data), *((int64_t*) node->data));
 			assert(0);
 		}
-		if(compareInt64(node->left->data,node->data) != +1){
+		if(compare_int64(node->left->data,node->data) != +1){
 			printf("ERROR Left key!\n");
 			assert(0);
 		}
@@ -40,7 +42,7 @@ int inorderCheck(tree_node* node,int depth, int * nodes, int redNodes, int black
 			printf("WARNING two red nodes node and right son...");
 			assert(0);
 		}		
-		if(compareInt64(node->right->data,node->data) != -1){
+		if(compare_int64(node->right->data,node->data) != -1){
 			printf("ERROR right key!\n");
 			assert(0);
 		}
@@ -49,7 +51,7 @@ int inorderCheck(tree_node* node,int depth, int * nodes, int redNodes, int black
 			assert(0);			
 		}
 		
-		retdepth=inorderCheck(node->right,depth+1, nodes,redNodes,blackNodes,leafBlackNodes);
+		retdepth=inorder_check(node->right,depth+1, nodes,redNodes,blackNodes,leafBlackNodes);
 		if(retdepth > maxdepth) maxdepth = retdepth;
 	}	
 	
@@ -71,19 +73,18 @@ int inorderCheck(tree_node* node,int depth, int * nodes, int redNodes, int black
 	return maxdepth;
 }
 
-int64_t numexists=0;
 
-void createRandomTreeNode(red_black_tree * tree){
+static void create_random_tree_node(red_black_tree * tree){
 	int num=rand()%10000;
 	int64_t * data = malloc(sizeof(int64_t));
 	*data = num;
-    insertKeyIntoTree( (RBData*)data, tree);
+    insert_key_into_tree( (RBData*)data, tree);
 	numexists = num;
 }
 
 int main(int argc, char ** argv){
 	
- 	red_black_tree * tree = newRedBlackTree(compareInt64,compareInt64);
+ 	red_black_tree * tree = new_red_black_tree(compare_int64,compare_int64);
 	int i;
 	int nodecount=0,nodecountA;
 	int blackNodes;
@@ -94,9 +95,9 @@ int main(int argc, char ** argv){
  	data = (RBData*) &one;
  	int two=2;
     printf("Testing default comparision function\n");
-	printf("CompareInt64 1,2 result:%d\n",compareInt64((RBData*) &one,(RBData*) &two));
-	printf("CompareInt64 2,1 result:%d\n",compareInt64((RBData*) &two,(RBData*) &one));
-	printf("CompareInt64 1,1 result:%d\n",compareInt64((RBData*) &one,(RBData*) &one));	
+	printf("CompareInt64 1,2 result:%d\n",compare_int64((RBData*) &one,(RBData*) &two));
+	printf("CompareInt64 2,1 result:%d\n",compare_int64((RBData*) &two,(RBData*) &one));
+	printf("CompareInt64 1,1 result:%d\n",compare_int64((RBData*) &one,(RBData*) &one));	
 	
 	int seed=3;
 	
@@ -112,23 +113,23 @@ int main(int argc, char ** argv){
 	srand(seed);
 	
 	for(i=0; i < 5000; i++){
-		createRandomTreeNode(tree);
+		create_random_tree_node(tree);
 	    nodecountA = 0;		
-	    depthA=inorderCheck(tree->head,0,& nodecountA,0,0,& blackNodes);
+	    depthA=inorder_check(tree->head,0,& nodecountA,0,0,& blackNodes);
 	}
 	printf("depth for %d nodes is %d\n",nodecountA,depthA);
 	nodecount = -1;
 	depth = -1;
-	printf("Try to delete existing num %llu, %p\n", numexists, lookupTree((void*)&numexists,tree) );
+	printf("Try to delete existing num %llu, %p\n", numexists, lookup_tree((void*)&numexists,tree) );
 	
 	for(i=0; i < 5000; i++){
 		int64_t num=rand()%10000;
-		if(lookupTree((void*)&num,tree) == NULL) continue;
-		tree_node * node = lookupTree((void*)&num,tree);
+		if(lookup_tree((void*)&num,tree) == NULL) continue;
+		tree_node * node = lookup_tree((void*)&num,tree);
 		free(node->data);
-    	deleteNodeFromTree(node,tree);
+    	delete_node_from_tree(node,tree);
 	    nodecount = 0;
-	    depth=inorderCheck(tree->head,0,& nodecount,0,0,& blackNodes);
+	    depth=inorder_check(tree->head,0,& nodecount,0,0,& blackNodes);
 	}
 
 	printf("Test correctly done\n");
