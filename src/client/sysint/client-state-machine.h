@@ -49,6 +49,9 @@
 /* Default number of milliseconds to delay before retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
+int PINT_client_state_machine_initialize(void);
+void PINT_client_state_machine_finalize(void);
+job_context_id PINT_client_get_sm_context(void);
 
 /* PINT_client_sm_recv_state_s
  *
@@ -276,7 +279,8 @@ struct PINT_client_lookup_sm
     int follow_link;                  /* input parameter */
     int skipped_final_resolution;
     int current_context;
-    PINT_client_lookup_sm_ctx contexts[MAX_LOOKUP_CONTEXTS];
+    int context_count;
+    PINT_client_lookup_sm_ctx * contexts;
 };
 
 struct PINT_client_rename_sm
@@ -471,6 +475,11 @@ struct PINT_client_perf_count_timer_sm
     struct PINT_perf_counter *pc;
 };
 
+struct PINT_client_job_timer_sm
+{
+    job_id_t job_id;
+};
+
 struct PINT_sysdev_unexp_sm
 {
     struct PINT_dev_unexp_info *info;
@@ -559,6 +568,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_listeattr_sm listeattr;
         struct PINT_client_perf_count_timer_sm perf_count_timer;
         struct PINT_sysdev_unexp_sm sysdev_unexp;
+        struct PINT_client_job_timer_sm job_timer;
     } u;
 } PINT_client_sm;
 
@@ -567,6 +577,9 @@ PVFS_error PINT_client_state_machine_post(
     PINT_smcb *smcb,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
+
+PVFS_error PINT_client_state_machine_release(
+    PINT_smcb * smcb);
 
 PVFS_error PINT_sys_dev_unexp(
     struct PINT_dev_unexp_info *info,

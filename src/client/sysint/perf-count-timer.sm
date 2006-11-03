@@ -100,7 +100,7 @@ static PINT_sm_action perf_count_timer_do_work(
     /* post another timer */
     return job_req_sched_post_timer(
         ((*sm_p->u.perf_count_timer.interval_secs)*1000), 
-        sm_p, 0, js_p, &tmp_id, pint_client_sm_context);
+        smcb, 0, js_p, &tmp_id, pint_client_sm_context);
 }
 
 /*

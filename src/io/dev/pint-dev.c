@@ -371,6 +371,11 @@ int PINT_dev_test_unexpected(
             /* assume we are done and return */
           safe_exit:
             free(buffer);
+            gossip_debug(GOSSIP_DEV_DEBUG,
+                         "[DEV]: %s Exit: "
+                         "incount: %d, outcount: %d, bytes available: %d\n",
+                         __func__, incount, *outcount, avail);
+
             return ((*outcount > 0) ? 1 : 0);
         }
 

@@ -62,7 +62,7 @@ int PVFS_sys_finalize()
 
     gossip_disable();
 
-    PINT_smcb_free(&g_smcb);
+    PINT_client_state_machine_release(g_smcb);
 
     return 0;
 }

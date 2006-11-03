@@ -63,14 +63,6 @@
 #define PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS 10
 
 /*
-  uncomment if you want to run this application stand-alone
-  (i.e. without the pvfs2-client wrapper).  this is only useful as a
-  developer and allows clean shutdown for valgrind debugging or
-  getting core dumps.  this is NOT a supported run mode
-*/
-/* #define STANDALONE_RUN_MODE */
-
-/*
   uncomment for timing of individual operation information to be
   emitted to the pvfs2-client logging output
 */
@@ -106,6 +98,7 @@ typedef struct
     char* gossip_mask;
     int logstamp_type;
     int logstamp_type_set;
+    int standalone;
 } options_t;
 
 /*
@@ -259,12 +252,10 @@ static void client_segfault_handler(int signum)
     abort();
 }
 
-#ifdef STANDALONE_RUN_MODE
 static void client_core_sig_handler(int signum)
 {
     s_client_is_processing = 0;
 }
-#endif
 
 static int hash_key(void *key, int table_size)
 {
@@ -3072,26 +3063,31 @@ int main(int argc, char **argv)
     PINT_smcb *smcb = NULL;
     PINT_client_sm *ncache_timer_sm_p = NULL;
 
-#ifndef STANDALONE_RUN_MODE
-    struct rlimit lim = {0,0};
-
-    /* set rlimit to prevent core files */
-    ret = setrlimit(RLIMIT_CORE, &lim);
-    if (ret < 0)
-    {
-	fprintf(stderr, "setrlimit system call failed (%d); "
-                "continuing", ret);
-    }
-#else
-    signal(SIGINT, client_core_sig_handler);
-#endif
-
     /* if pvfs2-client-core segfaults, at least log the occurence so
      * pvfs2-client won't repeatedly respawn pvfs2-client-core */
     signal(SIGSEGV, client_segfault_handler);
 
     memset(&s_opts, 0, sizeof(options_t));
     parse_args(argc, argv, &s_opts);
+
+    if(!s_opts.standalone)
+    {
+        struct rlimit lim = {0,0};
+
+        /* set rlimit to prevent core files */
+        ret = setrlimit(RLIMIT_CORE, &lim);
+        if (ret < 0)
+        {
+            fprintf(stderr, "setrlimit system call failed (%d); "
+                    "continuing", ret);
+        }
+    }
+    else
+    {
+        signal(SIGINT,  client_core_sig_handler);
+        signal(SIGHUP,  client_core_sig_handler);
+        signal(SIGQUIT, client_core_sig_handler);
+    }
 
     /* convert gossip mask if provided on command line */
     if (s_opts.gossip_mask)
@@ -3168,14 +3164,14 @@ int main(int argc, char **argv)
     acache_pc = PINT_perf_initialize(acache_keys);
     if(!acache_pc)
     {
-        fprintf(stderr, "Error: PINT_perf_initialize failure.\n");
+        gossip_err("Error: PINT_perf_initialize failure.\n");
         return(-PVFS_ENOMEM);
     }
     ret = PINT_perf_set_info(acache_pc, PINT_PERF_HISTORY_SIZE,
         s_opts.perf_history_size);
     if(ret < 0)
     {
-        fprintf(stderr, "Error: PINT_perf_set_info (history_size).\n");
+        gossip_err("Error: PINT_perf_set_info (history_size).\n");
         return(ret);
     }
     PINT_acache_enable_perf_counter(acache_pc);
@@ -3184,14 +3180,14 @@ int main(int argc, char **argv)
     ncache_pc = PINT_perf_initialize(ncache_keys);
     if(!ncache_pc)
     {
-        fprintf(stderr, "Error: PINT_perf_initialize failure.\n");
+        gossip_err("Error: PINT_perf_initialize failure.\n");
         return(-PVFS_ENOMEM);
     }
     ret = PINT_perf_set_info(ncache_pc, PINT_PERF_HISTORY_SIZE,
         s_opts.perf_history_size);
     if(ret < 0)
     {
-        fprintf(stderr, "Error: PINT_perf_set_info (history_size).\n");
+        gossip_err("Error: PINT_perf_set_info (history_size).\n");
         return(ret);
     }
     PINT_ncache_enable_perf_counter(ncache_pc);
@@ -3215,6 +3211,16 @@ int main(int argc, char **argv)
     {
         gossip_lerr("Error posting acache timer.\n");
         return(ret);
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
+            sizeof(struct PINT_client_sm),
+            client_op_state_get_machine,
+            client_state_machine_terminate,
+            s_client_dev_context);
+    if (!smcb)
+    {
+        return(-PVFS_ENOMEM);
     }
     ncache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
@@ -3396,6 +3402,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"ncache-soft-limit",1,0,0},
         {"logfile",1,0,0},
         {"logstamp",1,0,0},
+        {"standalone",0,0,0},
         {0,0,0,0}
     };
 
@@ -3443,7 +3450,9 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     }
                     else
                     {
-                        fprintf(stderr, "Error: invalid logstamp value. See usage below\n\n");
+                        gossip_err(
+                            "Error: invalid logstamp value. "
+                            "See usage below\n\n");
                         print_help(argv[0]);
                         exit(EXIT_FAILURE);
                     }
@@ -3454,7 +3463,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     ret = sscanf(optarg, "%u", &opts->acache_hard_limit);
                     if(ret != 1)
                     {
-                        fprintf(stderr, "Error: invalid acache-hard-limit value.\n");
+                        gossip_err(
+                            "Error: invalid acache-hard-limit value.\n");
                         exit(EXIT_FAILURE);
                     }
                     opts->acache_hard_limit_set = 1;
@@ -3464,7 +3474,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     ret = sscanf(optarg, "%u", &opts->acache_soft_limit);
                     if(ret != 1)
                     {
-                        fprintf(stderr, "Error: invalid acache-soft-limit value.\n");
+                        gossip_err(
+                            "Error: invalid acache-soft-limit value.\n");
                         exit(EXIT_FAILURE);
                     }
                     opts->acache_soft_limit_set = 1;
@@ -3474,7 +3485,9 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     ret = sscanf(optarg, "%u", &opts->acache_reclaim_percentage);
                     if(ret != 1)
                     {
-                        fprintf(stderr, "Error: invalid acache-reclaim-percentage value.\n");
+                        gossip_err(
+                            "Error: invalid "
+                            "acache-reclaim-percentage value.\n");
                         exit(EXIT_FAILURE);
                     }
                     opts->acache_reclaim_percentage_set = 1;
@@ -3484,7 +3497,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     ret = sscanf(optarg, "%u", &opts->ncache_hard_limit);
                     if(ret != 1)
                     {
-                        fprintf(stderr, "Error: invalid ncache-hard-limit value.\n");
+                        gossip_err(
+                            "Error: invalid ncache-hard-limit value.\n");
                         exit(EXIT_FAILURE);
                     }
                     opts->ncache_hard_limit_set = 1;
@@ -3494,7 +3508,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     ret = sscanf(optarg, "%u", &opts->ncache_soft_limit);
                     if(ret != 1)
                     {
-                        fprintf(stderr, "Error: invalid ncache-soft-limit value.\n");
+                        gossip_err(
+                            "Error: invalid ncache-soft-limit value.\n");
                         exit(EXIT_FAILURE);
                     }
                     opts->ncache_soft_limit_set = 1;
@@ -3504,7 +3519,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     ret = sscanf(optarg, "%u", &opts->ncache_reclaim_percentage);
                     if(ret != 1)
                     {
-                        fprintf(stderr, "Error: invalid ncache-reclaim-percentage value.\n");
+                        gossip_err(
+                            "Error: invalid ncache-reclaim-percentage value.\n");
                         exit(EXIT_FAILURE);
                     }
                     opts->ncache_reclaim_percentage_set = 1;
@@ -3515,7 +3531,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
                         &opts->perf_time_interval_secs);
                     if(ret != 1)
                     {
-                        fprintf(stderr, "Error: invalid perf-time-interval-secs value.\n");
+                        gossip_err(
+                            "Error: invalid perf-time-interval-secs value.\n");
                         exit(EXIT_FAILURE);
                     }
                 }
@@ -3525,13 +3542,18 @@ static void parse_args(int argc, char **argv, options_t *opts)
                         &opts->perf_history_size);
                     if(ret != 1)
                     {
-                        fprintf(stderr, "Error: invalid perf-history-size value.\n");
+                        gossip_err(
+                            "Error: invalid perf-history-size value.\n");
                         exit(EXIT_FAILURE);
                     }
                 }
                 else if (strcmp("gossip-mask", cur_option) == 0)
                 {
                     opts->gossip_mask = optarg;
+                }
+                else if (strcmp("standalone", cur_option) == 0)
+                {
+                    opts->standalone = 1;
                 }
                 break;
             case 'h':
@@ -3547,7 +3569,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 opts->acache_timeout = atoi(optarg);
                 if (opts->acache_timeout < 0)
                 {
-                    fprintf(stderr, "Invalid acache timeout value of %d ms,"
+                    gossip_err("Invalid acache timeout value of %d ms,"
                                "disabling the acache.\n",
                                opts->acache_timeout);
                     opts->acache_timeout = 0;
@@ -3558,14 +3580,14 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 opts->ncache_timeout = atoi(optarg);
                 if (opts->ncache_timeout < 0)
                 {
-                    fprintf(stderr, "Invalid ncache timeout value of %d ms,"
+                    gossip_err("Invalid ncache timeout value of %d ms,"
                                "disabling the ncache.\n",
                                opts->ncache_timeout);
                     opts->ncache_timeout = 0;
                 }
                 break;
             default:
-                fprintf(stderr, "Unrecognized option.  "
+                gossip_err("Unrecognized option.  "
                         "Try --help for information.\n");
                 exit(1);
         }

@@ -410,7 +410,7 @@ static PINT_sm_action io_init(
         }
 
         return job_req_sched_post_timer(
-            sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
+            sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
     return SM_ACTION_COMPLETE;
@@ -864,7 +864,7 @@ io_datafile_post_msgpairs_retry(
       sm_p->u.io.retry_count, sm_p->msgarray_params.retry_delay);
 
     return job_req_sched_post_timer(sm_p->msgarray_params.retry_delay,
-        sm_p, 0, js_p, NULL, pint_client_sm_context);
+        smcb, 0, js_p, NULL, pint_client_sm_context);
 }
 
 /*

@@ -304,7 +304,7 @@ static PINT_sm_action mkdir_init(
         js_p->error_code = 0;
 
         return job_req_sched_post_timer(
-            sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
+            sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
 

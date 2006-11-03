@@ -25,9 +25,7 @@
 
 #define MAX_RETURNED_JOBS   256
 
-job_context_id pint_client_sm_context;
-
-static int got_context = 0;
+job_context_id pint_client_sm_context = -1;
 
 /*
   used for locally storing completed operations from test() call so
@@ -38,18 +36,23 @@ static int s_completion_list_index = 0;
 static PINT_smcb *s_completion_list[MAX_RETURNED_JOBS] = {NULL};
 static gen_mutex_t s_completion_list_mutex = GEN_MUTEX_INITIALIZER;
 
-#define CLIENT_SM_INIT_ONCE()                                        \
-do {                                                                 \
-    if (got_context == 0)                                            \
-    {                                                                \
-	/* get a context for our state machine operations */         \
-	job_open_context(&pint_client_sm_context);                   \
-	got_context = 1;                                             \
-    }                                                                \
-} while(0)
-
 #define CLIENT_SM_ASSERT_INITIALIZED()  \
-do { assert(got_context); } while(0)
+do { assert(pint_client_sm_context != -1); } while(0)
+
+int PINT_client_state_machine_initialize(void)
+{
+    return job_open_context(&pint_client_sm_context);
+}
+
+void PINT_client_state_machine_finalize(void)
+{
+    job_close_context(pint_client_sm_context);
+}
+
+job_context_id PINT_client_get_sm_context(void)
+{
+    return pint_client_sm_context;
+}
 
 static PVFS_error add_sm_to_completion_list(PINT_smcb *smcb)
 {
@@ -346,9 +349,10 @@ PVFS_error PINT_client_state_machine_post(
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_client_state_machine_post smcb %p\n",smcb);
+                 "PINT_client_state_machine_post smcb %p, op: %s\n",
+                 smcb, PINT_client_get_name_str(smcb->op));
 
-    CLIENT_SM_INIT_ONCE();
+    CLIENT_SM_ASSERT_INITIALIZED();
 
     if (!smcb)
     {
@@ -402,6 +406,19 @@ PVFS_error PINT_client_state_machine_post(
             PINT_client_get_name_str(pvfs_sys_op), (op_id ? *op_id : -1));
     }
     return ret;
+}
+
+PVFS_error PINT_client_state_machine_release(
+    PINT_smcb * smcb)
+{
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_smcb_set_complete(smcb);
+
+    PINT_id_gen_safe_unregister(sm_p->sys_op_id);
+
+    PINT_smcb_free(&smcb);
+    return 0;
 }
 
 #if 0

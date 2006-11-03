@@ -217,7 +217,10 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
         do {
             if (!smcb->current_state || !smcb->current_state->trtbl)
             {
-                gossip_err("SM current state or trtbl is invalid\n");
+                gossip_err("SM current state or trtbl is invalid "
+                           "(smcb = %p)\n", smcb);
+                gossip_backtrace();
+                assert(0);
                 return -1;
             }
             transtbl = smcb->current_state->trtbl;

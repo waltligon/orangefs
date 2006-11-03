@@ -29,9 +29,9 @@
 #include "job-time-mgr.h"
 #include "pint-util.h"
 
-extern job_context_id pint_client_sm_context;
-
 PINT_smcb *g_smcb = NULL; 
+
+extern job_context_id pint_client_sm_context;
 
 typedef enum
 {
@@ -147,7 +147,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
     client_status_flag |= CLIENT_JOB_INIT;
 
-    ret = job_open_context(&pint_client_sm_context);
+    ret = PINT_client_state_machine_initialize();
     if (ret < 0)
     {
         gossip_lerr("job_open_context() failure.\n");
@@ -212,8 +212,6 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     PINT_util_digest_init();
 
-    PINT_util_digest_init();
-
     return 0;
 
   error_exit:
@@ -240,7 +238,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     if (client_status_flag & CLIENT_JOB_CTX_INIT)
     {
-        job_close_context(pint_client_sm_context);
+        PINT_client_state_machine_finalize();
     }
 
     if (client_status_flag & CLIENT_JOB_INIT)
