@@ -2570,7 +2570,7 @@ static inline PVFS_error repost_unexp_vfs_request(
     assert(vfs_request);
 
     PINT_dev_release_unexpected(&vfs_request->info);
-    PVFS_sys_release(vfs_request->op_id);
+    PINT_sys_release(vfs_request->op_id);
 
     memset(vfs_request, 0, sizeof(vfs_request_t));
     vfs_request->is_dev_unexp = 1;
@@ -3334,7 +3334,7 @@ int main(int argc, char **argv)
     for(i = 0; i < MAX_NUM_OPS; i++)
     {
         PINT_dev_release_unexpected(&s_vfs_request_array[i]->info);
-        PVFS_sys_release(s_vfs_request_array[i]->op_id);
+        PINT_sys_release(s_vfs_request_array[i]->op_id);
         free(s_vfs_request_array[i]);
     }
 
