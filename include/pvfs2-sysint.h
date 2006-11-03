@@ -592,7 +592,7 @@ int PVFS_sys_wait(
     const char *in_op_str,
     int *out_error);
 
-void PVFS_sys_release(PVFS_sys_op_id op_id);
+int PVFS_sys_cancel(PVFS_sys_op_id op_id);
 
 #endif
 

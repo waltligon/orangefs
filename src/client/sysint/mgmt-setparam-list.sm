@@ -177,7 +177,7 @@ PVFS_error PVFS_mgmt_setparam_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_setparam_list completed\n");
 
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 

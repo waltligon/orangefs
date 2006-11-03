@@ -185,7 +185,7 @@ PVFS_error PVFS_sys_statfs(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_sys_statfs completed\n");
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

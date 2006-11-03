@@ -217,7 +217,7 @@ int PINT_server_get_config(
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return(error);
 }
 
@@ -548,7 +548,7 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return(error);
 }
 

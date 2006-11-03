@@ -151,7 +151,7 @@ PVFS_error PVFS_mgmt_remove_dirent(
         }
     }
 
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 

@@ -214,7 +214,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

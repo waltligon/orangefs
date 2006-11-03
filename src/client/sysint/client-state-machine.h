@@ -678,6 +678,10 @@ int PINT_client_wait_internal(
     int *out_error,
     const char *in_class_str);
 
+void PINT_sys_release(PVFS_sys_op_id op_id);
+
+void PINT_mgmt_release(PVFS_mgmt_op_id op_id);
+
 /* internal helper macros */
 #define PINT_init_sysint_credentials(sm_p_cred_p, user_cred_p)\
 do {                                                          \
@@ -729,6 +733,7 @@ do {                                                           \
     sm_p->msgarray = msg_p;                                    \
     sm_p->msgarray_count = 1;                                  \
 } while(0)
+
 
 /************************************
  * state-machine.h included here

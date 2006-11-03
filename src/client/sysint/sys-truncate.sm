@@ -162,7 +162,7 @@ PVFS_error PVFS_sys_truncate(
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

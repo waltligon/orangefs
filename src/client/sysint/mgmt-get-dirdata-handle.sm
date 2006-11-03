@@ -152,7 +152,7 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
         }
     }
 
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 

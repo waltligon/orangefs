@@ -370,7 +370,7 @@ PVFS_error PVFS_sys_io(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
-        PVFS_sys_release(op_id);
+        PINT_sys_release(op_id);
     } 
 
     return error;

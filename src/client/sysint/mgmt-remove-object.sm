@@ -148,7 +148,7 @@ PVFS_error PVFS_mgmt_remove_object(
         }
     }
 
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 

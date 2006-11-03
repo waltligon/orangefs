@@ -145,7 +145,7 @@ static PVFS_error completion_list_retrieve_completed(
             }
             s_completion_list[i] = NULL;
 
-            PVFS_sys_release(sm_p->sys_op_id);
+            PINT_sys_release(sm_p->sys_op_id);
         }
         else
         {
@@ -322,7 +322,7 @@ int client_state_machine_terminate(
   for each operation.  the blocking calls DO NOT allocate this, but
   call the non-blocking method (which does allocate it) and waits for
   completion.  On completion, the blocking call frees the state
-  machine control block (via PVFS_sys_release).  the blocking calls only
+  machine control block (via PINT_sys_release).  the blocking calls only
   ever call the test() function, which does not free the state machine
   control block on completion.
 
@@ -331,7 +331,7 @@ int client_state_machine_terminate(
   testsome() *should* be using the non-blocking calls with it.  this
   means that if you are calling test() with a non-blocking operation
   that you manually issued (with a PVFS_isys* or PVFS_imgmt* call),
-  you need to call PVFS_sys_release on your own when the operation
+  you need to call PINT_sys_release on your own when the operation
   completes.
 */
 
@@ -893,7 +893,7 @@ PVFS_error PINT_client_wait_internal(
 
 /** Frees resources associated with state machine instance.
  */
-void PVFS_sys_release(PVFS_sys_op_id op_id)
+void PINT_sys_release(PVFS_sys_op_id op_id)
 {
     PINT_smcb *smcb; 
     PINT_client_sm *sm_p; 
@@ -926,38 +926,25 @@ void PVFS_sys_release(PVFS_sys_op_id op_id)
     PINT_smcb_free(&smcb);
 }
 
-/* why is this different??? */
-void PVFS_mgmt_release(PVFS_mgmt_op_id op_id)
+void PINT_mgmt_release(PVFS_mgmt_op_id op_id)
 {
-    PINT_smcb *smcb; 
-    PINT_client_sm *sm_p; 
-    PVFS_credentials *cred_p; 
+    PINT_sys_release(op_id);
+}
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-              "PVFS_mgmt_release id %lld\n",op_id);
-    smcb = PINT_id_gen_safe_lookup(op_id);
-    if (smcb == NULL)
-    {
-        return;
-    }
-    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if (sm_p == NULL)
-    {
-        cred_p = NULL;
-    }
-    else
-    {
-        cred_p = sm_p->cred_p;
-    }
-    PINT_id_gen_safe_unregister(op_id);
+/*
+ * TODO: fill these out so that operations can be cancelled by users.
+ * First though there needs to be better tracking of posted jobs for
+ * a client state machine (right now we just throw away the job id),
+ * so that we know which jobs need to be cancelled.
+ */
+int PVFS_sys_cancel(PVFS_sys_op_id op_id)
+{
+    return -PVFS_ENOSYS;
+}
 
-    if (PINT_smcb_op(smcb) && cred_p)
-    {
-        PVFS_util_release_credentials(cred_p);
-        if (sm_p) sm_p->cred_p = NULL;
-    }
-
-    PINT_smcb_free(&smcb);
+int PVFS_mgmt_cancel(PVFS_mgmt_op_id op_id)
+{
+    return -PVFS_ENOSYS;
 }
 
 const char *PINT_client_get_name_str(int op_type)
