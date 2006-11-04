@@ -736,12 +736,20 @@ void fsid_key_table_finalize(void);
  * defined in inode.c
  ****************************/
 uint32_t convert_to_pvfs2_mask(unsigned long lite_mask);
-struct inode *pvfs2_get_custom_inode(
+struct inode *pvfs2_get_custom_inode_common(
     struct super_block *sb,
     struct inode *dir,
     int mode,
     dev_t dev,
-    PVFS_object_ref ref);
+    PVFS_object_ref ref,
+    int from_create);
+
+/* In-core inodes are not being created on-disk */
+#define pvfs2_get_custom_core_inode(sb, dir, mode, dev, ref) \
+        pvfs2_get_custom_inode_common(sb, dir, mode, dev, ref, 0)
+/* On-disk inodes are being created */
+#define pvfs2_get_custom_inode(sb, dir, mode, dev, ref) \
+        pvfs2_get_custom_inode_common(sb, dir, mode, dev, ref, 1)
 
 int pvfs2_setattr(
     struct dentry *dentry,

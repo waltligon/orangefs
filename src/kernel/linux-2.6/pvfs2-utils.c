@@ -855,7 +855,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
 
     if (prefix)
     {
-        if(strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+        if(strlen(name)+strlen(prefix) >= PVFS_MAX_XATTR_NAMELEN)
         {
 		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
 				(int)(strlen(name)+strlen(prefix)));
@@ -947,7 +947,7 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
 
     if(!name)
     {
-	gossip_err("pvfs2_inode_removexattr: xattr key is NULL\n")
+	gossip_err("pvfs2_inode_removexattr: xattr key is NULL\n");
         return -EINVAL;
     }
 
