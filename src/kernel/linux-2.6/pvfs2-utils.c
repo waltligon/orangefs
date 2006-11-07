@@ -145,7 +145,9 @@ int copy_attributes_to_inode(
           changing the inode->i_blkbits to something other than
           PAGE_CACHE_SHIFT breaks mmap/execution as we depend on that.
         */
+#ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE
         inode->i_blksize = pvfs_bufmap_size_query();
+#endif
         inode->i_blkbits = PAGE_CACHE_SHIFT;
         gossip_debug(GOSSIP_UTILS_DEBUG, "attrs->mask = %x (objtype = %s)\n", 
                 attrs->mask, 

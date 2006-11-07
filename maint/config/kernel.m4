@@ -158,6 +158,20 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
+	dnl 2.6.18.1 removed this member
+	AC_MSG_CHECKING(for i_blksize in struct inode)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode i = {
+			.i_blksize = 0,
+			};
+		], [],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_I_BLKSIZE_IN_STRUCT_INODE, 1, Define if struct inode in kernel has i_blksize member),
+			AC_MSG_RESULT(no)
+	)
+
 	dnl checking if we have a statfs_lite callback in super_operations 
 	AC_MSG_CHECKING(for statfs_lite callback in struct super_operations in kernel)
 	AC_TRY_COMPILE([
