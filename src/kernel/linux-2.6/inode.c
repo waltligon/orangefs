@@ -455,17 +455,18 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
 /** Allocates a Linux inode structure with additional PVFS2-specific
  *  private data (I think -- RobR).
  */
-struct inode *pvfs2_get_custom_inode(
+struct inode *pvfs2_get_custom_inode_common(
     struct super_block *sb,
     struct inode *dir,
     int mode,
     dev_t dev,
-    PVFS_object_ref object)
+    PVFS_object_ref object,
+    int from_create)
 {
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: called\n  (sb is %p | "
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode_common: called\n  (sb is %p | "
                 "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
                 MINOR(dev));
 
@@ -482,7 +483,19 @@ struct inode *pvfs2_get_custom_inode(
             return NULL;
         }
 
-        inode->i_mode = mode;
+        /*
+         * Since we are using the same function to create a new on-disk object
+         * as well as to create an in-memory object, the mode of the object
+         * needs to be set carefully. If we are called from a function that is
+         * creating a new on-disk object, set its mode here since the caller is
+         * providing it. Else let it be since the getattr should fill it up
+         * properly.
+         */
+        if (from_create)
+            inode->i_mode = mode;
+        gossip_debug(GOSSIP_INODE_DEBUG, 
+                "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
+                inode, inode->i_mode);
         inode->i_mapping->host = inode;
         inode->i_uid = current->fsuid;
         inode->i_gid = current->fsgid;
