@@ -31,10 +31,12 @@ struct xtvec {
     size_t xtv_len;
 };
 
+/* the _syscallXX apprroach is not portable. instead, we'll use syscall and
+ * sadly forego any type checking.  For reference, here are the prototypes for
+ * the system calls 
 static ssize_t readx(unsigned long, const struct iovec *, unsigned long, const struct xtvec *, unsigned long);
 static ssize_t writex(unsigned long, const struct iovec *, unsigned long, const struct xtvec *, unsigned long);
-_syscall5(ssize_t, readx, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
-_syscall5(ssize_t, writex, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
+*/
 
 #ifndef Ld
 #define Ld(x) (x)
@@ -230,7 +232,8 @@ int main(int argc, char **argv)
     }
     time1 = Wtime();
     /* write out the data */
-    ret = writex(fh, wriov, frame.cf_valid_count, xtv, frame.cf_valid_count);
+    ret = syscall(__NR_writex, fh, wriov, frame.cf_valid_count, xtv, 
+	    frame.cf_valid_count);
     time2 = Wtime();
     if (ret < 0)
     {
@@ -300,7 +303,8 @@ int main(int argc, char **argv)
     fh = ret;
     /* now read it back from the file and make sure we have the correct data */
     time1 = Wtime();
-    ret = readx(fh, rdiov, frame.cf_valid_count, xtv, frame.cf_valid_count);
+    ret = syscall(__NR_readx, fh, rdiov, frame.cf_valid_count, xtv, 
+	    frame.cf_valid_count);
     time2 = Wtime();
     if(ret < 0)
     {

@@ -256,6 +256,9 @@ static inline struct files* clone_filp(struct files *filp)
 	return new_filp;
 }
 
+/* the _syscallXX apprroach is not portable. instead, we'll use syscall and
+ * sadly forego any type checking.  For reference, here are the prototypes for
+ * the system calls 
 int newstatlite(const char *, struct kernel_stat_lite *);
 static int newfstatlite(int, struct kernel_stat_lite *);
 static int newlstatlite(const char *, struct kernel_stat_lite *);
@@ -267,17 +270,8 @@ static int getdents_plus_lite(unsigned int fd, unsigned long lite_mask,
 				struct dirent_plus_lite *dirent, unsigned int count);
 static int getdents64_plus_lite(unsigned int fd, unsigned long lite_mask,
 				struct dirent64_plus_lite *dirent, unsigned int count);
+*/
 
-/* glibc does not seem to provide a getdents() routine, so we provide one */
-_syscall3(int, getdents, uint, fd, struct dirent *, dirp, uint, count);
-_syscall3(int, getdents64, uint, fd, struct dirent64 *, dirp, uint, count);
-_syscall3(int, getdents_plus, uint, fd, struct dirent_plus *, dirp, uint, count);
-_syscall3(int, getdents64_plus, uint, fd, struct dirent64_plus *, dirp, uint, count);
-_syscall4(int, getdents_plus_lite, uint, fd, unsigned long, lite_mask, struct dirent_plus_lite *, dirp, unsigned int, count);
-_syscall4(int, getdents64_plus_lite, uint, fd, unsigned long, lite_mask, struct dirent64_plus_lite *, dirp, unsigned int, count);
-_syscall2(int, newstatlite, const char *, path, struct kernel_stat_lite *, buf);
-_syscall2(int, newfstatlite, int, filedes, struct kernel_stat_lite *, buf);
-_syscall2(int, newlstatlite, const char *, path, struct kernel_stat_lite *, buf);
 
 /* free the struct files queued on the TREE list */
 
@@ -1036,7 +1030,7 @@ static int path_walk(struct files *root_filp)
 										 S_SLITE_CTIME |
 										 S_SLITE_BLKSIZE |
 										 S_SLITE_BLOCKS;
-				ret = newlstatlite(root_filp->name, &statbuflite);
+				ret = syscall(__NR_newlstatlite, root_filp->name, &statbuflite);
 				is_dir = S_ISDIR(statbuflite.st_mode);
 				is_link = S_ISLNK(statbuflite.st_mode);
 			}
@@ -1055,7 +1049,7 @@ static int path_walk(struct files *root_filp)
 										 S_SLITE_CTIME |
 										 S_SLITE_BLKSIZE |
 										 S_SLITE_BLOCKS;
-				ret = newlstatlite(root_filp->name, &statbuflite);
+				ret = syscall(__NR_newlstatlite, root_filp->name, &statbuflite);
 				is_dir = S_ISDIR(statbuflite.st_mode);
 				is_link = S_ISLNK(statbuflite.st_mode);
 			}
@@ -1077,7 +1071,7 @@ static int path_walk(struct files *root_filp)
 										 S_SLITE_CTIME |
 										 S_SLITE_BLKSIZE |
 										 S_SLITE_BLOCKS;
-				ret = newfstatlite(dir_fd, &statbuflite);
+				ret = syscall(__NR_newfstatlite,dir_fd, &statbuflite);
 				is_dir = S_ISDIR(statbuflite.st_mode);
 				is_link = S_ISLNK(statbuflite.st_mode);
 			}
@@ -1097,7 +1091,7 @@ static int path_walk(struct files *root_filp)
 										 S_SLITE_CTIME |
 										 S_SLITE_BLKSIZE |
 										 S_SLITE_BLOCKS;
-				ret = newfstatlite(dir_fd, &statbuflite);
+				ret = syscall(__NR_newfstatlite, dir_fd, &statbuflite);
 				is_dir = S_ISDIR(statbuflite.st_mode);
 				is_link = S_ISLNK(statbuflite.st_mode);
 			}
@@ -1154,8 +1148,9 @@ static int path_walk(struct files *root_filp)
 						assert(p64);
 					}
 					ptr = (char *) p64 + dirent_total_bytes;
-					dirent_output_bytes = getdents64(dir_fd, (struct dirent64 *) ptr, 
-							dirent_input_count * sizeof(struct dirent64));
+					dirent_output_bytes = syscall(__NR_getdents64, dir_fd, 
+										 (struct dirent64 *) ptr, 
+										 dirent_input_count * sizeof(struct dirent64));
 					if (dirent_output_bytes <= 0)
 						break;
 					total_rec_len = 0;
@@ -1174,8 +1169,9 @@ static int path_walk(struct files *root_filp)
 						assert(p);
 					}
 					ptr = (char *) p + dirent_total_bytes;
-					dirent_output_bytes = getdents(dir_fd, (struct dirent *) ptr, 
-							dirent_input_count * sizeof(struct dirent));
+					dirent_output_bytes = syscall(__NR_getdents, dir_fd, 
+										 (struct dirent *) ptr, 
+										 dirent_input_count * sizeof(struct dirent));
 					if (dirent_output_bytes <= 0)
 						break;
 					total_rec_len = 0;
@@ -1264,8 +1260,10 @@ static int path_walk(struct files *root_filp)
 							assert(p64_lite);
 						}
 						ptr = (char *) p64_lite + dirent_total_bytes;
-						dirent_output_bytes = getdents64_plus_lite(dir_fd, lite_mask, 
-								(struct dirent64_plus_lite *) ptr, dirent_input_count * sizeof(struct dirent64_plus_lite));
+						dirent_output_bytes = syscall(__NR_getdents64_plus_lite, 
+											 dir_fd, lite_mask, 
+											 (struct dirent64_plus_lite *) ptr, 
+											 dirent_input_count * sizeof(struct dirent64_plus_lite));
 						if (dirent_output_bytes <= 0)
 							break;
 						total_rec_len = 0;
@@ -1285,7 +1283,9 @@ static int path_walk(struct files *root_filp)
 							assert(p64);
 						}
 						ptr = (char *) p64 + dirent_total_bytes;
-						dirent_output_bytes = getdents64_plus(dir_fd, (struct dirent64_plus *) ptr, dirent_input_count * sizeof(struct dirent64_plus));
+						dirent_output_bytes = syscall(__NR_getdents64_plus, dir_fd, 
+											 (struct dirent64_plus *) ptr, 
+											 dirent_input_count * sizeof(struct dirent64_plus));
 						if (dirent_output_bytes <= 0)
 							break;
 						total_rec_len = 0;
@@ -1308,8 +1308,10 @@ static int path_walk(struct files *root_filp)
 							assert(p_lite);
 						}
 						ptr = (char *) p_lite + dirent_total_bytes;
-						dirent_output_bytes = getdents_plus_lite(dir_fd, lite_mask, 
-								(struct dirent_plus_lite *) ptr, dirent_input_count * sizeof(struct dirent_plus_lite));
+						dirent_output_bytes = syscall(__NR_getdents_plus_lite, 
+											 dir_fd, lite_mask, 
+											 (struct dirent_plus_lite *) ptr, 
+											 dirent_input_count * sizeof(struct dirent_plus_lite));
 						if (dirent_output_bytes <= 0)
 							break;
 						total_rec_len = 0;
@@ -1329,8 +1331,9 @@ static int path_walk(struct files *root_filp)
 							assert(p);
 						}
 						ptr = (char *) p + dirent_total_bytes;
-						dirent_output_bytes = getdents_plus(dir_fd, 
-								(struct dirent_plus *) ptr, dirent_input_count * sizeof(struct dirent_plus));
+						dirent_output_bytes = syscall(__NR_getdents_plus, dir_fd, 
+								(struct dirent_plus *) ptr, 
+								dirent_input_count * sizeof(struct dirent_plus));
 						if (dirent_output_bytes <= 0)
 							break;
 						total_rec_len = 0;
