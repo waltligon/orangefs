@@ -852,12 +852,26 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         gossip_err("pvfs2_inode_setxattr: bogus NULL pointers!\n");
         return -EINVAL;
     }
-    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+
+    if (prefix)
     {
-        gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
-                (int)(strlen(name)+strlen(prefix)));
-        return -EINVAL;
+        if(strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
+				(int)(strlen(name)+strlen(prefix)));
+		return -EINVAL;
+	}
     }
+    else
+    {
+        if(strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n",
+			   (int)(strlen(name)));
+                return -EINVAL;
+        }
+    }
+
     /* This is equivalent to a removexattr */
     if (size == 0 && value == NULL)
     {
@@ -933,15 +947,29 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
 
     if(!name)
     {
+	gossip_err("pvfs2_inode_removexattr: xattr key is NULL\n")
         return -EINVAL;
     }
 
-    if (prefix && (strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+    if (prefix)
     {
-        gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
-                (int)(strlen(name)+strlen(prefix)));
-        return -EINVAL;
+        if((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
+				(int)(strlen(name)+strlen(prefix)));
+		return -EINVAL;
+	}
     }
+    else
+    {
+        if(strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n",
+			   (int)(strlen(name)));
+                return -EINVAL;
+        }
+    }
+
     if (inode)
     {
         pvfs2_inode = PVFS2_I(inode);
@@ -1297,6 +1325,12 @@ static inline struct inode *pvfs2_create_symlink(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     struct inode *inode = NULL;
+
+    if(!symname)
+    {
+	*error_code = -EINVAL;
+        return NULL;
+    }
 
     new_op = op_alloc(PVFS2_VFS_OP_SYMLINK);
     if (!new_op)
