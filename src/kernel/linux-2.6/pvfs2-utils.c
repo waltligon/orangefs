@@ -931,7 +931,12 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+    if(!name)
+    {
+        return -EINVAL;
+    }
+
+    if (prefix && (strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
     {
         gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
                 (int)(strlen(name)+strlen(prefix)));
@@ -956,7 +961,8 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
          * later on...
          */
         ret = snprintf((char*)new_op->upcall.req.removexattr.key,
-            PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
+            PVFS_MAX_XATTR_NAMELEN, "%s%s", 
+            (prefix ? prefix : ""), name);
         new_op->upcall.req.removexattr.key_sz = ret + 1;
 
         gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_removexattr: key %s, key_sz %d\n", 
