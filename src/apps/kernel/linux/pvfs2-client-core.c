@@ -2908,6 +2908,12 @@ static PVFS_error process_vfs_requests(void)
         memset(vfs_request_array, 0,
                (MAX_NUM_OPS * sizeof(vfs_request_t *)));
 
+#if 0
+        /* generates too much logging, but useful sometimes */
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                 "Calling PVFS_sys_testsome for new requests\n");
+#endif
+
         ret = PVFS_sys_testsome(
             op_id_array, &op_count, (void **)vfs_request_array,
             error_code_array, PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
@@ -3150,7 +3156,7 @@ int main(int argc, char **argv)
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  " %s starting at %.4d-%.2d-%.2d %.2d:%.2d\n",
                  argv[0], (local_time->tm_year + 1900),
-                 local_time->tm_mon, local_time->tm_mday,
+                 local_time->tm_mon+1, local_time->tm_mday,
                  local_time->tm_hour, local_time->tm_min);
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "***************************************************\n");
