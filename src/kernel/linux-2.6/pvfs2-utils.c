@@ -1957,7 +1957,6 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
         pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
         pvfs2_inode->last_failed_block_index_read = 0;
         pvfs2_inode->link_target = NULL;
-        pvfs2_inode->directory_version = 0;
         pvfs2_inode->error_code = 0;
         SetInitFlag(pvfs2_inode);
     }
@@ -1972,7 +1971,6 @@ void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
     pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
     pvfs2_inode->last_failed_block_index_read = 0;
-    pvfs2_inode->directory_version = 0;
     pvfs2_inode->error_code = 0;
 }
 
