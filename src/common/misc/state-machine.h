@@ -109,36 +109,6 @@ struct PINT_tran_tbl_s
     struct PINT_state_s *next_state;
 };
 
-#if 0
-/* this union defines the possibles values for each word of the
-   the state machine memory.  Properly formed state machine programs
-   consist of these values in a particular order as documented
-   externally
- */
-union PINT_state_array_values
-{
-    const char *state_name;
-    struct PINT_state_machine_s *parent_machine;
-    int flag;
-    int (*state_action)(struct PINT_smcb *, job_status_s *);
-    struct PINT_state_machine_s *nested_machine;
-    int return_value;
-    union PINT_state_array_values *next_state;
-};
-
-struct PINT_state_machine_s
-{
-    const char *name;
-    union PINT_state_array_values *state_machine;
-};
-
-struct PINT_state_s
-{
-    const char *state_name;
-    struct PINT_state_machine_s *parent_machine;
-};
-#endif
-
 /* All state action functions return this type which controls state
  * machine action
  */
@@ -174,12 +144,6 @@ int PINT_state_machine_complete(void *);
 /* This macro returns the current state invoked */
 #define PINT_state_machine_current_state_name(smcb) \
     ((smcb)->current_state->state_name)
-
-#if 0
-#define PINT_state_machine_current_machine_name(smcb) \
-    (((smcb)->current_state - 2)->parent_machine->name + 6)
-
-#endif
 
 /* Prototypes for functions defined in by state machine code */
 int PINT_state_machine_halt(void);

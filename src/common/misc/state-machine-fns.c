@@ -257,6 +257,7 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
                 }
                 /* process terminating SM */
                 PINT_state_machine_terminate(smcb, r);
+                PINT_smcb_set_complete(smcb);
                 return SM_ACTION_TERMINATE;
 	    }
 	    if (transtbl[i].flag == SM_RETURN)

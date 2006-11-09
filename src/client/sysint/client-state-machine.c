@@ -364,15 +364,6 @@ PVFS_error PINT_client_state_machine_post(
     /* save operation type; mark operation as unfinished */
     sm_p->user_ptr = user_ptr;
 
-#if 0
-    if(pvfs_sys_op == PVFS_DEV_UNEXPECTED)
-    {
-        gossip_err("FAILURE: You should be using PINT_sys_dev_unexp for "
-                   "posting this type of operation!\n");
-        return ret;
-    }
-#endif
-
     if (op_id)
     {
         ret = PINT_id_gen_safe_register(op_id, (void *)smcb);
@@ -385,25 +376,25 @@ PVFS_error PINT_client_state_machine_post(
     */
     ret = PINT_state_machine_start(smcb, &js);
 
-    /* else ret == SM_ACTION_DEFERRED */
-
     if (PINT_smcb_complete(smcb))
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) (ran to termination)\n",
-            PINT_client_get_name_str(pvfs_sys_op), (op_id ? *op_id : -1));
+            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) "
+                    "(ran to termination)(%d)\n",
+                    PINT_client_get_name_str(pvfs_sys_op),
+                    (op_id ? *op_id : -1),
+                    js.error_code);
 
-        /* this is done in client_state_machine_terminate now */
-        /*
-        ret = add_sm_to_completion_list(smcb);
-        assert(ret == 0);
-        */
+        ret = js.error_code;
     }
     else
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) (waiting for test)\n",
-            PINT_client_get_name_str(pvfs_sys_op), (op_id ? *op_id : -1));
+            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) "
+                    "(waiting for test)(%d)\n",
+                    PINT_client_get_name_str(pvfs_sys_op),
+                    (op_id ? *op_id : -1),
+                    ret);
     }
     return ret;
 }
@@ -420,61 +411,6 @@ PVFS_error PINT_client_state_machine_release(
     PINT_smcb_free(&smcb);
     return 0;
 }
-
-#if 0
-PVFS_error PINT_sys_dev_unexp(
-    struct PINT_dev_unexp_info *info,
-    job_status_s *jstat,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr)
-{
-    PVFS_error ret = -PVFS_EINVAL;
-    job_id_t id;
-    PINT_smcb *smcb = NULL;
-    PINT_client_sm *sm_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_sys_dev_unexp\n");
-
-    CLIENT_SM_INIT_ONCE();
-
-    /* we require more input args than the regular post method above */
-    if (!info || !jstat || !op_id)
-    {
-        return -PVFS_EINVAL;
-    }
-
-    ret = PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED,
-            sizeof(struct PINT_client_sm),
-            client_op_state_get_machine,
-            client_state_machine_terminate,
-            pint_client_sm_context);
-    if (ret < 0)
-    {
-        gossip_lerr("Error: failed to allocate SMCB "
-                    "of op type %x\n", PVFS_DEV_UNEXPECTED);
-        return ret;
-    }
-    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    sm_p->user_ptr = user_ptr;
-    sm_p->cred_p = NULL;
-
-    memset(jstat, 0, sizeof(job_status_s));
-    ret = job_dev_unexp(info, (void *)smcb, 0, jstat, &id,
-                        JOB_NO_IMMED_COMPLETE, pint_client_sm_context);
-    if (ret < 0)
-    {
-        PVFS_perror_gossip("PINT_sys_dev_unexp failed", ret);
-        PINT_smcb_free(&smcb);
-    }
-    else
-    {
-        ret = PINT_id_gen_safe_register(op_id, (void *)smcb);
-        sm_p->sys_op_id = *op_id;
-    }
-    return ret;
-}
-#endif
 
 /** Cancels in progress I/O operations.
  *
@@ -656,15 +592,6 @@ PVFS_error PINT_client_state_machine_test(
 	tmp_smcb = (PINT_smcb *)smcb_p_array[i];
         assert(tmp_smcb);
 
-#if 0
-        /* why is this here - why doesn't an unexpected just terminate? */
-        if (PINT_smcb_op(tmp_smcb) == PVFS_DEV_UNEXPECTED)
-        {
-            /* this is bad - we are using this to skip over some logic */
-            /* below - needs to be reworked - WBL */
-            PINT_smcb_set_complete(tmp_smcb);
-        }
-#endif
         if (PINT_smcb_invalid_op(tmp_smcb))
         {
             gossip_err("Invalid sm control block op %d\n", PINT_smcb_op(tmp_smcb));
@@ -682,35 +609,6 @@ PVFS_error PINT_client_state_machine_test(
                 continue;
             }
         }
-
-        /* make sure we don't return internally cancelled I/O jobs */
-        /*  This is handled in terminate fn now
-        if ((PINT_smcb_op(tmp_smcb) == PVFS_SYS_IO) &&
-                (PINT_smcb_cancelled(tmp_smcb)) &&
-                (cancelled_io_jobs_are_pending(tmp_smcb)))
-        {
-            continue;
-        }
-        */
-
-        /*
-         * If we've found a completed operation and it's NOT the op
-         * being tested here, we add it to our local completion list so
-         * that later calls to the sysint test/testsome can find it.
-         * Unexpected messages need to go on the list but are not
-         * automatically put there, thus we need this code until
-         * we rework the unexpected stuff - WBL
-         * add_sm_to_completion_list() does the right thing in
-         * determining whether smcb has already been added to
-         * completion Q or not 
-         */
-#if 0
-        if ((tmp_smcb != smcb) && (PINT_smcb_complete(tmp_smcb)))
-        {
-            ret = add_sm_to_completion_list(tmp_smcb);
-            assert(ret == 0);
-        }
-#endif
     }
 
     if (PINT_smcb_complete(smcb))
@@ -784,18 +682,6 @@ PVFS_error PINT_client_state_machine_testsome(
 	smcb = (PINT_smcb *)smcb_p_array[i];
         assert(smcb);
 
-#if 0
-        /*
-          note that dev unexp messages found here are treated as
-          complete since if we see them at all in here, they're ready
-          to be passed back to the caller
-        */
-        if (PINT_smcb_op(smcb) == PVFS_DEV_UNEXPECTED)
-        {
-            PINT_smcb_set_complete(smcb);
-        }
-#endif
-
         if (!PINT_smcb_complete(smcb))
         {
             ret = PINT_state_machine_next(smcb, &job_status_array[i]);
@@ -810,37 +696,6 @@ PVFS_error PINT_client_state_machine_testsome(
                 continue;
             }
         }
-
-        /* make sure we don't return internally cancelled I/O jobs */
-        /* now done in terminate function
-        if ((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
-                (PINT_smcb_cancelled(smcb)) &&
-                (cancelled_io_jobs_are_pending(smcb)))
-        {
-            continue;
-        }
-        */
-
-        /*
-          by adding the completed op to our completion list, we can
-          keep progressing on operations in progress here and just
-          grab all completed operations when we're finished
-          (i.e. outside of this loop).
-
-          Again, this is here to get the unexpected stuff added to
-          the list - we really should not do it this way
-        */
-
-        /* add_sm_to_completion_list(smcb) does the right thing if an smcb
-         *  was already added to the completion list
-         */
-#if 0
-        if (PINT_smcb_complete(smcb))
-        {
-            ret = add_sm_to_completion_list(smcb);
-            assert(ret == 0);
-        }
-#endif
     }
 
     /* terminated SMs have added themselves to the completion list */

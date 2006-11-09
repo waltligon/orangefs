@@ -632,39 +632,13 @@ int main(int argc, char **argv)
             gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: job "
                     "completed smcb %p\n", smcb);
 
-            /* Completed jobs might be ongoing, or might be new
-             * (unexpected) ones.  We handle the first step of either
-             * type here.
-             */
-#if 0
-            if (smcb->op == BMI_UNEXPECTED_OP)
-            {
-                unexpected_msg = 1;
-                memset(&server_job_status_array[i], 0,
-                       sizeof(job_status_s));
-                ret = server_state_machine_start(
+               /* NOTE: PINT_state_machine_next() is a function that
+                * is shared with the client-side state machine
+                * processing, so it is defined in the src/common
+                * directory.
+                */
+            ret = PINT_state_machine_next(
                     smcb, &server_job_status_array[i]);
-                if (ret < 0)
-                {
-                    PVFS_perror_gossip("Error: server_state_machine_start", ret);
-                    /* TODO: tell BMI to drop this address? */
-                    /* set return code to zero to allow server to continue
-                     * processing 
-                     */
-                    ret = 0;
-                }
-            }
-            else
-#endif
-            {
-                /* NOTE: PINT_state_machine_next() is a function that
-                 * is shared with the client-side state machine
-                 * processing, so it is defined in the src/common
-                 * directory.
-                 */
-                ret = PINT_state_machine_next(
-                    smcb, &server_job_status_array[i]);
-            }
 
             if (SM_ACTION_ISERR(ret)) /* ret < 0 */
             {
@@ -673,27 +647,6 @@ int main(int argc, char **argv)
             }
 
             /* else ret == SM_ACTION_DEFERED */
-#if 0
-            if (unexpected_msg)
-            {
-                /* If this was a new (unexpected) job, we need to post
-                 * a replacement unexpected job so that we can
-                 * continue to receive incoming requests.
-                 */
-                ret = server_post_unexpected_recv(
-                    &server_job_status_array[i]);
-                if (ret < 0)
-                {
-                    /* TODO: do something here, the return value was
-                     * not being checked for failure before.  I just
-                     * put something here to make it exit for the
-                     * moment.  -Phil
-                     */
-                    gossip_lerr("Error: post unexpected failure not handled.\n");
-                    goto server_shutdown;
-                }
-            }
-#endif
         }
     }
 
