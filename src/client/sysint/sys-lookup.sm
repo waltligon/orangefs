@@ -534,7 +534,7 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_sysresp_lookup *resp,
     int32_t follow_link)
 {
-    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_error ret, error;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
@@ -546,20 +546,25 @@ PVFS_error PVFS_sys_ref_lookup(
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_ref_lookup call", ret);
-        error = ret;
+        return ret;
     }
-    else
+
+    if(op_id != -1)
     {
+        /* did not complete immediately, so we wait */
         ret = PVFS_sys_wait(op_id, "lookup", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
-            error = ret;
         }
+        if(error)
+        {
+            ret = error;
+        }
+        PINT_sys_release(op_id);
     }
 
-    PINT_sys_release(op_id);
-    return error;
+    return ret;
 }
 
 /** Dereference a path string relative to the root directory.

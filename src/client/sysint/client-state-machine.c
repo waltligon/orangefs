@@ -333,6 +333,9 @@ int client_state_machine_terminate(
   that you manually issued (with a PVFS_isys* or PVFS_imgmt* call),
   you need to call PINT_sys_release on your own when the operation
   completes.
+
+  If the posted operation completes immediately, post will return 0,
+  and set the op_id to -1
 */
 
 /** Adds a state machine into the list of machines that are being
@@ -343,6 +346,7 @@ PVFS_error PINT_client_state_machine_post(
     PVFS_sys_op_id *op_id,
     void *user_ptr /* in */)
 {
+    PINT_sm_action sm_ret;
     PVFS_error ret = -PVFS_EINVAL;
     job_status_s js;
     int pvfs_sys_op = PINT_smcb_op(smcb);
@@ -374,21 +378,33 @@ PVFS_error PINT_client_state_machine_post(
       start state machine and continue advancing while we're getting
       immediate completions
     */
-    ret = PINT_state_machine_start(smcb, &js);
+    sm_ret = PINT_state_machine_start(smcb, &js);
+    assert(SM_ACTION_ISVALID(sm_ret));
+
+    if(sm_ret < 0)
+    {
+        /* state machine code failed */
+        return sm_ret;
+    }
 
     if (PINT_smcb_complete(smcb))
     {
+        assert(sm_ret == SM_ACTION_TERMINATE);
+
+        PINT_sys_release(sm_p->sys_op_id);
+        *op_id = -1;
+
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) "
                     "(ran to termination)(%d)\n",
                     PINT_client_get_name_str(pvfs_sys_op),
                     (op_id ? *op_id : -1),
                     js.error_code);
-
-        ret = js.error_code;
     }
     else
     {
+        assert(sm_ret == SM_ACTION_DEFERRED);
+
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) "
                     "(waiting for test)(%d)\n",
@@ -396,7 +412,7 @@ PVFS_error PINT_client_state_machine_post(
                     (op_id ? *op_id : -1),
                     ret);
     }
-    return ret;
+    return js.error_code;
 }
 
 PVFS_error PINT_client_state_machine_release(

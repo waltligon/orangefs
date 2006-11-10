@@ -85,7 +85,7 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
  */
 int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
 {
-    int retval;
+    PINT_sm_action retval;
     const char * state_name;
     const char * machine_name;
 
@@ -95,7 +95,7 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
             !(smcb->current_state->action.func))
     {
         gossip_err("SM invoke called on invalid smcb or state\n");
-        return -1;
+        return SM_ERROR;
     }
 
     /* print pre-call debugging info */
@@ -115,29 +115,6 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
      
     /* call state action function */
     retval = (smcb->current_state->action.func)(smcb,r);
-
-    /* print post-call debugging info */
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
-                 "[SM Exiting]: (%p) %s:%s (error code: %d)\n",
-                 smcb,
-                 /* skip pvfs2_ */
-                 machine_name,
-                 state_name,
-                 r->error_code);
-
-    if (smcb->current_state->flag == SM_PJMP)
-    {
-        /* start child SMs */
-        PINT_sm_start_child_frames(smcb);
-        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
-                "SM (%p) started %d child frames\n",
-                smcb, smcb->children_running);
-        if (smcb->children_running > 0)
-            retval = SM_ACTION_DEFERRED;
-        else
-            retval = SM_ACTION_COMPLETE;
-    }
-
     /* process return code */
     switch (retval)
     {
@@ -156,9 +133,32 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
             break;
     default :
             /* error */
-            gossip_err("SM returned invalid return code %d (%p)\n",
-                    retval, smcb);
+            gossip_err("SM Action %s:%s returned invalid return code %d (%p)\n",
+                       machine_name, state_name, retval, smcb);
             break;
+    }
+
+    /* print post-call debugging info */
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                 "[SM Exiting]: (%p) %s:%s (error code: %d), (sm action: %s)\n",
+                 smcb,
+                 /* skip pvfs2_ */
+                 machine_name,
+                 state_name,
+                 r->error_code,
+                 SM_ACTION_STRING(retval));
+
+    if (smcb->current_state->flag == SM_PJMP)
+    {
+        /* start child SMs */
+        PINT_sm_start_child_frames(smcb);
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                "SM (%p) started %d child frames\n",
+                smcb, smcb->children_running);
+        if (smcb->children_running > 0)
+            retval = SM_ACTION_DEFERRED;
+        else
+            retval = SM_ACTION_COMPLETE;
     }
 
     return retval;
@@ -172,7 +172,7 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
         as long asreturn code is SM_ACTION_COMPLETE
  */
 
-int PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
+PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
 {
     int ret;
     /* run the current state action function */
@@ -190,7 +190,7 @@ int PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
    call.  Calls that function.  If that function returned COMPLETED loop
    and repeat.
  */
-int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
+PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 {
     int i; /* index for transition table */
     struct PINT_tran_tbl_s *transtbl;
@@ -286,8 +286,7 @@ int PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 
 /* Function: PINT_state_machine_locate(void)
    Params:   smcb pointer with op correctly set
-   Returns:  Pointer to the start of the state machine indicated by
-	          smcb->op
+   Returns:  1 on successful locate, 0 on locate failure, <0 on error
    Synopsis: This function locates the state associated with the op
              specified in smcb->op in order to start a state machine's
              execution.
@@ -664,6 +663,13 @@ void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
         retval = PINT_state_machine_start(new_sm, &r);
     }
 }
+
+char * PINT_sm_action_string[3] =
+{
+    "DEFERRED",
+    "COMPLETE",
+    "TERMINATE"
+};
 
 /*
  * Local variables:

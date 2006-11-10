@@ -113,13 +113,22 @@ struct PINT_tran_tbl_s
  * machine action
  */
 typedef enum {
-    SM_ACTION_TERMINATE = 2,
-    SM_ACTION_COMPLETE = 1,
     SM_ACTION_DEFERRED = 0,
+    SM_ACTION_COMPLETE = 1,
+    SM_ACTION_TERMINATE = 2,
     SM_ERROR = -1             /* this is a catastrophic error */
 } PINT_sm_action;
 
+extern char * PINT_sm_action_string[];
+#define SM_ACTION_STRING(action) \
+    (action == SM_ERROR ? "ERROR" : PINT_sm_action_string[action])
+
 #define SM_ACTION_ISERR(ret) ((ret)<0)
+#define SM_ACTION_ISVALID(ret)     \
+    (ret == SM_ACTION_DEFERRED  || \
+     ret == SM_ACTION_COMPLETE  || \
+     ret == SM_ACTION_TERMINATE || \
+     ret == SM_ERROR)
 
 /* what is this type? */
 enum {
@@ -132,7 +141,6 @@ enum {
 #define SM_NESTED_STATE 1
 
 /* Prototypes for functions provided by user */
-/* int PINT_state_machine_start(void *, job_status_s *ret); */
 int PINT_state_machine_complete(void *);
 
 /* This macro returns the state machine string of the current machine.
@@ -148,9 +156,9 @@ int PINT_state_machine_complete(void *);
 /* Prototypes for functions defined in by state machine code */
 int PINT_state_machine_halt(void);
 int PINT_state_machine_terminate(struct PINT_smcb *, job_status_s *);
-int PINT_state_machine_next(struct PINT_smcb *,job_status_s *);
-int PINT_state_machine_invoke(struct PINT_smcb *, job_status_s *);
-int PINT_state_machine_start(struct PINT_smcb *, job_status_s *);
+PINT_sm_action PINT_state_machine_next(struct PINT_smcb *,job_status_s *);
+PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *, job_status_s *);
+PINT_sm_action PINT_state_machine_start(struct PINT_smcb *, job_status_s *);
 int PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
 int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
 int PINT_smcb_op(struct PINT_smcb *smcb);
