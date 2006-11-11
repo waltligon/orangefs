@@ -360,7 +360,6 @@ typedef struct
 {
     PVFS_object_ref refn;
     char *link_target;
-    uint64_t directory_version;
     /*
      * Reading/Writing Extended attributes need to acquire the appropriate
      * reader/writer semaphore on the pvfs2_inode_t structure.
@@ -735,6 +734,7 @@ void fsid_key_table_finalize(void);
 /****************************
  * defined in inode.c
  ****************************/
+int pvfs2_set_inode(struct inode *inode, void *data);
 uint32_t convert_to_pvfs2_mask(unsigned long lite_mask);
 struct inode *pvfs2_get_custom_inode_common(
     struct super_block *sb,

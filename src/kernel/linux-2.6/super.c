@@ -250,13 +250,18 @@ static void pvfs2_read_inode(
     struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = NULL;
+    void *ptr = NULL;
 
+#if !defined(HAVE_IGET4_LOCKED) && !defined(HAVE_IGET_LOCKED)
     if (inode->u.generic_ip)
     {
         gossip_err("ERROR! Found an initialized inode in pvfs2_read_inode! "
                     "Should not have been initialized?\n");
         return;
     }
+#else
+    ptr = inode->u.generic_ip;
+#endif
 
     /* Here we allocate the PVFS2 specific inode structure */
     pvfs2_inode = pvfs2_inode_alloc();
@@ -266,7 +271,15 @@ static void pvfs2_read_inode(
         inode->u.generic_ip = pvfs2_inode;
         pvfs2_inode->vfs_inode = inode;
         inode->i_flags &= ~(S_APPEND|S_IMMUTABLE|S_NOATIME);
-
+        /* Initialize the handle id to be looked up in the case of iget4_locked
+         * and iget_locked functions, since they are not done elsewhere 
+         */
+#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET_LOCKED)
+        if (ptr == NULL) {
+            gossip_err("Warning! We don't have the reference to the pvfs2 object handle.. using iget4/iget(locked) interface\n");
+        }
+        pvfs2_set_inode(inode, ptr);
+#endif
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
             pvfs2_make_bad_inode(inode);
