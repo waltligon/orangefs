@@ -369,13 +369,18 @@ static inline ino_t pvfs2_handle_hash(PVFS_object_ref *ref)
 /* the ->set callback of iget5_locked and friends. Sorta equivalent to the ->read_inode()
  * callback if we are using iget and friends 
  */
-static int pvfs2_set_inode(struct inode *inode, void *data)
+int pvfs2_set_inode(struct inode *inode, void *data)
 {
     /* callbacks to set inode number handle */
     PVFS_object_ref *ref = (PVFS_object_ref *) data;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
+    /* Make sure that we have sane parameters */
+    if (!data || !inode)
+        return 0;
     pvfs2_inode = PVFS2_I(inode);
+    if (!pvfs2_inode)
+        return 0;
     pvfs2_inode_initialize(pvfs2_inode);
     pvfs2_inode->refn.fs_id  = ref->fs_id;
     pvfs2_inode->refn.handle = ref->handle;
@@ -443,6 +448,21 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
         if (inode && (inode->i_state & I_NEW))
         {
             inode->i_ino = hash; /* needed for stat etc */
+            /* iget4_locked and iget_locked dont invoke the set_inode callback.
+             * So we work around that by stashing the pvfs object reference
+             * in the inode specific private part for 2.4 kernels and invoking
+             * the setcallback explicitly for 2.6 kernels.
+             */
+#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET_LOCKED)
+            if (PVFS2_I(inode)) {
+                pvfs2_set_inode(inode, ref);
+            } 
+            else {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+                inode->u.generic_ip = (void *) ref;
+#endif
+            }
+#endif
             /* issue a call to read the inode */
             sb->s_op->read_inode(inode);
             unlock_new_inode(inode);
