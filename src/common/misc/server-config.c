@@ -542,12 +542,12 @@ static const configoption_t options[] =
      /* Specifies the timeout value in seconds for BMI jobs on the server.
       */
      {"ServerJobBMITimeoutSecs",ARG_INT, get_server_job_bmi_timeout,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL, "30"},
+         CTX_DEFAULTS|CTX_GLOBAL, "300"},
      
      /* Specifies the timeout value in seconds for TROVE jobs on the server.
       */
      {"ServerJobFlowTimeoutSecs",ARG_INT, get_server_job_flow_timeout,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL, "30"},
+         CTX_DEFAULTS|CTX_GLOBAL, "300"},
      
      /* Specifies the timeout value in seconds for BMI jobs on the client.
       */
