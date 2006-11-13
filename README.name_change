@@ -1,0 +1,12 @@
+
+As of pvfs release 2.6.0, the name of the package has been changed from
+'pvfs2' to 'pvfs' (removed the '2').  The release version now carries the
+'2', and the major and minor version numbers remain semantically the same
+as before.  The sequence of releases looks like this:
+
+pvfs2 1.5.0
+pvfs2 1.5.1
+pvfs  2.6.0
+pvfs  2.x.x
+...
+
