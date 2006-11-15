@@ -2026,6 +2026,7 @@ static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
     return fs_conf->trove_method;
 }
 
+#ifndef GOSSIP_DISABLE_DEBUG
 void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
@@ -2063,6 +2064,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
         va_end(ap);
     }
 }
+#endif
 
 /*
  * PINT_map_server_op_to_string()
