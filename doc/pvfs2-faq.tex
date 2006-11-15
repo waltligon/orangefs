@@ -662,6 +662,7 @@ the page-cache and thus there is a real possibility of the data being served sta
 Therefore users of the {\tt sendfile} system call are warned to be wary of this detail.
 
 \subsection{Trove-dbpf metadata format version mismatch!}
+\label{sec:trove-migration}
 
 In PVFS2-1.5.0 or newer the format of the metadata storage has change from
 previous versions (1.4.0 or earlier).  This affects users that have created
@@ -1003,6 +1004,7 @@ Not at this time, no.
 
 \subsection{Why does df show less free space than I think it should? What
             can I do about that?}
+\label{sec:df-free-space}
 
 PVFS2 uses a particular algorithm for calculating the free space on a file
 system that takes the minimum amount of space free on a single server and
