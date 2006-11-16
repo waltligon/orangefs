@@ -405,12 +405,6 @@ int PINT_thread_mgr_trove_start(void)
 	gen_mutex_unlock(&trove_mutex);
 	return(ret);
     }
-#else
-    ret = 0;
-    assert(0);
-#endif
-
-    trove_thread_running = 1;
 #ifdef __PVFS2_JOB_THREADED__
     ret = pthread_create(&trove_thread_id, NULL, trove_thread_function, NULL);
     if(ret != 0)
@@ -421,7 +415,13 @@ int PINT_thread_mgr_trove_start(void)
 	/* TODO: convert error code */
 	return(-ret);
     }
-#endif
+#endif /* PVFS2_JOB_THREADED */
+#else
+    ret = 0;
+    assert(0);
+#endif /* PVFS2_TROVE_SUPPORT */
+
+    trove_thread_running = 1;
     trove_thread_ref_count++;
 
     gen_mutex_unlock(&trove_mutex);
