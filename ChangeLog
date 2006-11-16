@@ -4,6 +4,8 @@ PVFS2 Release ChangeLog
 
 pvfs-2.6.0
 ==============
+* kernel module cleanups
+* appropriate support for 64bit handles in kernel module
 * added debugs for kernel to pvfs2-debug.h
 * added offsetof macro
 * added PVFS_U_SUID (root squash)
@@ -42,14 +44,11 @@ pvfs-2.6.0
 * add connection close to bmi for resetting the socket buffer size for initial
 socket
 * atime, mtime, and ctime fixes for VFS interface
-* ib? [maybe Pete can fill this one in..]
-    - check for ib reregister event
 * verify hash of config files
     - added openssl options and checks
 * updated faq entry for heartbeat
 * config check for linux/mount.h
 * config check that statfs callback has struct dentry arg
-* root squash
 * LTP fixes to pass tests
     - s/EOPNOTSUPP/EACCES/
     - acl fixes
