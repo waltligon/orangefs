@@ -725,16 +725,8 @@ ssize_t pvfs2_file_read(
     rw.dest.address.nr_segs = 1;
     rw.off.io.offset = offset;
 
-    if (IS_IMMUTABLE(rw.inode)) 
-    {
-        rw.readahead_size = (rw.inode)->i_size;
-        return generic_file_read(file, buf, count, offset);
-    }
-    else 
-    {
-        rw.readahead_size = 0;
-        return do_direct_readv_writev(&rw);
-    }
+    rw.readahead_size = 0;
+    return do_direct_readv_writev(&rw);
 }
 
 /** Write data from a contiguous user buffer into a file at a specified
@@ -767,6 +759,7 @@ static ssize_t pvfs2_file_write(
     return do_direct_readv_writev(&rw);
 }
 
+#ifdef HAVE_READV_FILE_OPERATIONS
 /** Reads data to several contiguous user buffers (an iovec) from a file at a
  * specified offset.
  */
@@ -794,7 +787,9 @@ static ssize_t pvfs2_file_readv(
     rw.readahead_size = 0;
     return do_direct_readv_writev(&rw);
 }
+#endif
 
+#ifdef HAVE_WRITEV_FILE_OPERATIONS
 /** Write data from a several contiguous user buffers (an iovec) into a file at
  * a specified offset.
  */
@@ -822,6 +817,7 @@ static ssize_t pvfs2_file_writev(
 
     return do_direct_readv_writev(&rw);
 }
+#endif
 
 
 /* Construct a trailer of <file offsets, length pairs> in a buffer that we
@@ -2064,12 +2060,32 @@ out_error:
     return error;
 }
 
+#ifdef HAVE_AIO_NEW_AIO_SIGNATURE
+static ssize_t 
+pvfs2_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
+        unsigned long n_segs, loff_t offset)
+#else
 static ssize_t 
 pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
         size_t count, loff_t offset)
+#endif
 {
     struct rw_options rw;
+    struct iovec *pvec;
+    unsigned long nr_segs;
+
+#ifndef HAVE_AIO_NEW_AIO_SIGNATURE
     struct iovec vec;
+
+    vec.iov_base = (char __user *) buffer;
+    vec.iov_len  = count;
+    pvec = (struct iovec *) &vec;
+    nr_segs = 1;
+#else
+    pvec = (struct iovec *) iov;
+    nr_segs = n_segs;
+#endif
+    
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
     rw.type = IO_READ;
@@ -2078,8 +2094,6 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     rw.copy_to_user = 1;
     rw.fnstr = __FUNCTION__;
     rw.iocb = iocb;
-    vec.iov_base = (char __user *) buffer;
-    vec.iov_len  = count;
     rw.file = iocb->ki_filp;
     if (!rw.file || !(rw.file)->f_mapping)
     {
@@ -2087,27 +2101,38 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     }
     rw.inode = (rw.file)->f_mapping->host;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
-    rw.dest.address.iov = &vec;
-    rw.dest.address.nr_segs = 1;
+    rw.dest.address.iov = pvec;
+    rw.dest.address.nr_segs = nr_segs;
 
-    if (IS_IMMUTABLE(rw.inode)) 
-    {
-        rw.readahead_size = (rw.inode)->i_size;
-        return generic_file_aio_read(iocb, buffer, count, offset);
-    }
-    else 
-    {
-        rw.readahead_size = 0;
-        return do_direct_aio_read_write(&rw);
-    }
+    rw.readahead_size = 0;
+    return do_direct_aio_read_write(&rw);
 }
 
+#ifdef HAVE_AIO_NEW_AIO_SIGNATURE
+static ssize_t 
+pvfs2_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
+        unsigned long n_segs, loff_t offset)
+#else
 static ssize_t 
 pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
         size_t count, loff_t offset)
+#endif
 {
     struct rw_options rw;
+    struct iovec *pvec;
+    unsigned long nr_segs;
+
+#ifndef HAVE_AIO_NEW_AIO_SIGNATURE
     struct iovec vec;
+
+    vec.iov_base = (char __user *) buffer;
+    vec.iov_len  = count;
+    pvec = (struct iovec *) &vec;
+    nr_segs = 1;
+#else
+    pvec = (struct iovec *) iov;
+    nr_segs = n_segs;
+#endif
 
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
@@ -2118,8 +2143,6 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     rw.copy_to_user = 1;
     rw.fnstr = __FUNCTION__;
     rw.iocb = iocb;
-    vec.iov_base = (char __user *) buffer;
-    vec.iov_len  = count;
     rw.file = iocb->ki_filp;
     if (!rw.file || !(rw.file)->f_mapping)
     {
@@ -2127,8 +2150,8 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     }
     rw.inode = (rw.file)->f_mapping->host;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
-    rw.dest.address.iov = &vec;
-    rw.dest.address.nr_segs = 1;
+    rw.dest.address.iov = pvec;
+    rw.dest.address.nr_segs = nr_segs;
     return do_direct_aio_read_write(&rw);
 }
 
@@ -2448,8 +2471,12 @@ struct file_operations pvfs2_file_operations =
     llseek : pvfs2_file_llseek,
     read : pvfs2_file_read,
     write : pvfs2_file_write,
+#ifdef HAVE_READV_FILE_OPERATIONS
     readv : pvfs2_file_readv,
+#endif
+#ifdef HAVE_WRITEV_FILE_OPERATIONS
     writev : pvfs2_file_writev,
+#endif
     ioctl : pvfs2_ioctl,
     mmap : pvfs2_file_mmap,
     open : pvfs2_file_open,
@@ -2459,8 +2486,12 @@ struct file_operations pvfs2_file_operations =
     .llseek = pvfs2_file_llseek,
     .read = pvfs2_file_read,
     .write = pvfs2_file_write,
+#ifdef HAVE_READV_FILE_OPERATIONS
     .readv = pvfs2_file_readv,
+#endif
+#ifdef HAVE_WRITEV_FILE_OPERATIONS
     .writev = pvfs2_file_writev,
+#endif
 #ifdef HAVE_AIO_VFS_SUPPORT
     .aio_read = pvfs2_file_aio_read,
     .aio_write = pvfs2_file_aio_write,
