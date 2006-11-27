@@ -8,7 +8,7 @@
 #   - please don't cheat and run this as root: will not catch permissions bugs
 
 # modify these variables
-export PVFS2_DEST=/tmp/pvfs2-nightly
+export PVFS2_DEST=${HOME}/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
@@ -45,7 +45,7 @@ pull_and_build_pvfs2 () {
 	mkdir -p $PVFS2_DEST
 	with_kernel=""
 	if  [ $do_vfs -eq 1 ] ; then
-		with_kernel="-k /lib/modules/`uname -r`/build"
+		with_kernel="-k /usr/src/linux-headers-`uname -r`"
 	fi
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
@@ -145,7 +145,8 @@ buildfail() {
 	cat ${PVFS2_DEST}/configure-${CVS_TAG}.log \
 		${PVFS2_DEST}/make-extracted-${CVS_TAG}.log \
 		${PVFS2_DEST}/make-install-${CVS_TAG}.log \
-		${PVFS2_DEST}/make-${CVS_TAG}.log | \
+		${PVFS2_DEST}/make-${CVS_TAG}.log \
+		${PVFS2_DEST}/make-test-${CVS_TAG}.log | \
 		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} build_failed $STARTTIME 
 	exit 1
 }
