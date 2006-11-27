@@ -33,10 +33,12 @@
 #endif
 
 #define MAX_LENGTH 128
+/* the _syscallXX apprroach is not portable. instead, we'll use syscall and
+ * sadly forego any type checking.  For reference, here are the prototypes for
+ * the system calls 
 static long openfh(const void *, size_t);
 static long openg(const char *, void *, size_t *, int, int);
-_syscall2(long, openfh, const void *, uhandle, size_t, handle_len);
-_syscall5(long, openg, const char *, pathname, void *, uhandle, size_t *, uhandle_len, int, flags, int, mode);
+*/
 
 static inline double msec_diff(double *end, double *begin)
 {
@@ -131,7 +133,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	begin = Wtime();
-	err = openg(fname, ptr, &len, O_RDONLY, 0775);
+	err = syscall(__NR_openg, fname, ptr, &len, O_RDONLY, 0775);
 	if (err < 0) {
 		perror("openg(2) error:");
 		exit(1);
@@ -141,7 +143,7 @@ int main(int argc, char *argv[])
 				fname, (unsigned long) len, msec_diff(&end, &begin));
 	muck_with_buffer(ptr, len, muck_options);
 	begin = Wtime();
-	fd = openfh(ptr, len);
+	fd = syscall(__NR_openfh, ptr, len);
 	if (fd < 0) {
 		fprintf(stderr, "openfh failed: %s\n", strerror(errno));
 		free(ptr);

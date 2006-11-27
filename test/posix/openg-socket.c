@@ -35,10 +35,12 @@
 #define __NR_openfh 274
 #endif
 
+/* the _syscallXX apprroach is not portable. instead, we'll use syscall and
+ * sadly forego any type checking.  For reference, here are the prototypes for
+ * the system calls 
 static long openfh(const void *, size_t);
 static long openg(const char *, void *, size_t *, int, int);
-_syscall2(long, openfh, const void *, uhandle, size_t, handle_len);
-_syscall5(long, openg, const char *, pathname, void *, uhandle, size_t *, uhandle_len, int, flags, int, mode);
+*/
 
 static inline double usec_diff(double *end, double *begin)
 {
@@ -179,6 +181,15 @@ int main(int argc, char *argv[])
 	double begin, end;
 	enum muck_options_t muck_options = DONT_MUCK;
 
+#ifndef __NR_openg 
+	printf("This kernel does not support the openg() extension\n");
+	exit(-1);
+#endif
+#ifndef __NR_openfh
+	printf("This kernel does not support the openfh() extension\n");
+	exit(-1);
+#endif
+
 	while ((c = getopt(argc, argv, opt)) != EOF) {
 		switch (c) {
 			case 's':
@@ -230,7 +241,7 @@ int main(int argc, char *argv[])
 	/* if I am the client, openg the file and send a packet */
 	else {
 		begin = Wtime();
-		err = openg(fname, ptr, &len, O_RDONLY, 0775);
+		err = syscall(__NR_openg, fname, ptr, &len, O_RDONLY, 0775);
 		end = Wtime();
 		if (err < 0) {
 			perror("openg error:");
@@ -243,7 +254,7 @@ int main(int argc, char *argv[])
 	/* muck with buffer if need be */
 	muck_with_buffer(ptr, len, muck_options);
 	begin = Wtime();
-	fd = openfh(ptr, len);
+	fd = syscall(__NR_openfh, ptr, len);
 	end = Wtime();
 	if (fd < 0) {
 		fprintf(stderr, "openfh failed: %s\n", strerror(errno));
