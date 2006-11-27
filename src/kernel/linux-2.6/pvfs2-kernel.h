@@ -20,7 +20,9 @@
 #ifndef __PVFS2KERNEL_H
 #define __PVFS2KERNEL_H
 
+#ifdef HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H
 #include <linux/config.h>
+#endif
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 
