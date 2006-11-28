@@ -122,8 +122,7 @@ retry:
         ret = dbenv->open(dbenv, path, 
                           DB_INIT_MPOOL|
                           DB_CREATE|
-                          DB_THREAD|
-                          DB_INIT_CDB, 
+                          DB_THREAD, 
                           0);
         if(ret != 0)
         {
@@ -150,8 +149,7 @@ retry:
                           DB_INIT_MPOOL|
                           DB_CREATE|
                           DB_THREAD|
-                          DB_SYSTEM_MEM|
-                          DB_INIT_CDB, 
+                          DB_SYSTEM_MEM, 
                           0);
         /* In some cases (oddly configured systems with pvfs2-server running as
          * non-root) DB_SYSTEM_MEM, which uses sysV shared memory, can fail

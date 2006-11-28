@@ -100,6 +100,9 @@ static inline void organize_post_op_statistics(
     }
 }
 
+static int dbpf_dspace_remove_keyval(
+    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p);
@@ -437,7 +440,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
         NULL,
         &count,
         TROVE_ITERATE_START,
-        PINT_dbpf_keyval_remove);
+        dbpf_dspace_remove_keyval);
     if(ret != 0 && ret != -TROVE_ENOENT)
     {
         goto return_error;
@@ -461,6 +464,22 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 
 return_error:
     return ret;
+}
+
+static int dbpf_dspace_remove_keyval(
+    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val)
+{
+    int ret;
+    DBC * dbc_p = (DBC *)args;
+
+    ret = dbc_p->c_del(dbc_p, 0);
+    if(ret != 0)
+    {
+        ret = -dbpf_db_error_to_trove_error(ret);
+    }
+
+    return ret;
+
 }
 
 static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,

@@ -165,7 +165,7 @@ struct dbpf_aio_ops
 };
 
 typedef int (* PINT_dbpf_keyval_iterate_callback)(
-    DB * db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+    void *, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
@@ -176,9 +176,6 @@ int PINT_dbpf_keyval_iterate(
     int *count,
     TROVE_ds_position pos,
     PINT_dbpf_keyval_iterate_callback callback);
-
-int PINT_dbpf_keyval_remove(
-    DB *db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 struct dbpf_storage
 {
