@@ -59,7 +59,9 @@ extern int synccount;
  * symlink       COMMON      "st"                      Target Handle
  * directory     COMMON      "de"                      Entries Handle
  * dir-ent       COMPONENT   <component name>          Entry Handle
- * ALL           XATTR       <extended attribute name> <extended attribute content>
+ * [metafile, 
+ *  symlink, 
+ *  directory]   XATTR       <extended attribute name> <extended attribute content>
  *
  * The descriptions for the common keys are:
  *
