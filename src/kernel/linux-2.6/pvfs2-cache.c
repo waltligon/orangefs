@@ -48,12 +48,7 @@ int op_cache_initialize(void)
 
 int op_cache_finalize(void)
 {
-    int ret = 0;
-#ifdef HAVE_INT_RETURN_KMEM_CACHE_DESTROY
-    ret =
-#endif
-    kmem_cache_destroy(op_cache);
-    if (ret != 0)
+    if (kmem_cache_destroy(op_cache) != 0)
     {
         gossip_err("Failed to destroy pvfs2_op_cache\n");
         return -EINVAL;
@@ -217,12 +212,7 @@ int dev_req_cache_initialize(void)
 
 int dev_req_cache_finalize(void)
 {
-    int ret = 0;
-#ifdef HAVE_INT_RETURN_KMEM_CACHE_DESTROY
-    ret =
-#endif
-    kmem_cache_destroy(dev_req_cache);
-    if (ret != 0)
+    if (kmem_cache_destroy(dev_req_cache) != 0)
     {
         gossip_err("Failed to destroy pvfs2_devreqcache\n");
         return -EINVAL;
@@ -336,7 +326,6 @@ int pvfs2_inode_cache_initialize(void)
 
 int pvfs2_inode_cache_finalize(void)
 {
-    int ret = 0;
     if (!list_empty(&pvfs2_inode_list))
     {
         gossip_err("pvfs2_inode_cache_finalize: WARNING: releasing unreleased pvfs2 inode objects!\n");
@@ -347,11 +336,7 @@ int pvfs2_inode_cache_finalize(void)
             kmem_cache_free(pvfs2_inode_cache, pinode);
         }
     }
-#ifdef HAVE_INT_RETURN_KMEM_CACHE_DESTROY
-    ret =
-#endif
-    kmem_cache_destroy(pvfs2_inode_cache);
-    if (ret != 0) 
+    if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
     {
         gossip_err("Failed to destroy pvfs2_inode_cache\n");
         return -EINVAL;
@@ -428,12 +413,7 @@ int kiocb_cache_initialize(void)
 
 int kiocb_cache_finalize(void)
 {
-    int ret = 0;
-#ifdef HAVE_INT_RETURN_KMEM_CACHE_DESTROY
-    ret =
-#endif
-    kmem_cache_destroy(pvfs2_kiocb_cache);
-    if (ret != 0)
+    if (kmem_cache_destroy(pvfs2_kiocb_cache) != 0)
     {
         gossip_err("Failed to destroy pvfs2_devreqcache\n");
         return -EINVAL;
