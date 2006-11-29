@@ -297,6 +297,7 @@ int client_state_machine_terminate(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_state_machine_terminate smcb %p\n",smcb);
 
+    PINT_smcb_set_complete(smcb);
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
             (cancelled_io_jobs_are_pending(smcb))))

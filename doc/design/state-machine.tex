@@ -32,8 +32,14 @@ various options by way of example:
 
 static PINT_sm_action state_action_1 (
     struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action state_action_3 (
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action state_action_4 (
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 /* helper functions and other declarations go here too */
+
+#define RETVAL 1
 
 %%
 
@@ -47,27 +53,31 @@ machine my_machine_sm (
     state state_1
 	 {
 	     run state_action_1;
-		  default => state_2;
+		  success => state_2;  /* success is return value 0 */
+		  default => state_4;
 	 }
 
 	 state state_2
 	 {
 	     jump a_nested_state_machine_sm;
-		  default => 3;
+		  RETVAL => state_3;
 	 }
 
 	 state state_3
 	 {
 	     pjmp state_action_3
 		  {
+		      /* values here are set up in state_action_3 */
 		      4 => parallel_state_machine_1;
 		      3 => parallel_state_machine_2;
+		      RETVAL => parallel_state_machine_3;
 		  }
-		  default => 4;
+		  default => state_4;
 	 }
 
 	 state state_4
 	 {
+	     /* this state action cleans up after the pjmp */
 	     run state_action_4;
 		  default => terminate;
 	 }
