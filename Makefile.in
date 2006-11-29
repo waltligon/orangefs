@@ -670,6 +670,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 $(KERNAPPS): %: %.o $(LIBRARIES)
+$(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 
 # target for building _just_ the statecomp tool
 #statecomp: $(STATECOMP)
