@@ -12,8 +12,10 @@ export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
-
-[ -f nightly-tests.cfg ] && . nightly-tests.cfg
+# look for a 'nightly-test.cfg' in the same directory as this script
+if [ -f $(cd `dirname $0`; pwd)/nightly-tests.cfg ] ; then 
+	. $(cd `dirname $0`; pwd)/nightly-tests.cfg
+fi
 
 
 # need to make this a command line arugment:
@@ -92,7 +94,7 @@ teardown_vfs() {
 
 setup_vfs() {
 	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
-	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client 
+	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
 		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
 		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
