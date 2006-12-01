@@ -303,6 +303,7 @@ ifdef BUILD_IB
     IBLIBS := -L@IB_LIBDIR@ \
 	      -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
     LIBS += $(IBLIBS)
+    LIBS_THREADED += $(IBLIBS)
     SERVERLIBS += $(IBLIBS)
 endif
 
