@@ -164,9 +164,6 @@
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
 
-/* Define to 1 if you have the <mntent.h,> header file. */
-#undef HAVE_MNTENT_H_
-
 /* Use the MPE profiling library */
 #undef HAVE_MPE
 
@@ -311,10 +308,10 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of `long int', as computed by sizeof. */
+/* The size of a `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of `void *', as computed by sizeof. */
+/* The size of a `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */
