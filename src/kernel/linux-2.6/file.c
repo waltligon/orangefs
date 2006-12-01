@@ -629,8 +629,6 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
         /* and push the I/O through */
-	gossip_err("calling wait_for_io: seg_array[%lu] = %lu\n",
-			seg, seg_array[seg]);
         ret = wait_for_io(rw, ptr, seg_array[seg], each_count);
         if (ret < 0)
         {
