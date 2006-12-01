@@ -548,21 +548,21 @@ int pvfs_bufmap_copy_iovec_from_user(
 
         if (iv->iov_len < (PAGE_SIZE - page_offset)) 
         {
-            cur_copy_size = iv->iov_len;
+            cur_copy_size = PVFS_util_min(iv->iov_len, size - amt_copied);
             seg++;
             from_addr = iv->iov_base;
             inc_index = 0;
         }
         else if (iv->iov_len == (PAGE_SIZE - page_offset))
         {
-            cur_copy_size = iv->iov_len;
+            cur_copy_size = PVFS_util_min(iv->iov_len, size - amt_copied);
             seg++;
             from_addr = iv->iov_base;
             inc_index = 1;
         }
         else 
         {
-            cur_copy_size = (PAGE_SIZE - page_offset);
+            cur_copy_size = PVFS_util_min(PAGE_SIZE - page_offset, size - amt_copied);
             from_addr = iv->iov_base;
             iv->iov_base += cur_copy_size;
             iv->iov_len -= cur_copy_size;
@@ -671,21 +671,21 @@ int pvfs_bufmap_copy_iovec_from_kernel(
 
         if (iv->iov_len < (PAGE_SIZE - page_offset)) 
         {
-            cur_copy_size = iv->iov_len;
+            cur_copy_size = PVFS_util_min(iv->iov_len, size - amt_copied);
             seg++;
             from_kaddr = iv->iov_base;
             inc_index = 0;
         }
         else if (iv->iov_len == (PAGE_SIZE - page_offset))
         {
-            cur_copy_size = iv->iov_len;
+            cur_copy_size = PVFS_util_min(iv->iov_len, size - amt_copied);
             seg++;
             from_kaddr = iv->iov_base;
             inc_index = 1;
         }
         else 
         {
-            cur_copy_size = (PAGE_SIZE - page_offset);
+            cur_copy_size = PVFS_util_min(PAGE_SIZE - page_offset, size - amt_copied);
             from_kaddr = iv->iov_base;
             iv->iov_base += cur_copy_size;
             iv->iov_len -= cur_copy_size;
@@ -784,21 +784,21 @@ int pvfs_bufmap_copy_to_user_iovec(
 
         if (iv->iov_len < (PAGE_SIZE - page_offset))
         {
-            cur_copy_size = iv->iov_len;
+            cur_copy_size = PVFS_util_min(iv->iov_len, size - amt_copied);
             seg++;
             to_addr = iv->iov_base;
             inc_index = 0;
         }
         else if (iv->iov_len == (PAGE_SIZE - page_offset))
         {
-            cur_copy_size = iv->iov_len;
+            cur_copy_size = PVFS_util_min(iv->iov_len, size - amt_copied);
             seg++;
             to_addr = iv->iov_base;
             inc_index = 1;
         }
         else 
         {
-            cur_copy_size = (PAGE_SIZE - page_offset);
+            cur_copy_size = PVFS_util_min(PAGE_SIZE - page_offset, size - amt_copied);
             to_addr = iv->iov_base;
             iv->iov_base += cur_copy_size;
             iv->iov_len  -= cur_copy_size;
@@ -904,21 +904,21 @@ int pvfs_bufmap_copy_to_kernel_iovec(
 
         if (iv->iov_len < (PAGE_SIZE - page_offset))
         {
-            cur_copy_size = iv->iov_len;
+            cur_copy_size = PVFS_util_min(iv->iov_len, size - amt_copied);
             seg++;
             to_kaddr = iv->iov_base;
             inc_index = 0;
         }
         else if (iv->iov_len == (PAGE_SIZE - page_offset))
         {
-            cur_copy_size = iv->iov_len;
+            cur_copy_size = PVFS_util_min(iv->iov_len, size - amt_copied);
             seg++;
             to_kaddr = iv->iov_base;
             inc_index = 1;
         }
         else 
         {
-            cur_copy_size = (PAGE_SIZE - page_offset);
+            cur_copy_size = PVFS_util_min(PAGE_SIZE - page_offset, size - amt_copied);
             to_kaddr = iv->iov_base;
             iv->iov_base += cur_copy_size;
             iv->iov_len  -= cur_copy_size;

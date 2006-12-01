@@ -151,7 +151,7 @@ struct rw_options {
  * @total_size - total expected size of the I/O operation
  */
 static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
-        int nr_segs, size_t total_size)
+        unsigned long nr_segs, size_t total_size)
 {
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
@@ -160,7 +160,7 @@ static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
     if (!rw || !vec || nr_segs < 0 || total_size <= 0 
             || !rw->pvfs2_inode || !rw->inode || !rw->fnstr)
     {
-        gossip_lerr("invalid parameters (rw: %p, vec: %p, nr_segs: %d, "
+        gossip_lerr("invalid parameters (rw: %p, vec: %p, nr_segs: %lu, "
                 "total_size: %zd)\n", rw, vec, nr_segs, total_size);
         ret = -EINVAL;
         goto out;
@@ -191,7 +191,7 @@ static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
     new_op->upcall.req.io.count = total_size;
     new_op->upcall.req.io.offset = *(rw->off.io.offset);
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %u, "
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %lu, "
             "offset: %llu total_size: %zd\n", rw->fnstr, rw->copy_to_user, 
             nr_segs, llu(*(rw->off.io.offset)), total_size);
     if (rw->type == IO_WRITEV)
@@ -319,15 +319,18 @@ out:
  * The max_new_nr_segs value is computed by the caller and returned.
  * (It will be (count of all iov_len/ block_size) + 1).
  */
-static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
+static int split_iovecs(
+	unsigned long max_new_nr_segs,      /* IN */
         unsigned long nr_segs,              /* IN */
         const struct iovec *original_iovec, /* IN */
-        unsigned long *new_nr_segs, struct iovec **new_vec,  /* OUT */
-        unsigned int *seg_count, unsigned int **seg_array)   /* OUT */
+        unsigned long *new_nr_segs, 	    /* OUT */
+	struct iovec **new_vec,  	    /* OUT */
+        unsigned long *seg_count,           /* OUT */
+	unsigned long **seg_array)   	    /* OUT */
 {
-    int seg, count = 0, begin_seg, tmpnew_nr_segs = 0;
+    unsigned long seg, count = 0, begin_seg, tmpnew_nr_segs = 0;
     struct iovec *new_iovec = NULL, *orig_iovec;
-    unsigned int *sizes = NULL, sizes_count = 0;
+    unsigned long *sizes = NULL, sizes_count = 0;
 
     if (nr_segs <= 0 || original_iovec == NULL 
             || new_nr_segs == NULL || new_vec == NULL
@@ -358,8 +361,8 @@ static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
                 (unsigned long)(max_new_nr_segs * sizeof(struct iovec)));
         return -ENOMEM;
     }
-    sizes = (int *) kmalloc(max_new_nr_segs * sizeof(int), 
-            PVFS2_BUFMAP_GFP_FLAGS);
+    sizes = (unsigned long *) kmalloc(max_new_nr_segs * sizeof(unsigned long), 
+		    PVFS2_BUFMAP_GFP_FLAGS);
     if (sizes == NULL)
     {
         kfree(new_iovec);
@@ -381,7 +384,7 @@ repeat:
             kfree(sizes);
             kfree(orig_iovec);
             kfree(new_iovec);
-            gossip_err("split_iovecs: exceeded the index limit (%d)\n", 
+            gossip_err("split_iovecs: exceeded the index limit (%lu)\n", 
                     tmpnew_nr_segs);
             return -EINVAL;
         }
@@ -469,8 +472,9 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
     size_t count;
     struct iovec *iov;
     unsigned long nr_segs, seg, new_nr_segs = 0;
-    long max_new_nr_segs = 0;
-    unsigned int  seg_count = 0, *seg_array = NULL;
+    unsigned long max_new_nr_segs = 0;
+    unsigned long  seg_count = 0;
+    unsigned long *seg_array = NULL;
     struct iovec *iovecptr = NULL, *ptr = NULL;
     loff_t *offset;
 
@@ -508,14 +512,14 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
     nr_segs = rw->dest.address.nr_segs;
     if (iov == NULL || nr_segs < 0)
     {
-        gossip_err("%s: Invalid iovec %p or nr_segs %ld\n",
+        gossip_err("%s: Invalid iovec %p or nr_segs %lu\n",
                 rw->fnstr, iov, nr_segs);
         goto out;
     }
     /* Compute total and max number of segments after split */
     if ((max_new_nr_segs = estimate_max_iovecs(iov, nr_segs, &count)) < 0)
     {
-        gossip_lerr("%s: could not estimate iovec %ld\n", rw->fnstr, max_new_nr_segs);
+        gossip_lerr("%s: could not estimate iovec %lu\n", rw->fnstr, max_new_nr_segs);
         goto out;
     }
     if (rw->type == IO_WRITEV)
@@ -565,9 +569,14 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
          * entries that will store the number of segments that straddle the
          * block-size boundaries.
          */
-        if ((ret = split_iovecs(max_new_nr_segs, nr_segs, iov, /* IN */
-                        &new_nr_segs, &iovecptr, /* OUT */
-                        &seg_count, &seg_array)  /* OUT */ ) < 0)
+        ret = split_iovecs(max_new_nr_segs, /* IN */
+			   nr_segs,         /* IN */
+			   iov,             /* IN */
+			   &new_nr_segs,    /* OUT */
+			   &iovecptr,       /* OUT */
+			   &seg_count,      /* OUT */
+			   &seg_array);     /* OUT */ 
+	if(ret < 0)
         {
             gossip_err("%s: Failed to split iovecs to satisfy larger "
                     " than blocksize readv/writev request %zd\n", rw->fnstr, ret);
@@ -586,7 +595,7 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
         /* There is only 1 element in the seg_array */
         seg_count = 1;
         /* and its value is the number of segments passed in */
-        seg_array = (unsigned int *) &nr_segs;
+        seg_array = &nr_segs;
         /* We dont have to free up anything */
         to_free = 0;
     }
@@ -594,7 +603,7 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
 
     gossip_debug(GOSSIP_FILE_DEBUG, "%s %zd@%llu\n", 
             rw->fnstr, count, llu(*offset));
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s: new_nr_segs: %lu, seg_count: %u\n", 
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s: new_nr_segs: %lu, seg_count: %lu\n", 
             rw->fnstr, new_nr_segs, seg_count);
 #ifdef PVFS2_KERNEL_DEBUG
     for (seg = 0; seg < new_nr_segs; seg++)
@@ -607,7 +616,7 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
     }
     for (seg = 0; seg < seg_count; seg++)
     {
-        gossip_debug(GOSSIP_FILE_DEBUG, "%s: %d) %u\n",
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: %d) %lu\n",
                 rw->fnstr, seg + 1, seg_array[seg]);
     }
 #endif
@@ -620,6 +629,8 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
         /* and push the I/O through */
+	gossip_err("calling wait_for_io: seg_array[%lu] = %lu\n",
+			seg, seg_array[seg]);
         ret = wait_for_io(rw, ptr, seg_array[seg], each_count);
         if (ret < 0)
         {
@@ -866,15 +877,18 @@ static int construct_file_offset_trailer(char **trailer,
  * The max_new_nr_segs value is computed by the caller and passed in.
  * (It will be (count of all xtv_len/ block_size) + 1).
  */
-static int split_xtvecs(unsigned long max_new_nr_segs,  /* IN */
-        unsigned long nr_segs,              /* IN */
-        const struct xtvec *original_xtvec, /* IN */
-        unsigned long *new_nr_segs, struct xtvec **new_vec,  /* OUT */
-        unsigned int *seg_count, unsigned int **seg_array)   /* OUT */
+static int split_xtvecs(
+		unsigned long max_new_nr_segs,      /* IN */
+		unsigned long nr_segs,              /* IN */
+		const struct xtvec *original_xtvec, /* IN */
+		unsigned long *new_nr_segs,         /* OUT */
+		struct xtvec **new_vec,  	    /* OUT */
+		unsigned long *seg_count,           /* OUT */
+		unsigned long **seg_array)          /* OUT */
 {
-    int seg, count, begin_seg, tmpnew_nr_segs;
+    unsigned long seg, count, begin_seg, tmpnew_nr_segs;
     struct xtvec *new_xtvec = NULL, *orig_xtvec;
-    unsigned int *sizes = NULL, sizes_count = 0;
+    unsigned long *sizes = NULL, sizes_count = 0;
 
     if (nr_segs <= 0 || original_xtvec == NULL 
             || new_nr_segs == NULL || new_vec == NULL
@@ -905,7 +919,7 @@ static int split_xtvecs(unsigned long max_new_nr_segs,  /* IN */
                 (unsigned long)(max_new_nr_segs * sizeof(struct xtvec)));
         return -ENOMEM;
     }
-    sizes = (unsigned int *) kmalloc(max_new_nr_segs * sizeof(unsigned int), 
+    sizes = (unsigned long *) kmalloc(max_new_nr_segs * sizeof(unsigned long), 
             PVFS2_BUFMAP_GFP_FLAGS);
     if (sizes == NULL)
     {
@@ -930,8 +944,8 @@ repeat:
             kfree(sizes);
             kfree(orig_xtvec);
             kfree(new_xtvec);
-            gossip_err("split_xtvecs: exceeded the index limit (%d)\n", 
-                    tmpnew_nr_segs);
+            gossip_err("split_xtvecs: exceeded the index limit (%lu)\n", 
+			    tmpnew_nr_segs);
             return -EINVAL;
         }
         if (count + orig_xtvec[seg].xtv_len < pvfs_bufmap_size_query())
@@ -1014,8 +1028,12 @@ estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, ssize_t *to
  * @xtvec - contains the file regions
  * @xtnr_segs - number of file vector regions
  */
-static ssize_t wait_for_iox(struct rw_options *rw, struct iovec *vec, int nr_segs,
-        struct xtvec *xtvec, int xtnr_segs, size_t total_size)
+static ssize_t wait_for_iox(struct rw_options *rw, 
+			    struct iovec *vec, 
+			    unsigned long nr_segs,
+			    struct xtvec *xtvec, 
+		            unsigned long xtnr_segs, 
+                            size_t total_size)
 {
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
@@ -1024,8 +1042,8 @@ static ssize_t wait_for_iox(struct rw_options *rw, struct iovec *vec, int nr_seg
     if (!rw || !vec || nr_segs < 0 || total_size <= 0
             || !xtvec || xtnr_segs < 0)
     {
-        gossip_lerr("invalid parameters (rw: %p, vec: %p, nr_segs: %d, "
-                "xtvec %p, xtnr_segs %d, total_size: %zd\n", rw, vec, nr_segs,
+        gossip_lerr("invalid parameters (rw: %p, vec: %p, nr_segs: %lu, "
+                "xtvec %p, xtnr_segs %lu, total_size: %zd\n", rw, vec, nr_segs,
                 xtvec, xtnr_segs, total_size);
         ret = -EINVAL;
         goto out;
@@ -1065,8 +1083,8 @@ static ssize_t wait_for_iox(struct rw_options *rw, struct iovec *vec, int nr_seg
                 "failure (%ld)\n", rw->fnstr, (long) ret);
         goto out;
     }
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %d, "
-            "xtnr_segs: %d "
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %lu, "
+            "xtnr_segs: %lu "
             "total_size: %zd\n",
             rw->fnstr, rw->copy_to_user, 
             nr_segs, xtnr_segs,
@@ -1193,10 +1211,10 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
     struct iovec *iov; 
     unsigned long seg, nr_segs, xtnr_segs;
     struct xtvec *xtvec; 
-    long max_new_nr_segs_mem, max_new_nr_segs_stream;
+    unsigned long max_new_nr_segs_mem, max_new_nr_segs_stream;
     unsigned long new_nr_segs_mem = 0, new_nr_segs_stream = 0;
-    unsigned int seg_count_mem, *seg_array_mem = NULL;
-    unsigned int seg_count_stream, *seg_array_stream = NULL;
+    unsigned long seg_count_mem, *seg_array_mem = NULL;
+    unsigned long seg_count_stream, *seg_array_stream = NULL;
     struct iovec *iovecptr = NULL, *ptr = NULL;
     struct xtvec *xtvecptr = NULL, *xptr = NULL;
 
@@ -1230,28 +1248,28 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
     nr_segs = rw->dest.address.nr_segs;
     if (iov == NULL || nr_segs < 0)
     {
-        gossip_err("%s: Invalid iovec %p or nr_segs %ld\n",
+        gossip_err("%s: Invalid iovec %p or nr_segs %lu\n",
                 rw->fnstr, iov, nr_segs);
         goto out;
     }
     /* Compute total and max number of segments after split of the memory vector */
     if ((max_new_nr_segs_mem = estimate_max_iovecs(iov, nr_segs, &count_mem)) < 0)
     {
-        gossip_lerr("%s: could not estimate iovec %ld\n", rw->fnstr, max_new_nr_segs_mem);
+        gossip_lerr("%s: could not estimate iovec %lu\n", rw->fnstr, max_new_nr_segs_mem);
         goto out;
     }
     xtvec = rw->off.iox.xtvec;
     xtnr_segs = rw->off.iox.xtnr_segs;
     if (xtvec == NULL || xtnr_segs < 0)
     {
-        gossip_err("%s: Invalid xtvec %p or xtnr_segs %ld\n",
+        gossip_err("%s: Invalid xtvec %p or xtnr_segs %lu\n",
                 rw->fnstr, xtvec, xtnr_segs);
         goto out;
     }
     /* Calculate the total stream length amd max segments after split of the stream vector */
     if ((max_new_nr_segs_stream = estimate_max_xtvecs(xtvec, xtnr_segs, &count_stream)) < 0)
     {
-        gossip_lerr("%s: could not estimate xtvec %ld\n", rw->fnstr, max_new_nr_segs_stream);
+        gossip_lerr("%s: could not estimate xtvec %lu\n", rw->fnstr, max_new_nr_segs_stream);
         goto out;
     }
     if (count_mem == 0)
@@ -1279,9 +1297,14 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
          * entries that will store the number of segments that straddle the
          * block-size boundaries.
          */
-        if ((ret = split_iovecs(max_new_nr_segs_mem, nr_segs, iov, /* IN */
-                        &new_nr_segs_mem, &iovecptr, /* OUT */
-                        &seg_count_mem, &seg_array_mem)  /* OUT */ ) < 0)
+        ret = split_iovecs(max_new_nr_segs_mem, /* IN */
+			   nr_segs, 		/* IN */
+			   iov, 		/* IN */
+			   &new_nr_segs_mem,    /* OUT */
+			   &iovecptr, 		/* OUT */
+			   &seg_count_mem, 	/* OUT */
+			   &seg_array_mem);     /* OUT */
+        if(ret < 0)
         {
             gossip_err("%s: Failed to split iovecs to satisfy larger "
                     " than blocksize readx request %ld\n", rw->fnstr, (long) ret);
@@ -1295,9 +1318,14 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
          * Split up the given xtvec description such that
          * no xtvec descriptor straddles over the block-size limitation.
          */
-        if ((ret = split_xtvecs(max_new_nr_segs_stream, xtnr_segs, xtvec, /* IN */
-                        &new_nr_segs_stream, &xtvecptr, /* OUT */
-                        &seg_count_stream, &seg_array_stream) /* OUT */) < 0)
+        ret = split_xtvecs(max_new_nr_segs_stream, /* IN */
+			   xtnr_segs,              /* IN */
+			   xtvec,  		   /* IN */
+                           &new_nr_segs_stream,    /* OUT */
+			   &xtvecptr, 		   /* OUT */
+                           &seg_count_stream,      /* OUT */
+			   &seg_array_stream);     /* OUT */
+        if(ret < 0)
         {
             gossip_err("Failed to split iovecs to satisfy larger "
                     " than blocksize readx request %ld\n", (long) ret);
@@ -1314,7 +1342,7 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
         /* There is only 1 element in the seg_array_mem */
         seg_count_mem = 1;
         /* and its value is the number of segments passed in */
-        seg_array_mem = (unsigned int *) &nr_segs;
+        seg_array_mem = &nr_segs;
         
         new_nr_segs_stream = xtnr_segs;
         /* use the given file description */
@@ -1322,7 +1350,7 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
         /* There is only 1 element in the seg_array_stream */
         seg_count_stream = 1;
         /* and its value is the number of segments passed in */
-        seg_array_stream = (unsigned int *) &xtnr_segs;
+        seg_array_stream = &xtnr_segs;
         /* We dont have to free up anything */
         to_free = 0;
     }
