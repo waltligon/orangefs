@@ -429,11 +429,11 @@ repeat:
     return 0;
 }
 
-static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs, ssize_t *total_count)
+static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs, size_t *total_count)
 {
     unsigned long i;
     long max_nr_iovecs;
-    ssize_t total, count;
+    size_t total, count;
 
     total = 0;
     count = 0;
@@ -988,11 +988,11 @@ repeat:
 }
 
 static long 
-estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, ssize_t *total_count)
+estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, size_t *total_count)
 {
     unsigned long i;
     long max_nr_xtvecs;
-    ssize_t total, count;
+    size_t total, count;
 
     total = 0;
     count = 0;
@@ -1202,7 +1202,8 @@ out:
 
 static ssize_t do_direct_readx_writex(struct rw_options *rw)
 {
-    ssize_t ret, total_count, count_mem, count_stream;
+    ssize_t ret, total_count;
+    size_t count_mem, count_stream;
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
     unsigned int to_free;
