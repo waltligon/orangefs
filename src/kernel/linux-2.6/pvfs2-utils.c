@@ -98,6 +98,24 @@ PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op)
     return fsid;
 }
 
+static void pvfs2_set_inode_flags(struct inode *inode, 
+        PVFS_sys_attr *attrs)
+{
+    if (attrs->flags & PVFS_IMMUTABLE_FL)
+        inode->i_flags |= S_IMMUTABLE;
+    else 
+        inode->i_flags &= ~S_IMMUTABLE;
+    if (attrs->flags & PVFS_APPEND_FL)
+        inode->i_flags |= S_APPEND;
+    else
+        inode->i_flags &= ~S_APPEND;
+    if (attrs->flags & PVFS_NOATIME_FL)
+        inode->i_flags |= S_NOATIME;
+    else
+        inode->i_flags &= ~S_NOATIME;
+    return;
+}
+
 /* NOTE: symname is ignored unless the inode is a sym link */
 int copy_attributes_to_inode(
     struct inode *inode,
@@ -127,7 +145,9 @@ int copy_attributes_to_inode(
           changing the inode->i_blkbits to something other than
           PAGE_CACHE_SHIFT breaks mmap/execution as we depend on that.
         */
+#ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE
         inode->i_blksize = pvfs_bufmap_size_query();
+#endif
         inode->i_blkbits = PAGE_CACHE_SHIFT;
         gossip_debug(GOSSIP_UTILS_DEBUG, "attrs->mask = %x (objtype = %s)\n", 
                 attrs->mask, 
@@ -136,32 +156,34 @@ int copy_attributes_to_inode(
                 attrs->objtype == PVFS_TYPE_SYMLINK ? "symlink" :
                  "invalid/unknown");
                 
-
-        if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
-            (attrs->mask & PVFS_ATTR_SYS_SIZE))
+        if (attrs->objtype == PVFS_TYPE_METAFILE)
         {
-            inode_size = (loff_t)attrs->size;
-            rounded_up_size =
-                (inode_size + (4096 - (inode_size % 4096)));
+            pvfs2_set_inode_flags(inode, attrs);
+            if (attrs->mask & PVFS_ATTR_SYS_SIZE)
+            {
+                inode_size = (loff_t)attrs->size;
+                rounded_up_size =
+                    (inode_size + (4096 - (inode_size % 4096)));
 
-            pvfs2_lock_inode(inode);
+                pvfs2_lock_inode(inode);
 #ifdef PVFS2_LINUX_KERNEL_2_4
 #if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER > 21)
-            inode->i_bytes = inode_size;
+                inode->i_bytes = inode_size;
 #endif
 #else
-            /* this is always ok for 2.6.x */
-            inode->i_bytes = inode_size;
+                /* this is always ok for 2.6.x */
+                inode->i_bytes = inode_size;
 #endif
-            inode->i_blocks = (unsigned long)(rounded_up_size / 512);
-            pvfs2_unlock_inode(inode);
+                inode->i_blocks = (unsigned long)(rounded_up_size / 512);
+                pvfs2_unlock_inode(inode);
 
-            /*
-              NOTE: make sure all the places we're called from have
-              the inode->i_sem lock.  we're fine in 99% of the cases
-              since we're mostly called from a lookup.
-            */
-            inode->i_size = inode_size;
+                /*
+                  NOTE: make sure all the places we're called from have
+                  the inode->i_sem lock.  we're fine in 99% of the cases
+                  since we're mostly called from a lookup.
+                */
+                inode->i_size = inode_size;
+            }
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))
@@ -592,8 +614,18 @@ int pvfs2_flush_inode(struct inode *inode)
         wbattr.ia_valid |= ATTR_MTIME;
     if (CtimeFlag(pvfs2_inode))
         wbattr.ia_valid |= ATTR_CTIME;
-    if (AtimeFlag(pvfs2_inode))
+    /*
+     * We do not need to honor atime flushes if
+     * a) object has a noatime marker
+     * b) object is a directory and has a nodiratime marker on the fs
+     * c) entire file system is mounted with noatime option
+     */
+    if (!((inode->i_flags & S_NOATIME)
+            || (inode->i_sb->s_flags & MS_NOATIME)
+            || ((inode->i_sb->s_flags & MS_NODIRATIME) && S_ISDIR(inode->i_mode))) && AtimeFlag(pvfs2_inode))
+    {
         wbattr.ia_valid |= ATTR_ATIME;
+    }
     if (ModeFlag(pvfs2_inode)) 
     {
         wbattr.ia_mode = inode->i_mode;
@@ -820,12 +852,26 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         gossip_err("pvfs2_inode_setxattr: bogus NULL pointers!\n");
         return -EINVAL;
     }
-    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+
+    if (prefix)
     {
-        gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
-                (int)(strlen(name)+strlen(prefix)));
-        return -EINVAL;
+        if(strlen(name)+strlen(prefix) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
+				(int)(strlen(name)+strlen(prefix)));
+		return -EINVAL;
+	}
     }
+    else
+    {
+        if(strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n",
+			   (int)(strlen(name)));
+                return -EINVAL;
+        }
+    }
+
     /* This is equivalent to a removexattr */
     if (size == 0 && value == NULL)
     {
@@ -843,7 +889,8 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         }
         if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
         {
-            gossip_err("pvfs2_inode_setxattr: Immutable inode or append-only inode; operation not permitted\n");
+            gossip_err("pvfs2_inode_setxattr: Immutable inode or append-only "
+                    "inode; operation not permitted\n");
             return -EPERM;
         }
         pvfs2_inode = PVFS2_I(inode);
@@ -898,12 +945,31 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+    if(!name)
     {
-        gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
-                (int)(strlen(name)+strlen(prefix)));
+	gossip_err("pvfs2_inode_removexattr: xattr key is NULL\n");
         return -EINVAL;
     }
+
+    if (prefix)
+    {
+        if((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
+				(int)(strlen(name)+strlen(prefix)));
+		return -EINVAL;
+	}
+    }
+    else
+    {
+        if(strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n",
+			   (int)(strlen(name)));
+                return -EINVAL;
+        }
+    }
+
     if (inode)
     {
         pvfs2_inode = PVFS2_I(inode);
@@ -923,7 +989,8 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
          * later on...
          */
         ret = snprintf((char*)new_op->upcall.req.removexattr.key,
-            PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
+            PVFS_MAX_XATTR_NAMELEN, "%s%s", 
+            (prefix ? prefix : ""), name);
         new_op->upcall.req.removexattr.key_sz = ret + 1;
 
         gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_removexattr: key %s, key_sz %d\n", 
@@ -1258,6 +1325,12 @@ static inline struct inode *pvfs2_create_symlink(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     struct inode *inode = NULL;
+
+    if(!symname)
+    {
+	*error_code = -EINVAL;
+        return NULL;
+    }
 
     new_op = op_alloc(PVFS2_VFS_OP_SYMLINK);
     if (!new_op)
@@ -1884,8 +1957,6 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
         pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
         pvfs2_inode->last_failed_block_index_read = 0;
         pvfs2_inode->link_target = NULL;
-        pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
-        pvfs2_inode->directory_version = 0;
         pvfs2_inode->error_code = 0;
         SetInitFlag(pvfs2_inode);
     }
@@ -1900,8 +1971,6 @@ void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
     pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
     pvfs2_inode->last_failed_block_index_read = 0;
-    pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
-    pvfs2_inode->directory_version = 0;
     pvfs2_inode->error_code = 0;
 }
 

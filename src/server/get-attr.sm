@@ -29,19 +29,12 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 
-enum 
-{
-    DIST_NAME_KEY = 0,
-    DIST_PARAMS_KEY = 1,
-    NUM_DFILES_KEY = 2,
-    NUM_SPECIAL_KEYS = 3,
-};
-
 PINT_server_trove_keys_s Trove_Special_Keys[] =
 {
-    {"user.pvfs2.dist_name", 21},
-    {"user.pvfs2.dist_params", 23},
-    {"user.pvfs2.num_dfiles", 22},
+    {"user.pvfs2.dist_name"  , SPECIAL_DIST_NAME_KEYLEN},
+    {"user.pvfs2.dist_params", SPECIAL_DIST_PARAMS_KEYLEN},
+    {"user.pvfs2.num_dfiles" , SPECIAL_NUM_DFILES_KEYLEN},
+    {"user.pvfs2.meta_hint"  , SPECIAL_METAFILE_HINT_KEYLEN},
 };
 
 enum
@@ -73,6 +66,10 @@ static int getattr_read_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_read_metafile_distribution_if_required(
     PINT_server_op *s_op, job_status_s *js_p);
+static int getattr_read_metafile_hint(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int getattr_interpret_metafile_hint(
+    PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_setup_resp(
     PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_setup_op(
@@ -83,11 +80,13 @@ static int getattr_setup_op(
 nested machine pvfs2_get_attr_work_sm(
     verify_attribs,
     read_symlink_target,
+    read_metafile_hint,
     read_metafile_datafile_handles_if_required,
     read_metafile_distribution_if_required,
     get_dirdata_handle,
     get_dirent_count,
     interpret_dirent_count,
+    interpret_metafile_hint,
     get_dir_hint,
     interpret_dir_hint,
     setup_resp)
@@ -96,7 +95,7 @@ nested machine pvfs2_get_attr_work_sm(
     {
         run getattr_verify_attribs;
         STATE_SYMLINK => read_symlink_target;
-        STATE_METAFILE => read_metafile_datafile_handles_if_required;
+        STATE_METAFILE => read_metafile_hint;
         STATE_DIR => get_dirdata_handle;
         default => setup_resp;
     }
@@ -104,6 +103,19 @@ nested machine pvfs2_get_attr_work_sm(
     state read_symlink_target
     {
         run getattr_read_symlink_target;
+        default => setup_resp;
+    }
+
+    state read_metafile_hint
+    {
+        run getattr_read_metafile_hint;
+        default => interpret_metafile_hint;
+    }
+
+    state interpret_metafile_hint
+    {
+        run getattr_interpret_metafile_hint;
+        STATE_METAFILE => read_metafile_datafile_handles_if_required;
         default => setup_resp;
     }
 
@@ -315,19 +327,7 @@ static int getattr_verify_attribs(
 
             resp_attr->mask &= ~PVFS_ATTR_META_DIST;
         }
-
-        if ((resp_attr->mask & PVFS_ATTR_META_DFILES) ||
-            (resp_attr->mask & PVFS_ATTR_META_DIST))
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, " * client wants extra "
-                         "meta info, about to retrieve it now\n");
-            js_p->error_code = STATE_METAFILE;
-        }
-        else
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, " * client doesn't want "
-                         "extra meta info, preparing response now\n");
-        }
+        js_p->error_code = STATE_METAFILE;
     }
     else if (resp_attr->objtype == PVFS_TYPE_DATAFILE)
     {
@@ -429,7 +429,7 @@ static int getattr_read_symlink_target(
         js_p->error_code = 0;
         return 1;
     }
-
+    
     s_op->key.buffer    = Trove_Common_Keys[SYMLINK_TARGET_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[SYMLINK_TARGET_KEY].size;
 
@@ -453,7 +453,54 @@ static int getattr_read_symlink_target(
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
-        &(s_op->key), &(s_op->val), 
+        &s_op->key, &s_op->val, 
+        0, 
+        NULL, s_op, 0, js_p,
+        &i, server_job_context,
+        s_op->req->hints
+        );
+
+
+    return ret;
+}
+
+static int getattr_read_metafile_hint(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+    char *buf = NULL;
+
+    assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
+    buf = (char *) calloc(sizeof(PVFS_metafile_hint) + 1, 1);
+    if (buf == NULL) 
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        /*If we hit an error the DIST & DFILES are no longer valid*/
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
+        return 1;
+    }
+
+    js_p->error_code = 0;
+
+    s_op->key.buffer = Trove_Special_Keys[METAFILE_HINT_KEY].key;
+    s_op->key.buffer_sz = Trove_Special_Keys[METAFILE_HINT_KEY].size;
+
+    s_op->val.buffer = buf;
+    s_op->val.buffer_sz = sizeof(s_op->resp.u.getattr.attr.u.meta.hint) + 1;
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+		 "  reading metafile hint (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->u.getattr.fs_id,
+		 llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
+		 s_op->key.buffer_sz, s_op->val.buffer,
+		 s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_read(
+        s_op->u.getattr.fs_id, s_op->u.getattr.handle,
+        &s_op->key, &s_op->val, 
         0, 
         NULL, s_op, 0, js_p,
         &i, server_job_context, s_op->req->hints);
@@ -461,6 +508,46 @@ static int getattr_read_symlink_target(
     return ret;
 }
 
+static int getattr_interpret_metafile_hint(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    PVFS_object_attr *resp_attr = NULL;
+
+    resp_attr = &s_op->resp.u.getattr.attr;
+    assert(resp_attr->objtype == PVFS_TYPE_METAFILE);
+    if (js_p->error_code == 0 || js_p->error_code == -TROVE_ENOENT)
+    {
+        if (js_p->error_code == 0)
+        {
+            memcpy(&s_op->resp.u.getattr.attr.u.meta.hint, s_op->val.buffer, 
+                sizeof(s_op->resp.u.getattr.attr.u.meta.hint));
+        }
+        if ((resp_attr->mask & PVFS_ATTR_META_DFILES) ||
+            (resp_attr->mask & PVFS_ATTR_META_DIST))
+        {
+            gossip_debug(GOSSIP_GETATTR_DEBUG, " * client wants extra "
+                         "meta info, about to retrieve it now\n");
+            js_p->error_code = STATE_METAFILE;
+        }
+        else
+        {
+            gossip_debug(GOSSIP_GETATTR_DEBUG, " * client doesn't want "
+                         "extra meta info, preparing response now\n");
+            js_p->error_code = 0;
+        }
+    }
+    else {
+        /*If we hit an error the DIST & DFILES are no longer valid*/
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
+    }
+    if (s_op->val.buffer)
+    {
+        free(s_op->val.buffer);
+        s_op->val.buffer = NULL;
+    }
+    return 1;
+}
 
 static int getattr_read_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s *js_p)
@@ -531,6 +618,9 @@ static int getattr_read_metafile_datafile_handles_if_required(
         gossip_err("Cannot allocate dfile array of count %d\n",
                    dfile_count);
 	js_p->error_code = -PVFS_ENOMEM;
+        /*If we hit an error the DIST & DFILES are no longer valid*/
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
 	return 1;
     }
 
@@ -587,6 +677,8 @@ static int getattr_read_metafile_distribution_if_required(
                    "handle %llu,%d\n",llu(s_op->u.getattr.handle),
                    s_op->u.getattr.fs_id);
         js_p->error_code = -PVFS_EINVAL;
+        /*If we hit an error the DIST & DFILES are no longer valid*/
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
         return 1;
     }
     assert(s_op->resp.u.getattr.attr.u.meta.dist_size > 0);
@@ -601,8 +693,11 @@ static int getattr_read_metafile_distribution_if_required(
         gossip_err("Cannot allocate dist of size %d\n",
                    s_op->val.buffer_sz);
 	js_p->error_code = -PVFS_ENOMEM;
+        /*If we hit an error the DIST & DFILES are no longer valid*/
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
 	return 1;
     }
+    s_op->free_val = 1;
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
@@ -628,10 +723,14 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     }
     if(js_p->error_code < 0)
     {
-        if(s_op->val.buffer)
+        if (s_op->free_val && s_op->val.buffer)
         {
             free(s_op->val.buffer);
+            s_op->free_val = 0;
         }
+        /*If we hit an error the DIST & DFILES are no longer valid*/
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
         return 1;
     }
 
@@ -922,7 +1021,6 @@ static int getattr_get_dir_hint(
     {
         js_p->error_code = -PVFS_ENOMEM;
         return 1;
-
     }
     for (i = 0; i < NUM_SPECIAL_KEYS; i++)
     {

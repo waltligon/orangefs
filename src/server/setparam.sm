@@ -198,6 +198,7 @@ static int check_fs_id(PVFS_fs_id fs_id)
     TROVE_keyval_s name;
     TROVE_coll_id tmp_coll;
     TROVE_op_id tmp_id;
+    struct server_configuration_s * server_config;
 
     name.buffer = malloc(PVFS_NAME_MAX);
     if (!name.buffer)
@@ -207,9 +208,12 @@ static int check_fs_id(PVFS_fs_id fs_id)
     }
     name.buffer_sz = PVFS_NAME_MAX;
 
+    server_config = get_server_config_struct();
+
     while(count == 1)
     {
         ret = trove_collection_iterate(
+            server_config->trove_method,
             &pos, &name, &tmp_coll, &count, 0, 0, NULL, &tmp_id);
 
         if (ret == 0)

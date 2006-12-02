@@ -851,11 +851,15 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
         }
     }
 
-    /* special case for when users ask for dfile count */
-    if(attr->objtype == PVFS_TYPE_METAFILE &&
-       sm_p->getattr.req_attrmask & PVFS_ATTR_META_DFILES)
+    if(attr->objtype == PVFS_TYPE_METAFILE) 
     {
-        sysresp->attr.dfile_count = attr->u.meta.dfile_count;
+       /* Copy if there are any special object specific flags */
+       sysresp->attr.flags = attr->u.meta.hint.flags;
+       /* special case for when users ask for dfile count */
+       if (sm_p->getattr.req_attrmask & PVFS_ATTR_META_DFILES)
+       {
+           sysresp->attr.dfile_count = attr->u.meta.dfile_count;
+       }
     }
     if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {
@@ -907,7 +911,6 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
 
     if (js_p->error_code == 0)
     {
- 
         /* convert outgoing attribute mask based on what we got */
         sysresp->attr.mask = PVFS_util_object_to_sys_attr_mask(
             sm_p->getattr.attr.mask);

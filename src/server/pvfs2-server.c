@@ -173,6 +173,8 @@ static void write_pidfile(int fd);
 static void remove_pidfile(void);
 static int parse_port_from_host_id(char* host_id);
 
+static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
+
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_params PINT_server_req_table[] =
 {
@@ -945,7 +947,6 @@ static int server_initialize_subsystems(
     PINT_server_status_flag *server_status_flag)
 {
     int ret = -PVFS_EINVAL;
-    char *method_name = NULL;
     char *cur_merged_handle_range = NULL;
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
@@ -1006,12 +1007,8 @@ static int server_initialize_subsystems(
                                    &server_config.db_cache_size_bytes);
     /* this should never fail */
     assert(ret == 0);
-    ret = trove_collection_setinfo(0, 0, TROVE_ALT_AIO_MODE,
-        &server_config.trove_alt_aio_mode);
-    /* this should never fail */
-    assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
-        &server_config.trove_max_concurrent_io);
+                                   &server_config.trove_max_concurrent_io);
     /* this should never fail */
     assert(ret == 0);
 
@@ -1038,8 +1035,11 @@ static int server_initialize_subsystems(
     BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
                  (void *)&server_config.tcp_buffer_size_receive);
 
-    ret = trove_initialize(server_config.storage_path,
-                           init_flags, &method_name, 0);
+    ret = trove_initialize(
+        server_config.trove_method, 
+        trove_coll_to_method_callback,
+        server_config.storage_path,
+        init_flags);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);
@@ -1095,6 +1095,7 @@ static int server_initialize_subsystems(
 
         orig_fsid = cur_fs->coll_id;
         ret = trove_collection_lookup(
+            cur_fs->trove_method,
             cur_fs->file_system_name, &(cur_fs->coll_id), NULL, NULL);
 
         if (ret < 0)
@@ -1547,7 +1548,7 @@ static int server_shutdown(
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting storage "
                      "interface         [   ...   ]\n");
-        trove_finalize();
+        trove_finalize(server_config.trove_method);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         storage "
                      "interface         [ stopped ]\n");
     }
@@ -2050,6 +2051,19 @@ static int parse_port_from_host_id(char* host_id)
     return(port_num);
 }
 
+static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
+{
+    struct filesystem_configuration_s * fs_conf;
+    
+    fs_conf = PINT_config_find_fs_id(&server_config, coll_id);
+    if(!fs_conf)
+    {
+        return server_config.trove_method;
+    }
+    return fs_conf->trove_method;
+}
+
+#ifndef GOSSIP_DISABLE_DEBUG
 void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
@@ -2087,6 +2101,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
         va_end(ap);
     }
 }
+#endif
 
 /*
  * PINT_map_server_op_to_string()

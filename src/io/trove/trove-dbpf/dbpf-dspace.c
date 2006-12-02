@@ -47,6 +47,18 @@ extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
 #endif
 extern gen_mutex_t dbpf_attr_cache_mutex;
+/* Union used by the dspace_iterate_handles call.  The berkeley db
+ * cursor->get(SET_RECNO) call, which sets the position of the cursor
+ * based on record number, expects the key.data to be a db_recno_t
+ * going in, but fills in the actual key value (in this case a TROVE_handle)
+ * on the way out.
+ */
+union dbpf_dspace_recno_handle_key
+{
+    db_recno_t recno;
+    TROVE_handle handle;
+};
+
 
 int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 
@@ -87,6 +99,9 @@ static inline void organize_post_op_statistics(
             break;
     }
 }
+
+static int dbpf_dspace_remove_keyval(
+    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
@@ -430,7 +445,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
         NULL,
         &count,
         TROVE_ITERATE_START,
-        PINT_dbpf_keyval_remove);
+        dbpf_dspace_remove_keyval);
     if(ret != 0 && ret != -TROVE_ENOENT)
     {
         goto return_error;
@@ -454,6 +469,22 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 
 return_error:
     return ret;
+}
+
+static int dbpf_dspace_remove_keyval(
+    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val)
+{
+    int ret;
+    DBC * dbc_p = (DBC *)args;
+
+    ret = dbc_p->c_del(dbc_p, 0);
+    if(ret != 0)
+    {
+        ret = -dbpf_db_error_to_trove_error(ret);
+    }
+
+    return ret;
+
 }
 
 static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
@@ -507,7 +538,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL, i = 0;
     DBC *dbc_p = NULL;
     DBT key, data;
-    db_recno_t recno;
+    union dbpf_dspace_recno_handle_key recno_key;
     TROVE_ds_storedattr_s s_attr;
     TROVE_handle dummy_handle = TROVE_HANDLE_NULL;
 
@@ -539,18 +570,15 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
      */
     if (*op_p->u.d_iterate_handles.position_p != TROVE_ITERATE_START)
     {
-        assert(sizeof(recno) < sizeof(dummy_handle));
-
         /* we need to position the cursor before we can read new
          * entries.  we will go ahead and read the first entry as
          * well, so that we can use the same loop below to read the
          * remainder in this or the above case.
          */
-        dummy_handle = (TROVE_handle)
-            (*op_p->u.d_iterate_handles.position_p);
+        recno_key.recno = (*op_p->u.d_iterate_handles.position_p);
         memset(&key, 0, sizeof(key));
-        key.data  = &dummy_handle;
-        key.size  = key.ulen = sizeof(dummy_handle);
+        key.data  = &recno_key;
+        key.size  = key.ulen = sizeof(recno_key);
         key.flags |= DB_DBT_USERMEM;
 
         memset(&data, 0, sizeof(data));
@@ -566,8 +594,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         else if (ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
-            gossip_err("failed to set cursor position at %llu\n",
-                       llu(dummy_handle));
+            gossip_err("failed to set cursor position at recno: %u\n",
+                       recno_key.recno);
             goto return_error;
         }
     }
@@ -606,6 +634,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     }
     else
     {
+        db_recno_t recno;
         /* get the record number to return.
          *
          * note: key field is ignored by c_get in this case

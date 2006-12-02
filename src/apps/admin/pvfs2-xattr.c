@@ -230,10 +230,10 @@ static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
   {
       if (get == 1)
       {
-          ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, creds, key_p, val_p);
+          ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, creds, key_p, val_p, NULL);
       }
       else {
-          ret = PVFS_sys_seteattr(obj->u.pvfs2.ref, creds, key_p, val_p, 0);
+          ret = PVFS_sys_seteattr(obj->u.pvfs2.ref, creds, key_p, val_p, 0, NULL);
       }
 
       if (ret < 0)
@@ -397,7 +397,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
                               (char *) obj->u.pvfs2.pvfs2_path,
                               credentials, 
                               &resp_lookup,
-                              PVFS2_LOOKUP_LINK_FOLLOW);
+                              PVFS2_LOOKUP_LINK_FOLLOW, NULL);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_lookup", ret);
@@ -408,7 +408,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
         ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                               credentials, &resp_getattr);
+                               credentials, &resp_getattr, NULL);
         if (ret)
         {
             fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",

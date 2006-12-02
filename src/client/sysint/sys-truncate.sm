@@ -187,6 +187,13 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
     assert(attr->u.meta.dist_size > 0);
+    /* cannot truncate an append-only or immutable file */
+    if ((attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL)
+        || (attr->u.meta.hint.flags & PVFS_APPEND_FL))
+    {
+        js_p->error_code = -PVFS_EPERM;
+        return 1;
+    }
 
     sm_p->msgarray_count = attr->u.meta.dfile_count;
 

@@ -92,12 +92,12 @@ enum
  *  functions.
  */
 int trove_initialize(
+    TROVE_method_id method_id,
+    TROVE_method_callback method_callback,
     char *stoname,
-    TROVE_ds_flags flags,
-    char **method_name_p,
-    int method_id);
+    TROVE_ds_flags flags);
 
-int trove_finalize(void);
+int trove_finalize(TROVE_method_id method_id);
 
 int trove_open_context(
     TROVE_coll_id coll_id,
@@ -108,11 +108,13 @@ int trove_close_context(
     TROVE_context_id context_id);
 
 int trove_storage_create(
+    TROVE_method_id method_id,
     char *stoname,
     void *user_ptr,
     TROVE_op_id *out_op_id_p);
 
 int trove_storage_remove(
+    TROVE_method_id method_id,
     char *stoname,
     void *user_ptr,
     TROVE_op_id *out_op_id_p);
@@ -125,12 +127,14 @@ int trove_collection_create(
     TROVE_op_id *out_op_id_p);
 
 int trove_collection_remove(
+    TROVE_method_id method_id,
 /* char *stoname, */
     char *collname,
     void *user_ptr,
     TROVE_op_id *out_op_id_p);
 
 int trove_collection_lookup(
+    TROVE_method_id method_id,
 /* char *stoname, */
     char *collname,
     TROVE_coll_id *out_coll_id_p,
@@ -138,6 +142,7 @@ int trove_collection_lookup(
     TROVE_op_id *out_op_id_p);
 
 int trove_collection_iterate(
+    TROVE_method_id method_id,
     TROVE_ds_position *inout_position_p,
     TROVE_keyval_s *name_array,
     TROVE_coll_id *coll_id_array,
@@ -147,7 +152,8 @@ int trove_collection_iterate(
     void *user_ptr,
     TROVE_op_id *out_op_id_p);
 
-int trove_bstream_read_at(TROVE_coll_id coll_id,
+int trove_bstream_read_at(
+                          TROVE_coll_id coll_id,
 			  TROVE_handle handle,
 			  void *buffer,
 			  TROVE_size *inout_size_p,
@@ -159,7 +165,8 @@ int trove_bstream_read_at(TROVE_coll_id coll_id,
 			  TROVE_op_id *out_op_id_p,
               PVFS_hint * hints);
 
-int trove_bstream_write_at(TROVE_coll_id coll_id,
+int trove_bstream_write_at(
+                           TROVE_coll_id coll_id,
 			   TROVE_handle handle,
 			   void *buffer,
 			   TROVE_size *inout_size_p,
@@ -171,7 +178,8 @@ int trove_bstream_write_at(TROVE_coll_id coll_id,
 			   TROVE_op_id *out_op_id_p,
                PVFS_hint * hints);
 
-int trove_bstream_resize(TROVE_coll_id coll_id,
+int trove_bstream_resize(
+                         TROVE_coll_id coll_id,
 			 TROVE_handle handle,
 			 TROVE_size *inout_size_p,
 			 TROVE_ds_flags flags,
@@ -181,7 +189,8 @@ int trove_bstream_resize(TROVE_coll_id coll_id,
 			 TROVE_op_id *out_op_id_p,
              PVFS_hint * hints);
 
-int trove_bstream_validate(TROVE_coll_id coll_id,
+int trove_bstream_validate(
+                           TROVE_coll_id coll_id,
 			   TROVE_handle handle,
 			   TROVE_ds_flags flags,
 			   TROVE_vtag_s *vtag,
@@ -190,7 +199,8 @@ int trove_bstream_validate(TROVE_coll_id coll_id,
 			   TROVE_op_id *out_op_id_p,
                PVFS_hint * hints);
 
-int trove_bstream_read_list(TROVE_coll_id coll_id,
+int trove_bstream_read_list(
+                            TROVE_coll_id coll_id,
 			    TROVE_handle handle,
 			    char **mem_offset_array, 
 			    TROVE_size *mem_size_array,
@@ -206,7 +216,8 @@ int trove_bstream_read_list(TROVE_coll_id coll_id,
 			    TROVE_op_id *out_op_id_p,
                 PVFS_hint * hints);
 
-int trove_bstream_write_list(TROVE_coll_id coll_id,
+int trove_bstream_write_list(
+                             TROVE_coll_id coll_id,
 			     TROVE_handle handle,
 			     char **mem_offset_array, 
 			     TROVE_size *mem_size_array,
@@ -223,7 +234,7 @@ int trove_bstream_write_list(TROVE_coll_id coll_id,
                  PVFS_hint * hints);
 
 int trove_bstream_flush(TROVE_coll_id coll_id,
-			TROVE_handle handle,
+                        TROVE_handle handle,
 			TROVE_ds_flags flags,
 			void *user_ptr,
 			TROVE_context_id context_id,
@@ -303,8 +314,7 @@ int trove_keyval_iterate_keys(
 			      TROVE_op_id *out_op_id_p,
                   PVFS_hint * hints);
 
-int trove_keyval_read_list(
-			   TROVE_coll_id coll_id,
+int trove_keyval_read_list(TROVE_coll_id coll_id,
 			   TROVE_handle handle,
 			   TROVE_keyval_s *key_array,
 			   TROVE_keyval_s *val_array,
@@ -360,7 +370,7 @@ int trove_dspace_create(TROVE_coll_id coll_id,
 
 int trove_dspace_remove(TROVE_coll_id coll_id,
 			TROVE_handle handle,
-			TROVE_ds_flags flags,
+                        TROVE_ds_flags flags,
 			void *user_ptr,
 			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p,

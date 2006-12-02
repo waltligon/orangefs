@@ -40,12 +40,13 @@ int PINT_event_bmi_start, PINT_event_bmi_stop;
 int PINT_event_flow_start, PINT_event_flow_stop;
 int PINT_event_unexpected_decode;
 
+extern char * mpe_logfile;
+#endif
+
 int * PINT_event_perf_counter_update = 0; /* event number for perf counters*/
 char ** PINT_event_perf_counter_key_names = 0;
 int PINT_event_perf_counter_keys = 0;
 
-extern char * mpe_logfile;
-#endif
 
 void PINT_event_initalize_perf_counter_events(int number){
     PINT_event_perf_counter_update = calloc(number,sizeof(int));

@@ -135,14 +135,24 @@ typedef struct PINT_server_trove_keys
 } PINT_server_trove_keys_s;
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
-enum
+/* Reserved keys */
+enum 
 {
     ROOT_HANDLE_KEY      = 0,
     DIR_ENT_KEY          = 1,
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
-    SYMLINK_TARGET_KEY   = 4
+    SYMLINK_TARGET_KEY   = 4,
+};
+
+/* optional; user-settable keys */
+enum 
+{
+    DIST_NAME_KEY        = 0,
+    DIST_PARAMS_KEY      = 1,
+    NUM_DFILES_KEY       = 2,
+    NUM_SPECIAL_KEYS     = 3, /* not an index */
+    METAFILE_HINT_KEY    = 3,
 };
 
 typedef enum
@@ -236,12 +246,11 @@ struct PINT_server_remove_op
                                    * the event that we are removing a
                                    * directory */
     PVFS_size dirent_count;
-    PVFS_ds_keyval * key_array;
+    PVFS_ds_keyval key;
     PVFS_ds_position pos;
     int key_count;
     int index;
     int remove_keyvals_state;
-    PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
 struct PINT_server_mgmt_remove_dirent_op

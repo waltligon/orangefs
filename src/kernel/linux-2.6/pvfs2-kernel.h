@@ -20,7 +20,9 @@
 #ifndef __PVFS2KERNEL_H
 #define __PVFS2KERNEL_H
 
+#ifdef HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H
 #include <linux/config.h>
+#endif
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 
@@ -144,7 +146,6 @@ typedef unsigned long sector_t;
 #define PVFS2_SEEK_END                 0x00000002
 #define PVFS2_MAX_NUM_OPTIONS          0x00000004
 #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
-#define PVFS2_NUM_READDIR_RETRIES      0x0000000A
 #define PVFS2_MAX_FSKEY_LEN            64
 
 #define MAX_DEV_REQ_UPSIZE (2*sizeof(int32_t) +   \
@@ -308,6 +309,15 @@ int pvfs2_xattr_get_default(struct inode *inode,
 
 #endif
 
+#ifndef HAVE_STRUCT_XTVEC
+/* Redefine xtvec structure so that we could move helper functions out of the define */
+struct xtvec 
+{
+    __kernel_off_t xtv_off;  /* must be off_t */
+    __kernel_size_t xtv_len; /* must be size_t */
+};
+#endif
+
 /************************************
  * pvfs2 data structures
  ************************************/
@@ -349,8 +359,6 @@ typedef struct
 typedef struct
 {
     PVFS_object_ref refn;
-    int num_readdir_retries;
-    uint64_t directory_version;
     char *link_target;
     /*
      * Reading/Writing Extended attributes need to acquire the appropriate
@@ -366,6 +374,7 @@ typedef struct
     sector_t last_failed_block_index_read;
     int error_code;
 
+    /* State of in-memory attributes not yet flushed to disk associated with this object */
     unsigned long pinode_flags;
     /* All allocated pvfs2_inode_t objects are chained to a list */
     struct list_head list;
@@ -415,6 +424,16 @@ typedef struct
     * file if set. NOTE: this is disabled by default.
     */
     int suid;
+    /** noatime option (if set) is inspired by the nfs mount option
+    * that requires the file system to disable atime updates for all
+    * files if set. NOTE: this is disabled by default.
+    */
+    int noatime;
+    /** nodiratime option (if set) is inspired by the nfs mount option
+    * that requires the file system to disable atime updates for
+    * directories alone if set. NOTE: this is disabled by default.
+    */
+    int nodiratime;
 } pvfs2_mount_options_t;
 
 /** per superblock private pvfs2 info */
@@ -715,13 +734,22 @@ void fsid_key_table_finalize(void);
 /****************************
  * defined in inode.c
  ****************************/
+int pvfs2_set_inode(struct inode *inode, void *data);
 uint32_t convert_to_pvfs2_mask(unsigned long lite_mask);
-struct inode *pvfs2_get_custom_inode(
+struct inode *pvfs2_get_custom_inode_common(
     struct super_block *sb,
     struct inode *dir,
     int mode,
     dev_t dev,
-    PVFS_object_ref ref);
+    PVFS_object_ref ref,
+    int from_create);
+
+/* In-core inodes are not being created on-disk */
+#define pvfs2_get_custom_core_inode(sb, dir, mode, dev, ref) \
+        pvfs2_get_custom_inode_common(sb, dir, mode, dev, ref, 0)
+/* On-disk inodes are being created */
+#define pvfs2_get_custom_inode(sb, dir, mode, dev, ref) \
+        pvfs2_get_custom_inode_common(sb, dir, mode, dev, ref, 1)
 
 int pvfs2_setattr(
     struct dentry *dentry,
@@ -999,29 +1027,6 @@ do {                                                      \
     pvfs_bufmap_put(buffer_index);                        \
     buffer_index = -1;                                    \
 } while(0)
-
-#ifdef HAVE_AIO_VFS_SUPPORT
-/* 
- * This macro differs from the above only in that it does not
- * manipulate the offsets.
- */
-#define handle_sync_aio_error()                           \
-do {                                                      \
-    if(!op_state_serviced(new_op))                        \
-    {                                                     \
-        pvfs2_cancel_op_in_progress(new_op->tag);         \
-        op_release(new_op);                               \
-    }                                                     \
-    else                                                  \
-    {                                                     \
-        wake_up_daemon_for_return(new_op);                \
-    }                                                     \
-    new_op = NULL;                                        \
-    pvfs_bufmap_put(buffer_index);                        \
-    buffer_index = -1;                                    \
-} while(0)
-
-#endif
 
 #define get_interruptible_flag(inode)                     \
 ((PVFS2_SB(inode->i_sb)->mnt_options.intr ? PVFS2_OP_INTERRUPTIBLE : 0))

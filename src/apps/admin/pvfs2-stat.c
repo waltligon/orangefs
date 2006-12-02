@@ -478,7 +478,22 @@ void print_stats(const PVFS_object_ref * ref,
    {
       fprintf(stdout, "  dir entries   : %llu\n", llu(attr->dirent_count));
    }
-   
+
+   if ((attr->mask & PVFS_ATTR_SYS_TYPE) && 
+          (attr->objtype & PVFS_TYPE_METAFILE))
+   {
+       if (attr->flags == 0)
+           fprintf(stdout, "  flags         : none");
+       else
+           fprintf(stdout, "  flags         : ");
+       if (attr->flags & PVFS_IMMUTABLE_FL)
+           fprintf(stdout, "immutable, ");
+       if (attr->flags & PVFS_APPEND_FL)
+           fprintf(stdout, "append-only, ");
+       if (attr->flags & PVFS_NOATIME_FL)
+           fprintf(stdout, "noatime ");
+       fprintf(stdout, "\n");
+   }
 }
 
 static void usage(int argc, char** argv)

@@ -15,9 +15,9 @@ extern "C" {
 #include <aio.h>
 #include "trove.h"
 #include "gen-locks.h"
-#include "dbpf-open-cache.h"
 #include "pvfs2-internal.h"
 #include "dbpf-keyval-pcache.h"
+#include "dbpf-open-cache.h"
 
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
 #define TROVE_DBPF_VERSION_VALUE                                  "0.1.2"
@@ -35,10 +35,12 @@ extern "C" {
 #define TROVE_DB_THREAD         0
 #endif /* __PVFS2_TROVE_THREADED__ */
 
-#define TROVE_DB_MODE                                                 0644
+#define TROVE_DB_MODE                                                 0600
 #define TROVE_DB_TYPE                                             DB_BTREE
 #define TROVE_DB_OPEN_FLAGS        (TROVE_DB_DIRTY_READ | TROVE_DB_THREAD)
 #define TROVE_DB_CREATE_FLAGS            (DB_CREATE | TROVE_DB_OPEN_FLAGS)
+
+#define TROVE_FD_MODE 0600
 
 /*
   for more efficient host filesystem accesses, we have a simple
@@ -148,8 +150,22 @@ extern struct TROVE_dspace_ops dbpf_dspace_ops;
 extern struct TROVE_keyval_ops dbpf_keyval_ops;
 extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
 
+struct dbpf_aio_ops
+{
+    int (* aio_read) (struct aiocb * aiocbp);
+    int (* aio_write) (struct aiocb * aiocbp);
+    int (* lio_listio) (int mode, struct aiocb * const list[], int nent,
+                        struct sigevent *sig);
+    int (* aio_error) (const struct aiocb *aiocbp);
+    ssize_t (* aio_return) (struct aiocb *aiocbp);
+    int (* aio_cancel) (int filedesc, struct aiocb * aiocbp);
+    int (* aio_suspend) (const struct aiocb * const list[], int nent,
+                         const struct timespec * timeout);
+    int (*aio_fsync) (int operation, struct aiocb * aiocbp);
+};
+
 typedef int (* PINT_dbpf_keyval_iterate_callback)(
-    DB * db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+    void *, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
@@ -160,9 +176,6 @@ int PINT_dbpf_keyval_iterate(
     int *count,
     TROVE_ds_position pos,
     PINT_dbpf_keyval_iterate_callback callback);
-
-int PINT_dbpf_keyval_remove(
-    DB *db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 struct dbpf_storage
 {
@@ -366,29 +379,61 @@ struct dbpf_bstream_rw_list_op
     TROVE_size *out_size_p;
     struct aiocb *aiocb_array;
     struct sigevent sigev;
+    struct dbpf_aio_ops *aio_ops;
     struct bstream_listio_state lio_state;
 #ifndef __PVFS2_TROVE_AIO_THREADED__
     void *queued_op_ptr;
 #endif
 };
 
+inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
+                                TROVE_handle handle,
+                                char **mem_offset_array, 
+                                TROVE_size *mem_size_array,
+                                int mem_count,
+                                TROVE_offset *stream_offset_array,
+                                TROVE_size *stream_size_array,
+                                int stream_count,
+                                TROVE_size *out_size_p,
+                                TROVE_ds_flags flags, 
+                                TROVE_vtag_s *vtag,
+                                void *user_ptr,
+                                TROVE_context_id context_id,
+                                TROVE_op_id *out_op_id_p,
+                                int opcode,
+                                struct dbpf_aio_ops * aio_ops,
+                                PVFS_hint * hints);
+
 struct dbpf_keyval_get_handle_info_op
 {
     TROVE_keyval_handle_info *info;
 };
 
+/*
+ * Keep the various types in one enum, but separate spaces in that
+ * for easy comparions.  Reserve the top two bits in an eight-bit
+ * space, leaving 64 entries in each.
+ */
+#define BSTREAM_OP_TYPE (0<<6)
+#define KEYVAL_OP_TYPE  (1<<6)
+#define DSPACE_OP_TYPE  (2<<6)
+#define OP_TYPE_MASK    (3<<6)
+
+#define DBPF_OP_IS_BSTREAM(t) (((t) & OP_TYPE_MASK) == BSTREAM_OP_TYPE)
+#define DBPF_OP_IS_KEYVAL(t)  (((t) & OP_TYPE_MASK) == KEYVAL_OP_TYPE)
+#define DBPF_OP_IS_DSPACE(t)  (((t) & OP_TYPE_MASK) == DSPACE_OP_TYPE)
 
 /* List of operation types that might be queued */
 enum dbpf_op_type
 {
-    BSTREAM_READ_AT = 1,
+    BSTREAM_READ_AT = BSTREAM_OP_TYPE,
     BSTREAM_WRITE_AT,
     BSTREAM_RESIZE,
     BSTREAM_READ_LIST,
     BSTREAM_WRITE_LIST,
     BSTREAM_VALIDATE,
     BSTREAM_FLUSH,
-    KEYVAL_READ = 8,  /* must change DBPF_OP_IS_BSTREAM also */
+    KEYVAL_READ = KEYVAL_OP_TYPE,
     KEYVAL_WRITE,
     KEYVAL_REMOVE_KEY,
     KEYVAL_VALIDATE,
@@ -398,7 +443,7 @@ enum dbpf_op_type
     KEYVAL_WRITE_LIST,
     KEYVAL_FLUSH,
     KEYVAL_GET_HANDLE_INFO,
-    DSPACE_CREATE = 18, /* must change DBPF_OP_KEYVAL also */
+    DSPACE_CREATE = DSPACE_OP_TYPE,
     DSPACE_REMOVE,
     DSPACE_ITERATE_HANDLES,
     DSPACE_VERIFY,
@@ -406,35 +451,6 @@ enum dbpf_op_type
     DSPACE_SETATTR,
     DSPACE_GETATTR_LIST,
 };
-
-#define DBPF_OP_IS_BSTREAM(__type)    \
-    (__type == BSTREAM_READ_AT ||     \
-     __type == BSTREAM_WRITE_AT ||    \
-     __type == BSTREAM_RESIZE ||      \
-     __type == BSTREAM_READ_LIST ||   \
-     __type == BSTREAM_WRITE_LIST ||  \
-     __type == BSTREAM_VALIDATE ||    \
-     __type == BSTREAM_FLUSH)
-
-#define DBPF_OP_IS_KEYVAL(__type)     \
-    (__type == KEYVAL_READ ||         \
-     __type == KEYVAL_WRITE ||        \
-     __type == KEYVAL_REMOVE_KEY ||   \
-     __type == KEYVAL_VALIDATE ||     \
-     __type == KEYVAL_ITERATE_KEYS || \
-     __type == KEYVAL_READ_LIST ||    \
-     __type == KEYVAL_WRITE_LIST ||   \
-     __type == KEYVAL_FLUSH ||        \
-     __type == KEYVAL_GET_HANDLE_INFO)
-    
-#define DBPF_OP_IS_DSPACE(__type)         \
-    (__type == DSPACE_CREATE ||           \
-     __type == DSPACE_REMOVE ||           \
-     __type == DSPACE_ITERATE_HANDLES ||  \
-     __type == DSPACE_VERIFY ||           \
-     __type == DSPACE_GETATTR ||          \
-     __type == DSPACE_SETATTR ||          \
-     __type == DSPACE_GETATTR_LIST)
 
 #define DBPF_OP_DOES_SYNC(__op)    \
     (__op == KEYVAL_WRITE       || \
@@ -459,13 +475,11 @@ enum dbpf_op_state
     OP_COMPLETED,
     OP_DEQUEUED,
     OP_CANCELED,
-    OP_INTERNALLY_DELAYED,
-    OP_SYNC_QUEUED
+    OP_INTERNALLY_DELAYED
 };
 
 #define DBPF_OP_CONTINUE 0
 #define DBPF_OP_COMPLETE 1
-#define DBPF_OP_NEEDS_SYNC 2
 
 /* Used to store parameters for queued operations */
 struct dbpf_op
@@ -526,6 +540,8 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 #define DBPF_SYNC   fsync
 #define DBPF_RESIZE ftruncate
 #define DBPF_FSTAT  fstat
+#define DBPF_ACCESS access
+#define DBPF_FCNTL  fcntl
 
 #define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret)  \
 do {                                                      \
@@ -605,6 +621,120 @@ extern DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *err
 extern int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
 extern int db_open(DB *db_p, const char *dbname, int, int);
 extern int db_close(DB *db_p);
+
+struct dbpf_storage *dbpf_storage_lookup(
+    char *stoname, int *error_p, TROVE_ds_flags flags);
+
+int dbpf_storage_create(char *stoname,
+                        void *user_ptr,
+                        TROVE_op_id *out_op_id_p);
+
+int dbpf_storage_remove(char *stoname,
+                        void *user_ptr,
+                        TROVE_op_id *out_op_id_p);
+
+int dbpf_collection_create(char *collname,
+                           TROVE_coll_id new_coll_id,
+                           void *user_ptr,
+                           TROVE_op_id *out_op_id_p);
+
+int dbpf_collection_remove(char *collname,
+                           void *user_ptr,
+                           TROVE_op_id *out_op_id_p);
+
+int dbpf_collection_lookup(char *collname,
+                           TROVE_coll_id *out_coll_id_p,
+                           void *user_ptr,
+                           TROVE_op_id *out_op_id_p);
+
+int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
+                            TROVE_keyval_s *name_array,
+                            TROVE_coll_id *coll_id_array,
+                            int *inout_count_p,
+                            TROVE_ds_flags flags,
+                            TROVE_vtag_s *vtag,
+                            void *user_ptr,
+                            TROVE_op_id *out_op_id_p);
+
+int dbpf_collection_setinfo(TROVE_method_id method_id,
+                            TROVE_coll_id coll_id,
+                            TROVE_context_id context_id,
+                            int option,
+                            void *parameter);
+
+int dbpf_collection_getinfo(TROVE_coll_id coll_id,
+                            TROVE_context_id context_id,
+                            TROVE_coll_getinfo_options opt,
+                            void *parameter);
+
+int dbpf_collection_seteattr(TROVE_coll_id coll_id,
+                             TROVE_keyval_s *key_p,
+                             TROVE_keyval_s *val_p,
+                             TROVE_ds_flags flags,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p);
+
+int dbpf_collection_geteattr(TROVE_coll_id coll_id,
+                             TROVE_keyval_s *key_p,
+                             TROVE_keyval_s *val_p,
+                             TROVE_ds_flags flags,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p);
+
+int dbpf_finalize(void);
+
+int dbpf_bstream_read_at(TROVE_coll_id coll_id,
+                         TROVE_handle handle,
+                         void *buffer,
+                         TROVE_size *inout_size_p,
+                         TROVE_offset offset,
+                         TROVE_ds_flags flags,
+                         TROVE_vtag_s *vtag, 
+                         void *user_ptr,
+                         TROVE_context_id context_id,
+                         TROVE_op_id *out_op_id_p,
+                         PVFS_hint * hints);
+
+int dbpf_bstream_write_at(TROVE_coll_id coll_id,
+                          TROVE_handle handle,
+                          void *buffer,
+                          TROVE_size *inout_size_p,
+                          TROVE_offset offset,
+                          TROVE_ds_flags flags,
+                          TROVE_vtag_s *vtag,
+                          void *user_ptr,
+                          TROVE_context_id context_id,
+                          TROVE_op_id *out_op_id_p,
+                          PVFS_hint * hints);
+
+int dbpf_bstream_resize(TROVE_coll_id coll_id,
+                        TROVE_handle handle,
+                        TROVE_size *inout_size_p,
+                        TROVE_ds_flags flags,
+                        TROVE_vtag_s *vtag,
+                        void *user_ptr,
+                        TROVE_context_id context_id,
+                        TROVE_op_id *out_op_id_p,
+                        PVFS_hint * hints);
+
+int dbpf_bstream_validate(TROVE_coll_id coll_id,
+                          TROVE_handle handle,
+                          TROVE_ds_flags flags,
+                          TROVE_vtag_s *vtag,
+                          void *user_ptr,
+                          TROVE_context_id context_id,
+                          TROVE_op_id *out_op_id_p,
+                          PVFS_hint * hints);
+
+int dbpf_bstream_flush(TROVE_coll_id coll_id,
+                       TROVE_handle handle,
+                       TROVE_ds_flags flags,
+                       void *user_ptr,
+                       TROVE_context_id context_id,
+                       TROVE_op_id *out_op_id_p,
+                       PVFS_hint * hints);
 
 #if defined(__cplusplus)
 }
