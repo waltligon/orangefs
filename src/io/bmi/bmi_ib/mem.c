@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.9 2006-09-13 23:11:21 vilayann Exp $
+ * $Id: mem.c,v 1.10 2006-12-02 19:08:41 pw Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "pvfs2-internal.h"
@@ -21,9 +21,13 @@
  * This internal state structure is allocated when the init function
  * is called.  The device hangs onto it and gives it back to us as
  * needed.
+ *
+ * TODO: Use an rbtree here instead.  Also deregister refcnt==0 regions
+ * when new ones come along that overlap, much like dreg, as an indication
+ * that application buffers have changed.
  */
 typedef struct {
-    list_t list;
+    struct qlist_head list;
     gen_mutex_t mutex;
     void (*mem_register)(memcache_entry_t *c);
     void (*mem_deregister)(memcache_entry_t *c);
@@ -58,7 +62,7 @@ memcache_add(memcache_device_t *memcache_device, void *buf, bmi_size_t len)
 static memcache_entry_t *
 memcache_lookup_cover(memcache_device_t *memcache_device, const void *const buf, bmi_size_t len)
 {
-    list_t *l;
+    struct qlist_head *l;
     const char *end = (const char *) buf + len;
     memcache_entry_t *cbest = 0;
 
@@ -89,7 +93,7 @@ memcache_lookup_cover(memcache_device_t *memcache_device, const void *const buf,
 static memcache_entry_t *
 memcache_lookup_exact(memcache_device_t *memcache_device, const void *const buf, bmi_size_t len)
 {
-    list_t *l;
+    struct qlist_head *l;
 
     qlist_for_each(l, &memcache_device->list) {
 	memcache_entry_t *c = qlist_entry(l, memcache_entry_t, list);
@@ -208,6 +212,34 @@ memcache_register(void *md, ib_buflist_t *buflist)
     gen_mutex_unlock(&memcache_device->mutex);
 }
 
+/*
+ * Similar to the normal register call, but does not use a buflist,
+ * just adds an entry to the cache for use by later registrations.
+ * Also does not add a refcnt on any entry.
+ */
+void memcache_preregister(void *md, const void *buf, bmi_size_t len,
+                          enum PVFS_io_type rw __unused)
+{
+#if ENABLE_MEMCACHE
+    memcache_device_t *memcache_device = md;
+    memcache_entry_t *c;
+
+    gen_mutex_lock(&memcache_device->mutex);
+    c = memcache_lookup_cover(memcache_device, buf, len);
+    if (c) {
+	debug(2, "%s: hit %p len %lld (via %p len %lld) refcnt now %d",
+	      __func__, buf, lld(len), c->buf, lld(c->len), c->count);
+    } else {
+	debug(2, "%s: miss %p len %lld", __func__, buf, lld(len));
+	c = memcache_add(memcache_device, (void *)(uintptr_t) buf, len);
+	if (!c)
+	    error("%s: no memory for cache entry", __func__);
+	(memcache_device->mem_register)(c);
+    }
+    gen_mutex_unlock(&memcache_device->mutex);
+#endif
+}
+
 void
 memcache_deregister(void *md, ib_buflist_t *buflist)
 {
@@ -219,8 +251,10 @@ memcache_deregister(void *md, ib_buflist_t *buflist)
 #if ENABLE_MEMCACHE
 	memcache_entry_t *c = buflist->memcache[i];
 	--c->count;
-	debug(2, "%s: dec refcount [%d] %p len %lld count now %d", __func__, i,
-	  buflist->buf.send[i], lld(buflist->len[i]), c->count);
+	debug(2,
+	   "%s: dec refcount [%d] %p len %lld (via %p len %lld) refcnt now %d",
+	   __func__, i, buflist->buf.send[i], lld(buflist->len[i]),
+	   c->buf, lld(c->len), c->count);
 	/* let garbage collection do ib_mem_deregister(c) for refcnt==0 */
 #else
 	(memcache_device->mem_deregister)(buflist->memcache[i]);
@@ -252,7 +286,7 @@ void *memcache_init(void (*mem_register)(memcache_entry_t *),
  */
 void memcache_shutdown(void *md)
 {
-    list_t *l, *lp;
+    struct qlist_head *l, *lp;
     memcache_device_t *memcache_device = md;
 
     gen_mutex_lock(&memcache_device->mutex);
