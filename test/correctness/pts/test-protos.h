@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <pts.h>
 #include <generic.h>
+#include <string.h>
 
 /* include all test specific header files */
 #include "test-create.h"

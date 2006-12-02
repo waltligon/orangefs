@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
     exit(1);
   }
   
-  //  printf("%d: here\n", myid);
+  /*  printf("%d: here\n", myid); */
   pts_config.myid = myid;
   pts_config.numprocs = numprocs;
   rc = sync_config(&pts_config);
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
   PINT_time_mark(&marker2);
   
   fprintf(stderr, "%d: DONE RUNNING TESTS!\n", myid);
-  //   MPI_Barrier(MPI_COMM_WORLD);
+  /*   MPI_Barrier(MPI_COMM_WORLD); */
   if(numprocs == 1)
   {
     PINT_time_diff(marker1, marker2, &wtime, &utime, &stime);
@@ -123,7 +123,7 @@ int sync_config(config *myconfig) {
     } else {
       /* all non proc 0 nodes gobble up some space */
       rawparams = malloc(4096);
-      bzero(rawparams, 4096);
+      memset(rawparams, 0, 4096);
     }
 
     /* bcast send out the new pindex */
@@ -206,7 +206,7 @@ int run_tests(config *myconfig) {
       fprintf(stderr, "\n\n");
     }
     index++;
-    bzero(buf, 4096);
+    memset(buf, 0, 4096);
   }
   free(buf);
   
@@ -313,9 +313,9 @@ int parse_configfile(config *myconfig) {
       if (strindex != NULL) {
 	*strindex = '\0';
 	pindex = lookup_test(myconfig, linebuf);
-	//	printf("pindex %d\n", pindex);
+	/*	printf("pindex %d\n", pindex); */
 	strindex++;
-	rawparams = strdup(strindex);
+	rawparams = (char *)strdup(strindex);
 	
 	if (pindex < 0) {
 	  fprintf(stderr, "parse error, test '%s' not found internally\n", linebuf);

@@ -301,4 +301,3 @@ diff -r 817f2e52d1c7 include/adioi.h
 
       /* deferred open:
       * we can only do this optimization if 'fd->hints->deferred_open' is set
- 

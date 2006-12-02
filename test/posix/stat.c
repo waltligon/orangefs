@@ -444,15 +444,14 @@ static void print_entry_kernel_stat_lite(
 	  printf("%s\n",buf);
 }
 
+/* the _syscallXX apprroach is not portable. instead, we'll use syscall and
+ * sadly forego any type checking.  For reference, here are the prototypes for
+ * the system calls 
 int newstatlite(const char *, struct kernel_stat_lite *);
 static int newfstatlite(int, struct kernel_stat_lite *);
 static int newlstatlite(const char *, struct kernel_stat_lite *);
 static int getdents(uint, struct dirent *, uint);
-
-_syscall2(int, newstatlite, const char *, path, struct kernel_stat_lite *, buf);
-_syscall2(int, newfstatlite, int, filedes, struct kernel_stat_lite *, buf);
-_syscall2(int, newlstatlite, const char *, path, struct kernel_stat_lite *, buf);
-_syscall3(int, getdents, uint, fd, struct dirent *, dirp, uint, count);
+*/
 
 /*
  * Notes: We don't follow symbolic links, and we ignore any special
@@ -490,7 +489,8 @@ static int path_walk(struct files *root_filp)
 										 S_SLITE_CTIME |
 										 S_SLITE_BLKSIZE |
 										 S_SLITE_BLOCKS;
-			ret = newlstatlite(root_filp->name, &statbuflite);
+			ret = syscall(__NR_newlstatlite, root_filp->name, 
+					&statbuflite);
 			is_dir = S_ISDIR(statbuflite.st_mode);
 			is_link = S_ISLNK(statbuflite.st_mode);
 		}
@@ -510,7 +510,7 @@ static int path_walk(struct files *root_filp)
 										 S_SLITE_CTIME |
 										 S_SLITE_BLKSIZE |
 										 S_SLITE_BLOCKS;
-			ret = newfstatlite(dir_fd, &statbuflite);
+			ret = syscall(__NR_newfstatlite, dir_fd, &statbuflite);
 			is_dir = S_ISDIR(statbuflite.st_mode);
 			is_link = S_ISLNK(statbuflite.st_mode);
 		}
@@ -555,7 +555,9 @@ static int path_walk(struct files *root_filp)
 						assert(p);
 					}
 					ptr = (char *) p + dirent_total_bytes;
-					dirent_output_bytes = getdents(dir_fd, (struct dirent *) ptr, 
+					dirent_output_bytes = syscall(__NR_getdents,
+							dir_fd, 
+							(struct dirent *) ptr, 
 							dirent_input_count * sizeof(struct dirent));
 					if (dirent_output_bytes <= 0)
 						break;

@@ -1,12 +1,5 @@
 /* pvfs2-config.h.in.  Generated from configure.in by autoheader.  */
 
-/* Define to explicitly use GNU extensions */
-#undef _GNU_SOURCE
-
-/* Define if you have the GNU extended strnlen function */
-#undef HAVE_STRNLEN
-
-
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
@@ -71,6 +64,9 @@
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
 
+/* Define if kernel has generic_file_readv */
+#undef HAVE_GENERIC_FILE_READV
+
 /* Define if kernel has generic_getxattr */
 #undef HAVE_GENERIC_GETXATTR
 
@@ -126,6 +122,9 @@
 /* Define if return value from follow_link in inode_operations is type int */
 #undef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
 
+/* Define if struct inode in kernel has i_blksize member */
+#undef HAVE_I_BLKSIZE_IN_STRUCT_INODE
+
 /* Define if kernel has i_size_read */
 #undef HAVE_I_SIZE_READ
 
@@ -165,11 +164,17 @@
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
 
+/* Define to 1 if you have the <mntent.h,> header file. */
+#undef HAVE_MNTENT_H_
+
 /* Use the MPE profiling library */
 #undef HAVE_MPE
 
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
+
+/* Define if including linux/config.h gives no warnings */
+#undef HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H
 
 /* Define to 1 if you have the <openssl/crypto.h> header file. */
 #undef HAVE_OPENSSL_CRYPTO_H
@@ -233,6 +238,9 @@
 
 /* Define to 1 if you have the `strtoull' function. */
 #undef HAVE_STRTOULL
+
+/* Define if struct xtvec is defined in the kernel */
+#undef HAVE_STRUCT_XTVEC
 
 /* Define if sysinfo.h is present */
 #undef HAVE_SYSINFO
@@ -303,10 +311,10 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of a `long int', as computed by sizeof. */
+/* The size of `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of a `void *', as computed by sizeof. */
+/* The size of `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */

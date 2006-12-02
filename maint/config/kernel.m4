@@ -99,6 +99,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_IGET5_LOCKED, 1, Define if kernel has iget5_locked),
 	)
 
+	dnl Check if the kernel defines the xtvec structure.
+	dnl This is part of a POSIX extension.
+	AC_MSG_CHECKING(for struct xtvec in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/uio.h>
+		static struct xtvec xv = { 0, 0 };
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STRUCT_XTVEC, 1, Define if struct xtvec is defined in the kernel),
+		AC_MSG_RESULT(no)
+	)
+
 	dnl The name of this field changed from memory_backed to capabilities
 	dnl in 2.6.12.
 	AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
@@ -143,6 +156,20 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has find_inode_handle callback),
 		AC_MSG_RESULT(no)
+	)
+
+	dnl 2.6.18.1 removed this member
+	AC_MSG_CHECKING(for i_blksize in struct inode)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode i = {
+			.i_blksize = 0,
+			};
+		], [],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_I_BLKSIZE_IN_STRUCT_INODE, 1, Define if struct inode in kernel has i_blksize member),
+			AC_MSG_RESULT(no)
 	)
 
 	dnl checking if we have a statfs_lite callback in super_operations 
@@ -310,7 +337,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			  static struct super_operations s_op = {
 				  .statfs = pvfs_statfs,
 			  };
-		], [],
+		], [ s_op.statfs = 0; ],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if statfs callback has struct dentry argument),
 		AC_MSG_RESULT(no)
@@ -327,7 +354,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			  static struct file_system_type fst = {
 				  .get_sb = pvfs_get_sb,
 			  };
-		], [],
+		], [fst.get_sb = 0;],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if get_sb callback has struct vfsmount argument),
 		AC_MSG_RESULT(no)
@@ -354,23 +381,26 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	if test "x$have_xattr" = "xyes"; then
 	   dnl Test to check if setxattr function has a const void * argument
 	   AC_MSG_CHECKING(for const argument to setxattr function)
-	   tmp_cflags=$CFLAGS
 	   dnl if this test passes, there is a const void* argument
-	   CFLAGS="$CFLAGS -Werror"
 	   AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		int pvfs2_setxattr(struct dentry *dentry, const char *name,
-		const void *value, size_t size, int flags) { return (0);};
-		static struct inode_operations in_op = {
-			.setxattr = pvfs2_setxattr
-		};
-		], [],
+		], 
+		[
+			struct inode_operations inode_ops;
+			int ret;
+			struct dentry * dent = NULL;
+			const char * name = NULL;
+			const void * val = NULL;
+			size_t size = 0;
+			int flags = 0;
+
+			ret = inode_ops.setxattr(dent, name, val, size, flags);
+		],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_SETXATTR_CONST_ARG, 1, Define if kernel setxattr has const void* argument),
 		AC_MSG_RESULT(no)
 		)
-		CFLAGS=$tmp_cflags
 	fi
 
 	dnl Test to see if sysctl proc handlers have a 6th argument
@@ -433,6 +463,25 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		[#define __KERNEL__
 		 #include <asm/ioctl32.h>
 		 ] )
+
+	AC_MSG_CHECKING(for generic_file_readv api in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel has it defined with a different
+	dnl signature!  deliberately, the signature for this method has been
+	dnl changed for it to give a compiler error.
+
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		int generic_file_readv(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GENERIC_FILE_READV, 1, Define if kernel has generic_file_readv),
+	)
 
 	AC_MSG_CHECKING(for generic_permission api in kernel)
 	dnl if this test passes, the kernel does not have it
@@ -520,24 +569,38 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	dnl I had to turn on -Werror for this test because i'm not sure how
 	dnl else to make dnl "initialization from incompatible pointer type"
 	dnl fail.  
-	tmp_cflags=${CFLAGS}
-	CFLAGS="${CFLAGS} -Werror"
 	AC_MSG_CHECKING(for older int return in invalidatepage)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		static int cfg_invalidate_page(struct page * page, unsigned long offset) {
-			return 0;
-		}
-		struct address_space_operations aso = 
-		{
-		    .invalidatepage = cfg_invalidate_page,
-		};
-		], [],
+		], 
+                [
+			struct address_space_operations aso;
+
+			int ret;
+			struct page * page = NULL;
+			unsigned long offset;
+
+			ret = aso.invalidatepage(page, offset);
+		],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE, 1, Define if return type of invalidatepage should be int),
 		AC_MSG_RESULT(NO)
 		)
+
+	dnl In 2.6.18.1 and newer, including <linux/config.h> will throw off a
+	dnl warning 
+	tmp_cflags=${CFLAGS}
+	CFLAGS="${CFLAGS} -Werror"
+	AC_MSG_CHECKING(for warnings when including linux/config.h)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/config.h>
+		], [], 
+		AC_MSG_RESULT(no)
+		AC_DEFINE(HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H, 1, Define if including linux/config.h gives no warnings),
+		AC_MSG_RESULT(yes)
+	)
 	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(for compat_ioctl member in file_operations structure)

@@ -86,6 +86,8 @@ as part of the following MPI implementations:
 \begin{itemize}
 \item MPICH2-0.96p2 or newer, though we suggest using the most recent MPICH2
 release
+\item OpenMPI-1.0 or newer, though it may not have some of the bug fixes or
+features of the MPICH2 version
 \end{itemize}
 
 \subsection{Untarring the packages}
@@ -950,33 +952,40 @@ The diagnostic level will be a bitwise OR of values specified in pvfs2-debug.h.
 \section{ROMIO Support}
 \label{sec:romio}
 
-Building ROMIO with PVFS2 support can be a bit tricky, and is certainly
-not well documented.  While ROMIO has been updated with PVFS2 support,
-only MPICH2 has included a recent snapshot of ROMIO.  
+Building ROMIO with PVFS2 support can be a bit tricky, and is certainly not
+well documented.  Reports of the correct way to build for OpenMPI would be
+appreciated.  This document will cover building for MPICH2. 
 
 First, get the software.  Download MPICH2 from
-http://www.mcs.anl.gov/mpi/mpich2/.  While MPICH2 contains a ROMIO
-with PVFS2 support, the PVFS2 API has continued to stabilize since
-MPICH2 was last released.  Patches to syncronize the ROMIO in MPICH2
-with PVFS2 can be found at
-http://www.mcs.anl.gov/romio/pvfs2-patches.html.  There is also a
-patch in the PVFS2 source in {\tt doc/coding}. For example's sake,
-assume all software was downloaded to {\tt \$\{HOME\}/src}.
+http://www.mcs.anl.gov/mpi/mpich2/.  We may have found bug fixes since the last MPICH2 release.  If there are bug fixes, they can be found at
+http://www.mcs.anl.gov/romio/pvfs2-patches.html. 
 
-Unpack mpich2, then change to the src/mpi/romio directory.  Apply the
-ROMIO patch.  The patch makes changes to the ROMIO configure scripts, so you'll have to re-run {\tt autoconf} to generate a new configure file.
+Unpack mpich2. Apply the ROMIO patch in the src/mpi/romio directory if one is
+needed. 
 
 \begin{verbatim}
-prompt% tar xzf ~/src/mpich2-0.96p2.tar.gz     # unpack mpich2 source
-prompt% cd mpich2-0.96p2/src/mpi/romio         # change to ROMIO dir
+prompt% tar xzf ~/src/mpich2-1.4.0p1.tar.gz    # unpack mpich2 source
+prompt% cd mpich2-1.4.0p1/src/mpi/romio        # change to ROMIO dir
 prompt% patch -p1 < ~/src/romio-<CORRECT_VERSION>.diff   #apply patch
-prompt% autoconf                               # create a new 'configure'
 prompt% cd ../../..                            # return to top of src
 prompt% 
 \end{verbatim}
 
-In order to build MPICH2 with a ROMIO that speaks PVFS2, a few changes
-have to be made to the normal configure process.  MPICH2 will need to
+In order to build MPICH2 with a ROMIO that speaks PVFS2, pass the
+\texttt{--with-pvfs2=PVFS\_PREFIX} option to configure.  'PVFS2\_PREFIX' is the
+prefix you gave to the PVFS configure script (e.g. /usr/local or
+/opt/packages/pvfs-2.6.0).  
+
+\begin{verbatim}
+configure --with-pvfs2=PVFS_PREFIX [other flags]
+\end{verbatim}
+
+Now compile and install MPICH2 as you normally would.  Applications accessing
+PVFS2 through MPI-IO will bypass the kernel interface and talk to PVFS2 servers
+directly.  
+
+Please note: older versions of MPICH2 need a few changes
+to the normal configure process.  MPICH2-1.0.4p1 and older will need to
 know the path to the PVFS2 installation.  Modify the {\tt CFLAGS},
 {\tt LDFLAGS} and {\tt LIBS} environment variables.
 
@@ -984,18 +993,7 @@ know the path to the PVFS2 installation.  Modify the {\tt CFLAGS},
 prompt% export CFLAGS="<other desired flags> -I/usr/local/pvfs2/include"
 prompt% export LDFLAGS="-L/usr/local/pvfs2/lib"
 prompt% export LIBS="-lpvfs2 -lpthread"
-prompt%
+prompt% configure --with-file-system=ufs+nfs+testfs+pvfs2 [other flags]
 \end{verbatim}
-
-The MPICH2 configure script needs a some additional arguments to build
-ROMIO correctly.  The {\tt enable-romio} flag builds ROMIO and  the
-{\tt with-file-system} flag tells ROMIO which file systems to support. 
-
-\begin{verbatim}
-configure --enable-romio --with-file-system=ufs+nfs+pvfs2 [other flags]
-\end{verbatim}
-
-Now compile and install MPICH2 as you normally would.  Applications accessing
-PVFS2 through MPI-IO will bypass the kernel interface and talk to PVFS2 servers directly.  
 
 \end{document}

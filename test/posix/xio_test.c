@@ -34,15 +34,17 @@ struct xtvec {
 	size_t xtv_len;
 };
 
+
+/* the _syscallXX apprroach is not portable. instead, we'll use syscall and
+ * sadly forego any type checking.  For reference, here are the prototypes for
+ * the system calls       
 static ssize_t readx(unsigned long fd,
 		const struct iovec * iov, unsigned long iovlen, 
 		const struct xtvec * xtv, unsigned long xtvlen);
 static ssize_t writex(unsigned long fd, 
 		const struct iovec * iov, unsigned long iovlen,
 		const struct xtvec * xtv, unsigned long xtvlen);
-
-_syscall5(ssize_t, readx, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
-_syscall5(ssize_t, writex, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
+*/
 
 #ifndef min
 #define min(a, b) (a) < (b) ? (a) : (b)
@@ -101,7 +103,7 @@ static ssize_t do_writex(struct iovec *iov, unsigned long ivlen, struct xtvec *x
 	double time1, time2;
 	fd = open(fname, O_RDWR | O_CREAT | O_TRUNC, 0700);
 	time1 = Wtime();
-	ret = writex(fd, iov, ivlen, xtv, xtvlen);
+	ret = syscall(__NR_writex, fd, iov, ivlen, xtv, xtvlen);
 	time2 = Wtime();
 	if (ret < 0)
 	{
@@ -120,7 +122,7 @@ static ssize_t do_readx(struct iovec *iov, unsigned long ivlen, struct xtvec *xt
 	double time1, time2;
 	fd = open(fname, O_RDONLY);
 	time1 = Wtime();
-	ret = readx(fd, iov, ivlen, xtv, xtvlen);
+	ret = syscall(__NR_readx, fd, iov, ivlen, xtv, xtvlen);
 	time2 = Wtime();
 	if (ret < 0)
 	{

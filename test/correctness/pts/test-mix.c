@@ -92,8 +92,8 @@ static int test_mx(void){
    PINT_dump_packed_request(r_packed);
                                                                                                                                                        
    /* skipping logical bytes */
-   // PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);
-   // PINT_REQUEST_STATE_SET_FINAL(rs1,(6 * 1024) + 512);
+   /*  PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512); */
+   /* PINT_REQUEST_STATE_SET_FINAL(rs1,(6 * 1024) + 512); */
                                                                                                                                                        
                                                                                                                                                        
    printf("\n************************************\n");

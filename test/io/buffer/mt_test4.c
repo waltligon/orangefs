@@ -76,7 +76,7 @@ int main(int argc, char * argv[])
     //cache_dump_inactive_list();
 
     trove_close_context(coll_id, trove_context);
-    trove_finalize();
+    trove_finalize(TROVE_METHOD_DBPF);
 
     return 0;
 }

@@ -42,6 +42,7 @@ struct PVFS_sys_attr_s
     PVFS2_ALIGN_VAR(char*, dist_params); /* NOTE: caller must free if valid */
     PVFS_size dirent_count;
     PVFS_ds_type objtype;
+    PVFS_flags flags;
     uint32_t mask;
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;

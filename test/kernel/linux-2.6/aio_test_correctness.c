@@ -11,6 +11,7 @@
  */
 
 #define _GNU_SOURCE
+#include "pvfs2-test-config.h"
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -25,58 +26,13 @@
 
 
 
-int check_zero(char *buf, int size)
-{
-	int *iptr;
-
-	iptr = (int *)buf;
-
-	while (size > 0) {
-		if (*iptr++ != 0) {
-			fprintf(stderr, "non zero buffer at buf[%d]\n",
-				((char *)iptr) - buf);
-			return 1;
-		}
-		size -= 4;
-	}
-	return 0;	/* all zeros */
-}
-
-int read_eof(char *filename)
-{
-	int fd;
-	int i;
-	int r;
-	char buf[4096];
-
-	while ((fd = open(filename, O_RDONLY)) < 0) {
-		sleep(1);	/* wait for file to be created */
-	}
-
-	for (i = 0 ; i < 1000000; i++) {
-		off_t offset;
-		int bufoff;
-
-		offset = lseek(fd, SEEK_END, 0);
-		r = read(fd, buf, 4096);
-		if (r > 0) {
-			if ((bufoff = check_zero(buf, 4096))) {
-				fprintf(stderr, "non-zero read at offset %ld\n",
-					offset + bufoff);
-				exit(1);
-			}
-		}
-	}
-	return 0;
-}
-
 #define NUM_AIO 18
 #define AIO_SIZE 64*1024
 
 /*
  * write to the different portions of a file using AIO.
  */
-void aiodio_write(char *filename, void **all_bufs)
+static void aiodio_write(char *filename, void **all_bufs)
 {
 	int fd;
 	void *bufptr;
@@ -128,7 +84,7 @@ void aiodio_write(char *filename, void **all_bufs)
 /*
  * read from different parts of the file using AIO.
  */
-void aiodio_read(char *filename, void **all_bufs)
+static void aiodio_read(char *filename, void **all_bufs)
 {
 	int fd;
 	void *bufptr;
