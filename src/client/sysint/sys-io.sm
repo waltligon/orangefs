@@ -1663,7 +1663,7 @@ static inline int io_post_flow(
     unsigned long status_user_tag = 0;
     struct filesystem_configuration_s * fs_config;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "- build_context_flow called\n");
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: entry\n", __func__);
 
     if (!sm_p || !cur_ctx)
     {
@@ -1674,6 +1674,23 @@ static inline int io_post_flow(
     attr = &sm_p->getattr.attr;
     assert(attr);
     
+    /*
+     * Notify BMI about the memory buffer the user passed in.  For transports
+     * that need registration, this allows them to work with one large region
+     * rather than lots of small stripe-size regions.  But only bother if the
+     * request is contiguous; too complex and likely no faster in the highly
+     * fragmented case.
+     */
+    if (sm_p->u.io.mem_req->num_contig_chunks == 1)
+    {
+        struct bmi_optimistic_buffer_info binfo;
+
+        binfo.buffer = sm_p->u.io.buffer;
+        binfo.len = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
+        binfo.rw = sm_p->u.io.io_type;
+        BMI_set_info(cur_ctx->msg.svr_addr, BMI_OPTIMISTIC_BUFFER_REG, &binfo);
+    }
+
     gossip_debug(GOSSIP_IO_DEBUG, "* mem req size is %lld, "
                  "file_req size is %lld (bytes)\n",
                  lld(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req)),
