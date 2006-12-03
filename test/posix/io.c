@@ -136,11 +136,11 @@ int main(int argc, char **argv)
 
 			if (err < 0)
 				fprintf(stderr, "node %d, write error, loc = %Ld: %s\n",
-						  mynod, mynod*opt_block, strerror(myerrno));
+						  mynod, (long long) mynod*opt_block, strerror(myerrno));
 			/* only way sync_err can be nonzero is if opt_sync set*/
 			if (opt_sync && sync_err < 0)
 				fprintf(stderr, "node %d, sync error, loc = %Ld: %s\n",
-						  mynod, mynod*opt_block, strerror(sync_errno));
+						  mynod, (long long) mynod*opt_block, strerror(sync_errno));
 			
 		} /* end of write loop */
 
@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 
 			if (err < 0)
 				fprintf(stderr, "node %d, read error, loc = %Ld: %s\n", mynod,
-						  mynod*opt_block, strerror(myerrno));
+						  (long long) mynod*opt_block, strerror(myerrno));
 
 			/* if the user wanted to check correctness, compare the write
 			 * buffer to the read buffer
@@ -274,9 +274,9 @@ int main(int argc, char **argv)
 		(max_write_tim*1000000.0);
 		
 		printf("nr_procs = %d, nr_iter = %d, blk_sz = %Ld\n",
-		nprocs, opt_iter, opt_block);
+		nprocs, opt_iter, (long long) opt_block);
 		
-		printf("# total_size = %Ld\n", (opt_block*nprocs*opt_iter));
+		printf("# total_size = %Ld\n", (long long) opt_block*nprocs*opt_iter);
 		
 		if (opt_write)
 			printf("# Write:  min_t = %f, max_t = %f, mean_t = %f, var_t = %f\n", 
