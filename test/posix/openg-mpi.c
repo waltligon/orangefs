@@ -34,11 +34,16 @@
 #define __NR_openfh 274
 #endif
 
-static long openg(const char *, void *, size_t *, int, int);
-static long openfh(const void *, size_t);
+static long openg(const char *pathname, void *uhandle, size_t *uhandle_len,
+                  int flags, int mode)
+{
+    return syscall(__NR_openg, pathname, uhandle, uhandle_len, flags, mode);
+}
 
-_syscall2(long, openfh, const void *, uhandle, size_t, handle_len);
-_syscall5(long, openg, const char *, pathname, void *, uhandle, size_t *, uhandle_len, int, flags, int, mode);
+static long openfh(const void *uhandle, size_t handle_len)
+{
+    return syscall(__NR_openfh, uhandle, handle_len);
+}
 
 #define MAX_LENGTH 128
 
