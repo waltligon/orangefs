@@ -39,6 +39,10 @@ do {                                              \
   wake_up_interruptible(&op->io_completion_waitq);\
 } while(0)
 
+#ifndef HAVE_COMBINED_AIO_AND_VECTOR
+/* <2.6.19 called it this instead */
+#define do_sync_read generic_file_read
+#endif
 
 /** Called when a process requests to open a file.
  */
@@ -124,7 +128,7 @@ struct rw_options {
     struct kiocb *iocb;
     union {
         struct {
-            struct iovec *iov;
+            const struct iovec *iov;
             unsigned long nr_segs;
         } address;
         struct {
@@ -470,7 +474,7 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
     struct file *file;
     unsigned int to_free;
     size_t count;
-    struct iovec *iov;
+    const struct iovec *iov;
     unsigned long nr_segs, seg, new_nr_segs = 0;
     unsigned long max_new_nr_segs = 0;
     unsigned long  seg_count = 0;
@@ -737,7 +741,7 @@ ssize_t pvfs2_file_read(
     if (IS_IMMUTABLE(rw.inode)) 
     {
         rw.readahead_size = (rw.inode)->i_size;
-        return generic_file_read(file, buf, count, offset);
+        return do_sync_read(file, buf, count, offset);
     }
     else 
     {
@@ -776,6 +780,8 @@ static ssize_t pvfs2_file_write(
     return do_direct_readv_writev(&rw);
 }
 
+/* compat code, < 2.6.19 */
+#ifndef HAVE_COMBINED_AIO_AND_VECTOR
 /** Reads data to several contiguous user buffers (an iovec) from a file at a
  * specified offset.
  */
@@ -831,6 +837,7 @@ static ssize_t pvfs2_file_writev(
 
     return do_direct_readv_writev(&rw);
 }
+#endif
 
 
 /* Construct a trailer of <file offsets, length pairs> in a buffer that we
@@ -1207,7 +1214,7 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
     unsigned int to_free;
-    struct iovec *iov; 
+    const struct iovec *iov; 
     unsigned long seg, nr_segs, xtnr_segs;
     struct xtvec *xtvec; 
     unsigned long max_new_nr_segs_mem, max_new_nr_segs_stream;
@@ -1877,7 +1884,7 @@ static ssize_t do_direct_aio_read_write(struct rw_options *rw)
     struct inode *inode;
     ssize_t error;
     pvfs2_inode_t *pvfs2_inode;
-    struct iovec *iov;
+    const struct iovec *iov;
     unsigned long nr_segs, max_new_nr_segs;
     size_t count;
     struct kiocb *iocb;
@@ -2091,12 +2098,12 @@ out_error:
     return error;
 }
 
-static ssize_t 
-pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
-        size_t count, loff_t offset)
+static ssize_t pvfs2_file_aio_read_iovec(struct kiocb *iocb,
+                                         const struct iovec *iov,
+                                         unsigned long nr_segs, loff_t offset)
 {
     struct rw_options rw;
-    struct iovec vec;
+
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
     rw.type = IO_READ;
@@ -2105,8 +2112,6 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     rw.copy_to_user = 1;
     rw.fnstr = __FUNCTION__;
     rw.iocb = iocb;
-    vec.iov_base = (char __user *) buffer;
-    vec.iov_len  = count;
     rw.file = iocb->ki_filp;
     if (!rw.file || !(rw.file)->f_mapping)
     {
@@ -2114,13 +2119,19 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     }
     rw.inode = (rw.file)->f_mapping->host;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
-    rw.dest.address.iov = &vec;
-    rw.dest.address.nr_segs = 1;
+    rw.dest.address.iov = iov;
+    rw.dest.address.nr_segs = nr_segs;
 
     if (IS_IMMUTABLE(rw.inode)) 
     {
         rw.readahead_size = (rw.inode)->i_size;
-        return generic_file_aio_read(iocb, buffer, count, offset);
+#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+        return generic_file_aio_read(iocb, iov, nr_segs, offset);
+#else
+        /* compatibility code; know nr_segs == 1 as only caller is the
+         * compat function below */
+        return generic_file_aio_read(iocb, iov->iov_base, iov->iov_len, offset);
+#endif
     }
     else 
     {
@@ -2129,12 +2140,11 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     }
 }
 
-static ssize_t 
-pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
-        size_t count, loff_t offset)
+static ssize_t pvfs2_file_aio_write_iovec(struct kiocb *iocb,
+                                          const struct iovec *iov,
+                                          unsigned long nr_segs, loff_t offset)
 {
     struct rw_options rw;
-    struct iovec vec;
 
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
@@ -2145,8 +2155,6 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     rw.copy_to_user = 1;
     rw.fnstr = __FUNCTION__;
     rw.iocb = iocb;
-    vec.iov_base = (char __user *) buffer;
-    vec.iov_len  = count;
     rw.file = iocb->ki_filp;
     if (!rw.file || !(rw.file)->f_mapping)
     {
@@ -2154,12 +2162,37 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     }
     rw.inode = (rw.file)->f_mapping->host;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
-    rw.dest.address.iov = &vec;
-    rw.dest.address.nr_segs = 1;
+    rw.dest.address.iov = iov;
+    rw.dest.address.nr_segs = nr_segs;
     return do_direct_aio_read_write(&rw);
 }
 
+/* compat functions for < 2.6.19 */
+#ifndef HAVE_COMBINED_AIO_AND_VECTOR
+static ssize_t 
+pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
+        size_t count, loff_t offset)
+
+{
+    struct iovec iov = {
+        .iov_base = buffer,
+        .iov_len = count,
+    };
+    return pvfs2_file_aio_read_iovec(iocb, &iov, 1, offset);
+}
+
+static ssize_t 
+pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
+        size_t count, loff_t offset)
+{
+    struct iovec iov = {
+        .iov_base = (void __user *) buffer,  /* discard const so it fits */
+        .iov_len = count,
+    };
+    return pvfs2_file_aio_write_iovec(iocb, &iov, 1, offset);
+}
 #endif
+#endif  /* HAVE_AIO_VFS_SUPPORT */
 
 /** Perform a miscellaneous operation on a file.
  */
@@ -2486,11 +2519,17 @@ struct file_operations pvfs2_file_operations =
     .llseek = pvfs2_file_llseek,
     .read = pvfs2_file_read,
     .write = pvfs2_file_write,
+#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+    /* for >= 2.6.19 */
+    .aio_read = pvfs2_file_aio_read_iovec,
+    .aio_write = pvfs2_file_aio_write_iovec,
+#else
     .readv = pvfs2_file_readv,
     .writev = pvfs2_file_writev,
-#ifdef HAVE_AIO_VFS_SUPPORT
+#  ifdef HAVE_AIO_VFS_SUPPORT
     .aio_read = pvfs2_file_aio_read,
     .aio_write = pvfs2_file_aio_write,
+#  endif
 #endif
     .ioctl = pvfs2_ioctl,
     .mmap = pvfs2_file_mmap,
