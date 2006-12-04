@@ -1,3 +1,0 @@
-DIR := src/common/gossip
-LIBSRC += $(DIR)/gossip.c
-SERVERSRC += $(DIR)/gossip.c
