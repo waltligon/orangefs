@@ -7,22 +7,92 @@
 #include "pvfs2-bufmap.h"
 #include "pint-dev-shared.h"
 
-#define BUFMAP_PAGE_COUNT (PVFS2_BUFMAP_TOTAL_SIZE/PAGE_SIZE)
-#define PAGES_PER_DESC (PVFS2_BUFMAP_DEFAULT_DESC_SIZE/PAGE_SIZE)
+
+static int bufmap_page_count, pages_per_desc;
+
+static int32_t pvfs2_bufmap_desc_size, pvfs2_bufmap_desc_shift,
+               pvfs2_bufmap_desc_count, pvfs2_bufmap_total_size;
+
+inline int pvfs_bufmap_size_query(void)
+{
+    return pvfs2_bufmap_desc_size;
+}
+
+inline int pvfs_bufmap_shift_query(void)
+{
+    return pvfs2_bufmap_desc_shift;
+}
 
 static int bufmap_init = 0;
 static struct page **bufmap_page_array = NULL;
+
 /* array to track usage of buffer descriptors */
-static int buffer_index_array[PVFS2_BUFMAP_DESC_COUNT] = {0};
+static int *buffer_index_array = NULL;
 static spinlock_t buffer_index_lock = SPIN_LOCK_UNLOCKED;
 
 /* array to track usage of buffer descriptors for readdir/readdirplus */
-int readdir_index_array[PVFS2_READDIR_DESC_COUNT] = {0};
+static int readdir_index_array[PVFS2_READDIR_DEFAULT_DESC_COUNT] = {0};
 static spinlock_t readdir_index_lock = SPIN_LOCK_UNLOCKED;
 
-static struct pvfs_bufmap_desc desc_array[PVFS2_BUFMAP_DESC_COUNT];
+static struct pvfs_bufmap_desc *desc_array = NULL;
+
 static DECLARE_WAIT_QUEUE_HEAD(bufmap_waitq);
 static DECLARE_WAIT_QUEUE_HEAD(readdir_waitq);
+
+static int initialize_bufmap_descriptors(int ndescs)
+{
+    int err;
+
+    err = -EINVAL;
+    if (ndescs < 0)
+    {
+        gossip_err("pvfs2: ndescs (%d) cannot be < 0.\n", ndescs);
+        goto out;
+    }
+    err = -ENOMEM;
+    buffer_index_array = (int *) kmalloc(ndescs * sizeof(int), 
+                                         PVFS2_BUFMAP_GFP_FLAGS);
+    if (buffer_index_array == NULL) 
+    {
+        gossip_err("pvfs2: could not allocate %d bytes\n",
+                ndescs * sizeof(int));
+        goto out;
+    }
+    memset(buffer_index_array, 0, ndescs * sizeof(int));
+
+    desc_array = (struct pvfs_bufmap_desc *) 
+                 kmalloc(ndescs * sizeof(struct pvfs_bufmap_desc),
+                         PVFS2_BUFMAP_GFP_FLAGS);
+    if (desc_array == NULL)
+    {
+        gossip_err("pvfs2: could not allocate %d bytes\n",
+                ndescs * sizeof(struct pvfs_bufmap_desc));
+        goto out1;
+    }
+    err = 0;
+    goto out;
+
+out1:
+    kfree(buffer_index_array);
+    buffer_index_array = NULL;
+out:
+    return err;
+}
+
+static void finalize_bufmap_descriptors(void)
+{
+    if (buffer_index_array != NULL) 
+    {
+        kfree(buffer_index_array);
+        buffer_index_array = NULL;
+    }
+    if (desc_array != NULL)
+    {
+        kfree(desc_array);
+        desc_array = NULL;
+    }
+    return;
+}
 
 /* pvfs_bufmap_initialize()
  *
@@ -36,7 +106,9 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     int i = 0;
     int offset = 0;
 
-    gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_initialize: called\n");
+    gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_initialize: called "
+                 "(ptr (%p) sz (%d) cnt(%d).\n",
+                 user_desc->ptr, user_desc->size, user_desc->count);
 
     if (bufmap_init == 1)
     {
@@ -51,34 +123,50 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     if (PAGE_ALIGN((unsigned long)user_desc->ptr) != 
         (unsigned long)user_desc->ptr)
     {
-        gossip_err("pvfs2 error: memory alignment (front).\n");
+        gossip_err("pvfs2 error: memory alignment (front). %p\n",
+                user_desc->ptr);
         goto init_failure;
     }
 
-    if (PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->size)) != 
-        (unsigned long)(user_desc->ptr + user_desc->size))
+    if (PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->total_size)) != 
+        (unsigned long)(user_desc->ptr + user_desc->total_size))
     {
-        gossip_err("pvfs2 error: memory alignment (back).\n");
+        gossip_err("pvfs2 error: memory alignment (back).(%p + %d)\n",
+                user_desc->ptr, user_desc->total_size);
         goto init_failure;
     }
 
-    if (user_desc->size != PVFS2_BUFMAP_TOTAL_SIZE)
+    if (user_desc->total_size != (user_desc->size * user_desc->count))
     {
         gossip_err("pvfs2 error: user provided an oddly "
-                    "sized buffer...\n");
+                    "sized buffer...(%d, %d, %d)\n",
+                    user_desc->total_size, user_desc->size, user_desc->count);
         goto init_failure;
     }
 
-    if ((PVFS2_BUFMAP_DEFAULT_DESC_SIZE % PAGE_SIZE) != 0)
+    if ((user_desc->size % PAGE_SIZE) != 0)
     {
         gossip_err("pvfs2 error: bufmap size not page size "
-                    "divisible.\n");
+                    "divisible (%d).\n", user_desc->size);
+        goto init_failure;
+    }
+    /* Initialize critical variables */
+    pvfs2_bufmap_total_size = user_desc->total_size;
+    pvfs2_bufmap_desc_count = user_desc->count;
+    pvfs2_bufmap_desc_size  = user_desc->size;
+    pvfs2_bufmap_desc_shift = LOG2(pvfs2_bufmap_desc_size);
+    bufmap_page_count = pvfs2_bufmap_total_size / PAGE_SIZE;
+    pages_per_desc    = pvfs2_bufmap_desc_size / PAGE_SIZE;
+    /* Initialize descriptor arrays */
+    if ((ret = initialize_bufmap_descriptors(pvfs2_bufmap_desc_count)) < 0)
+    {
         goto init_failure;
     }
 
     /* allocate storage to track our page mappings */
-    bufmap_page_array = (struct page **)kmalloc(
-        BUFMAP_PAGE_COUNT*sizeof(struct page *), PVFS2_BUFMAP_GFP_FLAGS);
+    bufmap_page_array = (struct page **)
+                         kmalloc(bufmap_page_count * sizeof(struct page *),
+                                 PVFS2_BUFMAP_GFP_FLAGS);
     if (!bufmap_page_array)
     {
         ret = -ENOMEM;
@@ -90,7 +178,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
 
     ret = get_user_pages(
         current, current->mm, (unsigned long)user_desc->ptr,
-        BUFMAP_PAGE_COUNT, 1, 0, bufmap_page_array, NULL);
+        bufmap_page_count, 1, 0, bufmap_page_array, NULL);
 
     up_read(&current->mm->mmap_sem);
 
@@ -104,10 +192,10 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
       in theory we could run with what we got, but I will just treat
       it as an error for simplicity's sake right now
     */
-    if (ret != BUFMAP_PAGE_COUNT)
+    if (ret != bufmap_page_count)
     {
         gossip_err("pvfs2 error: asked for %d pages, only got %d.\n",
-                    (int)BUFMAP_PAGE_COUNT, ret);
+                    (int) bufmap_page_count, ret);
 
         for(i = 0; i < ret; i++)
         {
@@ -129,37 +217,43 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
       it's worth.  in 2.4.x, marking the pages does what's expected
       and doesn't try to swap out our pages
     */
-    for(i = 0; i < BUFMAP_PAGE_COUNT; i++)
+    for(i = 0; i < bufmap_page_count; i++)
     {
         flush_dcache_page(bufmap_page_array[i]);
         pvfs2_set_page_reserved(bufmap_page_array[i]);
     }
 
     /* build a list of available descriptors */
-    for(offset = 0, i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
+    for(offset = 0, i = 0; i < pvfs2_bufmap_desc_count; i++)
     {
         desc_array[i].page_array = &bufmap_page_array[offset];
-        desc_array[i].array_count = PAGES_PER_DESC;
+        desc_array[i].array_count = pages_per_desc;
         desc_array[i].uaddr =
-            (user_desc->ptr + (i * PAGES_PER_DESC * PAGE_SIZE));
-        offset += PAGES_PER_DESC;
+            (user_desc->ptr + (i * pages_per_desc * PAGE_SIZE));
+        offset += pages_per_desc;
     }
 
     /* clear any previously used buffer indices */
     spin_lock(&buffer_index_lock);
-    for(i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
+    for(i = 0; i < pvfs2_bufmap_desc_count; i++)
     {
         buffer_index_array[i] = 0;
     }
     spin_unlock(&buffer_index_lock);
+    spin_lock(&readdir_index_lock);
+    for (i = 0; i < PVFS2_READDIR_DEFAULT_DESC_COUNT; i++)
+    {
+        readdir_index_array[i] = 0;
+    }
+    spin_unlock(&readdir_index_lock);
 
     bufmap_init = 1;
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_initialize: exiting normally\n");
     return 0;
 
-  init_failure:
-
+init_failure:
+    finalize_bufmap_descriptors();
     return ret;
 }
 
@@ -183,7 +277,7 @@ void pvfs_bufmap_finalize(void)
         return;
     }
 
-    for(i = 0; i < BUFMAP_PAGE_COUNT; i++)
+    for(i = 0; i < bufmap_page_count; i++)
     {
         pvfs2_clear_page_reserved(bufmap_page_array[i]);
         page_cache_release(bufmap_page_array[i]);
@@ -192,6 +286,7 @@ void pvfs_bufmap_finalize(void)
 
     bufmap_init = 0;
 
+    finalize_bufmap_descriptors();
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_finalize: exiting normally\n");
 }
 
@@ -281,7 +376,7 @@ int pvfs_bufmap_get(int *buffer_index)
 {
     struct slot_args slargs;
 
-    slargs.slot_count = PVFS2_BUFMAP_DESC_COUNT;
+    slargs.slot_count = pvfs2_bufmap_desc_count;
     slargs.slot_array = buffer_index_array;
     slargs.slot_lock  = &buffer_index_lock;
     slargs.slot_wq    = &bufmap_waitq;
@@ -298,7 +393,7 @@ void pvfs_bufmap_put(int buffer_index)
 {
     struct slot_args slargs;
 
-    slargs.slot_count = PVFS2_BUFMAP_DESC_COUNT;
+    slargs.slot_count = pvfs2_bufmap_desc_count;
     slargs.slot_array = buffer_index_array;
     slargs.slot_lock  = &buffer_index_lock;
     slargs.slot_wq    = &bufmap_waitq;
@@ -320,7 +415,7 @@ int readdir_index_get(int *buffer_index)
 {
     struct slot_args slargs;
 
-    slargs.slot_count = PVFS2_READDIR_DESC_COUNT;
+    slargs.slot_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
     slargs.slot_array = readdir_index_array;
     slargs.slot_lock  = &readdir_index_lock;
     slargs.slot_wq    = &readdir_waitq;
@@ -331,7 +426,7 @@ void readdir_index_put(int buffer_index)
 {
     struct slot_args slargs;
 
-    slargs.slot_count = PVFS2_READDIR_DESC_COUNT;
+    slargs.slot_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
     slargs.slot_array = readdir_index_array;
     slargs.slot_lock  = &readdir_index_lock;
     slargs.slot_wq    = &readdir_waitq;

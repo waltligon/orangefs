@@ -53,6 +53,8 @@ typedef struct
     char *path;
     char *logfile;
     char *logstamp;
+    char *dev_buffer_count;
+    char *dev_buffer_size;
     int threaded;
 } options_t;
 
@@ -345,6 +347,18 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->logstamp;
                 arg_index+=2;
             }
+            if(opts->dev_buffer_count)
+            {
+                arg_list[arg_index] = "--desc-count";
+                arg_list[arg_index+1] = opts->dev_buffer_count;
+                arg_index+=2;
+            }
+            if(opts->dev_buffer_size)
+            {
+                arg_list[arg_index] = "--desc-size";
+                arg_list[arg_index+1] = opts->dev_buffer_size;
+                arg_index+=2;
+            }
 
             ret = execvp(opts->path, arg_list);
 
@@ -406,6 +420,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"ncache-timeout",1,0,0},
         {"ncache-soft-limit",1,0,0},
         {"ncache-hard-limit",1,0,0},
+        {"desc-count",1,0,0},
+        {"desc-size",1,0,0},
         {"ncache-reclaim-percentage",1,0,0},
         {"perf-time-interval-secs",1,0,0},
         {"perf-history-size",1,0,0},
@@ -490,6 +506,16 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("ncache-reclaim-percentage", cur_option) == 0)
                 {
                     opts->ncache_reclaim_percentage = optarg;
+                    break;
+                }
+                else if (strcmp("desc-count", cur_option) == 0) 
+                {
+                    opts->dev_buffer_count = optarg;
+                    break;
+                }
+                else if (strcmp("desc-size", cur_option) == 0)
+                {
+                    opts->dev_buffer_size = optarg;
                     break;
                 }
                 else if (strcmp("perf-time-interval-secs", cur_option) == 0)

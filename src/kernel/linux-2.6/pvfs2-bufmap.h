@@ -18,8 +18,11 @@ struct pvfs_bufmap_desc
     struct list_head list_link;
 };
 
-/* this would be a function call if the buffer sizes weren't hard coded */
-#define pvfs_bufmap_size_query() PVFS2_BUFMAP_DEFAULT_DESC_SIZE
+/* pvfs_bufmap_size_query is now an inline function because buffer
+   sizes are not hardcoded */
+int pvfs_bufmap_size_query(void);
+
+int pvfs_bufmap_shift_query(void);
 
 int pvfs_bufmap_initialize(
     struct PVFS_dev_map_desc *user_desc);
