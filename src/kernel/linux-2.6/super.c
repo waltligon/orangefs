@@ -5,6 +5,7 @@
  */
 
 #include "pvfs2-kernel.h"
+#include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
 /* list for storing pvfs2 specific superblocks in use */
@@ -949,8 +950,8 @@ struct super_block* pvfs2_get_sb(
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
 
-    sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
-    sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
+    sb->s_blocksize = pvfs2_bufmap_desc_size;
+    sb->s_blocksize_bits = pvfs2_bufmap_desc_shift;
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;
@@ -1070,8 +1071,8 @@ int pvfs2_fill_sb(
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
 
-    sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
-    sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
+    sb->s_blocksize = pvfs_bufmap_size_query();
+    sb->s_blocksize_bits = pvfs_bufmap_shift_query();
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;

@@ -787,7 +787,9 @@ static int pvfs2_devreq_ioctl(
 struct PVFS_dev_map_desc32 
 {
     compat_uptr_t ptr;
+    int32_t      total_size;
     int32_t      size;
+    int32_t      count;
 };
 
 #ifndef PVFS2_LINUX_KERNEL_2_4
@@ -806,8 +808,12 @@ static unsigned long translate_dev_map26(
     /* try to put that into a 64-bit layout */
     if (put_user(compat_ptr(addr), &p->ptr))
         goto err;
-    /* copy the remaining field */
+    /* copy the remaining fields */
+    if (copy_in_user(&p->total_size, &p32->total_size, sizeof(int32_t)))
+        goto err;
     if (copy_in_user(&p->size, &p32->size, sizeof(int32_t)))
+        goto err;
+    if (copy_in_user(&p->count, &p32->count, sizeof(int32_t)))
         goto err;
     return (unsigned long) p;
 err:
@@ -819,17 +825,23 @@ static unsigned long translate_dev_map24(
         unsigned long args, struct PVFS_dev_map_desc *p, long *error)
 {
     struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
-    u32 addr, size;
+    u32 addr, size, total_size, count;
 
     *error = 0;
     /* get the ptr from the 32 bit user-space */
     if (get_user(addr, &p32->ptr))
         goto err;
     p->ptr = compat_ptr(addr);
-    /* copy the size */
+    /* copy the remaining fields */
+    if (get_user(total_size, &p32->total_size))
+        goto err;
     if (get_user(size, &p32->size))
         goto err;
+    if (get_user(count, &p32->count))
+        goto err;
+    p->total_size = total_size;
     p->size = size;
+    p->count = count;
     return 0;
 err:
     *error = -EFAULT;

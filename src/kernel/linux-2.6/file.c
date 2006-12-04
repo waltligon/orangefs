@@ -311,7 +311,9 @@ out:
 /*
  * The reason we need to do this is to be able to support 
  * readv and writev that are
- * larger than PVFS_DEFAULT_DESC_SIZE (4 MB). What that means is that
+ * larger than (pvfs_bufmap_size_query())
+ * Default is PVFS2_BUFMAP_DEFAULT_DESC_SIZE MB.
+ * What that means is that
  * we will create a new io vec descriptor for those memory addresses that 
  * go beyond the limit
  * Return value for this routine is -ve in case of errors
@@ -319,7 +321,7 @@ out:
  * Further, the new_nr_segs pointer is updated to hold the new value
  * of number of iovecs, the new_vec pointer is updated to hold the pointer
  * to the new split iovec, and the size array is an array of integers holding
- * the number of iovecs that straddle PVFS_DEFAULT_DESC_SIZE.
+ * the number of iovecs that straddle pvfs_bufmap_size_query().
  * The max_new_nr_segs value is computed by the caller and returned.
  * (It will be (count of all iov_len/ block_size) + 1).
  */
@@ -870,7 +872,9 @@ static int construct_file_offset_trailer(char **trailer,
 
 /*
  * The reason we need to do this is to be able to support readx() and writex()
- * of larger than PVFS_DEFAULT_DESC_SIZE (4 MB). What that means is that
+ * of larger than (pvfs_bufmap_size_query()) 
+ * (default is PVFS2_BUFMAP_DEFAULT_DESC_SIZE MB).
+ * What that means is that
  * we will create a new xtvec descriptor for those file offsets that 
  * go beyond the limit
  * Return value for this routine is -ve in case of errors
@@ -878,7 +882,7 @@ static int construct_file_offset_trailer(char **trailer,
  * Further, the new_nr_segs pointer is updated to hold the new value
  * of number of xtvecs, the new_xtvec pointer is updated to hold the pointer
  * to the new split xtvec, and the size array is an array of integers holding
- * the number of xtvecs that straddle PVFS_DEFAULT_DESC_SIZE.
+ * the number of xtvecs that straddle (pvfs_bufmap_size_query()).
  * The max_new_nr_segs value is computed by the caller and passed in.
  * (It will be (count of all xtv_len/ block_size) + 1).
  */
