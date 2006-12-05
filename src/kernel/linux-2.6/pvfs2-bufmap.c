@@ -55,7 +55,7 @@ static int initialize_bufmap_descriptors(int ndescs)
     if (buffer_index_array == NULL) 
     {
         gossip_err("pvfs2: could not allocate %d bytes\n",
-                ndescs * sizeof(int));
+                (int) (ndescs * sizeof(int)));
         goto out;
     }
     memset(buffer_index_array, 0, ndescs * sizeof(int));
@@ -66,7 +66,7 @@ static int initialize_bufmap_descriptors(int ndescs)
     if (desc_array == NULL)
     {
         gossip_err("pvfs2: could not allocate %d bytes\n",
-                ndescs * sizeof(struct pvfs_bufmap_desc));
+                (int) (ndescs * sizeof(struct pvfs_bufmap_desc)));
         goto out1;
     }
     err = 0;
