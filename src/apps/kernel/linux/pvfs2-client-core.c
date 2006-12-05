@@ -2902,7 +2902,7 @@ static PVFS_error process_vfs_requests(void)
                (MAX_NUM_OPS * sizeof(vfs_request_t *)));
 
         ret = PVFS_sys_testsome(
-            op_id_array, &op_count, (void **)vfs_request_array,
+            op_id_array, &op_count, (void *) vfs_request_array,
             error_code_array, PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
 
         for(i = 0; i < op_count; i++)
