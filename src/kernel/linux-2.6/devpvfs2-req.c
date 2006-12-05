@@ -544,6 +544,18 @@ static ssize_t pvfs2_devreq_writev(
     return count;
 }
 
+#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+/*
+ * Kernels >= 2.6.19 have no writev, use this instead with SYNC_KEY.
+ */
+static ssize_t pvfs2_devreq_aio_write(struct kiocb *kiocb,
+                                      const struct iovec *iov,
+                                      unsigned long count, loff_t offset)
+{
+    return pvfs2_devreq_writev(kiocb->ki_filp, iov, count, &kiocb->ki_pos);
+}
+#endif
+
 /* Returns whether any FS are still pending remounted */
 static int mark_all_pending_mounts(void)
 {
@@ -1015,7 +1027,11 @@ struct file_operations pvfs2_devreq_file_operations =
     poll : pvfs2_devreq_poll
 #else
     .read = pvfs2_devreq_read,
+#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+    .aio_write = pvfs2_devreq_aio_write,
+#else
     .writev = pvfs2_devreq_writev,
+#endif
     .open = pvfs2_devreq_open,
     .release = pvfs2_devreq_release,
     .ioctl = pvfs2_devreq_ioctl,

@@ -53,13 +53,17 @@ struct xtvec {
 
 static ssize_t readx(unsigned long fd,
 		const struct iovec * iov, unsigned long iovlen, 
-		const struct xtvec * xtv, unsigned long xtvlen);
+		const struct xtvec * xtv, unsigned long xtvlen)
+{
+	 return syscall(__NR_readx, fd, iov, iovlen, xtv, xtvlen);
+}
+
 static ssize_t writex(unsigned long fd, 
 		const struct iovec * iov, unsigned long iovlen,
-		const struct xtvec * xtv, unsigned long xtvlen);
-
-_syscall5(ssize_t, readx, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
-_syscall5(ssize_t, writex, unsigned long, fd, const struct iovec *, iov, unsigned long, iovlen, const struct xtvec *, xtv, unsigned long, xtvlen);
+		const struct xtvec * xtv, unsigned long xtvlen)
+{
+	 return syscall(__NR_writex, fd, iov, iovlen, xtv, xtvlen);
+}
 
 #ifndef min
 #define min(a, b) (a) < (b) ? (a) : (b)
