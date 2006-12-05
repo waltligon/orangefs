@@ -45,10 +45,14 @@ do {                                                                    \
         dbpf_completion_queue_array[__add_op->op.context_id],__add_op); \
 } while(0)
 
+#ifdef __PVFS2_TROVE_THREADED__
 #define DBPF_COMPLETION_SIGNAL()                                   \
 do {                                                               \
     pthread_cond_signal(&dbpf_op_completed_cond);                  \
 } while(0)
+#else
+#define DBPF_COMPLETION_SIGNAL()  do { } while (0)
+#endif
     
 #define DBPF_COMPLETION_FINISH(__context_id)                           \
 do {                                                                   \
