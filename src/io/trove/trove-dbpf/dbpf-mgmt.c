@@ -120,7 +120,10 @@ retry:
     {
         /* user wants the standard db cache which uses mmap */
         ret = dbenv->open(dbenv, path, 
-                          DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+                          DB_INIT_MPOOL|
+                          DB_CREATE|
+                          DB_THREAD, 
+                          0);
         if(ret != 0)
         {
             gossip_err("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
@@ -143,7 +146,11 @@ retry:
         }
 
         ret = dbenv->open(dbenv, path, 
-                             DB_INIT_MPOOL|DB_CREATE|DB_THREAD|DB_SYSTEM_MEM, 0);
+                          DB_INIT_MPOOL|
+                          DB_CREATE|
+                          DB_THREAD|
+                          DB_SYSTEM_MEM, 
+                          0);
         /* In some cases (oddly configured systems with pvfs2-server running as
          * non-root) DB_SYSTEM_MEM, which uses sysV shared memory, can fail
          * with EAGAIN (resource temporarily unavailable).   berkely DB can use
@@ -182,7 +189,11 @@ retry:
                 return NULL;
             }
             assert(my_storage_p != NULL);
-            ret = dbenv->open(dbenv, path, DB_CREATE|DB_THREAD|DB_PRIVATE, 0);
+            ret = dbenv->open(dbenv, path, 
+                              DB_CREATE|
+                              DB_THREAD|
+                              DB_PRIVATE, 
+                              0);
         }
 
         if(ret == DB_RUNRECOVERY)

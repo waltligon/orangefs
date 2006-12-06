@@ -40,7 +40,33 @@
 
 extern int synccount;
 
+/**
+ * Structure for key in the keyval DB:
+ *
+ * The keys in the keyval database are now stored as the following
+ * struct (dbpf_keyval_db_entry).  The size of key field (the common
+ * name or component name of the key) is not explicitly specified in the
+ * struct, instead it is calculated from the DBT->size field of the
+ * berkeley db key using the macros below.  Its important that the
+ * 'size' and 'ulen' fields of the DBT key struct are set correctly when
+ * calling get and put.  'size' should be the actual size of the string, 'ulen'
+ * should be the size available for the dbpf_keyval_db_entry struct, most
+ * likely sizeof(struct dbpf_keyval_db_entry).
+ */
+
 #define DBPF_MAX_KEY_LENGTH PVFS_NAME_MAX
+
+struct dbpf_keyval_db_entry
+{
+    TROVE_handle handle;
+    char key[DBPF_MAX_KEY_LENGTH];
+};
+
+#define DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(_size) \
+    (sizeof(TROVE_handle) + _size)
+
+#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
+    (_size - sizeof(TROVE_handle))
 
 /**
  * The keyval database contains attributes for pvfs2 handles
@@ -59,7 +85,9 @@ extern int synccount;
  * symlink       COMMON      "st"                      Target Handle
  * directory     COMMON      "de"                      Entries Handle
  * dir-ent       COMPONENT   <component name>          Entry Handle
- * ALL           XATTR       <extended attribute name> <extended attribute content>
+ * [metafile, 
+ *  symlink, 
+ *  directory]   XATTR       <extended attribute name> <extended attribute content>
  *
  * The descriptions for the common keys are:
  *
@@ -79,33 +107,10 @@ extern int synccount;
  * passed in through the API.
  */
 
-/**
- * Structure for key in the keyval DB:
- *
- * The keys in the keyval database are now stored as the following
- * struct (dbpf_keyval_db_entry).  The size of key field (the common
- * name or component name of the key) is not explicitly specified in the
- * struct, instead it is calculated from the DBT->size field of the
- * berkeley db key using the macros below.  Its important that the
- * 'size' and 'ulen' fields of the DBT key struct are set correctly when
- * calling get and put.  'size' should be the actual size of the string, 'ulen'
- * should be the size available for the dbpf_keyval_db_entry struct, most
- * likely sizeof(struct dbpf_keyval_db_entry).
- */
-
-struct dbpf_keyval_db_entry
-{
-    TROVE_handle handle;
-    char key[DBPF_MAX_KEY_LENGTH];
-};
-
-#define DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(_size) \
-    (sizeof(TROVE_handle) + _size)
-
-#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
-    (_size - sizeof(TROVE_handle))
-
 extern gen_mutex_t dbpf_attr_cache_mutex;
+
+static int dbpf_keyval_do_remove(
+    DB *db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p);
@@ -556,9 +561,10 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
                  op_p->u.k_remove.key.buffer_sz,
                  (char *)op_p->u.k_remove.key.buffer);
                  
-    ret = PINT_dbpf_keyval_remove(op_p->coll_p->keyval_db, op_p->handle,
-                                  &op_p->u.k_remove.key,
-                                  &op_p->u.k_remove.val);
+    ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db, 
+                                op_p->handle,
+                                &op_p->u.k_remove.key,
+                                &op_p->u.k_remove.val);
     if (ret != 0)
     {
         goto return_error;
@@ -1279,7 +1285,7 @@ int PINT_dbpf_keyval_iterate(
         if(callback)
         {
             key->buffer_sz = key->read_sz;
-            ret = callback(db_p, handle, key, NULL);
+            ret = callback(dbc_p, handle, key, NULL);
             if(ret != 0)
             {
                 goto return_error;
@@ -1319,7 +1325,7 @@ int PINT_dbpf_keyval_iterate(
         if(callback)
         {
             key->buffer_sz = key->read_sz;
-            ret = callback(db_p, handle, key, NULL);
+            ret = callback(dbc_p, handle, key, NULL);
             if(ret != 0)
             {
                 goto return_error;
@@ -1343,7 +1349,7 @@ return_error:
     return ret;
 }
 
-int PINT_dbpf_keyval_remove(
+static int dbpf_keyval_do_remove(
     DB *db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val)
 {
     int ret;
