@@ -2,6 +2,14 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+pvfs-2.7.x
+==============
+
+* HEC posix extensions now supported by PVFS.
+* HEC posix extensions patches to the vfs are provided in the patches subdir.
+* Support for immutible (read-only) files set by xattr and vfs caching of
+read-only files through the vfs.
+
 pvfs-2.6.0
 ==============
 * kernel module cleanups
