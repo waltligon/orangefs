@@ -23,7 +23,7 @@ my $opt_metaservers = '';
 my $opt_logfile = '';
 my $opt_storage = '';
 my $opt_trovesync = '1';
-my $opt_trovemethod = 'dbpf';
+my $opt_trovemethod = '';
 my $opt_quiet = '';
 my $opt_logging = '';
 my $opt_logstamp = '';
@@ -199,7 +199,6 @@ sub emit_defaults
     print $target "\tClientJobFlowTimeoutSecs $client_job_timeout\n";
     print $target "\tClientRetryLimit 5\n";
     print $target "\tClientRetryDelayMilliSecs 2000\n";
-    print $target "\tTroveMethod $opt_trovemethod\n";
 
     print $target "</Defaults>\n";
 }
@@ -288,6 +287,11 @@ sub emit_filesystem
         print $target "\t\tTroveSyncData no\n";
         print $target "\t\tCoalescingHighWatermark infinity\n";
         print $target "\t\tCoalescingLowWatermark 1\n";
+    }
+
+    if($opt_trovemethod ne "")
+    {
+        print $target "\t\tTroveMethod $opt_trovemethod\n";
     }
 
     print $target "\t</StorageHints>\n";
