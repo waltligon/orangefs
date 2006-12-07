@@ -103,7 +103,6 @@ int main(int argc, char *argv[])
 {
 	int c, fd, err;
 	int i, rank, np, do_unlink = 0, do_create = 0;
-	size_t len;
 	char opt[] = "n:f:cu", *fname = NULL;
 	double begin_openg, end_openg, begin_openfh, end_openfh, begin_total, end_total;
 	double openg_total = 0.0, openfh_total = 0.0, time_total = 0.0;
@@ -177,8 +176,9 @@ int main(int argc, char *argv[])
 		/* Broadcast the handle buffer to everyone */
 		if ((err = MPI_Bcast(&hb, 1, d, 0, MPI_COMM_WORLD)) != MPI_SUCCESS) {
 			char str[256];
-			len = 256;
-			MPI_Error_string(err, str, (int *) &len);
+			int len = sizeof(str);
+
+			MPI_Error_string(err, str, &len);
 			fprintf(stderr, "MPI_Bcast failed: %s\n", str);
 			MPI_Finalize();
 			exit(1);
