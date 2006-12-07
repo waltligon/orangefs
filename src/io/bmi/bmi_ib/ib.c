@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.47 2006-12-02 19:08:41 pw Exp $
+ * $Id: ib.c,v 1.48 2006-12-07 21:47:47 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -119,6 +119,8 @@ static int ib_check_cq(void)
 	debug(4, "%s: found something", __func__);
 	++ret;
 	if (wc.status != 0) {
+	    /* opcode is not necessarily valid; only wr_id, status, qp_num,
+	     * and vendor_err can be relied upon */
 	    if (wc.opcode == BMI_IB_OP_SEND) {
 		debug(0, "%s: entry id 0x%llx SEND error %s", __func__,
 		  llu(wc.id), wc_status_string(wc.status));
@@ -1281,13 +1283,8 @@ static int BMI_ib_testsome(int incount, bmi_op_id_t *ids, int *outcount,
 }
 
 /*
- * Used by the test functions to block if not much is going on
- * since the timeouts at the BMI job layer are too coarse.
- */
-static struct timeval last_action = { 0, 0 };
-
-/*
  * Test for multiple completions matching a particular user context.
+ * Return 0 if okay, >0 if want another poll soon, negative for error.
  */
 static int
 BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
@@ -1295,17 +1292,18 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
   int max_idle_time, bmi_context_id context_id)
 {
     struct qlist_head *l, *lnext;
-    int n, complete;
-    void **up = 0;
+    int n = 0, complete, activity = 0;
+    void **up = NULL;
 
     gen_mutex_lock(&interface_mutex);
-    ib_check_cq();
+
+restart:
+    activity += ib_check_cq();
 
     /*
      * Walk _all_ entries on sq, rq, marking them completed or
      * encouraging them as needed due to resource limitations.
      */
-    n = 0;
     for (l=ib_device->sendq.next; l != &ib_device->sendq; l=lnext) {
 	struct ib_work *sq = qlist_upcast(l);
 	lnext = l->next;
@@ -1331,37 +1329,18 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
     /* drop lock before blocking on new connections below */
     gen_mutex_unlock(&interface_mutex);
 
-    *outcount = n;
-
-    if (n > 0) {
-	gettimeofday(&last_action, 0);  /* remember this action */
-    } else if (max_idle_time > 0) {
+    if (activity == 0 && n == 0 && max_idle_time > 0) {
 	/*
-	 * Spin for an interval after some activity, then go to a
-	 * blocking interface by using poll() on the IB completion channel
-	 * and TCP listen socket.
+	 * Block if told to from above.
 	 */
-	struct timeval now;
-
-	gettimeofday(&now, 0);
-	timersub(&now, &last_action, &now);
-
-	/* if time since last activity is > 10ms, block */
-	if (now.tv_sec > 0 || now.tv_usec > 10000) {
-	    /* block */
-	    debug(8, "%s: last activity too long ago, blocking", __func__);
-	    n = ib_block_for_activity(max_idle_time);
-	    if (n)
-		gettimeofday(&last_action, 0);  /* had some action */
-	} else {
-	    /* whee, spin */
-	    /* totally helps on Lee's old 2.4.21 machine, but may cause
-	     * big delays on modern kernels; do not make default */
-	    /* sched_yield(); */
-	    ;
-	}
+	debug(2, "%s: last activity too long ago, blocking", __func__);
+	activity = ib_block_for_activity(max_idle_time);
+	if (activity == 1)   /* IB action, go do it immediately */
+	    goto restart;
     }
-    return 0;
+
+    *outcount = n;
+    return activity + n;
 }
 
 /*
@@ -1369,20 +1348,21 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
  * This is also where we check for new connections on the TCP socket, since
  * those would show up as unexpected the first time anything is sent.
  * Return 0 for success, or -1 for failure; number of things in *outcount.
+ * Return >0 if want another poll soon.
  */
 static int
 BMI_ib_testunexpected(int incount __unused, int *outcount,
   struct method_unexpected_info *ui, int max_idle_time __unused)
 {
-    int num_action;
     struct qlist_head *l;
+    int activity, n;
 
     gen_mutex_lock(&interface_mutex);
 
     /* Check CQ, then look for the first unexpected message.  */
-    num_action = ib_check_cq();
+    activity = ib_check_cq();
 
-    *outcount = 0;
+    n = 0;
     qlist_for_each(l, &ib_device->recvq) {
 	struct ib_work *rq = qlist_upcast(l);
 	if (rq->state.recv == RQ_EAGER_WAITING_USER_TESTUNEXPECTED) {
@@ -1403,7 +1383,7 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	    ui->tag = rq->bmi_tag;
 	    /* re-post the buffer in which it was sitting, just unexpecteds */
 	    post_rr(c, rq->bh);
-	    *outcount = 1;
+	    n = 1;
 	    qlist_del(&rq->list);
 	    free(rq);
 	    --c->refcnt;
@@ -1413,18 +1393,11 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	}
     }
 
-    /* check for new incoming connections */
-    num_action += ib_tcp_server_check_new_connections();
-
-    /* look for async events on the IB port */
-    num_action += check_async_events();
-
-    if (num_action)
-	gettimeofday(&last_action, 0);
-
   out:
     gen_mutex_unlock(&interface_mutex);
-    return 0;
+
+    *outcount = n;
+    return activity + n;
 }
 
 /*
@@ -1792,7 +1765,8 @@ static void ib_tcp_server_init_listen_socket(struct method_addr *addr)
 
 /*
  * Check for new connections.  The listening socket is left nonblocking
- * so this test can be quick.  Returns >0 if an accept worked.
+ * so this test can be quick; but accept is not really that quick compared
+ * to polling an IB interface, for instance.  Returns >0 if an accept worked.
  */
 static int ib_tcp_server_check_new_connections(void)
 {
@@ -1813,6 +1787,8 @@ static int ib_tcp_server_check_new_connections(void)
 	int port = ntohs(ssin.sin_port);
 	sprintf(peername, "%s:%d", hostname, port);
 
+	gen_mutex_lock(&interface_mutex);
+
 	c = ib_new_connection(s, peername, 1);
 	if (!c) {
 	    free(hostname);
@@ -1828,6 +1804,9 @@ static int ib_tcp_server_check_new_connections(void)
 
 	debug(2, "%s: accepted new connection %s at server", __func__,
 	  c->peername);
+
+	gen_mutex_unlock(&interface_mutex);
+
 	if (close(s) < 0)
 	    error_errno("%s: close new sock", __func__);
 	ret = 1;
@@ -1839,28 +1818,39 @@ static int ib_tcp_server_check_new_connections(void)
  * Ask the device to write to its FD if a CQ event happens, and poll on it
  * as well as the listen_sock for activity, but do not actually respond to
  * anything.  A later ib_check_cq will handle CQ events, and a later call to
- * testunexpected will pick up new connections.  Returns >0 if something is
- * ready.
+ * testunexpected will pick up new connections.  Returns ==1 if IB device is
+ * ready, other >0 for some activity, else 0.
  */
 static int ib_block_for_activity(int timeout_ms)
 {
-    struct pollfd pfd[2];
+    struct pollfd pfd[3];  /* cq fd, async fd, accept socket */
     int numfd;
     int ret;
 
-    pfd[0].fd = prepare_cq_block();
+    prepare_cq_block(&pfd[0].fd, &pfd[1].fd);
     pfd[0].events = POLLIN;
-    numfd = 1;
+    pfd[1].events = POLLIN;
+    numfd = 2;
     if (ib_device->listen_sock >= 0) {
-	pfd[1].fd = ib_device->listen_sock;
-	pfd[1].events = POLLIN;
-	numfd = 2;
+	pfd[2].fd = ib_device->listen_sock;
+	pfd[2].events = POLLIN;
+	numfd = 3;
     }
+
     ret = poll(pfd, numfd, timeout_ms);
-    debug(4, "%s: ret %d rev0 0x%x", __func__, ret, pfd[0].revents);
+    debug(4, "%s: ret %d rev0 %x rev1 %x", __func__, ret,
+          pfd[0].revents, pfd[1].revents);
     if (ret > 0) {
-	if (pfd[0].revents == POLLIN)
+	if (pfd[0].revents == POLLIN) {
 	    ack_cq_completion_event();
+	    return 1;
+	}
+	/* check others only if CQ was empty */
+	ret = 2;
+	if (pfd[1].revents == POLLIN)
+	    check_async_events();
+	if (pfd[2].revents == POLLIN)
+	    ib_tcp_server_check_new_connections();
     } else if (ret < 0) {
 	if (errno == EINTR)  /* normal, ignore but break */
 	    ret = 0;

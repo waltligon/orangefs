@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.10 2006-12-02 19:08:41 pw Exp $
+ * $Id: mem.c,v 1.11 2006-12-07 21:47:47 pw Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "pvfs2-internal.h"
@@ -29,6 +29,7 @@
 typedef struct {
     struct qlist_head list;
     gen_mutex_t mutex;
+    struct qlist_head free_chunk_list;
     void (*mem_register)(memcache_entry_t *c);
     void (*mem_deregister)(memcache_entry_t *c);
 } memcache_device_t;
@@ -107,6 +108,12 @@ memcache_lookup_exact(memcache_device_t *memcache_device, const void *const buf,
 /*
  * BMI malloc and free routines.  If the region is big enough, pin
  * it now to save time later in the actual send or recv routine.
+ * These are only ever called from PVFS internal functions to allocate
+ * buffers, on the server, or on the client for non-user-supplied
+ * buffers.
+ *
+ * Standard sizes will appear frequently, thus do not free them.  Use
+ * a separate list sorted by sizes that can be used to reuse one.
  */
 void *
 memcache_memalloc(void *md, bmi_size_t len, int eager_limit)
@@ -114,7 +121,30 @@ memcache_memalloc(void *md, bmi_size_t len, int eager_limit)
     memcache_device_t *memcache_device = md;
     void *buf;
 
+    debug(4, "%s: len %zd limit %d", __func__, len, eager_limit);
+
+    /* search in size cache first */
+#if ENABLE_MEMCACHE
+    if (len > eager_limit) {
+	memcache_entry_t *c;
+	gen_mutex_lock(&memcache_device->mutex);
+	qlist_for_each_entry(c, &memcache_device->free_chunk_list, list) {
+	    if (c->len == len) {
+		debug(4, "%s: recycle free chunk, buf %p", __func__, c->buf);
+		qlist_del(&c->list);
+		qlist_add_tail(&c->list, &memcache_device->list);
+		++c->count;
+		buf = c->buf;
+		gen_mutex_unlock(&memcache_device->mutex);
+		goto out;
+	    }
+	}
+	gen_mutex_unlock(&memcache_device->mutex);
+    }
+#endif
+
     buf = malloc(len);
+
 #if ENABLE_MEMCACHE
     if (bmi_ib_unlikely(!buf))
 	goto out;
@@ -124,16 +154,19 @@ memcache_memalloc(void *md, bmi_size_t len, int eager_limit)
 	gen_mutex_lock(&memcache_device->mutex);
 	/* could be recycled buffer */
 	c = memcache_lookup_cover(memcache_device, buf, len);
-	if (c)
+	if (c) {
 	    ++c->count;
-	else {
+	    debug(4, "%s: reuse reg, buf %p, count %d", __func__, c->buf,
+	          c->count);
+	} else {
 	    c = memcache_add(memcache_device, buf, len);
 	    if (bmi_ib_unlikely(!c)) {
 		free(buf);
-		buf = 0;
+		buf = NULL;
 	    } else {
-		(memcache_device->mem_register)(c);
+		memcache_device->mem_register(c);
 		++c->count;
+		debug(4, "%s: new reg, buf %p", __func__, c->buf);
 	    }
 	}
 	gen_mutex_unlock(&memcache_device->mutex);
@@ -146,20 +179,24 @@ memcache_memalloc(void *md, bmi_size_t len, int eager_limit)
 int
 memcache_memfree(void *md, void *buf, bmi_size_t len)
 {
-    memcache_device_t *memcache_device = md;
 #if ENABLE_MEMCACHE
+    memcache_device_t *memcache_device = md;
     memcache_entry_t *c;
-    /* okay if not found, just not cached */
 
     gen_mutex_lock(&memcache_device->mutex);
+    /* okay if not found, just not cached; perhaps an eager-size buffer */
     c = memcache_lookup_exact(memcache_device, buf, len);
     if (c) {
-	debug(6, "%s: found %p len %lld", __func__, c->buf, lld(c->len));
+	debug(4, "%s: cache free buf %p len %lld", __func__, c->buf,
+	      lld(c->len));
 	assert(c->count == 1, "%s: buf %p len %lld count = %d, expected 1",
-	  __func__, c->buf, lld(c->len), c->count);
-	(memcache_device->mem_deregister)(c);
+	       __func__, c->buf, lld(c->len), c->count);
+	/* cache it */
+	--c->count;
 	qlist_del(&c->list);
-	free(c);
+	qlist_add(&c->list, &memcache_device->free_chunk_list);
+	gen_mutex_unlock(&memcache_device->mutex);
+	return 0;
     }
     gen_mutex_unlock(&memcache_device->mutex);
 #endif
@@ -197,7 +234,7 @@ memcache_register(void *md, ib_buflist_t *buflist)
 	    if (!c)
 		error("%s: no memory for cache entry", __func__);
 	    c->count = 1;
-	    (memcache_device->mem_register)(c);
+	    memcache_device->mem_register(c);
 	}
 	buflist->memcache[i] = c;
 #else
@@ -205,7 +242,7 @@ memcache_register(void *md, ib_buflist_t *buflist)
 	cp->buf = buflist->buf.recv[i];
 	cp->len = buflist->len[i];
 	cp->type = type;
-	(memcache_device->mem_register)(cp);
+	memcache_device->mem_register(cp);
 	buflist->memcache[i] = cp;
 #endif
     }
@@ -234,7 +271,7 @@ void memcache_preregister(void *md, const void *buf, bmi_size_t len,
 	c = memcache_add(memcache_device, (void *)(uintptr_t) buf, len);
 	if (!c)
 	    error("%s: no memory for cache entry", __func__);
-	(memcache_device->mem_register)(c);
+	memcache_device->mem_register(c);
     }
     gen_mutex_unlock(&memcache_device->mutex);
 #endif
@@ -257,7 +294,7 @@ memcache_deregister(void *md, ib_buflist_t *buflist)
 	   c->buf, lld(c->len), c->count);
 	/* let garbage collection do ib_mem_deregister(c) for refcnt==0 */
 #else
-	(memcache_device->mem_deregister)(buflist->memcache[i]);
+	memcache_device->mem_deregister(buflist->memcache[i]);
 	free(buflist->memcache[i]);
 #endif
     }
@@ -276,6 +313,7 @@ void *memcache_init(void (*mem_register)(memcache_entry_t *),
     memcache_device = Malloc(sizeof(*memcache_device));
     INIT_QLIST_HEAD(&memcache_device->list);
     gen_mutex_init(&memcache_device->mutex);
+    INIT_QLIST_HEAD(&memcache_device->free_chunk_list);
     memcache_device->mem_register = mem_register;
     memcache_device->mem_deregister = mem_deregister;
     return memcache_device;
@@ -286,13 +324,17 @@ void *memcache_init(void (*mem_register)(memcache_entry_t *),
  */
 void memcache_shutdown(void *md)
 {
-    struct qlist_head *l, *lp;
     memcache_device_t *memcache_device = md;
+    memcache_entry_t *c, *cn;
 
     gen_mutex_lock(&memcache_device->mutex);
-    qlist_for_each_safe(l, lp, &memcache_device->list) {
-	memcache_entry_t *c = qlist_entry(l, memcache_entry_t, list);
-	(memcache_device->mem_deregister)(c);
+    qlist_for_each_entry_safe(c, cn, &memcache_device->list, list) {
+	memcache_device->mem_deregister(c);
+	qlist_del(&c->list);
+	free(c);
+    }
+    qlist_for_each_entry_safe(c, cn, &memcache_device->free_chunk_list, list) {
+	memcache_device->mem_deregister(c);
 	qlist_del(&c->list);
 	free(c);
     }

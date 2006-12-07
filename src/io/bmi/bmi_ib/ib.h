@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.25 2006-12-02 19:08:41 pw Exp $
+ * $Id: ib.h,v 1.26 2006-12-07 21:47:47 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -347,7 +347,7 @@ struct ib_device_func {
     void (*post_rr)(const ib_connection_t *c, struct buf_head *bh);
     void (*post_sr_rdmaw)(struct ib_work *sq, msg_header_cts_t *mh_cts,
                           void *mh_cts_buf);
-    int (*prepare_cq_block)(void);
+    void (*prepare_cq_block)(int *cq_fd, int *async_fd);
     void (*ack_cq_completion_event)(void);
     int (*check_cq)(struct bmi_ib_wc *wc);
     const char *(*wc_status_string)(int status);
@@ -394,6 +394,8 @@ void error_xerrno(int errnum, const char *fmt, ...)
   __attribute__((noreturn,format(printf,2,3)));
 void warning(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void warning_errno(const char *fmt, ...) __attribute__((format(printf,1,2)));
+void warning_xerrno(int errnum, const char *fmt, ...)
+  __attribute__((format(printf,2,3)));
 void info(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void *Malloc(unsigned long n) __attribute__((malloc));
 void *qlist_del_head(struct qlist_head *list);

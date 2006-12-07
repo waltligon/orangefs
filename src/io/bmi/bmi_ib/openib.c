@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.9 2006-12-02 19:08:41 pw Exp $
+ * $Id: openib.c,v 1.10 2006-12-07 21:47:47 pw Exp $
  */
 #include <string.h>
 #include <errno.h>
@@ -616,7 +616,7 @@ static int openib_check_cq(struct bmi_ib_wc *wc)
     return 1;
 }
 
-static int openib_prepare_cq_block(void)
+static void openib_prepare_cq_block(int *cq_fd, int *async_fd)
 {
     struct openib_device_priv *od = ib_device->priv;
     int ret;
@@ -627,7 +627,8 @@ static int openib_prepare_cq_block(void)
 	error_xerrno(ret, "%s: ibv_req_notify_cq", __func__);
 
     /* return the fd that can be fed to poll() */
-    return od->channel->fd;
+    *cq_fd = od->channel->fd;
+    *async_fd = od->ctx->async_fd;
 }
 
 /*

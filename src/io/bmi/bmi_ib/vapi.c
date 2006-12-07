@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.9 2006-12-02 19:08:41 pw Exp $
+ * $Id: vapi.c,v 1.10 2006-12-07 21:47:47 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -623,17 +623,19 @@ static int vapi_check_cq(struct bmi_ib_wc *wc)
     return 1;
 }
 
-static int vapi_prepare_cq_block(void)
+static void vapi_prepare_cq_block(int *cq_fd, int *async_fd)
 {
     struct vapi_device_priv *vd = ib_device->priv;
     int ret;
+
     /* ask for the next notfication */
     ret = VAPI_req_comp_notif(vd->nic_handle, vd->nic_cq, VAPI_NEXT_COMP);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_req_comp_notif", __func__);
 
     /* return the fd that can be fed to poll() */
-    return vd->cq_event_pipe[0];
+    *cq_fd = vd->cq_event_pipe[0];
+    *async_fd = vd->async_event_pipe[0];
 }
 
 /*
