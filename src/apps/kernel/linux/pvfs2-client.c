@@ -26,7 +26,11 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define PVFS2_CLIENT_CORE_NAME  "pvfs2-client-core"
+#define PVFS2_CLIENT_CORE_SUFFIX  "-core"
+#define PVFS2_CLIENT_CORE_NAME "pvfs2-client" PVFS2_CLIENT_CORE_SUFFIX
+#define PVFS2_CLIENT_CORE_THR_SUFFIX "-threaded"
+
+static char s_client_core_path[PATH_MAX];
 
 #define MAX_DEV_INIT_FAILURES 10
 
@@ -266,27 +270,22 @@ static int monitor_pvfs2_client(options_t *opts)
         {
             sleep(1);
 
-            if (opts->verbose)
-            {
-                printf("About to exec %s\n",opts->path);
-            }
-
             if(opts->threaded)
             {
-                arg_list[0] = PVFS2_CLIENT_CORE_NAME "-threaded";
+                arg_list[0] = PVFS2_CLIENT_CORE_NAME PVFS2_CLIENT_CORE_THR_SUFFIX;
             }
             else
             {
                 arg_list[0] = PVFS2_CLIENT_CORE_NAME;
             }
 
-            arg_list[1] = "-a";
-            arg_list[2] = opts->acache_timeout;
-            arg_list[3] = "-n";
-            arg_list[4] = opts->ncache_timeout;
-            arg_list[5] = "-L";
-            arg_list[6] = opts->logfile;
-            arg_index = 7;
+            arg_index = 1;
+            arg_list[arg_index++] = "-a";
+            arg_list[arg_index++] = opts->acache_timeout;
+            arg_list[arg_index++] = "-n";
+            arg_list[arg_index++] = opts->ncache_timeout;
+            arg_list[arg_index++] = "-L";
+            arg_list[arg_index++] = opts->logfile;
             if(opts->acache_hard_limit)
             {
                 arg_list[arg_index] = "--acache-hard-limit";
@@ -360,6 +359,16 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_index+=2;
             }
 
+            if(opts->verbose)
+            {
+                int i;
+                printf("About to exec: %s, with args: ", opts->path);
+                for(i = 0; i < arg_index; ++i)
+                {
+                    printf("%s ", arg_list[i]);
+                }
+                printf("\n");
+            }
             ret = execvp(opts->path, arg_list);
 
             fprintf(stderr, "Could not exec %s, errno is %d\n",
@@ -601,18 +610,18 @@ static void parse_args(int argc, char **argv, options_t *opts)
 
     if (!opts->path)
     {
-        /*
-          since they didn't specify a specific path, we're going to
-          let execlp() sort things out later
-        */
         if(opts->threaded)
         {
-            opts->path = PVFS2_CLIENT_CORE_NAME "-threaded";
+            sprintf(s_client_core_path, 
+                    "%s" PVFS2_CLIENT_CORE_SUFFIX PVFS2_CLIENT_CORE_THR_SUFFIX, 
+                    argv[0]);
         }
         else
         {
-            opts->path = PVFS2_CLIENT_CORE_NAME;
+            sprintf(s_client_core_path, "%s" PVFS2_CLIENT_CORE_SUFFIX,
+                    argv[0]);
         }
+        opts->path = s_client_core_path;
     }
 
     if (!opts->acache_timeout)
