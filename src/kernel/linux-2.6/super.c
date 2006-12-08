@@ -476,7 +476,6 @@ static int pvfs2_statfs(
             gossip_debug(GOSSIP_SUPER_DEBUG, "sizeof(sector_t)=%d\n",
                         (int)sizeof(sector_t));
 
-#if 0
             if ((sizeof(struct statfs) != sizeof(struct kstatfs)) &&
                 (sizeof(tmp_statfs.f_blocks) == 4))
             {
@@ -503,7 +502,6 @@ static int pvfs2_statfs(
                             "files_avail\n", (unsigned long)buf->f_files,
                             (unsigned long)buf->f_ffree);
             }
-#endif
         } while(0);
 #endif
     }
