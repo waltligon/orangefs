@@ -438,7 +438,7 @@ static int pvfs2_statfs(
                     "%ld blocks total | %ld block size\n",
                     (long) new_op->downcall.resp.statfs.blocks_avail,
                     (long) new_op->downcall.resp.statfs.blocks_total,
-                    (long) sb->s_blocksize);
+                    (long) new_op->downcall.resp.statfs.block_size);
 
         buf->f_type = sb->s_magic;
         /* stash the fsid as well */
