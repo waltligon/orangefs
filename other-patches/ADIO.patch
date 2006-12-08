@@ -296,8 +296,8 @@ diff -r 817f2e52d1c7 include/adioi.h
 @@ -75,6 +77,7 @@
      fd->hints->initialized = 0;
      fd->info = MPI_INFO_NULL;
++    fd->hints->fs_hints.pvfs2.hints = NULL;     
      ADIO_SetInfo(fd, info, &err);
-+    fd->hints->fs_hints.pvfs2.hints = NULL;
 
       /* deferred open:
       * we can only do this optimization if 'fd->hints->deferred_open' is set
