@@ -40,12 +40,6 @@
  *      - Dirdata missing directory object
  * - Dangling directory entry: directory entry exists, but object/attributes don't
  * .
- * 
- * Special error codes:
- * - PVFS2_EWARNING is used to represent problems that indicate bad practice
- *   rather than anything technically wrong with the file system.
- * .
- *
  */
 
 static void set_return_code(
@@ -364,7 +358,6 @@ int PVFS_fsck_check_server_configs(
  * .
  *
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_dfile(
@@ -397,7 +390,7 @@ int PVFS_fsck_validate_dfile(
     /* Check for existence of attributes */
     err = PVFS_fsck_get_attributes(fsck_options, &obj_ref, creds,
         &dfile_attributes);
-    if(err < 0 && err != -PVFS_EWARNING)
+    if(err < 0)
     {
         gossip_err("Error: unable to get dfile attributes\n");
         return(err);
@@ -409,7 +402,7 @@ int PVFS_fsck_validate_dfile(
 
     /* Do attributes contain valid data */
     err = PVFS_fsck_validate_dfile_attr(fsck_options, &dfile_attributes);
-    if(err < 0 && err != -PVFS_EWARNING)
+    if(err < 0)
     {
         gossip_err("Error: dfile has invalid attributes\n");
         return(err);
@@ -426,7 +419,6 @@ int PVFS_fsck_validate_dfile(
  * - size >=  0 
  * .
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_dfile_attr(
@@ -460,7 +452,6 @@ int PVFS_fsck_validate_dfile_attr(
  * Performs sanity checking on the PVFS_TYPE_METAFILE PVFS_Object type
  *
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_metafile(
@@ -487,7 +478,7 @@ int PVFS_fsck_validate_metafile(
 
     /* Check for validity of attributes */
     err = PVFS_fsck_validate_metafile_attr(fsck_options, attributes);
-    if(err < 0 && err != -PVFS_EWARNING)
+    if(err < 0)
     {
         gossip_err("Error: metafile has invalid attributes\n");
         return(err);
@@ -518,7 +509,7 @@ int PVFS_fsck_validate_metafile(
                                      &df_handles[i],
                                      &obj_ref->fs_id,
                                      creds, &dfiles_total_size);
-        if(err < 0 && err != -PVFS_EWARNING)
+        if(err < 0)
         {
             gossip_err("Error: metafile dfile [%d] is invalid\n", i);
             free(df_handles);
@@ -550,7 +541,6 @@ int PVFS_fsck_validate_metafile(
  * - size >= 0
  * .
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_metafile_attr(
@@ -587,7 +577,6 @@ int PVFS_fsck_validate_metafile_attr(
  * Performs sanity checking on the PVFS_TYPE_SYMLINK PVFS_Object type
  *
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_symlink(
@@ -619,7 +608,6 @@ int PVFS_fsck_validate_symlink(
  * - Target must be non-null
  * .
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_symlink_attr(
@@ -645,7 +633,7 @@ int PVFS_fsck_validate_symlink_attr(
         {
             /* we do have a target, make sure it's valid */
             err = PVFS_fsck_validate_symlink_target(fsck_options, attributes);
-            if (err < 0 && err != -PVFS_EWARNING)
+            if (err < 0)
             {
                 gossip_err("Error: symlink target [%s] is invalid\n",
                         attributes->attr.link_target);
@@ -671,7 +659,6 @@ int PVFS_fsck_validate_symlink_attr(
  * - Does target use absolute path
  * .
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_symlink_target(
@@ -686,7 +673,6 @@ int PVFS_fsck_validate_symlink_target(
     {
         gossip_err("WARNING: symlink target [%s] uses absolute path\n",
                 attributes->attr.link_target);
-        set_return_code(&ret, -PVFS_EWARNING);
     }
 
     return ret;
@@ -698,7 +684,6 @@ int PVFS_fsck_validate_symlink_target(
  * - Do attributes exist
  * .
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_dirdata(
@@ -728,7 +713,7 @@ int PVFS_fsck_validate_dirdata(
 
     err = PVFS_fsck_get_attributes
         (fsck_options, &obj_ref, creds, &dirdata_attributes);
-    if(err < 0 && err != -PVFS_EWARNING)
+    if(err < 0)
     {
         gossip_err("Error: failed to get attributes for dirdata object\n");
         return(err);
@@ -736,7 +721,7 @@ int PVFS_fsck_validate_dirdata(
     set_return_code(&ret, err);
 
     err = PVFS_fsck_validate_dirdata_attr(fsck_options, &dirdata_attributes);
-    if(err < 0 && err != -PVFS_EWARNING)
+    if(err < 0)
     {
         gossip_err("Error: dirdata entry has invalid attributes\n");
         return(err);
@@ -752,7 +737,6 @@ int PVFS_fsck_validate_dirdata(
  * - Object type must be PVFS_TYPE_DIRDATA
  * .
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_dirdata_attr(
@@ -779,7 +763,6 @@ int PVFS_fsck_validate_dirdata_attr(
  * - gets and validates directory entry filenames
  * .
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_dir(
@@ -808,7 +791,7 @@ int PVFS_fsck_validate_dir(
     }
 
     err = PVFS_fsck_validate_dir_attr(fsck_options, attributes);
-    if(err < 0 && err != -PVFS_EWARNING)
+    if(err < 0)
     {
         gossip_err("Error: directory has invalid attributes\n");
         return(err);
@@ -826,7 +809,7 @@ int PVFS_fsck_validate_dir(
 
     err = PVFS_fsck_validate_dirdata
         (fsck_options, &dirdata_handle, &obj_ref->fs_id, creds);
-    if(err < 0 && err != -PVFS_EWARNING)
+    if(err < 0)
     {
         gossip_err("Error: directory dirdata is invalid\n");
         return(err);
@@ -863,7 +846,7 @@ int PVFS_fsck_validate_dir(
                                                     readdir_resp.
                                                     dirent_array[i].d_name);
                 /* continue even if we hit errors; we want to see all entries */
-                if (err < 0 && err != -PVFS_EWARNING)
+                if (err < 0)
                 {
                     gossip_err("Error: directory entry [%s] is invalid\n",
                             readdir_resp.dirent_array[i].d_name);
@@ -887,7 +870,6 @@ int PVFS_fsck_validate_dir(
  * - dirent_count must be >= 0
  * .
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_dir_attr(
@@ -923,13 +905,13 @@ int PVFS_fsck_validate_dir_attr(
  * - warnings for characters that tend to confuse shells
  * .
  * \retval 0 on success 
- * \retval -PVFS_EWARNING for non critical warnings
  * \retval -PVFS_error on failure
  */
 int PVFS_fsck_validate_dir_ent(
     const struct PINT_fsck_options *fsck_options, /**< generic fsck options */
     const char *filename)              /**< Filename associated with handle */
 {
+    const char *cp;
     int ret = 0;
 
     if (strlen(filename) > PVFS_SEGMENT_MAX)
@@ -947,44 +929,16 @@ int PVFS_fsck_validate_dir_ent(
         set_return_code(&ret, -PVFS_EINVAL);
     }
 
-    if (strspn(filename, "\n") > 0)
+    cp = filename;
+    while (*cp)
     {
-        gossip_err(
-                "WARNING: directory entry [%s] contains invalid new line character\n",
-                filename);
-        set_return_code(&ret, -PVFS_EWARNING);
-    }
-
-    if (strspn(filename, "\r") > 0)
-    {
-        gossip_err(
-                "WARNING: directory entry [%s] contains invalid carriage return character\n",
-                filename);
-        set_return_code(&ret, -PVFS_EWARNING);
-    }
-
-    if (strspn(filename, "|") > 0)
-    {
-        gossip_err(
-                "WARNING: directory entry [%s] contains invalid pipe character\n",
-                filename);
-        set_return_code(&ret, -PVFS_EWARNING);
-    }
-
-    if (strspn(filename, "*") > 0)
-    {
-        gossip_err(
-                "WARNING: directory entry [%s] contains invalid # character\n",
-                filename);
-        set_return_code(&ret, -PVFS_EWARNING);
-    }
-
-    if (strspn(filename, "?") > 0)
-    {
-        gossip_err(
-                "WARNING: directory entry [%s] contains invalid ? character\n",
-                filename);
-        set_return_code(&ret, -PVFS_EWARNING);
+        /* isprint is ' ' through ~ in ASCII; no tabs or newlines */
+        if (!isprint(*cp))
+        {
+            gossip_err("WARNING: directory entry [%s] contains odd character\n",
+                       filename);
+            break;
+        }
     }
 
     return ret;
@@ -1661,7 +1615,7 @@ static void set_return_code(
     {
         *ret = retval;
     }
-    else if (retval != 0 && retval != -PVFS_EWARNING)
+    else if (retval != 0)
     {
         *ret = retval;
     }
