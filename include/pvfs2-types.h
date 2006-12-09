@@ -548,7 +548,6 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 #define PVFS_EADDRNTFD  (5|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ENORECVR   (6|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ETRYAGAIN  (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
-#define PVFS_EWARNING   (8|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -655,7 +654,6 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "No address associated with name",                \
     "Unknown server error",                           \
     "Host name lookup failure",                       \
-    "Warning"                                         \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -666,7 +664,6 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_EADDRNTFD, /* 5 */                           \
     PVFS_ENORECVR,  /* 6 */                           \
     PVFS_ETRYAGAIN, /* 7 */                           \
-    PVFS_EWARNING   /* 8 */                           \
 }
 
 /*
