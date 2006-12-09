@@ -1786,7 +1786,13 @@ int BMI_cancel(bmi_op_id_t id,
 /* bmi_method_addr_reg_callback()
  * 
  * Used by the methods to register new addresses when they are
- * discovered.
+ * discovered.  Only call this method when the device gets an
+ * unexpected receive from a new peer, i.e., if you do the equivalent
+ * of a socket accept() and get a new connection.
+ *
+ * Do not call this function for active lookups, that is from your
+ * BMI_meth_method_addr_lookup.  BMI already knows about the address in
+ * this case, since the user provided it.
  *
  * returns 0 on success, -errno on failure
  */
