@@ -33,6 +33,9 @@ void gen_machine(char *machine_name, char *first_state_name);
 int yylex(void);
 void yyerror(char *);
 
+/* used by mid-rules as a placeholder */
+static sym_ent_p tmp_symp;
+
 /*
  * Local variables:
  *    c-indent-level: 4
@@ -89,9 +92,9 @@ state_machine_list : state_machine
 		  ;
 
 state_machine	  : .NESTED. MACHINE identifier
-			{$$ = symenter($3);
-			 $$->type = TYPE_MACHINE;
-			 $$->flag = $1;}
+			{tmp_symp = symenter($3);
+			 tmp_symp->type = TYPE_MACHINE;
+			 tmp_symp->flag = $1;}
 		     LPAREN .state_decl_list. RPAREN LBRACE
 			{gen_machine($3, $6->name);}
 		    .state_def_list. RBRACE
@@ -142,8 +145,8 @@ state_def_list	  : state_def
 		  ;
 
 state_def	  : STATE identifier LBRACE
-		     {$$ = symlook($2);
-		      if ($$->type != TYPE_STATE){
+		     {tmp_symp = symlook($2);
+		      if (tmp_symp->type != TYPE_STATE){
 			 fprintf(stderr,"bad state identifier %s\n", $2);
 			 fprintf(stderr,"declared as another type\n");
 			 exit(1);
