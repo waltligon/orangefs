@@ -461,16 +461,23 @@ static int lookup_check_acls(
        find the segment that we should look up in the directory */
     if (js_p->error_code == 0)
     {
-        int ret = PINT_string_next_segment(
+        js_p->error_code = PINT_string_next_segment(
             s_op->req->u.lookup_path.path, &s_op->u.lookup.segp,
             &s_op->u.lookup.segstate);
 
-        assert(ret == 0);
-
-        gossip_debug(GOSSIP_SERVER_DEBUG, "  after ACL check "
-                    "object is a directory; will be "
-                     "looking for handle for segment \"%s\" in a bit\n",
-                     s_op->u.lookup.segp);
+        if(js_p->error_code != 0)
+        {
+            gossip_err("PINT_string_next_segment failed to get the"
+                       "next segment to lookup from the path: %s\n",
+                       s_op->req->u.lookup_path.path);
+        }
+        else
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "  after ACL check "
+                         "object is a directory; will be "
+                         "looking for handle for segment \"%s\" in a bit\n",
+                         s_op->u.lookup.segp);
+        }
     }
 cleanup:
     if (s_op->val.buffer) 

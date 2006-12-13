@@ -312,14 +312,13 @@ int PINT_check_mode(
 {
     int in_group_flag = 0;
     int ret = 0;
-    uint32_t perm_mask = (PVFS_ATTR_COMMON_UID |
-                          PVFS_ATTR_COMMON_GID |
-                          PVFS_ATTR_COMMON_PERM);
 
     /* if we don't have masks for the permission information that we
      * need, then the system is broken
      */
-    assert((attr->mask & perm_mask) == perm_mask);
+    assert(attr->mask & PVFS_ATTR_COMMON_UID &&
+           attr->mask & PVFS_ATTR_COMMON_GID &&
+           attr->mask & PVFS_ATTR_COMMON_PERM);
 
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - check_mode called --- "
                  "(uid=%d,gid=%d,access_type=%d)\n", uid, gid, access_type);
@@ -586,9 +585,9 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 {
     pvfs2_acl_entry pe, *pa;
     int i = 0, found = 0, count = 0;
-    uint32_t perm_mask = (PVFS_ATTR_COMMON_UID |
-                          PVFS_ATTR_COMMON_GID |
-                          PVFS_ATTR_COMMON_PERM);
+    assert(attr->mask & PVFS_ATTR_COMMON_UID &&
+           attr->mask & PVFS_ATTR_COMMON_GID &&
+           attr->mask & PVFS_ATTR_COMMON_PERM);
 
     if (acl_size == 0)
     {
@@ -605,7 +604,6 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
         uid, gid, want);
 
-    assert((attr->mask & perm_mask) == perm_mask);
     assert(acl_buf);
     assert(acl_size % sizeof(pvfs2_acl_entry) == 0);
     count = acl_size / sizeof(pvfs2_acl_entry);
