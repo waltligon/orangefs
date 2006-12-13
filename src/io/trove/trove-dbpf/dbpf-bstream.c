@@ -46,7 +46,7 @@ static int issue_or_delay_io_operation(
 static void start_delayed_ops_if_any(int dec_first);
 
 #ifdef __PVFS2_TROVE_AIO_THREADED__
-static char *list_proc_state_strings[] = {
+static char *list_proc_state_strings[] __attribute__((unused)) = {
     "LIST_PROC_INITIALIZED",
     "LIST_PROC_INPROGRESS ",
     "LIST_PROC_ALLCONVERTED",
