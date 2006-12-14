@@ -546,7 +546,7 @@ static int PINT_check_group(uid_t uid, gid_t gid)
 	gen_mutex_unlock(&check_group_mutex);
 	gossip_err("User (uid=%d) isn't in group %d on storage node.\n",
 		   uid, gid);
-        return(-PVFS_EINVAL);
+        return(-PVFS_EACCES);
     }
 
     gen_mutex_unlock(&check_group_mutex);

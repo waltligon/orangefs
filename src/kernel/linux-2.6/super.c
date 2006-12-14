@@ -435,15 +435,16 @@ static int pvfs2_statfs(
     if (new_op->downcall.status > -1)
     {
         gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_statfs: got %ld blocks available | "
-                    "%ld blocks total\n",
+                    "%ld blocks total | %ld block size\n",
                     (long) new_op->downcall.resp.statfs.blocks_avail,
-                    (long) new_op->downcall.resp.statfs.blocks_total);
+                    (long) new_op->downcall.resp.statfs.blocks_total,
+                    (long) new_op->downcall.resp.statfs.block_size);
 
         buf->f_type = sb->s_magic;
         /* stash the fsid as well */
         memcpy(&buf->f_fsid, &(PVFS2_SB(sb)->fs_id), 
                 sizeof(PVFS2_SB(sb)->fs_id));      
-        buf->f_bsize = sb->s_blocksize;
+        buf->f_bsize = new_op->downcall.resp.statfs.block_size;
         buf->f_namelen = PVFS2_NAME_LEN;
 
         buf->f_blocks = (sector_t)

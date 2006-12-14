@@ -2256,7 +2256,7 @@ static inline void package_downcall_members(
             break;
         case PVFS2_VFS_OP_STATFS:
             vfs_request->out_downcall.resp.statfs.block_size =
-                s_desc_params[BM_IO].dev_buffer_count;
+                s_desc_params[BM_IO].dev_buffer_size;
             vfs_request->out_downcall.resp.statfs.blocks_total = (int64_t)
                 (vfs_request->response.statfs.statfs_buf.bytes_total /
                  vfs_request->out_downcall.resp.statfs.block_size);
