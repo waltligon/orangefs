@@ -201,7 +201,9 @@ static struct qhash_table *s_ops_in_progress_table = NULL;
 static void parse_args(int argc, char **argv, options_t *opts);
 static void print_help(char *progname);
 static void reset_acache_timeout(void);
+#ifndef GOSSIP_DISABLE_DEBUG
 static char *get_vfs_op_name_str(int op_type);
+#endif
 static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
@@ -3655,6 +3657,7 @@ static void reset_ncache_timeout(void)
     }
 }
 
+#ifndef GOSSIP_DISABLE_DEBUG
 static char *get_vfs_op_name_str(int op_type)
 {
     typedef struct
@@ -3706,6 +3709,7 @@ static char *get_vfs_op_name_str(int op_type)
     }
     return vfs_op_info[limit-1].type_str;
 }
+#endif
 
 static int set_acache_parameters(options_t* s_opts)
 {
