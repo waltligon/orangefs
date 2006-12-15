@@ -172,10 +172,17 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
 #if defined(HAVE_MPE)
     for(i=0; i < PINT_server_pc->key_count; i++){
         if(current_debug_on)
-        { 
+        {
+            int64_t val;
+            if(PINT_server_pc->key_array[i].flag == PINT_PERF_PRESERVE){
+                val = PINT_server_pc->value_matrix[i][0] - 
+                    PINT_server_pc->value_matrix[i][1];
+            }else{   
+                val = PINT_server_pc->value_matrix[i][0];
+            }
             PINT_event_timestamp(PVFS_EVENT_API_PERFORMANCE_COUNTER, i, 
-                PINT_server_pc->value_matrix[i][0], 
-                0,0);
+                    val, 
+                    0,0);
         }
     }
 #endif
@@ -184,29 +191,18 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
     gossip_debug(GOSSIP_PERFCOUNTER_DEBUG, "Performance counter values:\n");
     if(current_mask & GOSSIP_PERFCOUNTER_DEBUG)
     {
-        /*
-        char* tmp_text;
-        char* ptr;
-        char* token;
-        char delim[] = "\n";
-        tmp_text = PINT_perf_generate_text(PINT_server_pc, 4096);
-        if(tmp_text)
-        {
-            token = strtok_r(tmp_text, delim, &ptr);
-            while(token)
-            {
-                gossip_perf_log("%s\n", token);
-                token = strtok_r(NULL, delim, &ptr);
-            }
-            free(tmp_text);
-        }
-        */
-        
+        int64_t val;
         /* simple output for easier parsing */
         for(i=0; i < PINT_server_pc->key_count; i++){
+            if(PINT_server_pc->key_array[i].flag == PINT_PERF_PRESERVE){
+                val = PINT_server_pc->value_matrix[i][0] - 
+                      PINT_server_pc->value_matrix[i][1];
+            }else{   
+                val = PINT_server_pc->value_matrix[i][0];
+            }            
             fprintf(stderr, "perf-update-stat:%s val:%lld\n", 
                 PINT_server_pc->key_array[i].key_name, 
-                PINT_server_pc->value_matrix[i][0]);     
+                val);     
         }   
     }
     } /* end ! first_run */
