@@ -63,8 +63,8 @@ extern "C" {
 (((__id << ((sizeof(__id) - 1) * 8)) | __handle) %                       \
    DBPF_BSTREAM_MAX_NUM_BUCKETS)
 
-#define DBPF_EVENT_START(__op, __id, __hint)                             \
- PINT_event_timestamp_hint(PVFS_EVENT_API_TROVE, __op, 0, __id,          \
+#define DBPF_EVENT_START(__op, __id, __hint, __value)                    \
+ PINT_event_timestamp_hint(PVFS_EVENT_API_TROVE, __op, __value, __id,    \
  PVFS_EVENT_FLAG_START, __hint)
 
 #define DBPF_EVENT_END(__op, __id, __hint)                               \

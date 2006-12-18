@@ -936,7 +936,14 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                         flags,
                         context_id);
 
-    DBPF_EVENT_START(event_type, q_op_p->op.id, hints);
+    {
+    PVFS_size count_mem = 0;
+    for(i = 0; i < mem_count; ++i)
+    {
+        count_mem += mem_size_array[i];
+    }
+    DBPF_EVENT_START(event_type, q_op_p->op.id, hints, count_mem);
+    }
 
     if(gossip_debug_enabled(GOSSIP_TROVE_DEBUG))
     {
