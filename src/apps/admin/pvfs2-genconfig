@@ -176,18 +176,6 @@ sub emit_defaults
 
     print $target "<Defaults>\n";
     print $target "\tUnexpectedRequests $num_unexp\n";
-
-    if(defined($logfile))
-    {
-        # remove quotes from logfile if any
-        if ($logfile =~ /\".*\"/)
-        {
-            $logfile =~ s/\"//g;
-        }
-
-        print $target "\tLogFile $logfile\n";
-    }
-
     print $target "\tEventLogging $logging\n";
     print $target "\tLogStamp $logstamp\n";
     print $target "\tBMIModules $bmi_module\n";
