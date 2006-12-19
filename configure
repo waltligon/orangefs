@@ -10073,6 +10073,7 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
+		if test x$ac_cv_header_linux_ioctl32_h = xyes ; then
 	echo "$as_me:$LINENO: checking for register_ioctl32_conversion kernel exports" >&5
 echo $ECHO_N "checking for register_ioctl32_conversion kernel exports... $ECHO_C" >&6
 			cat >conftest.$ac_ext <<_ACEOF
@@ -10135,6 +10136,7 @@ _ACEOF
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+	fi
 
 	echo "$as_me:$LINENO: checking for int return value of kmem_cache_destroy" >&5
 echo $ECHO_N "checking for int return value of kmem_cache_destroy... $ECHO_C" >&6
