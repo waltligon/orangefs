@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.11 2006-12-07 21:47:47 pw Exp $
+ * $Id: mem.c,v 1.12 2006-12-29 22:42:52 pw Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "pvfs2-internal.h"
@@ -336,6 +336,7 @@ void memcache_shutdown(void *md)
     qlist_for_each_entry_safe(c, cn, &memcache_device->free_chunk_list, list) {
 	memcache_device->mem_deregister(c);
 	qlist_del(&c->list);
+	free(c->buf);
 	free(c);
     }
     gen_mutex_unlock(&memcache_device->mutex);

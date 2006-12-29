@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.10 2006-12-07 21:47:47 pw Exp $
+ * $Id: openib.c,v 1.11 2006-12-29 22:42:52 pw Exp $
  */
 #include <string.h>
 #include <errno.h>
@@ -15,6 +15,12 @@
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/io/bmi/bmi-byteswap.h>  /* bmitoh64 */
 #include <src/common/misc/pvfs2-internal.h>  /* llu */
+
+#ifdef HAVE_VALGRIND
+#include <valgrind/memcheck.h>
+#else
+#define VALGRIND_MAKE_MEM_DEFINED(addr,len)
+#endif
 
 #include <infiniband/verbs.h>
 
@@ -99,13 +105,15 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
     int num_wr;
     size_t len;
     struct ibv_qp_init_attr att;
+
     /*
      * Values passed through TCP to permit IB connection.  These
      * are transformed to appear in network byte order (big endian)
-     * on the network.
+     * on the network.  The lid is pushed up to 32 bits to avoid struct
+     * alignment issues.
      */
     struct {
-	uint16_t lid;
+	uint32_t lid;
 	uint32_t qp_num;
     } ch_in, ch_out;
 
@@ -150,6 +158,8 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
     oc->qp = ibv_create_qp(od->nic_pd, &att);
     if (!oc->qp)
 	error("%s: create QP", __func__);
+    VALGRIND_MAKE_MEM_DEFINED(&att, sizeof(att));
+    VALGRIND_MAKE_MEM_DEFINED(&oc->qp->qp_num, sizeof(oc->qp->qp_num));
 
     /* compare the caps that came back against what we already have */
     if (od->sg_max_len == 0) {
@@ -182,14 +192,14 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
 	      att.cap.max_send_wr);
 
     /* exchange data, converting info to network order and back */
-    ch_out.lid = htobmi16(od->nic_lid);
+    ch_out.lid = htobmi32(od->nic_lid);
     ch_out.qp_num = htobmi32(oc->qp->qp_num);
 
     ret = exchange_data(sock, is_server, &ch_in, &ch_out, sizeof(ch_in));
     if (ret)
 	goto out;
 
-    oc->remote_lid = bmitoh16(ch_in.lid);
+    oc->remote_lid = bmitoh32(ch_in.lid);
     oc->remote_qp_num = bmitoh32(ch_in.qp_num);
 
     /* bring the two QPs up to RTR */
@@ -612,6 +622,7 @@ static int openib_check_cq(struct bmi_ib_wc *wc)
 	      __func__, desc.sl, desc.dlid_path_bits);
 	error("%s: unknown opcode %d", __func__, desc.opcode);
     }
+    VALGRIND_MAKE_MEM_DEFINED(wc, sizeof(*wc));
 
     return 1;
 }
@@ -848,6 +859,7 @@ int openib_ib_initialize(void)
 	warning("%s: ibv_open_device", __func__);
 	return -ENOSYS;
     }
+    VALGRIND_MAKE_MEM_DEFINED(ctx, sizeof(*ctx));
 
     od = Malloc(sizeof(*od));
     ib_device->priv = od;
@@ -876,6 +888,8 @@ int openib_ib_initialize(void)
     ret = ibv_query_port(od->ctx, od->nic_port, &hca_port);
     if (ret)
 	error_xerrno(ret, "%s: ibv_query_port", __func__);
+    VALGRIND_MAKE_MEM_DEFINED(&hca_port, sizeof(hca_port));
+
     od->nic_lid = hca_port.lid;
 
     if (hca_port.state != IBV_PORT_ACTIVE)
@@ -886,6 +900,7 @@ int openib_ib_initialize(void)
     ret = ibv_query_device(od->ctx, &hca_cap);
     if (ret)
 	error_xerrno(ret, "%s: ibv_query_device", __func__);
+    VALGRIND_MAKE_MEM_DEFINED(&hca_cap, sizeof(hca_cap));
 
     debug(1, "%s: max %d completion queue entries", __func__, hca_cap.max_cq);
     cqe_num = IBV_NUM_CQ_ENTRIES;

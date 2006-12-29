@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.49 2006-12-29 19:41:22 pw Exp $
+ * $Id: ib.c,v 1.50 2006-12-29 22:42:52 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +24,13 @@
 #include <src/io/bmi/bmi-method-callback.h>  /* bmi_method_addr_reg_callback */
 #include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t ... */
 #include <src/common/misc/pvfs2-internal.h>
+
+#ifdef HAVE_VALGRIND
+#include <valgrind/memcheck.h>
+#else
+#define VALGRIND_MAKE_MEM_DEFINED(addr,len)
+#endif
+
 #include "ib.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
@@ -148,6 +155,7 @@ static int ib_check_cq(void)
 	    char *ptr = bh->buf;
 	    u_int32_t byte_len = wc.byte_len;
 
+	    VALGRIND_MAKE_MEM_DEFINED(ptr, byte_len);
 	    decode_msg_header_common_t(&ptr, &mh_common);
 	    bh->c->send_credit += mh_common.credit;
 
@@ -449,6 +457,7 @@ alloc_new_recv(ib_connection_t *c, struct buf_head *bh)
     ++rq->c->refcnt;
     rq->bh = bh;
     rq->mop = 0;  /* until user posts for it */
+    rq->rts_mop_id = 0;
     qlist_add_tail(&rq->list, &ib_device->recvq);
     return rq;
 }
@@ -1983,10 +1992,13 @@ static int BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
      * The hostname is currently ignored; the port number is used to bind
      * the listening TCP socket which accepts new connections.
      */
-    if (init_flags & BMI_INIT_SERVER)
+    if (init_flags & BMI_INIT_SERVER) {
 	ib_tcp_server_init_listen_socket(listen_addr);
-    else
+	ib_device->listen_addr = listen_addr;
+    } else {
 	ib_device->listen_sock = -1;
+	ib_device->listen_addr = NULL;
+    }
 
     /*
      * Initialize data structures.
@@ -2025,8 +2037,12 @@ static int BMI_ib_finalize(void)
 	}
     }
     /* if server, stop listening */
-    if (ib_device->listen_sock >= 0)
+    if (ib_device->listen_sock >= 0) {
+	ib_method_addr_t *ibmap = ib_device->listen_addr->method_data;
 	close(ib_device->listen_sock);
+	free(ibmap->hostname);
+	free(ib_device->listen_addr);
+    }
 
     /* destroy QPs and other connection structures */
     while (ib_device->connection.next != &ib_device->connection) {

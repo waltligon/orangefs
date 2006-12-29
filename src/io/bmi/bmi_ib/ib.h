@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.26 2006-12-07 21:47:47 pw Exp $
+ * $Id: ib.h,v 1.27 2006-12-29 22:42:52 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -360,7 +360,9 @@ struct ib_device_func {
  * State that applies across all users of the device, built at initialization.
  */
 typedef struct {
-    int listen_sock;  /* TCP sock on whih to listen for new connections */
+    int listen_sock;  /* TCP sock on which to listen for new connections */
+    struct method_addr *listen_addr;  /* and BMI listen address */
+
     struct qlist_head connection; /* list of current connections */
     struct qlist_head sendq;  /* outstanding sent items */
     struct qlist_head recvq;  /* outstanding posted receives (or unexpecteds) */
