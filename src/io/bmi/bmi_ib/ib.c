@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.48 2006-12-07 21:47:47 pw Exp $
+ * $Id: ib.c,v 1.49 2006-12-29 19:41:22 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1333,7 +1333,7 @@ restart:
 	/*
 	 * Block if told to from above.
 	 */
-	debug(2, "%s: last activity too long ago, blocking", __func__);
+	debug(8, "%s: last activity too long ago, blocking", __func__);
 	activity = ib_block_for_activity(max_idle_time);
 	if (activity == 1)   /* IB action, go do it immediately */
 	    goto restart;
@@ -1583,7 +1583,7 @@ static struct method_addr *BMI_ib_method_addr_lookup(const char *id)
 	free(hostname);  /* found it */
     else
 	map = ib_alloc_method_addr(0, hostname, port);  /* alloc new one */
-	/* but don't call method_addr_reg_callback! */
+	/* but don't call bmi_method_addr_reg_callback! */
 
     return map;
 }
@@ -1653,8 +1653,6 @@ static ib_connection_t *ib_new_connection(int sock, const char *peername,
  */
 static void ib_close_connection(ib_connection_t *c)
 {
-    ib_method_addr_t *ibmap;
-
     debug(2, "%s: closing connection to %s", __func__, c->peername);
     c->closed = 1;
     if (c->refcnt != 0) {
@@ -1670,8 +1668,10 @@ static void ib_close_connection(ib_connection_t *c)
     free(c->eager_recv_buf_head_contig);
     /* never free the remote map, for the life of the executable, just
      * mark it unconnected since BMI will always have this structure. */
-    ibmap = c->remote_map->method_data;
-    ibmap->c = NULL;
+    if (c->remote_map) {
+	ib_method_addr_t *ibmap = c->remote_map->method_data;
+	ibmap->c = NULL;
+    }
     free(c->peername);
     qlist_del(&c->list);
     free(c);
@@ -1792,8 +1792,7 @@ static int ib_tcp_server_check_new_connections(void)
 	c = ib_new_connection(s, peername, 1);
 	if (!c) {
 	    free(hostname);
-	    close(s);
-	    return 0;
+	    goto out_unlock;
 	}
 
 	c->remote_map = ib_alloc_method_addr(c, hostname, port);
@@ -1804,12 +1803,12 @@ static int ib_tcp_server_check_new_connections(void)
 
 	debug(2, "%s: accepted new connection %s at server", __func__,
 	  c->peername);
+	ret = 1;
 
+out_unlock:
 	gen_mutex_unlock(&interface_mutex);
-
 	if (close(s) < 0)
 	    error_errno("%s: close new sock", __func__);
-	ret = 1;
     }
     return ret;
 }
