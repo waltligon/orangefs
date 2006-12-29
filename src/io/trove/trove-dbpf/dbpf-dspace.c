@@ -157,7 +157,8 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 
     DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, op_p->id);
 
-    /* this array is freed in dbpf-op.c:dbpf_queued_op_free */
+    /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
+     * in dbpf_queue_or_service in the case of immediate completion */
     op_p->u.d_create.extent_array.extent_count =
         extent_array->extent_count;
     op_p->u.d_create.extent_array.extent_array =
