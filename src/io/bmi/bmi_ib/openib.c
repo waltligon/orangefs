@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.11 2006-12-29 22:42:52 pw Exp $
+ * $Id: openib.c,v 1.12 2007-01-02 17:10:56 pw Exp $
  */
 #include <string.h>
 #include <errno.h>
@@ -15,14 +15,13 @@
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/io/bmi/bmi-byteswap.h>  /* bmitoh64 */
 #include <src/common/misc/pvfs2-internal.h>  /* llu */
+#include <infiniband/verbs.h>
 
 #ifdef HAVE_VALGRIND
-#include <valgrind/memcheck.h>
+#include <memcheck.h>
 #else
 #define VALGRIND_MAKE_MEM_DEFINED(addr,len)
 #endif
-
-#include <infiniband/verbs.h>
 
 #include "ib.h"
 

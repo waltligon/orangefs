@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.50 2006-12-29 22:42:52 pw Exp $
+ * $Id: ib.c,v 1.51 2007-01-02 17:10:56 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,8 +25,8 @@
 #include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t ... */
 #include <src/common/misc/pvfs2-internal.h>
 
-#ifdef HAVE_VALGRIND
-#include <valgrind/memcheck.h>
+#ifdef HAVE_VALGRIND_H
+#include <memcheck.h>
 #else
 #define VALGRIND_MAKE_MEM_DEFINED(addr,len)
 #endif
