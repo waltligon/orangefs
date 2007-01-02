@@ -873,9 +873,8 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-openssl=<dir>  Build with openssl (the default).  <dir> defaults to /usr
-	   --without-openssl     Don't build with openssl.
-
+  --with-openssl=<dir>    Build with openssl (default=/usr)
+  --without-openssl       Don't build with openssl.
   --with-mtrace           Use mtrace (must set MALLOC_TRACE to output file)
   --with-berkdb-debug     Use berkeley db error reporting (if detected).
   --with-pablo=path       Use Pablo trace library installed in "path"
@@ -883,14 +882,15 @@ Optional Packages:
   --with-kernel=srcpath   Build pvfs2 kernel module against 2.6.x src
   --with-kernel24=srcpath Build pvfs2 kernel module against 2.4.x src
   --with-efence=<path>    Use electric fence for malloc debugging.
+  --with-valgrind=<path>  Use valgrind annotations for debugging.
   --with-db=<dir>         Location of installed DB package (default=/usr)
   --with-gm=<dir>         Location of the GM installation (default no GM)
   --with-ib=<dir>         Location of the IB installation (default no IB)
-  --with-ib-includes=<dir>  Location of the IB includes
-  --with-ib-libs=<dir>      Location of the IB libraries
+  --with-ib-includes=<dir>      Location of the IB includes
+  --with-ib-libs=<dir>          Location of the IB libraries
   --with-openib=<dir>     Location of the OpenIB install (default no OpenIB)
   --with-openib-includes=<dir>  Location of the OpenIB includes
-  --with-openib-libs=<dir>  Location of the OpenIB libraries
+  --with-openib-libs=<dir>      Location of the OpenIB libraries
 
 Some influential environment variables:
   CC          C compiler command
@@ -10704,6 +10704,139 @@ fi
 
 fi;
 
+
+# Check whether --with-valgrind or --without-valgrind was given.
+if test "${with_valgrind+set}" = set; then
+  withval="$with_valgrind"
+
+    found=no
+    save_cppflags="$CPPFLAGS"
+    echo "$as_me:$LINENO: checking for valgrind.h usability" >&5
+echo $ECHO_N "checking for valgrind.h usability... $ECHO_C" >&6
+    if test "x$withval" = xyes ; then
+	cat >conftest.$ac_ext <<_ACEOF
+#include <valgrind.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  found=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+	if test x$found = xno ; then
+	    CPPFLAGS="$CPPFLAGS -I/usr/include/valgrind"
+	    cat >conftest.$ac_ext <<_ACEOF
+#include <valgrind.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  found=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+CPPFLAGS="$save_cppflags"
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+	fi
+    else
+	for d in $withval $withval/include \
+	         $withval/valgrind $withval/include/valgrind
+	do
+	    CPPFLAGS="$CPPFLAGS -I$d"
+	    cat >conftest.$ac_ext <<_ACEOF
+#include <valgrind.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  found=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+CPPFLAGS="$save_cppflags"
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+	    if test x$found = xyes ; then
+		break
+	    fi
+	done
+    fi
+    echo "$as_me:$LINENO: result: $found" >&5
+echo "${ECHO_T}$found" >&6
+    if test x$found = xyes ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_VALGRIND_H 1
+_ACEOF
+
+    fi
+
+fi;
+
 if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 
 # Check whether --with-db or --without-db was given.
@@ -12788,6 +12921,7 @@ echo "$as_me: error: Option --with-gm requires the path to your GM tree." >&2;}
 
 fi;
 if test -n "$GM_HOME" ; then
+    save_cppflags="$CPPFLAGS"
     CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
     if test "${ac_cv_header_gm_h+set}" = set; then
   echo "$as_me:$LINENO: checking for gm.h" >&5
@@ -12936,7 +13070,7 @@ fi
 
 
     BUILD_GM=1
-    CPPFLAGS="$CPPFLAGS_OLD"
+    CPPFLAGS="$save_cppflags"
 fi
 
 
@@ -12993,6 +13127,7 @@ if test -n "$ib_home" ; then
     fi
 fi
 if test -n "$IB_INCDIR$IB_LIBDIR" ; then
+    save_cppflags="$CPPFLAGS"
     CPPFLAGS="$CPPFLAGS -I$IB_INCDIR"
     if test "${ac_cv_header_vapi_h+set}" = set; then
   echo "$as_me:$LINENO: checking for vapi.h" >&5
@@ -13205,7 +13340,7 @@ _ACEOF
 fi
 
 
-    CPPFLAGS="$CPPFLAGS_OLD"
+    CPPFLAGS="$save_cppflags"
 fi
 
 
@@ -13263,6 +13398,7 @@ if test -n "$openib_home" ; then
     fi
 fi
 if test -n "$OPENIB_INCDIR$OPENIB_LIBDIR" ; then
+    save_cppflags="$CPPFLAGS"
     CPPFLAGS="$CPPFLAGS -I$OPENIB_INCDIR"
     if test "${ac_cv_header_infiniband_verbs_h+set}" = set; then
   echo "$as_me:$LINENO: checking for infiniband/verbs.h" >&5
@@ -13418,7 +13554,7 @@ echo "$as_me: error: OpenIB library libibverbs.so not found." >&2;}
 	fi
     fi
     BUILD_OPENIB=1
-    CPPFLAGS="$CPPFLAGS_OLD"
+    CPPFLAGS="$save_cppflags"
 fi
 
 

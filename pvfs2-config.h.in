@@ -282,6 +282,9 @@
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 
+/* Define if include file valgrind.h exists */
+#undef HAVE_VALGRIND_H
+
 /* Define if get_sb callback has struct vfsmount argument */
 #undef HAVE_VFSMOUNT_GETSB
 
