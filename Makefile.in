@@ -143,7 +143,7 @@ LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
 # make sure the srcdir include gets included first
-CFLAGS = -I$(srcdir)/include @CFLAGS@
+CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
