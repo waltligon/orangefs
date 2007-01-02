@@ -359,10 +359,6 @@ static void usage(
 
 static struct PINT_fsck_options *parse_args(int argc, char **argv)
 {
-    /* getopt variables */
-    extern char *optarg;
-    extern int optind, opterr, optopt;
-
     int opt = 0;
     int path_length = 0;
 
