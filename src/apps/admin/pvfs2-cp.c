@@ -139,7 +139,7 @@ int main (int argc, char ** argv)
 	return(-1);
     }
     memset(&src, 0, sizeof(src));
-    memset(&dest, 0, sizeof(src));
+    memset(&dest, 0, sizeof(dest));
 
     resolve_filename(&src,  user_opts->srcfile );
     resolve_filename(&dest, user_opts->destfile);

@@ -297,14 +297,14 @@ PVFS_error PVFS_isys_create(
     {
         if (!dist->name)
         {
-            free(sm_p);
+            PINT_smcb_free(&smcb);
             return -PVFS_EINVAL;
         }
 
         sm_p->u.create.dist = PINT_dist_create(dist->name);
         if (!sm_p->u.create.dist)
         {
-            free(sm_p);
+            PINT_smcb_free(&smcb);
             return -PVFS_ENOMEM;
         }
         sm_p->u.create.dist->params = dist->params;
@@ -315,7 +315,7 @@ PVFS_error PVFS_isys_create(
         sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
         if (!sm_p->u.create.dist)
         {
-            free(sm_p);
+            PINT_smcb_free(&smcb);
             return -PVFS_ENOMEM;
         }
     }
@@ -350,7 +350,7 @@ PVFS_error PVFS_isys_create(
     if (ret < 0)
     {
         gossip_err("Failed to get number of data servers\n");
-        free(sm_p);
+        PINT_smcb_free(&smcb);
         return ret;
     }
 

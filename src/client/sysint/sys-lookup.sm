@@ -513,7 +513,7 @@ PVFS_error PVFS_isys_ref_lookup(
                    __func__, relative_pathname);
 
         PVFS_util_release_credentials(sm_p->cred_p);
-        free(sm_p);
+        PINT_smcb_free(&smcb);
         return ret;
     }
 

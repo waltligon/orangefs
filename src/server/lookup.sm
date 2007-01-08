@@ -161,6 +161,13 @@ static PINT_sm_action lookup_init(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, " STARTING LOOKUP REQUEST "
+                     "(path:%s)(fs_id:%d)(handle:%lld)(attrmask:%u)\n",
+                     s_op->req->u.lookup_path.path,
+                     s_op->req->u.lookup_path.fs_id,
+                     s_op->req->u.lookup_path.starting_handle,
+                     s_op->req->u.lookup_path.attrmask);
+
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
     s_op->u.lookup.seg_nr = 0;
@@ -602,6 +609,7 @@ static PINT_sm_action lookup_setup_resp(
     else if(js_p->error_code < 0)
     {
         /* preserve error code in this case and fall through */
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  lookup error in previous step\n");
     }
     else
     {

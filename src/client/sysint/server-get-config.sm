@@ -526,7 +526,7 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
         nservers * sizeof(PINT_sm_msgpair_state));
     if (!sm_p->msgarray)
     {
-        free(sm_p);
+        PINT_smcb_free(&smcb);
         return -PVFS_ENOMEM;
     }
 

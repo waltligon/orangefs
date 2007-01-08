@@ -114,7 +114,7 @@ PVFS_error PVFS_imgmt_perf_mon_list(
     if (sm_p->msgarray == NULL)
     {
         PVFS_util_release_credentials(sm_p->cred_p);
-        free(sm_p);
+        PINT_smcb_free(&smcb);
         return -PVFS_ENOMEM;
     }
 

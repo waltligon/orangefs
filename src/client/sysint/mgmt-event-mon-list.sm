@@ -110,7 +110,7 @@ PVFS_error PVFS_imgmt_event_mon_list(
         server_count * sizeof(PINT_sm_msgpair_state));
     if (sm_p->msgarray == NULL)
     {
-        free(sm_p);
+        PINT_smcb_free(&smcb);
         return -PVFS_ENOMEM;
     }
 

@@ -90,7 +90,7 @@ PVFS_error PVFS_isys_statfs(
     PINT_put_server_config_struct(server_config);
     if (ret < 0)
     {
-        free(sm_p);
+        PINT_smcb_free(&smcb);
 	return ret;
     }
 
@@ -99,7 +99,7 @@ PVFS_error PVFS_isys_statfs(
         sm_p->u.statfs_list.count*sizeof(PVFS_BMI_addr_t));
     if (sm_p->u.statfs_list.addr_array == NULL)
     {
-        free(sm_p);
+        PINT_smcb_free(&smcb);
         return -PVFS_ENOMEM;
     }
 
@@ -108,7 +108,7 @@ PVFS_error PVFS_isys_statfs(
     if (!sm_p->u.statfs_list.stat_array)
     {
         free(sm_p->u.statfs_list.addr_array);
-        free(sm_p);
+        PINT_smcb_free(&smcb);
 	return(-PVFS_ENOMEM);
     }
 
@@ -123,7 +123,7 @@ PVFS_error PVFS_isys_statfs(
     {
         free(sm_p->u.statfs_list.addr_array);
         free(sm_p->u.statfs_list.stat_array);
-        free(sm_p);
+        PINT_smcb_free(&smcb);
 	return ret;
     }
 
@@ -144,7 +144,7 @@ PVFS_error PVFS_isys_statfs(
         PVFS_util_release_credentials(sm_p->cred_p);
         free(sm_p->u.statfs_list.addr_array);
         free(sm_p->u.statfs_list.stat_array);
-        free(sm_p);
+        PINT_smcb_free(&smcb);
         return -PVFS_ENOMEM;
     }
 
