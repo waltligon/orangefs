@@ -350,37 +350,33 @@ static int split_iovecs(
     *seg_count = 0;
     *seg_array = NULL;
     /* copy the passed in iovec descriptor to a temp structure */
-    orig_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+    orig_iovec = kmalloc(nr_segs * sizeof(*orig_iovec), PVFS2_BUFMAP_GFP_FLAGS);
     if (orig_iovec == NULL)
     {
         gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(nr_segs * sizeof(struct iovec)));
+                (unsigned long)(nr_segs * sizeof(*orig_iovec)));
         return -ENOMEM;
     }
-    new_iovec = (struct iovec *) kmalloc(max_new_nr_segs * sizeof(struct iovec), 
+    new_iovec = kzalloc(max_new_nr_segs * sizeof(*new_iovec), 
             PVFS2_BUFMAP_GFP_FLAGS);
     if (new_iovec == NULL)
     {
         kfree(orig_iovec);
         gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(max_new_nr_segs * sizeof(struct iovec)));
+                (unsigned long)(max_new_nr_segs * sizeof(*new_iovec)));
         return -ENOMEM;
     }
-    sizes = (unsigned long *) kmalloc(max_new_nr_segs * sizeof(unsigned long), 
-		    PVFS2_BUFMAP_GFP_FLAGS);
+    sizes = kzalloc(max_new_nr_segs * sizeof(*sizes), PVFS2_BUFMAP_GFP_FLAGS);
     if (sizes == NULL)
     {
         kfree(new_iovec);
         kfree(orig_iovec);
         gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(max_new_nr_segs * sizeof(int)));
+                (unsigned long)(max_new_nr_segs * sizeof(*sizes)));
         return -ENOMEM;
     }
     /* copy the passed in iovec to a temp structure */
-    memcpy(orig_iovec, original_iovec, nr_segs * sizeof(struct iovec));
-    memset(new_iovec, 0, max_new_nr_segs * sizeof(struct iovec));
-    memset(sizes, 0, max_new_nr_segs * sizeof(int));
+    memcpy(orig_iovec, original_iovec, nr_segs * sizeof(*orig_iovec));
     begin_seg = 0;
 repeat:
     for (seg = begin_seg; seg < nr_segs; seg++)
@@ -911,37 +907,33 @@ static int split_xtvecs(
     *seg_count = 0;
     *seg_array = NULL;
     /* copy the passed in xtvec descriptor to a temp structure */
-    orig_xtvec = (struct xtvec *) kmalloc(nr_segs * sizeof(struct xtvec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+    orig_xtvec = kmalloc(nr_segs * sizeof(*orig_xtvec), PVFS2_BUFMAP_GFP_FLAGS);
     if (orig_xtvec == NULL)
     {
         gossip_err("split_xtvecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(nr_segs * sizeof(struct xtvec)));
+                (unsigned long)(nr_segs * sizeof(*orig_xtvec)));
         return -ENOMEM;
     }
-    new_xtvec = (struct xtvec *) kmalloc(max_new_nr_segs * sizeof(struct xtvec), 
+    new_xtvec = kzalloc(max_new_nr_segs * sizeof(*new_xtvec), 
             PVFS2_BUFMAP_GFP_FLAGS);
     if (new_xtvec == NULL)
     {
         kfree(orig_xtvec);
         gossip_err("split_xtvecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(max_new_nr_segs * sizeof(struct xtvec)));
+                (unsigned long)(max_new_nr_segs * sizeof(*new_xtvec)));
         return -ENOMEM;
     }
-    sizes = (unsigned long *) kmalloc(max_new_nr_segs * sizeof(unsigned long), 
-            PVFS2_BUFMAP_GFP_FLAGS);
+    sizes = kzalloc(max_new_nr_segs * sizeof(*sizes), PVFS2_BUFMAP_GFP_FLAGS);
     if (sizes == NULL)
     {
         kfree(new_xtvec);
         kfree(orig_xtvec);
         gossip_err("split_xtvecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(max_new_nr_segs * sizeof(int)));
+                (unsigned long)(max_new_nr_segs * sizeof(*sizes)));
         return -ENOMEM;
     }
     /* copy the passed in xtvec to a temp structure */
-    memcpy(orig_xtvec, original_xtvec, nr_segs * sizeof(struct xtvec));
-    memset(new_xtvec, 0, max_new_nr_segs * sizeof(struct xtvec));
-    memset(sizes, 0, max_new_nr_segs * sizeof(int));
+    memcpy(orig_xtvec, original_xtvec, nr_segs * sizeof(*orig_xtvec));
     begin_seg = 0;
     count = 0;
     tmpnew_nr_segs = 0;
