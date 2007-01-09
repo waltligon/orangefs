@@ -1416,7 +1416,7 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 
     assert((vfs_request->in_upcall.req.io.buf_index > -1) &&
            (vfs_request->in_upcall.req.io.buf_index <
-            pvfs2_bufmap_desc_count));
+            s_desc_params[BM_IO].dev_buffer_count));
 
     vfs_request->io_tmp_buf = malloc(
         vfs_request->in_upcall.req.io.readahead_size);
@@ -1563,7 +1563,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
 
     assert((vfs_request->in_upcall.req.io.buf_index > -1) &&
            (vfs_request->in_upcall.req.io.buf_index <
-            s_desc_params[BM_IO].dev_buffer_size));
+            s_desc_params[BM_IO].dev_buffer_count));
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
     vfs_request->io_kernel_mapped_buf = 
@@ -1639,7 +1639,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
 
     if ((vfs_request->in_upcall.req.iox.buf_index < 0) ||
            (vfs_request->in_upcall.req.iox.buf_index >= 
-            s_desc_params[BM_IO].dev_buffer_size))
+            s_desc_params[BM_IO].dev_buffer_count))
     {
         gossip_err("post_iox_request: invalid buffer index %d\n",
                 vfs_request->in_upcall.req.iox.buf_index);
@@ -2373,7 +2373,7 @@ static inline void package_downcall_members(
                     assert(buf);
 
                     /* copy cached data into the shared user/kernel space */
-                    memcpy(buf, (vfs_request->io_tmp_buf +
+                    memcpy(buf, ((char *) vfs_request->io_tmp_buf +
                                  vfs_request->in_upcall.req.io.offset),
                            vfs_request->in_upcall.req.io.count);
 
