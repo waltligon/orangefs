@@ -337,7 +337,6 @@ int pvfs2_inode_cache_initialize(void)
 
 int pvfs2_inode_cache_finalize(void)
 {
-    int ret = 0;
     if (!list_empty(&pvfs2_inode_list))
     {
         gossip_err("pvfs2_inode_cache_finalize: WARNING: releasing unreleased pvfs2 inode objects!\n");

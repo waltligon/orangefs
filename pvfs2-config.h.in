@@ -6,9 +6,6 @@
 /* Define if kernel has aio support */
 #undef HAVE_AIO
 
-/* Define if VFS AIO support in kernel has a new prototype */
-#undef HAVE_AIO_NEW_AIO_SIGNATURE
-
 /* Define if we are enabling VFS AIO support in kernel */
 #undef HAVE_AIO_VFS_SUPPORT
 
@@ -129,9 +126,6 @@
 /* Define if return value from follow_link in inode_operations is type int */
 #undef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
 
-/* Define if return value from kmem_cache_destroy is type int */
-#undef HAVE_INT_RETURN_KMEM_CACHE_DESTROY
-
 /* Define if struct inode in kernel has i_blksize member */
 #undef HAVE_I_BLKSIZE_IN_STRUCT_INODE
 
@@ -206,9 +200,6 @@
 
 /* Define if struct file_operations in kernel has readdirplus callback */
 #undef HAVE_READDIRPLUS_FILE_OPERATIONS
-
-/* Define if struct file_operations in kernel has readv callback */
-#undef HAVE_READV_FILE_OPERATIONS
 
 /* Define if struct file_operations in kernel has readx callback */
 #undef HAVE_READX_FILE_OPERATIONS
@@ -296,9 +287,6 @@
 
 /* Define if get_sb callback has struct vfsmount argument */
 #undef HAVE_VFSMOUNT_GETSB
-
-/* Define if struct file_operations in kernel has writev callback */
-#undef HAVE_WRITEV_FILE_OPERATIONS
 
 /* Define if struct file_operations in kernel has writex callback */
 #undef HAVE_WRITEX_FILE_OPERATIONS

@@ -121,7 +121,7 @@ int main (int argc, char ** argv)
     int current_size=0;
     int64_t total_written=0, buffer_size=0;
     file_object src, dest;
-    void* buffer = NULL;
+    void* buffer[2];
     int64_t ret;
     PVFS_credentials credentials;
 
@@ -163,21 +163,25 @@ int main (int argc, char ** argv)
     }
 
     /* start moving data */
-    buffer = malloc(user_opts->buf_size);
-    if(!buffer)
+    for(; i < 2; ++i)
     {
-	perror("malloc");
-	ret = -1;
-	goto main_out;
+        buffer[0] = malloc(user_opts->buf_size);
+        if(!buffer)
+        {
+            perror("malloc");
+            ret = -1;
+            goto main_out;
+        }
     }
 
+    bi = 0;
     time1 = Wtime();
-    while((current_size = generic_read(&src, buffer, 
+    while((current_size = generic_read(&src, buffer[bi], 
 		    total_written, user_opts->buf_size, &credentials)) > 0)
     {
 	buffer_size = current_size;
 	
-	ret = generic_write(&dest, buffer, total_written, 
+	ret = generic_write(&dest, buffer[bi], total_written, 
 		buffer_size, &credentials);
 	if (ret != current_size)
 	{
