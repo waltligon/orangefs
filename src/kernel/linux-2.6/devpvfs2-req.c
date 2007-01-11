@@ -232,11 +232,17 @@ static ssize_t pvfs2_devreq_read(
     return len;
 }
 
-static ssize_t pvfs2_devreq_writev(
-    struct file *file,
-    const struct iovec *iov,
-    unsigned long count,
-    loff_t * offset)
+struct devrw_options {
+    struct file   *file;
+    /* Asynch I/O control block */
+    struct kiocb *iocb;
+    struct iovec *iov;
+    unsigned long nr_segs;
+    loff_t        *offset;
+};
+
+/* Common function for writev() and aio_write() callers into the device */
+static ssize_t do_devreq_writev(struct devrw_options *rw)
 {
     pvfs2_kernel_op_t *op = NULL;
     struct qhash_head *hash_link = NULL;
@@ -250,12 +256,18 @@ static ssize_t pvfs2_devreq_writev(
     int32_t magic = 0;
     int32_t proto_ver = 0;
     uint64_t tag = 0;
+    struct iovec *iov = NULL;
+    ssize_t total_returned_size = 0;
 
+    if (!rw || ((iov = rw->iov) == NULL)) {
+        gossip_err("Error: invalid parameter to device vectored write\n");
+        return -EINVAL;
+    }
     /* Either there is a trailer or there isn't */
-    if (count != notrailer_count && count != (notrailer_count + 1))
+    if (rw->nr_segs != notrailer_count && rw->nr_segs != (notrailer_count + 1))
     {
         gossip_err("Error: Number of iov vectors is (%ld) and notrailer count is %d\n",
-                count, notrailer_count);
+                rw->nr_segs, notrailer_count);
         return -EPROTO;
     }
     buffer = dev_req_alloc();
@@ -284,6 +296,7 @@ static ssize_t pvfs2_devreq_writev(
 	ptr += iov[i].iov_len;
 	payload_size += iov[i].iov_len;
     }
+    total_returned_size = payload_size;
 
     /* these elements are currently 8 byte aligned (8 bytes for (version +  
      * magic) 8 bytes for tag).  If you add another element, either make it 8
@@ -338,10 +351,10 @@ static ssize_t pvfs2_devreq_writev(
             if (op->downcall.status == 0 && op->downcall.trailer_size > 0)
             {
                 gossip_debug(GOSSIP_DEV_DEBUG, "writev: trailer size %ld\n", (unsigned long) op->downcall.trailer_size);
-                if (count != (notrailer_count + 1))
+                if (rw->nr_segs != (notrailer_count + 1))
                 {
                     gossip_err("Error: trailer size (%ld) is non-zero, no trailer elements though? (%ld)\n",
-                            (unsigned long) op->downcall.trailer_size, count);
+                            (unsigned long) op->downcall.trailer_size, rw->nr_segs);
                     dev_req_release(buffer);
                     put_op(op);
                     return -EPROTO;
@@ -541,8 +554,49 @@ static ssize_t pvfs2_devreq_writev(
     }
     dev_req_release(buffer);
 
-    return count;
+    /* if we are called from aio context, just mark that the iocb is completed */
+    if (rw->iocb) {
+        aio_complete(rw->iocb, total_returned_size, 0);
+    }
+
+    return total_returned_size;
 }
+
+#ifdef HAVE_WRITEV_FILE_OPERATIONS
+static ssize_t pvfs2_devreq_writev(
+    struct file *file,
+    const struct iovec *iov,
+    unsigned long n_segs,
+    loff_t * offset)
+{
+    struct devrw_options rw;
+
+    memset(&rw, 0, sizeof(rw));
+    rw.iocb = NULL;
+    rw.iov = (struct iovec *) iov;
+    rw.nr_segs = n_segs;
+    rw.offset = offset;
+    return do_devreq_writev(&rw);
+}
+#endif
+
+#ifdef HAVE_AIO_NEW_AIO_SIGNATURE
+/* For simplicity I am going to treat this aio call as if it were synchronous */
+static ssize_t
+pvfs2_devreq_aio_write(struct kiocb *iocb, const struct iovec *iov,
+        unsigned long n_segs, loff_t offset)
+{
+    struct devrw_options rw;
+
+    memset(&rw, 0, sizeof(rw));
+    rw.file = iocb->ki_filp;
+    rw.iov  = (struct iovec *) iov;
+    rw.nr_segs = n_segs;
+    rw.offset = &offset;
+    return do_devreq_writev(&rw);
+}
+
+#endif
 
 #ifdef HAVE_COMBINED_AIO_AND_VECTOR
 /*
@@ -1020,7 +1074,9 @@ struct file_operations pvfs2_devreq_file_operations =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     owner: THIS_MODULE,
     read : pvfs2_devreq_read,
+#ifdef HAVE_WRITEV_FILE_OPERATIONS
     writev : pvfs2_devreq_writev,
+#endif
     open : pvfs2_devreq_open,
     release : pvfs2_devreq_release,
     ioctl : pvfs2_devreq_ioctl,
@@ -1030,7 +1086,12 @@ struct file_operations pvfs2_devreq_file_operations =
 #ifdef HAVE_COMBINED_AIO_AND_VECTOR
     .aio_write = pvfs2_devreq_aio_write,
 #else
+#ifdef HAVE_WRITEV_FILE_OPERATIONS
     .writev = pvfs2_devreq_writev,
+#endif
+#ifdef HAVE_AIO_NEW_AIO_SIGNATURE
+    .aio_write = pvfs2_devreq_aio_write,
+#endif
 #endif
     .open = pvfs2_devreq_open,
     .release = pvfs2_devreq_release,
