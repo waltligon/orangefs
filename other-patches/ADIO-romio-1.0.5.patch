@@ -1,0 +1,306 @@
+diff -r 8ea74c3c8966 ad_pvfs2/ad_pvfs2_close.c
+--- a/ad_pvfs2/ad_pvfs2_close.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/ad_pvfs2/ad_pvfs2_close.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -11,6 +11,9 @@ void ADIOI_PVFS2_Close(ADIO_File fd, int
+ {
+     ADIOI_Free(fd->fs_ptr);
+     fd->fs_ptr = NULL;
++    /* free old hints:*/
++    PVFS_free_hint((struct pvfs2_hint_t **)  (&(fd->hints->fs_hints.pvfs2.hints)));
++    
+     /* PVFS2 doesn't have a 'close', but MPI-IO semantics dictate that we
+      * ensure all data has been flushed.
+      */
+diff -r 8ea74c3c8966 ad_pvfs2/ad_pvfs2_delete.c
+--- a/ad_pvfs2/ad_pvfs2_delete.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/ad_pvfs2/ad_pvfs2_delete.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -45,10 +45,12 @@ void ADIOI_PVFS2_Delete(char *filename, 
+     }
+     /* --END ERROR HANDLING-- */
+ 
+-    ret = PVFS_sys_getparent(cur_fs, pvfs_path, &credentials, &resp_getparent);
++    ret = PVFS_sys_getparent(cur_fs, pvfs_path, &credentials, &resp_getparent,
++	NULL);
+ 
+     ret = PVFS_sys_remove(resp_getparent.basename, 
+-			  resp_getparent.parent_ref, &credentials);
++			  resp_getparent.parent_ref, &credentials,
++			  NULL);
+     /* --BEGIN ERROR HANDLING-- */
+     if (ret != 0) {
+ 	*error_code = MPIO_Err_create_code(MPI_SUCCESS,
+diff -r 8ea74c3c8966 ad_pvfs2/ad_pvfs2_fcntl.c
+--- a/ad_pvfs2/ad_pvfs2_fcntl.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/ad_pvfs2/ad_pvfs2_fcntl.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -22,7 +22,8 @@ void ADIOI_PVFS2_Fcntl(ADIO_File fd, int
+     switch(flag) {
+     case ADIO_FCNTL_GET_FSIZE:
+ 	ret = PVFS_sys_getattr(pvfs_fs->object_ref, PVFS_ATTR_SYS_SIZE, 
+-		&(pvfs_fs->credentials), &resp_getattr);
++		&(pvfs_fs->credentials), &resp_getattr,
++		(struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	if (ret != 0 ) {
+ 	    /* --BEGIN ERROR HANDLING-- */
+ 	    *error_code = MPIO_Err_create_code(MPI_SUCCESS,
+diff -r 8ea74c3c8966 ad_pvfs2/ad_pvfs2_flush.c
+--- a/ad_pvfs2/ad_pvfs2_flush.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/ad_pvfs2/ad_pvfs2_flush.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -35,7 +35,8 @@ void ADIOI_PVFS2_Flush(ADIO_File fd, int
+ 
+     /* io_worker computed in ADIO_Open */
+     if (rank == fd->hints->ranklist[0]) {
+-	ret = PVFS_sys_flush(pvfs_fs->object_ref, &(pvfs_fs->credentials));
++	ret = PVFS_sys_flush(pvfs_fs->object_ref, &(pvfs_fs->credentials),
++	(struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+     }
+     MPI_Bcast(&ret, 1, MPI_INT, fd->hints->ranklist[0], fd->comm);
+ 
+diff -r 8ea74c3c8966 ad_pvfs2/ad_pvfs2_hints.c
+--- a/ad_pvfs2/ad_pvfs2_hints.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/ad_pvfs2/ad_pvfs2_hints.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -12,8 +12,17 @@ void ADIOI_PVFS2_SetInfo(ADIO_File fd, M
+ {
+     char *value;
+     int flag, tmp_value;
+-    static char myname[] = "ADIOI_PVFS_SETINFO";
++    static char myname[] = "ADIOI_PVFS2_SETINFO";
++    struct pvfs2_hint_t ** hint_p;
++    int ret;
++    int nkeys;
++    int i;
++    enum pvfs2_hint_type hint_type;
++    char key_hint[MPI_MAX_INFO_KEY];
++    char value_hint[MPI_MAX_INFO_VAL];
+ 
++    hint_p = (struct pvfs2_hint_t **)  (&(fd->hints->fs_hints.pvfs2.hints));
++    
+     if ((fd->info) == MPI_INFO_NULL) {
+ 	/* part of the open call */
+ 	MPI_Info_create(&(fd->info));
+@@ -97,6 +106,21 @@ void ADIOI_PVFS2_SetInfo(ADIO_File fd, M
+     }
+     /* set the values for collective I/O and data sieving parameters */
+     ADIOI_GEN_SetInfo(fd, users_info, error_code);
++    
++    /* Set the understood values of the pvfs2 hint structure*/
++    /* free old hints:*/
++    PVFS_free_hint(hint_p);
++    /* create new hints if available:*/
++    ret = MPI_Info_get_nkeys(users_info,  & nkeys);
++    for(i=0; i < nkeys; i++){
++        ret = MPI_Info_get_nthkey(users_info, i, key_hint);
++        hint_type = PVFS_hint_get_type(key_hint);
++        if ( hint_type >= 0){
++            /* key exits !*/
++            ret = MPI_Info_get(users_info, key_hint, MPI_MAX_INFO_VAL, value_hint, &flag);
++            ret = PVFS_add_hint(hint_p, hint_type, value_hint);
++        }
++    }
+ 
+     *error_code = MPI_SUCCESS;
+ }
+diff -r 8ea74c3c8966 ad_pvfs2/ad_pvfs2_open.c
+--- a/ad_pvfs2/ad_pvfs2_open.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/ad_pvfs2/ad_pvfs2_open.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -32,6 +32,7 @@ static void fake_an_open(PVFS_fs_id fs_i
+ static void fake_an_open(PVFS_fs_id fs_id, char *pvfs_name, int access_mode,
+ 	                 int nr_datafiles, int strip_size,
+                          ADIOI_PVFS2_fs *pvfs2_fs, 
++                         PVFS_hint * hints,
+ 			 open_status *o_status)
+ {
+     int ret;
+@@ -55,11 +56,11 @@ static void fake_an_open(PVFS_fs_id fs_i
+ 
+ 
+     ret = PVFS_sys_lookup(fs_id, pvfs_name,
+-	    &(pvfs2_fs->credentials), &resp_lookup, PVFS2_LOOKUP_LINK_FOLLOW);
++	    &(pvfs2_fs->credentials), &resp_lookup, PVFS2_LOOKUP_LINK_FOLLOW, hints);
+     if ( ret == (-PVFS_ENOENT)) {
+ 	if (access_mode & ADIO_CREATE)  {
+ 	    ret = PVFS_sys_getparent(fs_id, pvfs_name,
+-		    &(pvfs2_fs->credentials), &resp_getparent); 
++		    &(pvfs2_fs->credentials), &resp_getparent, hints); 
+ 	    if (ret < 0) {
+ 		FPRINTF(stderr, "pvfs_sys_getparent returns with %d\n", ret);
+ 		o_status->error = ret;
+@@ -84,7 +85,7 @@ static void fake_an_open(PVFS_fs_id fs_i
+             /* Perform file creation */
+             ret = PVFS_sys_create(resp_getparent.basename, 
+ 		    resp_getparent.parent_ref, attribs, 
+-		    &(pvfs2_fs->credentials), dist, &resp_create); 
++		    &(pvfs2_fs->credentials), dist, &resp_create, hints); 
+ 
+ 	    /* if many creates are happening in this directory, the earlier
+ 	     * sys_lookup may have returned ENOENT, but the sys_create could
+@@ -94,7 +95,7 @@ static void fake_an_open(PVFS_fs_id fs_i
+ 	    if (ret == (-PVFS_EEXIST)) {
+ 		ret = PVFS_sys_lookup(fs_id, pvfs_name,
+ 			&(pvfs2_fs->credentials), &resp_lookup, 
+-			PVFS2_LOOKUP_LINK_FOLLOW);
++			PVFS2_LOOKUP_LINK_FOLLOW, hints);
+ 		if ( ret < 0 ) {
+ 		    o_status->error = ret;
+ 		    return;
+@@ -187,7 +188,9 @@ void ADIOI_PVFS2_Open(ADIO_File fd, int 
+ 	    fake_an_open(cur_fs, pvfs_path,
+                          fd->access_mode, fd->hints->striping_factor,
+                          fd->hints->striping_unit,
+-                         pvfs2_fs, &o_status);
++                         pvfs2_fs, 
++                         (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints),
++                         &o_status);
+ 	}
+ 
+ 	/* store credentials and object reference in fd */
+diff -r 8ea74c3c8966 ad_pvfs2/ad_pvfs2_read.c
+--- a/ad_pvfs2/ad_pvfs2_read.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/ad_pvfs2/ad_pvfs2_read.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -57,7 +57,8 @@ void ADIOI_PVFS2_ReadContig(ADIO_File fd
+     }
+ 
+     ret = PVFS_sys_read(pvfs_fs->object_ref, file_req, offset, buf, 
+-			mem_req, &(pvfs_fs->credentials), &resp_io);
++			mem_req, &(pvfs_fs->credentials), &resp_io,
++			(struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+     /* --BEGIN ERROR HANDLING-- */
+     if (ret != 0 ) {
+ 	*error_code = MPIO_Err_create_code(MPI_SUCCESS,
+@@ -216,7 +217,8 @@ void ADIOI_PVFS2_ReadStrided(ADIO_File f
+ 		    if (err_flag < 0) break;
+ 		    err_flag = PVFS_sys_read(pvfs_fs->object_ref, file_req, 
+ 			    file_offsets, PVFS_BOTTOM, mem_req, 
+-			    &(pvfs_fs->credentials), &resp_io);
++			    &(pvfs_fs->credentials), &resp_io,
++			    (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 		    /* --BEGIN ERROR HANDLING-- */
+ 		    if (err_flag != 0) {
+ 			*error_code = MPIO_Err_create_code(MPI_SUCCESS,
+@@ -426,7 +428,8 @@ void ADIOI_PVFS2_ReadStrided(ADIO_File f
+ 	     * hindexed for the file type */
+ 	    err_flag = PVFS_sys_read(pvfs_fs->object_ref, file_req, 0, 
+ 				     mem_offsets, mem_req,
+-				     &(pvfs_fs->credentials), &resp_io);
++				     &(pvfs_fs->credentials), &resp_io,
++				     (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	    /* --BEGIN ERROR HANDLING-- */
+ 	    if (err_flag != 0) {
+ 		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
+@@ -498,7 +501,8 @@ void ADIOI_PVFS2_ReadStrided(ADIO_File f
+ 
+ 	    /* as above, use 0 for 'offset' when using hindexed file type */
+ 	    err_flag = PVFS_sys_read(pvfs_fs->object_ref, file_req, 0, 
+-		    mem_offsets, mem_req, &(pvfs_fs->credentials), &resp_io);
++		    mem_offsets, mem_req, &(pvfs_fs->credentials), &resp_io,
++		    (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	    /* --BEGIN ERROR HANDLING-- */
+ 	    if (err_flag != 0) {
+ 		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
+@@ -900,7 +904,8 @@ void ADIOI_PVFS2_ReadStrided(ADIO_File f
+ 
+ 	    /* offset will be expressed in memory and file datatypes */
+ 	    err_flag = PVFS_sys_read(pvfs_fs->object_ref, file_req, 0, 
+-		    PVFS_BOTTOM, mem_req, &(pvfs_fs->credentials), &resp_io);
++		    PVFS_BOTTOM, mem_req, &(pvfs_fs->credentials), &resp_io,
++		    (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	    /* --BEGIN ERROR HANDLING-- */
+ 	    if (err_flag != 0) {
+ 		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
+diff -r 8ea74c3c8966 ad_pvfs2/ad_pvfs2_resize.c
+--- a/ad_pvfs2/ad_pvfs2_resize.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/ad_pvfs2/ad_pvfs2_resize.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -34,7 +34,8 @@ void ADIOI_PVFS2_Resize(ADIO_File fd, AD
+ 
+     if (rank == fd->hints->ranklist[0]) {
+ 	ret = PVFS_sys_truncate(pvfs_fs->object_ref, 
+-		size, &(pvfs_fs->credentials));
++		size, &(pvfs_fs->credentials),
++		(struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	MPI_Bcast(&ret, 1, MPI_INT, fd->hints->ranklist[0], fd->comm);
+     } else  {
+ 	MPI_Bcast(&ret, 1, MPI_INT, fd->hints->ranklist[0], fd->comm);
+diff -r 8ea74c3c8966 ad_pvfs2/ad_pvfs2_write.c
+--- a/ad_pvfs2/ad_pvfs2_write.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/ad_pvfs2/ad_pvfs2_write.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -52,7 +52,8 @@ void ADIOI_PVFS2_WriteContig(ADIO_File f
+ 
+     if (file_ptr_type == ADIO_EXPLICIT_OFFSET) {
+ 	ret = PVFS_sys_write(pvfs_fs->object_ref, file_req, offset,  buf, 
+-			     mem_req, &(pvfs_fs->credentials), &resp_io);
++			     mem_req, &(pvfs_fs->credentials), &resp_io,
++			     (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	/* --BEGIN ERROR HANDLING-- */
+ 	if (ret != 0) {
+ 	    *error_code = MPIO_Err_create_code(MPI_SUCCESS,
+@@ -68,7 +69,8 @@ void ADIOI_PVFS2_WriteContig(ADIO_File f
+     }
+     else {
+ 	ret = PVFS_sys_write(pvfs_fs->object_ref, file_req, fd->fp_ind, buf, 
+-			     mem_req, &(pvfs_fs->credentials), &resp_io);
++			     mem_req, &(pvfs_fs->credentials), &resp_io,
++			     (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	/* --BEGIN ERROR HANDLING-- */
+ 	if (ret != 0) {
+ 	    *error_code = MPIO_Err_create_code(MPI_SUCCESS,
+@@ -262,7 +264,8 @@ void ADIOI_PVFS2_WriteStrided(ADIO_File 
+ 					      file_offsets, PVFS_BOTTOM,
+ 					      mem_req, 
+ 					      &(pvfs_fs->credentials),
+-					      &resp_io);
++					      &resp_io,
++					      (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 		    total_bytes_written += resp_io.total_completed;
+ 		  
+ 		    /* in the case of error or the last write list call, 
+@@ -474,7 +477,8 @@ void ADIOI_PVFS2_WriteStrided(ADIO_File 
+ 	     * hindexed for the file type */
+ 	    err_flag = PVFS_sys_write(pvfs_fs->object_ref, file_req, 0, 
+ 				      mem_offsets, mem_req,
+-				      &(pvfs_fs->credentials), &resp_io);
++				      &(pvfs_fs->credentials), &resp_io,
++				      (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	    /* --BEGIN ERROR HANDLING-- */
+ 	    if (err_flag != 0) {
+ 		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
+@@ -549,7 +553,8 @@ void ADIOI_PVFS2_WriteStrided(ADIO_File 
+ 	    /* as above, use 0 for 'offset' when using hindexed file type*/
+ 	    err_flag = PVFS_sys_write(pvfs_fs->object_ref, file_req, 0, 
+ 				      mem_offsets, mem_req,
+-				      &(pvfs_fs->credentials), &resp_io);
++				      &(pvfs_fs->credentials), &resp_io,
++				      (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	    /* --BEGIN ERROR HANDLING-- */
+ 	    if (err_flag != 0) {
+ 		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
+@@ -961,7 +966,8 @@ void ADIOI_PVFS2_WriteStrided(ADIO_File 
+ 
+ 	    err_flag = PVFS_sys_write(pvfs_fs->object_ref, file_req, 0, 
+ 				      PVFS_BOTTOM, mem_req,
+-				      &(pvfs_fs->credentials), &resp_io);
++				      &(pvfs_fs->credentials), &resp_io,
++				      (struct pvfs2_hint_t *) (fd->hints->fs_hints.pvfs2.hints));
+ 	    /* --BEGIN ERROR HANDLING-- */
+ 	    if (err_flag != 0) {
+ 		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
+diff -r 8ea74c3c8966 common/ad_open.c
+--- a/common/ad_open.c	Fri Jan 12 09:17:49 2007 +0100
++++ b/common/ad_open.c	Fri Jan 12 09:20:01 2007 +0100
+@@ -75,6 +75,7 @@ MPI_File ADIO_Open(MPI_Comm orig_comm,
+     fd->hints->ranklist = NULL;
+     fd->hints->initialized = 0;
+     fd->info = MPI_INFO_NULL;
++    fd->hints->fs_hints.pvfs2.hints = NULL;     
+     ADIO_SetInfo(fd, info, &err);
+ 
+      /* deferred open: 
+diff -r 8ea74c3c8966 include/adioi.h
+--- a/include/adioi.h	Fri Jan 12 09:17:49 2007 +0100
++++ b/include/adioi.h	Fri Jan 12 09:20:01 2007 +0100
+@@ -77,6 +77,7 @@ struct ADIOI_Hints_struct {
+ 	    } pvfs;
+ 	    struct {
+ 		    int debugmask;
++		    void * hints; /* pvfs2 may not be compiled/available*/
+ 	    } pvfs2;
+     } fs_hints;
+ 
