@@ -324,18 +324,20 @@ PVFS_error PVFS_isys_create(
     /* hints allow to override this behavior, e.g. for MPI */
     hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_DATAFILE_NODES);
     
-    if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
-    {
-        num_dfiles_req = attr.dfile_count;
-    }
-    else if (hintvalue)
+    
+    if (hintvalue)
     { 
-        while( (hintvalue = rindex(hintvalue, ',')))
+        while( *hintvalue != 0 )
         {    
+            if( *hintvalue == ','){
+                 num_dfiles_req++;
+            }
             hintvalue++;
-            num_dfiles_req++;
         }
         num_dfiles_req++;
+    }else if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
+    {
+        num_dfiles_req = attr.dfile_count;
     }
     else
     {
@@ -737,9 +739,9 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
         act_hostname = strtok_r(hintcpy, ",", & save_ptr);         
         while ( act_hostname ){
             if ( tokens >= sm_p->u.create.num_data_files){
-                gossip_err("Datafiles given by hint are not valid, "
+                gossip_err("Datafiles given by hint %s are not valid, "
                             "given by hints: %d set by create data_file_no: %d\n", 
-                    tokens + 1, sm_p->u.create.num_data_files);
+                    hintvalue, tokens + 1, sm_p->u.create.num_data_files);
                 js_p->error_code = -PVFS_EINVAL;
                 return 1;                
             }
