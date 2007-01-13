@@ -108,6 +108,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "access_hostnames", GOSSIP_ACCESS_HOSTNAMES },
     /* Show the client device events */
     { "dev", GOSSIP_DEV_DEBUG },
+    /* Debug the fsck tool */
+    { "fsck", GOSSIP_FSCK_DEBUG },
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose",
       (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG))

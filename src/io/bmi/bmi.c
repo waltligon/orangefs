@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 #include <sys/time.h>
 #include <stdio.h>
 
@@ -84,10 +85,12 @@ static gen_mutex_t active_method_count_mutex = GEN_MUTEX_INITIALIZER;
 
 static struct bmi_method_ops **active_method_table = NULL;
 static struct {
-    struct timeval active;
-    struct timeval polled;
+    int iters_polled;  /* how many iterations since this method was polled */
+    int iters_active;  /* how many iterations since this method had action */
     int plan;
 } *method_usage = NULL;
+static const int usage_iters_starvation = 100000;
+static const int usage_iters_active = 10000;
 
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
@@ -776,43 +779,47 @@ int BMI_testsome(int incount,
 static void
 construct_poll_plan(int nmeth, int *idle_time_ms)
 {
-    struct timeval now, delta;
     int i, numplan;
 
-    gettimeofday(&now, 0);
     numplan = 0;
     for (i=0; i<nmeth; i++) {
+        ++method_usage[i].iters_polled;
+        ++method_usage[i].iters_active;
         method_usage[i].plan = 0;
-        timersub(&now, &method_usage[i].polled, &delta);
-        if (delta.tv_sec >= 1) {
-            method_usage[i].plan = 1;  /* >= 1s starving */
-            method_usage[i].polled = now;
+        if (method_usage[i].iters_active <= usage_iters_active) {
+            /* recently busy, poll */
+	    if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "%s: polling active meth %d: %d / %d\n", __func__, i,
+                         method_usage[i].iters_active, usage_iters_active);
+            method_usage[i].plan = 1;
             ++numplan;
-        } else {
-            timersub(&now, &method_usage[i].active, &delta);
-            if (delta.tv_sec == 0) {
-                method_usage[i].plan = 1;  /* < 1s busy, prefer poll */
-                method_usage[i].polled = now;
-                ++numplan;
-            }
+            *idle_time_ms = 0;  /* busy polling */
+        } else if (method_usage[i].iters_polled >= usage_iters_starvation) {
+            /* starving, time to poke this one */
+	    if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "%s: polling starving meth %d: %d / %d\n", __func__, i,
+                         method_usage[i].iters_polled, usage_iters_starvation);
+            method_usage[i].plan = 1;
+            ++numplan;
         } 
     }
 
     /* if nothing is starving or busy, poll everybody */
     if (numplan == 0) {
-        for (i=0; i<nmeth; i++) {
+        for (i=0; i<nmeth; i++)
             method_usage[i].plan = 1;
-            method_usage[i].polled = now;
-        }
         numplan = nmeth;
-    }
 
-    /* spread idle time evenly */
-    if (*idle_time_ms)
-    {
-	*idle_time_ms /= numplan;
-	if (!*idle_time_ms)
-	    *idle_time_ms = 1;
+        /* spread idle time evenly */
+        if (*idle_time_ms) {
+            *idle_time_ms /= numplan;
+            if (*idle_time_ms == 0)
+                *idle_time_ms = 1;
+        }
+        /* note that BMI_testunexpected is always called with idle_time 0 */
+        if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                     "%s: polling all %d methods, idle %d ms\n", __func__,
+                     numplan, *idle_time_ms);
     }
 }
 
@@ -859,8 +866,9 @@ int BMI_testunexpected(int incount,
             }
             position += tmp_outcount;
             (*outcount) += tmp_outcount;
-            if (tmp_outcount)
-                gettimeofday(&method_usage[i].active, 0);
+            method_usage[i].iters_polled = 0;
+            if (ret)
+                method_usage[i].iters_active = 0;
         }
 	i++;
     }
@@ -957,8 +965,9 @@ int BMI_testcontext(int incount,
             }
             position += tmp_outcount;
             (*outcount) += tmp_outcount;
-            if (tmp_outcount)
-                gettimeofday(&method_usage[i].active, 0);
+            method_usage[i].iters_polled = 0;
+            if (ret)
+                method_usage[i].iters_active = 0;
         }
 	i++;
     }
@@ -1777,7 +1786,13 @@ int BMI_cancel(bmi_op_id_t id,
 /* bmi_method_addr_reg_callback()
  * 
  * Used by the methods to register new addresses when they are
- * discovered.
+ * discovered.  Only call this method when the device gets an
+ * unexpected receive from a new peer, i.e., if you do the equivalent
+ * of a socket accept() and get a new connection.
+ *
+ * Do not call this function for active lookups, that is from your
+ * BMI_meth_method_addr_lookup.  BMI already knows about the address in
+ * this case, since the user provided it.
  *
  * returns 0 on success, -errno on failure
  */

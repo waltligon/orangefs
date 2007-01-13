@@ -50,13 +50,6 @@
 #define OP_IN_PROGRESS      0xFFEEFF34
 
 /*
-  the block size to report in statfs as the blocksize (i.e. the
-  optimal i/o transfer size); regardless of this value, the fragment
-  size (underlying fs block size) in the kernel is fixed at 1024
-*/
-#define STATFS_DEFAULT_BLOCKSIZE PVFS2_BUFMAP_DEFAULT_DESC_SIZE
-
-/*
   default timeout value to wait for completion of in progress
   operations
 */
@@ -100,6 +93,11 @@ typedef struct
     int logstamp_type_set;
     int create_request_id;
     int standalone;
+    /* kernel module buffer size settings */
+    unsigned int dev_buffer_count;
+    int dev_buffer_count_set;
+    unsigned int dev_buffer_size;
+    int dev_buffer_size_set;
 } options_t;
 
 /*
@@ -184,10 +182,11 @@ static options_t s_opts;
 static job_context_id s_client_dev_context;
 static int s_client_is_processing = 1;
 
-/* We have 2 set of description buffers, one used for staging I/O and one for readdir/readdirplus */
+/* We have 2 sets of description buffers, one used for staging I/O 
+ * and one for readdir/readdirplus */
 #define NUM_MAP_DESC 2
 static struct PVFS_dev_map_desc s_io_desc[NUM_MAP_DESC];
-static int s_desc_size[NUM_MAP_DESC] = {PVFS2_BUFMAP_TOTAL_SIZE, PVFS2_READDIR_TOTAL_SIZE};
+static struct PINT_dev_params s_desc_params[NUM_MAP_DESC];
 
 static struct PINT_perf_counter* acache_pc = NULL;
 static struct PINT_perf_counter* ncache_pc = NULL;
@@ -207,6 +206,7 @@ static void print_help(char *progname);
 static void reset_acache_timeout(void);
 static char *get_vfs_op_name_str(int op_type);
 static int set_acache_parameters(options_t* s_opts);
+static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
 static int set_ncache_parameters(options_t* s_opts);
 static int create_request_id(PVFS_hint ** hint, vfs_request_t *vfs_request);
@@ -1491,7 +1491,7 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 
     assert((vfs_request->in_upcall.req.io.buf_index > -1) &&
            (vfs_request->in_upcall.req.io.buf_index <
-            PVFS2_BUFMAP_DESC_COUNT));
+            s_desc_params[BM_IO].dev_buffer_count));
 
     vfs_request->io_tmp_buf = malloc(
         vfs_request->in_upcall.req.io.readahead_size);
@@ -1639,7 +1639,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
 
     assert((vfs_request->in_upcall.req.io.buf_index > -1) &&
            (vfs_request->in_upcall.req.io.buf_index <
-            PVFS2_BUFMAP_DESC_COUNT));
+            s_desc_params[BM_IO].dev_buffer_count));
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
     vfs_request->io_kernel_mapped_buf = 
@@ -1715,7 +1715,8 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             (unsigned long) vfs_request->in_upcall.req.iox.count);
 
     if ((vfs_request->in_upcall.req.iox.buf_index < 0) ||
-           (vfs_request->in_upcall.req.iox.buf_index >= PVFS2_BUFMAP_DESC_COUNT))
+           (vfs_request->in_upcall.req.iox.buf_index >= 
+            s_desc_params[BM_IO].dev_buffer_count))
     {
         gossip_err("post_iox_request: invalid buffer index %d\n",
                 vfs_request->in_upcall.req.iox.buf_index);
@@ -2338,7 +2339,7 @@ static inline void package_downcall_members(
             break;
         case PVFS2_VFS_OP_STATFS:
             vfs_request->out_downcall.resp.statfs.block_size =
-                STATFS_DEFAULT_BLOCKSIZE;
+                s_desc_params[BM_IO].dev_buffer_count;
             vfs_request->out_downcall.resp.statfs.blocks_total = (int64_t)
                 (vfs_request->response.statfs.statfs_buf.bytes_total /
                  vfs_request->out_downcall.resp.statfs.block_size);
@@ -2455,7 +2456,7 @@ static inline void package_downcall_members(
                     assert(buf);
 
                     /* copy cached data into the shared user/kernel space */
-                    memcpy(buf, (vfs_request->io_tmp_buf +
+                    memcpy(buf, ((char *) vfs_request->io_tmp_buf +
                                  vfs_request->in_upcall.req.io.offset),
                            vfs_request->in_upcall.req.io.count);
 
@@ -2987,7 +2988,7 @@ static PVFS_error process_vfs_requests(void)
                (MAX_NUM_OPS * sizeof(vfs_request_t *)));
 
         ret = PVFS_sys_testsome(
-            op_id_array, &op_count, (void **)vfs_request_array,
+            op_id_array, &op_count, (void *) vfs_request_array,
             error_code_array, PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
 
         for(i = 0; i < op_count; i++)
@@ -3243,6 +3244,7 @@ int main(int argc, char **argv)
         PVFS_perror("set_ncache_parameters", ret);
         return(ret);
     }
+    set_device_parameters(&s_opts);
 
     /* start performance counters for acache */
     acache_pc = PINT_perf_initialize(acache_keys);
@@ -3325,7 +3327,7 @@ int main(int argc, char **argv)
 
     /* setup a mapped region for I/O transfers */
     memset(s_io_desc, 0 , NUM_MAP_DESC * sizeof(struct PVFS_dev_map_desc));
-    ret = PINT_dev_get_mapped_regions(NUM_MAP_DESC, s_io_desc, s_desc_size);
+    ret = PINT_dev_get_mapped_regions(NUM_MAP_DESC, s_io_desc, s_desc_params);
     if (ret < 0)
     {
 	PVFS_perror("PINT_dev_get_mapped_region", ret);
@@ -3420,7 +3422,9 @@ static void print_help(char *progname)
     printf("--logstamp=none|usec|datetime overrides the default log message's time stamp\n");
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
     printf("--create-request-id           create a id which is transfered to the server\n");
- }
+    printf("--desc-count=VALUE            overrides the default # of kernel buffer descriptors\n");
+    printf("--desc-size=VALUE             overrides the default size of each kernel buffer descriptor\n");
+}
 
 static void parse_args(int argc, char **argv, options_t *opts)
 {
@@ -3440,6 +3444,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"acache-soft-limit",1,0,0},
         {"ncache-hard-limit",1,0,0},
         {"ncache-soft-limit",1,0,0},
+        {"desc-count",1,0,0},
+        {"desc-size",1,0,0},
         {"logfile",1,0,0},
         {"logstamp",1,0,0},
         {"create-request-id",0,0,0},
@@ -3470,6 +3476,28 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("ncache-timeout", cur_option) == 0)
                 {
                     goto do_ncache;
+                }
+                else if (strcmp("desc-count", cur_option) == 0) 
+                {
+                    ret = sscanf(optarg, "%u", &opts->dev_buffer_count);
+                    if(ret != 1)
+                    {
+                        gossip_err(
+                            "Error: invalid descriptor count value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->dev_buffer_count_set = 1;
+                }
+                else if (strcmp("desc-size", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->dev_buffer_size);
+                    if(ret != 1)
+                    {
+                        gossip_err(
+                            "Error: invalid descriptor size value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->dev_buffer_size_set = 1;
                 }
                 else if (strcmp("logfile", cur_option) == 0)
                 {
@@ -3873,6 +3901,30 @@ static int set_ncache_parameters(options_t* s_opts)
     }
 
     return(0);
+}
+
+static void set_device_parameters(options_t *s_opts)
+{
+    if (s_opts->dev_buffer_count_set)
+    {
+        s_desc_params[BM_IO].dev_buffer_count = s_opts->dev_buffer_count;
+    }
+    else
+    {
+        s_desc_params[BM_IO].dev_buffer_count = PVFS2_BUFMAP_DEFAULT_DESC_COUNT;
+    }
+    if (s_opts->dev_buffer_size_set)
+    {
+        s_desc_params[BM_IO].dev_buffer_size  = s_opts->dev_buffer_size;
+    }
+    else
+    {
+        s_desc_params[BM_IO].dev_buffer_size = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
+    }
+    /* No command line options accepted for the readdir buffers */
+    s_desc_params[BM_READDIR].dev_buffer_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
+    s_desc_params[BM_READDIR].dev_buffer_size  = PVFS2_READDIR_DEFAULT_DESC_SIZE;
+    return;
 }
 
 /*

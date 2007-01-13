@@ -16,7 +16,8 @@ LIBSRC += $(DIR)/server-config.c \
 	  $(DIR)/msgpairarray.c \
 	  $(DIR)/pint-util.c \
 	  $(DIR)/realpath.c \
-	  $(DIR)/tcache.c
+	  $(DIR)/tcache.c \
+	  $(DIR)/fsck-utils.c
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/server-config-mgr.c \
              $(DIR)/str-utils.c \

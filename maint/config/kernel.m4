@@ -343,7 +343,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
-	AC_MSG_CHECKING(if get_sb callbacks' in kernel has struct vfsmount argument)
+	AC_MSG_CHECKING(if get_sb callback in kernel has struct vfsmount argument)
 	dnl if this test passes, the kernel has it
 	dnl if this test fails, the kernel does not have it
 	AC_TRY_COMPILE([
@@ -617,6 +617,8 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	    )
 
+	dnl Gives wrong answer if header is missing; don't try then.
+	if test x$ac_cv_header_linux_ioctl32_h = xyes ; then
 	AC_MSG_CHECKING(for register_ioctl32_conversion kernel exports)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel has it defined
@@ -633,6 +635,35 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_REGISTER_IOCTL32_CONVERSION, 1, Define if kernel has register_ioctl32_conversion),
 	)
+	fi
+
+	AC_MSG_CHECKING(for int return value of kmem_cache_destroy)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+		], [
+		int i = kmem_cache_destroy(NULL);
+		],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_KMEM_CACHE_DESTROY_INT_RETURN, 1, Define if kmem_cache_destroy returns int),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl As of 2.6.19, combined readv/writev into aio_read and aio_write
+	dnl functions.  Detect this by not finding a readv member.
+	AC_MSG_CHECKING(for combined file_operations readv and aio_read)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+			.readv = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(no),
+	    AC_MSG_RESULT(yes)
+	    AC_DEFINE(HAVE_COMBINED_AIO_AND_VECTOR, 1, Define if struct file_operations has combined aio_read and readv functions),
+	    )
 
 	CFLAGS=$oldcflags
 ])

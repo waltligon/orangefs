@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.7.8.1 2006-09-25 12:39:49 kunkel Exp $
+ * $Id: util.c,v 1.7.8.2 2007-01-13 10:12:52 kunkel Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -86,8 +86,8 @@ warning_errno(const char *fmt, ...)
     gossip_err("Warning: %s: %s.\n", s, strerror(errno));
 }
 
-void __attribute__((format(printf,1,2))) __hidden
-info(const char *fmt, ...)
+void __attribute__((format(printf,2,3))) __hidden
+warning_xerrno(int errnum, const char *fmt, ...)
 {
     char s[2048];
     va_list ap;
@@ -95,7 +95,7 @@ info(const char *fmt, ...)
     va_start(ap, fmt);
     vsprintf(s, fmt, ap);
     va_end(ap);
-    gossip_debug(GOSSIP_BMI_DEBUG_IB, "%s.\n", s);
+    gossip_err("Warning: %s: %s.\n", s, strerror(errnum));
 }
 
 void * __attribute__((malloc)) __hidden

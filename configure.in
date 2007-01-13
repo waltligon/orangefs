@@ -108,9 +108,8 @@ fi],
 AC_SUBST(BUILD_SERVER)
 
 AC_ARG_WITH(openssl,
-	[  --with-openssl=<dir>  Build with openssl (the default).  <dir> defaults to /usr
-	   --without-openssl     Don't build with openssl.
-	],
+	[  --with-openssl=<dir>    Build with openssl (default=/usr)
+  --without-openssl       Don't build with openssl.],
 	[AX_OPENSSL(${withval})],
 	[AX_OPENSSL_OPTIONAL])
 
@@ -617,6 +616,40 @@ AC_ARG_WITH(efence,
        AC_CHECK_LIB(efence,malloc)
 )
 
+dnl Use compiled-in valgrind annotations?  Give the header path if
+dnl is not in the usual location.  It is common to install the header
+dnl in a subdirectory, so look for that too.  Leave the include path
+dnl in CPPFLAGS if it is not a standard header.
+AC_ARG_WITH(valgrind,
+[  --with-valgrind[=<path>]  Use valgrind annotations for debugging.], [
+    found=no
+    save_cppflags="$CPPFLAGS"
+    AC_MSG_CHECKING(for valgrind.h usability)
+    if test "x$withval" = xyes ; then
+	AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes)
+	if test x$found = xno ; then
+	    CPPFLAGS="$CPPFLAGS -I/usr/include/valgrind"
+	    AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes,
+		CPPFLAGS="$save_cppflags")
+	fi
+    else
+	for d in $withval $withval/include \
+	         $withval/valgrind $withval/include/valgrind
+	do
+	    CPPFLAGS="$CPPFLAGS -I$d"
+	    AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes,
+		CPPFLAGS="$save_cppflags")
+	    if test x$found = xyes ; then
+		break
+	    fi
+	done
+    fi
+    AC_MSG_RESULT($found)
+    if test x$found = xyes ; then
+	AC_DEFINE(HAVE_VALGRIND_H, 1, Define if include file valgrind.h exists)
+    fi
+])
+
 if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     dnl
     dnl make sure that required db development package is installed
@@ -689,10 +722,11 @@ AC_ARG_WITH(gm,
     fi
 )
 if test -n "$GM_HOME" ; then
+    save_cppflags="$CPPFLAGS"
     CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
     AC_CHECK_HEADER(gm.h,, AC_MSG_ERROR([Header gm.h not found.]))
     BUILD_GM=1
-    CPPFLAGS="$CPPFLAGS_OLD"
+    CPPFLAGS="$save_cppflags"
 fi
 AC_SUBST(GM_HOME)
 AC_SUBST(BUILD_GM)
@@ -711,7 +745,7 @@ AC_ARG_WITH(ib,
     fi
 )
 AC_ARG_WITH(ib-includes,
-[  --with-ib-includes=<dir>  Location of the IB includes],
+[  --with-ib-includes=<dir>      Location of the IB includes],
     if test -z "$withval" -o "$withval" = yes ; then
 	AC_MSG_ERROR([Option --with-ib-includes requires path to IB headers.])
     elif test "$withval" != no ; then
@@ -719,7 +753,7 @@ AC_ARG_WITH(ib-includes,
     fi
 )
 AC_ARG_WITH(ib-libs,
-[  --with-ib-libs=<dir>      Location of the IB libraries],
+[  --with-ib-libs=<dir>          Location of the IB libraries],
     if test -z "$withval" -o "$withval" = yes ; then
 	AC_MSG_ERROR([Option --with-ib-libs requires path to IB libraries.])
     elif test "$withval" != no ; then
@@ -741,6 +775,7 @@ if test -n "$ib_home" ; then
 fi
 dnl If anything IB-ish was set, go look for header.
 if test -n "$IB_INCDIR$IB_LIBDIR" ; then
+    save_cppflags="$CPPFLAGS"
     CPPFLAGS="$CPPFLAGS -I$IB_INCDIR"
     AC_CHECK_HEADER(vapi.h,, AC_MSG_ERROR([Header vapi.h not found.]))
     dnl Run test is not possible on a machine that does not have an IB NIC,
@@ -756,7 +791,7 @@ if test -n "$IB_INCDIR$IB_LIBDIR" ; then
 	AC_DEFINE(HAVE_IB_WRAP_COMMON_H, 1, Define if IB wrap_common.h exists.),
 	,
 	[#include <vapi.h>])
-    CPPFLAGS="$CPPFLAGS_OLD"
+    CPPFLAGS="$save_cppflags"
 fi
 AC_SUBST(BUILD_IB)
 AC_SUBST(IB_INCDIR)
@@ -784,7 +819,7 @@ AC_ARG_WITH(openib-includes,
     fi
 )
 AC_ARG_WITH(openib-libs,
-[  --with-openib-libs=<dir>  Location of the OpenIB libraries],
+[  --with-openib-libs=<dir>      Location of the OpenIB libraries],
     if test -z "$withval" -o "$withval" = yes ; then
 	AC_MSG_ERROR([Option --with-openib-libs requires path to OpenIB libraries.])
     elif test "$withval" != no ; then
@@ -806,6 +841,7 @@ if test -n "$openib_home" ; then
 fi
 dnl If anything OpenIB-ish was set, go look for header.
 if test -n "$OPENIB_INCDIR$OPENIB_LIBDIR" ; then
+    save_cppflags="$CPPFLAGS"
     CPPFLAGS="$CPPFLAGS -I$OPENIB_INCDIR"
     AC_CHECK_HEADER(infiniband/verbs.h,,
 	AC_MSG_ERROR([Header infiniband/verbs.h not found.]))
@@ -817,7 +853,7 @@ if test -n "$OPENIB_INCDIR$OPENIB_LIBDIR" ; then
 	fi
     fi
     BUILD_OPENIB=1
-    CPPFLAGS="$CPPFLAGS_OLD"
+    CPPFLAGS="$save_cppflags"
 fi
 AC_SUBST(BUILD_OPENIB)
 AC_SUBST(OPENIB_INCDIR)

@@ -405,10 +405,10 @@ int PINT_thread_mgr_trove_start(void)
 	gen_mutex_unlock(&trove_mutex);
 	return(ret);
     }
+
+    trove_thread_ref_count++;
 #ifdef __PVFS2_JOB_THREADED__
     trove_thread_running = 1;
-    trove_thread_ref_count++;
-
     ret = pthread_create(&trove_thread_id, NULL, trove_thread_function, NULL);
     if(ret != 0)
     {

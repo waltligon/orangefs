@@ -161,6 +161,7 @@ sub create_pvfs2config
 		. " --metaservers " . $metaservers
 		. " --logfile "  . $href->{'SERVERLOG'} . "/pvfs2.log"
 		. " --storage "  . $href->{'STORAGE'}
+		. " --trove-method " . $href->{'TROVEMETHOD'}
 		. " --quiet "    . $conffile . " " . $serverfile;
     if ($href->{'TROVESYNC'} == 0) {
     	$cmd .= " --notrovesync";
@@ -264,6 +265,7 @@ sub init {
 	       'PINGPROG' => "pvfs2-ping",
 	       'GENCONFIG' => "pvfs2-genconfig",
 	       'TROVESYNC' => 1,
+	       'TROVEMETHOD' => "dbpf",
 	       'COMPUTENODES_LAST' => 1,
 	       'PROGROOT' => "./",
 	       'COPYBINS' => 0

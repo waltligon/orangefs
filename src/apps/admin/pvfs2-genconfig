@@ -176,18 +176,6 @@ sub emit_defaults
 
     print $target "<Defaults>\n";
     print $target "\tUnexpectedRequests $num_unexp\n";
-
-    if(defined($logfile))
-    {
-        # remove quotes from logfile if any
-        if ($logfile =~ /\".*\"/)
-        {
-            $logfile =~ s/\"//g;
-        }
-
-        print $target "\tLogFile $logfile\n";
-    }
-
     print $target "\tEventLogging $logging\n";
     print $target "\tLogStamp $logstamp\n";
     print $target "\tBMIModules $bmi_module\n";
@@ -1319,7 +1307,7 @@ if ($opt_security == 1)
 }
 emit_aliases($output_target);
 emit_filesystem($output_target, "pvfs2-fs", $fsid, $root_handle, 
-    $last_handle, $first_handle, $count, $default_num_dfiles);
+    $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles);
 
 # close fs.conf
 if ($using_stdout == 0)

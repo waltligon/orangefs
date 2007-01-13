@@ -766,30 +766,35 @@ static int getattr_acache_insert(PINT_client_sm *sm_p,
 {   
     PVFS_size* tmp_size = NULL;
 
-    /* see if we have a size value to cache */
-    if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE &&
-        sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
-    {                                           
-        /* compute size as requested */
-        assert(sm_p->getattr.attr.u.meta.dist);
-        assert(sm_p->getattr.attr.u.meta.dist->methods &&
-               sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
-        
-        sm_p->getattr.size =
-            (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
-            sm_p->getattr.attr.u.meta.dist->params,
-            sm_p->getattr.attr.u.meta.dfile_count,
-            sm_p->getattr.size_array);
+    if( sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE || 
+        sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY ||
+        sm_p->getattr.attr.objtype == PVFS_TYPE_SYMLINK )
+    {
+        /* see if we have a size value to cache */
+        if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE &&
+            sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
+        {                                           
+            /* compute size as requested */
+            assert(sm_p->getattr.attr.u.meta.dist);
+            assert(sm_p->getattr.attr.u.meta.dist->methods &&
+                   sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
+            
+            sm_p->getattr.size =
+                (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
+                sm_p->getattr.attr.u.meta.dist->params,
+                sm_p->getattr.attr.u.meta.dfile_count,
+                sm_p->getattr.size_array);
 
-        tmp_size = &sm_p->getattr.size;
+            tmp_size = &sm_p->getattr.size;
+        }
+
+        PINT_acache_update(sm_p->getattr.object_ref,
+            &sm_p->getattr.attr,
+            tmp_size);
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
+                     "reference to acache\n");
     }
-
-    PINT_acache_update(sm_p->getattr.object_ref,
-        &sm_p->getattr.attr,
-        tmp_size);
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
-                 "reference to acache\n");
 
     return 1;
 }
@@ -917,7 +922,15 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
 
        if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
         {
-            sysresp->attr.size = sm_p->getattr.size;
+            if( attr->objtype == PVFS_TYPE_DATAFILE )
+            {
+                sysresp->attr.size = attr->u.data.size;
+            }
+            else
+            {
+                sysresp->attr.size = sm_p->getattr.size;
+            }
+
             sysresp->attr.mask |= PVFS_ATTR_SYS_SIZE;
         }
 

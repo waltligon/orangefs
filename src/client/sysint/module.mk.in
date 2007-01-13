@@ -8,6 +8,7 @@ CSRC := \
 	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
+	$(DIR)/mgmt-get-config.c \
 	$(DIR)/mgmt-misc.c \
 	$(DIR)/sys-dist.c \
 	$(DIR)/error-details.c

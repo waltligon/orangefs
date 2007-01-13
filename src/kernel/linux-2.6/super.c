@@ -5,6 +5,7 @@
  */
 
 #include "pvfs2-kernel.h"
+#include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
 /* list for storing pvfs2 specific superblocks in use */
@@ -434,15 +435,16 @@ static int pvfs2_statfs(
     if (new_op->downcall.status > -1)
     {
         gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_statfs: got %ld blocks available | "
-                    "%ld blocks total\n",
+                    "%ld blocks total | %ld block size\n",
                     (long) new_op->downcall.resp.statfs.blocks_avail,
-                    (long) new_op->downcall.resp.statfs.blocks_total);
+                    (long) new_op->downcall.resp.statfs.blocks_total,
+                    (long) new_op->downcall.resp.statfs.block_size);
 
         buf->f_type = sb->s_magic;
         /* stash the fsid as well */
         memcpy(&buf->f_fsid, &(PVFS2_SB(sb)->fs_id), 
                 sizeof(PVFS2_SB(sb)->fs_id));      
-        buf->f_bsize = sb->s_blocksize;
+        buf->f_bsize = new_op->downcall.resp.statfs.block_size;
         buf->f_namelen = PVFS2_NAME_LEN;
 
         buf->f_blocks = (sector_t)
@@ -949,8 +951,8 @@ struct super_block* pvfs2_get_sb(
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
 
-    sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
-    sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
+    sb->s_blocksize = pvfs_bufmap_size_query();
+    sb->s_blocksize_bits = pvfs_bufmap_shift_query();
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;
@@ -1070,8 +1072,8 @@ int pvfs2_fill_sb(
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
 
-    sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
-    sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
+    sb->s_blocksize = pvfs_bufmap_size_query();
+    sb->s_blocksize_bits = pvfs_bufmap_shift_query();
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;

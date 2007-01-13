@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "pvfs2-types.h"
 #include "pvfs2-util.h"

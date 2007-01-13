@@ -1223,7 +1223,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
                   this particular operation completed w/out error.
                   gets the return value of the individual op
                 */
-                ret = AIO_RETURN(&aiocb_p[i]);
+                ret = op_p->u.b_rw_list.aio_ops->aio_return(&aiocb_p[i]);
 
                 gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %s complete: "
                              "aio_return() ret %d (fd %d)\n",

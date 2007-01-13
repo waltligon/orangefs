@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.4.2.1 2006-09-25 12:39:49 kunkel Exp $
+ * $Id: vapi.c,v 1.4.2.2 2007-01-13 10:12:52 kunkel Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -54,8 +54,8 @@ struct vapi_device_priv {
 
     /*
      * Maximum number of outstanding work requests in the NIC, same for both
-     * SQ and RQ, though we only care about SQ on the QP and ack QP.  Used to
-     * decide when to use a SIGNALED completion on a send to avoid WQE buildup.
+     * SQ and RQ.  Used to decide when to use a SIGNALED completion on a send
+     * to avoid WQE buildup.
      */
     unsigned int max_outstanding_wr;
 
@@ -74,19 +74,15 @@ struct vapi_device_priv {
 struct vapi_connection_priv {
     /* ib local params */
     VAPI_qp_hndl_t qp;
-    VAPI_qp_hndl_t qp_ack;
     VAPI_qp_num_t qp_num;
-    VAPI_qp_num_t qp_ack_num;
     VAPI_mr_hndl_t eager_send_mr;
     VAPI_mr_hndl_t eager_recv_mr;
     VAPI_lkey_t eager_send_lkey;  /* for post_sr */
     VAPI_lkey_t eager_recv_lkey;  /* for post_rr */
     unsigned int num_unsignaled_wr;  /* keep track of outstanding WRs */
-    unsigned int num_unsignaled_wr_ack;
     /* ib remote params */
     IB_lid_t remote_lid;
     VAPI_qp_num_t remote_qp_num;
-    VAPI_qp_num_t remote_qp_ack_num;
 };
 
 /* constants used to initialize infiniband device */
@@ -99,7 +95,7 @@ static int exchange_data(int sock, int is_server, void *xin, void *xout,
 static void verify_prop_caps(VAPI_qp_cap_t *cap);
 static void init_connection_modify_qp(VAPI_qp_hndl_t qp,
   VAPI_qp_num_t remote_qp_num, int remote_lid);
-static void vapi_post_rr(const ib_connection_t *c, buf_head_t *bh);
+static void vapi_post_rr(const ib_connection_t *c, struct buf_head *bh);
 static void __attribute__((noreturn,format(printf,2,3)))
   error_verrno(int ecode, const char *fmt, ...);
 int vapi_ib_initialize(void);
@@ -120,7 +116,6 @@ static int vapi_new_connection(ib_connection_t *c, int sock, int is_server)
     struct {
 	IB_lid_t lid;
 	VAPI_qp_num_t qp_num;
-	VAPI_qp_num_t qp_ack_num;
     } ch_in, ch_out;
 
     vc = Malloc(sizeof(*vc));
@@ -170,16 +165,8 @@ static int vapi_new_connection(ib_connection_t *c, int sock, int is_server)
     vc->qp_num = prop.qp_num;
     verify_prop_caps(&prop.cap);
 
-    /* and qp ack */
-    ret = VAPI_create_qp(vd->nic_handle, &qp_init_attr, &vc->qp_ack, &prop);
-    if (ret < 0)
-	error_verrno(ret, "%s: create QP ack", __func__);
-    vc->qp_ack_num = prop.qp_num;
-    verify_prop_caps(&prop.cap);
-
-    /* initialize for post_sr and post_sr_ack */
+    /* initialize for post_sr */
     vc->num_unsignaled_wr = 0;
-    vc->num_unsignaled_wr_ack = 0;
 
     /* share connection information across TCP */
     /* sanity check sizes of things (actually only 24 bits in qp_num) */
@@ -193,7 +180,6 @@ static int vapi_new_connection(ib_connection_t *c, int sock, int is_server)
     /* convert all to network order and back */
     ch_out.lid = htobmi16(vd->nic_lid);
     ch_out.qp_num = htobmi32(vc->qp_num);
-    ch_out.qp_ack_num = htobmi32(vc->qp_ack_num);
 
     ret = exchange_data(sock, is_server, &ch_in, &ch_out, sizeof(ch_in));
     if (ret)
@@ -201,12 +187,9 @@ static int vapi_new_connection(ib_connection_t *c, int sock, int is_server)
 
     vc->remote_lid = bmitoh16(ch_in.lid);
     vc->remote_qp_num = bmitoh32(ch_in.qp_num);
-    vc->remote_qp_ack_num = bmitoh32(ch_in.qp_ack_num);
 
     /* bring the two QPs up to RTR */
     init_connection_modify_qp(vc->qp, vc->remote_qp_num, vc->remote_lid);
-    init_connection_modify_qp(vc->qp_ack, vc->remote_qp_ack_num,
-                              vc->remote_lid);
 
     /* post initial RRs */
     for (i=0; i<ib_device->eager_buf_num; i++)
@@ -363,10 +346,9 @@ static void init_connection_modify_qp(VAPI_qp_hndl_t qp,
 }
 
 /*
- * Close the QP associated with this connection.  Do not bother draining
- * qp_ack, nothing sending on it anyway.  Used to wait for drain to finish,
- * but many seconds pass before the adapter tells us about it via an asynch
- * event.  Perhaps there is a way to do it via polling.
+ * Close the QP associated with this connection.  Used to wait for drain to
+ * finish, but many seconds pass before the adapter tells us about it via an
+ * asynch event.  Perhaps there is a way to do it via polling.
  */
 static void vapi_drain_qp(ib_connection_t *c)
 {
@@ -391,42 +373,6 @@ static void vapi_drain_qp(ib_connection_t *c)
 	error_verrno(ret, "%s: VAPI_modify_qp RTS -> SQD", __func__);
 }
 
-static void vapi_send_bye(ib_connection_t *c)
-{
-    struct vapi_connection_priv *vc = c->priv;
-    struct vapi_device_priv *vd = ib_device->priv;
-    buf_head_t *bh;
-    VAPI_sg_lst_entry_t sg;
-    VAPI_sr_desc_t sr;
-    msg_header_common_t mh_common;
-    char *ptr;
-    int ret;
-
-    bh = qlist_try_del_head(&c->eager_send_buf_free);
-    if (!bh) {
-	/* if no messages available, let garbage collection on server deal */
-	return;
-    }
-
-    ptr = bh->buf;
-    mh_common.type = MSG_BYE;
-    encode_msg_header_common_t(&ptr, &mh_common);
-
-    debug(2, "%s: sending bye", __func__);
-    sg.addr = int64_from_ptr(bh->buf);
-    sg.len = sizeof(mh_common);
-    sg.lkey = vc->eager_send_lkey;
-
-    memset(&sr, 0, sizeof(sr));
-    sr.opcode = VAPI_SEND;
-    sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
-    sr.sg_lst_p = &sg;
-    sr.sg_lst_len = 1;
-    ret = VAPI_post_sr(vd->nic_handle, vc->qp, &sr);
-    if (ret < 0)
-	error_verrno(ret, "%s: VAPI_post_sr", __func__);
-}
-
 /*
  * At an explicit BYE message, or at finalize time, shut down a connection.
  * If descriptors are posted, defer and clean up the connection structures
@@ -438,9 +384,6 @@ static void vapi_close_connection(ib_connection_t *c)
     struct vapi_connection_priv *vc = c->priv;
     struct vapi_device_priv *vd = ib_device->priv;
 
-    ret = VAPI_destroy_qp(vd->nic_handle, vc->qp_ack);
-    if (ret < 0)
-	error_verrno(ret, "%s: VAPI_destroy_qp ack", __func__);
     ret = VAPI_destroy_qp(vd->nic_handle, vc->qp);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_destroy_qp", __func__);
@@ -456,11 +399,9 @@ static void vapi_close_connection(ib_connection_t *c)
 
 /*
  * VAPI interface to post sends.  Not RDMA, just SEND.
- * Called for an eager send, rts send, or cts send.  Local send
- * completion is ignored, except rarely to clear the queue (see comments
- * at post_sr_ack).
+ * Called for an eager send, rts send, or cts send.
  */
-static void vapi_post_sr(const buf_head_t *bh, u_int32_t len)
+static void vapi_post_sr(const struct buf_head *bh, u_int32_t len)
 {
     VAPI_sg_lst_entry_t sg;
     VAPI_sr_desc_t sr;
@@ -493,7 +434,7 @@ static void vapi_post_sr(const buf_head_t *bh, u_int32_t len)
 /*
  * Post one of the eager recv bufs for this connection.
  */
-static void vapi_post_rr(const ib_connection_t *c, buf_head_t *bh)
+static void vapi_post_rr(const ib_connection_t *c, struct buf_head *bh)
 {
     VAPI_sg_lst_entry_t sg;
     VAPI_rr_desc_t rr;
@@ -517,91 +458,13 @@ static void vapi_post_rr(const ib_connection_t *c, buf_head_t *bh)
 }
 
 /*
- * Explicitly return a credit.  Immediate data says for which of
- * his buffer numbers does this ack apply.  Buffers will get reposted
- * out of order, although the buffers are always matched pairwise, so we
- * always return _his_ number, not ours.  (Consider this scenario
- *
- *     client                        server
- *        buf 0: send unex eager        buf 0: recv unex eager, no ack
- *        buf 1: send rts                      until app recognizes
- *                                      buf 1: recv rts, ack immediate,
- *                                             repost my buf 1
- *                                      ....
- *                                      app deals with eager, repost
- *                                             my buf 0
- *
- * Now the buffers are posted on the server in a different order.)
- *
- * Don't want to get a local completion from this, but if we don't do
- * so every once in a while, the NIC will fill up apparently.  So we
- * generate one every N - 100, where N =~ 5000, the number asked for
- * at QP build time.
- */
-static void vapi_post_sr_ack(ib_connection_t *c, int his_bufnum)
-{
-    VAPI_sr_desc_t sr;
-    int ret;
-    struct vapi_connection_priv *vc = c->priv;
-    struct vapi_device_priv *vd = ib_device->priv;
-
-    debug(2, "%s: %s his buf %d wr %d/%d", __func__, c->peername, his_bufnum,
-      vc->num_unsignaled_wr_ack, vd->max_outstanding_wr);
-    memset(&sr, 0, sizeof(sr));
-    sr.opcode = VAPI_SEND_WITH_IMM;
-    sr.id = int64_from_ptr(c);  /* for error checking if send fails */
-    if (++vc->num_unsignaled_wr_ack + 100 == vd->max_outstanding_wr) {
-	vc->num_unsignaled_wr_ack = 0;
-	sr.comp_type = VAPI_SIGNALED;
-    } else
-	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
-    /* convert to BMI order, then convert to "host" order since VAPI
-     * will convert it again for us if this is a little-endian machine */
-    sr.imm_data = ntohl(htobmi32(his_bufnum));
-    sr.sg_lst_len = 0;
-    ret = VAPI_post_sr(vd->nic_handle, vc->qp_ack, &sr);
-    if (ret < 0)
-	error_verrno(ret, "%s: VAPI_post_sr", __func__);
-}
-
-/*
- * Put another receive entry on the list for an ack.  These have no
- * data, so require no local buffers.  Just add a descriptor to the
- * NIC list.  We do keep the .id pointing to the bh which is the originator
- * of the eager (or RTS or whatever) send, just as a consistency check
- * that when the ack comes in, it is for the outgoing message we expected.
- *
- * In the future they could be out-of-order, though, so perhaps that will
- * go away.
- *
- * Could prepost a whole load of these and just replenish them without
- * thinking.
- */
-static void vapi_post_rr_ack(const ib_connection_t *c, const buf_head_t *bh)
-{
-    VAPI_rr_desc_t rr;
-    int ret;
-    struct vapi_connection_priv *vc = c->priv;
-    struct vapi_device_priv *vd = ib_device->priv;
-
-    debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
-    memset(&rr, 0, sizeof(rr));
-    rr.opcode = VAPI_RECEIVE;
-    rr.comp_type = VAPI_SIGNALED;  /* ask to get these, == 0 */
-    rr.id = int64_from_ptr(bh);
-    ret = VAPI_post_rr(vd->nic_handle, vc->qp_ack, &rr);
-    if (ret < 0)
-	error_verrno(ret, "%s: VAPI_post_rr", __func__);
-}
-
-/*
  * Called only in response to receipt of a CTS on the sender.  RDMA write
  * the big data to the other side.  A bit messy since an RDMA write may
  * not scatter to the receiver, but can gather from the sender, and we may
  * have a non-trivial buflist on both sides.  The mh_cts variable length
  * fields must be decoded as we go.
  */
-static void vapi_post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts,
+static void vapi_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
                                void *mh_cts_buf)
 {
     VAPI_sr_desc_t sr;
@@ -750,8 +613,6 @@ static int vapi_check_cq(struct bmi_ib_wc *wc)
     wc->id = desc.id;
     wc->status = desc.status;
     wc->byte_len = desc.byte_len;
-    wc->imm_data = htonl(desc.imm_data);  /* put in native form to work
-	around VAPI converting automatically for little-endian hosts */
     if (desc.opcode == VAPI_CQE_SQ_SEND_DATA)
 	wc->opcode = BMI_IB_OP_SEND;
     else if (desc.opcode == VAPI_CQE_RQ_SEND_DATA)
@@ -763,17 +624,19 @@ static int vapi_check_cq(struct bmi_ib_wc *wc)
     return 1;
 }
 
-static int vapi_prepare_cq_block(void)
+static void vapi_prepare_cq_block(int *cq_fd, int *async_fd)
 {
     struct vapi_device_priv *vd = ib_device->priv;
     int ret;
+
     /* ask for the next notfication */
     ret = VAPI_req_comp_notif(vd->nic_handle, vd->nic_cq, VAPI_NEXT_COMP);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_req_comp_notif", __func__);
 
     /* return the fd that can be fed to poll() */
-    return vd->cq_event_pipe[0];
+    *cq_fd = vd->cq_event_pipe[0];
+    *async_fd = vd->async_event_pipe[0];
 }
 
 /*
@@ -1041,13 +904,10 @@ int vapi_ib_initialize(void)
     ib_device->func.new_connection = vapi_new_connection;
     ib_device->func.close_connection = vapi_close_connection;
     ib_device->func.drain_qp = vapi_drain_qp;
-    ib_device->func.send_bye = vapi_send_bye;
     ib_device->func.ib_initialize = vapi_ib_initialize;
     ib_device->func.ib_finalize = vapi_ib_finalize;
     ib_device->func.post_sr = vapi_post_sr;
     ib_device->func.post_rr = vapi_post_rr;
-    ib_device->func.post_sr_ack = vapi_post_sr_ack;
-    ib_device->func.post_rr_ack = vapi_post_rr_ack;
     ib_device->func.post_sr_rdmaw = vapi_post_sr_rdmaw;
     ib_device->func.check_cq = vapi_check_cq;
     ib_device->func.prepare_cq_block = vapi_prepare_cq_block;

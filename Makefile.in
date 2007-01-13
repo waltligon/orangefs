@@ -143,7 +143,7 @@ LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
 # make sure the srcdir include gets included first
-CFLAGS = -I$(srcdir)/include @CFLAGS@
+CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
@@ -389,6 +389,7 @@ endif
 
 # LIBRARIES is a list of the pvfs2 client libraries
 LIBRARIES :=
+LIBRARIES_THREADED :=
 ifeq ($(build_shared),yes)
 LIBRARIES_SHARED = lib/libpvfs2.so
 LIBRARIES += $(LIBRARIES_SHARED)
@@ -692,7 +693,7 @@ tags:
 	    $(srcdir)/src/kernel/linux-2.6 \
 	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
 	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig \
-	) | ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
+	) | ctags --excmd=pattern -B --langmap=c:+.sm --extra=+f -I __hidden,DOTCONF_CB -L-
 
 # rule for running code check
 codecheck:
@@ -714,7 +715,7 @@ docsclean:
 clean:: 
 	$(Q) "  CLEAN"
 	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) $(SERVEROBJS) $(MISCOBJS) \
-		$(LIBRARIES) $(DEPENDS) $(SERVER) \
+		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(KERNAPPOBJS) $(KERNAPPS) \

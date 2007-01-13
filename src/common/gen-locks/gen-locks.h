@@ -70,16 +70,19 @@ typedef unsigned long gen_thread_t;
 static inline int gen_mutex_lock(
     gen_mutex_t * mutex_p)
 {
+    (void) mutex_p;
     return 0;
 }
 static inline int gen_mutex_unlock(
     gen_mutex_t * mutex_p)
 {
+    (void) mutex_p;
     return 0;
 }
 static inline int gen_mutex_trylock(
     gen_mutex_t * mutex_p)
 {
+    (void) mutex_p;
     return 0;
 }
 static inline gen_mutex_t *gen_mutex_build(

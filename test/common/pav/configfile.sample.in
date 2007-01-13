@@ -82,6 +82,11 @@ COPYBINS=1
 # could cause DATA LOSS, but will give improved performance.
 TROVESYNC=1
 
+# Set this to the desired Trove method (as you would set TroveMethod in
+# fs.conf).  Defaults to 'dbpf'.  'alt-aio' is another good one
+# TROVEMETHOD=dbpf
+
+
 # set this to 0 if you would rather have compute nodes come before server
 # nodes in the list of hosts pav uses
 COMPUTENODES_LAST=1

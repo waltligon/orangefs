@@ -2,6 +2,21 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+pvfs-2.7.x
+==============
+
+* HEC posix extensions now supported by PVFS.
+* HEC posix extensions patches to the vfs are provided in the patches subdir.
+* Support for immutible (read-only) files set by xattr and vfs caching of
+read-only files through the vfs.
+* ib: optimistic buffer registration to avoid segmented memory registration
+* ib: redesign and streamline credit-based flow control scheme
+* ib: cache explict BMI_memalloc registrations; huge latency improvement
+* bmi: avoid gettimeofday() to determine poll vs block for multi-method
+    scenario
+* ib: rely on bmi to make poll vs block decision
+* ib: only check for new connections and async events during blocking periods
+
 pvfs-2.6.0
 ==============
 * kernel module cleanups

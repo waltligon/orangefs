@@ -494,7 +494,7 @@ int PVFS_fsck_validate_metafile(
 
     err = PVFS_mgmt_get_dfile_array(*obj_ref,
                                   (PVFS_credentials *) creds,
-                                  df_handles, attributes->attr.dfile_count);
+                                  df_handles, attributes->attr.dfile_count, NULL);
     if(err < 0)
     {
         PVFS_perror("PVFS_mgmt_get_dfile_array", err);
@@ -800,7 +800,7 @@ int PVFS_fsck_validate_dir(
 
     /* get the dirdata handle and validate */
     err = PVFS_mgmt_get_dirdata_handle
-        (*obj_ref, &dirdata_handle, (PVFS_credentials *) creds);
+        (*obj_ref, &dirdata_handle, (PVFS_credentials *) creds, NULL);
     if(err < 0)
     {
         gossip_err("Error: unable to get dirdata handle\n");
@@ -824,7 +824,7 @@ int PVFS_fsck_validate_dir(
         err = PVFS_sys_readdir(*obj_ref,
                              token,
                              MAX_DIR_ENTS,
-                             (PVFS_credentials *) creds, &readdir_resp);
+                             (PVFS_credentials *) creds, &readdir_resp, NULL);
         if(err < 0)
         {
             gossip_err("Error: could not read directory entries\n");
@@ -960,7 +960,7 @@ int PVFS_fsck_get_attributes(
     int ret = 0;
 
     ret = PVFS_sys_getattr
-        (*pref, PVFS_ATTR_SYS_ALL, (PVFS_credentials *) creds, getattr_resp);
+        (*pref, PVFS_ATTR_SYS_ALL, (PVFS_credentials *) creds, getattr_resp, NULL);
     if(ret < 0)
     {
         gossip_err("Error: unable to retrieve attributes\n");
@@ -1137,7 +1137,7 @@ static int PINT_handle_wrangler_load_handles(
                           (PVFS_credentials *) creds,
                           stat_array,
                           PINT_handle_wrangler_handlelist.addr_array,
-                          server_count, NULL);
+                          server_count, NULL, NULL);
     if(err < 0)
     {
         ret = -PVFS_ENOMEM;
@@ -1263,7 +1263,7 @@ static int PINT_handle_wrangler_load_handles(
                                        handle_count_array,
                                        position_array,
                                        PINT_handle_wrangler_handlelist.
-                                       addr_array, server_count, NULL);
+                                       addr_array, server_count, NULL, NULL);
         if(err < 0)
         {
             PVFS_perror_gossip("PVFS_mgmt_iterate_handles", err);

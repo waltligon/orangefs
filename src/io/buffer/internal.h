@@ -15,7 +15,7 @@ typedef cache_desc_t NCAC_desc_t;
 typedef int          NCAC_optype;
 typedef cache_reply_t NCAC_reply_t;
 
-typedef pthread_mutex_t NCAC_lock;
+typedef gen_mutex_t NCAC_lock;
 
 struct NCAC_cache_info{
     int max_req_num;

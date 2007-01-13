@@ -654,7 +654,7 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "Unknown host",                                   \
     "No address associated with name",                \
     "Unknown server error",                           \
-    "Host name lookup failure"                        \
+    "Host name lookup failure",                       \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -664,7 +664,7 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_EHOSTNTFD, /* 4 */                           \
     PVFS_EADDRNTFD, /* 5 */                           \
     PVFS_ENORECVR,  /* 6 */                           \
-    PVFS_ETRYAGAIN  /* 7 */                           \
+    PVFS_ETRYAGAIN, /* 7 */                           \
 }
 
 /*

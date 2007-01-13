@@ -24,6 +24,10 @@
 /* Define if struct backing_dev_info in kernel has memory_backed */
 #undef HAVE_BDI_MEMORY_BACKED
 
+/* Define if struct file_operations has combined aio_read and readv functions
+   */
+#undef HAVE_COMBINED_AIO_AND_VECTOR
+
 /* Define if there exists a compat_ioctl member in file_operations */
 #undef HAVE_COMPAT_IOCTL_HANDLER
 
@@ -130,6 +134,9 @@
 
 /* Define if kernel has i_size_write */
 #undef HAVE_I_SIZE_WRITE
+
+/* Define if kmem_cache_destroy returns int */
+#undef HAVE_KMEM_CACHE_DESTROY_INT_RETURN
 
 /* Define to 1 if you have the `efence' library (-lefence). */
 #undef HAVE_LIBEFENCE
@@ -277,6 +284,9 @@
 
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+
+/* Define if include file valgrind.h exists */
+#undef HAVE_VALGRIND_H
 
 /* Define if get_sb callback has struct vfsmount argument */
 #undef HAVE_VFSMOUNT_GETSB
