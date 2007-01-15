@@ -177,7 +177,7 @@ diff -ur mpich2-1.0.4p1/src/mpe2/src/wrappers/src/log_mpi_io.c mpich2-1.0.4p1-pa
 +  if( comm != 0 )
 +  {
 +    PMPI_Comm_rank(MPI_COMM_WORLD, &rank);
-+    //PMPI_Comm_rank(comm, &rank);
++    /*PMPI_Comm_rank(comm, &rank);*/
 +    snprintf(value, PVFS2_MAX_HINT, "host:%s,comm:%d,rank:%d,id:%d,op:%s", 
 +             hostname, comm, rank, pvfs2_increment_id++,io_type);
 +  }
