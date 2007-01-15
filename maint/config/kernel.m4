@@ -617,6 +617,8 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	    )
 
+	dnl Gives wrong answer if header is missing; don't try then.
+	if test x$ac_cv_header_linux_ioctl32_h = xyes ; then
 	AC_MSG_CHECKING(for register_ioctl32_conversion kernel exports)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel has it defined
@@ -633,6 +635,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_REGISTER_IOCTL32_CONVERSION, 1, Define if kernel has register_ioctl32_conversion),
 	)
+	fi
 
 	AC_MSG_CHECKING(for int return value of kmem_cache_destroy)
 	AC_TRY_COMPILE([

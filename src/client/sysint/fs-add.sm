@@ -408,7 +408,7 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
         {
             gossip_err("     FS config file on %s -> (size) %d\n", 
                    PVFS_mgmt_map_addr(fsid, sm_p->cred_p, sm_p->fetch_config.addr_array[i], &tmp),
-                   sm_p->fetch_config.fs_config_buf_size[i]);
+                   sm_p->fetch_config.fs_config_buf_size[i] - 1);
             ret = -PVFS_EINVAL;
         }
         goto out;

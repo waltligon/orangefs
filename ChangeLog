@@ -2,6 +2,14 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+pvfs-2.6.2
+==============
+
+* fixes in trove dbpf to support latest Berkeley DB (version 4.5).
+* fix kmod compile issues with --enable-mmap-racache
+* fix for IO failures caused by invalid sizes used in file.c
+* fixes for 2.4 kernels
+
 pvfs-2.6.1
 ==============
 

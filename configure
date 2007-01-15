@@ -1802,7 +1802,7 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=2
 PVFS2_MINOR=6
-PVFS2_SUB=1
+PVFS2_SUB=2
 PVFS2_PRE=""
 #PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
@@ -11857,6 +11857,7 @@ fi
 
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
+		if test x$ac_cv_header_linux_ioctl32_h = xyes ; then
 	{ echo "$as_me:$LINENO: checking for register_ioctl32_conversion kernel exports" >&5
 echo $ECHO_N "checking for register_ioctl32_conversion kernel exports... $ECHO_C" >&6; }
 			cat >conftest.$ac_ext <<_ACEOF
@@ -11932,6 +11933,7 @@ _ACEOF
 fi
 
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+	fi
 
 	{ echo "$as_me:$LINENO: checking for int return value of kmem_cache_destroy" >&5
 echo $ECHO_N "checking for int return value of kmem_cache_destroy... $ECHO_C" >&6; }
