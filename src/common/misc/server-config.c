@@ -803,15 +803,18 @@ static const configoption_t options[] =
     /* This option specifies the method used for trove.  Currently the
      * dbpf method is the default.  Other methods include 'alt-aio'.
      *
-     * Note that this option can be specified in either the <Defaults>
-     * context of the main fs.conf, or in a filesystem specific <StorageHints>
-     * context, but the semantics of TroveMethod in the <Defaults>
+     * Note that this option can be specified in either the <a href="#Defaults">
+     * Defaults</a> context of the main fs.conf, or in a filesystem specific 
+     * <a href="#StorageHints">StorageHints</a>
+     * context, but the semantics of TroveMethod in the 
+     * <a href="#Defaults">Defaults</a>
      * context is different from other options.  The TroveMethod in the
-     * <Defaults> context only specifies which method is used at
+     * <a href="#Defaults">Defaults</a> context only specifies which 
+     * method is used at
      * server initialization.  It does not specify the default TroveMethod
      * for all the filesystems the server supports.  To set the TroveMethod
-     * for a filesystem, the TroveMethod must be placed in the <StorageHints>
-     * context for that filesystem.
+     * for a filesystem, the TroveMethod must be placed in the 
+     * <a href="#StorageHints">StorageHints</a> context for that filesystem.
      */
     {"TroveMethod", ARG_STR, get_trove_method, NULL, 
         CTX_DEFAULTS|CTX_GLOBAL|CTX_STORAGEHINTS, "dbpf"},
