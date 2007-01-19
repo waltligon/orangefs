@@ -416,7 +416,8 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
             return -1;
         }
 
-        if (resp_getattr.attr.objtype != PVFS_TYPE_METAFILE)
+        if (resp_getattr.attr.objtype != PVFS_TYPE_METAFILE &&
+            resp_getattr.attr.objtype != PVFS_TYPE_DIRECTORY)
         {
             fprintf(stderr, "Not a meta file!\n");
             return -1;
