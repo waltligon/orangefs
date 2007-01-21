@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.51 2007-01-02 17:10:56 pw Exp $
+ * $Id: ib.c,v 1.52 2007-01-21 20:56:26 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -823,7 +823,7 @@ post_send(bmi_op_id_t *id, struct method_addr *remote_map,
     sq->type = BMI_SEND;
     sq->state.send = SQ_WAITING_BUFFER;
 
-    debug(2, "%s: sq %p len %zu peer %s", __func__, sq, total_size,
+    debug(2, "%s: sq %p len %lld peer %s", __func__, sq, (long long) total_size,
           ibmap->c->peername);
 
     /*
