@@ -16,15 +16,21 @@ static spinlock_t next_tag_value_lock = SPIN_LOCK_UNLOCKED;
 
 /* the pvfs2 memory caches */
 
+#ifdef HAVE_STRUCT_KMEM_CACHE
+typedef struct kmem_cache pvfs2_kmem_cache_t;
+#else
+typedef kmem_cache_t pvfs2_kmem_cache_t;
+#endif
+
 /* a cache for pvfs2 upcall/downcall operations */
-static kmem_cache_t *op_cache = NULL;
+static pvfs2_kmem_cache_t *op_cache = NULL;
 /* a cache for device (/dev/pvfs2-req) communication */
-static kmem_cache_t *dev_req_cache = NULL;
+static pvfs2_kmem_cache_t *dev_req_cache = NULL;
 /* a cache for pvfs2-inode objects (i.e. pvfs2 inode private data) */
-static kmem_cache_t *pvfs2_inode_cache = NULL;
+static pvfs2_kmem_cache_t *pvfs2_inode_cache = NULL;
 #ifdef HAVE_AIO_VFS_SUPPORT
 /* a cache for pvfs2_kiocb objects (i.e pvfs2 iocb structures ) */
-static kmem_cache_t *pvfs2_kiocb_cache = NULL;
+static pvfs2_kmem_cache_t *pvfs2_kiocb_cache = NULL;
 #endif
 
 #ifdef HAVE_KMEM_CACHE_DESTROY_INT_RETURN
@@ -194,7 +200,7 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
 
 static void dev_req_cache_ctor(
     void *req,
-    kmem_cache_t * cachep,
+    pvfs2_kmem_cache_t * cachep,
     unsigned long flags)
 {
     if (flags & SLAB_CTOR_CONSTRUCTOR)
@@ -258,7 +264,7 @@ void dev_req_release(void *buffer)
 
 static void pvfs2_inode_cache_ctor(
     void *new_pvfs2_inode,
-    kmem_cache_t * cachep,
+    pvfs2_kmem_cache_t * cachep,
     unsigned long flags)
 {
     pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *)new_pvfs2_inode;
@@ -292,7 +298,7 @@ static void pvfs2_inode_cache_ctor(
 
 static void pvfs2_inode_cache_dtor(
     void *old_pvfs2_inode,
-    kmem_cache_t * cachep,
+    pvfs2_kmem_cache_t * cachep,
     unsigned long flags)
 {
     pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *)old_pvfs2_inode;
@@ -394,7 +400,7 @@ void pvfs2_inode_release(pvfs2_inode_t *pinode)
 
 static void kiocb_ctor(
     void *req,
-    kmem_cache_t * cachep,
+    pvfs2_kmem_cache_t * cachep,
     unsigned long flags)
 {
     if (flags & SLAB_CTOR_CONSTRUCTOR)
