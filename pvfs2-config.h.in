@@ -216,6 +216,9 @@
 /* Define if kernel setxattr has const void* argument */
 #undef HAVE_SETXATTR_CONST_ARG
 
+/* Define if SLAB_KERNEL is defined in kernel */
+#undef HAVE_SLAB_KERNEL
+
 /* Define if struct super_operations in kernel has statfs_lite callback */
 #undef HAVE_STATFS_LITE_SUPER_OPERATIONS
 
@@ -242,6 +245,9 @@
 
 /* Define to 1 if you have the `strtoull' function. */
 #undef HAVE_STRTOULL
+
+/* Define if struct kmem_cache is defined in kernel */
+#undef HAVE_STRUCT_KMEM_CACHE
 
 /* Define if struct xtvec is defined in the kernel */
 #undef HAVE_STRUCT_XTVEC
