@@ -128,6 +128,11 @@ A. Sivasubramaniam, M. Vilayannur, P. H. Carns, R. B. Ross, R. Thakur, ``On the
     Euromicro Conference on Parallel, Distributed and Network based Processing,
     A Coruna, Spain, February 2004.
 
+Hsieh, J.   Stanton, C.   Ali, R, ``Performance evaluation of software RAID vs.
+    hardware RAID for Parallel Virtual File System", Ninth International
+    Conference on Parallel and Distributed Systems, December 2002. 
+    http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=1183417
+
 /* this one does mention a bit of pvfs2k */
 "A Parallel Out-of-Core Computing System Using PVFS for Linux Clusters". Jianqi
     Tang.  Binxing Fang. Mingzeng Hu Hongli Zhang.  International Workshop on
