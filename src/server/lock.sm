@@ -66,6 +66,7 @@ machine pvfs2_lock_sm(
 static int lock_change_lock(
     PINT_server_op *s_op, job_status_s* js_p)
 {
+    int ret = -1;
     PVFS_object_ref object_ref;
     PINT_request_file_data fdata;
     memset(&s_op->resp.u.lock, 0, sizeof(struct PVFS_servresp_lock));
@@ -82,26 +83,42 @@ static int lock_change_lock(
     fdata.fsize = s_op->ds_attr.b_size;
     fdata.extend_flag = 1;
 
-    /* print_lock_file_table_all_info(); */
     if (s_op->req->u.lock.lock_type == PVFS_ACQUIRE)
     {
-	add_lock_req(&object_ref,
-		     s_op->req->u.lock.io_type,
-		     s_op->req->u.lock.file_req,
-		     s_op->req->u.lock.file_req_offset,
-		     &fdata,
-		     s_op->req->u.lock.aggregate_size,
-		     0,
-		     s_op->req->u.lock.aggregate_size,
-		     &(s_op->resp.u.lock.lock_id),
-		     &(s_op->resp.u.lock.granted_bytes));
+	lock_req_t *lock_req_p;
+	
+	ret = add_lock_req(&object_ref,
+			   s_op->req->u.lock.io_type,
+			   s_op->req->u.lock.file_req,
+			   s_op->req->u.lock.file_req_offset,
+			   &fdata,
+			   s_op->req->u.lock.nonblock_size,
+			   s_op->req->u.lock.block_size,
+			   s_op->req->u.lock.aggregate_size,
+			   &(s_op->resp.u.lock.lock_id),
+			   &(s_op->resp.u.lock.granted_bytes),
+			   &lock_req_p);
+	/* Set this to NULL so that it isn't killed at the end of the
+	 * operation. */
+	s_op->req->u.lock.file_req = NULL;
+	if (ret == 0)
+	{
+	    int err = -1;
+	    
+	    gossip_debug(GOSSIP_LOCK_DEBUG, 
+			 "lock_change_lock: starting job\n");
+	    
+	    err = job_lock_wait_block_bytes(s_op,
+					    lock_req_p);
+	    return err;
+	}
     }
     else
     {
-	del_lock_req(&object_ref,
-		     s_op->req->u.lock.file_req_offset,
-		     s_op->req->u.lock.aggregate_size,
-		     &(s_op->resp.u.lock.granted_bytes));
+	revise_lock_req(&object_ref,
+			s_op->req->u.lock.lock_id,
+			s_op->req->u.lock.block_size,
+			&(s_op->resp.u.lock.granted_bytes));
     }
 #if 0
     print_lock_file_table_all_info();
