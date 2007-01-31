@@ -99,6 +99,8 @@ struct job_desc
     job_context_id context_id;  /* context */
     struct PINT_thread_mgr_bmi_callback bmi_callback;  /* callback information */
     struct PINT_thread_mgr_trove_callback trove_callback;  /* callback information */
+    /* callback information (not signalled by a thread though) */
+    struct PINT_thread_mgr_trove_callback lock_callback;
     enum PVFS_event_op event_type;
 
     /* union of information for lower level interfaces */
