@@ -497,7 +497,10 @@ static int lock_setup_msgpairs(PINT_client_sm *sm_p,
 		attr->u.meta.dist,
 		sm_p->u.lock.file_req,
 		sm_p->u.lock.file_req_offset,
-		PINT_REQUEST_TOTAL_BYTES(sm_p->u.lock.mem_req));
+		PINT_REQUEST_TOTAL_BYTES(sm_p->u.lock.mem_req),
+		0,
+		PINT_REQUEST_TOTAL_BYTES(sm_p->u.lock.mem_req),
+		-1);
 	else
 	    PINT_SERVREQ_LOCK_FILL(
 		sm_p->u.lock.contexts[i].msg.req,
@@ -510,8 +513,11 @@ static int lock_setup_msgpairs(PINT_client_sm *sm_p,
 		attr->u.meta.dfile_count,
 		attr->u.meta.dist,
 		PVFS_BYTE,
-		(*(sm_p->u.lock.lock_id_arr_p))[i],
-		-1);
+		0,
+		-1,
+		-1,
+		-1,
+		(*(sm_p->u.lock.lock_id_arr_p))[i]);
     }
     
     js_p->error_code = 0;
