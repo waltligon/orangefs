@@ -19,7 +19,6 @@ struct itree_s
     enum itree_color color;
     /* end must be greater than or equal to start */
     int64_t start, end, max;
-    
     itree_t *parent, *left, *right;
 };
 
@@ -516,7 +515,6 @@ static inline itree_qnode * itree_qnode_pop(itree_qnode **q_head_p_p)
 
 /* itree_breadth_print - Debugging function to print out all nodes of
  * the interval tree in levels. */
-
 static inline void itree_breadth_print(itree_t *head_p,
 				       itree_t *NIL)
 {
@@ -553,6 +551,43 @@ static inline void itree_breadth_print(itree_t *head_p,
     fprintf(stdout, "\n\n");
 }
 
+/* itree_breadth_print_fn - Debugging function to print out
+ * function-defined informations of each node of the interval tree in
+ * levels. */
+static inline void itree_breadth_print_fn(itree_t *head_p,
+					  itree_t *NIL,
+					  void (*print_fn) (itree_t *))
+{
+    int old_level = -1;
+    itree_qnode *q_head_p = NULL;
+    itree_qnode *q_pop_p = NULL;
+    fprintf(stdout, "\nitree_breadth_print:");
+    if (head_p != NIL)
+    {
+	itree_qnode_add(&(q_head_p), 0, head_p);
+    }
+    while (q_head_p != NULL)
+    {
+	q_pop_p = itree_qnode_pop(&(q_head_p));
+	if (q_pop_p->itree_p->left != NIL)
+	    itree_qnode_add(&(q_head_p), q_pop_p->level + 1, 
+		       q_pop_p->itree_p->left);
+	if (q_pop_p->itree_p->right != NIL)
+	    itree_qnode_add(&(q_head_p), q_pop_p->level + 1, 
+		       q_pop_p->itree_p->right);
+	
+	if (old_level != q_pop_p->level)
+	{
+	    old_level =  q_pop_p->level;
+	    fprintf(stdout, "\nlevel %d: ", old_level);
+	}
+	
+	print_fn(q_pop_p->itree_p);
+	free(q_pop_p);
+    }
+    fprintf(stdout, "\n\n");
+}
+
 /* itree_inorder_tree_print - Debugging function to print out all nodes of
  * the interval tree in order. */
 static inline void itree_inorder_tree_print(itree_t *head_p,
@@ -566,6 +601,49 @@ static inline void itree_inorder_tree_print(itree_t *head_p,
 		(head_p->color == ITREE_RED ? "r": "b"));
 	itree_inorder_tree_print(head_p->right, NIL);
     }
+}
+
+/* itree_inorder_tree_print_fn - Debugging function to print out
+ * function-defined information for all nodes of the interval tree in
+ * order. */
+static inline void itree_inorder_tree_print_fn(itree_t *head_p,
+					       itree_t *NIL,
+					       void (*print_fn) (itree_t *))
+{
+    if (head_p != NIL)
+    {
+	itree_inorder_tree_print_fn(head_p->left, NIL, print_fn);
+	print_fn(head_p);
+	itree_inorder_tree_print_fn(head_p->right, NIL, print_fn);
+    }
+}
+
+/* itree_nil_check - Debugging function to figure out what is
+ * happening with the NIL node. */
+static inline int itree_nil_check(itree_t *NIL)
+{
+    if (NIL->color != ITREE_NONE ||
+	NIL->start != -1 ||
+	NIL->end != -1 ||
+	NIL->max != -1 ||
+	NIL->left != NIL ||
+	NIL->right != NIL ||
+	NIL->parent != NIL)
+    {
+	fprintf(stdout, 
+		"Error: Nil is wrong.\n"
+		"Color = %d, (should be %d)\n"
+		"Start = %Ld, End = %Ld, Max = %Ld (all should be -1)\n"
+		"Left = %x, Right = %x, Parent = %x (all should be %x)\n",
+		NIL->color, ITREE_NONE, NIL->start, NIL->end, 
+		NIL->max, 
+		(unsigned int) NIL->left, 
+		(unsigned int) NIL->right, 
+		(unsigned int) NIL->parent,
+		(unsigned int) NIL);
+    }
+
+    return 0;
 }
 
 /* itree_inorder_tree_check - Look for incorrectly ordered nodes and
