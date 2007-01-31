@@ -727,8 +727,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		break;
 
             case PVFS_SERV_LOCK:
-                decode_free(req->u.lock.io_dist);
-                decode_free(req->u.lock.file_req);
+		decode_free(req->u.lock.io_dist);
+		if (req->u.lock.file_req)
+		    decode_free(req->u.lock.file_req);
+/* AC - This information cannot be freed since it is necessary for the
+  lock_req.  Therefore, I will free it manually later on
+
+*/
                 break;
 
 	    case PVFS_SERV_IO:
