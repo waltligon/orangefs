@@ -1262,6 +1262,21 @@ static inline unsigned int diff(struct timeval *end, struct timeval *begin)
     return ((end->tv_sec * 1000000) + end->tv_usec);
 }
 
+#ifndef HAVE_KZALLOC
+static inline void *kzalloc(size_t size, int flags)
+{
+	void * ptr;
+
+	ptr = kmalloc(size, flags);
+	if(!ptr)
+	{
+		return ptr;
+	}
+	memset(ptr, 0, size);
+	return ptr;
+}
+#endif
+
 #endif /* __PVFS2KERNEL_H */
 
 /* @} */
