@@ -138,6 +138,9 @@
 /* Define if kmem_cache_destroy returns int */
 #undef HAVE_KMEM_CACHE_DESTROY_INT_RETURN
 
+/* Define if kzalloc exists */
+#undef HAVE_KZALLOC
+
 /* Define to 1 if you have the `efence' library (-lefence). */
 #undef HAVE_LIBEFENCE
 

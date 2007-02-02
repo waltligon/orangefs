@@ -666,4 +666,18 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    )
 
 	CFLAGS=$oldcflags
+
+	dnl Check for kzalloc
+	AC_MSG_CHECKING(for kzalloc)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+	], [
+		void * a;
+		a = kzalloc(1024);
+	],
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KZALLOC, 1, Define if kzalloc exists)
+	)
 ])
