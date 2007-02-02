@@ -176,8 +176,8 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         {
             gossip_err(
                 "Error: total size (%llu) of device "
-                "buffer must be < %d MB.\n",
-                llu(total_size), PVFS2_BUFMAP_MAX_TOTAL_SIZE);
+                "buffer must be < %llu MB.\n",
+                llu(total_size), llu(PVFS2_BUFMAP_MAX_TOTAL_SIZE));
             break;
         }
         if (params[i].dev_buffer_size & (params[i].dev_buffer_size - 1))

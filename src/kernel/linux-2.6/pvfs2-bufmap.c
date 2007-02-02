@@ -50,23 +50,20 @@ static int initialize_bufmap_descriptors(int ndescs)
         goto out;
     }
     err = -ENOMEM;
-    buffer_index_array = (int *) kmalloc(ndescs * sizeof(int), 
-                                         PVFS2_BUFMAP_GFP_FLAGS);
+    buffer_index_array = kzalloc(ndescs * sizeof(*buffer_index_array), 
+                                 PVFS2_BUFMAP_GFP_FLAGS);
     if (buffer_index_array == NULL) 
     {
         gossip_err("pvfs2: could not allocate %d bytes\n",
-                (int) (ndescs * sizeof(int)));
+                (int) (ndescs * sizeof(*buffer_index_array)));
         goto out;
     }
-    memset(buffer_index_array, 0, ndescs * sizeof(int));
 
-    desc_array = (struct pvfs_bufmap_desc *) 
-                 kmalloc(ndescs * sizeof(struct pvfs_bufmap_desc),
-                         PVFS2_BUFMAP_GFP_FLAGS);
+    desc_array = kmalloc(ndescs * sizeof(*desc_array), PVFS2_BUFMAP_GFP_FLAGS);
     if (desc_array == NULL)
     {
         gossip_err("pvfs2: could not allocate %d bytes\n",
-                (int) (ndescs * sizeof(struct pvfs_bufmap_desc)));
+                ndescs * sizeof(struct pvfs_bufmap_desc));
         goto out1;
     }
     err = 0;

@@ -51,7 +51,7 @@ pull_and_build_pvfs2 () {
 	mkdir -p $PVFS2_DEST
 	with_kernel=""
 	if  [ $do_vfs -eq 1 ] ; then
-		with_kernel="-k /lib/modules/`uname -r`/build"
+		with_kernel="-k /usr/src/linux-headers-`uname -r`"
 	fi
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a

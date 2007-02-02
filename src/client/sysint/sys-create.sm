@@ -621,7 +621,6 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL, i = 0;
     struct server_configuration_s *server_config = NULL;
-    int server_type;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "datafiles_setup_msgpair_array\n");
@@ -721,7 +720,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
         gossip_debug(GOSSIP_VARSTRIP_DEBUG, 
                      "Data file number: %d - Server name: %s\n",
                      i, PVFS_mgmt_map_addr(msg_p->fs_id, sm_p->cred_p,
-                                           msg_p->svr_addr, &server_type));
+                                           msg_p->svr_addr, NULL));
     }
     return 1;
 }

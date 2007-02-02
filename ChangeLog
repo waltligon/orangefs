@@ -17,6 +17,27 @@ read-only files through the vfs.
 * ib: rely on bmi to make poll vs block decision
 * ib: only check for new connections and async events during blocking periods
 
+pvfs-2.6.2
+==============
+
+* fixes in trove dbpf to support latest Berkeley DB (version 4.5).
+* fix kmod compile issues with --enable-mmap-racache
+* fix for IO failures caused by invalid sizes used in file.c
+* fixes for 2.4 kernels
+
+pvfs-2.6.1
+==============
+
+* fix --enable-fast
+* fix to build for client-core-threaded (make clean and make kmod before make)
+* fix problems on ppc64 (long/int type mismatches, no _syscall, removed
+warnings)
+* fix overwrites past end of request
+* allow kernel buffer size to be tuned from pvfs2-client
+* fixups for linux kernel version 2.6.19
+	- check return type of kmem_cache_destroy
+	- combine readv/writev to aio_read/aio_write
+
 pvfs-2.6.0
 ==============
 * kernel module cleanups

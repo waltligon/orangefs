@@ -361,7 +361,8 @@ static int create_partition_handles(PVFS_fs_id fsid, int input_handle_count,
         }
         for (i = 0; i < input_handle_count; i++) 
         {
-            int svr_index, ret;
+            int svr_index = 0;
+            int ret;
             ret = PINT_cached_config_map_to_server(&tmp_svr_addr,
                 input_handle_array[i].handle, fsid);
             /* unique server address to find index */

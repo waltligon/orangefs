@@ -201,7 +201,9 @@ static struct qhash_table *s_ops_in_progress_table = NULL;
 static void parse_args(int argc, char **argv, options_t *opts);
 static void print_help(char *progname);
 static void reset_acache_timeout(void);
+#ifndef GOSSIP_DISABLE_DEBUG
 static char *get_vfs_op_name_str(int op_type);
+#endif
 static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
@@ -2254,7 +2256,7 @@ static inline void package_downcall_members(
             break;
         case PVFS2_VFS_OP_STATFS:
             vfs_request->out_downcall.resp.statfs.block_size =
-                s_desc_params[BM_IO].dev_buffer_count;
+                s_desc_params[BM_IO].dev_buffer_size;
             vfs_request->out_downcall.resp.statfs.blocks_total = (int64_t)
                 (vfs_request->response.statfs.statfs_buf.bytes_total /
                  vfs_request->out_downcall.resp.statfs.block_size);
@@ -2902,7 +2904,7 @@ static PVFS_error process_vfs_requests(void)
                (MAX_NUM_OPS * sizeof(vfs_request_t *)));
 
         ret = PVFS_sys_testsome(
-            op_id_array, &op_count, (void *) vfs_request_array,
+            op_id_array, &op_count, (void *)vfs_request_array,
             error_code_array, PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
 
         for(i = 0; i < op_count; i++)
@@ -3655,6 +3657,7 @@ static void reset_ncache_timeout(void)
     }
 }
 
+#ifndef GOSSIP_DISABLE_DEBUG
 static char *get_vfs_op_name_str(int op_type)
 {
     typedef struct
@@ -3706,6 +3709,7 @@ static char *get_vfs_op_name_str(int op_type)
     }
     return vfs_op_info[limit-1].type_str;
 }
+#endif
 
 static int set_acache_parameters(options_t* s_opts)
 {
