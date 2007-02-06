@@ -112,6 +112,30 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
+	dnl 2.6.20 deprecated kmem_cache_t
+	AC_MSG_CHECKING(for struct kmem_cache in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+		static struct kmem_cache;
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STRUCT_KMEM_CACHE, 1, Define if struct kmem_cache is defined in kernel),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl 2.6.20 removed SLAB_KERNEL.  Need to use GFP_KERNEL instead
+	AC_MSG_CHECKING(for SLAB_KERNEL flag in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+		static int flags = SLAB_KERNEL;
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_SLAB_KERNEL, 1, Define if SLAB_KERNEL is defined in kernel),
+		AC_MSG_RESULT(no)
+	)
+
 	dnl The name of this field changed from memory_backed to capabilities
 	dnl in 2.6.12.
 	AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
