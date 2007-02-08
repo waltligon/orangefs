@@ -44,17 +44,6 @@ static int pvfs_kmem_cache_destroy(void *x)
 }
 #endif
 
-#ifdef HAVE_KMEM_CACHE_DESTROY_INT_RETURN
-#define pvfs_kmem_cache_destroy kmem_cache_destroy
-#else
-/* recent kernels do not return a value */
-static int pvfs_kmem_cache_destroy(void *x)
-{
-    kmem_cache_destroy(x);
-    return 0;
-}
-#endif
-
 int op_cache_initialize(void)
 {
     op_cache = kmem_cache_create(
