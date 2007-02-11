@@ -13,6 +13,39 @@
 #define MAX_OL_PAIRS 64
 static PINT_Request_result lock_result;
 
+/* qlist_swap - Swap out one's nodes pointers for another's.  There
+ * are 3 distinct cases. 1) node dest is before node src. 2) node dest
+ * is after node src. 3) node src and node dest are not neighbors. 4)
+ * also they are neighbors and there is one node, or no other nodes.
+ * This solution is magic =).  */
+static void qlist_swap(struct qlist_head *a_p,
+		       struct qlist_head *b_p)
+{
+    struct qlist_head *a_prev_p, *a_next_p, *b_prev_p, *b_next_p;
+
+    assert(a_p != b_p);
+
+    a_prev_p = a_p->prev;
+    a_next_p = a_p->next;
+    b_prev_p = b_p->prev;
+    b_next_p = b_p->next;
+
+    a_prev_p->next = b_p;
+    a_next_p->prev = b_p;
+    b_prev_p->next = a_p;
+    b_next_p->prev = a_p;
+
+    a_prev_p = a_p->prev;
+    a_next_p = a_p->next;
+    b_prev_p = b_p->prev;
+    b_next_p = b_p->next;
+
+    a_p->next = b_next_p;
+    a_p->prev = b_prev_p;
+    b_p->next = a_next_p;
+    b_p->prev = a_prev_p;
+}
+
 /* qlist_replace - Replace one node with another.  Since this node
  * which is replacing the other may be part of a list, it must first
  * be deleted from its list, then replace the other node.  Also, in
@@ -57,9 +90,11 @@ int linked_itree_cpy_fn(itree_t *dest_p, itree_t *src_p)
 	itree_entry(dest_p, linked_itree_t, itree_link);
     linked_itree_t *tmp_src_p =
         itree_entry(src_p, linked_itree_t, itree_link);
+    int tmp_lock = tmp_dest_p->lock_id;
 
     tmp_dest_p->lock_id = tmp_src_p->lock_id;
-    qlist_replace(&(tmp_dest_p->list_link), &(tmp_src_p->list_link));
+    tmp_src_p->lock_id = tmp_lock;
+    qlist_swap(&(tmp_dest_p->list_link), &(tmp_src_p->list_link));
     return 0;
 }
 
@@ -103,7 +138,7 @@ int rbtree_lock_req_cpy_fn(rbtree_t *dest_p, rbtree_t *src_p)
 {
     PINT_Request_state *tmp_file_req_state_p = NULL;
     PINT_Request *tmp_file_req_p = NULL;
-
+    
     lock_req_t *tmp_dest_p =
 	rbtree_entry(dest_p, lock_req_t, granted_req_link);
     lock_req_t *tmp_src_p =
@@ -115,12 +150,12 @@ int rbtree_lock_req_cpy_fn(rbtree_t *dest_p, rbtree_t *src_p)
     tmp_file_req_state_p = tmp_dest_p->file_req_state;    
     tmp_file_req_p = tmp_dest_p->file_req;
 
-    qlist_replace(&(tmp_dest_p->lock_head), &(tmp_src_p->lock_head));
+    qlist_swap(&(tmp_dest_p->lock_head), &(tmp_src_p->lock_head));
     tmp_dest_p->lock_req_status = tmp_src_p->lock_req_status;
-    qlist_replace(&(tmp_dest_p->queued_req_link), 
-		  &(tmp_src_p->queued_req_link));
-    qlist_replace(&(tmp_dest_p->all_req_link), 
-		  &(tmp_src_p->all_req_link));
+    qlist_swap(&(tmp_dest_p->queued_req_link), 
+	       &(tmp_src_p->queued_req_link));
+    qlist_swap(&(tmp_dest_p->all_req_link), 
+	       &(tmp_src_p->all_req_link));
     tmp_dest_p->req_id = tmp_src_p->req_id;
     tmp_dest_p->io_type = tmp_src_p->io_type;
 
@@ -131,7 +166,7 @@ int rbtree_lock_req_cpy_fn(rbtree_t *dest_p, rbtree_t *src_p)
     tmp_dest_p->wait_size = tmp_src_p->wait_size;
     tmp_dest_p->file_req = tmp_src_p->file_req;
     tmp_dest_p->file_req_offset = tmp_src_p->file_req_offset;
-    tmp_dest_p->lock_callback = tmp_src_p->lock_callback;
+    /* lock_callback is not necessary */
 
     /* Need to swap the file_req_state and file_req so that it can be
      * freed. */
@@ -320,7 +355,8 @@ void print_lock_file_table_all_info(void)
 	fprintf(stdout, "lock legend {start,end,max,color(red or black)}\n\n");
 	for (i = 0; i < lock_file_table->table_size; i++)
 	{
-	    struct qlist_head *tmp_req_p = NULL;
+	    linked_itree_t *tmp_linked_itree_p = NULL;
+	    struct qlist_head *tmp_req_p = NULL, *tmp_req_lock_p = NULL;
 	    lock_req_t *tmp_lock_req_p = NULL;
 	    fprintf(stdout, "index %d:\n", i);
 	    qhash_for_each(tmp_hash_head_p, &(lock_file_table->array[i]))
@@ -334,7 +370,18 @@ void print_lock_file_table_all_info(void)
 		{
 		    tmp_lock_req_p = qlist_entry(
 			tmp_req_p, lock_req_t, all_req_link);
-		    fprintf(stdout, "{req_id=%Ld} ", tmp_lock_req_p->req_id);
+		    fprintf(stdout, "{req_id=%Ld ", tmp_lock_req_p->req_id);
+		    qlist_for_each(tmp_req_lock_p, 
+				   &(tmp_lock_req_p->lock_head))
+		    {
+			tmp_linked_itree_p = qlist_entry(
+			    tmp_req_lock_p, linked_itree_t, list_link);
+
+			fprintf(stdout, "(%Ld,%Ld)",
+				tmp_linked_itree_p->itree_link.start,
+				tmp_linked_itree_p->itree_link.end);
+		    }
+		    fprintf(stdout, "}");
 		}	    
 		fprintf(stdout, "\n  granted_req: ");
 		rbtree_inorder_tree_print(lock_node_p->granted_req,
@@ -355,7 +402,7 @@ void print_lock_file_table_all_info(void)
 					    &ITREE_NIL,
 					    linked_itree_print_fn);
 		/* for now */
-#if 0
+#if 1
 		fprintf(stdout, "\n  read_itree: ");
 		itree_breadth_print_fn(lock_node_p->read_itree,
 				       &ITREE_NIL, 
@@ -792,8 +839,6 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
     lock_req_p->file_req = file_req;
     lock_req_p->file_req_offset = file_req_offset;
 
-
-
     /* Debugging code for setting lock information */
 	{
 	    struct qlist_head *pos = NULL;
@@ -813,7 +858,9 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 		      &(lock_req_p->granted_req_link));
 	lock_req_p->lock_req_status = ALL_LOCKS_GRANTED;
 	gossip_debug(GOSSIP_LOCK_DEBUG, "add_lock_req: all %Ld aggregate "
-		     "bytes granted\n",  lock_req_p->aggregate_size);
+		     "bytes granted to req_id=%Ld\n",  
+		     lock_req_p->aggregate_size,
+		     lock_req_p->req_id);
 	ret = 1;
     }
     else
@@ -832,9 +879,10 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 		       &(lock_node_p->queued_req));
 	lock_req_p->lock_req_status = INCOMPLETE;
 	gossip_debug(GOSSIP_LOCK_DEBUG, "add_lock_req: (blocking) %Ld of %Ld "
-		     "aggregate bytes granted\n",  
+		     "aggregate bytes granted to req_id=%Ld\n",  
 		     lock_req_p->actual_locked_bytes, 
-		     lock_req_p->aggregate_size);
+		     lock_req_p->aggregate_size,
+		     lock_req_p->req_id);
 	*lock_req_p_p = lock_req_p;
 	ret = 0;
     }
@@ -929,7 +977,6 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 	    printf("test");
 	}
 #endif
-
     
     /* Delete and/or change locks in the correct lock tree by
      * req_release_bytes. */
@@ -945,7 +992,6 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 			 linked_itree_p->itree_link.end,
 			 linked_itree_p->lock_id, req_id);
 
-	    qlist_del(&(linked_itree_p->list_link));
 	    del_itree_p = itree_delete(
 		((io_type == PVFS_IO_READ) ? 
 		 &(lock_node_p->read_itree) : &(lock_node_p->write_itree)),
@@ -953,13 +999,14 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 		linked_itree_cpy_fn);
 	    linked_itree_p = 
 		itree_entry(del_itree_p, linked_itree_t, itree_link);
+	    scratch = linked_itree_p->list_link.next;
+	    qlist_del(&(linked_itree_p->list_link));
 	    free(linked_itree_p);
 	}
     }
     else
     {
-	struct qlist_head *tmp_lock_p = NULL, 
-	    *last_lock_p = lock_head_p->prev;
+	struct qlist_head *last_lock_p = lock_head_p->prev;
 	while ((released_bytes < req_release_bytes) &&
 	       (last_lock_p != lock_head_p))
 	{
@@ -973,7 +1020,6 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 	    {
 		released_bytes += linked_itree_p->itree_link.end -
 		    linked_itree_p->itree_link.start + 1;
-		tmp_lock_p = last_lock_p->prev;
 		qlist_del(last_lock_p);
 		del_itree_p = itree_delete(
 		    ((io_type == PVFS_IO_READ) ? &(lock_node_p->read_itree) :
@@ -982,8 +1028,9 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 		    linked_itree_cpy_fn);
 		linked_itree_p = 
 		    itree_entry(del_itree_p, linked_itree_t, itree_link);
+		qlist_del(&(linked_itree_p->list_link));
 		free(linked_itree_p);
-		last_lock_p = tmp_lock_p;
+		last_lock_p = lock_head_p->prev;
 	    }
 	    else
 	    {
@@ -1023,6 +1070,7 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 	 * delete the lock_node if there are no more entries for
 	 * it. */
 	qlist_del(&(lock_req_p->all_req_link));
+	
 	free_lock_req(lock_req_p);
 	if (qlist_empty(&(lock_node_p->all_req)))
 	{
