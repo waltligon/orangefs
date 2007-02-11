@@ -518,7 +518,7 @@ static inline itree_qnode * itree_qnode_pop(itree_qnode **q_head_p_p)
 static inline void itree_breadth_print(itree_t *head_p,
 				       itree_t *NIL)
 {
-    int old_level = -1;
+    int old_level = -1, count = 0;
     itree_qnode *q_head_p = NULL;
     itree_qnode *q_pop_p = NULL;
     fprintf(stdout, "\nitree_breadth_print:");
@@ -547,8 +547,9 @@ static inline void itree_breadth_print(itree_t *head_p,
 		q_pop_p->itree_p->max, 
 		(q_pop_p->itree_p->color == ITREE_RED ? "r": "b"));
 	free(q_pop_p);
+	count++;
     }
-    fprintf(stdout, "\n\n");
+    fprintf(stdout, "\n%d total nodes\n\n", count);
 }
 
 /* itree_breadth_print_fn - Debugging function to print out
@@ -558,7 +559,7 @@ static inline void itree_breadth_print_fn(itree_t *head_p,
 					  itree_t *NIL,
 					  void (*print_fn) (itree_t *))
 {
-    int old_level = -1;
+    int old_level = -1, count = 0;
     itree_qnode *q_head_p = NULL;
     itree_qnode *q_pop_p = NULL;
     fprintf(stdout, "\nitree_breadth_print:");
@@ -584,8 +585,9 @@ static inline void itree_breadth_print_fn(itree_t *head_p,
 	
 	print_fn(q_pop_p->itree_p);
 	free(q_pop_p);
+	count++;
     }
-    fprintf(stdout, "\n\n");
+    fprintf(stdout, "\n%d total nodes\n\n", count);
 }
 
 /* itree_inorder_tree_print - Debugging function to print out all nodes of
