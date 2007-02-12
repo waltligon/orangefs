@@ -694,8 +694,7 @@ tags:
 	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
 	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig ;\
 	  find $(srcdir) -name \*.sm | sed s/sm\$$/c/ ;\
-	) | sort | uniq -u | ctags --excmd=pattern -B --langmap=c:+.sm --extra=+
-f -I __hidden,DOTCONF_CB -L-
+	) | sort | uniq -u | ctags --excmd=pattern -B --langmap=c:+.sm --extra=+f -I __hidden,DOTCONF_CB -L-
 
 # rule for running code check
 codecheck:
