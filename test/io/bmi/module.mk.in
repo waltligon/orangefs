@@ -4,7 +4,9 @@ TESTSRC += \
 	$(DIR)/test-bmi-client.c \
 	$(DIR)/test-bmi-client-list.c \
 	$(DIR)/test-bmi-server.c \
-	$(DIR)/test-bmi-server-list.c
+	$(DIR)/test-bmi-server-list.c \
+	$(DIR)/pingpong.c \
+	$(DIR)/pingpong_unex.c
 
 ifdef BUILD_GM
 TESTSRC += \

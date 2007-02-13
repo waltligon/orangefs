@@ -64,6 +64,7 @@ INSTALL = @INSTALL@
 BISON = bison
 FLEX = flex
 BUILD_GM = @BUILD_GM@
+BUILD_MX = @BUILD_MX@
 BUILD_IB = @BUILD_IB@
 BUILD_OPENIB = @BUILD_OPENIB@
 BUILD_VIS = @BUILD_VIS@
@@ -292,6 +293,22 @@ ifdef BUILD_GM
 	LIBS += -lgm
 	LIBS_THREADED += -lgm
 	SERVERLIBS += -lgm
+endif
+
+################################################################
+# enable MX if configure detected it
+
+ifdef BUILD_MX
+	CFLAGS += -I @MX_HOME@/include
+	CFLAGS += -D__STATIC_METHOD_BMI_MX__
+	# TODO: later on we will want the ability to modify this at configure
+	# time
+	CFLAGS += -g -O0
+	LDFLAGS += -L @MX_HOME@/lib
+	SERVER_LDFLAGS += -L @MX_HOME@/lib
+	LIBS += -lmyriexpress -lpthread
+	LIBS_THREADED += -lmyriexpress -lpthread
+	SERVERLIBS += -lmyriexpress -lpthread
 endif
 
 #####################################

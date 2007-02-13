@@ -694,6 +694,8 @@ TARGET_OS_DARWIN
 TARGET_OS_LINUX
 GM_HOME
 BUILD_GM
+MX_HOME
+BUILD_MX
 BUILD_IB
 IB_INCDIR
 IB_LIBDIR
@@ -1328,6 +1330,7 @@ Optional Packages:
   --with-valgrind=<path>  Use valgrind annotations for debugging.
   --with-db=<dir>         Location of installed DB package (default=/usr)
   --with-gm=<dir>         Location of the GM installation (default no GM)
+  --with-mx=<dir>         Location of the MX installation (default no MX)
   --with-ib=<dir>         Location of the IB installation (default no IB)
   --with-ib-includes=<dir>      Location of the IB includes
   --with-ib-libs=<dir>          Location of the IB libraries
@@ -15913,6 +15916,186 @@ fi
 
 
 
+MX_HOME=
+
+# Check whether --with-mx was given.
+if test "${with_mx+set}" = set; then
+  withval=$with_mx; if test -z "$withval" -o "$withval" = yes ; then
+	{ { echo "$as_me:$LINENO: error: Option --with-mx requires the path to your MX tree." >&5
+echo "$as_me: error: Option --with-mx requires the path to your MX tree." >&2;}
+   { (exit 1); exit 1; }; }
+    elif test "$withval" != no ; then
+	MX_HOME="$withval"
+    fi
+
+fi
+
+if test -n "$MX_HOME" ; then
+    CPPFLAGS="$CPPFLAGS -I ${MX_HOME}/include"
+    if test "${ac_cv_header_myriexpress_h+set}" = set; then
+  { echo "$as_me:$LINENO: checking for myriexpress.h" >&5
+echo $ECHO_N "checking for myriexpress.h... $ECHO_C" >&6; }
+if test "${ac_cv_header_myriexpress_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+{ echo "$as_me:$LINENO: result: $ac_cv_header_myriexpress_h" >&5
+echo "${ECHO_T}$ac_cv_header_myriexpress_h" >&6; }
+else
+  # Is the header compilable?
+{ echo "$as_me:$LINENO: checking myriexpress.h usability" >&5
+echo $ECHO_N "checking myriexpress.h usability... $ECHO_C" >&6; }
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+#include <myriexpress.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag" || test ! -s conftest.err'
+  { (case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_try") 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_try") 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_header_compiler=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_header_compiler=no
+fi
+
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+{ echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
+echo "${ECHO_T}$ac_header_compiler" >&6; }
+
+# Is the header present?
+{ echo "$as_me:$LINENO: checking myriexpress.h presence" >&5
+echo $ECHO_N "checking myriexpress.h presence... $ECHO_C" >&6; }
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <myriexpress.h>
+_ACEOF
+if { (ac_try="$ac_cpp conftest.$ac_ext"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } >/dev/null; then
+  if test -s conftest.err; then
+    ac_cpp_err=$ac_c_preproc_warn_flag
+    ac_cpp_err=$ac_cpp_err$ac_c_werror_flag
+  else
+    ac_cpp_err=
+  fi
+else
+  ac_cpp_err=yes
+fi
+if test -z "$ac_cpp_err"; then
+  ac_header_preproc=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+  ac_header_preproc=no
+fi
+
+rm -f conftest.err conftest.$ac_ext
+{ echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
+echo "${ECHO_T}$ac_header_preproc" >&6; }
+
+# So?  What about this header?
+case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
+  yes:no: )
+    { echo "$as_me:$LINENO: WARNING: myriexpress.h: accepted by the compiler, rejected by the preprocessor!" >&5
+echo "$as_me: WARNING: myriexpress.h: accepted by the compiler, rejected by the preprocessor!" >&2;}
+    { echo "$as_me:$LINENO: WARNING: myriexpress.h: proceeding with the compiler's result" >&5
+echo "$as_me: WARNING: myriexpress.h: proceeding with the compiler's result" >&2;}
+    ac_header_preproc=yes
+    ;;
+  no:yes:* )
+    { echo "$as_me:$LINENO: WARNING: myriexpress.h: present but cannot be compiled" >&5
+echo "$as_me: WARNING: myriexpress.h: present but cannot be compiled" >&2;}
+    { echo "$as_me:$LINENO: WARNING: myriexpress.h:     check for missing prerequisite headers?" >&5
+echo "$as_me: WARNING: myriexpress.h:     check for missing prerequisite headers?" >&2;}
+    { echo "$as_me:$LINENO: WARNING: myriexpress.h: see the Autoconf documentation" >&5
+echo "$as_me: WARNING: myriexpress.h: see the Autoconf documentation" >&2;}
+    { echo "$as_me:$LINENO: WARNING: myriexpress.h:     section \"Present But Cannot Be Compiled\"" >&5
+echo "$as_me: WARNING: myriexpress.h:     section \"Present But Cannot Be Compiled\"" >&2;}
+    { echo "$as_me:$LINENO: WARNING: myriexpress.h: proceeding with the preprocessor's result" >&5
+echo "$as_me: WARNING: myriexpress.h: proceeding with the preprocessor's result" >&2;}
+    { echo "$as_me:$LINENO: WARNING: myriexpress.h: in the future, the compiler will take precedence" >&5
+echo "$as_me: WARNING: myriexpress.h: in the future, the compiler will take precedence" >&2;}
+
+    ;;
+esac
+{ echo "$as_me:$LINENO: checking for myriexpress.h" >&5
+echo $ECHO_N "checking for myriexpress.h... $ECHO_C" >&6; }
+if test "${ac_cv_header_myriexpress_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_header_myriexpress_h=$ac_header_preproc
+fi
+{ echo "$as_me:$LINENO: result: $ac_cv_header_myriexpress_h" >&5
+echo "${ECHO_T}$ac_cv_header_myriexpress_h" >&6; }
+
+fi
+if test $ac_cv_header_myriexpress_h = yes; then
+  :
+else
+  { { echo "$as_me:$LINENO: error: Header myriexpress.h not found." >&5
+echo "$as_me: error: Header myriexpress.h not found." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+
+    BUILD_MX=1
+    CPPFLAGS="$CPPFLAGS_OLD"
+fi
+
+
+
 ib_home=
 
 # Check whether --with-ib was given.
@@ -18581,7 +18764,7 @@ for d in src/apps src/io src/common src/client src/kernel \
        install -d $d;
 done
 
-ac_config_files="$ac_config_files Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/kernel/linux/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_ib/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
+ac_config_files="$ac_config_files Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/kernel/linux/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -19146,6 +19329,7 @@ do
     "src/io/bmi/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/module.mk" ;;
     "src/io/bmi/bmi_tcp/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_tcp/module.mk" ;;
     "src/io/bmi/bmi_gm/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_gm/module.mk" ;;
+    "src/io/bmi/bmi_mx/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_mx/module.mk" ;;
     "src/io/bmi/bmi_ib/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_ib/module.mk" ;;
     "src/io/description/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/description/module.mk" ;;
     "src/io/flow/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/flow/module.mk" ;;
@@ -19325,7 +19509,7 @@ TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
 TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
 GM_HOME!$GM_HOME$ac_delim
 BUILD_GM!$BUILD_GM$ac_delim
-BUILD_IB!$BUILD_IB$ac_delim
+MX_HOME!$MX_HOME$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -19367,6 +19551,8 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+BUILD_MX!$BUILD_MX$ac_delim
+BUILD_IB!$BUILD_IB$ac_delim
 IB_INCDIR!$IB_INCDIR$ac_delim
 IB_LIBDIR!$IB_LIBDIR$ac_delim
 BUILD_OPENIB!$BUILD_OPENIB$ac_delim
@@ -19380,7 +19566,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 11; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 13; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5

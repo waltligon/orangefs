@@ -731,6 +731,25 @@ fi
 AC_SUBST(GM_HOME)
 AC_SUBST(BUILD_GM)
 
+dnl configure options for MX install path
+MX_HOME=
+AC_ARG_WITH(mx,
+[  --with-mx=<dir>         Location of the MX installation (default no MX)],
+    if test -z "$withval" -o "$withval" = yes ; then
+	AC_MSG_ERROR([Option --with-mx requires the path to your MX tree.])
+    elif test "$withval" != no ; then
+	MX_HOME="$withval"
+    fi
+)
+if test -n "$MX_HOME" ; then
+    CPPFLAGS="$CPPFLAGS -I ${MX_HOME}/include"
+    AC_CHECK_HEADER(myriexpress.h,, AC_MSG_ERROR([Header myriexpress.h not found.]))
+    BUILD_MX=1
+    CPPFLAGS="$CPPFLAGS_OLD"
+fi
+AC_SUBST(MX_HOME)
+AC_SUBST(BUILD_MX)
+
 dnl Configure options for IB install path.
 dnl --with-ib=<dir> is shorthand for
 dnl    --with-ib-includes=<dir>/include
@@ -1063,6 +1082,7 @@ src/common/statecomp/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
+src/io/bmi/bmi_mx/module.mk
 src/io/bmi/bmi_ib/module.mk
 src/io/description/module.mk
 src/io/flow/module.mk
