@@ -3,6 +3,8 @@
  *
  *   Copyright (C) 2006 Myricom, Inc.
  *   Author: Myricom, Inc. <help at myri.com>
+ *
+ *   See COPYING in top-level directory.
  */
 
 #ifndef __mx_h
