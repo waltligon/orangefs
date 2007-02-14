@@ -703,15 +703,20 @@ cscope:
 		 > $(srcdir)/cscope.files
 	( cd @SRC_ABSOLUTE_TOP@; cscope -be -i @SRC_ABSOLUTE_TOP@/cscope.files )
 
-# build editor tags file over all source files *.[ch] *.sm and
-# some known scripts
+# Build editor tags file over all source files *.[ch] *.sm and
+# some known scripts.  Grab the config files from the build dir.
+# If the build happens to be the source, ignore all sm->c generated
+# files with the help of uniq.
 tags:
-	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include . \
+	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include \
 	    $(srcdir)/src/kernel/linux-2.6 \
 	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
+	  find . -name pvfs2-config.h ;\
+	  find . -name pvfs2-test-config.h ;\
 	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig ;\
-	  find $(srcdir) -name \*.sm | sed s/sm\$$/c/ ;\
-	) | sort | uniq -u | ctags --excmd=pattern -B --langmap=c:+.sm --extra=+f -I __hidden,DOTCONF_CB -L-
+	  find . -name \*.sm | sed s/sm\$$/c/ ;\
+	) | sort | uniq -u | ctags -L- --excmd=pattern -B --extra=+f \
+	  --langmap=c:+.sm -I __hidden,DOTCONF_CB
 
 # rule for running code check
 codecheck:
