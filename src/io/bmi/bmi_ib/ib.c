@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.52 2007-01-21 20:56:26 pw Exp $
+ * $Id: ib.c,v 1.53 2007-02-14 21:54:28 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1344,8 +1344,10 @@ restart:
 	 */
 	debug(8, "%s: last activity too long ago, blocking", __func__);
 	activity = ib_block_for_activity(max_idle_time);
-	if (activity == 1)   /* IB action, go do it immediately */
+	if (activity == 1) {   /* IB action, go do it immediately */
+	    gen_mutex_lock(&interface_mutex);
 	    goto restart;
+	}
     }
 
     *outcount = n;
@@ -1361,15 +1363,16 @@ restart:
  */
 static int
 BMI_ib_testunexpected(int incount __unused, int *outcount,
-  struct method_unexpected_info *ui, int max_idle_time __unused)
+  struct method_unexpected_info *ui, int max_idle_time)
 {
     struct qlist_head *l;
-    int activity, n;
+    int activity = 0, n;
 
     gen_mutex_lock(&interface_mutex);
 
     /* Check CQ, then look for the first unexpected message.  */
-    activity = ib_check_cq();
+restart:
+    activity += ib_check_cq();
 
     n = 0;
     qlist_for_each(l, &ib_device->recvq) {
@@ -1404,6 +1407,18 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 
   out:
     gen_mutex_unlock(&interface_mutex);
+
+    if (activity == 0 && n == 0 && max_idle_time > 0) {
+	/*
+	 * Block if told to from above, also polls TCP listening socket.
+	 */
+	debug(8, "%s: last activity too long ago, blocking", __func__);
+	activity = ib_block_for_activity(max_idle_time);
+	if (activity == 1) {   /* IB action, go do it immediately */
+	    gen_mutex_lock(&interface_mutex);
+	    goto restart;
+	}
+    }
 
     *outcount = n;
     return activity + n;
