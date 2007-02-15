@@ -5,8 +5,10 @@ TESTSRC += \
 	$(DIR)/test-bmi-client-list.c \
 	$(DIR)/test-bmi-server.c \
 	$(DIR)/test-bmi-server-list.c \
-	$(DIR)/pingpong.c \
-	$(DIR)/pingpong_unex.c
+	$(DIR)/pingpong.c
+
+# need math lib for sqrt
+MODLDFLAGS_$(DIR)/pingpong.o := -lm
 
 ifdef BUILD_GM
 TESTSRC += \

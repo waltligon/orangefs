@@ -20,6 +20,7 @@
 #include <netinet/in.h>
 #include <sys/time.h>
 #include <time.h>
+#include <math.h>
 
 #include "bmi.h"
 #include "gossip.h"
@@ -32,18 +33,19 @@
 
 #define SERVER          1
 #define CLIENT          2
-#define BYTES           (1<<10)
-#define ITERATIONS      1000
+#define MIN_BYTES       1
+#define MAX_BYTES       (4<<20)
 
 #define RECV            0
 #define SEND            1
 
-#define KEY             0xdeadbeef
+#define EXPECTED        0
+#define UNEXPECTED      1
+
+#define ITERATIONS      10000
 
 struct msg {
-        int swap;
-        int bytes;
-        int iterations;
+        int test;
 };
 
 /* A little structure to hold program options, either defaults or
@@ -54,8 +56,7 @@ struct options
         char *hostid;           /* host identifier */
         char *method;
         int  which;
-        int  bytes;
-        int  iterations;
+        int  test;
 };
 
 
@@ -64,15 +65,16 @@ struct options
  */
 
 static struct options *parse_args(int argc, char *argv[]);
+static int do_server(struct options *opts, bmi_context_id *context);
+static int do_client(struct options *opts, bmi_context_id *context);
 
 static void print_usage(void)
 {
-        fprintf(stderr, "usage: pingpong -h HOST_URI -s|-c [-b BYTES] [-i ITERATIONS]\n");
+        fprintf(stderr, "usage: pingpong -h HOST_URI -s|-c [-u]\n");
         fprintf(stderr, "       where:\n");
         fprintf(stderr, "       HOST_URI is tcp://host:port, mx://host:board:endpoint, etc\n");
         fprintf(stderr, "       -s is server and -c is client\n");
-        fprintf(stderr, "       BYTES per message [default 1024]\n");
-        fprintf(stderr, "       ITERATIONS to send/receive [default 1000]\n");
+        fprintf(stderr, "       -u will use unexpected messages (pass to client only)\n");
         return;
 }
 
@@ -82,21 +84,7 @@ int main(int argc, char **argv)
 {
         struct options                  *opts = NULL;
         int                             ret = -1;
-        PVFS_BMI_addr_t                 peer_addr;
-        void                            *recv_buffer = NULL;
-        void                            *send_buffer = NULL;
-        bmi_op_id_t                     op_id[2];
-        bmi_error_code_t                error_code;
-        int                             outcount = 0;
-        struct BMI_unexpected_info      request_info;
-        bmi_size_t                      actual_size;
         bmi_context_id                  context;
-        struct msg                      *tx_msg  = NULL;
-        struct msg                      *rx_msg  = NULL;
-        int                             count   = 0;
-        struct timeval                  start;
-        struct timeval                  end;
-        double                          duration = 0.0;
 
         /* grab any command line options */
         opts = parse_args(argc, argv);
@@ -129,294 +117,10 @@ int main(int argc, char **argv)
         }
 
         if (opts->which == SERVER) {
-                int     iterations      = 0;
-                int     msg_len         = 0;
-                int     alloc_len       = 0;
-
-                /* wait for an initial request to get size */
-                do {
-                        ret = BMI_testunexpected(1, &outcount, &request_info, 10);
-                } while (ret == 0 && outcount == 0);
-
-                if (ret < 0) {
-                        fprintf(stderr, "Request recv failure (bad state).\n");
-                        errno = -ret;
-                        perror("BMI_testunexpected");
-                        goto server_exit;
-                }
-                if (request_info.error_code != 0) {
-                        fprintf(stderr, "Request recv failure (bad state).\n");
-                        goto server_exit;
-                }
-                
-                if (request_info.size != sizeof(struct msg)) {
-                        fprintf(stderr, "Bad Request! Received %d bytes\n", 
-                                        (int) request_info.size);
-                        goto server_exit;
-                }
-
-                rx_msg = (struct msg *) request_info.buffer;
-                opts->bytes = ntohl(rx_msg->bytes);
-                iterations = ntohl(rx_msg->iterations);
-
-                printf("Receiving %d messages of %d bytes\n", iterations, opts->bytes);
-
-                peer_addr = request_info.addr;
-        
-                msg_len = sizeof(struct msg);
-                alloc_len = opts->bytes;
-                if (alloc_len < msg_len) alloc_len = msg_len;
-            
-                /* create an ack */
-                send_buffer = BMI_memalloc(peer_addr, alloc_len, BMI_SEND);
-                if (!send_buffer) {
-                        fprintf(stderr, "BMI_memalloc failed.\n");
-                        return (-1);
-                }
-                memset(send_buffer, 0, opts->bytes);
-
-                tx_msg = (struct msg *) send_buffer;
-                tx_msg->swap = htonl(KEY);
-                tx_msg->bytes = htonl(opts->bytes);
-                tx_msg->iterations = htonl(opts->iterations);
-            
-                /* create a buffer to recv into */
-                recv_buffer = BMI_memalloc(peer_addr, alloc_len, BMI_RECV);
-                if (!recv_buffer) {
-                        fprintf(stderr, "BMI_memalloc failed.\n");
-                        return (-1);
-                }
-
-                /* post the ack */
-                ret = BMI_post_send(&(op_id[SEND]), peer_addr, tx_msg,
-                                msg_len, BMI_PRE_ALLOC, 0, NULL,
-                                context);
-                if (ret < 0) {
-                        fprintf(stderr, "BMI_post_send failure.\n");
-                        return (-1);
-                } else if (ret == 0) {
-                        do {
-                                ret = BMI_test(op_id[SEND], &outcount, &error_code,
-                                           &actual_size, NULL, 10, context);
-                        } while (ret == 0 && outcount == 0);
-                
-                        if (ret < 0 || error_code != 0) {
-                                fprintf(stderr, "ack send failed.\n");
-                                return (-1);
-                        }
-        
-                        if (actual_size != (bmi_size_t) msg_len) {
-                                fprintf(stderr, "Expected %d but received %llu\n",
-                                                msg_len, llu(actual_size));
-                        }
-                }
-
-                /* start iterations */
-                while (count < iterations) {
-                        count++;
-                        /* receive the ping */
-                        ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
-                                        opts->bytes, &actual_size, BMI_PRE_ALLOC, count, NULL,
-                                        context);
-    
-                        if (ret < 0) {
-                                fprintf(stderr, "BMI_post_recv_failure.\n");
-                                return (-1);
-                        } else if (ret == 0) {
-                                do {
-                                        ret = BMI_test(op_id[RECV], &outcount, &error_code,
-                                                &actual_size, NULL, 10, context);
-                                } while (ret == 0 && outcount == 0);
-        
-                                if (ret < 0 || error_code != 0) {
-                                        fprintf(stderr, "data recv failed.\n");
-                                        return (-1);
-                                }
-                                if (actual_size != opts->bytes) {
-                                        fprintf(stderr, "Expected %d but received %llu\n",
-                                                        opts->bytes, llu(actual_size));
-                                        return (-1);
-                                }
-                        }
-                        /* send the pong */
-                        ret = BMI_post_send(&(op_id[SEND]), peer_addr, send_buffer,
-                                        opts->bytes, BMI_PRE_ALLOC, count, NULL, context);
-                        if (ret < 0) {
-                                fprintf(stderr, "BMI_post_send failure.\n");
-                                return (-1);
-                        } else if (ret == 0) {
-                                do {
-                                        ret = BMI_test(op_id[SEND], &outcount, &error_code,
-                                                &actual_size, NULL, 10, context);
-                                } while (ret == 0 && outcount == 0);
-        
-                                if (ret < 0 || error_code != 0) {
-                                        fprintf(stderr, "ack send failed.\n");
-                                        return (-1);
-                                }
-                                if (actual_size != opts->bytes) {
-                                        fprintf(stderr, "Expected %d but received %llu\n",
-                                                        opts->bytes, llu(actual_size));
-                                        return (-1);
-                                }
-                        }
-                }
-        } else { /* CLIENT */
-                int     msg_len         = 0;
-                int     alloc_len       = 0;
-
-                /* get a bmi_addr for the server */
-                ret = BMI_addr_lookup(&peer_addr, opts->hostid);
-                if (ret < 0) {
-                        errno = -ret;
-                        perror("BMI_addr_lookup");
-                        return (-1);
-                }
-
-                msg_len = sizeof(struct msg);
-                alloc_len = opts->bytes;
-                if (alloc_len < msg_len) alloc_len = msg_len;
-
-                /* create send buffer */
-                send_buffer = BMI_memalloc(peer_addr, alloc_len, BMI_SEND);
-                if (!send_buffer) {
-                        fprintf(stderr, "BMI_memalloc failed.\n");
-                        return (-1);
-                }
-                memset(send_buffer, 0, opts->bytes);
-
-                tx_msg = (struct msg *) send_buffer;
-                tx_msg->swap = htonl(KEY);
-                tx_msg->bytes = htonl(opts->bytes);
-                tx_msg->iterations = htonl(opts->iterations);
-            
-                /* create a buffer to recv into */
-                recv_buffer = BMI_memalloc(peer_addr, alloc_len, BMI_RECV);
-                if (!recv_buffer) {
-                        fprintf(stderr, "BMI_memalloc failed.\n");
-                        return (-1);
-                }
-
-                /* post the test parameters */
-                ret = BMI_post_sendunexpected(&(op_id[SEND]), peer_addr, tx_msg,
-                                msg_len, BMI_PRE_ALLOC, 0, NULL, context);
-                if (ret < 0) {
-                        fprintf(stderr, "BMI_post_send failure.\n");
-                        return (-1);
-                } else if (ret == 0) {
-                        do {
-                                ret = BMI_test(op_id[SEND], &outcount, &error_code,
-                                        &actual_size, NULL, 10, context);
-                        } while (ret == 0 && outcount == 0);
-                        if (ret < 0 || error_code != 0) {
-                                fprintf(stderr, "data send failed.\n");
-                                return (-1);
-                        }
-                        if (actual_size != msg_len) {
-                                fprintf(stderr, "Expected %d but received %llu\n",
-                                                msg_len, llu(actual_size));
-                                return (-1);
-                        }
-                }
-        
-                /* post a recv for the ack */
-                ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
-                                msg_len, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
-                if (ret < 0) {
-                        fprintf(stderr, "BMI_post_recv_failure.\n");
-                        return (-1);
-                } else if (ret == 0) {
-                        do {
-                                ret = BMI_test(op_id[RECV], &outcount, &error_code,
-                                        &actual_size, NULL, 10, context);
-                        } while (ret == 0 && outcount == 0);
-        
-                        if (ret < 0 || error_code != 0) {
-                                fprintf(stderr, "data recv failed.\n");
-                                return (-1);
-                        }
-                        if (actual_size != msg_len) {
-                                fprintf(stderr, "Expected %d but received %llu\n",
-                                                msg_len, llu(actual_size));
-                                return (-1);
-                        }
-                }
-
-                /* make sure server has posted first recv */
-                sleep(1);
-
-                gettimeofday(&start, NULL);
-
-                /* start iterations */
-                while (count < opts->iterations) {
-                        count++;
-                        /* post the recv for the pong */
-                        ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
-                                        opts->bytes, &actual_size, BMI_PRE_ALLOC, count,
-                                        NULL, context);
-    
-                        if (ret < 0) {
-                                fprintf(stderr, "BMI_post_recv_failure.\n");
-                                return (-1);
-                        }
-
-                        /* send the ping */
-                        ret = BMI_post_send(&(op_id[SEND]), peer_addr, send_buffer,
-                                        opts->bytes, BMI_PRE_ALLOC, count, NULL, context);
-                        if (ret < 0) {
-                                fprintf(stderr, "BMI_post_send failure.\n");
-                                return (-1);
-                        } else if (ret == 0) {
-                                do {
-                                        ret = BMI_test(op_id[SEND], &outcount, &error_code,
-                                                        &actual_size, NULL, 10, context);
-                                } while (ret == 0 && outcount == 0);
-                        
-                                if (ret < 0 || error_code != 0) {
-                                        fprintf(stderr, "send ping failed.\n");
-                                        return (-1);
-                                }
-                                if (actual_size != opts->bytes) {
-                                        fprintf(stderr, "Expected %d but received %llu\n",
-                                                        opts->bytes, llu(actual_size));
-                                        return (-1);
-                                }
-                        }
-                        /* complete the receive for the pong */
-                        do {
-                                ret = BMI_test(op_id[RECV], &outcount, &error_code,
-                                                &actual_size, NULL, 10, context);
-                        } while (ret == 0 && outcount == 0);
-        
-                        if (ret < 0 || error_code != 0) {
-                                fprintf(stderr, "data recv failed.\n");
-                                return (-1);
-                        }
-                        if (actual_size != opts->bytes) {
-                                fprintf(stderr, "Expected %d but received %llu\n",
-                                                opts->bytes, llu(actual_size));
-                                return (-1);
-                        }
-                }
-                gettimeofday(&end, NULL);
-
-                duration = (double) end.tv_sec + ((double) end.tv_usec * 0.000001);
-                duration -= (double) start.tv_sec + ((double) start.tv_usec * 0.0000001);
-
-                fprintf(stdout, "Completed %d iterations of %d byte messages in "
-                                "%.2f secs\n", count, opts->bytes, duration);
-                fprintf(stdout, "one-way latency %.2f usecs  bi-dir throughput %.2f MB/s  "
-                                "%.2f messages/sec\n", 
-                                duration / (double) opts->iterations * 1000000.0 / 2.0,
-                                (double) opts->bytes * (double) opts->iterations / 
-                                duration / 1000000 * 2, (double) opts->iterations / duration);
+                ret = do_server(opts, &context);
+        } else {
+                ret = do_client(opts, &context);
         }
-
-        /* free up the message buffers */
-        BMI_memfree(peer_addr, recv_buffer, opts->bytes, BMI_RECV);
-        BMI_memfree(peer_addr, send_buffer, opts->bytes, BMI_SEND);
-    
-server_exit:
 
         /* shutdown the local interface */
         BMI_close_context(context);
@@ -433,6 +137,473 @@ server_exit:
         return (0);
 }
 
+static int bytes_to_iterations(int bytes)
+{
+        int     ret     = ITERATIONS;
+        if (bytes >= (128*1024)) ret = 5000;
+        if (bytes >= (256*1024)) ret = 2500;
+        if (bytes >= (1024*1024)) ret = 1000;
+        if (bytes >= (2*1024*1024)) ret = 500;
+        if (bytes >= (4*1024*1024)) ret = 250;
+        return ret;
+}
+
+static int do_server(struct options *opts, bmi_context_id *context)
+{
+        int                             ret = 0;
+        int                             i = 0;
+        PVFS_BMI_addr_t                 peer_addr;
+        PVFS_BMI_addr_t                 server_addr;
+        void                            *recv_buffer = NULL;
+        void                            *send_buffer = NULL;
+        bmi_op_id_t                     op_id[2];
+        bmi_error_code_t                error_code;
+        int                             outcount = 0;
+        struct BMI_unexpected_info      request_info;
+        bmi_size_t                      actual_size;
+        struct msg                      *tx_msg  = NULL;
+        struct msg                      *rx_msg  = NULL;
+        int                             bytes   = MIN_BYTES;
+        int                             max_bytes       = MAX_BYTES;
+        int                             warmup  = 1;
+        int                             iterations      = 0;
+        int                             msg_len         = 0;
+        int                             run     = 0;
+
+        /* wait for an initial request to get size */
+        do {
+                ret = BMI_testunexpected(1, &outcount, &request_info, 10);
+        } while (ret == 0 && outcount == 0);
+
+        if (ret < 0) {
+                fprintf(stderr, "Request recv failure (bad state).\n");
+                errno = -ret;
+                perror("BMI_testunexpected");
+                return ret;
+        }
+        if (request_info.error_code != 0) {
+                fprintf(stderr, "Request recv failure (bad state).\n");
+                return ret;
+        }
+        
+        if (request_info.size != sizeof(struct msg)) {
+                fprintf(stderr, "Bad Request! Received %d bytes\n", 
+                                (int) request_info.size);
+                return ret;
+        }
+
+        rx_msg = (struct msg *) request_info.buffer;
+        opts->test = ntohl(rx_msg->test);
+
+        printf("Starting %s test\n", opts->test == EXPECTED ? "expected" : "unexpected");
+
+        peer_addr = request_info.addr;
+
+        ret = BMI_get_info(server_addr, BMI_CHECK_MAXSIZE,
+                           (void *)&max_bytes);
+        if (ret < 0) {
+                fprintf(stderr, "BMI_get_info() returned %d\n", ret);
+                return ret;
+        }
+        if (max_bytes > MAX_BYTES) max_bytes = MAX_BYTES;
+
+        if (opts->test == UNEXPECTED) {
+                ret = BMI_addr_lookup(&server_addr, opts->hostid);
+                if (ret < 0) {
+                        errno = -ret;
+                        perror("BMI_addr_lookup");
+                        return (-1);
+                }
+                ret = BMI_get_info(server_addr, BMI_GET_UNEXP_SIZE,
+                                   (void *)&max_bytes);
+                if (ret < 0) {
+                        fprintf(stderr, "BMI_get_info() returned %d\n", ret);
+                        return ret;
+                }
+        } else {
+                int     maxsize = 0;
+                ret = BMI_get_info(server_addr, BMI_CHECK_MAXSIZE,
+                                (void *)&maxsize);
+                if (ret < 0) {
+                        fprintf(stderr, "BMI_get_info() returned %d\n", ret);
+                        return ret;
+                }
+                if (maxsize < max_bytes) max_bytes = maxsize;
+        }
+
+        msg_len = sizeof(struct msg);
+    
+        /* create an ack */
+        send_buffer = BMI_memalloc(peer_addr, max_bytes, BMI_SEND);
+        if (!send_buffer) {
+                fprintf(stderr, "BMI_memalloc failed.\n");
+                return (-1);
+        }
+        memset(send_buffer, 0, max_bytes);
+
+        tx_msg = (struct msg *) send_buffer;
+        tx_msg->test = htonl(opts->test);
+    
+        /* create a buffer to recv into */
+        recv_buffer = BMI_memalloc(peer_addr, max_bytes, BMI_RECV);
+        if (!recv_buffer) {
+                fprintf(stderr, "BMI_memalloc failed.\n");
+                return (-1);
+        }
+
+        /* post the ack */
+        ret = BMI_post_send(&(op_id[SEND]), peer_addr, tx_msg,
+                        msg_len, BMI_PRE_ALLOC, 0, NULL,
+                        *context);
+        if (ret < 0) {
+                fprintf(stderr, "BMI_post_send failure.\n");
+                return (-1);
+        } else if (ret == 0) {
+                do {
+                        ret = BMI_test(op_id[SEND], &outcount, &error_code,
+                                   &actual_size, NULL, 10, *context);
+                } while (ret == 0 && outcount == 0);
+        
+                if (ret < 0 || error_code != 0) {
+                        fprintf(stderr, "ack send failed.\n");
+                        return (-1);
+                }
+
+                if (actual_size != (bmi_size_t) msg_len) {
+                        fprintf(stderr, "Expected %d but received %llu\n",
+                                        msg_len, llu(actual_size));
+                }
+        }
+
+        /* start iterations */
+        while (bytes <= max_bytes) {
+                iterations = bytes_to_iterations(bytes);
+
+                for (i=0; i < iterations; i++) {
+                        /* receive the ping */
+                        if (opts->test == EXPECTED) {
+                                ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
+                                                bytes, &actual_size, BMI_PRE_ALLOC, i, NULL,
+                                                *context);
+                    
+                                if (ret < 0) {
+                                        fprintf(stderr, "BMI_post_recv_failure.\n");
+                                        return (-1);
+                                } else if (ret == 0) {
+                                        do {
+                                                ret = BMI_test(op_id[RECV], &outcount, &error_code,
+                                                        &actual_size, NULL, 10, *context);
+                                        } while (ret == 0 && outcount == 0);
+                
+                                        if (ret < 0 || error_code != 0) {
+                                                fprintf(stderr, "data recv failed.\n");
+                                                return (-1);
+                                        }
+                                        if (actual_size != bytes) {
+                                                fprintf(stderr, "Expected %d but received %llu\n",
+                                                                bytes, llu(actual_size));
+                                                return (-1);
+                                        }
+                                }
+                        } else { /* UNEXPECTED */
+                                do {
+                                        ret = BMI_testunexpected(1, &outcount, &request_info, 10);
+                                } while (ret == 0 && outcount == 0);
+                        
+                                if (ret < 0) {
+                                        fprintf(stderr, "Request recv failure (bad state).\n");
+                                        errno = -ret;
+                                        perror("BMI_testunexpected");
+                                        return ret;
+                                }
+                                if (request_info.error_code != 0) {
+                                        fprintf(stderr, "Request recv failure (bad state).\n");
+                                        return ret;
+                                }
+                                
+                                if (request_info.size != bytes) {
+                                        fprintf(stderr, "Bad Request! Received %d bytes\n", 
+                                                        (int) request_info.size);
+                                        return ret;
+                                }
+                        }
+                        /* send the pong */
+                        ret = BMI_post_send(&(op_id[SEND]), peer_addr, send_buffer,
+                                        bytes, BMI_PRE_ALLOC, i, NULL, *context);
+                        if (ret < 0) {
+                                fprintf(stderr, "BMI_post_send failure.\n");
+                                return (-1);
+                        } else if (ret == 0) {
+                                do {
+                                        ret = BMI_test(op_id[SEND], &outcount, &error_code,
+                                                &actual_size, NULL, 10, *context);
+                                } while (ret == 0 && outcount == 0);
+        
+                                if (ret < 0 || error_code != 0) {
+                                        fprintf(stderr, "ack send failed.\n");
+                                        return (-1);
+                                }
+                                if (actual_size != bytes) {
+                                        fprintf(stderr, "Expected %d but received %llu\n",
+                                                        bytes, llu(actual_size));
+                                        return (-1);
+                                }
+                        }
+                }
+                if (!warmup) {
+                        bytes *= 2;
+                        run++;
+                }
+                else warmup = 0;
+        }
+
+        /* free up the message buffers */
+        BMI_memfree(peer_addr, recv_buffer, max_bytes, BMI_RECV);
+        BMI_memfree(peer_addr, send_buffer, max_bytes, BMI_SEND);
+
+        return ret;
+}
+
+static int do_client(struct options *opts, bmi_context_id *context)
+{
+        int                     ret             = 0;
+        int                     i               = 0;
+        PVFS_BMI_addr_t         peer_addr;
+        void                    *recv_buffer    = NULL;
+        void                    *send_buffer    = NULL;
+        bmi_op_id_t             op_id[2];
+        bmi_error_code_t        error_code;
+        int                     outcount        = 0;
+        bmi_size_t              actual_size;
+        struct msg              *tx_msg         = NULL;
+        int                     bytes           = MIN_BYTES;
+        int                     max_bytes       = MAX_BYTES;
+        int                     warmup          = 1;
+        int                     iterations      = 0;
+        int                     msg_len         = 0;
+        int                     run             = 0;
+        struct timeval          start;
+        struct timeval          end;
+        double                  *val            = NULL;
+        double                  lat             = 0.0;
+        double                  min             = 99999.9;
+        double                  max             = 0.0;
+        double                  avg             = 0.0;
+
+        /* get a bmi_addr for the server */
+        ret = BMI_addr_lookup(&peer_addr, opts->hostid);
+        if (ret < 0) {
+                errno = -ret;
+                perror("BMI_addr_lookup");
+                return (-1);
+        }
+
+        if (opts->test == UNEXPECTED) {
+                ret = BMI_get_info(peer_addr, BMI_GET_UNEXP_SIZE,
+                                   (void *)&max_bytes);
+                if (ret < 0) {
+                        fprintf(stderr, "BMI_get_info() returned %d\n", ret);
+                        return ret;
+                }
+        } else {
+                int     maxsize = 0;
+                ret = BMI_get_info(peer_addr, BMI_CHECK_MAXSIZE,
+                                (void *)&maxsize);
+                if (ret < 0) {
+                        fprintf(stderr, "BMI_get_info() returned %d\n", ret);
+                        return ret;
+                }
+                if (maxsize < max_bytes) max_bytes = maxsize;
+        }
+
+        msg_len = sizeof(struct msg);
+
+        /* create send buffer */
+        send_buffer = BMI_memalloc(peer_addr, max_bytes, BMI_SEND);
+        if (!send_buffer) {
+                fprintf(stderr, "BMI_memalloc failed.\n");
+                return (-1);
+        }
+        memset(send_buffer, 0, max_bytes);
+
+        tx_msg = (struct msg *) send_buffer;
+        tx_msg->test = htonl(opts->test);
+    
+        /* create a buffer to recv into */
+        recv_buffer = BMI_memalloc(peer_addr, max_bytes, BMI_RECV);
+        if (!recv_buffer) {
+                fprintf(stderr, "BMI_memalloc failed.\n");
+                return (-1);
+        }
+
+        /* post the test parameters */
+        ret = BMI_post_sendunexpected(&(op_id[SEND]), peer_addr, tx_msg,
+                        msg_len, BMI_PRE_ALLOC, 0, NULL, *context);
+        if (ret < 0) {
+                fprintf(stderr, "BMI_post_sendunexpected failure.\n");
+                return (-1);
+        } else if (ret == 0) {
+                do {
+                        ret = BMI_test(op_id[SEND], &outcount, &error_code,
+                                &actual_size, NULL, 10, *context);
+                } while (ret == 0 && outcount == 0);
+                if (ret < 0 || error_code != 0) {
+                        fprintf(stderr, "data send failed.\n");
+                        return (-1);
+                }
+                if (actual_size != msg_len) {
+                        fprintf(stderr, "Expected %d but received %llu\n",
+                                        msg_len, llu(actual_size));
+                        return (-1);
+                }
+        }
+
+        /* post a recv for the ack */
+        ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
+                        msg_len, &actual_size, BMI_PRE_ALLOC, 0, NULL, *context);
+        if (ret < 0) {
+                fprintf(stderr, "BMI_post_recv_failure.\n");
+                return (-1);
+        } else if (ret == 0) {
+                do {
+                        ret = BMI_test(op_id[RECV], &outcount, &error_code,
+                                &actual_size, NULL, 10, *context);
+                } while (ret == 0 && outcount == 0);
+
+                if (ret < 0 || error_code != 0) {
+                        fprintf(stderr, "data recv failed.\n");
+                        return (-1);
+                }
+                if (actual_size != msg_len) {
+                        fprintf(stderr, "Expected %d but received %llu\n",
+                                        msg_len, llu(actual_size));
+                        return (-1);
+                }
+        }
+
+        val = calloc(ITERATIONS, sizeof(double));
+        if (val == NULL) {
+                fprintf(stderr, "calloc() for val failed\n");
+                return -1;
+        }
+
+        /* make sure server has posted first recv */
+        sleep(1);
+
+        fprintf(stdout, "     Bytes        usecs         MB/s       StdDev          Min          Max\n");
+
+        /* start iterations */
+        while (bytes <= max_bytes) {
+
+                iterations = bytes_to_iterations(bytes);
+
+                for (i=0; i < iterations; i++) {
+
+                        gettimeofday(&start, NULL);
+
+                        /* post the recv for the pong */
+                        ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
+                                        bytes, &actual_size, BMI_PRE_ALLOC, i,
+                                        NULL, *context);
+            
+                        if (ret < 0) {
+                                fprintf(stderr, "BMI_post_recv_failure.\n");
+                                return (-1);
+                        }
+        
+                        /* send the ping */
+                        if (opts->test == EXPECTED) {
+                                ret = BMI_post_send(&(op_id[SEND]), peer_addr, send_buffer,
+                                                bytes, BMI_PRE_ALLOC, i, NULL, *context);
+                        } else {
+                                ret = BMI_post_sendunexpected(&(op_id[SEND]), peer_addr, 
+                                                send_buffer, bytes, BMI_PRE_ALLOC, i, 
+                                                NULL, *context);
+                        }
+                        if (ret < 0) {
+                                fprintf(stderr, "BMI_post_sendunexpected failure.\n");
+                                return (-1);
+                        } else if (ret == 0) {
+                                do {
+                                        ret = BMI_test(op_id[SEND], &outcount, &error_code,
+                                                        &actual_size, NULL, 10, *context);
+                                } while (ret == 0 && outcount == 0);
+                        
+                                if (ret < 0 || error_code != 0) {
+                                        fprintf(stderr, "send ping failed.\n");
+                                        return (-1);
+                                }
+                                if (actual_size != bytes) {
+                                        fprintf(stderr, "Expected %d but received %llu\n",
+                                                        bytes, llu(actual_size));
+                                        return (-1);
+                                }
+                        }
+                        /* complete the receive for the pong */
+                        do {
+                                ret = BMI_test(op_id[RECV], &outcount, &error_code,
+                                                &actual_size, NULL, 10, *context);
+                        } while (ret == 0 && outcount == 0);
+        
+                        if (ret < 0 || error_code != 0) {
+                                fprintf(stderr, "data recv failed.\n");
+                                return (-1);
+                        }
+                        if (actual_size != bytes) {
+                                fprintf(stderr, "Expected %d but received %llu\n",
+                                                bytes, llu(actual_size));
+                                return (-1);
+                        }
+
+                        gettimeofday(&end, NULL);
+
+                        if (!warmup) {
+                                val[i] =  (double) end.tv_sec + 
+                                          (double) end.tv_usec * 0.000001;
+                                val[i] -= (double) start.tv_sec + 
+                                          (double) start.tv_usec * 0.000001;
+                                lat += val[i];
+                        }
+                }
+                if (!warmup) {
+                        double stdev    = 0.0;
+
+                        lat = lat / (double) iterations * 1000000.0 / 2.0;
+                        min = 999999.9;
+                        max = 0.0;
+                        avg = 0.0;
+
+                        /* convert seconds to MB/s */
+                        for (i=0; i < iterations; i++) {
+                                val[i] = (double) bytes * 2 / val[i] / 1000000.0;
+                                avg += val[i];
+                                if (val[i] < min) min = val[i];
+                                if (val[i] > max) max = val[i];
+                        }
+                        avg /= iterations;
+
+                        if (iterations > 1) {
+                                for (i=0; i < iterations; i++) {
+                                        double diff = val[i] - avg;
+                                        stdev += diff * diff;
+                                }
+                                stdev = sqrt(stdev / (iterations - 1));
+                        }
+
+                        fprintf(stdout, "%10d %12.3f %12.3f +- %9.3f %12.3f %12.3f\n", bytes, lat, avg, stdev, min, max);
+
+                        lat = 0.0;
+                        bytes *= 2;
+                        run++;
+                } else warmup = 0;
+        }
+
+        /* free up the message buffers */
+        BMI_memfree(peer_addr, recv_buffer, max_bytes, BMI_RECV);
+        BMI_memfree(peer_addr, send_buffer, max_bytes, BMI_SEND);
+
+        return ret;
+}
 
 static int check_uri(char *uri)
 {
@@ -463,7 +634,7 @@ static struct options *parse_args(int argc, char *argv[])
 
         /* getopt stuff */
         extern char *optarg;
-        char flags[] = "h:scb:i:";
+        char flags[] = "h:scu";
         int one_opt = 0;
 
         struct options *opts = NULL;
@@ -498,11 +669,8 @@ static struct options *parse_args(int argc, char *argv[])
                         }
                         opts->which = CLIENT;
                         break;
-                case ('b'):
-                        opts->bytes = (int) strtol(optarg, NULL, 0);
-                        break;
-                case ('i'):
-                        opts->iterations = (int) strtol(optarg, NULL, 0);
+                case ('u'):
+                        opts->test = UNEXPECTED;
                         break;
                 default:
                         break;
@@ -521,12 +689,6 @@ static struct options *parse_args(int argc, char *argv[])
         if (opts->which == 0) {
                 fprintf(stderr, "you must specify -s OR -c\n");
                 goto parse_args_error;
-        }
-        if (opts->bytes == 0) {
-                opts->bytes = BYTES;
-        }
-        if (opts->iterations == 0) {
-                opts->iterations = ITERATIONS;
         }
 
         return (opts);
