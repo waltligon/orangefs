@@ -199,6 +199,8 @@ static int do_server(struct options *opts, bmi_context_id *context)
 
         peer_addr = request_info.addr;
 
+        BMI_unexpected_free(peer_addr, request_info.buffer);
+
         ret = BMI_get_info(server_addr, BMI_CHECK_MAXSIZE,
                            (void *)&max_bytes);
         if (ret < 0) {
