@@ -13,31 +13,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "state-machine-values.h"
-#include "statecomp-symbol.h"
+#include "statecomp.h"
 
-extern FILE *out_file;
-extern int terminate_path_flag;
-static char *current_machine;
-
-static void gen_state_start(char *state_name);
+static void gen_state_decl(char *state_name);
+static void gen_state_start(char *state_name, char *machine_name);
 static void gen_state_action(enum state_action action, char *run_func);
 static void gen_return_code(char *return_code);
 static void gen_next_state(enum transition_type type, char *new_state);
 static void gen_state_end(void);
 
-static void gen_state_decl(char *state_name)
-{
-    fprintf(out_file, "static union PINT_state_array_values ST_%s[];\n",
-                      state_name);
-}
-
 void gen_machine(char *machine_name)
 {
     struct state *s, *snext;
     struct transition *t, *tnext;
-
-    current_machine = machine_name;
 
     if (states == NULL)
         fprintf(stderr, "%s: no states declared in machine %s\n", __func__,
@@ -55,7 +43,7 @@ void gen_machine(char *machine_name)
 
     /* generate all output */
     for (s=states; s; s=s->next) {
-        gen_state_start(s->name);
+        gen_state_start(s->name, machine_name);
         gen_state_action(s->action, s->function_or_machine);
         for (t=s->transition; t; t=t->next) {
             gen_return_code(t->return_code);
@@ -78,13 +66,19 @@ void gen_machine(char *machine_name)
     states = NULL;
 }
 
-static void gen_state_start(char *state_name)
+static void gen_state_decl(char *state_name)
+{
+    fprintf(out_file, "static union PINT_state_array_values ST_%s[];\n",
+            state_name);
+}
+
+static void gen_state_start(char *state_name, char *machine_name)
 {
     fprintf(out_file,
             "static union PINT_state_array_values ST_%s[] = {\n"
             "\t{ .state_name = \"%s\" },\n"
             "\t{ .parent_machine = &%s },\n", 
-            state_name, state_name, current_machine);
+            state_name, state_name, machine_name);
 }
 
 /** generates first two lines in the state machine (I think),

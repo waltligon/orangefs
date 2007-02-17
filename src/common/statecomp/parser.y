@@ -16,13 +16,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "statecomp-symbol.h"
-#include "state-machine-values.h"
-
-extern char *enter_string(char *);
-
-extern int yylex(void);
-extern void yyerror(char *);
+#include "statecomp.h"
 
 /* We never use this, disable default. */
 #define YY_LOCATION_PRINT 0
@@ -37,15 +31,13 @@ static struct transition *cur_transition;
 %}
 
 %union {
-   int i;
-   char *c;
+    int i;
+    char *c;
 };
 
 %token <i> MACHINE
 %token <i> NESTED
-%token <i> INIT
 %token <i> STATE
-%token <i> EXTERN
 %token <i> RUN
 %token <i> JUMP
 %token <i> STATE_RETURN
@@ -54,26 +46,21 @@ static struct transition *cur_transition;
 %token <c> DEFAULT
 %token <i> LBRACE
 %token <i> RBRACE
-%token <i> LPAREN
-%token <i> RPAREN
-%token <i> COMMA
 %token <i> SEMICOLON
 %token <i> ARROW
 %token <c> IDENTIFIER
-%token <c> INTEGER
 
 %type <c> identifier return_code
+
 %start state_machine_list
 
 %%
 
-state_machine_list : state_machine 
-		  | state_machine state_machine_list
-		  ;
+state_machine_list : state_machine
+		   | state_machine state_machine_list
+		   ;
 
-state_machine	  : .NESTED. MACHINE identifier
-		     LPAREN .state_decl_list. RPAREN LBRACE
-		    .state_def_list. RBRACE
+state_machine	  : .NESTED. MACHINE identifier LBRACE state_def_list RBRACE
 		    {
 			gen_machine($3);
 		    }
@@ -81,29 +68,6 @@ state_machine	  : .NESTED. MACHINE identifier
 
 .NESTED.	  : /* empty */
 		  | NESTED  /* ignored */
-		  ;
-
-.state_decl_list. : /* empty */
-		  | state_decl_list
-		  ;
-
-state_decl_list   : state_decl
-		  | state_decl COMMA state_decl_list
-		  ;
-
-state_decl	  : .EXTERN. identifier
-		    {
-			/* ignored, for backward compatibility */
-			free($2);
-		    }
-		  ;
-
-.EXTERN.	  : /* empty */
-		  | EXTERN   /* ignored */
-		  ;
-
-.state_def_list.  : /* empty */
-		  | state_def_list
 		  ;
 
 state_def_list	  : state_def
@@ -114,11 +78,7 @@ state_def	  : STATE identifier LBRACE
 		    {
 			cur_state = new_state($2);
 		    }
-		    .state_body. RBRACE
-		  ;
-
-.state_body.	  : /* empty */
-		  | state_body
+		    state_body RBRACE
 		  ;
 
 state_body	  : state_action transition_list
@@ -136,7 +96,7 @@ state_action	  : RUN identifier SEMICOLON
 		    }
 		  ;
 
-transition_list   : transition 
+transition_list   : transition
 		  | transition transition_list
 		  ;
 
@@ -162,12 +122,11 @@ target		  : identifier
 		    }
 		  ;
 
-return_code	  : SUCCESS {$$ = enter_string("0");}
-		  | INTEGER {$$ = enter_string($1);}
+return_code	  : SUCCESS {$$ = estrdup("0");}
+		  | DEFAULT {$$ = estrdup("-1");}
 		  | identifier {$$ = $1;}
-		  | DEFAULT {$$ = enter_string("-1");}
 		  ;
 
-identifier	  : IDENTIFIER {$$ = enter_string($1);}
+identifier	  : IDENTIFIER {$$ = estrdup($1);}
 		  ;
 

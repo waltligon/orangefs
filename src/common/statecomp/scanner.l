@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "statecomp-symbol.h"
+#include "statecomp.h"
 #include "parser.h"
 
 /*
@@ -33,30 +33,12 @@
 /* No main needed. */
 #define YY_MAIN 0
 
-extern int line;
-extern FILE *out_file;
-extern char *in_file_name;
-
-extern int yylex(void);
-extern void yyerror(char *);
-extern void produce_listing(int line, char *listing);
-
-#define	LIST		strcat(text,yytext);
-#define	RETURNVAL(x)	yylval.i = (int)(token = x); return((int)x);
-#define	MAKELIST	produce_listing(line,text);text[0]=0;
-char     text[132];
-int      token;
-int comment_caller;
+#define	RETURNVAL(x)	yylval.i = x; return x;
+static int comment_caller;
 
 %}
 
-string      ["][^"]*["]
-float1      [-+]?[0-9]+"."[0-9]*([eE][-+]?[0-9]+)?
-float2      [-+]?"."[0-9]+([eE][-+]?[0-9]+)?
-float3      [-+]?[0-9]+[eE][-+]?[0-9]+
-int         [-+][0-9]+
 id          [_a-zA-Z][_0-9a-zA-Z]*
-w           [ \t\n]*
 
 %x		CODE
 %x		COMMENT 
@@ -66,47 +48,48 @@ w           [ \t\n]*
 
 %%
 
-[^%\n]*		{fprintf(out_file,"%s", yytext);}
-"\n"		{fprintf(out_file,"%s", yytext); line++;}
-"\%"		{fprintf(out_file,"%s", yytext);}
+[^%\n]*		{fprintf(out_file, "%s", yytext);}
+"\n"		{fprintf(out_file, "%s", yytext); line++;}
+"\%"		{fprintf(out_file, "%s", yytext);}
 "\%\%"		{BEGIN(CODE);}
 
-<CODE>"\%\%"	{fprintf(out_file,"# %d \"%s\"\n", line, in_file_name); BEGIN(0);}
+<CODE>"\%\%"	{fprintf(out_file,"# %d \"%s\"\n", line, in_file_name);
+                 BEGIN(0);}
 
-<CODE>"machine"    {LIST; RETURNVAL(MACHINE);}
-<CODE>"nested" 	   {LIST; RETURNVAL(NESTED);}
-<CODE>"initialize" {LIST; RETURNVAL(INIT);}
-<CODE>"state"	   {LIST; RETURNVAL(STATE);}
-<CODE>"extern"	   {LIST; RETURNVAL(EXTERN);}
-<CODE>"return"	   {LIST; RETURNVAL(STATE_RETURN);}
-<CODE>"run"	   {LIST; RETURNVAL(RUN);}
-<CODE>"jump"	   {LIST; RETURNVAL(JUMP);}
-<CODE>"success"	   {LIST; RETURNVAL(SUCCESS);}
-<CODE>"default"	   {LIST; RETURNVAL(DEFAULT);}
-<CODE>"terminate"  {LIST; RETURNVAL(STATE_TERMINATE);}
-<CODE>"\{"	   {LIST; RETURNVAL(LBRACE);}
-<CODE>"\}"	   {LIST; RETURNVAL(RBRACE);}
-<CODE>"\("	   {LIST; RETURNVAL(LPAREN);}
-<CODE>"\)"	   {LIST; RETURNVAL(RPAREN);}
-<CODE>"\,"	   {LIST; RETURNVAL(COMMA);}
-<CODE>"\;"	   {LIST; RETURNVAL(SEMICOLON);}
-<CODE>"\=\>"	   {LIST; RETURNVAL(ARROW);}
+<CODE>"machine"    {RETURNVAL(MACHINE);}
+<CODE>"nested" 	   {RETURNVAL(NESTED);}
+<CODE>"state"	   {RETURNVAL(STATE);}
+<CODE>"run"	   {RETURNVAL(RUN);}
+<CODE>"jump"	   {RETURNVAL(JUMP);}
+<CODE>"return"	   {RETURNVAL(STATE_RETURN);}
+<CODE>"terminate"  {RETURNVAL(STATE_TERMINATE);}
+<CODE>"success"	   {RETURNVAL(SUCCESS);}
+<CODE>"default"	   {RETURNVAL(DEFAULT);}
+<CODE>"\{"	   {RETURNVAL(LBRACE);}
+<CODE>"\}"	   {RETURNVAL(RBRACE);}
+<CODE>"\;"	   {RETURNVAL(SEMICOLON);}
+<CODE>"\=\>"	   {RETURNVAL(ARROW);}
 
-<CODE>"/*"         {comment_caller = CODE; BEGIN(COMMENT);}
+<CODE>"/*"              {comment_caller = CODE; BEGIN(COMMENT);}
 <COMMENT>[^*\n]*        /* eat anything that's not a '*' */
 <COMMENT>"*"+[^*/\n]*   /* eat up '*'s not followed by '/'s */
 <COMMENT>\n             line++;
 <COMMENT>"*"+"/"        BEGIN(comment_caller);
 
+<CODE>{id}     	{yylval.c = yytext; return(IDENTIFIER);}
 
-<CODE>{id}     	{LIST; yylval.c = yytext; return(IDENTIFIER);}
-<CODE>{int}    	{LIST; yylval.c = yytext; return(INTEGER);}
-
-<CODE>"\n"	{MAKELIST; line++;}
-<CODE>[ \t]+	{LIST; /* eat white space */ }
-<*>.		{LIST; fprintf(stderr,"scanner error bad char %s\n",yytext);}
+<CODE>"\n"	{line++;}
+<CODE>[ \t]+	/* eat white space */
+<*>.		{char s[256];
+                 sprintf(s, "bad character '%s'", yytext); yyerror(s); }
 
 %%
+
+/* On EOF, no more files. */
+int yywrap(void)
+{
+    return 1;
+}
 
 /*
  * Local variables:

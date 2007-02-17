@@ -3,10 +3,7 @@ DIR := src/common/statecomp
 STATECOMP := $(DIR)/statecomp
 STATECOMPSRC := \
     $(DIR)/statecomp.c \
-    $(DIR)/statecomp-symbol.c \
-    $(DIR)/emalloc.c \
     $(DIR)/codegen.c \
-    $(DIR)/stringtbl.c \
     $(DIR)/parser.c \
     $(DIR)/scanner.c
 
@@ -18,3 +15,4 @@ STATECOMPGEN := \
 MODCFLAGS_$(DIR) := -I$(DIR)
 
 .SECONDARY: $(STATECOMPGEN)
+
