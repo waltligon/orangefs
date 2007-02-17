@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     TROVE_coll_id coll_id;
     TROVE_handle file_handle, parent_handle;
     TROVE_ds_state state;
-    char *method_name, *file_name;
+    char *file_name;
     TROVE_keyval_s key, val;
     TROVE_context_id trove_context = -1;
 
@@ -77,13 +77,15 @@ int main(int argc, char **argv)
     gossip_enable_stderr();
     gossip_set_debug_mask(1, GOSSIP_TROVE_DEBUG);
 
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+	TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0) {
         fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
         return -1;
     }
 
-    ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
+    ret = trove_collection_lookup(
+	TROVE_METHOD_DBPF, file_system, &coll_id, NULL, &op_id);
     if (ret < 0) {
         fprintf(stderr, "collection lookup failed.\n");
         return -1;
@@ -312,7 +314,7 @@ int main(int argc, char **argv)
             (test_failed ? "failed miserably" : "passed"));
 
     trove_close_context(coll_id, trove_context);
-    trove_finalize();
+    trove_finalize(TROVE_METHOD_DBPF);
     return 0;
 }
 
@@ -327,10 +329,8 @@ int path_lookup(TROVE_coll_id coll_id,
     TROVE_op_id op_id;
     TROVE_handle handle;
 
-    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
-
-    key.buffer = root_handle_string;
-    key.buffer_sz = strlen(root_handle_string) + 1;
+    key.buffer = ROOT_HANDLE_KEYSTR;
+    key.buffer_sz = ROOT_HANDLE_KEYLEN;
     val.buffer = &handle;
     val.buffer_sz = sizeof(handle);
 

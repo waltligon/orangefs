@@ -47,8 +47,10 @@ int gen_posix_mutex_destroy(
     pthread_mutex_t * mut);
 int gen_posix_mutex_init(
     pthread_mutex_t * mut);
+pthread_t gen_posix_thread_self(void);
 
 typedef pthread_mutex_t gen_mutex_t;
+typedef pthread_t       gen_thread_t;
 #define GEN_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER;
 #define gen_mutex_lock(m) gen_posix_mutex_lock(m)
 #define gen_mutex_unlock(m) gen_posix_mutex_unlock(m)
@@ -56,26 +58,31 @@ typedef pthread_mutex_t gen_mutex_t;
 #define gen_mutex_build() gen_posix_mutex_build()
 #define gen_mutex_destroy(m) gen_posix_mutex_destroy(m)
 #define gen_mutex_init(m) gen_posix_mutex_init(m)
+#define gen_thread_self() gen_posix_thread_self()
 #endif /* __GEN_POSIX_LOCKING__ */
 
 
 #ifdef __GEN_NULL_LOCKING__
 	/* this stuff messes around just enough to prevent warnings */
 typedef int gen_mutex_t;
+typedef unsigned long gen_thread_t;
 #define GEN_MUTEX_INITIALIZER 0
 static inline int gen_mutex_lock(
     gen_mutex_t * mutex_p)
 {
+    (void) mutex_p;
     return 0;
 }
 static inline int gen_mutex_unlock(
     gen_mutex_t * mutex_p)
 {
+    (void) mutex_p;
     return 0;
 }
 static inline int gen_mutex_trylock(
     gen_mutex_t * mutex_p)
 {
+    (void) mutex_p;
     return 0;
 }
 static inline gen_mutex_t *gen_mutex_build(
@@ -83,7 +90,10 @@ static inline gen_mutex_t *gen_mutex_build(
 {
     return (int *) malloc(sizeof(int));
 }
-
+static inline gen_thread_t gen_thread_self(void)
+{
+    return 0;
+}
 #define gen_mutex_init(m) do{}while(0)
 #define gen_mutex_destroy(m) free(m)
 #endif /* __GEN_NULL_LOCKING__ */

@@ -158,7 +158,7 @@ struct bmi_method_ops bmi_gm_ops = {
     .BMI_meth_memfree = BMI_gm_memfree,
     .BMI_meth_unexpected_free = BMI_gm_unexpected_free,
     .BMI_meth_post_send = BMI_gm_post_send,
-    .BMI_meth_post_sendunexpected_list = BMI_gm_post_sendunexpected,
+    .BMI_meth_post_sendunexpected = BMI_gm_post_sendunexpected,
     .BMI_meth_post_recv = BMI_gm_post_recv,
     .BMI_meth_test = BMI_gm_test,
     .BMI_meth_testsome = BMI_gm_testsome,
@@ -171,7 +171,8 @@ struct bmi_method_ops bmi_gm_ops = {
     .BMI_meth_open_context = BMI_gm_open_context,
     .BMI_meth_close_context = BMI_gm_close_context,
     .BMI_meth_cancel = BMI_gm_cancel,
-    .BMI_meth_rev_lookup_unexpected = NULL
+    .BMI_meth_rev_lookup_unexpected = NULL,
+    .BMI_meth_query_addr_range = NULL,
 };
 
 /* module parameters */

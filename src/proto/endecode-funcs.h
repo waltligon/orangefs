@@ -92,6 +92,7 @@
     *(pptr) += roundup8(4 + len + 1); \
 } while (0)
 
+
 /* keyvals; a lot like strings; decoding points existing character data */
 /* BTW we are skipping the read_sz field - keep that in mind */
 #define encode_PVFS_ds_keyval(pptr,pbuf) do { \
@@ -249,6 +250,7 @@ static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t5(pptr, &x->x5); \
     decode_##t6(pptr, &x->x6); \
 }
+
 #define endecode_fields_6(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6) \
     endecode_fields_6_generic(name, name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6)
 #define endecode_fields_6_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6) \
@@ -640,3 +642,4 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 }
 
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
+

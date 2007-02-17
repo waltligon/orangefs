@@ -65,16 +65,21 @@
 #define GOSSIP_PERFCOUNTER_DEBUG       ((uint64_t)1 << 43)
 #define GOSSIP_STATE_MACHINE_DEBUG     ((uint64_t)1 << 44)
 #define GOSSIP_DBPF_KEYVAL_DEBUG       ((uint64_t)1 << 45)
-#define GOSSIP_DBPF_COALESCE_DEBUG     ((uint64_t)1 << 46)
+#define GOSSIP_LISTATTR_DEBUG          ((uint64_t)1 << 46)
+#define GOSSIP_DBPF_COALESCE_DEBUG     ((uint64_t)1 << 47)
+#define GOSSIP_ACCESS_HOSTNAMES        ((uint64_t)1 << 48)
+#define GOSSIP_FSCK_DEBUG              ((uint64_t)1 << 49)
+#define GOSSIP_BMI_DEBUG_MX            ((uint64_t)1 << 50)
 
-/* NOTE: if you want your gossip flag to be controlable from 
+/* NOTE: if you want your gossip flag to be controllable from 
  * pvfs2-set-debugmask you have to add it in
  * src/common/misc/pvfs2-debug.c
  */
 
 #define GOSSIP_BMI_DEBUG_ALL (uint64_t)                               \
 (GOSSIP_BMI_DEBUG_TCP + GOSSIP_BMI_DEBUG_CONTROL +                    \
- GOSSIP_BMI_DEBUG_GM + GOSSIP_BMI_DEBUG_OFFSETS + GOSSIP_BMI_DEBUG_IB)
+ GOSSIP_BMI_DEBUG_GM + GOSSIP_BMI_DEBUG_OFFSETS + GOSSIP_BMI_DEBUG_IB \
+ + GOSSIP_BMI_DEBUG_MX)
 
 uint64_t PVFS_debug_eventlog_to_mask(
     const char *event_logging);

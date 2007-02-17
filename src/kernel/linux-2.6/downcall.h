@@ -27,6 +27,11 @@ typedef struct
 
 typedef struct
 {
+    int64_t amt_complete; 
+} pvfs2_iox_response_t;
+
+typedef struct
+{
     PVFS_object_ref refn;
 } pvfs2_lookup_response_t;
 
@@ -61,15 +66,37 @@ typedef struct
     PVFS_object_ref refn;
 } pvfs2_mkdir_response_t;
 
+/* duplication of some system interface structures so that I don't have to allocate extra memory */
+struct pvfs2_dirent
+{
+    char *d_name;
+    int   d_length;
+    PVFS_handle handle;
+};
+
+/* the readdir response is a blank downcall (i.e. all these fields are obtained from the trailer) */
 typedef struct
 {
-    int32_t dirent_count;
     PVFS_ds_position token;
+    uint32_t  __pad1;
     uint64_t directory_version;
-    PVFS_object_ref refn[MAX_DIRENT_COUNT];
-    char d_name[MAX_DIRENT_COUNT][PVFS2_NAME_LEN];
-    int32_t d_name_len[MAX_DIRENT_COUNT];
+    uint32_t  __pad2;
+    uint32_t pvfs_dirent_outcount;
+    struct pvfs2_dirent *dirent_array;
 } pvfs2_readdir_response_t;
+
+/* the readdirplus response is a blank downcall (i.e. all these fields are obtained from the trailer). Do not change the order of the fields. Change it only if readdir_response_t is changing */
+typedef struct
+{
+    PVFS_ds_position token;
+    uint32_t  __pad1;
+    uint64_t directory_version;
+    uint32_t  __pad2;
+    uint32_t pvfs_dirent_outcount;
+    struct pvfs2_dirent *dirent_array;
+    PVFS_error  *stat_err_array;
+    PVFS_sys_attr *attr_array;
+} pvfs2_readdirplus_response_t;
 
 /* the rename response is a blank downcall */
 typedef struct
@@ -149,22 +176,29 @@ typedef struct
 #define PERF_COUNT_BUF_SIZE 4096
 typedef struct
 {
-    /* NOTE: this seems large, but is in fact smaller than the readdir
-     * response structure, so the size of the union is unaffected by this
-     * particular response.  We should probably consider how to get these
-     * downcalls smaller in general so that they don't always span 2 pages
-     */
     char buffer[PERF_COUNT_BUF_SIZE];
 } pvfs2_perf_count_response_t;
+
+#define FS_KEY_BUF_SIZE 4096
+typedef struct
+{
+    int32_t fs_keylen;
+    int32_t __pad1;
+    char    fs_key[FS_KEY_BUF_SIZE];
+} pvfs2_fs_key_response_t;
 
 typedef struct
 {
     int32_t type;
     PVFS_error status;
+    /* currently trailer is used only by readdir and readdirplus */
+    PVFS_size  trailer_size;
+    PVFS2_ALIGN_VAR(char *, trailer_buf);
 
     union
     {
 	pvfs2_io_response_t io;
+        pvfs2_iox_response_t iox;
 	pvfs2_lookup_response_t lookup;
 	pvfs2_create_response_t create;
 	pvfs2_symlink_response_t sym;
@@ -172,7 +206,8 @@ typedef struct
 /* 	pvfs2_setattr_response_t setattr; */
 /*      pvfs2_remove_response_t remove; */
 	pvfs2_mkdir_response_t mkdir;
-	pvfs2_readdir_response_t readdir;
+/*	pvfs2_readdir_response_t readdir; */
+/*	pvfs2_readdirplus_response_t readdirplus; */
 /*      pvfs2_rename_response_t rename; */
 	pvfs2_statfs_response_t statfs;
 /* 	pvfs2_truncate_response_t truncate; */
@@ -186,6 +221,7 @@ typedef struct
 /* 	pvfs2_fsync_response_t fsync; */
         pvfs2_param_response_t param;
         pvfs2_perf_count_response_t perf_count;
+        pvfs2_fs_key_response_t fs_key;
     } resp;
 } pvfs2_downcall_t;
 

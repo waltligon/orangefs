@@ -10,7 +10,6 @@
 #include "dbpf-op.h"
 #include "dbpf-bstream.h"
 #include "gossip.h"
-#include "dbpf-open-cache.h"
 
 dbpf_queued_op_t *dbpf_queued_op_alloc(void)
 {

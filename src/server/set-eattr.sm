@@ -12,8 +12,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-util.h"
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
+#include "pint-util.h"
 
 static int seteattr_verify_eattribs(
     PINT_server_op *s_op, job_status_s *js_p);
@@ -86,7 +85,7 @@ static int seteattr_verify_eattribs(
                  "  ext attr list write to handle %llu refers to a %s\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
                  llu(s_op->req->u.seteattr.handle),
-                 get_object_type(a_p->objtype),
+                 PINT_util_get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
     /* iterate through the keys that are being written */

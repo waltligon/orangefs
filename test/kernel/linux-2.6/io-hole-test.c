@@ -46,7 +46,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Failed to seek\n");
         return 1;
     }
-    fprintf(stderr, "lseek() returned %ld\n", pos);
+    fprintf(stderr, "lseek() returned %ld\n", (long) pos);
 
     n_written = write(fd, buf, MAX_BUF_LEN);
     if (n_written != MAX_BUF_LEN)
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Failed to seek\n");
         return 1;
     }
-    fprintf(stderr, "lseek() returned %ld\n", pos);
+    fprintf(stderr, "lseek() returned %ld\n", (long) pos);
 
     n_read = read(fd, buf, MAX_BUF_LEN);
     if (n_read != MAX_BUF_LEN)

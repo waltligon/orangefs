@@ -17,6 +17,7 @@
 #include "ncache.h"
 #include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
+#include "pvfs2-util.h"
 #include "pint-dist-utils.h"
 #include "pint-sysint-utils.h"
 #include "gen-locks.h"
@@ -26,6 +27,7 @@
 #include "client-state-machine.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -205,6 +207,8 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 	gossip_lerr("Error posting job timer.\n");
 	goto error_exit;
     }
+
+    PINT_util_digest_init();
 
     return 0;
 

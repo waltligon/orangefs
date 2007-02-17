@@ -15,14 +15,18 @@ use strict 'vars';
 # ugly global variables for option parsing
 my $opt_protocol = '';
 my $opt_port = '';
+my $opt_board = '';
 my $opt_tcpport = '';
 my $opt_gmport = '';
+my $opt_mxboard = '';
+my $opt_mxendpoint = '';
 my $opt_ibport = '';
 my $opt_ioservers = '';
 my $opt_metaservers = '';
 my $opt_logfile = '';
 my $opt_storage = '';
 my $opt_trovesync = '1';
+my $opt_trovemethod = '';
 my $opt_quiet = '';
 my $opt_logging = '';
 my $opt_logstamp = '';
@@ -43,6 +47,8 @@ my $opt_iospec = undef;
 my $opt_metaspec = undef;
 
 my %all_endpoints = ();
+
+my $opt_gen_key = 0;
 
 my $META_ENDPOINT = 0x1;
 my $IO_ENDPOINT   = 0x2;
@@ -173,18 +179,6 @@ sub emit_defaults
 
     print $target "<Defaults>\n";
     print $target "\tUnexpectedRequests $num_unexp\n";
-
-    if(defined($logfile))
-    {
-        # remove quotes from logfile if any
-        if ($logfile =~ /\".*\"/)
-        {
-            $logfile =~ s/\"//g;
-        }
-
-        print $target "\tLogFile $logfile\n";
-    }
-
     print $target "\tEventLogging $logging\n";
     print $target "\tLogStamp $logstamp\n";
     print $target "\tBMIModules $bmi_module\n";
@@ -286,7 +280,17 @@ sub emit_filesystem
         print $target "\t\tCoalescingLowWatermark 1\n";
     }
 
+    if($opt_trovemethod ne "")
+    {
+        print $target "\t\tTroveMethod $opt_trovemethod\n";
+    }
+
     print $target "\t</StorageHints>\n";
+
+    if($opt_gen_key ne "0")
+    {
+        emit_fs_key($target);
+    }
 
     print $target "</Filesystem>\n";
 }
@@ -298,6 +302,34 @@ sub emit_server_conf
     print $target "StorageSpace $storage\n";
     print $target "HostID \"" . get_bmi_endpoint($node) . "\"\n";
     print $target "LogFile $logfile\n";
+}
+
+sub emit_fs_key
+{
+    my ($target, @path, $openssl_cmd, $b64_rand);
+
+    $target = $_[0];
+
+    $openssl_cmd = undef;
+
+    @path = split(/:/, $ENV{PATH});
+    for my $p (@path)
+    {
+        if( -x "$p/openssl" )
+        {
+            $openssl_cmd = "$p/openssl";
+        }
+    }
+
+    if(!defined($openssl_cmd))
+    {
+        print STDERR "\n\nFailed to find openssl executable in PATH\n\n";
+        exit 1;
+    }
+
+    $b64_rand = `$openssl_cmd rand -base64 20 2> /dev/null`;
+    chomp($b64_rand);
+    print $target "\tSecretKey $b64_rand\n";
 }
 
 sub confirm
@@ -350,7 +382,7 @@ sub specusage
   from the rest of the spec.  While the protocols and ports are different, the
   host for each uri must be the same.  For example:
 
-    --metaspec="[ib://myhosta:3335,gm://myhosta:6]:/psto,tcp://myhostb:3334"
+    --metaspec="[ib://myhosta:3335,gm://myhosta:6,mx://myhosta:0:3]:/psto,tcp://myhostb:3334"
 
   This specifies that one endpoint is at myhosta with the infiniband and myrinet
   protocols enabled, and the other endpoint is at myhostb with tcp enabled.
@@ -400,9 +432,11 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
   One of the two [] grouped options below must be chosen (for non-interactive):
 
      [
-       --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,ib)
+       --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,mx,ib)
        --port        <NUM>      port to use (any single protocol)
-       --ioservers   <STRING>   hostnames of data servers.  Can be 
+       --board       <NUM>      board index number for MX
+                                (only required if --protocol=mx)
+       --ioservers   <STRING>   hostnames of data servers.  Can be
                                 <prefix>{#-#,#,#-#,...}
        --metaservers <STRING>   hostnames of meta servers.
      ] 
@@ -417,6 +451,8 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
 
      --tcpport     <NUM>               TCP port to use
      --gmport      <NUM>               GM port to use
+     --mxboard     <NUM>               MX board to use (default is 0)
+     --mxendpoint  <NUM>               MX endpoint to use (default is 3)
      --ibport      <NUM>               IB port to use
      --logging     <STRING>            debugging mask for log messages
      --logstamp    <STRING>            timestamp type for log messages 
@@ -424,6 +460,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
      --notrovesync                     sync metadata only upon request
      --server-job-timeout <NUM>        server job timeout value (seconds)
      --client-job-timeout <NUM>        server job timeout value (seconds)
+     --trove-method <STRING>           specify a trove method
      --first-handle <NUM>              first handle value to reserve
      --last-handle  <NUM>              last handle value to reserve
      --root-handle  <NUM>              handle value to reserve for root object
@@ -431,11 +468,12 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
      --default-num-dfiles <NUM>        number of datafiles to use per file
                                        (defaults to number of I/O servers)
      --trusted      <0|1>              indicate whether trusted connection options need to be emitted
+     --genkey                          optionally generates a secret key for the 
+                                       filesystem(s).
 
      --help                            This message
      --spec-usage                      Show the usage info for --iospec 
                                        and --metaspec options
-
 THIS
 
 }
@@ -500,7 +538,7 @@ sub get_protocol
             # get network type
             print $OUT <<"PROTOCOL"
 You must first select the network protocol that your file system will use.
-The only currently supported options are \"tcp\", \"gm\", and \"ib\".
+The only currently supported options are \"tcp\", \"gm\", \"mx\", and \"ib\".
 (For multi-homed configurations, use e.g. \"ib,tcp\".)
 PROTOCOL
             ;;
@@ -534,10 +572,12 @@ PROTOCOL
             }
         } elsif ($_ eq "gm") {
             $port{'gm'} = gm_get_port();
+        } elsif ($_ eq "mx") {
+            $port{'mx'} = mx_get_endpoint();
         } elsif ($_ eq "ib") {
             $port{'ib'} = ib_get_port();
         } else {
-            die "Sorry.  At this time, only the tcp, gm and ib protocols are available\nfor use with this configuration utility.\n";
+            die "Sorry.  At this time, only the tcp, gm, mx and ib protocols are available\nfor use with this configuration utility.\n";
         }
     }
 
@@ -713,6 +753,46 @@ sub gm_get_port
 
     return  $port;
 }
+sub mx_get_endpoint
+{
+    my $port;
+    my $board = '0';
+
+    if ($opt_mxboard) {
+        $board = $opt_mxboard;
+    } elsif ($opt_board) {
+        $board = $opt_board;
+    } elsif (!$opt_iospec) {
+        if (!$opt_quiet) { 
+            print $OUT "Choose a MX board (in the range of 0 to 4) for the servers to listen on. \n";
+            print $OUT "This script assumes that all servers will use the same board number.\n";
+        }
+        $board = prompt_num("Enter board number [Default is 0]: ","0");
+    }
+    # The number of boards is only limited by the number of PCI-X or PCI-Express
+    # slots in the machine. This is reasonable maximum.
+    ($board < 8) or die "MX board must be in the range 0 to 7";
+
+    if ($opt_mxendpoint) {
+        $port = $opt_mxendpoint;
+    } elsif ($opt_port) {
+        $port = $opt_port;
+        $opt_port = '';
+    } elsif (!$opt_iospec) {
+        if (!$opt_quiet) { 
+            print $OUT "Choose a MX endpoint (in the range of 0 to 7) for the servers to listen on. \n";
+            print $OUT "This script assumes that all servers will use the same port number.\n";
+        }
+        $port = prompt_num("Enter port number [Default is 3]: ","3");
+    }
+    # The number of endpoints in MX is configurable. The default value is 4 
+    # but may be changing to 8. It can be higher, but this is reasonable.
+    ($port < 8) or die "MX endpoint must be in the range 0 to 7";
+
+    $port = $board . ":" . $port;
+    return  $port;
+}
+
 sub ib_get_port
 {
     my $port;
@@ -1060,8 +1140,11 @@ my $show_specusage = '';
 $opt_quiet = 0;
 GetOptions('protocol=s'    => \$opt_protocol,
     'port=i'        => \$opt_port,
+    'board=i'       => \$opt_board,
     'tcpport=i'     => \$opt_tcpport,
     'gmport=i'      => \$opt_gmport,
+    'mxboard=i'     => \$opt_mxboard,
+    'mxendpoint=i'  => \$opt_mxendpoint,
     'ibport=i'      => \$opt_ibport,
     'ioservers=s'   => \$opt_ioservers,
     'metaservers=s' => \$opt_metaservers,
@@ -1080,9 +1163,11 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'help'          => \$show_help,
     'quiet!'        => \$opt_quiet,
     'trovesync!'    => \$opt_trovesync,
+    'trove-method=s' => \$opt_trovemethod,
     'iospec=s'     => \$opt_iospec,
     'metaspec=s'   => \$opt_metaspec, 
     'spec-usage!'  => \$show_specusage,
+    'genkey!'       => \$opt_gen_key,
     '-'           => \$using_stdout)
     or die "Could not parse arguments.  See -h for help.\n";
 
@@ -1136,6 +1221,8 @@ else
 
 die "-port not allowed with -iospec or -metaspec."
 if($opt_port ne '' && defined($opt_iospec) && defined($opt_metaspec));
+die "-board not allowed with -iospec or -metaspec."
+if($opt_board ne '' && defined($opt_iospec) && defined($opt_metaspec));
 die "-iospec requires -metaspec." 
 if(defined($opt_iospec) && !defined($opt_metaspec));
 die "-metaspec requires -iospec." 
@@ -1274,7 +1361,7 @@ if ($opt_security == 1)
 }
 emit_aliases($output_target);
 emit_filesystem($output_target, "pvfs2-fs", $fsid, $root_handle, 
-    $last_handle, $first_handle, $count, $default_num_dfiles);
+    $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles);
 
 # close fs.conf
 if ($using_stdout == 0)

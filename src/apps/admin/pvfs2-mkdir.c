@@ -334,7 +334,7 @@ static int make_directory(PVFS_credentials     * credentials,
 static int parse_args(int argc, char** argv, struct options * opts)
 {
     int i = 0, ret = 0,option_index = 0, mode_requested = 0;
-    char * cur_option = NULL;
+    const char * cur_option = NULL;
     char flags[] = "hm:pvV";  /* Options available on command line */
 
     static struct option long_opts[] =
@@ -351,7 +351,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
         switch (ret)
         {
             case 0:
-                cur_option = (char*)long_opts[option_index].name;
+                cur_option = long_opts[option_index].name;
    
                 if(strcmp("help", cur_option) == 0)
                 {
@@ -456,7 +456,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
     if(!mode_requested)
     {
         mode_t mode = S_IRWXO | S_IRWXG | S_IRWXU; /* 0777 */
-        opts->mode = PVFS2_translate_mode(mode & ~PVFS_util_get_umask());
+        opts->mode = PVFS_util_translate_mode(mode & ~PVFS_util_get_umask(), 0);
     }
     
     /* Allocate memory to hold the filenames */

@@ -25,7 +25,6 @@
 #include "pvfs2-internal.h"
 #include "job.h"
 #include "bmi.h"
-#include "src/server/request-scheduler/request-scheduler.h"
 #include "trove.h"
 #include "gossip.h"
 #include "PINT-reqproto-encode.h"
@@ -72,7 +71,7 @@ enum PINT_server_req_permissions
     PINT_SERVER_CHECK_WRITE = 1,   /* needs write permission */
     PINT_SERVER_CHECK_READ = 2,    /* needs read permission */
     PINT_SERVER_CHECK_NONE = 3,    /* needs no permission */
-    PINT_SERVER_CHECK_ATTR = 4,    /* special case for attribute operations; 
+    PINT_SERVER_CHECK_ATTR = 4,    /* special case for attribute operations;
                                       needs ownership */
     PINT_SERVER_CHECK_CRDIRENT = 5 /* special case for crdirent operations;
                                       needs write and execute */
@@ -103,22 +102,7 @@ struct PINT_server_req_params
 
 extern struct PINT_server_req_params PINT_server_req_table[];
 
-/*
- * PINT_map_server_op_to_string()
- *
- * provides a string representation of the server operation number
- *
- * returns a pointer to a static string (DONT FREE IT) on success,
- * null on failure
- */
-static inline const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
-{
-    const char *s = NULL;
-
-    if (op >= 0 && op < PVFS_SERV_NUM_OPS)
-        s = PINT_server_req_table[op].string_name;
-    return s;
-}
+const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
 
 extern const char *PINT_eattr_namespaces[];
 /* PINT_eattr_is_prefixed()
@@ -150,6 +134,8 @@ typedef struct PINT_server_trove_keys
     int size;
 } PINT_server_trove_keys_s;
 
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
+/* Reserved keys */
 enum
 {
     ROOT_HANDLE_KEY      = 0,
@@ -157,7 +143,17 @@ enum
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
     SYMLINK_TARGET_KEY   = 4,
-    PARENT_HANDLE_KEY    = 5
+    PARENT_HANDLE_KEY    = 5,
+};
+
+/* optional; user-settable keys */
+enum
+{
+    DIST_NAME_KEY        = 0,
+    DIST_PARAMS_KEY      = 1,
+    NUM_DFILES_KEY       = 2,
+    NUM_SPECIAL_KEYS     = 3, /* not an index */
+    METAFILE_HINT_KEY    = 3,
 };
 
 typedef enum
@@ -191,7 +187,7 @@ typedef enum
 struct PINT_server_lookup_op
 {
     /* current segment (0..N), number of segments in the path */
-    int seg_ct, seg_nr; 
+    int seg_ct, seg_nr;
 
     /* number of attrs read succesfully */
     int attr_ct;
@@ -251,12 +247,11 @@ struct PINT_server_remove_op
                                    * the event that we are removing a
                                    * directory */
     PVFS_size dirent_count;
-    PVFS_ds_keyval * key_array;
+    PVFS_ds_keyval key;
     PVFS_ds_position pos;
     int key_count;
     int index;
     int remove_keyvals_state;
-    PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
 typedef struct PINT_server_sm_recv_state_s
@@ -271,12 +266,12 @@ typedef struct PINT_server_sm_recv_state_s
 struct PINT_server_mgmt_migrate
 {
     /* dataserver */
-    
+
     PVFS_size                   file_size;
     PVFS_Request                file_request;
     PINT_server_sm_recv_state   write_ack;
 
-    flow_descriptor            *flow_d;    
+    flow_descriptor            *flow_d;
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -338,13 +333,27 @@ struct PINT_server_getattr_op
     PVFS_handle dirent_handle;
 };
 
+struct PINT_server_listattr_op
+{
+    uint32_t nhandles;
+    PVFS_handle *handles;
+    PVFS_size dirent_count;
+    PVFS_fs_id fs_id;
+    PVFS_object_attr *attr_a;
+    PVFS_ds_attributes *ds_attr_a;
+    PVFS_error *errors;
+    uint32_t attrmask;
+    uint32_t handle_index;
+    PVFS_ds_keyval_handle_info keyval_handle_info;
+};
+
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
     void *buffer;
 };
-    
-/* This structure is passed into the void *ptr 
+
+/* This structure is passed into the void *ptr
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
  */
@@ -356,21 +365,21 @@ typedef struct PINT_server_op
      * track of the current state
      */
     int stackptr;
-    union PINT_state_array_values *current_state; 
-    union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE]; 
+    union PINT_state_array_values *current_state;
+    union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
 
     /* holds id from request scheduler so we can release it later */
-    job_id_t scheduled_id; 
+    job_id_t scheduled_id;
 
     /* generic structures used in most server operations */
-    PVFS_ds_keyval key, val; 
+    PVFS_ds_keyval key, val;
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
 
     int free_val;
 
-    /* attributes structure associated with target of operation; may be 
-     * partially filled in by prelude nested state machine (for 
+    /* attributes structure associated with target of operation; may be
+     * partially filled in by prelude nested state machine (for
      * permission checking); may be used/modified by later states as well
      *
      * the ds_attr is used by the prelude sm only (and for pulling the
@@ -386,8 +395,8 @@ typedef struct PINT_server_op
     struct BMI_unexpected_info unexp_bmi_buff;
 
     /* decoded request and response structures */
-    struct PVFS_server_req *req; 
-    struct PVFS_server_resp resp; 
+    struct PVFS_server_req *req;
+    struct PVFS_server_resp resp;
     /* encoded request and response structures */
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
@@ -409,6 +418,7 @@ typedef struct PINT_server_op
 	/* request-specific scratch spaces for use during processing */
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
+        struct PINT_server_listattr_op listattr;
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
 	struct PINT_server_crdirent_op crdirent;
@@ -438,39 +448,17 @@ typedef struct PINT_server_op
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
 #else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
-do {                                                                        \
-    PVFS_handle __handle;                                                   \
-    PVFS_fs_id __fsid;                                                      \
-    int __flag;                                                             \
-    static char __pint_access_buffer[GOSSIP_BUF_SIZE];                      \
-    struct passwd* __pw;                                                    \
-    struct group* __gr;                                                     \
-                                                                            \
-    if ((gossip_debug_on) &&                                                \
-        (gossip_debug_mask & __mask) &&                                     \
-        (gossip_facility))                                                  \
-    {                                                                       \
-        PINT_req_sched_target_handle(__s_op->req, 0, &__handle,             \
-            &__fsid, &__flag);                                              \
-        __pw = getpwuid(__s_op->req->credentials.uid);                      \
-        __gr = getgrgid(__s_op->req->credentials.gid);                      \
-        snprintf(__pint_access_buffer, GOSSIP_BUF_SIZE,                     \
-            "%s.%s@%s H=%llu S=%p: %s: %s",                                  \
-            ((__pw) ? __pw->pw_name : "UNKNOWN"),                           \
-            ((__gr) ? __gr->gr_name : "UNKNOWN"),                           \
-            BMI_addr_rev_lookup_unexpected(__s_op->addr),                   \
-            llu(__handle),                                                   \
-            __s_op,                                                         \
-            PINT_map_server_op_to_string(__s_op->req->op),                  \
-            format);                                                        \
-        __gossip_debug(__mask, 'A', __pint_access_buffer, ##f);             \
-    }                                                                       \
-} while(0);
+    PINT_server_access_debug(__s_op, __mask, format, ##f)
 #endif
 
+void PINT_server_access_debug(PINT_server_op * s_op,
+                              int64_t debug_mask,
+                              const char * format,
+                              ...) __attribute__((format(printf, 3, 4)));
 /* server operation state machines */
 extern struct PINT_state_machine_s pvfs2_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_sm;
+extern struct PINT_state_machine_s pvfs2_list_attr_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_sm;
 extern struct PINT_state_machine_s pvfs2_create_sm;
 extern struct PINT_state_machine_s pvfs2_crdirent_sm;
@@ -535,7 +523,7 @@ int server_state_machine_start_noreq(
 #include "state-machine.h"
 #include "pvfs2-internal.h"
 
-#endif /* __SM_CHECK_DEP */ 
+#endif /* __SM_CHECK_DEP */
 #endif /* __PVFS_SERVER_H */
 
 /*

@@ -21,8 +21,6 @@ static int mgmt_remove_dirent(
 static int mgmt_remove_dirent_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_mgmt_remove_dirent_sm(

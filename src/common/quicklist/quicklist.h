@@ -166,4 +166,28 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
 	for (pos = (head)->next, scratch = pos->next; pos != (head);\
 	pos = scratch, scratch = pos->next)
 
+/**
+ * qlist_for_each_entry	-	iterate over list of given type
+ * @pos:	the type * to use as a loop counter.
+ * @head:	the head for your list.
+ * @member:	the name of the list_struct within the struct.
+ */
+#define qlist_for_each_entry(pos, head, member)				\
+	for (pos = qlist_entry((head)->next, typeof(*pos), member);	\
+	     &pos->member != (head); 					\
+	     pos = qlist_entry(pos->member.next, typeof(*pos), member))	\
+
+/**
+ * qlist_for_each_entry_safe - iterate over list of given type safe against removal of list entry
+ * @pos:	the type * to use as a loop counter.
+ * @n:		another type * to use as temporary storage
+ * @head:	the head for your list.
+ * @member:	the name of the list_struct within the struct.
+ */
+#define qlist_for_each_entry_safe(pos, n, head, member)			\
+	for (pos = qlist_entry((head)->next, typeof(*pos), member),	\
+		n = qlist_entry(pos->member.next, typeof(*pos), member);	\
+	     &pos->member != (head); 					\
+	     pos = n, n = qlist_entry(n->member.next, typeof(*n), member))
+
 #endif /* QUICKLIST_H */

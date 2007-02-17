@@ -74,6 +74,7 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 
     if(new_server_socket > -1)
     {
+        memset(&event, 0, sizeof(event));
         event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
         event.data.ptr = NULL;
         ret = epoll_ctl(tmp_scp->epfd, EPOLL_CTL_ADD, new_server_socket,
@@ -203,6 +204,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
         /* take out of the epoll set */
         if(tcp_addr_data->sc_index > -1)
         {
+            memset(&event, 0, sizeof(event));
             event.events = 0;
             event.data.ptr = tcp_addr_data->map;
             ret = epoll_ctl(scp->epfd, EPOLL_CTL_DEL, tcp_addr_data->socket,
@@ -228,6 +230,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	qlist_del(&tcp_addr_data->sc_link);
 	if(tcp_addr_data->sc_index > -1)
 	{
+            memset(&event, 0, sizeof(event));
 	    /* update existing entry */
             event.data.ptr = tcp_addr_data->map;
             event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
@@ -249,6 +252,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	    /* new entry */
             tcp_addr_data->sc_index = 1;
 
+            memset(&event, 0, sizeof(event));
             event.data.ptr = tcp_addr_data->map;
             event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
 	    if(tcp_addr_data->write_ref_count > 0)

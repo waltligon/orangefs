@@ -23,7 +23,7 @@ int parse_args(int argc, char **argv);
 int main(int argc, char **argv)
 {
     int ret, count, i;
-    char *method_name, *file_name;
+    char *file_name;
     char path_name[PATH_SIZE];
 
     TROVE_op_id op_id;
@@ -40,14 +40,16 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+        TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
     }
 
     /* try to look up collection used to store file system */
-    ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
+    ret = trove_collection_lookup(
+        TROVE_METHOD_DBPF, file_system, &coll_id, NULL, &op_id);
     if (ret < 0) {
 	fprintf(stderr, "collection lookup failed.\n");
 	return -1;
@@ -150,7 +152,7 @@ int main(int argc, char **argv)
     }
 
     trove_close_context(coll_id, trove_context);
-    trove_finalize();
+    trove_finalize(TROVE_METHOD_DBPF);
     printf("file %s removed (file handle = %d, parent handle = %d).\n",
 	   file_name, 
 	   (int) file_handle,

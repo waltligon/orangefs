@@ -42,9 +42,6 @@
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
-int dbpf_method_id = -1;
-char dbpf_method_name[] = "dbpf";
-
 extern int TROVE_db_cache_size_bytes;
 extern int TROVE_shm_key_hint;
 
@@ -123,7 +120,10 @@ retry:
     {
         /* user wants the standard db cache which uses mmap */
         ret = dbenv->open(dbenv, path, 
-                          DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+                          DB_INIT_MPOOL|
+                          DB_CREATE|
+                          DB_THREAD, 
+                          0);
         if(ret != 0)
         {
             gossip_err("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
@@ -146,7 +146,11 @@ retry:
         }
 
         ret = dbenv->open(dbenv, path, 
-                             DB_INIT_MPOOL|DB_CREATE|DB_THREAD|DB_SYSTEM_MEM, 0);
+                          DB_INIT_MPOOL|
+                          DB_CREATE|
+                          DB_THREAD|
+                          DB_SYSTEM_MEM, 
+                          0);
         /* In some cases (oddly configured systems with pvfs2-server running as
          * non-root) DB_SYSTEM_MEM, which uses sysV shared memory, can fail
          * with EAGAIN (resource temporarily unavailable).   berkely DB can use
@@ -185,7 +189,11 @@ retry:
                 return NULL;
             }
             assert(my_storage_p != NULL);
-            ret = dbenv->open(dbenv, path, DB_CREATE|DB_THREAD|DB_PRIVATE, 0);
+            ret = dbenv->open(dbenv, path, 
+                              DB_CREATE|
+                              DB_THREAD|
+                              DB_PRIVATE, 
+                              0);
         }
 
         if(ret == DB_RUNRECOVERY)
@@ -204,7 +212,6 @@ retry:
             return NULL;
         }
     }
-        
     return dbenv;
 }
 
@@ -243,8 +250,6 @@ int dbpf_putdb_env(DB_ENV *dbenv, const char *path)
     return 0;
 }
 
-static struct dbpf_storage *dbpf_storage_lookup(
-    char *stoname, int *err_p, TROVE_ds_flags flags);
 static int dbpf_db_create(const char *sto_path, char *dbname, DB_ENV *envp);
 static DB *dbpf_db_open(
     const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
@@ -252,10 +257,10 @@ static DB *dbpf_db_open(
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 
-static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
-                                   TROVE_context_id context_id,
-                                   TROVE_coll_getinfo_options opt,
-                                   void *parameter)
+int dbpf_collection_getinfo(TROVE_coll_id coll_id,
+                            TROVE_context_id context_id,
+                            TROVE_coll_getinfo_options opt,
+                            void *parameter)
 {
     struct dbpf_collection *coll_p = NULL;
     struct dbpf_storage *sto_p = NULL;
@@ -309,10 +314,11 @@ static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
     return ret;
 }
 
-static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
-                                   TROVE_context_id context_id,
-                                   int option,
-                                   void *parameter)
+int dbpf_collection_setinfo(TROVE_method_id method_id,
+                            TROVE_coll_id coll_id,
+                            TROVE_context_id context_id,
+                            int option,
+                            void *parameter)
 {
     int ret = -TROVE_EINVAL;
 	struct dbpf_collection* coll;
@@ -409,13 +415,13 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
     return ret;
 }
 
-static int dbpf_collection_seteattr(TROVE_coll_id coll_id,
-                                    TROVE_keyval_s *key_p,
-                                    TROVE_keyval_s *val_p,
-                                    TROVE_ds_flags flags,
-                                    void *user_ptr,
-                                    TROVE_context_id context_id,
-                                    TROVE_op_id *out_op_id_p)
+int dbpf_collection_seteattr(TROVE_coll_id coll_id,
+                             TROVE_keyval_s *key_p,
+                             TROVE_keyval_s *val_p,
+                             TROVE_ds_flags flags,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
@@ -458,13 +464,13 @@ static int dbpf_collection_seteattr(TROVE_coll_id coll_id,
     return 1;
 }
 
-static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
-                                    TROVE_keyval_s *key_p,
-                                    TROVE_keyval_s *val_p,
-                                    TROVE_ds_flags flags,
-                                    void *user_ptr,
-                                    TROVE_context_id context_id,
-                                    TROVE_op_id *out_op_id_p)
+int dbpf_collection_geteattr(TROVE_coll_id coll_id,
+                             TROVE_keyval_s *key_p,
+                             TROVE_keyval_s *val_p,
+                             TROVE_ds_flags flags,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
@@ -504,9 +510,7 @@ static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
 }
 
 static int dbpf_initialize(char *stoname,
-                           TROVE_ds_flags flags,
-                           char **method_name_p,
-                           int method_id)
+                           TROVE_ds_flags flags)
 {
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
@@ -514,12 +518,6 @@ static int dbpf_initialize(char *stoname,
     if (!stoname)
     {
         gossip_err("dbpf_initialize failure: invalid storage name\n");
-        return ret;
-    }
-
-    if (!method_name_p)
-    {
-        gossip_err("dbpf_initialize failure: invalid method name ptr\n");
         return ret;
     }
 
@@ -533,25 +531,15 @@ static int dbpf_initialize(char *stoname,
     }
 
     my_storage_p = sto_p;
-    dbpf_method_id = method_id;
     
-    *method_name_p = strdup(dbpf_method_name);
-    if (*method_name_p == NULL)
-    {
-        gossip_err("dbpf_initialize failure: cannot allocate memory\n");
-        return -TROVE_ENOMEM;
-    }
-
     dbpf_open_cache_initialize();
 
     return dbpf_thread_initialize();
 }
 
-static int dbpf_finalize(void)
+int dbpf_finalize(void)
 {
     int ret = -TROVE_EINVAL;
-
-    dbpf_method_id = -TROVE_EINVAL;
 
     dbpf_thread_finalize();
     dbpf_open_cache_finalize();
@@ -605,9 +593,9 @@ static int dbpf_finalize(void)
  * - creating storage attribute database, propagating with create time
  * - creating collections database, filling in create time
  */
-static int dbpf_storage_create(char *stoname,
-                               void *user_ptr,
-                               TROVE_op_id *out_op_id_p)
+int dbpf_storage_create(char *stoname,
+                        void *user_ptr,
+                        TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL;
     char storage_dirname[PATH_MAX] = {0};
@@ -640,9 +628,9 @@ static int dbpf_storage_create(char *stoname,
     return 1;
 }
 
-static int dbpf_storage_remove(char *stoname,
-                               void *user_ptr,
-                               TROVE_op_id *out_op_id_p)
+int dbpf_storage_remove(char *stoname,
+                        void *user_ptr,
+                        TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL;
     char path_name[PATH_MAX] = {0};
@@ -698,10 +686,10 @@ static int dbpf_storage_remove(char *stoname,
   5) create dataspace attributes database
   6) create keyval and bstream directories
 */
-static int dbpf_collection_create(char *collname,
-                                  TROVE_coll_id new_coll_id,
-                                  void *user_ptr,
-                                  TROVE_op_id *out_op_id_p)
+int dbpf_collection_create(char *collname,
+                           TROVE_coll_id new_coll_id,
+                           void *user_ptr,
+                           TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL, error = 0, i = 0;
     TROVE_handle zero = TROVE_HANDLE_NULL;
@@ -918,9 +906,9 @@ static int dbpf_collection_create(char *collname,
     return 1;
 }
 
-static int dbpf_collection_remove(char *collname,
-                                  void *user_ptr,
-                                  TROVE_op_id *out_op_id_p)
+int dbpf_collection_remove(char *collname,
+                           void *user_ptr,
+                           TROVE_op_id *out_op_id_p)
 {
     char path_name[PATH_MAX];
     struct dbpf_storage *sto_p = NULL;
@@ -1059,7 +1047,6 @@ static int dbpf_collection_remove(char *collname,
     {
         gossip_err("failure removing bstream directory %s\n", path_name);
         ret = -trove_errno_to_trove_error(errno);
-        goto collection_remove_failure;
     }
 
     DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX,
@@ -1116,14 +1103,14 @@ collection_remove_failure:
     return ret;
 }
 
-static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
-                                   TROVE_keyval_s *name_array,
-                                   TROVE_coll_id *coll_id_array,
-                                   int *inout_count_p,
-                                   TROVE_ds_flags flags,
-                                   TROVE_vtag_s *vtag,
-                                   void *user_ptr,
-                                   TROVE_op_id *out_op_id_p)
+int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
+                            TROVE_keyval_s *name_array,
+                            TROVE_coll_id *coll_id_array,
+                            int *inout_count_p,
+                            TROVE_ds_flags flags,
+                            TROVE_vtag_s *vtag,
+                            void *user_ptr,
+                            TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL, i = 0;
     db_recno_t recno;
@@ -1288,12 +1275,11 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 }
 
 
-static int dbpf_collection_lookup(char *collname,
-                                  TROVE_coll_id *out_coll_id_p,
-                                  void *user_ptr,
-                                  TROVE_op_id *out_op_id_p)
+int dbpf_collection_lookup(char *collname,
+                           TROVE_coll_id *out_coll_id_p,
+                           void *user_ptr,
+                           TROVE_op_id *out_op_id_p)
 {
-	gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_lookup of coll: %s\n", collname);
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -1302,6 +1288,8 @@ static int dbpf_collection_lookup(char *collname,
     char path_name[PATH_MAX];
     char trove_dbpf_version[32] = {0};
     
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_lookup of coll: %s\n", 
+            collname);
     sto_p = my_storage_p;
     if (!sto_p)
     {
@@ -1505,7 +1493,7 @@ static int dbpf_collection_lookup(char *collname,
  * structure will be found by following the link from the dbpf_coll
  * structure associated with that collection.
  */
-static struct dbpf_storage *dbpf_storage_lookup(
+struct dbpf_storage *dbpf_storage_lookup(
     char *stoname, int *error_p, TROVE_ds_flags flags)
 {
     char path_name[PATH_MAX] = {0};
@@ -1548,6 +1536,15 @@ static struct dbpf_storage *dbpf_storage_lookup(
     sto_p->flags = flags;
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
+
+    /* we want to stat the attrib db first in case it doesn't
+     * exist but the storage directory does
+     */
+    if (stat(path_name, &sbuf) < 0) 
+    {
+        *error_p = -TROVE_ENOENT;
+        return NULL;
+    }
 
     sto_p->sto_attr_db = dbpf_db_open(sto_p->name, path_name, NULL, error_p, NULL);
     if (sto_p->sto_attr_db == NULL)

@@ -4,6 +4,9 @@ KERNAPPSRC += \
 	$(DIR)/pvfs2-client-core.c \
 	$(DIR)/pvfs2-client.c 
 
+KERNAPPSTHRSRC += \
+	$(DIR)/pvfs2-client-core.c
+
 ifneq (,$(LINUX24_KERNEL_SRC))
 KERNAPPSRC += $(DIR)/mount.pvfs2.c
 endif

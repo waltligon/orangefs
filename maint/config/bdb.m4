@@ -31,11 +31,11 @@ AC_DEFUN([AX_BERKELEY_DB],
 	fi
 
         DB_LDFLAGS="-L${dbpath}/lib"
-	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
+	LDFLAGS="$DB_LDFLAGS ${LDFLAGS}"
 
 	LIBS="${oldlibs} -ldb -lpthread"
 	DB_LIB="-ldb"
-	CFLAGS="$oldcflags $DB_CFLAGS"
+	CFLAGS="$DB_CFLAGS $oldcflags"
 	AC_TRY_LINK(
 		[#include <db.h>],
 		[DB *dbp; db_create(&dbp, NULL, 0);],
@@ -181,14 +181,14 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_TRY_COMPILE([
     #include <db.h>
     ], [
-    int ret;
-    DB *db;
-    DB_TXN *txnid;
-    char *file;
-    char *database;
-    DBTYPE type;
-    u_int32_t flags;
-    int mode;
+    int ret = 0;
+    DB *db = NULL;
+    DB_TXN *txnid = NULL;
+    char *file = NULL;
+    char *database = NULL;
+    DBTYPE type = 0;
+    u_int32_t flags = 0;
+    int mode = 0;
     
     ret = db->open(db, txnid, file, database, type, flags, mode);
     ], AC_MSG_RESULT(yes)

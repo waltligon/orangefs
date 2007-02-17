@@ -32,6 +32,9 @@
 int BMI_sockio_new_sock(void);
 int BMI_sockio_bind_sock(int,
 			 int);
+int BMI_sockio_bind_sock_specific(int sockd,
+              const char *name,
+	      int service);
 int BMI_sockio_connect_sock(int,
 			    const char *,
 			    int);

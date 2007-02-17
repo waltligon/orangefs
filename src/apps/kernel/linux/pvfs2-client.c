@@ -26,7 +26,11 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define PVFS2_CLIENT_CORE_NAME  "pvfs2-client-core"
+#define PVFS2_CLIENT_CORE_SUFFIX  "-core"
+#define PVFS2_CLIENT_CORE_NAME "pvfs2-client" PVFS2_CLIENT_CORE_SUFFIX
+#define PVFS2_CLIENT_CORE_THR_SUFFIX "-threaded"
+
+static char s_client_core_path[PATH_MAX];
 
 #define MAX_DEV_INIT_FAILURES 10
 
@@ -53,6 +57,9 @@ typedef struct
     char *path;
     char *logfile;
     char *logstamp;
+    char *dev_buffer_count;
+    char *dev_buffer_size;
+    int threaded;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -263,19 +270,22 @@ static int monitor_pvfs2_client(options_t *opts)
         {
             sleep(1);
 
-            if (opts->verbose)
+            if(opts->threaded)
             {
-                printf("About to exec %s\n",opts->path);
+                arg_list[0] = PVFS2_CLIENT_CORE_NAME PVFS2_CLIENT_CORE_THR_SUFFIX;
+            }
+            else
+            {
+                arg_list[0] = PVFS2_CLIENT_CORE_NAME;
             }
 
-            arg_list[0] = PVFS2_CLIENT_CORE_NAME;
-            arg_list[1] = "-a";
-            arg_list[2] = opts->acache_timeout;
-            arg_list[3] = "-n";
-            arg_list[4] = opts->ncache_timeout;
-            arg_list[5] = "-L";
-            arg_list[6] = opts->logfile;
-            arg_index = 7;
+            arg_index = 1;
+            arg_list[arg_index++] = "-a";
+            arg_list[arg_index++] = opts->acache_timeout;
+            arg_list[arg_index++] = "-n";
+            arg_list[arg_index++] = opts->ncache_timeout;
+            arg_list[arg_index++] = "-L";
+            arg_list[arg_index++] = opts->logfile;
             if(opts->acache_hard_limit)
             {
                 arg_list[arg_index] = "--acache-hard-limit";
@@ -336,7 +346,29 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->logstamp;
                 arg_index+=2;
             }
+            if(opts->dev_buffer_count)
+            {
+                arg_list[arg_index] = "--desc-count";
+                arg_list[arg_index+1] = opts->dev_buffer_count;
+                arg_index+=2;
+            }
+            if(opts->dev_buffer_size)
+            {
+                arg_list[arg_index] = "--desc-size";
+                arg_list[arg_index+1] = opts->dev_buffer_size;
+                arg_index+=2;
+            }
 
+            if(opts->verbose)
+            {
+                int i;
+                printf("About to exec: %s, with args: ", opts->path);
+                for(i = 0; i < arg_index; ++i)
+                {
+                    printf("%s ", arg_list[i]);
+                }
+                printf("\n");
+            }
             ret = execvp(opts->path, arg_list);
 
             fprintf(stderr, "Could not exec %s, errno is %d\n",
@@ -374,6 +406,8 @@ static void print_help(char *progname)
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
     printf("-p PATH, --path PATH          execute pvfs2-client at "
            "PATH\n");
+    printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
+    printf("--threaded                    use threaded client\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -395,12 +429,15 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"ncache-timeout",1,0,0},
         {"ncache-soft-limit",1,0,0},
         {"ncache-hard-limit",1,0,0},
+        {"desc-count",1,0,0},
+        {"desc-size",1,0,0},
         {"ncache-reclaim-percentage",1,0,0},
         {"perf-time-interval-secs",1,0,0},
         {"perf-history-size",1,0,0},
         {"gossip-mask",1,0,0},
         {"path",1,0,0},
         {"logstamp",1,0,0},
+        {"threaded",0,0,0},
         {0,0,0,0}
     };
 
@@ -480,6 +517,16 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     opts->ncache_reclaim_percentage = optarg;
                     break;
                 }
+                else if (strcmp("desc-count", cur_option) == 0) 
+                {
+                    opts->dev_buffer_count = optarg;
+                    break;
+                }
+                else if (strcmp("desc-size", cur_option) == 0)
+                {
+                    opts->dev_buffer_size = optarg;
+                    break;
+                }
                 else if (strcmp("perf-time-interval-secs", cur_option) == 0)
                 {
                     opts->perf_time_interval_secs = optarg;
@@ -493,6 +540,11 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("gossip-mask", cur_option) == 0)
                 {
                     opts->gossip_mask = optarg;
+                    break;
+                }
+                else if (strcmp("threaded", cur_option) == 0)
+                {
+                    opts->threaded = 1;
                     break;
                 }
                 break;
@@ -558,11 +610,18 @@ static void parse_args(int argc, char **argv, options_t *opts)
 
     if (!opts->path)
     {
-        /*
-          since they didn't specify a specific path, we're going to
-          let execlp() sort things out later
-        */
-        opts->path = PVFS2_CLIENT_CORE_NAME;
+        if(opts->threaded)
+        {
+            sprintf(s_client_core_path, 
+                    "%s" PVFS2_CLIENT_CORE_SUFFIX PVFS2_CLIENT_CORE_THR_SUFFIX, 
+                    argv[0]);
+        }
+        else
+        {
+            sprintf(s_client_core_path, "%s" PVFS2_CLIENT_CORE_SUFFIX,
+                    argv[0]);
+        }
+        opts->path = s_client_core_path;
     }
 
     if (!opts->acache_timeout)

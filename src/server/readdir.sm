@@ -33,8 +33,6 @@ static int readdir_verify_directory_metadata(
 static int readdir_setup_resp(
     PINT_server_op *s_op, job_status_s* js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 machine pvfs2_readdir_sm(
@@ -211,9 +209,10 @@ static int readdir_iterate_on_entries(
 
     gossip_debug(
         GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%llu,%d], "
-        "\n\ttoken=0x%x, count=%d\n",
+        "\n\ttoken=%d, count=%d\n",
         llu(s_op->u.readdir.dirent_handle), s_op->req->u.readdir.fs_id,
-        s_op->req->u.readdir.token, s_op->req->u.readdir.dirent_count);
+        s_op->req->u.readdir.token, 
+        s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(
         s_op->req->u.readdir.fs_id, s_op->u.readdir.dirent_handle,

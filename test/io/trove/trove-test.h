@@ -32,11 +32,9 @@ static inline int path_lookup(
     char dir[PATH_SIZE];
     TROVE_context_id context_id = 0; /* FIXME: Hacked for now */
 
-    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
-
     /* get root handle */
-    key.buffer = root_handle_string;
-    key.buffer_sz = strlen(root_handle_string) + 1;
+    key.buffer = ROOT_HANDLE_KEYSTR;
+    key.buffer_sz = ROOT_HANDLE_KEYLEN;
     val.buffer = &handle;
     val.buffer_sz = sizeof(handle);
     ret = trove_collection_geteattr(

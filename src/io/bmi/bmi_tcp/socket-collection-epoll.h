@@ -109,6 +109,7 @@ do { \
     struct tcp_addr* tcp_data = (m)->method_data; \
     if(tcp_data->socket > -1){ \
         struct epoll_event event;\
+        memset(&event, 0, sizeof(event));\
         event.events = EPOLLIN|EPOLLERR|EPOLLHUP;\
         event.data.ptr = tcp_data->map;\
         epoll_ctl(s->epfd, EPOLL_CTL_ADD, tcp_data->socket, &event);\
@@ -119,6 +120,7 @@ do { \
 do { \
     struct epoll_event event;\
     struct tcp_addr* tcp_data = (m)->method_data; \
+    memset(&event, 0, sizeof(event));\
     event.events = 0;\
     event.data.ptr = tcp_data->map;\
     epoll_ctl(s->epfd, EPOLL_CTL_DEL, tcp_data->socket, &event);\
@@ -131,6 +133,7 @@ do { \
     struct epoll_event event;\
     assert(tcp_data->socket > -1); \
     tcp_data->write_ref_count++; \
+    memset(&event, 0, sizeof(event));\
     event.events = EPOLLIN|EPOLLERR|EPOLLHUP|EPOLLOUT;\
     event.data.ptr = tcp_data->map;\
     epoll_ctl(s->epfd, EPOLL_CTL_MOD, tcp_data->socket, &event);\
@@ -143,6 +146,7 @@ do { \
     tcp_data->write_ref_count--; \
     assert(tcp_data->write_ref_count > -1); \
     if (tcp_data->write_ref_count == 0) { \
+        memset(&event, 0, sizeof(event));\
         event.events = EPOLLIN|EPOLLERR|EPOLLHUP;\
         event.data.ptr = tcp_data->map;\
         epoll_ctl(s->epfd, EPOLL_CTL_MOD, tcp_data->socket, &event);\

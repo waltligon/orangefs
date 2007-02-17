@@ -121,6 +121,12 @@ int gen_posix_mutex_destroy(
 
     return (0);
 }
+
+pthread_t gen_posix_thread_self(void)
+{
+    return pthread_self();
+}
+
 #endif
 
 /*

@@ -13,7 +13,9 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 #include <sys/time.h>
+#include <stdio.h>
 
 #include "bmi.h"
 #include "bmi-method-support.h"
@@ -46,6 +48,9 @@ extern struct bmi_method_ops bmi_tcp_ops;
 #ifdef __STATIC_METHOD_BMI_GM__
 extern struct bmi_method_ops bmi_gm_ops;
 #endif
+#ifdef __STATIC_METHOD_BMI_MX__
+extern struct bmi_method_ops bmi_mx_ops;
+#endif
 #ifdef __STATIC_METHOD_BMI_IB__
 extern struct bmi_method_ops bmi_ib_ops;
 #endif
@@ -56,6 +61,9 @@ static struct bmi_method_ops *const static_methods[] = {
 #endif
 #ifdef __STATIC_METHOD_BMI_GM__
     &bmi_gm_ops,
+#endif
+#ifdef __STATIC_METHOD_BMI_MX__
+    &bmi_mx_ops,
 #endif
 #ifdef __STATIC_METHOD_BMI_IB__
     &bmi_ib_ops,
@@ -83,10 +91,12 @@ static gen_mutex_t active_method_count_mutex = GEN_MUTEX_INITIALIZER;
 
 static struct bmi_method_ops **active_method_table = NULL;
 static struct {
-    struct timeval active;
-    struct timeval polled;
+    int iters_polled;  /* how many iterations since this method was polled */
+    int iters_active;  /* how many iterations since this method had action */
     int plan;
 } *method_usage = NULL;
+static const int usage_iters_starvation = 100000;
+static const int usage_iters_active = 10000;
 
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
@@ -775,43 +785,47 @@ int BMI_testsome(int incount,
 static void
 construct_poll_plan(int nmeth, int *idle_time_ms)
 {
-    struct timeval now, delta;
     int i, numplan;
 
-    gettimeofday(&now, 0);
     numplan = 0;
     for (i=0; i<nmeth; i++) {
+        ++method_usage[i].iters_polled;
+        ++method_usage[i].iters_active;
         method_usage[i].plan = 0;
-        timersub(&now, &method_usage[i].polled, &delta);
-        if (delta.tv_sec >= 1) {
-            method_usage[i].plan = 1;  /* >= 1s starving */
-            method_usage[i].polled = now;
+        if (method_usage[i].iters_active <= usage_iters_active) {
+            /* recently busy, poll */
+	    if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "%s: polling active meth %d: %d / %d\n", __func__, i,
+                         method_usage[i].iters_active, usage_iters_active);
+            method_usage[i].plan = 1;
             ++numplan;
-        } else {
-            timersub(&now, &method_usage[i].active, &delta);
-            if (delta.tv_sec == 0) {
-                method_usage[i].plan = 1;  /* < 1s busy, prefer poll */
-                method_usage[i].polled = now;
-                ++numplan;
-            }
+            *idle_time_ms = 0;  /* busy polling */
+        } else if (method_usage[i].iters_polled >= usage_iters_starvation) {
+            /* starving, time to poke this one */
+	    if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "%s: polling starving meth %d: %d / %d\n", __func__, i,
+                         method_usage[i].iters_polled, usage_iters_starvation);
+            method_usage[i].plan = 1;
+            ++numplan;
         } 
     }
 
     /* if nothing is starving or busy, poll everybody */
     if (numplan == 0) {
-        for (i=0; i<nmeth; i++) {
+        for (i=0; i<nmeth; i++)
             method_usage[i].plan = 1;
-            method_usage[i].polled = now;
-        }
         numplan = nmeth;
-    }
 
-    /* spread idle time evenly */
-    if (*idle_time_ms)
-    {
-	*idle_time_ms /= numplan;
-	if (!*idle_time_ms)
-	    *idle_time_ms = 1;
+        /* spread idle time evenly */
+        if (*idle_time_ms) {
+            *idle_time_ms /= numplan;
+            if (*idle_time_ms == 0)
+                *idle_time_ms = 1;
+        }
+        /* note that BMI_testunexpected is always called with idle_time 0 */
+        if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                     "%s: polling all %d methods, idle %d ms\n", __func__,
+                     numplan, *idle_time_ms);
     }
 }
 
@@ -858,8 +872,9 @@ int BMI_testunexpected(int incount,
             }
             position += tmp_outcount;
             (*outcount) += tmp_outcount;
-            if (tmp_outcount)
-                gettimeofday(&method_usage[i].active, 0);
+            method_usage[i].iters_polled = 0;
+            if (ret)
+                method_usage[i].iters_active = 0;
         }
 	i++;
     }
@@ -956,8 +971,9 @@ int BMI_testcontext(int incount,
             }
             position += tmp_outcount;
             (*outcount) += tmp_outcount;
-            if (tmp_outcount)
-                gettimeofday(&method_usage[i].active, 0);
+            method_usage[i].iters_polled = 0;
+            if (ret)
+                method_usage[i].iters_active = 0;
         }
 	i++;
     }
@@ -1320,6 +1336,83 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 	return (bmi_errno_to_pvfs(-ENOSYS));
     }
     return (0);
+}
+
+/** Given a string representation of a host/network address and a BMI
+ * address handle, return whether the BMI address handle is part of the wildcard
+ * address range specified by the string.
+ * \return 1 on success, -errno on failure and 0 if it is not part of
+ * the specified range
+ */
+int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netmask)
+{
+    int ret = -1;
+    int i = 0, failed = 1;
+    int provided_method_length = 0;
+    char *ptr, *provided_method_name = NULL;
+    ref_st_p tmp_ref = NULL;
+
+    if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
+    {
+	return(bmi_errno_to_pvfs(-ENAMETOOLONG));
+    }
+    /* lookup the provided address */
+    gen_mutex_lock(&ref_mutex);
+    tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+    if (!tmp_ref)
+    {
+	gen_mutex_unlock(&ref_mutex);
+	return (bmi_errno_to_pvfs(-EPROTO));
+    }
+    gen_mutex_unlock(&ref_mutex);
+
+    ptr = strchr(id_string, ':');
+    if (ptr == NULL)
+    {
+        return (bmi_errno_to_pvfs(-EINVAL));
+    }
+    ret = -EPROTO;
+    provided_method_length = (unsigned long) ptr - (unsigned long) id_string;
+    provided_method_name = (char *) calloc(provided_method_length + 1, sizeof(char));
+    if (provided_method_name == NULL)
+    {
+        return bmi_errno_to_pvfs(-ENOMEM);
+    }
+    strncpy(provided_method_name, id_string, provided_method_length);
+
+    /* Now we will run through each method looking for one that
+     * matches the specified wildcard address. 
+     */
+    i = 0;
+    gen_mutex_lock(&active_method_count_mutex);
+    while (i < active_method_count)
+    {
+        const char *active_method_name = active_method_table[i]->method_name + 4;
+        /* provided name matches this interface */
+        if (!strncmp(active_method_name, provided_method_name, provided_method_length))
+        {
+            int (*meth_fnptr)(method_addr_p, const char *, int);
+            failed = 0;
+            if ((meth_fnptr = active_method_table[i]->BMI_meth_query_addr_range) == NULL)
+            {
+                ret = -ENOSYS;
+                gossip_lerr("Error: method doesn't implement querying address range/wildcards! Cannot implement FS export options!\n");
+                failed = 1;
+                break;
+            }
+            /* pass it into the specific bmi layer */
+            ret = meth_fnptr(tmp_ref->method_addr, id_string, netmask);
+            if (ret < 0)
+                failed = 1;
+            break;
+        }
+	i++;
+    }
+    gen_mutex_unlock(&active_method_count_mutex);
+    free(provided_method_name);
+    if (failed)
+        return bmi_errno_to_pvfs(ret);
+    return ret;
 }
 
 /** Resolves the string representation of a host address into a BMI
@@ -1699,7 +1792,13 @@ int BMI_cancel(bmi_op_id_t id,
 /* bmi_method_addr_reg_callback()
  * 
  * Used by the methods to register new addresses when they are
- * discovered.
+ * discovered.  Only call this method when the device gets an
+ * unexpected receive from a new peer, i.e., if you do the equivalent
+ * of a socket accept() and get a new connection.
+ *
+ * Do not call this function for active lookups, that is from your
+ * BMI_meth_method_addr_lookup.  BMI already knows about the address in
+ * this case, since the user provided it.
  *
  * returns 0 on success, -errno on failure
  */

@@ -25,14 +25,13 @@
 #include "pvfs2-internal.h"
 
 /* defined later */
-PINT_encoding_table_values le_bytefield_table;
 static int check_req_size(struct PVFS_server_req *req);
 static int check_resp_size(struct PVFS_server_resp *resp);
 
 static int initializing_sizes = 0;
 
 /* an array of structs for storing precalculated maximum encoding sizes
- * for each type of server operation 
+ * for each type of server operation
  */
 static struct {
     int req;
@@ -41,7 +40,7 @@ static struct {
 
 /* lebf_initialize()
  *
- * initializes the encoder module, calculates max sizes of each request type 
+ * initializes the encoder module, calculates max sizes of each request type
  * in advance
  *
  * no return value
@@ -197,7 +196,7 @@ static void lebf_initialize(void)
             respsize = extra_size_PVFS_servresp_getscheduler_stats;
         break;
         case PVFS_SERV_MGMT_MIGRATE:
-            break;        
+            break;
 	    case PVFS_SERV_MGMT_EVENT_MON:
 		resp.u.mgmt_event_mon.event_count = 0;
 		respsize = extra_size_PVFS_servresp_mgmt_event_mon;
@@ -224,6 +223,12 @@ static void lebf_initialize(void)
 		req.u.listeattr.nkey = 0;
                 reqsize = extra_size_PVFS_servreq_listeattr;
 		respsize = extra_size_PVFS_servresp_listeattr;
+                break;
+            case PVFS_SERV_LISTATTR:
+                resp.u.listattr.nhandles = 0;
+                req.u.listattr.nhandles = 0;
+                reqsize = extra_size_PVFS_servreq_listattr;
+                respsize = extra_size_PVFS_servresp_listattr;
                 break;
 	}
 	/* since these take the max size when mallocing in the encode,
@@ -349,7 +354,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
     CASE(PVFS_SERV_MGMT_MIGRATE, mgmt_migrate);
-    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);    
+    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
@@ -371,6 +376,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
+        CASE(PVFS_SERV_LISTATTR,  listattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -436,7 +442,7 @@ static int lebf_encode_resp(
 
     /* we stand a good chance of segfaulting if we try to encode the response
      * after something bad happened reading data from disk. */
-    if (resp->status != -PVFS_EIO) 
+    if (resp->status != -PVFS_EIO)
     {
 
         /* extra encoding rules for particular responses */
@@ -463,19 +469,20 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
+        CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);
-            
+
             case PVFS_SERV_MGMT_MIGRATE:
-            case PVFS_SERV_REMOVE:
-            case PVFS_SERV_MGMT_REMOVE_OBJECT:
-            case PVFS_SERV_MGMT_REMOVE_DIRENT:
-            case PVFS_SERV_SETATTR:
-            case PVFS_SERV_SETEATTR:
-            case PVFS_SERV_DELEATTR:
-            case PVFS_SERV_CRDIRENT:
-            case PVFS_SERV_TRUNCATE:
-            case PVFS_SERV_FLUSH:
-            case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_REMOVE:
+        case PVFS_SERV_MGMT_REMOVE_OBJECT:
+        case PVFS_SERV_MGMT_REMOVE_DIRENT:
+        case PVFS_SERV_SETATTR:
+        case PVFS_SERV_SETEATTR:
+        case PVFS_SERV_DELEATTR:
+        case PVFS_SERV_CRDIRENT:
+        case PVFS_SERV_TRUNCATE:
+        case PVFS_SERV_FLUSH:
+        case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
             /* nothing else */
             break;
@@ -488,7 +495,7 @@ static int lebf_encode_resp(
             ret = -PVFS_ENOSYS;
             break;
         }
-    } 
+    }
 
 #undef CASE
 
@@ -568,7 +575,8 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
-    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);        
+    CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);
+        CASE(PVFS_SERV_LISTATTR, listattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -590,8 +598,8 @@ static int lebf_decode_req(
 
     if (ptr != (char *) input_buffer + input_size)
     {
-	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
-                    __func__, req->op, ptr - (char *) input_buffer, input_size);
+	gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
+                    __func__, req->op, (long)(ptr - (char *) input_buffer), input_size);
 	ret = -PVFS_EPROTO;
     }
 
@@ -622,7 +630,7 @@ static int lebf_decode_resp(
     decode_PVFS_server_resp(p, resp);
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_resp\n");
 
-    if (resp->status == -PVFS_EIO) 
+    if (resp->status == -PVFS_EIO)
         goto out;
 
 #define CASE(tag,var) \
@@ -652,8 +660,10 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
     CASE(PVFS_SERV_GET_SCHEDULER_STATS, get_sched_stats);
-    
+    CASE(PVFS_SERV_LISTATTR, listattr);
         case PVFS_SERV_MGMT_MIGRATE:
+
+
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
@@ -680,8 +690,8 @@ static int lebf_decode_resp(
 #undef CASE
 
     if (ptr != (char *) input_buffer + input_size) {
-	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
-                    __func__, resp->op, ptr - (char *) input_buffer,
+	gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
+                    __func__, resp->op, (long)(ptr - (char *) input_buffer),
                     input_size);
 	ret = -PVFS_EPROTO;
     }
@@ -694,7 +704,7 @@ static int lebf_decode_resp(
  *
  * releases resources consumed while encoding
  *
- * no return value 
+ * no return value
  */
 static void lebf_encode_rel(
     struct PINT_encoded_msg *msg,
@@ -759,6 +769,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
 		    decode_free(req->u.setattr.attr.u.meta.dfile_array);
 		break;
+            case PVFS_SERV_LISTATTR:
+                if (req->u.listattr.handles)
+                    decode_free(req->u.listattr.handles);
 
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
@@ -767,7 +780,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
 	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
         case PVFS_SERV_GET_SCHEDULER_STATS:
-        case PVFS_SERV_MGMT_MIGRATE:        
+        case PVFS_SERV_MGMT_MIGRATE:
 	    case PVFS_SERV_GETATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:
@@ -849,7 +862,22 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (resp->u.listeattr.key)
                     decode_free(resp->u.listeattr.key);
                 break;
-
+            case PVFS_SERV_LISTATTR:
+            {
+                int i;
+                if (resp->u.listattr.error)
+                    decode_free(resp->u.listattr.error);
+                if (resp->u.listattr.attr) {
+                    for (i = 0; i < resp->u.listattr.nhandles; i++) {
+                        if (resp->u.listattr.attr[i].mask & PVFS_ATTR_META_DIST)
+                            decode_free(resp->u.listattr.attr[i].u.meta.dist);
+                        if (resp->u.listattr.attr[i].mask & PVFS_ATTR_META_DFILES)
+                            decode_free(resp->u.listattr.attr[i].u.meta.dfile_array);
+                    }
+                    decode_free(resp->u.listattr.attr);
+                }
+                break;
+            }
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_CREATE:
 	    case PVFS_SERV_REMOVE:
@@ -869,7 +897,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_FLUSH:
 	    case PVFS_SERV_MGMT_SETPARAM:
 	    case PVFS_SERV_MGMT_NOOP:
-        case PVFS_SERV_MGMT_MIGRATE:        
+        case PVFS_SERV_MGMT_MIGRATE:
 	    case PVFS_SERV_STATFS:
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PROTO_ERROR:

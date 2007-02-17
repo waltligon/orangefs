@@ -51,20 +51,89 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_I_SIZE_READ, 1, Define if kernel has i_size_read),
 	)
 
-	AC_MSG_CHECKING(for parent_ino in kernel)
+	AC_MSG_CHECKING(for iget_locked function in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel already defined it
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		ino_t parent_ino(struct dentry *dentry)
+		loff_t iget_locked(struct inode *inode)
 		{
-			return (ino_t)0;
+			return 0;
 		}
 	], [],
 		AC_MSG_RESULT(no),
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_PARENT_INO, 1, Define if kernel has parent_ino),
+		AC_DEFINE(HAVE_IGET_LOCKED, 1, Define if kernel has iget_locked),
+	)
+
+	AC_MSG_CHECKING(for iget4_locked function in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel already defined it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		loff_t iget4_locked(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IGET4_LOCKED, 1, Define if kernel has iget4_locked),
+	)
+
+	AC_MSG_CHECKING(for iget5_locked function in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel already defined it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		loff_t iget5_locked(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IGET5_LOCKED, 1, Define if kernel has iget5_locked),
+	)
+
+	dnl Check if the kernel defines the xtvec structure.
+	dnl This is part of a POSIX extension.
+	AC_MSG_CHECKING(for struct xtvec in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/uio.h>
+		static struct xtvec xv = { 0, 0 };
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STRUCT_XTVEC, 1, Define if struct xtvec is defined in the kernel),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl 2.6.20 deprecated kmem_cache_t
+	AC_MSG_CHECKING(for struct kmem_cache in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+		static struct kmem_cache;
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STRUCT_KMEM_CACHE, 1, Define if struct kmem_cache is defined in kernel),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl 2.6.20 removed SLAB_KERNEL.  Need to use GFP_KERNEL instead
+	AC_MSG_CHECKING(for SLAB_KERNEL flag in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+		static int flags = SLAB_KERNEL;
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_SLAB_KERNEL, 1, Define if SLAB_KERNEL is defined in kernel),
+		AC_MSG_RESULT(no)
 	)
 
 	dnl The name of this field changed from memory_backed to capabilities
@@ -99,6 +168,178 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		)
 	fi
 
+	dnl checking if we have a readv callback in super_operations 
+	AC_MSG_CHECKING(for readv callback in struct file_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct file_operations fop = {
+		    .readv = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_READV_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readv callback),
+		AC_MSG_RESULT(no)
+	)
+	dnl checking if we have a writev callback in super_operations 
+	AC_MSG_CHECKING(for writev callback in struct file_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct file_operations fop = {
+		    .writev = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_WRITEV_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has writev callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a find_inode_handle callback in super_operations 
+	AC_MSG_CHECKING(for find_inode_handle callback in struct super_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct super_operations sop = {
+		    .find_inode_handle = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has find_inode_handle callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl 2.6.18.1 removed this member
+	AC_MSG_CHECKING(for i_blksize in struct inode)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode i = {
+			.i_blksize = 0,
+			};
+		], [],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_I_BLKSIZE_IN_STRUCT_INODE, 1, Define if struct inode in kernel has i_blksize member),
+			AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a statfs_lite callback in super_operations 
+	AC_MSG_CHECKING(for statfs_lite callback in struct super_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct super_operations sop = {
+		    .statfs_lite = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STATFS_LITE_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has statfs_lite callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a fill_handle callback in inode_operations 
+	AC_MSG_CHECKING(for fill_handle callback in struct inode_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode_operations iop = {
+		    .fill_handle = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_FILL_HANDLE_INODE_OPERATIONS, 1, Define if struct inode_operations in kernel has fill_handle callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a getattr_lite callback in inode_operations 
+	AC_MSG_CHECKING(for getattr_lite callback in struct inode_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode_operations iop = {
+		    .getattr_lite = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GETATTR_LITE_INODE_OPERATIONS, 1, Define if struct inode_operations in kernel has getattr_lite callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a get_fs_key callback in super_operations 
+	AC_MSG_CHECKING(for get_fs_key callback in struct super_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct super_operations sop = {
+		    .get_fs_key = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GET_FS_KEY_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has get_fs_key callback),
+		AC_MSG_RESULT(no)
+	)
+	
+	dnl checking if we have a readdirplus callback in file_operations
+	AC_MSG_CHECKING(for readdirplus member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readdirplus = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READDIRPLUS_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readdirplus callback),
+	    AC_MSG_RESULT(no)
+	    )
+
+	dnl checking if we have a readdirplus_lite callback in file_operations
+	AC_MSG_CHECKING(for readdirplus_lite member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readdirplus_lite = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READDIRPLUSLITE_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readdirplus_lite callback),
+	    AC_MSG_RESULT(no)
+	    )
+
+
+	dnl checking if we have a readx callback in file_operations
+	AC_MSG_CHECKING(for readx member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readx = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READX_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readx callback),
+	    AC_MSG_RESULT(no)
+	    )
+
+	dnl checking if we have a writex callback in file_operations
+	AC_MSG_CHECKING(for writex member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.writex = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_WRITEX_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has writex callback),
+	    AC_MSG_RESULT(no)
+	    )
+
 	AC_MSG_CHECKING(for aio support in kernel)
 	dnl if this test passes, the kernel has it
 	dnl if this test fails, the kernel does not have it
@@ -132,6 +373,25 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			AC_DEFINE(HAVE_AIO_VFS_SUPPORT, 1, Define if we are enabling VFS AIO support in kernel),
 			AC_MSG_RESULT(no)
 		)
+
+		tmp_cflags=$CFLAGS
+		dnl if this test passes, the signature of aio_read has changed to the new one 
+		CFLAGS="$CFLAGS -Werror"
+		AC_MSG_CHECKING(for new prototype of aio_read callback of file_operations structure)
+		AC_TRY_COMPILE([
+			#define __KERNEL__
+			#include <linux/fs.h>
+			extern ssize_t my_aio_read(struct kiocb *, const struct iovec *, unsigned long, loff_t);
+			static struct file_operations fop = {
+					  .aio_read = my_aio_read,
+			};
+		], [],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_AIO_NEW_AIO_SIGNATURE, 1, Define if VFS AIO support in kernel has a new prototype),
+			AC_MSG_RESULT(no)
+		)
+		CFLAGS=$tmp_cflags
+
 	fi
 
 	tmp_cflags=$CFLAGS
@@ -147,13 +407,13 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			  static struct super_operations s_op = {
 				  .statfs = pvfs_statfs,
 			  };
-		], [],
+		], [ s_op.statfs = 0; ],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if statfs callback has struct dentry argument),
 		AC_MSG_RESULT(no)
 	)
 
-	AC_MSG_CHECKING(if get_sb callbacks' in kernel has struct vfsmount argument)
+	AC_MSG_CHECKING(if get_sb callback in kernel has struct vfsmount argument)
 	dnl if this test passes, the kernel has it
 	dnl if this test fails, the kernel does not have it
 	AC_TRY_COMPILE([
@@ -164,7 +424,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			  static struct file_system_type fst = {
 				  .get_sb = pvfs_get_sb,
 			  };
-		], [],
+		], [fst.get_sb = 0;],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if get_sb callback has struct vfsmount argument),
 		AC_MSG_RESULT(no)
@@ -191,23 +451,26 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	if test "x$have_xattr" = "xyes"; then
 	   dnl Test to check if setxattr function has a const void * argument
 	   AC_MSG_CHECKING(for const argument to setxattr function)
-	   tmp_cflags=$CFLAGS
 	   dnl if this test passes, there is a const void* argument
-	   CFLAGS="$CFLAGS -Werror"
 	   AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		int pvfs2_setxattr(struct dentry *dentry, const char *name,
-		const void *value, size_t size, int flags) { return (0);};
-		static struct inode_operations in_op = {
-			.setxattr = pvfs2_setxattr
-		};
-		], [],
+		], 
+		[
+			struct inode_operations inode_ops;
+			int ret;
+			struct dentry * dent = NULL;
+			const char * name = NULL;
+			const void * val = NULL;
+			size_t size = 0;
+			int flags = 0;
+
+			ret = inode_ops.setxattr(dent, name, val, size, flags);
+		],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_SETXATTR_CONST_ARG, 1, Define if kernel setxattr has const void* argument),
 		AC_MSG_RESULT(no)
 		)
-		CFLAGS=$tmp_cflags
 	fi
 
 	dnl Test to see if sysctl proc handlers have a 6th argument
@@ -270,6 +533,25 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		[#define __KERNEL__
 		 #include <asm/ioctl32.h>
 		 ] )
+
+	AC_MSG_CHECKING(for generic_file_readv api in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel has it defined with a different
+	dnl signature!  deliberately, the signature for this method has been
+	dnl changed for it to give a compiler error.
+
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		int generic_file_readv(struct inode *inode)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GENERIC_FILE_READV, 1, Define if kernel has generic_file_readv),
+	)
 
 	AC_MSG_CHECKING(for generic_permission api in kernel)
 	dnl if this test passes, the kernel does not have it
@@ -352,29 +634,56 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	)
 
+	dnl kmem_cache_destroy function may return int only on pre 2.6.19 kernels
+	dnl else it returns a void.
+	AC_MSG_CHECKING(for int return in kmem_cache_destroy)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/slab.h>
+	    extern int kmem_cache_destroy(kmem_cache_t *);
+	    ], [],
+	    AC_MSG_RESULT(yes)
+	    AC_DEFINE(HAVE_INT_RETURN_KMEM_CACHE_DESTROY, 1, Define if return value from kmem_cache_destroy is type int),
+	    AC_MSG_RESULT(no)
+	)
+
 	dnl more 2.6 api changes.  return type for the invalidatepage
 	dnl address_space_operation is 'void' in new kernels but 'int' in old
 	dnl I had to turn on -Werror for this test because i'm not sure how
 	dnl else to make dnl "initialization from incompatible pointer type"
 	dnl fail.  
-	tmp_cflags=${CFLAGS}
-	CFLAGS="${CFLAGS} -Werror"
 	AC_MSG_CHECKING(for older int return in invalidatepage)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		static int cfg_invalidate_page(struct page * page, unsigned long offset) {
-			return 0;
-		}
-		struct address_space_operations aso = 
-		{
-		    .invalidatepage = cfg_invalidate_page,
-		};
-		], [],
+		], 
+                [
+			struct address_space_operations aso;
+
+			int ret;
+			struct page * page = NULL;
+			unsigned long offset;
+
+			ret = aso.invalidatepage(page, offset);
+		],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE, 1, Define if return type of invalidatepage should be int),
 		AC_MSG_RESULT(NO)
 		)
+
+	dnl In 2.6.18.1 and newer, including <linux/config.h> will throw off a
+	dnl warning 
+	tmp_cflags=${CFLAGS}
+	CFLAGS="${CFLAGS} -Werror"
+	AC_MSG_CHECKING(for warnings when including linux/config.h)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/config.h>
+		], [], 
+		AC_MSG_RESULT(no)
+		AC_DEFINE(HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H, 1, Define if including linux/config.h gives no warnings),
+		AC_MSG_RESULT(yes)
+	)
 	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(for compat_ioctl member in file_operations structure)
@@ -391,6 +700,8 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	    )
 
+	dnl Gives wrong answer if header is missing; don't try then.
+	if test x$ac_cv_header_linux_ioctl32_h = xyes ; then
 	AC_MSG_CHECKING(for register_ioctl32_conversion kernel exports)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel has it defined
@@ -407,6 +718,49 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_REGISTER_IOCTL32_CONVERSION, 1, Define if kernel has register_ioctl32_conversion),
 	)
+	fi
+
+	AC_MSG_CHECKING(for int return value of kmem_cache_destroy)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+		], [
+		int i = kmem_cache_destroy(NULL);
+		],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_KMEM_CACHE_DESTROY_INT_RETURN, 1, Define if kmem_cache_destroy returns int),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl As of 2.6.19, combined readv/writev into aio_read and aio_write
+	dnl functions.  Detect this by not finding a readv member.
+	AC_MSG_CHECKING(for combined file_operations readv and aio_read)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+			.readv = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(no),
+	    AC_MSG_RESULT(yes)
+	    AC_DEFINE(HAVE_COMBINED_AIO_AND_VECTOR, 1, Define if struct file_operations has combined aio_read and readv functions),
+	    )
 
 	CFLAGS=$oldcflags
+
+	dnl Check for kzalloc
+	AC_MSG_CHECKING(for kzalloc)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+	], [
+		void * a;
+		a = kzalloc(1024);
+	],
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KZALLOC, 1, Define if kzalloc exists)
+	)
 ])

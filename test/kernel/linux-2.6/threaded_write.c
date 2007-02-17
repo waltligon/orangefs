@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <string.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -28,7 +30,7 @@ typedef struct
     int index;
 } threaded_write_info_t;
 
-void *write_file(void *ptr)
+static void *write_file(void *ptr)
 {
     char *buf = NULL;
     threaded_write_info_t *info = (threaded_write_info_t *)ptr;

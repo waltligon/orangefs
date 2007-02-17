@@ -77,7 +77,6 @@ static int remove_remove_dirdata_dspace(
     PINT_server_op *s_op, job_status_s *js_p);
 static int remove_setup_work(
     PINT_server_op *s_op, job_status_s *js_p);
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
@@ -290,11 +289,15 @@ static int remove_get_dirent_count(
     }
     js_p->error_code = 0;
 
-    ret = job_trove_keyval_get_handle_info(
+
+    ret = job_trove_keyval_iterate_keys(
         s_op->u.remove.fs_id,
         s_op->u.remove.dirdata_handle,
-        TROVE_KEYVAL_HANDLE_COUNT,
-        &s_op->u.remove.keyval_handle_info,
+        PVFS_ITERATE_START,
+        &s_op->u.remove.key,
+        1,
+        0,
+        NULL,
         s_op,
         0,
         js_p,
@@ -309,15 +312,14 @@ static int remove_check_dirdata_entries(
 {
     if (js_p->error_code == 0)
     {
-        if (s_op->u.remove.keyval_handle_info.count > 0)
+        if(js_p->count > 0)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, 
                          " detected non-empty "
-                         "directory (fsid: %u, handle: %llu, size %llu) "
+                         "directory (fsid: %u, handle: %llu) "
                          "-- returning error\n",
                          s_op->u.remove.fs_id,
-                         llu(s_op->u.remove.handle),
-                         llu(s_op->u.remove.dirent_count));
+                         llu(s_op->u.remove.handle));
             js_p->error_code = -PVFS_ENOTEMPTY;
         }
     }
@@ -325,11 +327,8 @@ static int remove_check_dirdata_entries(
     {
         /* no entries because count is 0 */
         js_p->error_code = 0;
-        s_op->u.remove.keyval_handle_info.count = 0;
     }
 
-    /* setup position for next state (remove[_dirdata]_keyvals) */
-    s_op->u.remove.pos = PVFS_ITERATE_START;
      return 1;
 }
 
@@ -351,7 +350,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
     ret = job_trove_dspace_remove(
         s_op->u.remove.fs_id,
         s_op->u.remove.dirdata_handle,
-        TROVE_SYNC,
+        0,  /* don't sync here, we do a dspace remove on the dir handle next */
         s_op,
         0,
         js_p,

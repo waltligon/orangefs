@@ -53,6 +53,7 @@
 # define a few generic variables that we need to use
 srcdir = @srcdir@
 prefix = @prefix@
+datarootdir = @datarootdir@
 mandir = @mandir@
 exec_prefix = @exec_prefix@
 
@@ -63,6 +64,7 @@ INSTALL = @INSTALL@
 BISON = bison
 FLEX = flex
 BUILD_GM = @BUILD_GM@
+BUILD_MX = @BUILD_MX@
 BUILD_IB = @BUILD_IB@
 BUILD_OPENIB = @BUILD_OPENIB@
 BUILD_VIS = @BUILD_VIS@
@@ -141,15 +143,17 @@ CC = @CC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
-CFLAGS = @CFLAGS@
+# make sure the srcdir include gets included first
+CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
+LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
+LDFLAGS += @LDFLAGS@
+SERVER_LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
+SERVER_LDFLAGS += @SERVER_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
-LDFLAGS = @LDFLAGS@
-SERVER_LDFLAGS = @SERVER_LDFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
-LDFLAGS += -Llib 
-SERVER_LDFLAGS += -Llib
 LIBS += -lpvfs2 @LIBS@ 
+LIBS_THREADED += -lpvfs2-threaded @LIBS@
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
@@ -167,8 +171,8 @@ CFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
 CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
   # include current directory (for pvfs2-config.h)
 CFLAGS += -I .
-  # setup general warning levels and gcc options
-CFLAGS += -I $(srcdir)/include -I include -I $(srcdir)
+  # include toplevel source dir
+CFLAGS += -I $(srcdir)
   # add selected include directories
 CFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
   # add package version information
@@ -271,8 +275,9 @@ endif
 #
 # run ./configure --help for information on how to do this cleanly.
 LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
-LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
+LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
 LIBS += @THREAD_LIB@
+LIBS_THREADED += @THREAD_LIB@
 
 ################################################################
 # enable GM if configure detected it
@@ -286,7 +291,24 @@ ifdef BUILD_GM
 	LDFLAGS += -L @GM_HOME@/lib
 	SERVER_LDFLAGS += -L @GM_HOME@/lib
 	LIBS += -lgm
+	LIBS_THREADED += -lgm
 	SERVERLIBS += -lgm
+endif
+
+################################################################
+# enable MX if configure detected it
+
+ifdef BUILD_MX
+	CFLAGS += -I @MX_HOME@/include
+	CFLAGS += -D__STATIC_METHOD_BMI_MX__
+	# TODO: later on we will want the ability to modify this at configure
+	# time
+	CFLAGS += -g -O0
+	LDFLAGS += -L @MX_HOME@/lib
+	SERVER_LDFLAGS += -L @MX_HOME@/lib
+	LIBS += -lmyriexpress -lpthread
+	LIBS_THREADED += -lmyriexpress -lpthread
+	SERVERLIBS += -lmyriexpress -lpthread
 endif
 
 #####################################
@@ -298,6 +320,7 @@ ifdef BUILD_IB
     IBLIBS := -L@IB_LIBDIR@ \
 	      -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
     LIBS += $(IBLIBS)
+    LIBS_THREADED += $(IBLIBS)
     SERVERLIBS += $(IBLIBS)
 endif
 
@@ -307,6 +330,7 @@ ifndef BUILD_IB
 endif
     OPENIBLIBS := -L@OPENIB_LIBDIR@ -libverbs
     LIBS += $(OPENIBLIBS)
+    LIBS_THREADED += $(OPENIBLIBS)
     SERVERLIBS += $(OPENIBLIBS)
 endif
 
@@ -361,6 +385,8 @@ VISMISCSRC :=
 KARMASRC :=
 # userland helper programs for kernel drivers
 KERNAPPSRC :=
+#
+KERNAPPSTHRSRC :=
 # MISCSRC are sources that don't fall into the other categories
 MISCSRC := 
 # c files generated from state machines
@@ -380,6 +406,7 @@ endif
 
 # LIBRARIES is a list of the pvfs2 client libraries
 LIBRARIES :=
+LIBRARIES_THREADED :=
 ifeq ($(build_shared),yes)
 LIBRARIES_SHARED = lib/libpvfs2.so
 LIBRARIES += $(LIBRARIES_SHARED)
@@ -387,6 +414,8 @@ endif
 ifeq ($(build_static),yes)
 LIBRARIES_STATIC = lib/libpvfs2.a
 LIBRARIES += $(LIBRARIES_STATIC)
+LIBRARIES_THREADED_STATIC = lib/libpvfs2-threaded.a
+LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
 endif
 
 ################################################################
@@ -452,6 +481,8 @@ KERNAPPS := $(patsubst %.c,%, $(filter %.c, $(KERNAPPSRC)))
 # objects
 KERNAPPDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KERNAPPSRC)))
 
+KERNAPPSTHR := $(patsubst %.c,%-threaded, $(filter %.c, $(KERNAPPSTHRSRC)))
+
 # VISOBJS is a list of visualization program objects
 VISOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISSRC)))
 # VISS is a list of visualization program executables
@@ -496,13 +527,13 @@ DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) \
 # Rules and dependencies
 
 # default rule builds server, library, and applications
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) $(LIBRARIES_THREADED) admintools $(VISS) $(KARMA)
 
 # target for building admin tools
 admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 # target for building kernel driver userland programs
-kernapps: $(KERNAPPS)
+kernapps: $(KERNAPPS) $(KERNAPPSTHR)
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -550,7 +581,7 @@ $(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a
 # special rules for admin tool objects which also require server components
 $(ADMINOBJS_SERVER): %.o: %.c
 	$(Q) "  CC		$@"
-	$(E) $(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E) $(CC) $(CFLAGS) $(SERVERCFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
@@ -602,15 +633,19 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) $(call modldflags,$<)
 
+%-threaded: %.o $(LIBRARIES)
+	$(Q) "  LD              $@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS_THREADED) $(call modldflags,$<)
+
 # rule for building server objects
 %-server.o: %.c
 	$(Q) "  CC		$@"
-	$(E)$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E)$(CC) $(CFLAGS) $(SERVERCFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # default rule for building objects for threaded library
 %-threaded.o: %.c
 	$(Q) "  CC		$@"
-	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # rule for building shared objects for threaded library
 %-threaded.po: %.c
@@ -640,7 +675,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 .PHONY: FORCE
 %-server.i: %.c FORCE
 	$(Q) "  CPP		$@"
-	$(E)$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
+	$(E)$(CC) $(CFLAGS) $(SERVERCFLAGS) $(call modcflags,$<) $< -E -o $@
 
 %.i: %.c FORCE
 	$(Q) "  CPP		$@"
@@ -654,6 +689,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 $(KERNAPPS): %: %.o $(LIBRARIES)
+$(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 
 # target for building _just_ the statecomp tool
 #statecomp: $(STATECOMP)
@@ -667,14 +703,20 @@ cscope:
 		 > $(srcdir)/cscope.files
 	( cd @SRC_ABSOLUTE_TOP@; cscope -be -i @SRC_ABSOLUTE_TOP@/cscope.files )
 
-# build editor tags file over all source files *.[ch] *.sm and
-# some known scripts
+# Build editor tags file over all source files *.[ch] *.sm and
+# some known scripts.  Grab the config files from the build dir.
+# If the build happens to be the source, ignore all sm->c generated
+# files with the help of uniq.
 tags:
-	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include . \
+	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include \
 	    $(srcdir)/src/kernel/linux-2.6 \
 	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
-	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig \
-	) | ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
+	  find . -name pvfs2-config.h ;\
+	  find . -name pvfs2-test-config.h ;\
+	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig ;\
+	  find . -name \*.sm | sed s/sm\$$/c/ ;\
+	) | sort | uniq -u | ctags -L- --excmd=pattern -B --extra=+f \
+	  --langmap=c:+.sm -I __hidden,DOTCONF_CB
 
 # rule for running code check
 codecheck:
@@ -695,8 +737,8 @@ docsclean:
 # top rule for cleaning up tree
 clean:: 
 	$(Q) "  CLEAN"
-	$(E)rm -f $(LIBOBJS) $(SERVEROBJS) $(MISCOBJS) \
-		$(LIBRARIES) $(DEPENDS) $(SERVER) \
+	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) $(SERVEROBJS) $(MISCOBJS) \
+		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(KERNAPPOBJS) $(KERNAPPS) \
@@ -735,7 +777,7 @@ cleaner: clean
 	rm -rf autom4te*.cache
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
 	rm -f config.log config.status config.cache 
-	rm -f pvfs2-@PVFS2_VERSION@.tar.gz
+	rm -f pvfs-@PVFS2_VERSION@.tar.gz
 
 # _really_ clean the tree; should go back to pristine state
 # except, don't remove generated .c files if this is a distributed release

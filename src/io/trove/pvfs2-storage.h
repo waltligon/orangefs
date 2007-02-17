@@ -7,6 +7,7 @@
 #ifndef __PVFS2_STORAGE_H
 #define __PVFS2_STORAGE_H
 
+#include <time.h>
 #include "pvfs2-types.h"
 
 /************************************************************

@@ -26,7 +26,6 @@ int main(int argc, char **argv)
 {
     int ret, i;
     TROVE_coll_id coll_id;
-    char *method_name;
     job_id_t foo_id;
     job_status_s job_stat;
     job_context_id context;
@@ -39,7 +38,8 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+        TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;

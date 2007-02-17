@@ -72,6 +72,7 @@ EXTRA_CFLAGS = \
     -I$(absolute_src_dir)/src/io/dev \
     -I$(absolute_src_dir)/src/io/bmi \
     -I$(absolute_src_dir)/src/common/quickhash \
+	 -I$(absolute_src_dir)/src/proto \
     -I$(absolute_src_dir)/src/common/gossip \
     -I$(absolute_src_dir)/src/common/misc
 
@@ -98,14 +99,14 @@ default: links
 # link to real source directory if out-of-tree build
 links:
 	$(E)for i in $(csrc) $(hsrc); do \
-	    if [[ ! -f $$i  &&  ! -L $$i ]] ; then \
+	    if [ ! -f $$i  -a  ! -L $$i ] ; then \
 		ln -s $(relative_src_dir)/$(here)/$$i ;\
 	    fi ;\
 	done
 
 clean:
 	$(E)for i in $(csrc) $(hsrc); do \
-	    if [[ -L $$i ]] ; then \
+	    if [ -L $$i ] ; then \
 		rm -f $$i ;\
 	    fi ;\
 	done
@@ -113,4 +114,3 @@ clean:
 	$(E)rm -rf $(othergendir)
 
 endif
-

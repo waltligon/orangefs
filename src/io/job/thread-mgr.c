@@ -61,6 +61,7 @@ static pthread_cond_t trove_test_cond = PTHREAD_COND_INITIALIZER;
  */
 static gen_mutex_t bmi_test_mutex = GEN_MUTEX_INITIALIZER;
 static int bmi_test_flag = 0;
+static int bmi_test_cancel_waiter = 0;
 static int bmi_test_count = 0;
 static gen_mutex_t trove_test_mutex = GEN_MUTEX_INITIALIZER;
 static int trove_test_flag = 0;
@@ -218,6 +219,14 @@ static void *bmi_thread_function(void *ptr)
 
 	/* indicate that a test is in progress */
 	gen_mutex_lock(&bmi_test_mutex);
+#ifdef __PVFS2_JOB_THREADED__
+        /* wait politely for any cancel operations to run; else we're
+         * too fast in regrabbing the test_mutex and it hangs waiting for
+         * that small window where test_flag is zero. */
+        while (bmi_test_cancel_waiter) {
+            pthread_cond_wait(&bmi_test_cond, &bmi_test_mutex);
+        }
+#endif
 	bmi_test_flag = 1;
 	gen_mutex_unlock(&bmi_test_mutex);
 	
@@ -396,13 +405,9 @@ int PINT_thread_mgr_trove_start(void)
 	gen_mutex_unlock(&trove_mutex);
 	return(ret);
     }
-#else
-    ret = 0;
-    assert(0);
-#endif
-
-    trove_thread_running = 1;
+    trove_thread_ref_count++;
 #ifdef __PVFS2_JOB_THREADED__
+    trove_thread_running = 1;
     ret = pthread_create(&trove_thread_id, NULL, trove_thread_function, NULL);
     if(ret != 0)
     {
@@ -412,8 +417,11 @@ int PINT_thread_mgr_trove_start(void)
 	/* TODO: convert error code */
 	return(-ret);
     }
-#endif
-    trove_thread_ref_count++;
+#endif /* PVFS2_JOB_THREADED */
+#else
+    ret = 0;
+    assert(0);
+#endif /* PVFS2_TROVE_SUPPORT */
 
     gen_mutex_unlock(&trove_mutex);
     return(0);
@@ -509,6 +517,7 @@ int PINT_thread_mgr_bmi_cancel(PVFS_id_gen_t id, void* user_ptr)
      * progress
      */
     gen_mutex_lock(&bmi_test_mutex);
+    ++bmi_test_cancel_waiter;
     while(bmi_test_flag == 1)
     {
 #ifdef __PVFS2_JOB_THREADED__
@@ -518,14 +527,14 @@ int PINT_thread_mgr_bmi_cancel(PVFS_id_gen_t id, void* user_ptr)
 	assert(0);
 #endif
     }
+    --bmi_test_cancel_waiter;
 
     /* iterate down list of pending completions, to see if the caller is
      * trying to cancel one of them
      */
-#if 0
-    gossip_err("THREAD MGR trying to cancel op: %llu, ptr: %p.\n",
-	llu(id), user_ptr);
-#endif
+    gossip_debug(GOSSIP_JOB_DEBUG,
+                 "%s: trying to cancel opid: %llu, ptr: %p.\n",
+	         __func__, llu(id), user_ptr);
     for(i=0; i<bmi_test_count; i++)
     {
 #if 0
@@ -549,6 +558,10 @@ int PINT_thread_mgr_bmi_cancel(PVFS_id_gen_t id, void* user_ptr)
     ret = BMI_cancel(id, global_bmi_context);
     if(ret < 0)
 	gossip_err("WARNING: BMI cancel failed, proceeding anyway.\n");
+#ifdef __PVFS2_JOB_THREADED__
+    /* release waiting testcontext thread */
+    pthread_cond_signal(&bmi_test_cond);
+#endif
     gen_mutex_unlock(&bmi_test_mutex);
     return(ret);
 }

@@ -10,7 +10,6 @@
 #include "trove.h"
 #include "pvfs2-internal.h"
 
-#define ROOT_HANDLE_STRING ROOT_HANDLE_KEYSTR
 #define MB 1024*1024
 enum {
     INIT_TEST_SIZE = 40*MB,
@@ -71,14 +70,16 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
 	TROVE_ds_state state;
 	TROVE_keyval_s key, val;
 
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+	TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0) {
         fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
         return -1;
     }
 
     /* try to look up collection used to store file system */
-    ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
+    ret = trove_collection_lookup(
+	TROVE_METHOD_DBPF, file_system, &coll_id, NULL, &op_id);
     if (ret < 0) {
         fprintf(stderr, "collection lookup failed.\n");
         return -1;
@@ -210,11 +211,9 @@ int path_lookup(TROVE_coll_id coll_id,
     TROVE_op_id op_id;
     TROVE_handle handle;
 
-    char root_handle_string[] = ROOT_HANDLE_STRING;
-
     /* get root */
-    key.buffer = root_handle_string;
-    key.buffer_sz = strlen(root_handle_string) + 1;
+    key.buffer = ROOT_HANDLE_KEYSTR;
+    key.buffer_sz = ROOT_HANDLE_KEYLEN;
     val.buffer = &handle;
     val.buffer_sz = sizeof(handle);
 

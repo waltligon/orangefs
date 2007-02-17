@@ -5,36 +5,37 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.20 2006-08-18 21:27:30 pw Exp $
+ * $Id: ib.h,v 1.20.4.1 2007-02-17 11:16:33 kunkel Exp $
  */
 #ifndef __ib_h
 #define __ib_h
 
 #include <src/io/bmi/bmi-types.h>
 #include <src/common/quicklist/quicklist.h>
+#include <src/common/gossip/gossip.h>
 
 #ifdef __GNUC__
+/* confuses debugger */
 /* #  define __hidden __attribute__((visibility("hidden"))) */
-#  define __hidden  /* confuses debugger */
+#  define __hidden
 #  define __unused __attribute__((unused))
 #else
 #  define __hidden
 #  define __unused
 #endif
 
-typedef struct qlist_head list_t;  /* easier to type */
-
 /* 20 8kB buffers allocated to each connection for unexpected messages */
 #define DEFAULT_EAGER_BUF_NUM  (20)
 #define DEFAULT_EAGER_BUF_SIZE (8 << 10)
 
-struct S_buf_head;
+struct buf_head;
+
 /*
  * Connection record.  Each machine gets its own set of buffers and
  * an entry in this table.
  */
 typedef struct {
-    list_t list;
+    struct qlist_head list;
 
     /* connection management */
     struct method_addr *remote_map;
@@ -45,14 +46,17 @@ typedef struct {
     void *eager_recv_buf_contig;    /* eager bufs, for short recvs */
 
     /* lists of free bufs */
-    list_t eager_send_buf_free;
-    list_t eager_recv_buf_free;
-    struct S_buf_head *eager_send_buf_head_contig;
-    struct S_buf_head *eager_recv_buf_head_contig;
+    struct qlist_head eager_send_buf_free;
+    struct qlist_head eager_recv_buf_free;
+    struct buf_head *eager_send_buf_head_contig;
+    struct buf_head *eager_recv_buf_head_contig;
 
     int cancelled;  /* was any operation cancelled by BMI */
     int refcnt;  /* sq or rq that need the connection to hang around */
     int closed;  /* closed, but hanging around waiting for zero refcnt */
+
+    int send_credit;    /* free slots on receiver */
+    int return_credit;  /* receive buffers he filled but that we've emptied */
 
     void *priv;
 
@@ -62,13 +66,13 @@ typedef struct {
  * List structure of buffer areas, represents one at each local
  * and remote sides.
  */
-typedef struct S_buf_head {
-    list_t list;
-    int num;               /* ordinal index in the alloced buf heads */
-    ib_connection_t *c;    /* owning connection */
-    struct S_ib_send *sq;  /* owning sq or rq */
-    void *buf;             /* actual memory */
-} buf_head_t;
+struct buf_head {
+    struct qlist_head list;
+    int num;             /* ordinal index in the alloced buf heads */
+    ib_connection_t *c;  /* owning connection */
+    struct ib_work *sq;  /* owning sq (usually) or rq */
+    void *buf;           /* actual memory */
+};
 
 /* "private data" part of method_addr */
 typedef struct {
@@ -79,32 +83,39 @@ typedef struct {
 
 /*
  * Names of all the sendq and recvq states and message types, with string
- * arrays for debugging.
+ * arrays for debugging.  These must start at 1, not 0, for name printing.
  */
 typedef enum {
-    SQ_WAITING_BUFFER=1,
-    SQ_WAITING_EAGER_ACK,
+    SQ_WAITING_BUFFER = 1,
+    SQ_WAITING_EAGER_SEND_COMPLETION,
+    SQ_WAITING_RTS_SEND_COMPLETION,
+    SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS,
     SQ_WAITING_CTS,
-    SQ_WAITING_DATA_LOCAL_SEND_COMPLETE,
+    SQ_WAITING_DATA_SEND_COMPLETION,
+    SQ_WAITING_RTS_DONE_BUFFER,
+    SQ_WAITING_RTS_DONE_SEND_COMPLETION,
     SQ_WAITING_USER_TEST,
     SQ_CANCELLED,
 } sq_state_t;
-typedef enum {
+typedef enum {  /* bits *_USER_POST will be ORed */
     RQ_EAGER_WAITING_USER_POST = 0x1,
     RQ_EAGER_WAITING_USER_TESTUNEXPECTED = 0x2,
     RQ_EAGER_WAITING_USER_TEST = 0x4,
     RQ_RTS_WAITING_USER_POST = 0x8,
     RQ_RTS_WAITING_CTS_BUFFER = 0x10,
-    RQ_RTS_WAITING_DATA = 0x20,
-    RQ_RTS_WAITING_USER_TEST = 0x40,
-    RQ_WAITING_INCOMING = 0x80,
-    RQ_CANCELLED = 0x100,
+    RQ_RTS_WAITING_CTS_SEND_COMPLETION = 0x20,
+    RQ_RTS_WAITING_RTS_DONE = 0x40,
+    RQ_RTS_WAITING_USER_TEST = 0x80,
+    RQ_WAITING_INCOMING = 0x100,
+    RQ_CANCELLED = 0x200,
 } rq_state_t;
 typedef enum {
-    MSG_EAGER_SEND=1,
+    MSG_EAGER_SEND = 1,
     MSG_EAGER_SENDUNEXPECTED,
     MSG_RTS,
     MSG_CTS,
+    MSG_RTS_DONE,
+    MSG_CREDIT,
     MSG_BYE,
 } msg_type_t;
 
@@ -116,9 +127,13 @@ typedef struct {
 } name_t;
 static name_t sq_state_names[] = {
     entry(SQ_WAITING_BUFFER),
-    entry(SQ_WAITING_EAGER_ACK),
+    entry(SQ_WAITING_EAGER_SEND_COMPLETION),
+    entry(SQ_WAITING_RTS_SEND_COMPLETION),
+    entry(SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS),
     entry(SQ_WAITING_CTS),
-    entry(SQ_WAITING_DATA_LOCAL_SEND_COMPLETE),
+    entry(SQ_WAITING_DATA_SEND_COMPLETION),
+    entry(SQ_WAITING_RTS_DONE_BUFFER),
+    entry(SQ_WAITING_RTS_DONE_SEND_COMPLETION),
     entry(SQ_WAITING_USER_TEST),
     entry(SQ_CANCELLED),
     { 0, 0 }
@@ -129,7 +144,8 @@ static name_t rq_state_names[] = {
     entry(RQ_EAGER_WAITING_USER_TEST),
     entry(RQ_RTS_WAITING_USER_POST),
     entry(RQ_RTS_WAITING_CTS_BUFFER),
-    entry(RQ_RTS_WAITING_DATA),
+    entry(RQ_RTS_WAITING_CTS_SEND_COMPLETION),
+    entry(RQ_RTS_WAITING_RTS_DONE),
     entry(RQ_RTS_WAITING_USER_TEST),
     entry(RQ_WAITING_INCOMING),
     entry(RQ_CANCELLED),
@@ -140,6 +156,8 @@ static name_t msg_type_names[] = {
     entry(MSG_EAGER_SENDUNEXPECTED),
     entry(MSG_RTS),
     entry(MSG_CTS),
+    entry(MSG_RTS_DONE),
+    entry(MSG_CREDIT),
     entry(MSG_BYE),
     { 0, 0 }
 };
@@ -155,7 +173,7 @@ static name_t msg_type_names[] = {
  * needs a dreg-style consistency check against userspace freeing, though.
  */
 typedef struct {
-    list_t list;
+    struct qlist_head list;
     void *buf;
     bmi_size_t len;
     int count;  /* refcount, usage of this entry */
@@ -185,61 +203,43 @@ typedef struct {
 } ib_buflist_t;
 
 /*
- * Send message record.  There is no EAGER_SENT since we use RD which
- * ensures reliability, so the message is marked complete immediately
- * and removed from the queue.
+ * Common structure for both ib_send and ib_recv outstanding work items.
  */
-typedef struct S_ib_send {
-    list_t list;
-    int type;  /* BMI_SEND */
-    /* pointer back to owning method_op (BMI interface) */
-    struct method_op *mop;
-    sq_state_t state;
+struct ib_work {
+    struct qlist_head list;
+    int type;  /* BMI_SEND or BMI_RECV */
+    struct method_op *mop;   /* pointer back to owning method_op */
+
     ib_connection_t *c;
 
-    /* gather list of buffers */
+    /* gather (send) or scatter (recv) list of buffers */
     ib_buflist_t buflist;
 
     /* places to hang just one buf when not using _list funcs, avoids
      * small mallocs in that case but permits use of generic code */
-    const void *buflist_one_buf;
+    union {
+	const void *send;
+	void *recv;
+    } buflist_one_buf;
     bmi_size_t  buflist_one_len;
 
-    int is_unexpected;  /* if user posted this that way */
-    /* bh represents our local buffer that is tied up until completed */
-    buf_head_t *bh;
-    /* his_bufnum is used to tell him what his buffer was that sent to
-     * us, so he can free it up for reuse; only needed to ack a CTS */
-    int his_bufnum;
+    /* bh represents our local buffer for sending, maybe CTS messages
+     * as sent for receive items */
+    struct buf_head *bh;
+
+    /* tag as posted by user, or return value on recvs */
     bmi_msg_tag_t bmi_tag;
-} ib_send_t;
 
-/*
- * Receive message record.
- */
-typedef struct {
-    list_t list;
-    int type;  /* BMI_RECV */
-    /* pointer back to owning method_op (BMI interface) */
-    struct method_op *mop;
-    rq_state_t state;
-    ib_connection_t *c;
+    /* send or receive state */
+    union {
+	sq_state_t send;
+	rq_state_t recv;
+    } state;
 
-    /* scatter list of buffers */
-    ib_buflist_t buflist;
-
-    /* places to hang just one buf when not using _list funcs, avoids
-     * small mallocs in that case but permits use of generic code */
-    void *      buflist_one_buf;
-    bmi_size_t  buflist_one_len;
-
-    /* local and remote buf heads for sending associated cts */
-    buf_head_t *bh, *bhr;
-    u_int64_t rts_mop_id;  /* return tag to give to rts sender */
-    /* return value for test and wait, necessary when not pre-posted */
-    bmi_msg_tag_t bmi_tag;
-    bmi_size_t actual_len;
-} ib_recv_t;
+    int is_unexpected;      /* send: if user posted an unexpected message */
+    u_int64_t rts_mop_id;    /* recv: return tag to give to rts sender */
+    bmi_size_t actual_len;   /* recv: could be shorter than posted */
+};
 
 /*
  * Header structure used for various sends.  Make sure these stay fully 64-bit
@@ -249,43 +249,49 @@ typedef struct {
  */
 typedef struct {
     msg_type_t type;
+    u_int32_t credit;  /* return credits */
 } msg_header_common_t;
-endecode_fields_1(msg_header_common_t,
-    enum, type);
-
-typedef struct {
-    msg_type_t type;
-    bmi_msg_tag_t bmi_tag;
-    u_int32_t bufnum;  /* sender's bufnum for acknowledgement messages */
-    u_int32_t __pad;
-} msg_header_eager_t;
-endecode_fields_3(msg_header_eager_t,
+endecode_fields_2(msg_header_common_t,
     enum, type,
-    int32_t, bmi_tag,
-    uint32_t, bufnum);
+    uint32_t, credit);
 
 /*
- * Follows msg_header_t only on MSG_RTS messages.  No bufnum here as
- * the sender remembers via sq->bh and will free upon receipt of CTS.
+ * Eager message header, with data following this struct.
  */
 typedef struct {
-    msg_type_t type;
+    msg_header_common_t c;
     bmi_msg_tag_t bmi_tag;
+    u_int32_t __pad;
+} msg_header_eager_t;
+endecode_fields_4(msg_header_eager_t,
+    enum, c.type,
+    uint32_t, c.credit,
+    int32_t, bmi_tag,
+    uint32_t, __pad);
+
+/*
+ * MSG_RTS instead of MSG_EAGER from sender to receiver for big messages.
+ */
+typedef struct {
+    msg_header_common_t c;
+    bmi_msg_tag_t bmi_tag;
+    u_int32_t __pad;
     u_int64_t mop_id;  /* handle to ease lookup when CTS is delivered */
     u_int64_t tot_len;
 } msg_header_rts_t;
-endecode_fields_4(msg_header_rts_t,
-    enum, type,
+endecode_fields_6(msg_header_rts_t,
+    enum, c.type,
+    uint32_t, c.credit,
     int32_t, bmi_tag,
+    int32_t, __pad,
     uint64_t, mop_id,
     uint64_t, tot_len);
 
 /*
- * Ditto for MSG_CTS.
+ * MSG_CTS from receiver to sender with buffer information.
  */
 typedef struct {
-    msg_type_t type;
-    u_int32_t bufnum;  /* sender's bufnum for acknowledgment messages */
+    msg_header_common_t c;
     u_int64_t rts_mop_id;  /* return id from the RTS */
     u_int64_t buflist_tot_len;
     u_int32_t buflist_num;  /* number of buffers, then lengths to follow */
@@ -298,11 +304,25 @@ typedef struct {
 } msg_header_cts_t;
 #define MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE (8 + 4 + 4)
 endecode_fields_5(msg_header_cts_t,
-    enum, type,
-    uint32_t, bufnum,
+    enum, c.type,
+    uint32_t, c.credit,
     uint64_t, rts_mop_id,
     uint64_t, buflist_tot_len,
     uint32_t, buflist_num);
+
+/*
+ * After RDMA data has been sent, this RTS_DONE message tells the
+ * receiver that the sender has finished.
+ */
+typedef struct {
+    msg_header_common_t c;
+    u_int64_t mop_id;
+} msg_header_rts_done_t;
+endecode_fields_3(msg_header_rts_done_t,
+    enum, c.type,
+    uint32_t, c.credit,
+    uint64_t, mop_id);
+
 
 /*
  * Generic work completion from poll_cq() for both vapi and openib.
@@ -311,7 +331,6 @@ struct bmi_ib_wc {
     uint64_t id;
     int status;  /* opaque, but zero means success */
     uint32_t byte_len;
-    uint32_t imm_data;
     enum { BMI_IB_OP_SEND, BMI_IB_OP_RECV, BMI_IB_OP_RDMA_WRITE } opcode;
 };
 
@@ -322,16 +341,14 @@ struct ib_device_func {
     int (*new_connection)(ib_connection_t *c, int sock, int is_server);
     void (*close_connection)(ib_connection_t *c);
     void (*drain_qp)(ib_connection_t *c);
-    void (*send_bye)(ib_connection_t *c);
     int (*ib_initialize)(void);
     void (*ib_finalize)(void);
-    void (*post_sr)(const buf_head_t *bh, u_int32_t len);
-    void (*post_rr)(const ib_connection_t *c, buf_head_t *bh);
-    void (*post_sr_ack)(ib_connection_t *c, int his_bufnum);
-    void (*post_rr_ack)(const ib_connection_t *c, const buf_head_t *bh);
-    void (*post_sr_rdmaw)(ib_send_t *sq, msg_header_cts_t *mh_cts,
+    void (*post_sr)(const struct buf_head *bh, u_int32_t len);
+    void (*post_rr)(const ib_connection_t *c, struct buf_head *bh);
+    void (*post_sr_rdmaw)(struct ib_work *sq, msg_header_cts_t *mh_cts,
                           void *mh_cts_buf);
-    int (*prepare_cq_block)(void);
+    void (*prepare_cq_block)(int *cq_fd, int *async_fd);
+    void (*ack_cq_completion_event)(void);
     int (*check_cq)(struct bmi_ib_wc *wc);
     const char *(*wc_status_string)(int status);
     void (*mem_register)(memcache_entry_t *c);
@@ -343,10 +360,12 @@ struct ib_device_func {
  * State that applies across all users of the device, built at initialization.
  */
 typedef struct {
-    int listen_sock;  /* TCP sock on whih to listen for new connections */
-    list_t connection; /* list of current connections */
-    list_t sendq;  /* outstanding sent items */
-    list_t recvq;  /* outstanding posted receives (or unexpecteds) */
+    int listen_sock;  /* TCP sock on which to listen for new connections */
+    struct method_addr *listen_addr;  /* and BMI listen address */
+
+    struct qlist_head connection; /* list of current connections */
+    struct qlist_head sendq;  /* outstanding sent items */
+    struct qlist_head recvq;  /* outstanding posted receives (or unexpecteds) */
     void *memcache;  /* opaque structure that holds memory cache state */
 
     /*
@@ -377,6 +396,8 @@ void error_xerrno(int errnum, const char *fmt, ...)
   __attribute__((noreturn,format(printf,2,3)));
 void warning(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void warning_errno(const char *fmt, ...) __attribute__((format(printf,1,2)));
+void warning_xerrno(int errnum, const char *fmt, ...)
+  __attribute__((format(printf,2,3)));
 void info(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void *Malloc(unsigned long n) __attribute__((malloc));
 void *qlist_del_head(struct qlist_head *list);
@@ -395,6 +416,8 @@ int write_full(int fd, const void *buf, size_t count);
 void *memcache_memalloc(void *md, bmi_size_t len, int eager_limit);
 int memcache_memfree(void *md, void *buf, bmi_size_t len);
 void memcache_register(void *md, ib_buflist_t *buflist);
+void memcache_preregister(void *md, const void *buf, bmi_size_t len,
+                          enum PVFS_io_type rw);
 void memcache_deregister(void *md, ib_buflist_t *buflist);
 void *memcache_init(void (*mem_register)(memcache_entry_t *),
                     void (*mem_deregister)(memcache_entry_t *));
@@ -435,13 +458,13 @@ void memcache_shutdown(void *md);
 #define debug(lvl,fmt,args...) \
     do { \
 	if (lvl <= DEBUG_LEVEL) \
-	    info(fmt,##args); \
+	    gossip_debug(GOSSIP_BMI_DEBUG_IB, fmt ".\n", ##args); \
     } while (0)
 #else
 #  define debug(lvl,fmt,...) do { } while (0)
 #endif
 
-#if 1
+#if !defined(NDEBUG)
 #define assert(cond,fmt,args...) \
     do { \
 	if (bmi_ib_unlikely(!(cond))) \

@@ -227,7 +227,7 @@ int main(int argc, char **argv)
     if (!err)
     {
         /* if we hit this point, then everything is ok */
-        printf("   Ok; root handle is owned by exactly one server.\n");
+        printf("     Ok; root handle is owned by exactly one server.\n");
         printf("\n");
     }
 
@@ -351,7 +351,6 @@ static int noop_all_servers(PVFS_fs_id fsid)
 
     return(0);
 }
-
 
 /* print_config()
  *

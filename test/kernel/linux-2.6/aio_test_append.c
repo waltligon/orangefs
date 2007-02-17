@@ -8,6 +8,7 @@
 
 #define _GNU_SOURCE
 
+#include "pvfs2-test-config.h"
 #include <sys/types.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -16,12 +17,14 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+#ifdef HAVE_LIBAIO_H
 #include <libaio.h>
+#endif
 
 #define NUM_CHILDREN 8
 
 
-int check_zero(char *buf, int size)
+static int check_zero(char *buf, int size)
 {
 	int *iptr;
 
@@ -30,7 +33,7 @@ int check_zero(char *buf, int size)
 	while (size > 0) {
 		if (*iptr++ != 0) {
 			fprintf(stderr, "non zero buffer at buf[%d]\n",
-				((char *)iptr) - buf);
+				(int)(((char *)iptr) - buf));
 			return 1;
 		}
 		size -= 4;
@@ -38,7 +41,7 @@ int check_zero(char *buf, int size)
 	return 0;	/* all zeros */
 }
 
-int read_eof(char *filename)
+static int read_eof(char *filename)
 {
 	int fd;
 	int i;
@@ -58,7 +61,7 @@ int read_eof(char *filename)
 		if (r > 0) {
 			if ((bufoff = check_zero(buf, 4096))) {
 				fprintf(stderr, "non-zero read at offset %ld\n",
-					offset + bufoff);
+					(long)(offset + bufoff));
 				exit(1);
 			}
 		}
@@ -72,7 +75,7 @@ int read_eof(char *filename)
 /*
  * append to the end of a file using AIO DIRECT.
  */
-void aiodio_append(char *filename)
+static void aiodio_append(char *filename)
 {
 	int fd;
 	void *bufptr;

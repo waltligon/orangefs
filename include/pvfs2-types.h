@@ -11,7 +11,6 @@
  *
  *  Definitions of types used throughout PVFS2.
  */
-
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
@@ -27,6 +26,10 @@
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
 #define INT32_MAX (2147483647)
+#endif
+
+#ifndef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 #endif
 
 /* figure out the size of a pointer */
@@ -133,6 +136,7 @@ typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
 typedef uint64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
+typedef uint64_t PVFS_flags;
 #define encode_PVFS_uid encode_uint32_t
 #define decode_PVFS_uid decode_uint32_t
 #define encode_PVFS_gid encode_uint32_t
@@ -141,6 +145,8 @@ typedef uint32_t PVFS_permissions;
 #define decode_PVFS_time decode_int64_t
 #define encode_PVFS_permissions encode_uint32_t
 #define decode_PVFS_permissions decode_uint32_t
+#define encode_PVFS_flags encode_uint64_t
+#define decode_PVFS_flags decode_uint64_t
 
 /* contiguous range of handles */
 typedef struct
@@ -190,13 +196,13 @@ endecode_fields_1a(
 #define PVFS_U_READ    (1 << 8)
 /* no PVFS_U_VTX (sticky bit) */
 #define PVFS_G_SGID    (1 << 10)
-/* no PVFS_U_SGID */
+#define PVFS_U_SUID    (1 << 11)
 
 /* valid permission mask */
 #define PVFS_PERM_VALID \
 (PVFS_O_EXECUTE | PVFS_O_WRITE | PVFS_O_READ | PVFS_G_EXECUTE | \
  PVFS_G_WRITE | PVFS_G_READ | PVFS_U_EXECUTE | PVFS_U_WRITE | \
- PVFS_U_READ | PVFS_G_SGID)
+ PVFS_U_READ | PVFS_G_SGID | PVFS_U_SUID)
 
 #define PVFS_USER_ALL  (PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ)
 #define PVFS_GROUP_ALL (PVFS_G_EXECUTE|PVFS_G_WRITE|PVFS_G_READ)
@@ -219,6 +225,11 @@ typedef enum
 
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
+
+/* PVFS Object Flags (PVFS_flags); Add more as we implement them */
+#define PVFS_IMMUTABLE_FL 0x1ULL
+#define PVFS_APPEND_FL    0x2ULL
+#define PVFS_NOATIME_FL   0x4ULL
 
 /* Key/Value Pairs */
 /* Extended attributes are stored on objects with */
@@ -279,7 +290,8 @@ typedef struct
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_PARENT_HANDLE)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
- PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT)
+ PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT \
+ | PVFS_ATTR_SYS_DIR_HINT)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
 #define PVFS_ATTR_SYS_ALL_TIMES \
@@ -529,7 +541,7 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 #define PVFS_EHOSTDOWN       E(55) /* Host is down */
 #define PVFS_EHOSTUNREACH    E(56) /* No route to host */
 #define PVFS_EALREADY        E(57) /* Operation already in progress */
-#define PVFS_EACCES          E(58) /* Operation already in progress */
+#define PVFS_EACCES          E(58) /* Access not allowed */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
@@ -644,7 +656,7 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "Unknown host",                                   \
     "No address associated with name",                \
     "Unknown server error",                           \
-    "Host name lookup failure"                        \
+    "Host name lookup failure",                       \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -654,7 +666,7 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_EHOSTNTFD, /* 4 */                           \
     PVFS_EADDRNTFD, /* 5 */                           \
     PVFS_ENORECVR,  /* 6 */                           \
-    PVFS_ETRYAGAIN  /* 7 */                           \
+    PVFS_ETRYAGAIN, /* 7 */                           \
 }
 
 /*

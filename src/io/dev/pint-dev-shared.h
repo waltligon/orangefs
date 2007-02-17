@@ -11,6 +11,7 @@
 #ifndef __PINT_DEV_SHARED_H
 #define __PINT_DEV_SHARED_H
 
+
 #ifdef __KERNEL__
 #include <linux/ioctl.h>
 #else
@@ -23,11 +24,11 @@
 #define PVFS_KERNEL_PROTO_VERSION ((PVFS2_VERSION_MAJOR * 10000) + \
   (PVFS2_VERSION_MINOR * 100) + PVFS2_VERSION_SUB)
 
-/* This is the number of discrete buffers we will break the mapped I/O
+/* This is the default number of discrete buffers we will break the mapped I/O
  * region into.  In some sense it governs the number of concurrent I/O
  * operations that we will allow
  */
-#define PVFS2_BUFMAP_DESC_COUNT    5
+#define PVFS2_BUFMAP_DEFAULT_DESC_COUNT    5
 
 /*
   by default, we assume each description size is 4MB; this value
@@ -43,8 +44,32 @@
 #define PVFS2_BUFMAP_DEFAULT_DESC_SHIFT 22 /* NOTE: 2^22 == 4MB */
 
 /* size of mapped buffer region to use for I/O transfers (in bytes) */
-#define PVFS2_BUFMAP_TOTAL_SIZE \
-(PVFS2_BUFMAP_DESC_COUNT * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)
+#define PVFS2_BUFMAP_DEFAULT_TOTAL_SIZE \
+(PVFS2_BUFMAP_DEFAULT_DESC_COUNT * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)
+
+/* Sane maximum values for these parameters (128 MB) */
+#define PVFS2_BUFMAP_MAX_TOTAL_SIZE      (128ULL * (1024 * 1024))
+
+/* log to base 2 when we know that number is a power of 2 */
+static inline int LOG2(int number)
+{
+    int count = 0;
+    if (number == 0 || (number & (number - 1))) 
+    {
+        return -1;
+    }
+    while (number >>= 1)
+    {
+        count++;
+    }
+    return count;
+}
+
+#define PVFS2_READDIR_DEFAULT_DESC_COUNT  5
+#define PVFS2_READDIR_DEFAULT_DESC_SIZE  (128 * 1024)
+#define PVFS2_READDIR_DEFAULT_DESC_SHIFT 17
+#define PVFS2_READDIR_DEFAULT_TOTAL_SIZE \
+(PVFS2_READDIR_DEFAULT_DESC_COUNT * PVFS2_READDIR_DEFAULT_DESC_SIZE)
 
 /* pvfs2-client-core can cache readahead data up to this size in bytes */
 #define PVFS2_MMAP_RACACHE_MAX_SIZE ((loff_t)(8 * (1024 * 1024)))
@@ -59,7 +84,9 @@
 struct PVFS_dev_map_desc
 {
     void     *ptr;
-    int32_t  size; /* Changed to an int32_t for fixed size structure */
+    int32_t  total_size; 
+    int32_t  size;
+    int32_t  count;
 };
 
 #define PVFS_DEV_MAGIC 'k'

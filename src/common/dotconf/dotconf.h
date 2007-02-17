@@ -184,7 +184,7 @@ extern "C"
     struct command_t
     {
 	const char *name;	/* name of the command */
-	configoption_t *option;	/* the option as given in the app; READ ONLY */
+	const configoption_t *option;	/* the option as given in the app; READ ONLY */
 
 	/* ------ argument data filled in for each line / command ----------------------------------- */
 	struct
@@ -245,11 +245,6 @@ extern "C"
     configfile_t * configfile,
     unsigned long context);
 
-/* ------ PINT_dotconf_find_command() - iterate through all registered options trying to match ------- */
-    configoption_t *PINT_dotconf_find_command(
-    configfile_t * configfile,
-    const char *command);
-
 /* ------ PINT_dotconf_read_arg() - read one argument from the line handling quoting and escaping ---- */
 /*
 	side effects: the char* returned by PINT_dotconf_read_arg is malloc() before, hence that pointer
@@ -257,7 +252,7 @@ extern "C"
 */
     char *PINT_dotconf_read_arg(
     configfile_t * configfile,
-    char **line);
+    const char **line);
 
 /* ------ PINT_dotconf_handle_command() - parse, substitute, find, invoke the command found in buffer  */
     const char *PINT_dotconf_handle_command(

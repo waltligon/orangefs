@@ -10,8 +10,12 @@
 #include "pvfs2-config.h"
 
 #ifndef HAVE_FGETXATTR_PROTOTYPE
+#ifndef HAVE_FGETXATTR_EXTRA_ARGS
 /* prototype taken from fgetxattr(2) on Fedora FC4 */
 ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size);
+#else
+ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size, int pos, int opts);
+#endif
 #endif
 
 #endif
