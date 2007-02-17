@@ -53,12 +53,7 @@ static int fs_add_final_cleanup(
 
 %%
 
-machine pvfs2_fs_add_sm(
-    run_nested,
-    parent_cleanup,
-    config_integrity_checks,
-    do_config_integrity_checks,
-    final_cleanup)
+machine pvfs2_fs_add_sm
 {
     state run_nested 
     {

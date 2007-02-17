@@ -147,18 +147,7 @@ static void io_datafile_index_array_destroy(
 
 %%
 
-machine pvfs2_client_io_sm(
-    init,
-    io_getattr,
-    io_datafile_setup_msgpairs,
-    small_io,
-    io_datafile_post_msgpairs,
-    io_datafile_post_msgpairs_retry,
-    io_datafile_complete_operations,
-    io_analyze_results,
-    io_datafile_size,
-    io_analyze_size_results,
-    io_cleanup)
+machine pvfs2_client_io_sm
 {
     state init
     {

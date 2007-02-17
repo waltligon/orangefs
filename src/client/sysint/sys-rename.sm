@@ -80,30 +80,7 @@ static int rename_chdirent_comp_fn(
 
 %%
 
-machine pvfs2_client_rename_sm(
-    init,
-    rename_lookups_setup_msgpair_array,
-    rename_lookups_xfer_msgpair_array,
-    rename_lookups_failure,
-    rename_getattr_src,
-    rename_getattr_src_interpret,
-    rename_getattr_dest,
-    rename_crdirent_setup_msgpair,
-    rename_crdirent_xfer_msgpair,
-    rename_crdirent_retry_or_fail,
-    rename_crdirent_timer,
-    rename_rmdirent_setup_msgpair,
-    rename_rmdirent_xfer_msgpair,
-    rename_rmdirent_retry_or_fail,
-    rename_rmdirent_timer,
-    rename_rmdirent_failure,
-    rename_chdirent_setup_msgpair,
-    rename_chdirent_xfer_msgpair,
-    rename_chdirent_failure,
-    rename_check_for_remove,
-    rename_do_remove,
-    rename_warn_user_to_run_fsck,
-    cleanup)
+machine pvfs2_client_rename_sm
 {
     state init
     {

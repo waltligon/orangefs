@@ -40,10 +40,7 @@ static int small_io_completion_fn(void * user_args,
 
 %%
 
-nested machine pvfs2_client_small_io_sm(
-    setup_msgpairs,
-    xfer_msgpairs,
-    cleanup)
+nested machine pvfs2_client_small_io_sm
 {
     state setup_msgpairs 
     {

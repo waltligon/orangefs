@@ -63,12 +63,7 @@ static int msgpairarray_completion_fn(
 
 %%
 
-nested machine pvfs2_msgpairarray_sm(
-    init,
-    post,
-    post_retry,
-    complete,
-    completion_fn)
+nested machine pvfs2_msgpairarray_sm
 {
     state init
     {

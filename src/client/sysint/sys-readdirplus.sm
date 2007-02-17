@@ -50,14 +50,7 @@ static int readdirplus_cleanup(
 
 %%
 
-machine pvfs2_client_readdirplus_sm(
-    init,
-    readdirplus_fetch_attrs_setup_msgpair,
-    readdirplus_fetch_attrs_xfer_msgpair,
-    readdirplus_fetch_sizes_setup_msgpair,
-    readdirplus_fetch_sizes_xfer_msgpair,
-    readdirplus_msg_failure,
-    cleanup)
+machine pvfs2_client_readdirplus_sm
 {
     state init
     {

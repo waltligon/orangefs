@@ -49,11 +49,7 @@ static int server_fetch_config_comp_fn(
 
 %%
 
-nested machine pvfs2_server_get_config_nested_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    parse,
-    cleanup)
+nested machine pvfs2_server_get_config_nested_sm
 {
     state setup_msgpair
     {
@@ -82,9 +78,7 @@ nested machine pvfs2_server_get_config_nested_sm(
     }
 }
 
-machine pvfs2_server_get_config_sm(
-    run_nested,
-    parent_cleanup)
+machine pvfs2_server_get_config_sm
 {
     state run_nested 
     {
@@ -99,10 +93,7 @@ machine pvfs2_server_get_config_sm(
     }
 }
 
-nested machine pvfs2_server_fetch_config_nested_sm(
-    fetch_setup_msgpair,
-    fetch_xfer_msgpair,
-    fetch_cleanup)
+nested machine pvfs2_server_fetch_config_nested_sm
 {
     state fetch_setup_msgpair
     {
@@ -124,9 +115,7 @@ nested machine pvfs2_server_fetch_config_nested_sm(
     }
 }
 
-machine pvfs2_server_fetch_config_sm(
-    run_fetch_nested,
-    parent_fetch_cleanup)
+machine pvfs2_server_fetch_config_sm
 {
     state run_fetch_nested 
     {

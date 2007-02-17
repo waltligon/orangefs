@@ -30,7 +30,7 @@ static int reallocate_static_arrays_if_needed(void);
 
 %%
 
-machine pvfs2_perf_mon_sm(prelude, do_work, final_response, cleanup)
+machine pvfs2_perf_mon_sm
 {
 	state prelude
 	{

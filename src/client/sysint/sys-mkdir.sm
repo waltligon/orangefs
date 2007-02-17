@@ -65,22 +65,7 @@ static int mkdir_delete_handle_comp_fn(
 
 %%
 
-machine pvfs2_client_mkdir_sm(
-    init,
-    parent_getattr,
-    parent_getattr_inspect,
-    mkdir_msg_setup_msgpair,
-    mkdir_msg_xfer_msgpair,
-    mkdir_msg_failure,
-    mkdir_seteattr_setup_msgpair,
-    mkdir_seteattr_xfer_msgpair,
-    mkdir_seteattr_failure,
-    mkdir_crdirent_setup_msgpair,
-    mkdir_crdirent_xfer_msgpair,
-    mkdir_crdirent_failure,
-    delete_handle_setup_msgpair,
-    delete_handle_xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mkdir_sm
 {
     state init
     {

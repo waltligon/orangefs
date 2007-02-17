@@ -53,17 +53,7 @@ do {                                                                   \
 
 %%
 
-nested machine pvfs2_client_remove_helper_sm(
-    getattr_init,
-    getattr,
-    getattr_analyze_results,
-    datafile_remove_setup_msgpair,
-    datafile_remove_xfer_msgpair,
-    datafile_remove_failure,
-    object_remove_setup_msgpair,
-    object_remove_xfer_msgpair,
-    object_remove_failure,
-    remove_helper_cleanup)
+nested machine pvfs2_client_remove_helper_sm
 {
     state getattr_init
     {

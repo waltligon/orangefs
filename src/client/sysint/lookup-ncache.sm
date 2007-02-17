@@ -66,9 +66,7 @@ static int lookup_ncache_lookup(
 
 %%
 
-nested machine pvfs2_client_lookup_ncache_sm(
-    lookup,
-    xfer_msgpair)
+nested machine pvfs2_client_lookup_ncache_sm
 {
     state lookup
     {

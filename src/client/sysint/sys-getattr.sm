@@ -77,11 +77,7 @@ static int getattr_datafile_getattr_comp_fn(
 
 %%
 
-nested machine pvfs2_client_datafile_getattr_sizes_sm(
-    datafile_getattr_setup_msgpairarray,
-    datafile_getattr_xfer_msgpairarray,
-    datafile_getattr_failure,
-    datafile_getattr_cleanup)
+nested machine pvfs2_client_datafile_getattr_sizes_sm
 {
     state datafile_getattr_setup_msgpairarray
     {
@@ -111,14 +107,7 @@ nested machine pvfs2_client_datafile_getattr_sizes_sm(
 }
 
 
-nested machine pvfs2_client_getattr_sm(
-    acache_lookup,
-    object_getattr_setup_msgpair,
-    object_getattr_xfer_msgpair,
-    object_getattr_failure,
-    datafile_get_sizes,
-    acache_insert,
-    cleanup)
+nested machine pvfs2_client_getattr_sm
 {
     state acache_lookup
     {
@@ -169,9 +158,7 @@ nested machine pvfs2_client_getattr_sm(
     }
 }
 
-machine pvfs2_client_sysint_getattr_sm(
-    dowork,
-    set_sys_response)
+machine pvfs2_client_sysint_getattr_sm
 {
     state dowork
     {

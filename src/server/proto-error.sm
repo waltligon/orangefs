@@ -18,7 +18,7 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p);
 
 %%
 
-machine pvfs2_proto_error_sm(init, cleanup)
+machine pvfs2_proto_error_sm
 {
 	state init
 	{

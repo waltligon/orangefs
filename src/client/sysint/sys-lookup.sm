@@ -81,18 +81,7 @@ static void finalize_context(
 
 %%
 
-machine pvfs2_client_lookup_sm(
-    lookup_init,
-    lookup_segment_lookup_setup_msgpair,
-    lookup_segment_lookup_xfer_msgpair,
-    lookup_segment_lookup_failure,
-    lookup_segment_verify_attr_present,
-    lookup_segment_getattr,
-    lookup_segment_check_attr_type,
-    lookup_segment_handle_relative_link,
-    lookup_segment_handle_absolute_link,
-    lookup_context_check_completion,
-    lookup_cleanup)
+machine pvfs2_client_lookup_sm
 {
     state lookup_init
     {

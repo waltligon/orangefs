@@ -39,12 +39,7 @@ enum {
 
 %%
 
-nested machine pvfs2_prelude_sm(
-    req_sched,
-    getattr_if_needed,
-    perm_check,
-    check_acls_if_needed,
-    check_acls)
+nested machine pvfs2_prelude_sm
 {
     state req_sched
     {

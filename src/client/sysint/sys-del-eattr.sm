@@ -29,10 +29,7 @@ static int del_eattr_comp_fn(
 
 %%
 
-machine pvfs2_client_del_eattr_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    cleanup)
+machine pvfs2_client_del_eattr_sm
 {
     state setup_msgpair
     {

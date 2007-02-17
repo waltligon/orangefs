@@ -32,9 +32,7 @@ static int mgmt_get_dfile_array_cleanup(
 
 %%
 
-machine pvfs2_client_mgmt_get_dfile_array_sm(
-    getattr,
-    cleanup)
+machine pvfs2_client_mgmt_get_dfile_array_sm
 {
     state getattr
     {

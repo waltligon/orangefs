@@ -77,25 +77,7 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 
 %%
 
-machine pvfs2_client_create_sm(
-    init,
-    parent_getattr,
-    parent_getattr_inspect,
-    dspace_create_setup_msgpair,
-    dspace_create_xfer_msgpair,
-    dspace_create_failure,
-    datafiles_setup_msgpair_array,
-    datafiles_xfer_msgpair_array,
-    datafiles_failure,
-    create_setattr_setup_msgpair,
-    create_setattr_xfer_msgpair,
-    create_setattr_failure,
-    crdirent_setup_msgpair,
-    crdirent_xfer_msgpair,
-    crdirent_failure,
-    delete_handles_setup_msgpair_array,
-    delete_handles_xfer_msgpair_array,
-    cleanup)
+machine pvfs2_client_create_sm
 {
     state init
     {
