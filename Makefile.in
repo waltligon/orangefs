@@ -11,7 +11,6 @@
 # publish        copy over documents to the PVFS.org web pags
 # admintools     builds admin tools
 # kernapps       builds userland helper programs for kernel driver 
-# statecomp      builds only the statecomp component
 # cscope         generates information for cscope utility
 # tags           generates tags file for use by editors
 # codecheck      checks source code for nonconformance to our std.
@@ -107,7 +106,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean dist distclean docs docsclean publish cscope tags codecheck statecomp admintools kernapps
+.PHONY: all clean dist distclean docs docsclean publish cscope tags codecheck admintools kernapps
 
 ################################################################
 # Find project subdirectories
@@ -498,11 +497,10 @@ VISMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISMISCSRC)))
 KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
 KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
 
-# state machine generation tool
-# cannot build statecomp objects with the cross compiler, as we 
-# build and run the tool on the build host at compile-time
-#STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
-#STATECOMPDEPS := $(patsubst %.c,%.d,$(STATECOMPSRC))
+# state machine generation tool, built for the build machine, not the
+# host machine, in the case of cross-compilation
+STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
+STATECOMPDEPS := $(patsubst %.c,%.d,$(STATECOMPSRC))
 
 # DOCSPDF, DOCSPS, and DOCSHTML are lists of documentation files generated 
 #   from latex
@@ -691,11 +689,14 @@ $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 
-# target for building _just_ the statecomp tool
-#statecomp: $(STATECOMP)
-#$(STATECOMP): $(STATECOMPOBJS)
-#	$(Q) "  LD		$@"
-#	$(E)$(LD) -o $@ $(LDFLAGS) $(STATECOMPOBJS)
+# special rules to build state machine compiler using build host compiler
+$(STATECOMPOBJS): %.o: %.c
+	$(Q) "  BUILD_CC	$@"
+	$(E)$(BUILD_CC) $(CFLAGS) $< -c -o $@ $(call modcflags,$<)
+
+$(STATECOMP): $(STATECOMPOBJS)
+	$(Q) "  BUILD_LD	$@"
+	$(E)$(BUILD_LD) -o $@ $(LDFLAGS) $(STATECOMPOBJS) $(call modldflags,$<)
 
 # rule for generating cscope information
 cscope:
@@ -795,7 +796,7 @@ endif
 # NOTE: we wrap this in ifneq's in order to prevent the
 #    dependencies from being generated for special targets that don't 
 #    require them
-ifeq (,$(filter statecomp clean distclean dist docs cscope tags nodep,$(MAKECMDGOALS)))
+ifeq (,$(filter clean distclean dist docs cscope tags nodep,$(MAKECMDGOALS)))
 -include $(DEPENDS)
 endif
 # add this as a make goal to disable rebuilding dependencies
@@ -820,10 +821,9 @@ nodep:; @:
 	$(srcdir)/maint/pvfs2htmlfixup.sh $(@D)/*/$(@F)
 
 # rule for automatically generated source files
-# NOTE: this rule is disabled in release snapshots
-%.c: %.sm src/common/statecomp/statecomp
+%.c: %.sm $(STATECOMP)
 	$(Q) "  SMC		$@"
-	$(E)src/common/statecomp/statecomp $< $@
+	$(E)$(STATECOMP) $< $@
 
 # if this is not a distribution tarball, then drop some example
 # config files in the server build directory with good defaults for

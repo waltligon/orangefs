@@ -15,11 +15,6 @@ STATECOMPGEN := \
     $(DIR)/parser.c \
     $(DIR)/parser.h \
 
-# Trying to build lots of .c files at once confuses the MODCFLAGS calculation.
-# Point it to the target to get the real dir name.
-statecomp: $(STATECOMP)
-$(STATECOMP): $(STATECOMPSRC)
-	$(Q) "  CC		$@"
-	$(E)$(BUILD_CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags, $@) $^ -o $@
+MODCFLAGS_$(DIR) := -I$(DIR)
 
 .SECONDARY: $(STATECOMPGEN)
