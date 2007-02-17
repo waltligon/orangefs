@@ -64,6 +64,7 @@ INSTALL = @INSTALL@
 BISON = bison
 FLEX = flex
 BUILD_GM = @BUILD_GM@
+BUILD_MX = @BUILD_MX@
 BUILD_IB = @BUILD_IB@
 BUILD_OPENIB = @BUILD_OPENIB@
 BUILD_VIS = @BUILD_VIS@
@@ -292,6 +293,22 @@ ifdef BUILD_GM
 	LIBS += -lgm
 	LIBS_THREADED += -lgm
 	SERVERLIBS += -lgm
+endif
+
+################################################################
+# enable MX if configure detected it
+
+ifdef BUILD_MX
+	CFLAGS += -I @MX_HOME@/include
+	CFLAGS += -D__STATIC_METHOD_BMI_MX__
+	# TODO: later on we will want the ability to modify this at configure
+	# time
+	CFLAGS += -g -O0
+	LDFLAGS += -L @MX_HOME@/lib
+	SERVER_LDFLAGS += -L @MX_HOME@/lib
+	LIBS += -lmyriexpress -lpthread
+	LIBS_THREADED += -lmyriexpress -lpthread
+	SERVERLIBS += -lmyriexpress -lpthread
 endif
 
 #####################################
@@ -686,14 +703,20 @@ cscope:
 		 > $(srcdir)/cscope.files
 	( cd @SRC_ABSOLUTE_TOP@; cscope -be -i @SRC_ABSOLUTE_TOP@/cscope.files )
 
-# build editor tags file over all source files *.[ch] *.sm and
-# some known scripts
+# Build editor tags file over all source files *.[ch] *.sm and
+# some known scripts.  Grab the config files from the build dir.
+# If the build happens to be the source, ignore all sm->c generated
+# files with the help of uniq.
 tags:
-	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include . \
+	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include \
 	    $(srcdir)/src/kernel/linux-2.6 \
 	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
-	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig \
-	) | ctags --excmd=pattern -B --langmap=c:+.sm --extra=+f -I __hidden,DOTCONF_CB -L-
+	  find . -name pvfs2-config.h ;\
+	  find . -name pvfs2-test-config.h ;\
+	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig ;\
+	  find . -name \*.sm | sed s/sm\$$/c/ ;\
+	) | sort | uniq -u | ctags -L- --excmd=pattern -B --extra=+f \
+	  --langmap=c:+.sm -I __hidden,DOTCONF_CB
 
 # rule for running code check
 codecheck:

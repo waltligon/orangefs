@@ -19,6 +19,10 @@ extern "C" {
 #include "dbpf-keyval-pcache.h"
 #include "dbpf-open-cache.h"
 
+/* For unknown Berkeley DB errors, we return some large value
+ */
+#define DBPF_ERROR_UNKNOWN 4243
+
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
 #define TROVE_DBPF_VERSION_VALUE                                  "0.1.2"
 #define LAST_HANDLE_STRING                                  "last_handle"

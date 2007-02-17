@@ -39,7 +39,7 @@ TESTNAME="`hostname -s`-nightly"
 
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="gil lain"
+VFS_HOSTS="gil lain stan"
 
 
 # takes one argument: a tag or branch in CVS

@@ -232,11 +232,12 @@ static ssize_t pvfs2_devreq_read(
     return len;
 }
 
+/* Common function for writev() and aio_write() callers into the device */
 static ssize_t pvfs2_devreq_writev(
     struct file *file,
     const struct iovec *iov,
     unsigned long count,
-    loff_t * offset)
+    loff_t *offset)
 {
     pvfs2_kernel_op_t *op = NULL;
     struct qhash_head *hash_link = NULL;
@@ -250,6 +251,7 @@ static ssize_t pvfs2_devreq_writev(
     int32_t magic = 0;
     int32_t proto_ver = 0;
     uint64_t tag = 0;
+    ssize_t total_returned_size = 0;
 
     /* Either there is a trailer or there isn't */
     if (count != notrailer_count && count != (notrailer_count + 1))
@@ -284,6 +286,7 @@ static ssize_t pvfs2_devreq_writev(
 	ptr += iov[i].iov_len;
 	payload_size += iov[i].iov_len;
     }
+    total_returned_size = payload_size;
 
     /* these elements are currently 8 byte aligned (8 bytes for (version +  
      * magic) 8 bytes for tag).  If you add another element, either make it 8
@@ -541,7 +544,8 @@ static ssize_t pvfs2_devreq_writev(
     }
     dev_req_release(buffer);
 
-    return count;
+    /* if we are called from aio context, just mark that the iocb is completed */
+    return total_returned_size;
 }
 
 #ifdef HAVE_COMBINED_AIO_AND_VECTOR

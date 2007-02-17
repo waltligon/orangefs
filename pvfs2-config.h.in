@@ -6,6 +6,9 @@
 /* Define if kernel has aio support */
 #undef HAVE_AIO
 
+/* Define if VFS AIO support in kernel has a new prototype */
+#undef HAVE_AIO_NEW_AIO_SIGNATURE
+
 /* Define if we are enabling VFS AIO support in kernel */
 #undef HAVE_AIO_VFS_SUPPORT
 
@@ -126,6 +129,9 @@
 /* Define if return value from follow_link in inode_operations is type int */
 #undef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
 
+/* Define if return value from kmem_cache_destroy is type int */
+#undef HAVE_INT_RETURN_KMEM_CACHE_DESTROY
+
 /* Define if struct inode in kernel has i_blksize member */
 #undef HAVE_I_BLKSIZE_IN_STRUCT_INODE
 
@@ -137,6 +143,9 @@
 
 /* Define if kmem_cache_destroy returns int */
 #undef HAVE_KMEM_CACHE_DESTROY_INT_RETURN
+
+/* Define if kzalloc exists */
+#undef HAVE_KZALLOC
 
 /* Define to 1 if you have the `efence' library (-lefence). */
 #undef HAVE_LIBEFENCE
@@ -201,6 +210,9 @@
 /* Define if struct file_operations in kernel has readdirplus callback */
 #undef HAVE_READDIRPLUS_FILE_OPERATIONS
 
+/* Define if struct file_operations in kernel has readv callback */
+#undef HAVE_READV_FILE_OPERATIONS
+
 /* Define if struct file_operations in kernel has readx callback */
 #undef HAVE_READX_FILE_OPERATIONS
 
@@ -218,6 +230,9 @@
 
 /* Define if kernel setxattr has const void* argument */
 #undef HAVE_SETXATTR_CONST_ARG
+
+/* Define if SLAB_KERNEL is defined in kernel */
+#undef HAVE_SLAB_KERNEL
 
 /* Define if struct super_operations in kernel has statfs_lite callback */
 #undef HAVE_STATFS_LITE_SUPER_OPERATIONS
@@ -245,6 +260,9 @@
 
 /* Define to 1 if you have the `strtoull' function. */
 #undef HAVE_STRTOULL
+
+/* Define if struct kmem_cache is defined in kernel */
+#undef HAVE_STRUCT_KMEM_CACHE
 
 /* Define if struct xtvec is defined in the kernel */
 #undef HAVE_STRUCT_XTVEC
@@ -290,6 +308,9 @@
 
 /* Define if get_sb callback has struct vfsmount argument */
 #undef HAVE_VFSMOUNT_GETSB
+
+/* Define if struct file_operations in kernel has writev callback */
+#undef HAVE_WRITEV_FILE_OPERATIONS
 
 /* Define if struct file_operations in kernel has writex callback */
 #undef HAVE_WRITEX_FILE_OPERATIONS

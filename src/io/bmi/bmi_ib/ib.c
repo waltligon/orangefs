@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.38.2.2 2007-01-13 10:12:52 kunkel Exp $
+ * $Id: ib.c,v 1.38.2.3 2007-02-17 10:39:47 kunkel Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -222,7 +222,7 @@ static int ib_check_cq(void)
 	    } else {
 		struct ib_work *rq = sq;  /* rename */
 		rq_state_t state = rq->state.recv;
-		
+
 		if (state == RQ_RTS_WAITING_CTS_SEND_COMPLETION)
 		    rq->state.recv = RQ_RTS_WAITING_RTS_DONE;
 		else
@@ -823,7 +823,7 @@ post_send(bmi_op_id_t *id, struct method_addr *remote_map,
     sq->type = BMI_SEND;
     sq->state.send = SQ_WAITING_BUFFER;
 
-    debug(2, "%s: sq %p len %zu peer %s", __func__, sq, total_size,
+    debug(2, "%s: sq %p len %lld peer %s", __func__, sq, (long long) total_size,
           ibmap->c->peername);
 
     /*
@@ -946,7 +946,7 @@ post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     ib_connection_t *c;
     int i;
     int ret = 0;
-    
+
     gen_mutex_lock(&interface_mutex);
     ret = ensure_connected(remote_map);
     if (ret)
@@ -1157,7 +1157,7 @@ test_rq(struct ib_work *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
     debug(9, "%s: rq %p outid %p err %p size %p user_ptr %p complete %d",
       __func__, rq, outid, err, size, user_ptr, complete);
 
-    if (rq->state.recv == RQ_EAGER_WAITING_USER_TEST 
+    if (rq->state.recv == RQ_EAGER_WAITING_USER_TEST
       || rq->state.recv == RQ_RTS_WAITING_USER_TEST) {
 	if (complete) {
 	    debug(2, "%s: rq %p completed %lld from %s", __func__,
@@ -1344,8 +1344,10 @@ restart:
 	 */
 	debug(8, "%s: last activity too long ago, blocking", __func__);
 	activity = ib_block_for_activity(max_idle_time);
-	if (activity == 1)   /* IB action, go do it immediately */
+	if (activity == 1) {   /* IB action, go do it immediately */
+	    gen_mutex_lock(&interface_mutex);
 	    goto restart;
+	}
     }
 
     *outcount = n;
@@ -1361,15 +1363,16 @@ restart:
  */
 static int
 BMI_ib_testunexpected(int incount __unused, int *outcount,
-  struct method_unexpected_info *ui, int max_idle_time __unused)
+  struct method_unexpected_info *ui, int max_idle_time)
 {
     struct qlist_head *l;
-    int activity, n;
+    int activity = 0, n;
 
     gen_mutex_lock(&interface_mutex);
 
     /* Check CQ, then look for the first unexpected message.  */
-    activity = ib_check_cq();
+restart:
+    activity += ib_check_cq();
 
     n = 0;
     qlist_for_each(l, &ib_device->recvq) {
@@ -1404,6 +1407,18 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 
   out:
     gen_mutex_unlock(&interface_mutex);
+
+    if (activity == 0 && n == 0 && max_idle_time > 0) {
+	/*
+	 * Block if told to from above, also polls TCP listening socket.
+	 */
+	debug(8, "%s: last activity too long ago, blocking", __func__);
+	activity = ib_block_for_activity(max_idle_time);
+	if (activity == 1) {   /* IB action, go do it immediately */
+	    gen_mutex_lock(&interface_mutex);
+	    goto restart;
+	}
+    }
 
     *outcount = n;
     return activity + n;
@@ -1450,7 +1465,7 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
     } else {
 	/* actually a recv */
 	struct ib_work *rq = mop->method_data;
-	if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST 
+	if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST
 	   || rq->state.recv == RQ_RTS_WAITING_USER_TEST))
 	    c = rq->c;
     }
@@ -1496,7 +1511,7 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 		memcache_deregister(ib_device->memcache, &rq->buflist);
 #  endif
 #endif
-	    if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST 
+	    if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST
 	       || rq->state.recv == RQ_RTS_WAITING_USER_TEST))
 		rq->state.recv = RQ_CANCELLED;
 	}
@@ -1698,7 +1713,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
     char peername[2048];
     struct hostent *hp;
     struct sockaddr_in skin;
-    
+
     s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
 	warning("%s: create tcp socket: %m", __func__);
@@ -2074,7 +2089,7 @@ static int BMI_ib_finalize(void)
     return 0;
 }
 
-const struct bmi_method_ops bmi_ib_ops = 
+const struct bmi_method_ops bmi_ib_ops =
 {
     .method_name = "bmi_ib",
     .BMI_meth_initialize = BMI_ib_initialize,

@@ -482,7 +482,7 @@ void extentlist_count(
 
 static void extent_show(struct avlnode *n, int param, int depth)
 {
-    struct TROVE_handle_extent *e =
+    struct TROVE_handle_extent *e __attribute__((unused)) =
         (struct TROVE_handle_extent *)(n->d);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "lb: %llu ub: %llu\n",

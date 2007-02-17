@@ -112,6 +112,30 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
+	dnl 2.6.20 deprecated kmem_cache_t
+	AC_MSG_CHECKING(for struct kmem_cache in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+		static struct kmem_cache;
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STRUCT_KMEM_CACHE, 1, Define if struct kmem_cache is defined in kernel),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl 2.6.20 removed SLAB_KERNEL.  Need to use GFP_KERNEL instead
+	AC_MSG_CHECKING(for SLAB_KERNEL flag in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+		static int flags = SLAB_KERNEL;
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_SLAB_KERNEL, 1, Define if SLAB_KERNEL is defined in kernel),
+		AC_MSG_RESULT(no)
+	)
+
 	dnl The name of this field changed from memory_backed to capabilities
 	dnl in 2.6.12.
 	AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
@@ -143,6 +167,33 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			AC_MSG_RESULT(no)
 		)
 	fi
+
+	dnl checking if we have a readv callback in super_operations 
+	AC_MSG_CHECKING(for readv callback in struct file_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct file_operations fop = {
+		    .readv = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_READV_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readv callback),
+		AC_MSG_RESULT(no)
+	)
+	dnl checking if we have a writev callback in super_operations 
+	AC_MSG_CHECKING(for writev callback in struct file_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct file_operations fop = {
+		    .writev = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_WRITEV_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has writev callback),
+		AC_MSG_RESULT(no)
+	)
 
 	dnl checking if we have a find_inode_handle callback in super_operations 
 	AC_MSG_CHECKING(for find_inode_handle callback in struct super_operations in kernel)
@@ -322,6 +373,25 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			AC_DEFINE(HAVE_AIO_VFS_SUPPORT, 1, Define if we are enabling VFS AIO support in kernel),
 			AC_MSG_RESULT(no)
 		)
+
+		tmp_cflags=$CFLAGS
+		dnl if this test passes, the signature of aio_read has changed to the new one 
+		CFLAGS="$CFLAGS -Werror"
+		AC_MSG_CHECKING(for new prototype of aio_read callback of file_operations structure)
+		AC_TRY_COMPILE([
+			#define __KERNEL__
+			#include <linux/fs.h>
+			extern ssize_t my_aio_read(struct kiocb *, const struct iovec *, unsigned long, loff_t);
+			static struct file_operations fop = {
+					  .aio_read = my_aio_read,
+			};
+		], [],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_AIO_NEW_AIO_SIGNATURE, 1, Define if VFS AIO support in kernel has a new prototype),
+			AC_MSG_RESULT(no)
+		)
+		CFLAGS=$tmp_cflags
+
 	fi
 
 	tmp_cflags=$CFLAGS
@@ -564,6 +634,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	)
 
+	dnl kmem_cache_destroy function may return int only on pre 2.6.19 kernels
+	dnl else it returns a void.
+	AC_MSG_CHECKING(for int return in kmem_cache_destroy)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/slab.h>
+	    extern int kmem_cache_destroy(kmem_cache_t *);
+	    ], [],
+	    AC_MSG_RESULT(yes)
+	    AC_DEFINE(HAVE_INT_RETURN_KMEM_CACHE_DESTROY, 1, Define if return value from kmem_cache_destroy is type int),
+	    AC_MSG_RESULT(no)
+	)
+
 	dnl more 2.6 api changes.  return type for the invalidatepage
 	dnl address_space_operation is 'void' in new kernels but 'int' in old
 	dnl I had to turn on -Werror for this test because i'm not sure how
@@ -666,4 +749,18 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    )
 
 	CFLAGS=$oldcflags
+
+	dnl Check for kzalloc
+	AC_MSG_CHECKING(for kzalloc)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+	], [
+		void * a;
+		a = kzalloc(1024);
+	],
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KZALLOC, 1, Define if kzalloc exists)
+	)
 ])

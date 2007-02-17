@@ -18,8 +18,10 @@
 /* default hostid of server when none is given */
 #define DEFAULT_HOSTID  "tcp://localhost:3334"
 #define DEFAULT_HOSTID_GM  "gm://playtoy:5"
+#define DEFAULT_HOSTID_MX  "mx://foo:0:3/"
 #define DEFAULT_SERVERID  "tcp://NULL:3334"
 #define DEFAULT_SERVERID_GM  "gm://NULL:5"
+#define DEFAULT_SERVERID_MX  "mx://foo:0:3/"
 
 /* test server request format */
 struct server_request

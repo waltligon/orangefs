@@ -347,7 +347,8 @@ int dbpf_queue_or_service(
         }
 
         /* only one that allocs anything, see dbpf_queued_op_free */
-        if (op_p->type == DSPACE_CREATE) {
+        if(op_p->type == DSPACE_CREATE)
+        {
             free(op_p->u.d_create.extent_array.extent_array);
             op_p->u.d_create.extent_array.extent_array = NULL;
         }

@@ -240,7 +240,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
            op_p->u.k_read.key->buffer, 
            op_p->u.k_read.key->buffer_sz);
     key.data = &key_entry;
-    key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
+    key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
         op_p->u.k_read.key->buffer_sz);
 
     memset(&data, 0, sizeof(data));
@@ -378,7 +378,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
     key.data = &key_entry;
-    key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
+    key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
         op_p->u.k_write.key.buffer_sz);
     data.data = op_p->u.k_write.val.buffer;
     data.size = op_p->u.k_write.val.buffer_sz;
@@ -1057,7 +1057,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         memset(&key, 0, sizeof(key));
         memset(&data, 0, sizeof(data));
         key.data = &key_entry;
-        key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
+        key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
             op_p->u.k_write_list.key_array[k].buffer_sz);
         key.flags |= DB_DBT_USERMEM;
 
@@ -1094,12 +1094,12 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         memset(&data, 0, sizeof(data));
 
         key.data = &key_entry;
-        key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
+        key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
             op_p->u.k_write_list.key_array[k].buffer_sz);
 
         data.flags = 0;
         data.data = op_p->u.k_write_list.val_array[k].buffer;
-        data.size = op_p->u.k_write_list.val_array[k].buffer_sz;
+        data.size = data.ulen = op_p->u.k_write_list.val_array[k].buffer_sz;
 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
@@ -1382,7 +1382,7 @@ static int dbpf_keyval_do_remove(
 
     memset(&db_key, 0, sizeof(db_key));
     db_key.data = &key_entry;
-    db_key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(key->buffer_sz);
+    db_key.size = db_key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(key->buffer_sz);
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "keyval_db->del(handle= %llu, key= %*s (%d)) size=%d\n",
@@ -1707,7 +1707,7 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
     key.data = &key_entry;
-    key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
+    key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
     key.flags = DB_DBT_USERMEM;
     data.data = op_p->u.k_get_handle_info.info;
     data.ulen = sizeof(TROVE_keyval_handle_info);
@@ -1754,7 +1754,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         memset(&data, 0, sizeof(data));
         key.flags = DB_DBT_USERMEM;
         key.data = &key_entry;
-        key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
+        key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
         data.data = &info;
         data.ulen = sizeof(TROVE_keyval_handle_info);
         data.flags = DB_DBT_USERMEM;

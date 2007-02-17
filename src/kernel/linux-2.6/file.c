@@ -350,7 +350,7 @@ static int split_iovecs(
     *seg_count = 0;
     *seg_array = NULL;
     /* copy the passed in iovec descriptor to a temp structure */
-    orig_iovec = kzalloc(nr_segs * sizeof(*orig_iovec), PVFS2_BUFMAP_GFP_FLAGS);
+    orig_iovec = kmalloc(nr_segs * sizeof(*orig_iovec), PVFS2_BUFMAP_GFP_FLAGS);
     if (orig_iovec == NULL)
     {
         gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
@@ -372,7 +372,7 @@ static int split_iovecs(
         kfree(new_iovec);
         kfree(orig_iovec);
         gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(max_new_nr_segs * sizeof(unsigned long)));
+                (unsigned long)(max_new_nr_segs * sizeof(*sizes)));
         return -ENOMEM;
     }
     /* copy the passed in iovec to a temp structure */

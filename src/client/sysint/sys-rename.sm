@@ -508,8 +508,7 @@ static int rename_rmdirent_comp_fn(void *v_p,
                                    struct PVFS_server_resp *resp_p,
                                    int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
+    PINT_client_sm * sm_p __attribute__((unused)) = (PINT_client_sm *) v_p;
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_rmdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT);

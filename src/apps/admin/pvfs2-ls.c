@@ -132,7 +132,7 @@ static inline void format_size_string(
 	    spaces_size_allowed = num_spaces_total;
         }
     }
-	
+
     buf = (char *)malloc(spaces_size_allowed+1);
     assert(buf);
 
@@ -424,8 +424,9 @@ int do_list(
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
-    if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                         &credentials, &getattr_response, NULL) == 0)
+    ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
+                           &credentials, &getattr_response, NULL);
+    if(ret == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
             (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK) ||
@@ -461,6 +462,11 @@ int do_list(
             }
             return 0;
         }
+    }
+    else
+    {
+        PVFS_perror("PVFS_sys_getattr", ret);
+        return -1;
     }
 
     if (do_timing)
@@ -695,7 +701,7 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
-    fprintf(stderr,  "Usage: %s [OPTION]... [FILE]...\n", argv[0]); 
+    fprintf(stderr,  "Usage: %s [OPTION]... [FILE]...\n", argv[0]);
     fprintf(stderr, "List information about the FILEs (the current "
             "directory by default)\n\n");
     fprintf(stderr,"  -a, --all                  "

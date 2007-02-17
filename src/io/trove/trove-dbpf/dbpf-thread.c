@@ -203,6 +203,14 @@ int dbpf_do_one_work_cycle(int *out_count)
                 return ret; /* not sure how to recover from failure here */
             }
         }
+        else if(ret == -DBPF_ERROR_UNKNOWN || ret == DBPF_ERROR_UNKNOWN)
+        {
+            /* If we get an error back from Berkeley DB, we assume fatal
+             * and just return.  Make sure the return code is negative
+             * here though.
+             */
+            return (ret < 0) ? ret : -ret;
+        }
         else
         {
 #ifndef __PVFS2_TROVE_AIO_THREADED__

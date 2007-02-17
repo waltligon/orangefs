@@ -277,7 +277,7 @@ int PINT_get_path_element(
 {
     int count = -1;
     char *segp = (char *)0;
-    void *segstate;
+    void *segstate = NULL;
     char local_pathname[PVFS_NAME_MAX] = {0};
 
     strncpy(local_pathname,pathname,PVFS_NAME_MAX);

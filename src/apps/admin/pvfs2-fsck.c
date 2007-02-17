@@ -436,7 +436,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 			    int server_count,
 			    PVFS_credentials *creds)
 {
-    int ret, server_idx;
+    int ret, server_idx = 0;
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sysresp_getattr getattr_resp;
     PVFS_object_ref pref;
@@ -521,7 +521,7 @@ int descend(PVFS_fs_id cur_fs,
     PVFS_ds_position token; 
     PVFS_sysresp_readdir readdir_resp;
     PVFS_sysresp_getattr getattr_resp;
-    PVFS_object_ref entry_ref;
+    PVFS_object_ref entry_ref = {0, 0};
 
     count = 64;
 
@@ -536,7 +536,7 @@ int descend(PVFS_fs_id cur_fs,
 
         for (i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
         {
-            int server_idx, ret, in_main_list = 0, in_alt_list = 0;
+            int server_idx = 0, ret, in_main_list = 0, in_alt_list = 0;
             char *cur_file;
             PVFS_handle cur_handle;
 
@@ -700,7 +700,7 @@ int verify_datafiles(PVFS_fs_id cur_fs,
 		     int df_count,
 		     PVFS_credentials *creds)
 {
-    int ret, i, server_idx, error = 0;
+    int ret, i, server_idx = 0, error = 0;
     PVFS_handle *df_handles;
 
     df_handles = (PVFS_handle *) malloc(df_count * sizeof(PVFS_handle));

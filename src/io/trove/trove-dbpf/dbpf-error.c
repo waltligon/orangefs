@@ -36,8 +36,15 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value)
 	case DB_RUNRECOVERY:
 	    gossip_err("Error: DB_RUNRECOVERY encountered.\n");
 	    return TROVE_EIO;
+#ifdef HAVE_DB_BUFFER_SMALL
+        case DB_BUFFER_SMALL:
+            /* all Berkeley DB gets should be allocating user memory,
+             * so if we get BUFFER_SMALL it must be programming error
+             */
+            return TROVE_EINVAL;
+#endif
     }
-    return -4243; /* return some identifiable number */
+    return DBPF_ERROR_UNKNOWN; /* return some identifiable value */
 }
 
 /*

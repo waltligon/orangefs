@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright © Acxiom Corporation, 2006
  *
  * See COPYING in top-level directory.
@@ -230,14 +230,14 @@ PVFS_error PVFS_isys_create(
     PVFS_sys_dist *dist,
     PVFS_sysresp_create *resp,
     PVFS_sys_op_id *op_id,
-    PVFS_hint * hints,    
+    PVFS_hint * hints,
     void *user_ptr)
 {
     int num_dfiles_req = 0;
     PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
     char * hintvalue;
-    
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
 
     if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
@@ -317,18 +317,18 @@ PVFS_error PVFS_isys_create(
             return -PVFS_ENOMEM;
         }
     }
-    
+
     /* If an application hint has been provided, use that to request dfile
        else, if a tabfile hint has been provided, use that instead*/
     num_dfiles_req = 0;
     /* hints allow to override this behavior, e.g. for MPI */
     hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_DATAFILE_NODES);
-    
-    
+
+
     if (hintvalue)
-    { 
+    {
         while( *hintvalue != 0 )
-        {    
+        {
             if( *hintvalue == ','){
                  num_dfiles_req++;
             }
@@ -369,7 +369,7 @@ PVFS_error PVFS_isys_create(
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Creating file %s under %llu, %d\n",
         object_name, llu(parent_ref.handle), parent_ref.fs_id);
-          
+
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_CREATE, op_id, user_ptr);
 }
@@ -436,7 +436,7 @@ static int create_init(PINT_client_sm *sm_p,
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT, 
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT,
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -448,7 +448,7 @@ static int create_create_comp_fn(void *v_p,
                                  int index)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_create_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_CREATE);
@@ -473,7 +473,7 @@ static int create_datafiles_comp_fn(void *v_p,
                                     int index)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create_datafiles_comp_fn[%d]\n",index);
 
@@ -482,8 +482,8 @@ static int create_datafiles_comp_fn(void *v_p,
     if (resp_p->status != 0)
     {
         gossip_err("%s: Failed to create data handle at server: %s "
-                   "for file: %s\n", 
-                   __func__, 
+                   "for file: %s\n",
+                   __func__,
                    BMI_addr_rev_lookup(
                        sm_p->u.create.data_server_addrs[index]),
                    sm_p->u.create.object_name);
@@ -530,7 +530,7 @@ static int create_setattr_comp_fn(void *v_p,
     refn.handle = sm_p->msgpair.handle;
 
     /* insert a cache entry, set size to 0 */
-    res = PINT_acache_update(refn, 
+    res = PINT_acache_update(refn,
         &sm_p->msgpair.req.u.setattr.attr,
         &tmp_size);
     if(res != 0)
@@ -600,7 +600,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
 
 
     /*
-     * If the user parses a hint to explicity set the hostnames for the 
+     * If the user parses a hint to explicity set the hostnames for the
      * metaserver use this value!
      */
     hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_METAFILE_NODE);
@@ -611,19 +611,19 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
             sm_p->object_ref.fs_id,
             & msg_p->svr_addr,
             & meta_handle_extent_array,
-            0 /* metaserver ! */); 
+            0 /* metaserver ! */);
         if (ret){
             gossip_err("Metafile given by hint are not valid! "
                         " hostname: %s\n", hintvalue);
             js_p->error_code = ret;
             return 1;
-        }  
-    }else{  
+        }
+    }else{
         ret = PINT_cached_config_get_next_meta(
             server_config, sm_p->object_ref.fs_id,
             &msg_p->svr_addr, &meta_handle_extent_array);
     }
-    
+
     PINT_put_server_config_struct(server_config);
 
     if (ret)
@@ -664,7 +664,6 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL, i = 0;
     struct server_configuration_s *server_config = NULL;
-    int server_type;
     char * hintvalue;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
@@ -673,7 +672,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     js_p->error_code = 0;
 
     hintvalue = PVFS_get_hint(sm_p->hints, CREATE_SET_DATAFILE_NODES);
-    
+
     memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
     /* allocate msgarray and set msgarray_count */
@@ -701,7 +700,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     }
     if (!sm_p->u.create.io_handle_extent_array)
     {
-        gossip_err("create: failed to allocate handle_extent_array\n"); 
+        gossip_err("create: failed to allocate handle_extent_array\n");
         js_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
@@ -714,7 +713,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     }
     if (!sm_p->u.create.data_server_addrs)
     {
-        gossip_err("create: failed to allocate data server addrs\n"); 
+        gossip_err("create: failed to allocate data server addrs\n");
         js_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
@@ -723,27 +722,27 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
         sm_p->object_ref.fs_id);
 
 	/*
-	 * If the user parses a hint to explicity set the hostnames for the 
+	 * If the user parses a hint to explicity set the hostnames for the
 	 * datafiles use these values!
 	 */
     if ( hintvalue ){
         int tokens = 0;
         char * hintcpy;
-        char * act_hostname;    
+        char * act_hostname;
         char * save_ptr;
         char * hintbuff;
         hintbuff = (char *) malloc((strlen(hintvalue)+1)*sizeof(char));
         hintcpy = hintbuff;
-        strcpy(hintcpy, hintvalue);    
-        
-        act_hostname = strtok_r(hintcpy, ",", & save_ptr);         
+        strcpy(hintcpy, hintvalue);
+
+        act_hostname = strtok_r(hintcpy, ",", & save_ptr);
         while ( act_hostname ){
             if ( tokens >= sm_p->u.create.num_data_files){
                 gossip_err("Datafiles given by hint %s are not valid, "
-                            "given by hints: %d set by create data_file_no: %d\n", 
+                            "given by hints: %d set by create data_file_no: %d\n",
                     hintvalue, tokens + 1, sm_p->u.create.num_data_files);
                 js_p->error_code = -PVFS_EINVAL;
-                return 1;                
+                return 1;
             }
             ret = PINT_cached_config_get_one_server_str(
                 act_hostname,
@@ -751,27 +750,27 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
                 sm_p->object_ref.fs_id,
                 & sm_p->u.create.data_server_addrs[tokens],
                 & sm_p->u.create.io_handle_extent_array[tokens],
-                1 /*dataserver !*/); 
+                1 /*dataserver !*/);
             if (ret){
                 gossip_err("Datafiles given by hint are not valid! "
-                            "Current hostname: %s\n", 
+                            "Current hostname: %s\n",
                     act_hostname);
                 js_p->error_code = ret;
                 return 1;
             }
             act_hostname = strtok_r(NULL, ",", & save_ptr);
             tokens++;
-        }  
+        }
         free(hintbuff);
-    }else{	
+    }else{
         ret = PINT_cached_config_get_next_io(
             server_config,
             sm_p->object_ref.fs_id,
             sm_p->u.create.num_data_files,
             sm_p->u.create.data_server_addrs,
-            sm_p->u.create.io_handle_extent_array);	
+            sm_p->u.create.io_handle_extent_array);
     }
-	
+
     PINT_put_server_config_struct(server_config);
 
     if (ret)
@@ -780,7 +779,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
         js_p->error_code = ret;
         return 1;
     }
-    
+
     /* for each datafile, prepare to post a create send/recv pair */
     for(i = 0; i < sm_p->u.create.num_data_files; i++)
     {
@@ -807,10 +806,10 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
         msg_p->comp_fn = create_datafiles_comp_fn;
         msg_p->svr_addr = sm_p->u.create.data_server_addrs[i];
 
-        gossip_debug(GOSSIP_VARSTRIP_DEBUG, 
+        gossip_debug(GOSSIP_VARSTRIP_DEBUG,
                      "Data file number: %d - Server name: %s\n",
                      i, PVFS_mgmt_map_addr(msg_p->fs_id, sm_p->cred_p,
-                                           msg_p->svr_addr, &server_type));
+                                           msg_p->svr_addr, NULL));
     }
     return 1;
 }
@@ -992,7 +991,7 @@ static int create_delete_handles_setup_msgpair_array(
 
     if (sm_p->msgarray == NULL)
     {
-        gossip_err("create: failed to allocate msgarray\n"); 
+        gossip_err("create: failed to allocate msgarray\n");
         js_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
@@ -1076,8 +1075,8 @@ static int create_cleanup(PINT_client_sm *sm_p,
         sm_p->u.create.create_resp->ref = metafile_ref;
 
         /* insert newly created metafile into the ncache */
-        PINT_ncache_update((const char*) sm_p->u.create.object_name, 
-                           (const PVFS_object_ref*) &metafile_ref, 
+        PINT_ncache_update((const char*) sm_p->u.create.object_name,
+                           (const PVFS_object_ref*) &metafile_ref,
                            (const PVFS_object_ref*) &(sm_p->object_ref));
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
@@ -1139,7 +1138,7 @@ static int create_parent_getattr_inspect(
 {
     PVFS_object_attr *attr = NULL;
     int num_dfiles_requested_override = 0;
-    PINT_dist *current_dist; 
+    PINT_dist *current_dist;
     int ret = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: parent_getattr_inspect\n");
@@ -1178,7 +1177,7 @@ static int create_parent_getattr_inspect(
                 num_dfiles_requested_override,
                 &sm_p->u.create.num_data_files);
     }
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n",
         sm_p->u.create.num_data_files, num_dfiles_requested_override);
     current_dist = sm_p->u.create.dist;
     /* We have an overriding distribution name for this directory.. honor that */
@@ -1237,7 +1236,7 @@ static int create_parent_getattr_inspect(
                 ret = sscanf(val[i], SCANF_lld, &tmp_val);
                 if(ret != 1)
                 {
-                    gossip_err("Error: unsupported type for distribution parameter %s, value %s found in directory hints.\n", 
+                    gossip_err("Error: unsupported type for distribution parameter %s, value %s found in directory hints.\n",
                         key[i], val[i]);
                     gossip_err("Error: continuing anyway.\n");
                 }
@@ -1284,7 +1283,7 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
         NULL != server_config->default_dist_config.name)
     {
         dist = PINT_dist_create(server_config->default_dist_config.name);
-        
+
         if (dist)
         {
             PINT_llist_p iter = server_config->default_dist_config.param_list;
@@ -1319,7 +1318,7 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
                     }
                 }
                 iter = PINT_llist_next(iter);
-            }                
+            }
         }
         else
         {

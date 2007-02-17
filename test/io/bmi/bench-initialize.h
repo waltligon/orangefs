@@ -17,6 +17,7 @@
 
 #define BMI_TCP_PORT 3334
 #define BMI_GM_PORT 5
+#define BMI_MX_ENDPOINT 3
 #define BMI_IB_PORT 3335
 
 int bench_initialize_bmi_interface(
