@@ -26,28 +26,13 @@
 */
 #define YY_NEVER_INTERACTIVE 1
 
-extern YYSTYPE yylval;
-
+extern int line;
 extern FILE *out_file;
 extern char *in_file_name;
-void produce_listing(int line, char *listing);
+
 extern int yylex(void);
 extern void yyerror(char *);
-
-int yyget_lineno  (void);
-FILE *yyget_in  (void);
-FILE *yyget_out  (void);
-int yyget_leng  (void);
-char *yyget_text  (void);
-void yyset_lineno (int  line_number );
-void yyset_in (FILE *  in_str );
-void yyset_out (FILE *  out_str );
-int yyget_debug  (void);
-void yyset_debug (int  bdebug );
-int yylex_destroy  (void);
-/* int      atoi();
- * double   atof();
- */
+extern void produce_listing(int line, char *listing);
 
 #define	LIST		strcat(text,yytext);
 #define	RETURNVAL(x)	yylval.i = (int)(token = x); return((int)x);

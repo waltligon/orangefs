@@ -10,71 +10,52 @@
  * Symbol table and mapping routines for state machine source-to-source
  * translator.
  */
-
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "statecomp-symbol.h"
 
-void *emalloc(unsigned int size);
+extern void *emalloc(unsigned int size);
 
-/** hash table width */
-#define MAXHASH	311
+struct state *states = NULL;
 
-/** the symbol table structure */
-static sym_ent_p symtab[MAXHASH];
-
-/** scramble a name (hopefully) uniformly to fit in a table
- */
-static unsigned int hash(char *name)
+struct state *new_state(char *name)
 {
-    register unsigned int h = 0;
-    while (*name)
-    {
-	h <<= 4;
-	h ^= *name++;
+    struct state *s, **sprev = &states;
+
+    for (s=states; s; s=s->next) {
+        if (!strcmp(s->name, name)) {
+            fprintf(stderr, "%s: state %s already exists\n", __func__, name);
+            exit(1);
+        }
+        sprev = &s->next;
     }
-    return(h % MAXHASH);
+    s = emalloc(sizeof(*s));
+    s->name = name;
+    s->transition = NULL;
+    s->next = NULL;
+    *sprev = s;
+    return s;
 }
 
-/** enter a name into the symbol table
- */
-sym_ent_p symenter(char *name)
+struct transition *new_transition(struct state *s, char *return_code)
 {
-    register sym_ent_p p;
-    unsigned int h;
+    struct transition *t, **tprev = &s->transition;
 
-    /* create an entry and insert it at the front of the table */
-    h = hash(name);
-    p = (sym_ent_p)emalloc(sizeof(sym_ent));
-    p->name = name;
-    p->next = symtab[h];
-    symtab[h] = p;
-
-    return(p);
-}
-
-/** lookup a symbol in the symbol table.  scans the symbol table and returns a
- *  pointer to the symbol table entry
- */
-sym_ent_p symlook(char *name)
-{
-    register sym_ent_p p;
-    unsigned int h;
-    h = hash(name);
-    for (p = symtab[h]; p != 0; p = p->next)
-	if (strcmp(p->name, name) == 0)
-	    break;
-
-    return(p);
-}
-
-/** initializes data structures prior to additions into symbol table.
- *  \note there is no matching finalize for the symbol table.
- */
-void init_symbol_table(void)
-{
-    memset(symtab, 0, MAXHASH * sizeof(sym_ent_p));
+    for (t=s->transition; t; t=t->next) {
+        if (!strcmp(t->return_code, return_code)) {
+            fprintf(stderr, "%s: state %s: return code %s already exists\n",
+                    __func__, s->name, return_code);
+            exit(1);
+        }
+        tprev = &t->next;
+    }
+    t = emalloc(sizeof(*t));
+    t->return_code = return_code;
+    t->next = NULL;
+    *tprev = t;
+    return t;
 }
 
 /*

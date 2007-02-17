@@ -14,42 +14,71 @@
 #include <stdlib.h>
 
 #include "state-machine-values.h"
+#include "statecomp-symbol.h"
 
 extern FILE *out_file;
 extern int terminate_path_flag;
 static char *current_machine;
 
-void gen_init(void);
-void gen_state_decl(char *state_name);
-void gen_machine(char *machine_name, char *first_state_name);
-void gen_state_start(char *state_name);
-void gen_state_action(char *run_func, int flag);
-void gen_return_code(char *return_code);
-void gen_next_state(int flag, char *new_state);
-void gen_state_end(void);
+static void gen_state_start(char *state_name);
+static void gen_state_action(enum state_action action, char *run_func);
+static void gen_return_code(char *return_code);
+static void gen_next_state(enum transition_type type, char *new_state);
+static void gen_state_end(void);
 
-void gen_init(void)
-{
-    return;
-}
-
-void gen_state_decl(char *state_name)
+static void gen_state_decl(char *state_name)
 {
     fprintf(out_file, "static union PINT_state_array_values ST_%s[];\n",
                       state_name);
 }
 
-void gen_machine(char *machine_name,
-		 char *first_state_name)
+void gen_machine(char *machine_name)
 {
+    struct state *s, *snext;
+    struct transition *t, *tnext;
+
     current_machine = machine_name;
+
+    if (states == NULL)
+        fprintf(stderr, "%s: no states declared in machine %s\n", __func__,
+                machine_name);
+
+    /* dump forward declarations of all the states */
+    for (s=states; s; s=s->next)
+        gen_state_decl(s->name);
+
+    /* delcare the machine start point */
     fprintf(out_file, "\nstruct PINT_state_machine_s %s = {\n", machine_name);
     fprintf(out_file, "\t.name = \"%s\",\n", machine_name);
-    fprintf(out_file, "\t.state_machine = ST_%s\n", first_state_name);
+    fprintf(out_file, "\t.state_machine = ST_%s\n", states->name);
     fprintf(out_file, "};\n\n");
+
+    /* generate all output */
+    for (s=states; s; s=s->next) {
+        gen_state_start(s->name);
+        gen_state_action(s->action, s->function_or_machine);
+        for (t=s->transition; t; t=t->next) {
+            gen_return_code(t->return_code);
+            gen_next_state(t->type, t->next_state);
+        }
+        gen_state_end();
+    }
+
+    /* purge for next machine */
+    for (s=states; s; s=snext) {
+        for (t=s->transition; t; t=tnext) {
+            tnext = t->next;
+            free(t->return_code);
+            free(t);
+        }
+        snext = s->next;
+        free(s->name);
+        free(s);
+    }
+    states = NULL;
 }
 
-void gen_state_start(char *state_name)
+static void gen_state_start(char *state_name)
 {
     fprintf(out_file,
             "static union PINT_state_array_values ST_%s[] = {\n"
@@ -63,52 +92,43 @@ void gen_state_start(char *state_name)
  * or "jump") and the second being the action itself (either a
  * function or a nested state machine).
  */
-void gen_state_action(char *run_func, int flag)
+static void gen_state_action(enum state_action action, char *run_func)
 {
-    switch (flag) {
-	case SM_NONE:
+    switch (action) {
+	case ACTION_RUN:
 	    fprintf(out_file, "\t{ .flag = SM_NONE },\n");
             fprintf(out_file, "\t{ .state_action = %s }", run_func);
 	    break;
-	case SM_JUMP:
+	case ACTION_JUMP:
 	    fprintf(out_file, "\t{ .flag = SM_JUMP },\n");
             fprintf(out_file, "\t{ .nested_machine = &%s }", run_func);
 	    break;
-	default:
-	    fprintf(stderr,
-		    "invalid flag associated with action %s\n",
-		    run_func);
-	    exit(1);
     }
 }
 
-void gen_return_code(char *return_code)
+static void gen_return_code(char *return_code)
 {
     fprintf(out_file, ",\n\t{ .return_value = %s }", return_code);
 }
 
-void gen_next_state(int flag, char *new_state)
+static void gen_next_state(enum transition_type type, char *new_state)
 {
-    switch (flag) {
-	case SM_NEXT:
+    switch (type) {
+	case NEXT_STATE:
 	    fprintf(out_file, ",\n\t{ .next_state = ST_%s }", new_state);
 	    break;
-	case SM_RETURN:
+	case RETURN:
 	    terminate_path_flag = 1;
 	    fprintf(out_file, ",\n\t{ .flag = SM_RETURN }");
 	    break;
-	case SM_TERMINATE:
+	case TERMINATE:
 	    terminate_path_flag = 1;
 	    fprintf(out_file, ",\n\t{ .flag = SM_TERMINATE }");
 	    break;
-	default:
-	    fprintf(stderr,
-		    "invalid flag associated with target (no more info)\n");
-	    exit(1);
     }
 }
 
-void gen_state_end(void)
+static void gen_state_end(void)
 {
     fprintf(out_file,"\n};\n\n");
 }

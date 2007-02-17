@@ -13,24 +13,30 @@
 #ifndef _SYMBOL_H_
 #define _SYMBOL_H_
 
-#define TYPE_MACHINE 0x1
-#define TYPE_STATE 0x2	
-#define TYPE_EXTERN_STATE 0x4	
+enum transition_type { NEXT_STATE, RETURN, TERMINATE };
+enum state_action { ACTION_RUN, ACTION_JUMP };
 
-extern int line;
+struct transition {
+    struct transition *next;
+    char *return_code;
+    enum transition_type type;
+    char *next_state;
+};
 
-typedef struct sym_ent
-{
-	char *name;		/* ptr to string table */
-	int type;
-	int flag;
-	int offset;
-	struct sym_ent *next;	/* next in line */
-} sym_ent, *sym_ent_p;
+struct state {
+    struct state *next;
+    char *name;
+    enum state_action action;
+    char *function_or_machine;
+    struct transition *transition;
+};
 
-sym_ent_p symenter(char *name);
-sym_ent_p symlook(char *name);
+extern struct state *states;
+
 void init_symbol_table(void);
+struct transition *new_transition(struct state *s, char *return_code);
+struct state *new_state(char *name);
+void gen_machine(char *machine_name);
 
 #endif
 

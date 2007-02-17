@@ -39,10 +39,8 @@ int yyparse (void);
 #endif
 
 
-static void initialize(void);
 static void parse_args(int argc, char **argv);
 static void finalize(void);
-void gen_init(void);
 void yywrap(void);
 void yyerror(char *s);
 
@@ -64,17 +62,10 @@ char *in_file_name = 0;
 
 int main(int argc, char **argv)
 {
-    initialize();
     parse_args(argc, argv);
-    gen_init();
     yyparse();
     finalize();
     return 0;
-}
-
-static void initialize()
-{
-    init_symbol_table();
 }
 
 static void parse_args(int argc, char **argv)
