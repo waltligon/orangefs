@@ -24,7 +24,14 @@
   fails due to occassional improper ioctl command mappings --
   these can cause an infinite loop in statecomp execution.
 */
+#define YY_ALWAYS_INTERACTIVE 0
 #define YY_NEVER_INTERACTIVE 1
+
+/* No push/pop of scanner state. */
+#define YY_STACK_USED 0
+
+/* No main needed. */
+#define YY_MAIN 0
 
 extern int line;
 extern FILE *out_file;

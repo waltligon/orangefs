@@ -24,6 +24,12 @@ extern char *enter_string(char *);
 extern int yylex(void);
 extern void yyerror(char *);
 
+/* We never use this, disable default. */
+#define YY_LOCATION_PRINT 0
+
+/* No NLS. */
+#define YYENABLE_NLS 0
+
 /* building these things up as the rules go */
 static struct state *cur_state;
 static struct transition *cur_transition;
