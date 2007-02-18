@@ -39,11 +39,7 @@ static int mgmt_remove_dirent_comp_fn(
 
 %%
 
-machine pvfs2_client_mgmt_remove_dirent_sm(
-    init,
-    remove_dirent_setup_msgpair,
-    remove_dirent_xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_remove_dirent_sm
 {
     state init
     {

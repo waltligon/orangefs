@@ -41,13 +41,7 @@ static int readdir_msg_comp_fn(
 
 %%
 
-nested machine pvfs2_client_readdir_sm(
-    init,
-    readdir_getattr,
-    readdir_msg_setup_msgpair,
-    readdir_msg_xfer_msgpair,
-    readdir_msg_failure,
-    cleanup)
+nested machine pvfs2_client_readdir_sm
 {
     state init
     {
@@ -89,9 +83,7 @@ nested machine pvfs2_client_readdir_sm(
     }
 }
 
-machine pvfs2_client_sysint_readdir_sm(
-    dowork,
-    do_cleanup)
+machine pvfs2_client_sysint_readdir_sm
 {
     state dowork
     {

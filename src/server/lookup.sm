@@ -48,18 +48,7 @@ static int lookup_setup_resp(
 
 %%
 
-machine pvfs2_lookup_sm(
-    prelude,
-    init,
-    read_object_metadata,
-    read_directory_entry_handle,
-    read_directory_entry,
-    verify_object_metadata,
-    read_directory_acls,
-    check_acls,
-    setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_lookup_sm
 {
     state prelude
     {

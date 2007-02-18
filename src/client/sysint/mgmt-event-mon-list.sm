@@ -35,10 +35,7 @@ static int event_mon_list_comp_fn(
 
 %%
 
-machine pvfs2_client_mgmt_event_mon_list_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_event_mon_list_sm
 {
     state setup_msgpair
     {

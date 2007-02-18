@@ -61,21 +61,7 @@ static int symlink_delete_handle_comp_fn(
 
 %%
 
-machine pvfs2_client_symlink_sm(
-    init,
-    symlink_parent_getattr,
-    dspace_create_setup_msgpair,
-    dspace_create_xfer_msgpair,
-    dspace_create_failure,
-    crdirent_setup_msgpair,
-    crdirent_xfer_msgpair,
-    crdirent_failure,
-    symlink_setattr_setup_msgpair,
-    symlink_setattr_xfer_msgpair,
-    symlink_setattr_failure,
-    delete_handle_setup_msgpair,
-    delete_handle_xfer_msgpair,
-    cleanup)
+machine pvfs2_client_symlink_sm
 {
     state init
     {

@@ -33,10 +33,7 @@ static int mgmt_noop_cleanup(
 
 %%
 
-machine pvfs2_client_mgmt_noop_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_noop_sm
 {
     state setup_msgpair
     {

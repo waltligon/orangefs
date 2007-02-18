@@ -7,8 +7,6 @@
 #ifndef __STATE_MACHINE_H
 #define __STATE_MACHINE_H
 
-#include <state-machine-values.h>
-
 /* STATE-MACHINE.H
  *
  * This file sets up all the definitions necessary for our state machine
@@ -68,6 +66,14 @@ enum {
 #define ENCODE_TYPE 0
 #define SM_STATE_RETURN -1
 #define SM_NESTED_STATE 1
+
+#define SM_NONE   0
+#define SM_NEXT   1
+#define SM_RETURN 2
+#define SM_EXTERN 3
+#define SM_NESTED 5
+#define SM_JUMP   6
+#define SM_TERMINATE 7
 
 /* Prototypes for functions provided by user */
 int PINT_state_machine_start(struct PINT_OP_STATE *, job_status_s *ret);

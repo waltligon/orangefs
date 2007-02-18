@@ -19,7 +19,7 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p);
 
 %%
 
-machine pvfs2_get_config_sm(prelude, init, final_response, cleanup)
+machine pvfs2_get_config_sm
 {
 	state prelude
 	{

@@ -16,7 +16,7 @@ static int noop_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 
 %%
 
-machine pvfs2_noop_sm(prelude, final_response, cleanup)
+machine pvfs2_noop_sm
 {
 	state prelude
 	{

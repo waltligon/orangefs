@@ -73,24 +73,7 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_mgmt_migrate_sm(
-    prelude,
-    decide_role,
-    metaserver_init,
-    metaserver_read_handles,
-    metaserver_find_target_handle_number,
-    metaserver_rewrite_handles,
-    source_dataserver_prepare_io_write,
-    source_dataserver_start_io_write,
-    source_dataserver_start_io_read,
-    source_dataserver_flow_finished,
-    source_dataserver_wait_for_write_ack,
-    source_dataserver_notify_metadata_server,
-    source_dataserver_notify_metadata_server_xfer_msgpair,
-    source_dataserver_remove_datafile_setup,
-    source_dataserver_remove_datafile_work,
-    final_response,
-    cleanup)
+machine pvfs2_mgmt_migrate_sm
 {
     state prelude
     {

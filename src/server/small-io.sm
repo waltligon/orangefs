@@ -26,12 +26,7 @@ static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p);
 
 %%
 
-machine pvfs2_small_io_sm(
-    prelude,
-    start_job,
-    check_size,
-    send_response,
-    cleanup)
+machine pvfs2_small_io_sm
 {
     state prelude
     {

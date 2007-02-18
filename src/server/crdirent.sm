@@ -39,17 +39,7 @@ static int validation_object_type_failure(
 
 %%
 
-machine pvfs2_crdirent_sm(
-    prelude,
-    setup_op,
-    validate,
-    validation_object_type_failure,
-    read_directory_entry_handle,
-    write_directory_entry,
-    check_for_req_dir_update,
-    update_directory_attr,
-    cleanup,
-    final_response)
+machine pvfs2_crdirent_sm
 {
     state prelude
     {

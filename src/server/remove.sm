@@ -80,14 +80,7 @@ static int remove_setup_work(
 
 %%
 
-nested machine pvfs2_remove_work_sm(
-    check_object_type,
-    verify_object_metadata,
-    remove_dspace,
-    read_dirdata_handle,
-    getattr_of_dirdata_handle,
-    check_dirdata_entries,
-    remove_dirdata_dspace)
+nested machine pvfs2_remove_work_sm
 {
 
     state check_object_type
@@ -141,12 +134,7 @@ nested machine pvfs2_remove_work_sm(
 
 }
 
-machine pvfs2_remove_sm(
-    prelude,
-    setup_work,
-    work,
-    final_response,
-    cleanup)
+machine pvfs2_remove_sm
 {
     state prelude
     {

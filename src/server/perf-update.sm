@@ -20,7 +20,7 @@ static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p);
 
 %%
 
-machine pvfs2_perf_update_sm(do_work, error)
+machine pvfs2_perf_update_sm
 {
 	state do_work 
 	{

@@ -20,7 +20,7 @@ static int job_timer_error(PINT_server_op *s_op, job_status_s* js_p);
 
 %%
 
-machine pvfs2_job_timer_sm(do_work, error)
+machine pvfs2_job_timer_sm
 {
 	state do_work 
 	{

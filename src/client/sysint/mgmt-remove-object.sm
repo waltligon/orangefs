@@ -39,11 +39,7 @@ static int mgmt_remove_object_comp_fn(
 
 %%
 
-machine pvfs2_client_mgmt_remove_object_sm(
-    init,
-    remove_object_setup_msgpair,
-    remove_object_xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_remove_object_sm
 {
     state init
     {

@@ -32,10 +32,7 @@ static int iterate_handles_list_comp_fn(
 
 %%
 
-machine pvfs2_client_mgmt_iterate_handles_list_sm(
-    setup_msgpair, 
-    xfer_msgpair, 
-    cleanup)
+machine pvfs2_client_mgmt_iterate_handles_list_sm
 {
 
     state setup_msgpair
