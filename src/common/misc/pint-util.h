@@ -13,6 +13,19 @@
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 
+void time_get(PVFS_Gtime * time);
+
+void time_add(PVFS_Gtime * time_1, PVFS_Gtime * time_2,
+    PVFS_Gtime * target_time);
+
+void time_sub(PVFS_Gtime * time_1, PVFS_Gtime * time_2,
+    PVFS_Gtime * target_time);
+
+void time_get_current_diff(PVFS_Gtime * time, PVFS_Gtime * target_time);
+
+float time_get_float(PVFS_Gtime * time);
+int time_is_bigger(PVFS_Gtime * time_1, PVFS_Gtime * time_2);
+
 /* converts common fields between sys attr and obj attr structures */
 #define PINT_CONVERT_ATTR(dest, src, extra_amask)       \
 do{                                                     \
@@ -75,13 +88,13 @@ typedef struct PINT_time_marker_s PINT_time_marker;
 
 PVFS_msg_tag_t PINT_util_get_next_tag(void);
 
-int PINT_check_acls(void *acl_buf, size_t acl_size, 
+int PINT_check_acls(void *acl_buf, size_t acl_size,
     PVFS_object_attr *attr,
     PVFS_uid uid, PVFS_gid gid, int want);
 int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src);
 void PINT_free_object_attr(PVFS_object_attr *attr);
 void PINT_time_mark(PINT_time_marker* out_marker);
-void PINT_time_diff(PINT_time_marker mark1, 
+void PINT_time_diff(PINT_time_marker mark1,
     PINT_time_marker mark2,
     double* out_wtime_sec,
     double* out_utime_sec,
@@ -127,7 +140,7 @@ int PINT_check_mode(
 
 #else
 
-#error OS does not have sys/vfs.h or sys/mount.h.  
+#error OS does not have sys/vfs.h or sys/mount.h.
 #error Cant stat mounted filesystems
 
 #endif

@@ -46,10 +46,11 @@ enum job_flags
     JOB_NO_IMMED_COMPLETE = 1
 };
 
+
 #define JOB_TIMEOUT_INF (-1)
 
 /******************************************************************
- * management functions 
+ * management functions
  */
 
 int job_initialize(int flags);
@@ -62,8 +63,11 @@ void job_close_context(job_context_id context_id);
 
 int job_reset_timeout(job_id_t id, int timeout_sec);
 
+/* statistics to support scheduling decisions, also it rolls the values over */
+void job_get_statistics_diff(job_statistics_s * out_statistics);
+
 /******************************************************************
- * job posting functions 
+ * job posting functions
  */
 
 /* network send */
@@ -277,7 +281,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
 			    job_context_id context_id);
-	
+
 /* storage key/value read */
 int job_trove_keyval_read(PVFS_fs_id coll_id,
 			  PVFS_handle handle,
@@ -566,7 +570,7 @@ int job_null(
     job_context_id context_id);
 
 /******************************************************************
- * job test/wait for completion functions 
+ * job test/wait for completion functions
  */
 
 int job_test(job_id_t id,

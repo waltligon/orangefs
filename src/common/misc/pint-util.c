@@ -3,7 +3,7 @@
  *
  * Changes by Acxiom Corporation to add PINT_check_mode() helper function
  * as a replacement for check_mode() in permission checking, also added
- * PINT_check_group() for supplimental group support 
+ * PINT_check_group() for supplimental group support
  * Copyright © Acxiom Corporation, 2005.
  *
  * See COPYING in top-level directory.
@@ -46,25 +46,64 @@ void PINT_time_mark(PINT_time_marker *out_marker)
     out_marker->stime = usage.ru_stime;
 }
 
-void PINT_time_diff(PINT_time_marker mark1, 
+
+/*
+ * Helper functions for time managment needed for the statistics,
+ * should be moved somewhere to common
+ */
+void time_get(PVFS_Gtime * time){
+    gettimeofday(time, 0);
+}
+
+void time_add(PVFS_Gtime * time_1, PVFS_Gtime * time_2,
+    PVFS_Gtime * target_time){
+    target_time->tv_sec = time_1->tv_sec + time_2->tv_sec;
+    target_time->tv_usec = time_1->tv_usec + time_2->tv_usec;
+}
+
+void time_sub(PVFS_Gtime * time_1, PVFS_Gtime * time_2,
+    PVFS_Gtime * target_time){
+    target_time->tv_sec = time_1->tv_sec - time_2->tv_sec;
+    target_time->tv_usec = time_1->tv_usec - time_2->tv_usec;
+}
+
+void time_get_current_diff(PVFS_Gtime * time, PVFS_Gtime * target_time){
+    PVFS_Gtime now;
+    time_get(& now);
+    time_sub(& now, time, target_time);
+}
+
+float time_get_float(PVFS_Gtime * time){
+    return (float) time->tv_sec + (float) time->tv_usec * 0.000001;
+}
+
+int time_is_bigger(PVFS_Gtime * time_1, PVFS_Gtime * time_2){
+    if( time_1->tv_sec > time_2->tv_sec )
+        return 1;
+    if( time_1->tv_sec < time_2->tv_sec )
+        return 0;
+    return time_1->tv_usec > time_2->tv_usec;
+}
+
+void PINT_time_diff(PINT_time_marker mark1,
                     PINT_time_marker mark2,
                     double *out_wtime_sec,
                     double *out_utime_sec,
                     double *out_stime_sec)
 {
-    *out_wtime_sec = 
+    *out_wtime_sec =
         ((double)mark2.wtime.tv_sec +
          (double)(mark2.wtime.tv_usec) / 1000000) -
         ((double)mark1.wtime.tv_sec +
          (double)(mark1.wtime.tv_usec) / 1000000);
 
-    *out_stime_sec = 
+    *out_stime_sec =
         ((double)mark2.stime.tv_sec +
          (double)(mark2.stime.tv_usec) / 1000000) -
         ((double)mark1.stime.tv_sec +
          (double)(mark1.stime.tv_usec) / 1000000);
 
-    *out_utime_sec = 
+    *out_utime_sec =
         ((double)mark2.utime.tv_sec +
          (double)(mark2.utime.tv_usec) / 1000000) -
         ((double)mark1.utime.tv_sec +
@@ -101,8 +140,8 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
     if (src->mask & PVFS_ATTR_PARENT_HANDLE)
     {
         dest->u.data.parent_object = src->u.data.parent_object;
-    }        
-        
+    }
+
 	if (src->mask & PVFS_ATTR_COMMON_UID)
         {
             dest->owner = src->owner;
@@ -134,13 +173,13 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
         if (src->mask & PVFS_ATTR_DIR_DIRENT_COUNT)
         {
-            dest->u.dir.dirent_count = 
+            dest->u.dir.dirent_count =
                 src->u.dir.dirent_count;
         }
 
         if (src->mask & PVFS_ATTR_DIR_HINT)
         {
-            dest->u.dir.hint.dfile_count = 
+            dest->u.dir.hint.dfile_count =
                 src->u.dir.hint.dfile_count;
             dest->u.dir.hint.dist_name_len =
                 src->u.dir.hint.dist_name_len;
@@ -189,7 +228,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
 	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
             (src->objtype == PVFS_TYPE_METAFILE))
-        {      
+        {
             if(src->mask & PVFS_ATTR_META_DFILES)
             {
                 PVFS_size df_array_size = src->u.meta.dfile_count *
@@ -247,7 +286,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 return ret;
             }
         }
-        
+
 	dest->mask = src->mask;
         ret = 0;
     }
@@ -305,7 +344,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
 
 /* PINT_check_mode()
  *
- * checks to see if the type of access described by "access_type" is permitted 
+ * checks to see if the type of access described by "access_type" is permitted
  * for user "uid" of group "gid" on the object with attributes "attr"
  *
  * returns 0 on success, -PVFS_EACCES if permission is not granted
@@ -455,7 +494,7 @@ int PINT_check_mode(
         }
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
     }
-  
+
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "******PINT_check_mode: denying access\n");
     /* default case: access denied */
     return -PVFS_EACCES;
@@ -464,7 +503,7 @@ int PINT_check_mode(
 /* PINT_check_group()
  *
  * checks to see if uid is a member of gid
- * 
+ *
  * returns 0 on success, -PVFS_ENOENT if not a member, other PVFS error codes
  * on system failure
  */
@@ -477,7 +516,7 @@ static int PINT_check_group(uid_t uid, gid_t gid)
     int i = 0;
     int ret = -1;
 
-    /* Explanation: 
+    /* Explanation:
      *
      * We use the _r variants of getpwuid and getgrgid in order to insure
      * thread safety; particularly if this function ever gets called in a
@@ -547,7 +586,7 @@ static int PINT_check_group(uid_t uid, gid_t gid)
     }
 
     if(grp_p == NULL)
-    { 
+    {
 	gen_mutex_unlock(&check_group_mutex);
 	gossip_err("User (uid=%d) isn't in group %d on storage node.\n",
 		   uid, gid);
@@ -563,7 +602,7 @@ static int PINT_check_group(uid_t uid, gid_t gid)
         {
             gen_mutex_unlock(&check_group_mutex);
             return 0;
-        } 
+        }
     }
 
     gen_mutex_unlock(&check_group_mutex);
@@ -584,7 +623,7 @@ static int in_group_p(PVFS_uid uid, PVFS_gid gid, PVFS_gid attr_group)
  * Return 0 if requesting clients is granted want access to the object
  * by the acl. Returns -PVFS_E... otherwise.
  */
-int PINT_check_acls(void *acl_buf, size_t acl_size, 
+int PINT_check_acls(void *acl_buf, size_t acl_size,
     PVFS_object_attr *attr,
     PVFS_uid uid, PVFS_gid gid, int want)
 {
@@ -604,7 +643,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
     acl_size--;
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: read keyval size "
     " %d (%d acl entries)\n",
-        (int) acl_size, 
+        (int) acl_size,
         (int) (acl_size / sizeof(pvfs2_acl_entry)));
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
         uid, gid, want);
@@ -616,9 +655,9 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
     for (i = 0; i < count; i++)
     {
         pa = (pvfs2_acl_entry *) acl_buf + i;
-        /* 
-           NOTE: Remember that keyval is encoded as lebf, so convert it 
-           to host representation 
+        /*
+           NOTE: Remember that keyval is encoded as lebf, so convert it
+           to host representation
         */
         pe.p_tag  = bmitoh32(pa->p_tag);
         pe.p_perm = bmitoh32(pa->p_perm);
@@ -627,7 +666,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
             i, pa->p_tag, pa->p_perm, pa->p_id);
-        switch(pa->p_tag) 
+        switch(pa->p_tag)
         {
             case PVFS2_ACL_USER_OBJ:
                 /* (May have been checked already) */
@@ -639,7 +678,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
                     goto mask;
                 break;
             case PVFS2_ACL_GROUP_OBJ:
-                if (in_group_p(uid, gid, attr->group)) 
+                if (in_group_p(uid, gid, attr->group))
                 {
                     found = 1;
                     if ((pa->p_perm & want) == want)
@@ -678,8 +717,8 @@ mask:
     for (; i < count; i++)
     {
         pvfs2_acl_entry me, *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
-        
-        /* 
+
+        /*
           NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
           convert it to host endian format
          */
@@ -690,7 +729,7 @@ mask:
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded (mask) ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
             i, mask_obj->p_tag, mask_obj->p_perm, mask_obj->p_id);
-        if (mask_obj->p_tag == PVFS2_ACL_MASK) 
+        if (mask_obj->p_tag == PVFS2_ACL_MASK)
         {
             if ((pa->p_perm & mask_obj->p_perm & want) == want)
                 return 0;

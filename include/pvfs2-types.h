@@ -3,7 +3,7 @@
  *
  * See COPYING in top-level directory.
  */
-/* NOTE: if you make any changes to the encoding definitions in this file, 
+/* NOTE: if you make any changes to the encoding definitions in this file,
  * please update the PVFS2_PROTO_VERSION in pvfs2-req-proto.h accordingly
  */
 
@@ -147,6 +147,15 @@ typedef uint64_t PVFS_flags;
 #define decode_PVFS_permissions decode_uint32_t
 #define encode_PVFS_flags encode_uint64_t
 #define decode_PVFS_flags decode_uint64_t
+
+typedef struct timeval PVFS_Gtime;
+/* statistics to support scheduling decisions */
+typedef struct job_statistics
+{
+    float bmi_load;   /* indicate network read and/or write overloaded */
+    float trove_load; /* indicate disk overloaded */
+    float flow_load;  /* current stream load */
+} job_statistics_s;
 
 /* contiguous range of handles */
 typedef struct
@@ -293,7 +302,7 @@ typedef struct
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT \
  | PVFS_ATTR_SYS_DIR_HINT)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
-(PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
+(PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE)
 #define PVFS_ATTR_SYS_ALL_TIMES \
 ((PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) | PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
 
@@ -372,7 +381,7 @@ endecode_fields_2(
 #define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
                                         by <linux/xattr.h> */
 #define PVFS_MAX_XATTR_VALUELEN  256 /* Not the same as XATTR_SIZE_MAX defined
-                                        by <linux/xattr.h> */ 
+                                        by <linux/xattr.h> */
 #define PVFS_MAX_XATTR_LISTLEN   8    /* Not the same as XATTR_LIST_MAX
                                           defined by <linux/xattr.h> */
 

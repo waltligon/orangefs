@@ -16,6 +16,7 @@
 #include "job-desc-queue.h"
 #include "gossip.h"
 #include "id-generator.h"
+#include "pint-util.h"
 
 /***************************************************************
  * Visible functions
@@ -45,6 +46,7 @@ struct job_desc *alloc_job_desc(int type)
     }
 
     jd->type = type;
+
     return (jd);
 };
 
@@ -96,7 +98,7 @@ void job_desc_q_cleanup(job_desc_q_p jdqp)
             qlist_for_each_safe(iterator, scratch, jdqp)
             {
                 tmp_job_desc = qlist_entry(iterator, struct job_desc,
-                        job_desc_q_link); 
+                        job_desc_q_link);
                 /* qlist_for_each_safe lets us iterate and remove nodes.  no
                  * need to adjust pointers as we are freeing everything */
                 free(tmp_job_desc);

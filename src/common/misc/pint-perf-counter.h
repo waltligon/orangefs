@@ -32,7 +32,10 @@ enum PINT_server_perf_keys
     PINT_PERF_METADATA_WRITE = 3,
     PINT_PERF_METADATA_DSPACE_OPS = 4,
     PINT_PERF_METADATA_KEYVAL_OPS = 5,
-    PINT_PERF_REQSCHED = 6
+    PINT_PERF_REQSCHED = 6,
+    PINT_PERF_FLOW_JOB_LOAD = 7,
+    PINT_PERF_TROVE_JOB_LOAD = 8,
+    PINT_PERF_BMI_JOB_LOAD = 9,
 };
 
 /** enumeration of valid measurement operations */
@@ -66,7 +69,7 @@ struct PINT_perf_counter
     int key_count;                       /**< number of keys */
     int history_size;                    /**< number of history intervals */
     /** matrix of statistics, first dimension is key, second is history */
-    int64_t** value_matrix; 
+    int64_t** value_matrix;
     uint64_t* start_time_array_ms;        /**< array of start times */
     uint64_t* interval_array_ms;          /**< array of interval lengths */
 };
@@ -85,7 +88,7 @@ void PINT_perf_reset(
 
 void __PINT_perf_count(
     struct PINT_perf_counter* pc,
-    int key, 
+    int key,
     int64_t value,
     enum PINT_perf_ops op);
 
@@ -109,12 +112,12 @@ int PINT_perf_get_info(
     unsigned int* arg);
 
 void PINT_perf_retrieve(
-    struct PINT_perf_counter* pc,        
+    struct PINT_perf_counter* pc,
     int64_t** value_matrix,
-    uint64_t* start_time_array_ms,       
-    uint64_t* interval_array_ms,         
-    int max_key,                         
-    int max_history);     
+    uint64_t* start_time_array_ms,
+    uint64_t* interval_array_ms,
+    int max_key,
+    int max_history);
 
 char* PINT_perf_generate_text(
     struct PINT_perf_counter* pc,

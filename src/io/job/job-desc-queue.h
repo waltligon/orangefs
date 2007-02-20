@@ -101,6 +101,8 @@ struct job_desc
     struct PINT_thread_mgr_trove_callback trove_callback;  /* callback information */
     enum PVFS_event_op event_type;
 
+    PVFS_Gtime job_start_time;
+
     /* union of information for lower level interfaces */
     union
     {
