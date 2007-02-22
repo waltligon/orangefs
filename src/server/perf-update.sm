@@ -87,15 +87,15 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
     {
         switch(PINT_server_pc->key_array[i].key){
         case(PINT_PERF_FLOW_JOB_LOAD):{
-            PINT_server_pc->value_matrix[i][0] = (int64_t) job_statistic.flow_load;
+            PINT_server_pc->value_matrix[i][0] = (int64_t) (job_statistic.flow_load * 1e6);
             break;
         }
         case(PINT_PERF_TROVE_JOB_LOAD):{
-            PINT_server_pc->value_matrix[i][0] = (int64_t) job_statistic.trove_load;
+            PINT_server_pc->value_matrix[i][0] = (int64_t) (job_statistic.trove_load * 1e6);
             break;
         }
         case(PINT_PERF_BMI_JOB_LOAD):{
-            PINT_server_pc->value_matrix[i][0] = (int64_t) job_statistic.bmi_load;
+            PINT_server_pc->value_matrix[i][0] = (int64_t) (job_statistic.bmi_load * 1e6);
             break;
         }
         }
