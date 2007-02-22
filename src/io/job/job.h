@@ -38,6 +38,7 @@ typedef struct job_status
     PVFS_ds_type type;		/* dspace_verify */
     PVFS_fs_id coll_id;		/* fs_lookup */
     int count;			/* keyval_iterate, iterate_handles */
+    PVFS_Gtime start_time;
 }
 job_status_s;
 
@@ -62,9 +63,6 @@ int job_open_context(job_context_id* context_id);
 void job_close_context(job_context_id context_id);
 
 int job_reset_timeout(job_id_t id, int timeout_sec);
-
-/* statistics to support scheduling decisions, also it rolls the values over */
-void job_get_statistics_diff(job_statistics_s * out_statistics);
 
 /******************************************************************
  * job posting functions

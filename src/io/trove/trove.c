@@ -9,7 +9,7 @@
  *
  *  Trove interface routines.
  *
- *  This file holds the top-level routines for Trove.  These routines 
+ *  This file holds the top-level routines for Trove.  These routines
  *  are responsible for mapping Trove calls to specific underlying
  *  implementations.
  *
@@ -26,8 +26,6 @@ extern struct TROVE_keyval_ops  *keyval_method_table[];
 extern struct TROVE_dspace_ops  *dspace_method_table[];
 extern struct TROVE_bstream_ops *bstream_method_table[];
 extern struct TROVE_mgmt_ops    *mgmt_method_table[];
-
-struct PINT_perf_counter* PINT_server_pc = NULL;
 
 int TROVE_db_cache_size_bytes = 0;
 int TROVE_shm_key_hint = 0;

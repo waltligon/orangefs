@@ -15,7 +15,10 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
+#include "pint-util.h"
 #include "gossip.h"
+
+struct PINT_perf_counter* PINT_server_pc = NULL;
 
 #define PINT_PERF_REALLOC_ARRAY(__pc, __tmp_ptr, __src_ptr, __new_history, __type) \
 {                                                                      \
@@ -29,7 +32,7 @@
     __src_ptr = __tmp_ptr;                                             \
 }
 
-/** 
+/**
  * creates a new perf counter instance
  * \note key_array must not be freed by caller until after
  * PINT_perf_finalize()
@@ -69,7 +72,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
             free(pc);
             return(NULL);
         }
-        
+
         pc->key_count++;
         key = &key_array[pc->key_count];
     }
@@ -92,7 +95,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
         free(pc);
         return(NULL);
     }
-    pc->interval_array_ms = 
+    pc->interval_array_ms =
         (uint64_t*)malloc(PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
     if(!pc->interval_array_ms)
     {
@@ -105,7 +108,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
         PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
     memset(pc->interval_array_ms, 0,
         PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
-        
+
     /* allocate value matrix */
     pc->value_matrix = (int64_t**)malloc(pc->key_count*sizeof(int64_t*));
     if(!pc->value_matrix)
@@ -180,7 +183,89 @@ void PINT_perf_reset(
     return;
 }
 
-/** 
+void PINT_perf_load_start(
+    struct PINT_perf_counter* pc,
+    enum PINT_server_perf_keys key,
+    PVFS_Gtime * out_cur_time)
+{
+    if(!pc)
+    {
+        /* do nothing if perf counter is not initialized */
+        return;
+    }
+
+    PVFS_Gtime diff_time;
+
+    gen_mutex_lock(pc->mutex);
+    time_get(out_cur_time);
+
+    /*
+     * assume that this job will continue in the next time frame.
+     * Therefore we simply add the time-offset to the frame start
+     */
+    time_sub( out_cur_time,  & pc->time_of_last_rollover, &  diff_time);
+
+    pc->load_overlapping[key] += time_get_float(& diff_time);
+
+    pc->current_pending_count[key]++;
+
+    gen_mutex_unlock(pc->mutex);
+}
+
+void PINT_perf_load_stop(
+    struct PINT_perf_counter* pc,
+    enum PINT_server_perf_keys key,
+    PVFS_Gtime * start_time)
+{
+    if(!pc)
+    {
+        /* do nothing if perf counter is not initialized */
+        return;
+    }
+
+    PVFS_Gtime current, tmp_time;
+    /* get the current time as end-time */
+    time_get(& current);
+
+    pc->current_pending_count[key]--;
+    if ( time_is_bigger(& pc->time_of_last_rollover, start_time )){
+        /* job is startet in earlier time frames */
+        pc->last_pending_count[key]--;
+
+        /* copy result directly into current variable */
+        time_sub(& current, & pc->time_of_last_rollover,  & current);
+
+        pc->load_non_overlapping[key] += time_get_float(& current);
+
+    }else{
+        /* job is started in the same time frame, decrement pending_value
+         */
+        time_sub(& current, start_time, & current);
+
+        /* remove time diff extra added */
+        time_sub( start_time,  & pc->time_of_last_rollover, &  tmp_time);
+
+        /* corresponds to += current_time - jd->job_start_time -
+         *  time_ jd->job_start_time + statistic_start_time_of_last_frame */
+        pc->load_non_overlapping[key] += time_get_float(& current);
+        pc->load_overlapping[key] -= time_get_float(& tmp_time);
+    }
+    gen_mutex_unlock(pc->mutex);
+}
+
+static inline float PINT_compute_load(float value_non_overlapping,
+    float value_overlapping,
+    int last_frame_pending_jobs,
+    int current_pending_count,
+    PVFS_Gtime * last_frame_start, PVFS_Gtime * this_frame_start, float time_diff){
+
+    /* resubtract offset from extra_value of jobs */
+    return ((float) last_frame_pending_jobs + ( time_diff * (float) current_pending_count
+        - value_overlapping + value_non_overlapping )
+        / time_diff);
+}
+
+/**
  * destroys a perf counter instance
  */
 void PINT_perf_finalize(
@@ -198,7 +283,7 @@ void PINT_perf_finalize(
     gen_mutex_destroy(pc->mutex);
     free(pc);
     pc = NULL;
-    
+
     return;
 }
 
@@ -208,7 +293,7 @@ void PINT_perf_finalize(
  */
 void __PINT_perf_count(
     struct PINT_perf_counter* pc,
-    int key, 
+    int key,
     int64_t value,
     enum PINT_perf_ops op)
 {
@@ -249,14 +334,17 @@ void __PINT_perf_count(
     #define PINT_perf_count __PINT_perf_count
 #endif
 
-/** 
+/**
  * rolls over the current history window
  */
 void PINT_perf_rollover(
     struct PINT_perf_counter* pc)
 {
+    PVFS_Gtime time_diff_intervalls;
+    float time_diff_intervalls_float;
+    PVFS_Gtime current_time;
+
     int i;
-    struct timeval tv;
     uint64_t int_time;
 
     if(!pc)
@@ -264,9 +352,12 @@ void PINT_perf_rollover(
         /* do nothing if perf counter is not initialized */
         return;
     }
+    time_get(& current_time);
 
-    gettimeofday(&tv, NULL);
-    int_time = ((uint64_t)tv.tv_sec)*1000 + tv.tv_usec/1000;
+    time_sub(& current_time, & pc->time_of_last_rollover , & time_diff_intervalls);
+    time_diff_intervalls_float = time_get_float(& time_diff_intervalls);
+
+    int_time = ((uint64_t)current_time.tv_sec)*1000 + current_time.tv_usec/1000;
 
     gen_mutex_lock(pc->mutex);
 
@@ -299,7 +390,25 @@ void PINT_perf_rollover(
         {
             pc->value_matrix[i][0] = 0;
         }
+
+        if (pc->key_array[i].flag & PINT_PERF_LOAD_VALUE){
+            /* now calculate special marked load values */
+            pc->value_matrix[i][0] = (int64_t) 1e6 * PINT_compute_load(
+                pc->load_non_overlapping[i], pc->load_overlapping[i],
+                pc->last_pending_count[i], pc->current_pending_count[i],
+                &  pc->time_of_last_rollover, & current_time, time_diff_intervalls_float);
+
+            /* now update values for last time frame */
+            pc->last_pending_count[i] =  pc->current_pending_count[i];
+
+            pc->load_non_overlapping[i] = 0;
+            pc->load_overlapping[i] = 0;
+        }
+
     }
+
+    memcpy( & pc->time_of_last_rollover, & current_time, sizeof(PVFS_Gtime));
+
 
     gen_mutex_unlock(pc->mutex);
 
@@ -307,7 +416,7 @@ void PINT_perf_rollover(
 }
 
 /**
- * sets runtime tunable performance counter options 
+ * sets runtime tunable performance counter options
  * \returns 0 on success, -PVFS_error on failure
  */
 int PINT_perf_set_info(
@@ -364,13 +473,13 @@ int PINT_perf_set_info(
             gen_mutex_unlock(pc->mutex);
             return(-PVFS_EINVAL);
     }
-    
+
     gen_mutex_unlock(pc->mutex);
     return(0);
 }
 
 /**
- * retrieves runtime tunable performance counter options 
+ * retrieves runtime tunable performance counter options
  * \returns 0 on success, -PVFS_error on failure
  */
 int PINT_perf_get_info(
@@ -397,7 +506,7 @@ int PINT_perf_get_info(
             gen_mutex_unlock(pc->mutex);
             return(-PVFS_EINVAL);
     }
-    
+
     gen_mutex_unlock(pc->mutex);
     return(0);
 }
@@ -432,7 +541,7 @@ void PINT_perf_retrieve(
      * interpretting results
      */
     assert(max_key <= pc->key_count);
-    
+
     tmp_max_key = PVFS_util_min(max_key, pc->key_count);
     tmp_max_history = PVFS_util_min(max_history, pc->history_size);
 
@@ -462,7 +571,7 @@ void PINT_perf_retrieve(
         (tmp_max_history*sizeof(uint64_t)));
     memcpy(interval_array_ms, pc->interval_array_ms,
         (tmp_max_history*sizeof(uint64_t)));
-    
+
     gen_mutex_unlock(pc->mutex);
 
     /* fill in interval length for newest interval */
@@ -472,7 +581,7 @@ void PINT_perf_retrieve(
     {
         interval_array_ms[0] = int_time - start_time_array_ms[0];
     }
-    
+
     return;
 }
 
@@ -493,10 +602,10 @@ char* PINT_perf_generate_text(
     int ret;
 
     gen_mutex_lock(pc->mutex);
-    
-    line_size = 26 + (24*pc->history_size); 
+
+    line_size = 26 + (24*pc->history_size);
     total_size = (pc->key_count+2)*line_size + 1;
-    
+
     actual_size = PVFS_util_min(total_size, max_size);
 
     if((actual_size/line_size) < 3)
@@ -526,7 +635,7 @@ char* PINT_perf_generate_text(
             localtime_r(&tmp_time_t, &tmp_tm);
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
-            sprintf(position, ".%03u", 
+            sprintf(position, ".%03u",
                 (unsigned)(pc->start_time_array_ms[i]%1000));
             position += 4;
         }
@@ -558,7 +667,7 @@ char* PINT_perf_generate_text(
             gmtime_r(&tmp_time_t, &tmp_tm);
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
-            sprintf(position, ".%03u", 
+            sprintf(position, ".%03u",
                 (unsigned)(pc->interval_array_ms[i]%1000));
             position += 4;
         }

@@ -76,10 +76,11 @@ static struct PINT_perf_key server_keys[] =
     {"metadata writes", PINT_PERF_METADATA_WRITE, PINT_PERF_PRESERVE},
     {"metadata dspace ops", PINT_PERF_METADATA_DSPACE_OPS, PINT_PERF_PRESERVE},
     {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
-    {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
-    {"flow load", PINT_PERF_FLOW_JOB_LOAD, 0},
-    {"trove load", PINT_PERF_TROVE_JOB_LOAD, 0},
-    {"bmi load", PINT_PERF_BMI_JOB_LOAD, 0},
+
+    {"request scheduler load", PINT_PERF_REQSCHED, PINT_PERF_LOAD_VALUE},
+    {"flow load", PINT_PERF_FLOW_JOB_LOAD, PINT_PERF_LOAD_VALUE},
+    {"trove load", PINT_PERF_TROVE_JOB_LOAD, PINT_PERF_LOAD_VALUE},
+    {"bmi load", PINT_PERF_BMI_JOB_LOAD, PINT_PERF_LOAD_VALUE},
     {NULL, 0, 0},
 };
 

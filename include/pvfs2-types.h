@@ -149,13 +149,6 @@ typedef uint64_t PVFS_flags;
 #define decode_PVFS_flags decode_uint64_t
 
 typedef struct timeval PVFS_Gtime;
-/* statistics to support scheduling decisions */
-typedef struct job_statistics
-{
-    float bmi_load;   /* indicate network read and/or write overloaded */
-    float trove_load; /* indicate disk overloaded */
-    float flow_load;  /* current stream load */
-} job_statistics_s;
 
 /* contiguous range of handles */
 typedef struct

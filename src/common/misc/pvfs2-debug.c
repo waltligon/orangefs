@@ -12,7 +12,7 @@
 #include "pvfs2-debug.h"
 
 /* a private internal type */
-typedef struct 
+typedef struct
 {
     const char *keyword;
     uint64_t mask_val;
@@ -75,13 +75,15 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "readdir", GOSSIP_READDIR_DEBUG },
     /* Debug the mkdir operation (server only) */
     { "mkdir", GOSSIP_MKDIR_DEBUG },
-    /* Debug the io operation (reads and writes) 
+
+    { "perfcounter", GOSSIP_PERFCOUNTER_DEBUG },
+    /* Debug the io operation (reads and writes)
      * for both the client and server */
     { "io", GOSSIP_IO_DEBUG },
     /* Debug the server's open file descriptor cache */
-    { "open_cache", GOSSIP_DBPF_OPEN_CACHE_DEBUG }, 
+    { "open_cache", GOSSIP_DBPF_OPEN_CACHE_DEBUG },
     /* Debug permissions checking on the server */
-    { "permissions", GOSSIP_PERMISSIONS_DEBUG }, 
+    { "permissions", GOSSIP_PERMISSIONS_DEBUG },
     /* Debug the cancel operation */
     { "cancel", GOSSIP_CANCEL_DEBUG },
     /* Debug the msgpair state machine */
@@ -90,7 +92,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "clientcore", GOSSIP_CLIENTCORE_DEBUG },
     /* Debug the client timing state machines (job timeout, etc.) */
     { "clientcore_timing", GOSSIP_CLIENTCORE_TIMING_DEBUG },
-    /* Show server file (metadata) accesses (both modify and read-only). */ 
+    /* Show server file (metadata) accesses (both modify and read-only). */
     { "access", GOSSIP_ACCESS_DEBUG },
     /* Show more detailed server file accesses */
     { "access_detail", GOSSIP_ACCESS_DETAIL_DEBUG },
@@ -147,7 +149,7 @@ static __keyword_mask_t s_kmod_keyword_mask_map[] =
 static const int num_kmod_keyword_mask_map = (int)           \
 (sizeof(s_kmod_keyword_mask_map) / sizeof(__keyword_mask_t));
 
-static uint64_t debug_to_mask(__keyword_mask_t *mask_map, 
+static uint64_t debug_to_mask(__keyword_mask_t *mask_map,
         int num_mask_map, const char *event_logging)
 {
     uint64_t mask = 0;
@@ -201,20 +203,20 @@ static uint64_t debug_to_mask(__keyword_mask_t *mask_map,
  */
 uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
 {
-    return debug_to_mask(s_keyword_mask_map, 
+    return debug_to_mask(s_keyword_mask_map,
             num_keyword_mask_map, event_logging);
 }
 
 uint64_t PVFS_kmod_eventlog_to_mask(const char *event_logging)
 {
-    return debug_to_mask(s_kmod_keyword_mask_map, 
+    return debug_to_mask(s_kmod_keyword_mask_map,
             num_kmod_keyword_mask_map, event_logging);
 }
 
 /*
   returns the keyword matching the specified position.
   returns NULL when an invlalid position is requested.
-  
+
   to simply iterate all keywords, position should start at 0
   and be incremented repeatedly until this method returns NULL.
 */

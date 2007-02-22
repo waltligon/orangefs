@@ -24,7 +24,7 @@
 #include "id-generator.h"
 #include "pint-event.h"
 #include "job-time-mgr.h"
-#include "pint-util.h"
+#include "pint-perf-counter.h"
 
 #define JOB_EVENT_START(__op, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, 0, __id, \
@@ -50,18 +50,6 @@ static int trove_pending_count = 0;
 static int flow_pending_count = 0;
 static job_desc_q_p dev_unexp_queue = NULL;
 static int dev_unexp_pending_count = 0;
-
-/* additional information to be provided for scheduler */
-static job_statistics_s statistics_jobs_finished_in_interval = { 0.0f, 0.0f, 0.0f };
-static job_statistics_s statistics_jobs_overlapping_interval = { 0.0f, 0.0f, 0.0f };
-static gen_mutex_t statistic_mutex = GEN_MUTEX_INITIALIZER;
-
-static PVFS_Gtime statistic_start_time_of_last_frame;
-
-static int last_frame_pending_count_bmi = 0;
-static int last_frame_pending_count_trove = 0;
-static int last_frame_pending_count_flow = 0;
-
 /* locks for internal queues */
 static gen_mutex_t bmi_unexp_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t dev_unexp_mutex = GEN_MUTEX_INITIALIZER;
@@ -114,145 +102,14 @@ static void flow_callback(flow_descriptor* flow_d);
 static void do_one_work_cycle_all(int idle_time_ms);
 #endif
 
-#define BMI_START_LOAD_MEASURE     job_statistic_add_job( jd, \
-    & statistics_jobs_overlapping_interval.bmi_load, \
-    & bmi_pending_count);
-#define BMI_STOP_LOAD_MEASURE job_statistic_remove_job( jd, \
-        &  last_frame_pending_count_bmi,  & bmi_pending_count, \
-        & statistics_jobs_finished_in_interval.bmi_load, \
-        & statistics_jobs_overlapping_interval.bmi_load );
-
-#define FLOW_START_LOAD_MEASURE     job_statistic_add_job( jd, \
-    & statistics_jobs_overlapping_interval.flow_load, \
-    & flow_pending_count);
-#define FLOW_STOP_LOAD_MEASURE job_statistic_remove_job( jd, \
-        &  last_frame_pending_count_flow,  & flow_pending_count, \
-        & statistics_jobs_finished_in_interval.flow_load, \
-        & statistics_jobs_overlapping_interval.flow_load );
-
-#define TROVE_START_LOAD_MEASURE     job_statistic_add_job( jd, \
-    & statistics_jobs_overlapping_interval.trove_load, \
-    & trove_pending_count);
-#define TROVE_STOP_LOAD_MEASURE job_statistic_remove_job( jd, \
-        &  last_frame_pending_count_trove,  & trove_pending_count, \
-        & statistics_jobs_finished_in_interval.trove_load, \
-        & statistics_jobs_overlapping_interval.trove_load );
+#define JOB_FLOW_LOAD_START \
+    PINT_perf_load_start(PINT_server_pc, PINT_PERF_FLOW_JOB_LOAD, & jd->job_start_time);
+#define JOB_FLOW_LOAD_STOP(jd) \
+    PINT_perf_load_stop(PINT_server_pc, PINT_PERF_FLOW_JOB_LOAD, & jd->job_start_time);
 
 /********************************************************
  * public interface
  */
-
-/*
- * Load computation helper function
- * this one is kinda tricky to ensure that we do not need a explizit list of
- * jobs which are pending during a rollover to a new time-interval
- */
-static inline float job_statistic_compute_load(float value_non_overlapping,
-    float value_overlapping,
-    int last_frame_pending_jobs,
-    int current_pending_count,
-    PVFS_Gtime * last_frame_start, PVFS_Gtime * this_frame_start, float time_diff){
-
-    /* resubtract offset from extra_value of jobs */
-    return ((float) last_frame_pending_jobs + ( time_diff * (float) current_pending_count
-        - value_overlapping + value_non_overlapping )
-        / time_diff);
-}
-
-static inline void job_statistic_add_job(struct job_desc * jd,
-    float * value_overlapping, int * current_pending_count){
-    PVFS_Gtime diff_time;
-
-    gen_mutex_lock(& statistic_mutex);
-    time_get(& jd->job_start_time);
-
-    /*
-     * assume that this job will continue in the next time frame.
-     * Therefore we simply add the time-offset to the frame start
-     */
-    time_sub( & jd->job_start_time,  & statistic_start_time_of_last_frame, &  diff_time);
-
-    *value_overlapping += time_get_float(& diff_time);
-
-    (*current_pending_count)++;
-
-    gen_mutex_unlock(& statistic_mutex);
-}
-
-static inline void job_statistic_remove_job( struct job_desc * jd,
-    int * last_frame_pending_count, int * current_pending_count , float * value_non_overlapping,
-    float * value_overlapping){
-    gen_mutex_lock(& statistic_mutex);
-    PVFS_Gtime current, tmp_time;
-    /* get the current time as end-time */
-    time_get(& current);
-
-    (*current_pending_count)--;
-    if ( time_is_bigger(& statistic_start_time_of_last_frame, & jd->job_start_time )){
-        /* job is startet in earlier time frames */
-        (*last_frame_pending_count)--;
-
-        /* copy result directly into current variable */
-        time_sub(& current, & statistic_start_time_of_last_frame,  & current);
-
-        *value_non_overlapping += time_get_float(& current);
-
-    }else{
-        /* job is started in the same time frame, decrement pending_value
-         */
-        time_sub(& current, &jd->job_start_time,  & current);
-
-        /* remove time diff extra added */
-        time_sub( & jd->job_start_time,  & statistic_start_time_of_last_frame, &  tmp_time);
-
-        /* corresponds to += current_time - jd->job_start_time -
-         *  time_ jd->job_start_time + statistic_start_time_of_last_frame */
-        (*value_non_overlapping) += time_get_float(& current);
-        (*value_overlapping) -= time_get_float(& tmp_time);
-    }
-   gen_mutex_unlock(& statistic_mutex);
-}
-
-/*
- * returns load statistics about the job interface and rolls the load over !
- */
-void job_get_statistics_diff(job_statistics_s * out_statistics)
-{
-    PVFS_Gtime time_diff_intervalls;
-    float time_diff_intervalls_float;
-
-    gen_mutex_lock(& statistic_mutex);
-    PVFS_Gtime current_time;
-    time_get(& current_time);
-
-    time_sub(& current_time, & statistic_start_time_of_last_frame , & time_diff_intervalls);
-    time_diff_intervalls_float = time_get_float(& time_diff_intervalls);
-
-    out_statistics->bmi_load = job_statistic_compute_load(
-        statistics_jobs_finished_in_interval.bmi_load, statistics_jobs_overlapping_interval.bmi_load,
-        last_frame_pending_count_bmi, bmi_pending_count,
-        & statistic_start_time_of_last_frame, & current_time, time_diff_intervalls_float);
-    out_statistics->trove_load = job_statistic_compute_load(
-        statistics_jobs_finished_in_interval.trove_load, statistics_jobs_overlapping_interval.trove_load,
-        last_frame_pending_count_trove, trove_pending_count,
-        & statistic_start_time_of_last_frame, & current_time, time_diff_intervalls_float);
-    out_statistics->flow_load = job_statistic_compute_load(
-        statistics_jobs_finished_in_interval.flow_load, statistics_jobs_overlapping_interval.flow_load,
-        last_frame_pending_count_flow, flow_pending_count,
-        & statistic_start_time_of_last_frame, & current_time, time_diff_intervalls_float);
-
-    /* now update values for last time frame */
-    last_frame_pending_count_bmi =   bmi_pending_count;
-    last_frame_pending_count_trove = trove_pending_count;
-    last_frame_pending_count_flow =  flow_pending_count;
-
-    /* clear old information */
-    memset(&statistics_jobs_overlapping_interval  ,0, sizeof(job_statistics_s) );
-    memset(&statistics_jobs_finished_in_interval  ,0, sizeof(job_statistics_s) );
-
-    memcpy(& statistic_start_time_of_last_frame, & current_time, sizeof(PVFS_Gtime));
-    gen_mutex_unlock(& statistic_mutex);
-}
 
 /* job_initialize()
  *
@@ -336,6 +193,7 @@ int job_finalize(void)
     teardown_queues();
     return 0;
 }
+
 
 /* job_open_context()
  *
@@ -493,8 +351,6 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     user_ptr_internal = &jd->bmi_callback;
     JOB_EVENT_START(PVFS_EVENT_BMI_SEND, jd->job_id);
 
-    BMI_START_LOAD_MEASURE
-
     /* post appropriate type of send */
     if (!send_unexpected)
     {
@@ -511,7 +367,6 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
 
     if (ret < 0)
     {
-        BMI_STOP_LOAD_MEASURE
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
@@ -523,7 +378,6 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
 
     if (ret == 1)
     {
-        BMI_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -538,6 +392,7 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
      * we must queue up to test it later
      */
     *id = jd->job_id;
+    bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_SEND;
 
     return(job_time_mgr_add(jd, timeout_sec));
@@ -592,8 +447,6 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     user_ptr_internal = &jd->bmi_callback;
     JOB_EVENT_START(PVFS_EVENT_BMI_SEND, jd->job_id);
 
-    BMI_START_LOAD_MEASURE
-
     /* post appropriate type of send */
     if (!send_unexpected)
     {
@@ -613,7 +466,6 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
 
     if (ret < 0)
     {
-        BMI_STOP_LOAD_MEASURE
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
@@ -625,7 +477,6 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
 
     if (ret == 1)
     {
-        BMI_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -640,6 +491,7 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
      * we must queue up to test it later
      */
     *id = jd->job_id;
+    bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_SEND;
     return(job_time_mgr_add(jd, timeout_sec));
 }
@@ -687,15 +539,12 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     user_ptr_internal = &jd->bmi_callback;
     JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
 
-    BMI_START_LOAD_MEASURE
-
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
                         &(jd->u.bmi.actual_size), buffer_type, tag,
                         user_ptr_internal,
                         global_bmi_context);
     if (ret < 0)
     {
-        BMI_STOP_LOAD_MEASURE
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
@@ -707,7 +556,6 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
 
     if (ret == 1)
     {
-        BMI_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -723,6 +571,7 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
      * we must queue up to test it later
      */
     *id = jd->job_id;
+    bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_RECV;
 
     return(job_time_mgr_add(jd, timeout_sec));
@@ -776,8 +625,6 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     user_ptr_internal = &jd->bmi_callback;
     JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
 
-    BMI_START_LOAD_MEASURE
-
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
                              size_list, list_count, total_expected_size,
                              &(jd->u.bmi.actual_size), buffer_type, tag,
@@ -785,7 +632,6 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
 
     if (ret < 0)
     {
-        BMI_STOP_LOAD_MEASURE
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
@@ -797,7 +643,6 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
 
     if (ret == 1)
     {
-        BMI_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -813,6 +658,7 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
      * we must queue up to test it later
      */
     *id = jd->job_id;
+    bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_RECV;
 
     return(job_time_mgr_add(jd, timeout_sec));
@@ -1356,13 +1202,12 @@ int job_flow(flow_descriptor * flow_d,
 
     JOB_EVENT_START(PVFS_EVENT_FLOW, jd->job_id);
 
-    FLOW_START_LOAD_MEASURE
-
+    JOB_FLOW_LOAD_START
     /* post the flow */
     ret = PINT_flow_post(flow_d);
     if (ret < 0)
     {
-        FLOW_STOP_LOAD_MEASURE
+        JOB_FLOW_LOAD_STOP(jd)
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_FLOW, 0, jd->job_id);
@@ -1372,7 +1217,7 @@ int job_flow(flow_descriptor * flow_d,
     }
     if (ret == 1)
     {
-        FLOW_STOP_LOAD_MEASURE
+        JOB_FLOW_LOAD_STOP(jd)
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -1385,6 +1230,7 @@ int job_flow(flow_descriptor * flow_d,
 
     /* queue up the job desc. for later completion */
     *id = jd->job_id;
+    flow_pending_count++;
     jd->event_type = PVFS_EVENT_FLOW;
     gossip_debug(GOSSIP_FLOW_DEBUG, "Job flows in progress (post time): %d\n",
             flow_pending_count);
@@ -1474,7 +1320,6 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_WRITE_AT, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_write_at(coll_id, handle, buffer,
                                  &jd->u.trove.actual_size, offset, flags,
@@ -1488,7 +1333,6 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_AT, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -1500,7 +1344,6 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -1517,6 +1360,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_WRITE_AT;
 
     return (0);
@@ -1564,8 +1408,6 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_WRITE_LIST, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_write_list(coll_id, handle,
                                    mem_offset_array, mem_size_array,
@@ -1585,7 +1427,6 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -1597,7 +1438,6 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -1614,6 +1454,7 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_WRITE_LIST;
 
     return (0);
@@ -1666,8 +1507,6 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_READ_AT, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_read_at(coll_id, handle, buffer,
                                 &jd->u.trove.actual_size, offset, flags,
@@ -1681,7 +1520,6 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_READ_AT, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -1693,7 +1531,6 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -1710,6 +1547,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_READ_AT;
 
     return (0);
@@ -1757,7 +1595,6 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_READ_LIST, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_read_list(coll_id, handle,
                                   mem_offset_array, mem_size_array,
@@ -1775,7 +1612,6 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -1787,7 +1623,6 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -1804,6 +1639,7 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_READ_LIST;
 
     return (0);
@@ -1846,7 +1682,6 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_BSTREAM_FLUSH, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_flush(coll_id, handle, flags, user_ptr_internal,
                               global_trove_context, &(jd->u.trove.id));
@@ -1857,7 +1692,6 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_FLUSH, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -1868,7 +1702,6 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     }
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -1881,6 +1714,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_BSTREAM_FLUSH;
 
     return (0);
@@ -1930,7 +1764,6 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_READ, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
                             jd->u.trove.vtag, user_ptr_internal,
@@ -1942,7 +1775,6 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -1954,7 +1786,6 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -1969,6 +1800,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_KEYVAL_READ;
 
     return (0);
@@ -2020,8 +1852,6 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read_list(coll_id, handle, key_array, val_array,
                                  err_array, count, flags, jd->u.trove.vtag,
@@ -2034,7 +1864,6 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2046,7 +1875,6 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2061,6 +1889,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_KEYVAL_READ_LIST;
 
     return (0);
@@ -2109,7 +1938,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_WRITE, jd->job_id);
-    TROVE_START_LOAD_MEASURE
+
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
                              jd->u.trove.vtag, user_ptr_internal,
@@ -2122,7 +1951,6 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2134,7 +1962,6 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2149,6 +1976,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_KEYVAL_WRITE;
 
     return (0);
@@ -2199,8 +2027,6 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_write_list(coll_id, handle,
                              key_array, val_array,
@@ -2215,7 +2041,6 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2227,7 +2052,6 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2242,6 +2066,7 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST;
 
     return (0);
@@ -2283,8 +2108,6 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_FLUSH, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_flush(coll_id, handle, flags, user_ptr_internal,
                              global_trove_context, &(jd->u.trove.id));
@@ -2295,7 +2118,6 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_FLUSH, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2307,7 +2129,6 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2321,6 +2142,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_KEYVAL_FLUSH;
 
     return (0);
@@ -2362,8 +2184,6 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_GET_HANDLE_INFO, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_get_handle_info(
         coll_id,
@@ -2379,7 +2199,6 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_GET_HANDLE_INFO, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2391,7 +2210,6 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2405,6 +2223,7 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_KEYVAL_GET_HANDLE_INFO;
 
     return (0);
@@ -2453,8 +2272,6 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_GETATTR, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
                                handle, out_ds_attr_ptr, 0 /* flags */ ,
@@ -2467,7 +2284,6 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2479,7 +2295,6 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2493,6 +2308,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_DSPACE_GETATTR;
 
     return (0);
@@ -2542,8 +2358,6 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr_list(coll_id,
                                nhandles,
@@ -2559,7 +2373,6 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2571,7 +2384,6 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2585,6 +2397,7 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST;
 
     return (0);
@@ -2633,8 +2446,6 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_SETATTR, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_setattr(coll_id, handle, ds_attr_p,
                                flags,
@@ -2647,8 +2458,6 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
-
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_SETATTR, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2660,8 +2469,6 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
-
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2675,6 +2482,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_DSPACE_SETATTR;
 
     return (0);
@@ -2724,8 +2532,6 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_BSTREAM_RESIZE, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_resize(coll_id, handle, &size,
                                flags,
@@ -2738,7 +2544,6 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_RESIZE, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2750,7 +2555,6 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2764,6 +2568,7 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_BSTREAM_RESIZE;
 
     return (0);
@@ -2833,8 +2638,6 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_REMOVE, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_remove(coll_id, handle, key_p, val_p, flags,
                               jd->u.trove.vtag, user_ptr_internal,
@@ -2846,7 +2649,6 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_REMOVE, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2858,7 +2660,6 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2873,6 +2674,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_KEYVAL_REMOVE;
 
     return (0);
@@ -2946,8 +2748,6 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_ITERATE, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate(coll_id, handle,
                                &(jd->u.trove.position), key_array, val_array,
@@ -2961,7 +2761,6 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -2973,7 +2772,6 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -2990,6 +2788,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_KEYVAL_ITERATE;
 
     return (0);
@@ -3042,7 +2841,6 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate_keys(coll_id, handle,
                                &(jd->u.trove.position), key_array,
@@ -3056,7 +2854,6 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -3068,7 +2865,6 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -3085,6 +2881,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS;
 
     return (0);
@@ -3135,8 +2932,6 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_iterate_handles(coll_id,
                                &(jd->u.trove.position), handle_array,
@@ -3150,7 +2945,6 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -3162,7 +2956,6 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -3179,6 +2972,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES;
 
     return (0);
@@ -3228,8 +3022,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create(coll_id,
                               handle_extent_array,
@@ -3245,7 +3037,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -3257,7 +3048,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -3272,6 +3062,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_DSPACE_CREATE;
 
     return (0);
@@ -3317,8 +3108,6 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_REMOVE, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_remove(coll_id,
                               handle, flags,
@@ -3331,7 +3120,6 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -3343,7 +3131,6 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -3357,6 +3144,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_DSPACE_REMOVE;
 
     return (0);
@@ -3402,8 +3190,6 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
     JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_VERIFY, jd->job_id);
 
-    TROVE_START_LOAD_MEASURE
-
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_verify(coll_id,
                               handle, &jd->u.trove.type,
@@ -3416,7 +3202,6 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, jd->job_id);
         dealloc_job_desc(jd);
@@ -3430,7 +3215,6 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -3444,6 +3228,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
+    trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_DSPACE_VERIFY;
 
     return (0);
@@ -3614,7 +3399,6 @@ int job_trove_fs_lookup(char *collname,
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
 
-    TROVE_START_LOAD_MEASURE
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_lookup(
         TROVE_METHOD_DBPF,
@@ -3627,7 +3411,6 @@ int job_trove_fs_lookup(char *collname,
 
     if (ret < 0)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* error posting trove operation */
         dealloc_job_desc(jd);
         jd = NULL;
@@ -3638,7 +3421,6 @@ int job_trove_fs_lookup(char *collname,
 
     if (ret == 1)
     {
-        TROVE_STOP_LOAD_MEASURE
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -4427,8 +4209,8 @@ static void trove_thread_mgr_callback(
     void* data,
     PVFS_error error_code)
 {
-    struct job_desc* jd = (struct job_desc*)data;
-    assert(jd);
+    struct job_desc* tmp_desc = (struct job_desc*)data;
+    assert(tmp_desc);
 
     gen_mutex_lock(&initialized_mutex);
     if(initialized == 0)
@@ -4440,16 +4222,16 @@ static void trove_thread_mgr_callback(
     gen_mutex_unlock(&initialized_mutex);
 
     gen_mutex_lock(&completion_mutex);
-    if (jd->completed_flag == 0)
+    if (tmp_desc->completed_flag == 0)
     {
         /* set job descriptor fields and put into completion queue */
-        jd->u.trove.state = error_code;
-        job_desc_q_add(completion_queue_array[jd->context_id],
-                       jd);
+        tmp_desc->u.trove.state = error_code;
+        job_desc_q_add(completion_queue_array[tmp_desc->context_id],
+                       tmp_desc);
         /* set completed flag while holding queue lock */
-        jd->completed_flag = 1;
+        tmp_desc->completed_flag = 1;
 
-        TROVE_STOP_LOAD_MEASURE
+        trove_pending_count--;
 
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */
@@ -4471,8 +4253,8 @@ static void bmi_thread_mgr_callback(
     PVFS_size actual_size,
     PVFS_error error_code)
 {
-    struct job_desc* jd = (struct job_desc*)data;
-    assert(jd);
+    struct job_desc* tmp_desc = (struct job_desc*)data;
+    assert(tmp_desc);
 
     gen_mutex_lock(&initialized_mutex);
     if(initialized == 0)
@@ -4484,17 +4266,17 @@ static void bmi_thread_mgr_callback(
     gen_mutex_unlock(&initialized_mutex);
 
     gen_mutex_lock(&completion_mutex);
-    if (jd->completed_flag == 0)
+    if (tmp_desc->completed_flag == 0)
     {
         /* set job descriptor fields and put into completion queue */
-        jd->u.bmi.error_code = error_code;
-        jd->u.bmi.actual_size = actual_size;
-        job_desc_q_add(completion_queue_array[jd->context_id],
-                       jd);
+        tmp_desc->u.bmi.error_code = error_code;
+        tmp_desc->u.bmi.actual_size = actual_size;
+        job_desc_q_add(completion_queue_array[tmp_desc->context_id],
+                       tmp_desc);
         /* set completed flag while holding queue lock */
-        jd->completed_flag = 1;
+        tmp_desc->completed_flag = 1;
 
-        BMI_STOP_LOAD_MEASURE
+        bmi_pending_count--;
 
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */
@@ -4921,7 +4703,7 @@ static void do_one_work_cycle_all(int idle_time_ms)
  */
 static void flow_callback(flow_descriptor* flow_d)
 {
-    struct job_desc* jd = (struct job_desc*)flow_d->user_ptr;
+    struct job_desc* tmp_desc = (struct job_desc*)flow_d->user_ptr;
 
     gen_mutex_lock(&initialized_mutex);
     if(initialized == 0)
@@ -4934,12 +4716,13 @@ static void flow_callback(flow_descriptor* flow_d)
 
     /* set job descriptor fields and put into completion queue */
     gen_mutex_lock(&completion_mutex);
-    job_desc_q_add(completion_queue_array[jd->context_id],
-                   jd);
+    job_desc_q_add(completion_queue_array[tmp_desc->context_id],
+                   tmp_desc);
     /* set completed flag while holding queue lock */
-    jd->completed_flag = 1;
+    tmp_desc->completed_flag = 1;
 
-    FLOW_STOP_LOAD_MEASURE
+    JOB_FLOW_LOAD_STOP (tmp_desc)
+    flow_pending_count--;
     gossip_debug(GOSSIP_FLOW_DEBUG, "Job flows in progress (callback time): %d\n",
             flow_pending_count);
 

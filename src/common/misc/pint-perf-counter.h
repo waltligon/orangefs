@@ -20,6 +20,7 @@ PERF_DEFAULT_HISTORY_SIZE       = 6,
  * across rollover rather than reset to 0
  */
 #define PINT_PERF_PRESERVE 1
+#define PINT_PERF_LOAD_VALUE 2 /* calculate value as avg. concurrent ops of given type */
 
 /* TODO: this may be moved in the long term; it is an enumeration of keys
  * that pvfs2-server supports (used by trove and flow counters)
@@ -36,6 +37,7 @@ enum PINT_server_perf_keys
     PINT_PERF_FLOW_JOB_LOAD = 7,
     PINT_PERF_TROVE_JOB_LOAD = 8,
     PINT_PERF_BMI_JOB_LOAD = 9,
+    PINT_PERF_LAST, /* Sentinel */
 };
 
 /** enumeration of valid measurement operations */
@@ -72,6 +74,13 @@ struct PINT_perf_counter
     int64_t** value_matrix;
     uint64_t* start_time_array_ms;        /**< array of start times */
     uint64_t* interval_array_ms;          /**< array of interval lengths */
+
+    /* used for calculation of load */
+    PVFS_Gtime time_of_last_rollover;
+    float load_overlapping     [PINT_PERF_LAST];
+    float load_non_overlapping [PINT_PERF_LAST];
+    int   current_pending_count[PINT_PERF_LAST];
+    int   last_pending_count   [PINT_PERF_LAST];
 };
 
 /** server-wide perf counter structure */
@@ -91,6 +100,16 @@ void __PINT_perf_count(
     int key,
     int64_t value,
     enum PINT_perf_ops op);
+
+void PINT_perf_load_start(
+    struct PINT_perf_counter* pc,
+    enum PINT_server_perf_keys key,
+    PVFS_Gtime * out_cur_time);
+
+void PINT_perf_load_stop(
+    struct PINT_perf_counter* pc,
+    enum PINT_server_perf_keys key,
+    PVFS_Gtime * start_time);
 
 #ifdef __PVFS2_DISABLE_PERF_COUNTERS__
     #define PINT_perf_count(w,x,y,z) do{}while(0)

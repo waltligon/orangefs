@@ -67,39 +67,12 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
     char* ptr;
     char* token;
     char delim[] = "\n";
-    int i;
 
     struct server_configuration_s *user_opts = get_server_config_struct();
-    job_statistics_s job_statistic;
 
 #if 0
     PINT_STATE_DEBUG("do_work");
 #endif
-
-    /* get the job statistic about load values */
-    job_get_statistics_diff(& job_statistic);
-
-    /*
-     gossip_err("flow:%f bmi:%f trove:%f \n", job_statistic.flow_load, job_statistic.bmi_load,
-        job_statistic.trove_load);
-     */
-    for(i=0; i<PINT_server_pc->key_count; i++)
-    {
-        switch(PINT_server_pc->key_array[i].key){
-        case(PINT_PERF_FLOW_JOB_LOAD):{
-            PINT_server_pc->value_matrix[i][0] = (int64_t) (job_statistic.flow_load * 1e6);
-            break;
-        }
-        case(PINT_PERF_TROVE_JOB_LOAD):{
-            PINT_server_pc->value_matrix[i][0] = (int64_t) (job_statistic.trove_load * 1e6);
-            break;
-        }
-        case(PINT_PERF_BMI_JOB_LOAD):{
-            PINT_server_pc->value_matrix[i][0] = (int64_t) (job_statistic.bmi_load * 1e6);
-            break;
-        }
-        }
-    }
 
     /* log current statistics if the gossip mask permits */
     gossip_get_debug_mask(&current_debug_on, &current_mask);

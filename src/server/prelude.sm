@@ -1,5 +1,5 @@
-/* 
- * (C) 2001 Clemson University and The University of Chicago 
+/*
+ * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -17,7 +17,7 @@
 #include "pint-perf-counter.h"
 
 /* prelude state machine:
- * This is a nested state machine that performs initial setup 
+ * This is a nested state machine that performs initial setup
  * steps that are common to many server operations.
  * - post the request to the request scheduler
  * - check permissions
@@ -106,11 +106,11 @@ static int prelude_req_sched(
     {
         s_op->resp.u.mgmt_setparam.old_value = PINT_req_sched_get_mode();
     }
-    
+
     ret = job_req_sched_post(s_op->req, 0, s_op, 0, js_p,
                              &(s_op->scheduled_id), server_job_context);
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
+    PINT_perf_load_start(PINT_server_pc, PINT_PERF_REQSCHED, & js_p->start_time);
     return ret;
 }
 
@@ -135,7 +135,7 @@ static int prelude_getattr_if_needed(
      * what handle this request will operate on
      */
     ret = PINT_req_sched_target_handle(
-        s_op->req, 0, &s_op->target_handle, 
+        s_op->req, 0, &s_op->target_handle,
         &s_op->target_fs_id, &readonly_flag);
 
     if (ret < 0)
@@ -331,7 +331,7 @@ static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsco
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
             lld(client_addr), fsconfig->root_squash_hosts[i]);
-        if (BMI_query_addr_range(client_addr, fsconfig->root_squash_hosts[i], 
+        if (BMI_query_addr_range(client_addr, fsconfig->root_squash_hosts[i],
                 fsconfig->root_squash_netmasks[i]) == 1)
         {
             return 1;
@@ -341,7 +341,7 @@ static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsco
 }
 
 /* Translate_ids will return 1 if it did some uid/gid squashing, 0 otherwise */
-static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid, 
+static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid,
     PVFS_uid *translated_uid, PVFS_gid *translated_gid, PVFS_BMI_addr_t client_addr)
 {
     int exp_flags = 0;
@@ -408,8 +408,8 @@ static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, PVF
 }
 
 static int permit_operation(PVFS_fs_id fsid, int read_only, PVFS_BMI_addr_t client_addr)
-{ 
-    int exp_flags = 0; 
+{
+    int exp_flags = 0;
     struct server_configuration_s *serv_config = NULL;
     struct filesystem_configuration_s * fsconfig = NULL;
 
@@ -436,7 +436,7 @@ static int permit_operation(PVFS_fs_id fsid, int read_only, PVFS_BMI_addr_t clie
      */
     if (iterate_ro_wildcards(fsconfig, client_addr) == 1)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, 
+        gossip_debug(GOSSIP_SERVER_DEBUG,
             "Disallowing read-write operation on a read-only exported file-system\n");
         return -EROFS;
     }
@@ -505,7 +505,7 @@ static int prelude_perm_check(
             js_p->error_code = -PVFS_EROFS;
             return 1;
         }
-        else 
+        else
         {
             /* Translate the uid and gid's in case we need to do some squashing based on the export and the client address */
             if (translate_ids(fsid, s_op->req->credentials.uid, s_op->req->credentials.gid,
@@ -545,7 +545,7 @@ static int prelude_perm_check(
         s_op->attr.owner, translated_uid,
         ((s_op->attr.mask & PVFS_ATTR_COMMON_GID) ? "yes" : "no"),
         s_op->attr.group, translated_gid);
-    
+
     switch(PINT_server_req_table[s_op->req->op].perm)
     {
         case PINT_SERVER_CHECK_WRITE:
@@ -625,7 +625,7 @@ static int prelude_perm_check(
         "error code to %d\n", PINT_map_server_op_to_string(s_op->req->op),
         js_p->error_code);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
         "(%p) %s (prelude sm) state: perm_check (status = %d)\n",
 	s_op,
         PINT_map_server_op_to_string(s_op->req->op),
@@ -648,7 +648,7 @@ static int prelude_check_acls_if_needed(
                  PINT_map_server_op_to_string(s_op->req->op));
 
     /* If we get here with an invalid fsid and handle, we have to
-     * return -PVFS_EACCESS 
+     * return -PVFS_EACCESS
      */
     if (s_op->target_fs_id == PVFS_FS_ID_NULL
         || s_op->target_handle == PVFS_HANDLE_NULL)
@@ -735,7 +735,7 @@ static int prelude_check_acls(
     }
     js_p->error_code = PINT_check_acls(s_op->val.buffer,
                         s_op->val.read_sz,
-                        obj_attr, 
+                        obj_attr,
                         s_op->req->credentials.uid,
                         s_op->req->credentials.gid,
                         want);
@@ -746,7 +746,7 @@ cleanup:
             PINT_map_server_op_to_string(s_op->req->op),
             js_p->error_code, want);
 
-    if (s_op->val.buffer) 
+    if (s_op->val.buffer)
         free(s_op->val.buffer);
     memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
     memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
