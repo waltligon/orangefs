@@ -77,8 +77,8 @@ struct PINT_perf_counter
 
     /* used for calculation of load */
     PVFS_Gtime time_of_last_rollover;
-    float load_overlapping     [PINT_PERF_LAST];
-    float load_non_overlapping [PINT_PERF_LAST];
+    double load_overlapping     [PINT_PERF_LAST];
+    double load_non_overlapping [PINT_PERF_LAST];
     int   current_pending_count[PINT_PERF_LAST];
     int   last_pending_count   [PINT_PERF_LAST];
 };
