@@ -10,6 +10,8 @@
 #include "dbpf-op.h"
 #include "dbpf-bstream.h"
 #include "gossip.h"
+#include "pint-perf-counter.h"
+#include "pint-util.h"
 
 dbpf_queued_op_t *dbpf_queued_op_alloc(void)
 {
@@ -47,6 +49,11 @@ void dbpf_queued_op_init(
     q_op_p->op.flags = flags;
     q_op_p->op.context_id = context_id;
 
+    /* init start time for load computation */
+    time_get(& q_op_p->op.start_time );
+    PINT_perf_load_start(PINT_server_pc, PINT_PERF_TROVE_LOAD, &  q_op_p->op.start_time);
+
+
     id_gen_fast_register(&q_op_p->op.id, q_op_p);
 }
 
@@ -66,6 +73,8 @@ void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)
             q_op_p->op.u.b_rw_list.aiocb_array = NULL;
         }
     }
+    PINT_perf_load_stop(PINT_server_pc, PINT_PERF_TROVE_LOAD, & q_op_p->op.start_time);
+
     free(q_op_p);
 }
 

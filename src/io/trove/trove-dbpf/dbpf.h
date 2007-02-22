@@ -174,7 +174,7 @@ typedef int (* PINT_dbpf_keyval_iterate_callback)(
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
     TROVE_handle handle,
-    PINT_dbpf_keyval_pcache *pcache,    
+    PINT_dbpf_keyval_pcache *pcache,
     TROVE_keyval_s *keys_array,
     TROVE_keyval_s *values_array,
     int *count,
@@ -207,7 +207,7 @@ struct dbpf_collection
 
     /* used by dbpf_collection.c calls to maintain list of collections */
     struct dbpf_collection *next_p;
-    
+
     int c_low_watermark;
     int c_high_watermark;
     int meta_sync_enabled;
@@ -392,14 +392,14 @@ struct dbpf_bstream_rw_list_op
 
 inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                                 TROVE_handle handle,
-                                char **mem_offset_array, 
+                                char **mem_offset_array,
                                 TROVE_size *mem_size_array,
                                 int mem_count,
                                 TROVE_offset *stream_offset_array,
                                 TROVE_size *stream_size_array,
                                 int stream_count,
                                 TROVE_size *out_size_p,
-                                TROVE_ds_flags flags, 
+                                TROVE_ds_flags flags,
                                 TROVE_vtag_s *vtag,
                                 void *user_ptr,
                                 TROVE_context_id context_id,
@@ -496,6 +496,8 @@ struct dbpf_op
     void *user_ptr;
     TROVE_ds_flags flags;
     TROVE_context_id context_id;
+    PVFS_Gtime start_time;
+
     union
     {
         /* all the op types go in here; structs are all
@@ -693,7 +695,7 @@ int dbpf_bstream_read_at(TROVE_coll_id coll_id,
                          TROVE_size *inout_size_p,
                          TROVE_offset offset,
                          TROVE_ds_flags flags,
-                         TROVE_vtag_s *vtag, 
+                         TROVE_vtag_s *vtag,
                          void *user_ptr,
                          TROVE_context_id context_id,
                          TROVE_op_id *out_op_id_p);

@@ -9,6 +9,7 @@
 #include "pint-perf-counter.h"
 #include "dbpf-sync.h"
 #include "dbpf-thread.h"
+#include "pint-util.h"
 
 /* the queue that stores pending serviceable operations */
 QLIST_HEAD(dbpf_op_queue);
@@ -90,7 +91,7 @@ void dbpf_op_queue_cleanup(dbpf_op_queue_p op_queue)
 void dbpf_op_queue_add(dbpf_op_queue_p op_queue,
                        dbpf_queued_op_t *dbpf_op)
 {
-    gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG, 
+    gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "op_queue add: %p\n",
                  dbpf_op);
 
@@ -216,7 +217,7 @@ TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p)
     tmp_id = q_op_p->op.id;
 
     dbpf_sync_coalesce_enqueue(q_op_p);
-   
+
     gen_mutex_unlock(&q_op_p->mutex);
 
 #ifdef __PVFS2_TROVE_THREADED__
@@ -288,6 +289,11 @@ int dbpf_op_init_queued_or_immediate(
                      context_id,
                      0);
         *op_pp = op_p;
+
+        /* init start time for load computation */
+        time_get(& (*op_pp)->start_time);
+        PINT_perf_load_start(PINT_server_pc, PINT_PERF_TROVE_LOAD, & (*op_pp)->start_time);
+
     }
     else
     {
@@ -309,6 +315,7 @@ int dbpf_op_init_queued_or_immediate(
                             context_id);
         *op_pp = &(*q_op_pp)->op;
     }
+
     return 0;
 }
 
@@ -324,6 +331,7 @@ int dbpf_queue_or_service(
        (DBPF_OP_IS_KEYVAL(op_p->type) || DBPF_OP_IS_DSPACE(op_p->type)))
     {
         DB * dbp;
+
         *out_op_id_p = 0;
         ret = op_p->svc_fn(op_p);
         if(ret < 0)
@@ -353,8 +361,8 @@ int dbpf_queue_or_service(
             op_p->u.d_create.extent_array.extent_array = NULL;
         }
 
+        PINT_perf_load_stop(PINT_server_pc, PINT_PERF_TROVE_LOAD, & op_p->start_time);
         ret = 1;
-
     }
     else
     {
@@ -374,6 +382,7 @@ int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
     DBPF_COMPLETION_START(qop_p, ret, state);
     DBPF_COMPLETION_SIGNAL();
     DBPF_COMPLETION_FINISH(qop_p->op.context_id);
+
     return 0;
 }
 

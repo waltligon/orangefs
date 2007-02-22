@@ -79,8 +79,8 @@ static struct PINT_perf_key server_keys[] =
 
     {"request scheduler load", PINT_PERF_REQSCHED, PINT_PERF_LOAD_VALUE},
     {"flow load", PINT_PERF_FLOW_JOB_LOAD, PINT_PERF_LOAD_VALUE},
-    {"trove load", PINT_PERF_TROVE_JOB_LOAD, PINT_PERF_LOAD_VALUE},
-    {"bmi load", PINT_PERF_BMI_JOB_LOAD, PINT_PERF_LOAD_VALUE},
+    {"trove load", PINT_PERF_TROVE_LOAD, PINT_PERF_LOAD_VALUE},
+    {"bmi load", PINT_PERF_BMI_LOAD, PINT_PERF_LOAD_VALUE},
     {NULL, 0, 0},
 };
 
