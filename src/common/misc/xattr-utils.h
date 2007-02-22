@@ -9,6 +9,14 @@
 
 #include "pvfs2-config.h"
 
+#ifdef HAVE_SYS_XATTR_H
+#include <sys/xattr.h>
+#endif
+
+#ifdef HAVE_ATTR_XATTR_H
+#include <attr/xattr.h>
+#endif
+
 #ifndef HAVE_FGETXATTR_PROTOTYPE
 #ifndef HAVE_FGETXATTR_EXTRA_ARGS
 /* prototype taken from fgetxattr(2) on Fedora FC4 */
