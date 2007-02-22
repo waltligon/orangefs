@@ -43,6 +43,8 @@
 #include "bmi-tcp-addressing.h"
 #endif
 #include "gen-locks.h"
+#include "pint-util.h"
+#include "pint-perf-counter.h"
 
 #define BMI_EVENT_START(__op, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, 0, __id, \
@@ -181,7 +183,7 @@ struct tcp_msg_header
 	*((uint32_t*)&((hdr).enc_hdr[4])) = htobmi32((hdr).mode);	\
 	*((uint64_t*)&((hdr).enc_hdr[8])) = htobmi64((hdr).tag);	\
 	*((uint64_t*)&((hdr).enc_hdr[16])) = htobmi64((hdr).size);	\
-    } while(0)						    
+    } while(0)
 
 #define BMI_TCP_DEC_HDR(hdr)						\
     do {								\
@@ -189,7 +191,7 @@ struct tcp_msg_header
 	(hdr).mode = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[4])));	\
 	(hdr).tag = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[8])));	\
 	(hdr).size = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[16])));	\
-    } while(0)						    
+    } while(0)
 
 /* enumerate states that we care about */
 enum bmi_tcp_state
@@ -207,7 +209,7 @@ struct tcp_op
     /* these two fields are used as place holders for the buffer
      * list and size list when we really don't have lists (regular
      * BMI_send or BMI_recv operations); it allows us to use
-     * generic code to handle both cases 
+     * generic code to handle both cases
      */
     void *buffer_list_stub;
     bmi_size_t size_list_stub;
@@ -272,9 +274,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
 				 bmi_context_id context_id);
-static int payload_progress(int s, void *const *buffer_list, const bmi_size_t* 
-    size_list, int list_count, bmi_size_t total_size, int* list_index, 
-    bmi_size_t* current_index_complete, enum bmi_op_type send_recv, 
+static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
+    size_list, int list_count, bmi_size_t total_size, int* list_index,
+    bmi_size_t* current_index_complete, enum bmi_op_type send_recv,
     char* enc_hdr, bmi_size_t* env_amt_complete);
 
 #if defined(USE_TRUSTED) && defined(__PVFS2_CLIENT__)
@@ -348,7 +350,7 @@ enum
 {
     /* amount of pending connections we'll allow */
     TCP_BACKLOG = 256,
-    /* amount of work to be done during a test.  This roughly 
+    /* amount of work to be done during a test.  This roughly
      * translates into the number of sockets that we will perform
      * nonblocking operations on during one function call.
      */
@@ -377,7 +379,7 @@ enum
 static int forceful_cancel_mode = 0;
 
 /*
-  Socket buffer sizes, currently these default values will be used 
+  Socket buffer sizes, currently these default values will be used
   for the clients... (TODO)
  */
 static int tcp_buffer_size_receive = 0;
@@ -385,7 +387,7 @@ static int tcp_buffer_size_send = 0;
 
 
 /*************************************************************************
- * Visible Interface 
+ * Visible Interface
  */
 
 /* BMI_tcp_initialize()
@@ -488,7 +490,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 
 
 /* BMI_tcp_finalize()
- * 
+ *
  * Shuts down the tcp method.
  *
  * returns 0 on success, -errno on failure
@@ -523,7 +525,7 @@ int BMI_tcp_finalize(void)
 	tcp_socket_collection_p = NULL;
     }
 
-    /* NOTE: we are trusting the calling BMI layer to deallocate 
+    /* NOTE: we are trusting the calling BMI layer to deallocate
      * all of the method addresses (this will close any open sockets)
      */
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "TCP/IP module finalized.\n");
@@ -536,7 +538,7 @@ int BMI_tcp_finalize(void)
  * BMI_tcp_method_addr_lookup()
  *
  * resolves the string representation of an address into a method
- * address structure.  
+ * address structure.
  *
  * returns a pointer to method_addr on success, NULL on failure
  */
@@ -607,7 +609,7 @@ method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
 
 
 /* BMI_tcp_memalloc()
- * 
+ *
  * Allocates memory that can be used in native mode by tcp.
  *
  * returns 0 on success, -errno on failure
@@ -624,7 +626,7 @@ void *BMI_tcp_memalloc(bmi_size_t size,
 
 
 /* BMI_tcp_memfree()
- * 
+ *
  * Frees memory that was allocated with BMI_tcp_memalloc()
  *
  * returns 0 on success, -errno on failure
@@ -647,7 +649,7 @@ int BMI_tcp_memfree(void *buffer,
 }
 
 /* BMI_tcp_unexpected_free()
- * 
+ *
  * Frees memory that was returned from BMI_tcp_test_unexpected()
  *
  * returns 0 on success, -errno on failure
@@ -697,7 +699,7 @@ alloc_trusted_connection_info(int network_count)
     return tcp_allowed_connection_info;
 }
 
-static void 
+static void
 dealloc_trusted_connection_info(void* ptcp_allowed_connection_info)
 {
     struct tcp_allowed_connection_s *tcp_allowed_connection_info =
@@ -731,7 +733,7 @@ static void convert_mask(int mask_bits, struct in_addr *mask)
 }
 
 /* BMI_tcp_set_info()
- * 
+ *
  * Pass in optional parameters.
  *
  * returns 0 on success, -errno on failure
@@ -766,7 +768,7 @@ int BMI_tcp_set_info(int option,
             tcp_method_params.listen_addr->method_data)->socket);
 #endif
        break;
-    case BMI_TCP_CLOSE_SOCKET: 
+    case BMI_TCP_CLOSE_SOCKET:
         /* this should no longer make it to the bmi_tcp method; see bmi.c */
         ret = 0;
         break;
@@ -796,7 +798,7 @@ int BMI_tcp_set_info(int option,
             ret = -EINVAL;
             break;
         }
-        else 
+        else
         {
             int    bmi_networks_count = 0;
             char **bmi_networks = NULL;
@@ -818,15 +820,15 @@ int BMI_tcp_set_info(int option,
             svc_config->security_dtor = &dealloc_trusted_connection_info;
             ret = 0;
             /* Fill up the list of allowed ports */
-            PINT_config_get_allowed_ports(svc_config, 
-                    &tcp_allowed_connection->port_enforce, 
+            PINT_config_get_allowed_ports(svc_config,
+                    &tcp_allowed_connection->port_enforce,
                     tcp_allowed_connection->ports);
 
             /* if it was enabled, make sure that we know how to deal with it */
             if (tcp_allowed_connection->port_enforce == 1)
             {
                 /* illegal ports */
-                if (tcp_allowed_connection->ports[0] > 65535 
+                if (tcp_allowed_connection->ports[0] > 65535
                         || tcp_allowed_connection->ports[1] > 65535
                         || tcp_allowed_connection->ports[1] < tcp_allowed_connection->ports[0])
                 {
@@ -889,7 +891,7 @@ int BMI_tcp_set_info(int option,
 }
 
 /* BMI_tcp_get_info()
- * 
+ *
  * Query for optional parameters.
  *
  * returns 0 on success, -errno on failure
@@ -944,7 +946,7 @@ int BMI_tcp_get_info(int option,
 
 
 /* BMI_tcp_post_send()
- * 
+ *
  * Submits send operations.
  *
  * returns 0 on success that requires later poll, returns 1 on instant
@@ -999,7 +1001,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 
 
 /* BMI_tcp_post_sendunexpected()
- * 
+ *
  * Submits unexpected send operations.
  *
  * returns 0 on success that requires later poll, returns 1 on instant
@@ -1047,7 +1049,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 
 
 /* BMI_tcp_post_recv()
- * 
+ *
  * Submits recv operations.
  *
  * returns 0 on success that requires later poll, returns 1 on instant
@@ -1098,7 +1100,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 
 
 /* BMI_tcp_test()
- * 
+ *
  * Checks to see if a particular message has completed.
  *
  * returns 0 on success, -errno on failure
@@ -1150,7 +1152,7 @@ int BMI_tcp_test(bmi_op_id_t id,
 }
 
 /* BMI_tcp_testsome()
- * 
+ *
  * Checks to see if any messages from the specified list have completed.
  *
  * returns 0 on success, -errno on failure
@@ -1184,7 +1186,7 @@ int BMI_tcp_testsome(int incount,
 	if(id_array[i])
 	{
 	    /* NOTE: this depends on the user passing in valid id's;
-	     * otherwise we segfault.  
+	     * otherwise we segfault.
 	     */
 	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
 	    if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==
@@ -1216,7 +1218,7 @@ int BMI_tcp_testsome(int incount,
 
 
 /* BMI_tcp_testunexpected()
- * 
+ *
  * Checks to see if any unexpected messages have completed.
  *
  * returns 0 on success, -errno on failure
@@ -1244,7 +1246,7 @@ int BMI_tcp_testunexpected(int incount,
 
     *outcount = 0;
 
-    /* go through the completed/unexpected list as long as we are finding 
+    /* go through the completed/unexpected list as long as we are finding
      * stuff and we have room in the info array for it
      */
     while ((*outcount < incount) &&
@@ -1266,7 +1268,7 @@ int BMI_tcp_testunexpected(int incount,
 
 
 /* BMI_tcp_testcontext()
- * 
+ *
  * Checks to see if any messages from the specified context have completed.
  *
  * returns 0 on success, -errno on failure
@@ -1309,7 +1311,7 @@ int BMI_tcp_testcontext(int incount,
     }
 
     /* pop as many items off of the completion queue as we can */
-    while((*outcount < incount) && (query_op = 
+    while((*outcount < incount) && (query_op =
 	op_list_shownext(completion_array[context_id])))
     {
         assert(query_op);
@@ -1444,7 +1446,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 
 /* BMI_tcp_post_sendunexpected_list()
  *
- * same as the BMI_tcp_post_sendunexpected() function, except that 
+ * same as the BMI_tcp_post_sendunexpected() function, except that
  * it sends from an array of possibly non contiguous buffers
  *
  * returns 0 on success, 1 on immediate successful completion,
@@ -1524,7 +1526,7 @@ int BMI_tcp_open_context(bmi_context_id context_id)
  */
 void BMI_tcp_close_context(bmi_context_id context_id)
 {
-    
+
     gen_mutex_lock(&interface_mutex);
 
     /* tear down completion queue for this context */
@@ -1544,7 +1546,7 @@ void BMI_tcp_close_context(bmi_context_id context_id)
 int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
 {
     method_op_p query_op = NULL;
-    
+
     gen_mutex_lock(&interface_mutex);
 
     query_op = (method_op_p)id_gen_safe_lookup(id);
@@ -1575,7 +1577,7 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
 	/* be pessimistic and kill the socket, even if not in forceful
 	 * cancel mode */
 	/* NOTE: this may place other operations beside this one into
-	 * EINTR error state 
+	 * EINTR error state
 	 */
 	tcp_forget_addr(query_op->addr, 0, -BMI_ECANCEL);
 	gen_mutex_unlock(&interface_mutex);
@@ -1594,7 +1596,7 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
 					   query_op->addr);
     }
     op_list_remove(query_op);
-    ((struct tcp_op*)(query_op->method_data))->tcp_op_state = 
+    ((struct tcp_op*)(query_op->method_data))->tcp_op_state =
 	BMI_TCP_COMPLETE;
     /* only close socket in forceful cancel mode */
     if(forceful_cancel_mode)
@@ -1691,8 +1693,8 @@ static int check_octets(struct in_addr addr, unsigned long *octets)
     }
     return 1;
 #undef B1_MASK
-#undef B1_SHIFT 
-#undef B2_MASK 
+#undef B1_SHIFT
+#undef B2_MASK
 #undef B2_SHIFT
 #undef B3_MASK
 #undef B3_SHIFT
@@ -1769,14 +1771,14 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
     char* tmp_peer;
 
     /* return default response if we don't have support for the right socket
-     * calls 
+     * calls
      */
 #if !defined(HAVE_GETHOSTBYADDR)
     return(tcp_addr_data->peer);
-#else 
+#else
 
     /* Only resolve hostnames if a gossip mask is set to request it.
-     * Otherwise we leave it at ip address 
+     * Otherwise we leave it at ip address
      */
     gossip_get_debug_mask(&debug_on, &mask);
 
@@ -1801,14 +1803,14 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
         return(tcp_addr_data->peer);
     }
 
-    peerent = gethostbyaddr((void*)&peer.sin_addr.s_addr, 
+    peerent = gethostbyaddr((void*)&peer.sin_addr.s_addr,
         sizeof(struct in_addr), AF_INET);
     if(peerent == NULL)
     {
         /* default to use IP address */
         return(tcp_addr_data->peer);
     }
- 
+
     tmp_peer = (char*)malloc(strlen(peerent->h_name) + 1);
     if(!tmp_peer)
     {
@@ -1926,7 +1928,7 @@ method_addr_p alloc_tcp_method_addr(void)
     }
 
     /* note that we trust the alloc_method_addr() function to have zeroed
-     * out the structures for us already 
+     * out the structures for us already
      */
 
     tcp_addr_data = my_method_addr->method_data;
@@ -1943,7 +1945,7 @@ method_addr_p alloc_tcp_method_addr(void)
  * tcp_server_init()
  *
  * this function is used to prepare a node to recieve incoming
- * connections if it is initialized in a server configuration.   
+ * connections if it is initialized in a server configuration.
  *
  * returns 0 on succes, -errno on failure
  */
@@ -1986,7 +1988,7 @@ static int tcp_server_init(void)
         ret = BMI_sockio_bind_sock(tcp_addr_data->socket,
             tcp_addr_data->port);
     }
-    
+
     if (ret < 0)
     {
 	tmp_errno = errno;
@@ -2009,8 +2011,8 @@ static int tcp_server_init(void)
 /* find_recv_inflight()
  *
  * checks to see if there is a recv operation in flight (when in flight
- * means that some of the data or envelope has been read) for a 
- * particular address. 
+ * means that some of the data or envelope has been read) for a
+ * particular address.
  *
  * returns pointer to operation on success, NULL if nothing found.
  */
@@ -2061,7 +2063,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
      */
     if(tcp_addr_data->addr_error && tcp_addr_data->dont_reconnect)
     {
-	gossip_debug(GOSSIP_BMI_DEBUG_TCP, 
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP,
 	"Warning: BMI communication attempted on an address in failure mode.\n");
 	return(tcp_addr_data->addr_error);
     }
@@ -2104,7 +2106,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	 * see if the socket is usable yet. */
 	return (0);
     }
-    
+
     bmi_set_sock_buffers(tcp_addr_data->socket);
 
     /* at this point there is no socket.  try to build it */
@@ -2170,7 +2172,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
             /* BMI_sockio_connect_sock returns a PVFS error */
             char buff[300];
 
-            snprintf(buff, 300, "Error: BMI_sockio_connect_sock: (%s):", 
+            snprintf(buff, 300, "Error: BMI_sockio_connect_sock: (%s):",
                      tcp_addr_data->hostname);
 
             PVFS_perror_gossip(buff, ret);
@@ -2265,7 +2267,7 @@ static int enqueue_operation(op_list_p target_list,
 
     /* if there is only one item in the list, then keep the list stored
      * in the op structure.  This allows us to use the same code for send
-     * and recv as we use for send_list and recv_list, without having to 
+     * and recv as we use for send_list and recv_list, without having to
      * malloc lists for those special cases
      */
     if (list_count == 1)
@@ -2290,7 +2292,7 @@ static int enqueue_operation(op_list_p target_list,
 	 */
 	if(tcp_addr_data->dont_reconnect || send_recv == BMI_SEND)
 	{
-	    gossip_debug(GOSSIP_BMI_DEBUG_TCP, 
+	    gossip_debug(GOSSIP_BMI_DEBUG_TCP,
 		       "Warning: BMI communication attempted on an "
 		       "address in failure mode.\n");
 	    new_method_op->error_code = tcp_addr_data->addr_error;
@@ -2365,7 +2367,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
      */
     if(tcp_addr_data->addr_error && tcp_addr_data->dont_reconnect)
     {
-	gossip_debug(GOSSIP_BMI_DEBUG_TCP, 
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP,
 	"Warning: BMI communication attempted on an address in failure mode.\n");
 	return(tcp_addr_data->addr_error);
     }
@@ -2481,7 +2483,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	query_op->context_id = context_id;
 	/* if there is only one item in the list, then keep the list stored
 	 * in the op structure.  This allows us to use the same code for send
-	 * and recv as we use for send_list and recv_list, without having to 
+	 * and recv as we use for send_list and recv_list, without having to
 	 * malloc lists for those special cases
 	 */
 	if (list_count == 1)
@@ -2618,7 +2620,7 @@ static int tcp_cleanse_addr(method_addr_p map, int error_code)
 		}
 		else
 		{
-		    ((struct tcp_op*)(query_op->method_data))->tcp_op_state = 
+		    ((struct tcp_op*)(query_op->method_data))->tcp_op_state =
 			BMI_TCP_COMPLETE;
 		    op_list_add(completion_array[query_op->context_id], query_op);
 		}
@@ -2654,7 +2656,7 @@ static int tcp_shutdown_addr(method_addr_p map)
 /* tcp_do_work()
  *
  * this is the function that actually does communication work during
- * BMI_tcp_testXXX and BMI_tcp_waitXXX functions.  The amount of work 
+ * BMI_tcp_testXXX and BMI_tcp_waitXXX functions.  The amount of work
  * that it does is tunable.
  *
  * returns 0 on success, -errno on failure.
@@ -2861,7 +2863,7 @@ static int handle_new_connection(method_addr_p map)
 
 
 /* tcp_do_work_recv()
- * 
+ *
  * does work on a TCP address that is ready to recv data.
  *
  * returns 0 on success, -errno on failure
@@ -2980,7 +2982,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     *stall_flag = 0;
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Reading header for new op.\n");
     /* NOTE: we only allow a blocking call here because we peeked to see
-     * if this amount of data was ready above.  
+     * if this amount of data was ready above.
      */
     ret = BMI_sockio_brecv(tcp_addr_data->socket,
                            new_header.enc_hdr, TCP_ENC_HDR_SIZE);
@@ -3147,7 +3149,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
  *
  * used to perform work on a send operation.  this is called by the poll
  * function.
- * 
+ *
  * sets blocked_flag if no more work can be done on socket without
  * blocking
  * returns 0 on success, -errno on failure.
@@ -3211,7 +3213,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	BMI_socket_collection_remove_write_bit(tcp_socket_collection_p,
 					   my_method_op->addr);
 	op_list_remove(my_method_op);
-	((struct tcp_op*)(my_method_op->method_data))->tcp_op_state = 
+	((struct tcp_op*)(my_method_op->method_data))->tcp_op_state =
 	    BMI_TCP_COMPLETE;
 	op_list_add(completion_array[my_method_op->context_id], my_method_op);
 	*blocked_flag = 0;
@@ -3295,7 +3297,7 @@ static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
 	    }
 	    else
 	    {
-		((struct tcp_op*)(my_method_op->method_data))->tcp_op_state = 
+		((struct tcp_op*)(my_method_op->method_data))->tcp_op_state =
 		    BMI_TCP_COMPLETE;
 		op_list_add(completion_array[my_method_op->context_id], my_method_op);
 	    }
@@ -3307,7 +3309,7 @@ static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
 
 
 /* tcp_do_work_error()
- * 
+ *
  * handles a tcp address that has indicated an error during polling.
  *
  * returns 0 on success, -errno on failure
@@ -3384,14 +3386,14 @@ static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data)
     }
     if (BMI_sockio_bind_sock(tcp_addr_data->socket, my_requested_port) < 0)
     {
-        gossip_lerr("Could not bind to local port %hd: %s\n", 
+        gossip_lerr("Could not bind to local port %hd: %s\n",
                 my_requested_port, strerror(errno));
     }
     else {
         my_requested_port--;
     }
     my_local_sockaddr.sin_family = AF_INET;
-    if (getsockname(tcp_addr_data->socket, 
+    if (getsockname(tcp_addr_data->socket,
                 (struct sockaddr *)&my_local_sockaddr, &len) == 0)
     {
         my_local_port = ntohs(my_local_sockaddr.sin_port);
@@ -3441,7 +3443,7 @@ static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr)
         for (i = 0; i < gtcp_allowed_connection->network_count; i++)
         {
             /* check with all the masks */
-            if ((peer_sockaddr->sin_addr.s_addr & gtcp_allowed_connection->netmask[i].s_addr) 
+            if ((peer_sockaddr->sin_addr.s_addr & gtcp_allowed_connection->netmask[i].s_addr)
                     != gtcp_allowed_connection->network[i].s_addr)
             {
                 continue;
@@ -3476,9 +3478,9 @@ port_check:
 
 #endif
 
-/* 
+/*
  * tcp_accept_init()
- * 
+ *
  * used to establish a connection from the server side.  Attempts an
  * accept call and provides the socket if it succeeds.
  *
@@ -3537,9 +3539,9 @@ static int tcp_accept_init(int *socket, char** peer)
         /* Force closure of the connection */
         close(*socket);
         errno = EACCES;
-        /* FIXME: 
+        /* FIXME:
          * BIG KLUDGE
-         * if we return an error, pvfs2-server's bmi thread simply terminates. 
+         * if we return an error, pvfs2-server's bmi thread simply terminates.
          * hence I am returning 0 here. Need to ask Phil or RobR about this...
          */
         *socket = -1;
@@ -3582,6 +3584,11 @@ static method_op_p alloc_tcp_method_op(void)
     method_op_p my_method_op = NULL;
 
     my_method_op = alloc_method_op(sizeof(struct tcp_op));
+    if (my_method_op != NULL){
+        time_get(& my_method_op->start_time);
+        PINT_perf_load_start(PINT_server_pc, PINT_PERF_BMI_LOAD,
+            & my_method_op->start_time);
+    }
 
     /* we trust alloc_method_op to zero it out */
 
@@ -3598,12 +3605,17 @@ static method_op_p alloc_tcp_method_op(void)
  */
 static void dealloc_tcp_method_op(method_op_p old_op)
 {
+    if (old_op != NULL){
+        PINT_perf_load_stop(PINT_server_pc, PINT_PERF_BMI_LOAD,
+            & old_op->start_time);
+    }
+
     dealloc_method_op(old_op);
     return;
 }
 
 /* BMI_tcp_post_send_generic()
- * 
+ *
  * Submits send operations (low level).
  *
  * returns 0 on success that requires later poll, returns 1 on instant
@@ -3769,9 +3781,9 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
  *
  * returns amount completed on success, -errno on failure
  */
-static int payload_progress(int s, void *const *buffer_list, const bmi_size_t* 
-    size_list, int list_count, bmi_size_t total_size, int* list_index, 
-    bmi_size_t* current_index_complete, enum bmi_op_type send_recv, 
+static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
+    size_list, int list_count, bmi_size_t total_size, int* list_index,
+    bmi_size_t* current_index_complete, enum bmi_op_type send_recv,
     char* enc_hdr, bmi_size_t* env_amt_complete)
 {
     int i;
@@ -3820,7 +3832,7 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     }
 
     /* setup vector */
-    stat_io_vector[vector_index].iov_base = 
+    stat_io_vector[vector_index].iov_base =
 	(char*)buffer_list[*list_index] + *current_index_complete;
     count++;
     if(final_index == 0)
@@ -3829,7 +3841,7 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     }
     else
     {
-	stat_io_vector[vector_index].iov_len = 
+	stat_io_vector[vector_index].iov_len =
 	    size_list[*list_index] - *current_index_complete;
 	for(i = (*list_index + 1); i < list_count; i++)
 	{

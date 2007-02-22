@@ -32,7 +32,7 @@
 #endif
 
 /********************************************************
- * method interfaces and data structures 
+ * method interfaces and data structures
  */
 
 /* this is the generic address structure which contains adressing
@@ -43,7 +43,7 @@
 struct method_addr
 {
     int method_type;
-    /* indicates if the address is on the local machine (usually for 
+    /* indicates if the address is on the local machine (usually for
      * server listening) */
     int local_addr;
     void *method_data;		/* area to be used by specific methods */
@@ -195,9 +195,11 @@ struct method_op
     struct qlist_head hash_link;	/* hash table link */
     void *method_data;		/* for use by individual methods */
 
+    PVFS_Gtime start_time;
+
 	/************************************************************
-	 * following items were added for convenience of methods that 
-	 * implement send_list and recv_list 
+	 * following items were added for convenience of methods that
+	 * implement send_list and recv_list
 	 */
     void *const *buffer_list;		/* list of buffers */
     const bmi_size_t *size_list;	/* list of buffer sizes */
@@ -224,7 +226,7 @@ struct method_drop_addr_query
 };
 
 /***********************************************************
- * utility functions provided for use by the network methods 
+ * utility functions provided for use by the network methods
  */
 
 /* functions for managing operations */
