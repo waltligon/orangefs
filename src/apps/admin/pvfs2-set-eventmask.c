@@ -18,6 +18,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-event.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -76,15 +77,15 @@ int main(int argc, char **argv)
     if(!user_opts->op_mask || !user_opts->api_mask)
     {
 	/* turn off event logging */
-	ret = PVFS_mgmt_setparam_all(cur_fs, &creds, 
+	ret = PVFS_mgmt_setparam_all(cur_fs, &creds,
 	    PVFS_SERV_PARAM_EVENT_ON, 0, NULL, NULL, NULL);
     }
     else
     {
 	/* set mask */
-	ret = PVFS_mgmt_setparam_all(cur_fs, &creds, 
-	    PVFS_SERV_PARAM_EVENT_MASKS, 
-	    (int64_t)(((int64_t)user_opts->op_mask << 32) 
+	ret = PVFS_mgmt_setparam_all(cur_fs, &creds,
+	    PVFS_SERV_PARAM_EVENT_MASKS,
+	    (int64_t)(((int64_t)user_opts->op_mask << 32)
 		+ user_opts->api_mask),
 	    NULL, NULL, NULL);
 	if(ret < 0)
@@ -94,7 +95,7 @@ int main(int argc, char **argv)
 	}
 
 	/* turn on event logging */
-	ret = PVFS_mgmt_setparam_all(cur_fs, &creds, 
+	ret = PVFS_mgmt_setparam_all(cur_fs, &creds,
 	    PVFS_SERV_PARAM_EVENT_ON, 1, NULL, NULL, NULL);
     }
 
@@ -160,15 +161,37 @@ static struct options* parse_args(int argc, char* argv[])
 		strcat(tmp_opts->mnt_point, "/");
 		tmp_opts->mnt_point_set = 1;
 		break;
-	    case('a'):
-		sscanf(optarg, "%x", &tmp_opts->api_mask);
-		if(ret < 1){
-		    if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
-		    free(tmp_opts);
-		    return(NULL);
-		}
-		tmp_opts->api_mask_set = 1;
-		break;
+	    case('a'):{
+            char *saveptr;
+            char *token;
+            tmp_opts->api_mask = 0;
+            tmp_opts->api_mask_set = 1;
+
+            if ( strstr(optarg, ",") == NULL ){ /* none or all are allowed */
+                if( strcmp(optarg, "all") == 0 ){
+                    tmp_opts->api_mask = ~0;
+                    break;
+                }else if (strcmp(optarg, "none") == 0){
+                    tmp_opts->api_mask = 0;
+                    break;
+                }
+            }
+
+            token = strtok_r(optarg, ",", & saveptr);
+            while(token != NULL){
+                enum PVFS_event_api api = PVFS_event_get_api_nr(token);
+
+                if(api < 0){
+                    printf("Could not parse API: %s\n", token);
+                    return(NULL);
+                }
+                tmp_opts->api_mask |= api;
+
+                token = strtok_r(NULL, ",", & saveptr);
+            }
+
+    		break;
+        }
 	    case('o'):
 		sscanf(optarg, "%x", &tmp_opts->op_mask);
 		if(ret < 1){
@@ -198,11 +221,24 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
+    enum PVFS_event_api api_nr = 1;
+    char * name = 0;
+    int i = 1;
+
     fprintf(stderr, "\n");
     fprintf(stderr, "Usage  : %s [-m fs_mount_point] "
-            "[-a hex_api_mask] [-o hex_operation_mask]\n", argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -a 0xFFFF -o 0xFFFF\n",
+            "[-a hex_api_mask] [-o <API_List>]\n", argv[0]);
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -a bmi,trove -o 0xFFFF\n"
+                    "\tAPI_List is none or all or a komma separated list of the following APIs: \n",
             argv[0]);
+
+    while ( api_nr != PVFS_EVENT_API_LAST){
+        name = PVFS_event_get_api_name(api_nr);
+        fprintf(stderr, "\t%s\n", name);
+        api_nr = 1 << i;
+        i++;
+    }
+
     return;
 }
 

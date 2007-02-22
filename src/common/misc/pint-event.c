@@ -20,6 +20,21 @@
 /* logs a lot more than default :) */
 #define MPE_EXTENDED_LOGGING
 
+static PVFS_event_name_mapping_s PVFS_event_nr_api_name_mapping [] = {
+    {.nr = PVFS_EVENT_API_JOB, .name = "job"},
+    {.nr = PVFS_EVENT_API_BMI, .name = "bmi"},
+    {.nr = PVFS_EVENT_API_TROVE, .name = "trove"},
+    {.nr = PVFS_EVENT_API_ENCODE_REQ, .name = "encode_req"},
+    {.nr = PVFS_EVENT_API_ENCODE_RESP, .name = "encode_resp"},
+    {.nr = PVFS_EVENT_API_DECODE_REQ, .name = "decode_req"},
+    {.nr = PVFS_EVENT_API_DECODE_RESP, .name = "decode_resp"},
+    {.nr = PVFS_EVENT_API_SM, .name = "sm"},
+    {.nr = PVFS_EVENT_API_DECODE_UNEXPECTED, .name = "decode_unexpected"},
+    {.nr = PVFS_EVENT_API_FLOW, .name = "flow"},
+    {.nr = PVFS_EVENT_API_PERFORMANCE_COUNTER, .name = "performance_counter"},
+    {.nr = 0, .name = 0}, /* end sentinal */
+    };
+
 /* variables that provide runtime control over which events are recorded */
 int PINT_event_on = 0;
 int32_t PINT_event_api_mask = 0;
@@ -43,10 +58,40 @@ int PINT_event_unexpected_decode;
 extern char * mpe_logfile;
 #endif
 
+
 int * PINT_event_perf_counter_update = 0; /* event number for perf counters*/
 char ** PINT_event_perf_counter_key_names = 0;
 int PINT_event_perf_counter_keys = 0;
 
+char * PVFS_event_get_api_name(enum PVFS_event_api api_nr){
+    int i=0;
+    PVFS_event_name_mapping_s * api_mapping;
+    while(1){
+        api_mapping = & PVFS_event_nr_api_name_mapping[i];
+        if( api_mapping->name == 0){
+            return 0;
+        }
+        if( api_mapping->nr == api_nr ){
+            return api_mapping->name;
+        }
+        i++;
+    };
+}
+
+enum PVFS_event_api PVFS_event_get_api_nr(const char * api_name){
+    int i=0;
+    PVFS_event_name_mapping_s * api_mapping;
+    while(1){
+        api_mapping = & PVFS_event_nr_api_name_mapping[i];
+        if( api_mapping->name == 0){
+            return 0;
+        }
+        if( strcmp(api_mapping->name, api_name) == 0 ){
+            return api_mapping->nr;
+        }
+        i++;
+    }
+}
 
 void PINT_event_initalize_perf_counter_events(int number){
     PINT_event_perf_counter_update = calloc(number,sizeof(int));
@@ -57,12 +102,12 @@ void PINT_event_initalize_perf_counter_events(int number){
  * register the performance counter values:
  */
 void PINT_event_register_perf_counter_event(const char * keyName){
-    /* add new key name: */ 
-    PINT_event_perf_counter_key_names[PINT_event_perf_counter_keys] = 
+    /* add new key name: */
+    PINT_event_perf_counter_key_names[PINT_event_perf_counter_keys] =
         malloc(strlen(keyName)+1);
     strcpy(PINT_event_perf_counter_key_names[PINT_event_perf_counter_keys], keyName);
-    
-    PINT_event_perf_counter_keys++;     
+
+    PINT_event_perf_counter_keys++;
 }
 
 /* PINT_event_initialize()
@@ -85,7 +130,7 @@ int PINT_event_initialize(int ring_size, int enable_on_startup)
     PINT_event_default_init(ring_size);
 
     gen_mutex_unlock(&event_mutex);
-    
+
     if ( enable_on_startup )
     {
        PINT_event_set_masks(1, ~0, ~0);
@@ -108,46 +153,46 @@ void PINT_event_init_mpe_log_file(void)
 
     MPE_Log_get_solo_eventID(&PINT_event_trove_rd_start);
     MPE_Log_get_solo_eventID(&PINT_event_trove_rd_stop);
- 
+
     MPE_Log_get_solo_eventID(&PINT_event_trove_wr_start);
     MPE_Log_get_solo_eventID(&PINT_event_trove_wr_stop);
-     
+
     MPE_Log_get_solo_eventID(&PINT_event_bmi_start);
     MPE_Log_get_solo_eventID(&PINT_event_bmi_stop);
-     
+
     MPE_Log_get_solo_eventID(&PINT_event_flow_start);
     MPE_Log_get_solo_eventID(&PINT_event_flow_stop);
-     
+
     MPE_Log_get_solo_eventID(&PINT_event_unexpected_decode);
-    
+
 #ifdef MPE_EXTENDED_LOGGING
     for (i = 0 ; i < PINT_event_perf_counter_keys ; i++){
         char event_name[255];
         MPE_Log_get_solo_eventID(& PINT_event_perf_counter_update[i]);
         sprintf(event_name, "PC:%s", PINT_event_perf_counter_key_names[i]);
-        MPE_Describe_info_event(PINT_event_perf_counter_update[i], event_name, 
+        MPE_Describe_info_event(PINT_event_perf_counter_update[i], event_name,
             "white", "value=%l");
     }
 
     formatString ="cm=%d,rank=%d,cid=%d,op=%d,vl=%l,jid=%l";
-#else 
+#else
     formatString ="";
 #endif
-    
+
     MPE_Describe_info_event(PINT_event_job_start, "Job (start)", "green1", formatString);
     MPE_Describe_info_event(PINT_event_job_stop, "Job (end)", "green3", formatString);
-    
+
     MPE_Describe_info_event(PINT_event_trove_rd_start, "Trove read (start)", "blue1", formatString);
     MPE_Describe_info_event(PINT_event_trove_rd_stop, "Trove read (end)", "blue3", formatString);
     MPE_Describe_info_event(PINT_event_trove_wr_start, "Trove write (start)", "orange1", formatString);
     MPE_Describe_info_event(PINT_event_trove_wr_stop, "Trove write (end)", "orange3", formatString);
-     
-    
+
+
     MPE_Describe_info_event(PINT_event_bmi_start, "BMI (start)", "yellow3", formatString);
     MPE_Describe_info_event(PINT_event_bmi_stop, "BMI (end)", "yellow1", formatString);
     MPE_Describe_info_event(PINT_event_flow_start, "Flow (start)", "red3", formatString);
     MPE_Describe_info_event(PINT_event_flow_stop, "Flow (end)", "red1", formatString);
-    
+
     MPE_Describe_info_event(PINT_event_unexpected_decode, "Request decode", "gray", formatString);
 }
 
@@ -167,10 +212,10 @@ int PINT_event_mpe_init(void)
         const char buf[] = "/tmp/pvfs2-mpe-log";
         mpe_logfile = strdup(buf);
     }
-    
-    PMPI_Init(NULL, NULL);    
+
+    PMPI_Init(NULL, NULL);
     PINT_event_init_mpe_log_file();
-    
+
     return 0;
 }
 
@@ -188,7 +233,7 @@ void PINT_event_mpe_finalize(void)
 
 #if defined(HAVE_PABLO)
 /* PINT_event_pablo_init
- *   initialize the pablo trace library 
+ *   initialize the pablo trace library
  */
 int PINT_event_pablo_init(void)
 {
@@ -258,13 +303,13 @@ void PINT_event_default_finalize(void)
 
 /* PINT_event_finalize()
  *
- * shuts down the event logging interface 
+ * shuts down the event logging interface
  *
  * returns 0 on success, -PVFS_error on failure
  */
 void PINT_event_finalize(void)
 {
-    
+
     gen_mutex_lock(&event_mutex);
 #if defined(HAVE_PABLO)
     PINT_event_pablo_finalize();
@@ -290,7 +335,7 @@ void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask)
 {
     gen_mutex_lock(&event_mutex);
 #if defined(HAVE_MPE)
-     if(PINT_event_on && ! event_on){ 
+     if(PINT_event_on && ! event_on){
         gossip_err("Writing clog2 to: %s \n", mpe_logfile);
         PINT_event_finish_log(mpe_logfile);
         PINT_event_init_mpe_log_file();
@@ -306,7 +351,7 @@ void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask)
 
 /* PINT_event_get_masks()
  *
- * retrieves current mask values 
+ * retrieves current mask values
  *
  * no return value
  */
@@ -412,7 +457,7 @@ void __PINT_event_pablo(enum PVFS_event_api api,
     switch(flags) {
 	case PVFS_EVENT_FLAG_START:
 	    startTimeEvent( ((api<<6)&(operation<<3)) );
-	    traceEvent( ( (api<<6) & (operation<<3) & flags), 
+	    traceEvent( ( (api<<6) & (operation<<3) & flags),
 		    description, strlen(description));
 	    break;
 	case PVFS_EVENT_FLAG_END:
@@ -437,14 +482,14 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 /*
  * TODO figure out if the size of the MPE format string
  *  depends on the architecture.
- */    
+ */
     MPE_LOG_BYTES  bytebuf;      /* buffer for logging of flags */
     int    bytebuf_pos = 0;
     const char * request_id;
     char hostname[20] = "";       /* not in log for buffer size limit */
     int comm = -1, rank = -1, call_id = -1; /* 3 x 4 = 12 bytes in buffer */
     char io_type[20] = "";        /* longest io_type has 19 characters */
-            
+
 #ifdef MPE_EXTENDED_LOGGING
     if(api == PVFS_EVENT_API_PERFORMANCE_COUNTER){
         MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &value );
@@ -452,32 +497,32 @@ void __PINT_event_mpe(enum PVFS_event_api api,
         assert(operation <= PINT_event_perf_counter_keys);
         MPE_Log_event(PINT_event_perf_counter_update[operation], 0, bytebuf);
         return;
-    }    
+    }
 
     request_id = PVFS_get_hint( hints, REQUEST_ID);
     if(request_id != NULL){
-        /* In mpe.h size max 4 * sizeof(double) -> MPE_SIZE_BYTES */         
-        /* gossip_err("EVENT request ID received: %s\n", request_id); */       
+        /* In mpe.h size max 4 * sizeof(double) -> MPE_SIZE_BYTES */
+        /* gossip_err("EVENT request ID received: %s\n", request_id); */
         char *saveptr1, *saveptr2; /* for thread safe strtok_r() */
-    
+
         char *alloc_parseid = strdup(request_id);
         char *parseid = alloc_parseid; /* for free() */
-    
+
         char *rid_name, *rid_value;
-    
+
         while(1)
         {
             rid_name = strtok_r(parseid, ",", &saveptr1);
-    
+
             parseid = NULL;
             if (rid_name == NULL)
             {
                 break;
             }
-    
+
             strtok_r(rid_name, ":", &saveptr2);
             rid_value = strtok_r(NULL, ":", &saveptr2);
-    
+
             if(!strcmp(rid_name, "host"))
                sscanf(rid_value, "%20s", hostname);
             else if(!strcmp(rid_name, "comm"))
@@ -492,28 +537,28 @@ void __PINT_event_mpe(enum PVFS_event_api api,
         free(alloc_parseid);
         if ( strlen(io_type) > 18 )  /* max 18 + 2 = 20 bytes in buffer */
            io_type[18] = '\0';
-        
+
         if( hostname[0] == 0 )
         {
             gossip_err("pint-event.c unparsable request id in hints:%s\n", request_id);
         }
-/* DEBUG ME IF NECCESSARY        
+/* DEBUG ME IF NECCESSARY
         else
         {
             gossip_err("pint-event.c: host:%s,comm:%d,rank:%d,id:%d,op:%s\n",
                 hostname, comm, rank, call_id, io_type);
         }
-*/        
+*/
     }
 
 
     /* now log stuff to bytebuffer */
     MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &comm );
-    MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &rank );    
+    MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &rank );
     MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &call_id );
-    /* MPE_Log_pack( bytebuf, &bytebuf_pos, 's', strlen(io_type), io_type ); */    
+    /* MPE_Log_pack( bytebuf, &bytebuf_pos, 's', strlen(io_type), io_type ); */
 
-    MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &operation ); 
+    MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &operation );
     MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &value );
     MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &id );
 #endif
@@ -534,7 +579,7 @@ void __PINT_event_mpe(enum PVFS_event_api api,
         }
         break;
     case PVFS_EVENT_API_JOB:
-        bytebuf_pos = 0;        
+        bytebuf_pos = 0;
         if (flags & PVFS_EVENT_FLAG_START) {
             MPE_Log_event(PINT_event_job_start, 0, bytebuf);
         } else if (flags & PVFS_EVENT_FLAG_END) {
@@ -559,13 +604,15 @@ void __PINT_event_mpe(enum PVFS_event_api api,
     case PVFS_EVENT_API_DECODE_UNEXPECTED:
         MPE_Log_event(PINT_event_unexpected_decode, 0, bytebuf);
         break;
-    case PVFS_EVENT_API_PERFORMANCE_COUNTER:        
+    case PVFS_EVENT_API_PERFORMANCE_COUNTER:
     case PVFS_EVENT_API_DECODE_REQ:
     case PVFS_EVENT_API_ENCODE_REQ:
-    case PVFS_EVENT_API_ENCODE_RESP:            
+    case PVFS_EVENT_API_ENCODE_RESP:
     case PVFS_EVENT_API_DECODE_RESP:
     case PVFS_EVENT_API_SM:
         break; /* XXX: NEEDS SOMETHING */
+    case PVFS_EVENT_API_LAST: /* dummy */
+    break;
     }
 }
 #endif

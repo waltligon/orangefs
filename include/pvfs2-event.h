@@ -13,7 +13,14 @@
 #ifndef __PVFS2_EVENT_H
 #define __PVFS2_EVENT_H
 
-/* different API levels where we can log events */
+
+/* could be used for PVFS_event_op and PVFS_event_api as well */
+typedef struct {
+    int     nr;
+    char * name;
+} PVFS_event_name_mapping_s;
+
+/* different API levels where we can log events, see common/pint-event.c */
 enum PVFS_event_api
 {
     PVFS_EVENT_API_JOB =   (1 << 0),
@@ -26,10 +33,14 @@ enum PVFS_event_api
     PVFS_EVENT_API_SM =	   (1 << 7),        /* state machines */
     PVFS_EVENT_API_DECODE_UNEXPECTED = (1 << 8),
     PVFS_EVENT_API_FLOW = (1 << 9),
-    PVFS_EVENT_API_PERFORMANCE_COUNTER = (1 << 10) /* additional stats to be stored 
-                                             * like load, CPU usage, network 
-                                             * etc */   
+    PVFS_EVENT_API_PERFORMANCE_COUNTER = (1 << 10), /* additional stats to be stored
+                                             * like load, CPU usage, network
+                                             * etc */
+    PVFS_EVENT_API_LAST = (1 << 11), /* dummy only used for iteration through values */
 };
+
+char * PVFS_event_get_api_name(enum PVFS_event_api api_nr);
+enum PVFS_event_api PVFS_event_get_api_nr(const char * api_name); /* returns -1 on error */
 
 /* what kind of event */
 enum PVFS_event_flag
