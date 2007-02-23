@@ -66,7 +66,8 @@ struct PINT_perf_key
 /** struct representing a perf counter instance */
 struct PINT_perf_counter
 {
-    gen_mutex_t* mutex;
+    gen_sem_t sem;
+
     struct PINT_perf_key* key_array;     /**< keys (provided by initialize()) */
     int key_count;                       /**< number of keys */
     int history_size;                    /**< number of history intervals */

@@ -13,7 +13,7 @@
  * int gen_mutex_unlock(gen_mutex_t* mut);
  * int gen_mutex_trylock(gen_mutex_t* mut);
  * gen_mutex_t* gen_mutex_build(void);
- * int gen_mutex_destroy(gen_mutex_t* mut); 
+ * int gen_mutex_destroy(gen_mutex_t* mut);
  *
  * See the examples directory for details.
  */
@@ -25,7 +25,7 @@
 
 /* we will make posix locks the default unless turned off for now. */
 /* this is especially important for development in which case the locks
- * should really be enabled in order to verify proper operation 
+ * should really be enabled in order to verify proper operation
  */
 #if !defined(__GEN_NULL_LOCKING__) && !defined(__GEN_POSIX_LOCKING__)
 #define __GEN_POSIX_LOCKING__
@@ -33,6 +33,23 @@
 
 #ifdef __GEN_POSIX_LOCKING__
 #include <pthread.h>
+
+/* somehow I get sometimes cool messages like:
+ * pthread_mutex_lock.c  __pthread_mutex_lock: Assertion `mutex->__data.__owner == 0'
+ * now I try with semaphores
+ * */
+#include <semaphore.h>
+typedef sem_t gen_sem_t;
+
+
+int gen_posix_sem_init(
+    gen_sem_t * sem);
+int gen_posix_sem_destroy(
+    gen_sem_t * sem);
+int gen_posix_sem_lock(
+    gen_sem_t * sem);
+int gen_posix_sem_unlock(
+    gen_sem_t * sem);
 
 	/* function prototypes for specific locking implementations */
 int gen_posix_mutex_lock(

@@ -52,8 +52,8 @@ struct PINT_perf_counter* PINT_perf_initialize(
         return(NULL);
     }
     memset(pc, 0, sizeof(struct PINT_perf_counter));
-    pc->mutex = gen_mutex_build();
-    if(!pc->mutex)
+    gen_posix_sem_init(& pc->sem);
+    if(!& pc->sem)
     {
         free(pc);
         return(NULL);
@@ -68,7 +68,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
         if(key->key != pc->key_count)
         {
             gossip_err("Error: PINT_perf_initialize(): key out of order.\n");
-            gen_mutex_destroy(pc->mutex);
+            gen_posix_sem_destroy(& pc->sem);
             free(pc);
             return(NULL);
         }
@@ -79,7 +79,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
     if(pc->key_count < 1)
     {
         gossip_err("Error: PINT_perf_initialize(): no keys specified.\n");
-        gen_mutex_destroy(pc->mutex);
+        gen_posix_sem_destroy(& pc->sem);
         free(pc);
         return(NULL);
     }
@@ -91,7 +91,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
         (uint64_t*)malloc(PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
     if(!pc->start_time_array_ms)
     {
-        gen_mutex_destroy(pc->mutex);
+        gen_posix_sem_destroy(& pc->sem);
         free(pc);
         return(NULL);
     }
@@ -100,7 +100,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
     if(!pc->interval_array_ms)
     {
         free(pc->start_time_array_ms);
-        gen_mutex_destroy(pc->mutex);
+        gen_posix_sem_destroy(& pc->sem);
         free(pc);
         return(NULL);
     }
@@ -115,7 +115,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
     {
         free(pc->start_time_array_ms);
         free(pc->interval_array_ms);
-        gen_mutex_destroy(pc->mutex);
+        gen_posix_sem_destroy(& pc->sem);
         free(pc);
         return(NULL);
     }
@@ -133,7 +133,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
             free(pc->value_matrix);
             free(pc->start_time_array_ms);
             free(pc->interval_array_ms);
-            gen_mutex_destroy(pc->mutex);
+            gen_posix_sem_destroy(& pc->sem);
             free(pc);
             return(NULL);
         }
@@ -158,7 +158,7 @@ void PINT_perf_reset(
     int i;
     struct timeval tv;
 
-    gen_mutex_lock(pc->mutex);
+    gen_posix_sem_lock(& pc->sem);
 
     /* zero out all fields */
     memset(pc->start_time_array_ms, 0,
@@ -178,7 +178,7 @@ void PINT_perf_reset(
     pc->start_time_array_ms[0] = ((uint64_t)tv.tv_sec)*1000 +
 	tv.tv_usec/1000;
 
-    gen_mutex_unlock(pc->mutex);
+    gen_posix_sem_unlock(& pc->sem);
 
     return;
 }
@@ -196,7 +196,7 @@ void PINT_perf_load_start(
 
     PVFS_Gtime diff_time;
 
-    gen_mutex_lock(pc->mutex);
+    gen_posix_sem_lock(& pc->sem);
     time_get(out_cur_time);
 
     /*
@@ -209,7 +209,7 @@ void PINT_perf_load_start(
 
     pc->current_pending_count[key]++;
 
-    gen_mutex_unlock(pc->mutex);
+    gen_posix_sem_unlock(& pc->sem);
 }
 
 void PINT_perf_load_stop(
@@ -250,7 +250,7 @@ void PINT_perf_load_stop(
         pc->load_non_overlapping[key] += time_get_float(& current);
         pc->load_overlapping[key] -= time_get_float(& tmp_time);
     }
-    gen_mutex_unlock(pc->mutex);
+    gen_posix_sem_unlock(& pc->sem);
 }
 
 static inline float PINT_compute_load(float value_non_overlapping,
@@ -280,7 +280,7 @@ void PINT_perf_finalize(
     free(pc->value_matrix);
     free(pc->start_time_array_ms);
     free(pc->interval_array_ms);
-    gen_mutex_destroy(pc->mutex);
+    gen_posix_sem_destroy(& pc->sem);
     free(pc);
     pc = NULL;
 
@@ -303,7 +303,7 @@ void __PINT_perf_count(
         return;
     }
 
-    gen_mutex_lock(pc->mutex);
+    gen_posix_sem_lock(& pc->sem);
 
     if(key >= pc->key_count)
     {
@@ -324,7 +324,7 @@ void __PINT_perf_count(
             break;
     }
 
-    gen_mutex_unlock(pc->mutex);
+    gen_posix_sem_unlock(& pc->sem);
     return;
 }
 
@@ -359,7 +359,7 @@ void PINT_perf_rollover(
 
     int_time = ((uint64_t)current_time.tv_sec)*1000 + current_time.tv_usec/1000;
 
-    gen_mutex_lock(pc->mutex);
+    gen_posix_sem_lock(& pc->sem);
 
     /* rotate all values back one */
     if(pc->history_size > 1)
@@ -410,7 +410,7 @@ void PINT_perf_rollover(
     memcpy( & pc->time_of_last_rollover, & current_time, sizeof(PVFS_Gtime));
 
 
-    gen_mutex_unlock(pc->mutex);
+    gen_posix_sem_unlock(& pc->sem);
 
     return;
 }
@@ -434,7 +434,7 @@ int PINT_perf_set_info(
         return 0;
     }
 
-    gen_mutex_lock(pc->mutex);
+    gen_posix_sem_lock(& pc->sem);
     switch(option)
     {
         case PINT_PERF_HISTORY_SIZE:
@@ -470,11 +470,11 @@ int PINT_perf_set_info(
             }
             break;
         default:
-            gen_mutex_unlock(pc->mutex);
+            gen_posix_sem_unlock(& pc->sem);
             return(-PVFS_EINVAL);
     }
 
-    gen_mutex_unlock(pc->mutex);
+    gen_posix_sem_unlock(& pc->sem);
     return(0);
 }
 
@@ -493,7 +493,7 @@ int PINT_perf_get_info(
         return (0);
     }
 
-    gen_mutex_lock(pc->mutex);
+    gen_posix_sem_lock(& pc->sem);
     switch(option)
     {
         case PINT_PERF_HISTORY_SIZE:
@@ -503,11 +503,11 @@ int PINT_perf_get_info(
             *arg = pc->key_count;
             break;
         default:
-            gen_mutex_unlock(pc->mutex);
+            gen_posix_sem_unlock(& pc->sem);
             return(-PVFS_EINVAL);
     }
 
-    gen_mutex_unlock(pc->mutex);
+    gen_posix_sem_unlock(& pc->sem);
     return(0);
 }
 
@@ -534,7 +534,7 @@ void PINT_perf_retrieve(
         return;
     }
 
-    gen_mutex_lock(pc->mutex);
+    gen_posix_sem_lock(& pc->sem);
 
     /* it isn't very safe to allow the caller to ask for more keys than are
      * available, because they will probably overrun key array bounds when
@@ -572,7 +572,7 @@ void PINT_perf_retrieve(
     memcpy(interval_array_ms, pc->interval_array_ms,
         (tmp_max_history*sizeof(uint64_t)));
 
-    gen_mutex_unlock(pc->mutex);
+    gen_posix_sem_unlock(& pc->sem);
 
     /* fill in interval length for newest interval */
     gettimeofday(&tv, NULL);
@@ -601,7 +601,7 @@ char* PINT_perf_generate_text(
     struct tm tmp_tm;
     int ret;
 
-    gen_mutex_lock(pc->mutex);
+    gen_posix_sem_lock(& pc->sem);
 
     line_size = 26 + (24*pc->history_size);
     total_size = (pc->key_count+2)*line_size + 1;
@@ -619,7 +619,7 @@ char* PINT_perf_generate_text(
     tmp_str = (char*)malloc(actual_size*sizeof(char));
     if(!tmp_str)
     {
-        gen_mutex_unlock(pc->mutex);
+        gen_posix_sem_unlock(& pc->sem);
         return(NULL);
     }
     position = tmp_str;
@@ -709,7 +709,7 @@ char* PINT_perf_generate_text(
         position++;
     }
 
-    gen_mutex_unlock(pc->mutex);
+    gen_posix_sem_unlock(& pc->sem);
 
     return(tmp_str);
 }

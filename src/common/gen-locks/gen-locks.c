@@ -19,6 +19,32 @@
  */
 
 #ifndef __GEN_NULL_LOCKING__
+
+int gen_posix_sem_destroy(
+    gen_sem_t * sem)
+{
+    return sem_destroy(sem);
+}
+
+int gen_posix_sem_init(
+    gen_sem_t * sem)
+{
+    return sem_init(sem, 0, 1);
+}
+
+
+int gen_posix_sem_lock(
+    gen_sem_t * sem)
+{
+    return sem_wait(sem);
+}
+
+int gen_posix_sem_unlock(
+    gen_sem_t * sem)
+{
+    return sem_post(sem);
+}
+
 /*
  * gen_mutex_init()
  *
