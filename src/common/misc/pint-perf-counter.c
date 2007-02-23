@@ -224,6 +224,8 @@ void PINT_perf_load_stop(
     }
 
     PVFS_Gtime current, tmp_time;
+
+    gen_posix_sem_lock(& pc->sem);
     /* get the current time as end-time */
     time_get(& current);
 
@@ -253,14 +255,14 @@ void PINT_perf_load_stop(
     gen_posix_sem_unlock(& pc->sem);
 }
 
-static inline float PINT_compute_load(float value_non_overlapping,
-    float value_overlapping,
+static inline float PINT_compute_load(double value_non_overlapping,
+    double value_overlapping,
     int last_frame_pending_jobs,
     int current_pending_count,
-    PVFS_Gtime * last_frame_start, PVFS_Gtime * this_frame_start, float time_diff){
+    PVFS_Gtime * last_frame_start, PVFS_Gtime * this_frame_start, double time_diff){
 
     /* resubtract offset from extra_value of jobs */
-    return ((float) last_frame_pending_jobs + ( time_diff * (float) current_pending_count
+    return ((double) last_frame_pending_jobs + ( time_diff * (double) current_pending_count
         - value_overlapping + value_non_overlapping )
         / time_diff);
 }
@@ -352,14 +354,15 @@ void PINT_perf_rollover(
         /* do nothing if perf counter is not initialized */
         return;
     }
+
+    gen_posix_sem_lock(& pc->sem);
+
     time_get(& current_time);
 
     time_sub(& current_time, & pc->time_of_last_rollover , & time_diff_intervalls);
     time_diff_intervalls_float = time_get_double(& time_diff_intervalls);
 
     int_time = ((uint64_t)current_time.tv_sec)*1000 + current_time.tv_usec/1000;
-
-    gen_posix_sem_lock(& pc->sem);
 
     /* rotate all values back one */
     if(pc->history_size > 1)
