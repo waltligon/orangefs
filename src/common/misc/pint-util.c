@@ -77,6 +77,10 @@ float time_get_float(PVFS_Gtime * time){
     return (float) time->tv_sec + (float) time->tv_usec * 0.000001;
 }
 
+double time_get_double(PVFS_Gtime * time){
+    return (double) time->tv_sec + (double) time->tv_usec * 0.000001;
+}
+
 int time_is_bigger(PVFS_Gtime * time_1, PVFS_Gtime * time_2){
     if( time_1->tv_sec > time_2->tv_sec )
         return 1;

@@ -24,6 +24,7 @@ void time_sub(PVFS_Gtime * time_1, PVFS_Gtime * time_2,
 void time_get_current_diff(PVFS_Gtime * time, PVFS_Gtime * target_time);
 
 float time_get_float(PVFS_Gtime * time);
+double time_get_double(PVFS_Gtime * time);
 int time_is_bigger(PVFS_Gtime * time_1, PVFS_Gtime * time_2);
 
 /* converts common fields between sys attr and obj attr structures */

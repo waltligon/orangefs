@@ -205,7 +205,7 @@ void PINT_perf_load_start(
      */
     time_sub( out_cur_time,  & pc->time_of_last_rollover, &  diff_time);
 
-    pc->load_overlapping[key] += time_get_float(& diff_time);
+    pc->load_overlapping[key] += time_get_double(& diff_time);
 
     pc->current_pending_count[key]++;
 
@@ -235,7 +235,7 @@ void PINT_perf_load_stop(
         /* copy result directly into current variable */
         time_sub(& current, & pc->time_of_last_rollover,  & current);
 
-        pc->load_non_overlapping[key] += time_get_float(& current);
+        pc->load_non_overlapping[key] += time_get_double(& current);
 
     }else{
         /* job is started in the same time frame, decrement pending_value
@@ -247,8 +247,8 @@ void PINT_perf_load_stop(
 
         /* corresponds to += current_time - jd->job_start_time -
          *  time_ jd->job_start_time + statistic_start_time_of_last_frame */
-        pc->load_non_overlapping[key] += time_get_float(& current);
-        pc->load_overlapping[key] -= time_get_float(& tmp_time);
+        pc->load_non_overlapping[key] += time_get_double(& current);
+        pc->load_overlapping[key] -= time_get_double(& tmp_time);
     }
     gen_posix_sem_unlock(& pc->sem);
 }
@@ -355,7 +355,7 @@ void PINT_perf_rollover(
     time_get(& current_time);
 
     time_sub(& current_time, & pc->time_of_last_rollover , & time_diff_intervalls);
-    time_diff_intervalls_float = time_get_float(& time_diff_intervalls);
+    time_diff_intervalls_float = time_get_double(& time_diff_intervalls);
 
     int_time = ((uint64_t)current_time.tv_sec)*1000 + current_time.tv_usec/1000;
 
