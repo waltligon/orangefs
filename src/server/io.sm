@@ -19,7 +19,6 @@
 #include "pint-request.h"
 #include "pvfs2-internal.h"
 #include "scheduler-logger.h"
-#include "pint-perf-counter.h"
 
 static int io_send_ack(
     PINT_server_op *s_op, job_status_s* js_p);
@@ -328,8 +327,6 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
      * this bmi address
      */
     BMI_set_info(s_op->addr, BMI_DEC_ADDR_REF, NULL);
-
-    PINT_perf_load_stop(PINT_server_pc, PINT_PERF_REQSCHED, & js_p->start_time);
 
     return(server_state_machine_complete(s_op));
 }

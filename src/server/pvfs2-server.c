@@ -1898,6 +1898,8 @@ static int server_state_machine_start(
         return -PVFS_ENOSYS;
     }
 
+    PINT_perf_load_start(PINT_server_pc, PINT_PERF_REQSCHED, & s_op->start_time);
+
     s_op->resp.op = s_op->op;
     return PINT_state_machine_invoke(s_op,js_p);
 }
@@ -2017,6 +2019,8 @@ int server_state_machine_complete(PINT_server_op *s_op)
 
    /* Remove s_op from the inprogress_sop_list */
     qlist_del(&s_op->next);
+
+    PINT_perf_load_stop(PINT_server_pc, PINT_PERF_REQSCHED, & s_op->start_time);
 
     /* free the operation structure itself */
     free(s_op);

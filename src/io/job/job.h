@@ -38,7 +38,6 @@ typedef struct job_status
     PVFS_ds_type type;		/* dspace_verify */
     PVFS_fs_id coll_id;		/* fs_lookup */
     int count;			/* keyval_iterate, iterate_handles */
-    PVFS_Gtime start_time;
 }
 job_status_s;
 

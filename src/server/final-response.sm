@@ -12,7 +12,6 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
-#include "pint-perf-counter.h"
 
 /* final-response state machine:
  * This is used as a nested state machine to perform two primary tasks:
@@ -170,8 +169,6 @@ static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
     BMI_set_info(s_op->addr, BMI_DEC_ADDR_REF, NULL);
 
     js_p->error_code = 0;
-
-    PINT_perf_load_stop(PINT_server_pc, PINT_PERF_REQSCHED, & js_p->start_time);
 
     return 1;
 }
