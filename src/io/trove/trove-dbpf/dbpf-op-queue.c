@@ -289,11 +289,6 @@ int dbpf_op_init_queued_or_immediate(
                      context_id,
                      0);
         *op_pp = op_p;
-
-        /* init start time for load computation */
-        time_get(& (*op_pp)->start_time);
-        PINT_perf_load_start(PINT_server_pc, PINT_PERF_TROVE_LOAD, & (*op_pp)->start_time);
-
     }
     else
     {
@@ -332,10 +327,16 @@ int dbpf_queue_or_service(
     {
         DB * dbp;
 
+        /* init start time for load computation */
+        PINT_perf_load_start(PINT_server_pc, PINT_PERF_TROVE_LOAD, &
+            (*op_pp)->start_time);
+
         *out_op_id_p = 0;
         ret = op_p->svc_fn(op_p);
         if(ret < 0)
         {
+            PINT_perf_load_stop(PINT_server_pc, PINT_PERF_TROVE_LOAD,
+                & op_p->start_time);
             goto exit;
         }
 
@@ -351,6 +352,8 @@ int dbpf_queue_or_service(
         DBPF_DB_SYNC_IF_NECESSARY(op_p, dbp, ret);
         if(ret < 0)
         {
+            PINT_perf_load_stop(PINT_server_pc, PINT_PERF_TROVE_LOAD,
+                & op_p->start_time);
             goto exit;
         }
 
