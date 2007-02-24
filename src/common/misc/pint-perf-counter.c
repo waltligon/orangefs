@@ -260,9 +260,9 @@ static inline float PINT_compute_load(double value_non_overlapping,
     int last_frame_pending_jobs,
     int current_pending_count,
     PVFS_Gtime * last_frame_start, PVFS_Gtime * this_frame_start, double time_diff){
-
     /* resubtract offset from extra_value of jobs */
-    return ((double) last_frame_pending_jobs + ( time_diff * (double) current_pending_count
+    return (double) last_frame_pending_jobs  + (( time_diff *
+        (double) ( current_pending_count - last_frame_pending_jobs)
         - value_overlapping + value_non_overlapping )
         / time_diff);
 }
@@ -343,7 +343,7 @@ void PINT_perf_rollover(
     struct PINT_perf_counter* pc)
 {
     PVFS_Gtime time_diff_intervalls;
-    float time_diff_intervalls_float;
+    double time_diff_intervalls_float;
     PVFS_Gtime current_time;
 
     int i;
@@ -400,6 +400,14 @@ void PINT_perf_rollover(
                 pc->load_non_overlapping[i], pc->load_overlapping[i],
                 pc->last_pending_count[i], pc->current_pending_count[i],
                 &  pc->time_of_last_rollover, & current_time, time_diff_intervalls_float);
+
+            /*
+            if (pc->key_array[i].key == PINT_PERF_REQSCHED ){
+                printf("MY load %lld LP:%d P:%d TDiff:%f  NON_OVER:%f OVER:%f \n", pc->value_matrix[i][0],
+                pc->last_pending_count[i], pc->current_pending_count[i],
+                time_diff_intervalls_float, pc->load_non_overlapping[i], pc->load_overlapping[i] );
+            }
+            */
 
             /* now update values for last time frame */
             pc->last_pending_count[i] =  pc->current_pending_count[i];
