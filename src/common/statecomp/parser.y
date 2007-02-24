@@ -28,6 +28,9 @@
 static struct state *cur_state;
 static struct transition *cur_transition;
 
+/* in scanner.l generated code */
+extern int yylex(void);
+
 %}
 
 %union {

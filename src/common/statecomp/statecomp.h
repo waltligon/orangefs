@@ -42,5 +42,3 @@ struct transition *new_transition(struct state *s, char *return_code);
 
 void gen_machine(char *machine_name);
 
-int yylex(void);
-

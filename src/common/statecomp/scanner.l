@@ -33,6 +33,33 @@
 /* No main needed. */
 #define YY_MAIN 0
 
+/* For the new and broken flex-2.5.33, it defines isatty() no matter what,
+ * but we can tell it not to include unistd.h that really defines that.
+ */
+#define YY_NO_UNISTD_H 1
+
+/*
+ * flex-2.5.33 produces these non-static functions that are never used
+ * internally or externally by us.  Shut up gcc complaints by pretending we
+ * have declared them.  Older flex-2.5.4 is not so dumb.
+ */
+int yyget_lineno(void);
+FILE *yyget_in(void);
+FILE *yyget_out(void);
+int yyget_leng(void);
+char *yyget_text(void);
+void yyset_lineno(int line_number);
+void yyset_in(FILE *in_str );
+void yyset_out(FILE *out_str);
+int yyget_debug(void);
+void yyset_debug(int bdebug);
+int yylex_destroy(void);
+
+/* flex-2.5.33 does generate a prototype, but 2.5.4 does not */
+#if !defined(YY_FLEX_SUBMINOR_VERSION) || (YY_FLEX_SUBMINOR_VERSION < 33)
+extern int yylex(void);
+#endif
+
 #define	RETURNVAL(x)	yylval.i = x; return x;
 static int comment_caller;
 
@@ -41,7 +68,7 @@ static int comment_caller;
 id          [_a-zA-Z][_0-9a-zA-Z]*
 
 %x		CODE
-%x		COMMENT 
+%x		COMMENT
 
 /* avoid a warning since we do not use yyunput() */
 %option nounput
