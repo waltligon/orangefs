@@ -1705,6 +1705,8 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
     int32_t i, num_ops_posted, iox_count, iox_index;
     int32_t *mem_sizes = NULL;
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint * hints = NULL;
+
     struct read_write_x *rwx = (struct read_write_x *) vfs_request->in_upcall.trailer_buf;
 
     if (vfs_request->in_upcall.trailer_size <= 0 || rwx == NULL)
@@ -1831,7 +1833,9 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             gossip_err("post_iox_request: request_hindexed failed\n");
             break;
         }
-        /* post the I/O */
+	
+        create_request_id(& hints, vfs_request);
+	/* post the I/O */
         ret = PVFS_isys_io(
             vfs_request->in_upcall.req.iox.refn, vfs_request->file_req_a[i],
             0, 
@@ -1840,6 +1844,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             &vfs_request->response.iox[i],
             vfs_request->in_upcall.req.iox.io_type,
             &vfs_request->op_ids[i],
+	    hints,
             (void *)vfs_request);
 
         if (ret < 0)
