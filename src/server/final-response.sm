@@ -1,5 +1,5 @@
-/* 
- * (C) 2001 Clemson University and The University of Chicago 
+/*
+ * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -23,7 +23,7 @@
 /* PRECONDITIONS:
  * - the s_op->resp struct must be filled in with the response that
  *   needs to be sent (not yet encoded), with one exception:
- * - js_p->error_code must indicate the status value that you wish 
+ * - js_p->error_code must indicate the status value that you wish
  *   to have set in the response structure
  * - if the operation has been scheduled, then the scheduled id must be
  *   stored in s_op->scheduled_id
@@ -77,7 +77,7 @@ static int final_response_release(
     int ret = -1;
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (FR sm) state: release: (error_code = %d)\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op),
                  js_p->error_code);
@@ -101,8 +101,6 @@ static int final_response_release(
     ret = job_req_sched_release(
         s_op->scheduled_id, s_op, 0, js_p, &tmp_id, server_job_context);
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_SUB);
-
     return ret;
 }
 
@@ -116,9 +114,9 @@ static int final_response_send_resp(
     int ret = -1;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-    
+
     gossip_debug(
-        GOSSIP_SERVER_DEBUG, 
+        GOSSIP_SERVER_DEBUG,
 	"(%p) %s (FR sm) state: send_resp (status = %d)\n",
 	s_op,
 	PINT_map_server_op_to_string(s_op->req->op),
@@ -154,14 +152,14 @@ static int final_response_send_resp(
 
 /* final_response_cleanup()
  *
- * cleans up resources allocated while in this nested machine.  Right now 
+ * cleans up resources allocated while in this nested machine.  Right now
  * that just means releasing the encoding of the response
  */
 static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     char status_string[64] = {0};
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (FR sm) state: cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
 
@@ -251,7 +249,7 @@ static void PINT_gossip_err_server_resp(
                             "METAFILE [ dist is %p, dist_size is %d,\n\t"
                             "   dfile_array is %p, dfile_count is %d ]\n",
                             attr->u.meta.dist, attr->u.meta.dist_size,
-                            attr->u.meta.dfile_array, 
+                            attr->u.meta.dfile_array,
                             attr->u.meta.dfile_count);
 
                         if (attr->u.meta.dfile_array)

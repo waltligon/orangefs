@@ -1,5 +1,5 @@
-/* 
- * (C) 2001 Clemson University and The University of Chicago 
+/*
+ * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -35,7 +35,7 @@ static int io_cleanup(
 machine pvfs2_io_sm(
     prelude,
     send_positive_ack,
-    send_negative_ack, 
+    send_negative_ack,
     start_flow,
     cleanup,
     release,
@@ -55,7 +55,7 @@ machine pvfs2_io_sm(
         default => release;
     }
 
-    state send_negative_ack 
+    state send_negative_ack
     {
         run io_send_ack;
         default => release;
@@ -92,34 +92,36 @@ machine pvfs2_io_sm(
 /*
  * Function: io_send_ack()
  *
- * Params:   server_op *s_op, 
+ * Params:   server_op *s_op,
  *           job_status_s* js_p
  *
  * Pre:      error code has been set in job status for us to
  *           report to client
  *
  * Post:     response has been sent to client
- *            
+ *
  * Returns:  int
  *
  * Synopsis: fills in a response to the I/O request, encodes it,
  *           and sends it to the client via BMI.  Note that it may
  *           send either positive or negative acknowledgements.
- *           
+ *
  */
 static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
 {
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-    
+
+    /*
     const char * request_id;
     request_id = PVFS_get_hint( s_op->req->hints,
         REQUEST_ID);
     if(request_id != NULL){
         gossip_err("I/O request ID received: %s\n", request_id);
-    }        
-    
+    }
+    */
+
     /* this is where we report the file size to the client before
      * starting the I/O transfer, or else report an error if we
      * failed to get the size, or failed for permission reasons
@@ -140,7 +142,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size,
         s_op->tag, s_op->encoded.buffer_type, 0, s_op, 0, js_p,
-        &tmp_id, server_job_context, user_opts->server_job_bmi_timeout, 
+        &tmp_id, server_job_context, user_opts->server_job_bmi_timeout,
         s_op->req->hints);
 
     return err;
@@ -149,20 +151,20 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
 /*
  * Function: io_start_flow()
  *
- * Params:   server_op *s_op, 
+ * Params:   server_op *s_op,
  *           job_status_s* js_p
  *
  * Pre:      all of the previous steps have succeeded, so that we
  *           are ready to actually perform the I/O
  *
  * Post:     I/O has been carried out
- *            
+ *
  * Returns:  int
  *
  * Synopsis: this is the most important part of the state machine.
- *           we setup the flow descriptor and post it in order to 
+ *           we setup the flow descriptor and post it in order to
  *           carry out the data transfer
- *           
+ *
  */
 static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
 {
@@ -170,7 +172,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_conf;
-        
+
     s_op->u.io.flow_d = PINT_flow_alloc();
     if (!s_op->u.io.flow_d)
     {
@@ -178,7 +180,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
         return 1;
     }
 
-    /* we still have the file size stored in the response structure 
+    /* we still have the file size stored in the response structure
      * that we sent in the previous state, other details come from
      * request
      */
@@ -209,7 +211,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
 
-    fs_conf = PINT_config_find_fs_id(user_opts, 
+    fs_conf = PINT_config_find_fs_id(user_opts,
         s_op->req->u.io.fs_id);
     if(fs_conf)
     {
@@ -218,14 +220,14 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
         s_op->u.io.flow_d->buffers_per_flow = fs_conf->fp_buffers_per_flow;
     }
 
-    gossip_debug(GOSSIP_IO_DEBUG, "flow: fsize: %lld, " 
+    gossip_debug(GOSSIP_IO_DEBUG, "flow: fsize: %lld, "
         "server_nr: %d, server_ct: %d\n",
         lld(s_op->u.io.flow_d->file_data.fsize),
         (int)s_op->u.io.flow_d->file_data.server_nr,
         (int)s_op->u.io.flow_d->file_data.server_ct);
 
     gossip_debug(GOSSIP_IO_DEBUG, "      file_req_offset: %lld, "
-        "aggregate_size: %lld, handle: %llu\n", 
+        "aggregate_size: %lld, handle: %llu\n",
         lld(s_op->u.io.flow_d->file_req_offset),
         lld(s_op->u.io.flow_d->aggregate_size),
         llu(s_op->req->u.io.handle));
@@ -264,7 +266,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
 /*
  * Function: io_release()
  *
- * Params:   server_op *b, 
+ * Params:   server_op *b,
  *           job_status_s* js_p
  *
  * Pre:      we are done with all steps necessary to service
@@ -293,7 +295,7 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
 /*
  * Function: io_cleanup()
  *
- * Params:   server_op *b, 
+ * Params:   server_op *b,
  *           job_status_s* js_p
  *
  * Pre:      all jobs done, simply need to clean up
@@ -338,20 +340,20 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 /*
  * Function: io_send_completion_ack()
  *
- * Params:   server_op *s_op, 
+ * Params:   server_op *s_op,
  *           job_status_s* js_p
  *
  * Pre:      flow is completed so that we can report its status
  *
  * Post:     if this is a write, response has been sent to client
  *           if this is a read, do nothing
- *            
+ *
  * Returns:  int
  *
  * Synopsis: fills in a response to the I/O request, encodes it,
  *           and sends it to the client via BMI.  Note that it may
  *           send either positive or negative acknowledgements.
- *           
+ *
  */
 static int io_send_completion_ack(
     PINT_server_op *s_op, job_status_s *js_p)
@@ -359,7 +361,7 @@ static int io_send_completion_ack(
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-        
+
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early
      */
@@ -399,7 +401,7 @@ static int io_send_completion_ack(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
         s_op->encoded.buffer_type, 0, s_op, 0, js_p, &tmp_id,
-        server_job_context, user_opts->server_job_bmi_timeout, 
+        server_job_context, user_opts->server_job_bmi_timeout,
         s_op->req->hints);
 
     return err;

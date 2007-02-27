@@ -59,9 +59,6 @@ union dbpf_dspace_recno_handle_key
     TROVE_handle handle;
 };
 
-
-int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
-
 static inline void organize_post_op_statistics(
     enum dbpf_op_type op_type, TROVE_op_id op_id, PVFS_hint * hints)
 {
@@ -73,7 +70,8 @@ static inline void organize_post_op_statistics(
         case KEYVAL_FLUSH:
         case DSPACE_REMOVE:
         case DSPACE_SETATTR:
-            UPDATE_PERF_METADATA_WRITE();
+            PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_WRITE,
+                    1, PINT_PERF_ADD);
             break;
         case KEYVAL_READ:
         case KEYVAL_READ_LIST:
@@ -83,19 +81,19 @@ static inline void organize_post_op_statistics(
         case DSPACE_ITERATE_HANDLES:
         case DSPACE_VERIFY:
         case DSPACE_GETATTR:
-            UPDATE_PERF_METADATA_READ();
+            UPDATE_PERF_METADATA_READ()
             break;
         case BSTREAM_READ_LIST:
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, op_id, hints); 
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, op_id, hints);
             break;
         case BSTREAM_WRITE_LIST:
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, op_id, hints); 
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, op_id, hints);
             break;
         default:
             break;
         case DSPACE_CREATE:
-            UPDATE_PERF_METADATA_WRITE();
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, op_id, hints); 
+            UPDATE_PERF_METADATA_WRITE()
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, op_id, hints);
             break;
     }
 }
@@ -178,8 +176,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     op_p->u.d_create.out_handle_p = handle_p;
     op_p->u.d_create.type = type;
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_ADD);
+    UPDATE_PERF_METADATA_WRITE()
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
@@ -282,7 +279,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
-    
+
     /* check for old bstream files (these should not exist, but it is
      * possible if the db gets out of sync with the rest of the collection
      * somehow
@@ -296,11 +293,11 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         memset(new_filename, 0, PATH_MAX+1);
 
         gossip_err("Warning: found old bstream file %s; "
-                   "moving to stranded-bstreams.\n", 
+                   "moving to stranded-bstreams.\n",
                    filename);
-        
+
         DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename, PATH_MAX,
-                                           my_storage_p->name, 
+                                           my_storage_p->name,
                                            op_p->coll_p->coll_id,
                                            llu(new_handle));
         /* an old file exists.  Move it to the stranded subdirectory */
@@ -313,11 +310,11 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             goto return_error;
         }
     }
-     
+
     memset(&data, 0, sizeof(data));
     data.data = &s_attr;
     data.size = sizeof(s_attr);
-    
+
     /* create new dataspace entry */
     ret = op_p->coll_p->ds_db->put(op_p->coll_p->ds_db, NULL, &key, &data, 0);
     if (ret != 0)
@@ -334,9 +331,6 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_insert(ref, &attr);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
-
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
 
     *op_p->u.d_create.out_handle_p = new_handle;
     return DBPF_OP_COMPLETE;
@@ -387,8 +381,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
    /* initialize op-specific members */
     op_p->hints = hints;
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_ADD);
+    UPDATE_PERF_METADATA_WRITE()
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
@@ -460,9 +453,6 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     {
         goto return_error;
     }
-
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
 
     /* return handle to free list */
     trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
@@ -809,7 +799,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
                      ds_attr_p->dfile_count, ds_attr_p->dist_size,
                      lld(ds_attr_p->b_size));
 
-        UPDATE_PERF_METADATA_READ();
+        UPDATE_PERF_METADATA_READ()
         gen_mutex_unlock(&dbpf_attr_cache_mutex);
         return 1;
     }
@@ -862,7 +852,7 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
 
     /* fast path cache hit; skips queueing */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
-    for (i = 0; i < nhandles; i++) 
+    for (i = 0; i < nhandles; i++)
     {
         ref.handle = handle_array[i];
         ref.fs_id = coll_id;
@@ -884,7 +874,7 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
                          ds_attr_p->dfile_count, ds_attr_p->dist_size,
                          lld(ds_attr_p->b_size));
 
-            UPDATE_PERF_METADATA_READ();
+            UPDATE_PERF_METADATA_READ()
             error_array[i] = 0;
             continue;
         }
@@ -923,7 +913,7 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
     q_op_p->op.u.d_getattr_list.attr_p = &ds_attr_p[i];
     q_op_p->op.u.d_getattr_list.error_p = &error_array[i];
     q_op_p->op.hints = hints;
-    
+
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
@@ -971,8 +961,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     op_p->u.d_setattr.attr_p = ds_attr_p;
     op_p->hints = hints;
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_ADD);
+    UPDATE_PERF_METADATA_WRITE()
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
@@ -987,7 +976,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
     key.size = sizeof(TROVE_handle);
-    
+
     memset(&data, 0, sizeof(data));
     data.data = &s_attr;
     data.size = sizeof(s_attr);
@@ -1019,11 +1008,8 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
         ref, op_p->u.d_setattr.attr_p);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
-
     return DBPF_OP_COMPLETE;
-    
+
 return_error:
     return ret;
 }
@@ -1068,7 +1054,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
     data.flags |= DB_DBT_USERMEM;
 
-    ret = op_p->coll_p->ds_db->get(op_p->coll_p->ds_db, 
+    ret = op_p->coll_p->ds_db->get(op_p->coll_p->ds_db,
                                    NULL, &key, &data, 0);
     if (ret != 0)
     {
@@ -1097,7 +1083,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     return 1;
-    
+
 return_error:
     return ret;
 }
@@ -1121,11 +1107,11 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
         ref.handle = op_p->u.d_getattr_list.handle_array[i];
         ref.fs_id = op_p->coll_p->coll_id;
         /* It is still possible that we could hit in the attribute cache because of the way
-         * we do queueing in the getattr_list operation 
+         * we do queueing in the getattr_list operation
          */
         if (dbpf_attr_cache_ds_attr_fetch_cached_data(ref, &op_p->u.d_getattr_list.attr_p[i]) == 0)
         {
-            UPDATE_PERF_METADATA_READ();
+            UPDATE_PERF_METADATA_READ()
             op_p->u.d_getattr_list.error_p[i] = 0;
             continue;
         }
@@ -1180,7 +1166,7 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
         data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
         data.flags |= DB_DBT_USERMEM;
 
-        ret = op_p->coll_p->ds_db->get(op_p->coll_p->ds_db, 
+        ret = op_p->coll_p->ds_db->get(op_p->coll_p->ds_db,
                                        NULL, &key, &data, 0);
         if (ret != 0)
         {
@@ -1369,7 +1355,7 @@ static int dbpf_dspace_test(
         gettimeofday(&base, NULL);
         wait_time.tv_sec = base.tv_sec +
             (max_idle_time_ms / 1000);
-        wait_time.tv_nsec = base.tv_usec * 1000 + 
+        wait_time.tv_nsec = base.tv_usec * 1000 +
             ((max_idle_time_ms % 1000) * 1000000);
         if (wait_time.tv_nsec > 1000000000)
         {
@@ -1415,7 +1401,7 @@ static int dbpf_dspace_test(
             *returned_user_ptr_p = cur_op->op.user_ptr;
         }
 
-        organize_post_op_statistics(cur_op->op.type, cur_op->op.id, 
+        organize_post_op_statistics(cur_op->op.type, cur_op->op.id,
             cur_op->op.hints);
         dbpf_queued_op_free(cur_op);
         return 1;
@@ -1439,7 +1425,7 @@ static int dbpf_dspace_test(
         case DBPF_QUEUED_OP_SUCCESS:
             break;
     }
-    
+
     ret = cur_op->op.svc_fn(&(cur_op->op));
 
     if (ret != 0)
@@ -1459,7 +1445,7 @@ static int dbpf_dspace_test(
             *returned_user_ptr_p = cur_op->op.user_ptr;
         }
 
-        organize_post_op_statistics(cur_op->op.type, cur_op->op.id, 
+        organize_post_op_statistics(cur_op->op.type, cur_op->op.id,
             cur_op->op.hints);
         dbpf_queued_op_put_and_dequeue(cur_op);
         dbpf_queued_op_free(cur_op);
@@ -1503,7 +1489,7 @@ static int dbpf_dspace_testcontext(
       them in the provided ds_id_array (up to inout_count_p).
       otherwise, cond_timedwait for max_idle_time_ms.
 
-      we will only sleep if there is nothing to do; otherwise 
+      we will only sleep if there is nothing to do; otherwise
       we return whatever we find ASAP
     */
     gen_mutex_lock(context_mutex);
@@ -1516,7 +1502,7 @@ static int dbpf_dspace_testcontext(
         gettimeofday(&base, NULL);
         wait_time.tv_sec = base.tv_sec +
             (max_idle_time_ms / 1000);
-        wait_time.tv_nsec = base.tv_usec * 1000 + 
+        wait_time.tv_nsec = base.tv_usec * 1000 +
             ((max_idle_time_ms % 1000) * 1000000);
         if (wait_time.tv_nsec > 1000000000)
         {
@@ -1558,7 +1544,7 @@ static int dbpf_dspace_testcontext(
         }
         ds_id_array[out_count] = cur_op->op.id;
 
-        organize_post_op_statistics(cur_op->op.type, cur_op->op.id, 
+        organize_post_op_statistics(cur_op->op.type, cur_op->op.id,
             cur_op->op.hints);
         dbpf_queued_op_free(cur_op);
 
@@ -1670,7 +1656,7 @@ static int dbpf_dspace_testsome(
             {
                 *returned_user_ptr_p = cur_op->op.user_ptr;
             }
-            organize_post_op_statistics(cur_op->op.type, cur_op->op.id, 
+            organize_post_op_statistics(cur_op->op.type, cur_op->op.id,
                 cur_op->op.hints);
             dbpf_queued_op_free(cur_op);
         }
@@ -1711,7 +1697,7 @@ static int dbpf_dspace_testsome(
         gettimeofday(&base, NULL);
         wait_time.tv_sec = base.tv_sec +
             (max_idle_time_ms / 1000);
-        wait_time.tv_nsec = base.tv_usec * 1000 + 
+        wait_time.tv_nsec = base.tv_usec * 1000 +
             ((max_idle_time_ms % 1000) * 1000000);
         if (wait_time.tv_nsec > 1000000000)
         {

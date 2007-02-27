@@ -607,19 +607,17 @@ do {                                                          \
 
 
 extern struct dbpf_storage *my_storage_p;
-
-extern int64_t s_dbpf_metadata_writes, s_dbpf_metadata_reads;
 #define UPDATE_PERF_METADATA_READ()                         \
 do {                                                        \
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_READ,\
-                    ++s_dbpf_metadata_reads, PINT_PERF_SET);\
-} while(0)
+                    1, PINT_PERF_ADD);\
+} while(0);
 
 #define UPDATE_PERF_METADATA_WRITE()                         \
 do {                                                         \
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_WRITE,\
-                    ++s_dbpf_metadata_writes, PINT_PERF_SET);\
-} while(0)
+                    1, PINT_PERF_ADD);\
+} while(0);
 
 extern DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *err_p);
 extern int dbpf_putdb_env(DB_ENV *dbenv, const char *path);

@@ -1,5 +1,5 @@
-/* 
- * (C) 2001 Clemson University and The University of Chicago 
+/*
+ * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -26,14 +26,14 @@ static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p);
 
 machine pvfs2_perf_update_sm(do_work, error)
 {
-	state do_work 
+	state do_work
 	{
 		run perf_update_do_work;
 		success => do_work;
 		default => error;
 	}
 
-	state error 
+	state error
 	{
 		run perf_update_error;
 		default => terminate;
@@ -68,12 +68,15 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
     uint64_t current_mask = 0;
     int current_debug_on = 0;
     struct server_configuration_s *user_opts = get_server_config_struct();
-    
+
     static struct sstat * cursstat;
     static struct sstat * presstat; /* preserve values */
     static int first_run = 1;
-    
+
     struct sstat devsstat;
+
+    /* roll over to next set of statistics */
+    PINT_perf_rollover(PINT_server_pc);
 
 #if 0
     PINT_STATE_DEBUG("do_work");
@@ -85,24 +88,26 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
     {
         cursstat = malloc(sizeof(struct sstat));
         presstat = malloc(sizeof(struct sstat));
-        
-        photosyst(cursstat);   
+
+        photosyst(cursstat);
     }
     else
-    {        
+    {
         static struct sstat * tmpstat;
         tmpstat = cursstat;
         cursstat = presstat;
         presstat = tmpstat;
-                
+
         photosyst(cursstat);
         deviatsyst(cursstat, presstat, &devsstat);
     }
-    
+
     if (! first_run)
     {
     for(i=0; i<PINT_server_pc->key_count; i++)
     {
+        int j;
+        uint64_t total = 0;
         switch(PINT_server_pc->key_array[i].key){
         case(PINT_PERF_LOAD):{
           /* get the current load */
@@ -111,107 +116,82 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
             memset(&system_metrics, 0, sizeof(struct sysinfo));
             if (sysinfo(&system_metrics) == 0)
             {
-                PINT_server_pc->value_matrix[i][0] = system_metrics.loads[0];
+                total = system_metrics.loads[0];
             }
-#endif        
+#endif
             break;
         }
         case(PINT_PERF_CPU):{
-            PINT_server_pc->value_matrix[i][0] = devsstat.cpu.all.itime;
+            /* do not include wait_time and idle_time */
+            total = devsstat.cpu.all.utime + devsstat.cpu.all.stime;
             break;
         }
         case(PINT_PERF_DISK_READ):{
-            int j;
-            uint64_t total = 0;
             for(j=0; j < devsstat.xdsk.nrxdsk; j++)
             {
                 total += devsstat.xdsk.xdsk[j].nrblk;
             }
-            PINT_server_pc->value_matrix[i][0] = total;
             break;
         }
         case(PINT_PERF_DISK_WRITE):{
-            int j;
-            uint64_t total = 0;
             for(j=0; j < devsstat.xdsk.nrxdsk; j++)
             {
                 total += devsstat.xdsk.xdsk[j].nwblk;
             }
-            PINT_server_pc->value_matrix[i][0] = total;            
             break;
         }
         case(PINT_PERF_NETWORK_READ):{
-            int j;
-            uint64_t total = 0;
             for(j=0; j < devsstat.intf.nrintf; j++)
             {
                 total += devsstat.intf.intf[j].rbyte;
             }
-            PINT_server_pc->value_matrix[i][0] = total;                        
             break;
         }
         case(PINT_PERF_NETWORK_WRITE):{
-            int j;
-            uint64_t total = 0;
             for(j=0; j < devsstat.intf.nrintf; j++)
             {
                 total += devsstat.intf.intf[j].sbyte;
             }
-            PINT_server_pc->value_matrix[i][0] = total;                        
             break;
         }
-        
+        default:
+            total = PINT_server_pc->value_matrix[i][1];
         }
-        
+        PINT_server_pc->value_matrix[i][1] = total;
     }
-    
-    gossip_get_debug_mask(&current_debug_on, &current_mask);    
-    /* 
-     * log values to event subsystem 
-     */     
-#if defined(HAVE_MPE)
+
+    gossip_get_debug_mask(&current_debug_on, &current_mask);
+    /*
+     * log values to event subsystem
+     */
     for(i=0; i < PINT_server_pc->key_count; i++){
         if(current_debug_on)
         {
             int64_t val;
+            /* always take values from LAST interval which data is fixated */
             if(PINT_server_pc->key_array[i].flag == PINT_PERF_PRESERVE){
-                val = PINT_server_pc->value_matrix[i][0] - 
-                    PINT_server_pc->value_matrix[i][1];
-            }else{   
-                val = PINT_server_pc->value_matrix[i][0];
+                val = PINT_server_pc->value_matrix[i][1] -
+                      PINT_server_pc->value_matrix[i][2];
+            }else{
+                val = PINT_server_pc->value_matrix[i][1];
             }
-            PINT_event_timestamp(PVFS_EVENT_API_PERFORMANCE_COUNTER, i, 
-                    val, 
-                    0,0);
+#if defined(HAVE_MPE)
+           PINT_event_timestamp(PVFS_EVENT_API_PERFORMANCE_COUNTER, i,
+                    val, 0,0);
+#endif
+           if(current_mask & GOSSIP_PERFCOUNTER_DEBUG)
+           {
+                fprintf(stderr, "perf-update-stat:%s val:%lld\n",
+                    PINT_server_pc->key_array[i].key_name, val);
+           }
         }
     }
-#endif
-    
-    /* log current statistics if the gossip mask permits */
-    gossip_debug(GOSSIP_PERFCOUNTER_DEBUG, "Performance counter values:\n");
-    if(current_mask & GOSSIP_PERFCOUNTER_DEBUG)
-    {
-        int64_t val;
-        /* simple output for easier parsing */
-        for(i=0; i < PINT_server_pc->key_count; i++){
-            if(PINT_server_pc->key_array[i].flag == PINT_PERF_PRESERVE){
-                val = PINT_server_pc->value_matrix[i][0] - 
-                      PINT_server_pc->value_matrix[i][1];
-            }else{   
-                val = PINT_server_pc->value_matrix[i][0];
-            }            
-            fprintf(stderr, "perf-update-stat:%s val:%lld\n", 
-                PINT_server_pc->key_array[i].key_name, 
-                val);     
-        }   
-    }
+
     } /* end ! first_run */
-    
+
     first_run = 0;
-        
-    /* roll over to next set of statistics */
-    PINT_perf_rollover(PINT_server_pc);
-	
+
+
     /* post another timer */
     return(job_req_sched_post_timer(user_opts->perf_update_interval,
 	s_op,

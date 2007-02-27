@@ -232,6 +232,8 @@ void __PINT_perf_count(
         return;
     }
 
+    assert(op != PINT_PERF_LOAD);
+
     switch(op)
     {
         case PINT_PERF_ADD:
@@ -337,7 +339,9 @@ int PINT_perf_set_info(
         case PINT_PERF_HISTORY_SIZE:
             if(arg <= pc->history_size)
             {
-                pc->history_size = arg;
+                if( arg > 2 ){
+                    pc->history_size = arg;
+                }
             }
             else
             {

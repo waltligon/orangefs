@@ -74,9 +74,6 @@ static struct PINT_perf_key server_keys[] =
     {"bytes written", PINT_PERF_WRITE, 0},
     {"metadata reads", PINT_PERF_METADATA_READ, PINT_PERF_PRESERVE},
     {"metadata writes", PINT_PERF_METADATA_WRITE, PINT_PERF_PRESERVE},
-    {"metadata dspace ops", PINT_PERF_METADATA_DSPACE_OPS, PINT_PERF_PRESERVE},
-    {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
-    {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
     {"load_1", PINT_PERF_LOAD, 0},
     {"cpu usage", PINT_PERF_CPU, 0},
     {"network read", PINT_PERF_NETWORK_READ, 0},
@@ -483,13 +480,13 @@ int main(int argc, char **argv)
     }
     else
     {
-        server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);        
+        server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
     }
 
     ret = PINT_parse_config(&server_config, fs_conf, server_conf);
     if (ret < 0)
     {
-        gossip_err("Error: Please check your config files.\n");  
+        gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: Server aborting.\n");
         goto server_shutdown;
     }
@@ -593,7 +590,7 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 #endif
-    
+
     /* kick off timer for expired jobs */
     ret = server_state_machine_alloc_noreq(
         PVFS_SERV_JOB_TIMER, &(tmp_op));
@@ -609,7 +606,7 @@ int main(int argc, char **argv)
     }
 
     /* Initialization complete; process server requests indefinitely. */
-    for ( ;; )  
+    for ( ;; )
     {
         int i, comp_ct = PVFS_SERVER_TEST_COUNT;
 
@@ -620,7 +617,7 @@ int main(int argc, char **argv)
         {
             /*
              * If we received a signal, then find out if we can exit now
-             * by checking if all s_ops (for expected messages) have either 
+             * by checking if all s_ops (for expected messages) have either
              * finished or timed out,
              */
             if (qlist_empty(&inprogress_sop_list))
@@ -669,7 +666,7 @@ int main(int argc, char **argv)
                     PVFS_perror_gossip("Error: server_state_machine_start", ret);
                     /* TODO: tell BMI to drop this address? */
                     /* set return code to zero to allow server to continue
-                     * processing 
+                     * processing
                      */
                     ret = 0;
                 }
@@ -775,10 +772,10 @@ static int server_initialize(
     PINT_server_status_flag *server_status_flag,
     job_status_s *job_status_structs)
 {
-    int ret = 0, i = 0; 
+    int ret = 0, i = 0;
     FILE *dummy;
     uint64_t debug_mask = 0;
-    
+
     assert(server_config.logfile != NULL);
     dummy = fopen(server_config.logfile, "a");
     if (dummy == NULL)
@@ -985,7 +982,7 @@ static int server_initialize_subsystems(
         bmi_flags |= BMI_TCP_BIND_SPECIFIC;
     }
 
-    ret = BMI_initialize(server_config.bmi_modules, 
+    ret = BMI_initialize(server_config.bmi_modules,
                          server_config.host_id,
                          bmi_flags);
     if (ret < 0)
@@ -1030,13 +1027,13 @@ static int server_initialize_subsystems(
     }
 
     /* Set the buffer size according to configuration file */
-    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
+    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE,
                  (void *)&server_config.tcp_buffer_size_send);
-    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
+    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE,
                  (void *)&server_config.tcp_buffer_size_receive);
 
     ret = trove_initialize(
-        server_config.trove_method, 
+        server_config.trove_method,
         trove_coll_to_method_callback,
         server_config.storage_path,
         init_flags);
@@ -1157,7 +1154,7 @@ static int server_initialize_subsystems(
               complain in logging and continue.
             */
             ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context, 
+                cur_fs->coll_id, trove_context,
                 TROVE_COLLECTION_HANDLE_TIMEOUT,
                 (void *)&cur_fs->handle_recycle_timeout_sec);
             if (ret < 0)
@@ -1170,7 +1167,7 @@ static int server_initialize_subsystems(
                 cur_fs->attr_cache_max_num_elems)
             {
                 ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
+                    cur_fs->coll_id, trove_context,
                     TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
                     (void *)cur_fs->attr_cache_keywords);
                 if (ret < 0)
@@ -1178,7 +1175,7 @@ static int server_initialize_subsystems(
                     gossip_lerr("Error setting attr cache keywords\n");
                 }
                 ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
+                    cur_fs->coll_id, trove_context,
                     TROVE_COLLECTION_ATTR_CACHE_SIZE,
                     (void *)&cur_fs->attr_cache_size);
                 if (ret < 0)
@@ -1186,7 +1183,7 @@ static int server_initialize_subsystems(
                     gossip_lerr("Error setting attr cache size\n");
                 }
                 ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
+                    cur_fs->coll_id, trove_context,
                     TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
                     (void *)&cur_fs->attr_cache_max_num_elems);
                 if (ret < 0)
@@ -1194,7 +1191,7 @@ static int server_initialize_subsystems(
                     gossip_lerr("Error setting attr cache max num elems\n");
                 }
                 ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
+                    cur_fs->coll_id, trove_context,
                     TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
                     (void *)0);
                 if (ret < 0)
@@ -1241,7 +1238,7 @@ static int server_initialize_subsystems(
                 gossip_lerr("Error setting coalescing low watermark\n");
                 return ret;
             }
-            
+
             ret = trove_collection_setinfo(
                 cur_fs->coll_id, trove_context,
                 TROVE_COLLECTION_META_SYNC_MODE,
@@ -1250,8 +1247,8 @@ static int server_initialize_subsystems(
             {
                 gossip_lerr("Error setting coalescing low watermark\n");
                 return ret;
-            } 
-            
+            }
+
             ret = trove_collection_setinfo(
                 cur_fs->coll_id, trove_context,
                 TROVE_COLLECTION_IMMEDIATE_COMPLETION,
@@ -1260,7 +1257,7 @@ static int server_initialize_subsystems(
             {
                 gossip_lerr("Error setting trove immediate completion\n");
                 return ret;
-            } 
+            }
 
             gossip_debug(GOSSIP_SERVER_DEBUG, "File system %s using "
                          "handles:\n\t%s\n", cur_fs->file_system_name,
@@ -1321,7 +1318,7 @@ static int server_initialize_subsystems(
     }
 
     *server_status_flag |= SERVER_JOB_INIT;
-    
+
     ret = job_open_context(&server_job_context);
     if (ret < 0)
     {
@@ -1350,8 +1347,8 @@ static int server_initialize_subsystems(
 #endif
 
     /* start logging if start_event is specified in the event logging list */
-    ret = PINT_event_initialize(PINT_EVENT_DEFAULT_RING_SIZE, 
-        (server_config.event_logging[0] != 0 && 
+    ret = PINT_event_initialize(PINT_EVENT_DEFAULT_RING_SIZE,
+        (server_config.event_logging[0] != 0 &&
         strstr(server_config.event_logging,"start_event_logging") != 0) );
     if (ret < 0)
     {
@@ -1431,8 +1428,8 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
     /* Do something useful with siginfo_t */
     if (sig == SIGSEGV)
     {
-        gossip_err("PVFS2 server: signal %d, faulty address is %p, " 
-            "from %p\n", sig, info->si_addr, 
+        gossip_err("PVFS2 server: signal %d, faulty address is %p, "
+            "from %p\n", sig, info->si_addr,
             (void*)uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER]);
     }
     else
@@ -1502,7 +1499,7 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         request "
                      "scheduler         [ stopped ]\n");
     }
-        
+
     if (status & SERVER_JOB_CTX_INIT)
     {
         job_close_context(server_job_context);
@@ -1641,7 +1638,7 @@ static void usage(int argc, char **argv)
 {
     gossip_err("Usage: %s: [OPTIONS] <global_config_file> "
                "<server_config_file>\n\n", argv[0]);
-    gossip_err("  -n, \t adds hostname to server_config_file as prefix\n");           
+    gossip_err("  -n, \t adds hostname to server_config_file as prefix\n");
     gossip_err("  -d, --foreground\t"
                "will keep server in the foreground\n");
     gossip_err("  -f, --mkfs\t\twill cause server to "
@@ -1892,7 +1889,7 @@ static int server_state_machine_start(
 }
 
 /* server_state_machine_alloc_noreq()
- * 
+ *
  * allocates and initializes a server state machine that can later be
  * started with server_state_machine_start_noreq()
  *
@@ -1934,7 +1931,7 @@ int server_state_machine_alloc_noreq(
 }
 
 /* server_state_machine_start_noreq()
- * 
+ *
  * similar in purpose to server_state_machine_start(), except that it
  * kicks off a state machine instance without first receiving a client
  * side request
@@ -1988,7 +1985,7 @@ int server_state_machine_start_noreq(PINT_server_op *new_op)
 int server_state_machine_complete(PINT_server_op *s_op)
 {
     PVFS_id_gen_t tmp_id;
-    
+
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
     PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
@@ -1998,11 +1995,11 @@ int server_state_machine_complete(PINT_server_op *s_op)
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
         PVFS_free_hint(& s_op->decoded.stub_dec.req.hints);
-        
+
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
-    BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
+    BMI_unexpected_free(s_op->unexp_bmi_buff.addr,
                         s_op->unexp_bmi_buff.buffer);
     s_op->unexp_bmi_buff.buffer = NULL;
 
@@ -2047,14 +2044,14 @@ static int parse_port_from_host_id(char* host_id)
     {
         return(-1);
     }
-    
+
     return(port_num);
 }
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
 {
     struct filesystem_configuration_s * fs_conf;
-    
+
     fs_conf = PINT_config_find_fs_id(&server_config, coll_id);
     if(!fs_conf)
     {
@@ -2069,7 +2066,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                               const char * format,
                               ...)
 {
-    PVFS_handle handle;    
+    PVFS_handle handle;
     PVFS_fs_id fsid;
     int flag;
     static char pint_access_buffer[GOSSIP_BUF_SIZE];
