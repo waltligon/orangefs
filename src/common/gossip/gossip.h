@@ -26,7 +26,6 @@
 #include "syslog.h"
 #endif
 #include "pvfs2-config.h"
-#include <stdio.h>
 
 /********************************************************************
  * Visible interface
@@ -74,7 +73,10 @@ do {                                               \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
 } while(0)
 
-#else
+#else /* __KERNEL__ */
+
+/* stdio is needed by gossip_debug_fp declaration for FILE* */
+#include <stdio.h>
 
 int gossip_enable_syslog(
     int priority);
