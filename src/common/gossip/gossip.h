@@ -26,7 +26,7 @@
 #include "syslog.h"
 #endif
 #include "pvfs2-config.h"
-
+#include <stdio.h>
 
 /********************************************************************
  * Visible interface
@@ -117,6 +117,7 @@ int __gossip_debug_va(
 
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
+#define gossip_debug_fp(fp, mask, format, f...) do {} while(0)
 #define gossip_perf_log(format, f...) do {} while(0)
 #define gossip_debug_enabled(__m) 0
 #else
@@ -146,6 +147,9 @@ do {                                                      \
             format, ##f);                                 \
     }                                                     \
 } while(0)
+
+int gossip_debug_fp(FILE *fp, char prefix, const char *format, ...);
+
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 /* do file and line number printouts w/ the GNU preprocessor */
@@ -191,6 +195,8 @@ int gossip_err(
 #define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #define gossip_debug_enabled(__m) \
             ((gossip_debug_on != 0) && (__m & gossip_debug_mask))
+
+int gossip_debug_fp(FILE *fp, char prefix, const char *format, ...);
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err
