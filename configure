@@ -8976,9 +8976,9 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 	fi
 
-	tmp_cflags=$CFLAGS
-		CFLAGS="$CFLAGS -Werror"
-	echo "$as_me:$LINENO: checking if statfs callbacks' arguments in kernel has struct dentry argument" >&5
+				tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror -Wno-pointer-sign"
+		echo "$as_me:$LINENO: checking if statfs callbacks' arguments in kernel has struct dentry argument" >&5
 echo $ECHO_N "checking if statfs callbacks' arguments in kernel has struct dentry argument... $ECHO_C" >&6
 			cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
