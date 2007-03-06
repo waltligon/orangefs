@@ -176,7 +176,8 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
                 val = PINT_server_pc->value_matrix[i][1];
             }
 #if defined(HAVE_MPE)
-           PINT_event_timestamp(PVFS_EVENT_API_PERFORMANCE_COUNTER, i,
+           /* operation +2 to pass through preprocessor routine PINT_event_mpe */
+           PINT_event_timestamp(PVFS_EVENT_API_PERFORMANCE_COUNTER, i +2,
                     val, 0,0);
 #endif
            if(current_mask & GOSSIP_PERFCOUNTER_DEBUG)

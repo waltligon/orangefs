@@ -492,6 +492,8 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 
 #ifdef MPE_EXTENDED_LOGGING
     if(api == PVFS_EVENT_API_PERFORMANCE_COUNTER){
+         /* offset to pass through preprocessor routine PINT_event_mpe */
+        operation -= 2;
         MPE_Log_pack( bytebuf, &bytebuf_pos, 'l', 1, &value );
 
         assert(operation <= PINT_event_perf_counter_keys);
