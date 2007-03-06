@@ -116,6 +116,12 @@ int __gossip_debug_va(
     char prefix,
     const char *format,
     va_list ap);
+int __gossip_debug_fp(
+    uint64_t mask,
+    FILE *fp,
+    char prefix,
+    const char *format,
+    ...) __attribute__ ((format(printf, 4, 5)));
 
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
@@ -139,6 +145,14 @@ do {                                                      \
         __gossip_debug(mask, '?', format, ##f);           \
     }                                                     \
 } while(0)
+#define gossip_debug_fp(mask, filep, prefix, format, f...) \
+do {                                                       \
+    if ((gossip_debug_on) && (gossip_debug_mask & mask) && \
+        (gossip_facility))                                 \
+    {                                                      \
+        __gossip_debug_fp(mask, fp, prefix, format, ##f);  \
+    }                                                      \
+}
 #define gossip_perf_log(format, f...)                     \
 do {                                                      \
     if ((gossip_debug_on) &&                              \
@@ -149,8 +163,6 @@ do {                                                      \
             format, ##f);                                 \
     }                                                     \
 } while(0)
-
-int gossip_debug_fp(FILE *fp, char prefix, const char *format, ...);
 
 #endif /* GOSSIP_DISABLE_DEBUG */
 

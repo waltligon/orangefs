@@ -427,7 +427,7 @@ static int gossip_debug_syslog(
     return 0;
 }
 
-int gossip_debug_fp(FILE *fp, char prefix, const char *format, ...)
+int __gossip_debug_fp(uint64_t mask, FILE *fp, char prefix, const char *format, ...)
 {
     int ret;
     va_list ap;
@@ -446,7 +446,7 @@ int gossip_debug_fp(FILE *fp, char prefix, const char *format, ...)
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_debug_fp_va(FILE *fp, char prefix, 
+static int gossip_debug_fp_va(FILE *fp, char prefix,
     const char *format, va_list ap, enum gossip_logstamp ts)
 {
     char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
