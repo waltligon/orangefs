@@ -254,7 +254,7 @@ canonname = $(patsubst $(srcdir)/%,%,$(call dirname,$(1)))
 # Always add the directory in question for "local" includes.
 modcflags = $(MODCFLAGS_$(call canonname,$(1))) \
             $(MODCFLAGS_$(patsubst $(srcdir)/%,%,$(1))) \
-	    -I$(pvfs2_srcdir)/test/$(call dirname,$(1))
+	    -I$(call dirname,$(1))
 
 modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
             $(MODLDFLAGS_$(patsubst $(srcdir)/%,%,$(1))) \
