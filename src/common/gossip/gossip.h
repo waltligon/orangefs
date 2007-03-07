@@ -145,14 +145,14 @@ do {                                                      \
         __gossip_debug(mask, '?', format, ##f);           \
     }                                                     \
 } while(0)
-#define gossip_debug_fp(mask, filep, prefix, format, f...) \
-do {                                                       \
-    if ((gossip_debug_on) && (gossip_debug_mask & mask) && \
-        (gossip_facility))                                 \
-    {                                                      \
-        __gossip_debug_fp(mask, fp, prefix, format, ##f);  \
-    }                                                      \
-}
+#define gossip_debug_fp(mask, filep, prefix, format, f...)    \
+do {                                                          \
+    if ((gossip_debug_on) && (gossip_debug_mask & mask) &&    \
+        (gossip_facility))                                    \
+    {                                                         \
+        __gossip_debug_fp(mask, filep, prefix, format, ##f);  \
+    }                                                         \
+} while(0)
 #define gossip_perf_log(format, f...)                     \
 do {                                                      \
     if ((gossip_debug_on) &&                              \
