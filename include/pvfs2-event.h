@@ -36,7 +36,8 @@ enum PVFS_event_api
     PVFS_EVENT_API_PERFORMANCE_COUNTER = (1 << 10), /* additional stats to be stored
                                              * like load, CPU usage, network
                                              * etc */
-    PVFS_EVENT_API_LAST = (1 << 11), /* dummy only used for iteration through values */
+    PVFS_EVENT_API_SM_STEP = (1 << 11),
+    PVFS_EVENT_API_LAST = (1 << 12), /* dummy only used for iteration through values */
 };
 
 char * PVFS_event_get_api_name(enum PVFS_event_api api_nr);

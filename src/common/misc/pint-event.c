@@ -32,6 +32,7 @@ static PVFS_event_name_mapping_s PVFS_event_nr_api_name_mapping [] = {
     {.nr = PVFS_EVENT_API_DECODE_UNEXPECTED, .name = "decode_unexpected"},
     {.nr = PVFS_EVENT_API_FLOW, .name = "flow"},
     {.nr = PVFS_EVENT_API_PERFORMANCE_COUNTER, .name = "performance_counter"},
+    {.nr = PVFS_EVENT_API_SM_STEP, .name = "SM-step"},
     {.nr = 0, .name = 0}, /* end sentinal */
     };
 
@@ -54,6 +55,7 @@ int PINT_event_trove_wr_start, PINT_event_trove_wr_stop;
 int PINT_event_bmi_start, PINT_event_bmi_stop;
 int PINT_event_flow_start, PINT_event_flow_stop;
 int PINT_event_unexpected_decode;
+int PINT_event_sm_step;
 
 extern char * mpe_logfile;
 #endif
@@ -164,6 +166,7 @@ void PINT_event_init_mpe_log_file(void)
     MPE_Log_get_solo_eventID(&PINT_event_flow_stop);
 
     MPE_Log_get_solo_eventID(&PINT_event_unexpected_decode);
+    MPE_Log_get_solo_eventID(&PINT_event_sm_step);
 
 #ifdef MPE_EXTENDED_LOGGING
     for (i = 0 ; i < PINT_event_perf_counter_keys ; i++){
@@ -178,6 +181,9 @@ void PINT_event_init_mpe_log_file(void)
 #else
     formatString ="";
 #endif
+
+    MPE_Describe_info_event(PINT_event_sm_step, "SM-State", "black",
+        "sm=%d,st=%d,rank=%d,cid=%d");
 
     MPE_Describe_info_event(PINT_event_job_start, "Job (start)", "green1", formatString);
     MPE_Describe_info_event(PINT_event_job_stop, "Job (end)", "green3", formatString);
@@ -553,6 +559,17 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 */
     }
 
+    if( api == PVFS_EVENT_API_SM_STEP){
+        /* offset to pass through preprocessor routine PINT_event_mpe */
+        operation -=2;
+        MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &operation );
+        MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &value );
+        MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &rank );
+        MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &call_id );
+        MPE_Log_event(PINT_event_sm_step, 0, bytebuf);
+
+        return;
+    }
 
     /* now log stuff to bytebuffer */
     MPE_Log_pack( bytebuf, &bytebuf_pos, 'd', 1, &comm );
@@ -606,15 +623,8 @@ void __PINT_event_mpe(enum PVFS_event_api api,
     case PVFS_EVENT_API_DECODE_UNEXPECTED:
         MPE_Log_event(PINT_event_unexpected_decode, 0, bytebuf);
         break;
-    case PVFS_EVENT_API_PERFORMANCE_COUNTER:
-    case PVFS_EVENT_API_DECODE_REQ:
-    case PVFS_EVENT_API_ENCODE_REQ:
-    case PVFS_EVENT_API_ENCODE_RESP:
-    case PVFS_EVENT_API_DECODE_RESP:
-    case PVFS_EVENT_API_SM:
-        break; /* XXX: NEEDS SOMETHING */
-    case PVFS_EVENT_API_LAST: /* dummy */
-    break;
+    default:
+        break;
     }
 }
 #endif
