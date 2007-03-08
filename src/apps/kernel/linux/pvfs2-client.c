@@ -392,12 +392,12 @@ static void print_help(char *progname)
     printf("-L  --logfile                 specify log file to write to\n"
             "   (defaults to /tmp/pvfs2-client.log)\n");
     printf("-a MS, --acache-timeout=MS    acache timeout in ms "
-           "(default is 0 ms)\n");
+           "(default is %s ms)\n", DEFAULT_ACACHE_TIMEOUT_STR);
     printf("--acache-soft-limit=LIMIT     acache soft limit\n");
     printf("--acache-hard-limit=LIMIT     acache hard limit\n");
     printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
     printf("-n MS, --ncache-timeout=MS    ncache timeout in ms "
-           "(default is 0 ms)\n");
+           "(default is %s ms)\n", DEFAULT_NCACHE_TIMEOUT_STR);
     printf("--ncache-soft-limit=LIMIT     ncache soft limit\n");
     printf("--ncache-hard-limit=LIMIT     ncache hard limit\n");
     printf("--ncache-reclaim-percentage=LIMIT ncache reclaim percentage\n");
