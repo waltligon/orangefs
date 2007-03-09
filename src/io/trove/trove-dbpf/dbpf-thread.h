@@ -24,20 +24,18 @@ void *dbpf_thread_function(void *ptr);
 
 int dbpf_do_one_work_cycle(int *out_count);
 
-#define DBPF_COMPLETION_START(cur_op, ret_state, end_state)        \
+#define DBPF_COMPLETION_START(cur_op, end_state)                   \
 do {                                                               \
     TROVE_context_id cid = cur_op->op.context_id;                  \
     gen_mutex_lock(dbpf_completion_queue_array_mutex[cid]);        \
     dbpf_op_queue_add(dbpf_completion_queue_array[cid],cur_op);    \
-    cur_op->state = ret_state;                                     \
     gen_mutex_lock(&cur_op->mutex);                                \
     cur_op->op.state = end_state;                                  \
     gen_mutex_unlock(&cur_op->mutex);                              \
 } while(0)
 
-#define DBPF_COMPLETION_ADD(__add_op, __retstate, __endstate)           \
+#define DBPF_COMPLETION_ADD(__add_op, __endstate)                       \
 do {                                                                    \
-    __add_op->state = __retstate;                                       \
     gen_mutex_lock(&__add_op->mutex);                                   \
     __add_op->op.state = __endstate;                                    \
     gen_mutex_unlock(&__add_op->mutex);                                 \

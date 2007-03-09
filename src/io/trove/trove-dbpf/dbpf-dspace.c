@@ -1243,8 +1243,9 @@ static int dbpf_dspace_cancel(
             dbpf_queued_op_put_and_dequeue(cur_op);
             assert(cur_op->op.state == OP_DEQUEUED);
 
+	    cur_op->state = 0;
             /* this is a macro defined in dbpf-thread.h */
-            dbpf_queued_op_complete(cur_op, 0, OP_CANCELED);
+            dbpf_queued_op_complete(cur_op, OP_CANCELED);
 
             gossip_debug(
                 GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);

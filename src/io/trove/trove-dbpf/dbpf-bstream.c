@@ -156,9 +156,10 @@ static void aio_progress_notification(union sigval sig)
                      list_proc_state_strings[
                      op_p->u.b_rw_list.list_proc_state]);
 
+	cur_op->state = ret;
         /* this is a macro defined in dbpf-thread.h */
         dbpf_queued_op_complete(
-            cur_op, ret,
+            cur_op,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
 
         start_delayed_ops_if_any(1);
@@ -408,6 +409,7 @@ static int issue_or_delay_io_operation(
                              (int)aiocb_ptr_array[i]->aio_nbytes,
                              aiocb_ptr_array[i]->aio_buf,
                              (int)aiocb_ptr_array[i]->aio_lio_opcode);
+
             }
         }
 

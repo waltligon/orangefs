@@ -159,17 +159,24 @@ static void* alt_lio_thread(void* foo)
 
     if(tmp_item->cb_p->aio_lio_opcode == LIO_READ)
     {
-	ret = pread(tmp_item->cb_p->aio_fildes,
-		    (void*)tmp_item->cb_p->aio_buf,
-		    tmp_item->cb_p->aio_nbytes,
-		    tmp_item->cb_p->aio_offset);
+        ret = pread(tmp_item->cb_p->aio_fildes,
+                    (void*)tmp_item->cb_p->aio_buf,
+                    tmp_item->cb_p->aio_nbytes,
+                    tmp_item->cb_p->aio_offset);
     }
     else if(tmp_item->cb_p->aio_lio_opcode == LIO_WRITE)
     {
-	ret = pwrite(tmp_item->cb_p->aio_fildes,
-		     (const void*)tmp_item->cb_p->aio_buf,
-		     tmp_item->cb_p->aio_nbytes,
-		     tmp_item->cb_p->aio_offset);
+        int i = 0;
+        gossip_debug(GOSSIP_BSTREAM_DEBUG,
+                     "[alt-aio]: pwrite: cb_p: %p, "
+                     "fd: %d, bufp: %p, size: %d\n",
+                     tmp_item->cb_p, tmp_item->cb_p->aio_fildes, 
+                     tmp_item->cb_p->aio_buf, tmp_item->cb_p->aio_nbytes);
+
+        ret = pwrite(tmp_item->cb_p->aio_fildes,
+                     (const void*)tmp_item->cb_p->aio_buf,
+                     tmp_item->cb_p->aio_nbytes,
+                     tmp_item->cb_p->aio_offset);
     }
     else
     {
