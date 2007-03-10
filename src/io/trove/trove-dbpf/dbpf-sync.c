@@ -107,9 +107,13 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
     struct dbpf_collection* coll = qop_p->op.coll_p;
     int cid = qop_p->op.context_id;
 
+    /* We want to set the state in all cases
+     */
+    qop_p->state = retcode;
+
     if(!DBPF_OP_DOES_SYNC(qop_p->op.type))
     {
-        dbpf_queued_op_complete(qop_p, retcode, OP_COMPLETED);
+        dbpf_queued_op_complete(qop_p, OP_COMPLETED);
         (*outcount)++;
         return 0;
     }
@@ -129,7 +133,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
                      "[SYNC_COALESCE]: sync not needed, "
                      "moving to completion queue: %llu\n",
                      llu(qop_p->op.handle));
-        dbpf_queued_op_complete(qop_p, retcode, OP_COMPLETED);
+        dbpf_queued_op_complete(qop_p, OP_COMPLETED);
         return 0;
     }
 
@@ -161,7 +165,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
                      "[SYNC_COALESCE]: meta sync disabled, "
                      "moving operation to completion queue\n");
 
-        ret = dbpf_queued_op_complete(qop_p, retcode, OP_COMPLETED);
+        ret = dbpf_queued_op_complete(qop_p, OP_COMPLETED);
 
         /*
          * Sync periodical if count < lw or if lw = 0 and count > hw 
@@ -216,7 +220,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
                      "to completion queue\n",
                      qop_p, llu(qop_p->op.handle));
 
-        DBPF_COMPLETION_START(qop_p, retcode, OP_COMPLETED);
+        DBPF_COMPLETION_START(qop_p, OP_COMPLETED);
         (*outcount)++;
 
 
@@ -233,7 +237,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
                          ready_op, llu(ready_op->op.handle));
 
             dbpf_op_queue_remove(ready_op);
-            DBPF_COMPLETION_ADD(ready_op, 0, OP_COMPLETED);
+            DBPF_COMPLETION_ADD(ready_op, OP_COMPLETED);
             (*outcount)++;
         }
 
