@@ -116,16 +116,15 @@ int __gossip_debug_va(
     char prefix,
     const char *format,
     va_list ap);
-int __gossip_debug_fp(
-    uint64_t mask,
+int gossip_debug_fp(
     FILE *fp,
     char prefix,
+    enum gossip_logstamp ts,
     const char *format,
     ...) __attribute__ ((format(printf, 4, 5)));
 
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
-#define gossip_debug_fp(fp, mask, format, f...) do {} while(0)
 #define gossip_perf_log(format, f...) do {} while(0)
 #define gossip_debug_enabled(__m) 0
 #else
@@ -144,14 +143,6 @@ do {                                                      \
     {                                                     \
         __gossip_debug(mask, '?', format, ##f);           \
     }                                                     \
-} while(0)
-#define gossip_debug_fp(mask, filep, prefix, format, f...)    \
-do {                                                          \
-    if ((gossip_debug_on) && (gossip_debug_mask & mask) &&    \
-        (gossip_facility))                                    \
-    {                                                         \
-        __gossip_debug_fp(mask, filep, prefix, format, ##f);  \
-    }                                                         \
 } while(0)
 #define gossip_perf_log(format, f...)                     \
 do {                                                      \
@@ -210,7 +201,6 @@ int gossip_err(
 #define gossip_debug_enabled(__m) \
             ((gossip_debug_on != 0) && (__m & gossip_debug_mask))
 
-int gossip_debug_fp(FILE *fp, char prefix, const char *format, ...);
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err

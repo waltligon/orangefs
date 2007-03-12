@@ -427,14 +427,15 @@ static int gossip_debug_syslog(
     return 0;
 }
 
-int __gossip_debug_fp(uint64_t mask, FILE *fp, char prefix, const char *format, ...)
+int gossip_debug_fp(FILE *fp, char prefix, 
+                    enum gossip_logstamp ts, const char *format, ...)
 {
     int ret;
     va_list ap;
 
     /* rip out the variable arguments */
     va_start(ap, format);
-    ret = gossip_debug_fp_va(fp, prefix, format, ap, internal_logstamp);
+    ret = gossip_debug_fp_va(fp, prefix, format, ap, ts);
     va_end(ap);
     return ret;
 }
