@@ -106,6 +106,9 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
 	}
     }
 
+    /* run callback fn */
+    sig->sigev_notify_function(sig->sigev_value);
+
     free(tids);
 
     return(ret);
@@ -166,10 +169,9 @@ static void* alt_lio_thread(void* foo)
     }
     else if(tmp_item->cb_p->aio_lio_opcode == LIO_WRITE)
     {
-        int i = 0;
         gossip_debug(GOSSIP_BSTREAM_DEBUG,
                      "[alt-aio]: pwrite: cb_p: %p, "
-                     "fd: %d, bufp: %p, size: %d\n",
+                     "fd: %d, bufp: %p, size: %zd\n",
                      tmp_item->cb_p, tmp_item->cb_p->aio_fildes, 
                      tmp_item->cb_p->aio_buf, tmp_item->cb_p->aio_nbytes);
 
@@ -194,10 +196,6 @@ static void* alt_lio_thread(void* foo)
 	tmp_item->cb_p->__error_code = 0;
 	tmp_item->cb_p->__return_value = ret;
     }
-
-    /* run callback fn */
-    tmp_item->sig->sigev_notify_function(
-	tmp_item->sig->sigev_value);
 
     free(tmp_item);
 
