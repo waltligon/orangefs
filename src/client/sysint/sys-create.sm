@@ -770,8 +770,8 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
                  "create: %s: posting crdirent req: parent handle: %llu, "
                  "name: %s, handle: %llu\n",
                  __func__,
-                 sm_p->object_ref.handle, sm_p->u.create.object_name,
-                 sm_p->u.create.metafile_handle);
+                 llu(sm_p->object_ref.handle), sm_p->u.create.object_name,
+                 llu(sm_p->u.create.metafile_handle));
 
     PINT_init_msgpair(sm_p, msg_p);
 
