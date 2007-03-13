@@ -65,6 +65,9 @@
    */
 #undef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
 
+/* Define to 1 if you have the `fsetxattr' function. */
+#undef HAVE_FSETXATTR
+
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
 
