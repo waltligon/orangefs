@@ -231,6 +231,8 @@ static int small_io_completion_fn(void * user_args,
         int done = 0;
         PVFS_size bytes_processed = 0;
 
+        memset(&fdata, 0, sizeof(fdata));
+
         if(resp_p->u.small_io.result_size != 0)
         {
             fdata.server_ct = attr->u.meta.dfile_count;
