@@ -700,8 +700,8 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		void * a;
 		a = kzalloc(1024);
 	],
-	AC_MSG_RESULT(no),
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_KZALLOC, 1, Define if kzalloc exists)
+	AC_DEFINE(HAVE_KZALLOC, 1, Define if kzalloc exists),
+	AC_MSG_RESULT(no)
 	)
 ])
