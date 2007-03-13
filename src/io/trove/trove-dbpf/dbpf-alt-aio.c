@@ -3,6 +3,7 @@
 #include "dbpf-alt-aio.h"
 #include "pthread.h"
 #include "dbpf.h"
+#include <string.h>
 
 static int alt_lio_listio(int mode, struct aiocb * const list[],
                           int nent, struct sigevent *sig);
@@ -18,98 +19,120 @@ static int alt_aio_fsync(int operation, struct aiocb * aiocbp);
 static struct dbpf_aio_ops alt_aio_ops;
 
 struct alt_aio_item
-{   
+{
     struct aiocb *cb_p;
     struct sigevent *sig;
     struct qlist_head list_link;
-};      
+    int master;
+    pthread_t *tids;
+    int nent;
+};
 static void* alt_lio_thread(void*);
 
 int alt_lio_listio(int mode, struct aiocb * const list[], 
-		   int nent, struct sigevent *sig) 
-{   
+                   int nent, struct sigevent *sig) 
+{
     struct alt_aio_item* tmp_item;
     int ret, i;
     pthread_t *tids;
     pthread_attr_t attr;
-    
+
     tids = (pthread_t *)malloc(sizeof(pthread_t) * nent);
     if(!tids)
     {
-	return (-1);
+        return (-1);
     }
 
     for(i = 0; i < nent; ++i)
     {
-	tmp_item = (struct alt_aio_item*)malloc(sizeof(struct alt_aio_item)*nent);
-	if(!tmp_item)
-	{
-	    return (-1);
-	}
+        tmp_item = (struct alt_aio_item*)malloc(sizeof(struct alt_aio_item)*nent);
+        if(!tmp_item)
+        {
+            return (-1);
+        }
+        memset(tmp_item, 0, sizeof(struct alt_aio_item));
 
-	tmp_item->cb_p = list[i];
-	tmp_item->sig = sig;
+        if(mode == LIO_NOWAIT && i == (nent - 1))
+        {
+            /* This is the master thread and needs to wait for the others.
+             * We make the master the last thread to get created, so that
+             * we don't end up in a race with the thread ids getting set
+             * properly 
+             */
+            tmp_item->master = 1;
+            tmp_item->tids = tids;
+            tmp_item->nent = nent;
+        }
 
-	/* setup state */
-	tmp_item->cb_p->__error_code = EINPROGRESS;
+        tmp_item->cb_p = list[i];
+        tmp_item->sig = sig;
 
-	/* set detached state */
-	ret = pthread_attr_init(&attr);
-	if(ret != 0)
-	{
-	    free(tmp_item);
-	    errno = ret;
-	    return(-1);
-	}
-	ret = pthread_attr_setdetachstate(
-	    &attr, 
-	    (mode == LIO_WAIT) ? 
-	    PTHREAD_CREATE_JOINABLE :
-	    PTHREAD_CREATE_DETACHED);
-	if(ret != 0)
-	{
-	    free(tmp_item);
-	    errno = ret;
-	    return(-1);
-	}
+        /* setup state */
+        tmp_item->cb_p->__error_code = EINPROGRESS;
 
-	/* create thread to perform I/O and trigger callback */
-	ret = pthread_create(&tids[i], &attr, alt_lio_thread, tmp_item);
-	if(ret != 0)
-	{
-	    int j = 0;
+        /* set detached state */
+        ret = pthread_attr_init(&attr);
+        if(ret != 0)
+        {
+            free(tmp_item);
+            errno = ret;
+            return(-1);
+        }
+        ret = pthread_attr_setdetachstate(
+            &attr,
+            PTHREAD_CREATE_JOINABLE);
+        if(ret != 0)
+        {
+            free(tmp_item);
+            errno = ret;
+            return(-1);
+        }
 
-	    if(mode == LIO_WAIT)
-	    {
-		for(; j < i; ++j)
-		{
-		    pthread_join(tids[j], NULL);
-		}
-	    }
+        /* create thread to perform I/O and trigger callback */
+        ret = pthread_create(&tids[i], &attr, alt_lio_thread, tmp_item);
+        if(ret != 0)
+        {
+            int j = 0;
 
-	    free(tmp_item);
-	    errno = ret;
-	    return(-1);
-	}
+            if(mode == LIO_WAIT)
+            {
+                for(; j < i; ++j)
+                {
+                    pthread_join(tids[j], NULL);
+                }
+            }
+
+            free(tmp_item);
+            free(tids);
+            errno = ret;
+            return(-1);
+        }
+        gossip_debug(GOSSIP_BSTREAM_DEBUG, 
+                     "[alt-aio]: pthread_create completed:"
+                     " id: %d, thread_id: %p\n",
+                     i, (void *)tids[i]);
     }
 
     ret = 0;
     if(mode == LIO_WAIT)
     {
-	for(i = 0; i < nent; ++i)
-	{
-	    pthread_join(tids[i], NULL);
-	    if(ret != 0 && alt_aio_error(list[i]) != 0)
-	    {
-		ret = alt_aio_error(list[i]);
-	    }
-	}
+        for(i = 0; i < nent; ++i)
+        {
+            pthread_join(tids[i], NULL);
+            if(ret != 0 && alt_aio_error(list[i]) != 0)
+            {
+                /* for now we're just overwriting previous errors
+                 * since we have no way to store and return them
+                 * in the blocking case.
+                 * The caller should call aio_error to get the
+                 * element specific errors
+                 */
+                ret = alt_aio_error(list[i]);
+            }
+        }
+
+        free(tids);
     }
-
-    /* run callback fn */
-    sig->sigev_notify_function(sig->sigev_value);
-
-    free(tids);
 
     return(ret);
 }
@@ -131,7 +154,7 @@ static int alt_aio_cancel(int filedesc, struct aiocb *aiocbp)
 }
 
 static int alt_aio_suspend(const struct aiocb * const list[], int nent,
-                    const struct timespec * timeout)
+                           const struct timespec * timeout)
 {
     errno = ENOSYS;
     return -1;
@@ -182,19 +205,40 @@ static void* alt_lio_thread(void* foo)
     }
     else
     {
-	/* this should have been caught already */
-	assert(0);
+        /* this should have been caught already */
+        assert(0);
     }
 
     /* store error and return codes */
     if(ret < 0)
     {
-	tmp_item->cb_p->__error_code = errno;
+        tmp_item->cb_p->__error_code = errno;
     }
     else
     {
-	tmp_item->cb_p->__error_code = 0;
-	tmp_item->cb_p->__return_value = ret;
+        tmp_item->cb_p->__error_code = 0;
+        tmp_item->cb_p->__return_value = ret;
+    }
+
+    if(tmp_item->master)
+    {
+        int i;
+        /* I'm the master, gotta wait for the others to call notify */
+
+        /* we skip the last one because that's us */
+        for(i = 0; i < (tmp_item->nent - 1); ++i)
+        {
+            ret = pthread_join(tmp_item->tids[i], NULL);
+            if(ret != 0)
+            {
+                gossip_err("pthread_join failed: %d (%s), i: %d, tid: %p\n",
+                           ret, strerror(ret), i, (void *)tmp_item->tids[i]);
+            }
+        }
+
+        free(tmp_item->tids);
+        /* run callback fn */
+        tmp_item->sig->sigev_notify_function(tmp_item->sig->sigev_value);
     }
 
     free(tmp_item);
