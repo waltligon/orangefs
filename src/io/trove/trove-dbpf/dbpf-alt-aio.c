@@ -45,6 +45,7 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
 
     for(i = 0; i < nent; ++i)
     {
+	int spawnmode= PTHREAD_CREATE_JOINABLE;
         tmp_item = (struct alt_aio_item*)malloc(sizeof(struct alt_aio_item)*nent);
         if(!tmp_item)
         {
@@ -62,6 +63,7 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
             tmp_item->master = 1;
             tmp_item->tids = tids;
             tmp_item->nent = nent;
+	    spawnmode= PTHREAD_CREATE_DETACHED;
         }
 
         tmp_item->cb_p = list[i];
@@ -76,11 +78,13 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
         {
             free(tmp_item);
             errno = ret;
+
             return(-1);
         }
         ret = pthread_attr_setdetachstate(
             &attr,
-            PTHREAD_CREATE_JOINABLE);
+	    spawnmode
+        );
         if(ret != 0)
         {
             free(tmp_item);
@@ -133,7 +137,6 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
 
         free(tids);
     }
-
     return(ret);
 }
 
@@ -194,9 +197,10 @@ static void* alt_lio_thread(void* foo)
     {
         gossip_debug(GOSSIP_BSTREAM_DEBUG,
                      "[alt-aio]: pwrite: cb_p: %p, "
-                     "fd: %d, bufp: %p, size: %zd\n",
+                     "fd: %d, bufp: %p, size: %zd off:%lld\n",
                      tmp_item->cb_p, tmp_item->cb_p->aio_fildes, 
-                     tmp_item->cb_p->aio_buf, tmp_item->cb_p->aio_nbytes);
+                     tmp_item->cb_p->aio_buf, tmp_item->cb_p->aio_nbytes,
+		     tmp_item->cb_p->aio_offset);
 
         ret = pwrite(tmp_item->cb_p->aio_fildes,
                      (const void*)tmp_item->cb_p->aio_buf,
@@ -243,7 +247,8 @@ static void* alt_lio_thread(void* foo)
 
     free(tmp_item);
 
-    return(NULL);
+    pthread_exit(NULL);
+    return NULL;
 }
 
 static int alt_aio_bstream_read_list(TROVE_coll_id coll_id,
