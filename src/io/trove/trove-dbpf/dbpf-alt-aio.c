@@ -111,10 +111,6 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
             errno = ret;
             return(-1);
         }
-        gossip_debug(GOSSIP_BSTREAM_DEBUG, 
-                     "[alt-aio]: pthread_create completed:"
-                     " id: %d, thread_id: %p\n",
-                     i, (void *)tids[i]);
     }
 
     ret = 0;
