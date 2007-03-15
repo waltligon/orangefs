@@ -19,6 +19,7 @@
 #include "gossip.h"
 #include "pint-perf-counter.h"
 #include "pint-event.h"
+#include "pint-mem.h"
 #include "trove-internal.h"
 #include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
@@ -29,6 +30,7 @@
 #include "dbpf-op-queue.h"
 #include "dbpf-attr-cache.h"
 #include "dbpf-open-cache.h"
+
 
 #ifdef __PVFS2_TROVE_THREADED__
 #include <pthread.h>
@@ -47,18 +49,6 @@ extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
 #endif
 extern gen_mutex_t dbpf_attr_cache_mutex;
-/* Union used by the dspace_iterate_handles call.  The berkeley db
- * cursor->get(SET_RECNO) call, which sets the position of the cursor
- * based on record number, expects the key.data to be a db_recno_t
- * going in, but fills in the actual key value (in this case a TROVE_handle)
- * on the way out.
- */
-union dbpf_dspace_recno_handle_key
-{
-    db_recno_t recno;
-    TROVE_handle handle;
-};
-
 
 int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 
@@ -534,9 +524,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL, i = 0;
     DBC *dbc_p = NULL;
     DBT key, data;
-    union dbpf_dspace_recno_handle_key recno_key;
+    void * multiples_buffer = NULL;
     TROVE_ds_storedattr_s s_attr;
-    TROVE_handle dummy_handle = TROVE_HANDLE_NULL;
+    TROVE_handle dummy_handle;
+    size_t sizeof_handle = 0, sizeof_attr = 0;
+    int start_size;
+    void *tmp_ptr;
+    uint32_t dbpagesize;
 
     if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
     {
@@ -571,10 +565,9 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * well, so that we can use the same loop below to read the
          * remainder in this or the above case.
          */
-        recno_key.recno = (*op_p->u.d_iterate_handles.position_p);
         memset(&key, 0, sizeof(key));
-        key.data  = &recno_key;
-        key.size  = key.ulen = sizeof(recno_key);
+        key.data  = op_p->u.d_iterate_handles.position_p;
+        key.size  = key.ulen = sizeof(TROVE_handle);
         key.flags |= DB_DBT_USERMEM;
 
         memset(&data, 0, sizeof(data));
@@ -582,7 +575,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         data.size = data.ulen = sizeof(s_attr);
         data.flags |= DB_DBT_USERMEM;
 
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RANGE);
         if (ret == DB_NOTFOUND)
         {
             goto return_ok;
@@ -590,35 +583,99 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         else if (ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
-            gossip_err("failed to set cursor position at recno: %u\n",
-                       recno_key.recno);
+            gossip_err("failed to set cursor position at handle: %llu\n",
+                       llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
             goto return_error;
         }
     }
 
-    /* read handles until we run out of handles or space in buffer */
-    for (i = 0; i < *op_p->u.d_iterate_handles.count_p; i++)
+    start_size = ((sizeof(TROVE_handle) + sizeof(s_attr)) *
+                  *op_p->u.d_iterate_handles.count_p);
+    /* round up to the nearest 1024 */
+    start_size = (start_size + 1023) & (~(unsigned long)1023);
+
+    ret = op_p->coll_p->ds_db->get_pagesize(op_p->coll_p->ds_db, &dbpagesize);
+
+    multiples_buffer = PINT_mem_aligned_alloc(start_size, dbpagesize);
+    if(!multiples_buffer)
     {
-        memset(&key, 0, sizeof(key));
-        key.data = &op_p->u.d_iterate_handles.handle_array[i];
-        key.size = key.ulen = sizeof(TROVE_handle);
-        key.flags |= DB_DBT_USERMEM;
+        ret = -TROVE_ENOMEM;
+        goto return_error;
+    }
 
-        memset(&data, 0, sizeof(data));
-        data.data = &s_attr;
-        data.size = data.ulen = sizeof(s_attr);
-        data.flags |= DB_DBT_USERMEM;
+    key.data = &dummy_handle;
+    key.size = key.ulen = sizeof(TROVE_handle);
+    key.flags = DB_DBT_USERMEM;
 
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-        if (ret == DB_NOTFOUND)
+    data.data = multiples_buffer;
+    data.size = data.ulen = start_size;
+    data.flags = DB_DBT_USERMEM;
+
+    i = 0;
+    while(i < *op_p->u.d_iterate_handles.count_p)
+    {
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_MULTIPLE_KEY|DB_NEXT);
+        if(ret == DB_BUFFER_SMALL)
+        {
+            /* need to allocate more and try again */
+            free(multiples_buffer);
+            multiples_buffer = PINT_mem_aligned_alloc(data.size, dbpagesize);
+            if(!multiples_buffer)
+            {
+                ret = -TROVE_ENOMEM;
+                goto return_error;
+            }
+            data.data = multiples_buffer;
+            data.ulen = data.size;
+
+            ret = dbc_p->c_get(dbc_p, &key, &data, DB_MULTIPLE_KEY|DB_NEXT);
+        }
+
+        if(ret == DB_NOTFOUND)
         {
             goto return_ok;
         }
-        else if (ret != 0)
+
+        if(ret < 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
             gossip_err("c_get failed on iteration %d\n", i);
             goto return_error;
+        }
+
+        DB_MULTIPLE_INIT(tmp_ptr, &data);
+
+        /* read handles until we run out of handles or space in buffer */
+        for (; i < *op_p->u.d_iterate_handles.count_p; i++)
+        {
+            void *tmp_handle;
+            void *tmp_attr;
+
+            /* the semantics of this macro are a little odd.  after
+             * it returns, tmp_handle points into the data buffer
+             * (multiples_buffer) at the location of the key, so the
+             * pointer value of tmp_buffer actually changes, and it
+             * must be derefenced to get the handle value.
+             */
+            DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
+                                 tmp_handle, sizeof_handle,
+                                 tmp_attr, sizeof_attr);
+            if(!tmp_ptr)
+            {
+                break;
+            }
+
+            /* verify sizes are correct */
+            if(sizeof_handle != sizeof(TROVE_handle) ||
+               sizeof_attr != sizeof(s_attr))
+            {
+                /* something is wrong with the result */
+                ret = -TROVE_EINVAL;
+                goto return_error;
+            }
+
+            op_p->u.d_iterate_handles.handle_array[i] =
+                *(TROVE_handle *)tmp_handle;
         }
     }
 
@@ -630,7 +687,6 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     }
     else
     {
-        db_recno_t recno;
         /* get the record number to return.
          *
          * note: key field is ignored by c_get in this case
@@ -641,11 +697,11 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         key.flags |= DB_DBT_USERMEM;
 
         memset(&data, 0, sizeof(data));
-        data.data = &recno;
-        data.size = data.ulen = sizeof(recno);
+        data.data = &s_attr;
+        data.size = data.ulen = sizeof(s_attr);
         data.flags |= DB_DBT_USERMEM;
 
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_CURRENT);
         if (ret == DB_NOTFOUND)
         {
             gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");
@@ -656,7 +712,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                          "failure @ recno\n");
             ret = -dbpf_db_error_to_trove_error(ret);
         }
-        *op_p->u.d_iterate_handles.position_p = recno;
+        *op_p->u.d_iterate_handles.position_p = dummy_handle;
     }
     /* 'position' points to record we just read, or is set to END */
 
@@ -665,6 +721,11 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     if (dbc_p)
     {
         dbc_p->c_close(dbc_p);
+    }
+
+    if(multiples_buffer)
+    {
+        PINT_mem_aligned_free(multiples_buffer);
     }
 
     return 1;
@@ -676,6 +737,11 @@ return_error:
     if (dbc_p)
     {
         dbc_p->c_close(dbc_p);
+    }
+
+    if(multiples_buffer)
+    {
+        PINT_mem_aligned_free(multiples_buffer);
     }
 
     return ret;
@@ -1727,7 +1793,7 @@ static int dbpf_dspace_testsome(
     return ((out_count > 0) ? 1 : 0);
 }
 
-int PINT_trove_dbpf_ds_attr_compare(
+int PINT_trove_dbpf_ds_attr_compare_reversed(
     DB * dbp, const DBT * a, const DBT * b)
 {
     const TROVE_handle * handle_a;
@@ -1742,6 +1808,23 @@ int PINT_trove_dbpf_ds_attr_compare(
     }
 
     return (*handle_a < *handle_b) ? -1 : 1;
+}
+
+int PINT_trove_dbpf_ds_attr_compare(
+    DB * dbp, const DBT * a, const DBT * b)
+{
+    const TROVE_handle * handle_a;
+    const TROVE_handle * handle_b;
+
+    handle_a = (const TROVE_handle *) a->data;
+    handle_b = (const TROVE_handle *) b->data;
+
+    if(*handle_a == *handle_b)
+    {
+        return 0;
+    }
+
+    return (*handle_a > *handle_b) ? -1 : 1;
 }
 
 struct TROVE_dspace_ops dbpf_dspace_ops =

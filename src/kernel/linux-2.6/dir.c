@@ -147,8 +147,8 @@ static int pvfs2_readdir(
     case 0:
         token_set = 1;
         ino = get_ino_from_handle(dentry->d_inode);
-        gossip_debug(GOSSIP_DIR_DEBUG, 
-                     "calling filldir of . with pos = %d\n", pos);
+        gossip_debug(GOSSIP_DIR_DEBUG,
+                     "calling filldir of . with pos = %llu\n", llu(pos));
         if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
         {
             break;
@@ -160,7 +160,7 @@ static int pvfs2_readdir(
         token_set = 1;
         ino = get_parent_ino_from_dentry(dentry);
         gossip_debug(GOSSIP_DIR_DEBUG, 
-                     "calling filldir of .. with pos = %d\n", pos);
+                     "calling filldir of .. with pos = %llu\n", llu(pos));
         if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
         {
             break;
@@ -282,7 +282,8 @@ static int pvfs2_readdir(
                     file->f_pos = i;
             }
             gossip_debug(GOSSIP_DIR_DEBUG, 
-                         "pos = %d, file->f_pos should have been %ld\n", pos, 
+                         "pos = %llu, file->f_pos should have been %ld\n", 
+                         llu(pos),
                          (unsigned long) file->f_pos);
         }
         else

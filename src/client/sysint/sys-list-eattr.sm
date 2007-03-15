@@ -224,7 +224,7 @@ static int list_eattr_comp_fn(
     else
     {
         gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr returned %d keys\n",
-                sm_p->u.listeattr.resp_p->token);
+                sm_p->u.listeattr.resp_p->nkey);
         /* Copy the token and reset it */
         sm_p->u.listeattr.resp_p->nkey = sm_p->u.listeattr.resp_p->token;
         sm_p->u.listeattr.resp_p->token = PVFS_ITERATE_START;

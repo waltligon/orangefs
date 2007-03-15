@@ -78,7 +78,6 @@ struct pvfs2_dirent
 typedef struct
 {
     PVFS_ds_position token;
-    uint32_t  __pad1;
     uint64_t directory_version;
     uint32_t  __pad2;
     uint32_t pvfs_dirent_outcount;
@@ -89,7 +88,6 @@ typedef struct
 typedef struct
 {
     PVFS_ds_position token;
-    uint32_t  __pad1;
     uint64_t directory_version;
     uint32_t  __pad2;
     uint32_t pvfs_dirent_outcount;
@@ -146,10 +144,11 @@ typedef struct {
 
 typedef struct {
     int32_t  returned_count;
+    int32_t __pad1;
     PVFS_ds_position token;
     char key[PVFS_MAX_XATTR_LISTLEN*PVFS_MAX_XATTR_NAMELEN];
     int32_t  keylen;
-    int32_t  __pad1;
+    int32_t  __pad2;
     int32_t  lengths[PVFS_MAX_XATTR_LISTLEN];
 } pvfs2_listxattr_response_t;
 /* the removexattr response is a blank downcall */

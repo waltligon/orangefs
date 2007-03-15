@@ -202,9 +202,9 @@ static int readdir_iterate_on_entries(
 
     gossip_debug(
         GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%llu,%d], "
-        "\n\ttoken=%d, count=%d\n",
+        "\n\ttoken=%llu, count=%d\n",
         llu(s_op->u.readdir.dirent_handle), s_op->req->u.readdir.fs_id,
-        s_op->req->u.readdir.token, 
+        llu(s_op->req->u.readdir.token),
         s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(

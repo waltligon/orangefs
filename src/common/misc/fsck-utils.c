@@ -1080,7 +1080,7 @@ static int PINT_handle_wrangler_load_handles(
     PVFS_handle **handle_matrix = NULL;
     int i = 0;
     int *handle_count_array = NULL;
-    int *position_array = NULL;
+    PVFS_ds_position *position_array = NULL;
     int more_handles = 0;
     int err = 0;
 
@@ -1152,7 +1152,8 @@ static int PINT_handle_wrangler_load_handles(
         goto load_handles_error;
     }
 
-    position_array = (int *) calloc(server_count, sizeof(int));
+    position_array = (PVFS_ds_position *) calloc(server_count, 
+                                                 sizeof(PVFS_ds_position));
     if (position_array == NULL)
     {        
         ret = -PVFS_ENOMEM;

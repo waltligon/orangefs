@@ -122,14 +122,14 @@ typedef uint64_t PVFS_handle;
  *  PVFS2 file systems reachable by a given client.
  */
 typedef int32_t PVFS_fs_id;
-typedef int32_t PVFS_ds_position;
+typedef uint64_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
 #define encode_PVFS_handle encode_uint64_t
 #define decode_PVFS_handle decode_uint64_t
 #define encode_PVFS_fs_id encode_int32_t
 #define decode_PVFS_fs_id decode_int32_t
-#define decode_PVFS_ds_position decode_int32_t
-#define encode_PVFS_ds_position encode_int32_t
+#define decode_PVFS_ds_position decode_uint64_t
+#define encode_PVFS_ds_position encode_uint64_t
 
 /* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;

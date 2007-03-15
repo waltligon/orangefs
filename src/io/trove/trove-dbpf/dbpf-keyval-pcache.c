@@ -154,15 +154,15 @@ int PINT_dbpf_keyval_pcache_lookup(
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache NOTFOUND: "
-                         "handle: %llu, pos: %d\n",
-                         llu(handle), pos);
+                         "handle: %llu, pos: %llu\n",
+                         llu(handle), llu(pos));
         }
         else
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache failed: (error %d): "
-                         "handle: %llu, pos: %d\n",
-                         ret, llu(handle), pos);
+                         "handle: %llu, pos: %llu\n",
+                         ret, llu(handle), llu(pos));
         }
 
         gen_mutex_unlock(pcache->mutex);
@@ -175,8 +175,8 @@ int PINT_dbpf_keyval_pcache_lookup(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache lookup succeeded: "
-                 "handle: %llu, pos: %d, key: %*s\n",
-                 llu(handle), pos, *length, (char *) *keyname);
+                 "handle: %llu, pos: %llu, key: %*s\n",
+                 llu(handle), llu(pos), *length, (char *) *keyname);
 
     return 0;
 }
@@ -225,8 +225,8 @@ int PINT_dbpf_keyval_pcache_insert(
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "Trove KeyVal pcache insert failed: (error: %d) "
-                     "handle: %llu, pos: %d: key: %*s\n",
-                     ret, llu(handle), pos, length, keyname);
+                     "handle: %llu, pos: %llu: key: %*s\n",
+                     ret, llu(handle), llu(pos), length, keyname);
 
         gen_mutex_unlock(pcache->mutex);
         free(entry);
@@ -236,8 +236,8 @@ int PINT_dbpf_keyval_pcache_insert(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache insert succeeded: "
-                 "handle: %llu, pos: %d: key: %*s\n",
-                 llu(handle), pos, length, keyname);
+                 "handle: %llu, pos: %llu: key: %*s\n",
+                 llu(handle), llu(pos), length, keyname);
 
     return 0;
 }

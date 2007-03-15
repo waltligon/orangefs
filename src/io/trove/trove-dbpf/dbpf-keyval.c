@@ -677,10 +677,10 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                   "dbpf_keyval_iterate_op_svc: starting: fsid: %u, "
-                  "handle: %llu, pos: %u\n", 
+                  "handle: %llu, pos: %llu\n", 
                  op_p->coll_p->coll_id, 
                  llu(op_p->handle),
-                 *op_p->u.k_iterate.position_p);
+                 llu(*op_p->u.k_iterate.position_p));
     
     /* if they passed in that they are at the end, return 0.
      * this seems silly maybe, but it makes while (count) loops
@@ -737,8 +737,8 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
                  "dbpf_keyval_iterate_op_svc: finished: "
-                 "position: %d, count: %d\n", 
-                 *op_p->u.k_iterate.position_p, *op_p->u.k_iterate.count_p);
+                 "position: %llu, count: %d\n", 
+                 llu(*op_p->u.k_iterate.position_p), *op_p->u.k_iterate.count_p);
 
     return 1;
 }
