@@ -692,8 +692,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_DEFINE(HAVE_COMBINED_AIO_AND_VECTOR, 1, Define if struct file_operations has combined aio_read and readv functions),
 	    )
 
-	CFLAGS=$oldcflags
-
 	dnl Check for kzalloc
 	AC_MSG_CHECKING(for kzalloc)
 	AC_TRY_COMPILE([
@@ -701,10 +699,12 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		#include <linux/slab.h>
 	], [
 		void * a;
-		a = kzalloc(1024);
+		a = kzalloc(1024, GFP_KERNEL);
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_KZALLOC, 1, Define if kzalloc exists),
 	AC_MSG_RESULT(no)
 	)
+
+	CFLAGS=$oldcflags
 ])

@@ -10640,8 +10640,6 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-	CFLAGS=$oldcflags
-
 		{ echo "$as_me:$LINENO: checking for kzalloc" >&5
 echo $ECHO_N "checking for kzalloc... $ECHO_C" >&6; }
 	cat >conftest.$ac_ext <<_ACEOF
@@ -10659,7 +10657,7 @@ main ()
 {
 
 		void * a;
-		a = kzalloc(1024);
+		a = kzalloc(1024, GFP_KERNEL);
 
   ;
   return 0;
@@ -10699,6 +10697,8 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	CFLAGS=$oldcflags
 
 
 
