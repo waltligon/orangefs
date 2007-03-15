@@ -379,10 +379,9 @@ exit:
 }
 
 int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
-                            TROVE_ds_state ret,
                             enum dbpf_op_state state)
 {
-    DBPF_COMPLETION_START(qop_p, ret, state);
+    DBPF_COMPLETION_START(qop_p, state);
     DBPF_COMPLETION_SIGNAL();
     DBPF_COMPLETION_FINISH(qop_p->op.context_id);
 

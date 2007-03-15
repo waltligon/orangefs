@@ -477,8 +477,8 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
+    gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
+                    "PVFS2 Server version %s starting...\n", PVFS2_VERSION);
 
     fs_conf = ((argc >= optind) ? argv[optind] : NULL);
 
@@ -622,6 +622,9 @@ int main(int argc, char **argv)
                            "state machine.\n", ret);
         goto server_shutdown;
     }
+
+    gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
+                    "PVFS2 Server ready.\n");
 
     /* Initialization complete; process server requests indefinitely. */
     for ( ;; )

@@ -150,10 +150,8 @@ static int remove_getattr_analyze_results(PINT_client_sm *sm_p,
 	    assert(attr->mask & PVFS_ATTR_META_DFILES);
 	    assert(attr->u.meta.dfile_count > 0);
 
-	    gossip_debug(
-                GOSSIP_CLIENT_DEBUG,
-                "remove_getattr_comp_fn: must remove %d datafiles\n",
-                attr->u.meta.dfile_count);
+	    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: must remove %d datafiles\n",
+                         __func__, attr->u.meta.dfile_count);
 
 	    js_p->error_code = REMOVE_MUST_REMOVE_DATAFILES;
             break;
@@ -175,8 +173,7 @@ static int remove_getattr_analyze_results(PINT_client_sm *sm_p,
 	case PVFS_TYPE_DATAFILE:
 	case PVFS_TYPE_DIRDATA:
 	default:
-	    gossip_err("error: remove_getattr_comp_fn: unhandled "
-                       "object type (%x)\n",
+	    gossip_err("%s: unhandled object type (%x)\n", __func__,
                        attr->objtype);
     }
     return 1;

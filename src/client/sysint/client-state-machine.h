@@ -90,6 +90,7 @@ struct PINT_client_create_sm
     PVFS_handle *datafile_handles;
     PVFS_BMI_addr_t *data_server_addrs;
     PVFS_handle_extent_array *io_handle_extent_array;
+    PVFS_object_attr cache_attr;
 };
 
 struct PINT_client_mkdir_sm

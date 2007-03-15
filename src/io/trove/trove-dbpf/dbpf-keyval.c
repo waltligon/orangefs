@@ -437,6 +437,9 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     /* Either a put error or key already exists */
     if (ret != 0 )
     {
+	gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+		     "keyval_db->put failed. ret=%d\n", ret);
+
         /*op_p->coll_p->keyval_db->err(
             op_p->coll_p->keyval_db, ret, "keyval_db->put keyval write");
 	*/

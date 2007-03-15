@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.7.14.1 2007-02-17 11:16:32 kunkel Exp $
+ * $Id: mem.c,v 1.7.14.2 2007-03-15 09:49:54 kunkel Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "pvfs2-internal.h"
@@ -121,7 +121,7 @@ memcache_memalloc(void *md, bmi_size_t len, int eager_limit)
     memcache_device_t *memcache_device = md;
     void *buf;
 
-    debug(4, "%s: len %zd limit %d", __func__, len, eager_limit);
+    debug(4, "%s: len %lld limit %d", __func__, lld(len), eager_limit);
 
     /* search in size cache first */
 #if ENABLE_MEMCACHE

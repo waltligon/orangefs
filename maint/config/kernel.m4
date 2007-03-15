@@ -394,9 +394,12 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	fi
 
+	dnl we need the compiler to error on warnings about prototypes, but
+	dnl certain Fedora FC5 kernel header files throw extra (spurious)
+	dnl warnings, which -Wno-pointer-sign silences.
 	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror -Wno-pointer-sign"
 	dnl if this test passes, there is a struct dentry* argument
-	CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(if statfs callbacks' arguments in kernel has struct dentry argument)
 	dnl if this test passes, the kernel has it
 	dnl if this test fails, the kernel does not have it
@@ -748,8 +751,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_DEFINE(HAVE_COMBINED_AIO_AND_VECTOR, 1, Define if struct file_operations has combined aio_read and readv functions),
 	    )
 
-	CFLAGS=$oldcflags
-
 	dnl Check for kzalloc
 	AC_MSG_CHECKING(for kzalloc)
 	AC_TRY_COMPILE([
@@ -757,10 +758,12 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		#include <linux/slab.h>
 	], [
 		void * a;
-		a = kzalloc(1024);
+		a = kzalloc(1024, GFP_KERNEL);
 	],
-	AC_MSG_RESULT(no),
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_KZALLOC, 1, Define if kzalloc exists)
+	AC_DEFINE(HAVE_KZALLOC, 1, Define if kzalloc exists),
+	AC_MSG_RESULT(no)
 	)
+
+	CFLAGS=$oldcflags
 ])

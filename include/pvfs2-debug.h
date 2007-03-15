@@ -70,6 +70,7 @@
 #define GOSSIP_ACCESS_HOSTNAMES        ((uint64_t)1 << 48)
 #define GOSSIP_FSCK_DEBUG              ((uint64_t)1 << 49)
 #define GOSSIP_BMI_DEBUG_MX            ((uint64_t)1 << 50)
+#define GOSSIP_BSTREAM_DEBUG           ((uint64_t)1 << 51)
 
 /* NOTE: if you want your gossip flag to be controllable from 
  * pvfs2-set-debugmask you have to add it in

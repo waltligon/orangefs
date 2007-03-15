@@ -939,6 +939,7 @@ AC_CHECK_FUNCS(strnlen)
 AC_CHECK_FUNCS(strtoull)
 AC_CHECK_FUNCS(strstr)
 AC_CHECK_FUNCS(fgetxattr)
+AC_CHECK_FUNCS(fsetxattr)
 
 dnl fgetxattr doesn't have a prototype on some systems
 AC_MSG_CHECKING([for fgetxattr prototype])
