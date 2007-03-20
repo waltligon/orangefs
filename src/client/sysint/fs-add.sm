@@ -536,7 +536,8 @@ static int fs_add_parent_cleanup(
 
     /* finally, try to add the new config to the server config manager */
     ret = PINT_server_config_mgr_add_config(
-        sm_p->u.get_config.config, sm_p->u.get_config.mntent->fs_id);
+        sm_p->u.get_config.config, sm_p->u.get_config.mntent->fs_id,
+        &sm_p->u.get_config.free_config_flag);
     if (ret < 0)
     {
         PVFS_perror_gossip("PINT_server_config_mgr_add_config failed", ret);
@@ -568,6 +569,11 @@ static int fs_add_final_cleanup(
     else if (js_p->error_code == 0)
     {
         compare_hashes(sm_p, js_p);
+    }
+    if(sm_p->u.get_config.free_config_flag)
+    {
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
     }
     sm_p->error_code = js_p->error_code;
     sm_p->op_complete = 1;

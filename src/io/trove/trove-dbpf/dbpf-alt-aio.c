@@ -197,10 +197,10 @@ static void* alt_lio_thread(void* foo)
     {
         gossip_debug(GOSSIP_BSTREAM_DEBUG,
                      "[alt-aio]: pwrite: cb_p: %p, "
-                     "fd: %d, bufp: %p, size: %zd off:%lld\n",
+                     "fd: %d, bufp: %p, size: %zd off:%llu\n",
                      tmp_item->cb_p, tmp_item->cb_p->aio_fildes, 
                      tmp_item->cb_p->aio_buf, tmp_item->cb_p->aio_nbytes,
-		     tmp_item->cb_p->aio_offset);
+		     llu(tmp_item->cb_p->aio_offset));
 
         ret = pwrite(tmp_item->cb_p->aio_fildes,
                      (const void*)tmp_item->cb_p->aio_buf,

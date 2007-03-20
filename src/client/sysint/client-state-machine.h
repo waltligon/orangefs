@@ -370,6 +370,7 @@ struct PINT_server_get_config_sm
     uint32_t fs_config_buf_size;
     uint32_t server_config_buf_size;
     int persist_config_buffers;
+    int free_config_flag;
 };
 
 struct PINT_server_fetch_config_sm_state

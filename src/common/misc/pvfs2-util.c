@@ -851,6 +851,7 @@ int PVFS_util_remove_internal_mntent(
                 }
                 PVFS_util_copy_mntent(
                     &tmp_mnt_array[new_count++], current_mnt);
+                PVFS_util_free_mntent(current_mnt);
             }
 
             /* finally, swap the mntent arrays */
