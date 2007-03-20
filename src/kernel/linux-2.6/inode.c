@@ -512,7 +512,22 @@ struct inode *pvfs2_get_custom_inode_common(
          * properly.
          */
         if (from_create)
-            inode->i_mode = mode;
+        {
+            /* the exception is when we are creating a directory that needs
+             * to inherit the setgid bit.  That much we need to preserve from
+             * the getattr's view of the mode.
+             */
+            if(inode->i_mode & S_ISGID)
+            {
+                gossip_debug(GOSSIP_INODE_DEBUG,
+                    "pvfs2_get_custom_inode_commmon: setting SGID bit.\n");
+                inode->i_mode = mode | S_ISGID;
+            }
+            else
+            {
+                inode->i_mode = mode;
+            }
+        }
         gossip_debug(GOSSIP_INODE_DEBUG, 
                 "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
                 inode, inode->i_mode);

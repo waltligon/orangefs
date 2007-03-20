@@ -522,14 +522,18 @@ static int PINT_check_group(uid_t uid, gid_t gid)
     ret = getpwuid_r(uid, &pwd, check_group_pw_buffer,
         check_group_pw_buffer_size,
         &pwd_p);
-    if(ret != 0)
+    if(ret != 0 || pwd_p == NULL)
     {
         gen_mutex_unlock(&check_group_mutex);
         return(-PVFS_EINVAL);
     }
 
     /* check primary group */
-    if(pwd.pw_gid == gid) return 0;
+    if(pwd.pw_gid == gid)
+    {
+        gen_mutex_unlock(&check_group_mutex);
+        return 0;
+    }
 
     /* get other group information */
     ret = getgrgid_r(gid, &grp, check_group_gr_buffer,
@@ -548,9 +552,6 @@ static int PINT_check_group(uid_t uid, gid_t gid)
 		   uid, gid);
         return(-PVFS_EACCES);
     }
-
-    gen_mutex_unlock(&check_group_mutex);
-
 
     for(i = 0; grp.gr_mem[i] != NULL; i++)
     {
@@ -605,7 +606,14 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
         uid, gid, want);
 
     assert(acl_buf);
-    assert(acl_size % sizeof(pvfs2_acl_entry) == 0);
+    /* if the acl format doesn't look valid, then return an error rather than
+     * asserting; we don't want the server to crash due to an invalid keyval
+     */
+    if((acl_size % sizeof(pvfs2_acl_entry)) != 0)
+    {
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "invalid acls on object\n");
+        return(-PVFS_EACCES);
+    }
     count = acl_size / sizeof(pvfs2_acl_entry);
 
     for (i = 0; i < count; i++)
