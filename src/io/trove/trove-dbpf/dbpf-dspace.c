@@ -31,6 +31,7 @@
 #include "dbpf-attr-cache.h"
 #include "dbpf-open-cache.h"
 
+#define TROVE_DEFAULT_DB_PAGESIZE 512
 
 #ifdef __PVFS2_TROVE_THREADED__
 #include <pthread.h>
@@ -530,7 +531,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     size_t sizeof_handle = 0, sizeof_attr = 0;
     int start_size;
     void *tmp_ptr;
-    uint32_t dbpagesize;
+    uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
 
     if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
     {
@@ -594,7 +595,9 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     /* round up to the nearest 1024 */
     start_size = (start_size + 1023) & (~(unsigned long)1023);
 
+#ifdef HAVE_DB_GET_PAGESIZE
     ret = op_p->coll_p->ds_db->get_pagesize(op_p->coll_p->ds_db, &dbpagesize);
+#endif
 
     multiples_buffer = PINT_mem_aligned_alloc(start_size, dbpagesize);
     if(!multiples_buffer)
@@ -615,7 +618,12 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     while(i < *op_p->u.d_iterate_handles.count_p)
     {
         ret = dbc_p->c_get(dbc_p, &key, &data, DB_MULTIPLE_KEY|DB_NEXT);
+
+#ifdef HAVE_DB_BUFFER_SMALL
         if(ret == DB_BUFFER_SMALL)
+#else
+        if(ret == ENOMEM)
+#endif
         {
             /* need to allocate more and try again */
             free(multiples_buffer);
