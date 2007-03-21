@@ -402,19 +402,25 @@ static int rename_lookups_comp_fn(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup[%d] got response %d\n",
                  index, resp_p->status);
 
-    if (resp_p->status != 0)
+    /*
+     * if the index is 1, this failure just means that
+     * the target entry does not already exist, so it's
+     * expected and is not an error.
+     */
+    if(resp_p->status == -PVFS_ENOENT && index == 1)
     {
-        if (index == 1)
-        {
-            /*
-              if the index is 1, this failure just means that
-              the target entry does not already exist, so it's
-              expected and is not an error.
-            */
-            resp_p->status = 0;
-        }
-	return resp_p->status;
+        /* note: don't change the actual resp structure, because the
+         * decoder counts on this to know how to release data structures
+         */
+        return 0;
     }
+
+    if(resp_p->status != 0)
+    {
+        return resp_p->status;
+    }
+
+    /* SUCCESS! */
 
     /*
       stash the refns -- 'old' or 'new' based on index;
