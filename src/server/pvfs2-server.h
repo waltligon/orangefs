@@ -310,7 +310,6 @@ struct PINT_server_getattr_op
     PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_handle dirent_handle;
-    PVFS_ds_keyval dist_val; 
 };
 
 struct PINT_server_listattr_op
