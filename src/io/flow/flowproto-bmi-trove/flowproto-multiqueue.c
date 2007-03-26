@@ -471,7 +471,10 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
                      "%s: called on active flow, %lld bytes transferred.\n",
                      __func__, lld(flow_d->total_transferred));
         assert(flow_d->state == FLOW_TRANSMITTING);
-        handle_io_error(-PVFS_ECANCEL, NULL, flow_data);
+        /* NOTE: set flow error class bit so that system interface understands
+         * that this may be a retry-able error
+         */
+        handle_io_error(-(PVFS_ECANCEL|PVFS_ERROR_FLOW), NULL, flow_data);
         if(flow_data->parent->state == FLOW_COMPLETE)
         {
             gen_mutex_unlock(flow_data->parent->flow_mutex);

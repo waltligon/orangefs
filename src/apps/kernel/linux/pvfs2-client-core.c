@@ -2435,7 +2435,11 @@ static inline void package_downcall_members(
             /* replace non-errno error code to avoid passing to kernel */
             if (*error_code == -PVFS_ECANCEL)
             {
-                *error_code = -PVFS_EINTR;
+                /* if an ECANCEL shows up here without going through the 
+                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is 
+                 * a better errno approximation than -PVFS_EINTR 
+                 */
+                *error_code = -PVFS_ETIMEDOUT;
             }
             break;
         case PVFS2_VFS_OP_FILE_IOX:
@@ -2465,7 +2469,11 @@ static inline void package_downcall_members(
             /* replace non-errno error code to avoid passing to kernel */
             if (*error_code == -PVFS_ECANCEL)
             {
-                *error_code = -PVFS_EINTR;
+                /* if an ECANCEL shows up here without going through the 
+                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is 
+                 * a better errno approximation than -PVFS_EINTR 
+                 */
+                *error_code = -PVFS_ETIMEDOUT;
             }
             break;
         }

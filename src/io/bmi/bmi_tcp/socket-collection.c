@@ -292,7 +292,7 @@ do_again:
     if(ret < 0)
     {
 	gen_mutex_unlock(&scp->mutex);
-	return(-old_errno);
+	return(bmi_tcp_errno_to_pvfs(-old_errno));
     }
 
     /* nothing ready, just return */
