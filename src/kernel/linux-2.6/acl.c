@@ -612,10 +612,15 @@ int pvfs2_acl_chmod(struct inode *inode)
         goto out;
     }
     acl = pvfs2_get_acl(inode, ACL_TYPE_ACCESS);
-    if (IS_ERR(acl) || !acl)
+    if (IS_ERR(acl))
     {
         error = PTR_ERR(acl);
         gossip_err("pvfs2_acl_chmod: get acl (access) failed with %d\n", error);
+        goto out;
+    }
+    if(!acl)
+    {
+        error = 0;
         goto out;
     }
     clone = posix_acl_clone(acl, GFP_KERNEL);

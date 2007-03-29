@@ -123,16 +123,6 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN}
 };
 
-/* extended attribute name spaces supported in PVFS2 */
-const char *PINT_eattr_namespaces[] =
-{
-    "system.",
-    "user.",
-    "trusted.",
-    "security.",
-    NULL
-};
-
 /* These three are used continuously in our wait loop.  They could be
  * relatively large, so rather than allocate them on the stack, we'll
  * make them dynamically allocated globals.

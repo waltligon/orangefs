@@ -23,6 +23,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-util.h"
 #include "pint-util.h"
+#include "pint-eattr.h"
 
 static int listeattr_setup_resp(
     PINT_server_op *s_op, job_status_s *js_p);
@@ -182,10 +183,6 @@ static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
     int num_found = 0;
     int i = 0;
-    char* tmp_buffer = NULL;
-    char translate_prefix[] = "system.pvfs2.";
-    int translate_prefix_len = strlen("system.pvfs2.");
-    int ret = 0;
 
     /* Nothing was requested? then fill token to hold the max available keys */
     if (s_op->resp.u.listeattr.nkey == 0)
@@ -212,52 +209,21 @@ static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
         return(1);
     }
   
-    tmp_buffer = (char*)malloc(PVFS_REQ_LIMIT_KEY_LEN);
-    if(!tmp_buffer)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return(1);
-    }
-
     /* iterate through the keys that we found */
     for(i=0; i<num_found; i++)
     {
-        /* check to see if it is prefixed into a supported name space */
-        if(!PINT_eattr_is_prefixed(s_op->resp.u.listeattr.key[i].buffer))
+        js_p->error_code = PINT_eattr_list_access(
+            &s_op->resp.u.listeattr.key[i],
+            NULL);
+        if(js_p->error_code != 0)
         {
-            /* we need to tack on a "system.pvfs2." prefix */
-
-            /* find out if the key size requested is large enough */
-            if((translate_prefix_len + s_op->resp.u.listeattr.key[i].read_sz) >
-                s_op->req->u.listeattr.keysz[i])
-            {
-                /* NOTE: trying to mimic the semantics of
-                 * trove_keyval_iterate_keys(): it will also report an
-                 * overall error if one of the key buffers is to small,
-                 * though the choice of error code may be different.
-                 */
-                free(tmp_buffer);
-                js_p->error_code = -PVFS_EMSGSIZE;
-                return(1);
-            }
-
-            /* add a prefix onto the key and adjust sizes accordingly */
-            /* NOTE: this will have to change if we ever permit non-string
-             * keys (which would break using them for xattrs anyway)
-             */
-            ret = sprintf(tmp_buffer,
-                "%s%s", translate_prefix,
-                (char*)s_op->resp.u.listeattr.key[i].buffer);
-            memcpy(s_op->resp.u.listeattr.key[i].buffer, tmp_buffer,
-                (ret+1));
-            s_op->resp.u.listeattr.key[i].read_sz += translate_prefix_len;
+            return 1;
         }
 
         s_op->resp.u.listeattr.key[i].buffer_sz =
             s_op->resp.u.listeattr.key[i].read_sz;
     }    
 
-    free(tmp_buffer);
     js_p->error_code = 0;
     return(1);
 }
