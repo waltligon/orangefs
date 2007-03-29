@@ -1623,7 +1623,14 @@ static int dbpf_keyval_iterate_cursor_get(
         key->buffer_sz : DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size);
 
     memcpy(key->buffer, key_entry.key, key_sz);
-    key->buffer_sz = DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size);
+
+    /* only adjust the buffer size if the key didn't fit into the
+     * buffer
+     */
+    if(key->buffer_sz < DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size))
+    {
+        key->buffer_sz = DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size);
+    }
 
     key->read_sz = key_sz;
     
