@@ -276,7 +276,7 @@ struct PINT_server_getconfig_op
 
 struct PINT_server_lock_op
 {
-    PVFS_id_gen_t lock_id;
+    lock_node_t *lock_node_p;
 };
 
 struct PINT_server_io_op
@@ -400,6 +400,7 @@ typedef struct PINT_server_op
 	struct PINT_server_remove_op remove;
 	struct PINT_server_chdirent_op chdirent;
 	struct PINT_server_rmdirent_op rmdirent;
+	struct PINT_server_lock_op lock;
 	struct PINT_server_io_op io;
         struct PINT_server_small_io_op small_io;
 	struct PINT_server_flush_op flush;
