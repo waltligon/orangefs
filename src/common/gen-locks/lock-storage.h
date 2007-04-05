@@ -29,9 +29,17 @@
 #include "lock-storage.h"
 #include "pint-distribution.h"
 #include "pvfs2-request.h"
+#include "pvfs2-req-proto.h"
+
+enum PVFS_lock_origin
+{
+   REMOVED_LIST,
+   LOCK_REQUEST_SEG
+};
 
 enum PVFS_lock_req_status
 {
+   NEW,
    INCOMPLETE,
    ALL_LOCKS_GRANTED
 };
@@ -62,9 +70,14 @@ typedef struct {
    
    PVFS_size actual_locked_bytes; /* Total actual bytes that are locked. */
    PINT_Request_state *file_req_state; /* Use this for processing */
-   PVFS_offset target_offset; /* Where to start the request state */
+   PINT_Request_result *lock_result_p; /* flatten state result pointer */
+   int seg_num; /* Which lock segment are we on? */
+   int seg_bytes_used; /* How far have we gone in this seg? */
+   /* Locks that were revoked, for adding back*/ 
+   struct qlist_head removed_link; 
+   
+   PVFS_offset wait_abs_offset; /* If waiting, this is non-zero */
    PVFS_size aggregate_size; /* Total bytes in the entire req */
-   PVFS_size wait_size ; /* Maximum number of bytes waiting on */
    PINT_Request *file_req;
    PVFS_offset file_req_offset; /* Bytes in the file req to skip */
 
@@ -85,6 +98,12 @@ typedef struct {
    struct qlist_head hash_link; /* location in the hash linked list */
 } lock_node_t;
 
+typedef struct {
+   PVFS_offset start;
+   PVFS_offset end;
+   struct qlist_head lock_link;
+} lock_t;
+
 int init_lock_file_table(void);
 void free_lock_file_table(void);
 void free_lock_file_table_all(void);
@@ -93,20 +112,21 @@ void print_lock_file_table_all_info(void);
 int check_lock_reqs(lock_node_t *lock_node_p);
 int add_lock_req(PVFS_object_ref *object_ref_p, 
 		 enum PVFS_io_type io_type, 
+		 enum PVFS_server_lock_type lock_type,
+		 PVFS_id_gen_t client_lock_req_id,
+		 PINT_request_file_data *fdata_p,
 		 PINT_Request *file_req,
 		 PVFS_offset file_req_offset,
-		 PINT_request_file_data *fdata_p,
-		 PVFS_size nb_bytes,
-		 PVFS_size bb_bytes,
+		 PVFS_offset final_offset,
 		 PVFS_size aggregate_size,
-		 PVFS_id_gen_t *req_id,
-		 PVFS_size *granted_bytes_p,
+		 struct PVFS_servresp_lock *resp_lock_p,
 		 lock_req_t **lock_req_p_p);
 int revise_lock_req(PVFS_object_ref *object_ref_p,
-		    PVFS_id_gen_t req_id,
-		    PVFS_size nb_bytes,
-		    PVFS_size *total_bytes_released_p);
-
+		    enum PVFS_server_lock_type lock_type,
+		    PVFS_id_gen_t req_id, 
+		    PVFS_offset final_offset,
+		    struct PVFS_servresp_lock *resp_lock_p,
+		    lock_node_t **lock_node_p_p);
 #endif
 
 /*
