@@ -31,6 +31,7 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("PVFS2 Development Team");
 MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
 MODULE_PARM_DESC(debug, "debugging level (0 for none, 1 for verbose)");
+MODULE_PARM_DESC(op_timeout_secs, "Operation timeout in seconds");
 MODULE_PARM_DESC(hash_table_size, "size of hash table for operations in progress");
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
