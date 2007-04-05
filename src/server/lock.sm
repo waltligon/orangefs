@@ -20,6 +20,21 @@
 #include "pvfs2-internal.h"
 #include "lock-storage.h"
 
+const char *PVFS_lock_type_mapping[] =
+{                                       
+    "PVFS_CLIENT_ACQUIRE_TWO_PHASE",    
+    "PVFS_CLIENT_ACQUIRE_ONE_TRY",      
+    "PVFS_CLIENT_ACQUIRE_ALT_TRY",      
+    "PVFS_CLIENT_RELEASE",              
+    "PVFS_SERVER_LOCK_INIT",            
+    "PVFS_SERVER_ACQUIRE_NEW_NONBLOCK", 
+    "PVFS_SERVER_ACQUIRE_NEW_BLOCK",    
+    "PVFS_SERVER_ACQUIRE_NONBLOCK",     
+    "PVFS_SERVER_ACQUIRE_BLOCK",        
+    "PVFS_SERVER_RELEASE_SOME",         
+    "PVFS_SERVER_RELEASE_ALL"           
+};
+
 static int lock_change_lock(
     PINT_server_op *s_op, job_status_s* js_p);
 static int lock_cleanup(
@@ -70,7 +85,8 @@ static int lock_change_lock(
     PVFS_object_ref object_ref;
     PINT_request_file_data fdata;
     memset(&s_op->resp.u.lock, 0, sizeof(struct PVFS_servresp_lock));
-    
+
+    /* Set some of the resp fields */
     s_op->resp.u.lock.lock_type = s_op->req->u.lock.lock_type;
     s_op->resp.u.lock.bstream_size = s_op->ds_attr.b_size;
     
@@ -83,24 +99,36 @@ static int lock_change_lock(
     fdata.fsize = s_op->ds_attr.b_size;
     fdata.extend_flag = 1;
 
-    if (s_op->req->u.lock.lock_type == PVFS_ACQUIRE)
+    gossip_debug(GOSSIP_LOCK_DEBUG,
+		 "Request %s received with final_offset %Ld\n", 
+		 PVFS_lock_type_mapping[s_op->req->u.lock.lock_type],
+		 s_op->req->u.lock.final_offset);
+
+    if ((s_op->req->u.lock.lock_type != PVFS_SERVER_RELEASE_SOME) &&
+	(s_op->req->u.lock.lock_type != PVFS_SERVER_RELEASE_ALL))
     {
 	lock_req_t *lock_req_p;
 	
 	ret = add_lock_req(&object_ref,
 			   s_op->req->u.lock.io_type,
+			   s_op->req->u.lock.lock_type,
+			   s_op->req->u.lock.lock_id,
+			   &fdata,
 			   s_op->req->u.lock.file_req,
 			   s_op->req->u.lock.file_req_offset,
-			   &fdata,
-			   s_op->req->u.lock.nonblock_size,
-			   s_op->req->u.lock.block_size,
-			   s_op->req->u.lock.aggregate_size,
-			   &(s_op->resp.u.lock.lock_id),
-			   &(s_op->resp.u.lock.granted_bytes),
+			   s_op->req->u.lock.final_offset,
+			   s_op->req->u.lock.aggregate_size,		   
+			   &(s_op->resp.u.lock),
 			   &lock_req_p);
 	/* Set this to NULL so that it isn't killed at the end of the
-	 * operation. */
-	s_op->req->u.lock.file_req = NULL;
+	 * operation for new operations.  It will be freed by the
+	 * revise_lock_req() during the relase call */
+	if ((s_op->req->u.lock.lock_type == 
+	     PVFS_SERVER_ACQUIRE_NEW_NONBLOCK) ||
+	    (s_op->req->u.lock.lock_type == 	      
+	     PVFS_SERVER_ACQUIRE_NEW_BLOCK))
+	    s_op->req->u.lock.file_req = NULL;
+
 	if (ret == 0)
 	{
 	    int err = -1;
@@ -111,14 +139,19 @@ static int lock_change_lock(
 	    err = job_lock_wait_block_bytes(s_op,
 					    lock_req_p);
 	    return err;
+#if 0
+	    print_lock_file_table_all_info();
+#endif
 	}
     }
     else
     {
 	revise_lock_req(&object_ref,
+			s_op->req->u.lock.lock_type,
 			s_op->req->u.lock.lock_id,
-			s_op->req->u.lock.block_size,
-			&(s_op->resp.u.lock.granted_bytes));
+			s_op->req->u.lock.final_offset,
+			&(s_op->resp.u.lock),
+			&(s_op->u.lock.lock_node_p));
     }
 #if 0
     print_lock_file_table_all_info();
@@ -129,6 +162,15 @@ static int lock_change_lock(
 static int lock_cleanup(
     PINT_server_op *s_op, job_status_s* js_p)
 {
+    /* Do the check after the message is sent so the client doesn't
+     * have to wait excessively */
+    if (((s_op->req->u.lock.lock_type == PVFS_SERVER_RELEASE_SOME) ||
+	 (s_op->req->u.lock.lock_type == PVFS_SERVER_RELEASE_ALL)) &&
+	(s_op->u.lock.lock_node_p != NULL))
+    {
+	check_lock_reqs(s_op->u.lock.lock_node_p);
+    }
+
     return server_state_machine_complete(s_op);
 }
 
