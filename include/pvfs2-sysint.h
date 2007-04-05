@@ -136,7 +136,7 @@ struct PVFS_sysresp_lock_s
 {
     PVFS_id_gen_t lock_id;
     PVFS_size bstream_size;
-    PVFS_size granted_bytes;
+    PVFS_size bytes_accessed;
 };
 typedef struct PVFS_sysresp_lock_s PVFS_sysresp_lock;
 
@@ -388,10 +388,9 @@ PVFS_error PVFS_isys_lock(
     PVFS_Request mem_req,
     PVFS_credentials *credentials,
     PVFS_sysresp_lock *resp_p,
-    PVFS_id_gen_t **lock_id_arr_p,
-    int *lock_id_arr_count_p,
+    struct qlist_head *lock_id_list_head_p,
     enum PVFS_io_type io_type,
-    enum PVFS_lock_type lock_type,
+    enum PVFS_client_lock_type lock_type,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
@@ -402,10 +401,9 @@ PVFS_error PVFS_sys_lock(
     PVFS_Request mem_req,
     PVFS_credentials *credentials,
     PVFS_sysresp_lock *resp_p,
-    PVFS_id_gen_t **lock_id_arr_p,
-    int *lock_id_arr_count_p,
+    struct qlist_head *lock_id_list_head_p,
     enum PVFS_io_type io_type,
-    enum PVFS_lock_type lock_type);
+    enum PVFS_client_lock_type lock_type);
 
 PVFS_error PVFS_isys_io(
     PVFS_object_ref ref,
