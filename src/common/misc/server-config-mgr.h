@@ -17,7 +17,8 @@ int PINT_server_config_mgr_reload_cached_config_interface(void);
 
 int PINT_server_config_mgr_add_config(
     struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id);
+    PVFS_fs_id fs_id,
+    int* free_config_flag);
 
 int PINT_server_config_mgr_remove_config(
     PVFS_fs_id fs_id);

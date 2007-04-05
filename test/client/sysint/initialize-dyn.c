@@ -11,8 +11,6 @@
 #include "client.h"
 #include "pvfs2-util.h"
 
-#define MAX_NUM_MNT  3
-
 int main(int argc, char **argv)
 {
     int ret = -1;
@@ -61,7 +59,7 @@ int main(int argc, char **argv)
     printf("*** All defaults initialized\n");
 
     /* make sure we can resolve all mnt points */
-    for(i = 0; i < MAX_NUM_MNT; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
                                 buf, PVFS_NAME_MAX);
@@ -80,7 +78,7 @@ int main(int argc, char **argv)
     }
 
     /* remove the mount points */
-    for(i = 0; i < MAX_NUM_MNT; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         printf("Removing mount entry %d: %s\n",
                i, mntent[i].mnt_dir);
@@ -94,7 +92,7 @@ int main(int argc, char **argv)
     }
 
     /* make sure we *can't* resolve all mnt points */
-    for(i = 0; i < MAX_NUM_MNT; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
                                 buf, PVFS_NAME_MAX);
@@ -112,7 +110,7 @@ int main(int argc, char **argv)
     }
 
     /* re-add the mount points */
-    for(i = 0; i < MAX_NUM_MNT; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         printf("Adding dynamic mount entry %d: %s\n",
                i, mntent[i].mnt_dir);
@@ -129,7 +127,7 @@ int main(int argc, char **argv)
       make sure we can re-resolve all mnt points now that they've been
       moved to the dynamic area of the book keeping
     */
-    for(i = 0; i < MAX_NUM_MNT; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
                                 buf, PVFS_NAME_MAX);
@@ -148,7 +146,7 @@ int main(int argc, char **argv)
     }
 
     /* remove the dynamic mount points */
-    for(i = 0; i < MAX_NUM_MNT; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         printf("Removing dynamic mount entry %d: %s\n",
                i, mntent[i].mnt_dir);
@@ -162,7 +160,7 @@ int main(int argc, char **argv)
     }
 
     /* make sure we *can't* resolve all mnt points */
-    for(i = 0; i < MAX_NUM_MNT; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
                                 buf, PVFS_NAME_MAX);
@@ -180,7 +178,7 @@ int main(int argc, char **argv)
     }
 
     /* re-add the mount points */
-    for(i = 0; i < MAX_NUM_MNT; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         printf("Adding dynamic mount entry %d: %s\n",
                i, mntent[i].mnt_dir);
@@ -194,7 +192,7 @@ int main(int argc, char **argv)
     }
 
     /* re-resolve one more time -- to be sure ;-) */
-    for(i = 0; i < MAX_NUM_MNT; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
                                 buf, PVFS_NAME_MAX);

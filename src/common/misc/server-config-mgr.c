@@ -221,11 +221,14 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
 
 int PINT_server_config_mgr_add_config(
     struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id)
+    PVFS_fs_id fs_id,
+    int* free_config_flag)
 {
     int ret = -PVFS_EINVAL;
     server_config_t *config = NULL;
     struct qlist_head *hash_link = NULL;
+
+    *free_config_flag = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_server_config_mgr_add_"
                  "config: adding config %p\n", config_s);
@@ -245,6 +248,10 @@ int PINT_server_config_mgr_add_config(
             assert(config);
             assert(config->server_config);
             config->ref_count++;
+            /* set a flag to inform caller that we aren't using the config
+             * structure
+             */
+            *free_config_flag = 1;
             gen_mutex_unlock(s_server_config_mgr_mutex);
             return(0);
         }

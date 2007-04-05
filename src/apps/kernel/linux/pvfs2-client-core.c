@@ -646,10 +646,10 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdir request "
-                 "for %llu,%d (token %d)\n",
+                 "for %llu,%d (token %llu)\n",
                  llu(vfs_request->in_upcall.req.readdir.refn.handle),
                  vfs_request->in_upcall.req.readdir.refn.fs_id,
-                 vfs_request->in_upcall.req.readdir.token);
+                 llu(vfs_request->in_upcall.req.readdir.token));
 
     ret = PVFS_isys_readdir(
         vfs_request->in_upcall.req.readdir.refn,
@@ -671,10 +671,10 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdirplus request "
-                 "for %llu,%d (token %d)\n",
+                 "for %llu,%d (token %llu)\n",
                  llu(vfs_request->in_upcall.req.readdirplus.refn.handle),
                  vfs_request->in_upcall.req.readdirplus.refn.fs_id,
-                 vfs_request->in_upcall.req.readdirplus.token);
+                 llu(vfs_request->in_upcall.req.readdirplus.token));
 
     ret = PVFS_isys_readdirplus(
         vfs_request->in_upcall.req.readdirplus.refn,
@@ -2337,6 +2337,7 @@ static inline void package_downcall_members(
             }
 
             PVFS_util_free_mntent(vfs_request->mntent);
+            free(vfs_request->mntent);
 
             break;
         case PVFS2_VFS_OP_RENAME:
@@ -2434,7 +2435,11 @@ static inline void package_downcall_members(
             /* replace non-errno error code to avoid passing to kernel */
             if (*error_code == -PVFS_ECANCEL)
             {
-                *error_code = -PVFS_EINTR;
+                /* if an ECANCEL shows up here without going through the 
+                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is 
+                 * a better errno approximation than -PVFS_EINTR 
+                 */
+                *error_code = -PVFS_ETIMEDOUT;
             }
             break;
         case PVFS2_VFS_OP_FILE_IOX:
@@ -2464,7 +2469,11 @@ static inline void package_downcall_members(
             /* replace non-errno error code to avoid passing to kernel */
             if (*error_code == -PVFS_ECANCEL)
             {
-                *error_code = -PVFS_EINTR;
+                /* if an ECANCEL shows up here without going through the 
+                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is 
+                 * a better errno approximation than -PVFS_EINTR 
+                 */
+                *error_code = -PVFS_ETIMEDOUT;
             }
             break;
         }

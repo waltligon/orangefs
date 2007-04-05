@@ -43,6 +43,9 @@
 /* Define if db library has DB_DIRTY_READ flag */
 #undef HAVE_DB_DIRTY_READ
 
+/* Define if DB has get_pagesize function */
+#undef HAVE_DB_GET_PAGESIZE
+
 /* Define if statfs callback has struct dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
@@ -176,6 +179,9 @@
 
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
+
+/* Define to 1 if you have the <mntent.h,> header file. */
+#undef HAVE_MNTENT_H_
 
 /* Define to 1 if you have the <mntent.h,> header file. */
 #undef HAVE_MNTENT_H_

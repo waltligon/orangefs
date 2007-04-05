@@ -201,8 +201,16 @@ static void get_fs_intent(struct PVFS_server_req *req, PVFS_fs_id *fsid, int *re
             *fsid = req->u.io.fs_id;
             *read_only = (req->u.io.io_type == PVFS_IO_READ) ? 1 : 0;
             break;
+        case PVFS_SERV_SMALL_IO:
+            *fsid = req->u.small_io.fs_id;
+            *read_only = (req->u.small_io.io_type == PVFS_IO_READ) ? 1 : 0;
+            break;
         case PVFS_SERV_GETATTR:
             *fsid = req->u.getattr.fs_id;
+            *read_only = 1;
+            break;
+        case PVFS_SERV_LISTATTR:
+            *fsid = req->u.listattr.fs_id;
             *read_only = 1;
             break;
         case PVFS_SERV_SETATTR:
@@ -293,7 +301,8 @@ static void get_fs_intent(struct PVFS_server_req *req, PVFS_fs_id *fsid, int *re
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_GETCONFIG:
-        default:
+        case PVFS_SERV_NUM_OPS:
+        case PVFS_SERV_INVALID:
             *fsid = PVFS_FS_ID_NULL;
             *read_only = -1;
             break;
@@ -463,6 +472,8 @@ static int prelude_perm_check(
     PVFS_gid translated_gid = s_op->req->credentials.gid;
     PVFS_fs_id  fsid;
     int  rdonly = -1;
+    int squashed_flag = 0;
+    int skip_acl_flag = 0;
 
     /* moved gossip server debug output to end of state, so we can report
      * resulting status value.
@@ -498,6 +509,7 @@ static int prelude_perm_check(
         js_p->error_code = 0;
     }
 #endif
+    
     get_fs_intent(s_op->req, &fsid, &rdonly);
     if (fsid != PVFS_FS_ID_NULL)
     {
@@ -516,6 +528,7 @@ static int prelude_perm_check(
             if (translate_ids(fsid, s_op->req->credentials.uid, s_op->req->credentials.gid,
                 &translated_uid, &translated_gid, s_op->addr) == 1)
             {
+                squashed_flag = 1;
                 s_op->req->credentials.uid = translated_uid;
                 s_op->req->credentials.gid = translated_gid;
                 /* in the case of a setattr, translate the ids as well right here */
@@ -618,7 +631,25 @@ static int prelude_perm_check(
             }
             break;
         case PINT_SERVER_CHECK_NONE:
-            js_p->error_code = 0;
+            if(squashed_flag && !rdonly && ((s_op->req->op == PVFS_SERV_IO) ||
+                (s_op->req->op == PVFS_SERV_SMALL_IO) ||
+                (s_op->req->op == PVFS_SERV_TRUNCATE)))
+            {
+                /* special case:
+                 * If we have been squashed, deny write permission to the
+                 * file system.  At the datafile level we don't have enough
+                 * attribute information to figure out if the nobody/guest
+                 * user has permission to write or not, so we disallow all
+                 * writes to be safe.  Not perfect semantics, but better
+                 * than being too permissive.
+                 */
+                skip_acl_flag = 1;
+                js_p->error_code = -PVFS_EACCES;
+            }
+            else
+            {
+                js_p->error_code = 0;
+            }
             break;
         case PINT_SERVER_CHECK_INVALID:
             js_p->error_code = -PVFS_EINVAL;
@@ -636,7 +667,7 @@ static int prelude_perm_check(
         PINT_map_server_op_to_string(s_op->req->op),
 	js_p->error_code);
     /* If regular checks fail, we need to run acl checks */
-    if (js_p->error_code == -PVFS_EACCES)
+    if (js_p->error_code == -PVFS_EACCES && !skip_acl_flag)
         js_p->error_code = PRELUDE_RUN_ACL_CHECKS;
     return 1;
 }

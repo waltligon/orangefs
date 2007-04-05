@@ -32,6 +32,7 @@ enum
     IO_NO_DATA = 132,
     IO_DATAFILE_TRANSFERS_COMPLETE,
     IO_RETRY,
+    IO_RETRY_NODELAY,
     IO_GET_DATAFILE_SIZE,
     IO_ANALYZE_SIZE_RESULTS,
     IO_DO_SMALL_IO
@@ -390,7 +391,8 @@ static int io_init(PINT_client_sm *sm_p,
         PVFS_TYPE_METAFILE,
         0);
        
-    if (js_p->error_code == IO_RETRY)
+    if (js_p->error_code == IO_RETRY ||
+        (js_p->error_code == IO_RETRY_NODELAY))
     {
         js_p->error_code = 0;
 
@@ -403,6 +405,13 @@ static int io_init(PINT_client_sm *sm_p,
             return 1;
         }
 
+        if(js_p->error_code == IO_RETRY_NODELAY)
+        {
+            gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying without delay.\n");
+            js_p->error_code = 0;
+            return 1;
+        }
+        gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying with delay.\n");
         return job_req_sched_post_timer(
             sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
             pint_client_sm_context);
@@ -1272,7 +1281,18 @@ static int io_analyze_results(PINT_client_sm *sm_p,
         gossip_debug(GOSSIP_IO_DEBUG, "Retrying I/O operation "
                      "(attempt number %d)\n", sm_p->u.io.retry_count);
 
-        js_p->error_code = IO_RETRY;
+        if(ret == -BMI_ECANCEL)
+        {
+            /* if we got a BMI cancellation, then it probably indicates a
+             * that a BMI timeout has expired; we should retry without
+             * introducing another delay
+             */
+            js_p->error_code = IO_RETRY_NODELAY;
+        }
+        else
+        {
+            js_p->error_code = IO_RETRY;
+        }
         goto analyze_results_exit;
     }
 

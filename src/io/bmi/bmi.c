@@ -1972,6 +1972,7 @@ case err: bmi_errno = BMI_##err; break
         __CASE(EHOSTUNREACH);
         __CASE(EALREADY);
         __CASE(EACCES);
+        __CASE(ECONNRESET);
 #undef __CASE
     }
     return bmi_errno;

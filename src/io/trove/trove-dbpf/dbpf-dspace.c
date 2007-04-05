@@ -59,7 +59,6 @@ union dbpf_dspace_recno_handle_key
     TROVE_handle handle;
 };
 
-
 int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 
 static inline void organize_post_op_statistics(

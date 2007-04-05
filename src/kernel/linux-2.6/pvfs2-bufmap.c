@@ -331,6 +331,7 @@ static int wait_for_a_slot(struct slot_args *slargs, int *buffer_index)
             if (!schedule_timeout(timeout))
             {
                 gossip_debug(GOSSIP_BUFMAP_DEBUG, "*** wait_for_a_slot timed out\n");
+                ret = -ETIMEDOUT;
                 break;
             }
             continue;

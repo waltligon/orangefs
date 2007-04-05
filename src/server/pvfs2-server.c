@@ -96,6 +96,8 @@ static pid_t server_controlling_pid = 0;
 static QLIST_HEAD(posted_sop_list);
 /* A list of all serv_op's posted for expected messages alone */
 static QLIST_HEAD(inprogress_sop_list);
+/* A list of all serv_op's that are started automatically without requests */
+static QLIST_HEAD(noreq_sop_list);
 
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
@@ -1918,6 +1920,9 @@ int server_state_machine_start_noreq(PINT_server_op *new_op)
 
     if (new_op)
     {
+        /* add to list of state machines started without a request */
+        qlist_add_tail(&new_op->next, &noreq_sop_list);
+
         /* execute first state */
         ret = PINT_state_machine_invoke(new_op, &tmp_status);
         if (ret < 0)
