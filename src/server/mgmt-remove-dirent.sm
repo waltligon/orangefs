@@ -113,7 +113,7 @@ static int mgmt_remove_dirent(
         s_op->u.mgmt_remove_dirent.dirdata_handle,
         &s_op->key,
         NULL,
-        TROVE_SYNC,
+        TROVE_SYNC | TROVE_KEYVAL_HANDLE_COUNT,
         NULL,
         s_op,
         0,

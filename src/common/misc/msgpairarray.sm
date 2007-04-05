@@ -47,7 +47,8 @@
 enum
 {
     MSGPAIRS_COMPLETE = 190,
-    MSGPAIRS_RETRY = 191
+    MSGPAIRS_RETRY = 191,
+    MSGPAIRS_RETRY_NODELAY = 192
 };
 
 static int msgpairarray_init(
@@ -95,6 +96,7 @@ nested machine pvfs2_msgpairarray_sm
     {
         run msgpairarray_completion_fn;
         MSGPAIRS_RETRY => post_retry;
+        MSGPAIRS_RETRY_NODELAY => post;
         default => return;
     }
 }
@@ -621,7 +623,21 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
                 gossip_debug(GOSSIP_MSGPAIR_DEBUG,
                   "*** %s: msgpair %d failed, retry %d\n",
                   __func__, i, msg_p->retry_count);
-                js_p->error_code = MSGPAIRS_RETRY;
+                if(msg_p->op_status == -BMI_ECANCEL)
+                {
+                    /* if the error code indicates cancel, then skip the
+                     * delay.  We have probably already been waiting a while
+                     */
+                    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                       "*** %s: msgpair skipping retry delay.\n", __func__);
+                    js_p->error_code = MSGPAIRS_RETRY_NODELAY;
+                }
+                else
+                {
+                    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                       "*** %s: msgpair retrying after delay.\n", __func__);
+                    js_p->error_code = MSGPAIRS_RETRY;
+                }
 
             } else {
                 char s[1024];

@@ -75,6 +75,9 @@ int PVFS_mgmt_get_config(
 
     mntent.fs_id = *fsid;
 
+    mntent.pvfs_fs_name = cur_fs->file_system_name;
+    sm_p->u.get_config.config = config;
+
     sm_p->msgpair.enc_type = cur_fs->encoding;
 
     sm_p->u.get_config.mntent = &mntent;
