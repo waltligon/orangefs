@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <limits.h>
+#include <../src/common/quicklist/quicklist.h>
 #endif
 
 #ifndef INT32_MAX
@@ -409,6 +410,14 @@ typedef struct {
     uint32_t p_id;
 } pvfs2_acl_entry;
 
+/* PVFS2 lock_id linked list structure */
+typedef struct {
+    PVFS_id_gen_t *lock_id_arr; /* Lock id for each respective server */
+    PVFS_handle *datafile_handle_arr; /* Server dfile array */
+    int lock_id_arr_count;
+    struct qlist_head lock_link;
+} PVFS_lock_id_list;
+
 /* These defines match that of the POSIX defines */
 #define PVFS2_ACL_UNDEFINED_ID   (-1)
 
@@ -712,13 +721,27 @@ typedef struct
 PVFS_error_details *PVFS_error_details_new(int count);
 void PVFS_error_details_free(PVFS_error_details *details);
 
-/* PVFS lock operation types, used in both system and server
- * interfaces. */
+/* PVFS lock operation types - client */
 
-enum PVFS_lock_type
+enum PVFS_client_lock_type
 {
-    PVFS_ACQUIRE = 1,
-    PVFS_RELEASE = 2
+    PVFS_CLIENT_ACQUIRE_TWO_PHASE = 0,
+    PVFS_CLIENT_ACQUIRE_ONE_TRY   = 1,
+    PVFS_CLIENT_ACQUIRE_ALT_TRY   = 2,
+    PVFS_CLIENT_RELEASE           = 3
+};
+
+/* PVFS lock operation types - server */
+
+enum PVFS_server_lock_type
+{
+    PVFS_SERVER_LOCK_INIT            = 4,
+    PVFS_SERVER_ACQUIRE_NEW_NONBLOCK = 5,
+    PVFS_SERVER_ACQUIRE_NEW_BLOCK    = 6,
+    PVFS_SERVER_ACQUIRE_NONBLOCK     = 7,
+    PVFS_SERVER_ACQUIRE_BLOCK        = 8,
+    PVFS_SERVER_RELEASE_SOME         = 9,
+    PVFS_SERVER_RELEASE_ALL          = 10
 };
 
 /** PVFS I/O operation types, used in both system and server interfaces.
