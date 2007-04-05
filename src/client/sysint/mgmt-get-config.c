@@ -94,10 +94,10 @@ int PVFS_mgmt_get_config(
     }
     else
     {
-        ret = PVFS_sys_wait(op_id, "X-get_config", &error);
+        ret = PVFS_mgmt_wait(op_id, "X-get_config", &error);
         if (ret)
         {
-            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
             error = ret;
         }
     }
@@ -129,7 +129,7 @@ int PVFS_mgmt_get_config(
         sm_p->u.get_config.server_config_buf = NULL;
     }
 
-    PVFS_sys_release(op_id);
+    PVFS_mgmt_release(op_id);
     return error;
 }
 

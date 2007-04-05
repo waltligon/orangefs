@@ -768,10 +768,9 @@ static int server_initialize(
         ret = gossip_enable_file(server_config.logfile, "a");
         if (ret < 0)
         {
-            int tmp_errno = errno;
             gossip_lerr("error opening log file %s\n",
                         server_config.logfile);
-            return -tmp_errno;
+            return ret;
         }
         /* log starting message again so it appears in log file, not just
          * console
