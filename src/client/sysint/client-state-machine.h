@@ -27,6 +27,7 @@
 #include "msgpairarray.h"
 #include "pint-sysint-utils.h"
 #include "pint-perf-counter.h"
+#include "heap.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
@@ -140,70 +141,36 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
     PVFS_handle *dirdata_handle;
 };
 
-typedef struct
+typedef struct PINT_server_lock_info_s
 {
-    /* the index of the current context (in the context array) */
+    PVFS_offset last_abs_offset_locked;
+    PVFS_offset next_abs_offset;
+    heap_node_t *heap_node_p;
     int index;
-
-    /* the metafile's dfile server index we're communicating with */
-    int server_nr;
-
-    /* the data handle we're responsible for doing I/O on */
-    PVFS_handle data_handle;
-
-    /* a reference to the msgpair we're using for communication */
-    PINT_sm_msgpair_state msg;
-
-    /* First 'x' amount of bytes granted to the lock */
-    PVFS_size bytes_granted;
-    PVFS_msg_tag_t session_tag;
-
-    PINT_client_sm_recv_state req_ack;
-
-    /*
-      all *_has_been_posted fields are used at lock_analyze_results time
-      to know if we should be checking for errors on particular fields
-    */
-    int msg_send_has_been_posted;
-    int msg_recv_has_been_posted;
-    int write_ack_has_been_posted;
-
-    /*
-      all *_in_progress fields are used at cancellation time to
-      determine what operations are currently in flight
-    */
-    int msg_send_in_progress;
-    int msg_recv_in_progress;
-    int write_ack_in_progress;
-
-} PINT_client_lock_ctx;
+} PINT_server_lock_info;
 
 struct PINT_client_lock_sm
 {
     /* input parameters */
     enum PVFS_io_type io_type;
-    enum PVFS_lock_type lock_type;
+    enum PVFS_client_lock_type lock_type;
+    enum PVFS_server_lock_type lock_server_cur_method;
+    PVFS_Request mem_req;
     PVFS_Request file_req;
     PVFS_offset file_req_offset;
-    PVFS_Request mem_req;
+    PINT_server_lock_info *server_lock_info_arr;
+    heap_t server_heap;
+    int server_incomplete_count;
 
     /* output parameters */
+    struct qlist_head *lock_id_list_head_p;
+    PVFS_lock_id_list *cur_lock_id_list_p;
     PVFS_sysresp_lock *lock_resp_p;
-    PVFS_id_gen_t **lock_id_arr_p;
-    int *lock_id_arr_count_p;
 
     enum PVFS_encoding_type encoding;
 
     int *datafile_index_array;
     int datafile_count;
-
-    int msgpair_completion_count;
-    int ack_completion_count;
-
-    PINT_client_lock_ctx *contexts;
-    int context_count;
-
-    int total_cancellations_remaining;
 
     int retry_count;
     int stored_error_code;
