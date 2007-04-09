@@ -728,12 +728,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
             case PVFS_SERV_LOCK:
 		decode_free(req->u.lock.io_dist);
-		if (req->u.lock.file_req)
-		    decode_free(req->u.lock.file_req);
-/* AC - This information cannot be freed since it is necessary for the
-  lock_req.  Therefore, I will free it manually later on
 
-*/
+                /* AC - This information cannot be freed when there is
+		   a lock request is new since it is necessary for the
+		   lock_req.  Therefore, I will free it manually later
+		   on*/
+		if (req->u.lock.file_req != NULL)
+		    decode_free(req->u.lock.file_req);
                 break;
 
 	    case PVFS_SERV_IO:
