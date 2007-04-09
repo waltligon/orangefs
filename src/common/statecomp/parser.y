@@ -63,15 +63,15 @@ state_machine_list : state_machine
 		   | state_machine state_machine_list
 		   ;
 
-state_machine	  : .NESTED. MACHINE identifier LBRACE state_def_list RBRACE
+state_machine	  : NESTED MACHINE identifier LBRACE state_def_list RBRACE
 		    {
 			gen_machine($3);
 		    }
-		  ;
-
-.NESTED.	  : /* empty */
-		  | NESTED  /* ignored */
-		  ;
+		  | MACHINE identifier LBRACE state_def_list RBRACE
+                    {
+			gen_machine($2);
+		    }
+                  ;
 
 state_def_list	  : state_def
 		  | state_def state_def_list

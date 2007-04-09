@@ -144,9 +144,9 @@ BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
 # make sure the srcdir include gets included first
 CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
-LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
+LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
-SERVER_LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
+SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 SERVER_LDFLAGS += @SERVER_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared
@@ -287,8 +287,8 @@ ifdef BUILD_GM
 	# TODO: later on we will want the ability to modify this at configure
 	# time
 	CFLAGS += -DENABLE_GM_BUFPOOL
-	LDFLAGS += -L @GM_HOME@/lib
-	SERVER_LDFLAGS += -L @GM_HOME@/lib
+	LDFLAGS += -L@GM_HOME@/lib
+	SERVER_LDFLAGS += -L@GM_HOME@/lib
 	LIBS += -lgm
 	LIBS_THREADED += -lgm
 	SERVERLIBS += -lgm
@@ -303,8 +303,8 @@ ifdef BUILD_MX
 	# TODO: later on we will want the ability to modify this at configure
 	# time
 	CFLAGS += -g -O0
-	LDFLAGS += -L @MX_HOME@/lib
-	SERVER_LDFLAGS += -L @MX_HOME@/lib
+	LDFLAGS += -L@MX_HOME@/lib
+	SERVER_LDFLAGS += -L@MX_HOME@/lib
 	LIBS += -lmyriexpress -lpthread
 	LIBS_THREADED += -lmyriexpress -lpthread
 	SERVERLIBS += -lmyriexpress -lpthread
