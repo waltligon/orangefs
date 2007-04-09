@@ -473,6 +473,9 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	}
 	else /* Process request if necessary then get the next piece */
 	{
+	    assert(lock_req_p->seg_num <= lock_req_p->lock_result_p->segs - 1);
+	    assert(lock_req_p->seg_bytes_used <= 
+		   size_arr[lock_req_p->seg_num]);
 	    if ((lock_req_p->seg_num == 
 		 (lock_req_p->lock_result_p->segs - 1)) &&
 		(lock_req_p->seg_bytes_used == size_arr[lock_req_p->seg_num]))
@@ -494,6 +497,12 @@ static inline int add_locks(lock_req_t *lock_req_p,
 		    ret = -PVFS_EINVAL;
 		    break;
 		}
+		
+		/* Might finish here for some reason */
+		if ((PINT_REQUEST_DONE(lock_req_p->file_req_state)) &&
+		    (lock_req_p->lock_result_p->segs == 0))
+		    break;
+
 		lock_req_p->seg_num = 0;
 		lock_req_p->seg_bytes_used = 0;
 	    }
@@ -506,7 +515,7 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	}
 
 	gossip_debug(GOSSIP_LOCK_DEBUG,
-		     "add_locks: Lock (local off=%Ld,size=%Ld) "
+		     "add_locks: Lock (local off=%Ld,end=%Ld) "
 		     "max_abs_off=%Ld...\n",
 		     tmp_start_offset,
 		     tmp_end_offset,
