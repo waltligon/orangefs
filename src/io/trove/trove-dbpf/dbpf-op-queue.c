@@ -18,10 +18,10 @@ gen_mutex_t dbpf_op_queue_mutex = GEN_MUTEX_INITIALIZER;
 
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
-extern pthread_cond_t dbpf_op_completed_cond;
 
 #ifdef __PVFS2_TROVE_THREADED__
 extern pthread_cond_t dbpf_op_incoming_cond;
+extern pthread_cond_t dbpf_op_completed_cond;
 #endif
 
 /* dbpf_queued_op_put_and_dequeue()
@@ -346,6 +346,13 @@ int dbpf_queue_or_service(
             goto exit;
         }
 
+        /* only one that allocs anything, see dbpf_queued_op_free */
+        if(op_p->type == DSPACE_CREATE)
+        {
+            free(op_p->u.d_create.extent_array.extent_array);
+            op_p->u.d_create.extent_array.extent_array = NULL;
+        }
+
         ret = 1;
 
     }
@@ -361,10 +368,9 @@ exit:
 }
 
 int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
-                            TROVE_ds_state ret,
                             enum dbpf_op_state state)
 {
-    DBPF_COMPLETION_START(qop_p, ret, state);
+    DBPF_COMPLETION_START(qop_p, state);
     DBPF_COMPLETION_SIGNAL();
     DBPF_COMPLETION_FINISH(qop_p->op.context_id);
     return 0;

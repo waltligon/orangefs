@@ -34,9 +34,7 @@ static PINT_sm_action sys_statfs_cleanup(
 
 %%
 
-machine pvfs2_client_statfs_sm(
-    run_nested,
-    cleanup)
+machine pvfs2_client_statfs_sm
 {
     state run_nested
     {

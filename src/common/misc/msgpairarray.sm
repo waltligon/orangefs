@@ -63,12 +63,7 @@ static PINT_sm_action  msgpairarray_completion_fn(
 
 %%
 
-nested machine pvfs2_msgpairarray_sm(
-    init,
-    post,
-    post_retry,
-    complete,
-    completion_fn)
+nested machine pvfs2_msgpairarray_sm
 {
     state init
     {
@@ -165,19 +160,18 @@ static PINT_sm_action msgpairarray_post(
     PVFS_msg_tag_t session_tag;
     PINT_sm_msgpair_state *msg_p = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
-    int num_incomplete_msgpairs = (sm_p->msgarray_params.comp_ct / 2);
     int must_loop_encodings = 0;
     int local_enc_and_alloc = 0;
 
     gossip_debug(
         GOSSIP_MSGPAIR_DEBUG, "%s: sm %p "
         "%d total message(s) with %d incomplete\n", __func__, smcb,
-        sm_p->msgarray_count * 2, num_incomplete_msgpairs * 2);
+        sm_p->msgarray_count * 2, sm_p->msgarray_params.comp_ct);
 
     js_p->error_code = 0;
 
     assert(sm_p->msgarray_count > 0);
-    assert(num_incomplete_msgpairs && sm_p->msgarray_params.comp_ct);
+    assert(sm_p->msgarray_params.comp_ct >= 2);
 
     for (i = 0; i < sm_p->msgarray_count; i++)
     {

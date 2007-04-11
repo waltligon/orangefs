@@ -7,7 +7,6 @@
 #ifndef __STATE_MACHINE_H
 #define __STATE_MACHINE_H
 
-#include <state-machine-values.h>
 #include "job.h"
 #include "msgpairarray.h"
 
@@ -38,6 +37,24 @@
  * functions that must be defined, in particular some sort of initialization
  * function.  See src/server/server-state-machine.c for examples.
  */
+
+enum PINT_state_code {
+    SM_NONE   = 0,
+    SM_NEXT   = 1,
+    SM_RETURN = 2,
+    SM_EXTERN = 3,
+    SM_NESTED = 5,
+    SM_JUMP   = 6,
+    SM_TERM   = 7,
+    SM_PJMP   = 8,
+    SM_RUN     = 9
+};
+
+/* these define things like stack size and so forth for the common
+ * state machine code.
+ */
+#define PINT_STATE_STACK_SIZE 8
+#define PINT_FRAME_STACK_SIZE 8
 
 struct PINT_frame_s
 {

@@ -13,55 +13,109 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "state-machine-values.h"
+#include "statecomp.h"
 
 extern FILE *out_file;
 extern int terminate_path_flag;
 static char *current_machine;
 static int needcomma = 1;
 
-void gen_init(void);
-void gen_state_decl(char *state_name);
-void gen_machine(char *machine_name, char *first_state_name);
-void gen_state_start(char *state_name);
-void gen_state_action(char *run_func, int flag, char *state_action);
-void gen_trtbl(char *state_name);
-void gen_pjtbl(char *state_name);
+static void gen_state_decl(char *state_name);
+void gen_state_start(char *state_name, char *machine_name);
+void gen_state_action(enum state_action action,
+                             char *run_func, char *state_name);
 void gen_return_code(char *return_code);
-void gen_next_state(int flag, char *new_state);
+void gen_next_state(enum transition_type type, char *new_state);
 void gen_state_end(void);
 
-void gen_init(void)
+char *current_machine_name(void);
+
+void gen_machine(char *machine_name)
 {
-    return;
+    struct state *s, *snext;
+    struct transition *t, *tnext;
+    struct task *task, *tasknext;
+
+    current_machine = machine_name;
+
+    if (states == NULL)
+        fprintf(stderr, "%s: no states declared in machine %s\n", __func__,
+                machine_name);
+
+    /* dump forward declarations of all the states */
+    for (s=states; s; s=s->next)
+        gen_state_decl(s->name);
+
+    /* delcare the machine start point */
+    fprintf(out_file, "\nstruct PINT_state_machine_s %s = {\n", machine_name);
+    fprintf(out_file, "\t.name = \"%s\",\n", machine_name);
+    fprintf(out_file, "\t.first_state = &ST_%s\n", states->name);
+    fprintf(out_file, "};\n\n");
+
+    /* generate all output */
+    for (s=states; s; s=s->next) {
+        gen_state_start(s->name, machine_name);
+        gen_state_action(s->action, s->function_or_machine, s->name);
+        if(s->action == ACTION_PJMP)
+        {
+            gen_pjtbl(s->name);
+
+            /* if there are tasks (the action must be a pjmp) so we output
+             * stuff for the tasks
+             */
+            for (task=s->task; task; task=task->next)
+            {
+                gen_return_code(task->return_code);
+                gen_next_state(TRANS_PJMP, task->task_name);
+            }
+        }
+
+        gen_trtbl(s->name);
+
+        for (t=s->transition; t; t=t->next) {
+            gen_return_code(t->return_code);
+            gen_next_state(t->type, t->next_state);
+        }
+        gen_state_end();
+    }
+
+    /* purge for next machine */
+    for (s=states; s; s=snext) {
+        for (task=s->task; task; task=tasknext)
+        {
+            tasknext = task->next;
+            free(task->return_code);
+            free(task);
+        }
+
+        for (t=s->transition; t; t=tnext) {
+            tnext = t->next;
+            free(t->return_code);
+            free(t);
+        }
+        snext = s->next;
+        free(s->name);
+        free(s);
+    }
+    states = NULL;
 }
 
-void gen_state_decl(char *state_name)
+static void gen_state_decl(char *state_name)
 {
     fprintf(out_file, "static struct PINT_state_s ST_%s;\n", state_name);
-    fprintf(out_file, "static struct PINT_pjmp_tbl_s ST_%s_pjtbl[];\n",
+    fprintf(out_file, "static struct PINT_pjmp_tbl_s ST_%s_pjtbl[];\n", 
             state_name);
     fprintf(out_file, "static struct PINT_tran_tbl_s ST_%s_trtbl[];\n",
             state_name);
 }
 
-void gen_machine(char *machine_name,
-		 char *first_state_name)
-{
-    current_machine = machine_name;
-    fprintf(out_file, "\nstruct PINT_state_machine_s %s = {\n", machine_name);
-    fprintf(out_file, "\t.name = \"%s\",\n", machine_name);
-    fprintf(out_file, "\t.first_state = &ST_%s\n", first_state_name);
-    fprintf(out_file, "};\n\n");
-}
-
-void gen_state_start(char *state_name)
+void gen_state_start(char *state_name, char *machine_name)
 {
     fprintf(out_file,
             "static struct PINT_state_s ST_%s = {\n"
             "\t .state_name = \"%s\" ,\n"
-            "\t .parent_machine = &%s ,\n" ,
-            state_name, state_name, current_machine);
+            "\t .parent_machine = &%s ,\n",
+            state_name, state_name, machine_name);
 }
 
 /** generates first two lines in the state machine (I think),
@@ -69,32 +123,29 @@ void gen_state_start(char *state_name)
  * or "jump") and the second being the action itself (either a
  * function or a nested state machine).
  */
-void gen_state_action(char *run_func, int flag, char *state_name)
+void gen_state_action(enum state_action action,
+                             char *run_func,
+                             char *state_name)
 {
-    switch (flag) {
-	case SM_RUN:
+    switch (action) {
+	case ACTION_RUN:
 	    fprintf(out_file, "\t .flag = SM_RUN ,\n");
             fprintf(out_file, "\t .action.func = %s ,\n", run_func);
             fprintf(out_file,"\t .pjtbl = NULL ,\n");
             fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
 	    break;
-	case SM_PJMP:
+	case ACTION_PJMP:
 	    fprintf(out_file, "\t .flag = SM_PJMP ,\n");
             fprintf(out_file, "\t .action.func = &%s ,\n", run_func);
             fprintf(out_file,"\t .pjtbl = ST_%s_pjtbl ,\n", state_name);
             fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
 	    break;
-	case SM_JUMP:
+	case ACTION_JUMP:
 	    fprintf(out_file, "\t .flag = SM_JUMP ,\n");
             fprintf(out_file, "\t .action.nested = &%s ,\n", run_func);
             fprintf(out_file,"\t .pjtbl = NULL ,\n");
             fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
 	    break;
-	default:
-	    fprintf(stderr,
-		    "invalid flag associated with action %s\n",
-		    run_func);
-	    exit(1);
     }
     /* generate the end of the state struct with refs to jump tbls */
 }
@@ -125,31 +176,27 @@ void gen_return_code(char *return_code)
     needcomma = 1;
 }
 
-void gen_next_state(int flag, char *new_state)
+void gen_next_state(enum transition_type type, char *new_state)
 {
     if (needcomma)
     {
         fprintf(out_file,",\n");
     }
-    switch (flag) {
-	case SM_PJMP:
-	    fprintf(out_file, "\t .state_machine = &%s }", new_state);
+    switch (type) {
+	case TRANS_PJMP:
+	    fprintf(out_file, "\n\t .state_machine = &%s }", new_state);
 	    break;
-	case SM_NEXT:
+	case TRANS_NEXT_STATE:
 	    fprintf(out_file, "\t .next_state = &ST_%s }", new_state);
 	    break;
-	case SM_RETURN:
+	case TRANS_RETURN:
 	    terminate_path_flag = 1;
 	    fprintf(out_file, "\t .flag = SM_RETURN }");
 	    break;
-	case SM_TERM:
+	case TRANS_TERMINATE:
 	    terminate_path_flag = 1;
-	    fprintf(out_file, "\t .flag = SM_TERM }");
+	    fprintf(out_file, "\n\t .flag = SM_TERM }");
 	    break;
-	default:
-	    fprintf(stderr,
-		    "invalid flag associated with target (no more info)\n");
-	    exit(1);
     }
     needcomma = 1;
 }

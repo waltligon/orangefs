@@ -16,24 +16,30 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "statecomp-symbol.h"
+#include "statecomp.h"
 #include "state-machine-values.h"
 
-char *enter_string(char *);
-void gen_init(void);
-void gen_state_decl(char *state_name);
-void gen_state_array(char *machine_name, char *first_state_name);
-void gen_state_start(char *state_name);
-void gen_state_action(char *run_func, int flag, char *state_name);
-void gen_trtbl(char *state_name);
-void gen_pjtbl(char *state_name);
-void gen_return_code(char *return_code);
-void gen_next_state(int flag, char *new_state);
-void gen_state_end(void);
-void gen_machine(char *machine_name, char *first_state_name);
+/* We never use this, disable default. */
+#define YY_LOCATION_PRINT 0
 
-int yylex(void);
-void yyerror(char *);
+/* No NLS. */
+#define YYENABLE_NLS 0
+
+/* building these things up as the rules go */
+static struct state *cur_state;
+static struct transition *cur_transition;
+static struct task *cur_task;
+
+void gen_state_start(char *state_name, char *machine_name);
+void gen_state_action(enum state_action action,
+                             char *run_func, char *state_name);
+void gen_return_code(char *return_code);
+void gen_next_state(enum transition_type type, char *new_state);
+void gen_state_end(void);
+char *current_machine_name(void);
+
+/* in scanner.l generated code */
+extern int yylex(void);
 
 /*
  * Local variables:
@@ -51,17 +57,13 @@ void yyerror(char *);
 %error-verbose
 
 %union{
-   int i;
-   double f;
-   char *c;
-   sym_ent *s;
+    int i;
+    char *c;
 };
 
 %token <i> MACHINE
 %token <i> NESTED
-%token <i> INIT
 %token <i> STATE
-%token <i> EXTERN
 %token <i> RUN
 %token <i> PJMP
 %token <i> JUMP
@@ -71,173 +73,108 @@ void yyerror(char *);
 %token <c> DEFAULT
 %token <i> LBRACE
 %token <i> RBRACE
-%token <i> LPAREN
-%token <i> RPAREN
-%token <i> COMMA
 %token <i> SEMICOLON
 %token <i> ARROW
 %token <c> IDENTIFIER
-%token <c> INTVAL
 
-%type <i> .state_body. state_body state_action .NESTED. .EXTERN.
+%type <i> state_body state_action
 
-%type <c> identifier return_code
+%type <c> identifier return_code transition transition_list
 
-%type <s> state_decl_list .state_decl_list. state_decl
-	  state_def state_def_list .state_def_list.
-	  transition transition_list state_machine target state_machine_list
-	  task task_list
+%type <i>  state_def state_machine target state_machine_list
+	   task task_list
 
 %start state_machine_list
 
 %%
 
-state_machine_list : state_machine 
-		  | state_machine state_machine_list
-		  ;
+state_machine_list : state_machine
+		   | state_machine state_machine_list
+		   ;
 
-state_machine	  : .NESTED. MACHINE identifier
-			{$$ = symenter($3);
-			 $$->type = TYPE_MACHINE;
-			 $$->flag = $1;}
-		     LPAREN .state_decl_list. RPAREN LBRACE
-			{gen_machine($3, $6->name);}
-		    .state_def_list. RBRACE
-			 {;}
-		  ;
-
-.NESTED.	  : /* empty */
-		     {$$ = SM_NONE;}
-		  | NESTED
-		     {$$ = SM_NESTED;}
-		  ;
-
-.state_decl_list. : /* empty */
-		     {$$ = NULL;}
-		  | state_decl_list
-		  ;
-
-state_decl_list   : state_decl
-		  | state_decl COMMA state_decl_list
-		  ;
-
-state_decl	  : .EXTERN. identifier
-		     {$$ = symlook($2);
-		      if ($$ != NULL) {
-			 fprintf(stderr,"identifier already declared %s\n", $2);
-			 exit(1);
-		      } 
-		      else {
-			 $$ = symenter($2);
-			 $$->type = TYPE_STATE;
-			 $$->flag = $1;
-			 gen_state_decl($2);}}
-		  ;
-
-.EXTERN.	  : /* empty */
-		     {$$ = SM_NONE;}
-		  | EXTERN 
-		     {$$ = SM_EXTERN;}
-		  ;
-
-.state_def_list.  : /* empty */
-		     {$$ = NULL;}
-		  | state_def_list
+state_machine	  : NESTED MACHINE identifier LBRACE state_def_list RBRACE
+		    {
+			gen_machine($3);
+		    }
+		  | MACHINE identifier LBRACE state_def_list RBRACE
+                    {
+			gen_machine($2);
+		    }
 		  ;
 
 state_def_list	  : state_def
 		  | state_def state_def_list
 		  ;
 
-state_def  : STATE identifier LBRACE
-		    		  {$$ = symlook($2);
-		      		if ($$->type != TYPE_STATE)
-						{
-			 				fprintf(stderr,"bad state identifier %s\n", $2);
-			 				fprintf(stderr,"declared as another type\n");
-			 				exit(1);
-		      		} else{
-			 		 		gen_state_start($2);}
-						}
-		    	.state_body. RBRACE
-		      		{gen_state_end();}
+state_def	  : STATE identifier LBRACE
+		    {
+			cur_state = new_state($2);
+                    }
+		    state_body RBRACE
 		  ;
 
-.state_body.	  : /* empty */
-		     {$$ = 0;}
-		  | state_body
-		  ;
-
-state_body	  : state_action
-						{gen_trtbl($<c>-2);}
-					transition_list
+state_body	  : state_action transition_list
 		  ;
 
 state_action	  : RUN identifier SEMICOLON
-		     {gen_state_action($2, SM_RUN, $<c>-2);}
-		  | PJMP identifier
-		  	  {gen_state_action($2, SM_PJMP, $<c>-2);}
-		  	 LBRACE
-			  {gen_pjtbl($<c>-2);}
-			 task_list RBRACE
+		    {
+			cur_state->action = ACTION_RUN;
+			cur_state->function_or_machine = $2;
+		    }
 		  | JUMP identifier SEMICOLON
-		     {gen_state_action($2, SM_JUMP, $<c>-2);}
+		    {
+			 cur_state->action = ACTION_JUMP;
+			 cur_state->function_or_machine = $2;
+		    }
+		  | PJMP identifier LBRACE task_list RBRACE
+		    {
+			cur_state->action = ACTION_PJMP;
+			cur_state->function_or_machine = $2;
+		    }
 		  ;
 
 task_list	: task
-		  | task task_list
+		| task task_list
 		  ;
 
-task	: return_code
-			{gen_return_code($1);}
-			ARROW identifier SEMICOLON
-			{gen_next_state(SM_PJMP, $4);}
-		  ;
+task    : return_code ARROW identifier SEMICOLON
+	  {
+	      cur_task = new_task(cur_state, $1, $3);
+	  }
 
-transition_list   : transition 
+transition_list   : transition
 		  | transition transition_list
 		  ;
 
-transition	  : return_code
-		      {gen_return_code($1);}
-		    ARROW target SEMICOLON
-		     {$$ = $4;}
+transition	  : return_code ARROW
+		    {
+			cur_transition = new_transition(cur_state, $1);
+		    }
+		    target SEMICOLON
 		  ;
 
-target  : identifier
-		     {$$ = symlook($1);
-		      if ($$ == NULL){
-					fprintf(stderr,"jump to undeclared state %s\n", $1);
-			 		exit(1);
-		      }else{
-			      gen_next_state(SM_NEXT, $$->name);
-				}
-			  }
+target            : identifier
+		    {
+			cur_transition->type = TRANS_NEXT_STATE;
+			cur_transition->next_state = $1;
+		    }
 		  | STATE_RETURN
-		     {$$ = NULL;
-		      gen_next_state(SM_RETURN, NULL);}
+		    {
+			cur_transition->type = TRANS_RETURN;
+		    }
 		  | STATE_TERMINATE
-		     {$$ = NULL;
-		      gen_next_state(SM_TERM, NULL);}
+		    {
+		  	cur_transition->type = TRANS_TERMINATE;
+		    }
 		  ;
 
-return_code	  : SUCCESS {$$ = "0";}
-		  | INTVAL {$$ = enter_string($1);}
-		  | identifier {$$ = $1;} /* check for decl */
-		  | DEFAULT {$$ = "-1";}
+return_code	  : SUCCESS {$$ = estrdup("0");}
+		  | DEFAULT {$$ = estrdup("-1");}
+		  | identifier {$$ = $1;}
 		  ;
 
-identifier	  : IDENTIFIER {$$ = enter_string($1);}
+identifier	  : IDENTIFIER {$$ = estrdup($1);}
 		  ;
 
 %%
-
-void yyerror(char *s)
-{
-	/*
-	fprintf(stderr,"syntax error line %d: %s\n", line, s);
-	*/
-	fprintf(stderr,"syntax error line %d token %d(%s): %s\n",
-			line, yychar, yytname[yychar], s);
-}
 

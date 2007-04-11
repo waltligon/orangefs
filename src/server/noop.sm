@@ -17,7 +17,7 @@ static PINT_sm_action noop_cleanup(
 
 %%
 
-machine pvfs2_noop_sm(prelude, final_response, cleanup)
+machine pvfs2_noop_sm
 {
 	state prelude
 	{

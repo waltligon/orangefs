@@ -25,6 +25,27 @@
  * specifier and a parameter are mismatched, that machine will issue
  * a warning, while 64-bit machines will silently perform the cast.
  */
+
+#ifdef __KERNEL__
+#include <linux/types.h>
+#endif
+
+#ifdef BITS_PER_LONG
+/* don't use SIZEOF_* fields generated at configure */
+#if BITS_PER_LONG == 32
+#  define llu(x) (x)
+#  define lld(x) (x)
+#  define SCANF_lld "%lld"
+#elif BITS_PER_LONG == 64
+#  define llu(x) (unsigned long long)(x)
+#  define lld(x) (long long)(x)
+#define SCANF_lld "%ld"
+#else
+#  error Unexpected  BITS_PER_LONG
+#endif
+
+#else
+ 
 #if SIZEOF_LONG_INT == 4 
 #  define llu(x) (x)
 #  define lld(x) (x)
@@ -36,6 +57,8 @@
 #else
 #  error Unexpected sizeof(long int)
 #endif
+
+#endif /* BITS_PER_LONG */
 
 /* key string definition macros.  These are used by the server and
  * by the client (in the case of xattrs with viewdist, etc).

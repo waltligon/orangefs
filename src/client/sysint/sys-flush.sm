@@ -34,12 +34,7 @@ static PINT_sm_action flush_cleanup(
 
 %%
 
-machine pvfs2_client_flush_sm(
-    flush_getattr,
-    flush_datafile_setup_msgpairarray,
-    flush_datafile_xfer_msgpairarray,
-    flush_datafile_flush_failure,
-    cleanup)
+machine pvfs2_client_flush_sm
 {
     state flush_getattr
     {

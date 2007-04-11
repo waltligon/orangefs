@@ -35,13 +35,7 @@ static PINT_sm_action geteattr_cleanup(
 
 %%
 
-machine pvfs2_get_eattr_sm(
-    prelude,
-    setup_resp,
-    read_eattrib,
-    check_resp,
-    final_response,
-    cleanup)
+machine pvfs2_get_eattr_sm
 {
     state prelude
     {

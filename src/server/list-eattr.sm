@@ -35,13 +35,7 @@ static PINT_sm_action listeattr_cleanup(
 
 %%
 
-machine pvfs2_list_eattr_sm(
-    prelude,
-    setup_resp,
-    list_eattrib,
-    check_resp,
-    final_response,
-    cleanup)
+machine pvfs2_list_eattr_sm
 {
     state prelude
     {

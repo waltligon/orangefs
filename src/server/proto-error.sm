@@ -20,7 +20,7 @@ static PINT_sm_action proto_error_init(
 
 %%
 
-machine pvfs2_proto_error_sm(init, cleanup)
+machine pvfs2_proto_error_sm
 {
 	state init
 	{

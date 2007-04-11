@@ -48,18 +48,7 @@ static PINT_sm_action lookup_setup_resp(
 
 %%
 
-machine pvfs2_lookup_sm(
-    prelude,
-    init,
-    read_object_metadata,
-    read_directory_entry_handle,
-    read_directory_entry,
-    verify_object_metadata,
-    read_directory_acls,
-    check_acls,
-    setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_lookup_sm
 {
     state prelude
     {
@@ -162,10 +151,10 @@ static PINT_sm_action lookup_init(
     char *ptr = NULL;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, " STARTING LOOKUP REQUEST "
-                     "(path:%s)(fs_id:%d)(handle:%lld)(attrmask:%u)\n",
+                     "(path:%s)(fs_id:%d)(handle:%llu)(attrmask:%u)\n",
                      s_op->req->u.lookup_path.path,
                      s_op->req->u.lookup_path.fs_id,
-                     s_op->req->u.lookup_path.starting_handle,
+                     llu(s_op->req->u.lookup_path.starting_handle),
                      s_op->req->u.lookup_path.attrmask);
 
     /* fill in the lookup portion of the PINT_server_op */
@@ -474,16 +463,23 @@ static PINT_sm_action lookup_check_acls(
        find the segment that we should look up in the directory */
     if (js_p->error_code == 0)
     {
-        int ret = PINT_string_next_segment(
+        js_p->error_code = PINT_string_next_segment(
             s_op->req->u.lookup_path.path, &s_op->u.lookup.segp,
             &s_op->u.lookup.segstate);
 
-        assert(ret == 0);
-
-        gossip_debug(GOSSIP_SERVER_DEBUG, "  after ACL check "
-                    "object is a directory; will be "
-                     "looking for handle for segment \"%s\" in a bit\n",
-                     s_op->u.lookup.segp);
+        if(js_p->error_code != 0)
+        {
+            gossip_err("PINT_string_next_segment failed to get the"
+                       "next segment to lookup from the path: %s\n",
+                       s_op->req->u.lookup_path.path);
+        }
+        else
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "  after ACL check "
+                         "object is a directory; will be "
+                         "looking for handle for segment \"%s\" in a bit\n",
+                         s_op->u.lookup.segp);
+        }
     }
 cleanup:
     if (s_op->val.buffer) 

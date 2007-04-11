@@ -520,7 +520,7 @@ const char *PINT_cached_config_map_addr(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (!(config && server_type))
+    if (!config)
     {
         return NULL;
     }
@@ -546,7 +546,10 @@ const char *PINT_cached_config_map_addr(
     {
         if (cur_config_cache->server_array[i].addr == addr)
         {
-            *server_type = cur_config_cache->server_array[i].server_type;
+            if(server_type)
+            {
+                *server_type = cur_config_cache->server_array[i].server_type;
+            }
             return (cur_config_cache->server_array[i].addr_string);
         }
     }

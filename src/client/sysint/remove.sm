@@ -53,17 +53,7 @@ do {                                                                   \
 
 %%
 
-nested machine pvfs2_client_remove_helper_sm(
-    getattr_init,
-    getattr,
-    getattr_analyze_results,
-    datafile_remove_setup_msgpair,
-    datafile_remove_xfer_msgpair,
-    datafile_remove_failure,
-    object_remove_setup_msgpair,
-    object_remove_xfer_msgpair,
-    object_remove_failure,
-    remove_helper_cleanup)
+nested machine pvfs2_client_remove_helper_sm
 {
     state getattr_init
     {
@@ -162,10 +152,8 @@ static PINT_sm_action remove_getattr_analyze_results(
 	    assert(attr->mask & PVFS_ATTR_META_DFILES);
 	    assert(attr->u.meta.dfile_count > 0);
 
-	    gossip_debug(
-                GOSSIP_CLIENT_DEBUG,
-                "remove_getattr_comp_fn: must remove %d datafiles\n",
-                attr->u.meta.dfile_count);
+	    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: must remove %d datafiles\n",
+                         __func__, attr->u.meta.dfile_count);
 
 	    js_p->error_code = REMOVE_MUST_REMOVE_DATAFILES;
             break;
@@ -187,8 +175,7 @@ static PINT_sm_action remove_getattr_analyze_results(
 	case PVFS_TYPE_DATAFILE:
 	case PVFS_TYPE_DIRDATA:
 	default:
-	    gossip_err("error: remove_getattr_comp_fn: unhandled "
-                       "object type (%x)\n",
+	    gossip_err("%s: unhandled object type (%x)\n", __func__,
                        attr->objtype);
     }
     return SM_ACTION_COMPLETE;

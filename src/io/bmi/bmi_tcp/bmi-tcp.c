@@ -793,7 +793,7 @@ int BMI_tcp_set_info(int option,
         struct tcp_allowed_connection_s *tcp_allowed_connection = NULL;
         if (inout_parameter == NULL)
         {
-            ret = -EINVAL;
+            ret = bmi_tcp_errno_to_pvfs(-EINVAL);
             break;
         }
         else 
@@ -807,7 +807,7 @@ int BMI_tcp_set_info(int option,
             tcp_allowed_connection = alloc_trusted_connection_info(svc_config->allowed_networks_count);
             if (tcp_allowed_connection == NULL)
             {
-                ret = -ENOMEM;
+                ret = bmi_tcp_errno_to_pvfs(-ENOMEM);
                 break;
             }
 #ifdef      __PVFS2_SERVER__
@@ -1979,6 +1979,12 @@ static int tcp_server_init(void)
         ret = BMI_sockio_bind_sock_specific(tcp_addr_data->socket,
             tcp_addr_data->hostname,
             tcp_addr_data->port);
+        /* NOTE: this particular function converts errno in advance */
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("BMI_sockio_bind_sock_specific", ret);
+            return(ret);
+        }
     }
     else
     {
@@ -2067,9 +2073,6 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 
     if(tcp_addr_data->addr_error)
     {
-	/* TODO: make this a debug rather than error message once we have
-	 * tested this out enough
-	 */
         gossip_debug(GOSSIP_BMI_DEBUG_TCP, "%s: attempting reconnect.\n",
           __func__);
 	tcp_addr_data->addr_error = 0;
@@ -2159,14 +2162,14 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 
     if (ret < 0)
     {
-	if (errno == EINPROGRESS)
+	if (ret == -EINPROGRESS)
 	{
 	    tcp_addr_data->not_connected = 1;
 	    /* this will have to be connected later with a poll */
 	}
 	else
 	{
-            /* BMI_sockio_connect_sock returns a PVFS error */
+            /* NOTE: BMI_sockio_connect_sock returns a PVFS error */
             char buff[300];
 
             snprintf(buff, 300, "Error: BMI_sockio_connect_sock: (%s):", 
@@ -2513,6 +2516,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	    if (ret < 0)
 	    {
                 PVFS_perror_gossip("Error: payload_progress", ret);
+                /* payload_progress() returns BMI error codes */
 		tcp_forget_addr(query_op->addr, 0, ret);
 		return (ret);
 	    }
@@ -2680,6 +2684,7 @@ static int tcp_do_work(int max_idle_time)
     gen_mutex_lock(&interface_mutex);
     if (ret < 0)
     {
+        /* BMI_socket_collection_testglobal() returns BMI error code */
 	return (ret);
     }
 
@@ -2693,6 +2698,7 @@ static int tcp_do_work(int max_idle_time)
 	/* skip working on addresses in failure mode */
 	if(tcp_addr_data->addr_error)
 	{
+            /* addr_error field is in BMI error code format */
 	    tcp_forget_addr(addr_array[i], 0, tcp_addr_data->addr_error);
 	    continue;
 	}
@@ -2963,7 +2969,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
                          "...dropping connection.\n");
             tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-EPIPE));
         }
-	return(ret);
+	return(0);
     }
     else
     {
@@ -3168,6 +3174,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	if (ret < 0)
 	{
             PVFS_perror_gossip("Error: socket failed to init", ret);
+            /* tcp_sock_init() returns BMI error code */
 	    tcp_forget_addr(my_method_op->addr, 0, ret);
 	    return (0);
 	}
@@ -3192,6 +3199,7 @@ static int work_on_send_op(method_op_p my_method_op,
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: payload_progress", ret);
+        /* payload_progress() returns BMI error codes */
 	tcp_forget_addr(my_method_op->addr, 0, ret);
 	return (0);
     }
@@ -3259,6 +3267,7 @@ static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
 	if (ret < 0)
 	{
             PVFS_perror_gossip("Error: payload_progress", ret);
+            /* payload_progress() returns BMI error codes */
 	    tcp_forget_addr(my_method_op->addr, 0, ret);
 	    return (0);
 	}
@@ -3562,7 +3571,7 @@ static int tcp_accept_init(int *socket, char** peer)
     if(!(*peer))
     {
         close(*socket);
-        return(-BMI_ENOMEM);
+        return(bmi_tcp_errno_to_pvfs(-BMI_ENOMEM));
     }
     strcpy(*peer, tmp_peer);
 
@@ -3691,6 +3700,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     if (ret < 0)
     {
 	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "tcp_sock_init() failure.\n");
+        /* tcp_sock_init() returns BMI error code */
 	tcp_forget_addr(dest, 0, ret);
 	return (ret);
     }
@@ -3733,6 +3743,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: payload_progress", ret);
+        /* payload_progress() returns BMI error codes */
 	tcp_forget_addr(dest, 0, ret);
 	return (ret);
     }

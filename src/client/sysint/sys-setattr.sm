@@ -40,12 +40,7 @@ static int setattr_msg_comp_fn(
 
 %%
 
-machine pvfs2_client_setattr_sm(
-    init,
-    setattr_msg_setup_msgpair,
-    setattr_msg_xfer_msgpair,
-    setattr_msg_failure,
-    cleanup)
+machine pvfs2_client_setattr_sm
 {
     state init
     {

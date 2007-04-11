@@ -53,7 +53,7 @@ static inline int add_extent_to_cache(struct extent * extent,
 
 int NCAC_do_a_read_job(struct NCAC_req *ncac_req)
 {
-	int ret;
+    int ret;
     struct extent **cbufhash;
     PVFS_offset *foff;
     int *cbufflag;

@@ -32,11 +32,7 @@ static PINT_sm_action mkdir_prep_sm(
 
 %%
 
-nested machine pvfs2_mkdir_work_sm(create, 
-                                   set_attrib,
-                                   create_dirdata_dspace, 
-                                   write_dirdata_handle, 
-                                   err_msg)
+nested machine pvfs2_mkdir_work_sm
 {
     state create
     {
@@ -73,12 +69,7 @@ nested machine pvfs2_mkdir_work_sm(create,
     }
 }
 
-machine pvfs2_mkdir_sm(
-    prelude,
-    prep_sm,
-    work,
-    final_response,
-    cleanup)
+machine pvfs2_mkdir_sm
 {
     state prelude
     {

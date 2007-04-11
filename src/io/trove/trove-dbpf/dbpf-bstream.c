@@ -46,7 +46,7 @@ static int issue_or_delay_io_operation(
 static void start_delayed_ops_if_any(int dec_first);
 
 #ifdef __PVFS2_TROVE_AIO_THREADED__
-static char *list_proc_state_strings[] = {
+static char *list_proc_state_strings[] __attribute__((unused)) = {
     "LIST_PROC_INITIALIZED",
     "LIST_PROC_INPROGRESS ",
     "LIST_PROC_ALLCONVERTED",
@@ -191,9 +191,10 @@ static void aio_progress_notification(union sigval sig)
                      list_proc_state_strings[
                      op_p->u.b_rw_list.list_proc_state]);
 
+	cur_op->state = ret;
         /* this is a macro defined in dbpf-thread.h */
         dbpf_queued_op_complete(
-            cur_op, ret,
+            cur_op,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
 
         start_delayed_ops_if_any(1);
@@ -443,6 +444,7 @@ static int issue_or_delay_io_operation(
                              (int)aiocb_ptr_array[i]->aio_nbytes,
                              aiocb_ptr_array[i]->aio_buf,
                              (int)aiocb_ptr_array[i]->aio_lio_opcode);
+
             }
         }
 
@@ -1236,7 +1238,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
                   this particular operation completed w/out error.
                   gets the return value of the individual op
                 */
-                ret = AIO_RETURN(&aiocb_p[i]);
+                ret = op_p->u.b_rw_list.aio_ops->aio_return(&aiocb_p[i]);
 
                 gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %s complete: "
                              "aio_return() ret %d (fd %d)\n",

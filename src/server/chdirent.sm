@@ -40,18 +40,7 @@ static PINT_sm_action chdirent_setup_resp(
 
 %%
 
-machine pvfs2_chdirent_sm(
-    prelude,
-    verify_parent_metadata_and_read_directory_entry_handle,
-    read_directory_entry,
-    read_directory_entry_failure,
-    change_directory_entry,
-    change_directory_entry_failure,
-    check_for_req_dir_update,
-    update_directory_attr,
-    setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_chdirent_sm
 {
     state prelude
     {

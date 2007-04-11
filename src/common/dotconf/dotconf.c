@@ -176,7 +176,7 @@ char *PINT_dotconf_substitute_env(
 	    if (*cp1 != '}')
 	    {
 		PINT_dotconf_warning(configfile, DCLOG_WARNING, ERR_PARSE_ERROR,
-				"Unbalanced '{'");
+				"Unbalanced '{'\n");
 	    }
 	    else
 	    {
@@ -388,7 +388,7 @@ char *PINT_dotconf_get_here_document(
     }
     if (here_string)
 	PINT_dotconf_warning(configfile, DCLOG_WARNING, ERR_PARSE_ERROR,
-			"Unterminated here-document!");
+			"Unterminated here-document!\n");
 
     here_doc[offset - 1] = '\0';	/* strip newline */
 
@@ -758,7 +758,7 @@ const char *PINT_dotconf_handle_command(
 	    if (error)
 		return error;
 	    PINT_dotconf_warning(configfile, DCLOG_INFO, ERR_UNKNOWN_OPTION,
-			    "Unknown Config-Option: '%s'", name);
+			    "Unknown Config-Option: '%s'\n", name);
 	    return NULL;
 	}
 
@@ -1484,7 +1484,7 @@ DOTCONF_CB(dotconf_cb_include)
 	if ((len = (strlen(cmd->data.str) + inclen + 1)) == CFG_MAX_FILENAME)
 	{
 	    PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING, ERR_INCLUDE_ERROR,
-			    "Absolute filename too long (>%d)",
+			    "Absolute filename too long (>%d)\n",
 			    CFG_MAX_FILENAME);
 	    return NULL;
 	}

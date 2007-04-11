@@ -39,15 +39,7 @@ void flush_init_state_machine(void);
 
 %%
 
-machine pvfs2_flush_sm(
-    prelude,
-    flush_check_type,
-    kflush,
-    kflush_check_error,
-    bflush, 
-    bflush_check_error,
-    final_response,
-    cleanup)
+machine pvfs2_flush_sm
 {
     state prelude
     {

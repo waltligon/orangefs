@@ -7,10 +7,16 @@
 #   - $user needs to be able to sudo w/o prompting
 #   - please don't cheat and run this as root: will not catch permissions bugs
 
-# modify these variables
+# you can override these settings in nightly-tests.cfg 
 export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
+
+# look for a 'nightly-test.cfg' in the same directory as this script
+if [ -f $(cd `dirname $0`; pwd)/nightly-tests.cfg ] ; then 
+	. $(cd `dirname $0`; pwd)/nightly-tests.cfg
+fi
+
 
 # need to make this a command line arugment:
 export CVS_TAG="${CVS_TAG:-HEAD}"
@@ -33,7 +39,7 @@ TESTNAME="`hostname -s`-nightly"
 
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="gil lain"
+VFS_HOSTS="gil lain stan"
 
 
 # takes one argument: a tag or branch in CVS
@@ -88,7 +94,10 @@ teardown_vfs() {
 
 setup_vfs() {
 	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
-	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client -p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core
+	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
+		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
+		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
+	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	sudo mount -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
 }
 
@@ -145,7 +154,8 @@ buildfail() {
 	cat ${PVFS2_DEST}/configure-${CVS_TAG}.log \
 		${PVFS2_DEST}/make-extracted-${CVS_TAG}.log \
 		${PVFS2_DEST}/make-install-${CVS_TAG}.log \
-		${PVFS2_DEST}/make-${CVS_TAG}.log | \
+		${PVFS2_DEST}/make-${CVS_TAG}.log \
+		${PVFS2_DEST}/make-test-${CVS_TAG}.log | \
 		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} build_failed $STARTTIME 
 	exit 1
 }
@@ -153,7 +163,8 @@ buildfail() {
 setupfail() {
 	echo "Failure in setup"
 	dmesg | tail -20 > ${PVFS2_DEST}/dmesg
-	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* | \
+	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
+		${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* | \
 		${TINDERSCRIPT}  ${TESTNAME}-${CVS_TAG} test_failed $STARTTIME 
 	exit 1
 }

@@ -22,7 +22,7 @@ static PINT_sm_action job_timer_error(
 
 %%
 
-machine pvfs2_job_timer_sm(do_work, error)
+machine pvfs2_job_timer_sm
 {
 	state do_work 
 	{

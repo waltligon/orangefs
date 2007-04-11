@@ -19,8 +19,18 @@ extern "C" {
 #include "dbpf-keyval-pcache.h"
 #include "dbpf-open-cache.h"
 
+/* For unknown Berkeley DB errors, we return some large value
+ */
+#define DBPF_ERROR_UNKNOWN 4243
+
+/* Incremental versions are backward compatible with previous releases
+ * that have the same major and minor versions.
+ * Minor versions are NOT backward compatible.
+ * Major versions aren't either, but refer to architectural storage format changes.
+ */
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
-#define TROVE_DBPF_VERSION_VALUE                                  "0.1.2"
+#define TROVE_DBPF_VERSION_VALUE                                  "0.1.3"
+
 #define LAST_HANDLE_STRING                                  "last_handle"
 
 #ifdef HAVE_DB_DIRTY_READ
@@ -165,7 +175,7 @@ struct dbpf_aio_ops
 };
 
 typedef int (* PINT_dbpf_keyval_iterate_callback)(
-    DB * db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+    void *, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
@@ -176,9 +186,6 @@ int PINT_dbpf_keyval_iterate(
     int *count,
     TROVE_ds_position pos,
     PINT_dbpf_keyval_iterate_callback callback);
-
-int PINT_dbpf_keyval_remove(
-    DB *db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 struct dbpf_storage
 {
@@ -231,6 +238,8 @@ struct dbpf_collection_db_entry
 int PINT_trove_dbpf_keyval_compare(
     DB * dbp, const DBT * a, const DBT * b);
 int PINT_trove_dbpf_ds_attr_compare(
+    DB * dbp, const DBT * a, const DBT * b);
+int PINT_trove_dbpf_ds_attr_compare_reversed(
     DB * dbp, const DBT * a, const DBT * b);
 
 struct dbpf_dspace_create_op

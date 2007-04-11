@@ -41,10 +41,7 @@ static int statfs_list_comp_fn(
 
 %%
 
-nested machine pvfs2_client_mgmt_statfs_list_nested_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    cleanup)
+nested machine pvfs2_client_mgmt_statfs_list_nested_sm
 {
     state setup_msgpair
     {
@@ -66,9 +63,7 @@ nested machine pvfs2_client_mgmt_statfs_list_nested_sm(
     }
 }
 
-machine pvfs2_client_mgmt_statfs_list_sm(
-    run_nested,
-    parent_cleanup)
+machine pvfs2_client_mgmt_statfs_list_sm
 {
     state run_nested
     {

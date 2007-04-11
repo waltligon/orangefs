@@ -79,19 +79,7 @@ do {                                                                  \
 
 %%
 
-machine pvfs2_client_remove_sm(
-    init,
-    cleanup,
-    do_remove,
-    check_error_code,
-    rmdirent_setup_msgpair,
-    rmdirent_xfer_msgpair,
-    rmdirent_retry_or_fail,
-    rmdirent_timer,
-    crdirent_timer,
-    crdirent_retry_or_fail,
-    crdirent_setup_msgpair,
-    crdirent_xfer_msgpair)
+machine pvfs2_client_remove_sm
 {
     state init
     {

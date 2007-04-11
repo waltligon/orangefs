@@ -17,7 +17,8 @@ LIBSRC += $(DIR)/server-config.c \
 	  $(DIR)/void.c \
 	  $(DIR)/realpath.c \
 	  $(DIR)/tcache.c \
-	  $(DIR)/state-machine-fns.c
+	  $(DIR)/state-machine-fns.c \
+	  $(DIR)/fsck-utils.c
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/server-config-mgr.c \
              $(DIR)/str-utils.c \

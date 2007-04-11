@@ -40,11 +40,7 @@ static int mgmt_get_dirdata_handle_comp_fn(
 
 %%
 
-machine pvfs2_client_mgmt_get_dirdata_handle_sm(
-    init,
-    get_dirdata_handle_setup_msgpair,
-    get_dirdata_handle_xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_get_dirdata_handle_sm
 {
     state init
     {

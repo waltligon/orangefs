@@ -24,7 +24,7 @@ static int sysdev_unexp_cleanup(
 
 %%
 
-machine pvfs2_sysdev_unexp_sm(post, cleanup)
+machine pvfs2_sysdev_unexp_sm
 {
     state post 
     {

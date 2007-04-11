@@ -23,12 +23,7 @@ static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
 
 %%
 
-machine pvfs2_mgmt_get_dirdata_handle_sm(
-    prelude,
-    get_dirdata_handle_from_parent,
-    get_dirdata_handle_setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_mgmt_get_dirdata_handle_sm
 {
     state prelude
     {

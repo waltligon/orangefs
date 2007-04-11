@@ -39,11 +39,7 @@ static int mgmt_remove_dirent_comp_fn(
 
 %%
 
-machine pvfs2_client_mgmt_remove_dirent_sm(
-    init,
-    remove_dirent_setup_msgpair,
-    remove_dirent_xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_remove_dirent_sm
 {
     state init
     {
@@ -208,7 +204,8 @@ static int mgmt_remove_dirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p __attribute__((unused)) = 
+        PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     assert(resp_p->op == PVFS_SERV_MGMT_REMOVE_DIRENT);
 

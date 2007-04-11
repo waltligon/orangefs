@@ -36,16 +36,7 @@ static PINT_sm_action rmdirent_setup_resp(
 
 %%
 
-machine pvfs2_rmdirent_sm(
-    prelude,
-    verify_parent_metadata_and_read_directory_entry_handle,
-    remove_directory_entry,
-    remove_directory_entry_failure,
-    check_for_req_dir_update,
-    update_directory_attr,
-    setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_rmdirent_sm
 {
     state prelude
     {

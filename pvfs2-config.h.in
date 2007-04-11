@@ -6,6 +6,9 @@
 /* Define if kernel has aio support */
 #undef HAVE_AIO
 
+/* Define if VFS AIO support in kernel has a new prototype */
+#undef HAVE_AIO_NEW_AIO_SIGNATURE
+
 /* Define if we are enabling VFS AIO support in kernel */
 #undef HAVE_AIO_VFS_SUPPORT
 
@@ -24,6 +27,10 @@
 /* Define if struct backing_dev_info in kernel has memory_backed */
 #undef HAVE_BDI_MEMORY_BACKED
 
+/* Define if struct file_operations has combined aio_read and readv functions
+   */
+#undef HAVE_COMBINED_AIO_AND_VECTOR
+
 /* Define if there exists a compat_ioctl member in file_operations */
 #undef HAVE_COMPAT_IOCTL_HANDLER
 
@@ -38,6 +45,9 @@
 
 /* Define if db library has DB_DIRTY_READ flag */
 #undef HAVE_DB_DIRTY_READ
+
+/* Define if DB has get_pagesize function */
+#undef HAVE_DB_GET_PAGESIZE
 
 /* Define if statfs callback has struct dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
@@ -60,6 +70,9 @@
 /* Define if struct super_operations in kernel has find_inode_handle callback
    */
 #undef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+
+/* Define to 1 if you have the `fsetxattr' function. */
+#undef HAVE_FSETXATTR
 
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
@@ -122,6 +135,9 @@
 /* Define if return value from follow_link in inode_operations is type int */
 #undef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
 
+/* Define if return value from kmem_cache_destroy is type int */
+#undef HAVE_INT_RETURN_KMEM_CACHE_DESTROY
+
 /* Define if struct inode in kernel has i_blksize member */
 #undef HAVE_I_BLKSIZE_IN_STRUCT_INODE
 
@@ -130,6 +146,12 @@
 
 /* Define if kernel has i_size_write */
 #undef HAVE_I_SIZE_WRITE
+
+/* Define if kmem_cache_destroy returns int */
+#undef HAVE_KMEM_CACHE_DESTROY_INT_RETURN
+
+/* Define if kzalloc exists */
+#undef HAVE_KZALLOC
 
 /* Define to 1 if you have the `efence' library (-lefence). */
 #undef HAVE_LIBEFENCE
@@ -164,6 +186,9 @@
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
 
+/* Define to 1 if you have the <mntent.h,> header file. */
+#undef HAVE_MNTENT_H_
+
 /* Use the MPE profiling library */
 #undef HAVE_MPE
 
@@ -191,6 +216,9 @@
 /* Define if struct file_operations in kernel has readdirplus callback */
 #undef HAVE_READDIRPLUS_FILE_OPERATIONS
 
+/* Define if struct file_operations in kernel has readv callback */
+#undef HAVE_READV_FILE_OPERATIONS
+
 /* Define if struct file_operations in kernel has readx callback */
 #undef HAVE_READX_FILE_OPERATIONS
 
@@ -208,6 +236,9 @@
 
 /* Define if kernel setxattr has const void* argument */
 #undef HAVE_SETXATTR_CONST_ARG
+
+/* Define if SLAB_KERNEL is defined in kernel */
+#undef HAVE_SLAB_KERNEL
 
 /* Define if struct super_operations in kernel has statfs_lite callback */
 #undef HAVE_STATFS_LITE_SUPER_OPERATIONS
@@ -235,6 +266,9 @@
 
 /* Define to 1 if you have the `strtoull' function. */
 #undef HAVE_STRTOULL
+
+/* Define if struct kmem_cache is defined in kernel */
+#undef HAVE_STRUCT_KMEM_CACHE
 
 /* Define if struct xtvec is defined in the kernel */
 #undef HAVE_STRUCT_XTVEC
@@ -275,8 +309,14 @@
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 
+/* Define if include file valgrind.h exists */
+#undef HAVE_VALGRIND_H
+
 /* Define if get_sb callback has struct vfsmount argument */
 #undef HAVE_VFSMOUNT_GETSB
+
+/* Define if struct file_operations in kernel has writev callback */
+#undef HAVE_WRITEV_FILE_OPERATIONS
 
 /* Define if struct file_operations in kernel has writex callback */
 #undef HAVE_WRITEX_FILE_OPERATIONS
@@ -308,10 +348,10 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of a `long int', as computed by sizeof. */
+/* The size of `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of a `void *', as computed by sizeof. */
+/* The size of `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */

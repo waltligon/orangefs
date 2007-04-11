@@ -21,11 +21,7 @@ static PINT_sm_action mgmt_remove_cleanup(
 
 %%
 
-machine pvfs2_mgmt_remove_object_sm(
-    prelude,
-    remove_dspace,
-    final_response,
-    cleanup)
+machine pvfs2_mgmt_remove_object_sm
 {
     state prelude
     {

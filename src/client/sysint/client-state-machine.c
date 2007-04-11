@@ -12,6 +12,7 @@
 
 #include "pvfs2-sysint.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-internal.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 
@@ -396,10 +397,10 @@ PVFS_error PINT_client_state_machine_post(
         *op_id = -1;
 
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) "
+            GOSSIP_CLIENT_DEBUG, "Posted %s (%llu) "
                     "(ran to termination)(%d)\n",
                     PINT_client_get_name_str(pvfs_sys_op),
-                    (op_id ? *op_id : -1),
+                    llu((op_id ? *op_id : -1)),
                     js.error_code);
     }
     else
@@ -410,7 +411,7 @@ PVFS_error PINT_client_state_machine_post(
             GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) "
                     "(waiting for test)(%d)\n",
                     PINT_client_get_name_str(pvfs_sys_op),
-                    (op_id ? *op_id : -1),
+                    lld((op_id ? *op_id : -1)),
                     ret);
     }
     return js.error_code;
@@ -441,7 +442,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "PINT_client_io_cancel id %lld\n",id);
+            "PINT_client_io_cancel id %lld\n",lld(id));
 
     smcb = PINT_id_gen_safe_lookup(id);
     if (!smcb)
@@ -570,7 +571,7 @@ PVFS_error PINT_client_state_machine_test(
     void *smcb_p_array[MAX_RETURNED_JOBS] = {NULL};
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_client_state_machine_test id %lld\n",op_id);
+                 "PINT_client_state_machine_test id %lld\n",lld(op_id));
 
     CLIENT_SM_ASSERT_INITIALIZED();
 
@@ -772,7 +773,7 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     PVFS_credentials *cred_p; 
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-              "PVFS_sys_release id %lld\n",op_id);
+              "PVFS_sys_release id %lld\n",lld(op_id));
     smcb = PINT_id_gen_safe_lookup(op_id);
     if (smcb == NULL) 
     {

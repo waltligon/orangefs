@@ -111,6 +111,12 @@ int main(
         myment.mnt_opts = "rw";
     }
 
+    /* if this is just a remount, then exit without touching mtab */
+    if(flags & MS_REMOUNT)
+    {
+        return(0);
+    }
+
     /* Leave mtab alone if it is a link */
     if (lstat(PVFS2_MTAB, &sb) == 0 && S_ISLNK(sb.st_mode))
     {
@@ -191,6 +197,10 @@ static int parse_args(
                 if(!strcmp(index, "ro"))
                 {
                     *flags |= MS_RDONLY;
+                }
+                if(!strcmp(index, "remount"))
+                {
+                    *flags |= MS_REMOUNT;
                 }
                 index = strtok(NULL, ",");
             }

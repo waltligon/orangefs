@@ -20,7 +20,7 @@ static PINT_sm_action unexpected_map(
 
 %%
 
-machine pvfs2_unexpected_sm(post_unexpected, map_request)
+machine pvfs2_unexpected_sm
 {
 	state post_unexpected
 	{

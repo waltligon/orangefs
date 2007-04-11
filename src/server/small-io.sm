@@ -27,12 +27,7 @@ static PINT_sm_action small_io_cleanup(
 
 %%
 
-machine pvfs2_small_io_sm(
-    prelude,
-    start_job,
-    check_size,
-    send_response,
-    cleanup)
+machine pvfs2_small_io_sm
 {
     state prelude
     {

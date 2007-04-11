@@ -23,12 +23,7 @@ static PINT_sm_action deleattr_verify_eattribs(
 
 %%
 
-machine pvfs2_del_eattr_sm(
-    prelude,
-    cleanup,
-    verify_eattribs,
-    delobj_eattrib,
-    final_response)
+machine pvfs2_del_eattr_sm
 {
     state prelude
     {

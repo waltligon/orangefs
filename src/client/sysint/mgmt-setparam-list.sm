@@ -40,10 +40,7 @@ static int collect_old_values_comp_fn(
 
 %%
 
-machine pvfs2_client_mgmt_setparam_list_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_setparam_list_sm
 {
     state setup_msgpair
     {

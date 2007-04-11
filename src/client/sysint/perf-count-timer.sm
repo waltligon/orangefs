@@ -23,7 +23,7 @@ static PINT_sm_action perf_count_timer_error(
 
 %%
 
-machine pvfs2_client_perf_count_timer_sm(do_work, error)
+machine pvfs2_client_perf_count_timer_sm
 {
     state do_work 
     {

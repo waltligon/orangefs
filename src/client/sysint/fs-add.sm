@@ -52,12 +52,7 @@ static PINT_sm_action fs_add_final_cleanup(
 
 %%
 
-machine pvfs2_fs_add_sm(
-    run_nested,
-    parent_cleanup,
-    config_integrity_checks,
-    do_config_integrity_checks,
-    final_cleanup)
+machine pvfs2_fs_add_sm
 {
     state run_nested 
     {
@@ -413,7 +408,7 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
         {
             gossip_err("     FS config file on %s -> (size) %d\n", 
                    PVFS_mgmt_map_addr(fsid, sm_p->cred_p, sm_p->fetch_config.addr_array[i], &tmp),
-                   sm_p->fetch_config.fs_config_buf_size[i]);
+                   sm_p->fetch_config.fs_config_buf_size[i] - 1);
             ret = -PVFS_EINVAL;
         }
         goto out;
@@ -546,7 +541,8 @@ static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s
 
     /* finally, try to add the new config to the server config manager */
     ret = PINT_server_config_mgr_add_config(
-        sm_p->u.get_config.config, sm_p->u.get_config.mntent->fs_id);
+        sm_p->u.get_config.config, sm_p->u.get_config.mntent->fs_id,
+        &sm_p->u.get_config.free_config_flag);
     if (ret < 0)
     {
         PVFS_perror_gossip("PINT_server_config_mgr_add_config failed", ret);
@@ -582,6 +578,11 @@ static PINT_sm_action fs_add_final_cleanup(
     else if (js_p->error_code == 0)
     {
         compare_hashes(sm_p, js_p);
+    }
+    if(sm_p->u.get_config.free_config_flag)
+    {
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
     }
     sm_p->error_code = js_p->error_code;
     PINT_SET_OP_COMPLETE;

@@ -41,10 +41,7 @@ static void PINT_gossip_err_server_resp(
 
 %%
 
-nested machine pvfs2_final_response_sm(
-    release,
-    send_resp,
-    cleanup)
+nested machine pvfs2_final_response_sm
 {
     state release
     {

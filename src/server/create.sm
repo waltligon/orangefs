@@ -22,12 +22,7 @@ static PINT_sm_action create_setup_resp(
 
 %%
 
-machine pvfs2_create_sm(
-    prelude,
-    create,
-    setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_create_sm
 {
     state prelude
     {

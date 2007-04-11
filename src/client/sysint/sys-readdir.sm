@@ -41,13 +41,7 @@ static int readdir_msg_comp_fn(
 
 %%
 
-nested machine pvfs2_client_readdir_sm(
-    init,
-    readdir_getattr,
-    readdir_msg_setup_msgpair,
-    readdir_msg_xfer_msgpair,
-    readdir_msg_failure,
-    cleanup)
+nested machine pvfs2_client_readdir_sm
 {
     state init
     {
@@ -89,9 +83,7 @@ nested machine pvfs2_client_readdir_sm(
     }
 }
 
-machine pvfs2_client_sysint_readdir_sm(
-    dowork,
-    do_cleanup)
+machine pvfs2_client_sysint_readdir_sm
 {
     state dowork
     {
@@ -254,10 +246,10 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, "%llu|%d | token is %d | limit is %d\n",
+        GOSSIP_READDIR_DEBUG, "%llu|%d | token is %llu | limit is %d\n",
         llu(sm_p->object_ref.handle),
         sm_p->object_ref.fs_id,
-        sm_p->readdir.pos_token,
+        llu(sm_p->readdir.pos_token),
         sm_p->readdir.dirent_limit);
 
     PINT_init_msgpair(sm_p, msg_p);

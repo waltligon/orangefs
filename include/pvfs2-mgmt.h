@@ -361,6 +361,15 @@ int PVFS_mgmt_testsome(
 
 int PVFS_mgmt_cancel(PVFS_mgmt_op_id op_id);
 
+int PVFS_mgmt_get_config(
+    const PVFS_fs_id* fsid,
+    PVFS_BMI_addr_t* addr,
+    char* fs_buf,
+    int fs_buf_size,
+    char* server_buf,
+    int server_buf_size);
+
+
 #endif /* __PVFS2_MGMT_H */
 
 /* @} */

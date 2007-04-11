@@ -22,7 +22,7 @@ static PINT_sm_action perf_update_error(
 
 %%
 
-machine pvfs2_perf_update_sm(do_work, error)
+machine pvfs2_perf_update_sm
 {
 	state do_work 
 	{

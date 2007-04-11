@@ -149,7 +149,10 @@ static int pvfs2_readdir(
 	 */
     case 0:
         token_set = 1;
-        if (pvfs2_inode->directory_version == 0)
+        ino = get_ino_from_handle(dentry->d_inode);
+        gossip_debug(GOSSIP_DIR_DEBUG,
+                     "calling filldir of . with pos = %llu\n", llu(pos));
+        if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
         {
             ino = get_ino_from_handle(dentry->d_inode);
             gossip_debug(GOSSIP_DIR_DEBUG, 
@@ -164,7 +167,10 @@ static int pvfs2_readdir(
     /* drop through */
     case 1:
         token_set = 1;
-        if (pvfs2_inode->directory_version == 0)
+        ino = get_parent_ino_from_dentry(dentry);
+        gossip_debug(GOSSIP_DIR_DEBUG, 
+                     "calling filldir of .. with pos = %llu\n", llu(pos));
+        if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
         {
             ino = get_parent_ino_from_dentry(dentry);
             gossip_debug(GOSSIP_DIR_DEBUG, 
@@ -305,7 +311,8 @@ graceful_termination_path:
                     file->f_pos = i;
             }
             gossip_debug(GOSSIP_DIR_DEBUG, 
-                         "pos = %d, file->f_pos should have been %ld\n", pos, 
+                         "pos = %llu, file->f_pos should have been %ld\n", 
+                         llu(pos),
                          (unsigned long) file->f_pos);
         }
         else

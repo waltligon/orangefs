@@ -457,8 +457,8 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
+    gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
+                    "PVFS2 Server version %s starting...\n", PVFS2_VERSION);
 
     fs_conf = ((argc >= optind) ? argv[optind] : NULL);
     server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
@@ -584,6 +584,9 @@ int main(int argc, char **argv)
                            "state machine.\n", ret);
         goto server_shutdown;
     }
+
+    gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
+                    "PVFS2 Server ready.\n");
 
     /* Initialization complete; process server requests indefinitely. */
     for ( ;; )  
@@ -2032,6 +2035,7 @@ static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
     return fs_conf->trove_method;
 }
 
+#ifndef GOSSIP_DISABLE_DEBUG
 void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
@@ -2069,6 +2073,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
         va_end(ap);
     }
 }
+#endif
 
 /*
  * PINT_map_server_op_to_string()

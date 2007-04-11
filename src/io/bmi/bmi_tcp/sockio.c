@@ -60,6 +60,7 @@ int BMI_sockio_bind_sock(int sockd,
     return (sockd);
 }
 
+/* NOTE: this function returns BMI error codes */
 int BMI_sockio_bind_sock_specific(int sockd,
               const char *name,
 	      int service)
@@ -75,12 +76,13 @@ int BMI_sockio_bind_sock_specific(int sockd,
     {
 	if (errno == EINTR)
 	    goto bind_sock_restart;
-	return (-1);
+        return(bmi_errno_to_pvfs(-errno));
     }
     return (sockd);
 }
 
 
+/* NOTE: this function returns BMI error codes */
 int BMI_sockio_connect_sock(int sockd,
 		 const char *name,
 		 int service)
@@ -89,13 +91,13 @@ int BMI_sockio_connect_sock(int sockd,
     int ret;
 
     if ((ret = BMI_sockio_init_sock(&saddr, name, service)) != 0)
-	return (ret); /* converted to PVFS error code below */
+	return (ret);
   connect_sock_restart:
     if (connect(sockd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0)
     {
 	if (errno == EINTR)
 	    goto connect_sock_restart;
-        return (-PVFS_ERROR_CODE(errno));
+        return(bmi_errno_to_pvfs(-errno));
     }
     return (sockd);
 }

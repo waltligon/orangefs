@@ -22,14 +22,8 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-req-proto.h"
-#ifdef HAVE_SYS_XATTR_H
-#include <sys/xattr.h>
-#endif
 
-#ifdef HAVE_ATTR_XATTR_H
-#include <attr/xattr.h>
-#endif
-
+#include "xattr-utils.h"
 
 #define VALBUFSZ 1024
 
@@ -219,7 +213,11 @@ static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
       }
       else
       {
+#ifdef HAVE_FSETXATTR
         if ((ret = fsetxattr(obj->u.ufs.fd, key_p->buffer, val_p->buffer, val_p->buffer_sz, 0)) < 0)
+#else
+        errno = ENOSYS;
+#endif
         {
             perror("fsetxattr:");
             return -1;
@@ -416,7 +414,8 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
             return -1;
         }
 
-        if (resp_getattr.attr.objtype != PVFS_TYPE_METAFILE)
+        if (resp_getattr.attr.objtype != PVFS_TYPE_METAFILE &&
+            resp_getattr.attr.objtype != PVFS_TYPE_DIRECTORY)
         {
             fprintf(stderr, "Not a meta file!\n");
             return -1;

@@ -80,30 +80,7 @@ static int rename_chdirent_comp_fn(
 
 %%
 
-machine pvfs2_client_rename_sm(
-    init,
-    rename_lookups_setup_msgpair_array,
-    rename_lookups_xfer_msgpair_array,
-    rename_lookups_failure,
-    rename_getattr_src,
-    rename_getattr_src_interpret,
-    rename_getattr_dest,
-    rename_crdirent_setup_msgpair,
-    rename_crdirent_xfer_msgpair,
-    rename_crdirent_retry_or_fail,
-    rename_crdirent_timer,
-    rename_rmdirent_setup_msgpair,
-    rename_rmdirent_xfer_msgpair,
-    rename_rmdirent_retry_or_fail,
-    rename_rmdirent_timer,
-    rename_rmdirent_failure,
-    rename_chdirent_setup_msgpair,
-    rename_chdirent_xfer_msgpair,
-    rename_chdirent_failure,
-    rename_check_for_remove,
-    rename_do_remove,
-    rename_warn_user_to_run_fsck,
-    cleanup)
+machine pvfs2_client_rename_sm
 {
     state init
     {
@@ -430,19 +407,25 @@ static int rename_lookups_comp_fn(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup[%d] got response %d\n",
                  index, resp_p->status);
 
-    if (resp_p->status != 0)
+    /*
+     * if the index is 1, this failure just means that
+     * the target entry does not already exist, so it's
+     * expected and is not an error.
+     */
+    if(resp_p->status == -PVFS_ENOENT && index == 1)
     {
-        if (index == 1)
-        {
-            /*
-              if the index is 1, this failure just means that
-              the target entry does not already exist, so it's
-              expected and is not an error.
-            */
-            resp_p->status = 0;
-        }
-	return resp_p->status;
+        /* note: don't change the actual resp structure, because the
+         * decoder counts on this to know how to release data structures
+         */
+        return 0;
     }
+
+    if(resp_p->status != 0)
+    {
+        return resp_p->status;
+    }
+
+    /* SUCCESS! */
 
     /*
       stash the refns -- 'old' or 'new' based on index;
@@ -511,8 +494,8 @@ static int rename_rmdirent_comp_fn(void *v_p,
                                    int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    
+    PINT_client_sm *sm_p __attribute__((unused)) = 
+        PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_rmdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT);

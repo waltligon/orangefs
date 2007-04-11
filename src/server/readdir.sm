@@ -35,14 +35,7 @@ static PINT_sm_action readdir_setup_resp(
 
 %%
 
-machine pvfs2_readdir_sm(
-    prelude,
-    iterate_on_entries,
-    read_dirdata_handle,
-    verify_directory_metadata,
-    setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_readdir_sm
 {
     state prelude
     {
@@ -212,9 +205,9 @@ static PINT_sm_action readdir_iterate_on_entries(
 
     gossip_debug(
         GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%llu,%d], "
-        "\n\ttoken=%d, count=%d\n",
+        "\n\ttoken=%llu, count=%d\n",
         llu(s_op->u.readdir.dirent_handle), s_op->req->u.readdir.fs_id,
-        s_op->req->u.readdir.token, 
+        llu(s_op->req->u.readdir.token),
         s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(

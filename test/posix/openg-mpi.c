@@ -34,11 +34,16 @@
 #define __NR_openfh 274
 #endif
 
-static long openg(const char *, void *, size_t *, int, int);
-static long openfh(const void *, size_t);
+static long openg(const char *pathname, void *uhandle, size_t *uhandle_len,
+                  int flags, int mode)
+{
+    return syscall(__NR_openg, pathname, uhandle, uhandle_len, flags, mode);
+}
 
-_syscall2(long, openfh, const void *, uhandle, size_t, handle_len);
-_syscall5(long, openg, const char *, pathname, void *, uhandle, size_t *, uhandle_len, int, flags, int, mode);
+static long openfh(const void *uhandle, size_t handle_len)
+{
+    return syscall(__NR_openfh, uhandle, handle_len);
+}
 
 #define MAX_LENGTH 128
 
@@ -98,7 +103,6 @@ int main(int argc, char *argv[])
 {
 	int c, fd, err;
 	int i, rank, np, do_unlink = 0, do_create = 0;
-	size_t len;
 	char opt[] = "n:f:cu", *fname = NULL;
 	double begin_openg, end_openg, begin_openfh, end_openfh, begin_total, end_total;
 	double openg_total = 0.0, openfh_total = 0.0, time_total = 0.0;
@@ -172,8 +176,9 @@ int main(int argc, char *argv[])
 		/* Broadcast the handle buffer to everyone */
 		if ((err = MPI_Bcast(&hb, 1, d, 0, MPI_COMM_WORLD)) != MPI_SUCCESS) {
 			char str[256];
-			len = 256;
-			MPI_Error_string(err, str, (int *) &len);
+			int len = sizeof(str);
+
+			MPI_Error_string(err, str, &len);
 			fprintf(stderr, "MPI_Bcast failed: %s\n", str);
 			MPI_Finalize();
 			exit(1);

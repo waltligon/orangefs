@@ -77,19 +77,7 @@ static PINT_sm_action getattr_setup_op(
 
 %%
 
-nested machine pvfs2_get_attr_work_sm(
-    verify_attribs,
-    read_symlink_target,
-    read_metafile_hint,
-    read_metafile_datafile_handles_if_required,
-    read_metafile_distribution_if_required,
-    get_dirdata_handle,
-    get_dirent_count,
-    interpret_dirent_count,
-    interpret_metafile_hint,
-    get_dir_hint,
-    interpret_dir_hint,
-    setup_resp)
+nested machine pvfs2_get_attr_work_sm
 {
     state verify_attribs
     {
@@ -172,12 +160,7 @@ nested machine pvfs2_get_attr_work_sm(
     }
 }
 
-machine pvfs2_get_attr_sm(
-    prelude,
-    setup_op,
-    do_work,
-    final_response,
-    cleanup)
+machine pvfs2_get_attr_sm
 {
     state prelude
     {

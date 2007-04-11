@@ -36,12 +36,7 @@ static PINT_sm_action truncate_cleanup(
 
 %% 
 
-machine pvfs2_client_truncate_sm(
-    truncate_getattr,
-    truncate_datafile_setup_msgpairarray,
-    truncate_datafile_xfer_msgpairarray,
-    truncate_datafile_failure,
-    cleanup)
+machine pvfs2_client_truncate_sm
 {
     state truncate_getattr
     {

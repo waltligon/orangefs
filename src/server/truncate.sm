@@ -23,12 +23,7 @@ static PINT_sm_action truncate_cleanup(
 
 %%
 
-machine pvfs2_truncate_sm(
-    prelude, 
-    resize,
-    check_error,
-    final_response, 
-    cleanup)
+machine pvfs2_truncate_sm
 {
     state prelude
     {

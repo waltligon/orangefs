@@ -32,14 +32,7 @@ static PINT_sm_action io_cleanup(
 
 %%
 
-machine pvfs2_io_sm(
-    prelude,
-    send_positive_ack,
-    send_negative_ack, 
-    start_flow,
-    cleanup,
-    release,
-    send_completion_ack)
+machine pvfs2_io_sm
 {
     state prelude
     {

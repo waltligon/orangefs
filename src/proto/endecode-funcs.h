@@ -233,6 +233,29 @@ static inline void decode_##name(char **pptr, sname *x) { \
 #define endecode_fields_5_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5) \
     endecode_fields_5_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5)
 
+#define endecode_fields_6_generic(name, sname, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6) \
+static inline void encode_##name(char **pptr, const sname *x) { \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##t6(pptr, &x->x6); \
+} \
+static inline void decode_##name(char **pptr, sname *x) { \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##t6(pptr, &x->x6); \
+}
+
+#define endecode_fields_6(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6) \
+    endecode_fields_6_generic(name, name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6)
+#define endecode_fields_6_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6) \
+    endecode_fields_6_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6)
+
 #define endecode_fields_7(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) \
 static inline void encode_##name(char **pptr, const name *x) { \
     encode_##t1(pptr, &x->x1); \

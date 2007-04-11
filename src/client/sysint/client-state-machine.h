@@ -89,6 +89,7 @@ struct PINT_client_create_sm
     PVFS_handle *datafile_handles;
     PVFS_BMI_addr_t *data_server_addrs;
     PVFS_handle_extent_array *io_handle_extent_array;
+    PVFS_object_attr cache_attr;
 };
 
 struct PINT_client_mkdir_sm
@@ -372,6 +373,7 @@ struct PINT_server_get_config_sm
     uint32_t fs_config_buf_size;
     uint32_t server_config_buf_size;
     int persist_config_buffers;
+    int free_config_flag;
 };
 
 struct PINT_server_fetch_config_sm_state

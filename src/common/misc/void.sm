@@ -19,8 +19,7 @@ static PINT_sm_action void_action(
 
 %%
 
-machine pvfs2_void_sm(
-    void_action_state)
+machine pvfs2_void_sm
 {
     state void_action_state
     {

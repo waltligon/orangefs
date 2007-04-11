@@ -25,12 +25,7 @@ static PINT_sm_action seteattr_cleanup(
 
 %%
 
-machine pvfs2_set_eattr_sm(
-    prelude,
-    verify_eattrib,
-    setobj_eattrib,
-    cleanup,
-    final_response)
+machine pvfs2_set_eattr_sm
 {
     state prelude
     {

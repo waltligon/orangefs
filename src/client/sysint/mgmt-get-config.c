@@ -35,6 +35,7 @@ int PVFS_mgmt_get_config(
     int server_buf_size)
 {
     int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     PVFS_error error = 0;
     PVFS_credentials creds;
@@ -48,13 +49,16 @@ int PVFS_mgmt_get_config(
 
     PVFS_util_gen_credentials(&creds);
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SERVER_GET_CONFIG,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
+    if(smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
-
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->u.get_config.persist_config_buffers = 1;
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, *fsid);
@@ -75,9 +79,6 @@ int PVFS_mgmt_get_config(
 
     mntent.fs_id = *fsid;
 
-    mntent.pvfs_fs_name = cur_fs->file_system_name;
-    sm_p->u.get_config.config = config;
-
     sm_p->msgpair.enc_type = cur_fs->encoding;
 
     sm_p->u.get_config.mntent = &mntent;
@@ -85,7 +86,8 @@ int PVFS_mgmt_get_config(
     sm_p->msgarray_count = 1;
     sm_p->msgarray = &(sm_p->msgpair);
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SERVER_GET_CONFIG, &op_id, NULL);
+    ret = PINT_client_state_machine_post(
+        smcb, &op_id, NULL);
 
     if (ret)
     {
@@ -94,10 +96,10 @@ int PVFS_mgmt_get_config(
     }
     else
     {
-        ret = PVFS_mgmt_wait(op_id, "X-get_config", &error);
+        ret = PVFS_sys_wait(op_id, "X-get_config", &error);
         if (ret)
         {
-            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
     }
@@ -129,7 +131,7 @@ int PVFS_mgmt_get_config(
         sm_p->u.get_config.server_config_buf = NULL;
     }
 
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 

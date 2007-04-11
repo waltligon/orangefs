@@ -59,14 +59,7 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-nested machine pvfs2_list_attr_work_sm(
-    verify_attribs,
-    read_symlink_target,
-    read_metafile_datafile_handles_if_required,
-    read_metafile_distribution_if_required,
-    get_dirent_count,
-    interpret_dirent_count,
-    setup_resp)
+nested machine pvfs2_list_attr_work_sm
 {
     state verify_attribs
     {
@@ -116,12 +109,7 @@ nested machine pvfs2_list_attr_work_sm(
     }
 }
 
-machine pvfs2_list_attr_sm(
-    prelude,
-    setup_op,
-    do_work,
-    final_response,
-    cleanup)
+machine pvfs2_list_attr_sm
 {
     state prelude
     {

@@ -21,7 +21,7 @@ static PINT_sm_action getconfig_init(
 
 %%
 
-machine pvfs2_get_config_sm(prelude, init, final_response, cleanup)
+machine pvfs2_get_config_sm
 {
 	state prelude
 	{
