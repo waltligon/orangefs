@@ -326,6 +326,37 @@ if test $use_aio_thcb = 1 ; then
 fi
 AC_SUBST(MISC_TROVE_FLAGS)
 
+dnl Check for AIO's aiocb->__error_code field (linux has it, OS X doesn't)
+AC_MSG_CHECKING([for __error_code field in aiocb struct])
+AC_TRY_COMPILE(
+    [
+     	#include <aio.h>
+    ], 
+    [
+    	struct aiocb;
+	aiocb.__error_code = 0;
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_AIOCB_ERROR_CODE, 1, Define if aiocb->__error_code exists)
+    ,
+    AC_MSG_RESULT(no)
+)
+
+dnl Check for AIO's aiocb->__return_value field (linux has it, OS X doesn't)
+AC_MSG_CHECKING([for __return_value field in aiocb struct])
+AC_TRY_COMPILE(
+    [
+        #include <aio.h>
+    ],
+    [
+        struct aiocb;
+	aiocb.__return_value = 0;
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_AIOCB_RETURN_VALUE, 1, Define if aiocb->__return_value exists)
+    ,
+    AC_MSG_RESULT(no)
+)
 dnl Check byte ordering
 AC_C_BIGENDIAN
 
@@ -984,7 +1015,23 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(no)
 )
 
-
+AC_MSG_CHECKING([for fsetxattr extra arguments])
+AC_TRY_COMPILE([
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+	],
+	[
+	fsetxattr(0, 0, 0, 0, 0, 0);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FSETXATTR_EXTRA_ARGS, 1, Define if fsetxattr takes position and option arguments),
+	AC_MSG_RESULT(no)
+)
 
 
 dnl check for getmntent(), special test

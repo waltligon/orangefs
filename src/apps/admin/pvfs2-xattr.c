@@ -214,7 +214,12 @@ static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
       else
       {
 #ifdef HAVE_FSETXATTR
-        if ((ret = fsetxattr(obj->u.ufs.fd, key_p->buffer, val_p->buffer, val_p->buffer_sz, 0)) < 0)
+        if ((ret = fsetxattr(obj->u.ufs.fd, key_p->buffer, 
+                             val_p->buffer, val_p->buffer_sz, 0
+#ifdef HAVE_FSETXATTR_EXTRA_ARGS
+                             ,0
+#endif
+                            )) < 0)
 #else
         errno = ENOSYS;
 #endif

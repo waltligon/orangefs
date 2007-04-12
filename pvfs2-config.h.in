@@ -6,6 +6,12 @@
 /* Define if kernel has aio support */
 #undef HAVE_AIO
 
+/* Define if aiocb->__error_code exists */
+#undef HAVE_AIOCB_ERROR_CODE
+
+/* Define if aiocb->__return_value exists */
+#undef HAVE_AIOCB_RETURN_VALUE
+
 /* Define if VFS AIO support in kernel has a new prototype */
 #undef HAVE_AIO_NEW_AIO_SIGNATURE
 
@@ -73,6 +79,9 @@
 
 /* Define to 1 if you have the `fsetxattr' function. */
 #undef HAVE_FSETXATTR
+
+/* Define if fsetxattr takes position and option arguments */
+#undef HAVE_FSETXATTR_EXTRA_ARGS
 
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H

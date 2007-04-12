@@ -70,7 +70,9 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
         tmp_item->sig = sig;
 
         /* setup state */
+#ifdef HAVE_AIOCB_ERROR_CODE
         tmp_item->cb_p->__error_code = EINPROGRESS;
+#endif
 
         /* set detached state */
         ret = pthread_attr_init(&attr);
@@ -142,12 +144,20 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
 
 static int alt_aio_error(const struct aiocb *aiocbp)
 {
+#ifdef HAVE_AIOCB_ERROR_CODE
     return aiocbp->__error_code;
+#else
+    return 0;
+#endif
 }
 
 static ssize_t alt_aio_return(struct aiocb *aiocbp)
 {
+#ifdef HAVE_AIOCB_RETURN_VALUE
     return aiocbp->__return_value;
+#else
+    return 0;
+#endif
 }
 
 static int alt_aio_cancel(int filedesc, struct aiocb *aiocbp)
@@ -216,12 +226,19 @@ static void* alt_lio_thread(void* foo)
     /* store error and return codes */
     if(ret < 0)
     {
+#ifdef HAVE_AIOCB_ERROR_CODE
         tmp_item->cb_p->__error_code = errno;
+#endif
     }
     else
     {
+#ifdef HAVE_AIOCB_ERROR_CODE
         tmp_item->cb_p->__error_code = 0;
+#endif
+
+#ifdef HAVE_AIOCB_RETURN_VALUE
         tmp_item->cb_p->__return_value = ret;
+#endif
     }
 
     if(tmp_item->master)
