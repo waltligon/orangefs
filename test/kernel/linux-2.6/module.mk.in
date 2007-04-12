@@ -1,5 +1,6 @@
 DIR := kernel/linux-2.6
 
+ifeq ($(LIBAIO_EXISTS),1)
 
 TESTSRC += \
 	$(DIR)/aio_test_append.c \
@@ -13,3 +14,6 @@ TESTSRC += \
 	$(DIR)/threaded_write.c
 
 MODLDFLAGS_$(DIR) := -laio
+
+endif
+

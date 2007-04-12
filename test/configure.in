@@ -49,6 +49,8 @@ AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
+AC_CHECK_HEADERS(openssl/evp.h)
+AC_CHECK_HEADERS(openssl/crypto.h)
 dnl See if CC is a GNU compiler.  This may require a real test in future
 dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
 dnl check if it is an Intel compiler; those lie and claim to be gcc but are
