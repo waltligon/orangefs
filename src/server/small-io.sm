@@ -18,9 +18,12 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 
-static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p);
-static int small_io_check_size(PINT_server_op *s_op, job_status_s *js_p);
-static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p);
+static PINT_sm_action small_io_start_job(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action small_io_check_size(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action small_io_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -60,8 +63,10 @@ machine pvfs2_small_io_sm
 
 %%
 
-static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action small_io_start_job(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
     PINT_Request_state * file_req_state;
@@ -81,9 +86,9 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
        s_op->ds_attr.b_size == 0)
     {
-        /* nothing to read.  return 0 */
+        /* nothing to read.  return SM_ACTION_DEFERRED */
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     file_req_state = PINT_new_request_state(
@@ -120,7 +125,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     {
         gossip_err("small_io: Failed to process file request\n");
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
  
     /* figure out if the fs config has trove data sync turned on or off
@@ -130,7 +135,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     {
         gossip_err("small_io: server config is NULL!\n");
         js_p->error_code = -PVFS_EINVAL;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     
     fs_config = PINT_config_find_fs_id(
@@ -141,7 +146,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
                    "config from fs_id of: %d\n",
                    s_op->req->u.small_io.fs_id);
         js_p->error_code = -PVFS_EINVAL;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     if(s_op->req->u.small_io.io_type == PVFS_IO_WRITE)
@@ -158,7 +163,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
            &s_op->resp.u.small_io.result_size,
            (fs_config->trove_sync_data ? TROVE_SYNC : 0),
            NULL,
-           s_op,
+           smcb,
            0,
            js_p,
            &tmp_id,
@@ -176,7 +181,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
         if(!s_op->resp.u.small_io.buffer)
         {
             js_p->error_code = -PVFS_ENOMEM;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
         
         s_op->u.small_io.result_bytes = result.bytes;
@@ -192,7 +197,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
             &s_op->resp.u.small_io.result_size,
             (fs_config->trove_sync_data ? TROVE_SYNC : 0),
             NULL,
-            s_op,
+            smcb,
             0,
             js_p,
             &tmp_id,
@@ -201,7 +206,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
         {
             gossip_err("small-io: Failed to post trove bstream read\n");
             js_p->error_code = ret;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
     }
 
@@ -210,8 +215,10 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     return ret;
 }
 
-static int small_io_check_size(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action small_io_check_size(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ)
     {
         if(s_op->resp.u.small_io.result_size !=
@@ -224,11 +231,13 @@ static int small_io_check_size(PINT_server_op *s_op, job_status_s *js_p)
         }
     }
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action small_io_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
        s_op->resp.u.small_io.buffer)
     {
@@ -236,7 +245,7 @@ static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
                     s_op->req->u.small_io.total_bytes, BMI_SEND);
     }
 
-    return server_state_machine_complete(s_op);
+    return server_state_machine_complete(smcb);
 }
 
 /*

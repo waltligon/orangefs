@@ -15,12 +15,14 @@
 #include "pint-util.h"
 #include "pint-eattr.h"
 
-static int seteattr_verify_eattribs(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int seteattr_setobj_eattribs(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int seteattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
+
+static PINT_sm_action seteattr_verify_eattribs(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action seteattr_setobj_eattribs(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action seteattr_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -66,8 +68,9 @@ machine pvfs2_set_eattr_sm
  * It also prints debugging information.
  */
 static int seteattr_verify_eattribs(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL;
     a_p = &s_op->attr;
     int i;
@@ -89,11 +92,11 @@ static int seteattr_verify_eattribs(
             &s_op->req->u.seteattr.val[i]);
         if(!js_p->error_code)
         {
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
     }
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -112,8 +115,9 @@ static int seteattr_verify_eattribs(
  *  (TROVE_NOOVERWRITE, TROVE_ONLYOVERWRITE)
  */
 static int seteattr_setobj_eattribs(
-        PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     PVFS_ds_flags trove_flags = 0;
     job_id_t j_id;
@@ -143,7 +147,7 @@ static int seteattr_setobj_eattribs(
         s_op->req->u.seteattr.nkey,
         trove_flags,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &j_id,
@@ -163,10 +167,11 @@ static int seteattr_setobj_eattribs(
  * Synopsis: free memory and return
  *           
  */
-static int seteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static int seteattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
     /* do I need to free memory from decoding key and val?*/
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*
@@ -178,4 +183,3 @@ static int seteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
-

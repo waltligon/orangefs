@@ -30,6 +30,7 @@
 #include "PINT-reqproto-encode.h"
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
+#include "state-machine.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already
  * defined; this allows us to get the dependencies right for
@@ -39,8 +40,6 @@
 #ifndef __SM_CHECK_DEP
 extern job_context_id server_job_context;
 
-/* size of stack for nested state machines */
-#define PINT_STATE_STACK_SIZE                  8
 #define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
 #define BMI_UNEXPECTED_OP                    999
 
@@ -316,13 +315,8 @@ struct PINT_server_eattr_op
 typedef struct PINT_server_op
 {
     struct qlist_head   next; /* used to queue structures used for unexp style messages */
+    int op_cancelled; /* indicates unexp message was cancelled */
     enum PVFS_server_op op;  /* type of operation that we are servicing */
-    /* the following fields are used in state machine processing to keep
-     * track of the current state
-     */
-    int stackptr;
-    union PINT_state_array_values *current_state; 
-    union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE]; 
 
     /* holds id from request scheduler so we can release it later */
     job_id_t scheduled_id; 
@@ -432,6 +426,7 @@ extern struct PINT_state_machine_s pvfs2_flush_sm;
 extern struct PINT_state_machine_s pvfs2_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_setparam_sm;
 extern struct PINT_state_machine_s pvfs2_noop_sm;
+extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_perf_update_sm;
 extern struct PINT_state_machine_s pvfs2_job_timer_sm;
@@ -459,22 +454,32 @@ extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 struct server_configuration_s *get_server_config_struct(void);
 
 /* exported state machine resource reclamation function */
-int server_state_machine_complete(PINT_server_op *s_op);
+int server_post_unexpected_recv(job_status_s *js_p);
+int server_state_machine_start( PINT_smcb *smcb, job_status_s *js_p);
+int server_state_machine_complete(PINT_smcb *smcb);
+int server_state_machine_terminate(PINT_smcb *smcb, job_status_s *js_p);
+
+/* lists of server ops */
+extern struct qlist_head posted_sop_list;
+extern struct qlist_head inprogress_sop_list;
 
 /* starts state machines not associated with an incoming request */
 int server_state_machine_alloc_noreq(
-    enum PVFS_server_op op, PINT_server_op** new_op);
+    enum PVFS_server_op op, struct PINT_smcb ** new_op);
 int server_state_machine_start_noreq(
-    PINT_server_op *new_op);
+    struct PINT_smcb *new_op);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
+#if 0
 #define PINT_OP_STATE       PINT_server_op
 #define PINT_OP_STATE_GET_MACHINE(_op) \
     ((_op >= 0 && _op < PVFS_SERV_NUM_OPS) ? \
     PINT_server_req_table[_op].sm : NULL)
+#endif
 
-#include "state-machine.h"
 #include "pvfs2-internal.h"
+
+struct PINT_state_machine_s *server_op_state_get_machine(int);
 
 #endif /* __SM_CHECK_DEP */ 
 #endif /* __PVFS_SERVER_H */

@@ -359,7 +359,7 @@ int PVFS_mgmt_testsome(
     int *error_code_array,
     int timeout_ms);
 
-void PVFS_mgmt_release(PVFS_mgmt_op_id op_id);
+int PVFS_mgmt_cancel(PVFS_mgmt_op_id op_id);
 
 int PVFS_mgmt_get_config(
     const PVFS_fs_id* fsid,

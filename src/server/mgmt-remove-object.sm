@@ -14,10 +14,10 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-static int mgmt_remove_dspace(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int mgmt_remove_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+static PINT_sm_action mgmt_remove_dspace(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action mgmt_remove_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -51,9 +51,10 @@ machine pvfs2_mgmt_remove_object_sm
 
 %%
 
-static int mgmt_remove_dspace(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action mgmt_remove_dspace(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     
@@ -66,7 +67,7 @@ static int mgmt_remove_dspace(
         s_op->req->u.mgmt_remove_object.fs_id,
         s_op->req->u.mgmt_remove_object.handle,
         TROVE_SYNC,
-        s_op,
+        smcb,
         0,
         js_p,
         &j_id,
@@ -75,10 +76,10 @@ static int mgmt_remove_dspace(
     return ret;
 }
 
-static int mgmt_remove_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action mgmt_remove_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

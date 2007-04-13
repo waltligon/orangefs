@@ -25,16 +25,16 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int readdir_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int readdir_msg_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int readdir_msg_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int readdir_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int do_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action readdir_init(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action readdir_msg_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action readdir_msg_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action readdir_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action do_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int readdir_msg_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -116,6 +116,7 @@ PVFS_error PVFS_isys_readdir(
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_readdir entered\n");
@@ -135,12 +136,16 @@ PVFS_error PVFS_isys_readdir(
         return ret;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SYS_READDIR,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
@@ -159,7 +164,7 @@ PVFS_error PVFS_isys_readdir(
                  "%llu on fs %d\n", llu(ref.handle), ref.fs_id);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_READDIR, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Read entries from a directory.
@@ -198,15 +203,16 @@ PVFS_error PVFS_sys_readdir(
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 
 /****************************************************************/
 
-static int readdir_init(PINT_client_sm *sm_p,
-                        job_status_s *js_p)
+static PINT_sm_action readdir_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: init\n");
 
     PINT_SM_GETATTR_STATE_FILL(
@@ -218,12 +224,13 @@ static int readdir_init(PINT_client_sm *sm_p,
     
     assert(js_p->error_code == 0);
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
-                                     job_status_s *js_p)
+static PINT_sm_action readdir_msg_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -232,7 +239,7 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
 
     if (js_p->error_code)
     {
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
 
@@ -269,14 +276,15 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int readdir_msg_comp_fn(void *v_p,
                                struct PVFS_server_resp *resp_p,
                                int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir_msg_comp_fn\n");
 
@@ -316,17 +324,18 @@ static int readdir_msg_comp_fn(void *v_p,
     return 0;
 }
 
-static int readdir_msg_failure(PINT_client_sm *sm_p,
-                               job_status_s *js_p)
+static PINT_sm_action readdir_msg_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "readdir state: readdir_msg_failure\n");
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int readdir_cleanup(PINT_client_sm *sm_p,
-                           job_status_s *js_p)
+static PINT_sm_action readdir_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PVFS_object_ref tmp_ref;
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: cleanup\n");
@@ -351,20 +360,21 @@ static int readdir_cleanup(PINT_client_sm *sm_p,
     {
         PINT_acache_invalidate(sm_p->object_ref);
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int do_cleanup(PINT_client_sm *sm_p,
-                           job_status_s *js_p)
+static PINT_sm_action do_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: do_cleanup\n");
 
     sm_p->error_code = js_p->error_code;
     gossip_debug(GOSSIP_READDIR_DEBUG, " final return code is %d\n",
                  sm_p->error_code);
 
-    sm_p->op_complete = 1;
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 

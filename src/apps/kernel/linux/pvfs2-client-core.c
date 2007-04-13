@@ -2582,7 +2582,7 @@ static inline PVFS_error repost_unexp_vfs_request(
     assert(vfs_request);
 
     PINT_dev_release_unexpected(&vfs_request->info);
-    PVFS_sys_release(vfs_request->op_id);
+    PINT_sys_release(vfs_request->op_id);
 
     memset(vfs_request, 0, sizeof(vfs_request_t));
     vfs_request->is_dev_unexp = 1;
@@ -2819,6 +2819,14 @@ static inline PVFS_error handle_unexp_vfs_request(
     */
     switch(ret)
     {
+        case SM_ACTION_TERMINATE:
+        {
+           /* This should be set to the return value of the isys_* call */
+           int error = ret; /* error code of the SM> */
+           package_downcall_members(vfs_request,  &error);
+           write_inlined_device_response(vfs_request); 
+           /* This code falls through */ 
+        }
         case 0:
         {
             /*
@@ -2912,6 +2920,12 @@ static PVFS_error process_vfs_requests(void)
         memset(vfs_request_array, 0,
                (MAX_NUM_OPS * sizeof(vfs_request_t *)));
 
+#if 0
+        /* generates too much logging, but useful sometimes */
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                 "Calling PVFS_sys_testsome for new requests\n");
+#endif
+
         ret = PVFS_sys_testsome(
             op_id_array, &op_count, (void *)vfs_request_array,
             error_code_array, PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
@@ -2955,97 +2969,114 @@ static PVFS_error process_vfs_requests(void)
                   operation handling can be making progress on the
                   other ops in progress
                 */
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
+                             " returned unexp vfs_request %p\n",
+                             vfs_request);
                 ret = handle_unexp_vfs_request(vfs_request);
                 assert(ret == 0);
+                
+                /* We've handled this unexpected request (posted the
+                 * client isys call), we can move
+                 * on to the next request in the queue.
+                 */
+                continue;
             }
-            else
+
+            /* We've just completed an (expected) operation on this request, now
+             * we must figure out its completion state and act accordingly.
+             */
+            vfs_request->num_incomplete_ops--;
+
+            /* if operation is not complete, we gotta continue */
+            if (vfs_request->num_incomplete_ops != 0)
+                continue;
+            log_operation_timing(vfs_request);
+
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
+                         " returned completed vfs_request %p\n",
+                         vfs_request);
+            /*
+               if this is not a dev unexp msg, it's a non-blocking
+               sysint operation that has just completed
+               */
+            assert(vfs_request->in_upcall.type);
+
+            /*
+               even if the op was cancelled, if we get here, we
+               will have to remove the op from the in progress
+               table.  the error code on cancelled operations is
+               already set appropriately
+               */
+            ret = remove_op_from_op_in_progress_table(vfs_request);
+            if (ret)
             {
-                vfs_request->num_incomplete_ops--;
-                /* if operation is not complete, we gotta continue */
-                if (vfs_request->num_incomplete_ops != 0)
-                    continue;
-                log_operation_timing(vfs_request);
+                PVFS_perror_gossip("Failed to remove op in progress "
+                                   "from table", ret);
 
-                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
-                             " returned completed vfs_request %p\n",
-                             vfs_request);
-                /*
-                  if this is not a dev unexp msg, it's a non-blocking
-                  sysint operation that has just completed
-                */
-                assert(vfs_request->in_upcall.type);
-
-                /*
-                  even if the op was cancelled, if we get here, we
-                  will have to remove the op from the in progress
-                  table.  the error code on cancelled operations is
-                  already set appropriately
-                */
-                ret = remove_op_from_op_in_progress_table(vfs_request);
-                if (ret)
-                {
-                    PVFS_perror_gossip("Failed to remove op in progress "
-                                       "from table", ret);
-                    goto repost_unexp;
-                }
-
-                package_downcall_members(
-                    vfs_request, &error_code_array[i]);
-
-                /*
-                  write the downcall if the operation was NOT a
-                  cancelled I/O operation.  while it's safe to write
-                  cancelled I/O operations to the kernel, it's a waste
-                  of time since it will be discarded.  just repost the
-                  op instead
-                */
-                if (!vfs_request->was_cancelled_io)
-                {
-                    buffer_list[0] = &vfs_request->out_downcall;
-                    size_list[0] = sizeof(pvfs2_downcall_t);
-                    list_size = 1;
-                    total_size = sizeof(pvfs2_downcall_t);
-                    if (vfs_request->out_downcall.trailer_size > 0) {
-                        buffer_list[1] = vfs_request->out_downcall.trailer_buf;
-                        size_list[1] = vfs_request->out_downcall.trailer_size;
-                        list_size++;
-                        total_size += vfs_request->out_downcall.trailer_size;
-                    }
-                    ret = write_device_response(
-                        buffer_list,size_list,list_size, total_size,
-                        vfs_request->info.tag,
-                        &vfs_request->op_id, &vfs_request->jstat,
-                        s_client_dev_context);
-
-                    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "downcall "
-                                 "write returned %d\n", ret);
-
-                    if (ret < 0)
-                    {
-                        gossip_err(
-                            "write_device_response failed "
-                            "(tag=%lld)\n", lld(vfs_request->info.tag));
-                    }
-                }
-                else
-                {
-                    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "skipping "
-                                 "downcall write due to previous "
-                                 "cancellation\n");
-
-                    ret = repost_unexp_vfs_request(
-                        vfs_request, "cancellation");
-
-                    assert(ret == 0);
-                    continue;
-                }
-
-              repost_unexp:
+                /* repost the unexpected request since we're done
+                 * with this one.
+                 */
                 ret = repost_unexp_vfs_request(
                     vfs_request, "normal completion");
 
                 assert(ret == 0);
+                continue;
             }
+
+            package_downcall_members(
+                vfs_request, &error_code_array[i]);
+
+            /*
+               write the downcall if the operation was NOT a
+               cancelled I/O operation.  while it's safe to write
+               cancelled I/O operations to the kernel, it's a waste
+               of time since it will be discarded.  just repost the
+               op instead
+               */
+            if (!vfs_request->was_cancelled_io)
+            {
+                buffer_list[0] = &vfs_request->out_downcall;
+                size_list[0] = sizeof(pvfs2_downcall_t);
+                list_size = 1;
+                total_size = sizeof(pvfs2_downcall_t);
+                if (vfs_request->out_downcall.trailer_size > 0) {
+                    buffer_list[1] = vfs_request->out_downcall.trailer_buf;
+                    size_list[1] = vfs_request->out_downcall.trailer_size;
+                    list_size++;
+                    total_size += vfs_request->out_downcall.trailer_size;
+                }
+                ret = write_device_response(
+                    buffer_list,size_list,list_size, total_size,
+                    vfs_request->info.tag,
+                    &vfs_request->op_id, &vfs_request->jstat,
+                    s_client_dev_context);
+
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "downcall "
+                             "write returned %d\n", ret);
+
+                if (ret < 0)
+                {
+                    gossip_err(
+                        "write_device_response failed "
+                        "(tag=%lld)\n", lld(vfs_request->info.tag));
+                }
+            }
+            else
+            {
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "skipping "
+                             "downcall write due to previous "
+                             "cancellation\n");
+
+                ret = repost_unexp_vfs_request(
+                    vfs_request, "cancellation");
+
+                assert(ret == 0);
+                continue;
+            }
+
+            ret = repost_unexp_vfs_request(
+                vfs_request, "normal_completion");
+            assert(ret == 0);
         }
     }
 
@@ -3061,6 +3092,7 @@ int main(int argc, char **argv)
     struct tm *local_time = NULL;
     uint64_t debug_mask = GOSSIP_NO_DEBUG;
     PINT_client_sm *acache_timer_sm_p = NULL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *ncache_timer_sm_p = NULL;
 
     /* if pvfs2-client-core segfaults, at least log the occurence so
@@ -3084,9 +3116,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        signal(SIGINT,  client_core_sig_handler);
         signal(SIGHUP,  client_core_sig_handler);
-        signal(SIGQUIT, client_core_sig_handler);
     }
 
     /* convert gossip mask if provided on command line */
@@ -3138,7 +3168,7 @@ int main(int argc, char **argv)
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  " %s starting at %.4d-%.2d-%.2d %.2d:%.2d\n",
                  argv[0], (local_time->tm_year + 1900),
-                 local_time->tm_mon, local_time->tm_mday,
+                 local_time->tm_mon+1, local_time->tm_mday,
                  local_time->tm_hour, local_time->tm_min);
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "***************************************************\n");
@@ -3193,6 +3223,49 @@ int main(int argc, char **argv)
     }
     PINT_ncache_enable_perf_counter(ncache_pc);
 
+    /* start a timer to roll over performance counters (acache) */
+    PINT_smcb_alloc(&smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
+            sizeof(struct PINT_client_sm),
+            client_op_state_get_machine,
+            client_state_machine_terminate,
+            s_client_dev_context);
+    if (!smcb)
+    {
+        return(-PVFS_ENOMEM);
+    }
+    acache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    acache_timer_sm_p->u.perf_count_timer.interval_secs = 
+        &s_opts.perf_time_interval_secs;
+    acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
+    ret = PINT_client_state_machine_post(smcb, NULL, NULL);
+    if (ret < 0)
+    {
+        gossip_lerr("Error posting acache timer.\n");
+        return(ret);
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
+            sizeof(struct PINT_client_sm),
+            client_op_state_get_machine,
+            client_state_machine_terminate,
+            s_client_dev_context);
+    if (!smcb)
+    {
+        return(-PVFS_ENOMEM);
+    }
+    ncache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
+        &s_opts.perf_time_interval_secs;
+    ncache_timer_sm_p->u.perf_count_timer.pc = ncache_pc;
+    ret = PINT_client_state_machine_post(smcb, NULL, NULL);
+    if (ret < 0)
+    {
+        gossip_lerr("Error posting ncache timer.\n");
+        return(ret);
+    }
+
+#if 0
+    /* old timer code */
     acache_timer_sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
     if(!acache_timer_sm_p)
     {
@@ -3226,6 +3299,8 @@ int main(int argc, char **argv)
         return(ret);
     }
 
+    /* end of old code */
+#endif
     ret = initialize_ops_in_progress_table();
     if (ret)
     {
@@ -3290,7 +3365,7 @@ int main(int argc, char **argv)
     for(i = 0; i < MAX_NUM_OPS; i++)
     {
         PINT_dev_release_unexpected(&s_vfs_request_array[i]->info);
-        PVFS_sys_release(s_vfs_request_array[i]->op_id);
+        PINT_sys_release(s_vfs_request_array[i]->op_id);
         free(s_vfs_request_array[i]);
     }
 

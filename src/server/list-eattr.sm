@@ -25,14 +25,14 @@
 #include "pint-util.h"
 #include "pint-eattr.h"
 
-static int listeattr_setup_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listeattr_list_eattrib(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listeattr_check_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int listeattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+static PINT_sm_action listeattr_setup_resp(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listeattr_list_eattrib(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listeattr_check_resp(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action listeattr_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -83,8 +83,10 @@ machine pvfs2_list_eattr_sm
  * listeattr_setup_resp()
  * Set up the response - allocate needed resources
  */
-static int listeattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listeattr_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i, tsz;
     gossip_debug(GOSSIP_LISTEATTR_DEBUG, "listeattr requesting %d keys\n",
             s_op->req->u.listeattr.nkey);
@@ -96,7 +98,7 @@ static int listeattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     if (!s_op->resp.u.listeattr.key)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     s_op->resp.u.listeattr.nkey = s_op->req->u.listeattr.nkey;
@@ -108,7 +110,7 @@ static int listeattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
         s_op->resp.u.listeattr.nkey = 0;
         free (s_op->resp.u.listeattr.key);
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
     gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr buffer size %d bytes\n",
             tsz);
@@ -120,16 +122,17 @@ static int listeattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
             (char *)s_op->u.eattr.buffer + tsz;
         tsz += s_op->req->u.listeattr.keysz[i];
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
  * listeattr_list_eattrib()
  * Here is where the eattrib get listed.
  */
-static int listeattr_list_eattrib(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listeattr_list_eattrib(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -143,7 +146,7 @@ static int listeattr_list_eattrib(
         s_op->req->u.listeattr.nkey,
         0,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
@@ -179,8 +182,10 @@ static void print_string(char *buffer, size_t length)
  * will translate it so that it appears in the "system.pvfs2." name
  * space on the client side.
  */
-static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listeattr_check_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int num_found = 0;
     int i = 0;
 
@@ -189,7 +194,7 @@ static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
     {
         s_op->resp.u.listeattr.token = js_p->count;
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* how many entries did we find that we can process? */
@@ -206,9 +211,9 @@ static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
     {
         /* there aren't any extended attr's; go ahead and return */
         js_p->error_code = 0;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
-  
+
     /* iterate through the keys that we found */
     for(i=0; i<num_found; i++)
     {
@@ -217,27 +222,29 @@ static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
             NULL);
         if(js_p->error_code != 0)
         {
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
 
         s_op->resp.u.listeattr.key[i].buffer_sz =
             s_op->resp.u.listeattr.key[i].read_sz;
-    }    
+    }
 
     js_p->error_code = 0;
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 /* listeattr_cleanup()
  * free resources alloc'd by state machine
  */
-static int listeattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action listeattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (s_op->resp.u.listeattr.key)
         free(s_op->resp.u.listeattr.key);
     if (s_op->u.eattr.buffer)
         free(s_op->u.eattr.buffer);
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

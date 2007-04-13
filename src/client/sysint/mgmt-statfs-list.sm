@@ -29,12 +29,12 @@
 extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
-static int mgmt_statfs_list_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int mgmt_statfs_list_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int mgmt_statfs_list_parent_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action mgmt_statfs_list_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action mgmt_statfs_list_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action mgmt_statfs_list_parent_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int statfs_list_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -92,6 +92,7 @@ PVFS_error PVFS_imgmt_statfs_list(
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -102,12 +103,16 @@ PVFS_error PVFS_imgmt_statfs_list(
 	return -PVFS_EINVAL;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_STATFS_LIST,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
@@ -126,12 +131,12 @@ PVFS_error PVFS_imgmt_statfs_list(
     if (sm_p->msgarray == NULL)
     {
         PVFS_util_release_credentials(sm_p->cred_p);
-        free(sm_p);
+        PINT_smcb_free(&smcb);
         return -PVFS_ENOMEM;
     }
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_STATFS_LIST, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Obtain file system statistics from a list of servers.
@@ -171,13 +176,14 @@ PVFS_error PVFS_mgmt_statfs_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_statfs_list completed\n");
 
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 
-static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
-                                          job_status_s *js_p)
+static PINT_sm_action mgmt_statfs_list_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -201,12 +207,13 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
 	msg_p->comp_fn = statfs_list_comp_fn;
 	msg_p->svr_addr = sm_p->u.statfs_list.addr_array[i];
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static PINT_sm_action mgmt_statfs_list_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0, errct = 0;
     PVFS_error error = js_p->error_code;
 
@@ -243,8 +250,9 @@ static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
         sm_p->msgarray = NULL;
     }
 
-    js_p->error_code = error;
-    return 1;
+    sm_p->error_code  = error;
+
+    return SM_ACTION_COMPLETE;
 }
 
 static int statfs_list_comp_fn(void *v_p,
@@ -252,7 +260,8 @@ static int statfs_list_comp_fn(void *v_p,
 			       int i)
 {
     int j = 0;
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* if this particular request was successful, then store the
      * statfs information in an array to be returned to caller
@@ -303,13 +312,13 @@ static int statfs_list_comp_fn(void *v_p,
 }
 
 static int mgmt_statfs_list_parent_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code  = js_p->error_code;
-    sm_p->op_complete = 1;
+    PINT_SET_OP_COMPLETE;
 
-    return 0;
+    return SM_ACTION_DEFERRED;
 }
 
 /*

@@ -44,12 +44,11 @@ enum {
 gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
 extern job_context_id pint_client_sm_context;
 
-static int fs_add_parent_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int pvfs2_server_prepare_fetch_config(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int fs_add_final_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action pvfs2_server_prepare_fetch_config(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action fs_add_final_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -105,6 +104,7 @@ PVFS_error PVFS_isys_fs_add(
     int i;
     struct server_configuration_s *new_server_config = NULL;
     PVFS_BMI_addr_t test_addr;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     PVFS_credentials creds;
 
@@ -146,12 +146,16 @@ PVFS_error PVFS_isys_fs_add(
     }
     mntent->the_pvfs_config_server = mntent->pvfs_config_servers[i];
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SYS_FS_ADD,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     sm_p->u.get_config.mntent = mntent;
     sm_p->u.get_config.config = 
@@ -181,7 +185,7 @@ PVFS_error PVFS_isys_fs_add(
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_FS_ADD, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
@@ -205,7 +209,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 
@@ -245,11 +249,12 @@ int PVFS_sys_fs_remove(struct PVFS_sys_mntent *mntent)
     return ret;
 }
 
-static int pvfs2_server_prepare_fetch_config(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+static PINT_sm_action pvfs2_server_prepare_fetch_config(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
     PVFS_fs_id fsid;
     int count, ret;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     assert(js_p->error_code == 0);
     fsid = sm_p->u.get_config.mntent->fs_id;
@@ -259,12 +264,12 @@ static int pvfs2_server_prepare_fetch_config(
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
         js_p->error_code = ret;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
     if (count == 1)
     {
         js_p->error_code = SKIP_INTEGRITY_CHECK;
-        return 1;
+	return SM_ACTION_COMPLETE;
     }
     sm_p->fetch_config.nservers = count;
     sm_p->fetch_config.addr_array = (PVFS_BMI_addr_t *) malloc(count * sizeof(PVFS_BMI_addr_t));
@@ -272,7 +277,7 @@ static int pvfs2_server_prepare_fetch_config(
     {
 	perror("malloc");
 	js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     ret = PVFS_mgmt_get_server_array(fsid, sm_p->cred_p, 
@@ -283,7 +288,7 @@ static int pvfs2_server_prepare_fetch_config(
         free(sm_p->fetch_config.addr_array);
         sm_p->fetch_config.addr_array = NULL;
 	js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     sm_p->fetch_config.fs_config_bufs = (char **) calloc(count, sizeof(char *));
     if (sm_p->fetch_config.fs_config_bufs == NULL)
@@ -292,7 +297,7 @@ static int pvfs2_server_prepare_fetch_config(
         free(sm_p->fetch_config.addr_array);
         sm_p->fetch_config.addr_array = NULL;
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     sm_p->fetch_config.server_config_bufs = (char **) calloc(count, sizeof(char *));
     if (sm_p->fetch_config.server_config_bufs == NULL)
@@ -303,7 +308,7 @@ static int pvfs2_server_prepare_fetch_config(
         free(sm_p->fetch_config.fs_config_bufs);
         sm_p->fetch_config.fs_config_bufs = NULL;
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     sm_p->fetch_config.fs_config_buf_size = (int *) calloc(count, sizeof(int));
     if (sm_p->fetch_config.fs_config_buf_size == NULL)
@@ -316,7 +321,7 @@ static int pvfs2_server_prepare_fetch_config(
         free(sm_p->fetch_config.server_config_bufs);
         sm_p->fetch_config.server_config_bufs = NULL;
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     sm_p->fetch_config.server_config_buf_size = (int *) calloc(count, sizeof(int));
     if (sm_p->fetch_config.server_config_buf_size == NULL)
@@ -331,7 +336,7 @@ static int pvfs2_server_prepare_fetch_config(
         free(sm_p->fetch_config.fs_config_buf_size);
         sm_p->fetch_config.fs_config_buf_size = NULL;
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     sm_p->msgarray_count = count;
     sm_p->msgarray = (PINT_sm_msgpair_state *) malloc(
@@ -350,10 +355,10 @@ static int pvfs2_server_prepare_fetch_config(
         free(sm_p->fetch_config.server_config_buf_size);
         sm_p->fetch_config.server_config_buf_size = NULL;
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static void hash2str(unsigned char *hash, int hash_length, unsigned char *str)
@@ -375,7 +380,7 @@ static void hash2str(unsigned char *hash, int hash_length, unsigned char *str)
 
 static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    int i, count, ret, fs_conf_failed = 0, fs_conf_size_mismatch = 0, tmp;
+    int i, count, ret = 0, fs_conf_failed = 0, fs_conf_size_mismatch = 0, tmp;
     char **sha1_fs_digests = NULL;
     size_t digest_len;
     PVFS_fs_id fsid;
@@ -462,9 +467,9 @@ out:
     return 1;
 }
 
-static int fs_add_parent_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t addr;
 
@@ -474,7 +479,7 @@ static int fs_add_parent_cleanup(
         gen_mutex_unlock(&mt_config);
         PINT_config_release(sm_p->u.get_config.config);
         free(sm_p->u.get_config.config);
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
 #ifdef USE_TRUSTED
@@ -512,8 +517,8 @@ static int fs_add_parent_cleanup(
         gen_mutex_unlock(&mt_config);
         PINT_config_release(sm_p->u.get_config.config);
         free(sm_p->u.get_config.config);
-        js_p->error_code = ret;
-        return 1;
+        js_p->error_code  = ret;
+        return SM_ACTION_COMPLETE;
     }
 
     /*
@@ -530,8 +535,8 @@ static int fs_add_parent_cleanup(
         gen_mutex_unlock(&mt_config);
         PINT_config_release(sm_p->u.get_config.config);
         free(sm_p->u.get_config.config);
-        js_p->error_code = ret;
-        return 1;
+        js_p->error_code  = ret;
+        return SM_ACTION_COMPLETE;
     }
 
     /* finally, try to add the new config to the server config manager */
@@ -544,8 +549,8 @@ static int fs_add_parent_cleanup(
         gen_mutex_unlock(&mt_config);
         PINT_config_release(sm_p->u.get_config.config);
         free(sm_p->u.get_config.config);
-        js_p->error_code = ret;
-        return 1;
+        js_p->error_code  = ret;
+        return SM_ACTION_COMPLETE;
     }
 
     /*
@@ -556,14 +561,18 @@ static int fs_add_parent_cleanup(
 
     gen_mutex_unlock(&mt_config);
 
-    /* If fs_add indicates a need for checking integrity of conf files do so, else skip */
-    js_p->error_code = (sm_p->u.get_config.mntent->integrity_check == 0) ? SKIP_INTEGRITY_CHECK : 0;
-    return 1;
+    /* If fs_add indicates a need for checking integrity of config
+       files do so, else skip 
+     */
+    js_p->error_code = (sm_p->u.get_config.mntent->integrity_check == 0)
+                        ? SKIP_INTEGRITY_CHECK : 0;
+    return SM_ACTION_COMPLETE;
 }
 
-static int fs_add_final_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+static PINT_sm_action fs_add_final_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == SKIP_INTEGRITY_CHECK)
         js_p->error_code = 0;
     else if (js_p->error_code == 0)
@@ -576,8 +585,8 @@ static int fs_add_final_cleanup(
         free(sm_p->u.get_config.config);
     }
     sm_p->error_code = js_p->error_code;
-    sm_p->op_complete = 1;
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

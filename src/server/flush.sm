@@ -25,16 +25,16 @@ enum
     FLUSH_BSTREAM = 5
 };
 
-static int flush_check_type(
-    PINT_server_op *s_op, job_status_s * js_p);
-static int flush_keyval_flush(
-    PINT_server_op *s_op, job_status_s * js_p);
-static int flush_bstream_flush(
-    PINT_server_op *s_op, job_status_s * js_p);
-static int flush_cleanup(
-    PINT_server_op *s_op, job_status_s *ret);
-static int flush_check_error(
-    PINT_server_op *s_op, job_status_s *js_p);
+static PINT_sm_action flush_check_type(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action flush_keyval_flush(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action flush_bstream_flush(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action flush_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action flush_check_error(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 void flush_init_state_machine(void);
 
 %%
@@ -95,8 +95,10 @@ machine pvfs2_flush_sm
 
 %%
 
-static int flush_check_type(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action flush_check_type(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     js_p->error_code = 0;
 
     if (s_op->attr.objtype == PVFS_TYPE_METAFILE)
@@ -107,7 +109,7 @@ static int flush_check_type(PINT_server_op *s_op, job_status_s *js_p)
     {
         js_p->error_code = FLUSH_BSTREAM;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -123,8 +125,10 @@ static int flush_check_type(PINT_server_op *s_op, job_status_s *js_p)
  * Synopsys: send a keyval flush request to storage
  *
  */
-static int flush_keyval_flush(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action flush_keyval_flush(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
 
@@ -135,7 +139,7 @@ static int flush_keyval_flush(PINT_server_op *s_op, job_status_s *js_p)
         s_op->req->u.flush.fs_id,
         s_op->req->u.flush.handle,
         s_op->req->u.flush.flags,
-        s_op,
+        smcb,
         0,
         js_p,
         &tmp_id,
@@ -144,8 +148,10 @@ static int flush_keyval_flush(PINT_server_op *s_op, job_status_s *js_p)
     return ret;
 }
 
-static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action flush_check_error(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char buf[64] = {0};
     if (js_p->error_code != 0)
     {
@@ -154,7 +160,7 @@ static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p)
         gossip_err("failed to flush handle %llu: %s\n",
                    llu(s_op->req->u.flush.handle), buf);
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -170,8 +176,10 @@ static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p)
  * Synopsys: send a bstream flush request to storage
  *
  */
-static int flush_bstream_flush(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action flush_bstream_flush(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t i;
 
@@ -182,7 +190,7 @@ static int flush_bstream_flush(PINT_server_op *s_op, job_status_s *js_p)
         s_op->req->u.flush.fs_id,
         s_op->req->u.flush.handle,
         s_op->req->u.flush.flags,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
@@ -191,9 +199,10 @@ static int flush_bstream_flush(PINT_server_op *s_op, job_status_s *js_p)
     return ret;
 }
 	    
-static int flush_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action flush_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

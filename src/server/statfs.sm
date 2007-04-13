@@ -19,10 +19,10 @@
 #include <sys/sysinfo.h>
 #endif
 
-static int statfs_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int statfs_do_statfs(
-    PINT_server_op *s_op, job_status_s* js_p);
+static PINT_sm_action statfs_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action statfs_do_statfs(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -59,8 +59,10 @@ machine pvfs2_statfs_sm
  *
  * issue the trove call to retrieve fs statistics
  */
-static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action statfs_do_statfs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     TROVE_context_id tmp_context;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -73,7 +75,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     if (ret < 0)
     {
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* find out how many total handles this server controls */
@@ -83,7 +85,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     if(ret < 0)
     {   
         js_p->error_code = ret;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     /* we need a context to be able to make the getinfo call */
@@ -91,7 +93,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     if (ret < 0)
     {
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     ret = trove_collection_getinfo(
@@ -134,7 +136,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
 #endif
 
     js_p->error_code = ((ret != 1) ? ret : 0);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 
@@ -143,9 +145,10 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int statfs_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action statfs_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 

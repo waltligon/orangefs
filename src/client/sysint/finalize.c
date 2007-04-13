@@ -25,7 +25,7 @@
 
 extern job_context_id pint_client_sm_context;
 
-extern PINT_client_sm *g_sm_p;
+extern PINT_smcb *g_smcb;
 
 /* PVFS_finalize
  *
@@ -62,7 +62,7 @@ int PVFS_sys_finalize()
 
     gossip_disable();
 
-    free(g_sm_p);
+    PINT_client_state_machine_release(g_smcb);
 
     return 0;
 }

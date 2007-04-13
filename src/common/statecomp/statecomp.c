@@ -54,10 +54,29 @@ static void finalize(void);
 
 int main(int argc, char **argv)
 {
+    int retval;
     parse_args(argc, argv);
-    yyparse();
+    retval = yyparse();
+    switch (retval)
+    {
+        case 0:
+            /* successful parse */
+            break;
+        case 1:
+            /* syntax error */
+            fprintf(stderr,"yyparse returned syntax error\n");
+            break;
+        case 2:
+            /* out of memory error */
+            fprintf(stderr,"yyparse returned out of memory error\n");
+            break;
+        default:
+            /* unknown error */
+            fprintf(stderr,"yyparse returned unknown error\n");
+            break;
+    }
     finalize();
-    return 0;
+    return retval;
 }
 
 static void usage(void)
@@ -191,6 +210,29 @@ struct transition *new_transition(struct state *s, char *return_code)
     t = emalloc(sizeof(*t));
     t->return_code = return_code;
     t->next = NULL;
+    *tprev = t;
+    return t;
+}
+
+struct task *new_task(
+    struct state *s, char *return_code, char *task_name)
+{
+    struct task *t, **tprev;
+
+    /* allocate for the new task */
+    t = emalloc(sizeof(*t));
+    t->return_code = return_code;
+    t->task_name = task_name;
+    t->next = NULL;
+
+    /* move to the end of the task list */
+    tprev = &s->task;
+    while(*tprev)
+    {
+        tprev = &(*tprev)->next;
+    }
+
+    /* add the new task to the end of the list */
     *tprev = t;
     return t;
 }

@@ -24,20 +24,20 @@ enum
     REMOVE_MUST_REMOVE_DATAFILES = 1,
 };
 
-static int remove_getattr_init(PINT_client_sm *sm_p,
-                               job_status_s *js_p);
-static int remove_getattr_analyze_results(PINT_client_sm *sm_p,
-                                          job_status_s *js_p);
-static int remove_datafile_remove_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_datafile_remove_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_object_remove_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_object_remove_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_helper_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action remove_getattr_init(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_getattr_analyze_results(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_datafile_remove_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_datafile_remove_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_object_remove_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_object_remove_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_helper_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 #define HANDLE_REMOVE_ERROR(state)                                     \
 do {                                                                   \
@@ -125,21 +125,23 @@ nested machine pvfs2_client_remove_helper_sm
 
 %%
 
-static int remove_getattr_init(PINT_client_sm *sm_p,
-                               job_status_s *js_p)
+static PINT_sm_action remove_getattr_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
         PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
         PVFS_TYPE_NONE,
         0);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_getattr_analyze_results(PINT_client_sm *sm_p,
-                                          job_status_s *js_p)
+static PINT_sm_action remove_getattr_analyze_results(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
     attr = &sm_p->getattr.attr;
     assert(attr);
@@ -176,12 +178,13 @@ static int remove_getattr_analyze_results(PINT_client_sm *sm_p,
 	    gossip_err("%s: unhandled object type (%x)\n", __func__,
                        attr->objtype);
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
-						job_status_s *js_p)
+static PINT_sm_action remove_datafile_remove_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr = NULL;
@@ -204,7 +207,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     if (!sm_p->msgarray)
     {
 	js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     sm_p->msgarray_count = attr->u.meta.dfile_count;
     
@@ -238,12 +241,13 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 	gossip_err("Error: failed to resolve server addresses.\n");
 	js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
-					      job_status_s *js_p)
+static PINT_sm_action remove_object_remove_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -273,20 +277,22 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
-    return 1;    
+    return SM_ACTION_COMPLETE;    
 }
 
-static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
-					  job_status_s *js_p)
+static PINT_sm_action remove_datafile_remove_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_err("Error: failed removing one or more datafiles associated with the meta handle %llu\n", llu(sm_p->object_ref.handle));
     HANDLE_REMOVE_ERROR("datafile_remove_failure");
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_object_remove_failure(PINT_client_sm *sm_p,
-					job_status_s *js_p)
+static PINT_sm_action remove_object_remove_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: "
                  "object_remove_failure\n");
     /*
@@ -303,12 +309,13 @@ static int remove_object_remove_failure(PINT_client_sm *sm_p,
         gossip_err("Error: failed removing handle %llu\n", llu(sm_p->object_ref.handle));
         HANDLE_REMOVE_ERROR("object_remove_failure");
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_helper_cleanup(PINT_client_sm *sm_p,
-                                 job_status_s *js_p)
+static PINT_sm_action remove_helper_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
@@ -328,7 +335,7 @@ static int remove_helper_cleanup(PINT_client_sm *sm_p,
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "remove_helper_cleanup error: %s\n", buf);
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*

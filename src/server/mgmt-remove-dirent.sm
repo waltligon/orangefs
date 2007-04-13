@@ -14,12 +14,12 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int mgmt_remove_dirent(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int mgmt_remove_dirent_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
+static PINT_sm_action mgmt_remove_dirent_get_dirdata_handle_from_parent(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action mgmt_remove_dirent(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action mgmt_remove_dirent_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
@@ -61,8 +61,9 @@ machine pvfs2_mgmt_remove_dirent_sm
 %%
 
 static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -87,15 +88,16 @@ static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
         s_op->req->u.mgmt_remove_dirent.handle,
         &s_op->key, &s_op->val, 
         0, 
-        NULL, s_op, 0, js_p, &i,
+        NULL, smcb, 0, js_p, &i,
         server_job_context);
 
     return ret;
 }
 
-static int mgmt_remove_dirent(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action mgmt_remove_dirent(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
 
@@ -115,7 +117,7 @@ static int mgmt_remove_dirent(
         NULL,
         TROVE_SYNC | TROVE_KEYVAL_HANDLE_COUNT,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &j_id,
@@ -124,10 +126,10 @@ static int mgmt_remove_dirent(
     return ret;
 }
 
-static int mgmt_remove_dirent_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action mgmt_remove_dirent_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

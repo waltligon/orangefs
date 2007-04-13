@@ -22,16 +22,16 @@
  * - post the request to the request scheduler
  * - check permissions
  */
-static int prelude_req_sched(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int prelude_perm_check(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int prelude_getattr_if_needed(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int prelude_check_acls_if_needed(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int prelude_check_acls(
-    PINT_server_op *s_op, job_status_s *js_p);
+static PINT_sm_action prelude_req_sched(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action prelude_perm_check(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action prelude_getattr_if_needed(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action prelude_check_acls_if_needed(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action prelude_check_acls(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 enum {
     PRELUDE_RUN_ACL_CHECKS = 1,
@@ -80,9 +80,10 @@ nested machine pvfs2_prelude_sm
  *
  * posts a request scheduler job
  */
-static int prelude_req_sched(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action prelude_req_sched(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -107,7 +108,7 @@ static int prelude_req_sched(
         s_op->resp.u.mgmt_setparam.old_value = PINT_req_sched_get_mode();
     }
     
-    ret = job_req_sched_post(s_op->req, 0, s_op, 0, js_p,
+    ret = job_req_sched_post(s_op->req, 0, smcb, 0, js_p,
                              &(s_op->scheduled_id), server_job_context);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
@@ -119,9 +120,10 @@ static int prelude_req_sched(
  * reads basic attributes of target object, if there is a particular
  * target object for the operation
  */
-static int prelude_getattr_if_needed(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action prelude_getattr_if_needed(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, readonly_flag = 0;
     job_id_t tmp_id;
 
@@ -145,7 +147,7 @@ static int prelude_getattr_if_needed(
                      ret, llu(s_op->target_handle));
 
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* if the handle is 0, that indicates that the request does not
@@ -155,7 +157,7 @@ static int prelude_getattr_if_needed(
     if (s_op->target_handle == PVFS_HANDLE_NULL)
     {
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* all other operations fall to this point and read basic
@@ -167,8 +169,7 @@ static int prelude_getattr_if_needed(
                  "for handle %llu\n", llu(s_op->target_handle));
 
     ret = job_trove_dspace_getattr(
-        s_op->target_fs_id, s_op->target_handle,
-        s_op, &(s_op->ds_attr),
+        s_op->target_fs_id, s_op->target_handle, smcb, &(s_op->ds_attr),
         0, js_p, &tmp_id, server_job_context);
 
     return ret;
@@ -458,9 +459,10 @@ static int permit_operation(PVFS_fs_id fsid, int read_only, PVFS_BMI_addr_t clie
  * permission checking, it will be replaced by a couple of states that
  * actually perform this task later
  */
-static int prelude_perm_check(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action prelude_perm_check(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *obj_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
     PVFS_uid translated_uid = s_op->req->credentials.uid;
@@ -515,7 +517,7 @@ static int prelude_perm_check(
         if (permit_operation(fsid, rdonly, s_op->addr) < 0)
         {
             js_p->error_code = -PVFS_EROFS;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
         else 
         {
@@ -545,7 +547,7 @@ static int prelude_perm_check(
     if (js_p->error_code)
     {
         js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     gossip_debug(
@@ -664,13 +666,14 @@ static int prelude_perm_check(
     /* If regular checks fail, we need to run acl checks */
     if (js_p->error_code == -PVFS_EACCES && !skip_acl_flag)
         js_p->error_code = PRELUDE_RUN_ACL_CHECKS;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 
-static int prelude_check_acls_if_needed(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action prelude_check_acls_if_needed(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -685,7 +688,7 @@ static int prelude_check_acls_if_needed(
         || s_op->target_handle == PVFS_HANDLE_NULL)
     {
         js_p->error_code = -PVFS_EACCES;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
 
@@ -697,7 +700,7 @@ static int prelude_check_acls_if_needed(
     if (!s_op->val.buffer)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
 
@@ -712,7 +715,7 @@ static int prelude_check_acls_if_needed(
         &s_op->val,
         0,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
@@ -720,9 +723,10 @@ static int prelude_check_acls_if_needed(
     return ret;
 }
 
-static int prelude_check_acls(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action prelude_check_acls(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *obj_attr = NULL;
     int want = 0;
 
@@ -781,7 +785,7 @@ cleanup:
         free(s_op->val.buffer);
     memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
     memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*

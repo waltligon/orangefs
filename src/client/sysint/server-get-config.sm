@@ -27,23 +27,23 @@ static int server_parse_config(
     uint32_t server_config_buf_size);
 
 /* state function prototypes */
-static int server_get_config_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int server_get_config_parent_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int server_get_config_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int server_get_config_parse(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action server_get_config_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action server_get_config_parent_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action server_get_config_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action server_get_config_parse(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int server_get_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
-static int server_fetch_config_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action server_fetch_config_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int server_fetch_config_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int server_fetch_config_parent_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int server_fetch_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
@@ -144,6 +144,7 @@ int PINT_server_get_config(
     struct PVFS_sys_mntent* mntent_p)
 {
     int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     PVFS_error error = 0;
     PVFS_credentials creds;
@@ -162,12 +163,16 @@ int PINT_server_get_config(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "asked for fs name = %s\n",
                  mntent_p->pvfs_fs_name);
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SERVER_GET_CONFIG,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* NOTE: we set these fields manually here rather than use
      * PINT_init_msgarray_params(), because we don't yet have a server
@@ -185,8 +190,7 @@ int PINT_server_get_config(
     sm_p->u.get_config.mntent = mntent_p;
     sm_p->u.get_config.config = config;
 
-    ret = PINT_client_state_machine_post(
-        sm_p, PVFS_SERVER_GET_CONFIG, &op_id, NULL);
+    ret = PINT_client_state_machine_post(smcb, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PINT_client_state_machine_post call", ret);
@@ -202,7 +206,7 @@ int PINT_server_get_config(
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return(error);
 }
 
@@ -284,9 +288,10 @@ static int server_parse_config(
     return ret;
 }
 
-static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
+static PINT_sm_action server_get_config_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_BMI_addr_t serv_addr;
@@ -319,12 +324,13 @@ static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->svr_addr = serv_addr;
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int server_get_config_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static PINT_sm_action server_get_config_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (sm_p && !sm_p->u.get_config.persist_config_buffers)
     {
 	free(sm_p->u.get_config.fs_config_buf);
@@ -336,12 +342,13 @@ static int server_get_config_cleanup(PINT_client_sm *sm_p,
 
     /* preserve js_p->error_code */
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int server_get_config_parse(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static PINT_sm_action server_get_config_parse(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     struct filesystem_configuration_s* cur_fs = NULL;
 
@@ -360,7 +367,7 @@ static int server_get_config_parse(PINT_client_sm *sm_p,
             return 1;
         }
     }
-    
+
     if(sm_p->u.get_config.mntent->fs_id == PVFS_FS_ID_NULL)
     {
         cur_fs = PINT_config_find_fs_name(sm_p->u.get_config.config, 
@@ -392,17 +399,18 @@ static int server_get_config_parse(PINT_client_sm *sm_p,
     }
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 
-static int server_get_config_parent_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static PINT_sm_action server_get_config_parent_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code  = js_p->error_code;
-    sm_p->op_complete = 1;
+    PINT_SET_OP_COMPLETE;
 
-    return 0;
+    return SM_ACTION_DEFERRED;
 }
 
 
@@ -412,7 +420,8 @@ static int server_get_config_comp_fn(
     int i)
 {
     int j = 0;
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* only posted one msgpair */
     assert(i==0);
@@ -466,6 +475,7 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
                 int *fs_config_buf_size, int *server_config_buf_size)
 {
     int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     PVFS_error error = 0;
     PVFS_credentials creds;
@@ -480,13 +490,16 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
     }
 
     PVFS_util_gen_credentials(&creds);
-
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SERVER_FETCH_CONFIG,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* NOTE: we set these fields manually here rather than use
      * PINT_init_msgarray_params(), because we don't yet have a server
@@ -508,13 +521,13 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
         nservers * sizeof(PINT_sm_msgpair_state));
     if (!sm_p->msgarray)
     {
-        free(sm_p);
+        PINT_smcb_free(&smcb);
         return -PVFS_ENOMEM;
     }
 
 
     ret = PINT_client_state_machine_post(
-        sm_p, PVFS_SERVER_FETCH_CONFIG, &op_id, NULL);
+        smcb, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PINT_client_state_machine_post call", ret);
@@ -530,14 +543,15 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return(error);
 }
 
-static int server_fetch_config_setup_msgpair(PINT_client_sm *sm_p,
+static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
     int i;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -557,19 +571,20 @@ static int server_fetch_config_setup_msgpair(PINT_client_sm *sm_p,
     }
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int server_fetch_config_cleanup(PINT_client_sm *sm_p,
+static PINT_sm_action server_fetch_config_cleanup(struct PINT_smcb *smcb,
                                     job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
     }
     /* preserve js_p->error_code */
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int server_fetch_config_comp_fn(
@@ -578,7 +593,8 @@ static int server_fetch_config_comp_fn(
     int i)
 {
     int j = 0;
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */
@@ -611,13 +627,13 @@ static int server_fetch_config_comp_fn(
     return 0;
 }
 
-static int server_fetch_config_parent_cleanup(PINT_client_sm *sm_p,
+static PINT_sm_action server_fetch_config_parent_cleanup(struct PINT_smcb *smcb,
                                     job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code  = js_p->error_code;
-    sm_p->op_complete = 1;
-
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_DEFERRED;
 }
         
 /*

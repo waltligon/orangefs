@@ -10,8 +10,26 @@
  *  Defines and prototypes for statecomp symbol table.
  */
 
-enum transition_type { NEXT_STATE, RETURN, TERMINATE };
-enum state_action { ACTION_RUN, ACTION_JUMP };
+enum transition_type
+{
+    TRANS_NEXT_STATE,
+    TRANS_RETURN,
+    TRANS_TERMINATE,
+    TRANS_PJMP
+};
+
+enum state_action
+{
+    ACTION_RUN,
+    ACTION_JUMP,
+    ACTION_PJMP
+};
+
+struct task {
+    struct task *next;
+    char *return_code;
+    char *task_name;
+};
 
 struct transition {
     struct transition *next;
@@ -25,6 +43,7 @@ struct state {
     char *name;
     enum state_action action;
     char *function_or_machine;
+    struct task *task;
     struct transition *transition;
 };
 
@@ -39,6 +58,8 @@ void *emalloc(size_t size);
 char *estrdup(const char *oldstring);
 struct state *new_state(char *name);
 struct transition *new_transition(struct state *s, char *return_code);
+struct task *new_task(
+    struct state *s, char *return_code, char *task_name);
 
 void gen_machine(char *machine_name);
 
