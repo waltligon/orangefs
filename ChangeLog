@@ -17,6 +17,29 @@ read-only files through the vfs.
 * ib: rely on bmi to make poll vs block decision
 * ib: only check for new connections and async events during blocking periods
 
+* state machine changes:
+	- cleanup codegen to use structs instead of unions/arrays
+	- provide a universal smcb (state machine control block) for
+	  all state machine actions
+	- add support for concurrent state machines
+
+pvfs-2.6.3
+==============
+
+* fix to metadata coalescing that caused file corruption by writing to invalid
+file handles.  Occurs with large (>70) mpi parallel write workloads.
+* fix for race condition on metadata completion
+* fix for alt-aio with non-contig requests
+* fix to kzalloc configure checks for older kernels
+* fix to support older (0.9.6x) openssl versions
+* fix 2.4 kernel crash in lookup
+* fix cleanup of server internal state machines
+* fix remove-object to decrement dirent count
+* fix a number of error code problems in bmi and elsewhere
+* fix to prevent failures on decoding response errors from server
+* fix 2.4 mount bugs
+* fixes to acl checking, group checking, and root squash
+
 pvfs-2.6.2
 ==============
 

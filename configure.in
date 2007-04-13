@@ -17,8 +17,8 @@ dnl PVFS2 versioning information.
 dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=2
-PVFS2_MINOR=6
-PVFS2_SUB=2
+PVFS2_MINOR=7
+PVFS2_SUB=0
 #PVFS2_PRE=""
 PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
