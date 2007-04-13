@@ -481,8 +481,8 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
             gettimeofday(&tv, 0);
             tp = tv.tv_sec;
             strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
-            sprintf(bptr+8, ".%06ld (%llu)] ", (long)tv.tv_usec, 
-                    llu(gen_thread_self()));
+            sprintf(bptr+8, ".%06ld (%ld)] ", (long)tv.tv_usec, 
+                    gen_thread_self());
             bptr += 30;
             bsize -= 30;
             break;
