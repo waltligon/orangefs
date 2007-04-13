@@ -139,6 +139,7 @@ void linked_itree_print_fn(itree_t *head_p)
 
 int rbtree_lock_req_cpy_fn(rbtree_t *dest_p, rbtree_t *src_p)
 {
+#if 0
     PINT_Request_state *tmp_file_req_state_p = NULL;
     PINT_Request *tmp_file_req_p = NULL;
     PINT_Request_result *tmp_result_p = NULL;
@@ -183,6 +184,86 @@ int rbtree_lock_req_cpy_fn(rbtree_t *dest_p, rbtree_t *src_p)
     tmp_src_p->file_req_state = tmp_file_req_state_p;
     tmp_src_p->file_req = tmp_file_req_p;
     tmp_src_p->lock_result_p = tmp_result_p;
+#else
+    PINT_Request_state *tmp_file_req_state_p = NULL;
+    PINT_Request *tmp_file_req_p = NULL;
+    PINT_Request_result *tmp_result_p = NULL;
+    int tmp_int_swap;
+    PVFS_id_gen_t tmp_id_gen_t_swap;
+    PVFS_offset tmp_PVFS_offset_swap;
+    PVFS_size tmp_PVFS_size_swap;
+
+    lock_req_t *tmp_dest_p =
+	rbtree_entry(dest_p, lock_req_t, granted_req_link);
+    lock_req_t *tmp_src_p =
+	rbtree_entry(src_p, lock_req_t, granted_req_link);
+
+    assert(dest_p != &RBTREE_NIL);
+    assert(src_p != &RBTREE_NIL);
+
+    qlist_swap(&(tmp_dest_p->lock_head), &(tmp_src_p->lock_head));
+
+    tmp_int_swap = tmp_dest_p->lock_req_status;
+    tmp_dest_p->lock_req_status = tmp_src_p->lock_req_status;
+    tmp_src_p->lock_req_status = tmp_int_swap;
+
+    /* Granted req link not swapped */
+    qlist_swap(&(tmp_dest_p->queued_req_link), 
+	       &(tmp_src_p->queued_req_link));
+    qlist_swap(&(tmp_dest_p->all_req_link), 
+	       &(tmp_src_p->all_req_link));
+    
+    tmp_id_gen_t_swap = tmp_dest_p->req_id;
+    tmp_dest_p->req_id = tmp_src_p->req_id;
+    tmp_src_p->req_id = tmp_id_gen_t_swap;
+
+    tmp_int_swap = tmp_dest_p->io_type;
+    tmp_dest_p->io_type = tmp_src_p->io_type;
+    tmp_src_p->io_type = tmp_int_swap;
+
+    tmp_PVFS_size_swap = tmp_dest_p->actual_locked_bytes;
+    tmp_dest_p->actual_locked_bytes = tmp_src_p->actual_locked_bytes;
+    tmp_src_p->actual_locked_bytes = tmp_PVFS_size_swap;
+
+    tmp_file_req_state_p = tmp_dest_p->file_req_state;
+    tmp_dest_p->file_req_state = tmp_src_p->file_req_state;
+    tmp_src_p->file_req_state = tmp_file_req_state_p;
+
+    tmp_result_p = tmp_dest_p->lock_result_p;
+    tmp_dest_p->lock_result_p = tmp_src_p->lock_result_p;
+    tmp_src_p->lock_result_p = tmp_result_p;
+
+    tmp_int_swap = tmp_dest_p->seg_num;
+    tmp_dest_p->seg_num = tmp_src_p->seg_num;
+    tmp_src_p->seg_num = tmp_int_swap;
+
+    tmp_int_swap = tmp_dest_p->seg_bytes_used;
+    tmp_dest_p->seg_bytes_used = tmp_src_p->seg_bytes_used;
+    tmp_src_p->seg_bytes_used = tmp_int_swap;
+
+    qlist_swap(&(tmp_dest_p->removed_link),
+	       &(tmp_src_p->removed_link));
+
+    tmp_PVFS_offset_swap = tmp_dest_p->wait_abs_offset;
+    tmp_dest_p->wait_abs_offset = tmp_src_p->wait_abs_offset;
+    tmp_src_p->wait_abs_offset = tmp_PVFS_offset_swap;
+
+    tmp_PVFS_size_swap = tmp_dest_p->aggregate_size;
+    tmp_dest_p->aggregate_size = tmp_src_p->aggregate_size;
+    tmp_dest_p->aggregate_size = tmp_PVFS_size_swap;
+    
+    tmp_file_req_p = tmp_dest_p->file_req;    
+    tmp_dest_p->file_req = tmp_src_p->file_req;
+    tmp_src_p->file_req = tmp_file_req_p;
+
+    tmp_PVFS_offset_swap = tmp_dest_p->file_req_offset;
+    tmp_dest_p->file_req_offset = tmp_src_p->file_req_offset;
+    tmp_src_p->file_req_offset = tmp_PVFS_offset_swap;
+    /* lock_callback is not necessary to swap since anything in the
+     * granted list shouldn't have any callback information set up
+     * with it! */
+
+#endif
 
     return 0;
 }
@@ -1423,6 +1504,7 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 		    found_lock_req_p = tmp_lock_req_p;
 		    break;
 		}
+		tmp_req_p = tmp_req_p->next;
 	    }
 
 	    lock_req_p->lock_req_status = INCOMPLETE;	    
