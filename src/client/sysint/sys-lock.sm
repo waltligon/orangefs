@@ -653,7 +653,9 @@ static int lock_analyze_results(PINT_client_sm *sm_p,
 
 		build_heap(&(sm_p->u.lock.server_heap),
 			   heap_swap_fn);
+#if 0
 		print_heap(&(sm_p->u.lock.server_heap), heap_print_fn);
+#endif
 		build_heap(&(sm_p->u.lock.server_heap),
 			   heap_swap_fn);
 
