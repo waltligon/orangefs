@@ -78,11 +78,14 @@ void gen_machine(char *machine_name)
 
     /* purge for next machine */
     for (s=states; s; s=snext) {
-        for (task=s->task; task; task=tasknext)
+        if(s->task)
         {
-            tasknext = task->next;
-            free(task->return_code);
-            free(task);
+            for (task=s->task; task; task=tasknext)
+            {
+                tasknext = task->next;
+                free(task->return_code);
+                free(task);
+            }
         }
 
         for (t=s->transition; t; t=tnext) {

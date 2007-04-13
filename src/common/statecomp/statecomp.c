@@ -190,6 +190,7 @@ struct state *new_state(char *name)
     s = emalloc(sizeof(*s));
     s->name = name;
     s->transition = NULL;
+    s->task = NULL;
     s->next = NULL;
     *sprev = s;
     return s;
