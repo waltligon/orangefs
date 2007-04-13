@@ -394,11 +394,11 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	fi
 
-	dnl we need the compiler to error on warnings about prototypes, but
 	dnl certain Fedora FC5 kernel header files throw extra (spurious)
-	dnl warnings, which -Wno-pointer-sign silences.
+	dnl warnings, which -Wno-pointer-sign silences, but that option is 
+	dnl only supported by gcc-4.
 	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror -Wno-pointer-sign"
+	CFLAGS="$CFLAGS -Werror"
 	dnl if this test passes, there is a struct dentry* argument
 	AC_MSG_CHECKING(if statfs callbacks' arguments in kernel has struct dentry argument)
 	dnl if this test passes, the kernel has it
