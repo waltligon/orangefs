@@ -128,26 +128,24 @@ static PINT_sm_action geteattr_setup_resp(
     }
     s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
     for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
-        tsz += s_op->req->u.geteattr.valsz[i];
-    s_op->u.eattr.buffer = malloc(tsz);
-    if (!s_op->u.eattr.buffer)
     {
-        s_op->resp.u.geteattr.nkey = 0;
-        free (s_op->resp.u.geteattr.val);
-        free (s_op->resp.u.geteattr.err);
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
+        s_op->resp.u.geteattr.val[i].buffer = malloc(
+            s_op->req->u.geteattr.valsz[i]);
+        if (!s_op->resp.u.geteattr.val[i].buffer)
+        {
+            for(--i; i >= 0; --i)
+            {
+                free(s_op->resp.u.geteattr.val[i].buffer);
+            }
+            s_op->resp.u.geteattr.nkey = 0;
+            free (s_op->resp.u.geteattr.val);
+            free (s_op->resp.u.geteattr.err);
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        s_op->resp.u.geteattr.val[i].buffer_sz = s_op->req->u.geteattr.valsz[i];
     }
-    gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr buffer size %d bytes\n",
-            tsz);
-    for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
-    {
-        s_op->resp.u.geteattr.val[i].buffer_sz =
-            s_op->req->u.geteattr.valsz[i];
-        s_op->resp.u.geteattr.val[i].buffer =
-            (char *) s_op->u.eattr.buffer + tsz;
-        tsz += s_op->req->u.geteattr.valsz[i];
-    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -189,6 +187,7 @@ static PINT_sm_action geteattr_read_eattrib(
 static PINT_sm_action geteattr_check_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    int ret;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int k;
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr returning %d values\n",
@@ -201,10 +200,21 @@ static PINT_sm_action geteattr_check_resp(
     {
         if (js_p->error_code == 0)
         {
+            ret = PINT_eattr_encode(
+                &s_op->req->u.geteattr.key[k],
+                &s_op->resp.u.geteattr.val[k]);
+            if(ret != 0)
+            {
+                gossip_err("%s: failed encoding extended attribute: %s\n",
+                           __func__, (char *)s_op->req->u.geteattr.key[k].buffer);
+                s_op->resp.u.geteattr.err[k] = ret;
+            }
+
             s_op->resp.u.geteattr.val[k].buffer_sz =
                 s_op->resp.u.geteattr.val[k].read_sz;
             gossip_debug(GOSSIP_GETEATTR_DEBUG, "key %s, read_sz = %d\n",
-                (char *) s_op->req->u.geteattr.key[k].buffer, s_op->resp.u.geteattr.val[k].buffer_sz);
+                (char *) s_op->req->u.geteattr.key[k].buffer, 
+                s_op->resp.u.geteattr.val[k].buffer_sz);
         }
         /* in case of any errors, we initialize it to 0 */
         else {
@@ -220,13 +230,16 @@ static PINT_sm_action geteattr_check_resp(
 static PINT_sm_action geteattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    int i = 0;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    for(; i < s_op->resp.u.geteattr.nkey; ++i)
+    {
+        free(s_op->resp.u.geteattr.val[i].buffer);
+    }
     if (s_op->resp.u.geteattr.val)
         free(s_op->resp.u.geteattr.val);
     if (s_op->resp.u.geteattr.err)
         free(s_op->resp.u.geteattr.err);
-    if (s_op->u.eattr.buffer)
-        free(s_op->u.eattr.buffer);
     return(server_state_machine_complete(smcb));
 }
 

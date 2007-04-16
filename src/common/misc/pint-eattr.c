@@ -8,11 +8,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
+#include "endecode-funcs.h"
 #include "pvfs2.h"
 #include "pint-eattr.h"
 #include "pvfs2-req-proto.h"
+#include "pvfs2-internal.h"
 
-#define PVFS_EATTR_NS_SYSTEM_PVFS2 "system.pvfs2."
+#define PVFS_EATTR_SYSTEM_NS "system.pvfs2."
+
+/* This is used to encode/decode the datafile handles array when its retrieved
+ * as an extended attribute (viewdist does this)
+ */
+struct PINT_handle_array
+{
+    int32_t count;
+    PVFS_handle *handles;
+};
+endecode_fields_1a_struct(PINT_handle_array,
+                          skip4,,
+                          int32_t, count,
+                          PVFS_handle, handles);
 
 /* extended attribute name spaces supported in PVFS2 */
 struct PINT_eattr_check
@@ -31,7 +48,7 @@ static int PINT_eattr_strip_prefix(PVFS_ds_keyval *key, PVFS_ds_keyval *val);
 
 static struct PINT_eattr_check PINT_eattr_access[] =
 {
-    {"system.pvfs2.", 0, PINT_eattr_strip_prefix},
+    {PVFS_EATTR_SYSTEM_NS, 0, PINT_eattr_strip_prefix},
     {"system.", 0, NULL},
     {"user.", 0, NULL},
     {"trusted.", 0, NULL},
@@ -60,7 +77,7 @@ static int PINT_eattr_system_verify(PVFS_ds_keyval *k, PVFS_ds_keyval *v);
  */
 static struct PINT_eattr_check PINT_eattr_namespaces[] =
 {
-    {"system.pvfs2.", -PVFS_EINVAL, NULL},
+    {PVFS_EATTR_SYSTEM_NS, -PVFS_EINVAL, NULL},
     {"system.", 0, PINT_eattr_system_verify},
     {"user.", 0, NULL},
     {"trusted.", 0, NULL},
@@ -91,6 +108,26 @@ static struct PINT_eattr_check PINT_eattr_list[] =
     {"trusted.", 0, NULL},
     {"security.", 0, NULL},
     {NULL, 0, PINT_eattr_add_pvfs_prefix}
+};
+
+static int PINT_eattr_encode_datafile_handle_array(
+    PVFS_ds_keyval *key, PVFS_ds_keyval *val);
+
+static struct PINT_eattr_check PINT_eattr_encode_keyvals[] =
+{
+    {DATAFILE_HANDLES_KEYSTR, 0,
+     PINT_eattr_encode_datafile_handle_array},
+    {NULL, 0, NULL}
+};
+
+static int PINT_eattr_decode_datafile_handle_array(
+    PVFS_ds_keyval *key, PVFS_ds_keyval *val);
+
+static struct PINT_eattr_check PINT_eattr_decode_keyvals[] =
+{
+    {PVFS_EATTR_SYSTEM_NS DATAFILE_HANDLES_KEYSTR, 0,
+     PINT_eattr_decode_datafile_handle_array},
+    {NULL, 0, NULL}
 };
 
 /* PINT_eattr_verify
@@ -127,7 +164,7 @@ static int PINT_eattr_strip_prefix(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
      * trove.
      */
     ret = sscanf(key->buffer,
-                 PVFS_EATTR_NS_SYSTEM_PVFS2 "%s", tmp_buffer);
+                 PVFS_EATTR_SYSTEM_NS "%s", tmp_buffer);
     if(ret != 1)
     {
         free(tmp_buffer);
@@ -138,6 +175,53 @@ static int PINT_eattr_strip_prefix(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
     memcpy(key->buffer, tmp_buffer, tmp_len);
     key->buffer_sz = tmp_len;
     free(tmp_buffer);
+    return 0;
+}
+
+static int PINT_eattr_encode_datafile_handle_array(
+    PVFS_ds_keyval *key, PVFS_ds_keyval *val)
+{
+    char *tmp_buffer = NULL;
+    char *ptr;
+    struct PINT_handle_array harray;
+
+    harray.count = val->read_sz / sizeof(PVFS_handle);
+    harray.handles = (PVFS_handle *)val->buffer;
+
+    /* allocate twice as much as we probably need here */
+    tmp_buffer = malloc(harray.count * 2 * sizeof(int64_t));
+    if(!tmp_buffer)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    ptr = tmp_buffer;
+    encode_PINT_handle_array(&ptr, &harray);
+
+    free(val->buffer);
+    val->buffer = tmp_buffer;
+    val->buffer_sz = val->read_sz = (ptr - tmp_buffer);
+    return 0;
+}
+
+static int PINT_eattr_decode_datafile_handle_array(
+    PVFS_ds_keyval *key, PVFS_ds_keyval *val)
+{
+    char *ptr;
+    struct PINT_handle_array harray;
+
+    ptr = val->buffer;
+    decode_PINT_handle_array(&ptr, &harray);
+
+    if(val->buffer_sz < (harray.count * sizeof(PVFS_handle)))
+    {
+        decode_free(harray.handles);
+        return -PVFS_EMSGSIZE;
+    }
+
+    val->read_sz = val->buffer_sz = (harray.count * sizeof(PVFS_handle));
+    memcpy(val->buffer, (void *)harray.handles, val->read_sz);
+
     return 0;
 }
 
@@ -234,24 +318,34 @@ static int PINT_eattr_add_pvfs_prefix(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
     char * tmp_buffer = NULL;
     int ret;
 
-    if(key->buffer_sz < (key->read_sz + sizeof(PVFS_EATTR_NS_SYSTEM_PVFS2)))
+    if(key->buffer_sz < (key->read_sz + sizeof(PVFS_EATTR_SYSTEM_NS)))
     {
         return -PVFS_EMSGSIZE;
     }
 
-    tmp_buffer = (char*)malloc(key->read_sz + sizeof(PVFS_EATTR_NS_SYSTEM_PVFS2));
+    tmp_buffer = (char*)malloc(key->read_sz + sizeof(PVFS_EATTR_SYSTEM_NS));
     if(!tmp_buffer)
     {
         return -PVFS_ENOMEM;
     }
 
     ret = sprintf(tmp_buffer, "%s%.*s",
-                  PVFS_EATTR_NS_SYSTEM_PVFS2, key->read_sz, (char *)key->buffer);
+                  PVFS_EATTR_SYSTEM_NS, key->read_sz, (char *)key->buffer);
     memcpy(key->buffer, tmp_buffer, ret+1);
     key->read_sz = ret+1;
 
     free(tmp_buffer);
     return 0;
+}
+
+int PINT_eattr_encode(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
+{
+    return PINT_eattr_verify(PINT_eattr_encode_keyvals, key, val);
+}
+
+int PINT_eattr_decode(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
+{
+    return PINT_eattr_verify(PINT_eattr_decode_keyvals, key, val);
 }
 
 /*

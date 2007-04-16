@@ -43,8 +43,7 @@ ifdef BUILD_SERVER
 
 	# c files that should be added to server library
 	SERVERSRC += \
-		$(SERVER_SMCGEN) \
-		$(DIR)/pint-eattr.c
+		$(SERVER_SMCGEN)
 
 	# track generate .c files to remove during dist clean, etc. 
 		SMCGEN += $(SERVER_SMCGEN)

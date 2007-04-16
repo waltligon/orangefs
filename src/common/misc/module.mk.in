@@ -18,7 +18,8 @@ LIBSRC += $(DIR)/server-config.c \
 	  $(DIR)/realpath.c \
 	  $(DIR)/tcache.c \
 	  $(DIR)/state-machine-fns.c \
-	  $(DIR)/fsck-utils.c
+	  $(DIR)/fsck-utils.c \
+	  $(DIR)/pint-eattr.c
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/server-config-mgr.c \
              $(DIR)/str-utils.c \
@@ -31,8 +32,9 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/pint-cached-config.c \
 	     $(DIR)/pint-util.c \
 	     $(DIR)/tcache.c \
-		  $(DIR)/state-machine-fns.c \
-	  	  $(DIR)/void.c
+	     $(DIR)/state-machine-fns.c \
+	     $(DIR)/void.c \
+	     $(DIR)/pint-eattr.c
 
 MODCFLAGS_$(DIR)/server-config.c = \
    -I$(srcdir)/src/server

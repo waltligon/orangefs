@@ -3,6 +3,10 @@
  *
  * See COPYING in top-level directory.
  */
+#ifndef PINT_EATTR_H
+#define PINT_EATTR_H
+
+#include "pvfs2-types.h"
 
 /* Extended Attributes
  *
@@ -29,6 +33,17 @@ int PINT_eattr_check_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val);
  */
 int PINT_eattr_namespace_verify(PVFS_ds_keyval *k, PVFS_ds_keyval *v);
 
+/* PINT_eattr_encode
+ *
+ * Encode eattrs that we know about (system.pvfs2.*) so that clients
+ * with different endianness can handle the extended attributes properly.
+ * Right now we only care about datafile handles.
+ */
+int PINT_eattr_encode(PVFS_ds_keyval *key, PVFS_ds_keyval *val);
+
+int PINT_eattr_decode(PVFS_ds_keyval *key, PVFS_ds_keyval *val);
+
+#endif
 /*
  * Local variables:
  *  mode: c

@@ -16,6 +16,7 @@
 #include "str-utils.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "pint-eattr.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -174,8 +175,7 @@ static PINT_sm_action get_eattr_setup_msgpair(
             sm_p->object_ref.handle,
             sm_p->u.geteattr.nkey,
             sm_p->u.geteattr.key_array,
-            sm_p->u.geteattr.size_array
-            );
+            sm_p->u.geteattr.size_array);
 
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
@@ -222,6 +222,7 @@ static int get_eattr_comp_fn(
 {
     int j = 0;
     int ret = 0;
+    int decode_ret;
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -289,6 +290,18 @@ static int get_eattr_comp_fn(
                             sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
                     /* record an error, but keep going */
                     ret = -PVFS_EMSGSIZE;
+                }
+
+                /* seems ok - decode the eattrs we know about */
+                decode_ret = PINT_eattr_decode(
+                    &sm_p->u.geteattr.key_array[k],
+                    &sm_p->u.geteattr.resp_p->val_array[k]);
+                if(decode_ret != 0)
+                {
+                    gossip_debug(GOSSIP_GETATTR_DEBUG, 
+                                 "failed decode of eattr: %s\n",
+                                 (char *)sm_p->u.geteattr.key_array[k].buffer);
+                    return decode_ret;
                 }
             }
         }
