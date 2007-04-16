@@ -15,7 +15,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
-	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
+	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
 
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
@@ -397,8 +397,17 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	dnl certain Fedora FC5 kernel header files throw extra (spurious)
 	dnl warnings, which -Wno-pointer-sign silences, but that option is 
 	dnl only supported by gcc-4.
+	if test "x$GCC" = "xyes" ; then
+		AC_MSG_CHECKING(for gcc major version)
+		gcc_version=`$CC --version| head -1 | tr . ' ' | cut -d ' ' -f 3`
+		AC_MSG_RESULT($gcc_version)
+		if test $gcc_version -gt 3 ; then
+			extra_gcc_flags="-Wno-pointer-sign"
+		fi
+	fi
+		
 	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	CFLAGS="$CFLAGS -Werror $extra_gcc_flags"
 	dnl if this test passes, there is a struct dentry* argument
 	AC_MSG_CHECKING(if statfs callbacks' arguments in kernel has struct dentry argument)
 	dnl if this test passes, the kernel has it
