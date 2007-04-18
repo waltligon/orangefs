@@ -1916,6 +1916,10 @@ PVFS_error write_device_response(
     PVFS_error ret = -1;
     int outcount = 0;
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, 
+                 "%s: writing device response.  tag: %llu\n",
+                 __func__, llu(tag));
+
     if (buffer_list && size_list && list_size &&
         total_size && (list_size < MAX_LIST_SIZE))
     {
@@ -2806,6 +2810,10 @@ static inline PVFS_error handle_unexp_vfs_request(
      */
     if(posted_op == 1 && ret < 0)
     {
+        gossip_err(
+            "Post of op: %s failed!\n",
+            get_vfs_op_name_str(vfs_request->in_upcall.type));
+
         vfs_request->out_downcall.status = ret;
         /* this will treat the operation as if it were inlined in the logic
          * to follow, which is what we want -- report a general error and
@@ -2819,32 +2827,26 @@ static inline PVFS_error handle_unexp_vfs_request(
     */
     switch(ret)
     {
-        case SM_ACTION_TERMINATE:
-        {
-           /* This should be set to the return value of the isys_* call */
-           int error = ret; /* error code of the SM> */
-           package_downcall_members(vfs_request,  &error);
-           write_inlined_device_response(vfs_request); 
-           /* This code falls through */ 
-        }
         case 0:
         {
-            /*
-              if we've already completed the operation, just repost
-              the unexp request
-            */
-            if (vfs_request->was_handled_inline)
+            if(vfs_request->op_id == -1)
             {
+                /* This should be set to the return value of the isys_* call */
+                int error = ret; /* error code of the SM> */
+                vfs_request->num_incomplete_ops--;
+                package_downcall_members(vfs_request,  &error);
+                write_inlined_device_response(vfs_request); 
                 ret = repost_unexp_vfs_request(
                     vfs_request, "inlined completion");
             }
             else
             {
+
                 /*
-                  otherwise, we've just properly posted a non-blocking
-                  op; mark it as no longer a dev unexp msg and add it
-                  to the ops in progress table
-                */
+                   otherwise, we've just properly posted a non-blocking
+                   op; mark it as no longer a dev unexp msg and add it
+                   to the ops in progress table
+                   */
                 vfs_request->is_dev_unexp = 0;
                 ret = add_op_to_op_in_progress_table(vfs_request);
 #if 0
@@ -2970,11 +2972,12 @@ static PVFS_error process_vfs_requests(void)
                   other ops in progress
                 */
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
-                             " returned unexp vfs_request %p\n",
-                             vfs_request);
+                             " returned unexp vfs_request %p, tag: %llu\n",
+                             vfs_request,
+                             llu(vfs_request->info.tag));
                 ret = handle_unexp_vfs_request(vfs_request);
                 assert(ret == 0);
-                
+
                 /* We've handled this unexpected request (posted the
                  * client isys call), we can move
                  * on to the next request in the queue.

@@ -93,7 +93,7 @@ static int conditional_remove_sm_if_in_completion_list(PINT_smcb *smcb)
                 memmove(s_completion_list[i],
                         s_completion_list[i+1],
                         (s_completion_list_index - (i + 1)) *
-                        sizeof(PINT_client_sm *));
+                        sizeof(PINT_smcb *));
             }
             s_completion_list_index--;
             found = 1;
@@ -121,7 +121,7 @@ static PVFS_error completion_list_retrieve_completed(
     assert(out_count);
 
     memset(tmp_completion_list, 0,
-           (MAX_RETURNED_JOBS * sizeof(PINT_client_sm *)));
+           (MAX_RETURNED_JOBS * sizeof(PINT_smcb *)));
 
     gen_mutex_lock(&s_completion_list_mutex);
     for(i = 0; i < s_completion_list_index; i++)
@@ -298,7 +298,6 @@ int client_state_machine_terminate(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_state_machine_terminate smcb %p\n",smcb);
 
-    PINT_smcb_set_complete(smcb);
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
             (cancelled_io_jobs_are_pending(smcb))))
@@ -370,12 +369,6 @@ PVFS_error PINT_client_state_machine_post(
     /* save operation type; mark operation as unfinished */
     sm_p->user_ptr = user_ptr;
 
-    if (op_id)
-    {
-        ret = PINT_id_gen_safe_register(op_id, (void *)smcb);
-        sm_p->sys_op_id = *op_id;
-    }
-
     /*
       start state machine and continue advancing while we're getting
       immediate completions
@@ -393,8 +386,10 @@ PVFS_error PINT_client_state_machine_post(
     {
         assert(sm_ret == SM_ACTION_TERMINATE);
 
-        PINT_sys_release(sm_p->sys_op_id);
         *op_id = -1;
+
+        /* free the smcb */
+        PINT_smcb_free(&smcb);
 
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "Posted %s (%llu) "
@@ -406,6 +401,12 @@ PVFS_error PINT_client_state_machine_post(
     else
     {
         assert(sm_ret == SM_ACTION_DEFERRED);
+
+        PINT_id_gen_safe_register(&sm_p->sys_op_id, (void *)smcb);
+        if (op_id)
+        {
+            *op_id = sm_p->sys_op_id;
+        }
 
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) "
@@ -619,7 +620,7 @@ PVFS_error PINT_client_state_machine_test(
 
         if (!PINT_smcb_complete(tmp_smcb))
         {
-            ret = PINT_state_machine_next(tmp_smcb, &job_status_array[i]);
+            ret = PINT_state_machine_continue(tmp_smcb, &job_status_array[i]);
 
             if (ret != SM_ACTION_DEFERRED &&
                     ret != SM_ACTION_TERMINATE); /* ret == 0 */
@@ -702,7 +703,7 @@ PVFS_error PINT_client_state_machine_testsome(
 
         if (!PINT_smcb_complete(smcb))
         {
-            ret = PINT_state_machine_next(smcb, &job_status_array[i]);
+            ret = PINT_state_machine_continue(smcb, &job_status_array[i]);
 
             /* (ret < 0) indicates a problem from the job system
              * itself; the return value of the underlying operation is

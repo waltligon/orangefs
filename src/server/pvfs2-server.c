@@ -632,7 +632,7 @@ int main(int argc, char **argv)
                 * processing, so it is defined in the src/common
                 * directory.
                 */
-            ret = PINT_state_machine_next(
+            ret = PINT_state_machine_continue(
                     smcb, &server_job_status_array[i]);
 
             if (SM_ACTION_ISERR(ret)) /* ret < 0 */

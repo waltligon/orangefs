@@ -178,8 +178,16 @@ PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
     /* run the current state action function */
     ret = PINT_state_machine_invoke(smcb, r);
     if (ret == SM_ACTION_COMPLETE || ret == SM_ACTION_TERMINATE)
+    {
         /* keep running until state machine deferrs or terminates */
         ret = PINT_state_machine_next(smcb, r);
+        
+        /* note that if ret == SM_ACTION_TERMINATE, we _don't_ call
+         * PINT_state_machine_terminate here because that adds the smcb
+         * to the completion list.  We don't want to do that on immediate
+         * completion
+         */
+    }
     return ret;
 }
 
@@ -255,8 +263,6 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
                             " without returning SM_ACTION_TERMINATE\n");
                     smcb->op_terminate = 1;
                 }
-                /* process terminating SM */
-                PINT_state_machine_terminate(smcb, r);
                 return SM_ACTION_TERMINATE;
 	    }
 	    if (transtbl[i].flag == SM_RETURN)
@@ -280,6 +286,30 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
         /* runs state_action and returns the return code */
         ret = PINT_state_machine_invoke(smcb, r);
     } while (ret == SM_ACTION_COMPLETE || ret == SM_ACTION_TERMINATE);
+    return ret;
+}
+
+/* Function: PINT_state_machine_continue
+   Params: smcb pointer and job status pointer
+   Returns: return value of last state action
+   Synopsis: This function essentially calls next, and if the state
+             machine terminates, calls terminate to perform cleanup.
+             This allows separation from the start call (which calls
+             next but does not call terminate if the state machine
+             terminates).
+*/
+PINT_sm_action PINT_state_machine_continue(struct PINT_smcb *smcb, job_status_s *r)
+{
+    int ret;
+
+    ret = PINT_state_machine_next(smcb, r);
+
+    if(ret == SM_ACTION_TERMINATE)
+    {
+        /* process terminating SM */
+        PINT_state_machine_terminate(smcb, r);
+    }
+
     return ret;
 }
 
