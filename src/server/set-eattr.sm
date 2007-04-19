@@ -71,9 +71,9 @@ static int seteattr_verify_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
     PVFS_object_attr *a_p = NULL;
     a_p = &s_op->attr;
-    int i;
 
     js_p->error_code = 0;
 
