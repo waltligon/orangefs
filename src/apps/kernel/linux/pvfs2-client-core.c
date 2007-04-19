@@ -2810,9 +2810,14 @@ static inline PVFS_error handle_unexp_vfs_request(
      */
     if(posted_op == 1 && ret < 0)
     {
+#ifndef GOSSIP_DISABLE_DEBUG
         gossip_err(
             "Post of op: %s failed!\n",
             get_vfs_op_name_str(vfs_request->in_upcall.type));
+#else
+        gossip_err(
+            "Post of op: %d failed!\n", vfs_request->in_upcall.type);
+#endif
 
         vfs_request->out_downcall.status = ret;
         /* this will treat the operation as if it were inlined in the logic
