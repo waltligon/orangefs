@@ -624,8 +624,6 @@ int main(int argc, char **argv)
         {
             /* int unexpected_msg = 0; */
             struct PINT_smcb *smcb = server_completed_job_p_array[i];
-            gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: job "
-                    "completed smcb %p\n", smcb);
 
                /* NOTE: PINT_state_machine_next() is a function that
                 * is shared with the client-side state machine
