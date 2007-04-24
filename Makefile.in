@@ -50,11 +50,12 @@
 # Generic makefile setup 
 
 # define a few generic variables that we need to use
+DESTDIR =
 srcdir = @srcdir@
-prefix = @prefix@
-datarootdir = @datarootdir@
-mandir = @mandir@
-exec_prefix = @exec_prefix@
+prefix = $(DESTDIR)@prefix@
+datarootdir = $(DESTDIR)@datarootdir@
+mandir = $(DESTDIR)@mandir@
+exec_prefix = $(DESTDIR)@exec_prefix@
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
@@ -902,7 +903,7 @@ ifeq ($(NUM_UTS_LINES),1)
 else
     KERNEL_VERS := $(shell uname -r)
 endif
-KMOD_DIR ?= $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
+KMOD_DIR ?= $(DESTDIR)/${kmod_prefix}/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
 
 .PHONY: just_kmod_install
 just_kmod_install: just_kmod
@@ -923,7 +924,7 @@ ifeq ($(NUM_UTS_LINES),1)
 else
     KERNEL_VERS := $(shell uname -r)
 endif
-KMOD_DIR := $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
+KMOD_DIR := $(DESTDIR)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
 
 .PHONY: just_kmod24_install
 just_kmod24_install: just_kmod24
