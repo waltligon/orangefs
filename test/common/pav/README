@@ -25,6 +25,11 @@ servers run on the io nodes while the application runs on the compute
 nodes.  This split keeps the application nodes from perturbing the io
 nodes and should yield more consistent results.
 
+PAV can also mount PVFS, but only if you have a way of obtaining root
+without a passowrd.  Without speaking to the security implications, you
+could achieve this with ssh keys or sudo configurations.   See the
+config options below for how you would enable this optional feature.
+
 Using pav:
 
 To use the system (after installation), one must follow these steps:
@@ -94,6 +99,19 @@ TROVEMETHOD="<desired Trove method>" This defaults to 'dbpf'.
 
 COMPUTENODES_LAST=<1 = default.  Choose compute nodes from end of host list,
                    0 = Choose compute nodes from beginning of host list>
+
+MOUNT_FS=<0 = default. don't bother with the VFS interface
+          1 = load the kernel module, start the helper apps, and mount
+	      the fs>
+
+PVFS_KMOD="<path to kernel module>"  Be sure to specify a kernel module
+                                     built for the compute nodes
+PVFS_CLIENT="<path to pvfs2-client>" The helper app
+
+RCMDPROG_ROOT="<mechanism for gaining remote root>"  Could be anything
+						     really.  "ssh -l
+						     root" is the one
+						     we've tested most.
 
 3.) execute pav_start -c <configfile>.  You will see the pav system
 setting up a PVFS volume for you.

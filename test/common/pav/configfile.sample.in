@@ -86,6 +86,19 @@ TROVESYNC=1
 # fs.conf).  Defaults to 'dbpf'.  'alt-aio' is another good one
 # TROVEMETHOD=dbpf
 
+# set MOUNT_FS if you want PAV to load the kernel module, start
+# pvfs2-client, and mount the file system.  If you set MOUNT_FS, you
+# will also need the path to the kernel module and kernel helper
+# utilities...
+MOUNT_FS=0
+KERNEL_KVER=2.6.20-15-generic
+PVFS_KMOD=/home/robl/soft/pvfs2/lib/modules/$KERNEL_KVER/kernel/fs/pvfs2/pvfs2.ko
+PVFS_CLIENT=$PVFS/sbin/pvfs2-client
+
+#    ... and you will need a way to get root (sudo, ssh with keys, etc):
+#    set this to the apropriate mechansim, e.g.
+# RCMDPROG_ROOT="ssh -l root"
+RCMDPROG_ROOT=$RCMDPROG
 
 # set this to 0 if you would rather have compute nodes come before server
 # nodes in the list of hosts pav uses

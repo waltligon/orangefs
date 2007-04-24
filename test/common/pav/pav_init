@@ -22,6 +22,14 @@ if ($rc) {
     exit($rc);
 }
 
+if ($config{'MOUNT_FS'} == 1) {
+    $rc = do_fs_mount(\%config);
+    if ($rc) {
+    	print STDERR "WARNING: failed to mount FS on remote node $rc\n";
+	exit(-1);
+    }
+}
+
 exit(0);
 
 sub start_servers{
@@ -45,13 +53,44 @@ sub start_servers{
 
     # once to make the storage space, then a second time to run the servers
     my $cmd = "%node $binary  -f $serverconf $localconf-%node";
-
     $rc = do_remote_command($href->{'RCMDPROG'}, 8, 30, $cmd, undef, undef, @nodes);
 
     $cmd = "%node $binary $serverconf $localconf-%node";
     $rc = do_remote_command($href->{'RCMDPROG'}, 8, 30, $cmd, undef, undef, @nodes);
     return($rc);
 }
+
+sub do_fs_mount{
+    my $href = shift;
+
+    my @nodes = ();
+    my $rc = 0;
+
+    @nodes = @{$href->{'COMPNODES'}};
+
+    my $cmd = "%node mkdir $href->{'MOUNTPOINT'}";
+    $rc = do_remote_command($href->{'RCMDPROG_ROOT'}, 8, 30, $cmd, undef, undef, @nodes);
+
+    my $kmod = $href->{'PVFS_KMOD'};
+    $cmd = "%node /sbin/insmod $kmod";
+    $rc = do_remote_command($href->{'RCMDPROG_ROOT'}, 8, 30, $cmd, undef, undef, @nodes);
+
+    my $pvfs2_client = $href->{'PVFS_CLIENT'};
+    $cmd = "%node $pvfs2_client";
+    $rc = do_remote_command($href->{'RCMDPROG_ROOT'}, 8, 30, $cmd, undef, undef, @nodes);
+
+    my @metas = @{$href->{'MGR'}};
+    # from create_pvfs2tab:
+    my $big = $href->{'PROTOCOL'};
+    $big =~ y/a-z/A-Z/;
+    my $var = "PVFS" . $big . "PORT"; # PVFSGMPORT, PVFSIBPORT, etc
+
+    # mount -t pvfs2 gm://pmeta0:5/pvfs2-fs /mnt/pvfs2
+    $cmd = "%node /bin/mount -t pvfs2 " . $href->{'PROTOCOL'} . "://" . $metas[0] . ":" . $href->{$var} . "/pvfs2-fs " . $href->{'MOUNTPOINT'}; 
+    $rc = do_remote_command($href->{'RCMDPROG_ROOT'}, 8, 30, $cmd, undef, undef, @nodes);
+
+    return($rc);
+} 
 
 sub usage {
 

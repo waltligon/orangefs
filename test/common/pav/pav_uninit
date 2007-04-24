@@ -13,6 +13,13 @@ if (init()) {
     exit 1;
 }
 
+if ($config{'MOUNT_FS'} == 1) {
+	$rc = stop_fs_mount(\%config);
+	if ($rc) {
+		print STDERR "WARNING: mount cleanup failed...$rc\n";
+	}
+}
+
 #stop iods
 $rc = stop_servers(\%config);
 if ($rc) {
@@ -20,6 +27,27 @@ if ($rc) {
 }
 
 exit(0);
+
+sub stop_fs_mount {
+    my $href = shift;
+
+    my @nodes = ();
+    my $rc = 0;
+
+    @nodes = @{$href->{'COMPNODES'}};
+
+    my $cmd = "%node umount $href->{'MOUNTPOINT'}";
+    $rc = do_remote_command($href->{'RCMDPROG_ROOT'}, 8, 30, $cmd, undef, undef, @nodes);
+
+    $cmd = "%node killall pvfs2-client\\\; sleep 5\\\; killall -9 pvfs2-client";
+    $rc = do_remote_command($href->{'RCMDPROG_ROOT'}, 8, 30, $cmd, undef, undef, @nodes);
+
+    $cmd = "%node /sbin/rmmod $href->{'PVFS_KMOD'}";
+    $rc = do_remote_command($href->{'RCMDPROG_ROOT'}, 8, 30, $cmd, undef, undef, @nodes);
+
+    return ($rc);
+}
+
 
 sub stop_servers {
     my $href = shift;
