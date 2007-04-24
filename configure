@@ -9106,7 +9106,7 @@ echo $ECHO_N "checking for gcc major version... $ECHO_C" >&6
 		echo "$as_me:$LINENO: result: $gcc_version" >&5
 echo "${ECHO_T}$gcc_version" >&6
 		if test $gcc_version -gt 3 ; then
-			extra_gcc_flags="-Wno-pointer-sign  -Wno-strict-aliasing-Wno-strict-aliasing=2"
+			extra_gcc_flags="-Wno-pointer-sign  -Wno-strict-aliasing -Wno-strict-aliasing=2"
 		fi
 	fi
 
