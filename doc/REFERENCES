@@ -1,5 +1,9 @@
 PVFS2:
 
+Ananth Devulapalli and Pete Wyckoff, "File creation strategies in a
+    distributed metadata file system," Proceedings of IPDPS'07, Long Beach,
+    CA, March 2007.
+
 Weikuan Yu, Shuang Liang, Dhabaleswar K. Panda. "PVFS2 over Quadrics: Design,
     Implementation and Performance Evaluation". Ohio State University Tecnhical
     Report OSU-CISRC-12/04-TR6.  Date Unknown
