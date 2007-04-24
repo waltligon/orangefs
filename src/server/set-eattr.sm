@@ -15,8 +15,6 @@
 #include "pint-util.h"
 #include "pint-eattr.h"
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 static PINT_sm_action seteattr_verify_eattribs(
     struct PINT_smcb *smcb, job_status_s *js_p);
 static PINT_sm_action seteattr_setobj_eattribs(

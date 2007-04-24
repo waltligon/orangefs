@@ -77,7 +77,6 @@ static PINT_sm_action remove_remove_dirdata_dspace(
     struct PINT_smcb *smcb, job_status_s *js_p);
 static PINT_sm_action remove_setup_work(
     struct PINT_smcb *smcb, job_status_s *js_p);
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 

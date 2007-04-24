@@ -55,8 +55,6 @@ static PINT_sm_action listattr_setup_resp(
 static PINT_sm_action listattr_setup_op(
     struct PINT_smcb *smcb, job_status_s *js_p);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
 nested machine pvfs2_list_attr_work_sm

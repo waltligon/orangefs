@@ -146,10 +146,7 @@ static int server_shutdown(
     PINT_server_status_flag status,
     int ret, int sig);
 static void server_sig_handler(int sig);
-int server_post_unexpected_recv(job_status_s * js_p);
 static int server_parse_cmd_line_args(int argc, char **argv);
-int server_state_machine_start(
-    struct PINT_smcb *smcb, job_status_s *js_p);
 #ifdef __PVFS2_SEGV_BACKTRACE__
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 #endif
