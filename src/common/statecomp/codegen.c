@@ -15,8 +15,6 @@
 
 #include "statecomp.h"
 
-extern FILE *out_file;
-extern int terminate_path_flag;
 static int needcomma = 1;
 
 static void gen_state_decl(char *state_name);
