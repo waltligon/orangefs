@@ -117,8 +117,12 @@ int BMI_initialize(const char *method_list,
 		   int flags)
 {
     int ret = -1;
-    int i = 0;
+    int i = 0, j = 0;
     char **requested_methods = NULL;
+    char **listen_addrs = NULL;
+    char *this_addr = NULL;
+    char *proto = NULL;
+    int addr_count;
 
     /* server must specify method list at startup, optional for client */
     if (flags & BMI_INIT_SERVER) {
@@ -164,13 +168,52 @@ int BMI_initialize(const char *method_list,
 	    goto bmi_initialize_failure;
 	}
 
-	/*
-	 * XXX: the same listen_addr is obviously not going to work on
-	 * all the requested methods, though.  Figure out how to deal with
-	 * this someday.
-	 */
+	/* Today is that day! */
+	addr_count = PINT_split_string_list(&listen_addrs, listen_addr);
+	
 	for (i=0; i<numreq; i++) {
-	    ret = activate_method(requested_methods[i], listen_addr, flags);
+
+	    /* assume the method name is bmi_<proto>, and find the <proto>
+	     * part
+	     */
+	    proto = strstr(requested_methods[i], "bmi_");
+	    if(!proto)
+	    {
+	        gossip_err("%s: Invalid method name: %s.  Method names "
+			   "must start with 'bmi_'\n",
+			   __func__, requested_methods[i]);
+		ret = -PVFS_EINVAL;
+		gen_mutex_unlock(&active_method_count_mutex);
+		goto bmi_initialize_failure;
+	    }
+	    proto += 4;
+
+	    /* match the proper listen addr to the method */
+	    for(j=0; j<addr_count; ++j)
+	    {
+		/* we don't want a strstr here in case the addr has
+		 * the proto as part of the hostname
+		 */
+		if(!strncmp(listen_addrs[j], proto, strlen(proto)))
+		{
+		    /* found the right addr */
+		    this_addr = listen_addrs[j];
+		    break;
+		}
+	    }
+		
+	    if(!this_addr)
+	    {
+		/* couldn't find the right listen addr */
+		gossip_err("%s: Failed to find an appropriate listening "
+			   "address for the bmi method: %s\n",
+			   __func__, requested_methods[i]);
+		ret = -PVFS_EINVAL;
+		gen_mutex_unlock(&active_method_count_mutex);
+		goto bmi_initialize_failure;
+	    }
+
+	    ret = activate_method(requested_methods[i], this_addr, flags);
 	    if (ret < 0) {
 		ret = bmi_errno_to_pvfs(ret);
 		gen_mutex_unlock(&active_method_count_mutex);
@@ -179,6 +222,11 @@ int BMI_initialize(const char *method_list,
 	    free(requested_methods[i]);
 	}
 	free(requested_methods);
+	if(listen_addrs)
+	{
+	    PINT_free_string_list(listen_addrs, addr_count);
+	    listen_addrs = NULL;
+	}
     }
     gen_mutex_unlock(&active_method_count_mutex);
 
@@ -223,6 +271,12 @@ int BMI_initialize(const char *method_list,
 	}
 	free(requested_methods);
     }
+
+    if(listen_addrs)
+    {
+	PINT_free_string_list(listen_addrs, addr_count);
+    }
+
     active_method_count = 0;
     gen_mutex_unlock(&active_method_count_mutex);
 
