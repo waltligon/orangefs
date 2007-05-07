@@ -531,7 +531,10 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     size_t sizeof_handle = 0, sizeof_attr = 0;
     int start_size;
     void *tmp_ptr;
+    void *tmp_handle;
+    void *tmp_attr;
     uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
+    int count = 0;
 
     if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
     {
@@ -567,7 +570,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * remainder in this or the above case.
          */
         memset(&key, 0, sizeof(key));
-        key.data  = op_p->u.d_iterate_handles.position_p;
+        dummy_handle = *op_p->u.d_iterate_handles.position_p;
+        key.data  = &dummy_handle;
         key.size  = key.ulen = sizeof(TROVE_handle);
         key.flags |= DB_DBT_USERMEM;
 
@@ -589,9 +593,34 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             goto return_error;
         }
     }
+    else
+    {
+        memset(&key, 0, sizeof(key));
+        key.data  = &dummy_handle;
+        key.size  = key.ulen = sizeof(TROVE_handle);
+        key.flags |= DB_DBT_USERMEM;
+
+        memset(&data, 0, sizeof(data));
+        data.data = &s_attr;
+        data.size = data.ulen = sizeof(s_attr);
+        data.flags |= DB_DBT_USERMEM;
+
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_FIRST);
+        if (ret == DB_NOTFOUND)
+        {
+            goto return_ok;
+        }
+        else if (ret != 0)
+        {
+            ret = -dbpf_db_error_to_trove_error(ret);
+            gossip_err("failed to set cursor position at handle: %llu\n",
+                       llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
+            goto return_error;
+        }
+    }
 
     start_size = ((sizeof(TROVE_handle) + sizeof(s_attr)) *
-                  *op_p->u.d_iterate_handles.count_p);
+                  (*op_p->u.d_iterate_handles.count_p));
     /* round up to the nearest 1024 */
     start_size = (start_size + 1023) & (~(unsigned long)1023);
 
@@ -614,7 +643,6 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     data.size = data.ulen = start_size;
     data.flags = DB_DBT_USERMEM;
 
-    i = 0;
     while(i < *op_p->u.d_iterate_handles.count_p)
     {
         ret = dbc_p->c_get(dbc_p, &key, &data, DB_MULTIPLE_KEY|DB_NEXT);
@@ -656,9 +684,6 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         /* read handles until we run out of handles or space in buffer */
         for (; i < *op_p->u.d_iterate_handles.count_p; i++)
         {
-            void *tmp_handle;
-            void *tmp_attr;
-
             /* the semantics of this macro are a little odd.  after
              * it returns, tmp_handle points into the data buffer
              * (multiples_buffer) at the location of the key, so the
@@ -687,11 +712,15 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         }
     }
 
-  return_ok:
-    if (ret == DB_NOTFOUND)
+    if(i == *op_p->u.d_iterate_handles.count_p && tmp_ptr)
     {
-        /* if off the end of the database, return TROVE_ITERATE_END */
-        *op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
+        /* we ran out of count_p before tmp_ptr became NULL, so
+         * MULTIPLE_KEY returned more entries (because of the buffer
+         * size being page aligned), than the caller requested.  Set
+         * the position to the next handle after the last one we
+         * return
+         */
+        *op_p->u.d_iterate_handles.position_p = *(TROVE_handle *)tmp_handle;
     }
     else
     {
@@ -709,7 +738,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         data.size = data.ulen = sizeof(s_attr);
         data.flags |= DB_DBT_USERMEM;
 
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_CURRENT);
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
         if (ret == DB_NOTFOUND)
         {
             gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");
@@ -721,6 +750,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             ret = -dbpf_db_error_to_trove_error(ret);
         }
         *op_p->u.d_iterate_handles.position_p = dummy_handle;
+
+    }
+  return_ok:
+    if (ret == DB_NOTFOUND)
+    {
+        /* if off the end of the database, return TROVE_ITERATE_END */
+        *op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
     }
     /* 'position' points to record we just read, or is set to END */
 
