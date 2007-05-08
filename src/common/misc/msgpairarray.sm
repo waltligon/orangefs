@@ -407,6 +407,7 @@ static PINT_sm_action msgpairarray_post_retry(
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p, wait %d ms\n",
       __func__, smcb, sm_p->msgarray_params.retry_delay);
 
+    js_p->error_code = 0;  /* do not leak MSGPAIRS_RETRY through to wait */
     return job_req_sched_post_timer(
         sm_p->msgarray_params.retry_delay,
         smcb, 0, js_p, &tmp_id,
