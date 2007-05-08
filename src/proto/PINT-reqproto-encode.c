@@ -167,6 +167,7 @@ int PINT_decode(void* input_buffer,
     int proto_major_recved, proto_minor_recved;
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_decode\n");
+    target_msg->enc_type = -1;  /* invalid */
 
     /* sanity check size */
     if(size < PINT_ENC_GENERIC_HEADER_SIZE)
@@ -315,6 +316,11 @@ void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
     {
         PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
             input_buffer, input_type);
+    }
+    else if (input_buffer->enc_type == -1)
+    {
+        /* invalid return from PINT_decode, quietly return */
+        ;
     }
     else
     {
