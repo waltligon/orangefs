@@ -247,7 +247,6 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     memset(&s_attr, 0, sizeof(TROVE_ds_storedattr_s));
     s_attr.type = op_p->u.d_create.type;
 
-    printf("new handle: %llu\n", llu(new_handle));
     memset(&key, 0, sizeof(key));
     key.data = &new_handle;
     key.size = key.ulen = sizeof(new_handle);
