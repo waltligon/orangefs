@@ -247,6 +247,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     memset(&s_attr, 0, sizeof(TROVE_ds_storedattr_s));
     s_attr.type = op_p->u.d_create.type;
 
+    printf("new handle: %llu\n", llu(new_handle));
     memset(&key, 0, sizeof(key));
     key.data = &new_handle;
     key.size = key.ulen = sizeof(new_handle);
@@ -534,7 +535,6 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     void *tmp_handle;
     void *tmp_attr;
     uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
-    int count = 0;
 
     if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
     {
@@ -619,8 +619,11 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         }
     }
 
+    op_p->u.d_iterate_handles.handle_array[i] = dummy_handle;
+    ++i;
+
     start_size = ((sizeof(TROVE_handle) + sizeof(s_attr)) *
-                  (*op_p->u.d_iterate_handles.count_p));
+                  (*op_p->u.d_iterate_handles.count_p - 1));
     /* round up to the nearest 1024 */
     start_size = (start_size + 1023) & (~(unsigned long)1023);
 
@@ -720,39 +723,56 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * the position to the next handle after the last one we
          * return
          */
+        DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
+                             tmp_handle, sizeof_handle,
+                             tmp_attr, sizeof_attr);
+        if(!tmp_ptr)
+        {
+            goto get_next;
+        }
+
+        /* verify sizes are correct */
+        if(sizeof_handle != sizeof(TROVE_handle) ||
+           sizeof_attr != sizeof(s_attr))
+        {
+            /* something is wrong with the result */
+            ret = -TROVE_EINVAL;
+            goto return_error;
+        }
+
         *op_p->u.d_iterate_handles.position_p = *(TROVE_handle *)tmp_handle;
+        goto return_ok;
     }
-    else
+
+get_next:
+    /* get the record number to return.
+     *
+     * note: key field is ignored by c_get in this case
+     */
+    memset(&key, 0, sizeof(key));
+    key.data = &dummy_handle;
+    key.size = key.ulen = sizeof(dummy_handle);
+    key.flags |= DB_DBT_USERMEM;
+
+    memset(&data, 0, sizeof(data));
+    data.data = &s_attr;
+    data.size = data.ulen = sizeof(s_attr);
+    data.flags |= DB_DBT_USERMEM;
+
+    ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
+    if (ret == DB_NOTFOUND)
     {
-        /* get the record number to return.
-         *
-         * note: key field is ignored by c_get in this case
-         */
-        memset(&key, 0, sizeof(key));
-        key.data = &dummy_handle;
-        key.size = key.ulen = sizeof(dummy_handle);
-        key.flags |= DB_DBT_USERMEM;
-
-        memset(&data, 0, sizeof(data));
-        data.data = &s_attr;
-        data.size = data.ulen = sizeof(s_attr);
-        data.flags |= DB_DBT_USERMEM;
-
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-        if (ret == DB_NOTFOUND)
-        {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");
-        }
-        else if (ret != 0)
-        {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- some other "
-                         "failure @ recno\n");
-            ret = -dbpf_db_error_to_trove_error(ret);
-        }
-        *op_p->u.d_iterate_handles.position_p = dummy_handle;
-
+        gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");
     }
-  return_ok:
+    else if (ret != 0)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- some other "
+                     "failure @ recno\n");
+        ret = -dbpf_db_error_to_trove_error(ret);
+    }
+    *op_p->u.d_iterate_handles.position_p = dummy_handle;
+
+return_ok:
     if (ret == DB_NOTFOUND)
     {
         /* if off the end of the database, return TROVE_ITERATE_END */
