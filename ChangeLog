@@ -4,6 +4,7 @@ PVFS2 Release ChangeLog
 
 pvfs-2.7.x
 ==============
+* ib: free cached registrations when out of space (openib only)
 
 * HEC posix extensions now supported by PVFS.
 * HEC posix extensions patches to the vfs are provided in the patches subdir.
