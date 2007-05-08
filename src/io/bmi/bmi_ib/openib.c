@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.12 2007-01-02 17:10:56 pw Exp $
+ * $Id: openib.c,v 1.13 2007-05-08 21:28:01 pw Exp $
  */
 #include <string.h>
 #include <errno.h>
@@ -746,23 +746,42 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
  *
  * These two must be called holding the interface mutex since they
  * make IB calls and that these may or may not be threaded under the hood.
+ * Returns -errno on error.
  */
-static void openib_mem_register(memcache_entry_t *c)
+static int openib_mem_register(memcache_entry_t *c)
 {
     struct ibv_mr *mrh;
     struct openib_device_priv *od = ib_device->priv;
+    int tries = 0;
 
+retry:
     mrh = ibv_reg_mr(od->nic_pd, c->buf, c->len,
                      IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE
                      | IBV_ACCESS_REMOTE_READ);
-    if (!mrh)
-	error("%s: ibv_register_mr", __func__);
+    if (!mrh && (errno == ENOMEM && tries < 1)) {
+	++tries;
+
+	/*
+	 * Try to flush some cached entries, then try again.
+	 */
+	memcache_cache_flush(ib_device->memcache);
+	goto retry;
+    }
+
+    /*
+     * Die horribly.  Need registered memory.
+     */
+    if (!mrh) {
+	warning("%s: ibv_register_mr", __func__);
+	return -errno;
+    }
 
     c->memkeys.mrh = int64_from_ptr(mrh);  /* convert pointer to 64-bit int */
     c->memkeys.lkey = mrh->lkey;
     c->memkeys.rkey = mrh->rkey;
     debug(4, "%s: buf %p len %lld lkey %x rkey %x", __func__,
           c->buf, lld(c->len), c->memkeys.lkey, c->memkeys.rkey);
+    return 0;
 }
 
 static void openib_mem_deregister(memcache_entry_t *c)

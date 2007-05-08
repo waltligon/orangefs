@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.13 2007-02-23 18:38:14 pw Exp $
+ * $Id: mem.c,v 1.14 2007-05-08 21:28:01 pw Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "pvfs2-internal.h"
@@ -30,13 +30,14 @@ typedef struct {
     struct qlist_head list;
     gen_mutex_t mutex;
     struct qlist_head free_chunk_list;
-    void (*mem_register)(memcache_entry_t *c);
+    int (*mem_register)(memcache_entry_t *c);
     void (*mem_deregister)(memcache_entry_t *c);
 } memcache_device_t;
 
 #if ENABLE_MEMCACHE
 /*
  * Create and link a new memcache entry.  Assumes lock already held.
+ * Initializes count to 1.
  */
 static memcache_entry_t *
 memcache_add(memcache_device_t *memcache_device, void *buf, bmi_size_t len)
@@ -47,10 +48,21 @@ memcache_add(memcache_device_t *memcache_device, void *buf, bmi_size_t len)
     if (bmi_ib_likely(c)) {
 	c->buf = buf;
 	c->len = len;
-	c->count = 0;
+	c->count = 1;
 	qlist_add_tail(&c->list, &memcache_device->list);
     }
     return c;
+}
+
+/*
+ * Just undo the creation of the entry, in cases where memory registration
+ * fails, for instance.
+ */
+static void memcache_del(memcache_device_t *memcache_device __unused,
+			 memcache_entry_t *c)
+{
+    qlist_del(&c->list);
+    free(c);
 }
 
 /*
@@ -164,8 +176,12 @@ memcache_memalloc(void *md, bmi_size_t len, int eager_limit)
 		free(buf);
 		buf = NULL;
 	    } else {
-		memcache_device->mem_register(c);
-		++c->count;
+		int ret = memcache_device->mem_register(c);
+		if (ret) {
+		    memcache_del(memcache_device, c);
+		    free(buf);
+		    buf = NULL;
+		}
 		debug(4, "%s: new reg, buf %p", __func__, c->buf);
 	    }
 	}
@@ -211,7 +227,7 @@ memcache_memfree(void *md, void *buf, bmi_size_t len)
 void
 memcache_register(void *md, ib_buflist_t *buflist)
 {
-    int i;
+    int i, ret;
     memcache_device_t *memcache_device = md;
 
     buflist->memcache = Malloc(buflist->num * sizeof(*buflist->memcache));
@@ -231,10 +247,14 @@ memcache_register(void *md, ib_buflist_t *buflist)
 	      buflist->buf.send[i], lld(buflist->len[i]));
 	    c = memcache_add(memcache_device, buflist->buf.recv[i],
 	                     buflist->len[i]);
+	    /* XXX: replace error with return values, let caller deal */
 	    if (!c)
 		error("%s: no memory for cache entry", __func__);
-	    c->count = 1;
-	    memcache_device->mem_register(c);
+	    ret = memcache_device->mem_register(c);
+	    if (ret) {
+		memcache_del(memcache_device, c);
+		error("%s: could not register memory", __func__);
+	    }
 	}
 	buflist->memcache[i] = c;
 #else
@@ -242,7 +262,11 @@ memcache_register(void *md, ib_buflist_t *buflist)
 	cp->buf = buflist->buf.recv[i];
 	cp->len = buflist->len[i];
 	cp->type = type;
-	memcache_device->mem_register(cp);
+	ret = memcache_device->mem_register(cp);
+	if (ret) {
+	    free(cp);
+	    error("%s: could not register memory", __func__);
+	}
 	buflist->memcache[i] = cp;
 #endif
     }
@@ -267,11 +291,16 @@ void memcache_preregister(void *md, const void *buf, bmi_size_t len,
 	debug(2, "%s: hit %p len %lld (via %p len %lld) refcnt now %d",
 	      __func__, buf, lld(len), c->buf, lld(c->len), c->count);
     } else {
+	int ret;
+
 	debug(2, "%s: miss %p len %lld", __func__, buf, lld(len));
 	c = memcache_add(memcache_device, (void *)(uintptr_t) buf, len);
 	if (!c)
 	    error("%s: no memory for cache entry", __func__);
-	memcache_device->mem_register(c);
+	ret = memcache_device->mem_register(c);
+	c->count = 0;  /* drop ref */
+	if (ret)
+		memcache_del(memcache_device, c);
     }
     gen_mutex_unlock(&memcache_device->mutex);
 #endif
@@ -305,7 +334,7 @@ memcache_deregister(void *md, ib_buflist_t *buflist)
 /*
  * Initialize.
  */
-void *memcache_init(void (*mem_register)(memcache_entry_t *),
+void *memcache_init(int (*mem_register)(memcache_entry_t *),
                     void (*mem_deregister)(memcache_entry_t *))
 {
     memcache_device_t *memcache_device;
@@ -341,5 +370,35 @@ void memcache_shutdown(void *md)
     }
     gen_mutex_unlock(&memcache_device->mutex);
     free(memcache_device);
+}
+
+/*
+ * Used to flush the cache when a NIC returns -ENOMEM on mem_reg.  Must
+ * hold the device lock on entry here.
+ */
+void memcache_cache_flush(void *md)
+{
+    memcache_device_t *memcache_device = md;
+    memcache_entry_t *c, *cn;
+
+    debug(4, "%s", __func__);
+    qlist_for_each_entry_safe(c, cn, &memcache_device->list, list) {
+        debug(4, "%s: list c->count %x c->buf %p", __func__, c->count, c->buf);
+        if (c->count == 0) {
+            memcache_device->mem_deregister(c);
+            qlist_del(&c->list);
+            free(c);
+        }
+    }
+    qlist_for_each_entry_safe(c, cn, &memcache_device->free_chunk_list, list) {
+        debug(4, "%s: free list c->count %x c->buf %p", __func__,
+	      c->count, c->buf);
+        if (c->count == 0) {
+            memcache_device->mem_deregister(c);
+            qlist_del(&c->list);
+            free(c->buf);
+            free(c);
+        }
+    }
 }
 

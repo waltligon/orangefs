@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.53 2007-02-14 21:54:28 pw Exp $
+ * $Id: ib.c,v 1.54 2007-05-08 21:28:01 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1938,6 +1938,7 @@ static int BMI_ib_set_info(int option, void *param __unused)
 	break;
     }
     case BMI_OPTIMISTIC_BUFFER_REG: {
+	/* not guaranteed to work */
 	const struct bmi_optimistic_buffer_info *binfo = param;
 	memcache_preregister(ib_device->memcache, binfo->buffer,
 	                     binfo->len, binfo->rw);

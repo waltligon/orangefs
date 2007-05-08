@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.27 2006-12-29 22:42:52 pw Exp $
+ * $Id: ib.h,v 1.28 2007-05-08 21:28:01 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -351,7 +351,7 @@ struct ib_device_func {
     void (*ack_cq_completion_event)(void);
     int (*check_cq)(struct bmi_ib_wc *wc);
     const char *(*wc_status_string)(int status);
-    void (*mem_register)(memcache_entry_t *c);
+    int (*mem_register)(memcache_entry_t *c);
     void (*mem_deregister)(memcache_entry_t *c);
     int (*check_async_events)(void);
 };
@@ -419,9 +419,10 @@ void memcache_register(void *md, ib_buflist_t *buflist);
 void memcache_preregister(void *md, const void *buf, bmi_size_t len,
                           enum PVFS_io_type rw);
 void memcache_deregister(void *md, ib_buflist_t *buflist);
-void *memcache_init(void (*mem_register)(memcache_entry_t *),
+void *memcache_init(int (*mem_register)(memcache_entry_t *),
                     void (*mem_deregister)(memcache_entry_t *));
 void memcache_shutdown(void *md);
+void memcache_cache_flush(void *md);
 
 /*
  * Handle pointer to 64-bit integer conversions.  On 32-bit architectures

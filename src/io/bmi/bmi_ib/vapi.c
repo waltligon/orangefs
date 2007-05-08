@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.10 2006-12-07 21:47:47 pw Exp $
+ * $Id: vapi.c,v 1.11 2007-05-08 21:28:01 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -682,7 +682,7 @@ static const char *vapi_port_state_string(IB_port_state_t state)
  * Memory registration and deregistration.  Used both by sender and
  * receiver, vary if lkey or rkey = 0.
  */
-static void vapi_mem_register(memcache_entry_t *c)
+static int vapi_mem_register(memcache_entry_t *c)
 {
     struct vapi_device_priv *vd = ib_device->priv;
     VAPI_mrw_t mrw, mrw_out;
@@ -702,6 +702,7 @@ static void vapi_mem_register(memcache_entry_t *c)
     c->memkeys.lkey = mrw_out.l_key;
     c->memkeys.rkey = mrw_out.r_key;
     debug(4, "%s: buf %p len %lld", __func__, c->buf, lld(c->len));
+    return 0;
 }
 
 static void vapi_mem_deregister(memcache_entry_t *c)
