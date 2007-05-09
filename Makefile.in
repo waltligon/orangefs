@@ -209,11 +209,11 @@ INTEL_CFLAGS += -wd981
 # gcc options
 GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
 # These are quite nice to enable, but will raise some warnings.
-#GCC_CFLAGS += -Wcast-align -Wbad-function-cast
-#GCC_CFLAGS += -Wmissing-prototypes -Wmissing-declarations
-#GCC_CFLAGS += -Wundef -Wpointer-arith
-#GCC_CFLAGS += -Wnested-externs
-#GCC_CFLAGS += -Wredundant-decls
+GCC_CFLAGS += -Wcast-align -Wbad-function-cast
+GCC_CFLAGS += -Wmissing-prototypes -Wmissing-declarations
+GCC_CFLAGS += -Wundef -Wpointer-arith
+GCC_CFLAGS += -Wnested-externs
+GCC_CFLAGS += -Wredundant-decls
 # These are very noisy.
 #GCC_CFLAGS += -W -Wno-unused -Wno-sign-compare
 #GCC_CFLAGS += -Wcast-qual
