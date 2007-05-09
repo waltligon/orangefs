@@ -738,7 +738,7 @@ PVFS_error PINT_client_wait_internal(
 
     if (in_op_str && out_error && in_class_str)
     {
-        smcb = (PINT_smcb *)PINT_id_gen_safe_lookup(op_id);
+        smcb = PINT_id_gen_safe_lookup(op_id);
         assert(smcb);
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
