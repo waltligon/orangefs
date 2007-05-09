@@ -83,7 +83,8 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
         if needed (sets op_terminate if SM_ACTION_TERMINATED is
         returned)
  */
-int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
+PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
+                                         job_status_s *r)
 {
     PINT_sm_action retval;
     const char * state_name;
@@ -164,17 +165,18 @@ int PINT_state_machine_invoke(struct PINT_smcb *smcb, job_status_s *r)
     return retval;
 }
 
-/* Function: PINT_state_machine_next()
+/* Function: PINT_state_machine_start()
    Params: smcb pointer and job status pointer
    Returns: return value of last state action
-   Synopsis: runs the state action pointed to by the
+   Synopsis: Runs the state action pointed to by the
         current state, then continues to run the SM
-        as long asreturn code is SM_ACTION_COMPLETE
+        as long as return code is SM_ACTION_COMPLETE.
  */
 
 PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
 {
-    int ret;
+    PINT_sm_action ret;
+
     /* run the current state action function */
     ret = PINT_state_machine_invoke(smcb, r);
     if (ret == SM_ACTION_COMPLETE || ret == SM_ACTION_TERMINATE)
@@ -202,7 +204,7 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 {
     int i; /* index for transition table */
     struct PINT_tran_tbl_s *transtbl;
-    int ret;     /* holds state action return code */
+    PINT_sm_action ret;   /* holds state action return code */
 
     if (!smcb)
     {
@@ -300,7 +302,7 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 */
 PINT_sm_action PINT_state_machine_continue(struct PINT_smcb *smcb, job_status_s *r)
 {
-    int ret;
+    PINT_sm_action ret;
 
     ret = PINT_state_machine_next(smcb, r);
 
