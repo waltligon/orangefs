@@ -1774,7 +1774,6 @@ int server_state_machine_start(
      * If *someone* decides to do in-place decoding, then we will have to move
      * this back to state_machine_complete().
      */
-    s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     if (ret == -PVFS_EPROTONOSUPPORT)
     {
         /* we have a protocol mismatch of some sort; try to trigger a
@@ -1785,6 +1784,7 @@ int server_state_machine_start(
     }
     else if (ret == 0)
     {
+        s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
         ret = PINT_smcb_set_op(smcb, s_op->req->op);
     }
     else
@@ -1798,8 +1798,13 @@ int server_state_machine_start(
 
     /* set timestamp on the beginning of this state machine */
     id_gen_fast_register(&tmp_id, s_op);
-    PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
-                         0, tmp_id, PVFS_EVENT_FLAG_START);
+
+    if(s_op->req)
+    {
+        PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
+                             0, tmp_id, PVFS_EVENT_FLAG_START);
+        s_op->resp.op = s_op->req->op;
+    }
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
     s_op->tag  = s_op->unexp_bmi_buff.tag;
@@ -1812,7 +1817,6 @@ int server_state_machine_start(
         return -PVFS_ENOSYS;
     }
 
-    s_op->resp.op = s_op->req->op;
     return PINT_state_machine_invoke(smcb, js_p);
 }
 
