@@ -1,0 +1,42 @@
+#!/bin/sh
+
+. functions
+
+##
+## entry point for script
+##
+
+IO_TEST=${CLUSTER_DIR}/heidelberg-io
+
+${CLUSTER_DIR}/mpich2/bin/mpicc ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/mpiio-tests.d/heidelberg-IO.c -o $IO_TEST
+
+if [ $? -eq 1 ] ; then
+	exit 1
+fi
+
+# like the other mpiio tests we can only do multi processor tests if there's a
+# pav config file we can use
+# If we have to we can fall back to single processor, and still do something
+# reasonable. 
+
+if [ -f $PAV_CONFIG ] ; then 
+	# write out a pbs script
+	pbs_script=${CLUSTER_DIR}/heidelberg.sh
+	make_pbs_script ${IO_TEST} -f pvfs2:\${MOUNTPOINT}/io-test-1 level0 level1 level2 level3 > $pbs_script
+
+	# submit it
+	job_id=$(qsub -N heidelberg $pbs_script | cut -d . -f1)
+
+	# wait patently for it to complete
+	block_until_done $job_id
+
+	# need to get results into per-test log files
+	cat heidelberg.o$job_id
+
+	# need to know if we failed or not
+	egrep -q '(Assertion*failed|error:|Error|killed by signal)' heidelberg.o$job_id
+        if [ $? -eq 0 ] ; then 
+                exit 1
+        fi
+
+fi
