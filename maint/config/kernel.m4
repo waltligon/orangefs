@@ -355,7 +355,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_CHECKING(for gcc major version)
 		gcc_version=`$CC --version| head -1 | tr . ' ' | cut -d ' ' -f 3`
 		AC_MSG_RESULT($gcc_version)
-		if test $gcc_version -gc 3 ; then
+		if test $gcc_version -gt 3 ; then
 			extra_gcc_flags="-Wno-pointer-sign -Wno-strict-aliasing -Wno-strict-aliasing=2"
 		fi
 	fi
