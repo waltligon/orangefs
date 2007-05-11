@@ -714,5 +714,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+	dnl Check for two arg register_sysctl_table()
+	AC_MSG_CHECKING(for two arguments to register_sysctl_table)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/sysctl.h>
+		#include <linux/proc_fs.h>
+	], [
+		register_sysctl_table(NULL, 0);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TWO_ARG_REGISTER_SYSCTL_TABLE, 1, Define if register_sysctl_table takes two arguments),
+	AC_MSG_RESULT(no)
+	)
+
 	CFLAGS=$oldcflags
 ])
