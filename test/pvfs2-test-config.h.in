@@ -12,6 +12,9 @@
 /* Define if db library has DB_DIRTY_READ flag */
 #undef HAVE_DB_DIRTY_READ
 
+/* Define if DB has get_pagesize function */
+#undef HAVE_DB_GET_PAGESIZE
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 

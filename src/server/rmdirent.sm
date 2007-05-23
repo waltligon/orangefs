@@ -19,33 +19,24 @@ enum
     UPDATE_DIR_ATTR_REQUIRED = 133
 };
 
-static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int rmdirent_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int rmdirent_remove_directory_entry(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int rmdirent_check_for_req_dir_update(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int rmdirent_update_directory_attr(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int rmdirent_remove_directory_entry_failure(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int rmdirent_setup_resp(
-    PINT_server_op *s_op, job_status_s* js_p);
+static PINT_sm_action rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action rmdirent_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action rmdirent_remove_directory_entry(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action rmdirent_check_for_req_dir_update(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action rmdirent_update_directory_attr(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action rmdirent_remove_directory_entry_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action rmdirent_setup_resp(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
-machine pvfs2_rmdirent_sm(
-    prelude,
-    verify_parent_metadata_and_read_directory_entry_handle,
-    remove_directory_entry,
-    remove_directory_entry_failure,
-    check_for_req_dir_update,
-    update_directory_attr,
-    setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_rmdirent_sm
 {
     state prelude
     {
@@ -109,8 +100,9 @@ machine pvfs2_rmdirent_sm(
 %%
 
 static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
-    PINT_server_op *s_op, job_status_s* js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -144,7 +136,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         &s_op->val,
         0,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
@@ -160,9 +152,10 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
  * from the dirdata object.
  *           
  */
-static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
-                                           job_status_s* js_p)
+static int rmdirent_remove_directory_entry(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     TROVE_ds_flags flags;
@@ -191,7 +184,7 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
         &s_op->key, 
         &s_op->val,
         flags,
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     /* 
      * Removing an entry causes an update of directory timestamps
@@ -200,20 +193,22 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
     return ret;
 }
 
-static int rmdirent_check_for_req_dir_update(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action rmdirent_check_for_req_dir_update(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if ((js_p->error_code == 0) &&
         (s_op->u.rmdirent.dir_attr_update_required))
     {
         js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rmdirent_update_directory_attr(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action rmdirent_update_directory_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
@@ -224,7 +219,7 @@ static int rmdirent_update_directory_attr(
     {
         PVFS_perror_gossip("previous keyval remove failed",
                            js_p->error_code);
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
@@ -239,7 +234,7 @@ static int rmdirent_update_directory_attr(
         s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.parent_handle,
         ds_attr, 
         TROVE_SYNC,
-        s_op, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -259,8 +254,8 @@ static int rmdirent_update_directory_attr(
  * This state always returns 1, and it allows another function to
  * handle actually returning the error value.
  */
-static int rmdirent_remove_directory_entry_failure(PINT_server_op *s_op,
-						   job_status_s *js_p)
+static PINT_sm_action rmdirent_remove_directory_entry_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
     switch (js_p->error_code)
     {
@@ -272,12 +267,13 @@ static int rmdirent_remove_directory_entry_failure(PINT_server_op *s_op,
 	    break;
     }
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int rmdirent_setup_resp(PINT_server_op *s_op,
-                               job_status_s* js_p)
+static PINT_sm_action rmdirent_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* Set the handle if it was removed */
     if(js_p->error_code == 0)
     {
@@ -300,13 +296,13 @@ static int rmdirent_setup_resp(PINT_server_op *s_op,
      * we found it, so that later states can use it to set the resp.status
      * field.
      */
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
-static int rmdirent_cleanup(PINT_server_op *s_op,
-                            job_status_s* js_p)
+static PINT_sm_action rmdirent_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*

@@ -13,12 +13,14 @@
 #include "pvfs2-server.h"
 #include "server-config.h"
 
-static int proto_error_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p);
+static PINT_sm_action proto_error_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action proto_error_init(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
-machine pvfs2_proto_error_sm(init, cleanup)
+machine pvfs2_proto_error_sm
 {
 	state init
 	{
@@ -39,8 +41,10 @@ machine pvfs2_proto_error_sm(init, cleanup)
  *
  * encode and send a response indicating a protocol error
  */
-static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action proto_error_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -63,7 +67,7 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
 	 * some clues as to what went wrong
 	 */
 	js_p->error_code = ret;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     /* send the response */
@@ -75,7 +79,7 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
 			    s_op->tag,
 			    s_op->encoded.buffer_type,
 			    0,
-			    s_op,
+			    smcb,
 			    0,
 			    js_p,
 			    &tmp_id,
@@ -90,9 +94,10 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int proto_error_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action proto_error_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 

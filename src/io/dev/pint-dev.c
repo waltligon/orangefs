@@ -27,6 +27,7 @@
 #include "gossip.h"
 #include "pint-dev.h"
 #include "pvfs2-dev-proto.h"
+#include "pvfs2-internal.h"
 
 static int setup_dev_entry(
     const char *dev_name);
@@ -40,6 +41,9 @@ static int pdev_fd = -1;
 static int32_t pdev_magic;
 static int32_t pdev_max_upsize;
 static int32_t pdev_max_downsize;
+
+int32_t pvfs2_bufmap_total_size, pvfs2_bufmap_desc_size;
+int32_t pvfs2_bufmap_desc_count, pvfs2_bufmap_desc_shift;
 
 /* PINT_dev_initialize()
  *
@@ -147,34 +151,54 @@ void PINT_dev_finalize(void)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc, int *size)
+int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
+                                struct PINT_dev_params *params)
 {
     int i, ret = -1;
-    int page_count = 0;
-    long page_size = sysconf(_SC_PAGE_SIZE);
+    uint64_t page_size = sysconf(_SC_PAGE_SIZE), total_size;
     void *ptr = NULL;
     int ioctl_cmd[2] = {PVFS_DEV_MAP, 0};
 
     for (i = 0; i < ndesc; i++)
     {
+        total_size = params[i].dev_buffer_size * params[i].dev_buffer_count;
+        if (total_size < 0) 
+        {
+            gossip_err("Error:please provide sane values for device parameters.\n");
+            break;
+        }
+        if (total_size % page_size != 0) 
+        {
+            gossip_err("Error: total device buffer size must be a multiple of system page size.\n");
+            break;
+        }
+        if (total_size >= PVFS2_BUFMAP_MAX_TOTAL_SIZE)
+        {
+            gossip_err(
+                "Error: total size (%llu) of device "
+                "buffer must be < %llu MB.\n",
+                llu(total_size), llu(PVFS2_BUFMAP_MAX_TOTAL_SIZE));
+            break;
+        }
+        if (params[i].dev_buffer_size & (params[i].dev_buffer_size - 1))
+        {
+            gossip_err("Error: descriptor size must be a power of 2 (%llu)\n",
+                        llu(params[i].dev_buffer_size));
+            break;
+        }
         /* we would like to use a memaligned region that is a multiple
          * of the system page size
          */
-        page_count = (int)(size[i] / page_size);
-        if ((size[i] % page_size) != 0)
-        {
-            page_count++;
-        }
-
-        ptr = PINT_mem_aligned_alloc(
-            (page_count * page_size), page_size);
+        ptr = PINT_mem_aligned_alloc(total_size, page_size);
         if (!ptr)
         {
             desc[i].ptr = NULL;
             break;
         }
         desc[i].ptr  = ptr;
-        desc[i].size = (page_count * page_size);
+        desc[i].total_size = total_size;
+        desc[i].size = params[i].dev_buffer_size;
+        desc[i].count = params[i].dev_buffer_count;
 
         /* ioctl to ask driver to map pages if needed */
         if (ioctl_cmd[i] != 0)
@@ -184,6 +208,10 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc, int *
             {
                 break;
             }
+            pvfs2_bufmap_desc_count = params[i].dev_buffer_count;
+            pvfs2_bufmap_desc_size  = params[i].dev_buffer_size;
+            pvfs2_bufmap_total_size = total_size;
+            pvfs2_bufmap_desc_shift = LOG2(pvfs2_bufmap_desc_size);
         }
     }
     if (i != ndesc) {
@@ -223,7 +251,7 @@ void PINT_dev_put_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc)
 
 /* PINT_dev_get_mapped_buffer()
  *
- * returns a memory buffer of size PVFS2_BUFMAP_DEFAULT_DESC_SIZE
+ * returns a memory buffer of size (pvfs2_bufmap_desc_size)
  * matching the specified buffer_index given a PVFS_dev_map_desc
  *
  * returns a valid desc addr on success, NULL on failure
@@ -240,10 +268,10 @@ void *PINT_dev_get_mapped_buffer(
         return NULL;
 
     desc_count = (bm_type == BM_IO) ? 
-                PVFS2_BUFMAP_DESC_COUNT :
-                PVFS2_READDIR_DESC_COUNT;
+                pvfs2_bufmap_desc_count :
+                PVFS2_READDIR_DEFAULT_DESC_COUNT;
     desc_size  = (bm_type == BM_IO) ? 
-                PVFS2_BUFMAP_DEFAULT_DESC_SIZE : 
+                pvfs2_bufmap_desc_size : 
                 PVFS2_READDIR_DEFAULT_DESC_SIZE;
     ptr =  (char *) desc[bm_type].ptr;
     return ((desc && ptr &&
@@ -371,6 +399,11 @@ int PINT_dev_test_unexpected(
             /* assume we are done and return */
           safe_exit:
             free(buffer);
+            gossip_debug(GOSSIP_DEV_DEBUG,
+                         "[DEV]: %s Exit: "
+                         "incount: %d, outcount: %d, bytes available: %d\n",
+                         __func__, incount, *outcount, avail);
+
             return ((*outcount > 0) ? 1 : 0);
         }
 

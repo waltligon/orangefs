@@ -22,11 +22,11 @@
  * compatibility (such as changing the semantics or protocol fields for an
  * existing request type)
  */
-#define PVFS2_PROTO_MAJOR 3
+#define PVFS2_PROTO_MAJOR 4
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
-#define PVFS2_PROTO_MINOR 4
+#define PVFS2_PROTO_MINOR 0
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 /* we set the maximum possible size of a small I/O packed message as 64K.  This
@@ -646,8 +646,8 @@ endecode_fields_4_struct(
     PVFS_servreq_readdir,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    PVFS_ds_position, token,
-    uint32_t, dirent_count)
+    uint32_t, dirent_count,
+    PVFS_ds_position, token)
 
 #define PINT_SERVREQ_READDIR_FILL(__req,              \
                                   __creds,            \
@@ -673,10 +673,9 @@ struct PVFS_servresp_readdir
     uint32_t dirent_count;   /* # of entries retrieved */
     uint64_t directory_version;
 };
-endecode_fields_4a_struct(
+endecode_fields_3a_struct(
     PVFS_servresp_readdir,
     PVFS_ds_position, token,
-    skip4,,
     uint64_t, directory_version,
     skip4,,
     uint32_t, dirent_count,
@@ -1217,9 +1216,10 @@ struct PVFS_servresp_mgmt_iterate_handles
     PVFS_handle *handle_array;
     int handle_count;
 };
-endecode_fields_1a_struct(
+endecode_fields_2a_struct(
     PVFS_servresp_mgmt_iterate_handles,
     PVFS_ds_position, position,
+    skip4,,
     int32_t, handle_count,
     PVFS_handle, handle_array)
 #define extra_size_PVFS_servresp_mgmt_iterate_handles \
@@ -1450,8 +1450,8 @@ endecode_fields_4a_struct(
     PVFS_servreq_listeattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    PVFS_ds_position, token,
     skip4,,
+    PVFS_ds_position, token,
     uint32_t, nkey,
     PVFS_size, keysz);
 #define extra_size_PVFS_servreq_listeattr \
@@ -1481,9 +1481,10 @@ struct PVFS_servresp_listeattr
     uint32_t nkey;   /* # of keys retrieved */
     PVFS_ds_keyval *key; /* array of keys returned */
 };
-endecode_fields_1a_struct(
+endecode_fields_2a_struct(
     PVFS_servresp_listeattr,
     PVFS_ds_position, token,
+    skip4,,
     uint32_t, nkey,
     PVFS_ds_keyval, key)
 #define extra_size_PVFS_servresp_listeattr \

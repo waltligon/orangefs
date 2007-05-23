@@ -434,7 +434,7 @@ static int lebf_encode_resp(
 
     /* we stand a good chance of segfaulting if we try to encode the response
      * after something bad happened reading data from disk. */
-    if (resp->status != -PVFS_EIO) 
+    if (resp->status == 0) 
     {
 
         /* extra encoding rules for particular responses */
@@ -618,7 +618,7 @@ static int lebf_decode_resp(
     decode_PVFS_server_resp(p, resp);
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_resp\n");
 
-    if (resp->status == -PVFS_EIO) 
+    if (resp->status != 0) 
         goto out;
 
 #define CASE(tag,var) \
@@ -795,102 +795,106 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	}
     } else if (input_type == PINT_DECODE_RESP) {
 	struct PVFS_server_resp *resp = &msg->stub_dec.resp;
-	switch (resp->op) {
 
-	    case PVFS_SERV_LOOKUP_PATH:
+        if(resp->status == 0)
+        {
+            switch (resp->op)
             {
-		struct PVFS_servresp_lookup_path *lookup =
-                    &resp->u.lookup_path;
-		decode_free(lookup->handle_array);
-		decode_free(lookup->attr_array);
-		break;
-	    }
-
-	    case PVFS_SERV_READDIR:
-		decode_free(resp->u.readdir.dirent_array);
-		break;
-
-	    case PVFS_SERV_MGMT_PERF_MON:
-		decode_free(resp->u.mgmt_perf_mon.perf_array);
-		break;
-
-	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
-		decode_free(resp->u.mgmt_iterate_handles.handle_array);
-		break;
-
-	    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
-		decode_free(resp->u.mgmt_dspace_info_list.dspace_info_array);
-		break;
-
-	    case PVFS_SERV_GETATTR:
-		if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
-		    decode_free(resp->u.getattr.attr.u.meta.dist);
-		if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
-		    decode_free(resp->u.getattr.attr.u.meta.dfile_array);
-		break;
-
-	    case PVFS_SERV_MGMT_EVENT_MON:
-		decode_free(resp->u.mgmt_event_mon.event_array);
-		break;
-
-	    case PVFS_SERV_GETEATTR:
-                /* need a loop here?  WBL */
-		if (resp->u.geteattr.val)
-		    decode_free(resp->u.geteattr.val);
-		break;
-            case PVFS_SERV_LISTEATTR:
-                if (resp->u.listeattr.key)
-                    decode_free(resp->u.listeattr.key);
-                break;
-            case PVFS_SERV_LISTATTR:
-            {
-                int i;
-                if (resp->u.listattr.error)
-                    decode_free(resp->u.listattr.error);
-                if (resp->u.listattr.attr) {
-                    for (i = 0; i < resp->u.listattr.nhandles; i++) {
-                        if (resp->u.listattr.attr[i].mask & PVFS_ATTR_META_DIST)
-                            decode_free(resp->u.listattr.attr[i].u.meta.dist);
-                        if (resp->u.listattr.attr[i].mask & PVFS_ATTR_META_DFILES)
-                            decode_free(resp->u.listattr.attr[i].u.meta.dfile_array);
+                case PVFS_SERV_LOOKUP_PATH:
+                    {
+                        struct PVFS_servresp_lookup_path *lookup =
+                            &resp->u.lookup_path;
+                        decode_free(lookup->handle_array);
+                        decode_free(lookup->attr_array);
+                        break;
                     }
-                    decode_free(resp->u.listattr.attr);
-                }
-                break;
-            }
-	    case PVFS_SERV_GETCONFIG:
-	    case PVFS_SERV_CREATE:
-	    case PVFS_SERV_REMOVE:
-	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
-	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
-	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-	    case PVFS_SERV_IO:
-            case PVFS_SERV_SMALL_IO:
-	    case PVFS_SERV_SETATTR:
-	    case PVFS_SERV_SETEATTR:
-	    case PVFS_SERV_DELEATTR:
-	    case PVFS_SERV_CRDIRENT:
-	    case PVFS_SERV_RMDIRENT:
-	    case PVFS_SERV_CHDIRENT:
-	    case PVFS_SERV_TRUNCATE:
-	    case PVFS_SERV_MKDIR:
-	    case PVFS_SERV_FLUSH:
-	    case PVFS_SERV_MGMT_SETPARAM:
-	    case PVFS_SERV_MGMT_NOOP:
-	    case PVFS_SERV_STATFS:
-	    case PVFS_SERV_WRITE_COMPLETION:
-	    case PVFS_SERV_PROTO_ERROR:
-		/* nothing to free */
-		break;
 
-	    case PVFS_SERV_INVALID:
-	    case PVFS_SERV_PERF_UPDATE:
-	    case PVFS_SERV_JOB_TIMER:
-            case PVFS_SERV_NUM_OPS:  /* sentinel */
-		gossip_lerr("%s: invalid response operation %d.\n",
-		  __func__, resp->op);
-		break;
-	}
+                case PVFS_SERV_READDIR:
+                    decode_free(resp->u.readdir.dirent_array);
+                    break;
+
+                case PVFS_SERV_MGMT_PERF_MON:
+                    decode_free(resp->u.mgmt_perf_mon.perf_array);
+                    break;
+
+                case PVFS_SERV_MGMT_ITERATE_HANDLES:
+                    decode_free(resp->u.mgmt_iterate_handles.handle_array);
+                    break;
+
+                case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+                    decode_free(resp->u.mgmt_dspace_info_list.dspace_info_array);
+                    break;
+
+                case PVFS_SERV_GETATTR:
+                    if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
+                        decode_free(resp->u.getattr.attr.u.meta.dist);
+                    if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+                        decode_free(resp->u.getattr.attr.u.meta.dfile_array);
+                    break;
+
+                case PVFS_SERV_MGMT_EVENT_MON:
+                    decode_free(resp->u.mgmt_event_mon.event_array);
+                    break;
+
+                case PVFS_SERV_GETEATTR:
+                    /* need a loop here?  WBL */
+                    if (resp->u.geteattr.val)
+                        decode_free(resp->u.geteattr.val);
+                    break;
+                case PVFS_SERV_LISTEATTR:
+                    if (resp->u.listeattr.key)
+                        decode_free(resp->u.listeattr.key);
+                    break;
+                case PVFS_SERV_LISTATTR:
+                    {
+                        int i;
+                        if (resp->u.listattr.error)
+                            decode_free(resp->u.listattr.error);
+                        if (resp->u.listattr.attr) {
+                            for (i = 0; i < resp->u.listattr.nhandles; i++) {
+                                if (resp->u.listattr.attr[i].mask & PVFS_ATTR_META_DIST)
+                                    decode_free(resp->u.listattr.attr[i].u.meta.dist);
+                                if (resp->u.listattr.attr[i].mask & PVFS_ATTR_META_DFILES)
+                                    decode_free(resp->u.listattr.attr[i].u.meta.dfile_array);
+                            }
+                            decode_free(resp->u.listattr.attr);
+                        }
+                        break;
+                    }
+                case PVFS_SERV_GETCONFIG:
+                case PVFS_SERV_CREATE:
+                case PVFS_SERV_REMOVE:
+                case PVFS_SERV_MGMT_REMOVE_OBJECT:
+                case PVFS_SERV_MGMT_REMOVE_DIRENT:
+                case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
+                case PVFS_SERV_IO:
+                case PVFS_SERV_SMALL_IO:
+                case PVFS_SERV_SETATTR:
+                case PVFS_SERV_SETEATTR:
+                case PVFS_SERV_DELEATTR:
+                case PVFS_SERV_CRDIRENT:
+                case PVFS_SERV_RMDIRENT:
+                case PVFS_SERV_CHDIRENT:
+                case PVFS_SERV_TRUNCATE:
+                case PVFS_SERV_MKDIR:
+                case PVFS_SERV_FLUSH:
+                case PVFS_SERV_MGMT_SETPARAM:
+                case PVFS_SERV_MGMT_NOOP:
+                case PVFS_SERV_STATFS:
+                case PVFS_SERV_WRITE_COMPLETION:
+                case PVFS_SERV_PROTO_ERROR:
+                    /* nothing to free */
+                    break;
+
+                case PVFS_SERV_INVALID:
+                case PVFS_SERV_PERF_UPDATE:
+                case PVFS_SERV_JOB_TIMER:
+                case PVFS_SERV_NUM_OPS:  /* sentinel */
+                    gossip_lerr("%s: invalid response operation %d.\n",
+                                __func__, resp->op);
+                    break;
+            }
+        }
     }
 }
 

@@ -448,49 +448,65 @@ static PVFS_offset PINT_request_disp(PINT_Request *request)
 /* processing a request */
 struct PINT_Request_state *PINT_new_request_state(PINT_Request *request)
 {
-	struct PINT_Request_state *req;
-	int32_t rqdepth;
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"PINT_New_request_state\n");
-	if (!(req = (struct PINT_Request_state *)malloc(sizeof(struct PINT_Request_state))))
-	{
-		gossip_lerr("PINT_New_request_state failed to malloc req !!!!!!!\n");
-		return NULL;
-	}
-	req->lvl = 0;
-	req->bytes = 0;
-	req->type_offset = 0;
-	req->target_offset = 0;
-	req->final_offset = request->aggregate_size;
-	req->eof_flag = 0;
+    return PINT_new_request_states(request, 1);
+}
+
+struct PINT_Request_state *PINT_new_request_states(PINT_Request *request, int n)
+{
+	struct PINT_Request_state *reqs;
+	int rqdepth, i;
+
+	gossip_debug(GOSSIP_REQUEST_DEBUG, "%s n=%d\n", __func__, n);
+
 	/* we assume null request is a contiguous byte range depth 1 */
-	if (request)
+    if (request)
+    {
+        rqdepth = request->depth;
+    }
+    else
+    {
+        rqdepth = 1;
+    }
+
+	reqs = malloc(n * (sizeof(*reqs) + rqdepth * sizeof(*reqs->cur)));
+	if (!reqs)
 	{
-		rqdepth = request->depth;
-	}
-	else
-	{
-		rqdepth = 1;
-	}
-	if (!(req->cur = (struct PINT_reqstack *)malloc(rqdepth *
-			sizeof(struct PINT_reqstack))))
-	{
-		gossip_lerr("PINT_New_request_state failed to malloc rqstack !!!!!!\n");
+		gossip_lerr("%s: malloc failed\n", __func__);
 		return NULL;
 	}
-	req->cur[req->lvl].maxel = 1; /* transfer one instance of request */
-	req->cur[req->lvl].el = 0;
-	req->cur[req->lvl].rq = request;
-	req->cur[req->lvl].rqbase = request;
-	req->cur[req->lvl].blk = 0;
-	req->cur[req->lvl].chunk_offset = 0; /* transfer from inital file offset */
-	return req;
+
+    for (i=0; i<n; i++)
+    {
+        reqs[i].cur = (void *) &reqs[n];
+        reqs[i].cur += i * rqdepth;
+
+        reqs[i].lvl = 0;
+        reqs[i].bytes = 0;
+        reqs[i].type_offset = 0;
+        reqs[i].target_offset = 0;
+        reqs[i].final_offset = request->aggregate_size;
+        reqs[i].eof_flag = 0;
+
+        reqs[i].cur[0].maxel = 1; /* transfer one instance of request */
+        reqs[i].cur[0].el = 0;
+        reqs[i].cur[0].rq = request;
+        reqs[i].cur[0].rqbase = request;
+        reqs[i].cur[0].blk = 0;
+        reqs[i].cur[0].chunk_offset = 0; /* transfer from inital file offset */
+    }
+
+	return reqs;
 }
 
 /* This function frees request state structures */
-void PINT_free_request_state (PINT_Request_state *req)
+void PINT_free_request_state(PINT_Request_state *req)
 {
-	free(req->cur);
 	free(req);
+}
+
+void PINT_free_request_states(PINT_Request_state *reqs)
+{
+	free(reqs);
 }
 
 /**

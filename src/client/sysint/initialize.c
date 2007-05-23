@@ -29,9 +29,9 @@
 #include "job-time-mgr.h"
 #include "pint-util.h"
 
-extern job_context_id pint_client_sm_context;
+PINT_smcb *g_smcb = NULL; 
 
-PINT_client_sm *g_sm_p = NULL;
+extern job_context_id pint_client_sm_context;
 
 typedef enum
 {
@@ -67,18 +67,8 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     int ret = -PVFS_EINVAL;
     const char *debug_mask_str = NULL, *debug_file = NULL;
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
-    PINT_client_sm *sm_p = NULL;
+    PINT_smcb *smcb = NULL;
     uint64_t debug_mask = 0;
-
-    sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
-    if(!sm_p)
-    {
-	return(-PVFS_ENOMEM);
-    }
-
-    /* keep track of this pointer for freeing on finalize */
-    g_sm_p = sm_p;
-    memset(sm_p, 0, sizeof(*sm_p));
 
     gossip_enable_stderr();
 
@@ -157,7 +147,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
     client_status_flag |= CLIENT_JOB_INIT;
 
-    ret = job_open_context(&pint_client_sm_context);
+    ret = PINT_client_state_machine_initialize();
     if (ret < 0)
     {
         gossip_lerr("job_open_context() failure.\n");
@@ -200,13 +190,25 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         goto error_exit;
     }
 
-    ret = PINT_client_state_machine_post(
-        sm_p, PVFS_CLIENT_JOB_TIMER, NULL, NULL);
+    /* start job timer */
+    PINT_smcb_alloc(&smcb, PVFS_CLIENT_JOB_TIMER,
+            sizeof(struct PINT_client_sm),
+            client_op_state_get_machine,
+            NULL,
+            pint_client_sm_context);
+    if(!smcb)
+    {
+	return(-PVFS_ENOMEM);
+    }
+
+    ret = PINT_client_state_machine_post(smcb, NULL, NULL);
     if (ret < 0)
     {
 	gossip_lerr("Error posting job timer.\n");
 	goto error_exit;
     }
+    /* keep track of this pointer for freeing on finalize */
+    g_smcb = smcb;
 
     PINT_util_digest_init();
 
@@ -236,7 +238,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     if (client_status_flag & CLIENT_JOB_CTX_INIT)
     {
-        job_close_context(pint_client_sm_context);
+        PINT_client_state_machine_finalize();
     }
 
     if (client_status_flag & CLIENT_JOB_INIT)
@@ -269,7 +271,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         PINT_dist_finalize();
     }
 
-    free(sm_p);
+    PINT_smcb_free(&smcb);
 
     return ret;
 }

@@ -39,6 +39,10 @@ do {                                              \
   wake_up_interruptible(&op->io_completion_waitq);\
 } while(0)
 
+#ifndef HAVE_COMBINED_AIO_AND_VECTOR
+/* <2.6.19 called it this instead */
+#define do_sync_read generic_file_read
+#endif
 
 /** Called when a process requests to open a file.
  */
@@ -124,7 +128,7 @@ struct rw_options {
     struct kiocb *iocb;
     union {
         struct {
-            struct iovec *iov;
+            const struct iovec *iov;
             unsigned long nr_segs;
         } address;
         struct {
@@ -151,7 +155,7 @@ struct rw_options {
  * @total_size - total expected size of the I/O operation
  */
 static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
-        int nr_segs, size_t total_size)
+        unsigned long nr_segs, size_t total_size)
 {
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
@@ -160,7 +164,7 @@ static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
     if (!rw || !vec || nr_segs < 0 || total_size <= 0 
             || !rw->pvfs2_inode || !rw->inode || !rw->fnstr)
     {
-        gossip_lerr("invalid parameters (rw: %p, vec: %p, nr_segs: %d, "
+        gossip_lerr("invalid parameters (rw: %p, vec: %p, nr_segs: %lu, "
                 "total_size: %zd)\n", rw, vec, nr_segs, total_size);
         ret = -EINVAL;
         goto out;
@@ -191,7 +195,7 @@ static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
     new_op->upcall.req.io.count = total_size;
     new_op->upcall.req.io.offset = *(rw->off.io.offset);
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %u, "
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %lu, "
             "offset: %llu total_size: %zd\n", rw->fnstr, rw->copy_to_user, 
             nr_segs, llu(*(rw->off.io.offset)), total_size);
     if (rw->type == IO_WRITEV)
@@ -307,7 +311,9 @@ out:
 /*
  * The reason we need to do this is to be able to support 
  * readv and writev that are
- * larger than PVFS_DEFAULT_DESC_SIZE (4 MB). What that means is that
+ * larger than (pvfs_bufmap_size_query())
+ * Default is PVFS2_BUFMAP_DEFAULT_DESC_SIZE MB.
+ * What that means is that
  * we will create a new io vec descriptor for those memory addresses that 
  * go beyond the limit
  * Return value for this routine is -ve in case of errors
@@ -315,19 +321,22 @@ out:
  * Further, the new_nr_segs pointer is updated to hold the new value
  * of number of iovecs, the new_vec pointer is updated to hold the pointer
  * to the new split iovec, and the size array is an array of integers holding
- * the number of iovecs that straddle PVFS_DEFAULT_DESC_SIZE.
+ * the number of iovecs that straddle pvfs_bufmap_size_query().
  * The max_new_nr_segs value is computed by the caller and returned.
  * (It will be (count of all iov_len/ block_size) + 1).
  */
-static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
+static int split_iovecs(
+	unsigned long max_new_nr_segs,      /* IN */
         unsigned long nr_segs,              /* IN */
         const struct iovec *original_iovec, /* IN */
-        unsigned long *new_nr_segs, struct iovec **new_vec,  /* OUT */
-        unsigned int *seg_count, unsigned int **seg_array)   /* OUT */
+        unsigned long *new_nr_segs, 	    /* OUT */
+	struct iovec **new_vec,  	    /* OUT */
+        unsigned long *seg_count,           /* OUT */
+	unsigned long **seg_array)   	    /* OUT */
 {
-    int seg, count = 0, begin_seg, tmpnew_nr_segs = 0;
+    unsigned long seg, count = 0, begin_seg, tmpnew_nr_segs = 0;
     struct iovec *new_iovec = NULL, *orig_iovec;
-    unsigned int *sizes = NULL, sizes_count = 0;
+    unsigned long *sizes = NULL, sizes_count = 0;
 
     if (nr_segs <= 0 || original_iovec == NULL 
             || new_nr_segs == NULL || new_vec == NULL
@@ -341,37 +350,33 @@ static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
     *seg_count = 0;
     *seg_array = NULL;
     /* copy the passed in iovec descriptor to a temp structure */
-    orig_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+    orig_iovec = kmalloc(nr_segs * sizeof(*orig_iovec), PVFS2_BUFMAP_GFP_FLAGS);
     if (orig_iovec == NULL)
     {
         gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(nr_segs * sizeof(struct iovec)));
+                (unsigned long)(nr_segs * sizeof(*orig_iovec)));
         return -ENOMEM;
     }
-    new_iovec = (struct iovec *) kmalloc(max_new_nr_segs * sizeof(struct iovec), 
+    new_iovec = kzalloc(max_new_nr_segs * sizeof(*new_iovec), 
             PVFS2_BUFMAP_GFP_FLAGS);
     if (new_iovec == NULL)
     {
         kfree(orig_iovec);
         gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(max_new_nr_segs * sizeof(struct iovec)));
+                (unsigned long)(max_new_nr_segs * sizeof(*new_iovec)));
         return -ENOMEM;
     }
-    sizes = (int *) kmalloc(max_new_nr_segs * sizeof(int), 
-            PVFS2_BUFMAP_GFP_FLAGS);
+    sizes = kzalloc(max_new_nr_segs * sizeof(*sizes), PVFS2_BUFMAP_GFP_FLAGS);
     if (sizes == NULL)
     {
         kfree(new_iovec);
         kfree(orig_iovec);
         gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(max_new_nr_segs * sizeof(int)));
+                (unsigned long)(max_new_nr_segs * sizeof(*sizes)));
         return -ENOMEM;
     }
     /* copy the passed in iovec to a temp structure */
-    memcpy(orig_iovec, original_iovec, nr_segs * sizeof(struct iovec));
-    memset(new_iovec, 0, max_new_nr_segs * sizeof(struct iovec));
-    memset(sizes, 0, max_new_nr_segs * sizeof(int));
+    memcpy(orig_iovec, original_iovec, nr_segs * sizeof(*orig_iovec));
     begin_seg = 0;
 repeat:
     for (seg = begin_seg; seg < nr_segs; seg++)
@@ -381,7 +386,7 @@ repeat:
             kfree(sizes);
             kfree(orig_iovec);
             kfree(new_iovec);
-            gossip_err("split_iovecs: exceeded the index limit (%d)\n", 
+            gossip_err("split_iovecs: exceeded the index limit (%lu)\n", 
                     tmpnew_nr_segs);
             return -EINVAL;
         }
@@ -426,11 +431,11 @@ repeat:
     return 0;
 }
 
-static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs, ssize_t *total_count)
+static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs, size_t *total_count)
 {
     unsigned long i;
     long max_nr_iovecs;
-    ssize_t total, count;
+    size_t total, count;
 
     total = 0;
     count = 0;
@@ -467,10 +472,11 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
     struct file *file;
     unsigned int to_free;
     size_t count;
-    struct iovec *iov;
+    const struct iovec *iov;
     unsigned long nr_segs, seg, new_nr_segs = 0;
-    long max_new_nr_segs = 0;
-    unsigned int  seg_count = 0, *seg_array = NULL;
+    unsigned long max_new_nr_segs = 0;
+    unsigned long  seg_count = 0;
+    unsigned long *seg_array = NULL;
     struct iovec *iovecptr = NULL, *ptr = NULL;
     loff_t *offset;
 
@@ -508,14 +514,14 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
     nr_segs = rw->dest.address.nr_segs;
     if (iov == NULL || nr_segs < 0)
     {
-        gossip_err("%s: Invalid iovec %p or nr_segs %ld\n",
+        gossip_err("%s: Invalid iovec %p or nr_segs %lu\n",
                 rw->fnstr, iov, nr_segs);
         goto out;
     }
     /* Compute total and max number of segments after split */
     if ((max_new_nr_segs = estimate_max_iovecs(iov, nr_segs, &count)) < 0)
     {
-        gossip_lerr("%s: could not estimate iovec %ld\n", rw->fnstr, max_new_nr_segs);
+        gossip_lerr("%s: could not estimate iovec %lu\n", rw->fnstr, max_new_nr_segs);
         goto out;
     }
     if (rw->type == IO_WRITEV)
@@ -565,9 +571,14 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
          * entries that will store the number of segments that straddle the
          * block-size boundaries.
          */
-        if ((ret = split_iovecs(max_new_nr_segs, nr_segs, iov, /* IN */
-                        &new_nr_segs, &iovecptr, /* OUT */
-                        &seg_count, &seg_array)  /* OUT */ ) < 0)
+        ret = split_iovecs(max_new_nr_segs, /* IN */
+			   nr_segs,         /* IN */
+			   iov,             /* IN */
+			   &new_nr_segs,    /* OUT */
+			   &iovecptr,       /* OUT */
+			   &seg_count,      /* OUT */
+			   &seg_array);     /* OUT */ 
+	if(ret < 0)
         {
             gossip_err("%s: Failed to split iovecs to satisfy larger "
                     " than blocksize readv/writev request %zd\n", rw->fnstr, ret);
@@ -586,7 +597,7 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
         /* There is only 1 element in the seg_array */
         seg_count = 1;
         /* and its value is the number of segments passed in */
-        seg_array = (unsigned int *) &nr_segs;
+        seg_array = &nr_segs;
         /* We dont have to free up anything */
         to_free = 0;
     }
@@ -594,7 +605,7 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
 
     gossip_debug(GOSSIP_FILE_DEBUG, "%s %zd@%llu\n", 
             rw->fnstr, count, llu(*offset));
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s: new_nr_segs: %lu, seg_count: %u\n", 
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s: new_nr_segs: %lu, seg_count: %lu\n", 
             rw->fnstr, new_nr_segs, seg_count);
 #ifdef PVFS2_KERNEL_DEBUG
     for (seg = 0; seg < new_nr_segs; seg++)
@@ -607,7 +618,7 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
     }
     for (seg = 0; seg < seg_count; seg++)
     {
-        gossip_debug(GOSSIP_FILE_DEBUG, "%s: %d) %u\n",
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: %d) %lu\n",
                 rw->fnstr, seg + 1, seg_array[seg]);
     }
 #endif
@@ -728,7 +739,7 @@ ssize_t pvfs2_file_read(
     if (IS_IMMUTABLE(rw.inode)) 
     {
         rw.readahead_size = (rw.inode)->i_size;
-        return generic_file_read(file, buf, count, offset);
+        return do_sync_read(file, buf, count, offset);
     }
     else 
     {
@@ -767,6 +778,8 @@ static ssize_t pvfs2_file_write(
     return do_direct_readv_writev(&rw);
 }
 
+/* compat code, < 2.6.19 */
+#ifndef HAVE_COMBINED_AIO_AND_VECTOR
 /** Reads data to several contiguous user buffers (an iovec) from a file at a
  * specified offset.
  */
@@ -822,6 +835,7 @@ static ssize_t pvfs2_file_writev(
 
     return do_direct_readv_writev(&rw);
 }
+#endif
 
 
 /* Construct a trailer of <file offsets, length pairs> in a buffer that we
@@ -854,7 +868,9 @@ static int construct_file_offset_trailer(char **trailer,
 
 /*
  * The reason we need to do this is to be able to support readx() and writex()
- * of larger than PVFS_DEFAULT_DESC_SIZE (4 MB). What that means is that
+ * of larger than (pvfs_bufmap_size_query()) 
+ * (default is PVFS2_BUFMAP_DEFAULT_DESC_SIZE MB).
+ * What that means is that
  * we will create a new xtvec descriptor for those file offsets that 
  * go beyond the limit
  * Return value for this routine is -ve in case of errors
@@ -862,19 +878,22 @@ static int construct_file_offset_trailer(char **trailer,
  * Further, the new_nr_segs pointer is updated to hold the new value
  * of number of xtvecs, the new_xtvec pointer is updated to hold the pointer
  * to the new split xtvec, and the size array is an array of integers holding
- * the number of xtvecs that straddle PVFS_DEFAULT_DESC_SIZE.
+ * the number of xtvecs that straddle (pvfs_bufmap_size_query()).
  * The max_new_nr_segs value is computed by the caller and passed in.
  * (It will be (count of all xtv_len/ block_size) + 1).
  */
-static int split_xtvecs(unsigned long max_new_nr_segs,  /* IN */
-        unsigned long nr_segs,              /* IN */
-        const struct xtvec *original_xtvec, /* IN */
-        unsigned long *new_nr_segs, struct xtvec **new_vec,  /* OUT */
-        unsigned int *seg_count, unsigned int **seg_array)   /* OUT */
+static int split_xtvecs(
+		unsigned long max_new_nr_segs,      /* IN */
+		unsigned long nr_segs,              /* IN */
+		const struct xtvec *original_xtvec, /* IN */
+		unsigned long *new_nr_segs,         /* OUT */
+		struct xtvec **new_vec,  	    /* OUT */
+		unsigned long *seg_count,           /* OUT */
+		unsigned long **seg_array)          /* OUT */
 {
-    int seg, count, begin_seg, tmpnew_nr_segs;
+    unsigned long seg, count, begin_seg, tmpnew_nr_segs;
     struct xtvec *new_xtvec = NULL, *orig_xtvec;
-    unsigned int *sizes = NULL, sizes_count = 0;
+    unsigned long *sizes = NULL, sizes_count = 0;
 
     if (nr_segs <= 0 || original_xtvec == NULL 
             || new_nr_segs == NULL || new_vec == NULL
@@ -888,37 +907,33 @@ static int split_xtvecs(unsigned long max_new_nr_segs,  /* IN */
     *seg_count = 0;
     *seg_array = NULL;
     /* copy the passed in xtvec descriptor to a temp structure */
-    orig_xtvec = (struct xtvec *) kmalloc(nr_segs * sizeof(struct xtvec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+    orig_xtvec = kmalloc(nr_segs * sizeof(*orig_xtvec), PVFS2_BUFMAP_GFP_FLAGS);
     if (orig_xtvec == NULL)
     {
         gossip_err("split_xtvecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(nr_segs * sizeof(struct xtvec)));
+                (unsigned long)(nr_segs * sizeof(*orig_xtvec)));
         return -ENOMEM;
     }
-    new_xtvec = (struct xtvec *) kmalloc(max_new_nr_segs * sizeof(struct xtvec), 
+    new_xtvec = kzalloc(max_new_nr_segs * sizeof(*new_xtvec), 
             PVFS2_BUFMAP_GFP_FLAGS);
     if (new_xtvec == NULL)
     {
         kfree(orig_xtvec);
         gossip_err("split_xtvecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(max_new_nr_segs * sizeof(struct xtvec)));
+                (unsigned long)(max_new_nr_segs * sizeof(*new_xtvec)));
         return -ENOMEM;
     }
-    sizes = (unsigned int *) kmalloc(max_new_nr_segs * sizeof(unsigned int), 
-            PVFS2_BUFMAP_GFP_FLAGS);
+    sizes = kzalloc(max_new_nr_segs * sizeof(*sizes), PVFS2_BUFMAP_GFP_FLAGS);
     if (sizes == NULL)
     {
         kfree(new_xtvec);
         kfree(orig_xtvec);
         gossip_err("split_xtvecs: Could not allocate memory for %lu bytes!\n", 
-                (unsigned long)(max_new_nr_segs * sizeof(int)));
+                (unsigned long)(max_new_nr_segs * sizeof(*sizes)));
         return -ENOMEM;
     }
     /* copy the passed in xtvec to a temp structure */
-    memcpy(orig_xtvec, original_xtvec, nr_segs * sizeof(struct xtvec));
-    memset(new_xtvec, 0, max_new_nr_segs * sizeof(struct xtvec));
-    memset(sizes, 0, max_new_nr_segs * sizeof(int));
+    memcpy(orig_xtvec, original_xtvec, nr_segs * sizeof(*orig_xtvec));
     begin_seg = 0;
     count = 0;
     tmpnew_nr_segs = 0;
@@ -930,8 +945,8 @@ repeat:
             kfree(sizes);
             kfree(orig_xtvec);
             kfree(new_xtvec);
-            gossip_err("split_xtvecs: exceeded the index limit (%d)\n", 
-                    tmpnew_nr_segs);
+            gossip_err("split_xtvecs: exceeded the index limit (%lu)\n", 
+			    tmpnew_nr_segs);
             return -EINVAL;
         }
         if (count + orig_xtvec[seg].xtv_len < pvfs_bufmap_size_query())
@@ -976,11 +991,11 @@ repeat:
 }
 
 static long 
-estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, ssize_t *total_count)
+estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, size_t *total_count)
 {
     unsigned long i;
     long max_nr_xtvecs;
-    ssize_t total, count;
+    size_t total, count;
 
     total = 0;
     count = 0;
@@ -1014,8 +1029,12 @@ estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, ssize_t *to
  * @xtvec - contains the file regions
  * @xtnr_segs - number of file vector regions
  */
-static ssize_t wait_for_iox(struct rw_options *rw, struct iovec *vec, int nr_segs,
-        struct xtvec *xtvec, int xtnr_segs, size_t total_size)
+static ssize_t wait_for_iox(struct rw_options *rw, 
+			    struct iovec *vec, 
+			    unsigned long nr_segs,
+			    struct xtvec *xtvec, 
+		            unsigned long xtnr_segs, 
+                            size_t total_size)
 {
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
@@ -1024,8 +1043,8 @@ static ssize_t wait_for_iox(struct rw_options *rw, struct iovec *vec, int nr_seg
     if (!rw || !vec || nr_segs < 0 || total_size <= 0
             || !xtvec || xtnr_segs < 0)
     {
-        gossip_lerr("invalid parameters (rw: %p, vec: %p, nr_segs: %d, "
-                "xtvec %p, xtnr_segs %d, total_size: %zd\n", rw, vec, nr_segs,
+        gossip_lerr("invalid parameters (rw: %p, vec: %p, nr_segs: %lu, "
+                "xtvec %p, xtnr_segs %lu, total_size: %zd\n", rw, vec, nr_segs,
                 xtvec, xtnr_segs, total_size);
         ret = -EINVAL;
         goto out;
@@ -1065,8 +1084,8 @@ static ssize_t wait_for_iox(struct rw_options *rw, struct iovec *vec, int nr_seg
                 "failure (%ld)\n", rw->fnstr, (long) ret);
         goto out;
     }
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %d, "
-            "xtnr_segs: %d "
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %lu, "
+            "xtnr_segs: %lu "
             "total_size: %zd\n",
             rw->fnstr, rw->copy_to_user, 
             nr_segs, xtnr_segs,
@@ -1186,17 +1205,18 @@ out:
 
 static ssize_t do_direct_readx_writex(struct rw_options *rw)
 {
-    ssize_t ret, total_count, count_mem, count_stream;
+    ssize_t ret, total_count;
+    size_t count_mem, count_stream;
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
     unsigned int to_free;
-    struct iovec *iov; 
+    const struct iovec *iov; 
     unsigned long seg, nr_segs, xtnr_segs;
     struct xtvec *xtvec; 
-    long max_new_nr_segs_mem, max_new_nr_segs_stream;
+    unsigned long max_new_nr_segs_mem, max_new_nr_segs_stream;
     unsigned long new_nr_segs_mem = 0, new_nr_segs_stream = 0;
-    unsigned int seg_count_mem, *seg_array_mem = NULL;
-    unsigned int seg_count_stream, *seg_array_stream = NULL;
+    unsigned long seg_count_mem, *seg_array_mem = NULL;
+    unsigned long seg_count_stream, *seg_array_stream = NULL;
     struct iovec *iovecptr = NULL, *ptr = NULL;
     struct xtvec *xtvecptr = NULL, *xptr = NULL;
 
@@ -1230,28 +1250,28 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
     nr_segs = rw->dest.address.nr_segs;
     if (iov == NULL || nr_segs < 0)
     {
-        gossip_err("%s: Invalid iovec %p or nr_segs %ld\n",
+        gossip_err("%s: Invalid iovec %p or nr_segs %lu\n",
                 rw->fnstr, iov, nr_segs);
         goto out;
     }
     /* Compute total and max number of segments after split of the memory vector */
     if ((max_new_nr_segs_mem = estimate_max_iovecs(iov, nr_segs, &count_mem)) < 0)
     {
-        gossip_lerr("%s: could not estimate iovec %ld\n", rw->fnstr, max_new_nr_segs_mem);
+        gossip_lerr("%s: could not estimate iovec %lu\n", rw->fnstr, max_new_nr_segs_mem);
         goto out;
     }
     xtvec = rw->off.iox.xtvec;
     xtnr_segs = rw->off.iox.xtnr_segs;
     if (xtvec == NULL || xtnr_segs < 0)
     {
-        gossip_err("%s: Invalid xtvec %p or xtnr_segs %ld\n",
+        gossip_err("%s: Invalid xtvec %p or xtnr_segs %lu\n",
                 rw->fnstr, xtvec, xtnr_segs);
         goto out;
     }
     /* Calculate the total stream length amd max segments after split of the stream vector */
     if ((max_new_nr_segs_stream = estimate_max_xtvecs(xtvec, xtnr_segs, &count_stream)) < 0)
     {
-        gossip_lerr("%s: could not estimate xtvec %ld\n", rw->fnstr, max_new_nr_segs_stream);
+        gossip_lerr("%s: could not estimate xtvec %lu\n", rw->fnstr, max_new_nr_segs_stream);
         goto out;
     }
     if (count_mem == 0)
@@ -1279,9 +1299,14 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
          * entries that will store the number of segments that straddle the
          * block-size boundaries.
          */
-        if ((ret = split_iovecs(max_new_nr_segs_mem, nr_segs, iov, /* IN */
-                        &new_nr_segs_mem, &iovecptr, /* OUT */
-                        &seg_count_mem, &seg_array_mem)  /* OUT */ ) < 0)
+        ret = split_iovecs(max_new_nr_segs_mem, /* IN */
+			   nr_segs, 		/* IN */
+			   iov, 		/* IN */
+			   &new_nr_segs_mem,    /* OUT */
+			   &iovecptr, 		/* OUT */
+			   &seg_count_mem, 	/* OUT */
+			   &seg_array_mem);     /* OUT */
+        if(ret < 0)
         {
             gossip_err("%s: Failed to split iovecs to satisfy larger "
                     " than blocksize readx request %ld\n", rw->fnstr, (long) ret);
@@ -1295,9 +1320,14 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
          * Split up the given xtvec description such that
          * no xtvec descriptor straddles over the block-size limitation.
          */
-        if ((ret = split_xtvecs(max_new_nr_segs_stream, xtnr_segs, xtvec, /* IN */
-                        &new_nr_segs_stream, &xtvecptr, /* OUT */
-                        &seg_count_stream, &seg_array_stream) /* OUT */) < 0)
+        ret = split_xtvecs(max_new_nr_segs_stream, /* IN */
+			   xtnr_segs,              /* IN */
+			   xtvec,  		   /* IN */
+                           &new_nr_segs_stream,    /* OUT */
+			   &xtvecptr, 		   /* OUT */
+                           &seg_count_stream,      /* OUT */
+			   &seg_array_stream);     /* OUT */
+        if(ret < 0)
         {
             gossip_err("Failed to split iovecs to satisfy larger "
                     " than blocksize readx request %ld\n", (long) ret);
@@ -1314,7 +1344,7 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
         /* There is only 1 element in the seg_array_mem */
         seg_count_mem = 1;
         /* and its value is the number of segments passed in */
-        seg_array_mem = (unsigned int *) &nr_segs;
+        seg_array_mem = &nr_segs;
         
         new_nr_segs_stream = xtnr_segs;
         /* use the given file description */
@@ -1322,7 +1352,7 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
         /* There is only 1 element in the seg_array_stream */
         seg_count_stream = 1;
         /* and its value is the number of segments passed in */
-        seg_array_stream = (unsigned int *) &xtnr_segs;
+        seg_array_stream = &xtnr_segs;
         /* We dont have to free up anything */
         to_free = 0;
     }
@@ -1850,7 +1880,7 @@ static ssize_t do_direct_aio_read_write(struct rw_options *rw)
     struct inode *inode;
     ssize_t error;
     pvfs2_inode_t *pvfs2_inode;
-    struct iovec *iov;
+    const struct iovec *iov;
     unsigned long nr_segs, max_new_nr_segs;
     size_t count;
     struct kiocb *iocb;
@@ -2064,12 +2094,12 @@ out_error:
     return error;
 }
 
-static ssize_t 
-pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
-        size_t count, loff_t offset)
+static ssize_t pvfs2_file_aio_read_iovec(struct kiocb *iocb,
+                                         const struct iovec *iov,
+                                         unsigned long nr_segs, loff_t offset)
 {
     struct rw_options rw;
-    struct iovec vec;
+
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
     rw.type = IO_READ;
@@ -2078,8 +2108,6 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     rw.copy_to_user = 1;
     rw.fnstr = __FUNCTION__;
     rw.iocb = iocb;
-    vec.iov_base = (char __user *) buffer;
-    vec.iov_len  = count;
     rw.file = iocb->ki_filp;
     if (!rw.file || !(rw.file)->f_mapping)
     {
@@ -2087,13 +2115,19 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     }
     rw.inode = (rw.file)->f_mapping->host;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
-    rw.dest.address.iov = &vec;
-    rw.dest.address.nr_segs = 1;
+    rw.dest.address.iov = iov;
+    rw.dest.address.nr_segs = nr_segs;
 
     if (IS_IMMUTABLE(rw.inode)) 
     {
         rw.readahead_size = (rw.inode)->i_size;
-        return generic_file_aio_read(iocb, buffer, count, offset);
+#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+        return generic_file_aio_read(iocb, iov, nr_segs, offset);
+#else
+        /* compatibility code; know nr_segs == 1 as only caller is the
+         * compat function below */
+        return generic_file_aio_read(iocb, iov->iov_base, iov->iov_len, offset);
+#endif
     }
     else 
     {
@@ -2102,12 +2136,11 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     }
 }
 
-static ssize_t 
-pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
-        size_t count, loff_t offset)
+static ssize_t pvfs2_file_aio_write_iovec(struct kiocb *iocb,
+                                          const struct iovec *iov,
+                                          unsigned long nr_segs, loff_t offset)
 {
     struct rw_options rw;
-    struct iovec vec;
 
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
@@ -2118,8 +2151,6 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     rw.copy_to_user = 1;
     rw.fnstr = __FUNCTION__;
     rw.iocb = iocb;
-    vec.iov_base = (char __user *) buffer;
-    vec.iov_len  = count;
     rw.file = iocb->ki_filp;
     if (!rw.file || !(rw.file)->f_mapping)
     {
@@ -2127,12 +2158,37 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     }
     rw.inode = (rw.file)->f_mapping->host;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
-    rw.dest.address.iov = &vec;
-    rw.dest.address.nr_segs = 1;
+    rw.dest.address.iov = iov;
+    rw.dest.address.nr_segs = nr_segs;
     return do_direct_aio_read_write(&rw);
 }
 
+/* compat functions for < 2.6.19 */
+#ifndef HAVE_COMBINED_AIO_AND_VECTOR
+static ssize_t 
+pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
+        size_t count, loff_t offset)
+
+{
+    struct iovec iov = {
+        .iov_base = buffer,
+        .iov_len = count,
+    };
+    return pvfs2_file_aio_read_iovec(iocb, &iov, 1, offset);
+}
+
+static ssize_t 
+pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
+        size_t count, loff_t offset)
+{
+    struct iovec iov = {
+        .iov_base = (void __user *) buffer,  /* discard const so it fits */
+        .iov_len = count,
+    };
+    return pvfs2_file_aio_write_iovec(iocb, &iov, 1, offset);
+}
 #endif
+#endif  /* HAVE_AIO_VFS_SUPPORT */
 
 /** Perform a miscellaneous operation on a file.
  */
@@ -2459,11 +2515,17 @@ struct file_operations pvfs2_file_operations =
     .llseek = pvfs2_file_llseek,
     .read = pvfs2_file_read,
     .write = pvfs2_file_write,
+#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+    /* for >= 2.6.19 */
+    .aio_read = pvfs2_file_aio_read_iovec,
+    .aio_write = pvfs2_file_aio_write_iovec,
+#else
     .readv = pvfs2_file_readv,
     .writev = pvfs2_file_writev,
-#ifdef HAVE_AIO_VFS_SUPPORT
+#  ifdef HAVE_AIO_VFS_SUPPORT
     .aio_read = pvfs2_file_aio_read,
     .aio_write = pvfs2_file_aio_write,
+#  endif
 #endif
     .ioctl = pvfs2_ioctl,
     .mmap = pvfs2_file_mmap,

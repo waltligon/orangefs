@@ -35,6 +35,8 @@ foreach $file (@files)
 
 		if (/^  CC/ ||
 		    /^  SMC/ ||
+		    /^  BUILD_CC/ ||
+		    /^  BUILD_LD/ ||
 		    /^  DEP/ ||
 		    /^  RANLIB/ ||
 		    /^  LD/ ||

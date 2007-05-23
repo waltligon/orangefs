@@ -167,6 +167,7 @@ int PINT_decode(void* input_buffer,
     int proto_major_recved, proto_minor_recved;
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_decode\n");
+    target_msg->enc_type = -1;  /* invalid */
 
     /* sanity check size */
     if(size < PINT_ENC_GENERIC_HEADER_SIZE)
@@ -200,8 +201,8 @@ int PINT_decode(void* input_buffer,
 	gossip_err("   Protocol version mismatch: received major version %d when "
 	    "expecting %d.\n", (int)proto_major_recved,
 	    PVFS2_PROTO_MAJOR);
-	gossip_err("   Please verify your PVFS2 installation and make sure "
-	"that the version is\n   consistent.\n");
+	gossip_err("   Please verify your PVFS2 installation\n");
+        gossip_err("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
 
@@ -213,8 +214,8 @@ int PINT_decode(void* input_buffer,
 	    "expecting %d or lower.\n", (int)proto_minor_recved,
 	    PVFS2_PROTO_MINOR);
         gossip_err("   Client is too new for server.\n");
-	gossip_err("   Please verify your PVFS2 installation and make sure "
-	"that the version is\n   consistent.\n");
+	gossip_err("   Please verify your PVFS2 installation\n");
+        gossip_err("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
 
@@ -226,8 +227,8 @@ int PINT_decode(void* input_buffer,
 	    "expecting %d or higher.\n", (int)proto_minor_recved,
 	    PVFS2_PROTO_MINOR);
         gossip_err("   Server is too old for client.\n");
-	gossip_err("   Please verify your PVFS2 installation and make sure "
-	"that the version is\n   consistent.\n");
+	gossip_err("   Please verify your PVFS2 installation\n");
+        gossip_err("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
 
@@ -315,6 +316,11 @@ void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
     {
         PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
             input_buffer, input_type);
+    }
+    else if (input_buffer->enc_type == -1)
+    {
+        /* invalid return from PINT_decode, quietly return */
+        ;
     }
     else
     {

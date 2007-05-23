@@ -181,14 +181,14 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_TRY_COMPILE([
     #include <db.h>
     ], [
-    int ret;
-    DB *db;
-    DB_TXN *txnid;
-    char *file;
-    char *database;
-    DBTYPE type;
-    u_int32_t flags;
-    int mode;
+    int ret = 0;
+    DB *db = NULL;
+    DB_TXN *txnid = NULL;
+    char *file = NULL;
+    char *database = NULL;
+    DBTYPE type = 0;
+    u_int32_t flags = 0;
+    int mode = 0;
     
     ret = db->open(db, txnid, file, database, type, flags, mode);
     ], AC_MSG_RESULT(yes)
@@ -217,5 +217,19 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_DEFINE(HAVE_DB_BUFFER_SMALL, 1, [Define if db library has DB_BUFFER_SMALL error]),
     AC_MSG_RESULT(no))
 
+    dnl Test to check for db->get_pagesize
+    AC_MSG_CHECKING(for berkeley db get_pagesize function)
+    AC_TRY_COMPILE([
+    #include <db.h>
+    ], [
+    int ret = 0;
+    DB *db = NULL;
+    int pagesize;
+    
+    ret = db->get_pagesize(db, &pagesize);
+    ], AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_DB_GET_PAGESIZE, 1, [Define if DB has get_pagesize function]),
+    AC_MSG_RESULT(no))
+    
     CFLAGS="$oldcflags"    
 ])

@@ -20,19 +20,16 @@
 extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
-static int del_eattr_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int del_eattr_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action del_eattr_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action del_eattr_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int del_eattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 %%
 
-machine pvfs2_client_del_eattr_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    cleanup)
+machine pvfs2_client_del_eattr_sm
 {
     state setup_msgpair
     {
@@ -64,6 +61,7 @@ PVFS_error PVFS_isys_deleattr(
         void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_isys_del_eattr entered\n");
@@ -75,12 +73,16 @@ PVFS_error PVFS_isys_deleattr(
 	return ret;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SYS_DELEATTR,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
@@ -89,7 +91,7 @@ PVFS_error PVFS_isys_deleattr(
     sm_p->object_ref = ref;
 
     return PINT_client_state_machine_post(
-            sm_p, PVFS_SYS_DELEATTR, op_id, user_ptr);
+            smcb,  op_id, user_ptr);
 }
 
 PVFS_error PVFS_sys_deleattr(
@@ -120,13 +122,14 @@ PVFS_error PVFS_sys_deleattr(
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 
-static int del_eattr_setup_msgpair(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
+static PINT_sm_action del_eattr_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -157,18 +160,19 @@ static int del_eattr_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = 0;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int del_eattr_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static PINT_sm_action del_eattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"del_eattr state: del_eattr_cleanup\n");
     sm_p->error_code  = js_p->error_code;
-    sm_p->op_complete = 1;
 
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 static int del_eattr_comp_fn(
@@ -178,7 +182,8 @@ static int del_eattr_comp_fn(
 {
     int j = 0;
     int ret = 0;
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"del_eattr completion fn: del_eattr_comp_fn\n");

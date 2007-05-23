@@ -237,7 +237,11 @@ enum PVFS_async_io_type
 #define PVFS2_CACHE_CREATE_FLAGS 0
 #endif /* ((defined PVFS2_KERNEL_DEBUG) && (defined CONFIG_DEBUG_SLAB)) */
 
-#define PVFS2_CACHE_ALLOC_FLAGS (SLAB_KERNEL)
+#ifdef HAVE_SLAB_KERNEL_FLAG
+# define PVFS2_CACHE_ALLOC_FLAGS (SLAB_KERNEL)
+#else
+# define PVFS2_CACHE_ALLOC_FLAGS (GFP_KERNEL)
+#endif
 #define PVFS2_GFP_FLAGS (GFP_KERNEL)
 #define PVFS2_BUFMAP_GFP_FLAGS (GFP_KERNEL)
 
@@ -735,6 +739,7 @@ void fsid_key_table_finalize(void);
 /****************************
  * defined in inode.c
  ****************************/
+int pvfs2_set_inode(struct inode *inode, void *data);
 uint32_t convert_to_pvfs2_mask(unsigned long lite_mask);
 struct inode *pvfs2_get_custom_inode(
     struct super_block *sb,
@@ -1249,6 +1254,21 @@ static inline unsigned int diff(struct timeval *end, struct timeval *begin)
     end->tv_usec -= begin->tv_usec;
     return ((end->tv_sec * 1000000) + end->tv_usec);
 }
+
+#ifndef HAVE_KZALLOC
+static inline void *kzalloc(size_t size, int flags)
+{
+	void * ptr;
+
+	ptr = kmalloc(size, flags);
+	if(!ptr)
+	{
+		return ptr;
+	}
+	memset(ptr, 0, size);
+	return ptr;
+}
+#endif
 
 #endif /* __PVFS2KERNEL_H */
 

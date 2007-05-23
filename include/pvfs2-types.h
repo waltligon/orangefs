@@ -122,14 +122,14 @@ typedef uint64_t PVFS_handle;
  *  PVFS2 file systems reachable by a given client.
  */
 typedef int32_t PVFS_fs_id;
-typedef int32_t PVFS_ds_position;
+typedef uint64_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
 #define encode_PVFS_handle encode_uint64_t
 #define decode_PVFS_handle decode_uint64_t
 #define encode_PVFS_fs_id encode_int32_t
 #define decode_PVFS_fs_id decode_int32_t
-#define decode_PVFS_ds_position decode_int32_t
-#define encode_PVFS_ds_position encode_int32_t
+#define decode_PVFS_ds_position decode_uint64_t
+#define encode_PVFS_ds_position encode_uint64_t
 
 /* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;
@@ -539,6 +539,7 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 #define PVFS_EHOSTUNREACH    E(56) /* No route to host */
 #define PVFS_EALREADY        E(57) /* Operation already in progress */
 #define PVFS_EACCES          E(58) /* Access not allowed */
+#define PVFS_ECONNRESET      E(59) /* Connection reset by peer */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
@@ -556,7 +557,7 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
  * UNIX ERRNO VALUE IN THE MACROS BELOW (USED IN
  * src/common/misc/errno-mapping.c and the kernel module)
  */
-#define PVFS_ERRNO_MAX          59
+#define PVFS_ERRNO_MAX          60
 
 #ifndef EUNATCH
 #define EUNATCH -1
@@ -642,7 +643,8 @@ PVFS_error PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = { \
     EHOSTDOWN,                                        \
     EHOSTUNREACH,                                     \
     EALREADY,                                         \
-    EACCES,   /* 58 */                                \
+    EACCES,                                           \
+    ECONNRESET,   /* 59 */                            \
     0         /* PVFS_ERRNO_MAX */                    \
 };                                                    \
 const char *PINT_non_errno_strerror_mapping[] = {     \
@@ -653,7 +655,7 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "Unknown host",                                   \
     "No address associated with name",                \
     "Unknown server error",                           \
-    "Host name lookup failure"                        \
+    "Host name lookup failure",                       \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -663,7 +665,7 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_EHOSTNTFD, /* 4 */                           \
     PVFS_EADDRNTFD, /* 5 */                           \
     PVFS_ENORECVR,  /* 6 */                           \
-    PVFS_ETRYAGAIN  /* 7 */                           \
+    PVFS_ETRYAGAIN, /* 7 */                           \
 }
 
 /*

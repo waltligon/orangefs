@@ -28,23 +28,19 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int mgmt_get_dirdata_handle_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int mgmt_get_dirdata_handle_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int mgmt_get_dirdata_handle_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action mgmt_get_dirdata_handle_init(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action mgmt_get_dirdata_handle_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int mgmt_get_dirdata_handle_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 %%
 
-machine pvfs2_client_mgmt_get_dirdata_handle_sm(
-    init,
-    get_dirdata_handle_setup_msgpair,
-    get_dirdata_handle_xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_get_dirdata_handle_sm
 {
     state init
     {
@@ -85,6 +81,7 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -97,12 +94,16 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
         return ret;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_GET_DIRDATA_HANDLE,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
@@ -114,7 +115,7 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
         "dir %llu,%d\n", llu(parent_ref.handle), parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_GET_DIRDATA_HANDLE, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Obtain handle for dirdata object for a specific directory.
@@ -147,23 +148,21 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
         }
     }
 
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 
 static int mgmt_get_dirdata_handle_init(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "mgmt_get_dirdata_handle_init called\n");
-
     assert(js_p->error_code == 0);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int mgmt_get_dirdata_handle_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -194,13 +193,14 @@ static int mgmt_get_dirdata_handle_setup_msgpair(
         gossip_err("Failed to map server address\n");
 	js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static int mgmt_get_dirdata_handle_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     assert(resp_p->op == PVFS_SERV_MGMT_GET_DIRDATA_HANDLE);
 
@@ -220,16 +220,15 @@ static int mgmt_get_dirdata_handle_comp_fn(
     return resp_p->status;
 }
 
-static int mgmt_get_dirdata_handle_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p)
+static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "mgmt_get_dirdata_handle _cleanup called\n");
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     sm_p->error_code = js_p->error_code;
 
-    sm_p->op_complete = 1;
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

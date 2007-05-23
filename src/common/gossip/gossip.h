@@ -27,7 +27,6 @@
 #endif
 #include "pvfs2-config.h"
 
-
 /********************************************************************
  * Visible interface
  */
@@ -74,7 +73,10 @@ do {                                               \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
 } while(0)
 
-#else
+#else /* __KERNEL__ */
+
+/* stdio is needed by gossip_debug_fp declaration for FILE* */
+#include <stdio.h>
 
 int gossip_enable_syslog(
     int priority);
@@ -114,6 +116,12 @@ int __gossip_debug_va(
     char prefix,
     const char *format,
     va_list ap);
+int gossip_debug_fp(
+    FILE *fp,
+    char prefix,
+    enum gossip_logstamp ts,
+    const char *format,
+    ...) __attribute__ ((format(printf, 4, 5)));
 
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
@@ -146,6 +154,7 @@ do {                                                      \
             format, ##f);                                 \
     }                                                     \
 } while(0)
+
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 /* do file and line number printouts w/ the GNU preprocessor */
@@ -191,6 +200,7 @@ int gossip_err(
 #define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #define gossip_debug_enabled(__m) \
             ((gossip_debug_on != 0) && (__m & gossip_debug_mask))
+
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err

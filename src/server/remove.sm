@@ -59,35 +59,28 @@ enum
     STATE_TYPE_DATAFILE = 2,
 };
 
-static int remove_check_object_type(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int remove_verify_object_metadata(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int remove_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int remove_remove_dspace(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int remove_read_dirdata_handle(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int remove_get_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int remove_check_dirdata_entries(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int remove_remove_dirdata_dspace(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int remove_setup_work(
-    PINT_server_op *s_op, job_status_s *js_p);
+static PINT_sm_action remove_check_object_type(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_verify_object_metadata(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_remove_dspace(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_read_dirdata_handle(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_get_dirent_count(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_check_dirdata_entries(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_remove_dirdata_dspace(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action remove_setup_work(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
-nested machine pvfs2_remove_work_sm(
-    check_object_type,
-    verify_object_metadata,
-    remove_dspace,
-    read_dirdata_handle,
-    getattr_of_dirdata_handle,
-    check_dirdata_entries,
-    remove_dirdata_dspace)
+nested machine pvfs2_remove_work_sm
 {
 
     state check_object_type
@@ -141,12 +134,7 @@ nested machine pvfs2_remove_work_sm(
 
 }
 
-machine pvfs2_remove_sm(
-    prelude,
-    setup_work,
-    work,
-    final_response,
-    cleanup)
+machine pvfs2_remove_sm
 {
     state prelude
     {
@@ -190,20 +178,21 @@ machine pvfs2_remove_sm(
  * retrive object attributes earlier
  *
  */
-static int remove_check_object_type(PINT_server_op *s_op,
-                                    job_status_s *js_p)
+static PINT_sm_action remove_check_object_type(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->attr.objtype == PVFS_TYPE_DATAFILE)
     {
 	/* it must be a datafile, transition to try reading datafile 
 	 * attribs with dspace_getattr()
 	 */
 	js_p->error_code = STATE_TYPE_DATAFILE;
-	return(1);
+	return SM_ACTION_COMPLETE;
     }
 
     js_p->error_code = 0;
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -218,9 +207,10 @@ static int remove_check_object_type(PINT_server_op *s_op,
  * Note: errors from the previous state are redirected elsewhere, so
  * we know that we have metadata if we make it here.
  */
-static int remove_verify_object_metadata(PINT_server_op *s_op,
-					 job_status_s *js_p)
+static PINT_sm_action remove_verify_object_metadata(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p;
 
     a_p = &s_op->attr;
@@ -244,12 +234,13 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
             "dirdata object before removing directory itself.\n");
     }
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int remove_read_dirdata_handle(PINT_server_op *s_op,
-                                      job_status_s *js_p)
+static PINT_sm_action remove_read_dirdata_handle(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t j_id;
 
@@ -271,30 +262,35 @@ static int remove_read_dirdata_handle(PINT_server_op *s_op,
         s_op->u.remove.fs_id, s_op->u.remove.handle,
         &s_op->key, &s_op->val, 
         0, 
-        NULL, s_op, 0, js_p,
+        NULL, smcb, 0, js_p,
         &j_id, server_job_context);
 
     return ret;
 }
 
-static int remove_get_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action remove_get_dirent_count(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
 
     if (js_p->error_code)
     {
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
 
-    ret = job_trove_keyval_get_handle_info(
+
+    ret = job_trove_keyval_iterate_keys(
         s_op->u.remove.fs_id,
         s_op->u.remove.dirdata_handle,
-        TROVE_KEYVAL_HANDLE_COUNT,
-        &s_op->u.remove.keyval_handle_info,
-        s_op,
+        PVFS_ITERATE_START,
+        &s_op->u.remove.key,
+        1,
+        0,
+        NULL,
+        smcb,
         0,
         js_p,
         &tmp_id,
@@ -303,20 +299,20 @@ static int remove_get_dirent_count(
     return ret;
 }
 
-static int remove_check_dirdata_entries(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action remove_check_dirdata_entries(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
-        if (s_op->u.remove.keyval_handle_info.count > 0)
+        if(js_p->count > 0)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, 
                          " detected non-empty "
-                         "directory (fsid: %u, handle: %llu, size: %d) "
+                         "directory (fsid: %u, handle: %llu) "
                          "-- returning error\n",
                          s_op->u.remove.fs_id,
-                         llu(s_op->u.remove.handle),
-                         s_op->u.remove.keyval_handle_info.count);
+                         llu(s_op->u.remove.handle));
             js_p->error_code = -PVFS_ENOTEMPTY;
         }
     }
@@ -324,12 +320,10 @@ static int remove_check_dirdata_entries(
     {
         /* no entries because count is 0 */
         js_p->error_code = 0;
-        s_op->u.remove.keyval_handle_info.count = 0;
     }
 
     /* setup position for next state (remove[_dirdata]_keyvals) */
-    s_op->u.remove.pos = PVFS_ITERATE_START;
-     return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -338,9 +332,10 @@ static int remove_check_dirdata_entries(
  * Remove the dirdata dspace using the handle that we ready in the
  * read_dirdata_handle state.
  */
-static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
-					job_status_s *js_p)
+static PINT_sm_action remove_remove_dirdata_dspace(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t j_id;
     gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -350,8 +345,8 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
     ret = job_trove_dspace_remove(
         s_op->u.remove.fs_id,
         s_op->u.remove.dirdata_handle,
-        TROVE_SYNC,
-        s_op,
+        0,  /* don't sync here, we do a dspace remove on the dir handle next */
+        smcb,
         0,
         js_p,
         &j_id,
@@ -366,9 +361,10 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
  * Remove the dspace using the handle from the incoming request
  * (which was verified in previous states).
  */
-static int remove_remove_dspace(PINT_server_op *s_op,
-				job_status_s *js_p)
+static PINT_sm_action remove_remove_dspace(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) remove: removing dspace "
@@ -378,7 +374,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
     ret = job_trove_dspace_remove(
         s_op->u.remove.fs_id, s_op->u.remove.handle,
         TROVE_SYNC, 
-        s_op, 0, js_p,
+        smcb, 0, js_p,
         &j_id, server_job_context);
 
     return ret;
@@ -390,19 +386,20 @@ static int remove_remove_dspace(PINT_server_op *s_op,
  * Free all memory associated with this request and return 0, indicating
  * we're done processing.
  */
-static int remove_cleanup(PINT_server_op *s_op,
-			  job_status_s *js_p)
+static PINT_sm_action remove_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
-static int remove_setup_work(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action remove_setup_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->u.remove.handle = s_op->req->u.remove.handle;
     s_op->u.remove.fs_id = s_op->req->u.remove.fs_id;
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 

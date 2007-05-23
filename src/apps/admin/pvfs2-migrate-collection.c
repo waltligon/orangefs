@@ -1251,28 +1251,28 @@ static int translate_keyval_key_0_0_1(TROVE_keyval_s * keyval, DBT * db_key)
     if(!strncmp(db_key->data, "root_handle", strlen("root_handle")))
     {
         keyval->buffer = ROOT_HANDLE_KEYSTR;
-        keyval->buffer_sz = strlen(ROOT_HANDLE_KEYSTR);
+        keyval->buffer_sz = ROOT_HANDLE_KEYLEN;
     }
     else if(!strncmp(db_key->data, "dir_ent", strlen("dir_ent")))
     {
         keyval->buffer = DIRECTORY_ENTRY_KEYSTR;
-        keyval->buffer_sz = strlen(DIRECTORY_ENTRY_KEYSTR);
+        keyval->buffer_sz = DIRECTORY_ENTRY_KEYLEN;
     }
     else if(!strncmp(db_key->data, 
                      "datafile_handles", strlen("datafile_handles")))
     {
         keyval->buffer = DATAFILE_HANDLES_KEYSTR;
-        keyval->buffer_sz = strlen(DATAFILE_HANDLES_KEYSTR);
+        keyval->buffer_sz = DATAFILE_HANDLES_KEYLEN;
     }
     else if(!strncmp(db_key->data, "metafile_dist", strlen("metafile_dist")))
     {
         keyval->buffer = METAFILE_DIST_KEYSTR;
-        keyval->buffer_sz = strlen(METAFILE_DIST_KEYSTR);
+        keyval->buffer_sz = METAFILE_DIST_KEYLEN;
     }
     else if(!strncmp(db_key->data, "symlink_target", strlen("symlink_target")))
     {
         keyval->buffer = SYMLINK_TARGET_KEYSTR;
-        keyval->buffer_sz = strlen(SYMLINK_TARGET_KEYSTR);
+        keyval->buffer_sz = SYMLINK_TARGET_KEYLEN;
     }
     else
     {
@@ -1385,11 +1385,12 @@ static int translate_keyval_db_0_0_1(
                 /* assume its a component name of a directory entry */
                 t_key.buffer = key.data;
                 t_key.buffer_sz = key.size;
+		t_val.buffer = data.data;
+		t_val.buffer_sz = data.size;
                 trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
                 trove_flags |= TROVE_NOOVERWRITE;
             }
-            
-            if(!strncmp(t_key.buffer, "md", 2)) /* metafile_dist */
+            else if(!strncmp(t_key.buffer, "md", 2)) /* metafile_dist */
             {
                 PINT_dist *newdist;
                 newdist = data.data;

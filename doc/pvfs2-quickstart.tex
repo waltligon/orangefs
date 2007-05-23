@@ -965,14 +965,27 @@ needed.
 
 \begin{verbatim}
 prompt% tar xzf ~/src/mpich2-1.4.0p1.tar.gz    # unpack mpich2 source
-prompt% cd mpich2-0.96p2/src/mpi/romio         # change to ROMIO dir
+prompt% cd mpich2-1.4.0p1/src/mpi/romio        # change to ROMIO dir
 prompt% patch -p1 < ~/src/romio-<CORRECT_VERSION>.diff   #apply patch
 prompt% cd ../../..                            # return to top of src
 prompt% 
 \end{verbatim}
 
-In order to build MPICH2 with a ROMIO that speaks PVFS2, a few changes
-have to be made to the normal configure process.  MPICH2 will need to
+In order to build MPICH2 with a ROMIO that speaks PVFS2, pass the
+\texttt{--with-pvfs2=PVFS\_PREFIX} option to configure.  'PVFS2\_PREFIX' is the
+prefix you gave to the PVFS configure script (e.g. /usr/local or
+/opt/packages/pvfs-2.6.0).  
+
+\begin{verbatim}
+configure --with-pvfs2=PVFS_PREFIX [other flags]
+\end{verbatim}
+
+Now compile and install MPICH2 as you normally would.  Applications accessing
+PVFS2 through MPI-IO will bypass the kernel interface and talk to PVFS2 servers
+directly.  
+
+Please note: older versions of MPICH2 need a few changes
+to the normal configure process.  MPICH2-1.0.4p1 and older will need to
 know the path to the PVFS2 installation.  Modify the {\tt CFLAGS},
 {\tt LDFLAGS} and {\tt LIBS} environment variables.
 
@@ -980,18 +993,7 @@ know the path to the PVFS2 installation.  Modify the {\tt CFLAGS},
 prompt% export CFLAGS="<other desired flags> -I/usr/local/pvfs2/include"
 prompt% export LDFLAGS="-L/usr/local/pvfs2/lib"
 prompt% export LIBS="-lpvfs2 -lpthread"
-prompt%
+prompt% configure --with-file-system=ufs+nfs+testfs+pvfs2 [other flags]
 \end{verbatim}
-
-The MPICH2 configure script needs a some additional arguments to build
-ROMIO correctly.  The {\tt enable-romio} flag builds ROMIO and  the
-{\tt with-file-system} flag tells ROMIO which file systems to support. 
-
-\begin{verbatim}
-configure --enable-romio --with-file-system=ufs+nfs+pvfs2 [other flags]
-\end{verbatim}
-
-Now compile and install MPICH2 as you normally would.  Applications accessing
-PVFS2 through MPI-IO will bypass the kernel interface and talk to PVFS2 servers directly.  
 
 \end{document}

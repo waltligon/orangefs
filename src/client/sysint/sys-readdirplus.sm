@@ -35,29 +35,22 @@ enum {
 
 extern job_context_id pint_client_sm_context;
 
-static int readdirplus_fetch_attrs_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int readdirplus_fetch_attrs_comp_fn(void *v_p,
     struct PVFS_server_resp *resp_p, int index);
-static int readdirplus_fetch_sizes_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 static int readdirplus_fetch_sizes_comp_fn(void *v_p,
    struct PVFS_server_resp *resp_p, int index);
-static int readdirplus_msg_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int readdirplus_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action readdirplus_msg_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action readdirplus_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
-machine pvfs2_client_readdirplus_sm(
-    init,
-    readdirplus_fetch_attrs_setup_msgpair,
-    readdirplus_fetch_attrs_xfer_msgpair,
-    readdirplus_fetch_sizes_setup_msgpair,
-    readdirplus_fetch_sizes_xfer_msgpair,
-    readdirplus_msg_failure,
-    cleanup)
+machine pvfs2_client_readdirplus_sm
 {
     state init
     {
@@ -130,6 +123,7 @@ PVFS_error PVFS_isys_readdirplus(
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
+    PINT_smcb *smcb = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_readdirplus entered\n");
 
@@ -148,12 +142,16 @@ PVFS_error PVFS_isys_readdirplus(
         return ret;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SYS_READDIRPLUS,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
@@ -181,7 +179,7 @@ PVFS_error PVFS_isys_readdirplus(
                  "%llu on fs %d\n", llu(ref.handle), ref.fs_id);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_READDIRPLUS, op_id, user_ptr);
+        smcb, op_id, user_ptr);
 }
 
 /** Read entries from a directory and their associated attributes
@@ -222,7 +220,7 @@ PVFS_error PVFS_sys_readdirplus(
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 
@@ -361,7 +359,8 @@ static int create_partition_handles(PVFS_fs_id fsid, int input_handle_count,
         }
         for (i = 0; i < input_handle_count; i++) 
         {
-            int svr_index, ret;
+            int svr_index = 0;
+            int ret;
             ret = PINT_cached_config_map_to_server(&tmp_svr_addr,
                 input_handle_array[i].handle, fsid);
             /* unique server address to find index */
@@ -467,10 +466,11 @@ static int list_of_meta_servers(PINT_client_sm *sm_p)
 }
 
 /* Setup phase 1 stuff */
-static int readdirplus_fetch_attrs_setup_msgpair(PINT_client_sm *sm_p,
+static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *smcb,
                                job_status_s *js_p)
 {
     int i, ret;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus state: fetch_attrs_setup\n");
     /* if there are no dirents then return NO_WORK */
@@ -478,7 +478,7 @@ static int readdirplus_fetch_attrs_setup_msgpair(PINT_client_sm *sm_p,
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus: no dirent to read; return\n");
         js_p->error_code = NO_WORK;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* From the readdirplus structure figure out which meta servers
@@ -488,13 +488,13 @@ static int readdirplus_fetch_attrs_setup_msgpair(PINT_client_sm *sm_p,
      {
          gossip_err("Could not locate list of attribute servers %d\n", ret);
          js_p->error_code = ret;
-         return 1;
+         return SM_ACTION_COMPLETE;
      }
      if (sm_p->u.readdirplus.svr_count == 0)
      {
          gossip_err("Number of meta servers to contact cannot be 0 %d\n", -PVFS_EINVAL);
          js_p->error_code = -PVFS_EINVAL;
-         return 1;
+         return SM_ACTION_COMPLETE;
      }
      sm_p->msgarray_count = sm_p->u.readdirplus.svr_count;
      sm_p->msgarray = (PINT_sm_msgpair_state *) 
@@ -504,7 +504,7 @@ static int readdirplus_fetch_attrs_setup_msgpair(PINT_client_sm *sm_p,
          sm_p->msgarray_count = 0;
          js_p->error_code = -PVFS_ENOMEM;
          gossip_err("Could not allocate memory %d\n", -PVFS_ENOMEM);
-         return 1;
+         return SM_ACTION_COMPLETE;
      }
      for (i = 0; i < sm_p->msgarray_count; i++) 
      {
@@ -526,7 +526,7 @@ static int readdirplus_fetch_attrs_setup_msgpair(PINT_client_sm *sm_p,
      }
      /* immediate return. next state jumps to msgpairarray machine */
      js_p->error_code = 0;
-     return 1;
+     return SM_ACTION_COMPLETE;
 }
 
 /* Phase 1 completion callback */
@@ -534,7 +534,8 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
                                struct PVFS_server_resp *resp_p,
                                int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_LISTATTR_DEBUG,
                  "readdirplus_fetch_attrs_comp_fn called\n");
@@ -687,10 +688,11 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
 }
 
 /* Setup phase 2 stuff */
-static int readdirplus_fetch_sizes_setup_msgpair(PINT_client_sm *sm_p,
-                               job_status_s *js_p)
+static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int i, ret;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
@@ -701,20 +703,20 @@ static int readdirplus_fetch_sizes_setup_msgpair(PINT_client_sm *sm_p,
     if (!(sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
         && !(sm_p->u.readdirplus.attrmask & PVFS_ATTR_DATA_SIZE)) {
         js_p->error_code = NO_WORK;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     
      /* ok, now we have all the data files. split it on a per-server basis */
      if ((ret = list_of_data_servers(sm_p)) < 0) 
      {
          js_p->error_code = ret;
-         return 1;
+         return SM_ACTION_COMPLETE;
      }
      if (sm_p->u.readdirplus.svr_count == 0)
      {
          /* no need to contact any server since there are no regular meta files */
          js_p->error_code = NO_WORK;
-         return 1;
+         return SM_ACTION_COMPLETE;
      }
      sm_p->msgarray_count = sm_p->u.readdirplus.svr_count;
      sm_p->msgarray = (PINT_sm_msgpair_state *) 
@@ -722,7 +724,7 @@ static int readdirplus_fetch_sizes_setup_msgpair(PINT_client_sm *sm_p,
      if (sm_p->msgarray == NULL)
      {
          js_p->error_code = -PVFS_ENOMEM;
-         return 1;
+         return SM_ACTION_COMPLETE;
      }
      for (i = 0; i < sm_p->msgarray_count; i++) 
      {
@@ -745,7 +747,7 @@ static int readdirplus_fetch_sizes_setup_msgpair(PINT_client_sm *sm_p,
      }
      /* immediate return. next state jumps to msgpairarray machine */
      js_p->error_code = 0;
-     return 1;
+     return SM_ACTION_COMPLETE;
 }
 
 /* Phase 2 completion callback */
@@ -753,7 +755,8 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
                                struct PVFS_server_resp *resp_p,
                                int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_LISTATTR_DEBUG,
                  "readdirplus_fetch_attrs_comp_fn called\n");
@@ -816,19 +819,20 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
     return 0;
 }
 
-static int readdirplus_msg_failure(PINT_client_sm *sm_p,
-                               job_status_s *js_p)
+static PINT_sm_action readdirplus_msg_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "readdirplus state: readdirplus_msg_failure\n");
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int readdirplus_cleanup(PINT_client_sm *sm_p,
-                           job_status_s *js_p)
+static PINT_sm_action readdirplus_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int i;
     PVFS_sysresp_readdirplus *readdirplus_resp;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus state: cleanup\n");
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
@@ -932,8 +936,8 @@ static int readdirplus_cleanup(PINT_client_sm *sm_p,
         free(sm_p->msgarray);
         sm_p->msgarray = NULL;
     }
-    sm_p->op_complete = 1;
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

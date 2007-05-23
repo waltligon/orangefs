@@ -29,6 +29,12 @@ enum PINT_dev_buffer_type
     PINT_DEV_EXT_ALLOC = 2
 };
 
+struct PINT_dev_params 
+{
+    uint32_t dev_buffer_count;
+    uint64_t dev_buffer_size;
+};
+
 int PINT_dev_initialize(
     const char* dev_name,
     int flags);
@@ -36,7 +42,7 @@ int PINT_dev_initialize(
 int PINT_dev_get_mapped_regions(
     int ndesc,
     struct PVFS_dev_map_desc *desc,
-    int *size);
+    struct PINT_dev_params *params);
 
 void PINT_dev_put_mapped_regions(
     int ndesc,

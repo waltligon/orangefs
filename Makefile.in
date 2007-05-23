@@ -11,7 +11,6 @@
 # publish        copy over documents to the PVFS.org web pags
 # admintools     builds admin tools
 # kernapps       builds userland helper programs for kernel driver 
-# statecomp      builds only the statecomp component
 # cscope         generates information for cscope utility
 # tags           generates tags file for use by editors
 # codecheck      checks source code for nonconformance to our std.
@@ -51,11 +50,12 @@
 # Generic makefile setup 
 
 # define a few generic variables that we need to use
+DESTDIR =
 srcdir = @srcdir@
-prefix = @prefix@
-datarootdir = @datarootdir@
-mandir = @mandir@
-exec_prefix = @exec_prefix@
+prefix = $(DESTDIR)@prefix@
+datarootdir = $(DESTDIR)@datarootdir@
+mandir = $(DESTDIR)@mandir@
+exec_prefix = $(DESTDIR)@exec_prefix@
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
@@ -64,6 +64,7 @@ INSTALL = @INSTALL@
 BISON = bison
 FLEX = flex
 BUILD_GM = @BUILD_GM@
+BUILD_MX = @BUILD_MX@
 BUILD_IB = @BUILD_IB@
 BUILD_OPENIB = @BUILD_OPENIB@
 BUILD_VIS = @BUILD_VIS@
@@ -106,7 +107,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean dist distclean docs docsclean publish cscope tags codecheck statecomp admintools kernapps
+.PHONY: all clean dist distclean docs docsclean publish cscope tags codecheck admintools kernapps
 
 ################################################################
 # Find project subdirectories
@@ -143,10 +144,10 @@ LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
 # make sure the srcdir include gets included first
-CFLAGS = -I$(srcdir)/include @CFLAGS@
-LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
+CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
+LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
-SERVER_LDFLAGS = -L @BUILD_ABSOLUTE_TOP@/lib
+SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 SERVER_LDFLAGS += @SERVER_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared
@@ -287,11 +288,27 @@ ifdef BUILD_GM
 	# TODO: later on we will want the ability to modify this at configure
 	# time
 	CFLAGS += -DENABLE_GM_BUFPOOL
-	LDFLAGS += -L @GM_HOME@/lib
-	SERVER_LDFLAGS += -L @GM_HOME@/lib
+	LDFLAGS += -L@GM_HOME@/lib
+	SERVER_LDFLAGS += -L@GM_HOME@/lib
 	LIBS += -lgm
 	LIBS_THREADED += -lgm
 	SERVERLIBS += -lgm
+endif
+
+################################################################
+# enable MX if configure detected it
+
+ifdef BUILD_MX
+	CFLAGS += -I @MX_HOME@/include
+	CFLAGS += -D__STATIC_METHOD_BMI_MX__
+	# TODO: later on we will want the ability to modify this at configure
+	# time
+	CFLAGS += -g -O0
+	LDFLAGS += -L@MX_HOME@/lib
+	SERVER_LDFLAGS += -L@MX_HOME@/lib
+	LIBS += -lmyriexpress -lpthread
+	LIBS_THREADED += -lmyriexpress -lpthread
+	SERVERLIBS += -lmyriexpress -lpthread
 endif
 
 #####################################
@@ -303,6 +320,7 @@ ifdef BUILD_IB
     IBLIBS := -L@IB_LIBDIR@ \
 	      -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
     LIBS += $(IBLIBS)
+    LIBS_THREADED += $(IBLIBS)
     SERVERLIBS += $(IBLIBS)
 endif
 
@@ -388,6 +406,7 @@ endif
 
 # LIBRARIES is a list of the pvfs2 client libraries
 LIBRARIES :=
+LIBRARIES_THREADED :=
 ifeq ($(build_shared),yes)
 LIBRARIES_SHARED = lib/libpvfs2.so
 LIBRARIES += $(LIBRARIES_SHARED)
@@ -479,11 +498,10 @@ VISMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISMISCSRC)))
 KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
 KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
 
-# state machine generation tool
-# cannot build statecomp objects with the cross compiler, as we 
-# build and run the tool on the build host at compile-time
-#STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
-#STATECOMPDEPS := $(patsubst %.c,%.d,$(STATECOMPSRC))
+# state machine generation tool, built for the build machine, not the
+# host machine, in the case of cross-compilation
+STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
+STATECOMPDEPS := $(patsubst %.c,%.d,$(STATECOMPSRC))
 
 # DOCSPDF, DOCSPS, and DOCSHTML are lists of documentation files generated 
 #   from latex
@@ -670,12 +688,16 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 $(KERNAPPS): %: %.o $(LIBRARIES)
+$(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 
-# target for building _just_ the statecomp tool
-#statecomp: $(STATECOMP)
-#$(STATECOMP): $(STATECOMPOBJS)
-#	$(Q) "  LD		$@"
-#	$(E)$(LD) -o $@ $(LDFLAGS) $(STATECOMPOBJS)
+# special rules to build state machine compiler using build host compiler
+$(STATECOMPOBJS): %.o: %.c
+	$(Q) "  BUILD_CC	$@"
+	$(E)$(BUILD_CC) $(CFLAGS) $< -c -o $@ $(call modcflags,$<)
+
+$(STATECOMP): $(STATECOMPOBJS)
+	$(Q) "  BUILD_LD	$@"
+	$(E)$(BUILD_LD) -o $@ $(LDFLAGS) $(STATECOMPOBJS) $(call modldflags,$<)
 
 # rule for generating cscope information
 cscope:
@@ -683,14 +705,20 @@ cscope:
 		 > $(srcdir)/cscope.files
 	( cd @SRC_ABSOLUTE_TOP@; cscope -be -i @SRC_ABSOLUTE_TOP@/cscope.files )
 
-# build editor tags file over all source files *.[ch] *.sm and
-# some known scripts
+# Build editor tags file over all source files *.[ch] *.sm and
+# some known scripts.  Grab the config files from the build dir.
+# If the build happens to be the source, ignore all sm->c generated
+# files with the help of uniq.
 tags:
-	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include . \
+	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include \
 	    $(srcdir)/src/kernel/linux-2.6 \
 	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
-	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig \
-	) | ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
+	  find . -name pvfs2-config.h ;\
+	  find . -name pvfs2-test-config.h ;\
+	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig ;\
+	  find . -name \*.sm | sed s/sm\$$/c/ ;\
+	) | sort | uniq -u | ctags -L- --excmd=pattern -B --extra=+f \
+	  --langmap=c:+.sm -I __hidden,DOTCONF_CB
 
 # rule for running code check
 codecheck:
@@ -711,8 +739,8 @@ docsclean:
 # top rule for cleaning up tree
 clean:: 
 	$(Q) "  CLEAN"
-	$(E)rm -f $(LIBOBJS) $(SERVEROBJS) $(MISCOBJS) \
-		$(LIBRARIES) $(DEPENDS) $(SERVER) \
+	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) $(SERVEROBJS) $(MISCOBJS) \
+		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(KERNAPPOBJS) $(KERNAPPS) \
@@ -769,7 +797,7 @@ endif
 # NOTE: we wrap this in ifneq's in order to prevent the
 #    dependencies from being generated for special targets that don't 
 #    require them
-ifeq (,$(filter statecomp clean distclean dist docs cscope tags nodep,$(MAKECMDGOALS)))
+ifeq (,$(filter clean distclean dist docs cscope tags nodep,$(MAKECMDGOALS)))
 -include $(DEPENDS)
 endif
 # add this as a make goal to disable rebuilding dependencies
@@ -794,10 +822,9 @@ nodep:; @:
 	$(srcdir)/maint/pvfs2htmlfixup.sh $(@D)/*/$(@F)
 
 # rule for automatically generated source files
-# NOTE: this rule is disabled in release snapshots
-%.c: %.sm src/common/statecomp/statecomp
+%.c: %.sm $(STATECOMP)
 	$(Q) "  SMC		$@"
-	$(E)src/common/statecomp/statecomp $< $@
+	$(E)$(STATECOMP) $< $@
 
 # if this is not a distribution tarball, then drop some example
 # config files in the server build directory with good defaults for
@@ -876,7 +903,7 @@ ifeq ($(NUM_UTS_LINES),1)
 else
     KERNEL_VERS := $(shell uname -r)
 endif
-KMOD_DIR ?= $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
+KMOD_DIR ?= $(DESTDIR)/${kmod_prefix}/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
 
 .PHONY: just_kmod_install
 just_kmod_install: just_kmod
@@ -897,7 +924,7 @@ ifeq ($(NUM_UTS_LINES),1)
 else
     KERNEL_VERS := $(shell uname -r)
 endif
-KMOD_DIR := $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
+KMOD_DIR := $(DESTDIR)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
 
 .PHONY: just_kmod24_install
 just_kmod24_install: just_kmod24

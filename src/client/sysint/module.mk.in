@@ -8,6 +8,7 @@ CSRC := \
 	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
+	$(DIR)/mgmt-get-config.c \
 	$(DIR)/mgmt-misc.c \
 	$(DIR)/sys-dist.c \
 	$(DIR)/error-details.c
@@ -36,6 +37,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/sys-statfs.c \
 	$(DIR)/client-job-timer.c \
 	$(DIR)/perf-count-timer.c \
+	$(DIR)/pint-sysdev-unexp.c \
 	$(DIR)/server-get-config.c \
 	$(DIR)/fs-add.c \
 	$(DIR)/mgmt-noop.c \

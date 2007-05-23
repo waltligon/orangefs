@@ -158,76 +158,86 @@ static struct dentry *pvfs2_lookup(
                 llu(new_op->downcall.resp.lookup.refn.handle),
                 new_op->downcall.resp.lookup.refn.fs_id, ret);
 
-    /* lookup inode matching name (or add if not there) */
-    if (ret > -1)
+    if(ret < 0)
     {
-	inode = pvfs2_iget(sb, &new_op->downcall.resp.lookup.refn);
-	if (inode && !is_bad_inode(inode))
-	{
-            struct dentry *res;
-
-	    /* update dentry/inode pair into dcache */
-	    dentry->d_op = &pvfs2_dentry_operations;
-
-            res = pvfs2_d_splice_alias(dentry, inode);
-
-            gossip_debug(GOSSIP_NAME_DEBUG, "Lookup success (inode ct = %d)\n",
-                        (int)atomic_read(&inode->i_count));
-            op_release(new_op);
-            if (res) 
-                res->d_op = &pvfs2_dentry_operations;
-            return res;
-	}
-        else if (inode && is_bad_inode(inode))
+        if(ret == -ENOENT)
         {
-            ret = -EACCES;
-	    found_pvfs2_inode = PVFS2_I(inode);
-            /* look for an error code, possibly set by pvfs2_read_inode(),
-             * otherwise we have to guess EACCES 
+            /*
+             * if no inode was found, add a negative dentry to dcache anyway;
+             * if we don't, we don't hold expected lookup semantics and we most
+             * noticeably break during directory renames.
+             *
+             * however, if the operation failed or exited, do not add the
+             * dentry (e.g. in the case that a touch is issued on a file that
+             * already exists that was interrupted during this lookup -- no
+             * need to add another negative dentry for an existing file)
              */
-            if(found_pvfs2_inode->error_code)
-            {
-                ret = found_pvfs2_inode->error_code;
-            }
-            iput(inode);
+
+            gossip_debug(GOSSIP_NAME_DEBUG, 
+                         "pvfs2_lookup: Adding *negative* dentry %p\n for %s\n",
+                         dentry, dentry->d_name.name);
+
+            /*
+             * make sure to set the pvfs2 specific dentry operations for
+             * the negative dentry that we're adding now so that a
+             * potential future lookup of this cached negative dentry can
+             * be properly revalidated.
+             */
+            dentry->d_op = &pvfs2_dentry_operations;
+            d_add(dentry, inode);
+
             op_release(new_op);
-            return ERR_PTR(ret);
+            return NULL;
         }
-	else
-	{
-            op_release(new_op);
-            gossip_debug(GOSSIP_NAME_DEBUG, "Returning -EACCES\n");
-            return ERR_PTR(-EACCES);
-	}
+
+        /* must be a non-recoverable error */
+        return ERR_PTR(ret);
     }
 
-    /*
-      if no inode was found, add a negative dentry to dcache anyway;
-      if we don't, we don't hold expected lookup semantics and we most
-      noticeably break during directory renames.
-
-      however, if the operation failed or exited, do not add the
-      dentry (e.g. in the case that a touch is issued on a file that
-      already exists that was interrupted during this lookup -- no
-      need to add another negative dentry for an existing file)
-    */
-    if (!inode && op_state_serviced(new_op))
+    inode = pvfs2_iget(sb, &new_op->downcall.resp.lookup.refn);
+    if (inode && !is_bad_inode(inode))
     {
-        /*
-          make sure to set the pvfs2 specific dentry operations for
-          the negative dentry that we're adding now so that a
-          potential future lookup of this cached negative dentry can
-          be properly revalidated.
-        */
-        gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup: Adding *negative* dentry %p\n  "
-                    "for %s\n", dentry, dentry->d_name.name);
+        struct dentry *res;
 
+        /* update dentry/inode pair into dcache */
         dentry->d_op = &pvfs2_dentry_operations;
-        d_add(dentry, inode);
+
+        res = pvfs2_d_splice_alias(dentry, inode);
+
+        gossip_debug(GOSSIP_NAME_DEBUG, "Lookup success (inode ct = %d)\n",
+                     (int)atomic_read(&inode->i_count));
+        if (res)
+            res->d_op = &pvfs2_dentry_operations;
+
+        op_release(new_op);
+#ifdef PVFS2_LINUX_KERNEL_2_4
+        return NULL;
+#else
+        return res;
+#endif
+    }
+    else if (inode && is_bad_inode(inode))
+    {
+        ret = -EACCES;
+        found_pvfs2_inode = PVFS2_I(inode);
+        /* look for an error code, possibly set by pvfs2_read_inode(),
+         * otherwise we have to guess EACCES 
+         */
+        if(found_pvfs2_inode->error_code)
+        {
+            ret = found_pvfs2_inode->error_code;
+        }
+        iput(inode);
+        op_release(new_op);
+        return ERR_PTR(ret);
     }
 
+    /* no error was returned from service_operation, but the inode
+     * from pvfs2_iget was null...just return EACCESS
+     */
     op_release(new_op);
-    return NULL;
+    gossip_debug(GOSSIP_NAME_DEBUG, "Returning -EACCES\n");
+    return ERR_PTR(-EACCES);
 }
 
 /* return 0 on success; non-zero otherwise */

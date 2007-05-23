@@ -5,6 +5,7 @@
  */
 
 #include "pvfs2-kernel.h"
+#include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
 /* list for storing pvfs2 specific superblocks in use */
@@ -250,13 +251,18 @@ static void pvfs2_read_inode(
     struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = NULL;
+    void *ptr = NULL;
 
+#if !defined(HAVE_IGET4_LOCKED) && !defined(HAVE_IGET_LOCKED)
     if (inode->u.generic_ip)
     {
         gossip_err("ERROR! Found an initialized inode in pvfs2_read_inode! "
                     "Should not have been initialized?\n");
         return;
     }
+#else
+    ptr = inode->u.generic_ip;
+#endif
 
     /* Here we allocate the PVFS2 specific inode structure */
     pvfs2_inode = pvfs2_inode_alloc();
@@ -266,7 +272,15 @@ static void pvfs2_read_inode(
         inode->u.generic_ip = pvfs2_inode;
         pvfs2_inode->vfs_inode = inode;
         inode->i_flags &= ~(S_APPEND|S_IMMUTABLE|S_NOATIME);
-
+        /* Initialize the handle id to be looked up in the case of iget4_locked
+         * and iget_locked functions, since they are not done elsewhere 
+         */
+#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET_LOCKED)
+        if (ptr == NULL) {
+            gossip_err("Warning! We don't have the reference to the pvfs2 object handle.. using iget4/iget(locked) interface\n");
+        }
+        pvfs2_set_inode(inode, ptr);
+#endif
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
             pvfs2_make_bad_inode(inode);
@@ -421,15 +435,16 @@ static int pvfs2_statfs(
     if (new_op->downcall.status > -1)
     {
         gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_statfs: got %ld blocks available | "
-                    "%ld blocks total\n",
+                    "%ld blocks total | %ld block size\n",
                     (long) new_op->downcall.resp.statfs.blocks_avail,
-                    (long) new_op->downcall.resp.statfs.blocks_total);
+                    (long) new_op->downcall.resp.statfs.blocks_total,
+                    (long) new_op->downcall.resp.statfs.block_size);
 
         buf->f_type = sb->s_magic;
         /* stash the fsid as well */
         memcpy(&buf->f_fsid, &(PVFS2_SB(sb)->fs_id), 
                 sizeof(PVFS2_SB(sb)->fs_id));      
-        buf->f_bsize = sb->s_blocksize;
+        buf->f_bsize = new_op->downcall.resp.statfs.block_size;
         buf->f_namelen = PVFS2_NAME_LEN;
 
         buf->f_blocks = (sector_t)
@@ -936,8 +951,8 @@ struct super_block* pvfs2_get_sb(
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
 
-    sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
-    sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
+    sb->s_blocksize = pvfs_bufmap_size_query();
+    sb->s_blocksize_bits = pvfs_bufmap_shift_query();
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;
@@ -1057,8 +1072,8 @@ int pvfs2_fill_sb(
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
 
-    sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
-    sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
+    sb->s_blocksize = pvfs_bufmap_size_query();
+    sb->s_blocksize_bits = pvfs_bufmap_shift_query();
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;

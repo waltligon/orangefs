@@ -60,7 +60,7 @@ static enum gossip_logstamp internal_logstamp = GOSSIP_LOGSTAMP_DEFAULT;
 static int gossip_disable_stderr(void);
 static int gossip_disable_file(void);
 
-static int gossip_debug_fp(FILE *fp, char prefix, const char *format, va_list ap, enum
+static int gossip_debug_fp_va(FILE *fp, char prefix, const char *format, va_list ap, enum
 gossip_logstamp ts);
 static int gossip_debug_syslog(
     char prefix,
@@ -276,7 +276,7 @@ int __gossip_debug(
 
     /* rip out the variable arguments */
     va_start(ap, format);
-    __gossip_debug_va(mask, prefix, format, ap);
+    ret = __gossip_debug_va(mask, prefix, format, ap);
     va_end(ap);
 
     return ret;
@@ -311,10 +311,10 @@ int __gossip_debug_va(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-        ret = gossip_debug_fp(stderr, prefix, format, ap, internal_logstamp);
+        ret = gossip_debug_fp_va(stderr, prefix, format, ap, internal_logstamp);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(
+        ret = gossip_debug_fp_va(
             internal_log_file, prefix, format, ap, internal_logstamp);
         break;
     case GOSSIP_SYSLOG:
@@ -351,10 +351,10 @@ int gossip_err(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-        ret = gossip_debug_fp(stderr, 'E', format, ap, internal_logstamp);
+        ret = gossip_debug_fp_va(stderr, 'E', format, ap, internal_logstamp);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(internal_log_file, 'E', format, ap, internal_logstamp);
+        ret = gossip_debug_fp_va(internal_log_file, 'E', format, ap, internal_logstamp);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_err_syslog(format, ap);
@@ -427,14 +427,27 @@ static int gossip_debug_syslog(
     return 0;
 }
 
-/* gossip_debug_fp()
+int gossip_debug_fp(FILE *fp, char prefix, 
+                    enum gossip_logstamp ts, const char *format, ...)
+{
+    int ret;
+    va_list ap;
+
+    /* rip out the variable arguments */
+    va_start(ap, format);
+    ret = gossip_debug_fp_va(fp, prefix, format, ap, ts);
+    va_end(ap);
+    return ret;
+}
+
+/* gossip_debug_fp_va()
  * 
  * This is the standard debugging message function for the file logging
  * facility or to stderr.
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_debug_fp(FILE *fp, char prefix, 
+static int gossip_debug_fp_va(FILE *fp, char prefix,
     const char *format, va_list ap, enum gossip_logstamp ts)
 {
     char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
@@ -468,7 +481,7 @@ static int gossip_debug_fp(FILE *fp, char prefix,
             gettimeofday(&tv, 0);
             tp = tv.tv_sec;
             strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
-            sprintf(bptr+8, ".%06ld (%09lu)] ", (long)tv.tv_usec, 
+            sprintf(bptr+8, ".%06ld (%ld)] ", (long)tv.tv_usec, 
                     gen_thread_self());
             bptr += 30;
             bsize -= 30;

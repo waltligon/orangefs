@@ -61,14 +61,11 @@ enum
     LOOKUP_NCACHE_MISS = 1
 };
 
-static int lookup_ncache_lookup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lookup_ncache_lookup(struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
-nested machine pvfs2_client_lookup_ncache_sm(
-    lookup,
-    xfer_msgpair)
+nested machine pvfs2_client_lookup_ncache_sm
 {
     state lookup
     {
@@ -86,9 +83,10 @@ nested machine pvfs2_client_lookup_ncache_sm(
 
 %%
 
-static int lookup_ncache_lookup(PINT_client_sm *sm_p,
+static int lookup_ncache_lookup(struct PINT_smcb *smcb,
 				job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_object_ref parent_ref, object_ref;
     char segment[PVFS_NAME_MAX + 1] = {0};
@@ -144,7 +142,7 @@ static int lookup_ncache_lookup(PINT_client_sm *sm_p,
             llu(object_ref.handle), object_ref.fs_id);
 
         sm_p->ncache_hit = 1;
-	ret = sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
+	ret = sm_p->msgpair.comp_fn(smcb, &fake_resp, 0);
 	return 1;
     }
 

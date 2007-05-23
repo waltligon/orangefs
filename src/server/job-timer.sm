@@ -15,12 +15,14 @@
 #include "job-time-mgr.h"
 #include "server-config.h"
 
-static int job_timer_do_work(PINT_server_op *s_op, job_status_s* js_p);
-static int job_timer_error(PINT_server_op *s_op, job_status_s* js_p);
+static PINT_sm_action job_timer_do_work(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action job_timer_error(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 %%
 
-machine pvfs2_job_timer_sm(do_work, error)
+machine pvfs2_job_timer_sm
 {
 	state do_work 
 	{
@@ -43,11 +45,12 @@ machine pvfs2_job_timer_sm(do_work, error)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int job_timer_error(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action job_timer_error(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
     gossip_err("Error: stopping server job timer.\n");
 
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /* job_timer_do_work()
@@ -55,7 +58,8 @@ static int job_timer_error(PINT_server_op *s_op, job_status_s* js_p)
  * resets counters, updates metrices, etc- this is intended to be called
  * repeatedly on a regular interval
  */
-static int job_timer_do_work(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action job_timer_do_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret = -1;
     job_id_t tmp_id;
@@ -69,16 +73,16 @@ static int job_timer_do_work(PINT_server_op *s_op, job_status_s* js_p)
     if(ret < 0)
     {
 	js_p->error_code = ret;
-	return(1);
+	return SM_ACTION_COMPLETE;
     }
 	
     /* post another timer */
     return(job_req_sched_post_timer(1000,
-	s_op,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context));
+	    smcb,
+	    0,
+	    js_p,
+	    &tmp_id,
+	    server_job_context));
 }
 
 

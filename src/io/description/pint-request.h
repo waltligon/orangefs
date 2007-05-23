@@ -108,9 +108,11 @@ typedef struct PINT_request_file_data_s {
     PVFS_boolean extend_flag;   /* if zero, file will not be extended */
 } PINT_request_file_data;
 
-struct PINT_Request_state *PINT_new_request_state (PINT_Request *request);
-
-void PINT_free_request_state (PINT_Request_state *req);
+struct PINT_Request_state *PINT_new_request_state(PINT_Request *request);
+void PINT_free_request_state(PINT_Request_state *req);
+struct PINT_Request_state *PINT_new_request_states(PINT_Request *request,
+                                                   int n);
+void PINT_free_request_states(PINT_Request_state *reqs);
 
 /* generate offset length pairs from request and dist */
 int PINT_process_request(PINT_Request_state *req,

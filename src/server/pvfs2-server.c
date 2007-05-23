@@ -31,7 +31,7 @@
 #include "pvfs2-storage.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-server.h"
-#include "state-machine-fns.h"
+#include "state-machine.h"
 #include "mkspace.h"
 #include "server-config.h"
 #include "quicklist.h"
@@ -93,9 +93,11 @@ static int signal_recvd_flag = 0;
 static pid_t server_controlling_pid = 0;
 
 /* A list of all serv_op's posted for unexpected message alone */
-static QLIST_HEAD(posted_sop_list);
+QLIST_HEAD(posted_sop_list);
 /* A list of all serv_op's posted for expected messages alone */
-static QLIST_HEAD(inprogress_sop_list);
+QLIST_HEAD(inprogress_sop_list);
+/* A list of all serv_op's that are started automatically without requests */
+static QLIST_HEAD(noreq_sop_list);
 
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
@@ -124,16 +126,6 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN}
 };
 
-/* extended attribute name spaces supported in PVFS2 */
-const char *PINT_eattr_namespaces[] =
-{
-    "system.",
-    "user.",
-    "trusted.",
-    "security.",
-    NULL
-};
-
 /* These three are used continuously in our wait loop.  They could be
  * relatively large, so rather than allocate them on the stack, we'll
  * make them dynamically allocated globals.
@@ -155,10 +147,7 @@ static int server_shutdown(
     PINT_server_status_flag status,
     int ret, int sig);
 static void server_sig_handler(int sig);
-static int server_post_unexpected_recv(job_status_s * js_p);
 static int server_parse_cmd_line_args(int argc, char **argv);
-static int server_state_machine_start(
-    PINT_server_op *s_op, job_status_s *js_p);
 #ifdef __PVFS2_SEGV_BACKTRACE__
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 #endif
@@ -427,7 +416,7 @@ int main(int argc, char **argv)
 {
     int ret = -1, siglevel = 0;
     char *fs_conf = NULL, *server_conf = NULL;
-    PINT_server_op *tmp_op = NULL;
+    struct PINT_smcb *tmp_op = NULL;
     uint64_t debug_mask = 0;
 
 #ifdef WITH_MTRACE
@@ -458,8 +447,8 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
+    gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
+                    "PVFS2 Server version %s starting...\n", PVFS2_VERSION);
 
     fs_conf = ((argc >= optind) ? argv[optind] : NULL);
     
@@ -602,6 +591,9 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
+    gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
+                    "PVFS2 Server ready.\n");
+
     /* Initialization complete; process server requests indefinitely. */
     for ( ;; )  
     {
@@ -644,76 +636,24 @@ int main(int argc, char **argv)
         */
         for (i = 0; i < comp_ct; i++)
         {
-            int unexpected_msg = 0;
-            PINT_server_op *s_op = server_completed_job_p_array[i];
+            /* int unexpected_msg = 0; */
+            struct PINT_smcb *smcb = server_completed_job_p_array[i];
 
-            /* Completed jobs might be ongoing, or might be new
-             * (unexpected) ones.  We handle the first step of either
-             * type here.
-             */
-            if (s_op->op == BMI_UNEXPECTED_OP)
-            {
-                unexpected_msg = 1;
-                memset(&server_job_status_array[i], 0,
-                       sizeof(job_status_s));
-                ret = server_state_machine_start(
-                    s_op, &server_job_status_array[i]);
-                if (ret < 0)
-                {
-                    PVFS_perror_gossip("Error: server_state_machine_start", ret);
-                    /* TODO: tell BMI to drop this address? */
-                    /* set return code to zero to allow server to continue
-                     * processing 
-                     */
-                    ret = 0;
-                }
-            }
-            else
-            {
-                /* NOTE: PINT_state_machine_next() is a function that
-                 * is shared with the client-side state machine
-                 * processing, so it is defined in the src/common
-                 * directory.
-                 */
-                ret = PINT_state_machine_next(
-                    s_op, &server_job_status_array[i]);
-            }
+               /* NOTE: PINT_state_machine_next() is a function that
+                * is shared with the client-side state machine
+                * processing, so it is defined in the src/common
+                * directory.
+                */
+            ret = PINT_state_machine_continue(
+                    smcb, &server_job_status_array[i]);
 
-            /* Either of the above might have completed immediately
-             * (ret == 1).  While the job continues to complete
-             * immediately, we continue to service it.
-             */
-            while (ret == 1)
-            {
-                ret = PINT_state_machine_next(
-                    s_op, &server_job_status_array[i]);
-            }
-
-            if (ret < 0)
+            if (SM_ACTION_ISERR(ret)) /* ret < 0 */
             {
                 PVFS_perror_gossip("Error: state machine processing error", ret);
                 ret = 0;
             }
 
-            if (unexpected_msg)
-            {
-                /* If this was a new (unexpected) job, we need to post
-                 * a replacement unexpected job so that we can
-                 * continue to receive incoming requests.
-                 */
-                ret = server_post_unexpected_recv(
-                    &server_job_status_array[i]);
-                if (ret < 0)
-                {
-                    /* TODO: do something here, the return value was
-                     * not being checked for failure before.  I just
-                     * put something here to make it exit for the
-                     * moment.  -Phil
-                     */
-                    gossip_lerr("Error: post unexpected failure not handled.\n");
-                    goto server_shutdown;
-                }
-            }
+            /* else ret == SM_ACTION_DEFERED */
         }
     }
 
@@ -790,10 +730,9 @@ static int server_initialize(
         ret = gossip_enable_file(server_config.logfile, "a");
         if (ret < 0)
         {
-            int tmp_errno = errno;
             gossip_lerr("error opening log file %s\n",
                         server_config.logfile);
-            return -tmp_errno;
+            return ret;
         }
         /* log starting message again so it appears in log file, not just
          * console
@@ -1743,19 +1682,30 @@ static int server_parse_cmd_line_args(int argc, char **argv)
  *
  * Returns 0 on success, -PVFS_error on failure.
  */
-static int server_post_unexpected_recv(job_status_s *js_p)
+int server_post_unexpected_recv(job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    job_id_t j_id;
-    PINT_server_op *s_op = NULL;
+    /* job_id_t j_id; */
+    struct PINT_smcb *smcb = NULL;
+    struct PINT_server_op *s_op;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_post_unexpected_recv\n");
 
     if (js_p)
     {
-        s_op = (PINT_server_op *) malloc(sizeof(PINT_server_op));
-        if (s_op == NULL)
+        ret = PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP,
+                sizeof(struct PINT_server_op),
+                server_op_state_get_machine,
+                server_state_machine_terminate,
+                server_job_context);
+        if (ret < 0)
         {
-            return -PVFS_ENOMEM;
+            gossip_lerr("Error: failed to allocate SMCB "
+                        "of op type %x\n", BMI_UNEXPECTED_OP);
+            return ret;
         }
+        s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         memset(s_op, 0, sizeof(PINT_server_op));
         s_op->op = BMI_UNEXPECTED_OP;
         s_op->target_handle = PVFS_HANDLE_NULL;
@@ -1763,6 +1713,9 @@ static int server_post_unexpected_recv(job_status_s *js_p)
         /* Add an unexpected s_ops to the list */
         qlist_add_tail(&s_op->next, &posted_sop_list);
 
+#if 1
+        ret = PINT_state_machine_start(smcb, js_p);
+#else
         /*
           TODO: Consider the optimization of enabling immediate
           completion in this part of the code (see the mailing list
@@ -1771,15 +1724,16 @@ static int server_post_unexpected_recv(job_status_s *js_p)
           note: unexp_bmi_buff is really a struct that describes an
           unexpected message (it is an output parameter).
         */
-        ret = job_bmi_unexp(&s_op->unexp_bmi_buff, s_op, 0,
+        ret = job_bmi_unexp(&s_op->unexp_bmi_buff, smcb, 0,
                             js_p, &j_id, JOB_NO_IMMED_COMPLETE,
                             server_job_context);
         if (ret < 0)
         {
             PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
-            free(s_op);
-            s_op = NULL;
+            PINT_smcb_free(&smcb);
         }
+#endif
+
     }
     return ret;
 }
@@ -1804,10 +1758,13 @@ static int server_purge_unexpected_recv_machines(void)
         PINT_server_op *s_op = qlist_entry(tmp, PINT_server_op, next);
 
         /* Remove s_op from the posted_sop_list */
-        qlist_del(&s_op->next);
+        /* don't see a reason to remove this */
+        /* will be removed in state machine */
+        /* if and when message completes after cancellation */
+        /* qlist_del(&s_op->next); */
 
-        /* free the operation structure itself */
-        free(s_op);
+        /* mark the message for cancellation */
+        s_op->op_cancelled = 1;
     }
     return 0;
 }
@@ -1819,12 +1776,16 @@ static int server_purge_unexpected_recv_machines(void)
  *
  * returns 0 on success, -PVFS_errno on failure
  */
-static int server_state_machine_start(
-    PINT_server_op *s_op,
+int server_state_machine_start(
+    PINT_smcb *smcb,
     job_status_s *js_p)
 {
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_id_gen_t tmp_id;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_start %p\n",smcb);
 
     ret = PINT_decode(s_op->unexp_bmi_buff.buffer,
                       PINT_DECODE_REQ,
@@ -1836,18 +1797,18 @@ static int server_state_machine_start(
      * If *someone* decides to do in-place decoding, then we will have to move
      * this back to state_machine_complete().
      */
-    s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     if (ret == -PVFS_EPROTONOSUPPORT)
     {
         /* we have a protocol mismatch of some sort; try to trigger a
          * response that gives a helpful error on client side even
          * though we can't interpret what the client was asking for
          */
-        s_op->op = PVFS_SERV_PROTO_ERROR;
+        ret = PINT_smcb_set_op(smcb, PVFS_SERV_PROTO_ERROR);
     }
     else if (ret == 0)
     {
-        s_op->op = s_op->req->op;
+        s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
+        ret = PINT_smcb_set_op(smcb, s_op->req->op);
     }
     else
     {
@@ -1860,14 +1821,18 @@ static int server_state_machine_start(
 
     /* set timestamp on the beginning of this state machine */
     id_gen_fast_register(&tmp_id, s_op);
-    PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
-                         0, tmp_id, PVFS_EVENT_FLAG_START);
+
+    if(s_op->req)
+    {
+        PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
+                             0, tmp_id, PVFS_EVENT_FLAG_START);
+        s_op->resp.op = s_op->req->op;
+    }
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
     s_op->tag  = s_op->unexp_bmi_buff.tag;
-    s_op->current_state = PINT_state_machine_locate(s_op);
 
-    if (!s_op->current_state)
+    if (!ret)
     {
         gossip_err("Error: server does not implement request type: %d\n",
                    (int)s_op->req->op);
@@ -1875,8 +1840,7 @@ static int server_state_machine_start(
         return -PVFS_ENOSYS;
     }
 
-    s_op->resp.op = s_op->op;
-    return PINT_state_machine_invoke(s_op,js_p);
+    return PINT_state_machine_invoke(smcb, js_p);
 }
 
 /* server_state_machine_alloc_noreq()
@@ -1888,34 +1852,36 @@ static int server_state_machine_start(
  */
 int server_state_machine_alloc_noreq(
     enum PVFS_server_op op,
-    PINT_server_op **new_op)
+    struct PINT_smcb **new_op)
 {
     int ret = -PVFS_EINVAL;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_alloc_noreq %d\n",op);
+
     if (new_op)
     {
-        *new_op = (PINT_server_op*)malloc(sizeof(PINT_server_op));
-        if (!(*new_op))
+        PINT_server_op *tmp_op;
+        ret = PINT_smcb_alloc(new_op, op, 
+                sizeof(struct PINT_server_op),
+                server_op_state_get_machine,
+                server_state_machine_terminate,
+                server_job_context);
+        if (ret < 0)
         {
-            return -PVFS_ENOMEM;
-        }
-        memset(*new_op, 0, sizeof(PINT_server_op));
-        (*new_op)->op = op;
-        (*new_op)->target_handle = PVFS_HANDLE_NULL;
-        (*new_op)->target_fs_id = PVFS_FS_ID_NULL;
-
-        /* NOTE: We do not add these state machines to the in-progress or posted sop lists */
-
-        /* find the state machine for this op type */
-        (*new_op)->current_state = PINT_state_machine_locate(*new_op);
-
-        if (!((*new_op)->current_state))
-        {
-            gossip_lerr("Error: failed to start state machine "
+            gossip_lerr("Error: failed to allocate SMCB "
                         "of op type %x\n", op);
-            free(*new_op);
-            return -PVFS_ENOSYS;
+            return ret;
         }
+        tmp_op = PINT_sm_frame(*new_op, PINT_FRAME_CURRENT);
+        tmp_op->op = op;
+        tmp_op->target_handle = PVFS_HANDLE_NULL;
+        tmp_op->target_fs_id = PVFS_FS_ID_NULL;
+
+        /* NOTE: We do not add these state machines to the 
+         * in-progress or posted sop lists 
+         */
+
         ret = 0;
     }
     return ret;
@@ -1932,33 +1898,28 @@ int server_state_machine_alloc_noreq(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int server_state_machine_start_noreq(PINT_server_op *new_op)
+int server_state_machine_start_noreq(struct PINT_smcb *smcb)
 {
+    struct PINT_server_op *new_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_status_s tmp_status;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_start_noreq %p\n",smcb);
 
     tmp_status.error_code = 0;
 
     if (new_op)
     {
+        /* add to list of state machines started without a request */
+        qlist_add_tail(&new_op->next, &noreq_sop_list);
+
         /* execute first state */
-        ret = PINT_state_machine_invoke(new_op, &tmp_status);
+        ret = PINT_state_machine_start(smcb, &tmp_status);
         if (ret < 0)
         {
             gossip_lerr("Error: failed to start state machine.\n");
             return ret;
-        }
-
-        /* continue as long as states are immediately completing */
-        while(ret == 1)
-        {
-            ret = PINT_state_machine_next(new_op, &tmp_status);
-        }
-
-        if (ret < 0)
-        {
-            gossip_lerr("Error: unhandled state machine processing "
-                        "error (most likely an unhandled job error).\n");
         }
     }
     return ret;
@@ -1973,9 +1934,13 @@ int server_state_machine_start_noreq(PINT_server_op *new_op)
  *
  * returns 0
  */
-int server_state_machine_complete(PINT_server_op *s_op)
+int server_state_machine_complete(PINT_smcb *smcb)
 {
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_complete %p\n",smcb);
     
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
@@ -1995,10 +1960,17 @@ int server_state_machine_complete(PINT_server_op *s_op)
    /* Remove s_op from the inprogress_sop_list */
     qlist_del(&s_op->next);
 
-    /* free the operation structure itself */
-    free(s_op);
+    return SM_ACTION_TERMINATE;
+}
 
-    return 0;
+int server_state_machine_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* free the operation structure itself */
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_terminate %p\n",smcb);
+    PINT_smcb_free(&smcb); 
+    return SM_ACTION_TERMINATE;
 }
 
 struct server_configuration_s *get_server_config_struct(void)
@@ -2037,6 +2009,36 @@ static int parse_port_from_host_id(char* host_id)
     return(port_num);
 }
 
+/* server_op_get_machine()
+ * 
+ * looks up the state machine for the op * given and returns it, or
+ * NULL of the op is out of range.
+ * pointer to this function set in the control block of server state
+ * machines.
+ */
+struct PINT_state_machine_s *server_op_state_get_machine(int op)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "server_op_state_get_machine %d\n",op);
+
+    switch (op)
+    {
+    case BMI_UNEXPECTED_OP :
+        {
+            return &pvfs2_unexpected_sm;
+            break;
+        }
+    default :
+        {
+            if (op >= 0 && op < PVFS_SERV_NUM_OPS)
+                return PINT_server_req_table[op].sm;
+            else
+                return NULL;
+            break;
+        }
+    }
+}
+
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
 {
     struct filesystem_configuration_s * fs_conf;
@@ -2049,6 +2051,7 @@ static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
     return fs_conf->trove_method;
 }
 
+#ifndef GOSSIP_DISABLE_DEBUG
 void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
@@ -2086,6 +2089,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
         va_end(ap);
     }
 }
+#endif
 
 /*
  * PINT_map_server_op_to_string()

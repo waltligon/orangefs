@@ -277,7 +277,7 @@ int PINT_get_path_element(
 {
     int count = -1;
     char *segp = (char *)0;
-    void *segstate;
+    void *segstate = NULL;
     char local_pathname[PVFS_NAME_MAX] = {0};
 
     strncpy(local_pathname,pathname,PVFS_NAME_MAX);
@@ -365,11 +365,30 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
 	holder++;
     }
 
+    /* if we don't find any commas, just set the entire string to the first
+     *  token and return
+     */
+    if(0 == tokencount)
+    {
+	tokencount = 1;
+    }
+
     /* allocate pointers for each */
     *tokens = (char **) malloc(sizeof(char *) * tokencount);
     if (!(*tokens))
     {
 	return 0;
+    }
+
+    if(1 == tokencount)
+    {
+	(*tokens)[0] = strdup(comma_list);
+	if(!(*tokens)[0])
+	{
+	    tokencount = 0;
+	    goto failure;
+	}
+	return tokencount;
     }
 
     /* copy out all of the tokenized strings */

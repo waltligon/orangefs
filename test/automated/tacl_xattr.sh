@@ -90,16 +90,16 @@ fi
 cd $DIR/tacl
 CUR_PATH=`pwd`
 
-/usr/sbin/adduser -d $CUR_PATH/tacluser1 tacluser1
+/usr/sbin/useradd -d $CUR_PATH/tacluser1 tacluser1
 mkdir -p $CUR_PATH/tacluser1
 chown tacluser1 $CUR_PATH/tacluser1
-/usr/sbin/adduser -d $CUR_PATH/tacluser2 tacluser2
+/usr/sbin/useradd -d $CUR_PATH/tacluser2 tacluser2
 mkdir -p $CUR_PATH/tacluser2
 chown tacluser2 $CUR_PATH/tacluser2
-/usr/sbin/adduser -d $CUR_PATH/tacluser3 tacluser3
+/usr/sbin/useradd -d $CUR_PATH/tacluser3 tacluser3
 mkdir -p $CUR_PATH/tacluser3
 chown tacluser3 $CUR_PATH/tacluser3
-/usr/sbin/adduser -d $CUR_PATH/tacluser4 tacluser4
+/usr/sbin/useradd -d $CUR_PATH/tacluser4 tacluser4
 mkdir -p $CUR_PATH/tacluser4
 chown tacluser4 $CUR_PATH/tacluser4
 
@@ -287,7 +287,6 @@ su - tacluser3 << TACL_USER3
 	fi
 
 TACL_USER3
-
 
 setfacl -m mask:--- shared/team1
 

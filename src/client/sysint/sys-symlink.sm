@@ -31,24 +31,24 @@ enum
     SYMLINK_RETRY = 170
 };
 
-static int symlink_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int symlink_dspace_create_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int symlink_dspace_create_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int symlink_crdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int symlink_crdirent_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int symlink_setattr_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int symlink_setattr_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int symlink_delete_handle_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int symlink_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+static PINT_sm_action symlink_init(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action symlink_dspace_create_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action symlink_dspace_create_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action symlink_crdirent_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action symlink_crdirent_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action symlink_setattr_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action symlink_setattr_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action symlink_delete_handle_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action symlink_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p);
 
 static int symlink_create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -61,21 +61,7 @@ static int symlink_delete_handle_comp_fn(
 
 %%
 
-machine pvfs2_client_symlink_sm(
-    init,
-    symlink_parent_getattr,
-    dspace_create_setup_msgpair,
-    dspace_create_xfer_msgpair,
-    dspace_create_failure,
-    crdirent_setup_msgpair,
-    crdirent_xfer_msgpair,
-    crdirent_failure,
-    symlink_setattr_setup_msgpair,
-    symlink_setattr_xfer_msgpair,
-    symlink_setattr_failure,
-    delete_handle_setup_msgpair,
-    delete_handle_xfer_msgpair,
-    cleanup)
+machine pvfs2_client_symlink_sm
 {
     state init
     {
@@ -186,6 +172,7 @@ PVFS_error PVFS_isys_symlink(
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_symlink entered\n");
@@ -212,12 +199,16 @@ PVFS_error PVFS_isys_symlink(
         return -PVFS_ENAMETOOLONG;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SYS_SYMLINK,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
@@ -235,7 +226,7 @@ PVFS_error PVFS_isys_symlink(
         parent_ref.fs_id, target);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_SYMLINK, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Create a new symlink object on some server.
@@ -270,19 +261,18 @@ PVFS_error PVFS_sys_symlink(
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 
 /****************************************************************/
 
-static int symlink_init(PINT_client_sm *sm_p,
-		       job_status_s *js_p)
+static PINT_sm_action symlink_init(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 1;
     job_id_t tmp_id;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: init\n");
 
     assert((js_p->error_code == 0) ||
            (js_p->error_code == SYMLINK_RETRY));
@@ -292,7 +282,7 @@ static int symlink_init(PINT_client_sm *sm_p,
         js_p->error_code = 0;
 
         ret = job_req_sched_post_timer(
-            sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
+            sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
 
@@ -310,7 +300,8 @@ static int symlink_create_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_create_comp_fn\n");
 
@@ -333,7 +324,8 @@ static int symlink_setattr_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr attr;
     PVFS_object_ref tmp_ref;
 
@@ -372,16 +364,14 @@ static int symlink_delete_handle_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
-                                               job_status_s *js_p)
+static PINT_sm_action symlink_dspace_create_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
     struct server_configuration_s *server_config = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: "
-                 "dspace_create_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -402,7 +392,7 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_SERVREQ_CREATE_FILL(
@@ -417,27 +407,24 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_create_comp_fn;
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int symlink_dspace_create_failure(PINT_client_sm *sm_p,
-                                         job_status_s *js_p)
+static PINT_sm_action symlink_dspace_create_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->u.sym.stored_error_code = js_p->error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "symlink state: dspace_create_failure\n");
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-                                          job_status_s *js_p)
+static PINT_sm_action symlink_crdirent_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "symlink state: crdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -467,29 +454,25 @@ static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int symlink_crdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
+static PINT_sm_action symlink_crdirent_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->u.sym.stored_error_code = js_p->error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "symlink state: crdirent_failure\n");
-
     PVFS_perror_gossip("crdirent failure", js_p->error_code);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
-                                        job_status_s *js_p)
+static PINT_sm_action symlink_setattr_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "symlink state: setattr_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -530,27 +513,24 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int symlink_setattr_failure(PINT_client_sm *sm_p,
-                                   job_status_s *js_p)
+static PINT_sm_action symlink_setattr_failure(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->u.sym.stored_error_code = js_p->error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "symlink state: setattr_failure\n");
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
-                                               job_status_s *js_p)
+static PINT_sm_action symlink_delete_handle_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: "
-                 "delete_handle_setup_msgpair_array\n");
 
     js_p->error_code = 0;
 
@@ -579,15 +559,16 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int symlink_cleanup(PINT_client_sm *sm_p,
-                          job_status_s *js_p)
+static PINT_sm_action symlink_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref symlink_ref;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: cleanup\n");
+    memset(&symlink_ref, 0, sizeof(symlink_ref));
 
     PVFS_util_release_sys_attr(&sm_p->u.sym.sys_attr);
 
@@ -618,7 +599,7 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
                      "(attempt number %d)\n", sm_p->u.sym.retry_count);
 
         js_p->error_code = SYMLINK_RETRY;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     else
     {
@@ -631,8 +612,8 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
         sm_p->msgarray = NULL;
     }
 
-    sm_p->op_complete = 1;
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

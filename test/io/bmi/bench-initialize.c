@@ -155,6 +155,10 @@ int bench_initialize_bmi_interface(
     {
 	sprintf(local_address, "gm://NULL:%d\n", BMI_GM_PORT);
     }
+    else if (strcmp(method, "bmi_mx") == 0)
+    {
+	sprintf(local_address, "mx://foo:0:%d\n", BMI_MX_ENDPOINT);
+    }
     else if (strcmp(method, "bmi_ib") == 0)
     {
 	sprintf(local_address, "ib://NULL:%d\n", BMI_IB_PORT);
@@ -319,6 +323,10 @@ int bench_initialize_bmi_addresses_client(
 	else if (strcmp(method_name, "bmi_gm") == 0)
 	{
 	    sprintf(bmi_server_name, "gm://%s:%d", server_name, BMI_GM_PORT);
+	}
+	else if (strcmp(method_name, "bmi_mx") == 0)
+	{
+	    sprintf(bmi_server_name, "mx://%s:0:%d", server_name, BMI_MX_ENDPOINT);
 	}
 	else if (strcmp(method_name, "bmi_ib") == 0)
 	{
