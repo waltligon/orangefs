@@ -75,7 +75,7 @@ extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
  */
 #define TAS_UPDATE_FILESIZE
 
-/* 
+/*
  * Do not check if handle is already created in dspace_create...
  */
 #define NO_SAVE_CREATION
@@ -157,7 +157,7 @@ static char storage_name[200] = "";
 static char storage_path[200] = "";
 
 TROVE_handle akt_handle_first;
-/* number which seperates first and second handle range, 
+/* number which seperates first and second handle range,
  * for example when this server is a meta and dataserver */
 TROVE_handle handle_separator;
 TROVE_handle akt_handle_second;
@@ -433,9 +433,9 @@ static int remove_pair_of_cached_entry(
     if (found_pair != NULL)
     {
         /* copy value */
-        
+
         keyval_copy(key_p, val_p, 0, found_pair);
-    
+
         /* delete Node from Tree: */
         delete_node_from_tree(node, cache_entry->pair_tree);
 
@@ -1008,7 +1008,7 @@ static int tas_bstream_write_list(TROVE_coll_id coll_id,
         gen_mutex_unlock(&tas_meta_mutex);
         return -TROVE_ENOENT;
     }
-    /* get the last written byte and enlarge the file 
+    /* get the last written byte and enlarge the file
      * if this byte is larger than filesize*/
     for (i = 0; i < stream_count; i++)
     {
@@ -1250,13 +1250,14 @@ static int tas_keyval_iterate(TROVE_coll_id coll_id,
                               TROVE_context_id context_id,
                               TROVE_op_id * out_op_id_p)
 {
-    gossip_debug(GOSSIP_TROVE_DEBUG,
-                 "Tas tas_keyval_iterate\n");
-
     if (*inout_position_p == TROVE_ITERATE_START)
     {
         *inout_position_p = 0;
     }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "Tas tas_keyval_iterate, pos: %d\n", (int) *inout_position_p );
+
 
     gen_mutex_lock(&tas_meta_mutex);
     handle_cache *found = find_cached_entry(handle, coll_id);
@@ -1273,21 +1274,25 @@ static int tas_keyval_iterate(TROVE_coll_id coll_id,
     gossip_debug(GOSSIP_TROVE_DEBUG, " read_count %d read_pos %d remain %d \n",
                  in_read_count, in_read_position, remainingKeyValues);
     /* set read count, if less keys available */
-    if (remainingKeyValues < in_read_count)
+    if (remainingKeyValues <= in_read_count)
     {
         *inout_count_p = remainingKeyValues;    /* number of keypairs to read */
         in_read_count = remainingKeyValues;
+        *inout_position_p = TROVE_ITERATE_END;
+    }else{
+        *inout_position_p = in_read_position + *inout_count_p;
     }
-    *inout_position_p = in_read_position + *inout_count_p;
+
     if (*inout_count_p <= 0)
     {
         gen_mutex_unlock(&tas_meta_mutex);
         *inout_count_p = 0;
+        *inout_position_p = TROVE_ITERATE_END;
         return RETURN_IMMEDIATE_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, " read_count %d read_pos %d remain %d \n",
-                 in_read_count, in_read_position, remainingKeyValues);
+    gossip_debug(GOSSIP_TROVE_DEBUG, " read_count %d read_pos %d remain:%d newoutpos:%d \n",
+                 in_read_count, in_read_position, remainingKeyValues, (int)  *inout_position_p);
 
     /* skip to in_read_position... */
     keyvalpair *found_pair;
@@ -1927,7 +1932,7 @@ static int tas_collection_setinfo(TROVE_method_id method_id,
                     {
                         int key_sz, val_sz;
                         akt_pair = (keyvalpair *) malloc(sizeof(keyvalpair));
-                          
+
                         fscanf(file, "  Key-size:%d Val-size:%d  ", &key_sz,
                                &val_sz);
                         akt_pair->key.buffer_sz = key_sz;
@@ -2117,6 +2122,6 @@ struct TROVE_bstream_ops tas_bstream_ops =
 
 struct TROVE_context_ops tas_context_ops =
 {
-        tas_open_context, 
+        tas_open_context,
         tas_close_context
         };
