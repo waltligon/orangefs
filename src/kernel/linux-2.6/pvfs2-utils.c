@@ -852,12 +852,26 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         gossip_err("pvfs2_inode_setxattr: bogus NULL pointers!\n");
         return -EINVAL;
     }
-    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+
+    if (prefix)
     {
-        gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
-                (int)(strlen(name)+strlen(prefix)));
-        return -EINVAL;
+        if(strlen(name)+strlen(prefix) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
+				(int)(strlen(name)+strlen(prefix)));
+		return -EINVAL;
+	}
     }
+    else
+    {
+        if(strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n",
+			   (int)(strlen(name)));
+                return -EINVAL;
+        }
+    }
+
     /* This is equivalent to a removexattr */
     if (size == 0 && value == NULL)
     {
@@ -931,12 +945,31 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+    if(!name)
     {
-        gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
-                (int)(strlen(name)+strlen(prefix)));
+	gossip_err("pvfs2_inode_removexattr: xattr key is NULL\n");
         return -EINVAL;
     }
+
+    if (prefix)
+    {
+        if((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
+				(int)(strlen(name)+strlen(prefix)));
+		return -EINVAL;
+	}
+    }
+    else
+    {
+        if(strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n",
+			   (int)(strlen(name)));
+                return -EINVAL;
+        }
+    }
+
     if (inode)
     {
         pvfs2_inode = PVFS2_I(inode);
@@ -956,7 +989,8 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
          * later on...
          */
         ret = snprintf((char*)new_op->upcall.req.removexattr.key,
-            PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
+            PVFS_MAX_XATTR_NAMELEN, "%s%s", 
+            (prefix ? prefix : ""), name);
         new_op->upcall.req.removexattr.key_sz = ret + 1;
 
         gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_removexattr: key %s, key_sz %d\n", 
@@ -1291,6 +1325,12 @@ static inline struct inode *pvfs2_create_symlink(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     struct inode *inode = NULL;
+
+    if(!symname)
+    {
+	*error_code = -EINVAL;
+        return NULL;
+    }
 
     new_op = op_alloc(PVFS2_VFS_OP_SYMLINK);
     if (!new_op)
@@ -1917,7 +1957,6 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
         pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
         pvfs2_inode->last_failed_block_index_read = 0;
         pvfs2_inode->link_target = NULL;
-        pvfs2_inode->directory_version = 0;
         pvfs2_inode->error_code = 0;
         SetInitFlag(pvfs2_inode);
     }
@@ -1932,7 +1971,6 @@ void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
     pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
     pvfs2_inode->last_failed_block_index_read = 0;
-    pvfs2_inode->directory_version = 0;
     pvfs2_inode->error_code = 0;
 }
 

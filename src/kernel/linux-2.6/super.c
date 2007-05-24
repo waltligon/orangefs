@@ -960,7 +960,7 @@ struct super_block* pvfs2_get_sb(
 
     /* alloc and initialize our root directory inode by explicitly requesting
      * the sticky bit to be set */
-    root = pvfs2_get_custom_inode(
+    root = pvfs2_get_custom_core_inode(
         sb, NULL, (S_IFDIR | 0755 | S_ISVTX), 0, root_object);
     if (!root)
     {
@@ -1080,7 +1080,7 @@ int pvfs2_fill_sb(
     root_object.fs_id  = PVFS2_SB(sb)->fs_id;
     /* alloc and initialize our root directory inode. be explicit about sticky
      * bit */
-    root = pvfs2_get_custom_inode(sb, NULL, (S_IFDIR | 0755 | S_ISVTX),
+    root = pvfs2_get_custom_core_inode(sb, NULL, (S_IFDIR | 0755 | S_ISVTX),
                                   0, root_object);
     if (!root)
     {

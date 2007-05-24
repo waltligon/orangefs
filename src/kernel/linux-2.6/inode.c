@@ -167,7 +167,7 @@ void pvfs2_truncate(struct inode *inode)
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %llu "
                 "with size %ld\n", llu(get_handle_from_ino(inode)), (long) orig_size);
 
-    /* successful truncate when size changes also requires mtime updates
+    /* successful truncate when size changes also requires mtime updates 
      * although the mtime updates are propagated lazily!
      */
     if (pvfs2_truncate_inode(inode, inode->i_size) == 0
@@ -293,9 +293,9 @@ int pvfs2_getattr_lite(
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_getattr_lite: called on %s\n", dentry->d_name.name);
 
     /*
-     * ->getattr_lite needs to refresh only certain fields
+     * ->getattr_lite needs to refresh only certain fields 
      * of the inode and that is indicated by the lite_mask
-     * field of kstat_lite structure.
+     * field of kstat_lite structure. 
      */
     mask = convert_to_pvfs2_mask(kstat_lite->lite_mask);
     ret = pvfs2_inode_getattr(inode, mask);
@@ -321,7 +321,7 @@ struct inode_operations pvfs2_file_inode_operations =
     setattr : pvfs2_setattr,
     revalidate : pvfs2_revalidate,
 #ifdef HAVE_XATTR
-    setxattr : pvfs2_setxattr,
+    setxattr : pvfs2_setxattr, 
     getxattr : pvfs2_getxattr,
     removexattr: pvfs2_removexattr,
     listxattr: pvfs2_listxattr,
@@ -367,7 +367,7 @@ static inline ino_t pvfs2_handle_hash(PVFS_object_ref *ref)
 }
 
 /* the ->set callback of iget5_locked and friends. Sorta equivalent to the ->read_inode()
- * callback if we are using iget and friends
+ * callback if we are using iget and friends 
  */
 int pvfs2_set_inode(struct inode *inode, void *data)
 {
@@ -391,7 +391,7 @@ int pvfs2_set_inode(struct inode *inode, void *data)
 static int
 pvfs2_test_inode(struct inode *inode, void *data)
 #elif defined(HAVE_IGET4_LOCKED)
-static int
+static int 
 pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
 #endif
 {
@@ -417,7 +417,7 @@ pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
  * @keep_locked : indicates whether the inode must be simply allocated and not filled
  * in with the results from a ->getattr. i.e. if keep_locked is set to 0, we do a getattr() and
  * unlock the inode and if set to 1, we do not issue a getattr() and keep it locked
- *
+ * 
  * Boy, this function is so ugly with all these macros. I wish I could find a better
  * way to reduce the macro clutter.
  */
@@ -456,7 +456,7 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
 #if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET_LOCKED)
             if (PVFS2_I(inode)) {
                 pvfs2_set_inode(inode, ref);
-            }
+            } 
             else {
 #ifdef PVFS2_LINUX_KERNEL_2_4
                 inode->u.generic_ip = (void *) ref;
@@ -475,17 +475,18 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
 /** Allocates a Linux inode structure with additional PVFS2-specific
  *  private data (I think -- RobR).
  */
-struct inode *pvfs2_get_custom_inode(
+struct inode *pvfs2_get_custom_inode_common(
     struct super_block *sb,
     struct inode *dir,
     int mode,
     dev_t dev,
-    PVFS_object_ref object)
+    PVFS_object_ref object,
+    int from_create)
 {
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode: called\n  (sb is %p | "
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode_common: called\n  (sb is %p | "
                 "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
                 MINOR(dev));
 
@@ -502,7 +503,6 @@ struct inode *pvfs2_get_custom_inode(
             return NULL;
         }
 
-        inode->i_mode = mode;
         /*
          * Since we are using the same function to create a new on-disk object
          * as well as to create an in-memory object, the mode of the object
@@ -528,10 +528,9 @@ struct inode *pvfs2_get_custom_inode(
                 inode->i_mode = mode;
             }
         }
-        gossip_debug(GOSSIP_INODE_DEBUG,
+        gossip_debug(GOSSIP_INODE_DEBUG, 
                 "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
                 inode, inode->i_mode);
->>>>>>> 1.79
         inode->i_mapping->host = inode;
         inode->i_uid = current->fsuid;
         inode->i_gid = current->fsgid;
@@ -583,7 +582,7 @@ struct inode *pvfs2_get_custom_inode(
             goto error;
 	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
-        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %llu\n",
+        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %llu\n", 
                 llu(get_handle_from_ino(inode)));
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);

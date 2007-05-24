@@ -15,7 +15,7 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-internal.h"
 
-typedef struct
+typedef struct 
 {
     int buffer_index;
     pvfs2_readdir_response_t readdir_response;
@@ -23,7 +23,7 @@ typedef struct
 } readdir_handle_t;
 
 /* decode routine needed by kmod to make sense of the shared page for readdirs */
-static long decode_dirents(char *ptr, pvfs2_readdir_response_t *readdir)
+static long decode_dirents(char *ptr, pvfs2_readdir_response_t *readdir) 
 {
     int i;
     pvfs2_readdir_response_t *rd = (pvfs2_readdir_response_t *) ptr;
@@ -31,9 +31,8 @@ static long decode_dirents(char *ptr, pvfs2_readdir_response_t *readdir)
     char **pptr = &buf;
 
     readdir->token = rd->token;
-    readdir->directory_version = rd->directory_version;
     readdir->pvfs_dirent_outcount = rd->pvfs_dirent_outcount;
-    readdir->dirent_array = (struct pvfs2_dirent *)
+    readdir->dirent_array = (struct pvfs2_dirent *) 
             kmalloc(readdir->pvfs_dirent_outcount * sizeof(struct pvfs2_dirent), GFP_KERNEL);
     if (readdir->dirent_array == NULL)
     {
@@ -130,16 +129,14 @@ static int pvfs2_readdir(
     /* are we done? */
     if (pos == PVFS_READDIR_END)
     {
-        gossip_debug(GOSSIP_DIR_DEBUG,
+        gossip_debug(GOSSIP_DIR_DEBUG, 
                      "Skipping to graceful termination "
                      "path since we are done\n");
-        pvfs2_inode->directory_version = 0;
         return 0;
     }
 
-    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir called on %s (pos=%d, "
-                "v=%llu)\n", dentry->d_name.name, (int)pos,
-                llu(pvfs2_inode->directory_version));
+    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir called on %s (pos=%d)\n",
+                 dentry->d_name.name, (int)pos);
 
     switch (pos)
     {
@@ -149,38 +146,24 @@ static int pvfs2_readdir(
 	 */
     case 0:
         token_set = 1;
-        if (pvfs2_inode->directory_version == 0)
-            ino = get_ino_from_handle(dentry->d_inode);
+        ino = get_ino_from_handle(dentry->d_inode);
         gossip_debug(GOSSIP_DIR_DEBUG,
                      "calling filldir of . with pos = %llu\n", llu(pos));
         if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
         {
-            ino = get_ino_from_handle(dentry->d_inode);
-            gossip_debug(GOSSIP_DIR_DEBUG,
-                         "calling filldir of . with pos = %d\n", pos);
-            if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
-            {
-                break;
-            }
+            break;
         }
         file->f_pos++;
         pos++;
     /* drop through */
     case 1:
         token_set = 1;
-        if (pvfs2_inode->directory_version == 0)
-            ino = get_parent_ino_from_dentry(dentry);
-        gossip_debug(GOSSIP_DIR_DEBUG,
+        ino = get_parent_ino_from_dentry(dentry);
+        gossip_debug(GOSSIP_DIR_DEBUG, 
                      "calling filldir of .. with pos = %llu\n", llu(pos));
         if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
         {
-            ino = get_parent_ino_from_dentry(dentry);
-            gossip_debug(GOSSIP_DIR_DEBUG,
-                         "calling filldir of .. with pos = %d\n", pos);
-            if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
-            {
-                break;
-            }
+            break;
         }
         file->f_pos++;
         pos++;
@@ -238,7 +221,7 @@ static int pvfs2_readdir(
         new_op->upcall.req.readdir.buf_index = buffer_index;
 
         ret = service_operation(
-            new_op, "pvfs2_readdir",
+            new_op, "pvfs2_readdir", 
             get_interruptible_flag(dentry->d_inode));
 
 	gossip_debug(GOSSIP_DIR_DEBUG, "Readdir downcall status is %d\n",
@@ -251,7 +234,7 @@ static int pvfs2_readdir(
             char *current_entry = NULL;
             long bytes_decoded;
 
-            if ((bytes_decoded = readdir_handle_ctor(&rhandle,
+            if ((bytes_decoded = readdir_handle_ctor(&rhandle, 
                                                      new_op->downcall.trailer_buf,
                                                      buffer_index)) < 0)
             {
@@ -270,18 +253,6 @@ static int pvfs2_readdir(
                 goto err;
             }
 
-            if (rhandle.readdir_response.pvfs_dirent_outcount == 0)
-            {
-                goto graceful_termination_path;
-            }
-
-            if (pvfs2_inode->directory_version !=
-                rhandle.readdir_response.directory_version)
-            {
-                pvfs2_inode->directory_version =
-                    rhandle.readdir_response.directory_version;
-            }
-
             for (i = 0; i < rhandle.readdir_response.pvfs_dirent_outcount; i++)
             {
                 len = rhandle.readdir_response.dirent_array[i].d_length;
@@ -289,38 +260,36 @@ static int pvfs2_readdir(
                 current_ino = pvfs2_handle_to_ino(
                     rhandle.readdir_response.dirent_array[i].handle);
 
-                gossip_debug(GOSSIP_DIR_DEBUG,
+                gossip_debug(GOSSIP_DIR_DEBUG, 
                              "calling filldir for %s with len %d, pos %ld\n",
                              current_entry, len, (unsigned long) pos);
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
                 {
-graceful_termination_path:
-                    pvfs2_inode->directory_version = 0;
                     ret = 0;
                     break;
                 }
                 file->f_pos++;
                 pos++;
             }
-            /* For the first time around, use the token
+            /* For the first time around, use the token 
              * returned by the readdir response */
-            if (token_set == 1)
+            if (token_set == 1) 
             {
                 if (i == rhandle.readdir_response.pvfs_dirent_outcount)
                     file->f_pos = rhandle.readdir_response.token;
-                else
+                else 
                     file->f_pos = i;
             }
-            gossip_debug(GOSSIP_DIR_DEBUG,
-                         "pos = %llu, file->f_pos should have been %ld\n",
+            gossip_debug(GOSSIP_DIR_DEBUG, 
+                         "pos = %llu, file->f_pos should have been %ld\n", 
                          llu(pos),
                          (unsigned long) file->f_pos);
         }
         else
         {
             readdir_index_put(buffer_index);
-            gossip_debug(GOSSIP_DIR_DEBUG,
+            gossip_debug(GOSSIP_DIR_DEBUG, 
                          "Failed to readdir (downcall status %d)\n",
                          new_op->downcall.status);
         }
@@ -333,8 +302,8 @@ err:
 
     if (ret == 0)
     {
-        gossip_debug(GOSSIP_DIR_DEBUG,
-                     "pvfs2_readdir about to update_atime %p\n",
+        gossip_debug(GOSSIP_DIR_DEBUG, 
+                     "pvfs2_readdir about to update_atime %p\n", 
                      dentry->d_inode);
 
         SetAtimeFlag(pvfs2_inode);
@@ -365,20 +334,20 @@ typedef struct
     } u;
 } readdirplus_info_t;
 
-typedef struct
+typedef struct 
 {
     int buffer_index;
     pvfs2_readdirplus_response_t readdirplus_response;
     void *dentsplus_buf;
 } readdirplus_handle_t;
 
-static long decode_sys_attr(char *ptr, pvfs2_readdirplus_response_t *readdirplus)
+static long decode_sys_attr(char *ptr, pvfs2_readdirplus_response_t *readdirplus) 
 {
     int i;
     char *buf = (char *) ptr;
     char **pptr = &buf;
 
-    readdirplus->stat_err_array = (PVFS_error *)
+    readdirplus->stat_err_array = (PVFS_error *) 
         kmalloc(readdirplus->pvfs_dirent_outcount * sizeof(PVFS_error), GFP_KERNEL);
     if (readdirplus->stat_err_array == NULL)
     {
@@ -386,11 +355,11 @@ static long decode_sys_attr(char *ptr, pvfs2_readdirplus_response_t *readdirplus
     }
     memcpy(readdirplus->stat_err_array, buf, readdirplus->pvfs_dirent_outcount * sizeof(PVFS_error));
     *pptr += readdirplus->pvfs_dirent_outcount * sizeof(PVFS_error);
-    if (readdirplus->pvfs_dirent_outcount % 2)
+    if (readdirplus->pvfs_dirent_outcount % 2) 
     {
         *pptr += 4;
     }
-    readdirplus->attr_array = (PVFS_sys_attr *)
+    readdirplus->attr_array = (PVFS_sys_attr *) 
         kmalloc(readdirplus->pvfs_dirent_outcount * sizeof(PVFS_sys_attr), GFP_KERNEL);
     if (readdirplus->attr_array == NULL)
     {
@@ -523,12 +492,10 @@ static int pvfs2_readdirplus_common(
     if (pos == PVFS_READDIR_END)
     {
         gossip_debug(GOSSIP_DIR_DEBUG, "Skipping to graceful termination path since we are done\n");
-        pvfs2_inode->directory_version = 0;
         return 0;
     }
-    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdirplus called on %s (pos=%d, "
-                "v=%llu)\n", dentry->d_name.name, (int)pos,
-                llu(pvfs2_inode->directory_version));
+    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdirplus called on %s (pos=%d)\n",
+                 dentry->d_name.name, (int)pos);
 
     switch (pos)
     {
@@ -540,37 +507,34 @@ static int pvfs2_readdirplus_common(
         {
             struct inode *inode = NULL;
             token_set = 1;
-            if (pvfs2_inode->directory_version == 0)
+            ino = get_ino_from_handle(dentry->d_inode);
+            ref.fs_id = get_fsid_from_ino(dentry->d_inode);
+            ref.handle = get_handle_from_ino(dentry->d_inode);
+            inode = pvfs2_iget(dentry->d_inode->i_sb, &ref);
+            if (inode)
             {
-                ino = get_ino_from_handle(dentry->d_inode);
-                ref.fs_id = get_fsid_from_ino(dentry->d_inode);
-                ref.handle = get_handle_from_ino(dentry->d_inode);
-                inode = pvfs2_iget(dentry->d_inode->i_sb, &ref);
-                if (inode)
+                if (info->lite == 0)
                 {
-                    if (info->lite == 0)
+                    generic_fillattr(inode, &info->u.plus.ks);
+                }
+                else
+                {
+                    generic_fillattr_lite(inode, &info->u.plus_lite.ks);
+                }
+                iput(inode);
+                gossip_debug(GOSSIP_DIR_DEBUG, "calling filldirplus of . with pos = %d\n", pos);
+                if (info->lite == 0)
+                {
+                    if (filldirplus(direntplus, ".", 1, pos, ino, DT_DIR, &info->u.plus.ks) < 0)
                     {
-                        generic_fillattr(inode, &info->u.plus.ks);
+                        break;
                     }
-                    else
+                }
+                else 
+                {
+                    if (filldirplus_lite(direntplus, ".", 1, pos, ino, DT_DIR, &info->u.plus_lite.ks) < 0)
                     {
-                        generic_fillattr_lite(inode, &info->u.plus_lite.ks);
-                    }
-                    iput(inode);
-                    gossip_debug(GOSSIP_DIR_DEBUG, "calling filldirplus of . with pos = %d\n", pos);
-                    if (info->lite == 0)
-                    {
-                        if (filldirplus(direntplus, ".", 1, pos, ino, DT_DIR, &info->u.plus.ks) < 0)
-                        {
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        if (filldirplus_lite(direntplus, ".", 1, pos, ino, DT_DIR, &info->u.plus_lite.ks) < 0)
-                        {
-                            break;
-                        }
+                        break;
                     }
                 }
             }
@@ -582,37 +546,34 @@ static int pvfs2_readdirplus_common(
         {
             struct inode *inode = NULL;
             token_set = 1;
-            if (pvfs2_inode->directory_version == 0)
+            ino = get_parent_ino_from_dentry(dentry);
+            ref.fs_id = get_fsid_from_ino(dentry->d_parent->d_inode);
+            ref.handle = get_handle_from_ino(dentry->d_parent->d_inode);
+            inode = pvfs2_iget(dentry->d_inode->i_sb, &ref);
+            if (inode) 
             {
-                ino = get_parent_ino_from_dentry(dentry);
-                ref.fs_id = get_fsid_from_ino(dentry->d_parent->d_inode);
-                ref.handle = get_handle_from_ino(dentry->d_parent->d_inode);
-                inode = pvfs2_iget(dentry->d_inode->i_sb, &ref);
-                if (inode)
+                if (info->lite == 0)
                 {
-                    if (info->lite == 0)
+                    generic_fillattr(inode, &info->u.plus.ks);
+                }
+                else
+                {
+                    generic_fillattr_lite(inode, &info->u.plus_lite.ks);
+                }
+                iput(inode);
+                gossip_debug(GOSSIP_DIR_DEBUG, "calling filldirplus of .. with pos = %d\n", pos);
+                if (info->lite == 0)
+                {
+                    if (filldirplus(direntplus, "..", 2, pos, ino, DT_DIR, &info->u.plus.ks) < 0)
                     {
-                        generic_fillattr(inode, &info->u.plus.ks);
+                        break;
                     }
-                    else
+                }
+                else
+                {
+                    if (filldirplus_lite(direntplus, "..", 2, pos, ino, DT_DIR, &info->u.plus_lite.ks) < 0)
                     {
-                        generic_fillattr_lite(inode, &info->u.plus_lite.ks);
-                    }
-                    iput(inode);
-                    gossip_debug(GOSSIP_DIR_DEBUG, "calling filldirplus of .. with pos = %d\n", pos);
-                    if (info->lite == 0)
-                    {
-                        if (filldirplus(direntplus, "..", 2, pos, ino, DT_DIR, &info->u.plus.ks) < 0)
-                        {
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        if (filldirplus_lite(direntplus, "..", 2, pos, ino, DT_DIR, &info->u.plus_lite.ks) < 0)
-                        {
-                            break;
-                        }
+                        break;
                     }
                 }
             }
@@ -673,7 +634,7 @@ static int pvfs2_readdirplus_common(
             new_op->upcall.req.readdirplus.buf_index = buffer_index;
 
             ret = service_operation(
-                new_op, "pvfs2_readdirplus",
+                new_op, "pvfs2_readdirplus", 
                 get_interruptible_flag(dentry->d_inode));
 
             gossip_debug(GOSSIP_DIR_DEBUG, "Readdirplus downcall status is %d\n",
@@ -706,19 +667,6 @@ static int pvfs2_readdirplus_common(
                 if (rhandle.readdirplus_response.pvfs_dirent_outcount == 0)
                 {
                     goto graceful_termination_path;
-                }
-
-                if (pvfs2_inode->directory_version == 0)
-                {
-                    pvfs2_inode->directory_version =
-                        rhandle.readdirplus_response.directory_version;
-                }
-
-                if (pvfs2_inode->directory_version !=
-                    rhandle.readdirplus_response.directory_version)
-                {
-                    pvfs2_inode->directory_version =
-                        rhandle.readdirplus_response.directory_version;
                 }
 
                 for (i = 0; i < rhandle.readdirplus_response.pvfs_dirent_outcount; i++)
@@ -793,19 +741,19 @@ static int pvfs2_readdirplus_common(
                         {
                             ptr = &info->u.plus_lite.ks;
                         }
-                        if (attrs->objtype == PVFS_TYPE_METAFILE)
+                        if (attrs->objtype == PVFS_TYPE_METAFILE) 
                         {
                             dt_type = DT_REG;
                         }
-                        else if (attrs->objtype == PVFS_TYPE_DIRECTORY)
+                        else if (attrs->objtype == PVFS_TYPE_DIRECTORY) 
                         {
                             dt_type = DT_DIR;
                         }
-                        else if (attrs->objtype == PVFS_TYPE_SYMLINK)
+                        else if (attrs->objtype == PVFS_TYPE_SYMLINK) 
                         {
                             dt_type = DT_LNK;
                         }
-                        else
+                        else 
                         {
                             dt_type = DT_UNKNOWN;
                         }
@@ -816,16 +764,16 @@ static int pvfs2_readdirplus_common(
                         dt_type = DT_UNKNOWN;
                     }
                     gossip_debug(GOSSIP_DIR_DEBUG, "calling filldirplus for %s "
-                            " (%lu) with len %d, pos %ld kstat %p\n",
+                            " (%lu) with len %d, pos %ld kstat %p\n", 
                             current_entry, (unsigned long) handle,
                             len, (unsigned long) pos, ptr);
-
+                    
                     if (info->lite == 0)
                     {
                         ret = filldirplus(direntplus, current_entry, len, pos,
                                 current_ino, dt_type, ptr);
                     }
-                    else
+                    else 
                     {
                         ret = filldirplus_lite(direntplus, current_entry, len, pos,
                                 current_ino, dt_type, ptr);
@@ -833,9 +781,6 @@ static int pvfs2_readdirplus_common(
                     /* filldirplus has had enough */
                     if (ret < 0)
                     {
-graceful_termination_path:
-                        pvfs2_inode->directory_version = 0;
-
                         ret = 0;
                         break;
                     }
@@ -849,7 +794,7 @@ graceful_termination_path:
                     else
                         file->f_pos = i;
                 }
-                gossip_debug(GOSSIP_DIR_DEBUG, "pos = %d, file->f_pos is %ld\n", pos,
+                gossip_debug(GOSSIP_DIR_DEBUG, "pos = %d, file->f_pos is %ld\n", pos, 
                         (unsigned long) file->f_pos);
             }
             else
@@ -876,7 +821,7 @@ err:
     return ret;
 }
 
-/** Read directory entries from an instance of an open directory
+/** Read directory entries from an instance of an open directory 
  *  and the associated attributes for every entry in one-shot.
  *
  * \param filldirplus callback function called for each entry read.
@@ -902,7 +847,7 @@ static int pvfs2_readdirplus(
     return pvfs2_readdirplus_common(file, &info);
 }
 
-/** Read directory entries from an instance of an open directory
+/** Read directory entries from an instance of an open directory 
  *  and the associated attributes for every entry in one-shot.
  *
  * \param filldirplus_lite callback function called for each entry read.
