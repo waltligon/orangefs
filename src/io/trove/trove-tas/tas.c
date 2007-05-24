@@ -162,8 +162,7 @@ TROVE_handle akt_handle_first;
 TROVE_handle handle_separator;
 TROVE_handle akt_handle_second;
 
-inline static void keyval_copy(TROVE_keyval_s * out_key_array,
-                              TROVE_keyval_s * out_val_array,
+inline static void key_copy(TROVE_keyval_s * out_key_array,
                               int i, keyvalpair * pair)
 {
     int max_read_size = pair->key.buffer_sz;
@@ -173,14 +172,27 @@ inline static void keyval_copy(TROVE_keyval_s * out_key_array,
     }
     out_key_array[i].read_sz = max_read_size;
     memcpy(out_key_array[i].buffer, pair->key.buffer, max_read_size);
+}
 
-    max_read_size = pair->val.buffer_sz;
+inline static void val_copy(TROVE_keyval_s * out_val_array,
+                              int i, keyvalpair * pair)
+{
+    int max_read_size = pair->val.buffer_sz;
     if (out_val_array[i].buffer_sz < max_read_size)
     {
         max_read_size = out_val_array[i].buffer_sz;
     }
     out_val_array[i].read_sz = max_read_size;
     memcpy(out_val_array[i].buffer, pair->val.buffer, max_read_size);
+}
+
+
+inline static void keyval_copy(TROVE_keyval_s * out_key_array,
+                              TROVE_keyval_s * out_val_array,
+                              int i, keyvalpair * pair)
+{
+    key_copy(out_key_array, i,pair);
+    val_copy(out_val_array, i, pair);
 }
 
 #if defined(TAS_USE_RED_BLACKTREE)
@@ -1331,11 +1343,77 @@ static int tas_keyval_iterate_keys(TROVE_coll_id coll_id,
                                    TROVE_context_id context_id,
                                    TROVE_op_id * out_op_id_p)
 {
-    fprintf(stderr,
-            "TROVE MODULE TAS: FUNCTION tas_keyval_iterate_keys not implemented\n");
     gossip_debug(GOSSIP_TROVE_DEBUG,
                  "Tas tas_keyval_iterate_keys\n");
-    return 1;
+
+    if (*inout_position_p == TROVE_ITERATE_START)
+    {
+        *inout_position_p = 0;
+    }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "Tas tas_keyval_iterate, pos: %d\n", (int) *inout_position_p );
+
+
+    gen_mutex_lock(&tas_meta_mutex);
+    handle_cache *found = find_cached_entry(handle, coll_id);
+    if (found == NULL)
+    {
+        gen_mutex_unlock(&tas_meta_mutex);
+        return -TROVE_ENOENT;
+    }
+
+    int32_t in_read_count = *inout_count_p;
+    int32_t in_read_position = *inout_position_p;
+
+    int32_t remainingKeyValues = found->k_size - in_read_position;
+    gossip_debug(GOSSIP_TROVE_DEBUG, " read_count %d read_pos %d remain %d \n",
+                 in_read_count, in_read_position, remainingKeyValues);
+    /* set read count, if less keys available */
+    if (remainingKeyValues <= in_read_count)
+    {
+        *inout_count_p = remainingKeyValues;    /* number of keypairs to read */
+        in_read_count = remainingKeyValues;
+        *inout_position_p = TROVE_ITERATE_END;
+    }else{
+        *inout_position_p = in_read_position + *inout_count_p;
+    }
+
+    if (*inout_count_p <= 0)
+    {
+        gen_mutex_unlock(&tas_meta_mutex);
+        *inout_count_p = 0;
+        *inout_position_p = TROVE_ITERATE_END;
+        return RETURN_IMMEDIATE_COMPLETE;
+    }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, " read_count %d read_pos %d remain:%d newoutpos:%d \n",
+                 in_read_count, in_read_position, remainingKeyValues, (int)  *inout_position_p);
+
+    /* skip to in_read_position... */
+    keyvalpair *found_pair;
+
+
+#if defined(TAS_USE_RED_BLACKTREE)
+    /* go to leftmost node: */
+    found_pair = found->pair_list;
+#elif defined(TAS_USE_QUEUE)
+    found_pair = found->pairs;
+#endif
+
+    for (; in_read_position > 0;
+         found_pair = found_pair->next, in_read_position--);
+
+    /* fill the array... */
+    int i = 0;
+    for (; i < in_read_count; found_pair = found_pair->next, i++)
+    {
+        key_copy(out_key_array, i, found_pair);
+    }
+
+    gen_mutex_unlock(&tas_meta_mutex);
+
+    return RETURN_IMMEDIATE_COMPLETE;
 }
 
 static int tas_keyval_read_list(TROVE_coll_id coll_id,
