@@ -18,6 +18,7 @@
 #include "trove.h"
 #include "trove-internal.h"
 #include "gossip.h"
+#include "trove-handle-mgmt.h"
 
 extern struct TROVE_dspace_ops dbpf_dspace_ops;
 extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
@@ -1897,7 +1898,9 @@ static int tas_collection_setinfo(TROVE_method_id method_id,
             gossip_debug(GOSSIP_TROVE_DEBUG,
                          "TROVE_COLLECTION_HANDLE_RANGES: %s %d\n",
                          (char *) parameter, context_id);
-
+            /* necessary to get statfs working */
+            ret = trove_set_handle_ranges(
+                coll_id, context_id, (char *)parameter);
             /* set minimum handles according to handle range... */
             TROVE_handle minMetaHandle,
               maxMetaHandle,
@@ -2082,11 +2085,30 @@ static int tas_collection_getinfo(TROVE_coll_id coll_id,
                                   TROVE_coll_getinfo_options opt,
                                   void *parameter)
 {
-    fprintf(stderr,
-            "TROVE MODULE TAS: FUNCTION tas_collection_getinfo not implemented\n");
+
     gossip_debug(GOSSIP_TROVE_DEBUG,
                  "Tas tas_collection_getinfo\n");
-    return 1;
+
+    switch(opt)
+    {
+        case PVFS_COLLECTION_STATFS:
+            {
+                TROVE_statfs *tmp_trove_statfs = (TROVE_statfs *)parameter;
+
+                tmp_trove_statfs->fs_id = coll_id;
+
+                tmp_trove_statfs->bytes_available = ((uint64_t) 1000) * 1024 * 1024;
+                tmp_trove_statfs->bytes_total = ((uint64_t) 10000) * 1024 * 1024;
+
+                return RETURN_IMMEDIATE_COMPLETE;
+            }
+    }
+
+     fprintf(stderr,
+                  "TROVE MODULE TAS: FUNCTION tas_collection_geteattr not implemented for option"
+                  " %d\n", (int) opt);
+
+    return RETURN_IMMEDIATE_COMPLETE;
 }
 
 static int tas_collection_seteattr(TROVE_coll_id coll_id,
