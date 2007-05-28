@@ -716,7 +716,6 @@ tags:
 	  find . -name pvfs2-config.h ;\
 	  find . -name pvfs2-test-config.h ;\
 	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig ;\
-	  find . -name \*.sm | sed s/sm\$$/c/ ;\
 	) | sort | uniq -u | ctags -L- --excmd=pattern -B --extra=+f \
 	  --langmap=c:+.sm -I __hidden,DOTCONF_CB
 
