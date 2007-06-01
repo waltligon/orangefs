@@ -78,6 +78,7 @@ int PINT_encode_initialize(void)
  */
 void PINT_encode_finalize(void)
 {
+    le_bytefield_table.finalize_fun();
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_finalize\n");
     return;
 }

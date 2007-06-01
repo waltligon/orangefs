@@ -252,6 +252,11 @@ static void lebf_initialize(void)
     initializing_sizes = 0;
 }
 
+static void lebf_finalize(void)
+{
+    free(max_size_array);
+}
+
 /* lebf_encode_calc_max_size()
  *
  * reports the maximum allowed encoded size for the given request type
@@ -935,7 +940,8 @@ static PINT_encoding_functions lebf_functions = {
 PINT_encoding_table_values le_bytefield_table = {
     &lebf_functions,
     "little endian bytefield",
-    lebf_initialize
+    lebf_initialize,
+    lebf_finalize
 };
 
 /*
