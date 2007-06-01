@@ -124,6 +124,8 @@ int BMI_initialize(const char *method_list,
     char *proto = NULL;
     int addr_count;
 
+    id_gen_safe_initialize();
+
     /* server must specify method list at startup, optional for client */
     if (flags & BMI_INIT_SERVER) {
 	if (!listen_addr || !method_list)
@@ -466,6 +468,8 @@ int BMI_finalize(void)
     /* destroy the reference list */
     /* (side effect: destroys all method addresses as well) */
     ref_list_cleanup(cur_ref_list);
+
+    id_gen_safe_finalize();
 
     return (0);
 }

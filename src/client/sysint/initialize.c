@@ -212,9 +212,18 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     PINT_util_digest_init();
 
+    ret = id_gen_safe_initialize();
+    if(ret < 0)
+    {
+        gossip_lerr("Error initializing id_gen_safe\n");
+        goto error_exit;
+    }
+
     return 0;
 
   error_exit:
+
+    id_gen_safe_finalize();
 
     if (client_status_flag & CLIENT_CONFIG_MGR_INIT)
     {

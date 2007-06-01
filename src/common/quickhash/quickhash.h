@@ -190,6 +190,11 @@ static inline struct qhash_head *qhash_search_at_index(
 {
     struct qhash_head *tmp_link = NULL;
 
+    if(index >= table->table_size)
+    {
+        return NULL;
+    }
+
     qhash_lock(&table->lock);
     qhash_for_each(tmp_link, &(table->array[index]))
     {
@@ -247,6 +252,11 @@ static inline struct qhash_head *qhash_search_and_remove_at_index(
 {
     struct qhash_head *tmp_link = NULL;
 
+    if(index >= table->table_size)
+    {
+        return NULL;
+    }
+
     qhash_lock(&table->lock);
     qhash_for_each(tmp_link, &(table->array[index]))
     {
@@ -257,6 +267,27 @@ static inline struct qhash_head *qhash_search_and_remove_at_index(
     qhash_unlock(&table->lock);
     return (NULL);
 }
+
+#define qhash_destroy_and_finalize(_oldtable, _entry_type, _link, _destructor) \
+    do                                                                         \
+    {                                                                          \
+        int i = 0;                                                             \
+        struct qhash_head *entry;                                              \
+        struct qhash_head *tmpe;                                               \
+        qhash_lock(&_oldtable->lock);                                          \
+        for(i = 0; i < _oldtable->table_size; ++i)                             \
+        {                                                                      \
+            qhash_for_each_safe(entry, tmpe, &(_oldtable->array[i]))           \
+            {                                                                  \
+                qhash_del(entry);                                              \
+                _destructor(qhash_entry(entry, _entry_type, _link));           \
+            }                                                                  \
+        }                                                                      \
+        qhash_unlock(&_oldtable->lock);                                        \
+                                                                               \
+        qhash_finalize(_oldtable);                                             \
+                                                                               \
+    } while(0)
 
 #endif /* QUICKHASH_H */
 

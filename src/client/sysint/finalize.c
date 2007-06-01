@@ -35,6 +35,8 @@ extern PINT_smcb *g_smcb;
  */
 int PVFS_sys_finalize()
 {
+    id_gen_safe_finalize();
+
     PINT_util_digest_finalize();
     PINT_ncache_finalize();
     PINT_acache_finalize();
