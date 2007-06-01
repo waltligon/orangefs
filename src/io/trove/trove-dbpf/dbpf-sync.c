@@ -21,7 +21,7 @@ static dbpf_sync_context_t
     sync_array[COALESCE_CONTEXT_LAST][TROVE_MAX_CONTEXTS];
 
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
-extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
+extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 extern pthread_cond_t dbpf_op_completed_cond;
 
 static int dbpf_sync_db(
@@ -74,7 +74,7 @@ int dbpf_sync_context_init(int context_index)
     {
         bzero(& sync_array[c][context_index], sizeof(dbpf_sync_context_t));
 
-        sync_array[c][context_index].mutex      = gen_mutex_build();
+        gen_mutex_init(&sync_array[c][context_index].mutex);
         sync_array[c][context_index].sync_queue = dbpf_op_queue_new();
     }
 
@@ -90,8 +90,8 @@ void dbpf_sync_context_destroy(int context_index)
                  context_index);	
     for(c=0; c < COALESCE_CONTEXT_LAST; c++)
     {
-        gen_mutex_lock(sync_array[c][context_index].mutex);
-        gen_mutex_destroy(sync_array[c][context_index].mutex);
+        gen_mutex_lock(&sync_array[c][context_index].mutex);
+        gen_mutex_destroy(&sync_array[c][context_index].mutex);
         dbpf_op_queue_cleanup(sync_array[c][context_index].sync_queue);
     }
 }
@@ -170,7 +170,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
         /*
          * Sync periodical if count < lw or if lw = 0 and count > hw 
          */
-        gen_mutex_lock(sync_context->mutex);
+        gen_mutex_lock(&sync_context->mutex);
         sync_context->coalesce_counter++;
         if( (coll->c_high_watermark > 0 && 
              sync_context->coalesce_counter >= coll->c_high_watermark) 
@@ -185,7 +185,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
             sync_context->coalesce_counter = 0;
             do_sync = 1;      				
         }
-        gen_mutex_unlock(sync_context->mutex);
+        gen_mutex_unlock(&sync_context->mutex);
 
         if ( do_sync ) {
             gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
@@ -200,7 +200,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
      * metadata sync is enabled, either we delay and enqueue this op or we 
      * coalesce. 
      */
-    gen_mutex_lock(sync_context->mutex);
+    gen_mutex_lock(&sync_context->mutex);
     if( (sync_context->sync_counter < coll->c_low_watermark) ||
         ( coll->c_high_watermark > 0 && 
           sync_context->coalesce_counter >= coll->c_high_watermark ) )
@@ -261,7 +261,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
         ret = 0;
     }
 
-    gen_mutex_unlock(sync_context->mutex);
+    gen_mutex_unlock(&sync_context->mutex);
     return ret;
 }
 
@@ -282,7 +282,7 @@ int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
 
     sync_context = & sync_array[sync_context_type][qop_p->op.context_id];
 
-    gen_mutex_lock(sync_context->mutex);
+    gen_mutex_lock(&sync_context->mutex);
 
     if( (qop_p->op.flags & TROVE_SYNC) )
     { 
@@ -297,7 +297,7 @@ int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
                  sync_context_type,
                  sync_context->sync_counter, sync_context->non_sync_counter);
 
-    gen_mutex_unlock(sync_context->mutex);
+    gen_mutex_unlock(&sync_context->mutex);
 
     return 0;
 }
@@ -320,7 +320,7 @@ int dbpf_sync_coalesce_dequeue(
 
     sync_context = & sync_array[sync_context_type][qop_p->op.context_id];
 
-    gen_mutex_lock(sync_context->mutex);
+    gen_mutex_lock(&sync_context->mutex);
     if( (qop_p->op.flags & TROVE_SYNC) )
     { 
         sync_context->sync_counter--;
@@ -334,7 +334,7 @@ int dbpf_sync_coalesce_dequeue(
                  sync_context_type,
                  sync_context->sync_counter, sync_context->non_sync_counter);
 
-    gen_mutex_unlock(sync_context->mutex);
+    gen_mutex_unlock(&sync_context->mutex);
 
     return 0;
 }

@@ -17,7 +17,7 @@ QLIST_HEAD(dbpf_op_queue);
 gen_mutex_t dbpf_op_queue_mutex = GEN_MUTEX_INITIALIZER;
 
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
-extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
+extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 #ifdef __PVFS2_TROVE_THREADED__
 extern pthread_cond_t dbpf_op_incoming_cond;

@@ -49,9 +49,8 @@ PINT_dbpf_keyval_pcache * PINT_dbpf_keyval_pcache_initialize(void)
     {
         return NULL;
     }
-    
-    cache->mutex = gen_mutex_build();
-    gen_mutex_init(cache->mutex);
+
+    gen_mutex_init(&cache->mutex);
 
     cache->tcache = PINT_tcache_initialize(
         dbpf_keyval_pcache_compare,
@@ -78,7 +77,7 @@ void PINT_dbpf_keyval_pcache_finalize(
     PINT_dbpf_keyval_pcache * cache)
 {
     PINT_tcache_finalize(cache->tcache);
-    gen_mutex_destroy(cache->mutex);
+    gen_mutex_destroy(&cache->mutex);
     free(cache);
 }
 
@@ -146,7 +145,7 @@ int PINT_dbpf_keyval_pcache_lookup(
     key.handle = handle;
     key.pos = pos;
     
-    gen_mutex_lock(pcache->mutex);
+    gen_mutex_lock(&pcache->mutex);
     ret = PINT_tcache_lookup(pcache->tcache, (void *)&key, &entry, &status);
     if(ret != 0)
     {
@@ -165,10 +164,10 @@ int PINT_dbpf_keyval_pcache_lookup(
                          ret, llu(handle), llu(pos));
         }
 
-        gen_mutex_unlock(pcache->mutex);
+        gen_mutex_unlock(&pcache->mutex);
         return ret;
     }
-    gen_mutex_unlock(pcache->mutex);
+    gen_mutex_unlock(&pcache->mutex);
 
     *keyname = ((struct dbpf_keyval_pcache_entry *)entry->payload)->keyname;
     *length = ((struct dbpf_keyval_pcache_entry *)entry->payload)->keylen;
@@ -204,7 +203,7 @@ int PINT_dbpf_keyval_pcache_insert(
     key.handle = handle;
     key.pos = pos;
 
-    gen_mutex_lock(pcache->mutex);
+    gen_mutex_lock(&pcache->mutex);
     if(PINT_tcache_lookup(
             pcache->tcache, (void *)&key, &tentry, &lookup_status) == 0)
     {
@@ -228,11 +227,11 @@ int PINT_dbpf_keyval_pcache_insert(
                      "handle: %llu, pos: %llu: key: %*s\n",
                      ret, llu(handle), llu(pos), length, keyname);
 
-        gen_mutex_unlock(pcache->mutex);
+        gen_mutex_unlock(&pcache->mutex);
         free(entry);
         return ret;
     }
-    gen_mutex_unlock(pcache->mutex);
+    gen_mutex_unlock(&pcache->mutex);
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache insert succeeded: "

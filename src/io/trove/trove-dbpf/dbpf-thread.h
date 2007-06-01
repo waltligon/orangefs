@@ -27,7 +27,7 @@ int dbpf_do_one_work_cycle(int *out_count);
 #define DBPF_COMPLETION_START(cur_op, end_state)                   \
 do {                                                               \
     TROVE_context_id cid = cur_op->op.context_id;                  \
-    gen_mutex_lock(dbpf_completion_queue_array_mutex[cid]);        \
+    gen_mutex_lock(&dbpf_completion_queue_array_mutex[cid]);       \
     dbpf_op_queue_add(dbpf_completion_queue_array[cid],cur_op);    \
     gen_mutex_lock(&cur_op->mutex);                                \
     cur_op->op.state = end_state;                                  \
@@ -54,7 +54,7 @@ do {                                                               \
     
 #define DBPF_COMPLETION_FINISH(__context_id)                           \
 do {                                                                   \
-    gen_mutex_unlock(dbpf_completion_queue_array_mutex[__context_id]); \
+    gen_mutex_unlock(&dbpf_completion_queue_array_mutex[__context_id]);\
 } while(0)
 
 #if defined(__cplusplus)

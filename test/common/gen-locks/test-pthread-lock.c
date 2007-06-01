@@ -46,19 +46,16 @@ int main(int argc, char **argv)	{
  * destroyed */
 static int foo_function(void){
 
-	gen_mutex_t* foo_mutex;
+	gen_mutex_t foo_mutex;
 
-	foo_mutex = gen_mutex_build();
-	if(!foo_mutex){
-		return(-1);
-	}
+	gen_mutex_init(&foo_mutex);
 
-	gen_mutex_lock(foo_mutex);
+	gen_mutex_lock(&foo_mutex);
 		/* Access critical region */
 		printf("Critical region 2.\n");
-	gen_mutex_unlock(foo_mutex);
+	gen_mutex_unlock(&foo_mutex);
 
-	gen_mutex_destroy(foo_mutex);
+	gen_mutex_destroy(&foo_mutex);
 
 	return(0);
 }

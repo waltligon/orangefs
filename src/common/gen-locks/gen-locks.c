@@ -75,33 +75,6 @@ int gen_posix_mutex_trylock(
 }
 
 /*
- * gen_mutex_build()
- *
- * allocates storage for and initializes a new pthread_mutex_t
- *
- * returns a pointer to the new mutex on success, NULL on failure.
- */
-pthread_mutex_t *gen_posix_mutex_build(
-    void)
-{
-
-    pthread_mutex_t *mutex_p = NULL;
-
-    mutex_p = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
-    if (!mutex_p)
-    {
-	return (NULL);
-    }
-    if ((pthread_mutex_init(mutex_p, NULL)) < 0)
-    {
-	free(mutex_p);
-	return (NULL);
-    }
-    return (mutex_p);
-}
-
-
-/*
  * gen_mutex_destroy()
  *
  * uninitializes the mutex and frees all memory associated with it.
@@ -117,7 +90,6 @@ int gen_posix_mutex_destroy(
 	return (-EINVAL);
     }
     pthread_mutex_destroy(mut);
-    free(mut);
 
     return (0);
 }

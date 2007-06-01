@@ -31,13 +31,13 @@ typedef struct
 
     PVFS_fs_id fs_id;
 
-    gen_mutex_t *server_config_mutex;
+    gen_mutex_t server_config_mutex;
     struct server_configuration_s *server_config;
     int ref_count; /* allows same config to be added multiple times */
 } server_config_t;
 
 static struct qhash_table *s_fsid_to_config_table = NULL;
-static gen_mutex_t *s_server_config_mgr_mutex = NULL;
+static gen_mutex_t s_server_config_mgr_mutex = GEN_MUTEX_INITIALIZER;
 /*
   while loading configuration settings for all known file systems
   (across all configured servers), we keep track of the minimum handle
@@ -50,7 +50,7 @@ static int hash_fsid(void *key, int table_size);
 static int hash_fsid_compare(void *key, struct qlist_head *link);
 
 #define SC_MGR_INITIALIZED() \
-(s_fsid_to_config_table && s_server_config_mgr_mutex)
+(s_fsid_to_config_table)
 
 /*
   this is a check that needs to be made each time the
@@ -75,17 +75,8 @@ int PINT_server_config_mgr_initialize(void)
             qhash_init(hash_fsid_compare, hash_fsid, 17);
         if (s_fsid_to_config_table)
         {
-            s_server_config_mgr_mutex = gen_mutex_build();
-            if (s_server_config_mgr_mutex)
-            {
-                s_min_handle_recycle_timeout_in_sec = -1;
-                ret = 0;
-            }
-            else
-            {
-                qhash_finalize(s_fsid_to_config_table);
-                ret = -PVFS_ENOMEM;
-            }
+            s_min_handle_recycle_timeout_in_sec = -1;
+            ret = 0;
         }
         else
         {
@@ -103,7 +94,7 @@ int PINT_server_config_mgr_finalize(void)
 
     if (SC_MGR_INITIALIZED())
     {
-        gen_mutex_lock(s_server_config_mgr_mutex);
+        gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
         for (i = 0; i < s_fsid_to_config_table->table_size; i++)
@@ -121,7 +112,7 @@ int PINT_server_config_mgr_finalize(void)
 
                     PINT_config_release(config->server_config);
                     free(config->server_config);
-                    gen_mutex_destroy(config->server_config_mutex);
+                    gen_mutex_destroy(&config->server_config_mutex);
                     free(config);
                 }
             } while(hash_link);
@@ -129,9 +120,8 @@ int PINT_server_config_mgr_finalize(void)
         qhash_finalize(s_fsid_to_config_table);
         s_fsid_to_config_table = NULL;
 
-        gen_mutex_unlock(s_server_config_mgr_mutex);
-        gen_mutex_destroy(s_server_config_mgr_mutex);
-        s_server_config_mgr_mutex = NULL;
+        gen_mutex_unlock(&s_server_config_mgr_mutex);
+        gen_mutex_destroy(&s_server_config_mgr_mutex);
         s_min_handle_recycle_timeout_in_sec = -1;
 
         ret = 0;
@@ -149,7 +139,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
 
     if (SC_MGR_INITIALIZED())
     {
-        gen_mutex_lock(s_server_config_mgr_mutex);
+        gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
         PINT_cached_config_finalize();
@@ -157,7 +147,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
         if (ret)
         {
             PVFS_perror("PINT_cached_config_initialize failed", ret);
-            gen_mutex_unlock(s_server_config_mgr_mutex);
+            gen_mutex_unlock(&s_server_config_mgr_mutex);
             return ret;
         }
 
@@ -208,12 +198,12 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                 if (ret)
                 {
                     PVFS_perror("PINT_handle_load_mapping failed", ret);
-                    gen_mutex_unlock(s_server_config_mgr_mutex);
+                    gen_mutex_unlock(&s_server_config_mgr_mutex);
                     return ret;
                 }
             }
         }
-        gen_mutex_unlock(s_server_config_mgr_mutex);
+        gen_mutex_unlock(&s_server_config_mgr_mutex);
         ret = 0;
     }
     return ret;
@@ -235,7 +225,7 @@ int PINT_server_config_mgr_add_config(
 
     if (SC_MGR_INITIALIZED() && config_s)
     {
-        gen_mutex_lock(s_server_config_mgr_mutex);
+        gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
         hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
@@ -252,7 +242,7 @@ int PINT_server_config_mgr_add_config(
              * structure
              */
             *free_config_flag = 1;
-            gen_mutex_unlock(s_server_config_mgr_mutex);
+            gen_mutex_unlock(&s_server_config_mgr_mutex);
             return(0);
         }
 
@@ -264,12 +254,7 @@ int PINT_server_config_mgr_add_config(
         }
         memset(config, 0, sizeof(server_config_t));
 
-        config->server_config_mutex = gen_mutex_build();
-        if (!config->server_config_mutex)
-        {
-            ret = -PVFS_ENOMEM;
-            goto add_failure;
-        }
+        gen_mutex_init(&config->server_config_mutex);
 
         config->server_config = config_s;
         config->fs_id = fs_id;
@@ -281,7 +266,7 @@ int PINT_server_config_mgr_add_config(
         gossip_debug(GOSSIP_CLIENT_DEBUG, "\tmapped fs_id %d => "
                      "config %p\n", fs_id, config_s);
 
-        gen_mutex_unlock(s_server_config_mgr_mutex);
+        gen_mutex_unlock(&s_server_config_mgr_mutex);
 
         ret = 0;
     }
@@ -294,14 +279,10 @@ int PINT_server_config_mgr_add_config(
     if (config)
     {
         qhash_search_and_remove(s_fsid_to_config_table, &fs_id);
-        if (config->server_config_mutex)
-        {
-            gen_mutex_destroy(config->server_config_mutex);
-            config->server_config_mutex = NULL;
-        }
+        gen_mutex_destroy(&config->server_config_mutex);
         free(config);
     }
-    gen_mutex_unlock(s_server_config_mgr_mutex);
+    gen_mutex_unlock(&s_server_config_mgr_mutex);
     return ret;
 }
 
@@ -317,7 +298,7 @@ int PINT_server_config_mgr_remove_config(
 
     if (SC_MGR_INITIALIZED())
     {
-        gen_mutex_lock(s_server_config_mgr_mutex);
+        gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
         hash_link = qhash_search(
@@ -345,12 +326,12 @@ int PINT_server_config_mgr_remove_config(
                 PINT_config_release(config->server_config);
                 free(config->server_config);
 
-                if(gen_mutex_trylock(config->server_config_mutex) == EBUSY)
+                if(gen_mutex_trylock(&config->server_config_mutex) == EBUSY)
                 {
                     gossip_err("FIXME: Destroying mutex that is in use!\n");
                 }
-                gen_mutex_unlock(config->server_config_mutex);
-                gen_mutex_destroy(config->server_config_mutex);
+                gen_mutex_unlock(&config->server_config_mutex);
+                gen_mutex_destroy(&config->server_config_mutex);
 
                 free(config);
                 config = NULL;
@@ -364,7 +345,7 @@ int PINT_server_config_mgr_remove_config(
 
             ret = 0;
         }
-        gen_mutex_unlock(s_server_config_mgr_mutex);
+        gen_mutex_unlock(&s_server_config_mgr_mutex);
     }
     return ret;
 }
@@ -378,7 +359,7 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
 
     if (SC_MGR_INITIALIZED())
     {
-        gen_mutex_lock(s_server_config_mgr_mutex);
+        gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
         hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
@@ -392,10 +373,10 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
                 GOSSIP_CLIENT_DEBUG, "server_config_mgr: LOCKING config "
                 "object %p with fs_id %d\n", config, fs_id);
 #endif
-            gen_mutex_lock(config->server_config_mutex);
+            gen_mutex_lock(&config->server_config_mutex);
             ret = config->server_config;
         }
-        gen_mutex_unlock(s_server_config_mgr_mutex);
+        gen_mutex_unlock(&s_server_config_mgr_mutex);
     }
     return ret;
 }
@@ -410,7 +391,7 @@ void __PINT_server_config_mgr_put_config(
 
     if (SC_MGR_INITIALIZED() && config_s)
     {
-        gen_mutex_lock(s_server_config_mgr_mutex);
+        gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK( );
 
         cur = config_s->file_systems;
@@ -431,9 +412,9 @@ void __PINT_server_config_mgr_put_config(
                 GOSSIP_CLIENT_DEBUG, "server_config_mgr: "
                 "UNLOCKING config object %p\n", config);
 #endif
-            gen_mutex_unlock(config->server_config_mutex);
+            gen_mutex_unlock(&config->server_config_mutex);
         }
-        gen_mutex_unlock(s_server_config_mgr_mutex);
+        gen_mutex_unlock(&s_server_config_mgr_mutex);
     }
 }
 
