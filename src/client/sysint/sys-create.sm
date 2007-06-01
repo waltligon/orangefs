@@ -311,6 +311,7 @@ PVFS_error PVFS_isys_create(
         if (0 == rc)
         {
             num_dfiles_req = mntent.default_num_dfiles;
+            PVFS_util_free_mntent(&mntent);
         }
     }
 
