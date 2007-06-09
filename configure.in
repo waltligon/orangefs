@@ -578,9 +578,12 @@ test_for_epoll()
 	int fd;
 	fd = epoll_create(1);
 	close(fd);
-  ], CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
+  ],
+     AC_MSG_RESULT(yes)
+     CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
      BUILD_EPOLL=1
      AC_SUBST(BUILD_EPOLL),
+     AC_MSG_RESULT(no)
   )
 }
 
@@ -613,6 +616,12 @@ AC_ARG_ENABLE(shared,
 [  --enable-shared         Build shared client library],
 [build_shared=$enableval], [build_shared=no])
 AC_SUBST(build_shared)
+
+dnl Bad things happen in the makefile if you happen to --disable-static
+dnl but do not --enable-shared.
+if test "x$build_shared" = "xno" -a "x$build_static" = "xno" ; then
+    AC_MSG_ERROR([Must do --enable-shared or --enable-static or both.])
+fi
 
 dnl See if CC is a GNU compiler.  This may require a real test in future
 dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
