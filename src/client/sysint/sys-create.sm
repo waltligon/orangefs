@@ -946,7 +946,7 @@ static PINT_sm_action create_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref metafile_ref;
-    PVFS_size tmp_size;
+    PVFS_size tmp_size = 0;
     int ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
