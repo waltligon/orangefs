@@ -1248,7 +1248,7 @@ DOTCONF_CB(exit_distribution_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_GLOBAL;
+    config_s->configuration_context = CTX_FILESYSTEM;
     return NULL;
 }
 
