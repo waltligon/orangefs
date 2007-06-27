@@ -150,12 +150,6 @@ static PINT_sm_action lookup_init(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, " STARTING LOOKUP REQUEST "
-                     "(path:%s)(fs_id:%d)(handle:%llu)(attrmask:%u)\n",
-                     s_op->req->u.lookup_path.path,
-                     s_op->req->u.lookup_path.fs_id,
-                     llu(s_op->req->u.lookup_path.starting_handle),
-                     s_op->req->u.lookup_path.attrmask);
 
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
@@ -165,6 +159,14 @@ static PINT_sm_action lookup_init(
     s_op->u.lookup.handle_ct = 0;
     s_op->u.lookup.attr_ct = 0;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, " STARTING LOOKUP REQUEST "
+                     "(path:%s)(fs_id:%d)(handle:%llu)(attrmask:%u)"
+                     "(# of segments:%u)\n",
+                     s_op->req->u.lookup_path.path,
+                     s_op->req->u.lookup_path.fs_id,
+                     llu(s_op->req->u.lookup_path.starting_handle),
+                     s_op->req->u.lookup_path.attrmask,
+                     s_op->u.lookup.seg_ct);
     if ((s_op->u.lookup.seg_ct < 0) ||
         (s_op->u.lookup.seg_ct > PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
     {

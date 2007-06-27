@@ -170,11 +170,11 @@ static int initialize_context(
     char *pathname,
     PVFS_object_ref ctx_starting_refn)
 {
-    int ret = -PVFS_EINVAL, pathlen = 0, num_segments = 0;
+    int i, ret = -PVFS_EINVAL, pathlen = 0, num_segments = 0;
     void *state = NULL;
     int cur_seg_index = 0, prev_ctx_index = 0;
     char *cur_seg_name = NULL;
-    char *orig_pathname = NULL, *seg_remaining = NULL;
+    char *orig_pathname = NULL, *seg_remaining = NULL, *slash_str = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     int num_consecutive_prev_ctx_dot_dots = 0;
     PINT_client_lookup_sm_ctx *ctx = NULL;
@@ -378,7 +378,16 @@ static int initialize_context(
             cur_seg->seg_name = strdup(cur_seg_name);
             assert(cur_seg->seg_name);
 
-            seg_remaining = strstr(orig_pathname, cur_seg_name);
+            slash_str = orig_pathname;
+            for (i = 0; i < cur_seg_index; i++) {
+                slash_str = strrchr(slash_str, '/');
+                if (slash_str == NULL) {
+                    break;
+                }
+                slash_str++;
+            }
+            /* seg_remaining = strstr(orig_pathname, cur_seg_name); */
+            seg_remaining = slash_str;
             if (seg_remaining)
             {
                 gossip_debug(GOSSIP_LOOKUP_DEBUG,
