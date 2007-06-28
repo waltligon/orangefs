@@ -700,6 +700,19 @@ using {\tt --all}, the option {\tt --fs} can be used to specify the name of
 the storage collection that needs to be migrated (usually there's only
 one storage collection, with the default name of 'pvfs2-fs').
 
+\subsection{Problems with pre-release kernels}
+\label{sec:rc-kernels}
+
+For better or worse, the Linux kernel development process for the 2.6 series
+does not make much effort to maintain a stable kernel API.  As a result, we
+often find we need to make small adjustments to the PVFS kernel module to track
+recent kernel additions or changes.  
+
+If you are using a pre-release kernel (anything with -rc in the name), you
+stand a good chance of running into problems.  We are unable to track every
+pre-release kernel, but do make an effort to publish necessary patches once a
+kernel is officially released. 
+
 %
 % PERFORMANCE
 %
