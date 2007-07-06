@@ -122,7 +122,7 @@ int BMI_initialize(const char *method_list,
     char **listen_addrs = NULL;
     char *this_addr = NULL;
     char *proto = NULL;
-    int addr_count;
+    int addr_count = 0;
 
     id_gen_safe_initialize();
 
