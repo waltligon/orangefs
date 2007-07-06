@@ -84,7 +84,7 @@ int main(int argc, char * argv[])
 
     ret = PVFS_sys_create(
 	(char*)filename, 
-	lookup_resp.ref, attr, &creds, NULL, &create_resp);
+	lookup_resp.ref, attr, &creds, NULL, NULL, &create_resp);
     if(ret < 0) goto error;
 
     for(; i < count; ++i)

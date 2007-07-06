@@ -1115,6 +1115,7 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
                           attr, 
                           (PVFS_credentials *) credentials,
                           NULL,           /* Accept default distribution for fs */
+                          NULL,
                           &resp_create);
 
     if (ret < 0)

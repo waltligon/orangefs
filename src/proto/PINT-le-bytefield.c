@@ -510,6 +510,8 @@ static int lebf_encode_resp(
     return ret;
 }
 
+const char * PINT_map_server_op_to_string(enum PVFS_server_op op);
+
 /* lebf_decode_req()
  *
  * decodes a request message

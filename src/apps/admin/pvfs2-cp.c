@@ -628,7 +628,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
             
 		ret = PVFS_sys_create(entry_name, parent_ref, 
                                       obj->u.pvfs2.attr, credentials,
-                                      new_dist, &resp_create);
+                                      new_dist, NULL, &resp_create);
 		if (ret < 0)
 		{
 		    PVFS_perror("PVFS_sys_create", ret); 

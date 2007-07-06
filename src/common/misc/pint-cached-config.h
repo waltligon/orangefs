@@ -32,6 +32,11 @@ int PINT_handle_load_mapping(
     struct server_configuration_s *config,
     struct filesystem_configuration_s *fs);
 
+int PINT_cached_config_map_alias(
+    struct server_configuration_s *config,
+    const char *alias,
+    PVFS_BMI_addr_t *addr);
+
 int PINT_cached_config_get_next_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
@@ -67,7 +72,21 @@ int PINT_cached_config_count_servers(
 int PINT_cached_config_map_to_server(
     PVFS_BMI_addr_t *server_addr,
     PVFS_handle handle,
-    PVFS_fs_id fsid);
+    PVFS_fs_id fs_id);
+
+int PINT_cached_config_map_servers(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    int *inout_num_datafiles,
+    PVFS_sys_layout *layout,
+    PVFS_BMI_addr_t *addr_array,
+    PVFS_handle_extent_array *handle_extent_array);
+
+int PINT_cached_config_get_extents(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    PVFS_BMI_addr_t *addr,
+    PVFS_handle_extent_array *handle_extents);
 
 int PINT_cached_config_get_num_dfiles(
     PVFS_fs_id fsid,

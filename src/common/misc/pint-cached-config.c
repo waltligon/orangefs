@@ -388,6 +388,214 @@ int PINT_cached_config_get_next_meta(
     return ret;
 }
 
+int PINT_cached_config_get_extents(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    PVFS_BMI_addr_t *addr,
+    PVFS_handle_extent_array *handle_extents)
+{
+    struct qhash_head *hash_link;
+    struct PINT_llist *server_list;
+    PVFS_BMI_addr_t tmp_addr;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+    int num_io_servers, ret;
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if(!hash_link)
+    {
+        gossip_err("Failed to find a file system matching fsid: %d\n", fsid);
+        return -PVFS_EINVAL;
+    }
+
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
+
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    server_list = cur_config_cache->fs->data_handle_ranges;
+    num_io_servers = PINT_llist_count(server_list);
+
+    while(!PINT_llist_empty(server_list))
+    {
+        cur_mapping = PINT_llist_head(server_list);
+        assert(cur_mapping);
+        server_list = PINT_llist_next(server_list);
+
+        ret = BMI_addr_lookup(
+            &tmp_addr, PINT_config_get_host_addr_ptr(
+                config, cur_mapping->alias_mapping->host_alias));
+        if(ret < 0)
+        {
+            return ret;
+        }
+
+        if(tmp_addr == *addr)
+        {
+            handle_extents->extent_count =
+                cur_mapping->handle_extent_array.extent_count;
+            handle_extents->extent_array =
+                cur_mapping->handle_extent_array.extent_array;
+
+            return 0;
+        }
+    }
+    return -PVFS_ENOENT;
+}
+
+int PINT_cached_config_map_servers(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    int *inout_num_datafiles,
+    PVFS_sys_layout *layout,
+    PVFS_BMI_addr_t *addr_array,
+    PVFS_handle_extent_array *handle_extent_array)
+{
+    struct qhash_head *hash_link;
+    struct PINT_llist *server_list;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    int num_io_servers, i, j, ret;
+    int start_index = -1;
+    int index;
+
+    assert(config);
+    assert(inout_num_datafiles);
+    assert(handle_extent_array);
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if(!hash_link)
+    {
+        gossip_err("Failed to find a file system matching fsid: %d\n", fsid);
+        return -PVFS_EINVAL;
+    }
+
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
+
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    server_list = cur_config_cache->fs->data_handle_ranges;
+    num_io_servers = PINT_llist_count(server_list);
+
+    switch(layout->algorithm)
+    {
+        case PVFS_SYS_LAYOUT_LIST:
+
+            if(*inout_num_datafiles < layout->server_list.count)
+            {
+                gossip_err("The specified datafile layout is larger"
+                           " than the number of requested datafiles\n");
+                return -PVFS_EINVAL;
+            }
+
+            *inout_num_datafiles = layout->server_list.count;
+            for(i = 0; i < layout->server_list.count; ++i)
+            {
+                ret = PINT_cached_config_get_extents(
+                    config, fsid,
+                    &layout->server_list.servers[i],
+                    &handle_extent_array[i]);
+                if(ret < 0)
+                {
+                    gossip_err("The address specified in the datafile "
+                                "layout is invalid\n");
+                    return ret;
+                }
+
+                addr_array[i] = layout->server_list.servers[i];
+            }
+            break;
+
+        case PVFS_SYS_LAYOUT_NONE:
+            start_index = 0;
+            /* fall through */
+
+        case PVFS_SYS_LAYOUT_ROUND_ROBIN:
+
+            if(num_io_servers < *inout_num_datafiles)
+            {
+                *inout_num_datafiles = num_io_servers;
+            }
+
+            if(start_index == -1)
+            {
+                start_index = rand() % *inout_num_datafiles;
+            }
+
+            for(i = 0; i < *inout_num_datafiles; ++i)
+            {
+                cur_mapping = PINT_llist_head(server_list);
+                assert(cur_mapping);
+                server_list = PINT_llist_next(server_list);
+
+                index = (i + start_index) % *inout_num_datafiles;
+                ret = BMI_addr_lookup(
+                    &addr_array[index], PINT_config_get_host_addr_ptr(
+                        config, cur_mapping->alias_mapping->host_alias));
+                if (ret)
+                {
+                    return ret;
+                }
+
+                handle_extent_array[index].extent_count =
+                    cur_mapping->handle_extent_array.extent_count;
+                handle_extent_array[index].extent_array =
+                    cur_mapping->handle_extent_array.extent_array;
+            }
+            break;
+
+        case PVFS_SYS_LAYOUT_RANDOM:
+
+            /* all random */
+            if(num_io_servers < *inout_num_datafiles)
+            {
+                *inout_num_datafiles = num_io_servers;
+            }
+
+            /* init all the addrs to 0, so we know whether we've set an
+             * address at a particular index or not
+             */
+            for(i = 0; i < *inout_num_datafiles; ++i)
+            {
+                index = rand() % *inout_num_datafiles;
+                for(j = 0; j < i; ++j)
+                {
+                    if(addr_array[index] == 0)
+                    {
+                        cur_mapping = PINT_llist_head(server_list);
+                        assert(cur_mapping);
+                        server_list = PINT_llist_next(server_list);
+
+                        /* found an unused index */
+                        ret = BMI_addr_lookup(
+                            &addr_array[index],
+                            PINT_config_get_host_addr_ptr(
+                                config,
+                                cur_mapping->alias_mapping->host_alias));
+                        if (ret)
+                        {
+                            return ret;
+                        }
+
+                        handle_extent_array[index].extent_count =
+                            cur_mapping->handle_extent_array.extent_count;
+                        handle_extent_array[index].extent_array =
+                            cur_mapping->handle_extent_array.extent_array;
+                    }
+                }
+            }
+            break;
+        default:
+            gossip_err("Unknown datafile mapping algorithm\n");
+            return -PVFS_EINVAL;
+    }
+    return 0;
+}
+
+
 /* PINT_cached_config_get_next_io()
  *
  * returns the address of a set of servers that should be used to

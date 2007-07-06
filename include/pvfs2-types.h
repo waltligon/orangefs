@@ -171,6 +171,50 @@ endecode_fields_1a(
     uint32_t, extent_count,
     PVFS_handle_extent, extent_array);
 
+/* Layout algorithm for converting from server lists in the config
+ * to a list of servers to use to store datafiles for a file.
+ */
+enum PVFS_sys_layout_algorithm
+{
+    /* order the datafiles according to the server list */
+    PVFS_SYS_LAYOUT_NONE = 1,
+
+    /* choose the first datafile randomly, and then round-robin in-order */
+    PVFS_SYS_LAYOUT_ROUND_ROBIN = 2,
+
+    /* choose each datafile randomly */
+    PVFS_SYS_LAYOUT_RANDOM = 3,
+
+    /* order the datafiles based on the list specified */
+    PVFS_SYS_LAYOUT_LIST = 4
+};
+
+/* The list of datafile servers that can be passed into PVFS_sys_create
+ * to specify the exact layout of a file.  The count parameter will override
+ * the num_dfiles field in the attribute.
+ */
+struct PVFS_sys_server_list
+{
+    int32_t count;
+    PVFS_BMI_addr_t *servers;
+};
+
+/* The server laout struct passed to PVFS_sys_create.  The algorithm
+ * specifies how the servers are chosen to layout the file.  If the
+ * algorithm is set to PVFS_SYS_LAYOUT_LIST, the server_list parameter
+ * is used to determine the layout.
+ */
+typedef struct PVFS_sys_layout_s
+{
+    /* The algorithm to use to layout the file */
+    enum PVFS_sys_layout_algorithm algorithm;
+
+    /* The server list specified if the
+     * PVFS_SYS_LAYOUT_LIST algorithm is chosen.
+     */
+    struct PVFS_sys_server_list server_list;
+} PVFS_sys_layout;
+
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL     ((PVFS_handle)0)
 #define PVFS_FS_ID_NULL       ((PVFS_fs_id)0)

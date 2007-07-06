@@ -85,6 +85,7 @@ struct PINT_client_create_sm
     int stored_error_code;
 
     PINT_dist *dist;
+    PVFS_sys_layout layout;
     PVFS_handle metafile_handle;
     PVFS_handle *datafile_handles;
     PVFS_BMI_addr_t *data_server_addrs;

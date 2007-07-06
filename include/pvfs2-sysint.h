@@ -349,6 +349,7 @@ PVFS_error PVFS_isys_create(
     PVFS_sys_attr attr,
     const PVFS_credentials *credentials,
     PVFS_sys_dist *dist,
+    PVFS_sys_layout *layout,
     PVFS_sysresp_create *resp,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
@@ -359,6 +360,7 @@ PVFS_error PVFS_sys_create(
     PVFS_sys_attr attr,
     const PVFS_credentials *credentials,
     PVFS_sys_dist *dist,
+    PVFS_sys_layout *layout,
     PVFS_sysresp_create *resp);
 
 PVFS_error PVFS_isys_remove(

@@ -80,7 +80,7 @@ int main(int argc, char **argv)
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          &credentials, NULL, &resp_create);
+                          &credentials, NULL, NULL, &resp_create);
     if (ret < 0)
     {
         printf("create failed with errcode = %d\n", ret);

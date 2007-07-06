@@ -504,7 +504,7 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.create.d_name,
         vfs_request->in_upcall.req.create.parent_refn,
         vfs_request->in_upcall.req.create.attributes,
-        &vfs_request->in_upcall.credentials, NULL,
+        &vfs_request->in_upcall.credentials, NULL, NULL,
         &vfs_request->response.create,
         &vfs_request->op_id, (void *)vfs_request);
 

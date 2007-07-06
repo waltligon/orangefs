@@ -93,7 +93,7 @@ int main(int argc, char **argv)
         assert(entry_name);
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      &credentials, NULL, &resp_cr);
+			      &credentials, NULL, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_create() failure", ret);

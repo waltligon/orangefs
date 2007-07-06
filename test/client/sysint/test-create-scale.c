@@ -119,7 +119,7 @@ int main(int argc, char **argv)
     /* do one big one to prime connections if needed */
     sprintf(entry_name, "%s%d", str_buf, 0);
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			  &credentials, NULL, &resp_create);
+			  &credentials, NULL, NULL, &resp_create);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_create", ret);
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
 	    attr.dfile_count = i+1;
 	    start_time = Wtime();
 	    ret = PVFS_sys_create(entry_name, parent_refn, attr,
-				  &credentials, NULL, &resp_create);
+				  &credentials, NULL, NULL, &resp_create);
 	    end_time = Wtime();
 	    if (ret < 0)
 	    {
