@@ -282,20 +282,6 @@ static void pvfs2_inode_cache_ctor(
     init_rwsem(&pvfs2_inode->xattr_sem);
 }
 
-static void pvfs2_inode_cache_dtor(
-    void *old_pvfs2_inode,
-    pvfs2_kmem_cache_t * cachep,
-    unsigned long flags)
-{
-    pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *)old_pvfs2_inode;
-
-    if (pvfs2_inode && pvfs2_inode->link_target)
-    {
-        kfree(pvfs2_inode->link_target);
-        pvfs2_inode->link_target = NULL;
-    }
-}
-
 static inline void add_to_pinode_list(pvfs2_inode_t *pvfs2_inode)
 {
     spin_lock(&pvfs2_inode_list_lock);
@@ -316,8 +302,7 @@ int pvfs2_inode_cache_initialize(void)
 {
     pvfs2_inode_cache = kmem_cache_create(
         "pvfs2_inode_cache", sizeof(pvfs2_inode_t), 0,
-        PVFS2_CACHE_CREATE_FLAGS, pvfs2_inode_cache_ctor,
-        pvfs2_inode_cache_dtor);
+        PVFS2_CACHE_CREATE_FLAGS, pvfs2_inode_cache_ctor, NULL);
 
     if (!pvfs2_inode_cache)
     {
