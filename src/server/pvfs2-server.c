@@ -1471,6 +1471,15 @@ static int server_shutdown(
                      "interface         [ stopped ]\n");
     }
 
+    if (status & SERVER_DIST_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting dist "
+                     "interface            [   ...   ]\n");
+        PINT_dist_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         dist "
+                     "interface            [ stopped ]\n");
+    }
+
     if (status & SERVER_PERF_COUNTER_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting performance "
