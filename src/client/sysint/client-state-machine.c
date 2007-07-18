@@ -571,7 +571,7 @@ PVFS_error PINT_client_state_machine_test(
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *smcb_p_array[MAX_RETURNED_JOBS] = {NULL};
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
                  "PINT_client_state_machine_test id %lld\n",lld(op_id));
 
     CLIENT_SM_ASSERT_INITIALIZED();
