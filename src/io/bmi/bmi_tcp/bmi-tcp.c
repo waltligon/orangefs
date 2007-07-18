@@ -315,7 +315,12 @@ struct bmi_method_ops bmi_tcp_ops = {
 };
 
 /* module parameters */
-static method_params_st tcp_method_params;
+static struct
+{
+    int method_flags;
+    int method_id;
+    method_addr_p listen_addr;
+} tcp_method_params;
 
 #if defined(USE_TRUSTED) && defined(__PVFS2_SERVER__)
 static struct tcp_allowed_connection_s *gtcp_allowed_connection = NULL;
@@ -417,7 +422,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
     gen_mutex_lock(&interface_mutex);
 
     /* zero out our parameter structure and fill it in */
-    memset(&tcp_method_params, 0, sizeof(struct method_params));
+    memset(&tcp_method_params, 0, sizeof(tcp_method_params));
     tcp_method_params.method_id = method_id;
     tcp_method_params.method_flags = init_flags;
 

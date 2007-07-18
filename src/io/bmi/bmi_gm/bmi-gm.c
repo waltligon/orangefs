@@ -176,7 +176,12 @@ struct bmi_method_ops bmi_gm_ops = {
 };
 
 /* module parameters */
-static method_params_st gm_method_params;
+static struct
+{
+    int method_flags;
+    int method_id;
+    method_addr_p listen_addr;
+} gm_method_params;
 
 /* op_list_array indices */
 enum
@@ -441,7 +446,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 	sizeof(struct ctrl_msg);
 
     /* zero out our parameter structure and fill it in */
-    memset(&gm_method_params, 0, sizeof(struct method_params));
+    memset(&gm_method_params, 0, sizeof(gm_method_params));
     gm_method_params.method_id = method_id;
     gm_method_params.method_flags = init_flags;
 

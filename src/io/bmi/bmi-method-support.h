@@ -171,7 +171,13 @@ struct bmi_method_ops
 };
 
 
-/* this is the internal structure used to represent method operations */
+/*
+ * This structure is somewhat optional.  TCP and GM use the elements in
+ * here extensively, but IB, MX, Portals only use the bits required by
+ * the generic BMI layer.  Those are op_id and addr.  Everything else is
+ * ignored.  Would be nice to push most of method_op down into TCP and GM
+ * so other BMI implementations do not need to drag around the unused fields.
+ */
 struct method_op
 {
     bmi_op_id_t op_id;		/* operation identifier */
@@ -203,15 +209,6 @@ struct method_op
     bmi_size_t cur_index_complete;
 };
 typedef struct method_op method_op_st, *method_op_p;
-
-/* generic method parameters */
-struct method_params
-{
-    int method_flags;
-    int method_id;
-    method_addr_p listen_addr;
-};
-typedef struct method_params method_params_st, *method_params_p;
 
 struct method_drop_addr_query
 {
