@@ -16,11 +16,21 @@
 #define roundup8(x) (((x)+7) & ~7)
 
 /*
- * Look at the pointer value, push it up to the next 8 bytes.
+ * Look at the pointer value, leave it alone if aligned, or push it up to
+ * the next 8 bytes.
  */
+#ifdef HAVE_VALGRIND_H
 #define align8(pptr) do { \
-    *(pptr) = ((void *)(((unsigned long)(*(pptr)) + 8) & ~7)); \
+    int _pad = roundup8((uintptr_t) *(pptr)) - (uintptr_t) *(pptr); \
+    memset(*(pptr), 0, _pad); \
+    *(pptr) += _pad; \
 } while(0);
+#else
+#define align8(pptr) do { \
+    int _pad = roundup8((uintptr_t) *(pptr)) - (uintptr_t) *(pptr); \
+    *(pptr) += _pad; \
+} while(0);
+#endif
 
 /*
  * Files that want full definitions for the encoding and decoding functions
