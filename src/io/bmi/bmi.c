@@ -465,6 +465,9 @@ int BMI_finalize(void)
     free(known_method_table);
     known_method_count = 0;
 
+    if (method_usage)
+        free(method_usage);
+
     /* destroy the reference list */
     /* (side effect: destroys all method addresses as well) */
     ref_list_cleanup(cur_ref_list);
