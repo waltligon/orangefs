@@ -346,10 +346,9 @@ cscope:
 # build editor tags file over all source files *.[ch] *.sm and
 # some known scripts
 tags:
-	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include . \
-	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
-	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig \
-	) | ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
+	( find $(addprefix $(srcdir)/,$(MODULES)) \
+	    -maxdepth 1 -name '*.[ch]' ;\
+	) | ctags -L- --excmd=pattern -B --extra=+f -I __hidden
 
 # top rule for cleaning up tree
 clean: 
