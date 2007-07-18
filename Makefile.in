@@ -707,17 +707,18 @@ cscope:
 
 # Build editor tags file over all source files *.[ch] *.sm and
 # some known scripts.  Grab the config files from the build dir.
-# If the build happens to be the source, ignore all sm->c generated
-# files with the help of uniq.
+# Ignore all generated C files by echoing them and trusting uniq to
+# throw away the duplicates.  Echo them twice so they do not survive
+# uniq for out-of-tree builds.
 tags:
 	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include \
 	    $(srcdir)/src/kernel/linux-2.6 \
 	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
-	  find . -name pvfs2-config.h ;\
-	  find . -name pvfs2-test-config.h ;\
+	  find . -maxdepth 1 -name pvfs2-config.h ;\
 	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig ;\
+	  echo $(patsubst %,./%,$(SMCGEN) $(SMCGEN)) | tr ' ' '\012' ;\
 	) | sort | uniq -u | ctags -L- --excmd=pattern -B --extra=+f \
-	  --langmap=c:+.sm -I __hidden,DOTCONF_CB
+	  --langmap=c:+.sm -I __hidden,DOTCONF_CB,nested,machine=struct
 
 # rule for running code check
 codecheck:
