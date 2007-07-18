@@ -536,6 +536,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     }
     s_stat_tab_count++;
     strcpy(s_stat_tab_array[s_stat_tab_count-1].tabfile_name, targetfile);
+    PINT_fstab_close(mnt_fp);
     gen_mutex_unlock(&s_stat_tab_mutex);
     return (&s_stat_tab_array[s_stat_tab_count - 1]);
 
