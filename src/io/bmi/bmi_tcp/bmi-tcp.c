@@ -548,7 +548,6 @@ method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
     method_addr_p new_addr = NULL;
     struct tcp_addr *tcp_addr_data = NULL;
     int ret = -1;
-    char local_tag[] = "NULL";
 
     tcp_string = string_key("tcp", id_string);
     if (!tcp_string)
@@ -595,11 +594,6 @@ method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
     hostname[delim - tcp_string] = '\0';
 
     tcp_addr_data->hostname = hostname;
-
-    if (strcmp(hostname, local_tag) == 0)
-    {
-	new_addr->local_addr = 1;
-    }
 
     free(tcp_string);
     return (new_addr);

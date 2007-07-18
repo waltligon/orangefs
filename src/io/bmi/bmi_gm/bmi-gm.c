@@ -703,7 +703,8 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
     gen_mutex_lock(&interface_mutex);
     if (strncmp(gm_string, local_tag, strlen(local_tag)) == 0)
     {
-	new_addr->local_addr = 1;
+	/* is a local address */
+	;
     }
     else if(local_port != NULL)
     {

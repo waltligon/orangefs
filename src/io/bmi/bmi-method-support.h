@@ -35,17 +35,13 @@
  * method interfaces and data structures 
  */
 
-/* this is the generic address structure which contains adressing
+/* This is the generic address structure which contains adressing
  * information for every protocol we support.  The method routines
- * can look into the union to find necessary information for a given
- * device.
+ * upcast the void* to find their particular device information.
  */
 struct method_addr
 {
     int method_type;
-    /* indicates if the address is on the local machine (usually for 
-     * server listening) */
-    int local_addr;
     void *method_data;		/* area to be used by specific methods */
 };
 typedef struct method_addr method_addr_st, *method_addr_p;
