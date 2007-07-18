@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.13 2007-05-08 21:28:01 pw Exp $
+ * $Id: openib.c,v 1.14 2007-07-18 20:36:12 pw Exp $
  */
 #include <string.h>
 #include <errno.h>
@@ -17,7 +17,7 @@
 #include <src/common/misc/pvfs2-internal.h>  /* llu */
 #include <infiniband/verbs.h>
 
-#ifdef HAVE_VALGRIND
+#ifdef HAVE_VALGRIND_H
 #include <memcheck.h>
 #else
 #define VALGRIND_MAKE_MEM_DEFINED(addr,len)
