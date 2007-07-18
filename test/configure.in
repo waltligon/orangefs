@@ -97,8 +97,8 @@ AC_ARG_WITH(mpi,
 )
 
 dnl default paths:
-PVFS2_SRC_RELATIVE_TOP="${srcdir}/../"
-PVFS2_BUILD_RELATIVE_TOP="../"
+PVFS2_SRC_RELATIVE_TOP="${srcdir}/.."
+PVFS2_BUILD_RELATIVE_TOP=".."
 
 AC_ARG_WITH(pvfs2-src, 
 [  --with-pvfs2-src=<dir>  Location of the PVFS2 src directory],
