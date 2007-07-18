@@ -14005,6 +14005,10 @@ fi
 
     BUILD_MX=1
     CPPFLAGS="$CPPFLAGS_OLD"
+    CFLAGS="${CFLAGS} -I${MX_HOME}/include"
+    LDFLAGS="$LDFLAGS -L${MX_HOME}/lib"
+    SERVER_LDFLAGS="$SERVER_LDFLAGS -L${MX_HOME}/lib"
+    LIBS="$LIBS -lmyriexpress"
 fi
 
 

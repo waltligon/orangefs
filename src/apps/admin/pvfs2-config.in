@@ -55,6 +55,9 @@ while test $# -gt 0; do
 	if [ x"@BUILD_OPENIB@" = x"1" ]; then
 		libflags="$libflags -L@OPENIB_LIBDIR@ -libverbs"
 	fi
+	if [ x"@BUILD_MX@" = x"1" ]; then
+		libflags="$libflags -L@MX_HOME@/lib -lmyriexpress"
+	fi
 
 	echo $libflags
 	;;
@@ -71,6 +74,9 @@ while test $# -gt 0; do
 	fi
 	if [ x"@BUILD_OPENIB@" = x"1" ]; then
 		libflags="$libflags -L@OPENIB_LIBDIR@ -libverbs"
+	fi
+	if [ x"@BUILD_MX@" = x"1" ]; then
+		libflags="$libflags -L@MX_HOME@/lib -lmyriexpress"
 	fi
 
 	echo $libflags

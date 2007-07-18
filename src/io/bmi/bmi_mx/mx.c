@@ -2300,6 +2300,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
         struct bmx_ctx  *ctx            = NULL;
         struct bmx_peer *peer           = NULL;
         list_t          *canceled       = &bmi_mx->bmx_canceled;
+	int 		wait		= 0;
 
         bmx_connection_handlers();
 
@@ -2336,7 +2337,17 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                         uint32_t        result  = 0;
                         mx_status_t     status;
         
-                        mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
+			if(wait == 0 || wait == 2)
+			{
+			    mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
+			    if(!result && wait == 0) wait = 1;
+			}
+			else if(wait == 1 && max_idle_time > 0)
+			{
+			    mx_wait_any(bmi_mx->bmx_ep, max_idle_time, match, mask, &status, &result);
+			    wait = 2;
+			}
+			
                         if (result) {
                                 ctx = (struct bmx_ctx *) status.context;
                                 peer = ctx->mxc_peer;
@@ -2382,11 +2393,22 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
          * we will always try (incount - completed) times even
          *     if some iterations have no result */
         match = (uint64_t) BMX_MSG_EXPECTED << 60;
+	wait = 0;
         for (i = completed; i < incount; i++) {
                 uint32_t        result  = 0;
                 mx_status_t     status;
 
-                mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
+		if(wait == 0 || wait == 2)
+		{
+		    mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
+		    if(!result && wait == 0) wait = 1;
+		}
+		else if(wait == 1 && max_idle_time > 0)
+		{
+		    mx_wait_any(bmi_mx->bmx_ep, max_idle_time, match, mask, &status, &result);
+		    wait = 2;
+		}
+
                 if (result) {
                         ctx = (struct bmx_ctx *) status.context;
                         peer = ctx->mxc_peer;

@@ -786,6 +786,10 @@ if test -n "$MX_HOME" ; then
     AC_CHECK_HEADER(myriexpress.h,, AC_MSG_ERROR([Header myriexpress.h not found.]))
     BUILD_MX=1
     CPPFLAGS="$CPPFLAGS_OLD"
+    CFLAGS="${CFLAGS} -I${MX_HOME}/include"
+    LDFLAGS="$LDFLAGS -L${MX_HOME}/lib"
+    SERVER_LDFLAGS="$SERVER_LDFLAGS -L${MX_HOME}/lib"
+    LIBS="$LIBS -lmyriexpress"
 fi
 AC_SUBST(MX_HOME)
 AC_SUBST(BUILD_MX)
@@ -1163,6 +1167,8 @@ doc/random/module.mk
 examples/pvfs2-server.rc
 doc/doxygen/pvfs2-doxygen.conf
 )
+
+chmod $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
 
 # print a summary of the configuration information
 AC_MSG_RESULT()
