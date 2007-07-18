@@ -2340,7 +2340,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 			if(wait == 0 || wait == 2)
 			{
 			    mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
-			    if(!result && wait == 0) wait = 1;
+			    if(!result && wait == 0 && max_idle_time > 0) wait = 1;
 			}
 			else if(wait == 1 && max_idle_time > 0)
 			{
@@ -2401,7 +2401,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 		if(wait == 0 || wait == 2)
 		{
 		    mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
-		    if(!result && wait == 0) wait = 1;
+		    if(!result && wait == 0 && max_idle_time > 0) wait = 1;
 		}
 		else if(wait == 1 && max_idle_time > 0)
 		{
