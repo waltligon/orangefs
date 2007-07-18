@@ -1535,6 +1535,9 @@ struct PVFS_server_req
 static inline void
 encode_PVFS_server_req(char **pptr, const struct PVFS_server_req *x) {
     encode_enum(pptr, &x->op);
+#ifdef HAVE_VALGRIND_H
+    *(int32_t*) *pptr = 0;  /* else possible memcpy in BMI sees uninit */
+#endif
     *pptr += 4;
     encode_PVFS_credentials(pptr, &x->credentials);
 }
