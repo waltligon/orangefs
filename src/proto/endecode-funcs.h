@@ -60,24 +60,59 @@
     *(pptr) += 4; \
 } while (0)
 
-/* skip 4 bytes */
+/* skip 4 bytes, maybe zeroing them to avoid valgrind getting annoyed */
+#ifdef HAVE_VALGRIND_H
+#define encode_skip4(pptr,x) do { \
+    *(int32_t*) *(pptr) = 0; \
+    *(pptr) += 4; \
+} while (0)
+#else
 #define encode_skip4(pptr,x) do { \
     *(pptr) += 4; \
 } while (0)
+#endif
+
 #define decode_skip4(pptr,x) do { \
     *(pptr) += 4; \
 } while (0)
 
-/* strings; decoding just points into existing character data */
-/* now handles NULL strings as well */
+/*
+ * Strings. Decoding just points into existing character data.  This handles
+ * NULL strings too, just encoding the length and a single zero byte.  The
+ * valgrind version zeroes out any padding.
+ */
+#ifdef HAVE_VALGRIND_H
 #define encode_string(pptr,pbuf) do { \
-    u_int32_t len; \
-    if(*pbuf) {len = strlen(*pbuf);} \
-    else {len = 0;} \
+    u_int32_t len = 0; \
+    if (*pbuf) \
+	len = strlen(*pbuf); \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
-    if(len) {memcpy(*(pptr)+4, *pbuf, len+1);} \
-    *(pptr) += roundup8(4 + len + 1); \
+    if (len) { \
+	memcpy(*(pptr)+4, *pbuf, len+1); \
+	int pad = roundup8(4 + len + 1) - (4 + len + 1); \
+	*(pptr) += roundup8(4 + len + 1); \
+	memset(*(pptr)-pad, 0, pad); \
+    } else { \
+	*(u_int32_t *) *(pptr) = 0; \
+	*(pptr) += 8; \
+    } \
 } while (0)
+#else
+#define encode_string(pptr,pbuf) do { \
+    u_int32_t len = 0; \
+    if (*pbuf) \
+	len = strlen(*pbuf); \
+    *(u_int32_t *) *(pptr) = htobmi32(len); \
+    if (len) { \
+	memcpy(*(pptr)+4, *pbuf, len+1); \
+	*(pptr) += roundup8(4 + len + 1); \
+    } else { \
+	*(u_int32_t *) *(pptr) = 0; \
+	*(pptr) += 8; \
+    } \
+} while (0)
+#endif
+
 #define decode_string(pptr,pbuf) do { \
     u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
     *pbuf = *(pptr) + 4; \
