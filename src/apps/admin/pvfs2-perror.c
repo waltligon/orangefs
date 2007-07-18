@@ -102,9 +102,7 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
-    fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s <error_code>\n",
-	argv[0]);
+    fprintf(stderr, "Usage: %s <error_code>\n", argv[0]);
     return;
 }
 
