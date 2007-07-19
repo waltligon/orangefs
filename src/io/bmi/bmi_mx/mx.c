@@ -2332,7 +2332,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
         }
         if (!bmi_mx->bmx_is_server) { /* client */
                 /* check for completed unexpected sends */
-                match |= (uint64_t) BMX_MSG_UNEXPECTED << 60;
+                match = (uint64_t) BMX_MSG_UNEXPECTED << 60;
                 for (i = completed; i < incount; i++) {
                         uint32_t        result  = 0;
                         mx_status_t     status;
@@ -2383,7 +2383,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
         /* return completed messages
          * we will always try (incount - completed) times even
          *     if some iterations have no result */
-        match |= (uint64_t) BMX_MSG_EXPECTED << 60;
+        match = (uint64_t) BMX_MSG_EXPECTED << 60;
         for (i = completed; i < incount; i++) {
                 uint32_t        result  = 0;
                 mx_status_t     status;

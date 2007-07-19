@@ -19,11 +19,11 @@ Table of Contents:
     I. Installation
        1. Configuring and compiling
        2. Compile-time tunables
+       3. Runtime tunables
    II. bmi_mx Performance
   III. Caveats
-       1. Systems with different page sizes
-       2. Multi-homing
-       3. MX endpoint collision
+       1. Multi-homing
+       2. MX endpoint collision
    IV. License
     V. Support
 
@@ -32,7 +32,7 @@ I. Installation
 ===============
 
 Bmi_mx is supported on Linux 2.6. It may be possible to run it on 2.4,
-but it has not been tested. bmi_mx requires Myricom's MX version 1.2.1
+but it has not been tested. Bmi_mx requires Myricom's MX version 1.2.1
 or higher. See MX's README for the supported list of platforms.
 
 1. Configuring and compiling
@@ -58,7 +58,7 @@ in configure's output or the presence of:
 
 Bmi_mx supports a number of compile-time tunables in mx.h.
 
-The options are (in order from top to bottom):
+The options are:
 
     BMX_PEER_RX_NUM             Number of rxs allocated per peer
     BMX_UNEXPECTED_SIZE         Max size of unexpected messages
@@ -98,7 +98,7 @@ When using BMX_MEM_TWEAK, allocate buffers of this size (in bytes). Expected
 messages up to this size will try to use these buffers. If they are not
 available or the buffer is larger than this size, bmi_mx will fallback to using
 malloc(). For MX-2G systems, 1 MB are large enough. For MX-10G, you may want to
-increase it to 4 MB.
+increase it to 4 MB. Also, set FlowBufferSizeBytes to this value in fs.conf.
 
 BMX_BUFF_NUM
 When using BMX_MEM_TWEAK, allocate this many buffers. Increasing this number
@@ -117,7 +117,7 @@ memory allcoated before bmi_mx is started such as during
 BMI_mx_method_addr_lookup().
 
 BMX_LOGGING
-This is not generally recommended it. It turns on support for MPE logging but
+This is not generally recommended. It turns on support for MPE logging but
 it requires modifying the Makefile.in script and re-generating configure.
 Contact help <at> myri.com for assistance.
 
@@ -136,17 +136,24 @@ generated. There are several types of messages, all start with BMX_DB_ (see
 mx.h). Set the mask by OR'ing together the types of messages that you want
 bmi_mx to display.  At a minimum, always use BMX_DB_ERR and BMX_DB_WARN.
 
+3. Runtime tunables
+
+MX uses an internal registration cache when MX_RCACHE=1 is set in the
+environment when the application starts. Using MX_RCACHE improves performance
+slightly for the metadata and IO servers as well as when using MPI-IO and
+PVFS2.
+
 ======================
 II. bmi_mx Performance
 ======================
 
 On MX-2G systems, bmi_mx should easily saturate the link and use minimal CPU.
 On MX-10G systems, bmi_mx can saturate the link and use moderate CPU resources
-(20-30% for read and write operations).  MX-10G relies on PCI-Express which is
-relatively new and performance varies considerably by processor, motherboard
-and PCI-E chipset. Refer to Myricom's website for the latest DMA read/write
-performance results by motherboard. The DMA results will place an upper-bound
-on bmi_mx performance.
+(20-30% for IO operations).  MX-10G relies on PCI-Express which is relatively
+new and performance varies considerably by processor, motherboard and PCI-E
+chipset. Refer to Myricom's website for the latest DMA read/write performance
+results by motherboard. The DMA results will place an upper-bound on bmi_mx
+performance.
 
 ============
 III. Caveats
@@ -158,7 +165,7 @@ At this time, PVFS2 does not support multi-homing of non-TCP interconnects.
 Thus, a single client cannot mount two MX-10G, two MX-2G, or both MX-10G and
 MX-2G fabrics.
 
-3. MX endpoint collision
+2. MX endpoint collision
 
 Each process that uses MX is required to have at least one MX endpoint to
 access the MX library and NIC. Other processes may need to use MX and no two
@@ -166,7 +173,6 @@ processes can use the same endpoint ID.  MPICH-MX dynamically chooses one at
 MPI startup and should not interfere with bmi_mx. Sockets-MX, on the other hand,
 is hard coded to use 0 for its ID. If it is possible that anyone will want to
 run Sockets-MX on this system, use a non-0 value for bmi_mx's endpoint ID.
-
 
 ===========
 IV. License
