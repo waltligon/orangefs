@@ -43,9 +43,6 @@
 /* Define if third param (message) to DB error callback function is const */
 #undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
 
-/* Define if ctl_table struct has a de field */
-#undef HAVE_CTL_TABLE_DE_FIELD
-
 /* Define if DB error callback function takes dbenv parameter */
 #undef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
 
@@ -197,6 +194,9 @@
 
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
+
+/* Define to 1 if you have the <mntent.h,> header file. */
+#undef HAVE_MNTENT_H_
 
 /* Use the MPE profiling library */
 #undef HAVE_MPE
@@ -360,10 +360,10 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of a `long int', as computed by sizeof. */
+/* The size of `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of a `void *', as computed by sizeof. */
+/* The size of `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */
