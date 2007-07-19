@@ -21,11 +21,16 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <limits.h>
+#include <errno.h>
 #endif
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
 #define INT32_MAX (2147483647)
+#endif
+
+#ifndef NAME_MAX
+#define NAME_MAX 255
 #endif
 
 #ifndef offsetof
@@ -603,28 +608,41 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
  */
 #define PVFS_ERRNO_MAX          60
 
+/*
+ * If system headers do not define these, assign them, with arbitrary
+ * numbers.  These values must be unique with respect to defined errors
+ * and each other to avoid collisions in case statements elsewhere.
+ */
 #ifndef EUNATCH
-#define EUNATCH -1
+#define EUNATCH -6060842
 #endif
 
 #ifndef EBADR
-#define EBADR -1
+#define EBADR -6060843
 #endif
 
 #ifndef EDEADLOCK
-#define EDEADLOCK -1
+#define EDEADLOCK -6060844
 #endif
 
 #ifndef ENONET
-#define ENONET -1
+#define ENONET -6060845
 #endif
 
 #ifndef ECOMM
-#define ECOMM -1
+#define ECOMM -6060846
 #endif
 
 #ifndef ERESTART
-#define ERESTART -1
+#define ERESTART -6060847
+#endif
+
+#ifndef ETIME
+#define ETIME -6060848
+#endif
+
+#ifndef EBADMSG
+#define EBADMSG -6060849
 #endif
 
 #define DECLARE_ERRNO_MAPPING()                       \
