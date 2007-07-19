@@ -144,6 +144,8 @@ CC = @CC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
+BUILD_CFLAGS = @BUILD_CFLAGS@
+BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
 CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
@@ -709,11 +711,11 @@ $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 # special rules to build state machine compiler using build host compiler
 $(STATECOMPOBJS): %.o: %.c
 	$(Q) "  BUILD_CC	$@"
-	$(E)$(BUILD_CC) $(CFLAGS) $< -c -o $@ $(call modcflags,$<)
+	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $< -c -o $@ $(call modcflags,$<)
 
 $(STATECOMP): $(STATECOMPOBJS)
 	$(Q) "  BUILD_LD	$@"
-	$(E)$(BUILD_LD) -o $@ $(LDFLAGS) $(STATECOMPOBJS) $(call modldflags,$<)
+	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(STATECOMPOBJS) $(call modldflags,$<)
 
 # rule for generating cscope information
 cscope:

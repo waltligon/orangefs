@@ -71,12 +71,16 @@ AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
 if test $host != $build; then
-  AC_CHECK_PROGS(BUILD_CC, gcc cc)
+	AC_CHECK_PROGS(BUILD_CC, gcc cc)
 else
 	BUILD_CC=$CC
+	BUILD_CFLAGS=$BUILD_CFLAGS
+	BUILD_LDFLAGS=$BUILD_LDFLAGS
 fi
 
 AC_SUBST(BUILD_CC)
+AC_SUBST(BUILD_CFLAGS)
+AC_SUBST(BUILD_LDFLAGS)
 
 dnl a mechanism to turn off threads in the client library
 AC_MSG_CHECKING([for client library thread safety support])
