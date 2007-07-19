@@ -63,6 +63,7 @@ INSTALL = @INSTALL@
 # TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
+BUILD_BMI_TCP = @BUILD_BMI_TCP@
 BUILD_GM = @BUILD_GM@
 BUILD_MX = @BUILD_MX@
 BUILD_IB = @BUILD_IB@
