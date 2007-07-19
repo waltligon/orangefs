@@ -2,14 +2,22 @@ AC_DEFUN([AX_PORTALS],
 [
     dnl
     dnl Configure to build Portals BMI method, if requested and available.
-    dnl --with-portals=<dir> is shorthand for
-    dnl    --with-portals-includes=<dir>/include
-    dnl    --with-portals-libs=<dir>/lib  (or lib64 if that exists)
+    dnl Use
+    dnl   --with-portals       To find include files and libraries in standard
+    dnl                        system paths.
+    dnl   --with-portals=<dir> To specify a location that has include and lib
+    dnl                        (or lib64) subdirectories with the goods.
+    dnl Or specify the locations exactly using:
+    dnl
+    dnl   --with-portals-includes=<dir>
+    dnl   --with-portals-libs=<dir>
+    dnl
+    use_portals=no
     portals_home=
     AC_ARG_WITH(portals,
-    [  --with-portals=<dir>     Location of the Portals install (default no Portals)],
+    [  --with-portals[=<dir>]   Location of the Portals install (default no Portals)],
 	if test -z "$withval" -o "$withval" = yes ; then
-	    AC_MSG_ERROR([Option --with-portals requires the path to your Portals tree.])
+	    use_portals=yes
 	elif test "$withval" != no ; then
 	    portals_home="$withval"
 	fi
@@ -45,33 +53,60 @@ AC_DEFUN([AX_PORTALS],
     fi
 
     dnl If Portals, go verify existence of header.
-    if test -n "$PORTALS_INCDIR$PORTALS_LIBDIR" ; then
+    if test -n "$PORTALS_INCDIR" ; then
 	save_cppflags="$CPPFLAGS"
-	save_ldflags="$LDFLAGS"
-	save_libs="$LIBS"
 	CPPFLAGS="$CPPFLAGS -I$PORTALS_INCDIR"
+	use_portals=yes
+    fi
+    if test -n "$PORTALS_LIBDIR" ; then
+	save_ldflags="$LDFLAGS"
 	LDFLAGS="$LDFLAGS -L$PORTALS_LIBDIR"
-	LIBS="$LIBS -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
+	use_portals=yes
+    fi
+    if test "$use_portals" = yes ; then
 	AC_CHECK_HEADER(portals3.h,,
 	    AC_MSG_ERROR([Header portals3.h not found.]))
+
+	dnl try without first, for Cray, then try TCP version
 	dnl Run test is not always possible, esp when cross-compiling or on
 	dnl a box that does not have the hardware.
+	linked_ok=no
+	PORTALS_LIBS=
+	AC_MSG_CHECKING([for portals libraries])
 	AC_TRY_LINK(
 	    [#include <portals3.h>],
 	    [
 		int m, n;
 		m = PtlInit(&n);
 	    ],
-	    [AC_MSG_RESULT(ok)],
-	    AC_MSG_ERROR([Could not link Portals library.]))
-	BUILD_PORTALS=1
+	    [AC_MSG_RESULT(ok); linked_ok=yes])
+
+	if test "$linked_ok" = no ; then
+	    PORTALS_LIBS="-lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
+	    save_libs="$LIBS"
+	    LIBS="$LIBS $PORTALS_LIBS"
+	    AC_TRY_LINK(
+		[#include <portals3.h>],
+		[
+		    int m, n;
+		    m = PtlInit(&n);
+		],
+		[AC_MSG_RESULT(ok)],
+		AC_MSG_ERROR([Could not link Portals library.]))
+	    BUILD_PORTALS=1
+	    LIBS="$save_libs"
+	fi
+    fi
+    if test -n "$PORTALS_INCDIR" ; then
 	CPPFLAGS="$save_cppflags"
+    fi
+    if test -n "$PORTALS_LIBDIR" ; then
 	LDFLAGS="$save_ldflags"
-	LIBS="$save_libs"
     fi
     AC_SUBST(BUILD_PORTALS)
     AC_SUBST(PORTALS_INCDIR)
     AC_SUBST(PORTALS_LIBDIR)
+    AC_SUBST(PORTALS_LIBS)
 ])
 
 dnl vim: set ft=config : 

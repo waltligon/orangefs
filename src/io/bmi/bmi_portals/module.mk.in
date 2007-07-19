@@ -38,6 +38,8 @@ MODCFLAGS_$(DIR) := $(cflags)
 #
 # Portals headers.
 #
+ifneq (,@PORTALS_INCDIR@)
 MODCFLAGS_$(DIR)/portals.c := -I@PORTALS_INCDIR@
+endif
 
 endif  # BUILD_PORTALS
