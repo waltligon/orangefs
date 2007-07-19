@@ -546,7 +546,7 @@ DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) \
 # Rules and dependencies
 
 # default rule builds server, library, and applications
-all:: $(SERVER) $(KARMA) $(LIBRARIES) $(LIBRARIES_THREADED) admintools $(VISS) $(KARMA)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA)
 
 # target for building admin tools
 admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
