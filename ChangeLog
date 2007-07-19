@@ -24,6 +24,8 @@ read-only files through the vfs.
 	  all state machine actions
 	- add support for concurrent state machines
 
+* portals: new BMI implementation
+
 pvfs-2.6.3
 ==============
 

@@ -677,6 +677,8 @@ HAVE_FIND
 HAVE_BISON
 HAVE_FLEX
 BUILD_CC
+BUILD_CFLAGS
+BUILD_LDFLAGS
 LIBCFLAGS
 THREAD_LIB
 BUILD_SERVER
@@ -707,6 +709,7 @@ DB_LIB
 NEEDS_LIBRT
 TARGET_OS_DARWIN
 TARGET_OS_LINUX
+BUILD_BMI_TCP
 GM_HOME
 BUILD_GM
 MX_HOME
@@ -720,6 +723,7 @@ OPENIB_LIBDIR
 BUILD_PORTALS
 PORTALS_INCDIR
 PORTALS_LIBDIR
+PORTALS_LIBS
 SERVER_LDFLAGS
 BUILD_VIS
 VISCFLAGS
@@ -1348,6 +1352,7 @@ Optional Packages:
   --with-efence=<path>    Use electric fence for malloc debugging.
   --with-valgrind=<path>  Use valgrind annotations for debugging.
   --with-db=<dir>         Location of installed DB package (default=/usr)
+  --without-bmi-tcp       Disable BMI TCP method
   --with-gm=<dir>         Location of the GM installation (default no GM)
   --with-mx=<dir>         Location of the MX installation (default no MX)
   --with-ib=<dir>         Location of the IB installation (default no IB)
@@ -1356,7 +1361,7 @@ Optional Packages:
   --with-openib=<dir>     Location of the OpenIB install (default no OpenIB)
   --with-openib-includes=<dir>  Location of the OpenIB includes
   --with-openib-libs=<dir>      Location of the OpenIB libraries
-  --with-portals=<dir>     Location of the Portals install (default no Portals)
+  --with-portals=<dir>   Location of the Portals install (default no Portals)
   --with-portals-includes=<dir>  Location of the Portals includes
   --with-portals-libs=<dir>      Location of the Portals libraries
 
@@ -5888,7 +5893,7 @@ fi
 
 
 if test $host != $build; then
-  for ac_prog in gcc cc
+	for ac_prog in gcc cc
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
@@ -5932,7 +5937,11 @@ done
 
 else
 	BUILD_CC=$CC
+	BUILD_CFLAGS=$BUILD_CFLAGS
+	BUILD_LDFLAGS=$BUILD_LDFLAGS
 fi
+
+
 
 
 
@@ -7969,6 +7978,7 @@ else
 fi
 
 
+if test -n "$lk_src" ; then
 
 
 
@@ -11127,7 +11137,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 	CFLAGS=$oldcflags
 
-
+fi
 
 BUILD_ABSOLUTE_TOP=`pwd`
 SRC_RELATIVE_TOP=$srcdir
@@ -13746,6 +13756,24 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 CFLAGS="$oldcflags"
 
+BUILD_BMI_TCP=1
+
+# Check whether --with-tcp was given.
+if test "${with_tcp+set}" = set; then
+  withval=$with_tcp; if test -z "$withval" -o "$withval" = yes ; then
+	:
+    elif test "$withval" = no ; then
+	BUILD_BMI_TCP=
+    else
+	{ { echo "$as_me:$LINENO: error: Option --with-tcp requires yes/no argument." >&5
+echo "$as_me: error: Option --with-tcp requires yes/no argument." >&2;}
+   { (exit 1); exit 1; }; }
+    fi
+
+fi
+
+
+
 GM_HOME=
 
 # Check whether --with-gm was given.
@@ -14638,14 +14666,13 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 fi
 
 
-                        portals_home=
+                                                    use_portals=no
+    portals_home=
 
 # Check whether --with-portals was given.
 if test "${with_portals+set}" = set; then
   withval=$with_portals; if test -z "$withval" -o "$withval" = yes ; then
-	    { { echo "$as_me:$LINENO: error: Option --with-portals requires the path to your Portals tree." >&5
-echo "$as_me: error: Option --with-portals requires the path to your Portals tree." >&2;}
-   { (exit 1); exit 1; }; }
+	    use_portals=yes
 	elif test "$withval" != no ; then
 	    portals_home="$withval"
 	fi
@@ -14690,13 +14717,17 @@ fi
 	fi
     fi
 
-        if test -n "$PORTALS_INCDIR$PORTALS_LIBDIR" ; then
+        if test -n "$PORTALS_INCDIR" ; then
 	save_cppflags="$CPPFLAGS"
-	save_ldflags="$LDFLAGS"
-	save_libs="$LIBS"
 	CPPFLAGS="$CPPFLAGS -I$PORTALS_INCDIR"
+	use_portals=yes
+    fi
+    if test -n "$PORTALS_LIBDIR" ; then
+	save_ldflags="$LDFLAGS"
 	LDFLAGS="$LDFLAGS -L$PORTALS_LIBDIR"
-	LIBS="$LIBS -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
+	use_portals=yes
+    fi
+    if test "$use_portals" = yes ; then
 	if test "${ac_cv_header_portals3_h+set}" = set; then
   { echo "$as_me:$LINENO: checking for portals3.h" >&5
 echo $ECHO_N "checking for portals3.h... $ECHO_C" >&6; }
@@ -14831,7 +14862,12 @@ echo "$as_me: error: Header portals3.h not found." >&2;}
 fi
 
 
-			cat >conftest.$ac_ext <<_ACEOF
+
+				linked_ok=no
+	PORTALS_LIBS=
+	{ echo "$as_me:$LINENO: checking for portals libraries" >&5
+echo $ECHO_N "checking for portals libraries... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -14868,6 +14904,58 @@ eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
        } && test -s conftest$ac_exeext &&
        $as_test_x conftest$ac_exeext; then
   { echo "$as_me:$LINENO: result: ok" >&5
+echo "${ECHO_T}ok" >&6; }; linked_ok=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+
+	if test "$linked_ok" = no ; then
+	    PORTALS_LIBS="-lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
+	    save_libs="$LIBS"
+	    LIBS="$LIBS $PORTALS_LIBS"
+	    cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <portals3.h>
+int
+main ()
+{
+
+		    int m, n;
+		    m = PtlInit(&n);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext &&
+       $as_test_x conftest$ac_exeext; then
+  { echo "$as_me:$LINENO: result: ok" >&5
 echo "${ECHO_T}ok" >&6; }
 else
   echo "$as_me: failed program was:" >&5
@@ -14880,11 +14968,17 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
-	BUILD_PORTALS=1
-	CPPFLAGS="$save_cppflags"
-	LDFLAGS="$save_ldflags"
-	LIBS="$save_libs"
+	    BUILD_PORTALS=1
+	    LIBS="$save_libs"
+	fi
     fi
+    if test -n "$PORTALS_INCDIR" ; then
+	CPPFLAGS="$save_cppflags"
+    fi
+    if test -n "$PORTALS_LIBDIR" ; then
+	LDFLAGS="$save_ldflags"
+    fi
+
 
 
 
@@ -17372,6 +17466,8 @@ HAVE_FIND!$HAVE_FIND$ac_delim
 HAVE_BISON!$HAVE_BISON$ac_delim
 HAVE_FLEX!$HAVE_FLEX$ac_delim
 BUILD_CC!$BUILD_CC$ac_delim
+BUILD_CFLAGS!$BUILD_CFLAGS$ac_delim
+BUILD_LDFLAGS!$BUILD_LDFLAGS$ac_delim
 LIBCFLAGS!$LIBCFLAGS$ac_delim
 THREAD_LIB!$THREAD_LIB$ac_delim
 BUILD_SERVER!$BUILD_SERVER$ac_delim
@@ -17402,9 +17498,7 @@ DB_LIB!$DB_LIB$ac_delim
 NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
 TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
 TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
-GM_HOME!$GM_HOME$ac_delim
-BUILD_GM!$BUILD_GM$ac_delim
-MX_HOME!$MX_HOME$ac_delim
+BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -17446,6 +17540,9 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+GM_HOME!$GM_HOME$ac_delim
+BUILD_GM!$BUILD_GM$ac_delim
+MX_HOME!$MX_HOME$ac_delim
 BUILD_MX!$BUILD_MX$ac_delim
 BUILD_IB!$BUILD_IB$ac_delim
 IB_INCDIR!$IB_INCDIR$ac_delim
@@ -17456,6 +17553,7 @@ OPENIB_LIBDIR!$OPENIB_LIBDIR$ac_delim
 BUILD_PORTALS!$BUILD_PORTALS$ac_delim
 PORTALS_INCDIR!$PORTALS_INCDIR$ac_delim
 PORTALS_LIBDIR!$PORTALS_LIBDIR$ac_delim
+PORTALS_LIBS!$PORTALS_LIBS$ac_delim
 SERVER_LDFLAGS!$SERVER_LDFLAGS$ac_delim
 BUILD_VIS!$BUILD_VIS$ac_delim
 VISCFLAGS!$VISCFLAGS$ac_delim
@@ -17464,7 +17562,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 16; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 20; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
@@ -17894,7 +17992,7 @@ if test "$no_create" != yes; then
 fi
 
 
-chmod $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
+chmod +x $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
 
 # print a summary of the configuration information
 { echo "$as_me:$LINENO: result: " >&5
