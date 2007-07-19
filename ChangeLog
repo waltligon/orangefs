@@ -25,6 +25,7 @@ read-only files through the vfs.
 	- add support for concurrent state machines
 
 * portals: new BMI implementation
+* make/configure: support Cray XT3/XT4 compute node build environment
 
 pvfs-2.6.3
 ==============
