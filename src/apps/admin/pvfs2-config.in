@@ -58,6 +58,9 @@ while test $# -gt 0; do
 	if [ x"@BUILD_MX@" = x"1" ]; then
 		libflags="$libflags -L@MX_HOME@/lib -lmyriexpress"
 	fi
+	if [ x"@BUILD_PORTALS@" = x"1" ]; then
+		libflags="$libflags -L@PORTALS_LIBDIR@ -lp3api -lp3lib -lp3utcp -lp3rt"
+	fi
 
 	echo $libflags
 	;;
@@ -77,6 +80,9 @@ while test $# -gt 0; do
 	fi
 	if [ x"@BUILD_MX@" = x"1" ]; then
 		libflags="$libflags -L@MX_HOME@/lib -lmyriexpress"
+	fi
+	if [ x"@BUILD_PORTALS@" = x"1" ]; then
+		libflags="$libflags -L@PORTALS_LIBDIR@ -lp3api -lp3lib -lp3utcp -lp3rt"
 	fi
 
 	echo $libflags

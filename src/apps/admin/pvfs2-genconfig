@@ -21,6 +21,7 @@ my $opt_gmport = '';
 my $opt_mxboard = '';
 my $opt_mxendpoint = '';
 my $opt_ibport = '';
+my $opt_portal = '';
 my $opt_ioservers = '';
 my $opt_metaservers = '';
 my $opt_logfile = '';
@@ -432,7 +433,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
   One of the two [] grouped options below must be chosen (for non-interactive):
 
      [
-       --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,mx,ib)
+       --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,mx,ib,portals)
        --port        <NUM>      port to use (any single protocol)
        --board       <NUM>      board index number for MX
                                 (only required if --protocol=mx)
@@ -454,6 +455,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
      --mxboard     <NUM>               MX board to use (default is 0)
      --mxendpoint  <NUM>               MX endpoint to use (default is 3)
      --ibport      <NUM>               IB port to use
+     --portal      <NUM>               Portals index for listening server
      --logging     <STRING>            debugging mask for log messages
      --logstamp    <STRING>            timestamp type for log messages 
                                        ('none','usec', or 'datetime' are valid)
@@ -538,7 +540,7 @@ sub get_protocol
             # get network type
             print $OUT <<"PROTOCOL"
 You must first select the network protocol that your file system will use.
-The only currently supported options are \"tcp\", \"gm\", \"mx\", and \"ib\".
+The only currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", and \"portals\".
 (For multi-homed configurations, use e.g. \"ib,tcp\".)
 PROTOCOL
             ;;
@@ -576,8 +578,10 @@ PROTOCOL
             $port{'mx'} = mx_get_endpoint();
         } elsif ($_ eq "ib") {
             $port{'ib'} = ib_get_port();
+        } elsif ($_ eq "portals") {
+            $port{'portals'} = portals_get_portal();
         } else {
-            die "Sorry.  At this time, only the tcp, gm, mx and ib protocols are available\nfor use with this configuration utility.\n";
+            die "Sorry.  At this time, only the tcp, gm, mx, ib, and portals protocols are available\nfor use with this configuration utility.\n";
         }
     }
 
@@ -732,6 +736,7 @@ sub tcp_get_port
     }
     return  $port;
 }
+
 sub gm_get_port
 {
     my $port;
@@ -753,6 +758,7 @@ sub gm_get_port
 
     return  $port;
 }
+
 sub mx_get_endpoint
 {
     my $port;
@@ -809,6 +815,24 @@ sub ib_get_port
         $port = prompt_num("Enter port number [Default is 3335]: ","3335");
     }
     return  $port;
+}
+
+sub portals_get_portal
+{
+    my $port;
+    if ($opt_portal) {
+        $port = $opt_portal;
+    } elsif ($opt_port) {
+        $port = $opt_port;
+        $opt_port = '';
+    } elsif(!$opt_iospec) {
+        if (!$opt_quiet) { 
+            print $OUT "Choose a portal index for the servers to listen on for communications.  Note that this\n";
+            print $OUT "script assumes that all servers will use the same portal index.\n";
+        }
+        $port = prompt_num("Enter portal index [Default is 5]: ","5");
+    }
+    return $port;
 }
 
 sub get_ionames
@@ -1146,6 +1170,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'mxboard=i'     => \$opt_mxboard,
     'mxendpoint=i'  => \$opt_mxendpoint,
     'ibport=i'      => \$opt_ibport,
+    'portal=i'      => \$opt_portal,
     'ioservers=s'   => \$opt_ioservers,
     'metaservers=s' => \$opt_metaservers,
     'logfile=s'     => \$opt_logfile,

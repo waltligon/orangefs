@@ -953,6 +953,11 @@ if test -n "$BUILD_OPENIB" ; then
 fi
 
 dnl
+dnl Configure bmi_portals, if --with-portals or a variant given.
+dnl
+AX_PORTALS
+
+dnl
 dnl check if fgetxattr takes extra arguments
 AC_MSG_CHECKING([for fgetxattr extra arguments])
 AC_TRY_COMPILE([
@@ -1145,6 +1150,7 @@ src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
 src/io/bmi/bmi_mx/module.mk
 src/io/bmi/bmi_ib/module.mk
+src/io/bmi/bmi_portals/module.mk
 src/io/description/module.mk
 src/io/flow/module.mk
 src/io/flow/flowproto-bmi-trove/module.mk

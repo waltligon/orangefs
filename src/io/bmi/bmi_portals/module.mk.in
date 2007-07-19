@@ -1,0 +1,43 @@
+#
+# Makefile stub for bmi_portals.
+#
+# Copyright (C) 2007 Pete Wyckoff <pw@osc.edu>
+#
+# See COPYING in top-level directory.
+#
+
+# only do any of this if configure decided to use Portals
+ifneq (,$(BUILD_PORTALS))
+
+#
+# Local definitions.
+#
+DIR := src/io/bmi/bmi_portals
+cfiles := portals.c
+
+#
+# Export these to the top Makefile to tell it what to build.
+#
+src := $(patsubst %,$(DIR)/%,$(cfiles))
+LIBSRC    += $(src)
+SERVERSRC += $(src)
+
+#
+# Add extra include paths and warnings just for this directory.
+#
+cflags :=
+ifdef GNUC
+cflags += -W -Wcast-qual -Wshadow -Wwrite-strings
+endif
+
+#
+# Extra cflags for files in this directory.
+#
+MODCFLAGS_$(DIR) := $(cflags)
+
+#
+# Portals headers.
+#
+MODCFLAGS_$(DIR)/portals.c := -I@PORTALS_INCDIR@
+
+endif  # BUILD_PORTALS
