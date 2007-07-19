@@ -1,3 +1,6 @@
+
+ifneq (,$(BUILD_BMI_TCP))
+
 BUILD_EPOLL = @BUILD_EPOLL@
 DIR := src/io/bmi/bmi_tcp
 LIBSRC += \
@@ -16,3 +19,4 @@ LIBSRC += $(DIR)/socket-collection.c
 SERVERSRC += $(DIR)/socket-collection.c
 endif
 
+endif  # BUILD_BMI_TCP

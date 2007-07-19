@@ -162,8 +162,6 @@ NPTL_WORKAROUND = @NPTL_WORKAROUND@
 # for Solaris:
 # LIBS += -lsocket -lnsl
 
-  # enable BMI TCP module
-CFLAGS += -D__STATIC_METHOD_BMI_TCP__
   # enable Flow debugging protocol
 #CFLAGS += -D__STATIC_FLOWPROTO_DUMP_OFFSETS__
   # enable new style Flow BMI/Trove protocol
@@ -279,6 +277,14 @@ LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
 LIBS += @THREAD_LIB@
 LIBS_THREADED += @THREAD_LIB@
+
+################################################################
+# build BMI TCP?
+
+ifdef BUILD_BMI_TCP
+	CFLAGS += -D__STATIC_METHOD_BMI_TCP__
+endif
+
 
 ################################################################
 # enable GM if configure detected it
