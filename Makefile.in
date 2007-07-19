@@ -346,10 +346,12 @@ endif
 # Portals
 ifdef BUILD_PORTALS
     CFLAGS += -D__STATIC_METHOD_BMI_PORTALS__
+ifneq (,@PORTALS_LIBS@)
     PORTALSLIBS := -L@PORTALS_LIBDIR@ -lp3api -lp3lib -lp3utcp -lp3rt
     LIBS += $(PORTALSLIBS)
     LIBS_THREADED += $(PORTALSLIBS)
     SERVERLIBS += $(PORTALSLIBS)
+endif
 endif
 
 # enable mmap-readahead cache (unless disabled by configure)
