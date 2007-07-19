@@ -509,8 +509,9 @@ AC_ARG_ENABLE(kernel-sendfile,
   [ enable_kernel_sendfile=no ]
   )
 
-AX_KERNEL_FEATURES
-
+if test -n "$lk_src" ; then
+    AX_KERNEL_FEATURES
+fi
 
 dnl PAV configuration needs absolute location of source and build.
 dnl Linux-2.6 module needs absolute location of source, and uses the
@@ -1192,7 +1193,7 @@ examples/pvfs2-server.rc
 doc/doxygen/pvfs2-doxygen.conf
 )
 
-chmod $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
+chmod +x $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
 
 # print a summary of the configuration information
 AC_MSG_RESULT()
