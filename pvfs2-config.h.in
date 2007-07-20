@@ -219,6 +219,15 @@
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_SIX_ARG
 
+/* Define if have PtlACEntry with jid argument. */
+#undef HAVE_PTLACENTRY_JID
+
+/* Define to 1 if you have the `PtlErrorStr' function. */
+#undef HAVE_PTLERRORSTR
+
+/* Define to 1 if you have the `PtlEventKindStr' function. */
+#undef HAVE_PTLEVENTKINDSTR
+
 /* Define if struct file_operations in kernel has readdirplus_lite callback */
 #undef HAVE_READDIRPLUSLITE_FILE_OPERATIONS
 

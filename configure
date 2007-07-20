@@ -721,8 +721,7 @@ BUILD_OPENIB
 OPENIB_INCDIR
 OPENIB_LIBDIR
 BUILD_PORTALS
-PORTALS_INCDIR
-PORTALS_LIBDIR
+PORTALS_INCS
 PORTALS_LIBS
 SERVER_LDFLAGS
 BUILD_VIS
@@ -1362,8 +1361,8 @@ Optional Packages:
   --with-openib-includes=<dir>  Location of the OpenIB includes
   --with-openib-libs=<dir>      Location of the OpenIB libraries
   --with-portals=<dir>   Location of the Portals install (default no Portals)
-  --with-portals-includes=<dir>  Location of the Portals includes
-  --with-portals-libs=<dir>      Location of the Portals libraries
+  --with-portals-includes=<dir>  Extra CFLAGS to specify Portals includes
+  --with-portals-libs=<dir>      Extra LIBS to link Portals libraries
 
 Some influential environment variables:
   CC          C compiler command
@@ -13763,9 +13762,9 @@ CFLAGS="$oldcflags"
 
 BUILD_BMI_TCP=1
 
-# Check whether --with-tcp was given.
-if test "${with_tcp+set}" = set; then
-  withval=$with_tcp; if test -z "$withval" -o "$withval" = yes ; then
+# Check whether --with-bmi-tcp was given.
+if test "${with_bmi_tcp+set}" = set; then
+  withval=$with_bmi_tcp; if test -z "$withval" -o "$withval" = yes ; then
 	:
     elif test "$withval" = no ; then
 	BUILD_BMI_TCP=
@@ -14671,15 +14670,17 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 fi
 
 
-                                                    use_portals=no
-    portals_home=
+                                                                        use_portals=no
+    home=
+    incs=
+    libs=
 
 # Check whether --with-portals was given.
 if test "${with_portals+set}" = set; then
   withval=$with_portals; if test -z "$withval" -o "$withval" = yes ; then
 	    use_portals=yes
 	elif test "$withval" != no ; then
-	    portals_home="$withval"
+	    home="$withval"
 	fi
 
 fi
@@ -14688,11 +14689,11 @@ fi
 # Check whether --with-portals-includes was given.
 if test "${with_portals_includes+set}" = set; then
   withval=$with_portals_includes; if test -z "$withval" -o "$withval" = yes ; then
-	    { { echo "$as_me:$LINENO: error: Option --with-portals-includes requires path to Portals headers." >&5
-echo "$as_me: error: Option --with-portals-includes requires path to Portals headers." >&2;}
+	    { { echo "$as_me:$LINENO: error: Option --with-portals-includes requires an argument." >&5
+echo "$as_me: error: Option --with-portals-includes requires an argument." >&2;}
    { (exit 1); exit 1; }; }
 	elif test "$withval" != no ; then
-	    PORTALS_INCDIR="$withval"
+	    incs="$withval"
 	fi
 
 fi
@@ -14701,58 +14702,58 @@ fi
 # Check whether --with-portals-libs was given.
 if test "${with_portals_libs+set}" = set; then
   withval=$with_portals_libs; if test -z "$withval" -o "$withval" = yes ; then
-	    { { echo "$as_me:$LINENO: error: Option --with-portals-libs requires path to Portals libraries." >&5
-echo "$as_me: error: Option --with-portals-libs requires path to Portals libraries." >&2;}
+	    { { echo "$as_me:$LINENO: error: Option --with-portals-libs requires an argument." >&5
+echo "$as_me: error: Option --with-portals-libs requires an argument." >&2;}
    { (exit 1); exit 1; }; }
 	elif test "$withval" != no ; then
-	    PORTALS_LIBDIR="$withval"
+	    libs="$withval"
 	fi
 
 fi
 
-            if test -n "$portals_home" ; then
-	if test -z "$PORTALS_INCDIR"; then
-	    PORTALS_INCDIR=$portals_home/include
+            if test -n "$home" ; then
+	if test -z "$incs"; then
+	    incs=$home/include
 	fi
-	if test -z "$PORTALS_LIBDIR"; then
-	    PORTALS_LIBDIR=$portals_home/lib64
-	    if test ! -d "$PORTALS_LIBDIR" ; then
-		PORTALS_LIBDIR=$portals_home/lib
+	if test -z "$libs"; then
+	    libs=$home/lib64
+	    if test ! -d "$libs" ; then
+		libs=$home/lib
 	    fi
 	fi
     fi
 
-        if test -n "$PORTALS_INCDIR" ; then
+                BUILD_PORTALS=
+    PORTALS_INCS=
+    PORTALS_LIBS=
+    if test "X$use_portals$home$incs$libs" != X ; then
+	# Save stuff
 	save_cppflags="$CPPFLAGS"
-	CPPFLAGS="$CPPFLAGS -I$PORTALS_INCDIR"
-	use_portals=yes
-    fi
-    if test -n "$PORTALS_LIBDIR" ; then
-	save_ldflags="$LDFLAGS"
-	LDFLAGS="$LDFLAGS -L$PORTALS_LIBDIR"
-	use_portals=yes
-    fi
-    if test "$use_portals" = yes ; then
-	if test "${ac_cv_header_portals3_h+set}" = set; then
-  { echo "$as_me:$LINENO: checking for portals3.h" >&5
-echo $ECHO_N "checking for portals3.h... $ECHO_C" >&6; }
-if test "${ac_cv_header_portals3_h+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-fi
-{ echo "$as_me:$LINENO: result: $ac_cv_header_portals3_h" >&5
-echo "${ECHO_T}$ac_cv_header_portals3_h" >&6; }
-else
-  # Is the header compilable?
-{ echo "$as_me:$LINENO: checking portals3.h usability" >&5
-echo $ECHO_N "checking portals3.h usability... $ECHO_C" >&6; }
-cat >conftest.$ac_ext <<_ACEOF
+	save_libs="$LIBS"
+
+	PORTALS_INCS="$incs"
+	CPPFLAGS="$CPPFLAGS $PORTALS_INCS"
+
+	PORTALS_LIBS="$libs"
+	LIBS="$LIBS $PORTALS_LIBS"
+
+	{ echo "$as_me:$LINENO: checking for portals3.h header" >&5
+echo $ECHO_N "checking for portals3.h header... $ECHO_C" >&6; }
+	ok=no
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
-$ac_includes_default
-#include <portals3.h>
+#include <portals/portals3.h>
+int
+main ()
+{
+int m, n; m = PtlInit(&n);
+  ;
+  return 0;
+}
 _ACEOF
 rm -f conftest.$ac_objext
 if { (ac_try="$ac_compile"
@@ -14771,121 +14772,41 @@ eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
 	 test -z "$ac_c_werror_flag" ||
 	 test ! -s conftest.err
        } && test -s conftest.$ac_objext; then
-  ac_header_compiler=yes
+  ok=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
-	ac_header_compiler=no
+
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-{ echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
-echo "${ECHO_T}$ac_header_compiler" >&6; }
 
-# Is the header present?
-{ echo "$as_me:$LINENO: checking portals3.h presence" >&5
-echo $ECHO_N "checking portals3.h presence... $ECHO_C" >&6; }
-cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <portals3.h>
-_ACEOF
-if { (ac_try="$ac_cpp conftest.$ac_ext"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
-  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } >/dev/null && {
-	 test -z "$ac_c_preproc_warn_flag$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       }; then
-  ac_header_preproc=yes
-else
-  echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-  ac_header_preproc=no
-fi
-
-rm -f conftest.err conftest.$ac_ext
-{ echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
-echo "${ECHO_T}$ac_header_preproc" >&6; }
-
-# So?  What about this header?
-case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
-  yes:no: )
-    { echo "$as_me:$LINENO: WARNING: portals3.h: accepted by the compiler, rejected by the preprocessor!" >&5
-echo "$as_me: WARNING: portals3.h: accepted by the compiler, rejected by the preprocessor!" >&2;}
-    { echo "$as_me:$LINENO: WARNING: portals3.h: proceeding with the compiler's result" >&5
-echo "$as_me: WARNING: portals3.h: proceeding with the compiler's result" >&2;}
-    ac_header_preproc=yes
-    ;;
-  no:yes:* )
-    { echo "$as_me:$LINENO: WARNING: portals3.h: present but cannot be compiled" >&5
-echo "$as_me: WARNING: portals3.h: present but cannot be compiled" >&2;}
-    { echo "$as_me:$LINENO: WARNING: portals3.h:     check for missing prerequisite headers?" >&5
-echo "$as_me: WARNING: portals3.h:     check for missing prerequisite headers?" >&2;}
-    { echo "$as_me:$LINENO: WARNING: portals3.h: see the Autoconf documentation" >&5
-echo "$as_me: WARNING: portals3.h: see the Autoconf documentation" >&2;}
-    { echo "$as_me:$LINENO: WARNING: portals3.h:     section \"Present But Cannot Be Compiled\"" >&5
-echo "$as_me: WARNING: portals3.h:     section \"Present But Cannot Be Compiled\"" >&2;}
-    { echo "$as_me:$LINENO: WARNING: portals3.h: proceeding with the preprocessor's result" >&5
-echo "$as_me: WARNING: portals3.h: proceeding with the preprocessor's result" >&2;}
-    { echo "$as_me:$LINENO: WARNING: portals3.h: in the future, the compiler will take precedence" >&5
-echo "$as_me: WARNING: portals3.h: in the future, the compiler will take precedence" >&2;}
-
-    ;;
-esac
-{ echo "$as_me:$LINENO: checking for portals3.h" >&5
-echo $ECHO_N "checking for portals3.h... $ECHO_C" >&6; }
-if test "${ac_cv_header_portals3_h+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  ac_cv_header_portals3_h=$ac_header_preproc
-fi
-{ echo "$as_me:$LINENO: result: $ac_cv_header_portals3_h" >&5
-echo "${ECHO_T}$ac_cv_header_portals3_h" >&6; }
-
-fi
-if test $ac_cv_header_portals3_h = yes; then
-  :
-else
-  { { echo "$as_me:$LINENO: error: Header portals3.h not found." >&5
-echo "$as_me: error: Header portals3.h not found." >&2;}
+	if test "$ok" = yes ; then
+	    { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+	else
+	    { echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+	    { { echo "$as_me:$LINENO: error: Header portals/portals3.h not found." >&5
+echo "$as_me: error: Header portals/portals3.h not found." >&2;}
    { (exit 1); exit 1; }; }
-fi
+	fi
 
-
-
-				linked_ok=no
-	PORTALS_LIBS=
-	{ echo "$as_me:$LINENO: checking for portals libraries" >&5
+				{ echo "$as_me:$LINENO: checking for portals libraries" >&5
 echo $ECHO_N "checking for portals libraries... $ECHO_C" >&6; }
+	ok=no
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
-#include <portals3.h>
+#include <portals/portals3.h>
 int
 main ()
 {
-
-		int m, n;
-		m = PtlInit(&n);
-
+int m, n; m = PtlInit(&n);
   ;
   return 0;
 }
@@ -14908,8 +14829,7 @@ eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
 	 test ! -s conftest.err
        } && test -s conftest$ac_exeext &&
        $as_test_x conftest$ac_exeext; then
-  { echo "$as_me:$LINENO: result: ok" >&5
-echo "${ECHO_T}ok" >&6; }; linked_ok=yes
+  ok=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
@@ -14920,9 +14840,8 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
 
-	if test "$linked_ok" = no ; then
-	    PORTALS_LIBS="-lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
-	    save_libs="$LIBS"
+	if test "$ok" = no ; then
+	    PORTALS_LIBS="$libs -lportals"
 	    LIBS="$LIBS $PORTALS_LIBS"
 	    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
@@ -14930,14 +14849,11 @@ _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
-#include <portals3.h>
+#include <portals/portals3.h>
 int
 main ()
 {
-
-		    int m, n;
-		    m = PtlInit(&n);
-
+int m, n; m = PtlInit(&n);
   ;
   return 0;
 }
@@ -14960,30 +14876,321 @@ eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
 	 test ! -s conftest.err
        } && test -s conftest$ac_exeext &&
        $as_test_x conftest$ac_exeext; then
-  { echo "$as_me:$LINENO: result: ok" >&5
-echo "${ECHO_T}ok" >&6; }
+  ok=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
-	{ { echo "$as_me:$LINENO: error: Could not link Portals library." >&5
-echo "$as_me: error: Could not link Portals library." >&2;}
-   { (exit 1); exit 1; }; }
+
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
-	    BUILD_PORTALS=1
-	    LIBS="$save_libs"
 	fi
-    fi
-    if test -n "$PORTALS_INCDIR" ; then
-	CPPFLAGS="$save_cppflags"
-    fi
-    if test -n "$PORTALS_LIBDIR" ; then
-	LDFLAGS="$save_ldflags"
-    fi
 
+	if test "$ok" = no ; then
+	    PORTALS_LIBS="$libs -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
+	    LIBS="$LIBS $PORTALS_LIBS"
+	    cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <portals/portals3.h>
+int
+main ()
+{
+int m, n; m = PtlInit(&n);
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext &&
+       $as_test_x conftest$ac_exeext; then
+  ok=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+	fi
+
+	if test "$ok" = yes ; then
+	    { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+	    BUILD_PORTALS=1
+	else
+	    { echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+	    { { echo "$as_me:$LINENO: error: Could not link Portals library." >&5
+echo "$as_me: error: Could not link Portals library." >&2;}
+   { (exit 1); exit 1; }; }
+	fi
+
+	#
+	# Check for API variations.
+	#
+
+for ac_func in PtlErrorStr
+do
+as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
+{ echo "$as_me:$LINENO: checking for $ac_func" >&5
+echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6; }
+if { as_var=$as_ac_var; eval "test \"\${$as_var+set}\" = set"; }; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
+   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
+#define $ac_func innocuous_$ac_func
+
+/* System header to define __stub macros and hopefully few prototypes,
+    which can conflict with char $ac_func (); below.
+    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
+    <limits.h> exists even on freestanding compilers.  */
+
+#ifdef __STDC__
+# include <limits.h>
+#else
+# include <assert.h>
+#endif
+
+#undef $ac_func
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char $ac_func ();
+/* The GNU C library defines this for functions which it implements
+    to always fail with ENOSYS.  Some functions are actually named
+    something starting with __ and the normal name is an alias.  */
+#if defined __stub_$ac_func || defined __stub___$ac_func
+choke me
+#endif
+
+int
+main ()
+{
+return $ac_func ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext &&
+       $as_test_x conftest$ac_exeext; then
+  eval "$as_ac_var=yes"
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	eval "$as_ac_var=no"
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+fi
+ac_res=`eval echo '${'$as_ac_var'}'`
+	       { echo "$as_me:$LINENO: result: $ac_res" >&5
+echo "${ECHO_T}$ac_res" >&6; }
+if test `eval echo '${'$as_ac_var'}'` = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+
+for ac_func in PtlEventKindStr
+do
+as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
+{ echo "$as_me:$LINENO: checking for $ac_func" >&5
+echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6; }
+if { as_var=$as_ac_var; eval "test \"\${$as_var+set}\" = set"; }; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
+   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
+#define $ac_func innocuous_$ac_func
+
+/* System header to define __stub macros and hopefully few prototypes,
+    which can conflict with char $ac_func (); below.
+    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
+    <limits.h> exists even on freestanding compilers.  */
+
+#ifdef __STDC__
+# include <limits.h>
+#else
+# include <assert.h>
+#endif
+
+#undef $ac_func
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char $ac_func ();
+/* The GNU C library defines this for functions which it implements
+    to always fail with ENOSYS.  Some functions are actually named
+    something starting with __ and the normal name is an alias.  */
+#if defined __stub_$ac_func || defined __stub___$ac_func
+choke me
+#endif
+
+int
+main ()
+{
+return $ac_func ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext &&
+       $as_test_x conftest$ac_exeext; then
+  eval "$as_ac_var=yes"
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	eval "$as_ac_var=no"
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+fi
+ac_res=`eval echo '${'$as_ac_var'}'`
+	       { echo "$as_me:$LINENO: result: $ac_res" >&5
+echo "${ECHO_T}$ac_res" >&6; }
+if test `eval echo '${'$as_ac_var'}'` = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <portals/portals3.h>
+int
+main ()
+{
+int m; ptl_process_id_t any_pid;
+	     m = PtlACEntry(0, 0, any_pid, (ptl_uid_t) -1, (ptl_jid_t) -1, 0);
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_PTLACENTRY_JID 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	# Reset
+	CPPFLAGS="$save_cppflags"
+	LIBS="$save_libs"
+    fi
 
 
 
@@ -17556,8 +17763,7 @@ BUILD_OPENIB!$BUILD_OPENIB$ac_delim
 OPENIB_INCDIR!$OPENIB_INCDIR$ac_delim
 OPENIB_LIBDIR!$OPENIB_LIBDIR$ac_delim
 BUILD_PORTALS!$BUILD_PORTALS$ac_delim
-PORTALS_INCDIR!$PORTALS_INCDIR$ac_delim
-PORTALS_LIBDIR!$PORTALS_LIBDIR$ac_delim
+PORTALS_INCS!$PORTALS_INCS$ac_delim
 PORTALS_LIBS!$PORTALS_LIBS$ac_delim
 SERVER_LDFLAGS!$SERVER_LDFLAGS$ac_delim
 BUILD_VIS!$BUILD_VIS$ac_delim
@@ -17567,7 +17773,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 20; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 19; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
