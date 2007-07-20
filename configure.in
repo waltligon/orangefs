@@ -759,7 +759,7 @@ CFLAGS="$oldcflags"
 
 dnl allow disabling TCP BMI method
 BUILD_BMI_TCP=1
-AC_ARG_WITH(tcp,
+AC_ARG_WITH(bmi-tcp,
 [  --without-bmi-tcp       Disable BMI TCP method],
     if test -z "$withval" -o "$withval" = yes ; then
 	:
