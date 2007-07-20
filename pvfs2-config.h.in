@@ -375,6 +375,9 @@
 /* Define if on linux */
 #undef TARGET_OS_LINUX
 
+/* Define to build for linux kernel module userspace helper. */
+#undef WITH_LINUX_KMOD
+
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 

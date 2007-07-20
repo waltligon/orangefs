@@ -11137,6 +11137,11 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 	CFLAGS=$oldcflags
 
+
+cat >>confdefs.h <<\_ACEOF
+#define WITH_LINUX_KMOD 1
+_ACEOF
+
 fi
 
 BUILD_ABSOLUTE_TOP=`pwd`
