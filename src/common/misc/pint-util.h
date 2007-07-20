@@ -75,9 +75,6 @@ typedef struct PINT_time_marker_s PINT_time_marker;
 
 PVFS_msg_tag_t PINT_util_get_next_tag(void);
 
-int PINT_check_acls(void *acl_buf, size_t acl_size, 
-    PVFS_object_attr *attr,
-    PVFS_uid uid, PVFS_gid gid, int want);
 int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src);
 void PINT_free_object_attr(PVFS_object_attr *attr);
 void PINT_time_mark(PINT_time_marker* out_marker);
@@ -86,18 +83,6 @@ void PINT_time_diff(PINT_time_marker mark1,
     double* out_wtime_sec,
     double* out_utime_sec,
     double* out_stime_sec);
-
-enum PINT_access_type
-{
-    PINT_ACCESS_EXECUTABLE = 1,
-    PINT_ACCESS_WRITABLE = 2,
-    PINT_ACCESS_READABLE = 4,
-};
-
-int PINT_check_mode(
-    PVFS_object_attr *attr,
-    PVFS_uid uid, PVFS_gid gid,
-    enum PINT_access_type access_type);
 
 #ifdef HAVE_SYS_VFS_H
 
