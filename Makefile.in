@@ -348,10 +348,10 @@ endif
 ifdef BUILD_PORTALS
     CFLAGS += -D__STATIC_METHOD_BMI_PORTALS__
 ifneq (,@PORTALS_LIBS@)
-    PORTALSLIBS := -L@PORTALS_LIBDIR@ -lp3api -lp3lib -lp3utcp -lp3rt
-    LIBS += $(PORTALSLIBS)
-    LIBS_THREADED += $(PORTALSLIBS)
-    SERVERLIBS += $(PORTALSLIBS)
+    PORTALS_LIBS := @PORTALS_LIBS@
+    LIBS += $(PORTALS_LIBS)
+    LIBS_THREADED += $(PORTALS_LIBS)
+    SERVERLIBS += $(PORTALS_LIBS)
 endif
 endif
 
@@ -798,6 +798,7 @@ cleaner: clean
 	rm -f doc/doxygen/pvfs2-doxygen.conf
 	rm -f examples/fs.conf examples/server.conf-localhost
 	rm -rf autom4te*.cache
+	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
 	rm -f config.log config.status config.cache 
 	rm -f pvfs-@PVFS2_VERSION@.tar.gz

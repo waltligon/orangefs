@@ -7,105 +7,144 @@ AC_DEFUN([AX_PORTALS],
     dnl                        system paths.
     dnl   --with-portals=<dir> To specify a location that has include and lib
     dnl                        (or lib64) subdirectories with the goods.
-    dnl Or specify the locations exactly using:
     dnl
-    dnl   --with-portals-includes=<dir>
-    dnl   --with-portals-libs=<dir>
+    dnl Or specify the -I an -L and -l flags exactly using, e.g.:
+    dnl
+    dnl   --with-portals-includes="-I<dir>"
+    dnl   --with-portals-libs="-L<dir> -l<name>"
+    dnl
+    dnl The C file uses #include <portals/portals3.h>, so choose your include
+    dnl path accordingly.  If it did not do this, portals/errno.h would sit in
+    dnl front of the system version.
     dnl
     use_portals=no
-    portals_home=
+    home=
+    incs=
+    libs=
     AC_ARG_WITH(portals,
     [  --with-portals[=<dir>]   Location of the Portals install (default no Portals)],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    use_portals=yes
 	elif test "$withval" != no ; then
-	    portals_home="$withval"
+	    home="$withval"
 	fi
     )
     AC_ARG_WITH(portals-includes,
-    [  --with-portals-includes=<dir>  Location of the Portals includes],
+    [  --with-portals-includes=<dir>  Extra CFLAGS to specify Portals includes],
 	if test -z "$withval" -o "$withval" = yes ; then
-	    AC_MSG_ERROR([Option --with-portals-includes requires path to Portals headers.])
+	    AC_MSG_ERROR([Option --with-portals-includes requires an argument.])
 	elif test "$withval" != no ; then
-	    PORTALS_INCDIR="$withval"
+	    incs="$withval"
 	fi
     )
     AC_ARG_WITH(portals-libs,
-    [  --with-portals-libs=<dir>      Location of the Portals libraries],
+    [  --with-portals-libs=<dir>      Extra LIBS to link Portals libraries],
 	if test -z "$withval" -o "$withval" = yes ; then
-	    AC_MSG_ERROR([Option --with-portals-libs requires path to Portals libraries.])
+	    AC_MSG_ERROR([Option --with-portals-libs requires an argument.])
 	elif test "$withval" != no ; then
-	    PORTALS_LIBDIR="$withval"
+	    libs="$withval"
 	fi
     )
     dnl If supplied the incls and libs explicitly, use them, else populate them
     dnl using guesses from the --with-portals dir.
-    if test -n "$portals_home" ; then
-	if test -z "$PORTALS_INCDIR"; then
-	    PORTALS_INCDIR=$portals_home/include
+    if test -n "$home" ; then
+	if test -z "$incs"; then
+	    incs=$home/include
 	fi
-	if test -z "$PORTALS_LIBDIR"; then
-	    PORTALS_LIBDIR=$portals_home/lib64
-	    if test ! -d "$PORTALS_LIBDIR" ; then
-		PORTALS_LIBDIR=$portals_home/lib
+	if test -z "$libs"; then
+	    libs=$home/lib64
+	    if test ! -d "$libs" ; then
+		libs=$home/lib
 	    fi
 	fi
     fi
 
-    dnl If Portals, go verify existence of header.
-    if test -n "$PORTALS_INCDIR" ; then
+    dnl
+    dnl Look for headers and libs.
+    dnl
+    BUILD_PORTALS=
+    PORTALS_INCS=
+    PORTALS_LIBS=
+    if test "X$use_portals$home$incs$libs" != X ; then
+	# Save stuff
 	save_cppflags="$CPPFLAGS"
-	CPPFLAGS="$CPPFLAGS -I$PORTALS_INCDIR"
-	use_portals=yes
-    fi
-    if test -n "$PORTALS_LIBDIR" ; then
-	save_ldflags="$LDFLAGS"
-	LDFLAGS="$LDFLAGS -L$PORTALS_LIBDIR"
-	use_portals=yes
-    fi
-    if test "$use_portals" = yes ; then
-	AC_CHECK_HEADER(portals3.h,,
-	    AC_MSG_ERROR([Header portals3.h not found.]))
+	save_libs="$LIBS"
+
+	PORTALS_INCS="$incs"
+	CPPFLAGS="$CPPFLAGS $PORTALS_INCS"
+
+	PORTALS_LIBS="$libs"
+	LIBS="$LIBS $PORTALS_LIBS"
+
+	AC_MSG_CHECKING([for portals3.h header])
+	ok=no
+	AC_TRY_COMPILE(
+	    [#include <portals/portals3.h>],
+	    [int m, n; m = PtlInit(&n);],
+	    [ok=yes])
+
+	if test "$ok" = yes ; then
+	    AC_MSG_RESULT([yes])
+	else
+	    AC_MSG_RESULT([no])
+	    AC_MSG_ERROR([Header portals/portals3.h not found.])
+	fi
 
 	dnl try without first, for Cray, then try TCP version
 	dnl Run test is not always possible, esp when cross-compiling or on
 	dnl a box that does not have the hardware.
-	linked_ok=no
-	PORTALS_LIBS=
 	AC_MSG_CHECKING([for portals libraries])
+	ok=no
 	AC_TRY_LINK(
-	    [#include <portals3.h>],
-	    [
-		int m, n;
-		m = PtlInit(&n);
-	    ],
-	    [AC_MSG_RESULT(ok); linked_ok=yes])
+	    [#include <portals/portals3.h>],
+	    [int m, n; m = PtlInit(&n);],
+	    [ok=yes])
 
-	if test "$linked_ok" = no ; then
-	    PORTALS_LIBS="-lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
-	    save_libs="$LIBS"
+	if test "$ok" = no ; then
+	    PORTALS_LIBS="$libs -lportals"
 	    LIBS="$LIBS $PORTALS_LIBS"
 	    AC_TRY_LINK(
-		[#include <portals3.h>],
-		[
-		    int m, n;
-		    m = PtlInit(&n);
-		],
-		[AC_MSG_RESULT(ok)],
-		AC_MSG_ERROR([Could not link Portals library.]))
-	    BUILD_PORTALS=1
-	    LIBS="$save_libs"
+		[#include <portals/portals3.h>],
+		[int m, n; m = PtlInit(&n);],
+		[ok=yes])
 	fi
-    fi
-    if test -n "$PORTALS_INCDIR" ; then
+
+	if test "$ok" = no ; then
+	    PORTALS_LIBS="$libs -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
+	    LIBS="$LIBS $PORTALS_LIBS"
+	    AC_TRY_LINK(
+		[#include <portals/portals3.h>],
+		[int m, n; m = PtlInit(&n);],
+		[ok=yes])
+	fi
+
+	if test "$ok" = yes ; then
+	    AC_MSG_RESULT([yes])
+	    BUILD_PORTALS=1
+	else
+	    AC_MSG_RESULT([no])
+	    AC_MSG_ERROR([Could not link Portals library.])
+	fi
+
+	#
+	# Check for API variations.
+	#
+	AC_CHECK_FUNCS(PtlErrorStr)
+	AC_CHECK_FUNCS(PtlEventKindStr)
+
+	AC_TRY_COMPILE(
+	    [#include <portals/portals3.h>],
+	    [int m; ptl_process_id_t any_pid;
+	     m = PtlACEntry(0, 0, any_pid, (ptl_uid_t) -1, (ptl_jid_t) -1, 0);],
+	    AC_DEFINE(HAVE_PTLACENTRY_JID, 1,
+		      [Define if have PtlACEntry with jid argument.]))
+
+	# Reset
 	CPPFLAGS="$save_cppflags"
-    fi
-    if test -n "$PORTALS_LIBDIR" ; then
-	LDFLAGS="$save_ldflags"
+	LIBS="$save_libs"
     fi
     AC_SUBST(BUILD_PORTALS)
-    AC_SUBST(PORTALS_INCDIR)
-    AC_SUBST(PORTALS_LIBDIR)
+    AC_SUBST(PORTALS_INCS)
     AC_SUBST(PORTALS_LIBS)
 ])
 

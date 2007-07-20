@@ -7,12 +7,21 @@
  */
 #include <string.h>
 #include <errno.h>
-#include <portals3.h>
-#include <p3nal_utcp.h>  /* sets PTL_IFACE_DEFAULT to UTCP */
-#include <p3api/debug.h>
+
+#ifdef __LIBCATAMOUNT__
+/* Cray XT3 version */
+#define PTL_IFACE_DEFAULT PTL_IFACE_SS
+#include <portals/portals3.h>
+#else
+/* TCP version */
+#include <portals/portals3.h>
+#include <portals/p3nal_utcp.h>  /* sets PTL_IFACE_DEFAULT to UTCP */
+#include <portals/p3api/debug.h>
 #include <netdb.h>  /* gethostbyname */
-#include <assert.h>
 #include <arpa/inet.h>  /* inet_ntop */
+#endif
+
+#include <assert.h>
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/io/bmi/bmi-method-support.h>   /* bmi_method_ops */
 #include <src/io/bmi/bmi-method-callback.h>  /* bmi_method_addr_reg_callback */
@@ -46,7 +55,6 @@
 #else
 #  define debug(lvl,fmt,...) do { } while (0)
 #endif
-
 
 /*
  * No global locking.  Portals has its own library-level locking, but
@@ -86,9 +94,27 @@ static ptl_handle_eq_t eq = PTL_INVALID_HANDLE;
 static const ptl_pt_index_t ptl_index = 1;
 
 /*
- * Handy const.
+ * Handy const.  Cray version needs padding, though, so initialize this
+ * elsewhere.
  */
-static const ptl_process_id_t any_pid = { PTL_NID_ANY, PTL_PID_ANY };
+static ptl_process_id_t any_pid;
+
+/*
+ * Cray does not have these, but TCP does.
+ */
+#ifndef HAVE_PTLERRORSTR
+static const char *PtlErrorStr(unsigned int ptl_errno)
+{
+    return ptl_err_str[ptl_errno];
+}
+#endif
+
+#ifndef HAVE_PTLEVENTKINDSTR
+static const char *PtlEventKindStr(ptl_event_kind_t ev_kind)
+{
+    return ptl_err_str[ev_kind];
+}
+#endif
 
 /*
  * Match bits.  The lower 32 bits always carry the bmi_tag.  If this bit
@@ -720,8 +746,8 @@ out:
 static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
 				 ptl_process_id_t my_pid)
 {
-    int ret;
-    static const ptl_process_id_t no_pid = { 0, 0 };
+    int ret = 0;
+    static ptl_process_id_t no_pid;
     ptl_md_t zero_mdesc = {
 	.threshold = PTL_MD_THRESH_INF,
 	.max_size = 0,
@@ -731,13 +757,13 @@ static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
 
     /* already initialized */
     if (ni != PTL_INVALID_HANDLE)
-	return 0;
+	return ret;
 
     gen_mutex_lock(&ni_mutex);
 
     /* check again now that we have the mutex */
     if (ni != PTL_INVALID_HANDLE)
-	return 0;
+	goto out;
 
     /*
      * XXX: should do this properly.  If server, we could look
@@ -745,19 +771,25 @@ static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
      * lookup server, figure out how route would go to it, choose
      * that interface.  Yeah.
      */
-    setenv("PTL_IFACE", "eth0", 0);
+    /* setenv("PTL_IFACE", "eth0", 0); */
 
+    my_pid.pid = -1;
     ret = PtlNIInit(PTL_IFACE_DEFAULT, my_pid.pid, NULL, NULL, &ni);
     if (ret) {
-	/* error number is bogus here, do not try to print it */
-	gossip_err("%s: PtlNIInit failed\n", __func__);
+	/* error number is bogus here, do not try to decode it */
+	gossip_err("%s: PtlNIInit failed: %d\n", __func__, ret);
+	ni = PTL_INVALID_HANDLE;  /* init call nulls it out */
 	ret = -EIO;
 	goto out;
     }
 
     /* need an access control entry to allow everybody to talk, else root
      * cannot talk to random user, e.g. */
-    ret = PtlACEntry(ni, 0, any_pid, PTL_UID_ANY, PTL_JID_ANY, ptl_index);
+#ifdef HAVE_PTLACENTRY_JID
+    ret = PtlACEntry(ni, 0, any_pid, (ptl_uid_t) -1, (ptl_jid_t) -1, ptl_index);
+#else
+#endif
+    ret = PtlACEntry(ni, 0, any_pid, (ptl_uid_t) -1, ptl_index);
     if (ret) {
 	gossip_err("%s: PtlACEntry: %s\n", __func__, PtlErrorStr(ret));
 	ret = -EIO;
@@ -773,6 +805,8 @@ static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
     }
 
     /* "mark" match entry that denotes the bottom of the prepost entries */
+    no_pid.nid = 0;
+    no_pid.pid = 0;
     ret = PtlMEAttach(ni, ptl_index, no_pid, 0, 0, PTL_RETAIN, PTL_INS_BEFORE,
 		      &mark_me);
     if (ret) {
@@ -1330,6 +1364,14 @@ static const char *bmip_rev_lookup(struct method_addr *addr)
     return pma->peername;
 }
 
+#ifdef __LIBCATAMOUNT__
+static int bmip_nid_from_hostname(const char *hostname, uint32_t *nid)
+{
+    debug(0, "%s: no clue how to do this: %s\n", __func__, hostname);
+    *nid = 0;
+    return 0;
+}
+#else
 /*
  * Clients give hostnames.  Convert these to Portals nids.  This routine
  * specific for Portals-over-IP (tcp or utcp).
@@ -1352,6 +1394,7 @@ static int bmip_nid_from_hostname(const char *hostname, uint32_t *nid)
     *nid = htonl(*(uint32_t *) he->h_addr_list[0]);
     return 0;
 }
+#endif
 
 /*
  * Build and fill a Portals-specific method_addr structure.  This routine
@@ -1408,6 +1451,21 @@ out:
     return map;
 }
 
+#ifdef __LIBCATAMOUNT__
+static struct method_addr *addr_from_nidpid(ptl_process_id_t pid)
+{
+    struct method_addr *map;
+    char *hostname;
+
+    hostname = malloc(22);
+    sprintf(hostname, "%u:%u", pid.pid, pid.nid);
+    debug(0, "%s: no clue what to do here either, allocing a new one.\n",
+	  __func__);
+    map = bmip_alloc_method_addr(hostname, pid, 1);
+    free(hostname);
+    return map;
+}
+#else
 /*
  * This is called from the server, on seeing an unexpected message from
  * a client.  Convert that to a method_addr.  If BMI has never seen it
@@ -1435,6 +1493,7 @@ static struct method_addr *addr_from_nidpid(ptl_process_id_t pid)
 
     return map;
 }
+#endif
 
 /*
  * Break up a method string like:
@@ -1748,6 +1807,9 @@ static int bmip_initialize(struct method_addr *listen_addr,
 
     gen_mutex_lock(&ni_mutex);
 
+    any_pid.nid = PTL_NID_ANY;
+    any_pid.pid = PTL_PID_ANY;
+
     /* check params */
     if (!!listen_addr ^ (init_flags & BMI_INIT_SERVER)) {
 	gossip_err("%s: server but no listen address\n", __func__);
@@ -1768,7 +1830,10 @@ static int bmip_initialize(struct method_addr *listen_addr,
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | PTL_DBG_NI_ALL); */
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | 0x001f0000); */
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | 0x00000000); */
-    PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_DROP | 0x00000000);
+    /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_DROP | 0x00000000); */
+
+    /* catamount has different debug symbols */
+    PtlNIDebug(PTL_INVALID_HANDLE, PTL_DEBUG_DROP | 0x00000000);
 
     /*
      * Allocate and build MDs for a queue of unexpected messages from
@@ -1803,6 +1868,9 @@ static int bmip_finalize(void)
 
     gen_mutex_lock(&ni_mutex);
 
+    if (ni == PTL_INVALID_HANDLE)
+	goto out;
+
     nonprepost_fini();
     if (unexpected_buf)
 	unexpected_fini();
@@ -1826,6 +1894,7 @@ static int bmip_finalize(void)
 
     PtlFini();
 
+out:
     gen_mutex_unlock(&ni_mutex);
     return 0;
 }

@@ -24,10 +24,11 @@ SERVERSRC += $(src)
 
 #
 # Add extra include paths and warnings just for this directory.
+# No shadow, as portals headers use "index".
 #
 cflags :=
 ifdef GNUC
-cflags += -W -Wcast-qual -Wshadow -Wwrite-strings
+cflags += -W -Wcast-qual -Wwrite-strings
 endif
 
 #
@@ -38,8 +39,8 @@ MODCFLAGS_$(DIR) := $(cflags)
 #
 # Portals headers.
 #
-ifneq (,@PORTALS_INCDIR@)
-MODCFLAGS_$(DIR)/portals.c := -I@PORTALS_INCDIR@
+ifneq (,@PORTALS_INCS@)
+MODCFLAGS_$(DIR)/portals.c := @PORTALS_INCS@
 endif
 
 endif  # BUILD_PORTALS
