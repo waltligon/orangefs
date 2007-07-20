@@ -89,6 +89,12 @@ struct PVFS_dev_map_desc
     int32_t  count;
 };
 
+/*
+ * Disable this code when not compiling for the use of the linux kernel
+ * module helper code.  Not all client machines have ioctl, poll.
+ */
+#ifdef WITH_LINUX_KMOD
+
 #define PVFS_DEV_MAGIC 'k'
 
 #define DEV_GET_MAGIC           0x1
@@ -109,6 +115,8 @@ PVFS_DEV_REMOUNT_ALL        =  _IO(PVFS_DEV_MAGIC , DEV_REMOUNT_ALL),
 PVFS_DEV_DEBUG              =  _IOR(PVFS_DEV_MAGIC, DEV_DEBUG, int32_t),
 PVFS_DEV_MAXNR              =  DEV_MAX_NR,
 };
+
+#endif  /* WITH_LINUX_KMOD */
 
 #endif /* __PINT_DEV_SHARED_H */
 

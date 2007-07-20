@@ -29,6 +29,7 @@
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-internal.h"
 
+#ifdef WITH_LINUX_KMOD
 static int setup_dev_entry(
     const char *dev_name);
 
@@ -36,10 +37,13 @@ static int parse_devices(
     const char *targetfile,
     const char *devname, 
     int *majornum);
+#endif  /* WITH_LINUX_KMOD */
 
 static int pdev_fd = -1;
 static int32_t pdev_magic;
+#ifdef WITH_LINUX_KMOD
 static int32_t pdev_max_upsize;
+#endif  /* WITH_LINUX_KMOD */
 static int32_t pdev_max_downsize;
 
 int32_t pvfs2_bufmap_total_size, pvfs2_bufmap_desc_size;
@@ -55,6 +59,7 @@ int PINT_dev_initialize(
     const char *dev_name,
     int flags)
 {
+#ifdef WITH_LINUX_KMOD
     int ret = -1;
     char *debug_string = getenv("PVFS2_KMODMASK");
     int32_t debug_mask = 0;
@@ -126,6 +131,7 @@ int PINT_dev_initialize(
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
+#endif  /* WITH_LINUX_KMOD */
     return 0;
 }
 
@@ -154,6 +160,7 @@ void PINT_dev_finalize(void)
 int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
                                 struct PINT_dev_params *params)
 {
+#ifdef WITH_LINUX_KMOD
     int i, ret = -1;
     uint64_t page_size = sysconf(_SC_PAGE_SIZE), total_size;
     void *ptr = NULL;
@@ -224,6 +231,7 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         }
         return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
     }
+#endif  /* WITH_LINUX_KMOD */
     return 0;
 }
 
@@ -294,7 +302,9 @@ int PINT_dev_test_unexpected(
         struct PINT_dev_unexp_info *info_array,
         int max_idle_time)
 {
-    int ret = -1, avail = -1, i = 0;
+    int ret = -1;
+#ifdef WITH_LINUX_KMOD
+    int avail = -1, i = 0;
     struct pollfd pfd;
     int32_t *magic = NULL;
     int32_t *proto_ver = NULL;
@@ -495,6 +505,7 @@ dev_test_unexp_error:
     }
 
     *outcount = 0;
+#endif  /* WITH_LINUX_KMOD */
     return ret;
 }
 
@@ -595,6 +606,7 @@ int PINT_dev_remount(void)
 {
     int ret = -PVFS_EINVAL;
 
+#ifdef WITH_LINUX_KMOD
     if (pdev_fd > -1)
     {
         ret = ((ioctl(pdev_fd, PVFS_DEV_REMOUNT_ALL, NULL) < 0) ?
@@ -604,6 +616,7 @@ int PINT_dev_remount(void)
             gossip_err("Error: ioctl PVFS_DEV_REMOUNT_ALL failure\n");
         }
     }
+#endif  /* WITH_LINUX_KMOD */
     return ret;
 }
 
@@ -645,6 +658,7 @@ void PINT_dev_memfree(void *buffer, int size)
     free(buffer);
 }
 
+#ifdef WITH_LINUX_KMOD
 /* setup_dev_entry()
  *
  * sets up the device file
@@ -772,6 +786,7 @@ static int parse_devices(
     fclose(devfile);
     return 0;
 }
+#endif  /* WITH_LINUX_KMOD */
 
 /*
  * Local variables:
