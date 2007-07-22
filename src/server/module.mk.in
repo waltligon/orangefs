@@ -1,4 +1,5 @@
 BUILD_SERVER = @BUILD_SERVER@
+PVFS2_SEGV_BACKTRACE = @PVFS2_SEGV_BACKTRACE@
 
 ifdef BUILD_SERVER
         DIR := src/server
@@ -56,7 +57,12 @@ ifdef BUILD_SERVER
 		$(DIR)/pvfs2-server.c
 
 	# to stat the fs, need to know about handle statistics
-	        MODCFLAGS_$(DIR)/statfs.c = \
-                        -I$(srcdir)/src/io/trove/trove-handle-mgmt
+	MODCFLAGS_$(DIR)/statfs.c = \
+		-I$(srcdir)/src/io/trove/trove-handle-mgmt
+
+ifdef PVFS2_SEGV_BACKTRACE
+	MODCFLAGS_$(DIR)/pvfs2-server.c := -D__PVFS2_SEGV_BACKTRACE__
+endif
+
 endif
 

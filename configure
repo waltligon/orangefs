@@ -702,6 +702,7 @@ ENABLE_COVERAGE
 STRICT_CFLAGS
 QUIET_COMPILE
 BUILD_EPOLL
+PVFS2_SEGV_BACKTRACE
 build_shared
 INTELC
 GNUC
@@ -11407,9 +11408,9 @@ fi
 
 # Check whether --enable-segv-backtrace was given.
 if test "${enable_segv_backtrace+set}" = set; then
-  enableval=$enable_segv_backtrace; CFLAGS="$CFLAGS -D__PVFS2_SEGV_BACKTRACE__"
-
+  enableval=$enable_segv_backtrace; PVFS2_SEGV_BACKTRACE=1
 fi
+
 
 
 # Check whether --enable-shared was given.
@@ -17701,6 +17702,7 @@ ENABLE_COVERAGE!$ENABLE_COVERAGE$ac_delim
 STRICT_CFLAGS!$STRICT_CFLAGS$ac_delim
 QUIET_COMPILE!$QUIET_COMPILE$ac_delim
 BUILD_EPOLL!$BUILD_EPOLL$ac_delim
+PVFS2_SEGV_BACKTRACE!$PVFS2_SEGV_BACKTRACE$ac_delim
 build_shared!$build_shared$ac_delim
 INTELC!$INTELC$ac_delim
 GNUC!$GNUC$ac_delim
@@ -17708,7 +17710,6 @@ DB_CFLAGS!$DB_CFLAGS$ac_delim
 DB_LIB!$DB_LIB$ac_delim
 NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
 TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
-TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -17750,6 +17751,7 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
 BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
 GM_HOME!$GM_HOME$ac_delim
 BUILD_GM!$BUILD_GM$ac_delim
@@ -17773,7 +17775,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 21; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 22; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
