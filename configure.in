@@ -528,7 +528,7 @@ AC_SUBST(BUILD_ABSOLUTE_TOP)
 AC_SUBST(SRC_RELATIVE_TOP)
 AC_SUBST(SRC_ABSOLUTE_TOP)
 
-dnl More options
+dnl Optimized code, but never override CFLAGS from command line or environment.
 AC_ARG_ENABLE(fast,
 [  --enable-fast           Disable optional debugging, enable optimizations.],
 [
@@ -536,6 +536,11 @@ if test "x$USR_CFLAGS_SET" = "xno"; then
     CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG"
 fi
 ])
+
+# default CFLAGS is -g -O2, unless user set CFLAGS or asked for --enable-fast
+if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
+    CFLAGS="$CFLAGS -g -O2"
+fi
 
 dnl Options that are not yet working
 dnl --------------------------------
@@ -552,18 +557,11 @@ dnl )
 
 AC_SUBST(ENABLE_COVERAGE)
 
+STRICT_CFLAGS=
 AC_ARG_ENABLE(strict,
-[  --enable-strict         Turn on strict debugging with gcc],
-[
-if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -g -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
-fi
-],
-[
-if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
-    CFLAGS="$CFLAGS -O2"
-fi
-])
+[  --enable-strict         Turn on strict compiler warnings],
+    STRICT_CFLAGS=1)
+AC_SUBST(STRICT_CFLAGS)
 
 dnl Check if user actually wants to see all our build output (compiles, links, etc.).
 AC_ARG_ENABLE(verbose-build,

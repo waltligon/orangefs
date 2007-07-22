@@ -699,6 +699,7 @@ BUILD_ABSOLUTE_TOP
 SRC_RELATIVE_TOP
 SRC_ABSOLUTE_TOP
 ENABLE_COVERAGE
+STRICT_CFLAGS
 QUIET_COMPILE
 BUILD_EPOLL
 build_shared
@@ -1327,7 +1328,7 @@ Optional Features:
   --disable-kernel-aio    Forcibly disable kernel aio
   --enable-kernel-sendfile    Forcibly enable kernel sendfile
   --enable-fast           Disable optional debugging, enable optimizations.
-  --enable-strict         Turn on strict debugging with gcc
+  --enable-strict         Turn on strict compiler warnings
   --enable-verbose-build  Enables full output during build process
   --enable-epoll          Enable use of epoll for TCP/IP polling
                           (epoll is enabled by default, this option
@@ -11164,23 +11165,20 @@ fi
 fi
 
 
+# default CFLAGS is -g -O2, unless user set CFLAGS or asked for --enable-fast
+if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
+    CFLAGS="$CFLAGS -g -O2"
+fi
 
 
 
+
+STRICT_CFLAGS=
 # Check whether --enable-strict was given.
 if test "${enable_strict+set}" = set; then
-  enableval=$enable_strict;
-if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -g -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
+  enableval=$enable_strict; STRICT_CFLAGS=1
 fi
 
-else
-
-if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
-    CFLAGS="$CFLAGS -O2"
-fi
-
-fi
 
 
 # Check whether --enable-verbose-build was given.
@@ -14670,7 +14668,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 fi
 
 
-                                                                        use_portals=no
+                                                                        use_portals=
     home=
     incs=
     libs=
@@ -17700,6 +17698,7 @@ BUILD_ABSOLUTE_TOP!$BUILD_ABSOLUTE_TOP$ac_delim
 SRC_RELATIVE_TOP!$SRC_RELATIVE_TOP$ac_delim
 SRC_ABSOLUTE_TOP!$SRC_ABSOLUTE_TOP$ac_delim
 ENABLE_COVERAGE!$ENABLE_COVERAGE$ac_delim
+STRICT_CFLAGS!$STRICT_CFLAGS$ac_delim
 QUIET_COMPILE!$QUIET_COMPILE$ac_delim
 BUILD_EPOLL!$BUILD_EPOLL$ac_delim
 build_shared!$build_shared$ac_delim
@@ -17710,7 +17709,6 @@ DB_LIB!$DB_LIB$ac_delim
 NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
 TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
 TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
-BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -17752,6 +17750,7 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
 GM_HOME!$GM_HOME$ac_delim
 BUILD_GM!$BUILD_GM$ac_delim
 MX_HOME!$MX_HOME$ac_delim
@@ -17773,7 +17772,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 19; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 20; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
