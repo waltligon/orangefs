@@ -17,7 +17,7 @@ AC_DEFUN([AX_PORTALS],
     dnl path accordingly.  If it did not do this, portals/errno.h would sit in
     dnl front of the system version.
     dnl
-    use_portals=no
+    use_portals=
     home=
     incs=
     libs=
