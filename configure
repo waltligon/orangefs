@@ -14093,17 +14093,18 @@ fi
 
 
 
-ib_home=
+
+                    ib_home=
 
 # Check whether --with-ib was given.
 if test "${with_ib+set}" = set; then
   withval=$with_ib; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-ib requires the path to your IB tree." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-ib requires the path to your IB tree." >&5
 echo "$as_me: error: Option --with-ib requires the path to your IB tree." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	ib_home="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    ib_home="$withval"
+	fi
 
 fi
 
@@ -14111,12 +14112,12 @@ fi
 # Check whether --with-ib-includes was given.
 if test "${with_ib_includes+set}" = set; then
   withval=$with_ib_includes; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-ib-includes requires path to IB headers." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-ib-includes requires path to IB headers." >&5
 echo "$as_me: error: Option --with-ib-includes requires path to IB headers." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	IB_INCDIR="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    IB_INCDIR="$withval"
+	fi
 
 fi
 
@@ -14124,30 +14125,30 @@ fi
 # Check whether --with-ib-libs was given.
 if test "${with_ib_libs+set}" = set; then
   withval=$with_ib_libs; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-ib-libs requires path to IB libraries." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-ib-libs requires path to IB libraries." >&5
 echo "$as_me: error: Option --with-ib-libs requires path to IB libraries." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	IB_LIBDIR="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    IB_LIBDIR="$withval"
+	fi
 
 fi
 
-if test -n "$ib_home" ; then
-    if test -z "$IB_INCDIR"; then
-	IB_INCDIR=$ib_home/include
-    fi
-    if test -z "$IB_LIBDIR"; then
-	IB_LIBDIR=$ib_home/lib64
-	if test ! -d "$IB_LIBDIR" ; then
-	    IB_LIBDIR=$ib_home/lib
+            if test -n "$ib_home" ; then
+	if test -z "$IB_INCDIR"; then
+	    IB_INCDIR=$ib_home/include
+	fi
+	if test -z "$IB_LIBDIR"; then
+	    IB_LIBDIR=$ib_home/lib64
+	    if test ! -d "$IB_LIBDIR" ; then
+		IB_LIBDIR=$ib_home/lib
+	    fi
 	fi
     fi
-fi
-if test -n "$IB_INCDIR$IB_LIBDIR" ; then
-    save_cppflags="$CPPFLAGS"
-    CPPFLAGS="$CPPFLAGS -I$IB_INCDIR"
-    if test "${ac_cv_header_vapi_h+set}" = set; then
+        if test -n "$IB_INCDIR$IB_LIBDIR" ; then
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$IB_INCDIR"
+	if test "${ac_cv_header_vapi_h+set}" = set; then
   { echo "$as_me:$LINENO: checking for vapi.h" >&5
 echo $ECHO_N "checking for vapi.h... $ECHO_C" >&6; }
 if test "${ac_cv_header_vapi_h+set}" = set; then
@@ -14281,15 +14282,15 @@ echo "$as_me: error: Header vapi.h not found." >&2;}
 fi
 
 
-                if test ! -f $IB_LIBDIR/libvapi.so ; then
-	if test ! -f $IB_LIBDIR/libvapi.a ; then
-	    { { echo "$as_me:$LINENO: error: Infiniband library libvapi.so not found." >&5
+				if test ! -f $IB_LIBDIR/libvapi.so ; then
+	    if test ! -f $IB_LIBDIR/libvapi.a ; then
+		{ { echo "$as_me:$LINENO: error: Infiniband library libvapi.so not found." >&5
 echo "$as_me: error: Infiniband library libvapi.so not found." >&2;}
    { (exit 1); exit 1; }; }
+	    fi
 	fi
-    fi
-    BUILD_IB=1
-    { echo "$as_me:$LINENO: checking for wrap_common.h" >&5
+	BUILD_IB=1
+	{ echo "$as_me:$LINENO: checking for wrap_common.h" >&5
 echo $ECHO_N "checking for wrap_common.h... $ECHO_C" >&6; }
 if test "${ac_cv_header_wrap_common_h+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -14342,23 +14343,23 @@ _ACEOF
 fi
 
 
-    CPPFLAGS="$save_cppflags"
-fi
+	CPPFLAGS="$save_cppflags"
+    fi
 
 
 
 
-openib_home=
+                    openib_home=
 
 # Check whether --with-openib was given.
 if test "${with_openib+set}" = set; then
   withval=$with_openib; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-openib requires the path to your OpenIB tree." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-openib requires the path to your OpenIB tree." >&5
 echo "$as_me: error: Option --with-openib requires the path to your OpenIB tree." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	openib_home="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    openib_home="$withval"
+	fi
 
 fi
 
@@ -14366,12 +14367,12 @@ fi
 # Check whether --with-openib-includes was given.
 if test "${with_openib_includes+set}" = set; then
   withval=$with_openib_includes; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-openib-includes requires path to OpenIB headers." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-openib-includes requires path to OpenIB headers." >&5
 echo "$as_me: error: Option --with-openib-includes requires path to OpenIB headers." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	OPENIB_INCDIR="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    OPENIB_INCDIR="$withval"
+	fi
 
 fi
 
@@ -14379,30 +14380,30 @@ fi
 # Check whether --with-openib-libs was given.
 if test "${with_openib_libs+set}" = set; then
   withval=$with_openib_libs; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-openib-libs requires path to OpenIB libraries." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-openib-libs requires path to OpenIB libraries." >&5
 echo "$as_me: error: Option --with-openib-libs requires path to OpenIB libraries." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	OPENIB_LIBDIR="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    OPENIB_LIBDIR="$withval"
+	fi
 
 fi
 
-if test -n "$openib_home" ; then
-    if test -z "$OPENIB_INCDIR"; then
-	OPENIB_INCDIR=$openib_home/include
-    fi
-    if test -z "$OPENIB_LIBDIR"; then
-	OPENIB_LIBDIR=$openib_home/lib64
-	if test ! -d "$OPENIB_LIBDIR" ; then
-	    OPENIB_LIBDIR=$openib_home/lib
+            if test -n "$openib_home" ; then
+	if test -z "$OPENIB_INCDIR"; then
+	    OPENIB_INCDIR=$openib_home/include
+	fi
+	if test -z "$OPENIB_LIBDIR"; then
+	    OPENIB_LIBDIR=$openib_home/lib64
+	    if test ! -d "$OPENIB_LIBDIR" ; then
+		OPENIB_LIBDIR=$openib_home/lib
+	    fi
 	fi
     fi
-fi
-if test -n "$OPENIB_INCDIR$OPENIB_LIBDIR" ; then
-    save_cppflags="$CPPFLAGS"
-    CPPFLAGS="$CPPFLAGS -I$OPENIB_INCDIR"
-    if test "${ac_cv_header_infiniband_verbs_h+set}" = set; then
+        if test -n "$OPENIB_INCDIR$OPENIB_LIBDIR" ; then
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$OPENIB_INCDIR"
+	if test "${ac_cv_header_infiniband_verbs_h+set}" = set; then
   { echo "$as_me:$LINENO: checking for infiniband/verbs.h" >&5
 echo $ECHO_N "checking for infiniband/verbs.h... $ECHO_C" >&6; }
 if test "${ac_cv_header_infiniband_verbs_h+set}" = set; then
@@ -14536,26 +14537,26 @@ echo "$as_me: error: Header infiniband/verbs.h not found." >&2;}
 fi
 
 
-            if test ! -f $OPENIB_LIBDIR/libibverbs.so ; then
-	if test ! -f $OPENIB_LIBDIR/libibverbs.a ; then
-	    { { echo "$as_me:$LINENO: error: OpenIB library libibverbs.so not found." >&5
+			if test ! -f $OPENIB_LIBDIR/libibverbs.so ; then
+	    if test ! -f $OPENIB_LIBDIR/libibverbs.a ; then
+		{ { echo "$as_me:$LINENO: error: OpenIB library libibverbs.so not found." >&5
 echo "$as_me: error: OpenIB library libibverbs.so not found." >&2;}
    { (exit 1); exit 1; }; }
+	    fi
 	fi
+	BUILD_OPENIB=1
+	CPPFLAGS="$save_cppflags"
     fi
-    BUILD_OPENIB=1
-    CPPFLAGS="$save_cppflags"
-fi
 
 
 
 
-if test -n "$BUILD_OPENIB" ; then
-            save_ldflags="$LDFLAGS"
-    LDFLAGS="-L$OPENIB_LIBDIR -libverbs"
-    { echo "$as_me:$LINENO: checking for ibv_get_devices" >&5
+    if test -n "$BUILD_OPENIB" ; then
+			save_ldflags="$LDFLAGS"
+	LDFLAGS="-L$OPENIB_LIBDIR -libverbs"
+	{ echo "$as_me:$LINENO: checking for ibv_get_devices" >&5
 echo $ECHO_N "checking for ibv_get_devices... $ECHO_C" >&6; }
-    cat >conftest.$ac_ext <<_ACEOF
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -14566,7 +14567,7 @@ int
 main ()
 {
 
-	ibv_get_devices();
+	    ibv_get_devices();
 
   ;
   return 0;
@@ -14608,24 +14609,24 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
-    LDFLAGS="$save_ldflags"
+	LDFLAGS="$save_ldflags"
 
-        { echo "$as_me:$LINENO: checking for IBV_EVENT_CLIENT_REREGISTER" >&5
+		{ echo "$as_me:$LINENO: checking for IBV_EVENT_CLIENT_REREGISTER" >&5
 echo $ECHO_N "checking for IBV_EVENT_CLIENT_REREGISTER... $ECHO_C" >&6; }
-    cat >conftest.$ac_ext <<_ACEOF
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#include "infiniband/verbs.h"
+	    #include "infiniband/verbs.h"
 
 int
 main ()
 {
 
-	enum ibv_event_type x = IBV_EVENT_CLIENT_REREGISTER;
+	    enum ibv_event_type x = IBV_EVENT_CLIENT_REREGISTER;
 
   ;
   return 0;
@@ -14665,7 +14666,8 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
+    fi
+
 
 
                                                                         use_portals=
