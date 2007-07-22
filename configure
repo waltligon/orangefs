@@ -725,6 +725,7 @@ BUILD_PORTALS
 PORTALS_INCS
 PORTALS_LIBS
 SERVER_LDFLAGS
+GOSSIP_ENABLE_BACKTRACE
 BUILD_VIS
 VISCFLAGS
 VISLIBS
@@ -16577,11 +16578,12 @@ if test `eval echo '${'$as_ac_Header'}'` = yes; then
 #define `echo "HAVE_$ac_header" | $as_tr_cpp` 1
 _ACEOF
  LDFLAGS="$LDFLAGS -rdynamic"
-	CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
+	GOSSIP_ENABLE_BACKTRACE=1
 
 fi
 
 done
+
 
 
 { echo "$as_me:$LINENO: checking for SDL" >&5
@@ -17763,6 +17765,7 @@ BUILD_PORTALS!$BUILD_PORTALS$ac_delim
 PORTALS_INCS!$PORTALS_INCS$ac_delim
 PORTALS_LIBS!$PORTALS_LIBS$ac_delim
 SERVER_LDFLAGS!$SERVER_LDFLAGS$ac_delim
+GOSSIP_ENABLE_BACKTRACE!$GOSSIP_ENABLE_BACKTRACE$ac_delim
 BUILD_VIS!$BUILD_VIS$ac_delim
 VISCFLAGS!$VISCFLAGS$ac_delim
 VISLIBS!$VISLIBS$ac_delim
@@ -17770,7 +17773,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 20; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 21; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5

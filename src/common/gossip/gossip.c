@@ -389,6 +389,10 @@ void gossip_backtrace(void)
     }
     free(messages);
 }
+#else
+void gossip_backtrace(void)
+{
+}
 #endif
 
 /****************************************************************

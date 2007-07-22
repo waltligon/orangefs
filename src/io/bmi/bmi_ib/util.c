@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.11 2006-12-07 21:47:47 pw Exp $
+ * $Id: util.c,v 1.12 2007-07-22 16:15:01 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -29,9 +29,7 @@ error(const char *fmt, ...)
     vsprintf(s, fmt, ap);
     va_end(ap);
     gossip_err("Error: %s.\n", s);
-#ifdef GOSSIP_ENABLE_BACKTRACE
     gossip_backtrace();
-#endif
     exit(1);
 }
 

@@ -96,9 +96,7 @@ int gossip_get_debug_mask(
 int gossip_set_logstamp(
     enum gossip_logstamp ts);
 
-#ifdef GOSSIP_ENABLE_BACKTRACE
 void gossip_backtrace(void);
-#endif
 
 #ifdef __GNUC__
 
@@ -163,18 +161,11 @@ do {                                                       \
     gossip_debug(mask, "%s: " format, __func__ , ##f); \
 } while(0)
 
-#ifdef GOSSIP_ENABLE_BACKTRACE
 #define gossip_lerr(format, f...)                  \
 do {                                               \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
     gossip_backtrace();                            \
 } while(0)
-#else
-#define gossip_lerr(format, f...)                  \
-do {                                               \
-    gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
-} while(0)
-#endif
 #else /* ! __GNUC__ */
 
 int __gossip_debug(
