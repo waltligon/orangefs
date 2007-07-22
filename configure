@@ -11374,7 +11374,6 @@ eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
        $as_test_x conftest$ac_exeext; then
   { echo "$as_me:$LINENO: result: yes" >&5
 echo "${ECHO_T}yes" >&6; }
-     CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
      BUILD_EPOLL=1
 
 else
@@ -11394,7 +11393,6 @@ rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
 if test "${enable_epoll+set}" = set; then
   enableval=$enable_epoll;
    if test "x$enableval" = "xyes"; then
-        CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
         BUILD_EPOLL=1
 
    fi

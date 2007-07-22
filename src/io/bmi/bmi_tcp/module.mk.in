@@ -14,6 +14,7 @@ SERVERSRC += \
 ifdef BUILD_EPOLL
 LIBSRC += $(DIR)/socket-collection-epoll.c
 SERVERSRC += $(DIR)/socket-collection-epoll.c
+MODCFLAGS_$(DIR)/bmi-tcp.c := -D__PVFS2_USE_EPOLL__
 else
 LIBSRC += $(DIR)/socket-collection.c
 SERVERSRC += $(DIR)/socket-collection.c
