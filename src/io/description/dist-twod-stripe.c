@@ -49,6 +49,8 @@ static PVFS_offset logical_to_physical_offset ( void* params,
     uint32_t num_groups = dparam->num_groups;
     PVFS_size strip_size = dparam->strip_size;
 
+    if(num_groups > server_ct)
+	gossip_err("%s: num_groups > server_ct!\n",__func__);
     /* size of all groups that are of equal size: all groups
      * except when server_ct doesnt divide evenly into num_groups */
     uint32_t small_group_size = server_ct / num_groups;
@@ -157,6 +159,9 @@ static PVFS_offset physical_to_logical_offset (void* params,
     PVFS_size full_group_strips = strips % factor;
     PVFS_size global_stripes = 0;
     uint32_t num_groups = dparam->num_groups;
+
+    if(num_groups > server_ct)
+	gossip_err("%s: num_groups > server_ct!\n",__func__);
 
     /* if we are a server in the last group, make sure things are happy */
     if(server_nr >= (num_groups-1)*(small_group_size))
@@ -300,7 +305,10 @@ static PVFS_offset next_mapped_offset (void* params,
     PVFS_offset p_off = 0;
     PVFS_offset g_off = 0;
     uint32_t g_strips = 0;
-    
+
+    if(num_groups > server_ct)
+	gossip_err("%s: num_groups > server_ct!\n",__func__);
+
     PVFS_offset result = 0;
     /* we'll find the server where teh logical offset should be, then
      * use that to compute the address offsets for everyone else.
