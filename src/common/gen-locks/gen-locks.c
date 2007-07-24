@@ -77,7 +77,7 @@ int gen_posix_mutex_trylock(
 /*
  * gen_mutex_destroy()
  *
- * uninitializes the mutex and frees all memory associated with it.
+ * uninitializes the mutex.
  *
  * returns 0 on success, -errno on failure.
  */

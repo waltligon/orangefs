@@ -86,7 +86,7 @@ static inline gen_thread_t gen_thread_self(void)
     return 0;
 }
 #define gen_mutex_init(m) do{}while(0)
-#define gen_mutex_destroy(m) free(m)
+#define gen_mutex_destroy(m) do{}while(0)
 #endif /* __GEN_NULL_LOCKING__ */
 
 #endif /* __GEN_LOCKS_H */
