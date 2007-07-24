@@ -773,8 +773,7 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     PINT_client_sm *sm_p; 
     PVFS_credentials *cred_p; 
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-              "PVFS_sys_release id %lld\n",lld(op_id));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: id %lld\n", __func__, lld(op_id));
     smcb = PINT_id_gen_safe_lookup(op_id);
     if (smcb == NULL) 
     {
