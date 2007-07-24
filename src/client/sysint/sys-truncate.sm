@@ -211,12 +211,6 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     {
         msg_p = &sm_p->msgarray[i];
 
-        gossip_debug(
-            GOSSIP_CLIENT_DEBUG,
-            "  datafile_truncate: client requests %lld: resizing %lld",
-            lld(sm_p->u.truncate.size),
-            llu(attr->u.meta.dfile_array[i]));
-
         file_data.server_nr = i;
         new_dfile_size = 
             attr->u.meta.dist->methods->logical_to_physical_offset(
@@ -225,7 +219,9 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
                 sm_p->u.truncate.size);
        
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                " to %lld bytes\n", lld(new_dfile_size));
+            "  %s: client requests %lld: resizing %lld to %lld bytes\n",
+            __func__, lld(sm_p->u.truncate.size),
+            llu(attr->u.meta.dfile_array[i]), lld(new_dfile_size));
 
         PINT_SERVREQ_TRUNCATE_FILL(
             msg_p->req,
