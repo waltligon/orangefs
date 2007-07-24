@@ -625,6 +625,33 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
 
     js_p->error_code = 0;
 
+    /* allocate handle extent array objects */
+    if (sm_p->u.create.io_handle_extent_array == NULL)
+    {
+        sm_p->u.create.io_handle_extent_array = (PVFS_handle_extent_array *)
+            malloc(sm_p->u.create.num_data_files *
+                   sizeof(PVFS_handle_extent_array));
+    }
+    if (!sm_p->u.create.io_handle_extent_array)
+    {
+        gossip_err("create: failed to allocate handle_extent_array\n"); 
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* allocate data server bmi address array */
+    if (sm_p->u.create.data_server_addrs == NULL)
+    {
+        sm_p->u.create.data_server_addrs = (PVFS_BMI_addr_t *)malloc(
+            sm_p->u.create.num_data_files * sizeof(PVFS_BMI_addr_t));
+    }
+    if (!sm_p->u.create.data_server_addrs)
+    {
+        gossip_err("create: failed to allocate data server addrs\n"); 
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
     server_config = PINT_get_server_config_struct(
         sm_p->object_ref.fs_id);
 
@@ -667,33 +694,6 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
         return SM_ACTION_COMPLETE;
     }
     sm_p->msgarray_count = sm_p->u.create.num_data_files;
-
-    /* allocate handle extent array objects */
-    if (sm_p->u.create.io_handle_extent_array == NULL)
-    {
-        sm_p->u.create.io_handle_extent_array = (PVFS_handle_extent_array *)
-            malloc(sm_p->u.create.num_data_files *
-                   sizeof(PVFS_handle_extent_array));
-    }
-    if (!sm_p->u.create.io_handle_extent_array)
-    {
-        gossip_err("create: failed to allocate handle_extent_array\n"); 
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    /* allocate data server bmi address array */
-    if (sm_p->u.create.data_server_addrs == NULL)
-    {
-        sm_p->u.create.data_server_addrs = (PVFS_BMI_addr_t *)malloc(
-            sm_p->u.create.num_data_files * sizeof(PVFS_BMI_addr_t));
-    }
-    if (!sm_p->u.create.data_server_addrs)
-    {
-        gossip_err("create: failed to allocate data server addrs\n"); 
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
 
     /* for each datafile, prepare to post a create send/recv pair */
     for(i = 0; i < sm_p->u.create.num_data_files; i++)
