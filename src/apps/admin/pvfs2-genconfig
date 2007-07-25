@@ -38,6 +38,8 @@ my $opt_last_handle = '';
 my $opt_root_handle = '';
 my $opt_fsid = '';
 my $opt_default_num_dfiles = '';
+my $opt_default_flow_buffer_size = '';
+my $opt_default_flow_buffer_count = '';
 
 my $opt_security = '0';
 my $opt_trusted_port = '';
@@ -221,7 +223,7 @@ sub emit_filesystem
 {
     my ($target, $name, $fs_id, $root_handle, 
         $last_handle, $first_handle, $count,
-        $default_num_dfiles) = @_;
+        $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count) = @_;
 
     # divide handle range space equally among servers ((2^32)-1 for now)
     my($total_num_handles_available, $start, $end, $i, $step, $num_ranges);
@@ -240,8 +242,8 @@ sub emit_filesystem
     {
         print $target "\tDefaultNumDFiles $default_num_dfiles\n";
     }
-    print $target "\t<MetaHandleRanges>\n";
 
+    print $target "\t<MetaHandleRanges>\n";
     $start = $end = $first_handle - 1;
 
     my @meta_aliases = get_aliases($META_ENDPOINT);
@@ -290,6 +292,16 @@ sub emit_filesystem
     if($opt_gen_key ne "0")
     {
         emit_fs_key($target);
+    }
+
+    if($default_flow_buffer_size > 0)
+    {
+        print $target "\tFlowBufferSizeBytes $default_flow_buffer_size\n";
+    }
+ 
+    if($default_flow_buffer_count > 0)
+    {
+        print $target "\tFlowBuffersPerFlow $default_flow_buffer_count\n";
     }
 
     print $target "</Filesystem>\n";
@@ -460,6 +472,8 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
      --fsid         <NUM>              fs identifier value
      --default-num-dfiles <NUM>        number of datafiles to use per file
                                        (defaults to number of I/O servers)
+     --flow-buffer-size <NUM>          set flowbuffersize in bytes            
+     --flow-buffer-count <NUM>         set flow buffers per flow
      --trusted      <0|1>              indicate whether trusted connection options need to be emitted
      --genkey                          optionally generates a secret key for the 
                                        filesystem(s).
@@ -644,6 +658,28 @@ sub get_default_num_dfiles
         $default_num_dfiles = -1;
     }
     return $default_num_dfiles;
+}
+
+sub get_default_flow_buffer_size
+{
+    my $default_flow_buffer_size;
+    if($opt_default_flow_buffer_size ne '') {
+        $default_flow_buffer_size = $opt_default_flow_buffer_size;
+    } else {
+        $default_flow_buffer_size = -1;
+    }
+    return $default_flow_buffer_size;
+}
+
+sub get_default_flow_buffer_count
+{
+    my $default_flow_buffer_count;
+    if($opt_default_flow_buffer_count ne '') {
+        $default_flow_buffer_count = $opt_default_flow_buffer_count;
+    } else {
+        $default_flow_buffer_count = -1;
+    }
+    return $default_flow_buffer_count;
 }
 
 sub get_first_handle
@@ -1147,6 +1183,8 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'first-handle=i' => \$opt_first_handle,
     'last-handle=i' => \$opt_last_handle,
     'default-num-dfiles=i' => \$opt_default_num_dfiles,
+    'flow-buffer-size=i' => \$opt_default_flow_buffer_size,
+    'flow-buffer-count=i'=> \$opt_default_flow_buffer_count,
     'root-handle=i' => \$opt_root_handle,
     'fsid=i'        => \$opt_fsid,
     'trusted=i'        => \$opt_security,
@@ -1333,6 +1371,8 @@ my $logstamp = get_logstamp();
 my $first_handle = get_first_handle();
 my $last_handle = get_last_handle();
 my $default_num_dfiles = get_default_num_dfiles();
+my $default_flow_buffer_size = get_default_flow_buffer_size();
+my $default_flow_buffer_count = get_default_flow_buffer_count();
 my $root_handle = get_root_handle();
 my $fsid = get_fsid();
 my $server_job_timeout = get_server_job_timeout();
@@ -1363,7 +1403,7 @@ if ($opt_security == 1)
 }
 emit_aliases($output_target);
 emit_filesystem($output_target, "pvfs2-fs", $fsid, $root_handle, 
-    $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles);
+    $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count);
 
 # close fs.conf
 if ($using_stdout == 0)
