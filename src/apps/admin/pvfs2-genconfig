@@ -153,7 +153,6 @@ sub parse_hostlist
                 if($r !~ /-/)
                 {
                     # only one number, just push it on
-                    push @hosts, "$prefix$r";
                 }
                 else
                 {
@@ -423,25 +422,16 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
   arguments, then pvfs2-genconfig will prompt interactively for required
   parameters.
 
-  pvfs2-genconfig can also be executed non-interactively by providing,
-  at a minimum, all of the following arguments:
-
-     --logfile     <STRING>     logfile location
-     --storage     <STRING>     storage space location
-     --quiet                    run silently
-
-  One of the two [] grouped options below must be chosen (for non-interactive):
+  pvfs2-genconfig can also be executed non-interactively with --quiet
+  and one of the two [] grouped options below:
 
      [
        --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,mx,ib,portals)
-       --port        <NUM>      port to use (any single protocol)
-       --board       <NUM>      board index number for MX
-                                (only required if --protocol=mx)
        --ioservers   <STRING>   hostnames of data servers.  Can be
                                 <prefix>{#-#,#,#-#,...}
        --metaservers <STRING>   hostnames of meta servers.
-     ] 
-  or 
+     ]
+  or
      [
        --iospec      <STRING>   endpoints of data servers. See --spec-usage
        --metaspec    <STRING>   endpoints of meta servers. See --spec-usage
@@ -450,12 +440,13 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
   The following arguments are entirely optional, whether your intention is
   to run pvfs2-genconfig in interactive or non-interactive mode:
 
-     --tcpport     <NUM>               TCP port to use
-     --gmport      <NUM>               GM port to use
+     --tcpport     <NUM>               TCP port to use (default: 3334)
+     --gmport      <NUM>               GM port to use (default: 6)
      --mxboard     <NUM>               MX board to use (default is 0)
      --mxendpoint  <NUM>               MX endpoint to use (default is 3)
-     --ibport      <NUM>               IB port to use
-     --portal      <NUM>               Portals index for listening server
+     --ibport      <NUM>               IB port to use (default is 3335)
+     --portal      <NUM>               Portals index for
+                                       listening server (default is 5)
      --logging     <STRING>            debugging mask for log messages
      --logstamp    <STRING>            timestamp type for log messages 
                                        ('none','usec', or 'datetime' are valid)
@@ -508,8 +499,8 @@ You must enter the trusted port ranges that your file system will accept
 This must be of the form <port1 - port2>
 PORTLIST
         ;;
+        $type = prompt_word("Enter port list [Default is 0-65535]: ","0-65535");
     }
-    $type = prompt_word("Enter port list [Default is 0-65535]: ","0-65535");
     return $type;
 }
 
@@ -690,28 +681,24 @@ sub get_client_job_timeout
 
 sub get_logfile
 {
-    my $logfile;
+    my $logfile = "/tmp/pvfs2-server.log";
     if ($opt_logfile) {
         $logfile = $opt_logfile;
-    } else {
-        if (!$opt_quiet) {
+    } elsif (!$opt_quiet) {
             print $OUT "Choose a file for each server to write log messages to.\n";
-        }
-        $logfile = prompt_word("Enter log file location [Default is /tmp/pvfs2-server.log]: ","/tmp/pvfs2-server.log");
+            $logfile = prompt_word("Enter log file location [Default is /tmp/pvfs2-server.log]: ","/tmp/pvfs2-server.log");
     }
     return $logfile;
 }
 
 sub get_storage
 {
-    my $storage;
+    my $storage = "/pvfs2-storage-space";
     if ($opt_storage) {
         $storage = $opt_storage;
-    } else {
-        if (!$opt_quiet) {
+    } elsif (!$opt_quiet) {
             print $OUT "Choose a directory for each server to store data in.\n";
-        }
-        $storage = prompt_word("Enter directory name: [Default is /pvfs2-storage-space]: ","/pvfs2-storage-space");
+            $storage = prompt_word("Enter directory name: [Default is /pvfs2-storage-space]: ","/pvfs2-storage-space");
     }
     return $storage;
 }
@@ -721,36 +708,30 @@ sub get_storage
 # get host port
 sub tcp_get_port
 {
-    my $port;
+    my $port = 3334;
     if ($opt_tcpport) {
         $port = $opt_tcpport;
-    } elsif ($opt_port) {
-        $port = $opt_port;
-        $opt_port = '';
     } elsif (!$opt_iospec) {
         if (!$opt_quiet) { 
             print $OUT "Choose a TCP/IP port for the servers to listen on.  Note that this\n";
             print $OUT "script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 3334]: ","3334");
         }
-        $port = prompt_num("Enter port number [Default is 3334]: ","3334");
     }
     return  $port;
 }
 
 sub gm_get_port
 {
-    my $port;
+    my $port = 6;
     if ($opt_gmport) {
         $port = $opt_gmport;
-    } elsif ($opt_port) {
-        $port = $opt_port;
-        $opt_port = '';
     } elsif (!$opt_iospec) {
         if (!$opt_quiet) { 
             print $OUT "Choose a GM port (in the range of 0 to 7) for the servers to listen on. \n";
             print $OUT "This script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 6]: ","6");
         }
-        $port = prompt_num("Enter port number [Default is 6]: ","6");
     }
     # every myrinet card i've seen has 8 ports.  If myricom makes a card
     # with more than that, we'll have to adapt
@@ -761,19 +742,17 @@ sub gm_get_port
 
 sub mx_get_endpoint
 {
-    my $port;
-    my $board = '0';
+    my $port = 3;
+    my $board = 0;
 
     if ($opt_mxboard) {
         $board = $opt_mxboard;
-    } elsif ($opt_board) {
-        $board = $opt_board;
     } elsif (!$opt_iospec) {
         if (!$opt_quiet) { 
             print $OUT "Choose a MX board (in the range of 0 to 4) for the servers to listen on. \n";
             print $OUT "This script assumes that all servers will use the same board number.\n";
+            $board = prompt_num("Enter board number [Default is 0]: ","0");
         }
-        $board = prompt_num("Enter board number [Default is 0]: ","0");
     }
     # The number of boards is only limited by the number of PCI-X or PCI-Express
     # slots in the machine. This is reasonable maximum.
@@ -781,15 +760,12 @@ sub mx_get_endpoint
 
     if ($opt_mxendpoint) {
         $port = $opt_mxendpoint;
-    } elsif ($opt_port) {
-        $port = $opt_port;
-        $opt_port = '';
     } elsif (!$opt_iospec) {
         if (!$opt_quiet) { 
             print $OUT "Choose a MX endpoint (in the range of 0 to 7) for the servers to listen on. \n";
             print $OUT "This script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 3]: ","3");
         }
-        $port = prompt_num("Enter port number [Default is 3]: ","3");
     }
     # The number of endpoints in MX is configurable. The default value is 4 
     # but may be changing to 8. It can be higher, but this is reasonable.
@@ -801,36 +777,30 @@ sub mx_get_endpoint
 
 sub ib_get_port
 {
-    my $port;
+    my $port = 3335;
     if ($opt_ibport) {
         $port = $opt_ibport;
-    } elsif ($opt_port) {
-        $port = $opt_port;
-        $opt_port = '';
     } elsif(!$opt_iospec) {
         if (!$opt_quiet) { 
             print $OUT "Choose a TCP/IP port for the servers to listen on for IB communications.  Note that this\n";
             print $OUT "script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 3335]: ","3335");
         }
-        $port = prompt_num("Enter port number [Default is 3335]: ","3335");
     }
     return  $port;
 }
 
 sub portals_get_portal
 {
-    my $port;
+    my $port = 5;
     if ($opt_portal) {
         $port = $opt_portal;
-    } elsif ($opt_port) {
-        $port = $opt_port;
-        $opt_port = '';
     } elsif(!$opt_iospec) {
         if (!$opt_quiet) { 
             print $OUT "Choose a portal index for the servers to listen on for communications.  Note that this\n";
             print $OUT "script assumes that all servers will use the same portal index.\n";
+            $port = prompt_num("Enter portal index [Default is 5]: ","5");
         }
-        $port = prompt_num("Enter portal index [Default is 5]: ","5");
     }
     return $port;
 }
@@ -1163,8 +1133,6 @@ my $show_specusage = '';
 
 $opt_quiet = 0;
 GetOptions('protocol=s'    => \$opt_protocol,
-    'port=i'        => \$opt_port,
-    'board=i'       => \$opt_board,
     'tcpport=i'     => \$opt_tcpport,
     'gmport=i'      => \$opt_gmport,
     'mxboard=i'     => \$opt_mxboard,
@@ -1196,10 +1164,21 @@ GetOptions('protocol=s'    => \$opt_protocol,
     '-'           => \$using_stdout)
     or die "Could not parse arguments.  See -h for help.\n";
 
-if(!((($opt_protocol && $opt_port && $opt_ioservers && $opt_metaservers) ||
-      ($opt_iospec && $opt_metaspec)) &&
-     $opt_quiet && $opt_logfile && $opt_storage))
+if($opt_quiet)
 {
+    # quiet requires a protocol
+    die "Invalid arguments.  See -h for help\n" if(!$opt_protocol);
+
+    if(!($opt_iospec || $opt_metaspec))
+    {
+        # quiet requires io servers and meta servers to be specified
+        die "Invalid arguments.  See -h for help\n" if(!$opt_ioservers);
+        die "Invalid arguments.  See -h for help\n" if(!$opt_metaservers);
+    }
+}
+else
+{
+
     $term = new Term::ReadLine 'pvfs2-genconfig';
     if(!defined($term))
     {
@@ -1246,8 +1225,6 @@ else
 
 die "-port not allowed with -iospec or -metaspec."
 if($opt_port ne '' && defined($opt_iospec) && defined($opt_metaspec));
-die "-board not allowed with -iospec or -metaspec."
-if($opt_board ne '' && defined($opt_iospec) && defined($opt_metaspec));
 die "-iospec requires -metaspec." 
 if(defined($opt_iospec) && !defined($opt_metaspec));
 die "-metaspec requires -iospec." 
