@@ -460,8 +460,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PVFS_object_ref object_ref;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) "
-                 "getattr_setup_msgpair\n", sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) %s\n", sm_p, __func__);
 
     js_p->error_code = 0;
 
