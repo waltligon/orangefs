@@ -2157,11 +2157,8 @@ static int io_get_max_unexp_size(
     int * max_unexp_payload)
 {
     int ret;
-    struct server_configuration_s * server_config;
-    struct filesystem_configuration_s * fs_config;
     PVFS_BMI_addr_t server_addr;
     int bmi_max_unexp_payload;
-    int small_io_size;
 
     /* we need to get the server address for the particular server
      * with this datafile so that we can use it to get the size
@@ -2186,45 +2183,7 @@ static int io_get_max_unexp_size(
         return ret;
     }
 
-    /* we need the encoding type from the server config */
-    server_config = PINT_get_server_config_struct(fs_id);
-    if(!server_config)
-    {
-        return -PVFS_EINVAL;
-    }
-    
-    fs_config = PINT_config_find_fs_id(server_config, fs_id);
-    if(!fs_config)
-    {
-        return -PVFS_EINVAL;
-    }
-
-    /* finally, compute the exact payload from the bmi_max_unexp_payload
-     * and the small io message size
-     */
-    small_io_size = PINT_encode_calc_max_size(
-        (type == PVFS_IO_READ ? PINT_ENCODE_RESP : PINT_ENCODE_REQ), 
-        PVFS_SERV_SMALL_IO, 
-        fs_config->encoding);
-
-    PINT_put_server_config_struct(server_config);
-
-    if(type == PVFS_IO_WRITE)
-    {
-        /* add the size of the entire file request */
-        small_io_size += (PVFS_REQUEST_ENCODED_SIZE * 
-                          (file_req->num_nested_req + 1));
-    }
-
-    /* encode/decode funcs malloc a max size for small I/O independent
-     * of the bmi max unexp payload, so we need to subtract that
-     * extra here
-     */
-    small_io_size -= (type == PVFS_IO_READ ? 
-                      extra_size_PVFS_servreq_small_io :
-                      extra_size_PVFS_servresp_small_io);
-
-    *max_unexp_payload = (bmi_max_unexp_payload - small_io_size);
+    *max_unexp_payload = bmi_max_unexp_payload;
     return 0;
 }
 
@@ -2255,6 +2214,9 @@ static int io_find_target_datafiles(
     PVFS_offset offsets;
     PVFS_size sizes;
     int total_bytes = 0;
+    struct server_configuration_s * server_config;
+    struct filesystem_configuration_s * fs_config;
+    int small_io_size;
 
     gossip_debug(GOSSIP_IO_DEBUG, "- io_find_target_datafiles called\n");
 
@@ -2370,7 +2332,45 @@ static int io_find_target_datafiles(
             handle_index_array[(*handle_index_out_count)++] = i;
 
 #ifndef PVFS2_SMALL_IO_OFF
-            if(total_bytes <= max_unexp_payload)
+            /* we need the encoding type from the server config */
+            server_config = PINT_get_server_config_struct(fs_id);
+            if(!server_config)
+            {
+                return -PVFS_EINVAL;
+            }
+
+            fs_config = PINT_config_find_fs_id(server_config, fs_id);
+            if(!fs_config)
+            {
+                return -PVFS_EINVAL;
+            }
+
+            /* finally, compute the exact payload from the bmi_max_unexp_payload
+             * and the small io message size
+             */
+            small_io_size = PINT_encode_calc_max_size(
+                (io_type == PVFS_IO_READ ? PINT_ENCODE_RESP : PINT_ENCODE_REQ), 
+                PVFS_SERV_SMALL_IO, 
+                fs_config->encoding);
+
+            PINT_put_server_config_struct(server_config);
+
+            if(io_type == PVFS_IO_WRITE)
+            {
+                /* add the size of the entire file request */
+                small_io_size += (PVFS_REQUEST_ENCODED_SIZE * 
+                                  (file_req->num_nested_req + 1));
+            }
+
+            /* encode/decode funcs malloc a max size for small I/O independent
+             * of the bmi max unexp payload, so we need to subtract that
+             * extra here
+             */
+            small_io_size -= (io_type == PVFS_IO_READ ? 
+                              extra_size_PVFS_servreq_small_io :
+                              extra_size_PVFS_servresp_small_io);
+
+            if(total_bytes + small_io_size <= max_unexp_payload)
             {
                 sio_handle_index_array[(*sio_handle_index_count)++] = i;
             }
