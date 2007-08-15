@@ -60,6 +60,7 @@ typedef struct PINT_dist_methods_s
     /* Called when the distribution is registered */
     void (*registration_init)(void* params);
     
+    char *(*params_string)(void *params);
 } PINT_dist_methods;
 
 /* Internal representation of a PVFS2 Distribution */
