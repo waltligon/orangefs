@@ -60,6 +60,7 @@ typedef struct
     char *dev_buffer_count;
     char *dev_buffer_size;
     int threaded;
+    char *logtype;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -202,7 +203,18 @@ static int monitor_pvfs2_client(options_t *opts)
 
             if (WIFEXITED(ret))
             {
-                gossip_enable_file(opts->logfile, "a");
+                if(!strcmp(opts->logtype, "file"))
+                {
+                    gossip_enable_file(opts->logfile, "a");
+                }
+                else if(!strcmp(opts->logtype, "syslog"))
+                {
+                    gossip_enable_syslog(LOG_INFO);
+                }
+                else
+                {
+                    gossip_enable_stderr();
+                }
                 gossip_err("pvfs2-client-core with pid %d exited with "
                        "value %d\n", core_pid, (int)WEXITSTATUS(ret));
                 gossip_disable();
@@ -284,8 +296,17 @@ static int monitor_pvfs2_client(options_t *opts)
             arg_list[arg_index++] = opts->acache_timeout;
             arg_list[arg_index++] = "-n";
             arg_list[arg_index++] = opts->ncache_timeout;
-            arg_list[arg_index++] = "-L";
-            arg_list[arg_index++] = opts->logfile;
+            if(opts->logtype)
+            {
+                arg_list[arg_index] = "--logtype";
+                arg_list[arg_index+1] = opts->logtype;
+                arg_index+=2;
+                if(!strcmp(opts->logtype, "file"))
+                {
+                    arg_list[arg_index++] = "-L";
+                    arg_list[arg_index++] = opts->logfile;
+                }
+            }
             if(opts->acache_hard_limit)
             {
                 arg_list[arg_index] = "--acache-hard-limit";
@@ -407,6 +428,7 @@ static void print_help(char *progname)
     printf("-p PATH, --path PATH          execute pvfs2-client at "
            "PATH\n");
     printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
+    printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
     printf("--threaded                    use threaded client\n");
 }
 
@@ -422,6 +444,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"verbose",0,0,0},
         {"foreground",0,0,0},
         {"logfile",1,0,0},
+        {"logtype",1,0,0},
         {"acache-timeout",1,0,0},
         {"acache-soft-limit",1,0,0},
         {"acache-hard-limit",1,0,0},
@@ -482,6 +505,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("logfile", cur_option) == 0)
                 {
                     goto do_logfile;
+                }
+                else if (strcmp("logtype", cur_option) == 0)
+                {
+                    opts->logtype = optarg;
                 }
                 else if (strcmp("logstamp", cur_option) == 0)
                 {
@@ -599,14 +626,21 @@ static void parse_args(int argc, char **argv, options_t *opts)
     {
         opts->logfile = DEFAULT_LOGFILE;
     }
-    /* make sure that log file location is writable before proceeding */
-    ret = open(opts->logfile, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
-    if(ret < 0)
+    if (!opts->logtype)
     {
-        fprintf(stderr, "Error: logfile (%s) isn't writable.\n",
-                opts->logfile);
-        exit(1);
-    } 
+        opts->logtype = "file";
+    }
+    if(!strcmp(opts->logtype, "file"))
+    {
+        /* make sure that log file location is writable before proceeding */
+        ret = open(opts->logfile, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
+        if(ret < 0)
+        {
+            fprintf(stderr, "Error: logfile (%s) isn't writable.\n",
+                    opts->logfile);
+            exit(1);
+        } 
+    }
 
     if (!opts->path)
     {

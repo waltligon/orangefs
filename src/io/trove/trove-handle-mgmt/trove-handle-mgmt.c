@@ -116,8 +116,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                     if (!PINT_handle_in_extent_list(extent_list,
                                                     handles[i]))
                     {
-                        gossip_debug(
-                            GOSSIP_TROVE_DEBUG, "handle %llu is invalid "
+                        gossip_err(
+                            "Error: handle %llu is invalid "
                             "(out of bounds)\n", llu(handles[i]));
                         return -1;
                     }

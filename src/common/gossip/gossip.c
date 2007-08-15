@@ -49,7 +49,7 @@ int gossip_facility = GOSSIP_STDERR;
 static FILE *internal_log_file = NULL;
 
 /* syslog priority setting */
-static int internal_syslog_priority = LOG_USER;
+static int internal_syslog_priority = LOG_INFO;
 
 /* what type of timestamp to put on logs */
 static enum gossip_logstamp internal_logstamp = GOSSIP_LOGSTAMP_DEFAULT;
@@ -96,6 +96,8 @@ int gossip_enable_syslog(
 
     internal_syslog_priority = priority;
     gossip_facility = GOSSIP_SYSLOG;
+
+    openlog("PVFS2", 0, LOG_DAEMON);
 
     /* restore the logging settings */
     gossip_debug_on = tmp_debug_on;

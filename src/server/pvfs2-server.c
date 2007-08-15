@@ -693,15 +693,19 @@ static int server_initialize(
     uint64_t debug_mask = 0;
     
     assert(server_config.logfile != NULL);
-    dummy = fopen(server_config.logfile, "a");
-    if (dummy == NULL)
+
+    if(!strcmp(server_config.logtype, "file"))
     {
-        int tmp_errno = errno;
-        gossip_err("error opening log file %s\n",
-                server_config.logfile);
-        return -tmp_errno;
+        dummy = fopen(server_config.logfile, "a");
+        if (dummy == NULL)
+        {
+            int tmp_errno = errno;
+            gossip_err("error opening log file %s\n",
+                    server_config.logfile);
+            return -tmp_errno;
+        }
+        fclose(dummy);
     }
-    fclose(dummy);
 
     /* redirect gossip to specified target if backgrounded */
     if (s_server_options.server_background)
@@ -710,10 +714,22 @@ static int server_initialize(
         freopen("/dev/null", "w", stdout);
         freopen("/dev/null", "w", stderr);
 
-        ret = gossip_enable_file(server_config.logfile, "a");
+        if(!strcmp(server_config.logtype, "syslog"))
+        {
+            ret = gossip_enable_syslog(LOG_INFO);
+        }
+        else if(!strcmp(server_config.logtype, "file"))
+        {
+            ret = gossip_enable_file(server_config.logfile, "a");
+        }
+        else
+        {
+            ret = gossip_enable_stderr();
+        }
+
         if (ret < 0)
         {
-            gossip_lerr("error opening log file %s\n",
+            gossip_err("error opening log file %s\n",
                         server_config.logfile);
             return ret;
         }
@@ -800,7 +816,7 @@ static int server_setup_process_environment(int background)
 
     if (chdir("/"))
     {
-        gossip_lerr("cannot change working directory to \"/\" "
+        gossip_err("cannot change working directory to \"/\" "
                     "(errno = %x). aborting.\n", errno);
         return(-PVFS_EINVAL);
     }
@@ -812,7 +828,7 @@ static int server_setup_process_environment(int background)
         new_pid = fork();
         if (new_pid < 0)
         {
-            gossip_lerr("error in fork() system call (errno = %x). "
+            gossip_err("error in fork() system call (errno = %x). "
                         "aborting.\n", errno);
             return(-PVFS_EINVAL);
         }
@@ -825,7 +841,7 @@ static int server_setup_process_environment(int background)
         new_pid = setsid();
         if (new_pid < 0)
         {
-            gossip_lerr("error in setsid() system call.  aborting.\n");
+            gossip_err("error in setsid() system call.  aborting.\n");
             return(-PVFS_EINVAL);
         }
     }
@@ -1012,7 +1028,7 @@ static int server_initialize_subsystems(
 
         if (ret < 0)
         {
-            gossip_lerr("Error initializing filesystem %s\n",
+            gossip_err("Error initializing filesystem %s\n",
                         cur_fs->file_system_name);
             return ret;
         }
@@ -1046,7 +1062,7 @@ static int server_initialize_subsystems(
          */
         if (!cur_merged_handle_range)
         {
-            gossip_lerr("Error: Invalid handle range for host %s "
+            gossip_err("Error: Invalid handle range for host %s "
                         "(alias %s) specified in file system %s\n",
                         server_config.host_id,
                         PINT_config_get_host_alias_ptr(
@@ -1059,7 +1075,7 @@ static int server_initialize_subsystems(
             ret = trove_open_context(cur_fs->coll_id, &trove_context);
             if (ret < 0)
             {
-                gossip_lerr("Error initializing trove context\n");
+                gossip_err("Error initializing trove context\n");
                 return ret;
             }
 
@@ -1074,7 +1090,7 @@ static int server_initialize_subsystems(
                 (void *)&cur_fs->handle_recycle_timeout_sec);
             if (ret < 0)
             {
-                gossip_lerr("Error setting handle timeout\n");
+                gossip_err("Error setting handle timeout\n");
             }
 
             if (cur_fs->attr_cache_keywords &&
@@ -1087,7 +1103,7 @@ static int server_initialize_subsystems(
                     (void *)cur_fs->attr_cache_keywords);
                 if (ret < 0)
                 {
-                    gossip_lerr("Error setting attr cache keywords\n");
+                    gossip_err("Error setting attr cache keywords\n");
                 }
                 ret = trove_collection_setinfo(
                     cur_fs->coll_id, trove_context, 
@@ -1095,7 +1111,7 @@ static int server_initialize_subsystems(
                     (void *)&cur_fs->attr_cache_size);
                 if (ret < 0)
                 {
-                    gossip_lerr("Error setting attr cache size\n");
+                    gossip_err("Error setting attr cache size\n");
                 }
                 ret = trove_collection_setinfo(
                     cur_fs->coll_id, trove_context, 
@@ -1103,7 +1119,7 @@ static int server_initialize_subsystems(
                     (void *)&cur_fs->attr_cache_max_num_elems);
                 if (ret < 0)
                 {
-                    gossip_lerr("Error setting attr cache max num elems\n");
+                    gossip_err("Error setting attr cache max num elems\n");
                 }
                 ret = trove_collection_setinfo(
                     cur_fs->coll_id, trove_context, 
@@ -1111,7 +1127,7 @@ static int server_initialize_subsystems(
                     (void *)0);
                 if (ret < 0)
                 {
-                    gossip_lerr("Error initializing the attr cache\n");
+                    gossip_err("Error initializing the attr cache\n");
                 }
             }
 
@@ -1127,7 +1143,7 @@ static int server_initialize_subsystems(
                 (void *)cur_merged_handle_range);
             if (ret < 0)
             {
-                gossip_lerr("Error adding handle range %s to "
+                gossip_err("Error adding handle range %s to "
                             "filesystem %s\n",
                             cur_merged_handle_range,
                             cur_fs->file_system_name);
@@ -1140,7 +1156,7 @@ static int server_initialize_subsystems(
                 (void *)&cur_fs->coalescing_high_watermark);
             if(ret < 0)
             {
-                gossip_lerr("Error setting coalescing high watermark\n");
+                gossip_err("Error setting coalescing high watermark\n");
                 return ret;
             }
 
@@ -1150,7 +1166,7 @@ static int server_initialize_subsystems(
                 (void *)&cur_fs->coalescing_low_watermark);
             if(ret < 0)
             {
-                gossip_lerr("Error setting coalescing low watermark\n");
+                gossip_err("Error setting coalescing low watermark\n");
                 return ret;
             }
             
@@ -1160,7 +1176,7 @@ static int server_initialize_subsystems(
                 (void *)&cur_fs->trove_sync_meta);
             if(ret < 0)
             {
-                gossip_lerr("Error setting coalescing low watermark\n");
+                gossip_err("Error setting coalescing low watermark\n");
                 return ret;
             } 
             
@@ -1170,7 +1186,7 @@ static int server_initialize_subsystems(
                 (void *)&cur_fs->immediate_completion);
             if(ret < 0)
             {
-                gossip_lerr("Error setting trove immediate completion\n");
+                gossip_err("Error setting trove immediate completion\n");
                 return ret;
             } 
 

@@ -74,6 +74,7 @@ typedef struct
     int acache_timeout;
     int ncache_timeout;
     char* logfile;
+    char* logtype;
     unsigned int acache_hard_limit;
     int acache_hard_limit_set;
     unsigned int acache_soft_limit;
@@ -3157,12 +3158,30 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    ret = gossip_enable_file(s_opts.logfile, "a");
-    if(ret < 0)
+    if(!strcmp(s_opts.logtype, "file"))
     {
-        fprintf(stderr, "Error opening logfile: %s\n", s_opts.logfile);
-        return(ret);
+        ret = gossip_enable_file(s_opts.logfile, "a");
+        if(ret < 0)
+        {
+            fprintf(stderr, "Error opening logfile: %s\n", s_opts.logfile);
+            return(ret);
+        }
     }
+    else if(!strcmp(s_opts.logtype, "syslog"))
+    {
+        ret = gossip_enable_syslog(LOG_INFO);
+        if(ret < 0)
+        {
+            fprintf(stderr, "Error opening syslog\n");
+            return(ret);
+        }
+    }
+    else
+    {
+        fprintf(stderr, "Error: unsupported log type.\n");
+        return(-PVFS_EINVAL);
+    }
+
     /* get rid of stdout/stderr/stdin */
     freopen("/dev/null", "r", stdin);
     freopen("/dev/null", "w", stdout);
@@ -3417,6 +3436,7 @@ static void print_help(char *progname)
     printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
     printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
     printf("--logfile=VALUE               override the default log file\n");
+    printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
     printf("--logstamp=none|usec|datetime overrides the default log message's time stamp\n");
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
     printf("--desc-count=VALUE            overrides the default # of kernel buffer descriptors\n");
@@ -3444,6 +3464,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"desc-count",1,0,0},
         {"desc-size",1,0,0},
         {"logfile",1,0,0},
+        {"logtype",1,0,0},
         {"logstamp",1,0,0},
         {"standalone",0,0,0},
         {0,0,0,0}
@@ -3498,6 +3519,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("logfile", cur_option) == 0)
                 {
                     goto do_logfile;
+                }
+                else if (strcmp("logtype", cur_option) == 0)
+                {
+                    opts->logtype = optarg;
                 }
                 else if (strcmp("logstamp", cur_option) == 0)
                 {
@@ -3660,6 +3685,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
     if (!opts->logfile)
     {
         opts->logfile = DEFAULT_LOGFILE;
+    }
+    if (!opts->logtype)
+    {
+        opts->logtype = "file";
     }
 }
 

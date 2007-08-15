@@ -64,6 +64,7 @@ static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_name);
 static DOTCONF_CB(get_logfile);
+static DOTCONF_CB(get_logtype);
 static DOTCONF_CB(get_event_logging_list);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
@@ -472,6 +473,15 @@ static const configoption_t options[] =
      */
     {"LogFile",ARG_STR, get_logfile,NULL,
         CTX_DEFAULTS|CTX_GLOBAL,"/tmp/pvfs2-server.log"},
+
+    /* The LogType option can be used to control the destination of log 
+     * messages from PVFS2 server.  The default value is "file", which causes
+     * all log messages to be written to the file specified by the LogFile
+     * parameter.  Another option is "syslog", which causes all log messages
+     * to be written to syslog.
+     */
+    {"LogType",ARG_STR, get_logtype,NULL,
+        CTX_DEFAULTS|CTX_GLOBAL,"file"},
 
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  This option sets that level for
@@ -1365,6 +1375,18 @@ DOTCONF_CB(get_logfile)
     config_s->logfile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
+
+DOTCONF_CB(get_logtype)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    /* free whatever was added in set_defaults phase */
+    if (config_s->logtype)
+        free(config_s->logtype);
+    config_s->logtype = (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
 
 DOTCONF_CB(get_event_logging_list)
 {
@@ -2475,6 +2497,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->logfile);
             config_s->logfile = NULL;
+        }
+
+        if (config_s->logtype)
+        {
+            free(config_s->logtype);
+            config_s->logtype = NULL;
         }
 
         if (config_s->event_logging)
