@@ -263,6 +263,7 @@ PVFS_error PVFS_isys_create(
     PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
+    sm_p->parent_ref = parent_ref;
 
     /* copy layout to sm struct */
     if(layout)
