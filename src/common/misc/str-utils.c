@@ -366,6 +366,14 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
 	holder++;
     }
 
+    /* if we don't find any commas, just set the entire string to the first
+     *  token and return
+     */
+    if(0 == tokencount)
+    {
+        tokencount = 1;
+    }
+
     retval = tokencount;
     /* allocate pointers for each */
     *tokens = (char **) malloc(sizeof(char *) * tokencount);
