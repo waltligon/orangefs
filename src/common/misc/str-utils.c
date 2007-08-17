@@ -9,6 +9,7 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include "str-utils.h"
 
@@ -349,7 +350,7 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
     const char *holder = NULL;
     const char *holder2 = NULL;
     const char *end = NULL;
-    int tokencount = 1;
+    int tokencount = 1, retval;
     int i = -1;
 
     if (!comma_list || !tokens)
@@ -365,14 +366,7 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
 	holder++;
     }
 
-    /* if we don't find any commas, just set the entire string to the first
-     *  token and return
-     */
-    if(0 == tokencount)
-    {
-	tokencount = 1;
-    }
-
+    retval = tokencount;
     /* allocate pointers for each */
     *tokens = (char **) malloc(sizeof(char *) * tokencount);
     if (!(*tokens))
@@ -401,6 +395,10 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
 	{
 	    holder2 = end;
 	}
+        if (holder2 - holder == 0) {
+            retval--;
+            goto out;
+        }
 	(*tokens)[i] = (char *) malloc((holder2 - holder) + 1);
 	if (!(*tokens)[i])
 	{
@@ -408,11 +406,12 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
 	}
 	strncpy((*tokens)[i], holder, (holder2 - holder));
 	(*tokens)[i][(holder2 - holder)] = '\0';
+        assert(strlen((*tokens)[i]) != 0);
 	holder = holder2 + 1;
-
     }
 
-    return (tokencount);
+out:
+    return (retval);
 
   failure:
 

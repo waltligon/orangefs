@@ -30,9 +30,7 @@ int PVFS_mgmt_get_config(
     const PVFS_fs_id * fsid,
     PVFS_BMI_addr_t * addr,
     char *fs_buf,
-    int fs_buf_size,
-    char *server_buf,
-    int server_buf_size)
+    int fs_buf_size)
 {
     int ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -118,22 +116,17 @@ int PVFS_mgmt_get_config(
 
     /* make sure strings will be null terminated after strncpy */
     fs_buf[fs_buf_size-1] = '\0';
-    server_buf[server_buf_size-1] = '\0';
 
     /* The following copies the retrieved configuration buffers
        into the return buffers */
     strncpy(fs_buf, sm_p->u.get_config.fs_config_buf, (fs_buf_size - 1));
-    strncpy(server_buf, sm_p->u.get_config.server_config_buf,
-            (server_buf_size - 1));
 
   exit_path:
 
     if (sm_p && sm_p->u.get_config.persist_config_buffers)
     {
         free(sm_p->u.get_config.fs_config_buf);
-        free(sm_p->u.get_config.server_config_buf);
         sm_p->u.get_config.fs_config_buf = NULL;
-        sm_p->u.get_config.server_config_buf = NULL;
     }
 
     PINT_mgmt_release(op_id);

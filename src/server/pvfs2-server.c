@@ -108,9 +108,11 @@ typedef struct
     int server_create_storage_space;
     int server_background;
     char *pidfile;
+    char *server_alias;
 } options_t;
 
-static options_t s_server_options = { 0, 0, 1, NULL };
+static options_t s_server_options = { 0, 0, 1, NULL, NULL};
+static char *fs_conf = NULL;
 
 /* each of the elements in this array consists of a string and its length.
  * we're able to use sizeof here because sizeof an inlined string ("") gives
@@ -154,6 +156,7 @@ static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
 static int parse_port_from_host_id(char* host_id);
+static char *guess_alias(void);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
@@ -414,7 +417,6 @@ struct server_configuration_s *PINT_get_server_config(void)
 int main(int argc, char **argv)
 {
     int ret = -1, siglevel = 0;
-    char *fs_conf = NULL, *server_conf = NULL;
     struct PINT_smcb *tmp_op = NULL;
     uint64_t debug_mask = 0;
 
@@ -447,18 +449,21 @@ int main(int argc, char **argv)
     }
 
     gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
-                    "PVFS2 Server version %s starting...\n", PVFS2_VERSION);
+                    "PVFS2 Server on node %s version %s starting...\n",
+                    s_server_options.server_alias, PVFS2_VERSION);
 
-    fs_conf = ((argc >= optind) ? argv[optind] : NULL);
-    server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
+    /* code to handle older two config file format */
 
-    ret = PINT_parse_config(&server_config, fs_conf, server_conf);
+    ret = PINT_parse_config(&server_config, fs_conf, s_server_options.server_alias);
     if (ret < 0)
     {
-        gossip_err("Error: Please check your config files.\n");  
+        gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: Server aborting.\n");
+        free(s_server_options.server_alias);
         goto server_shutdown;
     }
+
+    free(s_server_options.server_alias);
 
     server_status_flag |= SERVER_CONFIG_INIT;
 
@@ -1574,7 +1579,7 @@ static void server_sig_handler(int sig)
 static void usage(int argc, char **argv)
 {
     gossip_err("Usage: %s: [OPTIONS] <global_config_file> "
-               "<server_config_file>\n\n", argv[0]);
+               "\n\n", argv[0]);
     gossip_err("  -d, --foreground\t"
                "will keep server in the foreground\n");
     gossip_err("  -f, --mkfs\t\twill cause server to "
@@ -1585,11 +1590,13 @@ static void usage(int argc, char **argv)
     gossip_err("  -v, --version\t\toutput version information "
                "and exit\n");
     gossip_err("  -p, --pidfile <file>\twrite process id to file\n");
+    gossip_err("  -a, --alias <alias>\tuse the specified alias for this node\n");
 }
 
 static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int ret = 0, option_index = 0;
+    int total_arguments = 0;
     const char *cur_option = NULL;
     static struct option long_opts[] =
     {
@@ -1599,12 +1606,14 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         {"rmfs",0,0,0},
         {"version",0,0,0},
         {"pidfile",1,0,0},
+        {"alias",0,0,0},
         {0,0,0,0}
     };
 
-    while ((ret = getopt_long(argc, argv,"dfhrvp:",
+    while ((ret = getopt_long(argc, argv,"dfhrvp:a:",
                               long_opts, &option_index)) != -1)
     {
+        total_arguments++;
         switch (ret)
         {
             case 0:
@@ -1635,6 +1644,10 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                 {
                     goto do_pidfile;
                 }
+                else if (strcmp("alias", cur_option) == 0)
+                {
+                    goto do_alias;
+                }
                 break;
             case 'v':
           do_version:
@@ -1654,6 +1667,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                 break;
             case 'p':
           do_pidfile:
+                total_arguments++;
                 s_server_options.pidfile = optarg;
                 if(optarg[0] != '/')
                 {
@@ -1661,19 +1675,49 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                     goto parse_cmd_line_args_failure;
                 }
                 break;
+            case 'a':
+           do_alias:
+                total_arguments++;
+                s_server_options.server_alias = strdup(optarg);
+                break;
             case '?':
             case 'h':
           do_help:
             default:
           parse_cmd_line_args_failure:
                 usage(argc, argv);
+                if(s_server_options.server_alias)
+                {
+                    free(s_server_options.server_alias);
+                }
                 return 1;
         }
     }
 
-    if (argc == 1)
+    if(argc < optind)
     {
+        gossip_err("Missing config file in command line arguments\n");
         goto parse_cmd_line_args_failure;
+    }
+
+    fs_conf = argv[optind++];
+
+    if(argc - total_arguments > 2)
+    {
+        /* Assume user is passing in a server.conf.  Bit of a hack here to
+         * support server.conf files in the old format by appending the
+         * server.conf options onto the fs.conf.
+         */
+        gossip_err("The two config file format is no longer supported.  "
+                   "Generate a single fs.conf that uses the new format with the "
+                   "pvfs2-config-convert script.\n\n");
+        goto parse_cmd_line_args_failure;
+    }
+
+    if (s_server_options.server_alias == NULL)
+    {
+        /* Try to guess the alias from the hostname */
+        s_server_options.server_alias = guess_alias();
     }
     return 0;
 }
@@ -2043,14 +2087,14 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op)
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
 {
-    struct filesystem_configuration_s * fs_conf;
-    
-    fs_conf = PINT_config_find_fs_id(&server_config, coll_id);
-    if(!fs_conf)
+    struct filesystem_configuration_s * fs_config;
+
+    fs_config = PINT_config_find_fs_id(&server_config, coll_id);
+    if(!fs_config)
     {
         return server_config.trove_method;
     }
-    return fs_conf->trove_method;
+    return fs_config->trove_method;
 }
 
 #ifndef GOSSIP_DISABLE_DEBUG
@@ -2108,6 +2152,34 @@ const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
     if (op >= 0 && op < PVFS_SERV_NUM_OPS)
         s = PINT_server_req_table[op].string_name;
     return s;
+}
+
+static char *guess_alias(void)
+{
+    char tmp_alias[1024];
+    char *tmpstr;
+    char *alias;
+    int ret;
+
+    /* hmm...failed to find alias as part of the server config filename,
+     * use the hostname to guess
+     */
+    ret = gethostname(tmp_alias, 1024);
+    if(ret != 0)
+    {
+        gossip_err("Failed to get hostname while attempting to guess "
+                   "alias.  Use -a to specify the alias for this server "
+                   "process directly\n");
+        return NULL;
+    }
+    alias = tmp_alias;
+
+    tmpstr = strstr(tmp_alias, ".");
+    if(tmpstr)
+    {
+        *tmpstr = 0;
+    }
+    return strdup(tmp_alias);
 }
 
 /*

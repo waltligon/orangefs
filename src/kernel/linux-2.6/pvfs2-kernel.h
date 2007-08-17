@@ -47,6 +47,7 @@ typedef unsigned long sector_t;
 #include <linux/statfs.h>
 #include <linux/buffer_head.h>
 #include <linux/backing-dev.h>
+#include <linux/device.h>
 #include <linux/mpage.h>
 #include <linux/namei.h>
 #include <linux/errno.h>
@@ -821,8 +822,8 @@ ssize_t pvfs2_inode_read(
  * defined in devpvfs2-req.c
  ****************************/
 
-int     pvfs2_ioctl32_init(void);
-void    pvfs2_ioctl32_cleanup(void);
+int     pvfs2_dev_init(void);
+void    pvfs2_dev_cleanup(void);
 int     is_daemon_in_service(void);
 int     fs_mount_pending(PVFS_fs_id fsid);
 

@@ -24,7 +24,7 @@ int main(int argc, char **argv)
 
     if (argc != 3)
     {
-        printf("Usage: %s <fs.conf> <server.conf>\n",argv[0]);
+        printf("Usage: %s <fs.conf> <server-alias>\n",argv[0]);
         return 1;
     }
 
@@ -47,13 +47,14 @@ int main(int argc, char **argv)
     fprintf(stderr,"FS Config File Name      : %s (%d bytes)\n",
             serverconfig.fs_config_filename,
             (int)serverconfig.fs_config_buflen);
-    fprintf(stderr,"Server Config File Name  : %s (%d bytes)\n",
-            serverconfig.server_config_filename,
-            (int)serverconfig.server_config_buflen);
     fprintf(stderr,"Initial Unexp Requests   : %d\n",
             serverconfig.initial_unexpected_requests);
     fprintf(stderr,"Configured Log File      : %s\n",
             serverconfig.logfile);
+    fprintf(stderr,"Configured FlowModules : %s\n",
+            serverconfig.flow_modules);
+    fprintf(stderr,"Configured BMIModules : %s\n",
+            serverconfig.bmi_modules);
     fprintf(stderr,"Event Logging Mask String: %s\n",
             serverconfig.event_logging);
 

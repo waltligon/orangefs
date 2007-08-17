@@ -30,6 +30,8 @@ gossip_err("'lsof | grep %s' (run this as root)\n",                   \
 gossip_err("  open_access_count = %d\n", open_access_count);          \
 gossip_err("*****************************************************\n")
 
+static struct class *pvfs2_dev_class;
+
 static int pvfs2_devreq_open(
     struct inode *inode,
     struct file *file)
@@ -951,7 +953,7 @@ static struct ioctl_trans pvfs2_ioctl32_trans[] = {
 };
 
 /* Must be called on module load */
-int pvfs2_ioctl32_init(void)
+static int pvfs2_ioctl32_init(void)
 {
     int i, error;
 
@@ -972,7 +974,7 @@ fail:
 }
 
 /* Must be called on module unload */
-void pvfs2_ioctl32_cleanup(void)
+static void pvfs2_ioctl32_cleanup(void)
 {
     int i;
     for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
@@ -988,16 +990,69 @@ void pvfs2_ioctl32_cleanup(void)
 #endif /* CONFIG_COMPAT */
 
 #if (defined(CONFIG_COMPAT) && !defined(HAVE_REGISTER_IOCTL32_CONVERSION)) || !defined(CONFIG_COMPAT)
-int pvfs2_ioctl32_init(void)
+static int pvfs2_ioctl32_init(void)
 {
     return 0;
 }
 
-void pvfs2_ioctl32_cleanup(void)
+static void pvfs2_ioctl32_cleanup(void)
 {
     return;
 }
 #endif
+
+/* the assigned character device major number */
+static int pvfs2_dev_major = 0;
+/* Initialize pvfs2 device specific state: 
+ * Must be called at module load time only 
+ */
+int pvfs2_dev_init(void)
+{
+    int ret;
+
+    /* register the ioctl32 sub-system */
+    if ((ret = pvfs2_ioctl32_init()) < 0) {
+        return ret;
+    }
+    /* register pvfs2-req device  */
+    pvfs2_dev_major = register_chrdev(0, PVFS2_REQDEVICE_NAME,
+                                      &pvfs2_devreq_file_operations);
+    if (pvfs2_dev_major < 0)
+    {
+	gossip_debug(GOSSIP_INIT_DEBUG, "Failed to register /dev/%s (error %d)\n",
+		    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
+        pvfs2_ioctl32_cleanup();
+        return pvfs2_dev_major;
+    }
+    pvfs2_dev_class = class_create(THIS_MODULE, "pvfs2");
+    if (IS_ERR(pvfs2_dev_class)) {
+        pvfs2_ioctl32_cleanup();
+        unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
+        ret = PTR_ERR(pvfs2_dev_class);
+        return ret;
+    }
+    class_device_create(pvfs2_dev_class, NULL,
+                        MKDEV(pvfs2_dev_major, 0), NULL,
+                        PVFS2_REQDEVICE_NAME);
+
+    gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device registered ***\n",
+		PVFS2_REQDEVICE_NAME);
+    gossip_debug(GOSSIP_INIT_DEBUG, "'mknod /dev/%s c %d 0'.\n", PVFS2_REQDEVICE_NAME,
+                pvfs2_dev_major);
+    return 0;
+}
+
+void pvfs2_dev_cleanup(void)
+{
+    class_device_destroy(pvfs2_dev_class, MKDEV(pvfs2_dev_major, 0));
+    class_destroy(pvfs2_dev_class);
+    unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
+    gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device unregistered ***\n",
+            PVFS2_REQDEVICE_NAME);
+    /* unregister the ioctl32 sub-system */
+    pvfs2_ioctl32_cleanup();
+    return;
+}
 
 static unsigned int pvfs2_devreq_poll(
     struct file *file,

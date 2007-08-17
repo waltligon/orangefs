@@ -370,9 +370,7 @@ struct PINT_server_get_config_sm
     struct server_configuration_s *config;
     struct PVFS_sys_mntent *mntent;
     char *fs_config_buf;
-    char *server_config_buf;
     uint32_t fs_config_buf_size;
-    uint32_t server_config_buf_size;
     int persist_config_buffers;
     int free_config_flag;
 };
@@ -382,9 +380,7 @@ struct PINT_server_fetch_config_sm_state
     int nservers;
     PVFS_BMI_addr_t *addr_array;
     char **fs_config_bufs;
-    char **server_config_bufs;
     int32_t *fs_config_buf_size;
-    int32_t *server_config_buf_size;
 };
 
 /* flag to disable cached lookup during getattr nested sm */

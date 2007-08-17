@@ -77,16 +77,11 @@ static PINT_sm_action getconfig_init(
 
     /* TODO: handle this properly later */
     assert(user_opts->fs_config_buflen <= PVFS_REQ_LIMIT_CONFIG_FILE_BYTES);
-    assert(user_opts->server_config_buflen <= PVFS_REQ_LIMIT_CONFIG_FILE_BYTES);
 
     s_op->resp.u.getconfig.fs_config_buf_size =
         (uint32_t)user_opts->fs_config_buflen;
     s_op->resp.u.getconfig.fs_config_buf =
         (char*)user_opts->fs_config_buf;
-    s_op->resp.u.getconfig.server_config_buf_size =
-        (uint32_t)user_opts->server_config_buflen;
-    s_op->resp.u.getconfig.server_config_buf =
-        (char*)user_opts->server_config_buf;
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;

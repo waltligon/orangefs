@@ -27,6 +27,7 @@ enum
     CTX_DISTRIBUTION     = (1 << 8),
     CTX_SECURITY         = (1 << 9),
     CTX_EXPORT           = (1 << 10),
+    CTX_SERVER_OPTIONS   = (1 << 11),
 };
 
 typedef struct phys_server_desc
@@ -130,13 +131,12 @@ typedef struct distribution_configuration_s
 typedef struct server_configuration_s
 {
     char *host_id;
+    char *server_alias;             /* the command line server-alias parameter */
+    int my_server_options;
     char *storage_path;
     char *fs_config_filename;       /* the fs.conf file name            */
     size_t fs_config_buflen;        /* the fs.conf file length          */
     char *fs_config_buf;            /* the fs.conf file contents        */
-    char *server_config_filename;   /* the server.conf file name        */
-    size_t server_config_buflen;    /* the server.conf file length      */
-    char *server_config_buf;        /* the server.conf file contents    */
     int  initial_unexpected_requests;
     int  server_job_bmi_timeout;    /* job timeout values in seconds    */
     int  server_job_flow_timeout;
@@ -185,13 +185,13 @@ typedef struct server_configuration_s
                                      * be configurable.
                                      */
     int trove_method;
-
+    void *private_data;
 } server_configuration_s;
 
 int PINT_parse_config(
     struct server_configuration_s *config_s,
     char *global_config_filename,
-    char *server_config_filename);
+    char *server_alias_name);
 
 void PINT_config_release(
     struct server_configuration_s *config_s);

@@ -802,7 +802,7 @@ cleaner: clean
 	rm -f maint/mpi-depend.sh
 	rm -f examples/pvfs2-server.rc
 	rm -f doc/doxygen/pvfs2-doxygen.conf
-	rm -f examples/fs.conf examples/server.conf-localhost
+	rm -f examples/fs.conf
 	rm -rf autom4te*.cache
 	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
@@ -815,7 +815,6 @@ distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
 	rm -f Makefile pvfs2-config.h
 	rm -f src/server/simple.conf
-	rm -f src/server/server.conf-localhost
 	rm -f src/apps/admin/pvfs2-config
 ifndef DIST_RELEASE
 	rm -f $(SMCGEN)
@@ -858,24 +857,24 @@ nodep:; @:
 # config files in the server build directory with good defaults for
 # debugging
 ifndef DIST_RELEASE
-all:: src/server/simple.conf src/server/server.conf-localhost
+all:: src/server/simple.conf
 endif
-src/server/simple.conf src/server/server.conf-localhost: src/apps/admin/pvfs2-genconfig
+src/server/simple.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
  --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
  --storage /tmp/pvfs2-test-space --logging "server,network,storage,flow" \
- --quiet src/server/simple.conf src/server/server.conf
+ --quiet src/server/simple.conf
 
 # whether this is a distribution tarball or not, drop some config files
 # into the "examples" subdir of the build dir
-all:: examples/fs.conf examples/server.conf-localhost
-examples/fs.conf examples/server.conf-localhost: src/apps/admin/pvfs2-genconfig
+all:: examples/fs.conf
+examples/fs.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
  --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
  --storage /tmp/pvfs2-test-space \
- --quiet examples/fs.conf examples/server.conf
+ --quiet examples/fs.conf
 
 install_doc:
 	install -d $(mandir)/man1
@@ -907,6 +906,7 @@ endif
 	install -m 755 src/apps/admin/pvfs2-config $(prefix)/bin
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(prefix)/bin
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(prefix)/bin
 ifdef BUILD_KARMA
 	install -m 755 $(KARMA) $(prefix)/bin
 endif

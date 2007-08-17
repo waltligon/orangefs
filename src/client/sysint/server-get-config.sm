@@ -22,9 +22,7 @@ extern job_context_id pint_client_sm_context;
 static int server_parse_config(
     struct server_configuration_s *config,
     char *fs_config_buf,
-    uint32_t fs_config_buf_size,
-    char *server_config_buf,
-    uint32_t server_config_buf_size);
+    uint32_t fs_config_buf_size);
 
 /* state function prototypes */
 static PINT_sm_action server_get_config_setup_msgpair(
@@ -213,35 +211,25 @@ int PINT_server_get_config(
 static int server_parse_config(
     struct server_configuration_s *config,
     char *fs_config_buf,
-    uint32_t fs_config_buf_size,
-    char *server_config_buf,
-    uint32_t server_config_buf_size)
+    uint32_t fs_config_buf_size)
 {
     int ret = 1, template_index = 1;
-    int fs_fd = 0, server_fd = 0;
+    int fs_fd = 0;
     char fs_template_array[2][64] =
     {
         ".__pvfs_fs_configXXXXXX",
         "/tmp/.__pvfs_fs_configXXXXXX"
     };
-    char server_template_array[2][64] =
-    {
-        ".__pvfs_server_configXXXXXX",
-        "/tmp/.__pvfs_server_configXXXXXX"
-    };
     char *fs_template = NULL;
-    char *server_template = NULL;
 
     if (config)
     {
         assert(fs_config_buf);
-        assert(server_config_buf);
 
         while(1)
         {
             assert(template_index > -1);
             fs_template = fs_template_array[template_index];
-            server_template = server_template_array[template_index];
 
             fs_fd = mkstemp(fs_template);
             if (fs_fd != -1)
@@ -256,34 +244,16 @@ static int server_parse_config(
             }
         }
 
-        server_fd = mkstemp(server_template);
-        if (server_fd == -1)
-        {
-            close(fs_fd);
-            remove(fs_template);
-            gossip_err("mkstemp(%s) failed\n", server_template);
-            return ret;
-        }
-
         assert(!fs_config_buf[fs_config_buf_size - 1]);
-        assert(!server_config_buf[server_config_buf_size - 1]);
 
         if (write(fs_fd,fs_config_buf, 
 		    (fs_config_buf_size - 1)) == (fs_config_buf_size - 1))
         {
-            if (write(server_fd,server_config_buf,
-                      (server_config_buf_size - 1)) ==
-                (server_config_buf_size - 1))
-            {
-                ret = PINT_parse_config(
-                    config, fs_template, server_template);
-            }
+            ret = PINT_parse_config(config, fs_template, NULL);
         }
         close(fs_fd);
-        close(server_fd);
 
         remove(fs_template);
-        remove(server_template);
     }
     return ret;
 }
@@ -334,10 +304,7 @@ static PINT_sm_action server_get_config_cleanup(
     if (sm_p && !sm_p->u.get_config.persist_config_buffers)
     {
 	free(sm_p->u.get_config.fs_config_buf);
-	free(sm_p->u.get_config.server_config_buf);
-
         sm_p->u.get_config.fs_config_buf = NULL;
-        sm_p->u.get_config.server_config_buf = NULL;
     }
 
     /* preserve js_p->error_code */
@@ -356,9 +323,7 @@ static PINT_sm_action server_get_config_parse(
     {
         ret = server_parse_config(
             sm_p->u.get_config.config,  sm_p->u.get_config.fs_config_buf,
-            sm_p->u.get_config.fs_config_buf_size,
-            sm_p->u.get_config.server_config_buf,
-            sm_p->u.get_config.server_config_buf_size);
+            sm_p->u.get_config.fs_config_buf_size);
         if (ret)
         {
             gossip_err("Failed to get_config from host %s\n",
@@ -435,10 +400,6 @@ static int server_get_config_comp_fn(
 		strdup(resp_p->u.getconfig.fs_config_buf);
 	sm_p->u.get_config.fs_config_buf_size = 
 		resp_p->u.getconfig.fs_config_buf_size;
-	sm_p->u.get_config.server_config_buf = 
-		strdup(resp_p->u.getconfig.server_config_buf);
-	sm_p->u.get_config.server_config_buf_size = 
-		resp_p->u.getconfig.server_config_buf_size;
     }
 
     /* if this is the last response, check all of the status values
@@ -466,13 +427,11 @@ static int server_get_config_comp_fn(
  */
 #ifdef __GNUC__
 static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
-                char **fs_config_bufs, char **server_config_bufs,
-                int *fs_config_buf_size, int *server_config_buf_size) __attribute__((unused));
+                char **fs_config_bufs, int *fs_config_buf_size) __attribute__((unused));
 #endif
 
 static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
-                char **fs_config_bufs, char **server_config_bufs,
-                int *fs_config_buf_size, int *server_config_buf_size)
+                char **fs_config_bufs, int *fs_config_buf_size)
 {
     int ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -483,8 +442,7 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_fetch_config_list entered\n");
-    if (nservers < 0 || !servers || !fs_config_bufs || !server_config_bufs
-        || !fs_config_buf_size || !server_config_buf_size)
+    if (nservers < 0 || !servers || !fs_config_bufs || !fs_config_buf_size)
     {
         return ret;
     }
@@ -513,9 +471,7 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
     sm_p->fetch_config.nservers = nservers;
     sm_p->fetch_config.addr_array = servers;
     sm_p->fetch_config.fs_config_bufs = fs_config_bufs;
-    sm_p->fetch_config.server_config_bufs = server_config_bufs;
     sm_p->fetch_config.fs_config_buf_size = fs_config_buf_size;
-    sm_p->fetch_config.server_config_buf_size = server_config_buf_size;
     sm_p->msgarray_count = nservers;
     sm_p->msgarray = (PINT_sm_msgpair_state *) malloc(
         nservers * sizeof(PINT_sm_msgpair_state));
@@ -605,10 +561,6 @@ static int server_fetch_config_comp_fn(
 		strdup(resp_p->u.getconfig.fs_config_buf);
 	sm_p->fetch_config.fs_config_buf_size[i] = 
 		resp_p->u.getconfig.fs_config_buf_size;
-	sm_p->fetch_config.server_config_bufs[i] = 
-		strdup(resp_p->u.getconfig.server_config_buf);
-	sm_p->fetch_config.server_config_buf_size[i] = 
-		resp_p->u.getconfig.server_config_buf_size;
     }
 
     /* if this is the last response, check all of the status values

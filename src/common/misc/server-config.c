@@ -33,7 +33,6 @@
 
 static const char * replace_old_keystring(const char * oldkey);
 
-static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_logstamp);
 static DOTCONF_CB(get_storage_space);
 static DOTCONF_CB(enter_defaults_context);
@@ -50,6 +49,8 @@ static DOTCONF_CB(enter_storage_hints_context);
 static DOTCONF_CB(exit_storage_hints_context);
 static DOTCONF_CB(enter_export_options_context);
 static DOTCONF_CB(exit_export_options_context);
+static DOTCONF_CB(enter_server_options_context);
+static DOTCONF_CB(exit_server_options_context);
 static DOTCONF_CB(enter_mhranges_context);
 static DOTCONF_CB(exit_mhranges_context);
 static DOTCONF_CB(enter_dhranges_context);
@@ -68,6 +69,7 @@ static DOTCONF_CB(get_logtype);
 static DOTCONF_CB(get_event_logging_list);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
+static DOTCONF_CB(check_this_server);
 #ifdef USE_TRUSTED
 static DOTCONF_CB(get_trusted_portlist);
 static DOTCONF_CB(get_trusted_network);
@@ -122,8 +124,7 @@ static void copy_filesystem(
     struct filesystem_configuration_s *src_fs);
 static int cache_config_files(
     struct server_configuration_s *config_s,
-    char *global_config_filename,
-    char *server_config_filename);
+    char *global_config_filename);
 static int is_populated_filesystem_configuration(
     struct filesystem_configuration_s *fs);
 static int is_root_handle_in_a_meta_range(
@@ -154,11 +155,12 @@ static int is_root_handle_in_my_range(
 
 /* PVFS2 servers are deployed using configuration files that provide information
  * about the file systems, storage locations and endpoints that each server
- * manages.  For every pvfs2 deployment, there is a global config file
- * (<i>fs.conf</i>) shared between all of the pvfs2 servers, as well as
- * per-server config files (<i>server.conf</i>) that contain config options 
- * unique to that server (such as host/port endpoint).  Configuration options 
- * in both the global and server specific config files have the following format:
+ * manages.  For every pvfs2 deployment, there should be a global config file
+ * (<i>fs.conf</i>) shared across all of the pvfs2 servers. When the servers
+ * are started up, a command line parameter (server-alias) indicates what options
+ * are relevant and applicable for a particular server.
+ * This parameter will be used by the server to parse relevant options.
+ * Configuration options in the global config files have the following format:
  * 
  * <pre>
  * OptionName OptionValue
@@ -197,8 +199,8 @@ static int is_root_handle_in_my_range(
  *
  * Options and contexts that appear in the top-level (not defined within
  * another context) are considered to be defined in a special <i>Global</i>
- * context.  Many options are only specified to appear within either the
- * <i>Global</i> context or the <a name="Default">Default</a> context, 
+ * context.  Many options are only specified to appear within
+ * the <a name="Default">Default</a> context, 
  * which is a context that allows a default value to be specified for certain
  * options.
  *
@@ -210,29 +212,6 @@ static int is_root_handle_in_my_range(
  */
 static const configoption_t options[] =
 {
-    /* 
-     * Specifies a string identifier for the pvfs2 server that is to be
-     * run on this host.  This option is required for each per-server config
-     * file.  The format of this string is:
-     *
-     * {transport}://{hostname}:{port}
-     *
-     * Where {transport} is one of the possible BMI transport modules
-     * (tcp, ib, gm).  Example:
-     *
-     * tcp://myhost.mydn:12345
-     *
-     */
-    {"HostID",ARG_STR, get_pvfs_server_id,NULL,CTX_GLOBAL,NULL},
-    
-    /* Specifies the local path for the pvfs2 server to use as storage space.
-     * This option is required for each per-server config file.
-     * Example:
-     *
-     * /tmp/pvfs.storage
-     */
-    {"StorageSpace",ARG_STR, get_storage_space,NULL,CTX_GLOBAL,NULL},
-
     /* Options specified within the Defaults context are used as 
      * default values over all the pvfs2 server specific config files.
      */
@@ -305,6 +284,47 @@ static const configoption_t options[] =
      * Alias mynode1 tcp://hostname1.clustername1.domainname:12345
      */
     {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALIASES,NULL},
+
+    /* Defines the server alias for the server specific options that
+     * are to be set within the ServerOptions context.
+     */
+    {"Server", ARG_STR, check_this_server, NULL, CTX_SERVER_OPTIONS, NULL},
+
+    /* This groups the Server specific options.
+     *
+     * The ServerOptions context should be defined after the Alias mappings 
+     * have been defined. The reason is that the ServerOptions context is
+     * defined in terms of the aliases defined in that context.
+     *
+     * Default options applicable to all servers can be overridden on
+     * a per-server basis in the ServerOptions context.
+     * To illustrate:
+     * Suppose the Option name is X, its default value is Y,
+     * and one wishes to override the option for a server to Y'.
+     *
+     * <Defaults>
+     *     ..
+     *     X  Y
+     *     ..
+     * </Defaults>
+     *
+     * <ServerOptions>
+     *     Server {server alias}
+     *     ..
+     *     X Y'
+     *     ..
+     * </ServerOptions>
+     *
+     * The ServerOptions context REQUIRES the Server option specify
+     * the server alias, which sets the remaining options specified
+     * in the context for that server.
+    */
+    {"<ServerOptions>",ARG_NONE,enter_server_options_context,NULL,
+        CTX_GLOBAL, NULL},
+    /* Specifies the end-tag of the ServerOptions context.
+     */
+    {"</ServerOptions>",ARG_NONE,exit_server_options_context,NULL,
+        CTX_SERVER_OPTIONS,NULL},
 
     /* This groups options specific to a filesystem.  A pvfs2 server may manage
      * more than one filesystem, so a config file may have more than
@@ -461,7 +481,7 @@ static const configoption_t options[] =
      * concurrently 
      */
     {"TroveMaxConcurrentIO", ARG_INT, get_trove_max_concurrent_io, NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"16"},
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"16"},
 
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  The output of these
@@ -472,7 +492,7 @@ static const configoption_t options[] =
      * a particular server in the Global context.
      */
     {"LogFile",ARG_STR, get_logfile,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"/tmp/pvfs2-server.log"},
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"/tmp/pvfs2-server.log"},
 
     /* The LogType option can be used to control the destination of log 
      * messages from PVFS2 server.  The default value is "file", which causes
@@ -481,7 +501,7 @@ static const configoption_t options[] =
      * to be written to syslog.
      */
     {"LogType",ARG_STR, get_logtype,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"file"},
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"file"},
 
     /* The gossip interface in pvfs allows users to specify different
      * levels of logging for the pvfs server.  This option sets that level for
@@ -502,19 +522,33 @@ static const configoption_t options[] =
      * EventLogging -flow,-flowproto
      */
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"none,"},
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"none,"},
 
     /* At startup each pvfs server allocates space for a set number
      * of incoming requests to prevent the allocation delay at the beginning
      * of each unexpected request.  This parameter specifies the number
      * of requests for which to allocate space.
      *
-     * If set in the Defaults context, its value will be used for all servers.
-     * The default value can also be overwritten by setting a separate value
-     * in the Global context.
+     * A default value is set in the Defaults context which will be be used 
+     * for all servers. 
+     * However, the default value can also be overwritten by setting a separate value
+     * in the ServerOptions context using the Option tag.
      */
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL,"50"},
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS,"50"},
+
+    /* Specifies the local path for the pvfs2 server to use as storage space.
+     * This option specifies the default path for all servers and will appear
+     * in the Defaults context.
+     *
+     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
+     * basis. Look at the "Option" tag for more details
+     * Example:
+     *
+     * StorageSpace /tmp/pvfs.storage
+     */
+    {"StorageSpace",ARG_STR, get_storage_space,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
 
      /* Current implementations of TCP on most systems use a window
       * size that is too small for almost all uses of pvfs.  
@@ -536,57 +570,57 @@ static const configoption_t options[] =
       * PSC networking options</a> for details.
       */
      {"TCPBufferSend",ARG_INT, get_tcp_buffer_send,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL,"0"},
+         CTX_DEFAULTS,"0"},
 
      /* See the <a href="#TCPBufferSend">TCPBufferSend</a> option.
       */
       {"TCPBufferReceive",ARG_INT, get_tcp_buffer_receive,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL,"0"},
+         CTX_DEFAULTS,"0"},
 
      /* If enabled, specifies that the server should bind its port only on
       * the specified address (rather than INADDR_ANY)
       */
      {"TCPBindSpecific",ARG_STR, get_tcp_bind_specific,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"no"},
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"no"},
 
      /* Specifies the timeout value in seconds for BMI jobs on the server.
       */
      {"ServerJobBMITimeoutSecs",ARG_INT, get_server_job_bmi_timeout,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL, "300"},
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "300"},
      
      /* Specifies the timeout value in seconds for TROVE jobs on the server.
       */
      {"ServerJobFlowTimeoutSecs",ARG_INT, get_server_job_flow_timeout,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL, "300"},
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "300"},
      
      /* Specifies the timeout value in seconds for BMI jobs on the client.
       */
      {"ClientJobBMITimeoutSecs",ARG_INT, get_client_job_bmi_timeout,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL, "300"},
+         CTX_DEFAULTS, "300"},
 
      /* Specifies the timeout value in seconds for FLOW jobs on the client.
       */
      {"ClientJobFlowTimeoutSecs",ARG_INT, get_client_job_flow_timeout,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL, "300"},
+         CTX_DEFAULTS, "300"},
 
      /* Specifies the number of retry attempts for operations (when possible)
       */
      {"ClientRetryLimit",ARG_INT, get_client_retry_limit,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL, "5"},
+         CTX_DEFAULTS, "5"},
 
      /* Specifies the delay in milliseconds to wait between retries.
       */
      {"ClientRetryDelayMilliSecs",ARG_INT, get_client_retry_delay,NULL,
-         CTX_DEFAULTS|CTX_GLOBAL, "2000"},
+         CTX_DEFAULTS, "2000"},
 
      /* This specifies the frequency (in milliseconds) 
       * that performance monitor should be updated
       * when the pvfs server is running in admin mode.
       *
-      * Can be set in either Default or Global contexts.
+      * Can be set in either Default or ServerOptions contexts.
       */
     {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"1000"},
+        CTX_DEFAULTS,"1000"},
 
     /* List the BMI modules to load when the server is started.  At present,
      * only tcp, infiniband, and myrinet are valid BMI modules.  
@@ -602,11 +636,10 @@ static const configoption_t options[] =
      *
      * Note that only the bmi modules compiled into pvfs should be
      * specified in this list.  The BMIModules option can be specified
-     * in either the Defaults or Global contexts.
+     * in either the Defaults or ServerOptions contexts.
      */
-    {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,NULL},
-    
+    {"BMIModules",ARG_LIST, get_bmi_module_list,NULL, CTX_DEFAULTS,NULL},
+
     /* List the flow modules to load when the server is started.  The modules
      * available for loading currently are:
      *
@@ -626,7 +659,28 @@ static const configoption_t options[] =
      *
      */
     {"FlowModules",ARG_LIST, get_flow_module_list,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"flowproto_multiqueue,"},
+        CTX_DEFAULTS,"flowproto_multiqueue,"},
+
+    /* Specifies the format of the date/timestamp that events will have
+     * in the event log.  Possible values are:
+     *
+     * usec: [%H:%M:%S.%U]
+     *
+     * datetime: [%m/%d %H:%M]
+     *
+     * thread: [%H:%M:%S.%U (%lu)]
+     *
+     * none
+     *
+     * The format of the option is one of the above values.  For example,
+     *
+     * LogStamp datetime
+     */
+    {"LogStamp",ARG_STR, get_logstamp,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"usec"},
+
+    /* --- end default options for all servers */
+    
 
     /* buffer size to use for bulk data transfers */
     {"FlowBufferSizeBytes", ARG_INT,
@@ -636,44 +690,60 @@ static const configoption_t options[] =
     {"FlowBuffersPerFlow", ARG_INT,
          get_flow_buffers_per_flow, NULL, CTX_FILESYSTEM,"8"},
 
-    /* Define options that will influence the way a file-system gets exported
+    /* 
+     * File-system export options
+     *
+     * Define options that will influence the way a file-system gets exported
      * to the rest of the world.
      */
 
-    /* RootSquash option specifies whether the exported file-system needs to squash accesses
-     * by root. This is an optional parameter that needs to be specified as part of the ExportOptions
-     * context and is a list of BMI URL specification of client addresses for which RootSquash
-     * has to be enforced. 
+    /* RootSquash option specifies whether the exported file-system needs to
+    *  squash accesses by root. This is an optional parameter that needs 
+    *  to be specified as part of the ExportOptions
+     * context and is a list of BMI URL specification of client addresses 
+     * for which RootSquash has to be enforced. 
+     *
      * RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
      */
     {"RootSquash", ARG_LIST, get_root_squash, NULL,
         CTX_EXPORT, ""},
 
-    /* ReadOnly option specifies whether the exported file-system needs to disallow write accesses
-     * from clients or anything that modifies the state of the file-system.
-     * This is an optional parameter that needs to be specified as part of the ExportOptions
-     * context and is a list of BMI URL specification of client addresses for which ReadOnly
-     * has to be enforced.
+    /* ReadOnly option specifies whether the exported file-system needs to
+    *  disallow write accesses from clients or anything that modifies the 
+    *  state of the file-system.
+     * This is an optional parameter that needs to be specified as part of 
+     * the ExportOptions context and is a list of BMI URL specification of 
+     * client addresses for which ReadOnly has to be enforced.
+     * An example: 
+     *
      * ReadOnly tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
      */
     {"ReadOnly", ARG_LIST,  get_read_only,    NULL,
         CTX_EXPORT, ""},
 
-    /* AllSquash option specifies whether the exported file-system needs to squash all accesses
-     * to the file-system to a specified uid/gid!
-     * This is an optional parameter that needs to be specified as part of the ExportOptions
-     * context and is a list of BMI URL specification of client addresses for which AllSquash
-     * has to be enforced.
+    /* AllSquash option specifies whether the exported file-system needs to 
+    *  squash all accesses to the file-system to a specified uid/gid!
+     * This is an optional parameter that needs to be specified as part of 
+     * the ExportOptions context and is a list of BMI URL specification of client 
+     * addresses for which AllSquash has to be enforced.
+     * An example:
+     *
      * AllSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
      */
     {"AllSquash", ARG_LIST, get_all_squash,   NULL,
         CTX_EXPORT, ""},
 
-    /* AnonUID and AnonGID are 2 integers that tell the servers to translate the requesting clients'
-     * uid/gid to the specified ones whenever AllSquash is specified!
-     * If these are not specified and AllSquash is specified then the uid used will be
-     * that of nobody and gid that of nobody
+    /* AnonUID and AnonGID are 2 integers that tell the servers to translate 
+    *  the requesting clients' uid/gid to the specified ones whenever AllSquash
+    *  is specified!
+     * If these are not specified and AllSquash is specified then the uid used 
+     * will be that of nobody and gid that of nobody.
+     * An example:
+     *
+     * AnonUID 3454
+     * AnonGID 3454
      */
+
     {"AnonUID",  ARG_STR,  get_anon_uid,     NULL,
         CTX_EXPORT, "65534"},
     {"AnonGID",  ARG_STR,  get_anon_gid,     NULL,
@@ -763,24 +833,6 @@ static const configoption_t options[] =
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
 
-    /* Specifies the format of the date/timestamp that events will have
-     * in the event log.  Possible values are:
-     *
-     * usec: [%H:%M:%S.%U]
-     *
-     * datetime: [%m/%d %H:%M]
-     *
-     * thread: [%H:%M:%S.%U (%lu)]
-     *
-     * none
-     *
-     * The format of the option is one of the above values.  For example,
-     *
-     * LogStamp datetime
-     */
-    {"LogStamp",ARG_STR, get_logstamp,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"usec"},
-    
     /* This option specifies a parameter name to be passed to the 
      * distribution to be used.  This option should be immediately
      * followed by a Value option.
@@ -827,7 +879,7 @@ static const configoption_t options[] =
      * <a href="#StorageHints">StorageHints</a> context for that filesystem.
      */
     {"TroveMethod", ARG_STR, get_trove_method, NULL, 
-        CTX_DEFAULTS|CTX_GLOBAL|CTX_STORAGEHINTS, "dbpf"},
+        CTX_DEFAULTS|CTX_STORAGEHINTS, "dbpf"},
 
     /* Specifies the file system's key for use in HMAC-based digests of
      * client operations.
@@ -843,7 +895,7 @@ static const configoption_t options[] =
  * Params:   struct server_configuration_s*,
  *           global_config_filename - common config file for all servers
  *                                    and clients
- *           server_config_filename - config file specific to one server
+ *           server_alias_name      - alias (if any) provided for this server
  *                                    (ignored on client side)
  *
  * Returns:  0 on success; 1 on failure
@@ -852,7 +904,7 @@ static const configoption_t options[] =
 int PINT_parse_config(
     struct server_configuration_s *config_obj,
     char *global_config_filename,
-    char *server_config_filename)
+    char *server_alias_name)
 {
     struct server_configuration_s *config_s;
     configfile_t *configfile = (configfile_t *)0;
@@ -867,6 +919,7 @@ int PINT_parse_config(
     config_s = config_obj;
     memset(config_s, 0, sizeof(struct server_configuration_s));
 
+    config_s->server_alias = server_alias_name;
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
     config_s->server_job_bmi_timeout = PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT;
@@ -877,15 +930,13 @@ int PINT_parse_config(
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
     config_s->trove_max_concurrent_io = 16;
 
-    if (cache_config_files(
-            config_s, global_config_filename, server_config_filename))
+    if (cache_config_files(config_s, global_config_filename))
     {
         return 1;
     }
     assert(config_s->fs_config_buflen && config_s->fs_config_buf);
-    assert(config_s->server_config_buflen && config_s->server_config_buf);
 
-    /* first read in the fs.conf defaults config file */
+    /* read in the fs.conf defaults config file */
     config_s->configuration_context = CTX_GLOBAL;
     configfile = PINT_dotconf_create(config_s->fs_config_filename,
                                      options, (void *)config_s, 
@@ -896,6 +947,7 @@ int PINT_parse_config(
                    config_s->fs_config_filename);
         return 1;
     }
+    config_s->private_data = configfile;
     configfile->errorhandler = (dotconf_errorhandler_t)errorhandler;
     configfile->contextchecker = (dotconf_contextchecker_t)contextchecker;
     
@@ -906,37 +958,24 @@ int PINT_parse_config(
     }
     PINT_dotconf_cleanup(configfile);
 
-    /* then read in the server.conf (host specific) config file */
-    config_s->configuration_context = CTX_GLOBAL;
-    configfile = PINT_dotconf_create(config_s->server_config_filename,
-                                options, (void *)config_s, CASE_INSENSITIVE);
-    if (!configfile)
+    if (server_alias_name) 
     {
-        gossip_err("Error opening config file: %s\n",
-                   config_s->server_config_filename);
-        return 1;
+        struct host_alias_s *halias;
+        halias = find_host_alias_ptr_by_alias(
+                                config_s, server_alias_name);
+        if (!halias || !halias->bmi_address) 
+        {
+            gossip_err("Configuration file error. "
+                       "No host ID specified for alias %s.\n", server_alias_name);
+            return 1;
+        }
+        config_s->host_id = strdup(halias->bmi_address);
     }
-    configfile->errorhandler = (dotconf_errorhandler_t)errorhandler;
-    configfile->contextchecker = (dotconf_contextchecker_t)contextchecker;
 
-    if (PINT_dotconf_command_loop(configfile) == 0)
-    {
-        /* NOTE: dotconf error handler will log message */
-        return 1;
-    }
-    PINT_dotconf_cleanup(configfile);
-
-    if (!config_s->host_id)
+    if (server_alias_name && !config_s->storage_path)
     {
         gossip_err("Configuration file error. "
-                   "No host ID specified.\n");
-        return 1;
-    }
-
-    if (!config_s->storage_path)
-    {
-        gossip_err("Configuration file error. "
-                   "No storage path specified.\n");
+                   "No storage path specified for alias %s.\n", server_alias_name);
         return 1;
     }
 
@@ -985,25 +1024,16 @@ FUNC_ERRORHANDLER(errorhandler)
     return(1);
 }
 
-DOTCONF_CB(get_pvfs_server_id)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    if (config_s->host_id)
-    {
-        gossip_err("WARNING: HostID value being overwritten (from "
-                   "%s to %s).\n",config_s->host_id,cmd->data.str);
-        free(config_s->host_id);
-    }
-    config_s->host_id = (cmd->data.str ? strdup(cmd->data.str) : NULL);
-    return NULL;
-}
-
 DOTCONF_CB(get_logstamp)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
     if(!strcmp(cmd->data.str, "none"))
     {
         config_s->logstamp_type = GOSSIP_LOGSTAMP_NONE;
@@ -1033,6 +1063,11 @@ DOTCONF_CB(get_storage_space)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
     if (config_s->storage_path)
     {
         gossip_err("WARNING: StorageSpace value being overwritten.\n");
@@ -1194,6 +1229,48 @@ DOTCONF_CB(exit_export_options_context)
     return NULL;
 }
 
+DOTCONF_CB(enter_server_options_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_SERVER_OPTIONS;
+
+    return PINT_dotconf_set_defaults(
+        cmd->configfile, CTX_SERVER_OPTIONS);
+}
+
+DOTCONF_CB(exit_server_options_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_GLOBAL;
+    config_s->my_server_options = 0;
+    return NULL;
+}
+
+DOTCONF_CB(check_this_server)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    if(is_valid_alias(config_s->host_aliases, cmd->data.str))
+    {
+        /* if the Server option specifies our alias, enable setting
+         * of server specific options
+         */
+        if(config_s->server_alias &&
+           strcmp(config_s->server_alias, cmd->data.str) == 0)
+        {
+            config_s->my_server_options = 1;
+        }
+    }
+    else
+    {
+        return "Unrecognized alias specified.\n";
+    }
+    return NULL;
+}
+
 DOTCONF_CB(enter_mhranges_context)
 {
     struct server_configuration_s *config_s = 
@@ -1266,6 +1343,11 @@ DOTCONF_CB(get_unexp_req)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
     config_s->initial_unexpected_requests = cmd->data.value;
     return NULL;
 }
@@ -1291,6 +1373,11 @@ DOTCONF_CB(get_tcp_bind_specific)
     struct server_configuration_s *config_s =
         (struct server_configuration_s *)cmd->context;
 
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
     if(strcasecmp(cmd->data.str, "yes") == 0)
     {
         config_s->tcp_bind_specific = 1;
@@ -1307,12 +1394,15 @@ DOTCONF_CB(get_tcp_bind_specific)
     return NULL;
 }
 
-
-
 DOTCONF_CB(get_server_job_bmi_timeout)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
     config_s->server_job_bmi_timeout = cmd->data.value;
     return NULL;
 }
@@ -1321,6 +1411,11 @@ DOTCONF_CB(get_server_job_flow_timeout)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
     config_s->server_job_flow_timeout = cmd->data.value;
     return NULL;
 }
@@ -1370,6 +1465,11 @@ DOTCONF_CB(get_logfile)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     /* free whatever was added in set_defaults phase */
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
     if (config_s->logfile)
         free(config_s->logfile);
     config_s->logfile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
@@ -1381,6 +1481,11 @@ DOTCONF_CB(get_logtype)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     /* free whatever was added in set_defaults phase */
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
     if (config_s->logtype)
         free(config_s->logtype);
     config_s->logtype = (cmd->data.str ? strdup(cmd->data.str) : NULL);
@@ -1396,12 +1501,15 @@ DOTCONF_CB(get_event_logging_list)
     char buf[512] = {0};
     char *ptr = buf;
 
-    if (config_s->event_logging != NULL)
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
     {
-        len = strlen(config_s->event_logging);
-        strncpy(ptr,config_s->event_logging,len);
-        ptr += (len * sizeof(char));
+        return NULL;
+    }
+    if (config_s->event_logging != NULL) 
+    {
         free(config_s->event_logging);
+        config_s->event_logging = NULL;
     }
     for(i = 0; i < cmd->arg_count; i++)
     {
@@ -1423,10 +1531,8 @@ DOTCONF_CB(get_flow_module_list)
 
     if (config_s->flow_modules != NULL)
     {
-        len = strlen(config_s->flow_modules);
-        strncpy(ptr,config_s->flow_modules,len);
-        ptr += (len * sizeof(char));
         free(config_s->flow_modules);
+        config_s->flow_modules = NULL;
     }
     for(i = 0; i < cmd->arg_count; i++)
     {
@@ -1729,10 +1835,8 @@ DOTCONF_CB(get_bmi_module_list)
 
     if (config_s->bmi_modules != NULL)
     {
-        len = strlen(config_s->bmi_modules);
-        strncpy(ptr,config_s->bmi_modules,len);
-        ptr += (len * sizeof(char));
         free(config_s->bmi_modules);
+        config_s->bmi_modules = NULL;
     }
     for(i = 0; i < cmd->arg_count; i++)
     {
@@ -2061,6 +2165,12 @@ DOTCONF_CB(get_trove_max_concurrent_io)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
     config_s->trove_max_concurrent_io = cmd->data.value;
     return NULL;
 }
@@ -2440,8 +2550,6 @@ DOTCONF_CB(get_trove_method)
     return NULL;
 }
 
-
-
 /*
  * Function: PINT_config_release
  *
@@ -2475,22 +2583,10 @@ void PINT_config_release(struct server_configuration_s *config_s)
             config_s->fs_config_filename = NULL;
         }
 
-        if (config_s->server_config_filename)
-        {
-            free(config_s->server_config_filename);
-            config_s->server_config_filename = NULL;
-        }
-
         if (config_s->fs_config_buf)
         {
             free(config_s->fs_config_buf);
             config_s->fs_config_buf = NULL;
-        }
-
-        if (config_s->server_config_buf)
-        {
-            free(config_s->server_config_buf);
-            config_s->server_config_buf = NULL;
         }
 
         if (config_s->logfile)
@@ -3409,7 +3505,7 @@ char *PINT_config_get_merged_handle_range_str(
 }
 
 /*
-  verify that both config files exist.  if so, cache them in RAM so
+  verify that the config file exists.  if so, cache it in RAM so
   that getconfig will not have to re-read the file contents each time.
   returns 0 on success; 1 on failure.
 
@@ -3418,14 +3514,12 @@ char *PINT_config_get_merged_handle_range_str(
 */
 static int cache_config_files(
     struct server_configuration_s *config_s,
-    char *global_config_filename,
-    char *server_config_filename)
+    char *global_config_filename)
 {
     int fd = 0, nread = 0;
     struct stat statbuf;
     char *working_dir = NULL;
     char *my_global_fn = NULL;
-    char *my_server_fn = NULL;
     char buf[512] = {0};
 
     assert(config_s);
@@ -3435,16 +3529,14 @@ static int cache_config_files(
     /* pick some filenames if not provided */
     my_global_fn = ((global_config_filename != NULL) ?
                     global_config_filename : "fs.conf");
-    my_server_fn = ((server_config_filename != NULL) ?
-                    server_config_filename : "server.conf");
 
-  open_global_config:
+open_global_config:
     memset(&statbuf, 0, sizeof(struct stat));
     if (stat(my_global_fn, &statbuf) == 0)
     {
         if (statbuf.st_size == 0)
         {
-            gossip_err("Invalid global config file %s.  This "
+            gossip_err("Invalid config file %s.  This "
                        "file is 0 bytes in length!\n", my_global_fn);
             goto error_exit;
         }
@@ -3475,40 +3567,6 @@ static int cache_config_files(
         goto error_exit;
     }
 
-  open_server_config:
-    memset(&statbuf,0,sizeof(struct stat));
-    if (stat(my_server_fn, &statbuf) == 0)
-    {
-        if (statbuf.st_size == 0)
-        {
-            gossip_err("Invalid server config file %s.  This "
-                       "file is 0 bytes in length!\n", my_server_fn);
-            goto error_exit;
-        }
-        config_s->server_config_filename = strdup(my_server_fn);
-        config_s->server_config_buflen = statbuf.st_size + 1;
-    }
-    else if (errno == ENOENT)
-    {
-	gossip_err("Failed to find server config file %s.  This "
-                   "file does not exist!\n", my_server_fn);
-        goto error_exit;
-    }
-    else
-    {
-        assert(working_dir);
-        snprintf(buf, 512, "%s/%s", working_dir, my_server_fn);
-        my_server_fn = buf;
-        goto open_server_config;
-    }
-
-    if (!config_s->server_config_filename ||
-        (config_s->server_config_buflen == 0))
-    {
-        gossip_err("Failed to stat server config file.  (0 file size?)\n");
-        goto error_exit;
-    }
-
     if ((fd = open(my_global_fn, O_RDONLY)) == -1)
     {
         gossip_err("Failed to open fs config file %s.\n",
@@ -3536,34 +3594,6 @@ static int cache_config_files(
     }
     close(fd);
 
-    if ((fd = open(my_server_fn,O_RDONLY)) == -1)
-    {
-        gossip_err("Failed to open fs config file %s.\n", my_server_fn);
-        goto error_exit;
-    }
-
-    config_s->server_config_buf = (char *)
-        malloc(config_s->server_config_buflen);
-    if (!config_s->server_config_buf)
-    {
-        gossip_err("Failed to allocate %d bytes for caching the server "
-                   "config file\n", (int) config_s->server_config_buflen);
-        goto close_fd_fail;
-    }
-
-    memset(config_s->server_config_buf, 0, config_s->server_config_buflen);
-    nread = read(fd, config_s->server_config_buf,
-                 (config_s->server_config_buflen - 1));
-    if (nread != (config_s->server_config_buflen - 1))
-    {
-        gossip_err("Failed to read server config file %s "
-                   "(nread is %d | config_buflen is %d)\n",
-                   my_server_fn, nread,
-                   (int)(config_s->server_config_buflen - 1));
-        goto close_fd_fail;
-    }
-
-    close(fd);
     return 0;
 
   close_fd_fail:
@@ -4004,9 +4034,8 @@ int PINT_config_pvfs2_mkspace(
                 gossip_err("Could not find handle range for host %s\n",
                            config->host_id);
                 gossip_err("Please make sure that the host names in "
-                           "%s and %s are consistent\n",
-                           config->fs_config_filename,
-                           config->server_config_filename);
+                           "%s are consistent\n",
+                           config->fs_config_filename);
                 break;
             }
 

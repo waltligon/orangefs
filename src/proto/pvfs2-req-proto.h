@@ -697,17 +697,14 @@ struct PVFS_servresp_getconfig
 {
     char *fs_config_buf;
     uint32_t fs_config_buf_size;
-    char *server_config_buf;
-    uint32_t server_config_buf_size;
 };
-endecode_fields_4_struct(
+endecode_fields_3_struct(
     PVFS_servresp_getconfig,
     uint32_t, fs_config_buf_size,
-    uint32_t, server_config_buf_size,
-    string, fs_config_buf,
-    string, server_config_buf)
+    skip4,,
+    string, fs_config_buf)
 #define extra_size_PVFS_servresp_getconfig \
-    (2 * PVFS_REQ_LIMIT_CONFIG_FILE_BYTES)
+    (PVFS_REQ_LIMIT_CONFIG_FILE_BYTES)
 
 /* truncate ****************************************************/
 /* - resizes an existing datafile */

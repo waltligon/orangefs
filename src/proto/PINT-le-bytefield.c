@@ -92,7 +92,6 @@ static void lebf_initialize(void)
 		continue;
 	    case PVFS_SERV_GETCONFIG:
 		resp.u.getconfig.fs_config_buf = tmp_name;
-		resp.u.getconfig.server_config_buf = tmp_name;
 		respsize = extra_size_PVFS_servresp_getconfig;
 		break;
 	    case PVFS_SERV_LOOKUP_PATH:

@@ -106,7 +106,7 @@ nested machine pvfs2_msgpairarray_sm
 static PINT_sm_action msgpairarray_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PARENT_SM *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -156,7 +156,7 @@ static PINT_sm_action msgpairarray_init(
 static PINT_sm_action msgpairarray_post(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PARENT_SM *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0, tmp = 0;
     struct server_configuration_s *server_config = NULL;
     PVFS_msg_tag_t session_tag;
@@ -401,7 +401,7 @@ static PINT_sm_action msgpairarray_post(
 static PINT_sm_action msgpairarray_post_retry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PARENT_SM *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p, wait %d ms\n",
@@ -417,7 +417,7 @@ static PINT_sm_action msgpairarray_post_retry(
 static PINT_sm_action msgpairarray_complete(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PARENT_SM *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_MSGPAIR_DEBUG,
       "%s: sm %p status_user_tag %d msgarray_count %d\n",
       __func__, smcb, (int) js_p->status_user_tag, sm_p->msgarray_count);
@@ -488,7 +488,7 @@ static PINT_sm_action msgpairarray_complete(
 static PINT_sm_action msgpairarray_completion_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PARENT_SM *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     int need_retry = 0;
     struct PINT_decoded_msg decoded_resp;

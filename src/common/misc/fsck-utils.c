@@ -133,7 +133,6 @@ int PVFS_fsck_check_server_configs(
     PVFS_BMI_addr_t *addresses = NULL;
     char *fs_config = NULL;
     char *fs_config_diff = NULL;
-    char *server_config = NULL;
     char *reference_config_server = NULL;
     const char *server_name = NULL;
     struct server_configuration_s *server_config_struct = NULL;
@@ -198,19 +197,10 @@ int PVFS_fsck_check_server_configs(
             return -PVFS_ENOMEM;
         }
         
-        server_config = calloc(SERVER_CONFIG_BUFFER_SIZE, sizeof(char));
-        if (server_config == NULL)
-        {
-            free(addresses);
-            free(fs_config);
-            return -PVFS_ENOMEM;
-        }
-
         ret = PVFS_mgmt_get_config(cur_fs,
                                  &addresses[i],
                                  fs_config,
-                                 FS_CONFIG_BUFFER_SIZE,
-                                 server_config, SERVER_CONFIG_BUFFER_SIZE);
+                                 FS_CONFIG_BUFFER_SIZE);
         if (ret < 0)
         {
             PVFS_perror_gossip("PVFS_mgmt_get_config", ret);
@@ -218,12 +208,8 @@ int PVFS_fsck_check_server_configs(
                 i, num_servers);
             free(addresses);
             free(fs_config);
-            free(server_config);
             return(ret);
         }
-
-        /* don't need this guy */
-        free(server_config);
 
         if (i == 0)
         {

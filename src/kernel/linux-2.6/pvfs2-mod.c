@@ -68,9 +68,6 @@ module_param(op_timeout_secs, int, 0);
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
-/* the assigned character device major number */
-static int pvfs2_dev_major = 0;
-
 /* synchronizes the request device file */
 struct semaphore devreq_semaphore;
 
@@ -118,29 +115,13 @@ static int __init pvfs2_init(void)
         goto cleanup_inode;
     }
 
-    /* Initialize the ioctl32 subsystem. This could be a noop too */
-    if ((ret = pvfs2_ioctl32_init()) < 0)
+    /* Initialize the pvfsdev subsystem. */
+    if ((ret = pvfs2_dev_init()) < 0)
     {
-        gossip_err("pvfs2: could not register ioctl32 handlers? %d!\n",
+        gossip_err("pvfs2: could not initialize device subsystem %d!\n",
                 ret);
         goto cleanup_kiocb;
     }
-
-    /* register pvfs2-req device  */
-    pvfs2_dev_major = register_chrdev(0, PVFS2_REQDEVICE_NAME,
-                                      &pvfs2_devreq_file_operations);
-    if (pvfs2_dev_major < 0)
-    {
-	gossip_debug(GOSSIP_INIT_DEBUG, "Failed to register /dev/%s (error %d)\n",
-		    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
-        ret = pvfs2_dev_major;
-        goto cleanup_ioctl;
-    }
-
-    gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device registered ***\n",
-		PVFS2_REQDEVICE_NAME);
-    gossip_debug(GOSSIP_INIT_DEBUG, "'mknod /dev/%s c %d 0'.\n", PVFS2_REQDEVICE_NAME,
-                pvfs2_dev_major);
 
     sema_init(&devreq_semaphore, 1);
     sema_init(&request_semaphore, 1);
@@ -170,9 +151,7 @@ static int __init pvfs2_init(void)
 cleanup_progress_table:
     qhash_finalize(htable_ops_in_progress);
 cleanup_device:
-    unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
-cleanup_ioctl:
-    pvfs2_ioctl32_cleanup();
+    pvfs2_dev_cleanup();
 cleanup_kiocb:
     kiocb_cache_finalize();
 cleanup_inode:
@@ -196,15 +175,7 @@ static void __exit pvfs2_exit(void)
     unregister_filesystem(&pvfs2_fs_type);
     pvfs2_proc_finalize();
     fsid_key_table_finalize();
-    if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
-    {
-	gossip_err("Failed to unregister pvfs2 device /dev/%s\n",
-		    PVFS2_REQDEVICE_NAME);
-    }
-    else {
-        gossip_debug(GOSSIP_INIT_DEBUG, "Unregistered pvfs2 device /dev/%s\n",
-                    PVFS2_REQDEVICE_NAME);
-    }
+    pvfs2_dev_cleanup();
     /* clear out all pending upcall op requests */
     spin_lock(&pvfs2_request_list_lock);
     while (!list_empty(&pvfs2_request_list))
@@ -231,8 +202,6 @@ static void __exit pvfs2_exit(void)
 	    }
 	} while (hash_link);
     }
-    /* cleans up all ioctl32 handlers */
-    pvfs2_ioctl32_cleanup();
     kiocb_cache_finalize();
     pvfs2_inode_cache_finalize();
     dev_req_cache_finalize();

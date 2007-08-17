@@ -299,17 +299,6 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    sm_p->fetch_config.server_config_bufs = (char **) calloc(count, sizeof(char *));
-    if (sm_p->fetch_config.server_config_bufs == NULL)
-    {
-        fprintf(stderr, "Could not allocate svc_configs\n");
-        free(sm_p->fetch_config.addr_array);
-        sm_p->fetch_config.addr_array = NULL;
-        free(sm_p->fetch_config.fs_config_bufs);
-        sm_p->fetch_config.fs_config_bufs = NULL;
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
     sm_p->fetch_config.fs_config_buf_size = (int *) calloc(count, sizeof(int));
     if (sm_p->fetch_config.fs_config_buf_size == NULL)
     {
@@ -318,23 +307,6 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
         sm_p->fetch_config.addr_array = NULL;
         free(sm_p->fetch_config.fs_config_bufs);
         sm_p->fetch_config.fs_config_bufs = NULL;
-        free(sm_p->fetch_config.server_config_bufs);
-        sm_p->fetch_config.server_config_bufs = NULL;
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    sm_p->fetch_config.server_config_buf_size = (int *) calloc(count, sizeof(int));
-    if (sm_p->fetch_config.server_config_buf_size == NULL)
-    {
-        fprintf(stderr, "Could not allocate svc_sizes\n");
-        free(sm_p->fetch_config.addr_array);
-        sm_p->fetch_config.addr_array = NULL;
-        free(sm_p->fetch_config.fs_config_bufs);
-        sm_p->fetch_config.fs_config_bufs = NULL;
-        free(sm_p->fetch_config.server_config_bufs);
-        sm_p->fetch_config.server_config_bufs = NULL;
-        free(sm_p->fetch_config.fs_config_buf_size);
-        sm_p->fetch_config.fs_config_buf_size = NULL;
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -348,12 +320,8 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
         sm_p->fetch_config.addr_array = NULL;
         free(sm_p->fetch_config.fs_config_bufs);
         sm_p->fetch_config.fs_config_bufs = NULL;
-        free(sm_p->fetch_config.server_config_bufs);
-        sm_p->fetch_config.server_config_bufs = NULL;
         free(sm_p->fetch_config.fs_config_buf_size);
         sm_p->fetch_config.fs_config_buf_size = NULL;
-        free(sm_p->fetch_config.server_config_buf_size);
-        sm_p->fetch_config.server_config_buf_size = NULL;
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -447,8 +415,6 @@ out:
     {
         if (sm_p->fetch_config.fs_config_bufs && sm_p->fetch_config.fs_config_bufs[i])
             free(sm_p->fetch_config.fs_config_bufs[i]);
-        if (sm_p->fetch_config.server_config_bufs && sm_p->fetch_config.server_config_bufs[i])
-            free(sm_p->fetch_config.server_config_bufs[i]);
         if (sha1_fs_digests && sha1_fs_digests[i])
             free(sha1_fs_digests[i]);
     }
@@ -457,12 +423,8 @@ out:
     sm_p->fetch_config.addr_array = NULL;
     free(sm_p->fetch_config.fs_config_bufs);
     sm_p->fetch_config.fs_config_bufs = NULL;
-    free(sm_p->fetch_config.server_config_bufs);
-    sm_p->fetch_config.server_config_bufs = NULL;
     free(sm_p->fetch_config.fs_config_buf_size);
     sm_p->fetch_config.fs_config_buf_size = NULL;
-    free(sm_p->fetch_config.server_config_buf_size);
-    sm_p->fetch_config.server_config_buf_size = NULL;
     js_p->error_code = (ret == -PVFS_EOPNOTSUPP) ? 0 : ret;
     return 1;
 }

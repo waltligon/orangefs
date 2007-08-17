@@ -46,7 +46,6 @@ typedef struct
     int all_set;
     int cleanup_set;
     char fs_conf[PATH_MAX];
-    char server_conf[PATH_MAX];
 } options_t;
 
 /** default size of buffers to use for reading old db keys */
@@ -137,7 +136,7 @@ int main(int argc, char **argv)
 {
     int ret = -1;
 
-    /* all parameters read in from fs.conf and server.conf */
+    /* all parameters read in from fs.conf */
     struct server_configuration_s server_config;
     PINT_llist_p fs_configs;
     
@@ -161,7 +160,7 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    ret = PINT_parse_config(&server_config, opts.fs_conf, opts.server_conf);
+    ret = PINT_parse_config(&server_config, opts.fs_conf, NULL);
     if(ret < 0)
     {
         gossip_err("Error: Please check your config files.\n");
@@ -454,14 +453,6 @@ static int parse_args(
     }
     strcpy(opts->fs_conf, argv[optind++]);
 
-    if(argc < optind)
-    {
-        /* missing server.conf */
-        print_help(argv[0]);
-        return(-1);
-    }
-    strcpy(opts->server_conf, argv[optind]);
-
     return 0;
 }
 
@@ -471,7 +462,7 @@ static int parse_args(
 static void print_help(
     char *progname) /**< executable name */
 {
-    fprintf(stderr,"\nusage: %s \\\n\t\t[OPTIONS] <global_config_file> <server_config_file>\n", progname);
+    fprintf(stderr,"\nusage: %s \\\n\t\t[OPTIONS] <global_config_file>\n", progname);
     fprintf(stderr,"\nThis utility will migrate a PVFS2 collection from an old version\n"
            "to the most recent version.\n\n");
     fprintf(stderr,"One of the following arguments is required:\n");

@@ -51,6 +51,11 @@ my $opt_metaspec = undef;
 
 my %all_endpoints = ();
 
+my $default_storage = undef;
+my $default_logfile = undef;
+
+my $bmi_module = undef;
+
 my $opt_gen_key = 0;
 
 my $META_ENDPOINT = 0x1;
@@ -192,6 +197,9 @@ sub emit_defaults
     print $target "\tClientJobFlowTimeoutSecs $client_job_timeout\n";
     print $target "\tClientRetryLimit 5\n";
     print $target "\tClientRetryDelayMilliSecs 2000\n";
+
+    print $target "\n\tStorageSpace " . $default_storage . "\n";
+    print $target "\tLogFile " . $default_logfile . "\n";
 
     print $target "</Defaults>\n";
 }
@@ -414,19 +422,15 @@ sub usage
 # dump usage with a single HERE document rather than seperate print
 # statements
     print $OUT <<"THIS";    
-Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
+Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
 
   The pvfs2-genconfig utility creates configuration files for the
-  PVFS2 file system.  The <fs.conf> and <server.conf> arguments are
-  manditory and specify the names of the configuration files that will
-  be written.  This utility will create one fs.conf file.  It will also
-  create a seperate server.conf file for each server in the file system.
-  Each server.conf file will be appended with the host name of the server
-  to which it belongs.
+  PVFS2 file system.  The <fs.conf> argument is
+  manditory and specify the name of the configuration file that will
+  be written.  This utility will create the fs.conf file.  
 
-  EXAMPLE: 'pvfs2-genconfig /tmp/fs.conf /tmp/server.conf' will
-  generate a file called /tmp/fs.conf and server specific files
-  called /tmp/server.conf-host1, /tmp/server.conf-host2, etc.  
+  EXAMPLE: 'pvfs2-genconfig /tmp/fs.conf' will
+  generate a file called /tmp/fs.conf
   NOTE: If pvfs2-genconfig is executed with a single argument of "-", 
   then all output is directed to stdout and no files are written.
 
@@ -1248,7 +1252,7 @@ my $output_target = undef;
 if ($using_stdout) {
     $output_target = \*STDOUT;
 }
-elsif (@ARGV != 2)
+elsif (@ARGV != 1)
 {
     die "Bad arguments.  See -h for help.\n";
 }
@@ -1272,10 +1276,6 @@ if(defined($opt_metaspec) && !defined($opt_iospec));
 # on the command line are not enough to gather necessary information
 
 print_welcome();
-
-my $default_storage = undef;
-my $default_logfile = undef;
-my $bmi_module = undef;
 
 if($opt_metaspec)
 {
@@ -1387,10 +1387,7 @@ my $client_job_timeout = get_client_job_timeout();
 
 if (!$opt_quiet) {
     print $OUT "Writing fs config file... ";
-    if ($using_stdout == 1)
-    {
-        print $OUT "\n";
-    }
+    print $OUT "done\n";
 }
 
 emit_defaults($output_target, $num_unexp_reqs,
@@ -1409,46 +1406,6 @@ emit_filesystem($output_target, "pvfs2-fs", $fsid, $root_handle,
 if ($using_stdout == 0)
 {
     close($output_target);
-}
-
-if (!$opt_quiet) {
-    print $OUT "Done.\n";
-
-    print $OUT "Writing ", $count, " server config file(s)... ";
-    if ($using_stdout == 1)
-    {
-        print $OUT "\n";
-    }
-}
-
-foreach my $ep (sort keys %all_endpoints)
-{
-    my($filename);
-
-    # and open server.conf files
-    if ($using_stdout == 0)
-    {
-        $filename = "$ARGV[1]-" . $ep;
-        unless (open(SERVEROUT, ">", $filename))
-        {
-            die "Can't open specified file $filename: $!\n";
-        }
-        $output_target = \*SERVEROUT;
-    }
-
-    emit_server_conf(
-        $output_target, $ep, 
-        $all_endpoints{$ep}->{STORAGE}, 
-        $all_endpoints{$ep}->{LOGFILE});
-
-    if ($using_stdout == 0)
-    {
-        close(SERVEROUT);
-    }
-}
-
-if (!$opt_quiet) {
-    print $OUT "Done.\n";
 }
 
 # Local variables:
