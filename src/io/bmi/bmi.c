@@ -130,8 +130,6 @@ int BMI_initialize(const char *method_list,
     char *proto = NULL;
     int addr_count = 0;
 
-    id_gen_safe_initialize();
-
     /* server must specify method list at startup, optional for client */
     if (flags & BMI_INIT_SERVER) {
 	if (!listen_addr || !method_list)
@@ -478,8 +476,6 @@ int BMI_finalize(void)
     /* (side effect: destroys all method addresses as well) */
     ref_list_cleanup(cur_ref_list);
 
-    id_gen_safe_finalize();
-
     return (0);
 }
 
@@ -710,7 +706,7 @@ int BMI_test(bmi_op_id_t id,
 
     *outcount = 0;
 
-    target_op = id_gen_safe_lookup(id);
+    target_op = id_gen_fast_lookup(id);
     assert(target_op->op_id == id);
 
     ret = active_method_table[
@@ -802,7 +798,7 @@ int BMI_testsome(int incount,
 	    if(id_array[j])
 	    {
 		query_op = (struct method_op*)
-                    id_gen_safe_lookup(id_array[j]);
+                    id_gen_fast_lookup(id_array[j]);
 		assert(query_op->op_id == id_array[j]);
 		if(query_op->addr->method_type == i)
 		{
@@ -1488,7 +1484,7 @@ int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netma
  *  \return 0 on success, -errno on failure.
  */
 int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
-		    const char *id_string)
+                    const char *id_string)
 {
 
     ref_st_p new_ref = NULL;
@@ -1825,7 +1821,7 @@ int BMI_cancel(bmi_op_id_t id,
     gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                  "%s: cancel id %llu\n", __func__, llu(id));
 
-    target_op = id_gen_safe_lookup(id);
+    target_op = id_gen_fast_lookup(id);
     if(target_op == NULL)
     {
         /* if we can't find the operation, then assume it has already

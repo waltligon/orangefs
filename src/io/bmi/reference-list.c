@@ -204,7 +204,7 @@ ref_st_p alloc_ref_st(void)
     memset(new_ref, 0, ssize);
 
     /* we can go ahead and set the bmi_addr here */
-    ret = id_gen_safe_register(&(new_ref->bmi_addr), new_ref);
+    id_gen_fast_register(&(new_ref->bmi_addr), new_ref);
     if (ret < 0)
     {
 	dealloc_ref_st(new_ref);
@@ -241,7 +241,7 @@ void dealloc_ref_st(ref_st_p deadref)
 					      deadref->method_addr);
     }
 
-    id_gen_safe_unregister(deadref->bmi_addr);
+    id_gen_fast_unregister(deadref->bmi_addr);
 
     free(deadref);
 }
