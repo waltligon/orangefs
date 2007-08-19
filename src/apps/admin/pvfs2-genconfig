@@ -233,7 +233,7 @@ sub emit_filesystem
         $last_handle, $first_handle, $count,
         $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count) = @_;
 
-    # divide handle range space equally among servers ((2^32)-1 for now)
+    # divide handle range space equally among servers ((2^63)-1 for now)
     my($total_num_handles_available, $start, $end, $i, $step, $num_ranges);
     $num_ranges = $count;
     $total_num_handles_available = $last_handle - $first_handle + 1;
@@ -648,7 +648,7 @@ sub get_last_handle
     if ($opt_last_handle) {
         $last_handle = $opt_last_handle;
     } else {
-        $last_handle = 4294967297;
+        $last_handle = 0x7FFFFFFFFFFFFFFF;  # 2^63
     }
     return $last_handle;
 }
