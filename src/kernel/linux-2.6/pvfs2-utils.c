@@ -101,18 +101,24 @@ PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op)
 static void pvfs2_set_inode_flags(struct inode *inode, 
         PVFS_sys_attr *attrs)
 {
-    if (attrs->flags & PVFS_IMMUTABLE_FL)
+    if (attrs->flags & PVFS_IMMUTABLE_FL) {
         inode->i_flags |= S_IMMUTABLE;
-    else 
+    }
+    else {
         inode->i_flags &= ~S_IMMUTABLE;
-    if (attrs->flags & PVFS_APPEND_FL)
+    }
+    if (attrs->flags & PVFS_APPEND_FL) {
         inode->i_flags |= S_APPEND;
-    else
+    }
+    else {
         inode->i_flags &= ~S_APPEND;
-    if (attrs->flags & PVFS_NOATIME_FL)
+    }
+    if (attrs->flags & PVFS_NOATIME_FL) {
         inode->i_flags |= S_NOATIME;
-    else
+    }
+    else {
         inode->i_flags &= ~S_NOATIME;
+    }
     return;
 }
 
@@ -1781,7 +1787,8 @@ static void *pvfs2_fh_ctor(void)
 {
     void *buf;
 
-    buf = kmalloc(sizeof(pvfs2_opaque_handle_t), PVFS2_BUFMAP_GFP_FLAGS);
+    buf = kmalloc(sizeof(pvfs2_opaque_handle_t), 
+                  PVFS2_BUFMAP_GFP_FLAGS);
     return buf;
 }
 

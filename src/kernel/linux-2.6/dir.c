@@ -32,8 +32,8 @@ static long decode_dirents(char *ptr, pvfs2_readdir_response_t *readdir)
 
     readdir->token = rd->token;
     readdir->pvfs_dirent_outcount = rd->pvfs_dirent_outcount;
-    readdir->dirent_array = (struct pvfs2_dirent *) 
-            kmalloc(readdir->pvfs_dirent_outcount * sizeof(struct pvfs2_dirent), GFP_KERNEL);
+    readdir->dirent_array = kmalloc(readdir->pvfs_dirent_outcount *
+                                    sizeof(*readdir->dirent_array), GFP_KERNEL);
     if (readdir->dirent_array == NULL)
     {
         return -ENOMEM;
@@ -347,8 +347,8 @@ static long decode_sys_attr(char *ptr, pvfs2_readdirplus_response_t *readdirplus
     char *buf = (char *) ptr;
     char **pptr = &buf;
 
-    readdirplus->stat_err_array = (PVFS_error *) 
-        kmalloc(readdirplus->pvfs_dirent_outcount * sizeof(PVFS_error), GFP_KERNEL);
+    readdirplus->stat_err_array = kmalloc(readdirplus->pvfs_dirent_outcount * 
+                                          sizeof(*readdirplus->stat_err_array), GFP_KERNEL);
     if (readdirplus->stat_err_array == NULL)
     {
         return -ENOMEM;
@@ -359,8 +359,8 @@ static long decode_sys_attr(char *ptr, pvfs2_readdirplus_response_t *readdirplus
     {
         *pptr += 4;
     }
-    readdirplus->attr_array = (PVFS_sys_attr *) 
-        kmalloc(readdirplus->pvfs_dirent_outcount * sizeof(PVFS_sys_attr), GFP_KERNEL);
+    readdirplus->attr_array = kmalloc(readdirplus->pvfs_dirent_outcount * 
+                                      sizeof(*readdirplus->attr_array), GFP_KERNEL);
     if (readdirplus->attr_array == NULL)
     {
         return -ENOMEM;

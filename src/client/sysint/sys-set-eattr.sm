@@ -70,6 +70,20 @@ PVFS_error PVFS_isys_seteattr_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_isys_set_eattr entered\n");
 
+    if(gossip_debug_enabled(GOSSIP_SETEATTR_DEBUG))
+    {
+        int i = 0;
+        gossip_debug(GOSSIP_SETEATTR_DEBUG,
+                     "Setting extended attributes:\n");
+        for(; i < nkey; ++i)
+        {
+            gossip_debug(GOSSIP_SETEATTR_DEBUG,
+                         "eattr[%d]: key=%s val=%.*s\n",
+                         i, (char *)key_array[i].buffer,
+                         val_array[i].buffer_sz, (char *)val_array[i].buffer);
+        }
+    }
+
     if ((ref.handle == PVFS_HANDLE_NULL) ||
        (ref.fs_id == PVFS_FS_ID_NULL))
     {

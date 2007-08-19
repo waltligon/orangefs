@@ -26,10 +26,24 @@ enum io_type {
     IO_WRITEX = 1,
 };
 
+struct rw_options;
+
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
     size_t *count, loff_t *ppos);
 #endif
+
+static ssize_t wait_for_direct_io(struct rw_options *rw,
+                                  struct iovec *vec,
+                                  unsigned long  nr_segs,
+                                  size_t total_size);
+
+static ssize_t wait_for_iox(struct rw_options *rw, 
+                            struct iovec *vec,
+                            unsigned long  nr_segs,
+                            struct xtvec *xtvec,
+                            unsigned long xtnr_segs,
+                            size_t total_size);
 
 #define wake_up_daemon_for_return(op)             \
 do {                                              \
@@ -106,8 +120,10 @@ int pvfs2_file_open(
 }
 
 enum dest_type {
-    COPY_TO_ADDRESSES = 0,
-    COPY_TO_PAGES     = 1
+    /* Destination type can be addresses (user or kernel va) */
+    COPY_DEST_ADDRESSES = 0,
+    /* or can be pointers to struct pages */
+    COPY_DEST_PAGES     = 1
 };
 
 struct rw_options {
@@ -122,8 +138,9 @@ struct rw_options {
     pvfs2_inode_t *pvfs2_inode;
     loff_t readahead_size;
     /* whether the destination addresses are in user/kernel */
-    int copy_to_user;
+    int copy_to_user_addresses;
     const char *fnstr;
+    ssize_t count;
     /* Asynch I/O control block */
     struct kiocb *iocb;
     union {
@@ -132,14 +149,28 @@ struct rw_options {
             unsigned long nr_segs;
         } address;
         struct {
+            /* byte-map of which pages are locked down for I/o */
+            unsigned char *pg_byte_map;
+            /* All pages spanning a given I/O operation */
             struct page  **pages;
+            /* count of such pages */
             unsigned long nr_pages;
+            /* Only those pages that need to be fetched */
+            struct page  **issue_pages;
+            /* and the count of such pages */
+            unsigned long nr_issue_pages;
+            /* list of pages for which I/O needs to be 
+             * done as dictated by read_cache_pages 
+             */
+            struct list_head page_list;
         } pages;
     } dest;
     union {
+        /* Contiguous file I/O operations use a single offset */
         struct {
             loff_t        *offset;
         } io;
+        /* Non-contiguous file I/O operations use a vector of offsets */
         struct {
             struct xtvec  *xtvec;
             unsigned long  xtnr_segs;
@@ -148,14 +179,258 @@ struct rw_options {
 };
 
 /*
+ * Copy to client-core's address space from the buffers specified
+ * by the iovec upto total_size bytes.
+ * NOTE: the iovector can either contain addresses which
+ *       can futher be kernel-space or user-space addresses.
+ *       or it can pointers to struct page's
+ * @buffer_index: index used by client-core's buffers
+ * @rw: operation context (read/write) holding the state of the I/O
+ * @vec: iovector
+ * @nr_segs: number of segments in the iovector
+ * @total_size: Total size in bytes to be copied into client-core.
+ */
+static int precopy_buffers(int buffer_index, 
+                           struct rw_options *rw, 
+                           const struct iovec *vec,
+                           unsigned long nr_segs,
+                           size_t total_size)
+{
+    int ret = 0;
+
+    if (rw->type == IO_WRITEV)
+    {
+        /* 
+         * copy data from application/kernel by pulling it out 
+         * of the iovec. NOTE: target buffers can be addresses
+         * or struct page pointers
+         */
+        if (rw->copy_dest_type == COPY_DEST_ADDRESSES) {
+            /* Are we copying from User Virtual Addresses? */
+            if (rw->copy_to_user_addresses)
+            {
+                ret = pvfs_bufmap_copy_iovec_from_user(buffer_index,
+                                                       vec,
+                                                       nr_segs,
+                                                       total_size);
+            }
+            /* Are we copying from Kernel Virtual Addresses? */
+            else {
+                ret = pvfs_bufmap_copy_iovec_from_kernel(buffer_index,
+                                                         vec,
+                                                         nr_segs,
+                                                         total_size);
+            }
+        }
+        else {
+            /* We must be copying from struct page pointers */
+            ret = pvfs_bufmap_copy_from_pages(buffer_index,
+                                              vec,
+                                              nr_segs,
+                                              total_size);
+        }
+        if (ret < 0)
+        {
+            gossip_err("%s: Failed to copy-in buffers. Please make sure "
+                        "that the pvfs2-client is running. %ld\n", 
+                        rw->fnstr, (long) ret);
+        }
+    }
+    return ret;
+}
+
+/*
+ * Copy from client-core's address space to the buffers specified
+ * by the iovec upto total_size bytes.
+ * NOTE: the iovector can either contain addresses which
+ *       can futher be kernel-space or user-space addresses.
+ *       or it can pointers to struct page's
+ * @buffer_index: index used by client-core's buffers
+ * @rw: operation context (read/write) holding the state of the I/O
+ * @vec: iovector
+ * @nr_segs: number of segments in the iovector
+ * @total_size: Total size in bytes to be copied from client-core.
+ */
+static int postcopy_buffers(int buffer_index, struct rw_options *rw,
+        const struct iovec *vec, int nr_segs, size_t total_size)
+{
+    int ret = 0;
+
+    if (rw->type == IO_READV)
+    {
+        /*
+         * copy data to application/kernel by pushing it out to the iovec.
+         * NOTE; target buffers can be addresses or struct page pointers
+         */
+        if (total_size)
+        {
+            if (rw->copy_dest_type == COPY_DEST_ADDRESSES) {
+                /* Are we copying to User Virtual Addresses? */
+                if (rw->copy_to_user_addresses)
+                {
+                    ret = pvfs_bufmap_copy_to_user_iovec(buffer_index, vec, 
+                            nr_segs, total_size);
+
+                }
+                /* Are we copying to Kernel Virtual Addresses? */
+                else
+                {
+                    ret = pvfs_bufmap_copy_to_kernel_iovec(buffer_index, vec,
+                            nr_segs, total_size);
+                }
+            }
+            else {
+                /* We must be copying to struct page pointers */
+                ret = pvfs_bufmap_copy_to_pages(buffer_index, vec,
+                            nr_segs, total_size);
+            }
+            if (ret < 0)
+            {
+                gossip_err("%s: Failed to copy-out buffers.  Please make sure "
+                            "that the pvfs2-client is running (%ld)\n",
+                            rw->fnstr, (long) ret);
+            }
+        }
+    }
+    return ret;
+}
+
+/* Copy from page-cache to application address space 
+ * @rw - operation context, contains information about the I/O operation
+ *       and holds the pointers to the page-cache page array from which
+ *       the copies are to be initiated.
+ * @vec - iovec describing the layout of buffers in user-space
+ * @nr_segs - number of segments in the iovec
+ * @total_actual_io - total size of the buffers to be copied.
+ */
+static int copy_from_pagecache(struct rw_options *rw,
+                               const struct iovec *vec, 
+                               unsigned long nr_segs,
+                               size_t total_actual_io)
+{
+    struct iovec *copied_iovec = NULL;
+    size_t amt_copied = 0, cur_copy_size = 0;
+    int ret = 0;
+    unsigned long seg, page_offset = 0;
+    int index = 0;
+    void __user *to_addr = NULL;
+
+    gossip_debug(GOSSIP_FILE_DEBUG, "copy_from_pagecache: "
+                 "nr_segs %ld, total_actual_io: %zd, total pages %ld\n",
+                 nr_segs, total_actual_io, rw->dest.pages.nr_pages);
+    /*
+     * copy the passed in iovec so that we can change some of its fields
+     */
+    copied_iovec = kmalloc(nr_segs * sizeof(*copied_iovec), 
+                           PVFS2_BUFMAP_GFP_FLAGS);
+    if (copied_iovec == NULL)
+    {
+        gossip_err("copy_from_pagecache: failed allocating memory\n");
+        return -ENOMEM;
+    }
+    memcpy(copied_iovec, vec, nr_segs * sizeof(struct iovec));
+    /*
+     * Go through each segment in the iovec and make sure that
+     * the summation of iov_len is greater than the given size.
+     */
+    for (seg = 0, amt_copied = 0; seg < nr_segs; seg++)
+    {
+        amt_copied += copied_iovec[seg].iov_len;
+    }
+    if (amt_copied < total_actual_io)
+    {
+        gossip_err("copy_from_pagecache: user buffer size (%zd) "
+                   "is less than I/O size (%zd)\n",
+                    amt_copied, total_actual_io);
+        kfree(copied_iovec);
+        return -EINVAL;
+    }
+    index = 0;
+    amt_copied = 0;
+    seg = 0;
+    page_offset = 0;
+    /* 
+     * Go through each segment in the iovec and copy from the page-cache,
+     * but make sure that we do so one page at a time.
+     */
+    while (amt_copied < total_actual_io)
+    {
+	struct iovec *iv = &copied_iovec[seg];
+        int inc_index = 0;
+        void *from_kaddr;
+
+        if (index >= rw->dest.pages.nr_pages) {
+            gossip_err("index cannot exceed number of allocated pages %ld\n", 
+                    (long) rw->dest.pages.nr_pages);
+            kfree(copied_iovec);
+            return -EINVAL;
+        }
+
+        if (iv->iov_len < (PAGE_CACHE_SIZE - page_offset))
+        {
+            cur_copy_size = iv->iov_len;
+            seg++;
+            to_addr = iv->iov_base;
+            inc_index = 0;
+        }
+        else if (iv->iov_len == (PAGE_CACHE_SIZE - page_offset))
+        {
+            cur_copy_size = iv->iov_len;
+            seg++;
+            to_addr = iv->iov_base;
+            inc_index = 1;
+        }
+        else 
+        {
+            cur_copy_size = (PAGE_CACHE_SIZE - page_offset);
+            to_addr = iv->iov_base;
+            iv->iov_base += cur_copy_size;
+            iv->iov_len  -= cur_copy_size;
+            inc_index = 1;
+        }
+#if 0
+        gossip_debug(GOSSIP_FILE_DEBUG, "copy_from_pagecache: copying to "
+                "user %p, kernel page %p\n", to_addr, rw->dest.pages.pages[index]);
+#endif
+        from_kaddr = pvfs2_kmap(rw->dest.pages.pages[index]);
+        ret = copy_to_user(to_addr, from_kaddr + page_offset, cur_copy_size);
+        pvfs2_kunmap(rw->dest.pages.pages[index]);
+#if 0
+        gossip_debug(GOSSIP_FILE_DEBUG, "copy_from_pagecache: copying to user %p from "
+                "kernel %p %d bytes (from_kaddr:%p, page_offset:%d)\n",
+                to_addr, from_kaddr + page_offset, cur_copy_size, from_kaddr, page_offset); 
+#endif
+        if (ret)
+        {
+            gossip_err("Failed to copy data to user space\n");
+            kfree(copied_iovec);
+            return -EFAULT;
+        }
+
+        amt_copied += cur_copy_size;
+        if (inc_index) {
+            page_offset = 0;
+            index++;
+        }
+        else {
+            page_offset += cur_copy_size;
+        }
+    }
+    kfree(copied_iovec);
+    return 0;
+}
+
+/*
  * Post and wait for the I/O upcall to finish
  * @rw - contains state information to initiate the I/O operation
  * @vec- contains the memory vector regions 
  * @nr_segs - number of memory vector regions
  * @total_size - total expected size of the I/O operation
  */
-static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
-        unsigned long nr_segs, size_t total_size)
+static ssize_t wait_for_direct_io(struct rw_options *rw,
+                                  struct iovec *vec,
+                                  unsigned long nr_segs,
+                                  size_t total_size)
 {
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
@@ -178,8 +453,8 @@ static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
     /* synchronous I/O */
     new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; 
     new_op->upcall.req.io.readahead_size = (int32_t) rw->readahead_size;
-    new_op->upcall.req.io.io_type = 
-        (rw->type == IO_READV) ? PVFS_IO_READ : PVFS_IO_WRITE;
+    new_op->upcall.req.io.io_type = (rw->type == IO_READV) ?
+                                     PVFS_IO_READ : PVFS_IO_WRITE;
     new_op->upcall.req.io.refn = rw->pvfs2_inode->refn;
     /* get a shared buffer index */
     ret = pvfs_bufmap_get(&buffer_index);
@@ -196,31 +471,14 @@ static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
     new_op->upcall.req.io.offset = *(rw->off.io.offset);
 
     gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %lu, "
-            "offset: %llu total_size: %zd\n", rw->fnstr, rw->copy_to_user, 
+            "offset: %llu total_size: %zd\n", rw->fnstr, rw->copy_to_user_addresses, 
             nr_segs, llu(*(rw->off.io.offset)), total_size);
-    if (rw->type == IO_WRITEV)
+    /* Stage 1: copy the buffers into client-core's address space */
+    if ((ret = precopy_buffers(buffer_index, rw, vec, nr_segs, total_size)) < 0) 
     {
-        /* 
-         * copy data from application/kernel by pulling it out 
-         * of the iovec.
-         */
-        if (rw->copy_to_user)
-        {
-            ret = pvfs_bufmap_copy_iovec_from_user(
-                    buffer_index, vec, nr_segs, total_size);
-        }
-        else {
-            ret = pvfs_bufmap_copy_iovec_from_kernel(
-                    buffer_index, vec, nr_segs, total_size);
-        }
-        if (ret < 0)
-        {
-            gossip_lerr("Failed to copy-in buffers. Please make sure "
-                        "that the pvfs2-client is running. %ld\n", 
-                        (long) ret);
-            goto out;
-        }
+        goto out;
     }
+    /* Stage 2: Service the I/O operation */
     ret = service_operation(new_op, rw->fnstr,
          get_interruptible_flag(rw->inode));
 
@@ -253,38 +511,18 @@ static ssize_t wait_for_io(struct rw_options *rw, struct iovec *vec,
           }
           goto out;
     }
-
-    if (rw->type == IO_READV)
-    {
-        /*
-         * copy data to application/kernel by pushing it out to the iovec.
+    /* Stage 3: Post copy buffers from client-core's address space */
+    if ((ret = postcopy_buffers(buffer_index, rw, vec, nr_segs, 
+                    new_op->downcall.resp.io.amt_complete)) < 0) {
+        /* put error codes in downcall so that handle_io_error()
+         * preserves it properly 
          */
-        if (new_op->downcall.resp.io.amt_complete)
-        {
-            if (rw->copy_to_user)
-            {
-                ret = pvfs_bufmap_copy_to_user_iovec(buffer_index, vec, 
-                        nr_segs, new_op->downcall.resp.io.amt_complete);
-            }
-            else
-            {
-                ret = pvfs_bufmap_copy_to_kernel_iovec(buffer_index, vec,
-                        nr_segs, new_op->downcall.resp.io.amt_complete);
-            }
-            if (ret < 0)
-            {
-                gossip_lerr("%s: Failed to copy-out buffers.  Please make sure "
-                            "that the pvfs2-client is running (%ld)\n",
-                            rw->fnstr, (long) ret);
-                /* put error codes in downcall so that handle_io_error()
-                 * preserves it properly */
-                new_op->downcall.status = ret;
-                handle_io_error();
-                goto out;
-            }
-        }
+        new_op->downcall.status = ret;
+        handle_io_error();
+        goto out;
     }
     ret = new_op->downcall.resp.io.amt_complete;
+    gossip_debug(GOSSIP_FILE_DEBUG, "wait_for_io returning %ld\n", (long) ret);
     /*
       tell the device file owner waiting on I/O that this read has
       completed and it can return now.  in this exact case, on
@@ -350,7 +588,8 @@ static int split_iovecs(
     *seg_count = 0;
     *seg_array = NULL;
     /* copy the passed in iovec descriptor to a temp structure */
-    orig_iovec = kmalloc(nr_segs * sizeof(*orig_iovec), PVFS2_BUFMAP_GFP_FLAGS);
+    orig_iovec = kmalloc(nr_segs * sizeof(*orig_iovec),
+                         PVFS2_BUFMAP_GFP_FLAGS);
     if (orig_iovec == NULL)
     {
         gossip_err("split_iovecs: Could not allocate memory for %lu bytes!\n", 
@@ -358,7 +597,7 @@ static int split_iovecs(
         return -ENOMEM;
     }
     new_iovec = kzalloc(max_new_nr_segs * sizeof(*new_iovec), 
-            PVFS2_BUFMAP_GFP_FLAGS);
+                        PVFS2_BUFMAP_GFP_FLAGS);
     if (new_iovec == NULL)
     {
         kfree(orig_iovec);
@@ -366,7 +605,8 @@ static int split_iovecs(
                 (unsigned long)(max_new_nr_segs * sizeof(*new_iovec)));
         return -ENOMEM;
     }
-    sizes = kzalloc(max_new_nr_segs * sizeof(*sizes), PVFS2_BUFMAP_GFP_FLAGS);
+    sizes = kzalloc(max_new_nr_segs * sizeof(*sizes),
+                    PVFS2_BUFMAP_GFP_FLAGS);
     if (sizes == NULL)
     {
         kfree(new_iovec);
@@ -431,11 +671,11 @@ repeat:
     return 0;
 }
 
-static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs, size_t *total_count)
+static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs, ssize_t *total_count)
 {
     unsigned long i;
     long max_nr_iovecs;
-    size_t total, count;
+    ssize_t total, count;
 
     total = 0;
     count = 0;
@@ -461,10 +701,465 @@ static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs,
     return max_nr_iovecs;
 }
 
+#define pg_ref_count(pg) atomic_read(&(pg)->_count)
+/*
+ * Cleaning up pages in the cache involves dropping the reference count
+ * while cleaning up pages that were newly allocated involves unlocking
+ * the page after indicating if there was an error in the page.
+ */
+static void cleanup_cache_pages(unsigned long page_idx,
+                                struct rw_options *rw,
+                                int error)
+{
+    unsigned long j;
+
+    gossip_debug(GOSSIP_FILE_DEBUG, "cleaning up %ld memory pages\n", page_idx);
+    /* and pinned existing ones as well */
+    for (j = 0; j < page_idx; j++) {
+        if (rw->dest.pages.pages[j]) {
+            /* if the page was locked for I/O unlock it */
+            if (rw->dest.pages.pg_byte_map[j]) {
+                /* Mark if the page had errors */
+                if (error < 0) {
+                    gossip_lerr("Marking page %ld with error %d\n", j, error);
+                    SetPageError(rw->dest.pages.pages[j]);
+                }
+                /* or if it is indeed uptodate */
+                else {
+                    gossip_debug(GOSSIP_FILE_DEBUG, "Marking page %ld uptodate\n", j);
+                    SetPageUptodate(rw->dest.pages.pages[j]);
+                }
+                unlock_page(rw->dest.pages.pages[j]);
+            } else {
+                /* if it was already cached, decrement its use count */
+                page_cache_release(rw->dest.pages.pages[j]);
+            }
+            gossip_debug(GOSSIP_FILE_DEBUG, "Releasing page %p (refcount %d)\n",
+                    rw->dest.pages.pages[j], pg_ref_count(rw->dest.pages.pages[j]));
+        }
+    }
+    kfree(rw->dest.pages.pages);
+    rw->dest.pages.pages = NULL;
+    rw->dest.pages.nr_pages = 0;
+    kfree(rw->dest.pages.issue_pages);
+    rw->dest.pages.issue_pages = NULL;
+    kfree(rw->dest.pages.pg_byte_map);
+    rw->dest.pages.pg_byte_map = NULL;
+    rw->dest.pages.nr_issue_pages = 0;
+    return;
+}
+
+/* callback from read_cache_pages.
+ * What we are doing is aggregating all the pages in the cache
+ * on which I/O needs to be issued against.
+ * nr_issue_pages is a counter that keeps track of how many such
+ * pages are there and issue_pages is the array that keeps track
+ * of all the pointers to such pages.
+ * All such pages are locked until the I/O completes or an error
+ * happens.
+ */
+static int pvfs2_readpages_fill_cb(void *_data, struct page *page)
+{
+    struct rw_options *rw = (struct rw_options *) _data;
+
+    gossip_debug(GOSSIP_FILE_DEBUG, "nr_issue: %ld page %p\n",
+                 rw->dest.pages.nr_issue_pages, page);
+    rw->dest.pages.issue_pages[rw->dest.pages.nr_issue_pages++] = page;
+    return 0;
+}
+
+/* A debugging function to check the contents of a
+ *  mapping's address space/radix tree
+ */
+static int check_mapping_tree(struct address_space *mapping,
+                              size_t file_size) __attribute__((unused));
+static int check_mapping_tree(struct address_space *mapping,
+                              size_t file_size)
+{
+    unsigned long page_idx, begin_index, end_index, nr_to_read;
+
+    begin_index = 0;
+    end_index = (file_size - 1) >> PAGE_CACHE_SHIFT;
+    nr_to_read = end_index - begin_index + 1;
+    read_lock_irq(&mapping->tree_lock);
+    for (page_idx = 0; page_idx < nr_to_read; page_idx++) {
+        struct page *page;
+        pgoff_t page_offset = begin_index + page_idx;
+
+        if (page_offset > end_index) {
+            break;
+        }
+        page = radix_tree_lookup(&mapping->page_tree, page_offset);
+        if (page) {
+            gossip_debug(GOSSIP_FILE_DEBUG, "check:(%ld) HIT page %p (refcount %d)"
+                                            "(page_offset %ld)\n",
+                                            page_idx, page,
+                                            pg_ref_count(page),
+                                            page_offset);
+        } else {
+            gossip_debug(GOSSIP_FILE_DEBUG, "check: (%ld) MISS (page_offset %ld)\n",
+                                            page_idx, page_offset);
+        }
+    }
+    read_unlock_irq(&mapping->tree_lock);
+    return 0;
+}
+                            
+
+/* Locate the pages of the file blocks from the page-cache and 
+ * store them in the rw_options control block.
+ * Note: if we don't locate, we allocate them.
+ * After that we increment their ref count so that we know for sure that
+ * they won't get swapped out.
+ */
+static int locate_file_pages(struct rw_options *rw, size_t total_size)
+{
+    struct address_space *mapping;
+    loff_t offset, isize;
+    unsigned long page_idx, begin_index, end_index, nr_to_read;
+    int ret = 0;
+    struct page *page;
+    
+    if (!rw ||  !rw->inode || !rw->off.io.offset || 
+        !rw->inode->i_mapping) {
+        gossip_lerr("invalid options\n");
+        return -EINVAL;
+    }
+    isize = i_size_read(rw->inode);
+    rw->copy_dest_type = COPY_DEST_PAGES;
+    /* start with an empty page list */
+    INIT_LIST_HEAD(&rw->dest.pages.page_list);
+    mapping = rw->inode->i_mapping;
+    offset = *(rw->off.io.offset);
+    /* Return if the file size was 0 */
+    if (isize == 0) {
+        rw->dest.pages.nr_pages = 0;
+        rw->dest.pages.pages = NULL;
+        rw->dest.pages.nr_issue_pages = 0;
+        rw->dest.pages.issue_pages = NULL;
+        return 0;
+    }
+    begin_index = offset >> PAGE_CACHE_SHIFT;
+    end_index = (unsigned long) (PVFS_util_min(isize - 1, (offset + total_size - 1))) >> PAGE_CACHE_SHIFT;
+    gossip_debug(GOSSIP_FILE_DEBUG, "filp: %p, inode: %p, mapping: %p\n",
+                                     rw->file, rw->inode, rw->inode->i_mapping);
+    gossip_debug(GOSSIP_FILE_DEBUG, "isize: %ld, offset (%ld) + total_size (%ld): %ld\n",
+                                     (long) isize, 
+                                     (long) offset,
+                                     (long) total_size, 
+                                     (long) offset + total_size);
+    gossip_debug(GOSSIP_FILE_DEBUG, "offset %lld, begin_index: %ld "
+                                    "end_index: %ld requested total_size: %zd\n",
+                                     offset, begin_index,
+                                     end_index, total_size);
+    nr_to_read = end_index - begin_index + 1;
+    rw->dest.pages.nr_pages = nr_to_read;
+    /* Allocate a byte map for all the pages */
+    rw->dest.pages.pg_byte_map = kzalloc(nr_to_read *
+                                         sizeof(*rw->dest.pages.pg_byte_map),
+                                         PVFS2_BUFMAP_GFP_FLAGS);
+    if (!rw->dest.pages.pg_byte_map) {
+        gossip_err("could not allocate memory\n");
+        return -ENOMEM;
+    }
+    /* and the array to hold the page pointers */
+    rw->dest.pages.pages = kzalloc(nr_to_read * sizeof(*rw->dest.pages.pages), 
+                                   PVFS2_BUFMAP_GFP_FLAGS);
+    if (!rw->dest.pages.pages) {
+        gossip_err("could not allocate memory\n");
+        kfree(rw->dest.pages.pg_byte_map);
+        return -ENOMEM;
+    }
+    gossip_debug(GOSSIP_FILE_DEBUG, "read %ld pages\n",
+            nr_to_read);
+
+    read_lock_irq(&mapping->tree_lock);
+    /* Preallocate all pages, increase their ref counts if they are in cache */
+    for (page_idx = 0; page_idx < nr_to_read; page_idx++) {
+        pgoff_t page_offset = begin_index + page_idx;
+
+        if (page_offset > end_index) {
+            break;
+        }
+        page = radix_tree_lookup(&mapping->page_tree, page_offset);
+        if (page) {
+            page_cache_get(page);
+            gossip_debug(GOSSIP_FILE_DEBUG, "(%ld) HIT page %p (refcount %d)"
+                                            "(page_offset %ld)\n",
+                                            page_idx, page,
+                                            pg_ref_count(page),
+                                            page_offset);
+            rw->dest.pages.pages[page_idx] = page;
+            g_pvfs2_stats.cache_hits++;
+            continue;
+        }
+        g_pvfs2_stats.cache_misses++;
+        read_unlock_irq(&mapping->tree_lock);
+        /* Allocate, but don't add it to the LRU list yet */
+        page = page_cache_alloc_cold(mapping);
+        read_lock_irq(&mapping->tree_lock);
+        if (!page) {
+            ret = -ENOMEM;
+            gossip_err("could not allocate page cache\n");
+            break;
+        }
+        page_cache_get(page);
+        gossip_debug(GOSSIP_FILE_DEBUG, "(%ld) MISS page %p (refcount %d)"
+                                        "(page_offset %ld)\n",
+                                        page_idx, page,
+                                        pg_ref_count(page),
+                                        page_offset);
+        page->index = page_offset;
+        /* Add it to our internal private list */
+        list_add(&page->lru, &rw->dest.pages.page_list);
+        rw->dest.pages.pages[page_idx] = page;
+        /* mark in the byte map */
+        rw->dest.pages.pg_byte_map[page_idx] = 1;
+        ret++;
+    }
+    read_unlock_irq(&mapping->tree_lock);
+    /* cleanup in case of error */
+    if (ret < 0) {
+        gossip_err("could not page_cache_alloc_cold\n");
+        goto cleanup;
+    }
+    rw->dest.pages.nr_issue_pages = 0;
+    /* if there is any need to issue I/O */
+    if (ret > 0)
+    {
+        /* Allocate memory for the pages against which I/O needs to be issued */
+        rw->dest.pages.issue_pages = kzalloc(ret * 
+                                             sizeof(*rw->dest.pages.issue_pages), 
+                                             PVFS2_BUFMAP_GFP_FLAGS);
+        if (!rw->dest.pages.issue_pages) {
+            gossip_err("could not allocate memory for issue_pages\n");
+            ret = -ENOMEM;
+            goto cleanup;
+        }
+        gossip_debug(GOSSIP_FILE_DEBUG, "issue %d I/O\n", ret);
+        /* read_cache_pages can now be called on the list of pages */
+        read_cache_pages(mapping, &rw->dest.pages.page_list, 
+                               pvfs2_readpages_fill_cb, rw);
+        BUG_ON(!list_empty(&rw->dest.pages.page_list));
+        /* 
+         * A failed read_cache_pages will be
+         * indicated if
+         * rw->dest.pages.nr_issues_pages != ret
+         */
+        if (rw->dest.pages.nr_issue_pages != ret) {
+            gossip_err("read_cache_pages failed (%ld != %d)\n",
+                 rw->dest.pages.nr_issue_pages, ret);
+            ret = -ENOMEM;
+            goto cleanup;
+        }
+    }
+out:
+    return ret;
+cleanup:
+    /* cleanup any of the allocated pagecache pages */
+    cleanup_cache_pages(page_idx, rw, ret);
+    goto out;
+}
+
+/*
+ * Given an array of pages and a count of such pages, this function
+ * returns
+ * an error if the parameters/pages are invalid/similar
+ * 0 if the pages are not contiguous on the file
+ * 1 if the pages are contiguous on file
+ */
+static int are_contiguous(int nr_pages, struct page **page_array)
+{
+    int i;
+    pgoff_t fpoffset;
+    if (!page_array || nr_pages <= 0) {
+        gossip_err("Bogus parameters %d, page_array: %p\n", nr_pages, page_array);
+        return -EINVAL;
+    }
+    if (!page_array[0]) {
+        gossip_err("Bogus parameters %p\n", page_array[0]);
+        return -EINVAL;
+    }
+    fpoffset = page_array[0]->index;
+    for (i = 1; i < nr_pages; i++) {
+        if (!page_array[i]) {
+            return -EINVAL;
+        }
+        if (page_array[i]->index == fpoffset) {
+            gossip_err("2 pages have the same file offset (index 0 and %d)\n",
+                    i);
+            return -EINVAL;
+        }
+        /* not contiguous on file */
+        if (page_array[i]->index != fpoffset + i) {
+            gossip_debug(GOSSIP_FILE_DEBUG, "offset at index %d is non-contiguous\n", i);
+            return 0;
+        }
+    }
+    /* Cool. they are all contiguous */
+    return 1;
+}
+
+/* Issue any I/O for regions not found in the cache 
+ * NOTE: Try to be smart about whether to issue non-contiguous I/O
+ * or contiguous I/O.
+ */
+static ssize_t wait_for_missing_io(struct rw_options *rw)
+{
+    ssize_t err = 0;
+
+    if (rw->dest.pages.nr_issue_pages) {
+        int contig_on_file = 0;
+
+        gossip_debug(GOSSIP_FILE_DEBUG, "Number of pages for I/O issue %ld, total_size: %ld\n", 
+                rw->dest.pages.nr_issue_pages, (rw->dest.pages.nr_issue_pages << PAGE_CACHE_SHIFT));
+        /* scan through the issue pages array and see if we can submit a direct
+         * contiguous request first.
+         */
+        contig_on_file = are_contiguous(rw->dest.pages.nr_issue_pages,
+                rw->dest.pages.issue_pages);
+        /* Any errors? */
+        if (contig_on_file < 0) {
+            err = contig_on_file;
+            goto out;
+        }
+        /* contiguous or non-contiguous on file */
+        else {
+            struct iovec *uncached_vec = NULL;
+            struct xtvec *uncached_xtvec = NULL;
+            int i;
+            size_t total_requested_io;
+
+            total_requested_io = (rw->dest.pages.nr_issue_pages << PAGE_CACHE_SHIFT);
+            uncached_vec = kzalloc(rw->dest.pages.nr_issue_pages *
+                                   sizeof(*uncached_vec), PVFS2_BUFMAP_GFP_FLAGS);
+            if (!uncached_vec) {
+                gossip_err("out of memory allocating uncached_vec\n");
+                err = -ENOMEM;
+                goto out;
+            }
+            if (!contig_on_file)
+            {
+                uncached_xtvec = kzalloc(rw->dest.pages.nr_issue_pages * 
+                                         sizeof(*uncached_xtvec), PVFS2_BUFMAP_GFP_FLAGS);
+                if (!uncached_xtvec) {
+                    gossip_err("out of memory allocating uncached_xtvec\n");
+                    kfree(uncached_vec);
+                    err = -ENOMEM;
+                    goto out;
+                }
+            }
+            for (i = 0; i < rw->dest.pages.nr_issue_pages; i++) {
+                uncached_vec[i].iov_base = rw->dest.pages.issue_pages[i];
+                uncached_vec[i].iov_len = PAGE_CACHE_SIZE;
+#if 0
+                gossip_debug(GOSSIP_FILE_DEBUG, "ISSUE: (%d) "
+                        "iov_base: %p, iov_len: %zd \n",
+                        i, uncached_vec[i].iov_base, 
+                        uncached_vec[i].iov_len);
+#endif
+                if (!contig_on_file)
+                {
+                    uncached_xtvec[i].xtv_off = 
+                        (rw->dest.pages.issue_pages[i]->index << PAGE_CACHE_SHIFT);
+                    uncached_xtvec[i].xtv_len = PAGE_CACHE_SIZE;
+                    gossip_debug(GOSSIP_FILE_DEBUG, 
+                            "(%d) xtv_off = %zd, xtv_len = %zd\n",
+                            i, (size_t) uncached_xtvec[i].xtv_off, 
+                            uncached_xtvec[i].xtv_len);
+                }
+            }
+            /* if all page cache pages are contiguous on file */
+            if (contig_on_file) {
+                /* issue a simple direct contiguous I/O call */
+                err = wait_for_direct_io(rw,
+                                         uncached_vec,
+                                         rw->dest.pages.nr_issue_pages,
+                                         total_requested_io);
+            }
+            else {
+                /* else issue a complicated non-contig I/O call */
+                err = wait_for_iox(rw, 
+                                   uncached_vec, 
+                                   rw->dest.pages.nr_issue_pages, 
+                                   uncached_xtvec,
+                                   rw->dest.pages.nr_issue_pages, 
+                                   total_requested_io);
+                kfree(uncached_xtvec);
+            }
+            kfree(uncached_vec);
+            if (err < 0) {
+                gossip_err("failed with error %zd\n",
+                        (size_t) err);
+                goto out;
+            }
+            gossip_debug(GOSSIP_FILE_DEBUG, "wait_for_missing_io: "
+                    "transferred %zd, requested %zd\n",
+                     (size_t) err, total_requested_io);
+        }
+    }
+out:
+    return err;
+}
+
+/*
+ * NOTE: Currently only immutable files pass their I/O
+ * through the cache.
+ * Preparation for cached I/O requires that we locate all the file block
+ * in the page-cache and stashing those pointers.
+ * Returns the actual size of completed I/O.
+ */
+static ssize_t wait_for_cached_io(struct rw_options *old_rw, struct iovec *vec, 
+        int nr_segs, size_t total_size)
+{
+    ssize_t err = 0, total_actual_io;
+    struct rw_options rw;
+    loff_t isize, offset;
+
+    memcpy(&rw, old_rw, sizeof(struct rw_options));
+    if (rw.type != IO_READV) {
+        gossip_err("writes are not handled yet!\n");
+        return -EOPNOTSUPP;
+    }
+    offset = *(rw.off.io.offset);
+    isize = i_size_read(rw.inode);
+    /* If our file offset was greater than file size, we should return 0 */
+    if (offset >= isize) {
+        return 0;
+    }
+    /* (Al)locate all the pages in the pagecache first */
+    if ((err = locate_file_pages(&rw, total_size)) < 0) {
+        gossip_err("error in locating pages %ld\n", (long) err);
+        return err;
+    }
+    gossip_debug(GOSSIP_FILE_DEBUG, "total_size %zd, total # of pages %ld\n",
+            total_size, rw.dest.pages.nr_pages);
+    /* Issue and wait for I/O only for pages that are not uptodate 
+     * or are not found in the cache 
+     */
+    if ((err = wait_for_missing_io(&rw)) < 0) {
+        gossip_err("wait_for_missing_io: error in waiting for missing I/O %ld\n", (long) err);
+        goto cleanup;
+    }
+    /* return value is basically file size minus current file offset */
+    total_actual_io = isize - offset;
+    gossip_debug(GOSSIP_FILE_DEBUG, "total_actual_io to be staged from page-cache %zd\n", total_actual_io);
+    /* Copy the data from the page-cache to the application's address space */
+    err = copy_from_pagecache(&rw, vec, nr_segs, total_actual_io);
+    err = 0;
+cleanup:
+    cleanup_cache_pages(rw.dest.pages.nr_pages, &rw, err);
+    return err == 0 ? total_actual_io : err;
+}
+
 /*
  * Common entry point for read/write/readv/writev
+ * This function will dispatch it to either the direct I/O
+ * or buffered I/O path depending on the mount options and/or
+ * augmented/extended metadata attached to the file.
+ * Note: File extended attributes override any mount options.
  */
-static ssize_t do_direct_readv_writev(struct rw_options *rw)
+static ssize_t do_readv_writev(struct rw_options *rw)
 {
     ssize_t ret, total_count;
     struct inode *inode = NULL;
@@ -556,6 +1251,7 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
         ret = 0;
         goto out;
     }
+    rw->count = count;
     /*
      * if the total size of data transfer requested is greater than
      * the kernel-set blocksize of PVFS2, then we split the iovecs
@@ -630,8 +1326,16 @@ static ssize_t do_direct_readv_writev(struct rw_options *rw)
         /* how much to transfer in this loop iteration */
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
-        /* and push the I/O through */
-        ret = wait_for_io(rw, ptr, seg_array[seg], each_count);
+        /* if a file is immutable, stage its I/O 
+         * through the cache */
+        if (IS_IMMUTABLE(rw->inode)) {
+            /* Stage the I/O through the kernel's pagecache */
+            ret = wait_for_cached_io(rw, ptr, seg_array[seg], each_count);
+        }
+        else {
+            /* push the I/O directly through to storage */
+            ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
+        }
         if (ret < 0)
         {
             goto out;
@@ -695,9 +1399,9 @@ ssize_t pvfs2_inode_read(
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_READ;
-    rw.copy_dest_type = COPY_TO_ADDRESSES;
+    rw.copy_dest_type = COPY_DEST_ADDRESSES;
     rw.readahead_size = readahead_size;
-    rw.copy_to_user = copy_to_user;
+    rw.copy_to_user_addresses = copy_to_user;
     rw.fnstr = __FUNCTION__;
     vec.iov_base = buf;
     vec.iov_len  = count;
@@ -707,7 +1411,8 @@ ssize_t pvfs2_inode_read(
     rw.dest.address.iov = &vec;
     rw.dest.address.nr_segs = 1;
     rw.off.io.offset = offset;
-    return do_direct_readv_writev(&rw); 
+    g_pvfs2_stats.reads++;
+    return do_readv_writev(&rw); 
 }
 
 /** Read data from a specified offset in a file into a user buffer.
@@ -724,8 +1429,8 @@ ssize_t pvfs2_file_read(
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_READ;
-    rw.copy_dest_type = COPY_TO_ADDRESSES;
-    rw.copy_to_user = 1;
+    rw.copy_dest_type = COPY_DEST_ADDRESSES;
+    rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     vec.iov_base = buf;
     vec.iov_len  = count;
@@ -739,13 +1444,13 @@ ssize_t pvfs2_file_read(
     if (IS_IMMUTABLE(rw.inode)) 
     {
         rw.readahead_size = (rw.inode)->i_size;
-        return do_sync_read(file, buf, count, offset);
     }
     else 
     {
         rw.readahead_size = 0;
-        return do_direct_readv_writev(&rw);
     }
+    g_pvfs2_stats.reads++;
+    return do_readv_writev(&rw);
 }
 
 /** Write data from a contiguous user buffer into a file at a specified
@@ -763,9 +1468,9 @@ static ssize_t pvfs2_file_write(
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_WRITE;
-    rw.copy_dest_type = COPY_TO_ADDRESSES;
+    rw.copy_dest_type = COPY_DEST_ADDRESSES;
     rw.readahead_size = 0;
-    rw.copy_to_user = 1;
+    rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     vec.iov_base  = (char *) buf;
     vec.iov_len   = count;
@@ -775,7 +1480,8 @@ static ssize_t pvfs2_file_write(
     rw.dest.address.iov = &vec;
     rw.dest.address.nr_segs = 1;
     rw.off.io.offset = offset;
-    return do_direct_readv_writev(&rw);
+    g_pvfs2_stats.writes++;
+    return do_readv_writev(&rw);
 }
 
 /* compat code, < 2.6.19 */
@@ -794,8 +1500,8 @@ static ssize_t pvfs2_file_readv(
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_READV;
-    rw.copy_dest_type = COPY_TO_ADDRESSES;
-    rw.copy_to_user = 1;
+    rw.copy_dest_type = COPY_DEST_ADDRESSES;
+    rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     rw.inode = file->f_dentry->d_inode;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
@@ -803,9 +1509,9 @@ static ssize_t pvfs2_file_readv(
     rw.dest.address.iov = (struct iovec *) iov;
     rw.dest.address.nr_segs = nr_segs;
     rw.off.io.offset = offset;
-
     rw.readahead_size = 0;
-    return do_direct_readv_writev(&rw);
+    g_pvfs2_stats.reads++;
+    return do_readv_writev(&rw);
 }
 
 /** Write data from a several contiguous user buffers (an iovec) into a file at
@@ -822,9 +1528,9 @@ static ssize_t pvfs2_file_writev(
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_WRITEV;
-    rw.copy_dest_type = COPY_TO_ADDRESSES;
+    rw.copy_dest_type = COPY_DEST_ADDRESSES;
     rw.readahead_size = 0;
-    rw.copy_to_user = 1;
+    rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     rw.file = file;
     rw.inode = file->f_dentry->d_inode;
@@ -833,7 +1539,8 @@ static ssize_t pvfs2_file_writev(
     rw.dest.address.nr_segs = nr_segs;
     rw.off.io.offset = offset;
 
-    return do_direct_readv_writev(&rw);
+    g_pvfs2_stats.writes++;
+    return do_readv_writev(&rw);
 }
 #endif
 
@@ -1086,34 +1793,17 @@ static ssize_t wait_for_iox(struct rw_options *rw,
     }
     gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %lu, "
             "xtnr_segs: %lu "
-            "total_size: %zd\n",
-            rw->fnstr, rw->copy_to_user, 
+            "total_size: %zd "
+            "copy_dst_type %d\n",
+            rw->fnstr, rw->copy_to_user_addresses, 
             nr_segs, xtnr_segs,
-            total_size);
+            total_size, rw->copy_dest_type);
 
-    if (rw->type == IO_WRITEX)
-    {
-        /* copy data from application by pulling it out
-         * of the iovec.
-         */
-        if (rw->copy_to_user)
-        {
-            ret = pvfs_bufmap_copy_iovec_from_user(
-                    buffer_index, vec, nr_segs, total_size);
-        }
-        else {
-            ret = pvfs_bufmap_copy_iovec_from_kernel(
-                    buffer_index, vec, nr_segs, total_size);
-        }
-        if (ret < 0)
-        {
-            gossip_lerr("%s: failed to copy-in user buffer. Please make sure "
-                    " that the pvfs2-client is running. %ld\n",
-                    rw->fnstr, (long) ret);
-            goto out;
-        }
+    /* Stage 1: Copy in buffers */
+    if ((ret = precopy_buffers(buffer_index, rw, vec, nr_segs, total_size)) < 0) {
+        goto out;
     }
-    /* whew! finally service this operation */
+    /* Stage 2: whew! finally service this operation */
     ret = service_operation(new_op, rw->fnstr,
             get_interruptible_flag(rw->inode));
     if (ret < 0)
@@ -1147,34 +1837,14 @@ static ssize_t wait_for_iox(struct rw_options *rw,
     }
     gossip_debug(GOSSIP_FILE_DEBUG, "downcall returned %lld\n",
             llu(new_op->downcall.resp.iox.amt_complete));
-    if (rw->type == IO_READX)
-    {
-        /* copy data to application by pushing it out to the iovec.
-         */
-        if (new_op->downcall.resp.iox.amt_complete)
-        {
-            if (rw->copy_to_user)
-            {
-                ret = pvfs_bufmap_copy_to_user_iovec(buffer_index, vec,
-                        nr_segs, new_op->downcall.resp.iox.amt_complete);
-            }
-            else
-            {
-                ret = pvfs_bufmap_copy_to_kernel_iovec(buffer_index, vec, 
-                        nr_segs, new_op->downcall.resp.iox.amt_complete);
-            }
-            if (ret < 0)
-            {
-                gossip_lerr("%s: failed to copy-out user buffers. Please make sure "
-                        " that the pvfs2-client is running. (%ld)\n", 
-                        rw->fnstr, (long) ret);
-                /* put error codes in downcall so that handle_io_error()
-                 * preserves it properly */
-                new_op->downcall.status = ret;
-                handle_io_error();
-                goto out;
-            }
-        }
+    /* Stage 3: Post copy buffers */
+    if ((ret = postcopy_buffers(buffer_index, rw, vec, nr_segs, 
+                    new_op->downcall.resp.iox.amt_complete)) < 0) {
+        /* put error codes in downcall so that handle_io_error()
+         * preserves it properly */
+        new_op->downcall.status = ret;
+        handle_io_error();
+        goto out;
     }
     ret = new_op->downcall.resp.iox.amt_complete;
     gossip_debug(GOSSIP_FILE_DEBUG, "wait_for_iox returning %ld\n", (long) ret);
@@ -1203,7 +1873,7 @@ out:
     return ret;
 }
 
-static ssize_t do_direct_readx_writex(struct rw_options *rw)
+static ssize_t do_readx_writex(struct rw_options *rw)
 {
     ssize_t ret, total_count;
     size_t count_mem, count_stream;
@@ -1385,7 +2055,7 @@ static ssize_t do_direct_readx_writex(struct rw_options *rw)
         /* how much to transfer in this loop iteration */
         each_count = (((count_mem - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count_mem - total_count));
-        /* and push the I/O through */
+        /* and push the I/O directly through to the servers */
         ret = wait_for_iox(rw, ptr, seg_array_mem[seg],
                 xptr, seg_array_stream[seg], each_count);
         if (ret < 0)
@@ -1456,8 +2126,8 @@ static ssize_t pvfs2_file_readx(
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_READX;
-    rw.copy_dest_type = COPY_TO_ADDRESSES;
-    rw.copy_to_user = 1;
+    rw.copy_dest_type = COPY_DEST_ADDRESSES;
+    rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     rw.inode = file->f_dentry->d_inode;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
@@ -1466,8 +2136,8 @@ static ssize_t pvfs2_file_readx(
     rw.dest.address.nr_segs = nr_segs;
     rw.off.iox.xtvec = (struct xtvec *) xtvec;
     rw.off.iox.xtnr_segs = xtnr_segs;
-
-    return do_direct_readx_writex(&rw);
+    g_pvfs2_stats.reads++;
+    return do_readx_writex(&rw);
 }
 
 #ifndef HAVE_WRITEX_FILE_OPERATIONS
@@ -1490,8 +2160,8 @@ static ssize_t pvfs2_file_writex(
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_WRITEX;
-    rw.copy_dest_type = COPY_TO_ADDRESSES;
-    rw.copy_to_user = 1;
+    rw.copy_dest_type = COPY_DEST_ADDRESSES;
+    rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     rw.inode = file->f_dentry->d_inode;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
@@ -1500,8 +2170,8 @@ static ssize_t pvfs2_file_writex(
     rw.dest.address.nr_segs = nr_segs;
     rw.off.iox.xtvec = (struct xtvec *) xtvec;
     rw.off.iox.xtnr_segs = xtnr_segs;
-
-    return do_direct_readx_writex(&rw);
+    g_pvfs2_stats.writes++;
+    return do_readx_writex(&rw);
 }
 
 #ifdef HAVE_AIO_VFS_SUPPORT
@@ -1874,7 +2544,7 @@ fill_default_kiocb(pvfs2_kiocb *x,
  * context (i.e. the client daemon).
  * TODO: We do not handle vectored aio requests yet
  */
-static ssize_t do_direct_aio_read_write(struct rw_options *rw)
+static ssize_t do_aio_read_write(struct rw_options *rw)
 {
     struct file *filp;
     struct inode *inode;
@@ -1938,7 +2608,7 @@ static ssize_t do_direct_aio_read_write(struct rw_options *rw)
     /* synchronous I/O */
     if (!rw->async)
     {
-        error = do_direct_readv_writev(rw);
+        error = do_readv_writev(rw);
         goto out_error;
     }
     /* Asynchronous I/O */
@@ -2099,13 +2769,12 @@ static ssize_t pvfs2_file_aio_read_iovec(struct kiocb *iocb,
                                          unsigned long nr_segs, loff_t offset)
 {
     struct rw_options rw;
-
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
     rw.type = IO_READ;
-    rw.copy_dest_type = COPY_TO_ADDRESSES;
+    rw.copy_dest_type = COPY_DEST_ADDRESSES;
     rw.off.io.offset = &offset;
-    rw.copy_to_user = 1;
+    rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     rw.iocb = iocb;
     rw.file = iocb->ki_filp;
@@ -2117,23 +2786,9 @@ static ssize_t pvfs2_file_aio_read_iovec(struct kiocb *iocb,
     rw.pvfs2_inode = PVFS2_I(rw.inode);
     rw.dest.address.iov = iov;
     rw.dest.address.nr_segs = nr_segs;
-
-    if (IS_IMMUTABLE(rw.inode)) 
-    {
-        rw.readahead_size = (rw.inode)->i_size;
-#ifdef HAVE_COMBINED_AIO_AND_VECTOR
-        return generic_file_aio_read(iocb, iov, nr_segs, offset);
-#else
-        /* compatibility code; know nr_segs == 1 as only caller is the
-         * compat function below */
-        return generic_file_aio_read(iocb, iov->iov_base, iov->iov_len, offset);
-#endif
-    }
-    else 
-    {
-        rw.readahead_size = 0;
-        return do_direct_aio_read_write(&rw);
-    }
+    rw.readahead_size = 0;
+    g_pvfs2_stats.reads++;
+    return do_aio_read_write(&rw);
 }
 
 static ssize_t pvfs2_file_aio_write_iovec(struct kiocb *iocb,
@@ -2145,10 +2800,10 @@ static ssize_t pvfs2_file_aio_write_iovec(struct kiocb *iocb,
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
     rw.type = IO_WRITE;
-    rw.copy_dest_type = COPY_TO_ADDRESSES;
+    rw.copy_dest_type = COPY_DEST_ADDRESSES;
     rw.readahead_size = 0;
     rw.off.io.offset = &offset;
-    rw.copy_to_user = 1;
+    rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     rw.iocb = iocb;
     rw.file = iocb->ki_filp;
@@ -2160,7 +2815,8 @@ static ssize_t pvfs2_file_aio_write_iovec(struct kiocb *iocb,
     rw.pvfs2_inode = PVFS2_I(rw.inode);
     rw.dest.address.iov = iov;
     rw.dest.address.nr_segs = nr_segs;
-    return do_direct_aio_read_write(&rw);
+    g_pvfs2_stats.writes++;
+    return do_aio_read_write(&rw);
 }
 
 /* compat functions for < 2.6.19 */

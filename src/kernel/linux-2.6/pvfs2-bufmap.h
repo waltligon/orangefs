@@ -80,6 +80,18 @@ int pvfs_bufmap_copy_to_kernel(
     int buffer_index,
     size_t size);
 
+int pvfs_bufmap_copy_to_pages(
+    int buffer_index, 
+    const struct iovec *vec, 
+    unsigned long nr_segs, 
+    size_t size);
+
+int pvfs_bufmap_copy_from_pages(
+    int buffer_index, 
+    const struct iovec *vec, 
+    unsigned long nr_segs, 
+    size_t size);
+
 #ifdef HAVE_AIO_VFS_SUPPORT
 size_t pvfs_bufmap_copy_to_user_task(
         struct task_struct *tsk,

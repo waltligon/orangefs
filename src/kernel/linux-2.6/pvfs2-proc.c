@@ -360,6 +360,46 @@ static ctl_table pvfs2_pc_table[] = {
     },
     {0}
 };
+
+pvfs2_stats g_pvfs2_stats;
+
+static ctl_table pvfs2_stats_table[] = {
+    /* shows number of hits in cache */
+    {
+        .ctl_name = 1,
+        .procname = "hits",
+        .data     = &g_pvfs2_stats.cache_hits,
+        .maxlen   = sizeof(unsigned long),
+        .mode     = 0444,
+        .proc_handler = &proc_dointvec,
+    },
+    {
+        .ctl_name = 2,
+        .procname = "misses",
+        .data     = &g_pvfs2_stats.cache_misses,
+        .maxlen   = sizeof(unsigned long),
+        .mode     = 0444,
+        .proc_handler = &proc_dointvec,
+    },
+    {
+        .ctl_name = 3,
+        .procname = "reads",
+        .data     = &g_pvfs2_stats.reads,
+        .maxlen   = sizeof(unsigned long),
+        .mode     = 0444,
+        .proc_handler = &proc_dointvec,
+    },
+    {
+        .ctl_name = 4,
+        .procname = "writes",
+        .data     = &g_pvfs2_stats.writes,
+        .maxlen   = sizeof(unsigned long),
+        .mode     = 0444,
+        .proc_handler = &proc_dointvec,
+    },
+    {.ctl_name = 0},
+};
+
 static ctl_table pvfs2_table[] = {
     /* controls debugging level */
     {
@@ -434,6 +474,14 @@ static ctl_table pvfs2_table[] = {
         .maxlen = 0,
         .mode = 0555,
         .child = pvfs2_ncache_table
+    },
+    /* statistics maintained by the kernel module (output only below this) */
+    {
+        .ctl_name = 9,
+        .procname = "stats",
+        .maxlen = 0,
+        .mode = 0555,
+        .child = pvfs2_stats_table
     },
     {0}
 };

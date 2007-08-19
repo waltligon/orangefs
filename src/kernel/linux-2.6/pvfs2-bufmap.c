@@ -59,7 +59,8 @@ static int initialize_bufmap_descriptors(int ndescs)
         goto out;
     }
 
-    desc_array = kmalloc(ndescs * sizeof(*desc_array), PVFS2_BUFMAP_GFP_FLAGS);
+    desc_array = kmalloc(ndescs * sizeof(*desc_array),
+                         PVFS2_BUFMAP_GFP_FLAGS);
     if (desc_array == NULL)
     {
         gossip_err("pvfs2: could not allocate %d bytes\n",
@@ -161,9 +162,8 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     }
 
     /* allocate storage to track our page mappings */
-    bufmap_page_array = (struct page **)
-                         kmalloc(bufmap_page_count * sizeof(struct page *),
-                                 PVFS2_BUFMAP_GFP_FLAGS);
+    bufmap_page_array = kmalloc(bufmap_page_count * sizeof(*bufmap_page_array), 
+                                PVFS2_BUFMAP_GFP_FLAGS);
     if (!bufmap_page_array)
     {
         ret = -ENOMEM;
@@ -565,6 +565,142 @@ int pvfs_bufmap_copy_from_user(
     return 0;
 }
 
+/*
+ * pvfs_bufmap_copy_to_pages() 
+ *
+ * Copies data from client-core's address space to the specified 
+ * pages (typically page-cache pages) for a specified size and 
+ * number of pages.
+ * NOTE: iovec is expected to store pointers to struct page
+ */
+int pvfs_bufmap_copy_to_pages(int buffer_index,
+                              const struct iovec *vec, 
+                              unsigned long nr_segs,
+                              size_t size)
+{
+    size_t amt_copied = 0, amt_remaining = 0, cur_copy_size = 0;
+    int index = 0;
+    void *from_kaddr = NULL, *to_kaddr = NULL;
+    struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
+    struct page *page;
+
+    gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_pages: nr_pages %lu,"
+                 "index %d, size %zd\n", nr_segs, buffer_index, size);
+
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_copy_to_pages: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client is running.\n");
+        return -EIO;
+    }
+
+    while (amt_copied < size)
+    {
+        if (index >= nr_segs) 
+        {
+            gossip_err("pvfs_bufmap_copy_to_pages: count cannot exceed "
+                       "number of pages(%lu)\n", nr_segs);
+            return -EIO;
+        }
+        page = (struct page *) vec[index].iov_base;
+        if (page == NULL) {
+            gossip_err("pvfs_bufmap_copy_to_pages: invalid page pointer %d\n",
+                        index);
+            return -EIO;
+        }
+        amt_remaining = (size - amt_copied);
+        cur_copy_size = ((amt_remaining > PAGE_SIZE) ? 
+                          PAGE_SIZE : amt_remaining);
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_pages:"
+                                          "from_page: %p, to_page: %p\n",
+                                          from->page_array[index], page);
+
+        from_kaddr = pvfs2_kmap(from->page_array[index]);
+        to_kaddr = pvfs2_kmap(page);
+#if 0
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_pages -> "
+                     "to_kaddr: %p, from_kaddr:%p, cur_copy_size: %d\n",
+                     to_kaddr, from_kaddr, cur_copy_size);
+#endif
+        memcpy(to_kaddr, from_kaddr, cur_copy_size);
+        /* zero out remaining page */
+        if (cur_copy_size < PAGE_SIZE) {
+            memset(to_kaddr + cur_copy_size, 0, PAGE_SIZE - cur_copy_size);
+        }
+        pvfs2_kunmap(page);
+        pvfs2_kunmap(from->page_array[index]);
+
+        amt_copied += cur_copy_size;
+        index++;
+    }
+    return 0;
+}
+
+/*
+ * pvfs_bufmap_copy_from_pages() 
+ *
+ * Copies data to client-core's address space from the specified target 
+ * pages (typically the kernel's page-cache)
+ * for a given size and number of pages.
+ * NOTE: iovec is expected to store pointers to struct page
+ */
+int pvfs_bufmap_copy_from_pages(int buffer_index, 
+                                const struct iovec *vec,
+                                unsigned long nr_segs,
+                                size_t size)
+{
+    size_t amt_copied = 0, amt_remaining = 0, cur_copy_size = 0;
+    int index = 0;
+    void *from_kaddr = NULL, *to_kaddr = NULL;
+    struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
+    struct page *page;
+
+    gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_from_pages: nr_pages %lu "
+            "index %d, size %zd\n", nr_segs, buffer_index, size);
+
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_copy_from_pages: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client is running.\n");
+        return -EIO;
+    }
+
+    while (amt_copied < size)
+    {
+        if (index >= nr_segs) {
+            gossip_err("pvfs_bufmap_copy_from_pages: count cannot exceed number of"
+                       "pages(%lu)\n", nr_segs);
+            return -EIO;
+        }
+        page = (struct page *) vec[index].iov_base;
+        if (page == NULL) {
+            gossip_err("pvfs_bufmap_copy_from_pages: invalid page pointer\n");
+            return -EIO;
+        }
+        amt_remaining = (size - amt_copied);
+        cur_copy_size = ((amt_remaining > PAGE_SIZE) ?
+                          PAGE_SIZE : amt_remaining);
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_from_pages:"
+                "from_page: %p, to_page: %p\n", page, to->page_array[index]);
+        to_kaddr = pvfs2_kmap(to->page_array[index]);
+        from_kaddr = pvfs2_kmap(page);
+#if 0
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_from_pages -> "
+                     "to_kaddr: %p, from_kaddr:%p, cur_copy_size: %d\n",
+                     to_kaddr, from_kaddr, cur_copy_size);
+#endif
+        memcpy(to_kaddr, from_kaddr, cur_copy_size);
+        pvfs2_kunmap(page);
+        pvfs2_kunmap(to->page_array[index]);
+        amt_copied += cur_copy_size;
+        index++;
+    }
+    return 0;
+}
+
+
 /* pvfs_bufmap_copy_iovec_from_user()
  *
  * copies data from several user space address's in an iovec
@@ -603,8 +739,8 @@ int pvfs_bufmap_copy_iovec_from_user(
     /*
      * copy the passed in iovec so that we can change some of its fields
      */
-    copied_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+    copied_iovec = kmalloc(nr_segs * sizeof(*copied_iovec), 
+                           PVFS2_BUFMAP_GFP_FLAGS);
     if (copied_iovec == NULL)
     {
         gossip_err("pvfs2_bufmap_copy_iovec_from_user: failed allocating memory\n");
@@ -726,8 +862,8 @@ int pvfs_bufmap_copy_iovec_from_kernel(
     /*
      * copy the passed in iovec so that we can change some of its fields
      */
-    copied_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+    copied_iovec = kmalloc(nr_segs * sizeof(*copied_iovec),
+                           PVFS2_BUFMAP_GFP_FLAGS);
     if (copied_iovec == NULL)
     {
         gossip_err("pvfs2_bufmap_copy_iovec_from_kernel: failed allocating memory\n");
@@ -838,8 +974,8 @@ int pvfs_bufmap_copy_to_user_iovec(
     /*
      * copy the passed in iovec so that we can change some of its fields
      */
-    copied_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+    copied_iovec = kmalloc(nr_segs * sizeof(*copied_iovec),
+                           PVFS2_BUFMAP_GFP_FLAGS);
     if (copied_iovec == NULL)
     {
         gossip_err("pvfs2_bufmap_copy_to_user_iovec: failed allocating memory\n");
@@ -958,8 +1094,8 @@ int pvfs_bufmap_copy_to_kernel_iovec(
     /*
      * copy the passed in iovec so that we can change some of its fields
      */
-    copied_iovec = (struct iovec *) kmalloc(nr_segs * sizeof(struct iovec),
-            PVFS2_BUFMAP_GFP_FLAGS);
+    copied_iovec = kmalloc(nr_segs * sizeof(*copied_iovec),
+                           PVFS2_BUFMAP_GFP_FLAGS);
     if (copied_iovec == NULL)
     {
         gossip_err("pvfs2_bufmap_copy_to_kernel_iovec: failed allocating memory\n");

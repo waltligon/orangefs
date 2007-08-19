@@ -612,7 +612,7 @@ static struct fskey_entry *fskey_entry_ctor(PVFS_fs_id fsid)
 {
     struct fskey_entry * entry;
 
-    entry = (struct fskey_entry *) kmalloc(sizeof(struct fskey_entry), PVFS2_GFP_FLAGS);
+    entry = kmalloc(sizeof(*entry), PVFS2_GFP_FLAGS);
     if (entry) {
         entry->fsid = fsid;
         entry->fs_keylen = PVFS2_MAX_FSKEY_LEN;
@@ -890,8 +890,8 @@ struct super_block* pvfs2_get_sb(
     else
     {
         /* alloc and init our private pvfs2 sb info */
-        sb->u.generic_sbp = kmalloc(
-            sizeof(pvfs2_sb_info_t), PVFS2_GFP_FLAGS);
+        sb->u.generic_sbp = kmalloc(sizeof(pvfs2_sb_info_t),
+                                    PVFS2_GFP_FLAGS);
 
         if (!PVFS2_SB(sb))
         {

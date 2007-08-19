@@ -51,6 +51,24 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_I_SIZE_READ, 1, Define if kernel has i_size_read),
 	)
 
+	AC_MSG_CHECKING(for kzalloc in kernel)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel already defined it
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/slab.h>
+		void* kzalloc(size_t size,
+				int mask)
+		{
+			return NULL;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_KZALLOC, 1, Define if kernel has kzalloc),
+	)
+
+
 	AC_MSG_CHECKING(for iget_locked function in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel already defined it

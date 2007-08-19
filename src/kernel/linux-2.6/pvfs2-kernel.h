@@ -572,6 +572,15 @@ typedef struct
 
 #endif
 
+typedef struct pvfs2_stats {
+    unsigned long cache_hits;
+    unsigned long cache_misses;
+    unsigned long reads;
+    unsigned long writes;
+} pvfs2_stats;
+
+extern pvfs2_stats g_pvfs2_stats;
+
 /*
   NOTE: See Documentation/filesystems/porting for information
   on implementing FOO_I and properly accessing fs private data
@@ -1251,6 +1260,18 @@ static inline void i_size_write(struct inode *inode, loff_t i_size)
 }
 #endif
 
+#ifndef HAVE_KZALLOC
+static void *kzalloc(size_t size, gfp_t mask)
+{
+    void *ptr;
+    ptr = kmalloc(size, mask);
+    if (ptr) {
+        memset(ptr, 0, size);
+    }
+    return ptr;
+}
+#endif
+
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 static inline unsigned int diff(struct timeval *end, struct timeval *begin)
@@ -1269,11 +1290,10 @@ static inline void *kzalloc(size_t size, int flags)
 	void * ptr;
 
 	ptr = kmalloc(size, flags);
-	if(!ptr)
+	if (ptr)
 	{
-		return ptr;
+            memset(ptr, 0, size);
 	}
-	memset(ptr, 0, size);
 	return ptr;
 }
 #endif

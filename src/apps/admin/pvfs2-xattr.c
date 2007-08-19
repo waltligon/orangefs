@@ -143,9 +143,24 @@ int main(int argc, char **argv)
     }
     if (user_opts->get && user_opts->text)  
     {
-        printf("key:%s Value:\n%s\n",
-                (char *)user_opts->key.buffer,
-                (char *)user_opts->val.buffer);
+        if (strncmp(user_opts->key.buffer, "user.pvfs2.meta_hint", SPECIAL_METAFILE_HINT_KEYLEN) == 0) {
+            PVFS_metafile_hint *hint = (PVFS_metafile_hint *) user_opts->val.buffer;
+            printf("Metafile hints: ");
+            if (hint->flags & PVFS_IMMUTABLE_FL) {
+                printf("immutable file ");
+            }
+            if (hint->flags & PVFS_APPEND_FL) {
+                printf("Append-only file ");
+            }
+            if (hint->flags & PVFS_NOATIME_FL) {
+                printf("Atime updates disabled.");
+            }
+            printf("\n");
+        } else {
+            printf("key:%s Value:\n%s\n",
+                    (char *)user_opts->key.buffer,
+                    (char *)user_opts->val.buffer);
+        }
     }
   PVFS_sys_finalize();
   return(ret);
