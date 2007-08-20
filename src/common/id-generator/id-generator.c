@@ -64,6 +64,8 @@ int id_gen_safe_register(
 {
     id_gen_safe_t *id_elem = NULL;
 
+    assert(s_id_gen_safe_table != NULL);
+
     if (!item)
     {
 	return -PVFS_EINVAL;

@@ -193,7 +193,6 @@ ref_st_p alloc_ref_st(void)
 
     int ssize = sizeof(struct ref_st);
     ref_st_p new_ref = NULL;
-    int ret = -1;
 
     new_ref = (ref_st_p) malloc(ssize);
     if (!new_ref)
@@ -205,11 +204,6 @@ ref_st_p alloc_ref_st(void)
 
     /* we can go ahead and set the bmi_addr here */
     id_gen_fast_register(&(new_ref->bmi_addr), new_ref);
-    if (ret < 0)
-    {
-	dealloc_ref_st(new_ref);
-	return (NULL);
-    }
 
     return (new_ref);
 }
