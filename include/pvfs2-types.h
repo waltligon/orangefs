@@ -275,10 +275,24 @@ typedef enum
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
 
+#ifdef __KERNEL__
+#include <linux/fs.h>
+#endif
+
+#if defined(FS_IMMUTABLE_FL)
+
+#define PVFS_IMMUTABLE_FL FS_IMMUTABLE_FL
+#define PVFS_APPEND_FL    FS_APPEND_FL
+#define PVFS_NOATIME_FL   FS_NOATIME_FL
+
+#else
+
 /* PVFS Object Flags (PVFS_flags); Add more as we implement them */
-#define PVFS_IMMUTABLE_FL 0x1ULL
-#define PVFS_APPEND_FL    0x2ULL
-#define PVFS_NOATIME_FL   0x4ULL
+#define PVFS_IMMUTABLE_FL 0x10ULL
+#define PVFS_APPEND_FL    0x20ULL
+#define PVFS_NOATIME_FL   0x80ULL
+
+#endif
 
 /* Key/Value Pairs */
 /* Extended attributes are stored on objects with */

@@ -2855,8 +2855,54 @@ int pvfs2_ioctl(
     unsigned long arg)
 {
     int ret = -ENOTTY;
+    uint64_t val = 0;
+    unsigned long uval;
 
     gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: called with cmd %d\n", cmd);
+
+    /* we understand some general ioctls on files, such as the immutable
+     * and append flags
+     */
+    if(cmd == FS_IOC_GETFLAGS)
+    {
+        val = 0;
+        ret = pvfs2_xattr_get_default(inode,
+                                      "user.pvfs2.meta_hint",
+                                      &val, sizeof(val));
+        if(ret < 0 && ret != -ENODATA)
+        {
+            return ret;
+        }
+        else if(ret == -ENODATA)
+        {
+            val = 0;
+        }
+        uval = val;
+        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: FS_IOC_GETFLAGS: %llu\n",
+                     (unsigned long long)uval);
+        return put_user(uval, (int __user *)arg);
+    }
+    else if(cmd == FS_IOC_SETFLAGS)
+    {
+        ret = 0;
+        if(get_user(uval, (int __user *)arg))
+        {
+            return -EFAULT;
+        }
+        if(uval & (~(FS_IMMUTABLE_FL|FS_APPEND_FL|FS_NOATIME_FL)))
+        {
+            gossip_err("pvfs2_ioctl: the FS_IOC_SETFLAGS only supports setting "
+                       "one of FS_IMMUTABLE_FL|FS_APPEND_FL|FS_NOATIME_FL\n");
+            return -EINVAL;
+        }
+        val = uval;
+        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: FS_IOC_SETFLAGS: %llu\n",
+                     (unsigned long long)val);
+        ret = pvfs2_xattr_set_default(inode,
+                                      "user.pvfs2.meta_hint",
+                                      &val, sizeof(val), 0);
+    }
+
     return ret;
 }
 
