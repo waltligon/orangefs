@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.54 2007-05-08 21:28:01 pw Exp $
+ * $Id: ib.c,v 1.55 2007-08-22 16:12:45 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -871,7 +871,7 @@ post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 
     /* generate identifier used by caller to test for message later */
     mop = Malloc(sizeof(*mop));
-    id_gen_safe_register(&mop->op_id, mop);
+    id_gen_fast_register(&mop->op_id, mop);
     mop->addr = remote_map;  /* set of function pointers, essentially */
     mop->method_data = sq;
     mop->user_ptr = user_ptr;
@@ -997,7 +997,7 @@ post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 
     /* generate identifier used by caller to test for message later */
     mop = Malloc(sizeof(*mop));
-    id_gen_safe_register(&mop->op_id, mop);
+    id_gen_fast_register(&mop->op_id, mop);
     mop->addr = remote_map;  /* set of function pointers, essentially */
     mop->method_data = rq;
     mop->user_ptr = user_ptr;
@@ -1102,7 +1102,7 @@ test_sq(struct ib_work *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    if (user_ptr)
 		*user_ptr = sq->mop->user_ptr;
 	    qlist_del(&sq->list);
-	    id_gen_safe_unregister(sq->mop->op_id);
+	    id_gen_fast_unregister(sq->mop->op_id);
 	    c = sq->c;
 	    free(sq->mop);
 	    free(sq);
@@ -1128,7 +1128,7 @@ test_sq(struct ib_work *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	if (user_ptr)
 	    *user_ptr = sq->mop->user_ptr;
 	qlist_del(&sq->list);
-	id_gen_safe_unregister(sq->mop->op_id);
+	id_gen_fast_unregister(sq->mop->op_id);
 	c = sq->c;
 	free(sq->mop);
 	free(sq);
@@ -1168,7 +1168,7 @@ test_rq(struct ib_work *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 		*outid = rq->mop->op_id;
 		if (user_ptr)
 		    *user_ptr = rq->mop->user_ptr;
-		id_gen_safe_unregister(rq->mop->op_id);
+		id_gen_fast_unregister(rq->mop->op_id);
 		free(rq->mop);
 	    }
 	    qlist_del(&rq->list);
@@ -1197,7 +1197,7 @@ test_rq(struct ib_work *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    *outid = rq->mop->op_id;
 	    if (user_ptr)
 		*user_ptr = rq->mop->user_ptr;
-	    id_gen_safe_unregister(rq->mop->op_id);
+	    id_gen_fast_unregister(rq->mop->op_id);
 	    free(rq->mop);
 	}
 	qlist_del(&rq->list);
@@ -1230,7 +1230,7 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
     gen_mutex_lock(&interface_mutex);
     ib_check_cq();
 
-    mop = id_gen_safe_lookup(id);
+    mop = id_gen_fast_lookup(id);
     sq = mop->method_data;
     n = 0;
     if (sq->type == BMI_SEND) {
@@ -1267,7 +1267,7 @@ static int BMI_ib_testsome(int incount, bmi_op_id_t *ids, int *outcount,
     for (i=0; i<incount; i++) {
 	if (!ids[i])
 	    continue;
-	mop = id_gen_safe_lookup(ids[i]);
+	mop = id_gen_fast_lookup(ids[i]);
 	sq = mop->method_data;
 
 	if (sq->type == BMI_SEND) {
@@ -1452,7 +1452,7 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 
     gen_mutex_lock(&interface_mutex);
     ib_check_cq();
-    mop = id_gen_safe_lookup(id);
+    mop = id_gen_fast_lookup(id);
     tsq = mop->method_data;
     if (tsq->type == BMI_SEND) {
 	/*

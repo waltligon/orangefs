@@ -1646,7 +1646,7 @@ int BMI_gm_test(bmi_op_id_t id,
 		bmi_context_id context_id)
 {
     int ret = -1;
-    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
+    method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
     struct gm_op *gm_op_data = query_op->method_data;
 
     *outcount = 0;
@@ -1741,7 +1741,7 @@ int BMI_gm_testsome(int incount,
     {
 	if(id_array[i])
 	{
-	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
+	    query_op = (method_op_p)id_gen_fast_lookup(id_array[i]);
 	    gm_op_data = query_op->method_data;
 	    if(gm_op_data->complete)
 	    {
@@ -1787,7 +1787,7 @@ int BMI_gm_testsome(int incount,
     {
 	if(id_array[i])
 	{
-	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
+	    query_op = (method_op_p)id_gen_fast_lookup(id_array[i]);
 	    gm_op_data = query_op->method_data;
 	    if(gm_op_data->complete)
 	    {
@@ -3204,7 +3204,7 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
     int i;
 
     /* find the matching operation */
-    query_op = id_gen_safe_lookup(ctrl_op_id);
+    query_op = id_gen_fast_lookup(ctrl_op_id);
     if(!query_op)
     {
         /* operation must have been cancelled; just return */
@@ -3322,7 +3322,7 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
      */
 
     /* find the matching operation */
-    query_op = id_gen_safe_lookup(ctrl_op_id);
+    query_op = id_gen_fast_lookup(ctrl_op_id);
 
     if(!query_op)
     {
@@ -3959,7 +3959,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
  */
 int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
 {
-    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
+    method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
     method_op_p tmp_op;
     struct gm_op *gm_op_data = query_op->method_data;
     struct op_list_search_key key;

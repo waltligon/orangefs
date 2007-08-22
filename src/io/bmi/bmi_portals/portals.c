@@ -589,7 +589,7 @@ static void fill_done(struct bmip_work *w, bmi_op_id_t *id, bmi_size_t *size,
 	*err = -PVFS_EOVERFLOW;
 
     /* free resources too */
-    id_gen_safe_unregister(w->mop.op_id);
+    id_gen_fast_unregister(w->mop.op_id);
     qlist_del(&w->list);
     /* work around "me/md in use" problem with doing this in the ack */
     if (w->me_unlink) {
@@ -858,7 +858,7 @@ static void fill_mop(struct bmip_work *w, bmi_op_id_t *id,
 		     struct method_addr *addr, void *user_ptr,
 		     bmi_context_id context_id)
 {
-    id_gen_safe_register(&w->mop.op_id, &w->mop);
+    id_gen_fast_register(&w->mop.op_id, &w->mop);
     w->mop.addr = addr;
     w->mop.method_data = w;
     w->mop.user_ptr = user_ptr;
@@ -1305,7 +1305,7 @@ static int bmip_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 
     gen_mutex_lock(&eq_mutex);
     __check_eq(0);
-    mop = id_gen_safe_lookup(id);
+    mop = id_gen_fast_lookup(id);
     w = mop->method_data;
     debug(2, "%s: cancel %p state %s\n", __func__, w, state_name(w->state));
     switch (w->state) {

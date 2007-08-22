@@ -1111,7 +1111,7 @@ int BMI_tcp_test(bmi_op_id_t id,
 		 bmi_context_id context_id)
 {
     int ret = -1;
-    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
+    method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
 
     assert(query_op != NULL);
 
@@ -1185,7 +1185,7 @@ int BMI_tcp_testsome(int incount,
 	    /* NOTE: this depends on the user passing in valid id's;
 	     * otherwise we segfault.  
 	     */
-	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
+	    query_op = (method_op_p)id_gen_fast_lookup(id_array[i]);
 	    if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==
 		BMI_TCP_COMPLETE)
 	    {
@@ -1546,7 +1546,7 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
     
     gen_mutex_lock(&interface_mutex);
 
-    query_op = (method_op_p)id_gen_safe_lookup(id);
+    query_op = (method_op_p)id_gen_fast_lookup(id);
     if(!query_op)
     {
         /* if we can't find the operattion, then assume that it has already

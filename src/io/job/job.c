@@ -271,7 +271,7 @@ int job_reset_timeout(job_id_t id, int timeout_sec)
      */
     gen_mutex_lock(&completion_mutex);
 
-    query = id_gen_safe_lookup(id);
+    query = id_gen_fast_lookup(id);
     if(!query)
     {        
         /* this id is not valid */
@@ -758,7 +758,7 @@ int job_bmi_cancel(job_id_t id, job_context_id context_id)
 
     gen_mutex_lock(&completion_mutex);
 
-    query = id_gen_safe_lookup(id);
+    query = id_gen_fast_lookup(id);
     if (!query || query->completed_flag)
     {
         /* job has already completed, no cancellation needed */
@@ -1113,7 +1113,7 @@ int job_req_sched_release(job_id_t in_completed_id,
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
 
-    match_jd = id_gen_safe_lookup(in_completed_id);
+    match_jd = id_gen_fast_lookup(in_completed_id);
     if (!match_jd)
     {
         /* id has been released or was not registered */
@@ -1246,7 +1246,7 @@ int job_flow_cancel(job_id_t id, job_context_id context_id)
 
     gen_mutex_lock(&completion_mutex);
 
-    query = id_gen_safe_lookup(id);
+    query = id_gen_fast_lookup(id);
 
     if (!query || query->completed_flag)
     {
@@ -3242,7 +3242,7 @@ int job_trove_dspace_cancel(PVFS_fs_id coll_id,
 
     gen_mutex_lock(&completion_mutex);
 
-    query = id_gen_safe_lookup(id);
+    query = id_gen_fast_lookup(id);
     if (!query || query->completed_flag)
     {
         /* job has already completed, no cancellation needed */
@@ -4530,7 +4530,7 @@ static int completion_query_some(job_id_t * id_array,
     /* don't do anything unless all of the target ops are done */
     for(i=0; i<incount; i++)
     {
-        tmp_desc = id_gen_safe_lookup(id_array[i]);
+        tmp_desc = id_gen_fast_lookup(id_array[i]);
         if(tmp_desc && tmp_desc->completed_flag)
         {
             done_count++;
@@ -4545,7 +4545,7 @@ static int completion_query_some(job_id_t * id_array,
     /* all target ops are complete; pull them out of completion queue */
     for(i=0; i<incount; i++)
     {
-        tmp_desc = id_gen_safe_lookup(id_array[i]);
+        tmp_desc = id_gen_fast_lookup(id_array[i]);
         if(tmp_desc && tmp_desc->completed_flag)
         {
             if(returned_user_ptr_array)
