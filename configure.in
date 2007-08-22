@@ -70,6 +70,15 @@ AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
+
+AC_MSG_CHECKING([for required Math::BigInt perl module])
+perl -e "use Math::BigInt" 2>&1 > /dev/null
+if test $? != 0; then
+	AC_MSG_ERROR(no)
+else
+	AC_MSG_RESULT(yes)
+fi
+
 if test $host != $build; then
 	AC_CHECK_PROGS(BUILD_CC, gcc cc)
 else

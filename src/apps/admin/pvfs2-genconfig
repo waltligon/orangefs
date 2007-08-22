@@ -8,6 +8,7 @@
 #
 use Term::ReadLine;
 use Getopt::Long;
+use Math::BigInt;
 
 # turn on strictness
 use strict 'vars';
@@ -236,11 +237,14 @@ sub emit_filesystem
     # divide handle range space equally among servers ((2^63)-1 for now)
     my($total_num_handles_available, $start, $end, $i, $step, $num_ranges);
     $num_ranges = $count;
-    $total_num_handles_available = $last_handle - $first_handle + 1;
+    $total_num_handles_available = $last_handle->copy();
+    $total_num_handles_available->bsub($first_handle);
+    $total_num_handles_available->inc();
 
     # since meta and data handle ranges must be split, increment
     # num nodes for calculation purposes below
-    $step = sprintf("%lu",($total_num_handles_available / $num_ranges));
+    $step = $total_num_handles_available->copy();
+    $step->bdiv($num_ranges);
 
     print $target "\n<Filesystem>\n";
     print $target "\tName $name\n";
@@ -252,14 +256,17 @@ sub emit_filesystem
     }
 
     print $target "\t<MetaHandleRanges>\n";
-    $start = $end = $first_handle - 1;
+    $start = $end = $first_handle->copy();
+    $start->dec();
+    $end->dec();
 
     my @meta_aliases = get_aliases($META_ENDPOINT);
     @meta_aliases = sort @meta_aliases;
     foreach my $ma (@meta_aliases)
     {
-        $start = $end + 1;
-        $end += $step;
+        $start = $end->copy();
+        $start->inc();
+        $end->badd($step);
         print $target "\t\tRange $ma $start-$end\n";
     }
 
@@ -270,8 +277,9 @@ sub emit_filesystem
     @io_aliases = sort @io_aliases;
     foreach my $ia (@io_aliases)
     {
-        $start = $end + 1;
-        $end += $step;
+        $start = $end->copy();
+        $start->inc();
+        $end->badd($step);
         print $target "\t\tRange $ia $start-$end\n";
     }
     print $target "\t</DataHandleRanges>\n";
@@ -648,7 +656,7 @@ sub get_last_handle
     if ($opt_last_handle) {
         $last_handle = $opt_last_handle;
     } else {
-        $last_handle = 0x7FFFFFFFFFFFFFFF;  # 2^63
+        $last_handle = Math::BigInt->new('0x7FFFFFFFFFFFFFFF');  # 2^63
     }
     return $last_handle;
 }

@@ -5894,6 +5894,19 @@ fi
 
 
 
+
+{ echo "$as_me:$LINENO: checking for required Math::BigInt perl module" >&5
+echo $ECHO_N "checking for required Math::BigInt perl module... $ECHO_C" >&6; }
+perl -e "use Math::BigInt" 2>&1 > /dev/null
+if test $? != 0; then
+	{ { echo "$as_me:$LINENO: error: no" >&5
+echo "$as_me: error: no" >&2;}
+   { (exit 1); exit 1; }; }
+else
+	{ echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+fi
+
 if test $host != $build; then
 	for ac_prog in gcc cc
 do
