@@ -239,7 +239,7 @@ sub emit_filesystem
     $num_ranges = $count;
     $total_num_handles_available = $last_handle->copy();
     $total_num_handles_available->bsub($first_handle);
-    $total_num_handles_available->inc();
+    $total_num_handles_available->binc();
 
     # since meta and data handle ranges must be split, increment
     # num nodes for calculation purposes below
@@ -257,15 +257,15 @@ sub emit_filesystem
 
     print $target "\t<MetaHandleRanges>\n";
     $start = $end = $first_handle->copy();
-    $start->dec();
-    $end->dec();
+    $start->bdec();
+    $end->bdec();
 
     my @meta_aliases = get_aliases($META_ENDPOINT);
     @meta_aliases = sort @meta_aliases;
     foreach my $ma (@meta_aliases)
     {
         $start = $end->copy();
-        $start->inc();
+        $start->binc();
         $end->badd($step);
         print $target "\t\tRange $ma $start-$end\n";
     }
@@ -278,7 +278,7 @@ sub emit_filesystem
     foreach my $ia (@io_aliases)
     {
         $start = $end->copy();
-        $start->inc();
+        $start->binc();
         $end->badd($step);
         print $target "\t\tRange $ia $start-$end\n";
     }
@@ -654,7 +654,7 @@ sub get_last_handle
 {
     my $last_handle;
     if ($opt_last_handle) {
-        $last_handle = $opt_last_handle;
+        $last_handle = Math::BigInt->new($opt_last_handle);
     } else {
         $last_handle = Math::BigInt->new('0x7FFFFFFFFFFFFFFF');  # 2^63
     }
@@ -698,9 +698,9 @@ sub get_first_handle
 {
     my $first_handle;
     if ($opt_first_handle) {
-        $first_handle = $opt_first_handle;
+        $first_handle = Math::BigInt->new($opt_first_handle);
     } else {
-        $first_handle = 4;
+        $first_handle = Math::BigInt->new(4);
     }
     return $first_handle;
 }
