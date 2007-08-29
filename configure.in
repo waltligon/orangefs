@@ -1132,6 +1132,25 @@ if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
 fi
 
 
+dnl
+dnl Warn about potential slowness if using a "fast" network along with
+dnl TCP.  Polling with timeout in BMI is implemented by sequentially asking
+dnl each device to poll for half of the timeout.  This leads to a fixed 5 ms
+dnl delay in the TCP device before the IB device can be queried, for instance.
+dnl When traffic will only appear on one device, suggest that TCP be disabled.
+dnl But leave TCP as default on, certainly, as that is what most people want.
+dnl
+if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
+	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 ; then
+    if test x$BUILD_BMI_TCP = x1 ; then
+	AC_MSG_WARN([You have selected to build PVFS to use a "fast" network
+		    interface, but have not disabled TCP.  The way this is
+		    currently implemented will lead to rather slow response
+		    times on the fast interface.  Suggest you configure with
+		    "--without-bmi-tcp" for the best performance.])
+    fi
+fi
+
 AC_MSG_RESULT()
 AC_MSG_RESULT([PVFS2 version string: $PVFS2_VERSION])
 

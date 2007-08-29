@@ -16154,7 +16154,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT 1
+#define HAVE_GETMNTENT
 _ACEOF
 
 else
@@ -18332,6 +18332,22 @@ if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
 echo "${ECHO_T}WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION." >&6; }
 fi
 
+
+if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
+	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 ; then
+    if test x$BUILD_BMI_TCP = x1 ; then
+	{ echo "$as_me:$LINENO: WARNING: You have selected to build PVFS to use a \"fast\" network
+		    interface, but have not disabled TCP.  The way this is
+		    currently implemented will lead to rather slow response
+		    times on the fast interface.  Suggest you configure with
+		    \"--without-bmi-tcp\" for the best performance." >&5
+echo "$as_me: WARNING: You have selected to build PVFS to use a \"fast\" network
+		    interface, but have not disabled TCP.  The way this is
+		    currently implemented will lead to rather slow response
+		    times on the fast interface.  Suggest you configure with
+		    \"--without-bmi-tcp\" for the best performance." >&2;}
+    fi
+fi
 
 { echo "$as_me:$LINENO: result: " >&5
 echo "${ECHO_T}" >&6; }
