@@ -20,19 +20,6 @@ enum
     STATE_SYMLINK = 8
 };
 
-static PINT_sm_action setattr_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action setattr_setobj_attribs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action setattr_write_metafile_distribution_if_required(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action setattr_write_symlink_target_if_required(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action setattr_verify_attribs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_set_attr_sm

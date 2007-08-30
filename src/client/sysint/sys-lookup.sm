@@ -46,26 +46,6 @@ enum
     LOOKUP_NCACHE_HIT_FASTPATH = 8
 };
 
-/* state function prototypes */
-static PINT_sm_action lookup_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_segment_lookup_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_segment_lookup_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_segment_verify_attr_present(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_segment_check_attr_type(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_segment_handle_relative_link(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_segment_handle_absolute_link(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_context_check_completion(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static int lookup_segment_lookup_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
@@ -511,7 +491,7 @@ PVFS_error PVFS_isys_ref_lookup(
                    __func__, relative_pathname);
 
         PVFS_util_release_credentials(sm_p->cred_p);
-        PINT_smcb_free(&smcb);
+        PINT_smcb_free(smcb);
         return ret;
     }
 

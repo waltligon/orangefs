@@ -27,13 +27,6 @@
 
 extern job_context_id pint_client_sm_context;
 
-static PINT_sm_action mgmt_remove_dirent_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mgmt_remove_dirent_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static int mgmt_remove_dirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 

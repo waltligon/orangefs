@@ -16,11 +16,6 @@
 #include "pint-event.h"
 #include "pvfs2-internal.h"
 
-static PINT_sm_action setparam_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action setparam_work(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static int check_fs_id(PVFS_fs_id fs_id);
 
 %%

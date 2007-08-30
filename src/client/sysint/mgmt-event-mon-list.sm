@@ -24,11 +24,6 @@
 
 extern job_context_id pint_client_sm_context;
 
-static PINT_sm_action mgmt_event_mon_list_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mgmt_event_mon_list_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 /* completion function prototypes */
 static int event_mon_list_comp_fn(
     void* v_p, struct PVFS_server_resp* resp_p, int i);
@@ -107,7 +102,7 @@ PVFS_error PVFS_imgmt_event_mon_list(
         server_count * sizeof(PINT_sm_msgpair_state));
     if (sm_p->msgarray == NULL)
     {
-        PINT_smcb_free(&smcb);
+        PINT_smcb_free(smcb);
         return -PVFS_ENOMEM;
     }
 

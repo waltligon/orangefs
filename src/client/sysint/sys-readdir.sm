@@ -25,17 +25,6 @@
 
 extern job_context_id pint_client_sm_context;
 
-static PINT_sm_action readdir_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action readdir_msg_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action readdir_msg_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action readdir_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action do_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static int readdir_msg_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 

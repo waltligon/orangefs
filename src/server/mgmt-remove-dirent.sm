@@ -14,13 +14,6 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-static PINT_sm_action mgmt_remove_dirent_get_dirdata_handle_from_parent(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mgmt_remove_dirent(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mgmt_remove_dirent_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_mgmt_remove_dirent_sm

@@ -27,13 +27,6 @@
 
 extern job_context_id pint_client_sm_context;
 
-static PINT_sm_action truncate_datafile_setup_msgpairarray(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action truncate_datafile_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action truncate_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %% 
 
 machine pvfs2_client_truncate_sm

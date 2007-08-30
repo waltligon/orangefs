@@ -14,11 +14,6 @@
 #include "pvfs2-server.h"
 #include "pint-event.h"
 
-static PINT_sm_action event_mon_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action event_mon_do_work(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_event_mon_sm

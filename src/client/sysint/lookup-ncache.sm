@@ -61,8 +61,6 @@ enum
     LOOKUP_NCACHE_MISS = 1
 };
 
-static int lookup_ncache_lookup(struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 nested machine pvfs2_client_lookup_ncache_sm

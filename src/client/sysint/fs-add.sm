@@ -44,12 +44,6 @@ enum {
 gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
 extern job_context_id pint_client_sm_context;
 
-static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action pvfs2_server_prepare_fetch_config(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action fs_add_final_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_fs_add_sm

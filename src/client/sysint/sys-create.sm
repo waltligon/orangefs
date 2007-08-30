@@ -34,30 +34,6 @@ enum
     CREATE_RETRY = 170
 };
 
-/* state function prototypes */
-static PINT_sm_action create_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_dspace_create_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_datafiles_setup_msgpair_array(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_datafiles_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_setattr_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_setattr_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_crdirent_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_crdirent_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_delete_handles_setup_msgpair_array(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_parent_getattr_inspect(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 /* completion function prototypes */
 static int create_create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -296,14 +272,14 @@ PVFS_error PVFS_isys_create(
     {
         if (!dist->name)
         {
-            PINT_smcb_free(&smcb);
+            PINT_smcb_free(smcb);
             return -PVFS_EINVAL;
         }
 
         sm_p->u.create.dist = PINT_dist_create(dist->name);
         if (!sm_p->u.create.dist)
         {
-            PINT_smcb_free(&smcb);
+            PINT_smcb_free(smcb);
             return -PVFS_ENOMEM;
         }
         sm_p->u.create.dist->params = dist->params;
@@ -314,7 +290,7 @@ PVFS_error PVFS_isys_create(
         sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
         if (!sm_p->u.create.dist)
         {
-            PINT_smcb_free(&smcb);
+            PINT_smcb_free(smcb);
             return -PVFS_ENOMEM;
         }
     }
@@ -350,7 +326,7 @@ PVFS_error PVFS_isys_create(
     if (ret < 0)
     {
         gossip_err("Failed to get number of data servers\n");
-        PINT_smcb_free(&smcb);
+        PINT_smcb_free(smcb);
         return ret;
     }
 

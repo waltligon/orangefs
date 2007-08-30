@@ -28,14 +28,6 @@
 
 extern job_context_id pint_client_sm_context;
 
-/* state function prototypes */
-static PINT_sm_action mgmt_statfs_list_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mgmt_statfs_list_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mgmt_statfs_list_parent_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static int statfs_list_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
@@ -131,7 +123,7 @@ PVFS_error PVFS_imgmt_statfs_list(
     if (sm_p->msgarray == NULL)
     {
         PVFS_util_release_credentials(sm_p->cred_p);
-        PINT_smcb_free(&smcb);
+        PINT_smcb_free(smcb);
         return -PVFS_ENOMEM;
     }
 

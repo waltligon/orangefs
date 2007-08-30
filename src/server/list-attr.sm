@@ -36,25 +36,6 @@ enum
     MORE_WORK = 1,
 };
 
-static PINT_sm_action listattr_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action listattr_verify_attribs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action listattr_read_symlink_target(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action listattr_get_dirent_count(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action listattr_interpret_dirent_count(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action listattr_read_metafile_datafile_handles_if_required(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action listattr_read_metafile_distribution_if_required(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action listattr_setup_resp(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action listattr_setup_op(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 nested machine pvfs2_list_attr_work_sm

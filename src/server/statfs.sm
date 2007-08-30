@@ -19,11 +19,6 @@
 #include <sys/sysinfo.h>
 #endif
 
-static PINT_sm_action statfs_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action statfs_do_statfs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_statfs_sm

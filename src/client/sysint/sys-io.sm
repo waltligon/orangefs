@@ -38,23 +38,6 @@ enum
     IO_DO_SMALL_IO
 };
 
-static PINT_sm_action io_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_datafile_setup_msgpairs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_datafile_post_msgpairs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_datafile_post_msgpairs_retry(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_datafile_complete_operations(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_analyze_results(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_analyze_size_results(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 /* Helper functions local to sys-io.sm. */
 
 static inline int io_complete_context_send_or_recv(

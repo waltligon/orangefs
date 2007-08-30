@@ -25,7 +25,7 @@
 #else
 
 #include <stdlib.h>
-#include "quicklist.h"
+#include "../quicklist/quicklist.h"
 
 #define qhash_malloc(x)            malloc(x)
 #define qhash_free(x)              free(x)

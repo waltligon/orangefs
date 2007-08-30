@@ -14,11 +14,6 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 
-static PINT_sm_action getconfig_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action getconfig_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_get_config_sm

@@ -14,13 +14,6 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 
-static PINT_sm_action deleattr_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action deleattr_delobj_eattribs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action deleattr_verify_eattribs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_del_eattr_sm

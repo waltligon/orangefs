@@ -48,23 +48,6 @@ enum
     RETURN_STORED_ERROR_CODE
 };
 
-static PINT_sm_action remove_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_rmdirent_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_generic_timer(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_rmdirent_retry_or_fail(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_crdirent_retry_or_fail(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_crdirent_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_check_error_code(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static int remove_rmdirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 static int remove_crdirent_comp_fn(

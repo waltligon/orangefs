@@ -17,11 +17,6 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int sysdev_unexp_post(
-    struct PINT_smcb *smcb, job_status_s* js_p);
-static int sysdev_unexp_cleanup(
-    struct PINT_smcb *smcb, job_status_s* js_p);
-
 %%
 
 machine pvfs2_sysdev_unexp_sm

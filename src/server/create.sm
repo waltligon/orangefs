@@ -13,13 +13,6 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-static PINT_sm_action create_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_create(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action create_setup_resp(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_create_sm

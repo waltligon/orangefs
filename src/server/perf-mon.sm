@@ -15,11 +15,6 @@
 #include "pvfs2-server.h"
 #include "pint-perf-counter.h"
 
-static PINT_sm_action perf_mon_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action perf_mon_do_work(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static uint64_t* static_start_time_array_ms = NULL;
 static uint64_t* static_interval_array_ms = NULL;
 static int64_t** static_value_matrix = NULL;

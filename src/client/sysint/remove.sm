@@ -24,21 +24,6 @@ enum
     REMOVE_MUST_REMOVE_DATAFILES = 1,
 };
 
-static PINT_sm_action remove_getattr_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_getattr_analyze_results(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_datafile_remove_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_datafile_remove_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_object_remove_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_object_remove_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_helper_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 #define HANDLE_REMOVE_ERROR(state)                                     \
 do {                                                                   \
     char buf[64] = {0};                                                \

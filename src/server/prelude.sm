@@ -23,17 +23,6 @@
  * - post the request to the request scheduler
  * - check permissions
  */
-static PINT_sm_action prelude_req_sched(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action prelude_perm_check(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action prelude_getattr_if_needed(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action prelude_check_acls_if_needed(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action prelude_check_acls(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 enum {
     PRELUDE_RUN_ACL_CHECKS = 1,
 };

@@ -8,7 +8,7 @@
 #define __STATE_MACHINE_H
 
 #include "job.h"
-#include "msgpairarray.h"
+#include "quicklist.h"
 
 /* STATE-MACHINE.H
  *
@@ -52,15 +52,10 @@ enum PINT_state_code {
 
 /* these define things like stack size and so forth for the common
  * state machine code.
+ * The state stack size limits the number of nested state machines that
+ * can exist.  8 seems reasonable.
  */
 #define PINT_STATE_STACK_SIZE 8
-#define PINT_FRAME_STACK_SIZE 8
-
-struct PINT_frame_s
-{
-    int task_id;
-    void *frame;
-};
 
 /* State machine control block - one per running instance of a state
  * machine
@@ -69,11 +64,11 @@ typedef struct PINT_smcb
 {
     /* state machine execution variables */
     int stackptr;
-    int framebaseptr;
-    int framestackptr;
     struct PINT_state_s *current_state;
     struct PINT_state_s *state_stack[PINT_STATE_STACK_SIZE];
-    struct PINT_frame_s frame_stack[PINT_FRAME_STACK_SIZE];
+
+    struct qlist_head frames;
+
     /* usage specific routinet to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int);
     /* state machine context and control variables */
@@ -198,15 +193,12 @@ int PINT_smcb_alloc(struct PINT_smcb **, int, int,
         struct PINT_state_machine_s *(*getmach)(int),
         int (*term_fn)(struct PINT_smcb *, job_status_s *),
         job_context_id context_id);
-void PINT_smcb_free(struct PINT_smcb **);
-struct PINT_state_s *PINT_pop_state(struct PINT_smcb *);
-void PINT_push_state(struct PINT_smcb *, struct PINT_state_s *);
+void PINT_smcb_free(struct PINT_smcb *);
 void *PINT_sm_frame(struct PINT_smcb *, int);
-void PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);
-void PINT_sm_set_frame(struct PINT_smcb *smcb);
-void *PINT_sm_pop_frame(struct PINT_smcb *smcb);
-struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id);
-void PINT_sm_start_child_frames(struct PINT_smcb *smcb);
+int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);
+void *PINT_sm_pop_frame(struct PINT_smcb *smcb, int *error_code);
+
+int PINT_sm_pop_error(PINT_smcb *smcb, PVFS_error ret);
 
 /* This macro is used in calls to PINT_sm_fram() */
 #define PINT_FRAME_CURRENT 0

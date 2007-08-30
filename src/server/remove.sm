@@ -59,25 +59,6 @@ enum
     STATE_TYPE_DATAFILE = 2,
 };
 
-static PINT_sm_action remove_check_object_type(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_verify_object_metadata(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_remove_dspace(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_read_dirdata_handle(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_get_dirent_count(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_check_dirdata_entries(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_remove_dirdata_dspace(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action remove_setup_work(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 nested machine pvfs2_remove_work_sm

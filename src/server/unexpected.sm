@@ -13,11 +13,6 @@
 #include "pvfs2-server.h"
 #include "quicklist.h"
 
-static PINT_sm_action unexpected_post(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action unexpected_map(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_unexpected_sm
@@ -63,7 +58,7 @@ static PINT_sm_action unexpected_post(
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
-        PINT_smcb_free(&smcb);
+        js_p->error_code = ret;
         return SM_ACTION_TERMINATE;
     }
 

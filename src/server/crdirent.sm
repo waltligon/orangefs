@@ -20,23 +20,6 @@ enum
     UPDATE_DIR_ATTR_REQUIRED
 };
 
-static PINT_sm_action crdirent_setup_op(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action crdirent_validate(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action crdirent_read_directory_entry_handle(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action crdirent_write_directory_entry(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action crdirent_check_for_req_dir_update(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action crdirent_update_directory_attr(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action crdirent_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action validation_object_type_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_crdirent_sm

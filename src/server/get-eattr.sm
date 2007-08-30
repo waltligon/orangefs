@@ -25,15 +25,6 @@
 #include "pint-util.h"
 #include "pint-eattr.h"
 
-static PINT_sm_action geteattr_setup_resp(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action geteattr_read_eattrib(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action geteattr_check_resp(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action geteattr_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_get_eattr_sm

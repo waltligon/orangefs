@@ -22,17 +22,6 @@ enum
     STATE_ENOTDIR = 7
 };
 
-static PINT_sm_action readdir_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action readdir_read_dirdata_handle(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action readdir_iterate_on_entries(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action readdir_verify_directory_metadata(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action readdir_setup_resp(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_readdir_sm

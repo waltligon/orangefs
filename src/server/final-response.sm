@@ -29,13 +29,6 @@
  *   stored in s_op->scheduled_id
  */
 
-static PINT_sm_action final_response_release(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action final_response_send_resp(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action final_response_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static void PINT_gossip_err_server_resp(
     struct PVFS_server_resp *resp);
 

@@ -1759,27 +1759,13 @@ int server_post_unexpected_recv(job_status_s *js_p)
         /* Add an unexpected s_ops to the list */
         qlist_add_tail(&s_op->next, &posted_sop_list);
 
-#if 1
         ret = PINT_state_machine_start(smcb, js_p);
-#else
-        /*
-          TODO: Consider the optimization of enabling immediate
-          completion in this part of the code (see the mailing list
-          thread from Feb. 2003 on pvfs2-internal).
-
-          note: unexp_bmi_buff is really a struct that describes an
-          unexpected message (it is an output parameter).
-        */
-        ret = job_bmi_unexp(&s_op->unexp_bmi_buff, smcb, 0,
-                            js_p, &j_id, JOB_NO_IMMED_COMPLETE,
-                            server_job_context);
-        if (ret < 0)
+        if(ret == SM_ACTION_TERMINATE)
         {
-            PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
-            PINT_smcb_free(&smcb);
+            /* error posting unexpected */
+            PINT_smcb_free(smcb);
+            return js_p->error_code;
         }
-#endif
-
     }
     return ret;
 }
@@ -2015,7 +2001,7 @@ int server_state_machine_terminate(
     /* free the operation structure itself */
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "server_state_machine_terminate %p\n",smcb);
-    PINT_smcb_free(&smcb); 
+    PINT_smcb_free(smcb);
     return SM_ACTION_TERMINATE;
 }
 

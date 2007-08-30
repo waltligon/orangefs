@@ -25,16 +25,6 @@ enum
     FLUSH_BSTREAM = 5
 };
 
-static PINT_sm_action flush_check_type(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action flush_keyval_flush(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action flush_bstream_flush(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action flush_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action flush_check_error(
-    struct PINT_smcb *smcb, job_status_s *js_p);
 void flush_init_state_machine(void);
 
 %%

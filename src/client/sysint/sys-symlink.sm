@@ -31,25 +31,6 @@ enum
     SYMLINK_RETRY = 170
 };
 
-static PINT_sm_action symlink_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action symlink_dspace_create_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action symlink_dspace_create_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action symlink_crdirent_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action symlink_crdirent_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action symlink_setattr_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action symlink_setattr_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action symlink_delete_handle_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action symlink_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static int symlink_create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int symlink_setattr_comp_fn(

@@ -15,11 +15,6 @@
 #include "pint-perf-counter.h"
 #include "server-config.h"
 
-static PINT_sm_action perf_update_do_work(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action perf_update_error(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_perf_update_sm

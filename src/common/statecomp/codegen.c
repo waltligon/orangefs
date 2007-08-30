@@ -12,12 +12,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "../quicklist/quicklist.h"
+#include "../quickhash/quickhash.h"
 
 #include "statecomp.h"
 
 static int needcomma = 1;
 
 static void gen_state_decl(char *state_name);
+static void gen_runfunc_decl(char *func_name);
 static void gen_state_start(char *state_name, char *machine_name);
 static void gen_state_action(
     enum state_action action, char *run_func, char *state_name);
@@ -39,7 +45,11 @@ void gen_machine(char *machine_name)
 
     /* dump forward declarations of all the states */
     for (s=states; s; s=s->next)
+    {
+        if(s->action == ACTION_RUN)
+            gen_runfunc_decl(s->function_or_machine);
         gen_state_decl(s->name);
+    }
 
     /* delcare the machine start point */
     fprintf(out_file, "\nstruct PINT_state_machine_s %s = {\n", machine_name);
@@ -96,6 +106,65 @@ void gen_machine(char *machine_name)
         free(s);
     }
     states = NULL;
+}
+
+struct runfunc_decl_entry
+{
+    char *func_name;
+    struct qhash_head link;
+};
+
+static int runfunc_compare(void *key, struct qhash_head *link)
+{
+    if(!strcmp((char *)key, 
+               qhash_entry(link, struct runfunc_decl_entry, link)->func_name))
+    {
+        return 1;
+    }
+    return 0;
+}
+
+static int runfunc_hash(void *key, int table_size)
+{
+    char *k = (char *)key;
+    int h, g;
+    while(*k)
+    {
+        h = (h << 4) + *k++;
+        if((g = (h & 0xF0UL)))
+        {
+            h ^= g >> 24;
+            h ^= g;
+        }
+    }
+
+    return h % table_size;
+}
+
+static struct qhash_table *runfunc_table = NULL;
+
+static void gen_runfunc_decl(char *func_name)
+{
+    if(!runfunc_table)
+    {
+        runfunc_table = qhash_init(runfunc_compare, runfunc_hash, 1024);
+        assert(runfunc_table);
+    }
+
+    if(!qhash_search(runfunc_table, func_name))
+    {
+        struct runfunc_decl_entry *entry =
+            malloc(sizeof(struct runfunc_decl_entry));
+        assert(entry);
+
+        entry->func_name = strdup(func_name);
+        qhash_add(runfunc_table, entry->func_name, &entry->link);
+
+        fprintf(out_file,
+                "\nstatic PINT_sm_action %s(\n"
+                "\tstruct PINT_smcb *smcb, job_status_s *js_p);\n\n",
+                func_name);
+    }
 }
 
 static void gen_state_decl(char *state_name)

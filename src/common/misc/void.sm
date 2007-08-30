@@ -14,9 +14,6 @@
 #include "state-machine.h"
 
 
-static PINT_sm_action void_action(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_void_sm

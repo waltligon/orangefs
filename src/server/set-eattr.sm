@@ -15,13 +15,6 @@
 #include "pint-util.h"
 #include "pint-eattr.h"
 
-static PINT_sm_action seteattr_verify_eattribs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action seteattr_setobj_eattribs(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action seteattr_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_set_eattr_sm

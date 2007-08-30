@@ -12,9 +12,6 @@
 
 #include "pvfs2-server.h"
 
-static PINT_sm_action noop_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_noop_sm

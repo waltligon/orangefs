@@ -20,13 +20,10 @@
 
 extern job_context_id pint_client_sm_context;
 
-/* state function prototypes */
-static PINT_sm_action get_eattr_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action get_eattr_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
 static int get_eattr_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i);
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i);
 
 %%
 

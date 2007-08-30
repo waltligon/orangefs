@@ -28,25 +28,6 @@ enum
     LOOKUP_CHECK_DIR_ACLS = 24,
 };
 
-static PINT_sm_action lookup_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_read_object_metadata(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_verify_object_metadata(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_check_acls_if_needed(
-    struct PINT_smcb *smcb, job_status_s* js_p);
-static PINT_sm_action lookup_check_acls(
-    struct PINT_smcb *smcb, job_status_s* js_p);
-static PINT_sm_action lookup_read_directory_entry(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_read_directory_entry_handle(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action lookup_setup_resp(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_lookup_sm

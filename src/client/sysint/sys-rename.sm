@@ -38,37 +38,6 @@ enum
     RENAME_RMDIRENT_RETRY
 };
 
-static PINT_sm_action rename_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_lookups_setup_msgpair_array(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_lookups_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_crdirent_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_rmdirent_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_rmdirent_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_chdirent_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_chdirent_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_check_for_remove(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_warn_user_to_run_fsck(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_generic_timer(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_crdirent_retry_or_fail(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_rmdirent_retry_or_fail(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action rename_getattr_src_interpret(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 static int rename_lookups_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int rename_crdirent_comp_fn(

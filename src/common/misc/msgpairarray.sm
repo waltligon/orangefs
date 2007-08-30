@@ -51,17 +51,6 @@ enum
     MSGPAIRS_RETRY_NODELAY = 192
 };
 
-static PINT_sm_action  msgpairarray_init(
-        struct PINT_smcb *smcp, job_status_s *js_p);
-static PINT_sm_action  msgpairarray_post(
-        struct PINT_smcb *smcp, job_status_s *js_p);
-static PINT_sm_action  msgpairarray_post_retry(
-        struct PINT_smcb *smcp, job_status_s *js_p);
-static PINT_sm_action  msgpairarray_complete(
-        struct PINT_smcb *smcp, job_status_s *js_p);
-static PINT_sm_action  msgpairarray_completion_fn(
-        struct PINT_smcb *smcp, job_status_s *js_p);
-
 %%
 
 nested machine pvfs2_msgpairarray_sm

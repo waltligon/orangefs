@@ -37,6 +37,18 @@
  * which includes first pvfs2-server.h and then state-machine-fns.h.
  */
 
+struct PINT_frame_s
+{
+    int task_id;
+    void *frame;
+    int error;
+    struct qlist_head link;
+};
+
+static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *);
+static void PINT_push_state(struct PINT_smcb *, struct PINT_state_s *);
+static struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id);
+static void PINT_sm_start_child_frames(struct PINT_smcb *smcb);
 
 /* Function: PINT_state_machine_halt(void)
    Params: None
@@ -58,14 +70,30 @@ int PINT_state_machine_halt(void)
  */
 int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
 {
+    struct PINT_frame_s *current_frame;
+    job_id_t id;
+
     /* notify parent */
     if (smcb->parent_smcb)
     {
-        job_id_t id;
-        /* wake up parent, through job interface */
-        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "SM job_null called smcb %p\n", smcb->parent_smcb);
-        job_null(0, smcb->parent_smcb, 0, r, &id, smcb->context);
+        assert(smcb->parent_smcb->children_running > 0);
+
+        current_frame = qlist_entry(
+            &smcb->frames.next, struct PINT_frame_s, link);
+        current_frame->error = r->error_code;
+
+        if (--smcb->parent_smcb->children_running > 0)
+        {
+            /* SM is still deferred */
+            return SM_ACTION_DEFERRED;
+        }
+        else
+        {
+            /* no more child state machines running, so we can
+             * start up the parent state machine again
+             */
+            job_null(0, smcb->parent_smcb, 0, r, &id, smcb->context);
+        }
     }
     /* call state machine completion function */
     if (smcb->terminate_fn)
@@ -149,7 +177,7 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
                  r->error_code,
                  SM_ACTION_STRING(retval));
 
-    if (smcb->current_state->flag == SM_PJMP)
+    if (retval == SM_ACTION_COMPLETE && smcb->current_state->flag == SM_PJMP)
     {
         /* start child SMs */
         PINT_sm_start_child_frames(smcb);
@@ -213,14 +241,6 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
     }
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
             "SM next smcb %p op %d\n",smcb,(smcb)->op);
-    if (smcb->children_running > 0)
-    {
-        if (--smcb->children_running > 0)
-        {
-            /* SM is still deferred */
-            return SM_ACTION_DEFERRED;
-        }
-    }
     /* loop while invoke of new state returns COMPLETED */
     do {
         /* loop while returning from nested SM */
@@ -474,6 +494,9 @@ int PINT_smcb_alloc(
             "SM allocate smcb %p op %d\n",*smcb,op);
     /* zero out all members */
     memset(*smcb, 0, sizeof(struct PINT_smcb));
+
+    INIT_QLIST_HEAD(&(*smcb)->frames);
+
     /* if frame_size given, allocate a frame */
     if (frame_size > 0)
     {
@@ -504,25 +527,23 @@ int PINT_smcb_alloc(
  * Synopsis: this frees an smcb struct, including
  * anything on the frame stack with a zero task_id
  */
-void PINT_smcb_free(struct PINT_smcb **smcb)
+void PINT_smcb_free(struct PINT_smcb *smcb)
 {
-    int i;
-    assert(smcb && *smcb);
+    struct PINT_frame_s *frame_entry, *tmp;
+    assert(smcb);
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-             "SM free smcb %p op %d\n",*smcb,(*smcb)->op);
-    for (i = 0; i < PINT_FRAME_STACK_SIZE; i++)
+             "SM free smcb %p op %d\n", smcb, smcb->op);
+    qlist_for_each_entry_safe(frame_entry, tmp, &smcb->frames, link)
     {
-        if ((*smcb)->frame_stack[i].frame &&
-            (*smcb)->frame_stack[i].task_id == 0)
+        if (frame_entry->frame && frame_entry->task_id == 0)
         {
             /* only free if task_id is 0 */
-            free((*smcb)->frame_stack[i].frame);
+            free(frame_entry->frame);
         }
-        (*smcb)->frame_stack[i].task_id = 0;
-        (*smcb)->frame_stack[i].frame = NULL;
+        qlist_del(&frame_entry->link);
+        free(frame_entry);
     }
-    free(*smcb);
-    (*smcb) = (struct PINT_smcb *)0;
+    free(smcb);
 }
 
 /* Function: PINT_pop_state
@@ -532,8 +553,7 @@ void PINT_smcb_free(struct PINT_smcb **smcb)
  *      implementing nested SMs - called by the
  *      "next" routine above
  */
-/* should probably be STATIC - WBL */
-struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
+static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
 {
     assert(smcb->stackptr > 0);
 
@@ -547,9 +567,8 @@ struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
  *      implementing nested SMs - called by the
  *      "next" routine above
  */
-/* should probably be STATIC - WBL */
-void PINT_push_state(struct PINT_smcb *smcb,
-				   struct PINT_state_s *p)
+static void PINT_push_state(struct PINT_smcb *smcb,
+                            struct PINT_state_s *p)
 {
     assert(smcb->stackptr < PINT_STATE_STACK_SIZE);
 
@@ -563,12 +582,31 @@ void PINT_push_state(struct PINT_smcb *smcb,
  */
 void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
 {
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "FRAME smcb %p base %d stack %d\n",
-            smcb, smcb->framebaseptr, smcb->framestackptr);
-    assert(smcb->framebaseptr + index < smcb->framestackptr);
-    
-    return smcb->frame_stack[smcb->framebaseptr + index].frame;
+    struct PINT_frame_s *frame_entry;
+    struct qlist_head *next;
+
+    if(qlist_empty(&smcb->frames))
+    {
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                     "FRAME GET smcb %p index %d -> frame: NULL\n",
+                     smcb, index);
+        return NULL;
+    }
+    else
+    {
+        int i = 0;
+
+        next = smcb->frames.next;
+        while(i < index)
+        {
+            next = next->next;
+        }
+        frame_entry = qlist_entry(next, struct PINT_frame_s, link);
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                     "FRAME GET smcb %p index %d -> frame: %p\n",
+                     smcb, index, frame_entry->frame);
+        return frame_entry->frame;
+    }
 }
 
 /* Function: PINT_sm_push_frame
@@ -576,36 +614,22 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
  * Returns: 
  * Synopsis: pushes a new frame pointer onto the frame_stack
  */
-void PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p)
- {
-    int index;
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "PUSH smcb %p base %d stack %d\n",
-            smcb, smcb->framebaseptr, smcb->framestackptr);
-    assert(smcb->framestackptr < PINT_FRAME_STACK_SIZE);
-
-    index = smcb->framestackptr;
-    smcb->framestackptr++;
-    smcb->frame_stack[index].task_id = task_id;
-    smcb->frame_stack[index].frame = frame_p;
- }
-
-/* Function: PINT_sm_set
- * Params: pointer to smcb
- * Returns: 
- * Synopsis: This moves the framebaseptr up to the stop of the frame_stack
- */
-void PINT_sm_set_frame(struct PINT_smcb *smcb)
+int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p)
 {
+    struct PINT_frame_s *newframe;
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "SET smcb %p base %d stack %d\n",
-            smcb, smcb->framebaseptr, smcb->framestackptr);
-    assert(smcb->framestackptr >= 0);
+                 "PUSH FRAME %p onto smcb %p\n",
+                 frame_p, smcb);
 
-    if (smcb->framestackptr == 0)
-        smcb->framebaseptr = 0;
-    else
-        smcb->framebaseptr = smcb->framestackptr - 1;
+    newframe = malloc(sizeof(struct PINT_frame_s));
+    if(!newframe)
+    {
+        return -PVFS_ENOMEM;
+    }
+    newframe->task_id = task_id;
+    newframe->frame = frame_p;
+    qlist_add(&newframe->link, &smcb->frames);
+    return 0;
 }
 
 /* Function: PINT_sm_pop_frame
@@ -613,21 +637,27 @@ void PINT_sm_set_frame(struct PINT_smcb *smcb)
  * Returns: frame pointer
  * Synopsis: pops a frame pointer from the frame_stack and returns it
  */
-void *PINT_sm_pop_frame(struct PINT_smcb *smcb)
+void *PINT_sm_pop_frame(struct PINT_smcb *smcb, int *error_code)
 {
-    int index;
+    struct PINT_frame_s *frame_entry;
     void *frame;
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-            "POP smcb %p base %d stack %d\n",
-            smcb, smcb->framebaseptr, smcb->framestackptr);
-    assert(smcb->framestackptr > smcb->framebaseptr);
 
-    smcb->framestackptr--;
-    index = smcb->framestackptr;
-    frame = smcb->frame_stack[index].frame;
-    smcb->frame_stack[index].task_id = 0;
-    /* so we won't free on smcb_free */
-    smcb->frame_stack[index].frame = NULL;
+    if(qlist_empty(&smcb->frames))
+    {
+        return NULL;
+    }
+
+    frame_entry = qlist_entry(&smcb->frames.next, struct PINT_frame_s, link);
+    qlist_del(smcb->frames.next);
+
+    frame = frame_entry->frame;
+    *error_code = frame_entry->error;
+
+    free(frame_entry);
+
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "POP FRAME %p from smcb %p\n",
+            frame, smcb);
     return frame;
 }
 
@@ -638,8 +668,7 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb)
  *      code to decide which SM a new child should run.  Called
  *      by the start_child_frames function
  */
-/* should probably be STATIC - WBL */
-struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id)
+static struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id)
 {
     struct PINT_pjmp_tbl_s *pjmptbl;
     int i;
@@ -652,6 +681,12 @@ struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id)
     }
 }
 
+static int child_sm_frame_terminate(struct PINT_smcb * smcb, job_status_s * js_p)
+{
+    PINT_smcb_free(smcb);
+    return 0;
+}
+
 /* Function: PINT_sm_start_child_frames
  * Params: pointer to an smcb pointer
  * Returns: number of children started
@@ -660,38 +695,34 @@ struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id)
  *      number of children to be returned to decide if the state is
  *      deferred or not.
  */
-/* should probably be STATIC - WBL */
-void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
+static void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
 {
-    int i, retval;
+    int retval;
     struct PINT_smcb *new_sm;
+    struct PINT_frame_s *frame_entry;
     job_status_s r;
 
     assert(smcb);
 
-    /* framebaseptr is the current SM, start at +1 */
-    for(i = smcb->framebaseptr + 1; i < smcb->framestackptr; i++)
+    qlist_for_each_entry(frame_entry, &smcb->frames, link)
     {
         /* allocate smcb */
         PINT_smcb_alloc(&new_sm, smcb->op, 0, NULL,
-                smcb->terminate_fn, smcb->context);
+                child_sm_frame_terminate, smcb->context);
         /* set parent smcb pointer */
         new_sm->parent_smcb = smcb;
         /* increment parent's counter */
         smcb->children_running++;
         /* assign frame */
-        PINT_sm_push_frame(new_sm, smcb->frame_stack[i].task_id,
-                smcb->frame_stack[i].frame);
+        PINT_sm_push_frame(new_sm, frame_entry->task_id, frame_entry->frame);
         /* locate SM to run */
-        new_sm->current_state = PINT_sm_task_map(smcb,
-                smcb->frame_stack[i].task_id);
-#if 0
-        fprintf(stderr,"child %d task_id %d state %p flag %d func %p\n",
-            i, smcb->frame_stack[i].task_id, new_sm->current_state,
-            new_sm->current_state->flag, new_sm->current_state->action.func);
-#endif
+        new_sm->current_state = PINT_sm_task_map(smcb, frame_entry->task_id);
         /* invoke SM */
         retval = PINT_state_machine_start(new_sm, &r);
+        if(retval < 0)
+        {
+            gossip_err("PJMP child state machine failed to start.\n");
+        }
     }
 }
 

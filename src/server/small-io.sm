@@ -18,13 +18,6 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 
-static PINT_sm_action small_io_start_job(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action small_io_check_size(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action small_io_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_small_io_sm

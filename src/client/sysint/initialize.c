@@ -280,7 +280,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         PINT_dist_finalize();
     }
 
-    PINT_smcb_free(&smcb);
+    PINT_smcb_free(smcb);
 
     return ret;
 }

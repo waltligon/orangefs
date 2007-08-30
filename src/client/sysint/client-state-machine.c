@@ -389,7 +389,7 @@ PVFS_error PINT_client_state_machine_post(
         *op_id = -1;
 
         /* free the smcb */
-        PINT_smcb_free(&smcb);
+        PINT_smcb_free(smcb);
 
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "Posted %s (%llu) "
@@ -427,7 +427,7 @@ PVFS_error PINT_client_state_machine_release(
 
     PINT_id_gen_safe_unregister(sm_p->sys_op_id);
 
-    PINT_smcb_free(&smcb);
+    PINT_smcb_free(smcb);
     return 0;
 }
 
@@ -796,7 +796,7 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
         if (sm_p) sm_p->cred_p = NULL;
     }
 
-    PINT_smcb_free(&smcb);
+    PINT_smcb_free(smcb);
 }
 
 void PINT_mgmt_release(PVFS_mgmt_op_id op_id)

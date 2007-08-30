@@ -15,21 +15,6 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 
-static PINT_sm_action mkdir_create(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mkdir_setattrib(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mkdir_create_dirdata_dspace(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mkdir_write_dirdata_handle(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mkdir_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mkdir_error(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action mkdir_prep_sm(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 nested machine pvfs2_mkdir_work_sm

@@ -14,13 +14,6 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 
-static PINT_sm_action truncate_resize(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action truncate_check_error(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action truncate_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_truncate_sm

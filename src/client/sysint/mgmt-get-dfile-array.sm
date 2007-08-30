@@ -27,9 +27,6 @@
 
 extern job_context_id pint_client_sm_context;
 
-static PINT_sm_action mgmt_get_dfile_array_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_client_mgmt_get_dfile_array_sm

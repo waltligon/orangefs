@@ -24,24 +24,9 @@ static int server_parse_config(
     char *fs_config_buf,
     uint32_t fs_config_buf_size);
 
-/* state function prototypes */
-static PINT_sm_action server_get_config_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action server_get_config_parent_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action server_get_config_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action server_get_config_parse(
-    struct PINT_smcb *smcb, job_status_s *js_p);
 static int server_get_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
-static PINT_sm_action server_fetch_config_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static int server_fetch_config_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static int server_fetch_config_parent_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
 static int server_fetch_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
@@ -477,7 +462,7 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
         nservers * sizeof(PINT_sm_msgpair_state));
     if (!sm_p->msgarray)
     {
-        PINT_smcb_free(&smcb);
+        PINT_smcb_free(smcb);
         return -PVFS_ENOMEM;
     }
 

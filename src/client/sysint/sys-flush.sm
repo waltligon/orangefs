@@ -25,13 +25,6 @@
 
 extern job_context_id pint_client_sm_context;
 
-static PINT_sm_action flush_datafile_flush_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action flush_datafile_setup_msgpairarray(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action flush_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_client_flush_sm

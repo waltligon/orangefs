@@ -35,18 +35,13 @@ enum {
 
 extern job_context_id pint_client_sm_context;
 
-static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
 static int readdirplus_fetch_attrs_comp_fn(void *v_p,
-    struct PVFS_server_resp *resp_p, int index);
-static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
-    struct PINT_smcb *smcb, job_status_s *js_p);
+                               struct PVFS_server_resp *resp_p,
+                               int index);
+
 static int readdirplus_fetch_sizes_comp_fn(void *v_p,
-   struct PVFS_server_resp *resp_p, int index);
-static PINT_sm_action readdirplus_msg_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action readdirplus_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
+                               struct PVFS_server_resp *resp_p,
+                               int index);
 
 %%
 

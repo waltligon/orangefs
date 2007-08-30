@@ -15,11 +15,6 @@
 #include "job-time-mgr.h"
 #include "server-config.h"
 
-static PINT_sm_action job_timer_do_work(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action job_timer_error(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_job_timer_sm

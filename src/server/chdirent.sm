@@ -19,25 +19,6 @@ enum
     UPDATE_DIR_ATTR_REQUIRED = 135
 };
 
-static PINT_sm_action chdirent_verify_parent_metadata_and_read_directory_entry_handle(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action chdirent_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action chdirent_change_directory_entry(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action chdirent_check_for_req_dir_update(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action chdirent_update_directory_attr(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action chdirent_read_directory_entry(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action chdirent_read_directory_entry_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action chdirent_change_directory_entry_failure(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action chdirent_setup_resp(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_chdirent_sm

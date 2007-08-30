@@ -13,11 +13,6 @@
 #include "pvfs2-server.h"
 #include "server-config.h"
 
-static PINT_sm_action proto_error_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action proto_error_init(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_proto_error_sm

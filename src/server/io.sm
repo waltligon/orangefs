@@ -19,17 +19,6 @@
 #include "pint-request.h"
 #include "pvfs2-internal.h"
 
-static PINT_sm_action io_send_ack(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_send_completion_ack(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_start_flow(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_release(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-static PINT_sm_action io_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p);
-
 %%
 
 machine pvfs2_io_sm
@@ -48,7 +37,7 @@ machine pvfs2_io_sm
         default => release;
     }
 
-    state send_negative_ack 
+    state send_negative_ack
     {
         run io_send_ack;
         default => release;
