@@ -703,9 +703,9 @@ static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs,
 
 #ifdef HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE
 #define pg_ref_count(pg) atomic_read(&(pg)->count)
-#endif
-
+#else
 #define pg_ref_count(pg) atomic_read(&(pg)->_count)
+#endif
 /*
  * Cleaning up pages in the cache involves dropping the reference count
  * while cleaning up pages that were newly allocated involves unlocking
@@ -2862,7 +2862,7 @@ int pvfs2_ioctl(
 {
     return -ENOTTY;
 }
-#endif
+#else
 
 int pvfs2_ioctl(
     struct inode *inode,
@@ -2921,6 +2921,7 @@ int pvfs2_ioctl(
 
     return ret;
 }
+#endif
 
 /** Memory map a region of a file.
  */
