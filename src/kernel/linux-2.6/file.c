@@ -2848,6 +2848,18 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
 
 /** Perform a miscellaneous operation on a file.
  */
+
+#ifdef HAVE_NO_FS_IOC_FLAGS
+int pvfs2_ioctl(
+        struct inode *inode,
+        struct file *file,
+        unsigned int cmd,
+        unsigned long arg)
+{
+    return -ENOTTY;
+}
+#endif
+
 int pvfs2_ioctl(
     struct inode *inode,
     struct file *file,

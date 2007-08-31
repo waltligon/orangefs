@@ -207,6 +207,9 @@
 /* Define if including linux/config.h gives no warnings */
 #undef HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H
 
+/* Define if FS_IOC flags missing from fs.h */
+#undef HAVE_NO_FS_IOC_FLAGS
+
 /* Define to 1 if you have the <openssl/crypto.h> header file. */
 #undef HAVE_OPENSSL_CRYPTO_H
 

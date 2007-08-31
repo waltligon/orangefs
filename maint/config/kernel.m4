@@ -788,5 +788,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+	dnl FS_IOC_GETFLAGS and FS_IOC_SETFLAGS appeared 
+	dnl somewhere around 2.6.20.1 as generic versions of fs-specific flags
+	AC_MSG_CHECKING(for generic FS_IOC ioctl flags)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+	], [
+	    int flags = FS_IOC_GETFLAGS;
+	],
+	AC_MSG_RESULT(yes),
+	AC_DEFINE(HAVE_NO_FS_IOC_FLAGS, 1, Define if FS_IOC flags missing from fs.h)
+	AC_MSG_RESULT(no)
+	)
+
 	CFLAGS=$oldcflags
 ])
