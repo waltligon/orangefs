@@ -1024,6 +1024,7 @@ int pvfs2_dev_init(void)
         pvfs2_ioctl32_cleanup();
         return pvfs2_dev_major;
     }
+#ifdef HAVE_KERNEL_DEVICE_CLASSES
     pvfs2_dev_class = class_create(THIS_MODULE, "pvfs2");
     if (IS_ERR(pvfs2_dev_class)) {
         pvfs2_ioctl32_cleanup();
@@ -1034,6 +1035,7 @@ int pvfs2_dev_init(void)
     class_device_create(pvfs2_dev_class, NULL,
                         MKDEV(pvfs2_dev_major, 0), NULL,
                         PVFS2_REQDEVICE_NAME);
+#endif
 
     gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device registered ***\n",
 		PVFS2_REQDEVICE_NAME);
@@ -1044,8 +1046,10 @@ int pvfs2_dev_init(void)
 
 void pvfs2_dev_cleanup(void)
 {
+#ifdef HAVE_KERNEL_DEVICE_CLASSES
     class_device_destroy(pvfs2_dev_class, MKDEV(pvfs2_dev_major, 0));
     class_destroy(pvfs2_dev_class);
+#endif
     unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
     gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device unregistered ***\n",
             PVFS2_REQDEVICE_NAME);

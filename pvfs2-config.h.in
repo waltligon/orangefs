@@ -156,6 +156,9 @@
 /* Define if kernel has i_size_write */
 #undef HAVE_I_SIZE_WRITE
 
+/* Define if kernel lacks device classes */
+#undef HAVE_KERNEL_DEVICE_CLASSES
+
 /* Define if kmem_cache_destroy returns int */
 #undef HAVE_KMEM_CACHE_DESTROY_INT_RETURN
 
