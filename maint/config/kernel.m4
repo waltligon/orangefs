@@ -829,7 +829,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_KERNEL_DEVICE_CLASSES, 1, Define if kernel lacks device classes),
-	AC_MSG_RESULT(yes)
+	AC_MSG_RESULT(no)
 	)
 
 	CFLAGS=$oldcflags
