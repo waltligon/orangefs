@@ -810,8 +810,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    #define __KERNEL__
 	    #include <linux/mm.h>
 	], [
-	    struct page p;
-	    p.count = 0;
+	    struct page *p;
+	    int foo;
+	    foo = atomic_read(&(p)->count);
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE, 1, Define if struct page defines a count member without leading underscore),

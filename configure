@@ -11223,8 +11223,9 @@ int
 main ()
 {
 
-	    struct page p;
-	    p.count = 0;
+	    struct page *p;
+	    int foo;
+	    foo = atomic_read(&(p)->count);
 
   ;
   return 0;
