@@ -701,6 +701,10 @@ static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs,
     return max_nr_iovecs;
 }
 
+#ifdef HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE
+#define pg_ref_count(pg) atomic_read(&(pg)->count)
+#endif
+
 #define pg_ref_count(pg) atomic_read(&(pg)->_count)
 /*
  * Cleaning up pages in the cache involves dropping the reference count

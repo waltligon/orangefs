@@ -802,5 +802,21 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+	dnl old linux kernels define struct page with a 'count' member, whereas
+	dnl other kernels (since at least 2.6.20) define struct page with a
+	dnl '_count'
+	AC_MSG_CHECKING(for obsolete struct page count without underscore)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/mm.h>
+	], [
+	    struct page p;
+	    p.count = 0;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE, 1, Define if struct page defines a count member without leading underscore),
+	AC_MSG_RESULT(no)
+	)
+
 	CFLAGS=$oldcflags
 ])

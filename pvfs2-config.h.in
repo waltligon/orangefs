@@ -210,6 +210,9 @@
 /* Define if FS_IOC flags missing from fs.h */
 #undef HAVE_NO_FS_IOC_FLAGS
 
+/* Define if struct page defines a count member without leading underscore */
+#undef HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE
+
 /* Define to 1 if you have the <openssl/crypto.h> header file. */
 #undef HAVE_OPENSSL_CRYPTO_H
 
