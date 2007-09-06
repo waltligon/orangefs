@@ -14738,8 +14738,11 @@ echo "$as_me: error: OpenIB library libibverbs.so not found." >&2;}
 
 
     if test -n "$BUILD_OPENIB" ; then
-			save_ldflags="$LDFLAGS"
+				save_ldflags="$LDFLAGS"
 	LDFLAGS="-L$OPENIB_LIBDIR -libverbs"
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$OPENIB_INCDIR"
+
 	{ echo "$as_me:$LINENO: checking for ibv_get_devices" >&5
 echo $ECHO_N "checking for ibv_get_devices... $ECHO_C" >&6; }
 	cat >conftest.$ac_ext <<_ACEOF
@@ -14795,7 +14798,6 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
-	LDFLAGS="$save_ldflags"
 
 		{ echo "$as_me:$LINENO: checking for IBV_EVENT_CLIENT_REREGISTER" >&5
 echo $ECHO_N "checking for IBV_EVENT_CLIENT_REREGISTER... $ECHO_C" >&6; }
@@ -14852,6 +14854,9 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	LDFLAGS="$save_ldflags"
+	CPPFLAGS="$save_cppflags"
     fi
 
 
@@ -16327,7 +16332,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT 1
+#define HAVE_GETMNTENT
 _ACEOF
 
 else
