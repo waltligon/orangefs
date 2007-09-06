@@ -129,10 +129,14 @@ AC_DEFUN([AX_IB],
     AC_SUBST(OPENIB_LIBDIR)
 
     if test -n "$BUILD_OPENIB" ; then
-	dnl Check for which version of the ibverbs library, device opening is
-	dnl different.  This format is the older one; newer is ibv_get_device_list.
+	dnl Check for which version of the ibverbs library; device opening is
+	dnl different.  This format is the older one, newer is
+	dnl ibv_get_device_list.
 	save_ldflags="$LDFLAGS"
 	LDFLAGS="-L$OPENIB_LIBDIR -libverbs"
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$OPENIB_INCDIR"
+
 	AC_MSG_CHECKING(for ibv_get_devices)
 	AC_TRY_LINK([], [
 	    ibv_get_devices();
@@ -142,7 +146,6 @@ AC_DEFUN([AX_IB],
 		      Define if libibverbs has ibv_get_devices),
 	    AC_MSG_RESULT(no)
 	)
-	LDFLAGS="$save_ldflags"
 
 	dnl Check for existence of reregister event; it's somewhat new.
 	AC_MSG_CHECKING(for IBV_EVENT_CLIENT_REREGISTER)
@@ -156,7 +159,10 @@ AC_DEFUN([AX_IB],
 		      Define if libibverbs has reregister event),
 	    AC_MSG_RESULT(no)
 	)
+
+	LDFLAGS="$save_ldflags"
+	CPPFLAGS="$save_cppflags"
     fi
 ])
 
-dnl vim: set ft=config : 
+dnl vim: set ft=config :
