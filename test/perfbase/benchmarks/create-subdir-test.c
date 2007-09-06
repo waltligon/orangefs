@@ -158,7 +158,7 @@ int main(int argc, char **argv)
 		  test_util_start_timing();
 		  pvfs_error = PVFS_sys_create(test_file, mkdir_resp.ref,
 												 attr, &credentials,
-												 NULL, &create_resp);
+												 NULL, NULL, &create_resp);
 		  test_util_stop_timing();
 		  if(pvfs_error != 0)
 		  {

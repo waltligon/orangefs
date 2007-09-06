@@ -308,12 +308,12 @@ static int test_create(int nullCase)
     case 0:
 	ret =
 	    PVFS_sys_create(NULL, resp_look.ref, attr, &credentials,
-			    NULL, &resp_create);
+			    NULL, NULL, &resp_create);
 	break;
     case 1:
 	ret =
 	    PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-			    NULL, NULL);
+			    NULL, NULL, NULL);
 	break;
     default:
 	fprintf(stderr, "Error - incorect case number \n");
@@ -550,7 +550,7 @@ static int init_file(void)
     }
 
     return PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-			   NULL, &resp_create);
+			   NULL, NULL, &resp_create);
 
 }
 

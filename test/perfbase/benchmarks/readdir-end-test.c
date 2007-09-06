@@ -159,7 +159,7 @@ int main(int argc, char **argv)
 
 		  pvfs_error = PVFS_sys_create(test_file, mkdir_resp.ref,
 												 attr, &credentials,
-												 NULL, &create_resp);
+												 NULL, NULL, &create_resp);
 		  if(pvfs_error != 0)
 		  {
 				PVFS_perror("PVFS_sys_create", pvfs_error);
