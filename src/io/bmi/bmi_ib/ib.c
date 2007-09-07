@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.55 2007-08-22 16:12:45 slang Exp $
+ * $Id: ib.c,v 1.56 2007-09-07 16:02:14 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -214,8 +214,9 @@ static int ib_check_cq(void)
 		else if (state == SQ_WAITING_RTS_DONE_SEND_COMPLETION)
 		    sq->state.send = SQ_WAITING_USER_TEST;
 		else
-		    assert(0, "%s: unknown send state %s of sq %p",
-		           __func__, sq_state_name(sq->state.send), sq);
+		    assert(0, "%s: unknown send state %s (%d) of sq %p",
+		           __func__, sq_state_name(sq->state.send),
+			   sq->state.send, sq);
 		debug(2, "%s: send to %s completed locally: -> %s",
 		      __func__, bh->c->peername, sq_state_name(sq->state.send));
 

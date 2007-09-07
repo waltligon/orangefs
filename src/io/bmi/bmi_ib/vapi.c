@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.11 2007-05-08 21:28:01 pw Exp $
+ * $Id: vapi.c,v 1.12 2007-09-07 16:02:14 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -417,12 +417,14 @@ static void vapi_post_sr(const struct buf_head *bh, u_int32_t len)
 
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND;
-    sr.id = int64_from_ptr(c);  /* for error checking if send fails */
+    sr.id = int64_from_ptr(bh);
+    sr.comp_type = VAPI_SIGNALED;
+/* no unsignaled anymore, see openib.c
     if (++vc->num_unsignaled_wr + 100 == vd->max_outstanding_wr) {
 	vc->num_unsignaled_wr = 0;
-	sr.comp_type = VAPI_SIGNALED;
     } else
-	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
+	sr.comp_type = VAPI_UNSIGNALED;
+ */
     sr.sg_lst_p = &sg;
     sr.sg_lst_len = 1;
     ret = VAPI_post_sr(vd->nic_handle, vc->qp, &sr);
