@@ -664,6 +664,7 @@ int dbpf_storage_remove(char *stoname,
     }
 
     DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, stoname);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
     if (rmdir(path_name) != 0)
     {
         perror("failure removing storage space");
