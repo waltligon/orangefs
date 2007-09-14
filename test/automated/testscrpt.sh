@@ -105,8 +105,8 @@ setup_vfs() {
 
 setup_pvfs2() {
 	cd $PVFS2_DEST
-	rm -f fs.conf server.conf*
-	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf server.conf \
+	rm -f fs.conf 
+	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf \
 		--protocol tcp \
 		--iospec="`hostname -s`:{3396-3399}" \
 		--metaspec="`hostname -s`:{3396-3399}"  \
@@ -116,13 +116,13 @@ setup_pvfs2() {
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
 	failure_logs="${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* $failure_logs"
-	for server_conf in server.conf*; do 
+	for alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`; do
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
-			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid \
-			-f fs.conf $server_conf
+			-p `pwd`/pvfs2-server-${alias}.pid \
+			-f fs.conf -a $alias
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
-			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid  \
-			fs.conf $server_conf
+			-p `pwd`/pvfs2-server-${alias}.pid  \
+			fs.conf $server_conf -a $alias
 	done
 
 	echo "tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
