@@ -323,6 +323,22 @@ sub emit_filesystem
     print $target "</Filesystem>\n";
 }
 
+sub emit_serveropts
+{
+    my $target = shift;
+
+    foreach my $alias (sort keys %all_endpoints)
+    {
+        my $endpoint = $all_endpoints{$alias};
+        print $target "\n<ServerOptions>\n";
+        print $target "\tServer $alias\n";
+        print $target "\tStorageSpace $endpoint->{STORAGE}\n";
+        print $target "\tLogFile $endpoint->{LOGFILE}\n";
+        print $target "</ServerOptions>\n";
+    }
+}
+
+
 sub emit_server_conf
 {
     my($target, $node, $storage, $logfile) = @_;
@@ -1410,11 +1426,16 @@ emit_aliases($output_target);
 emit_filesystem($output_target, "pvfs2-fs", $fsid, $root_handle, 
     $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count);
 
+if ($opt_metaspec) {
+    emit_serveropts($output_target);
+}
+
 # close fs.conf
 if ($using_stdout == 0)
 {
     close($output_target);
 }
+
 
 # Local variables:
 #  c-indent-level: 4
