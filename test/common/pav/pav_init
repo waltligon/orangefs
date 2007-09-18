@@ -52,10 +52,11 @@ sub start_servers{
     my $localconf = $href->{'WORKINGDIR'} . "/server.conf";
 
     # once to make the storage space, then a second time to run the servers
-    my $cmd = "%node $binary  -f $serverconf $localconf-%node";
+
+    my $cmd = "%node $binary  -f $serverconf -a %node";
     $rc = do_remote_command($href->{'RCMDPROG'}, 8, 30, $cmd, undef, undef, @nodes);
 
-    $cmd = "%node $binary $serverconf $localconf-%node";
+    $cmd = "%node $binary $serverconf -a %node";
     $rc = do_remote_command($href->{'RCMDPROG'}, 8, 30, $cmd, undef, undef, @nodes);
     return($rc);
 }

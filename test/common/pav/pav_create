@@ -131,7 +131,6 @@ sub create_pvfs2config
 {
     my $href = shift;
     my $conffile = $href->{'WORKINGDIR'} . "/fs.conf";
-    my $serverfile = $href->{'WORKINGDIR'} ."/server.conf";
     my $ioservers = '';
     my $metaservers = '';
     my $rc = -1;
@@ -162,7 +161,7 @@ sub create_pvfs2config
 		. " --logfile "  . $href->{'SERVERLOG'} . "/pvfs2.log"
 		. " --storage "  . $href->{'STORAGE'}
 		. " --trove-method " . $href->{'TROVEMETHOD'}
-		. " --quiet "    . $conffile . " " . $serverfile;
+		. " --quiet "    . $conffile;
     if ($href->{'TROVESYNC'} == 0) {
     	$cmd .= " --notrovesync";
     }
