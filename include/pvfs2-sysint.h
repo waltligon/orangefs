@@ -421,11 +421,11 @@ PVFS_error PVFS_isys_io(
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
-#define PVFS_isys_read(x1,x2,x3,x4,x5,x6,y) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ)
+#define PVFS_isys_read(x1,x2,x3,x4,x5,x6,y,x7,x8) \
+PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,x7,x8)
 
-#define PVFS_isys_write(x1,x2,x3,x4,x5,x6,y) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE)
+#define PVFS_isys_write(x1,x2,x3,x4,x5,x6,y,x7,x8) \
+PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,x7,x8)
 
 PVFS_error PVFS_sys_io(
     PVFS_object_ref ref,
