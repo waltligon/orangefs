@@ -363,7 +363,7 @@ typedef struct
 typedef struct
 {
     PVFS_object_ref refn;
-    char *link_target;
+    char link_target[PVFS_NAME_MAX];
     /*
      * Reading/Writing Extended attributes need to acquire the appropriate
      * reader/writer semaphore on the pvfs2_inode_t structure.

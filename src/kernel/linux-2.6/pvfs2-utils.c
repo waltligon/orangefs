@@ -288,17 +288,7 @@ int copy_attributes_to_inode(
                 /* copy link target to inode private data */
                 if (pvfs2_inode && symname)
                 {
-                    if (pvfs2_inode->link_target)
-                    {
-                        kfree(pvfs2_inode->link_target);
-                        pvfs2_inode->link_target = NULL;
-                    }
-                    pvfs2_inode->link_target = kmalloc(
-                        (strlen(symname) + 1), PVFS2_GFP_FLAGS);
-                    if (pvfs2_inode->link_target)
-                    {
-                        strcpy(pvfs2_inode->link_target, symname);
-                    }
+                    strncpy(pvfs2_inode->link_target, symname, PVFS_NAME_MAX);
                     gossip_debug(GOSSIP_UTILS_DEBUG, "Copied attr link target %s\n",
                                 pvfs2_inode->link_target);
                 }
@@ -1956,7 +1946,7 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
         pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
         pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
         pvfs2_inode->last_failed_block_index_read = 0;
-        pvfs2_inode->link_target = NULL;
+        memset(pvfs2_inode->link_target, 0, sizeof(pvfs2_inode->link_target));
         pvfs2_inode->error_code = 0;
         SetInitFlag(pvfs2_inode);
     }
@@ -1964,7 +1954,6 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
 
 /*
   this is called from super:pvfs2_destroy_inode.
-  pvfs2_inode_cache_dtor frees the link_target if any
 */
 void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
 {

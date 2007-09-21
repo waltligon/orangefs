@@ -203,14 +203,7 @@ static void dev_req_cache_ctor(
     pvfs2_kmem_cache_t * cachep,
     unsigned long flags)
 {
-    if (flags & SLAB_CTOR_CONSTRUCTOR)
-    {
-        memset(req, 0, sizeof(MAX_ALIGNED_DEV_REQ_DOWNSIZE));
-    }
-    else
-    {
-        gossip_err("WARNING!! devreq_ctor called without ctor flag\n");
-    }
+    memset(req, 0, sizeof(MAX_ALIGNED_DEV_REQ_DOWNSIZE));
 }
 
 int dev_req_cache_initialize(void)
@@ -269,45 +262,24 @@ static void pvfs2_inode_cache_ctor(
 {
     pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *)new_pvfs2_inode;
 
-    if (flags & SLAB_CTOR_CONSTRUCTOR)
-    {
-        memset(pvfs2_inode, 0, sizeof(pvfs2_inode_t));
-        ClearInitFlag(pvfs2_inode);
+    memset(pvfs2_inode, 0, sizeof(pvfs2_inode_t));
+    ClearInitFlag(pvfs2_inode);
 
-        pvfs2_inode_initialize(pvfs2_inode);
+    pvfs2_inode_initialize(pvfs2_inode);
 
 #ifndef PVFS2_LINUX_KERNEL_2_4
-        /*
-           inode_init_once is from 2.6.x's inode.c; it's normally run
-           when an inode is allocated by the system's inode slab
-           allocator.  we call it here since we're overloading the
-           system's inode allocation with this routine, thus we have
-           to init vfs inodes manually
-        */
-        inode_init_once(&pvfs2_inode->vfs_inode);
-        pvfs2_inode->vfs_inode.i_version = 1;
+    /*
+       inode_init_once is from 2.6.x's inode.c; it's normally run
+       when an inode is allocated by the system's inode slab
+       allocator.  we call it here since we're overloading the
+       system's inode allocation with this routine, thus we have
+       to init vfs inodes manually
+    */
+    inode_init_once(&pvfs2_inode->vfs_inode);
+    pvfs2_inode->vfs_inode.i_version = 1;
 #endif
-        /* Initialize the reader/writer semaphore */
-        init_rwsem(&pvfs2_inode->xattr_sem);
-    }
-    else
-    {
-        gossip_err("WARNING!! inode_ctor called without ctor flag\n");
-    }
-}
-
-static void pvfs2_inode_cache_dtor(
-    void *old_pvfs2_inode,
-    pvfs2_kmem_cache_t * cachep,
-    unsigned long flags)
-{
-    pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *)old_pvfs2_inode;
-
-    if (pvfs2_inode && pvfs2_inode->link_target)
-    {
-        kfree(pvfs2_inode->link_target);
-        pvfs2_inode->link_target = NULL;
-    }
+    /* Initialize the reader/writer semaphore */
+    init_rwsem(&pvfs2_inode->xattr_sem);
 }
 
 static inline void add_to_pinode_list(pvfs2_inode_t *pvfs2_inode)
@@ -330,8 +302,7 @@ int pvfs2_inode_cache_initialize(void)
 {
     pvfs2_inode_cache = kmem_cache_create(
         "pvfs2_inode_cache", sizeof(pvfs2_inode_t), 0,
-        PVFS2_CACHE_CREATE_FLAGS, pvfs2_inode_cache_ctor,
-        pvfs2_inode_cache_dtor);
+        PVFS2_CACHE_CREATE_FLAGS, pvfs2_inode_cache_ctor, NULL);
 
     if (!pvfs2_inode_cache)
     {
@@ -403,14 +374,7 @@ static void kiocb_ctor(
     pvfs2_kmem_cache_t * cachep,
     unsigned long flags)
 {
-    if (flags & SLAB_CTOR_CONSTRUCTOR)
-    {
-        memset(req, 0, sizeof(pvfs2_kiocb));
-    }
-    else
-    {
-        gossip_err("WARNING!! kiocb_ctor called without ctor flag\n");
-    }
+    memset(req, 0, sizeof(pvfs2_kiocb));
 }
 
 
