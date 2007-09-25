@@ -1070,7 +1070,6 @@ DOTCONF_CB(get_storage_space)
     }
     if (config_s->storage_path)
     {
-        gossip_err("WARNING: StorageSpace value being overwritten.\n");
         free(config_s->storage_path);
     }
     config_s->storage_path =
