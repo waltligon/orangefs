@@ -19,16 +19,23 @@
 #include "str-utils.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 
-/* state function prototypes */
+/* state function prototypes for version nested machine */
 static PINT_sm_action version_init(
     struct PINT_smcb *smcb, job_status_s *js_p);
 static PINT_sm_action version_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p);
 static PINT_sm_action version_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p);
+
+/* state function prototypes for system interface version state machine */
+static PINT_sm_action version_set_sys_response(
+    struct PINT_smcb *smcb, job_status_s *js_p);
+
+/* completion function prototypes */
 static int version_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
@@ -36,24 +43,11 @@ static int version_comp_fn(
 
 nested machine pvfs2_client_version_sm
 {
-    state init
-    {
-	run version_init;
-	default => getattr;
-    }
-
-    state getattr
-    {
-	jump pvfs2_client_getattr_sm;
-	success => setup_msgpair;
-        default => cleanup;
-    }
-
     state setup_msgpair
     {
         run version_setup_msgpair;
-        success => xfer_msgpair;
-        default => cleanup;
+        success => xfer_msgpair; 
+	default => cleanup;
     }
 
     state xfer_msgpair
@@ -65,9 +59,37 @@ nested machine pvfs2_client_version_sm
     state cleanup
     {
         run version_cleanup;
+        default => return;
+    }
+}
+
+machine pvfs2_client_sysint_version_sm
+{
+    state init
+    {
+	run version_init;
+	default => get_attr;
+    }
+
+    state get_attr
+    {
+	jump pvfs2_client_getattr_sm;
+	success => version;
+    }
+
+    state version
+    {
+	jump pvfs2_client_version_sm;
+	default => set_sys_response;
+    }
+
+    state set_sys_response
+    {
+        run version_set_sys_response;
         default => terminate;
     }
 }
+
 
 %%
 
@@ -85,7 +107,7 @@ PVFS_error PVFS_isys_version(
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_VERSION_DEBUG,
 		 "PINT_isys_version entered\n");
     
     if ((ref.handle == PVFS_HANDLE_NULL) ||
@@ -111,13 +133,13 @@ PVFS_error PVFS_isys_version(
     
 /* AC - forget what this is for.  I believe it is necessary to copy to
  * state machine so that you have a copy */
-    sm_p->u.version.op_type = op_type;
+    sm_p->version.op_type = op_type;
     sm_p->version.server_bit_array = server_bit_arr;
+    sm_p->version.op_var = op_var;
     sm_p->u.version.resp_p = resp_p;
-    sm_p->u.version.op_var = op_var;
     sm_p->object_ref = ref;
 
-    return PINT_client_state_machine_post(smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
 
 PVFS_error PVFS_sys_version(
@@ -131,8 +153,9 @@ PVFS_error PVFS_sys_version(
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_version entered\n");
-    
+    gossip_debug(GOSSIP_VERSION_DEBUG, "PVFS_sys_version entered\n");
+    memset(resp_p, 0, sizeof(PVFS_sysresp_version));
+
     ret = PVFS_isys_version(ref, credentials, op_type, resp_p, 
 			    server_bit_arr, op_var,
 			    &op_id, NULL);
@@ -161,7 +184,7 @@ static PINT_sm_action version_init(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) version state: "
+    gossip_debug(GOSSIP_VERSION_DEBUG, "(%p) version state: "
 		 "version_init\n", sm_p);
 
     assert(js_p->error_code == 0);
@@ -183,22 +206,29 @@ static PINT_sm_action version_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr = NULL;
+    struct server_configuration_s *server_config;
+    PVFS_handle version_meta_handle;
 
     attr = &sm_p->getattr.attr;
     assert(attr);
 
     sm_p->version.server_count = attr->u.meta.dfile_count;
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_VERSION_DEBUG,
 		"version state: version_setup_msgpair\n");
+
+    server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
+    version_meta_handle = PINT_cached_config_version_meta_remap(
+	server_config, sm_p->object_ref.fs_id, sm_p->object_ref.handle);
+    PINT_put_server_config_struct(server_config);
 
     PINT_SERVREQ_VERSION_FILL(
             sm_p->msgpair.req,
             (*sm_p->cred_p),
             sm_p->object_ref.fs_id,
-            sm_p->object_ref.handle,
-            sm_p->u.version.op_type,
-	    (uint32_t) sm_p->u.version.op_var,
-	    sm_p->u.version.op_var,
+	    version_meta_handle,
+            sm_p->version.op_type,
+	    (uint32_t) sm_p->version.op_var,
+	    sm_p->version.op_var,
 	    sm_p->version.server_count,
 	    sm_p->version.server_bit_array->numBits,
 	    sm_p->version.server_bit_array->array);
@@ -206,13 +236,13 @@ static PINT_sm_action version_setup_msgpair(
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
     sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle = sm_p->object_ref.handle;
+    sm_p->msgpair.handle = PVFS_HANDLE_NULL;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = version_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
             &sm_p->msgpair.svr_addr,
-            sm_p->msgpair.handle,
+	    sm_p->object_ref.handle,
             sm_p->msgpair.fs_id);
 
     if (ret)
@@ -220,6 +250,9 @@ static PINT_sm_action version_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = 0;
     }
+    gossip_debug(GOSSIP_VERSION_DEBUG,
+		"version state: version_setup_msgpair done!\n");
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -227,14 +260,85 @@ static PINT_sm_action version_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_VERSION_DEBUG,
 		 "version state: version_cleanup\n");
+
     sm_p->error_code  = js_p->error_code;
     if(sm_p->error_code != 0)
     {
         PINT_acache_invalidate(sm_p->object_ref);
     }
     
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action version_set_sys_response(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* Copy out PINT_client_sm to the resp */
+    switch (sm_p->version.op_type)
+    {
+	case PVFS_GET_UNIQUE_ID:
+	    memcpy(&sm_p->u.version.resp_p->u.unique_id_range,
+		   &sm_p->version.u.unique_id_range, 
+		   sizeof(PVFS_unique_id_range));
+	    break;
+	case PVFS_GET_SNAPSHOT:
+	    sm_p->u.version.resp_p->u.snapshot.snapshot_id =
+		sm_p->version.u.snapshot.snapshot_id;
+	    sm_p->u.version.resp_p->u.snapshot.min_snapshot_id = 
+		sm_p->version.u.snapshot.min_snapshot_id;
+	    sm_p->u.version.resp_p->u.snapshot.commit_tuple_count =
+		sm_p->version.u.snapshot.commit_tuple_count;
+
+
+	    assert(sm_p->u.version.resp_p->u.snapshot.tmp_id_arr == NULL);
+	    assert(sm_p->u.version.resp_p->u.snapshot.commit_id_arr == NULL);
+	    if (sm_p->u.version.resp_p->u.snapshot.commit_tuple_count)
+	    {
+		if ((sm_p->u.version.resp_p->u.snapshot.tmp_id_arr = malloc(
+			 sm_p->u.version.resp_p->u.snapshot.commit_tuple_count
+			 * sizeof(PVFS_id_gen_t))) == NULL)
+		{
+		    gossip_err("version_comp_fn: malloc tmp_id_arr failed\n");
+		    return -1;
+		}
+		
+		if ((sm_p->u.version.resp_p->u.snapshot.commit_id_arr = malloc(
+			 sm_p->u.version.resp_p->u.snapshot.commit_tuple_count
+			 * sizeof(PVFS_id_gen_t))) == NULL)
+		{
+		    gossip_err(
+			"version_comp_fn: malloc commit_id_arr failed\n");
+		    return -1;
+		}
+		
+		memcpy(sm_p->u.version.resp_p->u.snapshot.tmp_id_arr,
+		       sm_p->version.u.snapshot.tmp_id_arr,
+		       sm_p->u.version.resp_p->u.snapshot.commit_tuple_count *
+		       sizeof(PVFS_id_gen_t));
+		memcpy(sm_p->u.version.resp_p->u.snapshot.commit_id_arr,
+		       sm_p->version.u.snapshot.commit_id_arr,
+		       sm_p->u.version.resp_p->u.snapshot.commit_tuple_count *
+		       sizeof(PVFS_id_gen_t));
+	    }
+	    break;
+	case PVFS_REMOVE_SNAPSHOT:
+	    break;
+	case PVFS_COMMIT:
+	    sm_p->u.version.resp_p->u.commit_id = 
+		sm_p->version.u.commit_id;
+	    break;
+	default:
+	    break;
+    }
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    PINT_SM_VERSION_STATE_CLEAR(sm_p->version);
+
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }
@@ -246,8 +350,10 @@ static int version_comp_fn(
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_VERSION_DEBUG,
 		 "version completion fn: version_comp_fn\n");
 
     /* only posted one msgpair */
@@ -258,7 +364,88 @@ static int version_comp_fn(
         return resp_p->status;
 
     /* Copy the req to the PINT_client_sm */
-    switch (sm_p->u.version.op_type)
+    switch (sm_p->version.op_type)
+    {
+	case PVFS_GET_UNIQUE_ID:
+	    sm_p->version.u.unique_id_range.start = 
+		resp_p->u.version.unique_id_start;
+	    sm_p->version.u.unique_id_range.count = 
+		resp_p->u.version.unique_id_count;
+	    break;
+	case PVFS_GET_SNAPSHOT:
+	    sm_p->version.u.snapshot.snapshot_id = 
+		resp_p->u.version.snapshot_id;
+	    sm_p->version.u.snapshot.min_snapshot_id = 
+		resp_p->u.version.min_snapshot_id;
+	    sm_p->version.u.snapshot.commit_tuple_count = 
+		resp_p->u.version.commit_tuple_count;
+	    assert(sm_p->version.u.snapshot.tmp_id_arr == NULL);
+	    assert(sm_p->version.u.snapshot.commit_id_arr == NULL);
+	    if (sm_p->version.u.snapshot.commit_tuple_count)
+	    {
+		if ((sm_p->version.u.snapshot.tmp_id_arr = malloc(
+			 sm_p->version.u.snapshot.commit_tuple_count
+			 * sizeof(PVFS_id_gen_t))) == NULL)
+		{
+		    gossip_err("version_comp_fn: malloc tmp_id_arr failed\n");
+		    return -1;
+		}
+		
+		if ((sm_p->version.u.snapshot.commit_id_arr = malloc(
+			 sm_p->version.u.snapshot.commit_tuple_count
+			 * sizeof(PVFS_id_gen_t))) == NULL)
+		{
+		    gossip_err(
+			"version_comp_fn: malloc commit_id_arr failed\n");
+		    return -1;
+		}
+		
+		memcpy(sm_p->version.u.snapshot.tmp_id_arr,
+		       resp_p->u.version.tmp_id_arr,  
+		       sm_p->version.u.snapshot.commit_tuple_count *
+		       sizeof(PVFS_id_gen_t));
+		memcpy(sm_p->version.u.snapshot.commit_id_arr,
+		       resp_p->u.version.commit_id_arr,  
+		       sm_p->version.u.snapshot.commit_tuple_count *
+		       sizeof(PVFS_id_gen_t));
+	    }
+	    break;
+	case PVFS_REMOVE_SNAPSHOT:
+	    break;
+	case PVFS_COMMIT:
+	    sm_p->version.u.commit_id = resp_p->u.version.commit_id;
+	    break;
+	default:
+	    break;
+    }
+
+    return 0;
+}
+
+
+#if 0
+static int version_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    
+    gossip_debug(GOSSIP_VERSION_DEBUG,
+		 "version completion fn: version_comp_fn\n");
+
+    /* only posted one msgpair */
+    assert(i==0);
+    assert(resp_p->op == PVFS_SERV_VERSION);
+    
+    if(resp_p->status != 0)
+        return resp_p->status;
+
+    /* Copy the req to the PINT_client_sm */
+    switch (sm_p->version.op_type)
     {
 	case PVFS_GET_UNIQUE_ID:
 	    sm_p->u.version.resp_p->u.unique_id_range.start = 
@@ -267,38 +454,45 @@ static int version_comp_fn(
 		resp_p->u.version.unique_id_count;
 	    break;
 	case PVFS_GET_SNAPSHOT:
-	    sm_p->version.snapshot.snapshot_id = 
+	    sm_p->u.version.resp_p->u.snapshot.snapshot_id = 
 		resp_p->u.version.snapshot_id;
-	    sm_p->version.snapshot.min_snapshot_id = 
+	    sm_p->u.version.resp_p->u.snapshot.min_snapshot_id = 
 		resp_p->u.version.min_snapshot_id;
-	    sm_p->version.snapshot.commit_tuple_count = 
+	    sm_p->u.version.resp_p->u.snapshot.commit_tuple_count = 
 		resp_p->u.version.commit_tuple_count;
-	    assert(sm_p->version.snapshot.tmp_id_arr != NULL);
-	    assert(sm_p->version.snapshot.commit_id_arr != NULL);
-	    if ((sm_p->version.snapshot.tmp_id_arr = malloc(
-		     sm_p->version.snapshot.commit_tuple_count * 
-		     sizeof(PVFS_id_gen_t))) == NULL)
+	    assert(sm_p->u.version.resp_p->u.snapshot.tmp_id_arr == NULL);
+	    assert(sm_p->u.version.resp_p->u.snapshot.commit_id_arr == NULL);
+	    if (sm_p->u.version.resp_p->u.snapshot.commit_tuple_count)
 	    {
-		gossip_err("version_comp_fn: malloc tmp_id_arr failed\n");
-		return -1;
+		if ((sm_p->u.version.resp_p->u.snapshot.tmp_id_arr = malloc(
+			 sm_p->u.version.resp_p->u.snapshot.commit_tuple_count
+			 * sizeof(PVFS_id_gen_t))) == NULL)
+		{
+		    gossip_err("version_comp_fn: malloc tmp_id_arr failed\n");
+		    return -1;
+		}
+		
+		if ((sm_p->u.version.resp_p->u.snapshot.commit_id_arr = malloc(
+			 sm_p->u.version.resp_p->u.snapshot.commit_tuple_count
+			 * sizeof(PVFS_id_gen_t))) == NULL)
+		{
+		    gossip_err(
+			"version_comp_fn: malloc commit_id_arr failed\n");
+		    return -1;
+		}
+		
+		memcpy(sm_p->u.version.resp_p->u.snapshot.tmp_id_arr,
+		       resp_p->u.version.tmp_id_arr,  
+		       sm_p->u.version.resp_p->u.snapshot.commit_tuple_count *
+		       sizeof(PVFS_id_gen_t));
+		memcpy(sm_p->u.version.resp_p->u.snapshot.commit_id_arr,
+		       resp_p->u.version.commit_id_arr,  
+		       sm_p->u.version.resp_p->u.snapshot.commit_tuple_count *
+		       sizeof(PVFS_id_gen_t));
 	    }
-	    if ((sm_p->version.snapshot.commit_id_arr = malloc(
-		     sm_p->version.snapshot.commit_tuple_count * 
-		     sizeof(PVFS_id_gen_t))) == NULL)
-	    {
-		gossip_err("version_comp_fn: malloc commit_id_arr failed\n");
-		return -1;
-	    }
-	    memcpy(sm_p->version.snapshot.tmp_id_arr,
-		   resp_p->u.version.tmp_id_arr,  
-		   sm_p->version.snapshot.commit_tuple_count *
-		   sizeof(PVFS_id_gen_t));
-	    memcpy(sm_p->version.snapshot.commit_id_arr,
-		   resp_p->u.version.commit_id_arr,  
-		   sm_p->version.snapshot.commit_tuple_count *
-		   sizeof(PVFS_id_gen_t));
 	    break;
 	case PVFS_REMOVE_SNAPSHOT:
+	    break;
 	case PVFS_COMMIT:
 	    sm_p->u.version.resp_p->u.commit_id = resp_p->u.version.commit_id;
 	    break;
@@ -308,6 +502,7 @@ static int version_comp_fn(
 
     return 0;
 }
+#endif
 
 /*
  * Local variables:
