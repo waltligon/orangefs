@@ -199,8 +199,15 @@ sub emit_defaults
     print $target "\tClientRetryLimit 5\n";
     print $target "\tClientRetryDelayMilliSecs 2000\n";
 
-    print $target "\n\tStorageSpace " . $default_storage . "\n";
-    print $target "\tLogFile " . $default_logfile . "\n";
+    if(defined($default_storage))
+    {
+        print $target "\n\tStorageSpace " . $default_storage . "\n";
+    }
+
+    if(defined($default_logfile))
+    {
+        print $target "\tLogFile " . $default_logfile . "\n";
+    }
 
     print $target "</Defaults>\n";
 }
@@ -971,6 +978,7 @@ sub get_specs
         my $proto = undef;
         my $hostname = undef;
         my $portn = undef;
+        my $boardn = undef;
         if($ep =~ /^\[/)
         {
             # the string must have multiple protocols specified for the same
@@ -998,7 +1006,17 @@ sub get_specs
                 $prothost =~ /([a-z]+):\/\/([^:]+):([0-9]+)/;
                 $proto = $1;
                 my $hn = $2;
-                $portn = $3;
+
+                # special casing for mx
+                if($proto =~ /mx/)
+                {
+                    $boardn = $3;
+                    $portn = $4;
+                }
+                else
+                {
+                    $portn = $3;
+                }
 
                 if(!defined($hostname))
                 {
@@ -1012,8 +1030,8 @@ sub get_specs
                     exit(1);
                 }
 
-                $port{$proto} = $portn;
-                $alias_suffix .= "_" . $proto . $portn;
+                $port{$proto} = "$boardn:$portn";
+                $alias_suffix .= "_" . $proto . $boardn . "_" . $portn;
             }
 
             my $alias = $hostname . $alias_suffix;
@@ -1039,7 +1057,8 @@ sub get_specs
             # match the storage and logfile respectively, with subgroups that
             # put the actual strings into $4 and $5.
             # 
-            $ep =~ /(?:([a-z]+):\/\/)?([^:]+):([^:]+)(?::([^:]+))?(?::([^:]+))?/;
+            my $count = 
+                $ep =~ /(?:([a-z]+):\/\/)?([^:]+):([^:]+)(?::([^:]+))?(?::([^:]+))?(?::([^:]+))?/;
             if(!defined($1))
             {
                 # assume tcp for now
@@ -1064,14 +1083,23 @@ sub get_specs
                 "requires a port number\n";
                 exit(1);
             }
-            my $ranges = $3;
 
-            $stor = $4;
-            $logf = $5;
+            my $branges = $3;
+            my $pranges = $4;
+            $stor = $5;
+            $logf = $6;
+
+            if($proto !~ /mx/)
+            {
+                $logf = $stor;
+                $stor = $pranges;
+                $pranges = $branges;
+                $branges = undef;
+            }
 
             my ($s, $e);
 
-            foreach my $r (split(/,/, $ranges))
+            foreach my $r (split(/,/, $pranges))
             {
                 if($r !~ /-/)
                 {
@@ -1089,22 +1117,86 @@ sub get_specs
 
                 for(my $i = $s; $i <= $e; ++$i)
                 {
-                    my $portmap = {$proto => $i};
-                    my $alias = $hostname . "_" . $proto . $i;
-
-                    if(exists $all_endpoints{$alias})
+                    if($proto !~ /mx/)
                     {
-                        $all_endpoints{$alias}->{TYPE} |= $type;
+                        my $portmap = {$proto => $i};
+                        my $alias = $hostname . "_" . $proto . $i;
+
+                        if(exists $all_endpoints{$alias})
+                        {
+                            $all_endpoints{$alias}->{TYPE} |= $type;
+                        }
+                        else
+                        {
+                            $all_endpoints{$alias} = {
+                                ALIAS => $alias, 
+                                TYPE => $type,
+                                HOSTNAME => $hostname,
+                                PORTMAP => $portmap, 
+                                STORAGE => $stor, 
+                                LOGFILE => $logf};
+                        }
                     }
                     else
                     {
-                        $all_endpoints{$alias} = {
-                            ALIAS => $alias, 
-                            TYPE => $type,
-                            HOSTNAME => $hostname,
-                            PORTMAP => $portmap, 
-                            STORAGE => $stor, 
-                            LOGFILE => $logf};
+                        if(!defined($branges))
+                        {
+                            my $portmap = {$proto => "$branges:$i"};
+                            my $alias = $hostname . "_" . $proto . $branges . "_" . $i;
+                            if(exists $all_endpoints{$alias})
+                            {
+                                $all_endpoints{$alias}->{TYPE} |= $type;
+                            }
+                            else
+                            {
+                                $all_endpoints{$alias} = {
+                                    ALIAS => $alias,
+                                    TYPE => $type,
+                                    HOSTNAME => $hostname,
+                                    PORTMAP => $portmap,
+                                    STORAGE => $stor,
+                                    LOGFILE => $logf};
+                            }
+                        }
+
+                        my ($bs, $be);
+
+                        foreach my $br (split(/,/, $branges))
+                        {
+                            if($br !~ /-/)
+                            {
+                                $bs = $br;
+                                $be = $br;
+                            }
+                            else
+                            {
+                                if($br =~ /([0-9]+)-([0-9]+)/)
+                                {
+                                    $bs = $1;
+                                    $be = $2;
+                                }
+                            }
+
+                            for(my $bi = $bs; $bi <= $be; ++$bi)
+                            {
+                                my $portmap = {$proto => "$bi:$i"};
+                                my $alias = $hostname . "_" . $proto . $bi . "_" . $i;
+                                if(exists $all_endpoints{$alias})
+                                {
+                                    $all_endpoints{$alias}->{TYPE} |= $type;
+                                }
+                                else
+                                {
+                                    $all_endpoints{$alias} = {
+                                        ALIAS => $alias,
+                                        TYPE => $type,
+                                        HOSTNAME => $hostname,
+                                        PORTMAP => $portmap,
+                                        STORAGE => $stor,
+                                        LOGFILE => $logf};
+                                }
+                            }
+                        }
                     }
                 }
             }
