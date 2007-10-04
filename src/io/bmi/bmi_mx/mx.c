@@ -1530,8 +1530,8 @@ bmx_post_send_common(bmi_op_id_t *id, struct method_addr *remote_map,
                 ret = -BMI_ENOMEM;
                 goto out;
         }
-        debug(BMX_DB_CTX, "TX id_gen_safe_register(%llu)", llu(mop->op_id));
-        id_gen_safe_register(&mop->op_id, mop);
+        debug(BMX_DB_CTX, "TX id_gen_fast_register(%llu)", llu(mop->op_id));
+        id_gen_fast_register(&mop->op_id, mop);
         mop->addr = remote_map;  /* set of function pointers, essentially */
         mop->method_data = tx;
         mop->user_ptr = user_ptr;
@@ -1717,8 +1717,8 @@ bmx_post_recv_common(bmi_op_id_t *id, struct method_addr *remote_map,
                 ret = -BMI_ENOMEM;
                 goto out;
         }
-        debug(BMX_DB_CTX, "RX id_gen_safe_register(%llu)", llu(mop->op_id));
-        id_gen_safe_register(&mop->op_id, mop);
+        debug(BMX_DB_CTX, "RX id_gen_fast_register(%llu)", llu(mop->op_id));
+        id_gen_fast_register(&mop->op_id, mop);
         mop->addr = remote_map;  /* set of function pointers, essentially */
         mop->method_data = rx;
         mop->user_ptr = user_ptr;
@@ -2350,7 +2350,7 @@ BMI_mx_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
 
         bmx_connection_handlers();
 
-        mop = id_gen_safe_lookup(id);
+        mop = id_gen_fast_lookup(id);
         ctx = mop->method_data;
         peer = ctx->mxc_peer;
 
@@ -2370,7 +2370,7 @@ BMI_mx_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
                         if (user_ptr) {
                                 *user_ptr = ctx->mxc_mop->user_ptr;
                         }
-                        id_gen_safe_unregister(ctx->mxc_mop->op_id);
+                        id_gen_fast_unregister(ctx->mxc_mop->op_id);
                         BMX_FREE(ctx->mxc_mop, sizeof(*ctx->mxc_mop));
                 }
                 bmx_peer_decref(peer);
@@ -2395,7 +2395,7 @@ BMI_mx_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
                                 if (user_ptr) {
                                         *user_ptr = ctx->mxc_mop->user_ptr;
                                 }
-                                id_gen_safe_unregister(ctx->mxc_mop->op_id);
+                                id_gen_fast_unregister(ctx->mxc_mop->op_id);
                                 BMX_FREE(ctx->mxc_mop, sizeof(*ctx->mxc_mop));
                         }
                         bmx_deq_pending_ctx(ctx);
@@ -2446,7 +2446,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                 errs[completed] = ctx->mxc_mxstat.code;
                 if (user_ptrs)
                         user_ptrs[completed] = ctx->mxc_mop->user_ptr;
-                id_gen_safe_unregister(ctx->mxc_mop->op_id);
+                id_gen_fast_unregister(ctx->mxc_mop->op_id);
                 BMX_FREE(ctx->mxc_mop, sizeof(*ctx->mxc_mop));
                 completed++;
                 if (ctx->mxc_type == BMX_REQ_TX) {
@@ -2502,7 +2502,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                         }
                         if (user_ptrs)
                                 user_ptrs[completed] = ctx->mxc_mop->user_ptr;
-                        id_gen_safe_unregister(ctx->mxc_mop->op_id);
+                        id_gen_fast_unregister(ctx->mxc_mop->op_id);
                         BMX_FREE(ctx->mxc_mop, sizeof(*ctx->mxc_mop));
                         completed++;
 #if BMX_LOGGING
@@ -2559,7 +2559,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                                 }
                                 if (user_ptrs)
                                         user_ptrs[completed] = ctx->mxc_mop->user_ptr;
-                                id_gen_safe_unregister(ctx->mxc_mop->op_id);
+                                id_gen_fast_unregister(ctx->mxc_mop->op_id);
                                 BMX_FREE(ctx->mxc_mop, sizeof(*ctx->mxc_mop));
                                 completed++;
 #if BMX_LOGGING
@@ -2808,7 +2808,7 @@ BMI_mx_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
-        mop = id_gen_safe_lookup(id);
+        mop = id_gen_fast_lookup(id);
         ctx = mop->method_data;
         peer = ctx->mxc_peer;
 
