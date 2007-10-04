@@ -293,7 +293,6 @@ struct bmx_connreq
 #if BMX_DEBUG
 /* set the mask to the BMX_DB_* errors that you want gossip to report */
 #define BMX_DB_MASK (BMX_DB_ERR|BMX_DB_WARN)
-#ifdef GOSSIP_ENABLE_BACKTRACE
 #define debug(lvl,fmt,args...)                                                 \
   do {                                                                         \
       if (lvl & BMX_DB_MASK) {                                                 \
@@ -305,18 +304,6 @@ struct bmx_connreq
           }                                                                    \
       }                                                                        \
   } while (0)
-#else /* #ifndef GOSSIP_ENABLE_BACKTRACE */
-#define debug(lvl,fmt,args...)                                                 \
-  do {                                                                         \
-      if (lvl & BMX_DB_MASK) {                                                 \
-          if (lvl & (BMX_DB_ERR | BMX_DB_WARN)) { /* always send to log */     \
-              gossip_err("bmi_mx: " fmt ".\n", ##args);                        \
-          } else {                                                             \
-              gossip_debug(GOSSIP_BMI_DEBUG_MX, "bmi_mx: " fmt ".\n", ##args); \
-          }                                                                    \
-      }                                                                        \
-  } while (0)
-#endif /* GOSSIP_ENABLE_BACKTRACE */
 #else  /* ! BMX_DEBUG */
 #define debug(lvl,fmt,...) do { } while (0)
 #endif /* BMX_DEBUG */
