@@ -1,7 +1,7 @@
 /* -*- mode: c; c-basic-offset: 8; indent-tabs-mode: nil; -*-
  *  vim:expandtab:shiftwidth=8:tabstop=8:
  *
- *   Copyright (C) 2006 Myricom, Inc.
+ *   Copyright (C) 2007 Myricom, Inc.
  *   Author: Myricom, Inc. <help at myri.com>
  *
  *   See COPYING in top-level directory.
@@ -45,9 +45,10 @@ typedef struct qlist_head list_t;       /* easier to type */
 
 /* Allocate 20 RX structs per peer */
 #define BMX_PEER_RX_NUM      (20)
-/* On servers only, these RX structs will also have a 4 KB buffer to
+/* On servers only, these RX structs will also have a 8 KB buffer to
  * receive unexpected messages */
-#define BMX_UNEXPECTED_SIZE  (4 << 10)
+#define BMX_UNEXPECTED_SIZE  (8 << 10)
+#define BMX_UNEXPECTED_NUM   2  /* buffers allocated per rx */
 
 #define BMX_MEM_TWEAK 1         /* use buffer list for mem[alloc|free] */
 #define BMX_DEBUG     1         /* enable debug (gossip) statements */
@@ -59,8 +60,8 @@ typedef struct qlist_head list_t;       /* easier to type */
 #endif
 
 #if BMX_MEM_TWEAK
-/* Allocate 16 1MB buffers for use with BMI_mx_mem[alloc|free] */
-#define BMX_BUFF_SIZE      (1 << 20)
+/* Allocate 16 4MB buffers for use with BMI_mx_mem[alloc|free] */
+#define BMX_BUFF_SIZE      (4 << 20)
 #define BMX_BUFF_NUM       16
 #endif
 
@@ -171,6 +172,12 @@ struct bmx_data
         list_t              bmx_used_buffers;
         gen_mutex_t         bmx_used_buffers_lock;
         int                 bmx_misses;
+
+        list_t              bmx_idle_unex_buffers;
+        gen_mutex_t         bmx_idle_unex_buffers_lock;
+        list_t              bmx_used_unex_buffers;
+        gen_mutex_t         bmx_used_unex_buffers_lock;
+        int                 bmx_unex_misses;
 #endif
 };
 
@@ -286,6 +293,7 @@ struct bmx_connreq
 #if BMX_DEBUG
 /* set the mask to the BMX_DB_* errors that you want gossip to report */
 #define BMX_DB_MASK (BMX_DB_ERR|BMX_DB_WARN)
+#ifdef GOSSIP_ENABLE_BACKTRACE
 #define debug(lvl,fmt,args...)                                                 \
   do {                                                                         \
       if (lvl & BMX_DB_MASK) {                                                 \
@@ -297,6 +305,18 @@ struct bmx_connreq
           }                                                                    \
       }                                                                        \
   } while (0)
+#else /* #ifndef GOSSIP_ENABLE_BACKTRACE */
+#define debug(lvl,fmt,args...)                                                 \
+  do {                                                                         \
+      if (lvl & BMX_DB_MASK) {                                                 \
+          if (lvl & (BMX_DB_ERR | BMX_DB_WARN)) { /* always send to log */     \
+              gossip_err("bmi_mx: " fmt ".\n", ##args);                        \
+          } else {                                                             \
+              gossip_debug(GOSSIP_BMI_DEBUG_MX, "bmi_mx: " fmt ".\n", ##args); \
+          }                                                                    \
+      }                                                                        \
+  } while (0)
+#endif /* GOSSIP_ENABLE_BACKTRACE */
 #else  /* ! BMX_DEBUG */
 #define debug(lvl,fmt,...) do { } while (0)
 #endif /* BMX_DEBUG */
