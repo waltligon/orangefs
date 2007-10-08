@@ -546,7 +546,11 @@ static int gossip_disable_stderr(
 static int gossip_disable_file(
     void)
 {
-    fclose(internal_log_file);
+    if (internal_log_file)
+    {
+        fclose(internal_log_file);
+        internal_log_file = NULL;
+    }
     return 0;
 }
 
