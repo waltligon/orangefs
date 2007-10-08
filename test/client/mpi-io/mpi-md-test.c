@@ -228,7 +228,7 @@ int main(int argc, char **argv)
 					total_time, opt_nfiles, 
 					(total_time)/opt_nfiles);
 		} else if (opt_do_resize) {
-			printf("%f seconds to perform %d resize ops: %f secs/opeeration\n", 
+			printf("%f seconds to perform %d resize ops: %f secs/operation\n", 
 					total_time, opt_nfiles, 
 					(total_time)/opt_nfiles);
 		}
