@@ -35,8 +35,14 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: parent not found.\n");
     }
     
+    if (inode == NULL) {
+        return 1;
+    }
     if (inode && parent_inode)
     {
+        if (is_bad_inode(inode)) {
+            return 0;
+        }
         /* first perform a lookup to make sure that the object not only
          * exists, but is still in the expected place in the name space 
          */
@@ -73,14 +79,30 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
                 new_op, "pvfs2_lookup", 
                 get_interruptible_flag(parent_inode));
 
-            if((new_op->downcall.status != 0) || 
-                    !match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
-            {
-                gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: lookup failure or no match.\n");
+            if ((new_op->downcall.status != 0)) {
+                gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: lookup failure.\n");
                 op_release(new_op);
-                return(0);
+                return 0;
             }
-            
+            /* no match */
+            if (!match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
+            {
+                struct inode *res_inode;
+
+                /* Find or allocate a new inode for this new handle */
+                res_inode = pvfs2_iget(parent_inode->i_sb, &new_op->downcall.resp.lookup.refn);
+                if (res_inode != NULL) {
+                    /* associate with the given dentry */
+                    pvfs2_d_splice_alias(dentry, res_inode);
+                    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: associated inode %llu)\n",
+                                 llu(get_handle_from_ino(res_inode)));
+                    inode = res_inode;
+                } else {
+                    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: lookup failure or no match.\n");
+                    op_release(new_op);
+                    return(0);
+                }
+            }
             op_release(new_op);
         }
         else
