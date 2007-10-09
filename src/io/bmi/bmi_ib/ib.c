@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.46 2006-10-12 20:37:28 pw Exp $
+ * $Id: ib.c,v 1.46.6.1 2007-10-09 22:01:38 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1735,9 +1735,9 @@ static int ib_tcp_server_check_new_connections(void)
 
 	c->remote_map = ib_alloc_method_addr(c, hostname, port);
 	/* register this address with the method control layer */
-	ret = bmi_method_addr_reg_callback(c->remote_map);
-	if (ret < 0)
-	    error_xerrno(ret, "%s: bmi_method_addr_reg_callback", __func__);
+	c->bmi_addr = bmi_method_addr_reg_callback(c->remote_map);
+	if (c->bmi_addr == 0)
+	    error_xerrno(ENOMEM, "%s: bmi_method_addr_reg_callback", __func__);
 
 	debug(2, "%s: accepted new connection %s at server", __func__,
 	  c->peername);
@@ -1835,6 +1835,7 @@ static int BMI_ib_set_info(int option, void *param __unused)
 	ib_method_addr_t *ibmap = map->method_data;
 	free(ibmap->hostname);
 	free(map);
+	bmi_method_addr_forget_callback(ibmap->c->bmi_addr);
 	break;
     }
     default:

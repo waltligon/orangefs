@@ -9,7 +9,8 @@
 
 #include "bmi-method-support.h"
 
-int bmi_method_addr_reg_callback(method_addr_p map);
+PVFS_BMI_addr_t bmi_method_addr_reg_callback(method_addr_p map);
+int bmi_method_addr_forget_callback(PVFS_BMI_addr_t addr);
 
 #endif /* __BMI_METHOD_CALLBACK_H */
 

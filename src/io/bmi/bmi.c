@@ -1138,6 +1138,9 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
     int i = 0;
     ref_st_p tmp_ref = NULL;
 
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                 "[BMI CONTROL]: %s: set_info: %llu option: %d\n",
+                 __func__, llu(addr), option);
     /* if the addr is NULL, then the set_info should apply to all
      * available methods.
      */
@@ -1165,6 +1168,9 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	return (0);
     }
 
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                 "[BMI CONTROL]: %s: searching for ref %llu\n",
+                 __func__, llu(addr));
     /* find a reference that matches this address */
     gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, addr);
@@ -1178,12 +1184,18 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
     if(option == BMI_INC_ADDR_REF)
     {
 	tmp_ref->ref_count++;
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                     "[BMI CONTROL]: %s: incremented ref %llu to: %d\n",
+                     __func__, llu(addr), tmp_ref->ref_count);
 	gen_mutex_unlock(&ref_mutex);
 	return(0);
     }
     if(option == BMI_DEC_ADDR_REF)
     {
 	tmp_ref->ref_count--;
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                     "[BMI CONTROL]: %s: decremented ref %llu to: %d\n",
+                     __func__, llu(addr), tmp_ref->ref_count);
 	assert(tmp_ref->ref_count >= 0);
 
 	if(tmp_ref->ref_count == 0)
@@ -1201,7 +1213,8 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	    {
 		/* kill the address */
 		gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-		    "bmi discarding address: %llu\n", llu(addr));
+		    "[BMI CONTROL]: %s: bmi discarding address: %llu\n",
+                    __func__, llu(addr));
 		ref_list_rem(cur_ref_list, addr);
 		/* NOTE: this triggers request to module to free underlying
 		 * resources if it wants to
@@ -1223,7 +1236,10 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
              * out the entire address structure and anything linked to it so 
              * that the next addr_lookup starts from scratch
              */
-	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "Closing bmi_tcp connection at caller's request.\n"); 
+	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "[BMI CONTROL]: %s: Closing bmi_tcp "
+                         "connection at caller's request.\n",
+                         __func__); 
             ref_list_rem(cur_ref_list, addr);
             dealloc_ref_st(tmp_ref);
         }
@@ -1485,7 +1501,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     /* make sure one was successful */
     if (!meth_addr)
     {
-	return (bmi_errno_to_pvfs(-ENOPROTOOPT));
+        return bmi_errno_to_pvfs(-ENOPROTOOPT);
     }
 
     /* create a new reference for the addr */
@@ -1501,7 +1517,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     new_ref->id_string = (char *) malloc(strlen(id_string) + 1);
     if (!new_ref->id_string)
     {
-	ret = -errno;
+	ret = bmi_errno_to_pvfs(errno);
 	goto bmi_addr_lookup_failure;
     }
     strcpy(new_ref->id_string, id_string);
@@ -1782,7 +1798,7 @@ int BMI_cancel(bmi_op_id_t id,
  *
  * returns 0 on success, -errno on failure
  */
-int bmi_method_addr_reg_callback(method_addr_p map)
+PVFS_BMI_addr_t bmi_method_addr_reg_callback(method_addr_p map)
 {
     ref_st_p new_ref = NULL;
 
@@ -1794,7 +1810,7 @@ int bmi_method_addr_reg_callback(method_addr_p map)
     new_ref = alloc_ref_st();
     if (!new_ref)
     {
-	return (bmi_errno_to_pvfs(-ENOMEM));
+	return 0;
     }
 
     /*
@@ -1808,8 +1824,33 @@ int bmi_method_addr_reg_callback(method_addr_p map)
     new_ref->interface = active_method_table[map->method_type];
 
     /* add the reference structure to the list */
+    gen_mutex_lock(&ref_mutex);
     ref_list_add(cur_ref_list, new_ref);
+    gen_mutex_unlock(&ref_mutex);
 
+    return new_ref->bmi_addr;
+}
+
+int bmi_method_addr_forget_callback(PVFS_BMI_addr_t addr)
+{
+    ref_st_p ref;
+
+    gen_mutex_lock(&ref_mutex);
+    ref = ref_list_search_addr(cur_ref_list, addr);
+    if (!ref)
+    {
+	gen_mutex_unlock(&ref_mutex);
+	return (bmi_errno_to_pvfs(-EPROTO));
+    }
+    gen_mutex_unlock(&ref_mutex);
+
+    ref_list_rem(cur_ref_list, ref->bmi_addr);
+
+    /* have to set the method_addr to null before deallocating, since
+     * dealloc_ref_st tries to enter the method again to drop the addr
+     */
+    ref->method_addr = NULL;
+    dealloc_ref_st(ref);
     return (0);
 }
 

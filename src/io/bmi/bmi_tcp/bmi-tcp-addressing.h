@@ -46,6 +46,7 @@ struct tcp_allowed_connection_s {
  * connections are made */
 struct tcp_addr
 {
+    PVFS_BMI_addr_t bmi_addr;
     method_addr_p map;		/* points back to generic address */
     /* stores error code for addresses that are broken for some reason */
     int addr_error;		

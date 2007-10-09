@@ -916,7 +916,7 @@ int BMI_tcp_get_info(int option,
 	 * an error and there is no way to reconnect
 	 */
 	if(tcp_addr_data->addr_error != 0 &&
-	    tcp_addr_data->dont_reconnect == 1)
+           tcp_addr_data->dont_reconnect == 1)
 	{
 	    query->response = 1;
 	}
@@ -1855,6 +1855,8 @@ void tcp_forget_addr(method_addr_p map,
 	BMI_socket_collection_testglobal(tcp_socket_collection_p,
 	    0, &tmp_outcount, &tmp_addr, &tmp_status, 0, &interface_mutex);
     }
+
+    bmi_method_addr_forget_callback(tcp_addr_data->bmi_addr);
     tcp_shutdown_addr(map);
     tcp_cleanse_addr(map, error_code);
     tcp_addr_data->addr_error = error_code;
@@ -2850,7 +2852,7 @@ static int handle_new_connection(method_addr_p map)
      */
     tcp_addr_data->dont_reconnect = 1;
     /* register this address with the method control layer */
-    ret = bmi_method_addr_reg_callback(new_addr);
+    tcp_addr_data->bmi_addr = bmi_method_addr_reg_callback(new_addr);
     if (ret < 0)
     {
 	tcp_shutdown_addr(new_addr);
@@ -2985,10 +2987,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
 
     *stall_flag = 0;
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Reading header for new op.\n");
-    /* NOTE: we only allow a blocking call here because we peeked to see
-     * if this amount of data was ready above.  
-     */
-    ret = BMI_sockio_brecv(tcp_addr_data->socket,
+    ret = BMI_sockio_nbrecv(tcp_addr_data->socket,
                            new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < TCP_ENC_HDR_SIZE)
     {

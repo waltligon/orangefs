@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.24 2006-10-12 20:37:27 pw Exp $
+ * $Id: ib.h,v 1.24.6.1 2007-10-09 22:01:38 slang Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -57,6 +57,7 @@ typedef struct {
 
     void *priv;
 
+    PVFS_BMI_addr_t bmi_addr;
 } ib_connection_t;
 
 /*

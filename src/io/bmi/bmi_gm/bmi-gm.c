@@ -3141,11 +3141,11 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 		gm_addr_data->node_id = gm_ntohs(poll_event->recv.sender_node_id);
 		gm_addr_data->port_id = gm_ntohc(poll_event->recv.sender_port_id);
 		/* let the bmi layer know about it */
-		ret = bmi_method_addr_reg_callback(map);
-		if (ret < 0)
+		gm_addr_data->bmi_addr = bmi_method_addr_reg_callback(map);
+		if (!gm_addr_data->bmi_addr)
 		{
 		    dealloc_gm_method_addr(map);
-		    return (ret);
+		    return (-BMI_ENOMEM);
 		}
 		/* keep up with it ourselves also */
 		gm_addr_add(&gm_addr_list, map);
