@@ -190,6 +190,7 @@ static struct dentry *pvfs2_lookup(
             return NULL;
         }
 
+        op_release(new_op);
         /* must be a non-recoverable error */
         return ERR_PTR(ret);
     }
