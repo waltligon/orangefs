@@ -159,6 +159,8 @@ int job_initialize(int flags)
     assert(ret == 0);
 #endif
 
+    id_gen_safe_initialize();
+
     gen_mutex_lock(&initialized_mutex);
     initialized = 1;
     gen_mutex_unlock(&initialized_mutex);
@@ -177,6 +179,8 @@ int job_finalize(void)
     gen_mutex_lock(&initialized_mutex);
     initialized = 0;
     gen_mutex_unlock(&initialized_mutex);
+
+    id_gen_safe_finalize();
 
     PINT_thread_mgr_bmi_stop();
 #ifdef __PVFS2_CLIENT__
