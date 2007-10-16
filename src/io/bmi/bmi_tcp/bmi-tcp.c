@@ -3497,6 +3497,7 @@ static int tcp_accept_init(int *socket, char** peer)
     int ret = -1;
     int tmp_errno = 0;
     struct tcp_addr *tcp_addr_data = tcp_method_params.listen_addr->method_data;
+    int oldfl = 0;
     struct sockaddr_in peer_sockaddr;
     int peer_sockaddr_size = sizeof(struct sockaddr_in);
     char* tmp_peer;
@@ -3562,6 +3563,13 @@ static int tcp_accept_init(int *socket, char** peer)
 	gossip_lerr("Error: failed to set TCP_NODELAY option.\n");
 	close(*socket);
 	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
+    }
+
+    /* set it to non-blocking operation */
+    oldfl = fcntl(*socket, F_GETFL, 0);
+    if (!(oldfl & O_NONBLOCK))
+    {
+	fcntl(*socket, F_SETFL, oldfl | O_NONBLOCK);
     }
 
     /* allocate ip address string */

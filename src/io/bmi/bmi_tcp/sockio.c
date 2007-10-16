@@ -226,6 +226,8 @@ int BMI_sockio_nbrecv(int s,
 {
     int ret, comp = len;
 
+    assert(fcntl(s, F_GETFL, 0) & O_NONBLOCK);
+
     while (comp)
     {
       nbrecv_restart:
@@ -264,6 +266,8 @@ int BMI_sockio_nbrecv(int s,
 int BMI_sockio_nbpeek(int s, void* buf, int len)
 {
     int ret, comp = len;
+
+    assert(fcntl(s, F_GETFL, 0) & O_NONBLOCK);
 
     while (comp)
     {
