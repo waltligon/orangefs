@@ -24,6 +24,7 @@
 #endif
 #include <sys/poll.h>
 #include <sys/uio.h>
+#include <assert.h>
 
 #include "sockio.h"
 
