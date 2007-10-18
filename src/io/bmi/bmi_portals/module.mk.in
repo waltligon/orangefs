@@ -24,11 +24,12 @@ SERVERSRC += $(src)
 
 #
 # Add extra include paths and warnings just for this directory.
-# No shadow, as portals headers use "index".
+# No shadow, as portals headers use "index".  No unused else lots
+# of warnings for Cray portals header files.
 #
 cflags :=
 ifdef GNUC
-cflags += -W -Wcast-qual -Wwrite-strings
+cflags += -W -Wcast-qual -Wwrite-strings -Wno-unused
 endif
 
 #
