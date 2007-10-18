@@ -188,7 +188,7 @@ void print_entry_attr(
     char *empty_str = "";
     char *owner = empty_str, *group = empty_str;
     char *inode = empty_str;
-    time_t mtime = (time_t)attr->mtime;
+    time_t mtime;
     struct tm *time = localtime(&mtime);
     PVFS_size size = 0;
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
@@ -204,6 +204,7 @@ void print_entry_attr(
     {
         return;
     }
+    mtime = (time_t)attr->mtime;
 
     snprintf(scratch_owner,16,"%d",(int)attr->owner);
     snprintf(scratch_group,16,"%d",(int)attr->group);
