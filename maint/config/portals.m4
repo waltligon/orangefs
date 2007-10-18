@@ -49,12 +49,12 @@ AC_DEFUN([AX_PORTALS],
     dnl using guesses from the --with-portals dir.
     if test -n "$home" ; then
 	if test -z "$incs"; then
-	    incs=$home/include
+	    incs=-I$home/include
 	fi
 	if test -z "$libs"; then
-	    libs=$home/lib64
-	    if test ! -d "$libs" ; then
-		libs=$home/lib
+	    libs=-L$home/lib64
+	    if test ! -d "$home/lib64" ; then
+		libs=-L$home/lib
 	    fi
 	fi
     fi
