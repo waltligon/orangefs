@@ -121,15 +121,19 @@ PVFS_error PVFS_mgmt_get_dfile_array(
     }
     else
     {
-        ret = PVFS_mgmt_wait(op_id, "get_dfile_array", &error);
-        if (ret)
+        if (op_id >= 0)  /* -1 means completed immediately */
         {
-            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
-            error = ret;
+            ret = PVFS_mgmt_wait(op_id, "get_dfile_array", &error);
+            if (ret)
+            {
+                PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+                error = ret;
+            }
         }
     }
 
-    PINT_mgmt_release(op_id);
+    if (op_id >= 0)
+        PINT_mgmt_release(op_id);
     return error;
 }
 
