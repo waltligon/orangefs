@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #include <limits.h>
 #include <errno.h>
+#include <malloc.h>  /* pick up potential offsetof defn */
 #endif
 
 #ifndef INT32_MAX
