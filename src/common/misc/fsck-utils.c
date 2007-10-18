@@ -925,6 +925,7 @@ int PVFS_fsck_validate_dir_ent(
                        filename);
             break;
         }
+        cp++;
     }
 
     return ret;
