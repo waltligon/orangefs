@@ -12,6 +12,7 @@
 /* Cray XT3 version */
 #define PTL_IFACE_DEFAULT PTL_IFACE_SS
 #include <portals/portals3.h>
+#include <sys/utsname.h>
 #else
 /* TCP version */
 #include <portals/portals3.h>
@@ -71,6 +72,7 @@ static gen_mutex_t eq_mutex = GEN_MUTEX_INITIALIZER;
  * method_addrs.
  */
 static int bmi_portals_method_id;
+static int bmi_portals_nic_type;
 
 /*
  * Various static ptls objects.  One per instance of the code.
@@ -80,6 +82,7 @@ static ptl_handle_me_t mark_me = PTL_INVALID_HANDLE;
 static ptl_handle_me_t zero_me = PTL_INVALID_HANDLE;
 static ptl_handle_md_t zero_md;
 static ptl_handle_eq_t eq = PTL_INVALID_HANDLE;
+static int ni_init_dup;  /* did runtime open the nic for us? */
 
 /*
  * Server listens at this well-known portal for unexpected messages.  Clients
@@ -90,8 +93,10 @@ static ptl_handle_eq_t eq = PTL_INVALID_HANDLE;
  * we'd have to remember the ptl_index from a sendunexpected over to the
  * answering send call in the server.  No need for connection state just
  * for that.
+ *
+ * Cray has a bunch reserved.  SNLers suggest using ARMCI's.
  */
-static const ptl_pt_index_t ptl_index = 1;
+static const ptl_pt_index_t ptl_index = 37;
 
 /*
  * Handy const.  Cray version needs padding, though, so initialize this
@@ -112,7 +117,9 @@ static const char *PtlErrorStr(unsigned int ptl_errno)
 #ifndef HAVE_PTLEVENTKINDSTR
 static const char *PtlEventKindStr(ptl_event_kind_t ev_kind)
 {
-    return ptl_err_str[ev_kind];
+    extern const char *ptl_event_str[];
+
+    return ptl_event_str[ev_kind];
 }
 #endif
 
@@ -772,9 +779,15 @@ static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
      * that interface.  Yeah.
      */
     /* setenv("PTL_IFACE", "eth0", 0); */
-
-    my_pid.pid = -1;
-    ret = PtlNIInit(PTL_IFACE_DEFAULT, my_pid.pid, NULL, NULL, &ni);
+    ret = PtlNIInit(bmi_portals_nic_type, my_pid.pid, NULL, NULL, &ni);
+#ifdef __LIBCATAMOUNT__
+    if (bmi_portals_nic_type == PTL_IFACE_DEFAULT) {
+	if (ret == PTL_IFACE_DUP && ni != PTL_INVALID_HANDLE) {
+	    ret = 0;  /* already set up by pre-main on Cray compute nodes */
+	    ni_init_dup = 1;
+	}
+    }
+#endif
     if (ret) {
 	/* error number is bogus here, do not try to decode it */
 	gossip_err("%s: PtlNIInit failed: %d\n", __func__, ret);
@@ -783,18 +796,38 @@ static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
 	goto out;
     }
 
-    /* need an access control entry to allow everybody to talk, else root
-     * cannot talk to random user, e.g. */
+    /*
+     * May not be able to assign PID to whatever we want.  Let's see
+     * what runtime has assigned.
+     */
+    {
+    ptl_process_id_t id;
+    ret = PtlGetId(ni, &id);
+    if (ret != 0) {
+	gossip_err("%s: PtlGetId failed: %d\n", __func__, ret);
+	ni = PTL_INVALID_HANDLE;
+	ret = -EIO;
+	goto out;
+    }
+    debug(0, "%s: runtime thinks my id is %d.%d\n", __func__, id.nid, id.pid);
+    }
+
+#ifndef __LIBCATAMOUNT__
+    /*
+     * Need an access control entry to allow everybody to talk, else root
+     * cannot talk to random user, e.g.  Not implemented on Cray.
+     */
 #ifdef HAVE_PTLACENTRY_JID
     ret = PtlACEntry(ni, 0, any_pid, (ptl_uid_t) -1, (ptl_jid_t) -1, ptl_index);
 #else
-#endif
     ret = PtlACEntry(ni, 0, any_pid, (ptl_uid_t) -1, ptl_index);
+#endif
     if (ret) {
 	gossip_err("%s: PtlACEntry: %s\n", __func__, PtlErrorStr(ret));
 	ret = -EIO;
 	goto out;
     }
+#endif
 
     /* a single EQ for all messages, with some arbitrary depth */
     ret = PtlEQAlloc(ni, 100, NULL, &eq);
@@ -1164,7 +1197,7 @@ static int post_recv(bmi_op_id_t *id, struct method_addr *addr,
 		     void *user_ptr, bmi_context_id context_id)
 {
     struct bmip_method_addr *pma = addr->method_data;
-    struct bmip_work *rq;
+    struct bmip_work *rq = NULL;
     ptl_md_t mdesc;
     int ret, ms = 0;
 
@@ -1364,38 +1397,6 @@ static const char *bmip_rev_lookup(struct method_addr *addr)
     return pma->peername;
 }
 
-#ifdef __LIBCATAMOUNT__
-static int bmip_nid_from_hostname(const char *hostname, uint32_t *nid)
-{
-    debug(0, "%s: no clue how to do this: %s\n", __func__, hostname);
-    *nid = 0;
-    return 0;
-}
-#else
-/*
- * Clients give hostnames.  Convert these to Portals nids.  This routine
- * specific for Portals-over-IP (tcp or utcp).
- */
-static int bmip_nid_from_hostname(const char *hostname, uint32_t *nid)
-{
-    struct hostent *he;
-
-    he = gethostbyname(hostname);
-    if (!he) {
-	gossip_err("%s: gethostbyname cannot resolve %s\n", __func__, hostname);
-	return 1;
-    }
-    if (he->h_length != 4) {
-	gossip_err("%s: gethostbyname returns %d-byte addresses, hoped for 4\n",
-		   __func__, he->h_length);
-	return 1;
-    }
-    /* portals wants host byte order, apparently */
-    *nid = htonl(*(uint32_t *) he->h_addr_list[0]);
-    return 0;
-}
-#endif
-
 /*
  * Build and fill a Portals-specific method_addr structure.  This routine
  * copies the hostname if it needs it.
@@ -1451,21 +1452,31 @@ out:
     return map;
 }
 
-#ifdef __LIBCATAMOUNT__
-static struct method_addr *addr_from_nidpid(ptl_process_id_t pid)
-{
-    struct method_addr *map;
-    char *hostname;
 
-    hostname = malloc(22);
-    sprintf(hostname, "%u:%u", pid.pid, pid.nid);
-    debug(0, "%s: no clue what to do here either, allocing a new one.\n",
-	  __func__);
-    map = bmip_alloc_method_addr(hostname, pid, 1);
-    free(hostname);
-    return map;
+#ifndef __LIBCATAMOUNT__
+/*
+ * Clients give hostnames.  Convert these to Portals nids.  This routine
+ * specific for Portals-over-IP (tcp or utcp).
+ */
+static int bmip_nid_from_hostname(const char *hostname, uint32_t *nid)
+{
+    struct hostent *he;
+
+    he = gethostbyname(hostname);
+    if (!he) {
+	gossip_err("%s: gethostbyname cannot resolve %s\n", __func__, hostname);
+	return 1;
+    }
+    if (he->h_length != 4) {
+	gossip_err("%s: gethostbyname returns %d-byte addresses, hoped for 4\n",
+		   __func__, he->h_length);
+	return 1;
+    }
+    /* portals wants host byte order, apparently */
+    *nid = htonl(*(uint32_t *) he->h_addr_list[0]);
+    return 0;
 }
-#else
+
 /*
  * This is called from the server, on seeing an unexpected message from
  * a client.  Convert that to a method_addr.  If BMI has never seen it
@@ -1491,6 +1502,49 @@ static struct method_addr *addr_from_nidpid(ptl_process_id_t pid)
     map = bmip_alloc_method_addr(hostname, pid, 1);
     free(hostname);
 
+    return map;
+}
+
+#else
+
+/*
+ * Cray versions
+ */
+static int bmip_nid_from_hostname(const char *hostname, uint32_t *nid)
+{
+    int ret = -1;
+    uint32_t v = 0;
+    char *cp;
+
+    /*
+     * There is apparently no API for this on Cray.  Chop up the hostname,
+     * knowing the format.  Also can look at /proc/cray_xt/nid on linux
+     * nodes.
+     */
+    if (strncmp(hostname, "nid", 3) == 0) {
+	v = strtoul(hostname + 3, &cp, 10);
+	if (*cp != '\0') {
+	    gossip_err("%s: convert nid<num> hostname %s failed\n", __func__,
+		       hostname);
+	    v = 0;
+	} else {
+	    ret = 0;
+	}
+    }
+    if (ret)
+	debug(0, "%s: no clue how to convert hostname %s\n", __func__,
+	      hostname);
+    *nid = v;
+    return ret;
+}
+
+static struct method_addr *addr_from_nidpid(ptl_process_id_t pid)
+{
+    struct method_addr *map;
+    char hostname[9];
+
+    sprintf(hostname, "nid%05d", pid.nid);
+    map = bmip_alloc_method_addr(hostname, pid, 1);
     return map;
 }
 #endif
@@ -1819,6 +1873,24 @@ static int bmip_initialize(struct method_addr *listen_addr,
 
     bmi_portals_method_id = method_id;
 
+    bmi_portals_nic_type = PTL_IFACE_DEFAULT;
+#ifdef __LIBCATAMOUNT__
+    {
+	/* magic for Cray XT3 service nodes only; compute uses default,
+	 * and TCP uses default */
+	struct utsname buf;
+
+	ret = uname(&buf);
+	if (ret) {
+	    gossip_err("%s: uname failed: %m\n", __func__);
+	    ret = -EIO;
+	    goto out;
+	}
+	if (strcmp(buf.sysname, "Linux") == 0)
+	    bmi_portals_nic_type = CRAY_USER_NAL;
+    }
+#endif
+
     ret = PtlInit(&numint);
     if (ret) {
 	gossip_err("%s: PtlInit failed\n", __func__);
@@ -1832,8 +1904,9 @@ static int bmip_initialize(struct method_addr *listen_addr,
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | 0x00000000); */
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_DROP | 0x00000000); */
 
-    /* catamount has different debug symbols */
-    PtlNIDebug(PTL_INVALID_HANDLE, PTL_DEBUG_DROP | 0x00000000);
+    /* catamount has different debug symbols, but never prints anything */
+    PtlNIDebug(PTL_INVALID_HANDLE, PTL_DEBUG_ALL | PTL_DEBUG_NI_ALL);
+    /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DEBUG_DROP | 0x00000000); */
 
     /*
      * Allocate and build MDs for a queue of unexpected messages from
@@ -1892,7 +1965,9 @@ static int bmip_finalize(void)
     if (ret)
 	gossip_err("%s: PtlNIFini: %s\n", __func__, PtlErrorStr(ret));
 
-    PtlFini();
+    /* do not call this if runtime opened the nic, else oops in sysio */
+    if (ni_init_dup == 0)
+	PtlFini();
 
 out:
     gen_mutex_unlock(&ni_mutex);
