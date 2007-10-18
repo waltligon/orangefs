@@ -75,6 +75,7 @@ static PINT_sm_action iterate_handles_do_work(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
+    int ret;
 
     /* allocate memory to hold handles */
     s_op->resp.u.mgmt_iterate_handles.handle_array
@@ -89,18 +90,23 @@ static PINT_sm_action iterate_handles_do_work(
     s_op->resp.u.mgmt_iterate_handles.position
 	= s_op->req->u.mgmt_iterate_handles.position;
 
-    return(job_trove_dspace_iterate_handles(
+    ret = job_trove_dspace_iterate_handles(
 	s_op->req->u.mgmt_iterate_handles.fs_id,
 	s_op->resp.u.mgmt_iterate_handles.position,
 	s_op->resp.u.mgmt_iterate_handles.handle_array,
 	s_op->req->u.mgmt_iterate_handles.handle_count,
 	0,
 	NULL,
-	s_op,
+	smcb,
 	0,
 	js_p,
 	&tmp_id,
-	server_job_context));
+	server_job_context);
+    if (ret < 0)
+        return ret;  /* error */
+    if (ret == 1)
+        return SM_ACTION_COMPLETE;  /* immediate */
+    return SM_ACTION_DEFERRED;
 }
 
 /* iterate_handles_fill_resp()
