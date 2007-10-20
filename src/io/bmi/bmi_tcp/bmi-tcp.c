@@ -1841,6 +1841,7 @@ void tcp_forget_addr(method_addr_p map,
 		     int error_code)
 {
     struct tcp_addr* tcp_addr_data = map->method_data;
+    PVFS_BMI_addr_t bmi_addr = tcp_addr_data->bmi_addr;
     int tmp_outcount;
     method_addr_p tmp_addr;
     int tmp_status;
@@ -1855,15 +1856,19 @@ void tcp_forget_addr(method_addr_p map,
 	    0, &tmp_outcount, &tmp_addr, &tmp_status, 0, &interface_mutex);
     }
 
-    gen_mutex_unlock(&interface_mutex);
-    bmi_method_addr_forget_callback(tcp_addr_data->bmi_addr);
-    gen_mutex_lock(&interface_mutex);
     tcp_shutdown_addr(map);
     tcp_cleanse_addr(map, error_code);
     tcp_addr_data->addr_error = error_code;
     if (dealloc_flag)
     {
 	dealloc_tcp_method_addr(map);
+    }
+    else
+    {
+        /* this will cause the bmi control layer to check to see if 
+         * this address can be completely forgotten
+         */
+        bmi_method_addr_forget_callback(bmi_addr);
     }
     return;
 };

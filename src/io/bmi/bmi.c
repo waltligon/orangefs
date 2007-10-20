@@ -38,6 +38,15 @@ static int context_array[BMI_MAX_CONTEXTS] = { 0 };
 static gen_mutex_t context_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t ref_mutex = GEN_MUTEX_INITIALIZER;
 
+static QLIST_HEAD(forget_list);
+static gen_mutex_t forget_list_mutex = GEN_MUTEX_INITIALIZER;
+
+struct forget_item
+{
+    struct qlist_head link;
+    PVFS_BMI_addr_t addr;
+};
+
 /*
  * Static list of defined BMI methods.  These are pre-compiled into
  * the client libraries and into the server.
@@ -106,6 +115,8 @@ static const int usage_iters_active = 10000;
 
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
+static void bmi_addr_drop(ref_st_p tmp_ref);
+static void bmi_check_forget_list(void);
 
 /** Initializes the BMI layer.  Must be called before any other BMI
  *  functions.
@@ -910,6 +921,9 @@ int BMI_testunexpected(int incount,
     ref_st_p tmp_ref = NULL;
     int tmp_active_method_count = 0;
 
+    /* figure out if we need to drop any stale addresses */
+    bmi_check_forget_list();
+
     gen_mutex_lock(&active_method_count_mutex);
     tmp_active_method_count = active_method_count;
     gen_mutex_unlock(&active_method_count_mutex);
@@ -1277,27 +1291,7 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 
 	if(tmp_ref->ref_count == 0)
 	{
-	    struct method_drop_addr_query query;
-	    query.response = 0;
-	    query.addr = tmp_ref->method_addr;
-	    /* reference count is zero; ask module if it wants us to discard
-	     * the address; TCP will tell us to drop addresses for which the
-	     * socket has died with no possibility of reconnect 
-	     */
-	    ret = tmp_ref->interface->BMI_meth_get_info(BMI_DROP_ADDR_QUERY,
-		&query);
-	    if(ret == 0 && query.response == 1)
-	    {
-		/* kill the address */
-		gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-		    "[BMI CONTROL]: %s: bmi discarding address: %llu\n",
-                    __func__, llu(addr));
-		ref_list_rem(cur_ref_list, addr);
-		/* NOTE: this triggers request to module to free underlying
-		 * resources if it wants to
-		 */
-		dealloc_ref_st(tmp_ref);
-	    }
+            bmi_addr_drop(tmp_ref);
 	}
 	gen_mutex_unlock(&ref_mutex);
 	return(0);
@@ -1907,33 +1901,30 @@ PVFS_BMI_addr_t bmi_method_addr_reg_callback(method_addr_p map)
     new_ref->interface = active_method_table[map->method_type];
 
     /* add the reference structure to the list */
-    gen_mutex_lock(&ref_mutex);
     ref_list_add(cur_ref_list, new_ref);
-    gen_mutex_unlock(&ref_mutex);
 
     return new_ref->bmi_addr;
 }
 
 int bmi_method_addr_forget_callback(PVFS_BMI_addr_t addr)
 {
-    ref_st_p ref;
+    struct forget_item* tmp_item = NULL;
 
-    gen_mutex_lock(&ref_mutex);
-    ref = ref_list_search_addr(cur_ref_list, addr);
-    if (!ref)
+    tmp_item = (struct forget_item*)malloc(sizeof(struct forget_item));
+    if(!tmp_item)
     {
-	gen_mutex_unlock(&ref_mutex);
-	return (bmi_errno_to_pvfs(-EPROTO));
+        return(bmi_errno_to_pvfs(-ENOMEM));
     }
-    gen_mutex_unlock(&ref_mutex);
 
-    ref_list_rem(cur_ref_list, ref->bmi_addr);
+    tmp_item->addr = addr;
 
-    /* have to set the method_addr to null before deallocating, since
-     * dealloc_ref_st tries to enter the method again to drop the addr
+    /* add to queue of items that we want the BMI control layer to consider
+     * deallocating
      */
-    ref->method_addr = NULL;
-    dealloc_ref_st(ref);
+    gen_mutex_lock(&forget_list_mutex);
+    qlist_add(&tmp_item->link, &forget_list);
+    gen_mutex_unlock(&forget_list_mutex);
+
     return (0);
 }
 
@@ -2100,6 +2091,81 @@ case err: bmi_errno = BMI_##err; break
 #undef __CASE
     }
     return bmi_errno;
+}
+
+/* bmi_check_forget_list()
+ * 
+ * Scans queue of items that methods have suggested that we forget about 
+ *
+ * no return value
+ */
+static void bmi_check_forget_list(void)
+{
+    PVFS_BMI_addr_t tmp_addr;
+    struct forget_item* tmp_item;
+    ref_st_p tmp_ref = NULL;
+    
+    gen_mutex_lock(&forget_list_mutex);
+    while(!qlist_empty(&forget_list))
+    {
+        tmp_item = qlist_entry(forget_list.next, struct forget_item,
+            link);     
+        qlist_del(&tmp_item->link);
+        /* item is off of the list; unlock for a moment while we work on
+         * this addr 
+         */
+        gen_mutex_unlock(&forget_list_mutex);
+        tmp_addr = tmp_item->addr;
+        free(tmp_item);
+
+        gen_mutex_lock(&ref_mutex);
+        tmp_ref = ref_list_search_addr(cur_ref_list, tmp_addr);
+        if(tmp_ref && tmp_ref->ref_count == 0)
+        {
+            bmi_addr_drop(tmp_ref);
+        }   
+        gen_mutex_unlock(&ref_mutex);
+
+        gen_mutex_lock(&forget_list_mutex);
+    }
+    gen_mutex_unlock(&forget_list_mutex);
+
+    return;
+}
+
+/* bmi_addr_drop
+ *
+ * Destroys a complete BMI address, including asking the method to clean up 
+ * its portion.  Will query the method for permission before proceeding
+ *
+ * NOTE: must be called with ref list mutex held 
+ */
+static void bmi_addr_drop(ref_st_p tmp_ref)
+{
+    struct method_drop_addr_query query;
+    query.response = 0;
+    query.addr = tmp_ref->method_addr;
+    int ret = 0;
+
+    /* reference count is zero; ask module if it wants us to discard
+     * the address; TCP will tell us to drop addresses for which the
+     * socket has died with no possibility of reconnect 
+     */
+    ret = tmp_ref->interface->BMI_meth_get_info(BMI_DROP_ADDR_QUERY,
+        &query);
+    if(ret == 0 && query.response == 1)
+    {
+        /* kill the address */
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+            "[BMI CONTROL]: %s: bmi discarding address: %llu\n",
+            __func__, llu(tmp_ref->bmi_addr));
+        ref_list_rem(cur_ref_list, tmp_ref->bmi_addr);
+        /* NOTE: this triggers request to module to free underlying
+         * resources if it wants to
+         */
+        dealloc_ref_st(tmp_ref);
+    }
+    return;
 }
 
 /*
