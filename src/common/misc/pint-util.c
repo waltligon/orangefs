@@ -204,7 +204,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             {
                 assert(src->u.meta.dist_size > 0);
 
-                if ((dest->mask & PVFS_ATTR_META_DIST))
+                if ((dest->mask & PVFS_ATTR_META_DIST) && dest->u.meta.dist)
                 {
                     PINT_dist_free(dest->u.meta.dist);
                 }
@@ -280,6 +280,8 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                 }
             }
         }
+
+        memset(attr, 0, sizeof(PVFS_object_attr));
     }
 }
 
