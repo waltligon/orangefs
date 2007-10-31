@@ -58,6 +58,9 @@
 /* Define if statfs callback has struct dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
+/* Define if kernel (2.6.22 or older) has kmem_cache_create with eight args */
+#undef HAVE_EIGHT_ARG_KMEM_CACHE_CREATE
+
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
