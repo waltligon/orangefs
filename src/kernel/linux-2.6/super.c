@@ -1018,7 +1018,7 @@ struct super_block* pvfs2_get_sb(
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
 
-static struct export_operations pvfs2_export_ops = {};
+static struct export_operations pvfs2_export_ops;
 
 int pvfs2_fill_sb(
     struct super_block *sb,
