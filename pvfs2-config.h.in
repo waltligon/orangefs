@@ -58,9 +58,6 @@
 /* Define if statfs callback has struct dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
-/* Define if kernel (2.6.22 or older) has kmem_cache_create with eight args */
-#undef HAVE_EIGHT_ARG_KMEM_CACHE_CREATE
-
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
@@ -161,6 +158,9 @@
 
 /* Define if kernel lacks device classes */
 #undef HAVE_KERNEL_DEVICE_CLASSES
+
+/* Define if kernel kmem_cache_create has destructor param */
+#undef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
 
 /* Define if kmem_cache_destroy returns int */
 #undef HAVE_KMEM_CACHE_DESTROY_INT_RETURN

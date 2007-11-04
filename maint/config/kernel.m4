@@ -832,16 +832,16 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
-	dnl 2.6.23 removed a parameter from kmem_cache_create
-	AC_MSG_CHECKING(for eight-argument kmem_cache_create)
+	dnl 2.6.23 removed the destructor parameter from kmem_cache_create
+	AC_MSG_CHECKING(for destructor param to kmem_cache_create)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/slab.h>
 	], [
-	   kmem_cache_create("config-test", 0, 0, 0, NULL, NULL)
+	   kmem_cache_create("config-test", 0, 0, 0, NULL, NULL);
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_EIGHT_ARG_KMEM_CACHE_CREATE, 1, [Define if kernel (2.6.22 or older) has kmem_cache_create with eight args]),
+	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM, 1, [Define if kernel kmem_cache_create has destructor param]),
 	AC_MSG_RESULT(no)
 	)
 

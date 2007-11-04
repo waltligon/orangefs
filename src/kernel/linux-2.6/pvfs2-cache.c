@@ -49,7 +49,7 @@ int op_cache_initialize(void)
     op_cache = kmem_cache_create(
         "pvfs2_op_cache", sizeof(pvfs2_kernel_op_t),
         0, PVFS2_CACHE_CREATE_FLAGS, NULL
-#ifdef HAVE_EIGHT_ARG_KMEM_CACHE_CREATE
+#ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
         , NULL
 #endif
         );
@@ -215,7 +215,7 @@ int dev_req_cache_initialize(void)
     dev_req_cache = kmem_cache_create(
         "pvfs2_devreqcache", MAX_ALIGNED_DEV_REQ_DOWNSIZE, 0,
         PVFS2_CACHE_CREATE_FLAGS, dev_req_cache_ctor
-#ifdef HAVE_EIGHT_ARG_KMEM_CACHE_CREATE
+#ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
         , NULL
 #endif
         );
@@ -311,7 +311,7 @@ int pvfs2_inode_cache_initialize(void)
     pvfs2_inode_cache = kmem_cache_create(
         "pvfs2_inode_cache", sizeof(pvfs2_inode_t), 0,
         PVFS2_CACHE_CREATE_FLAGS, pvfs2_inode_cache_ctor
-#ifdef HAVE_EIGHT_ARG_KMEM_CACHE_CREATE
+#ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
         , NULL
 #endif
         );
@@ -395,7 +395,7 @@ int kiocb_cache_initialize(void)
     pvfs2_kiocb_cache = kmem_cache_create(
         "pvfs2_kiocbcache", sizeof(pvfs2_kiocb), 0,
         PVFS2_CACHE_CREATE_FLAGS, kiocb_ctor
-#ifdef HAVE_EIGHT_ARG_KMEM_CACHE_CREATE
+#ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
         , NULL
 #endif
         );
