@@ -545,6 +545,10 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		[#define __KERNEL__
 		 #include <asm/ioctl32.h>
 		 ] )
+	AC_CHECK_HEADERS([linux/exportfs.h], [],[],
+		[#define __KERNEL__
+		 #include <exportfs.h>
+		])
 
 	AC_MSG_CHECKING(for generic_file_readv api in kernel)
 	dnl if this test passes, the kernel does not have it
