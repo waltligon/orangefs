@@ -110,6 +110,10 @@ typedef unsigned long sector_t;
 #endif
 #endif
 
+#ifdef HAVE_LINUX_EXPORTFS_H
+#include <linux/exportfs.h>
+#endif
+
 /* taken from include/linux/fs.h from 2.4.19 or later kernels */
 #ifndef MAX_LFS_FILESIZE
 #if BITS_PER_LONG == 32

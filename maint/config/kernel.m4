@@ -498,6 +498,10 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		[#define __KERNEL__
 		 #include <asm/ioctl32.h>
 		 ] )
+	AC_CHECK_HEADERS([linux/exportfs.h], [],[],
+		[#define __KERNEL__
+		 #include <exportfs.h>
+		])
 
 	AC_MSG_CHECKING(for generic_file_readv api in kernel)
 	dnl if this test passes, the kernel does not have it
@@ -725,6 +729,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_TWO_ARG_REGISTER_SYSCTL_TABLE, 1, Define if register_sysctl_table takes two arguments),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl 2.6.23 removed the destructor parameter from kmem_cache_create
+	AC_MSG_CHECKING(for destructor param to kmem_cache_create)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/slab.h>
+	], [
+	   kmem_cache_create("config-test", 0, 0, 0, NULL, NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM, 1, [Define if kernel kmem_cache_create has destructor param]),
 	AC_MSG_RESULT(no)
 	)
 
