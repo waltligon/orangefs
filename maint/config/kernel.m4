@@ -547,7 +547,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		 ] )
 	AC_CHECK_HEADERS([linux/exportfs.h], [],[],
 		[#define __KERNEL__
-		 #include <exportfs.h>
+		 #include <linux/exportfs.h>
 		])
 
 	AC_MSG_CHECKING(for generic_file_readv api in kernel)
