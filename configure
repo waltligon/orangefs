@@ -9961,7 +9961,7 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #define __KERNEL__
-		 #include <exportfs.h>
+		 #include <linux/exportfs.h>
 
 
 #include <$ac_header>
@@ -14985,7 +14985,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT 1
+#define HAVE_GETMNTENT
 _ACEOF
 
 else
