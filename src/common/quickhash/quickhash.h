@@ -25,6 +25,7 @@
 #else
 
 #include <stdlib.h>
+#include <stdint.h>
 #include "../quicklist/quicklist.h"
 
 #define qhash_malloc(x)            malloc(x)
@@ -288,6 +289,66 @@ static inline struct qhash_head *qhash_search_and_remove_at_index(
         qhash_finalize(_oldtable);                                             \
                                                                                \
     } while(0)
+
+/* http://www.cris.com/~Ttwang/tech/inthash.htm */
+static inline int quickhash_32bit_hash(void *k, int table_size)
+{
+    int32_t key = *(int32_t *)k;
+    key = ~key + (key << 15); /* key = (key << 15) - key - 1; */
+    key = key ^ (key >> 12);
+    key = key + (key << 2);
+    key = key ^ (key >> 4);
+    key = key * 2057; /* key = (key + (key << 3)) + (key << 11); */
+    key = key ^ (key >> 16);
+
+    return (int) (key & (table_size - 1));
+}
+
+static inline int quickhash_64bit_hash(void *k, int table_size)
+{
+    uint64_t key  = *(uint64_t *)k;
+
+    key = (~key) + (key << 18); /* key = (key << 18) - key - 1; */
+    key = key ^ (key >> 31);
+    key = key * 21; /* key = (key + (key << 2)) + (key << 4); */
+    key = key ^ (key >> 11);
+    key = key + (key << 6);
+    key = key ^ (key >> 22);
+
+    return (int) (key & ((uint64_t)(table_size - 1)));
+}
+
+/**
+ * derived from an algorithm found in Aho, Sethi and Ullman's
+ * {Compilers: Principles, Techniques and Tools}, published by Addison-Wesley. 
+ * This algorithm comes from P.J. Weinberger's C compiler. 
+ */
+static inline int quickhash_string_hash(void *k, int table_size)
+{
+    const char *str = (char *)k;
+    uint32_t h, g;
+
+    while(*str)
+    {
+        h = (h << 4) + *str++;
+        if((g = (h & 0xF0UL)))
+        {
+            h ^= g >> 24;
+            h ^= g;
+        }
+    }
+
+    return (int)(h & ((uint64_t)(table_size - 1)));
+}
+
+static inline int quickhash_voidp_hash(void *key, int tablesize)
+{
+#if PVFS2_SIZEOF_VOIDP == 32
+    return (int)(((int)key) & (table_size - 1));
+#else
+    return quickhash_64bit_hash(key, tablesize);
+#endif
+}
 
 #endif /* QUICKHASH_H */
 
