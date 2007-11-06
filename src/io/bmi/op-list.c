@@ -130,7 +130,7 @@ void op_list_cleanup(op_list_p olp)
     {
 	tmp_method_op = qlist_entry(iterator, struct method_op,
 				    op_list_entry);
-	dealloc_method_op(tmp_method_op);
+	bmi_dealloc_method_op(tmp_method_op);
     }
     free(olp);
     olp = NULL;

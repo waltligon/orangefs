@@ -46,8 +46,8 @@ struct tcp_allowed_connection_s {
  * connections are made */
 struct tcp_addr
 {
+    bmi_method_addr_p map;		/* points back to generic address */ \
     PVFS_BMI_addr_t bmi_addr;
-    method_addr_p map;		/* points back to generic address */
     /* stores error code for addresses that are broken for some reason */
     int addr_error;		
     char *hostname;
@@ -78,10 +78,10 @@ struct tcp_addr
 
 #define bmi_tcp_errno_to_pvfs bmi_errno_to_pvfs
 
-void tcp_forget_addr(method_addr_p map,
+void tcp_forget_addr(bmi_method_addr_p map,
 		     int dealloc_flag,
 		     int error_code);
-method_addr_p alloc_tcp_method_addr(void);
+bmi_method_addr_p alloc_tcp_method_addr(void);
 
 #endif /* __BMI_TCP_ADDRESSING_H */
 

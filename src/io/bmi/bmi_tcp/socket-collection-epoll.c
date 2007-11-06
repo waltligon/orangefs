@@ -101,7 +101,7 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
  * returns 0 on success, -errno on failure.
  */
 void BMI_socket_collection_queue(socket_collection_p scp,
-			   method_addr_p map, struct qlist_head* queue)
+			   bmi_method_addr_p map, struct qlist_head* queue)
 {
     struct qlist_head* iterator = NULL;
     struct qlist_head* scratch = NULL;
@@ -168,7 +168,7 @@ void BMI_socket_collection_finalize(socket_collection_p scp)
 int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int incount,
 				 int *outcount,
-				 method_addr_p * maps,
+				 bmi_method_addr_p * maps,
 				 int * status,
 				 int poll_timeout,
 				 gen_mutex_t* external_mutex)
@@ -187,7 +187,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
     /* init the outgoing arguments for safety */
     *outcount = 0;
-    memset(maps, 0, (sizeof(method_addr_p) * incount));
+    memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
     memset(status, 0, (sizeof(int) * incount));
 
     gen_mutex_lock(&scp->mutex);

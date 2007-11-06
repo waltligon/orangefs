@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.57 2007-10-09 21:58:30 slang Exp $
+ * $Id: ib.c,v 1.58 2007-11-06 23:08:34 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1364,7 +1364,7 @@ restart:
  */
 static int
 BMI_ib_testunexpected(int incount __unused, int *outcount,
-  struct method_unexpected_info *ui, int max_idle_time)
+  struct bmi_method_unexpected_info *ui, int max_idle_time)
 {
     struct qlist_head *l;
     int activity = 0, n;
@@ -1607,8 +1607,11 @@ static struct method_addr *BMI_ib_method_addr_lookup(const char *id)
     if (map)
 	free(hostname);  /* found it */
     else
+    {
 	map = ib_alloc_method_addr(0, hostname, port);  /* alloc new one */
+	map->ops = &bmi_ib_ops;
 	/* but don't call bmi_method_addr_reg_callback! */
+    }
 
     return map;
 }
@@ -2095,28 +2098,28 @@ static int BMI_ib_finalize(void)
 const struct bmi_method_ops bmi_ib_ops = 
 {
     .method_name = "bmi_ib",
-    .BMI_meth_initialize = BMI_ib_initialize,
-    .BMI_meth_finalize = BMI_ib_finalize,
-    .BMI_meth_set_info = BMI_ib_set_info,
-    .BMI_meth_get_info = BMI_ib_get_info,
-    .BMI_meth_memalloc = BMI_ib_memalloc,
-    .BMI_meth_memfree = BMI_ib_memfree,
-    .BMI_meth_unexpected_free = BMI_ib_unexpected_free,
-    .BMI_meth_post_send = BMI_ib_post_send,
-    .BMI_meth_post_sendunexpected = BMI_ib_post_sendunexpected,
-    .BMI_meth_post_recv = BMI_ib_post_recv,
-    .BMI_meth_test = BMI_ib_test,
-    .BMI_meth_testsome = BMI_ib_testsome,
-    .BMI_meth_testcontext = BMI_ib_testcontext,
-    .BMI_meth_testunexpected = BMI_ib_testunexpected,
-    .BMI_meth_method_addr_lookup = BMI_ib_method_addr_lookup,
-    .BMI_meth_post_send_list = BMI_ib_post_send_list,
-    .BMI_meth_post_recv_list = BMI_ib_post_recv_list,
-    .BMI_meth_post_sendunexpected_list = BMI_ib_post_sendunexpected_list,
-    .BMI_meth_open_context = BMI_ib_open_context,
-    .BMI_meth_close_context = BMI_ib_close_context,
-    .BMI_meth_cancel = BMI_ib_cancel,
-    .BMI_meth_rev_lookup_unexpected = BMI_ib_rev_lookup,
-    .BMI_meth_query_addr_range = NULL,
+    .initialize = BMI_ib_initialize,
+    .finalize = BMI_ib_finalize,
+    .set_info = BMI_ib_set_info,
+    .get_info = BMI_ib_get_info,
+    .memalloc = BMI_ib_memalloc,
+    .memfree = BMI_ib_memfree,
+    .unexpected_free = BMI_ib_unexpected_free,
+    .post_send = BMI_ib_post_send,
+    .post_sendunexpected = BMI_ib_post_sendunexpected,
+    .post_recv = BMI_ib_post_recv,
+    .test = BMI_ib_test,
+    .testsome = BMI_ib_testsome,
+    .testcontext = BMI_ib_testcontext,
+    .testunexpected = BMI_ib_testunexpected,
+    .method_addr_lookup = BMI_ib_method_addr_lookup,
+    .post_send_list = BMI_ib_post_send_list,
+    .post_recv_list = BMI_ib_post_recv_list,
+    .post_sendunexpected_list = BMI_ib_post_sendunexpected_list,
+    .open_context = BMI_ib_open_context,
+    .close_context = BMI_ib_close_context,
+    .cancel = BMI_ib_cancel,
+    .rev_lookup_unexpected = BMI_ib_rev_lookup,
+    .query_addr_range = NULL,
 };
 

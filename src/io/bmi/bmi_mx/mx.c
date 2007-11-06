@@ -834,7 +834,7 @@ bmx_open_endpoint(mx_endpoint_t *ep, uint32_t board, uint32_t ep_id)
 /* The listen_addr is our method if we are a server. It is NULL for a
  * client. The other params are NULL/0 for the client as well. */
 static int
-BMI_mx_initialize(method_addr_p listen_addr, int method_id, int init_flags)
+BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
 {
         int             i       = 0;
         int             ret     = 0;
@@ -1988,11 +1988,14 @@ bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board
         struct bmx_method_addr  *mxmap          = NULL;
 
         if (bmi_mx == NULL) {
-                map = alloc_method_addr(tmp_id, (bmi_size_t) sizeof(*mxmap));
+                map = bmi_alloc_method_addr(
+                    tmp_id, &bmi_mx_ops, (bmi_size_t) sizeof(*mxmap));
         } else {
-                map = alloc_method_addr(bmi_mx->bmx_method_id, (bmi_size_t) sizeof(*mxmap));
+                map = bmi_alloc_method_addr(bmi_mx->bmx_method_id, (bmi_size_t) sizeof(*mxmap));
         }
         if (map == NULL) return NULL;
+
+        map->ops = &bmi_mx_ops;
 
         mxmap = map->method_data;
         mxmap->mxm_map = map;
@@ -2586,7 +2589,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 
 static int
 BMI_mx_testunexpected(int incount __unused, int *outcount,
-            struct method_unexpected_info *ui, int max_idle_time __unused)
+            struct bmi_method_unexpected_info *ui, int max_idle_time __unused)
 {
         uint32_t        result  = 0;
         uint64_t        match   = (uint64_t) BMX_MSG_UNEXPECTED << 60;
@@ -2858,27 +2861,27 @@ BMI_mx_rev_lookup(struct method_addr *meth)
 
 struct bmi_method_ops bmi_mx_ops = 
 {
-    .method_name                        = "bmi_mx",
-    .BMI_meth_initialize                = BMI_mx_initialize,
-    .BMI_meth_finalize                  = BMI_mx_finalize,
-    .BMI_meth_set_info                  = BMI_mx_set_info,
-    .BMI_meth_get_info                  = BMI_mx_get_info,
-    .BMI_meth_memalloc                  = BMI_mx_memalloc,
-    .BMI_meth_memfree                   = BMI_mx_memfree,
-    .BMI_meth_unexpected_free           = BMI_mx_unexpected_free,
-    .BMI_meth_post_send                 = BMI_mx_post_send,
-    .BMI_meth_post_sendunexpected       = BMI_mx_post_sendunexpected,
-    .BMI_meth_post_recv                 = BMI_mx_post_recv,
-    .BMI_meth_test                      = BMI_mx_test,
-    .BMI_meth_testsome                  = 0,
-    .BMI_meth_testcontext               = BMI_mx_testcontext,
-    .BMI_meth_testunexpected            = BMI_mx_testunexpected,
-    .BMI_meth_method_addr_lookup        = BMI_mx_method_addr_lookup,
-    .BMI_meth_post_send_list            = BMI_mx_post_send_list,
-    .BMI_meth_post_recv_list            = BMI_mx_post_recv_list,
-    .BMI_meth_post_sendunexpected_list  = BMI_mx_post_sendunexpected_list,
-    .BMI_meth_open_context              = BMI_mx_open_context,
-    .BMI_meth_close_context             = BMI_mx_close_context,
-    .BMI_meth_cancel                    = BMI_mx_cancel,
-    .BMI_meth_rev_lookup_unexpected     = BMI_mx_rev_lookup,
+    .method_name               = "bmi_mx",
+    .initialize                = BMI_mx_initialize,
+    .finalize                  = BMI_mx_finalize,
+    .set_info                  = BMI_mx_set_info,
+    .get_info                  = BMI_mx_get_info,
+    .memalloc                  = BMI_mx_memalloc,
+    .memfree                   = BMI_mx_memfree,
+    .unexpected_free           = BMI_mx_unexpected_free,
+    .post_send                 = BMI_mx_post_send,
+    .post_sendunexpected       = BMI_mx_post_sendunexpected,
+    .post_recv                 = BMI_mx_post_recv,
+    .test                      = BMI_mx_test,
+    .testsome                  = 0,
+    .testcontext               = BMI_mx_testcontext,
+    .testunexpected            = BMI_mx_testunexpected,
+    .method_addr_lookup        = BMI_mx_method_addr_lookup,
+    .post_send_list            = BMI_mx_post_send_list,
+    .post_recv_list            = BMI_mx_post_recv_list,
+    .post_sendunexpected_list  = BMI_mx_post_sendunexpected_list,
+    .open_context              = BMI_mx_open_context,
+    .close_context             = BMI_mx_close_context,
+    .cancel                    = BMI_mx_cancel,
+    .rev_lookup_unexpected     = BMI_mx_rev_lookup,
 };

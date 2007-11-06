@@ -53,7 +53,7 @@ enum
 
 socket_collection_p BMI_socket_collection_init(int new_server_socket);
 void BMI_socket_collection_queue(socket_collection_p scp,
-			   method_addr_p map, struct qlist_head* queue);
+			   bmi_method_addr_p map, struct qlist_head* queue);
 
 /* the bmi_tcp code may try to add a socket to the collection before
  * it is fully connected, just ignore in this case
@@ -159,7 +159,7 @@ void BMI_socket_collection_finalize(socket_collection_p scp);
 int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int incount,
 				 int *outcount,
-				 method_addr_p * maps,
+				 bmi_method_addr_p * maps,
 				 int * status,
 				 int poll_timeout,
 				 gen_mutex_t* external_mutex);

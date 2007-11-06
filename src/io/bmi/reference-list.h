@@ -29,7 +29,7 @@ struct ref_st
 {
     PVFS_BMI_addr_t bmi_addr;	/* the identifier passed out of the BMI layer */
     char *id_string;		/* the id string that represents this reference */
-    method_addr_p method_addr;	/* address structure used by the method */
+    bmi_method_addr_p method_addr;	/* address structure used by the method */
 
     /* pointer to the appropriate method interface */
     struct bmi_method_ops *interface;
@@ -53,7 +53,7 @@ ref_st_p ref_list_search_addr(ref_list_p rlp,
 ref_st_p ref_list_rem(ref_list_p rlp,
 		      PVFS_BMI_addr_t my_addr);
 ref_st_p ref_list_search_method_addr(ref_list_p rlp,
-				     method_addr_p map);
+				     bmi_method_addr_p map);
 ref_st_p ref_list_search_str(ref_list_p rlp,
 			     const char *idstring);
 void ref_list_cleanup(ref_list_p rlp);

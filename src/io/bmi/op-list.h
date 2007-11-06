@@ -26,7 +26,7 @@ typedef struct qlist_head *op_list_p;
  */
 struct op_list_search_key
 {
-    method_addr_p method_addr;
+    bmi_method_addr_p method_addr;
     int method_addr_yes;
     bmi_msg_tag_t msg_tag;
     int msg_tag_yes;

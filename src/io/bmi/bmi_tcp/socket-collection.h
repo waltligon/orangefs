@@ -29,7 +29,7 @@ struct socket_collection
     gen_mutex_t mutex;
 
     struct pollfd* pollfd_array;
-    method_addr_p* addr_array;
+    bmi_method_addr_p* addr_array;
     int array_max;
     int array_count;
 
@@ -51,7 +51,7 @@ enum
 
 socket_collection_p BMI_socket_collection_init(int new_server_socket);
 void BMI_socket_collection_queue(socket_collection_p scp,
-			   method_addr_p map, struct qlist_head* queue);
+			   bmi_method_addr_p map, struct qlist_head* queue);
 
 #ifndef __PVFS2_JOB_THREADED__
 /* the bmi_tcp code may try to add a socket to the collection before
@@ -151,7 +151,7 @@ void BMI_socket_collection_finalize(socket_collection_p scp);
 int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int incount,
 				 int *outcount,
-				 method_addr_p * maps,
+				 bmi_method_addr_p * maps,
 				 int * status,
 				 int poll_timeout,
 				 gen_mutex_t* external_mutex);

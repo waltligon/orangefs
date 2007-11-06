@@ -703,7 +703,7 @@ static int bmip_testsome(int num __unused, bmi_op_id_t *ids __unused,
  * to the idle time.
  */
 static int bmip_testunexpected(int incount, int *outcount,
-			       struct method_unexpected_info *ui,
+			       struct bmi_method_unexpected_info *ui,
 			       int max_idle_time)
 {
     struct bmip_work *w, *wn;
@@ -1427,6 +1427,7 @@ static struct method_addr *bmip_alloc_method_addr(const char *hostname,
     extra = sizeof(*pma) + 2 * (strlen(hostname) + 1) + 10 + 1;
 
     map = alloc_method_addr(bmi_portals_method_id, extra);
+    map->ops = &bmi_portals_ops;
     pma = map->method_data;
 
     pma->hostname = (void *) &pma[1];
@@ -1987,28 +1988,28 @@ static int bmip_query_addr_range(struct method_addr *mop __unused,
 const struct bmi_method_ops bmi_portals_ops =
 {
     .method_name = "bmi_portals",
-    .BMI_meth_initialize = bmip_initialize,
-    .BMI_meth_finalize = bmip_finalize,
-    .BMI_meth_set_info = bmip_set_info,
-    .BMI_meth_get_info = bmip_get_info,
-    .BMI_meth_memalloc = bmip_memalloc,
-    .BMI_meth_memfree = bmip_memfree,
-    .BMI_meth_unexpected_free = bmip_unexpected_free,
-    .BMI_meth_post_send = bmip_post_send,
-    .BMI_meth_post_sendunexpected = bmip_post_sendunexpected,
-    .BMI_meth_post_recv = bmip_post_recv,
-    .BMI_meth_test = bmip_test,
-    .BMI_meth_testsome = bmip_testsome,
-    .BMI_meth_testcontext = bmip_testcontext,
-    .BMI_meth_testunexpected = bmip_testunexpected,
-    .BMI_meth_method_addr_lookup = bmip_method_addr_lookup,
-    .BMI_meth_post_send_list = bmip_post_send_list,
-    .BMI_meth_post_recv_list = bmip_post_recv_list,
-    .BMI_meth_post_sendunexpected_list = bmip_post_sendunexpected_list,
-    .BMI_meth_open_context = bmip_open_context,
-    .BMI_meth_close_context = bmip_close_context,
-    .BMI_meth_cancel = bmip_cancel,
-    .BMI_meth_rev_lookup_unexpected = bmip_rev_lookup,
-    .BMI_meth_query_addr_range = bmip_query_addr_range,
+    .initialize = bmip_initialize,
+    .finalize = bmip_finalize,
+    .set_info = bmip_set_info,
+    .get_info = bmip_get_info,
+    .memalloc = bmip_memalloc,
+    .memfree = bmip_memfree,
+    .unexpected_free = bmip_unexpected_free,
+    .post_send = bmip_post_send,
+    .post_sendunexpected = bmip_post_sendunexpected,
+    .post_recv = bmip_post_recv,
+    .test = bmip_test,
+    .testsome = bmip_testsome,
+    .testcontext = bmip_testcontext,
+    .testunexpected = bmip_testunexpected,
+    .method_addr_lookup = bmip_method_addr_lookup,
+    .post_send_list = bmip_post_send_list,
+    .post_recv_list = bmip_post_recv_list,
+    .post_sendunexpected_list = bmip_post_sendunexpected_list,
+    .open_context = bmip_open_context,
+    .close_context = bmip_close_context,
+    .cancel = bmip_cancel,
+    .rev_lookup_unexpected = bmip_rev_lookup,
+    .query_addr_range = bmip_query_addr_range,
 };
 
