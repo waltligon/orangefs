@@ -13,6 +13,7 @@
 #define DEFAULT_ID_GEN_SAFE_TABLE_SIZE 997
 
 static gen_mutex_t s_id_gen_safe_mutex = GEN_MUTEX_INITIALIZER;
+static int s_id_gen_safe_init_count = 0;
 
 static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);
@@ -43,12 +44,14 @@ int id_gen_safe_initialize()
             return -PVFS_ENOMEM;
         }
     }
+    s_id_gen_safe_init_count++;
     return 0;
 }
 
 int id_gen_safe_finalize()
 {
-    if(ID_GEN_SAFE_INITIALIZED())
+    s_id_gen_safe_init_count--;
+    if(s_id_gen_safe_init_count == 0 && ID_GEN_SAFE_INITIALIZED())
     {
         gen_mutex_lock(&s_id_gen_safe_mutex);
         qhash_destroy_and_finalize(s_id_gen_safe_table, id_gen_safe_t, hash_link, free);
