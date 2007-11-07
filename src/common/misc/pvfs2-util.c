@@ -100,6 +100,60 @@ static int PINT_util_resolve_absolute(
     char* out_fs_path,
     int out_fs_path_max);
 
+struct PVFS_sys_mntent* PVFS_util_gen_mntent(
+    char* config_server,
+    char* fs_name)
+{
+    struct PVFS_sys_mntent* tmp_ent = NULL;
+
+    tmp_ent = (struct PVFS_sys_mntent*)malloc(sizeof(struct
+        PVFS_sys_mntent));
+    if(!tmp_ent)
+    {
+        return(NULL);
+    }
+    memset(tmp_ent, 0, sizeof(struct PVFS_sys_mntent));
+
+    tmp_ent->num_pvfs_config_servers = 1;
+    tmp_ent->pvfs_config_servers = (char**)malloc(sizeof(char*));
+    if(!tmp_ent->pvfs_config_servers)
+    {
+        free(tmp_ent);
+        return(NULL);
+    }
+
+    tmp_ent->pvfs_config_servers[0] = strdup(config_server);
+    if(!tmp_ent->pvfs_config_servers[0])
+    {
+        free(tmp_ent->pvfs_config_servers);
+        free(tmp_ent);
+        return(NULL);
+    }
+
+    tmp_ent->pvfs_fs_name = strdup(fs_name);
+    if(!tmp_ent->pvfs_fs_name)
+    {
+        free(tmp_ent->pvfs_config_servers[0]);
+        free(tmp_ent->pvfs_config_servers);
+        free(tmp_ent);
+        return(NULL);
+    }
+
+    tmp_ent->flowproto = FLOWPROTO_DEFAULT;
+    tmp_ent->encoding = ENCODING_DEFAULT;
+
+    return(tmp_ent);
+}
+
+void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
+{
+    free(mntent->pvfs_config_servers[0]);
+    free(mntent->pvfs_config_servers);
+    free(mntent->pvfs_fs_name);
+    free(mntent);
+    return;
+}
+
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials)
 {

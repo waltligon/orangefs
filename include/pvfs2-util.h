@@ -47,6 +47,12 @@ int PVFS_util_get_umask(void);
 PVFS_credentials *PVFS_util_dup_credentials(
     const PVFS_credentials *credentials);
 
+struct PVFS_sys_mntent* PVFS_util_gen_mntent(
+    char* config_server,
+    char* fs_name);
+
+void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent);
+
 void PVFS_util_release_credentials(
     PVFS_credentials *credentials);
 
