@@ -214,7 +214,7 @@ int BMI_initialize(const char *method_list,
 		if(!strncmp(listen_addrs[j], proto, strlen(proto)))
 		{
 		    /* found the right addr */
-		    this_addr = strstr(listen_addrs[j], "://") + 3;
+		    this_addr = listen_addrs[j];
 		    break;
 		}
 	    }
@@ -1558,7 +1558,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
                     break;
                 }
 		meth_addr = known_method_table[i]->
-		    method_addr_lookup(id_string + strlen(name) + 3);
+		    method_addr_lookup(id_string);
 		i = active_method_count - 1;  /* point at the new one */
 		break;
 	    }

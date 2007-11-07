@@ -554,7 +554,7 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
     struct tcp_addr *tcp_addr_data = NULL;
     int ret = -1;
 
-    tcp_string = strdup(id_string);
+    tcp_string = string_key("tcp", id_string);
     if (!tcp_string)
     {
 	/* the string doesn't even have our info */
