@@ -79,6 +79,7 @@ static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
 
 static DOTCONF_CB(get_root_squash);
+static DOTCONF_CB(get_root_squash_exceptions);
 static DOTCONF_CB(get_read_only);
 static DOTCONF_CB(get_all_squash);
 static DOTCONF_CB(get_anon_gid);
@@ -706,6 +707,16 @@ static const configoption_t options[] =
      * RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
      */
     {"RootSquash", ARG_LIST, get_root_squash, NULL,
+        CTX_EXPORT, ""},
+  
+    /* RootSquashExceptions option specifies exceoptions to the RootSquash 
+     * list. This is an optional parameter that needs to be specified as 
+     * part of the ExportOptions context and is a list of BMI URL 
+     * specification of client addresses for which RootSquash
+     * has to be enforced. 
+     * RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     */
+    {"RootSquashExceptions", ARG_LIST, get_root_squash_exceptions, NULL,
         CTX_EXPORT, ""},
 
     /* ReadOnly option specifies whether the exported file-system needs to
@@ -1689,6 +1700,50 @@ DOTCONF_CB(get_root_squash)
     }
     return NULL;
 }
+
+DOTCONF_CB(get_root_squash_exceptions)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (cmd->arg_count != 0)
+    {
+        fs_conf->root_squash_exceptions_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        if (fs_conf->root_squash_exceptions_netmasks == NULL)
+        {
+            fs_conf->root_squash_exceptions_count = 0;
+            return("Could not allocate memory for root_squash_exceptions_netmasks\n");
+        }
+        if (get_list_of_strings(cmd->arg_count, cmd->data.list,
+                    &fs_conf->root_squash_exceptions_hosts) < 0)
+        {
+            free(fs_conf->root_squash_exceptions_netmasks);
+            fs_conf->root_squash_exceptions_netmasks = NULL;
+            fs_conf->root_squash_exceptions_count = 0;
+            return("Could not allocate memory for root_squash_exceptions_hosts\n");
+        }
+        fs_conf->root_squash_exceptions_count = cmd->arg_count;
+        /* Setup the netmasks */
+        if (setup_netmasks(fs_conf->root_squash_exceptions_count, fs_conf->root_squash_exceptions_hosts, 
+                    fs_conf->root_squash_exceptions_netmasks) < 0)
+        {
+            free(fs_conf->root_squash_exceptions_netmasks);
+            fs_conf->root_squash_exceptions_netmasks = NULL;
+            free_list_of_strings(fs_conf->root_squash_exceptions_count, &fs_conf->root_squash_exceptions_hosts);
+            fs_conf->root_squash_exceptions_count = 0;
+            return("Could not setup netmasks for root_squash_exceptions_hosts\n");
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d RootSquashExceptions wildcard entries\n",
+                cmd->arg_count);
+    }
+    return NULL;
+}
+
 
 DOTCONF_CB(get_read_only)
 {

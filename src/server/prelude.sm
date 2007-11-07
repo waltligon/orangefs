@@ -327,10 +327,25 @@ static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsco
 {
     int i;
 
+    /* check exceptions first */
+    for (i = 0; i < fsconfig->root_squash_exceptions_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s, netmask: %i\n",
+            lld(client_addr), fsconfig->root_squash_exceptions_hosts[i],
+            fsconfig->root_squash_exceptions_netmasks[i]);
+        if (BMI_query_addr_range(client_addr, fsconfig->root_squash_exceptions_hosts[i], 
+                fsconfig->root_squash_exceptions_netmasks[i]) == 1)
+        {
+            /* in the exception list, do not squash */
+            return 0;
+        }
+    }
+
     for (i = 0; i < fsconfig->root_squash_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
-            lld(client_addr), fsconfig->root_squash_hosts[i]);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s, netmask: %i\n",
+            lld(client_addr), fsconfig->root_squash_hosts[i],
+            fsconfig->root_squash_netmasks[i]);
         if (BMI_query_addr_range(client_addr, fsconfig->root_squash_hosts[i], 
                 fsconfig->root_squash_netmasks[i]) == 1)
         {

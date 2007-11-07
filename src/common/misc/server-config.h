@@ -105,6 +105,10 @@ typedef struct filesystem_configuration_s
     char **root_squash_hosts;
     int   *root_squash_netmasks;
 
+    int    root_squash_exceptions_count;
+    char **root_squash_exceptions_hosts;
+    int   *root_squash_exceptions_netmasks;
+
     int    all_squash_count;
     char **all_squash_hosts;
     int   *all_squash_netmasks;
