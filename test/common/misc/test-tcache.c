@@ -15,6 +15,15 @@ static void usage(int argc, char** argv);
 static int foo_compare_key_entry(void* key, struct qhash_head* link);
 static int foo_hash_key(void* key, int table_size);
 static int foo_free_payload(void* payload);
+static void check_param(char *parameter_name, int param, int expected_value);
+
+#define TEST_TIMEOUT_MSEC     4000
+#define TEST_NUM_ENTRIES        30
+#define TEST_HARD_LIMIT         10
+#define TEST_SOFT_LIMIT          5
+#define TEST_ENABLE              1
+#define TEST_RECLAIM_PERCENTAGE 50
+
 
 /* test payload */
 struct foo_payload
@@ -32,9 +41,8 @@ int main(int argc, char **argv)
     int ret = 0;
     int status = 0;
     unsigned int param = 0;
-    int removed = 0;
-    int reclaimed = 0;
-    
+    int tmp_count = 0;
+
     if(argc != 1)
     {
         usage(argc, argv);
@@ -42,7 +50,7 @@ int main(int argc, char **argv)
     }
 
     /* initialize */
-    printf("Initializing cache...\n");
+    printf("Initializing cache... ");
     test_tcache = PINT_tcache_initialize(foo_compare_key_entry,
         foo_hash_key,
         foo_free_payload,
@@ -54,72 +62,49 @@ int main(int argc, char **argv)
     }
     printf("Done.\n");
 
-    /* read current parameters */
-    printf("Reading parameters...\n");
-    ret = PINT_tcache_get_info(test_tcache, TCACHE_TIMEOUT_MSECS, &param);
-    assert(ret == 0);
-    printf("timeout_msecs: %d\n", param);
-    ret = PINT_tcache_get_info(test_tcache, TCACHE_NUM_ENTRIES, &param);
-    assert(ret == 0);
-    printf("num_entries: %d\n", param);
-    ret = PINT_tcache_get_info(test_tcache, TCACHE_HARD_LIMIT, &param);
-    assert(ret == 0);
-    printf("hard_limit: %d\n", param);
-    ret = PINT_tcache_get_info(test_tcache, TCACHE_SOFT_LIMIT, &param);
-    assert(ret == 0);
-    printf("soft_limit: %d\n", param);
-    ret = PINT_tcache_get_info(test_tcache, TCACHE_ENABLE, &param);
-    assert(ret == 0);
-    printf("enable: %d\n", param);
-    ret = PINT_tcache_get_info(test_tcache, TCACHE_RECLAIM_PERCENTAGE, &param);
-    assert(ret == 0);
-    printf("reclaim_percentage: %d\n", param);
-    printf("Done.\n");
-
     /* set parameters */
-    printf("Setting parameters...\n");
-    param = 4000;
+    printf("Setting all TCACHE parameters... ");
+    param = TEST_TIMEOUT_MSEC;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_TIMEOUT_MSECS, param);
     assert(ret == 0);
-    param = 30;
+    param = TEST_NUM_ENTRIES;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_NUM_ENTRIES, param);
-    assert(ret < 0);
-    param = 10;
+    assert(ret == -PVFS_EINVAL);
+    param = TEST_HARD_LIMIT;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_HARD_LIMIT, param);
     assert(ret == 0);
-    param = 5;
+    param = TEST_SOFT_LIMIT;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_SOFT_LIMIT, param);
     assert(ret == 0);
-    param = 1;
+    param = TEST_ENABLE;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_ENABLE, param);
     assert(ret == 0);
-    param = 50;
+    param = TEST_RECLAIM_PERCENTAGE;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_RECLAIM_PERCENTAGE, param);
     assert(ret == 0);
     printf("Done.\n");
 
     /* read current parameters */
-    printf("Reading parameters...\n");
+    printf("Reading all TCACHE parameters... ");
     ret = PINT_tcache_get_info(test_tcache, TCACHE_TIMEOUT_MSECS, &param);
     assert(ret == 0);
-    printf("timeout_msecs: %d\n", param);
+    check_param("TCACHE_TIMEOUT_MSECS", param, TEST_TIMEOUT_MSEC);
     ret = PINT_tcache_get_info(test_tcache, TCACHE_NUM_ENTRIES, &param);
     assert(ret == 0);
-    printf("num_entries: %d\n", param);
+    check_param("TCACHE_NUM_ENTRIES", param, 0);
     ret = PINT_tcache_get_info(test_tcache, TCACHE_HARD_LIMIT, &param);
     assert(ret == 0);
-    printf("hard_limit: %d\n", param);
+    check_param("TCACHE_HARD_LIMIT", param, TEST_HARD_LIMIT);
     ret = PINT_tcache_get_info(test_tcache, TCACHE_SOFT_LIMIT, &param);
     assert(ret == 0);
-    printf("soft_limit: %d\n", param);
+    check_param("TCACHE_SOFT_LIMIT", param, TEST_SOFT_LIMIT);
     ret = PINT_tcache_get_info(test_tcache, TCACHE_ENABLE, &param);
     assert(ret == 0);
-    printf("enable: %d\n", param);
+    check_param("TCACHE_ENABLE", param, TEST_ENABLE);
     ret = PINT_tcache_get_info(test_tcache, TCACHE_RECLAIM_PERCENTAGE, &param);
     assert(ret == 0);
-    printf("reclaim_percentage: %d\n", param);
+    check_param("TCACHE_RECLAIM_PERCENTAGE", param, TEST_RECLAIM_PERCENTAGE);
     printf("Done.\n");
-
 
     /* insert some entries */
     for(i=0; i< 3; i++)
@@ -130,12 +115,12 @@ int main(int argc, char **argv)
         tmp_payload->key = i;
         tmp_payload->value = i;
 
-        printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
+        printf("Inserting [%d]... ", i);
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload,
+            &tmp_count);
         if(ret < 0)
         {
-            PVFS_perror("PINT_tcache_insert", ret);
+            PVFS_perror("\nPINT_tcache_insert", ret);
             return(-1);
         }
         printf("Done.\n");
@@ -145,58 +130,58 @@ int main(int argc, char **argv)
     /* lookup all three */
     for(i=0; i<3; i++)
     {
-        printf("Looking up entry %d\n", i);
+        printf("Looking up valid entry [%d]... ", i);
         ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
         if(ret < 0)
         {
-            PVFS_perror("PINT_tcache_lookup", ret);
+            PVFS_perror("\nPINT_tcache_lookup", ret);
             return(-1);
         }
         if(status != 0)
         {
-            PVFS_perror("PINT_tcache_lookup status", status);
+            PVFS_perror("\nPINT_tcache_lookup status", status);
             return(-1);
         }
-        printf("Done.\n");
         tmp_payload = test_entry->payload;
-        printf("Value: %f\n", tmp_payload->value);
+        check_param("tcache value", tmp_payload->value, i);
+        printf("Done.\n");
     }
 
     /* sleep until at least first expires */
     sleep(2);
     i=0;
-    printf("Looking up expired entry %d\n", i);
+    printf("Looking up expired entry [%d]... ", i);
     ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
     if(ret < 0)
     {
-        PVFS_perror("PINT_tcache_lookup", ret);
+        PVFS_perror("\nPINT_tcache_lookup", ret);
         return(-1);
     }
-    if(status != -PVFS_ETIME)
+    if(status != -PVFS_ETIME) /* The status should be EXPIRED */
     {
-        PVFS_perror("PINT_tcache_lookup status", status);
+        PVFS_perror("\nPINT_tcache_lookup status", status);
         return(-1);
     }
-    printf("Done.\n");
     tmp_payload = test_entry->payload;
-    printf("Value: %f\n", tmp_payload->value);
+    check_param("tcache value", tmp_payload->value, i);
+    printf("Done.\n");
 
     i=2;
-    printf("Looking up valid entry %d\n", i);
+    printf("Looking up valid entry [%d]... ", i);
     ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
     if(ret < 0)
     {
-        PVFS_perror("PINT_tcache_lookup", ret);
+        PVFS_perror("\nPINT_tcache_lookup", ret);
         return(-1);
     }
     if(status != 0)
     {
-        PVFS_perror("PINT_tcache_lookup status", status);
+        PVFS_perror("\nPINT_tcache_lookup status", status);
         return(-1);
     }
-    printf("Done.\n");
     tmp_payload = test_entry->payload;
-    printf("Value: %f\n", tmp_payload->value);
+    check_param("tcache value", tmp_payload->value, i);
+    printf("Done.\n");
 
     /* try destroying an entry */
     printf("Destroying an entry...\n");
@@ -209,26 +194,29 @@ int main(int argc, char **argv)
     printf("Done.\n");
 
     i=2;
-    printf("Looking up destroyed entry %d\n", i);
+    printf("Looking up destroyed entry [%d]... ", i);
     ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
-    if(ret == 0)
+    if(ret != -PVFS_ENOENT)
     {
-        PVFS_perror("PINT_tcache_lookup", ret);
+        PVFS_perror("\nPINT_tcache_lookup", ret);
         return(-1);
     }
     printf("Done.\n");
 
     i=200;
-    printf("Looking up entry that never existed %d\n", i);
+    printf("Looking up entry that never existed [%d]... ", i);
     ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
-    if(ret == 0)
+    if(ret != -PVFS_ENOENT)
     {
-        PVFS_perror("PINT_tcache_lookup", ret);
+        PVFS_perror("\nPINT_tcache_lookup", ret);
         return(-1);
     }
     printf("Done.\n");
 
+    /* All entries will be expired after sleep*/
+    printf("Sleeping 5 seconds to expire all entries... ");
     sleep(5);
+    printf("Done.\n");
 
     /* insert a new entry */
     i=3;
@@ -237,9 +225,9 @@ int main(int argc, char **argv)
     assert(tmp_payload);
     tmp_payload->key = i;
     tmp_payload->value = i;
-    printf("Inserting %d...\n", i);
-    ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                   tmp_payload, &removed);
+    printf("Inserting [%d]... ", i);
+    ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload,
+        &tmp_count);
     if(ret < 0)
     {
         PVFS_perror("PINT_tcache_insert", ret);
@@ -247,34 +235,61 @@ int main(int argc, char **argv)
     }
     printf("Done.\n");
 
-    /* reclaim */
-    ret = PINT_tcache_reclaim(test_tcache, &reclaimed);
+    /* reclaim. There should be 3 entries... Soft limit is 5, reclaim percentage
+     * is 50. We should reclaim (soft limit) * (reclaim percentage), so we should
+     * reclaim 2 entries, which leaves us with 1 entry
+     */
+    printf("Issuing a reclaim...");
+    ret = PINT_tcache_reclaim(test_tcache, &tmp_count);
     if(ret < 0)
     {
         PVFS_perror("PINT_tcache_reclaim", ret);
         return(-1);
     }
+    ret = PINT_tcache_get_info(test_tcache, TCACHE_NUM_ENTRIES, &param);
+    assert(ret == 0);
+    check_param("TCACHE_NUM_ENTRIES", param, 1);
+    printf("Done.\n");
 
+    /* Check that reclaim removed the expected entries and that only one entry 
+     * exists 
+     */
+    printf("Looking up valid entry [%d]... ", i);
+    ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
+    if(ret < 0)
+    {
+        PVFS_perror("\nPINT_tcache_lookup", ret);
+        return(-1);
+    }
+    if(status != 0)
+    {
+        PVFS_perror("\nPINT_tcache_lookup status", status);
+        return(-1);
+    }
+    tmp_payload = test_entry->payload;
+    check_param("tcache value", tmp_payload->value, i);
+    printf("Done.\n");
+    
     /* finalize */
-    printf("Finalizing cache...\n");
+    printf("Finalizing cache... ");
     PINT_tcache_finalize(test_tcache);
     printf("Done.\n");
 
     /* initialize */
-    printf("Initializing cache...\n");
+    printf("Initializing cache... ");
     test_tcache = PINT_tcache_initialize(foo_compare_key_entry,
         foo_hash_key,
         foo_free_payload,
         -1);
     if(!test_tcache)
     {
-        fprintf(stderr, "PINT_tcache_initialize failure.\n");
+        fprintf(stderr, "\nPINT_tcache_initialize failure.\n");
         return(-1);
     }
     printf("Done.\n");
 
     /* disable */
-    printf("Disabling...\n");
+    printf("Disabling TCACHE...");
     param = 0;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_ENABLE, param);
     assert(ret == 0);
@@ -289,48 +304,58 @@ int main(int argc, char **argv)
         tmp_payload->key = i;
         tmp_payload->value = i;
 
-        printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
+        printf("Inserting [%d]... ", i);
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload,
+            &tmp_count);
         if(ret < 0)
         {
-            PVFS_perror("PINT_tcache_insert", ret);
+            PVFS_perror("\nPINT_tcache_insert", ret);
             return(-1);
         }
         printf("Done.\n");
-        sleep(1);
     }
 
+    /* Try and lookup each entry, make sure it doesn't exist */
+    for(i=0; i<3; i++)
+    {
+        printf("Looking up invalid entry [%d]... ", i);
+        ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
+        if(ret != -PVFS_ENOENT)
+        {
+            PVFS_perror("\nPINT_tcache_lookup", ret);
+            return(-1);
+        }
+        printf("Done.\n");
+    }
+    
     /* enable */
-    printf("Enabling...\n");
+    printf("Enable TCACHE... ");
     param = 1;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_ENABLE, param);
     assert(ret == 0);
     printf("Done.\n");
 
     /* set parameters */
-    printf("Setting parameters...\n");
-    param = 4000;
+    printf("Setting all TCACHE parameters... ");
+    param = TEST_TIMEOUT_MSEC;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_TIMEOUT_MSECS, param);
     assert(ret == 0);
-    param = 30;
+    param = TEST_NUM_ENTRIES;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_NUM_ENTRIES, param);
-    assert(ret < 0);
-    param = 10;
+    assert(ret == -PVFS_EINVAL);
+    param = TEST_HARD_LIMIT;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_HARD_LIMIT, param);
     assert(ret == 0);
-    param = 5;
+    param = TEST_SOFT_LIMIT;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_SOFT_LIMIT, param);
     assert(ret == 0);
-    param = 1;
+    param = TEST_ENABLE;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_ENABLE, param);
     assert(ret == 0);
-    param = 50;
+    param = TEST_RECLAIM_PERCENTAGE;
     ret = PINT_tcache_set_info(test_tcache, TCACHE_RECLAIM_PERCENTAGE, param);
     assert(ret == 0);
     printf("Done.\n");
-
-
 
     /* insert some entries */
     for(i=0; i< 5; i++)
@@ -341,23 +366,28 @@ int main(int argc, char **argv)
         tmp_payload->key = i;
         tmp_payload->value = i;
 
-        printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
+        printf("Inserting [%d]... ", i);
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload,
+            &tmp_count);
         if(ret < 0)
         {
-            PVFS_perror("PINT_tcache_insert", ret);
+            PVFS_perror("\nPINT_tcache_insert", ret);
             return(-1);
         }
         printf("Done.\n");
     }
 
+    /* All entries should be expired after sleep */
+    printf("Sleeping 5 seconds to expire all entries... ");
     sleep(5);
+    printf("Done.\n");
 
     /* check num_entries */
+    printf("Checking for 5 entries...");
     ret = PINT_tcache_get_info(test_tcache, TCACHE_NUM_ENTRIES, &param);
     assert(ret == 0);
-    printf("num_entries: %d\n", param);
+    check_param("TCACHE_NUM_ENTRIES", param, 5);
+    printf("Done.\n");
 
     /* insert some entries */
     for(i=5; i< 6; i++)
@@ -368,21 +398,26 @@ int main(int argc, char **argv)
         tmp_payload->key = i;
         tmp_payload->value = i;
 
-        printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
+        printf("Inserting [%d]... ", i);
+        /* Soft limit is 5, insert of 6th entry should cause a  reclaim. 5 
+         * expired entries exist. Reclaim of 2 entries should occur 
+         */
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload,
+            &tmp_count);
         if(ret < 0)
         {
-            PVFS_perror("PINT_tcache_insert", ret);
+            PVFS_perror("\nPINT_tcache_insert", ret);
             return(-1);
         }
         printf("Done.\n");
     }
 
-    /* check num_entries */
+    /* check num_entries. Reclaim should have purged 2 entries */
+    printf("Checking RECLAIM occurred during last insert. Should contain 4 entries... ");
     ret = PINT_tcache_get_info(test_tcache, TCACHE_NUM_ENTRIES, &param);
     assert(ret == 0);
-    printf("num_entries: %d\n", param);
+    check_param("TCACHE_NUM_ENTRIES", param, 4);
+    printf("Done.\n");
 
     /* insert some entries */
     for(i=6; i< 20; i++)
@@ -393,12 +428,16 @@ int main(int argc, char **argv)
         tmp_payload->key = i;
         tmp_payload->value = i;
 
-        printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, 
-                                       tmp_payload, &removed);
+        printf("Inserting [%d]... ", i);
+        /* Inserting should cause reclaims to happen. 3 entries (3-5) are 
+         * expired and should be purged. HARD_LIMIT is 10, so only the last
+         * 10 entries should exist 
+         */
+        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload,
+            &tmp_count);
         if(ret < 0)
         {
-            PVFS_perror("PINT_tcache_insert", ret);
+            PVFS_perror("\nPINT_tcache_insert", ret);
             return(-1);
         }
         printf("Done.\n");
@@ -407,7 +446,21 @@ int main(int argc, char **argv)
     /* check num_entries */
     ret = PINT_tcache_get_info(test_tcache, TCACHE_NUM_ENTRIES, &param);
     assert(ret == 0);
-    printf("num_entries: %d\n", param);
+    check_param("TCACHE_NUM_ENTRIES", param, TEST_HARD_LIMIT);
+
+    /* Check to make sure the first 10 entries do NOT exist */
+    /* Try and lookup each entry, make sure it doesn't exist */
+    for(i=0; i<10; i++)
+    {
+        printf("Looking up invalid entry [%d]... ", i);
+        ret = PINT_tcache_lookup(test_tcache, &i, &test_entry, &status);
+        if(ret != -PVFS_ENOENT)
+        {
+            PVFS_perror("\nPINT_tcache_lookup", ret);
+            return(-1);
+        }
+        printf("Done.\n");
+    }
 
     return(0);
 }
@@ -452,6 +505,19 @@ static int foo_free_payload(void* payload)
     return(0);
 }
 
+static void check_param(char *parameter_name, int param, int expected_value)
+{
+    if(param != expected_value)
+    {
+        fprintf(stderr, "\n%s does not match expected result\n"
+                        "\t%s = %d\n"
+                        "\texpected value = %d\n",
+                        parameter_name,
+                        parameter_name,
+                        param,
+                        expected_value);
+    }
+}
 /*
  * Local variables:
  *  c-indent-level: 4
