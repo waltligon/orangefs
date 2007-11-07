@@ -344,7 +344,7 @@ static inline int quickhash_string_hash(void *k, int table_size)
 static inline int quickhash_voidp_hash(void *key, int tablesize)
 {
 #if PVFS2_SIZEOF_VOIDP == 32
-    return (int)(((int)key) & (table_size - 1));
+    return (int)(((int)key) & (tablesize - 1));
 #else
     return quickhash_64bit_hash(key, tablesize);
 #endif
