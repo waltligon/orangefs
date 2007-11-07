@@ -92,8 +92,7 @@ int main(int argc, char **argv)
 static struct options* parse_args(int argc, char* argv[])
 {
     /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
+    char* optarg;
     char flags[] = "h:f:n:p:";
     int one_opt = 0;
     int len = 0;
