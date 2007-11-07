@@ -196,15 +196,10 @@ static void __exit pvfs2_exit(void)
     unregister_filesystem(&pvfs2_fs_type);
     pvfs2_proc_finalize();
     fsid_key_table_finalize();
-    if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
-    {
-	gossip_err("Failed to unregister pvfs2 device /dev/%s\n",
-		    PVFS2_REQDEVICE_NAME);
-    }
-    else {
-        gossip_debug(GOSSIP_INIT_DEBUG, "Unregistered pvfs2 device /dev/%s\n",
+    /* linux-2.6.23 changed unregister_chrdev to return void */
+    unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
+    gossip_debug(GOSSIP_INIT_DEBUG, "Unregistered pvfs2 device /dev/%s\n",
                     PVFS2_REQDEVICE_NAME);
-    }
     /* clear out all pending upcall op requests */
     spin_lock(&pvfs2_request_list_lock);
     while (!list_empty(&pvfs2_request_list))
