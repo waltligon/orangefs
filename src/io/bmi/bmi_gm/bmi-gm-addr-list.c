@@ -69,7 +69,7 @@ bmi_method_addr_p gm_addr_search(struct qlist_head * head,
              */
             return ((bmi_method_addr_p) ((unsigned long) gm_addr_data -
                                          (unsigned long) sizeof(struct
-                                                                method_addr)));
+                                                                bmi_method_addr)));
         }
     }
     return (NULL);
