@@ -718,7 +718,7 @@ bmi_method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
 	{
 	    gossip_lerr("Error: gm_host_name_to_node_id() failure for: %s.\n",
 		gm_string);
-	    dealloc_method_addr(new_addr);
+	    bmi_dealloc_method_addr(new_addr);
 	    free(gm_string);
 	    gen_mutex_unlock(&interface_mutex);
 	    return (NULL);
@@ -2037,7 +2037,7 @@ void BMI_gm_close_context(bmi_context_id context_id)
 static void dealloc_gm_method_addr(bmi_method_addr_p map)
 {
 
-    dealloc_method_addr(map);
+    bmi_dealloc_method_addr(map);
 
     return;
 }
@@ -2053,11 +2053,11 @@ static void dealloc_gm_method_addr(bmi_method_addr_p map)
 static bmi_method_addr_p alloc_gm_method_addr(void)
 {
 
-    struct method_addr *my_method_addr = NULL;
+    struct bmi_method_addr *my_method_addr = NULL;
     struct gm_addr *gm_data = NULL;
 
-    my_method_addr = alloc_method_addr(gm_method_params.method_id, sizeof(struct
-									  gm_addr));
+    my_method_addr = bmi_alloc_method_addr(gm_method_params.method_id, 
+            sizeof(struct gm_addr));
     if (!my_method_addr)
     {
 	return (NULL);
@@ -2085,7 +2085,7 @@ static method_op_p alloc_gm_method_op(void)
 {
     method_op_p my_method_op = NULL;
 
-    my_method_op = alloc_method_op(sizeof(struct gm_op));
+    my_method_op = bmi_alloc_method_op(sizeof(struct gm_op));
 
     /* note that we trust the alloc_method_addr() function to have zeroed
      * out the structures for us already 
@@ -2104,7 +2104,7 @@ static method_op_p alloc_gm_method_op(void)
  */
 void dealloc_gm_method_op(method_op_p op_p)
 {
-    dealloc_method_op(op_p);
+    bmi_dealloc_method_op(op_p);
     return;
 }
 
