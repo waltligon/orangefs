@@ -1707,9 +1707,15 @@ int BMI_tcp_query_addr_range(bmi_method_addr_p map, const char *wildcard_string,
     struct sockaddr_in map_addr;
     socklen_t map_addr_len = sizeof(map_addr);
     const char *tcp_wildcard = wildcard_string + 6 /* strlen("tcp://") */;
+    int ret = -1;
 
     memset(&map_addr, 0, sizeof(map_addr));
-    getsockname(tcp_addr_data->socket, (struct sockaddr *) &map_addr, &map_addr_len);
+    if(getpeername(tcp_addr_data->socket, (struct sockaddr *) &map_addr, &map_addr_len) < 0)
+    {
+        ret =  bmi_tcp_errno_to_pvfs(-EINVAL);
+        gossip_err("Error: failed to retrieve peer name for client.\n");
+        return(ret);
+    }
     /* Wildcard specification */
     if (netmask == -1)
     {

@@ -165,6 +165,8 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
     uint64_t page_size = sysconf(_SC_PAGE_SIZE), total_size;
     void *ptr = NULL;
     int ioctl_cmd[2] = {PVFS_DEV_MAP, 0};
+    int debug_on = 0;
+    uint64_t debug_mask = 0;
 
     for (i = 0; i < ndesc; i++)
     {
@@ -206,6 +208,12 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         desc[i].total_size = total_size;
         desc[i].size = params[i].dev_buffer_size;
         desc[i].count = params[i].dev_buffer_count;
+
+        gossip_get_debug_mask(&debug_on, &debug_mask);
+        gossip_set_debug_mask(1, GOSSIP_DEV_DEBUG);
+        gossip_debug(GOSSIP_DEV_DEBUG,
+            "[INFO]: Mapping pointer %p for I/O.\n", ptr);
+        gossip_set_debug_mask(debug_on, debug_mask);
 
         /* ioctl to ask driver to map pages if needed */
         if (ioctl_cmd[i] != 0)

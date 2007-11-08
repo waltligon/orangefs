@@ -530,6 +530,8 @@ int pvfs_bufmap_copy_from_user(
     void __user *offset = from;
     void *to_kaddr = NULL;
     struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
+    char* tmp_printer = NULL;
+    int tmp_int = 0;
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_from_user: from %p, index %d, "
                 "size %zd\n", from, buffer_index, size);
@@ -550,6 +552,13 @@ int pvfs_bufmap_copy_from_user(
 
         to_kaddr = pvfs2_kmap(to->page_array[index]);
         ret = copy_from_user(to_kaddr, offset, cur_copy_size);
+        if(!tmp_printer)
+        {
+            tmp_printer = (char*)(to_kaddr);
+            tmp_int += tmp_printer[0];
+            gossip_debug(GOSSIP_BUFMAP_DEBUG, "First character (integer value) in pvfs_bufmap_copy_from_user: %d\n", tmp_int);
+        }
+
         pvfs2_kunmap(to->page_array[index]);
 
         if (ret)
@@ -726,6 +735,8 @@ int pvfs_bufmap_copy_iovec_from_user(
     struct iovec *copied_iovec = NULL;
     struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
     unsigned int seg, page_offset = 0;
+    char* tmp_printer = NULL;
+    int tmp_int = 0;
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_iovec_from_user: index %d, "
                 "size %zd\n", buffer_index, size);
@@ -799,6 +810,14 @@ int pvfs_bufmap_copy_iovec_from_user(
         }
         to_kaddr = pvfs2_kmap(to->page_array[index]);
         ret = copy_from_user(to_kaddr + page_offset, from_addr, cur_copy_size);
+        if(!tmp_printer)
+        {
+            tmp_printer = (char*)(to_kaddr+page_offset);
+            tmp_int += tmp_printer[0];
+            gossip_debug(GOSSIP_BUFMAP_DEBUG, "First character (integer value) in pvfs_bufmap_copy_from_user: %d\n", tmp_int);
+        }
+
+
         pvfs2_kunmap(to->page_array[index]);
 #if 0
         gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_iovec_from_user: copying from user %p to kernel %p %zd bytes (to_kddr: %p,page_offset: %d)\n",
@@ -961,6 +980,8 @@ int pvfs_bufmap_copy_to_user_iovec(
     struct iovec *copied_iovec = NULL;
     struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
     unsigned int seg, page_offset = 0;
+    char* tmp_printer = NULL;
+    int tmp_int = 0;
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_user_iovec: index %d, "
                 "size %zd\n", buffer_index, size);
@@ -1034,6 +1055,12 @@ int pvfs_bufmap_copy_to_user_iovec(
             inc_index = 1;
         }
         from_kaddr = pvfs2_kmap(from->page_array[index]);
+        if(!tmp_printer)
+        {
+            tmp_printer = (char*)(from_kaddr + page_offset);
+            tmp_int += tmp_printer[0];
+            gossip_debug(GOSSIP_BUFMAP_DEBUG, "First character (integer value) in pvfs_bufmap_copy_to_user_iovec: %d\n", tmp_int);
+        }
         ret = copy_to_user(to_addr, from_kaddr + page_offset, cur_copy_size);
         pvfs2_kunmap(from->page_array[index]);
 #if 0

@@ -38,6 +38,8 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
+static uint32_t readdir_session = 0;
+
 extern int synccount;
 
 /**
@@ -670,6 +672,7 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 {
     int count, ret;
+    uint64_t tmp_pos = 0;
 
     assert(*op_p->u.k_iterate.count_p > 0);
 
@@ -713,6 +716,10 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
         if(*op_p->u.k_iterate.position_p == TROVE_ITERATE_START)
         {
             *op_p->u.k_iterate.position_p = count;
+            /* store a session identifier in the top 32 bits */
+            tmp_pos += readdir_session;
+            *op_p->u.k_iterate.position_p += (tmp_pos << 32);
+            readdir_session++;
         }
         else
         {
@@ -1454,7 +1461,10 @@ static int dbpf_keyval_iterate_skip_to_position(
          * we fall back to stepping through all the entries to get
          * to the position
          */
-
+        /* strip the session out of the position; we need to use a true
+         * integer offset if we get past the cache
+         */
+        pos = pos & 0xffff;
         return dbpf_keyval_iterate_step_to_position(handle, pos, dbc_p);
     }
 

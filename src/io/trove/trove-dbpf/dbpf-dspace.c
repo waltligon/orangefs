@@ -1391,8 +1391,13 @@ static int dbpf_dspace_cancel(
             if ((cur_op->op.type == BSTREAM_READ_LIST) ||
                 (cur_op->op.type == BSTREAM_WRITE_LIST))
             {
+#if 0
                 ret = aio_cancel(cur_op->op.u.b_rw_list.fd,
                                  cur_op->op.u.b_rw_list.aiocb_array);
+#endif
+                ret = cur_op->op.u.b_rw_list.aio_ops->aio_cancel(
+                    cur_op->op.u.b_rw_list.fd,
+                    cur_op->op.u.b_rw_list.aiocb_array);
                 gossip_debug(
                     GOSSIP_TROVE_DEBUG, "aio_cancel returned %s\n",
                     ((ret == AIO_CANCELED) ? "CANCELED" :
