@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.12 2007-09-07 16:02:14 pw Exp $
+ * $Id: vapi.c,v 1.12.2.1 2007-11-09 00:32:05 slang Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +14,7 @@
 #include <fcntl.h>
 #include <netinet/in.h>  /* htonl */
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
-#include <src/io/bmi/bmi-method-support.h>   /* struct method_addr */
+#include <src/io/bmi/bmi-method-support.h>   /* struct bmi_method_addr */
 #include <src/common/misc/pvfs2-internal.h>
 #include <src/io/bmi/bmi-byteswap.h>  /* bmitoh64 */
 
