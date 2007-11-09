@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.58 2007-11-06 23:08:34 slang Exp $
+ * $Id: ib.c,v 1.59 2007-11-09 00:33:40 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,7 +85,7 @@ static int send_cts(struct ib_work *rq);
 static void ib_close_connection(ib_connection_t *c);
 #ifndef __PVFS2_SERVER__
 static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
-                                 struct method_addr *remote_map);
+                                 struct bmi_method_addr *remote_map);
 #endif
 static int ib_tcp_server_check_new_connections(void);
 static int ib_block_for_activity(int timeout_ms);
@@ -783,7 +783,7 @@ send_cts(struct ib_work *rq)
  * Bring up the connection before posting a send or receive on it.
  */
 static int
-ensure_connected(struct method_addr *remote_map)
+ensure_connected(struct bmi_method_addr *remote_map)
 {
     int ret = 0;
     ib_method_addr_t *ibmap = remote_map->method_data;
@@ -802,7 +802,7 @@ ensure_connected(struct method_addr *remote_map)
  * Generic interface for both send and sendunexpected, list and non-list send.
  */
 static int
-post_send(bmi_op_id_t *id, struct method_addr *remote_map,
+post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
           int numbufs, const void *const *buffers, const bmi_size_t *sizes,
           bmi_size_t total_size, bmi_msg_tag_t tag, void *user_ptr,
           bmi_context_id context_id, int is_unexpected)
@@ -889,7 +889,7 @@ post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_ib_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_ib_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  const void *buffer, bmi_size_t total_size,
                  enum bmi_buffer_type buffer_flag __unused,
                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
@@ -899,7 +899,7 @@ BMI_ib_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_ib_post_send_list(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_ib_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   const void *const *buffers, const bmi_size_t *sizes, int list_count,
   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
   bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
@@ -909,7 +909,7 @@ BMI_ib_post_send_list(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_ib_post_sendunexpected(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_ib_post_sendunexpected(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                            const void *buffer, bmi_size_t total_size,
                            enum bmi_buffer_type buffer_flag __unused,
                            bmi_msg_tag_t tag, void *user_ptr,
@@ -920,7 +920,7 @@ BMI_ib_post_sendunexpected(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                                 const void *const *buffers,
 				const bmi_size_t *sizes, int list_count,
                                 bmi_size_t total_size,
@@ -936,7 +936,7 @@ BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct method_addr *remote_map,
  * Used by both recv and recv_list.
  */
 static int
-post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
+post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
           int numbufs, void *const *buffers, const bmi_size_t *sizes,
           bmi_size_t tot_expected_len, bmi_msg_tag_t tag,
           void *user_ptr, bmi_context_id context_id)
@@ -1060,7 +1060,7 @@ post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_ib_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_ib_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   void *buffer, bmi_size_t expected_len, bmi_size_t *actual_len __unused,
   enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
   bmi_context_id context_id)
@@ -1070,7 +1070,7 @@ BMI_ib_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_ib_post_recv_list(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_ib_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   void *const *buffers, const bmi_size_t *sizes, int list_count,
   bmi_size_t tot_expected_len, bmi_size_t *tot_actual_len __unused,
   enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
@@ -1523,7 +1523,7 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 }
 
 static const char *
-BMI_ib_rev_lookup(struct method_addr *meth)
+BMI_ib_rev_lookup(struct bmi_method_addr *meth)
 {
     ib_method_addr_t *ibmap = meth->method_data;
     if (!ibmap->c)
@@ -1535,10 +1535,10 @@ BMI_ib_rev_lookup(struct method_addr *meth)
 /*
  * Build and fill an IB-specific method_addr structure.
  */
-static struct method_addr *ib_alloc_method_addr(ib_connection_t *c,
+static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
                                                 char *hostname, int port)
 {
-    struct method_addr *map;
+    struct bmi_method_addr *map;
     ib_method_addr_t *ibmap;
 
     map = alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
@@ -1558,11 +1558,11 @@ static struct method_addr *ib_alloc_method_addr(ib_connection_t *c,
  * XXX: I'm assuming that these actually return a _const_ pointer
  * so that I can hand back an existing map.
  */
-static struct method_addr *BMI_ib_method_addr_lookup(const char *id)
+static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
 {
     char *s, *hostname, *cp, *cq;
     int port;
-    struct method_addr *map = NULL;
+    struct bmi_method_addr *map = NULL;
 
     /* parse hostname */
     s = string_key("ib", id);  /* allocs a string */
@@ -1711,7 +1711,7 @@ static void ib_close_connection(ib_connection_t *c)
  * post_recv*
  */
 static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
-                                 struct method_addr *remote_map)
+                                 struct bmi_method_addr *remote_map)
 {
     int s;
     char peername[2048];
@@ -1758,7 +1758,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
 /*
  * On a server, initialize a socket for listening for new connections.
  */
-static void ib_tcp_server_init_listen_socket(struct method_addr *addr)
+static void ib_tcp_server_init_listen_socket(struct bmi_method_addr *addr)
 {
     int flags;
     struct sockaddr_in skin;
@@ -1935,7 +1935,7 @@ static int BMI_ib_set_info(int option, void *param __unused)
 {
     switch (option) {
     case BMI_DROP_ADDR: {
-	struct method_addr *map = param;
+	struct bmi_method_addr *map = param;
 	ib_method_addr_t *ibmap = map->method_data;
 	free(ibmap->hostname);
 	free(map);
@@ -1966,7 +1966,7 @@ extern int vapi_ib_initialize(void);
 /*
  * Startup, once per application.
  */
-static int BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
+static int BMI_ib_initialize(struct bmi_method_addr *listen_addr, int method_id,
                              int init_flags)
 {
     int ret;

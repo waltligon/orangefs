@@ -311,7 +311,7 @@ static QLIST_HEAD(q_recv_nonprepost);
 static QLIST_HEAD(q_unexpected_done);
 static QLIST_HEAD(q_done);
 
-static struct method_addr *addr_from_nidpid(ptl_process_id_t pid);
+static struct bmi_method_addr *addr_from_nidpid(ptl_process_id_t pid);
 static void unexpected_repost(int which);
 static int nonprepost_init(void);
 static void nonprepost_repost(int which);
@@ -888,7 +888,7 @@ out:
  * Fill in bits for BMI, used by caller for later test or cancel.
  */
 static void fill_mop(struct bmip_work *w, bmi_op_id_t *id,
-		     struct method_addr *addr, void *user_ptr,
+		     struct bmi_method_addr *addr, void *user_ptr,
 		     bmi_context_id context_id)
 {
     id_gen_fast_register(&w->mop.op_id, &w->mop);
@@ -930,7 +930,7 @@ static void build_mdesc(struct bmip_work *w, ptl_md_t *mdesc, int numbufs,
  * Generic interface for both send and sendunexpected, list and non-list send.
  */
 static int
-post_send(bmi_op_id_t *id, struct method_addr *addr,
+post_send(bmi_op_id_t *id, struct bmi_method_addr *addr,
 	  int numbufs, const void *const *buffers, const bmi_size_t *sizes,
 	  bmi_size_t total_size, bmi_msg_tag_t bmi_tag, void *user_ptr,
 	  bmi_context_id context_id, int is_unexpected)
@@ -1013,7 +1013,7 @@ out:
     return ret;
 }
 
-static int bmip_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
+static int bmip_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 			  const void *buffer, bmi_size_t total_size,
 			  enum bmi_buffer_type buffer_flag __unused,
 			  bmi_msg_tag_t tag, void *user_ptr,
@@ -1023,7 +1023,7 @@ static int bmip_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 		     total_size, tag, user_ptr, context_id, 0);
 }
 
-static int bmip_post_send_list(bmi_op_id_t *id, struct method_addr *remote_map,
+static int bmip_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 			       const void *const *buffers,
 			       const bmi_size_t *sizes, int list_count,
 			       bmi_size_t total_size,
@@ -1036,7 +1036,7 @@ static int bmip_post_send_list(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int bmip_post_sendunexpected(bmi_op_id_t *id,
-				    struct method_addr *remote_map,
+				    struct bmi_method_addr *remote_map,
 				    const void *buffer, bmi_size_t total_size,
 				    enum bmi_buffer_type bflag __unused,
 				    bmi_msg_tag_t tag, void *user_ptr,
@@ -1047,7 +1047,7 @@ static int bmip_post_sendunexpected(bmi_op_id_t *id,
 }
 
 static int bmip_post_sendunexpected_list(bmi_op_id_t *id,
-					 struct method_addr *remote_map,
+					 struct bmi_method_addr *remote_map,
 					 const void *const *buffers,
 					 const bmi_size_t *sizes,
 					 int list_count, bmi_size_t total_size,
@@ -1092,7 +1092,7 @@ static void memcpy_buflist(int numbufs __unused, void *const *buffers,
  * other side has sent to us.  If one matches, satisfy this receive now,
  * else return and let the receive be preposted.
  */
-static int match_nonprepost_recv(bmi_op_id_t *id, struct method_addr *addr,
+static int match_nonprepost_recv(bmi_op_id_t *id, struct bmi_method_addr *addr,
 				 int numbufs, void *const *buffers,
 				 const bmi_size_t *sizes,
 				 bmi_size_t total_size, bmi_msg_tag_t tag,
@@ -1191,7 +1191,7 @@ out:
     return ret;
 }
 
-static int post_recv(bmi_op_id_t *id, struct method_addr *addr,
+static int post_recv(bmi_op_id_t *id, struct bmi_method_addr *addr,
 		     int numbufs, void *const *buffers, const bmi_size_t *sizes,
 		     bmi_size_t total_size, bmi_msg_tag_t tag,
 		     void *user_ptr, bmi_context_id context_id)
@@ -1301,7 +1301,7 @@ out:
     return ret;
 }
 
-static int bmip_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
+static int bmip_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 			  void *buffer, bmi_size_t expected_len,
 			  bmi_size_t *actual_len __unused,
 			  enum bmi_buffer_type buffer_flag __unused,
@@ -1312,7 +1312,7 @@ static int bmip_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 		     expected_len, tag, user_ptr, context_id);
 }
 
-static int bmip_post_recv_list(bmi_op_id_t *id, struct method_addr *remote_map,
+static int bmip_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 			       void *const *buffers, const bmi_size_t *sizes,
 			       int list_count, bmi_size_t tot_expected_len,
 			       bmi_size_t *tot_actual_len __unused,
@@ -1390,7 +1390,7 @@ out:
     return 0;
 }
 
-static const char *bmip_rev_lookup(struct method_addr *addr)
+static const char *bmip_rev_lookup(struct bmi_method_addr *addr)
 {
     struct bmip_method_addr *pma = addr->method_data;
 
@@ -1401,11 +1401,11 @@ static const char *bmip_rev_lookup(struct method_addr *addr)
  * Build and fill a Portals-specific method_addr structure.  This routine
  * copies the hostname if it needs it.
  */
-static struct method_addr *bmip_alloc_method_addr(const char *hostname,
+static struct bmi_method_addr *bmip_alloc_method_addr(const char *hostname,
 						  ptl_process_id_t pid,
 						  int register_with_bmi)
 {
-    struct method_addr *map;
+    struct bmi_method_addr *map;
     struct bmip_method_addr *pma;
     bmi_size_t extra;
     int ret;
@@ -1417,7 +1417,7 @@ static struct method_addr *bmip_alloc_method_addr(const char *hostname,
     qlist_for_each_entry(pma, &pma_list, list) {
 	if (pma->pid.pid == pid.pid && pma->pid.nid == pid.nid) {
 	    /* relies on alloc_method_addr() working like it does */
-	    map = &((struct method_addr *) pma)[-1];
+	    map = &((struct bmi_method_addr *) pma)[-1];
 	    debug(2, "%s: found map %p from pma %p\n", __func__, map, pma);
 	    goto out;
 	}
@@ -1489,9 +1489,9 @@ static int bmip_nid_from_hostname(const char *hostname, uint32_t *nid)
  * it is not exported to us.  So we have to maintain our own list
  * structure.
  */
-static struct method_addr *addr_from_nidpid(ptl_process_id_t pid)
+static struct bmi_method_addr *addr_from_nidpid(ptl_process_id_t pid)
 {
-    struct method_addr *map;
+    struct bmi_method_addr *map;
     struct in_addr inaddr;
     char *hostname;
 
@@ -1539,9 +1539,9 @@ static int bmip_nid_from_hostname(const char *hostname, uint32_t *nid)
     return ret;
 }
 
-static struct method_addr *addr_from_nidpid(ptl_process_id_t pid)
+static struct bmi_method_addr *addr_from_nidpid(ptl_process_id_t pid)
 {
-    struct method_addr *map;
+    struct bmi_method_addr *map;
     char hostname[9];
 
     sprintf(hostname, "nid%05d", pid.nid);
@@ -1556,12 +1556,12 @@ static struct method_addr *addr_from_nidpid(ptl_process_id_t pid)
  * into its constituent fields, storing them in an opaque
  * type, which is then returned.
  */
-static struct method_addr *bmip_method_addr_lookup(const char *id)
+static struct bmi_method_addr *bmip_method_addr_lookup(const char *id)
 {
     char *s, *cp, *cq;
     int ret;
     ptl_process_id_t pid;
-    struct method_addr *map = NULL;
+    struct bmi_method_addr *map = NULL;
 
     /* parse hostname */
     s = string_key("portals", id);  /* allocs a string "node27:3334/pvfs2-fs" */
@@ -1612,7 +1612,7 @@ out:
 /*
  * "Listen" on a particular portal, specified in the address in pvfs2tab.
  */
-static int unexpected_init(struct method_addr *listen_addr)
+static int unexpected_init(struct bmi_method_addr *listen_addr)
 {
     struct bmip_method_addr *pma = listen_addr->method_data;
     int i, ret;
@@ -1832,7 +1832,7 @@ static int bmip_set_info(int option, void *param)
 {
     switch (option) {
     case BMI_DROP_ADDR: {
-	struct method_addr *addr = param;
+	struct bmi_method_addr *addr = param;
 	struct bmip_method_addr *pma = addr->method_data;
 	gen_mutex_lock(&pma_mutex);
 	qlist_del(&pma->list);
@@ -1853,7 +1853,7 @@ static int bmip_set_info(int option, void *param)
  * This is called with a method_addr initialized by
  * bmip_method_addr_lookup.
  */
-static int bmip_initialize(struct method_addr *listen_addr,
+static int bmip_initialize(struct bmi_method_addr *listen_addr,
 			   int method_id, int init_flags)
 {
     int ret = -ENODEV, numint;
@@ -1978,7 +1978,7 @@ out:
 /*
  * All addresses are in the same netmask.
  */
-static int bmip_query_addr_range(struct method_addr *mop __unused,
+static int bmip_query_addr_range(struct bmi_method_addr *mop __unused,
 				 const char *wildcard __unused,
 				 int netmask __unused)
 {

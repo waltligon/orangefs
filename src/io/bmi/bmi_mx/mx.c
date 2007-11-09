@@ -28,6 +28,8 @@ int     recvunex_start;
 int     recvunex_finish;
 #endif
 
+struct bmi_method_ops bmi_mx_ops;
+
 mx_unexp_handler_action_t
 bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                       uint64_t match_value, uint32_t length, void *data_if_available);
@@ -1096,7 +1098,7 @@ bmx_peer_disconnect(struct bmx_peer *peer, int mx_dis, bmi_error_code_t err)
 static int
 BMI_mx_set_info(int option, void *inout_parameter)
 {
-        struct method_addr      *map    = NULL;
+        struct bmi_method_addr      *map    = NULL;
         struct bmx_method_addr  *mxmap  = NULL;
         struct bmx_peer         *peer   = NULL;
 
@@ -1105,7 +1107,7 @@ BMI_mx_set_info(int option, void *inout_parameter)
         switch(option) {
                 case BMI_DROP_ADDR:
                         if (inout_parameter != NULL) {
-                                map = (struct method_addr *) inout_parameter;
+                                map = (struct bmi_method_addr *) inout_parameter;
                                 mxmap = map->method_data;
                                 debug(BMX_DB_PEER, "%s drop %s map 0x%p mxmap 0x%p)",
                                                 __func__, mxmap->mxm_peername != NULL ?
@@ -1199,7 +1201,7 @@ bmx_memalloc(bmi_size_t size, int type)
                 gen_mutex_unlock(used_lock);
                 gen_mutex_lock(idle_lock);
         } else {
-                *misses++;
+                (*misses)++;
                 gen_mutex_unlock(idle_lock);
                 buf = malloc((size_t) size);
                 gen_mutex_lock(idle_lock);
@@ -1436,7 +1438,7 @@ out:
 }
 
 static int
-bmx_post_send_common(bmi_op_id_t *id, struct method_addr *remote_map,
+bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                      int numbufs, const void *const *buffers, 
                      const bmi_size_t *sizes, bmi_size_t total_size, 
                      bmi_msg_tag_t tag, void *user_ptr,
@@ -1552,7 +1554,7 @@ out:
 }
 
 static int
-BMI_mx_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_mx_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  const void *buffer, bmi_size_t size,
                  enum bmi_buffer_type buffer_flag __unused,
                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
@@ -1564,7 +1566,7 @@ BMI_mx_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_mx_post_send_list(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_mx_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                       const void *const *buffers, const bmi_size_t *sizes, int list_count,
                       bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
                       bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
@@ -1576,7 +1578,7 @@ BMI_mx_post_send_list(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_mx_post_sendunexpected(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_mx_post_sendunexpected(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  const void *buffer, bmi_size_t size,
                  enum bmi_buffer_type buffer_flag __unused,
                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
@@ -1588,7 +1590,7 @@ BMI_mx_post_sendunexpected(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_mx_post_sendunexpected_list(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_mx_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                   const void *const *buffers, const bmi_size_t *sizes, int list_count,
                   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
                   bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
@@ -1641,7 +1643,7 @@ bmx_post_rx(struct bmx_ctx *rx)
 }
 
 static int
-bmx_post_recv_common(bmi_op_id_t *id, struct method_addr *remote_map,
+bmx_post_recv_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                      int numbufs, void *const *buffers, const bmi_size_t *sizes,
                      bmi_size_t tot_expected_len, bmi_msg_tag_t tag,
                      void *user_ptr, bmi_context_id context_id)
@@ -1737,7 +1739,7 @@ out:
 }
 
 static int
-BMI_mx_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_mx_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  void *buffer, bmi_size_t expected_len, bmi_size_t *actual_len __unused,
                  enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
                  bmi_context_id context_id)
@@ -1749,7 +1751,7 @@ BMI_mx_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 }
 
 static int
-BMI_mx_post_recv_list(bmi_op_id_t *id, struct method_addr *remote_map,
+BMI_mx_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                void *const *buffers, const bmi_size_t *sizes, int list_count,
                bmi_size_t tot_expected_len, bmi_size_t *tot_actual_len __unused,
                enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
@@ -1981,15 +1983,15 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
 }
 
 /* This is called before BMI_mx_initialize() on servers, do not use anything from bmx_data */
-static struct method_addr *
+static struct bmi_method_addr *
 bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board, uint32_t ep_id)
 {
-        struct method_addr      *map            = NULL;
+        struct bmi_method_addr      *map            = NULL;
         struct bmx_method_addr  *mxmap          = NULL;
 
         if (bmi_mx == NULL) {
                 map = bmi_alloc_method_addr(
-                    tmp_id, &bmi_mx_ops, (bmi_size_t) sizeof(*mxmap));
+                    tmp_id, (bmi_size_t) sizeof(*mxmap));
         } else {
                 map = bmi_alloc_method_addr(bmi_mx->bmx_method_id, (bmi_size_t) sizeof(*mxmap));
         }
@@ -2163,7 +2165,7 @@ bmx_handle_conn_req(void)
                                 uint32_t        board           = 0;
                                 uint32_t        ep_id           = 0;
                                 const char     *peername        = rx->mxc_buffer;
-                                struct method_addr *map         = NULL;
+                                struct bmi_method_addr *map         = NULL;
 
                                 debug((BMX_DB_CONN|BMX_DB_PEER), "%s peer %s connecting",
                                                 __func__, peername);
@@ -2727,14 +2729,14 @@ bmx_peer_connect(struct bmx_peer *peer)
  *       mx_iconnect()
  */
 /* This is called on the server before BMI_mx_initialize(). */
-static struct method_addr *
+static struct bmi_method_addr *
 BMI_mx_method_addr_lookup(const char *id)
 {
         int                     ret     = 0;
         char                   *host    = NULL;
         uint32_t                board   = 0;
         uint32_t                ep_id   = 0;
-        struct method_addr     *map     = NULL;
+        struct bmi_method_addr     *map     = NULL;
         struct bmx_method_addr *mxmap   = NULL;
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
@@ -2846,7 +2848,7 @@ BMI_mx_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 
 /* Unlike bmi_ib, we always know our peername, check if the peer exists */
 static const char *
-BMI_mx_rev_lookup(struct method_addr *meth)
+BMI_mx_rev_lookup(struct bmi_method_addr *meth)
 {
         struct bmx_method_addr  *mxmap = meth->method_data;
 
