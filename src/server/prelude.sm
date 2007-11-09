@@ -472,7 +472,7 @@ static PINT_sm_action prelude_perm_check(
     PVFS_ds_attributes *ds_attr = NULL;
     PVFS_uid translated_uid = s_op->req->credentials.uid;
     PVFS_gid translated_gid = s_op->req->credentials.gid;
-    PVFS_fs_id  fsid;
+    PVFS_fs_id  fsid = PVFS_FS_ID_NULL;
     int  rdonly = -1;
     int squashed_flag = 0;
     int skip_acl_flag = 0;
