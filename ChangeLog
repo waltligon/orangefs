@@ -2,7 +2,7 @@
 PVFS2 Release ChangeLog
 -----------------------
 
-pvfs-2.7.x
+pvfs-2.7.0
 ==============
 * ib: free cached registrations when out of space (openib only)
 
@@ -26,6 +26,24 @@ read-only files through the vfs.
 
 * portals: new BMI implementation
 * make/configure: support Cray XT3/XT4 compute node build environment
+
+* Added a RootSquashExceptions config option
+
+* support for Linux kernels 2.6.22 and 2.6.23
+
+* New layout parameter to PVFS_[i]sys_create.
+
+* Immutable file support, allowing client caching of files.
+
+* Added a new two-dimensional distribution for incast scenarios.
+
+* MX: new BMI implementation
+
+* Fixes to:
+	- servers running over an extended period of time.
+	- kernel module for simul workloads
+	- readdir handling of tokens
+	- alt aio cleanup path
 
 pvfs-2.6.3
 ==============

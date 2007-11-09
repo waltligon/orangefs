@@ -1836,8 +1836,8 @@ CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=2
 PVFS2_MINOR=7
 PVFS2_SUB=0
-#PVFS2_PRE=""
-PVFS2_PRE="pre1-$CONFIGURE_TIME"
+PVFS2_PRE=""
+#PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE
 
@@ -16449,7 +16449,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT
+#define HAVE_GETMNTENT 1
 _ACEOF
 
 else
