@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.58.2.1 2007-11-09 00:32:05 slang Exp $
+ * $Id: ib.c,v 1.58.2.2 2007-11-15 15:19:13 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1541,7 +1541,7 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
     struct bmi_method_addr *map;
     ib_method_addr_t *ibmap;
 
-    map = alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
+    map = bmi_alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
     ibmap = map->method_data;
     ibmap->c = c;
     ibmap->hostname = hostname;
