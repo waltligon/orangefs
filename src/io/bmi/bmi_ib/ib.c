@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.59 2007-11-09 00:33:40 slang Exp $
+ * $Id: ib.c,v 1.60 2007-11-15 15:50:59 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +40,8 @@ static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
  * method_addrs.
  */
 static int bmi_ib_method_id;
+
+const struct bmi_method_ops bmi_ib_ops;
 
 /* alloc space for the single device structure pointer; one for
  * vapi and one for openib */
@@ -1541,7 +1543,7 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
     struct bmi_method_addr *map;
     ib_method_addr_t *ibmap;
 
-    map = alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
+    map = bmi_alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
     ibmap = map->method_data;
     ibmap->c = c;
     ibmap->hostname = hostname;

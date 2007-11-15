@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.29 2007-10-09 21:58:30 slang Exp $
+ * $Id: ib.h,v 1.30 2007-11-15 15:50:59 slang Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -38,7 +38,7 @@ typedef struct {
     struct qlist_head list;
 
     /* connection management */
-    struct method_addr *remote_map;
+    struct bmi_method_addr *remote_map;
     char *peername;  /* string representation of remote_map */
 
     /* per-connection buffers */
@@ -362,7 +362,7 @@ struct ib_device_func {
  */
 typedef struct {
     int listen_sock;  /* TCP sock on which to listen for new connections */
-    struct method_addr *listen_addr;  /* and BMI listen address */
+    struct bmi_method_addr *listen_addr;  /* and BMI listen address */
 
     struct qlist_head connection; /* list of current connections */
     struct qlist_head sendq;  /* outstanding sent items */
