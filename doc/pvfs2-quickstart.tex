@@ -170,8 +170,8 @@ several questions to determine your desired configuration.  Please pay
 particular attention to the listing of the metadata servers and I/O
 servers.  In this example we will use ``testhost'' for both.
 
-\em{NEW:} The pvfs2-genconfig tool will generate 
-\em{a single} configuration file.  Previous versions (before 2.7.0) of PVFS
+\emph{NEW:} The pvfs2-genconfig tool will generate 
+\emph{a single} configuration file.  Previous versions (before 2.7.0) of PVFS
 generated two files, but the format allows for easier deployment
 using a single file.  This script should be excuted as root, so
 that we can place the configuration files in their default /etc/
@@ -259,7 +259,7 @@ bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf
 The server uses the hostname of the machine to determine the endpoint
 for the config file that it should attach to.  If the server is unable
 to match the hostname to one of the endpoints in the config file, the
-\em{-a} option can be given, using the alias string
+\emph{-a} option can be given, using the alias string
 to specify the endpoint.
 
 \begin{verbatim}
