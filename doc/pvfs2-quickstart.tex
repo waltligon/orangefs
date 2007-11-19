@@ -972,7 +972,8 @@ configure --with-pvfs2=PVFS_PREFIX [other flags]
 
 Now compile and install MPICH2 as you normally would.  Applications accessing
 PVFS2 through MPI-IO will bypass the kernel interface and talk to PVFS2 servers
-directly.  
+directly.  If you do not have the file system mounted, ROMIO will still work.
+Just be sure to add the "pvfs2:" to your file name.
 
 Please note: older versions of MPICH2 need a few changes
 to the normal configure process.  MPICH2-1.0.4p1 and older will need to
