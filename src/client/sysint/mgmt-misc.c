@@ -42,6 +42,15 @@ const char *PVFS_mgmt_map_addr(
     return ret;
 }
 
+PVFS_error PVFS_mgmt_map_handle(
+    PVFS_fs_id fs_id,
+    PVFS_handle handle,
+    PVFS_BMI_addr_t *addr)
+{
+    return PINT_cached_config_map_to_server(
+        addr, handle, fs_id);
+}
+
 /** Obtains file system statistics from all servers in a given
  *  file system.
  *
