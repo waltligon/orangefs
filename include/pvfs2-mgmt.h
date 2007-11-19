@@ -386,6 +386,10 @@ int PVFS_mgmt_get_config(
     char* fs_buf,
     int fs_buf_size);
 
+PVFS_error PVFS_mgmt_map_handle(
+    PVFS_fs_id fs_id,
+    PVFS_handle handle,
+    PVFS_BMI_addr_t *addr);
 
 #endif /* __PVFS2_MGMT_H */
 
