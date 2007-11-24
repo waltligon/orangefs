@@ -772,6 +772,17 @@ static int pvfs2_readpages_fill_cb(void *_data, struct page *page)
     return 0;
 }
 
+#ifdef HAVE_SPIN_LOCK_ADDR_SPACE_STRUCT
+#define lock_mapping_tree(mapping) spin_lock(&mapping->page_lock)
+#define unlock_mapping_tree(mapping) spin_unlock(&mapping->page_lock)
+#elif HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT
+#define lock_mapping_tree(mapping) spin_lock(&mapping->priv_lock)
+#define unlock_mapping_tree(mapping) spin_unlock(&mapping->priv_lock)
+#else
+#define lock_mapping_tree(mapping) read_lock_irq(&mapping->tree_lock)
+#define unlock_mapping_tree(mapping) read_unlock_irq(&mapping->tree_lock)
+#endif
+
 /* A debugging function to check the contents of a
  *  mapping's address space/radix tree
  */
@@ -785,7 +796,7 @@ static int check_mapping_tree(struct address_space *mapping,
     begin_index = 0;
     end_index = (file_size - 1) >> PAGE_CACHE_SHIFT;
     nr_to_read = end_index - begin_index + 1;
-    read_lock_irq(&mapping->tree_lock);
+    lock_mapping_tree(mapping);
     for (page_idx = 0; page_idx < nr_to_read; page_idx++) {
         struct page *page;
         pgoff_t page_offset = begin_index + page_idx;
@@ -805,7 +816,7 @@ static int check_mapping_tree(struct address_space *mapping,
                                             page_idx, page_offset);
         }
     }
-    read_unlock_irq(&mapping->tree_lock);
+    unlock_mapping_tree(mapping);
     return 0;
 }
                             
@@ -877,7 +888,7 @@ static int locate_file_pages(struct rw_options *rw, size_t total_size)
     gossip_debug(GOSSIP_FILE_DEBUG, "read %ld pages\n",
             nr_to_read);
 
-    read_lock_irq(&mapping->tree_lock);
+    lock_mapping_tree(mapping);
     /* Preallocate all pages, increase their ref counts if they are in cache */
     for (page_idx = 0; page_idx < nr_to_read; page_idx++) {
         pgoff_t page_offset = begin_index + page_idx;
@@ -898,10 +909,10 @@ static int locate_file_pages(struct rw_options *rw, size_t total_size)
             continue;
         }
         g_pvfs2_stats.cache_misses++;
-        read_unlock_irq(&mapping->tree_lock);
+        unlock_mapping_tree(mapping);
         /* Allocate, but don't add it to the LRU list yet */
         page = page_cache_alloc_cold(mapping);
-        read_lock_irq(&mapping->tree_lock);
+        lock_mapping_tree(mapping);
         if (!page) {
             ret = -ENOMEM;
             gossip_err("could not allocate page cache\n");
@@ -921,7 +932,7 @@ static int locate_file_pages(struct rw_options *rw, size_t total_size)
         rw->dest.pages.pg_byte_map[page_idx] = 1;
         ret++;
     }
-    read_unlock_irq(&mapping->tree_lock);
+    unlock_mapping_tree(mapping);
     /* cleanup in case of error */
     if (ret < 0) {
         gossip_err("could not page_cache_alloc_cold\n");
@@ -2961,6 +2972,10 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 #endif
 }
 
+#ifndef HAVE_MAPPING_NRPAGES_MACRO
+#define mapping_nrpages(idata) (idata)->nrpages
+#endif
+
 /** Called to notify the module that there are no more references to
  *  this file (i.e. no processes have it open).
  *
@@ -2986,7 +3001,7 @@ int pvfs2_file_release(
     */
     if (file->f_dentry->d_inode &&
         file->f_dentry->d_inode->i_mapping &&
-        file->f_dentry->d_inode->i_data.nrpages)
+        mapping_nrpages(&file->f_dentry->d_inode->i_data))
     {
         clear_inode_mmap_ra_cache(file->f_dentry->d_inode);
         truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0);

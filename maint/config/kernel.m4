@@ -849,5 +849,44 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+	AC_MSG_CHECKING(if kernel address_space struct has a spin_lock field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		spin_lock(&as.page_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SPIN_LOCK_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock instead of rw_lock]),
+	AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(if kernel address_space struct has a priv_lock field - from RT linux)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		spin_lock(&as.priv_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock for private data instead of rw_lock -- used by RT linux]),
+	AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(if kernel defines mapping_nrpages macro - from RT linux)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space idata;
+		int i = mapping_nrpages(&idata);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_MAPPING_NRPAGES_MACRO, 1, [Define if kernel defines mapping_nrpages macro -- defined by RT linux]),
+	AC_MSG_RESULT(no)
+	)
+
 	CFLAGS=$oldcflags
 ])
