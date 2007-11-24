@@ -22,6 +22,7 @@
 
 
 \title{A Quick Start Guide to PVFS2}
+\author{ PVFS2 Development Team }
 
 %
 % BEGINNING OF DOCUMENT
@@ -170,10 +171,12 @@ several questions to determine your desired configuration.  Please pay
 particular attention to the listing of the metadata servers and I/O
 servers.  In this example we will use ``testhost'' for both.
 
-\emph{NEW:} The pvfs2-genconfig tool will generate 
-\emph{a single} configuration file.  Previous versions (before 2.7.0) of PVFS
-generated two files, but the format allows for easier deployment
-using a single file.  This script should be excuted as root, so
+The pvfs2-genconfig tool will generate two configuration files.  One
+is a file system configuration file that will be identical for all
+servers (if we had more than one).  The second is a server specific
+configuration file that will be different for each server.  The server
+specific files have the hostname of the server that they belong to
+appended to the file name.  This script should be excuted as root, so
 that we can place the configuration files in their default /etc/
 locations.
 
@@ -183,7 +186,7 @@ every field.  We will use the hostname ``testhost'' rather than
 
 \begin{verbatim}
 root@testhost:~# /usr/bin/pvfs2-genconfig  \
-	/etc/pvfs2-fs.conf
+	/etc/pvfs2-fs.conf /etc/pvfs2-server.conf
 **********************************************************************
 	Welcome to the PVFS2 Configuration Generator:
 
@@ -246,24 +249,16 @@ a storage space in /pvfs2-storage-space as specified in the configuration
 files.
 
 \begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf -f
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+	/etc/pvfs2-server.conf-testhost -f
 \end{verbatim}
 
 Once the above step is done, you can start the server in normal mode 
 as follows:
 
 \begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf 
-\end{verbatim}
-
-The server uses the hostname of the machine to determine the endpoint
-for the config file that it should attach to.  If the server is unable
-to match the hostname to one of the endpoints in the config file, the
-\emph{-a} option can be given, using the alias string
-to specify the endpoint.
-
-\begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf -a myhost1
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+		/etc/pvfs2-server.conf-testhost
 \end{verbatim}
 
 All log messages will be directed to /tmp/pvfs2-server.log, unless you specified
@@ -272,7 +267,8 @@ pvfs2-server in the foreground and direct all messages to stderr, then
 you may run the server as follows:
 
 \begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf -d
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+	/etc/pvfs2-server.conf-testhost -d
 \end{verbatim}
 
 \subsubsection{Automatic server startup and shutdown}
@@ -533,13 +529,24 @@ Writing 8 server config file(s)... Done.
 Configuration complete!
 \end{verbatim}
 
-The generated config file will have conservative default values.  The PVFS2
+The generated config files will have conservative default values.  The PVFS2
 Users Guide has more information about the settings and the consequences of
 setting more aggressive, high performance values.
 
-Now the config file must be copied out to all of the server nodes.  If you 
-use the provided (Redhat style) rc scripts, then you can simply copy
-the config file to every node.  The following example assumes
+We have now made all the config files for an 8-node storage cluster:
+\begin{verbatim}
+root@cluster1:~# ls /etc/pvfs2/foo/
+pvfs2-fs.conf               pvfs2-server.conf-cluster5
+pvfs2-server.conf-cluster1  pvfs2-server.conf-cluster6
+pvfs2-server.conf-cluster2  pvfs2-server.conf-cluster7
+pvfs2-server.conf-cluster3  pvfs2-server.conf-cluster8
+pvfs2-server.conf-cluster4
+\end{verbatim}
+
+Now the config files must be copied out to all of the server nodes.  If you 
+use the provided (Redhat style) rc scripts, then you can simply copy all
+config files to every node; each server will pick the correct config files
+based on its own hostname at startup time.  The following example assumes
 that you will use scp to copy files to cluster nodes.  Other possibilities
 include rcp, bpcp, or simply storing the configuration files on an NFS volume.
 Please note, however, that the rc script should be modified if you intend
@@ -550,6 +557,7 @@ each machine.
 
 \begin{verbatim}
 root@cluster1:~# for i in `seq 1 8`; do
+> scp /etc/pvfs2-server.conf-cluster\${i} cluster\${i}:/etc/
 > scp /etc/pvfs2-fs.conf cluster\${i}:/etc/
 > scp /usr/src/pvfs2/examples/pvfs2-server.rc \
     cluster\${i}:/etc/rc.d/init.d/pvfs2-server
@@ -565,14 +573,16 @@ does not already exist.  Run the following command on every metadata
 or IO node in the cluster:
 
 \begin{verbatim}
-root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf -f
+root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+	/etc/pvfs2-server.conf -f
 \end{verbatim}
 
 Then once the storage space is created, start the server for real with a
 command like this on every metadata or IO node in the cluster:
 
 \begin{verbatim}
-root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf 
+root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+	/etc/pvfs2-server.conf
 \end{verbatim}
 
 If you want to run the server in the foreground (e.g. for debugging), use the
@@ -972,8 +982,7 @@ configure --with-pvfs2=PVFS_PREFIX [other flags]
 
 Now compile and install MPICH2 as you normally would.  Applications accessing
 PVFS2 through MPI-IO will bypass the kernel interface and talk to PVFS2 servers
-directly.  If you do not have the file system mounted, ROMIO will still work.
-Just be sure to add the "pvfs2:" to your file name.
+directly.  
 
 Please note: older versions of MPICH2 need a few changes
 to the normal configure process.  MPICH2-1.0.4p1 and older will need to
