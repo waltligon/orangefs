@@ -198,6 +198,9 @@
 /* Define to 1 if you have the <malloc.h> header file. */
 #undef HAVE_MALLOC_H
 
+/* Define if kernel defines mapping_nrpages macro -- defined by RT linux */
+#undef HAVE_MAPPING_NRPAGES_MACRO
+
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
@@ -258,6 +261,10 @@
 /* Define if kernel has register_ioctl32_conversion */
 #undef HAVE_REGISTER_IOCTL32_CONVERSION
 
+/* Define if kernel address_space struct has a spin_lock for private data
+   instead of rw_lock -- used by RT linux */
+#undef HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT
+
 /* Define to 1 if you have the <SDL/SDL_ttf.h> header file. */
 #undef HAVE_SDL_SDL_TTF_H
 
@@ -272,6 +279,9 @@
 
 /* Define if SLAB_KERNEL is defined in kernel */
 #undef HAVE_SLAB_KERNEL
+
+/* Define if kernel address_space struct has a spin_lock instead of rw_lock */
+#undef HAVE_SPIN_LOCK_ADDR_SPACE_STRUCT
 
 /* Define if struct super_operations in kernel has statfs_lite callback */
 #undef HAVE_STATFS_LITE_SUPER_OPERATIONS
