@@ -293,6 +293,15 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
                  * and we'll continue from the state returned to
                  */
 	        smcb->current_state = PINT_pop_state(smcb);
+                if(!smcb->current_state ||
+                   smcb->current_state->trtbl[0].flag == SM_TERM)
+                {
+                    /* assume nested machine was invoked without
+                     * a parent, or nested machine completion results
+                     * in immediate termination
+                     */
+                    return SM_ACTION_TERMINATE;
+                }
 	    }
         } while (transtbl[i].flag == SM_RETURN);
         smcb->current_state = transtbl[i].next_state;
