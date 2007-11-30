@@ -1963,6 +1963,11 @@ static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *
     ptr->token = readdir->token;
     ptr->directory_version = readdir->directory_version;
     ptr->pvfs_dirent_outcount = readdir->pvfs_dirent_outcount;
+
+#ifndef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
+
     *pptr += offsetof(pvfs2_readdir_response_t, dirent_array);
     for (i = 0; i < readdir->pvfs_dirent_outcount; i++) 
     {

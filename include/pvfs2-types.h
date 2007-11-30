@@ -22,7 +22,6 @@
 #include <sys/time.h>
 #include <limits.h>
 #include <errno.h>
-#include <malloc.h>  /* pick up potential offsetof defn */
 #endif
 
 #ifndef INT32_MAX
@@ -32,10 +31,6 @@
 
 #ifndef NAME_MAX
 #define NAME_MAX 255
-#endif
-
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 #endif
 
 /* figure out the size of a pointer */
