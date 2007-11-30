@@ -42,7 +42,6 @@
 struct bmi_method_addr
 {
     int method_type;
-    struct bmi_method_ops *ops;
     void *method_data;		/* area to be used by specific methods */
 };
 typedef struct bmi_method_addr bmi_method_addr_st, *bmi_method_addr_p;

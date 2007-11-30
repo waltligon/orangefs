@@ -28,8 +28,6 @@ int     recvunex_start;
 int     recvunex_finish;
 #endif
 
-struct bmi_method_ops bmi_mx_ops;
-
 mx_unexp_handler_action_t
 bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                       uint64_t match_value, uint32_t length, void *data_if_available);
@@ -1997,8 +1995,6 @@ bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board
         }
         if (map == NULL) return NULL;
 
-        map->ops = &bmi_mx_ops;
-
         mxmap = map->method_data;
         mxmap->mxm_map = map;
         mxmap->mxm_peername = strdup(peername);
@@ -2861,7 +2857,7 @@ BMI_mx_rev_lookup(struct bmi_method_addr *meth)
 }
 
 
-struct bmi_method_ops bmi_mx_ops = 
+const struct bmi_method_ops bmi_mx_ops = 
 {
     .method_name               = "bmi_mx",
     .initialize                = BMI_mx_initialize,

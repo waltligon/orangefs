@@ -287,7 +287,7 @@ static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr);
 static void bmi_set_sock_buffers(int socket);
 
 /* exported method interface */
-struct bmi_method_ops bmi_tcp_ops = {
+const struct bmi_method_ops bmi_tcp_ops = {
     .method_name = BMI_tcp_method_name,
     .initialize = BMI_tcp_initialize,
     .finalize = BMI_tcp_finalize,
@@ -1938,8 +1938,6 @@ bmi_method_addr_p alloc_tcp_method_addr(void)
     {
 	return (NULL);
     }
-
-    my_method_addr->ops = &bmi_tcp_ops;
 
     /* note that we trust the alloc_method_addr() function to have zeroed
      * out the structures for us already 
