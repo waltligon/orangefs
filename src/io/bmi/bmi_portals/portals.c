@@ -1426,8 +1426,7 @@ static struct bmi_method_addr *bmip_alloc_method_addr(const char *hostname,
     /* room for a peername tacked on the end too, no more than 10 digits */
     extra = sizeof(*pma) + 2 * (strlen(hostname) + 1) + 10 + 1;
 
-    map = alloc_method_addr(bmi_portals_method_id, extra);
-    map->ops = &bmi_portals_ops;
+    map = bmi_alloc_method_addr(bmi_portals_method_id, extra);
     pma = map->method_data;
 
     pma->hostname = (void *) &pma[1];
