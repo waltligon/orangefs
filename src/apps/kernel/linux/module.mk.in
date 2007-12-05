@@ -14,3 +14,8 @@ endif
 # get kernel interface defines, and sysint client.h
 MODCFLAGS_$(DIR)/pvfs2-client-core.c = \
   -I$(srcdir)/src/kernel/linux-2.6
+
+# explicitly uses pthreads both threaded and not-threaded versions, even if
+# threading is turned off in the rest of libpvfs
+MODLDFLAGS_$(DIR)/pvfs2-client-core.o = -lpthread
+
