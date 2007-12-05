@@ -90,6 +90,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "clientcore", GOSSIP_CLIENTCORE_DEBUG },
     /* Debug the client timing state machines (job timeout, etc.) */
     { "clientcore_timing", GOSSIP_CLIENTCORE_TIMING_DEBUG },
+    /* network encoding */
+    { "endecode", GOSSIP_ENDECODE_DEBUG },
     /* Show server file (metadata) accesses (both modify and read-only). */ 
     { "access", GOSSIP_ACCESS_DEBUG },
     /* Show more detailed server file accesses */
@@ -111,7 +113,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "bstream", GOSSIP_BSTREAM_DEBUG },
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose",
-      (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG))
+      (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG |
+                       GOSSIP_ENDECODE_DEBUG))
     },
     /* No debug output */
     { "none", GOSSIP_NO_DEBUG },
