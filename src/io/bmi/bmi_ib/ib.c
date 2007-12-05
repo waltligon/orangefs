@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.61 2007-11-30 19:33:16 pw Exp $
+ * $Id: ib.c,v 1.62 2007-12-05 20:03:17 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1938,7 +1938,6 @@ static int BMI_ib_set_info(int option, void *param __unused)
 	ib_method_addr_t *ibmap = map->method_data;
 	free(ibmap->hostname);
 	free(map);
-	bmi_method_addr_forget_callback(ibmap->c->bmi_addr);
 	break;
     }
     case BMI_OPTIMISTIC_BUFFER_REG: {
