@@ -452,7 +452,7 @@ static int create_datafiles_comp_fn(void *v_p,
                    __func__, 
                    BMI_addr_rev_lookup(
                        sm_p->u.create.data_server_addrs[index]),
-                   sm_p->u.create.object_name);
+                       sm_p->u.create.object_name);
         PVFS_perror_gossip("Creation failure", resp_p->status);
 	return resp_p->status;
     }
