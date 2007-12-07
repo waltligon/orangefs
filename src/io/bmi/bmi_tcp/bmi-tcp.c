@@ -3004,7 +3004,7 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
     if (ret < TCP_ENC_HDR_SIZE)
     {
 	tmp_errno = errno;
-	gossip_err("Error: BMI_sockio_brecv: %s\n", strerror(tmp_errno));
+	gossip_err("Error: BMI_sockio_nbrecv: %s\n", strerror(tmp_errno));
 	tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-tmp_errno));
 	return (0);
     }
