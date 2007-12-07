@@ -283,7 +283,8 @@ static PINT_sm_action remove_get_dirent_count(
 static PINT_sm_action remove_check_dirdata_entries(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op __attribute__((unused)) =
+        PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
         if(js_p->count > 0)

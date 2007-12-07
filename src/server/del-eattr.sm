@@ -185,7 +185,8 @@ static PINT_sm_action deleattr_delobj_eattribs(
 static PINT_sm_action deleattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op __attribute__((unused)) =
+        PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(
         GOSSIP_DELEATTR_DEBUG,
         "keybuf %p keylen %d\n",
