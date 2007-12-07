@@ -104,6 +104,16 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    if (fsck_options->repair_stranded_objects && 
+        !fsck_options->check_stranded_objects)
+    {
+        fprintf(stderr, "Error: option to check for stranded objects (-c) ");
+        fprintf(stderr, "required with repair option (See -R option below).\n");
+        usage(argc, argv);
+        free(fsck_options);
+        return -1;
+    }
+
     ret = PVFS_util_init_defaults();
     if (ret != 0)
     {
@@ -235,7 +245,10 @@ int validate_pvfs_object(
     ret = PVFS_fsck_get_attributes(fsck_options, pref, creds, &attributes);
     if(ret < 0)
     {
-        fprintf(stderr, "Error: [%s] cannot retrieve attributes.\n", current_path);
+        fprintf(stderr, 
+                "Error: [%s] cannot retrieve attributes for object: "
+                "handle=[%llu] fsid=[%d]\n", 
+                current_path, llu(pref->handle), pref->fs_id);
     }
     else if (attributes.attr.objtype == PVFS_TYPE_METAFILE)
     {
@@ -345,6 +358,8 @@ static void usage(
     fprintf(stderr, "  -v \t print version and exit\n");
     fprintf(stderr, "  -a \t fix all problems found (NOT IMPLEMENTED)\n");
     fprintf(stderr, "  -r \t run in interactive mode (NOT IMPLEMENTED)\n");
+    fprintf(stderr, "  -R \t repair stranded objects (requires -c)\n");
+    fprintf(stderr, "     \t (requires that -d refer to the PVFS2 root directory)\n");
     fprintf(stderr, "\n\n");
     fprintf(stderr, "  Return Codes:\n");
     fprintf(stderr,
@@ -359,6 +374,9 @@ static void usage(
 
 static struct PINT_fsck_options *parse_args(int argc, char **argv)
 {
+    /* getopt variables */
+    char *optarg;
+
     int opt = 0;
     int path_length = 0;
 
@@ -369,7 +387,7 @@ static struct PINT_fsck_options *parse_args(int argc, char **argv)
         return NULL;
     }
 
-    while ((opt = getopt(argc, argv, "d:VvharsfcF")) != EOF)
+    while ((opt = getopt(argc, argv, "d:VvharsfcFR")) != EOF)
     {
         switch (opt)
         {
@@ -391,6 +409,9 @@ static struct PINT_fsck_options *parse_args(int argc, char **argv)
             break;
         case 'c':
             opts->check_stranded_objects = 1;
+            break;
+        case 'R':
+            opts->repair_stranded_objects = 1;
             break;
         case 'a':
             opts->fix_errors = 1;

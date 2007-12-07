@@ -57,6 +57,16 @@ enum PINT_state_code {
  */
 #define PINT_STATE_STACK_SIZE 8
 
+/* All state action functions return this type which controls state
+ * machine action
+ */
+typedef enum {
+    SM_ACTION_DEFERRED = 0,
+    SM_ACTION_COMPLETE = 1,
+    SM_ACTION_TERMINATE = 2,
+    SM_ERROR = -1             /* this is a catastrophic error */
+} PINT_sm_action;
+
 /* State machine control block - one per running instance of a state
  * machine
  */
@@ -100,7 +110,7 @@ struct PINT_state_s
     enum PINT_state_code flag;
     union
     {
-        int (*func)(struct PINT_smcb *, job_status_s *);
+        PINT_sm_action (*func)(struct PINT_smcb *, job_status_s *);
         struct PINT_state_machine_s *nested;
     } action;
     struct PINT_pjmp_tbl_s *pjtbl;
@@ -120,16 +130,6 @@ struct PINT_tran_tbl_s
     enum PINT_state_code flag;
     struct PINT_state_s *next_state;
 };
-
-/* All state action functions return this type which controls state
- * machine action
- */
-typedef enum {
-    SM_ACTION_DEFERRED = 0,
-    SM_ACTION_COMPLETE = 1,
-    SM_ACTION_TERMINATE = 2,
-    SM_ERROR = -1             /* this is a catastrophic error */
-} PINT_sm_action;
 
 extern char * PINT_sm_action_string[];
 #define SM_ACTION_STRING(action) \

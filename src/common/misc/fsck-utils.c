@@ -11,6 +11,7 @@
 #include <assert.h>
 
 #include "fsck-utils.h"
+#include "client-state-machine.h"
 
 #define HANDLE_BATCH 1000
 #define MAX_DIR_ENTS 64
@@ -62,13 +63,15 @@ struct PINT_handle_wrangler_handlelist
     PVFS_BMI_addr_t *addr_array;
 } PINT_handle_wrangler_handlelist;
 
-#if 0
-/* not used yet */
 static int PINT_handle_wrangler_get_stranded_handles(
     const PVFS_fs_id * cur_fs, 
     int *num_stranded_handles, 
     PVFS_handle ** stranded_handles);
-#endif
+
+static int PINT_handle_wrangler_repair_stranded_handles(
+    const struct PINT_fsck_options *fsck_options,
+    const PVFS_fs_id * cur_fs,                   
+    const PVFS_credentials * creds);
 
 static int PINT_handle_wrangler_display_stranded_handles(
     const struct PINT_fsck_options *fsck_options,
@@ -1046,6 +1049,13 @@ int PVFS_fsck_finalize(
                                                       creds);
     }
 
+    /* repair leftover handles */
+    if (fsck_options->repair_stranded_objects)
+    {
+        PINT_handle_wrangler_repair_stranded_handles(fsck_options, cur_fs, 
+                                                     creds);
+    }
+
     return(0);
 }
 
@@ -1413,14 +1423,14 @@ static int PINT_handle_wrangler_remove_handle(
     return ret;
 }
 
-#if 0
 /** 
   * Returns the handles left over from the fsck 
  */
 static int PINT_handle_wrangler_get_stranded_handles(
     const PVFS_fs_id * cur_fs,                  /**< filesystem id */
     int *num_stranded_handles,                  /**< number of handles in array of handles returned */
-    PVFS_handle ** stranded_handles)            /**< array of stranded handles on fs cur_fs */
+    PVFS_handle ** stranded_handles)            /**< array of stranded handles on fs cur_fs,
+                                                     allocated here. Must be freed by the caller. */
 {
     int ret = 0;
     int i = 0;
@@ -1456,7 +1466,177 @@ static int PINT_handle_wrangler_get_stranded_handles(
 
     return ret;
 }
-#endif
+
+/** 
+ * Repairs the handles left over from the fsck 
+ *
+ * \retval 0 on success 
+ * \retval -PVFS_error on failure
+ */
+static int PINT_handle_wrangler_repair_stranded_handles(
+    const struct PINT_fsck_options *fsck_options, /**< populated fsck options */
+    const PVFS_fs_id * cur_fs,                             /**< filesystem id */
+    const PVFS_credentials * creds)      /**< populated credentials structure */
+{
+    int i = 0;
+    int ret = 0;
+    int num_stranded_handles = 0;
+    PVFS_handle * stranded_handles = NULL;
+    PVFS_credentials credentials;
+    PVFS_sys_attr attr;                 
+    PVFS_sysresp_getattr attributes;
+    PVFS_sysresp_mkdir mkdir_resp; 
+    PVFS_sysresp_create repair_resp; 
+    PVFS_sysresp_lookup lookup_resp;
+    PVFS_object_ref parent_ref;
+
+    memset(&credentials, 0, sizeof(credentials));
+    memset(&attr, 0, sizeof(attr));
+    memset(&attributes, 0, sizeof(attributes));
+    memset(&mkdir_resp, 0, sizeof(mkdir_resp));
+    memset(&repair_resp, 0, sizeof(repair_resp));
+    memset(&lookup_resp, 0, sizeof(lookup_resp));
+    memset(&parent_ref, 0, sizeof(parent_ref));
+
+    char cur_time[20];
+    size_t num_chars;
+    struct tm cur_time_s;
+    time_t now;
+    now = time(NULL);
+    cur_time_s = *(localtime(&now));
+    num_chars = strftime(cur_time,20,"%Y.%m.%d_%H.%M.%S",&cur_time_s);
+    if(num_chars == 0)
+    {
+        gossip_err("Error: could not get current time.\n");
+        return(-PVFS_EINVAL);
+    }
+        
+    PVFS_util_gen_credentials(&credentials);
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
+    attr.perms = 0700;                          /*owner (root) only*/
+    attr.atime = attr.mtime = attr.ctime = 0;   /*Set to "now"*/
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;      /*requires 'at lest' this*/
+
+    /*Set to dir in lost+found.*/
+    /*look up the handle for lost+found*/
+    char * parent_name = "/lost+found";
+    ret = PVFS_sys_lookup(*cur_fs, parent_name, &credentials, &lookup_resp,
+                          PVFS2_LOOKUP_LINK_NO_FOLLOW);
+    if (ret < 0)
+    {
+        gossip_err(" *** lookup failed on [%s] directory\n",parent_name);
+        return ret;
+    }
+
+    ret = PVFS_sys_mkdir(cur_time, lookup_resp.ref, attr, &credentials,
+                         &mkdir_resp);
+    if (ret < 0 && ret != -PVFS_EEXIST)
+    {
+        gossip_err(" *** mkdir failed on directory [/lost+found/%s]\n",cur_time);
+        return ret;
+    }
+
+    parent_ref = mkdir_resp.ref;
+   
+    PINT_handle_wrangler_get_stranded_handles(cur_fs,
+                                              &num_stranded_handles,
+                                              &stranded_handles); 
+    if(num_stranded_handles > 0)
+    {
+        printf("Repaired Objects:\n");
+        printf("[  Handle  ] [  FSID  ] [    Size    ] ");
+        printf("[      PVFS2 Server     ] [  Filename  ]\n");
+    }
+    for(i = 0;i < num_stranded_handles; i++)
+    {
+        char name[PATH_MAX] = "";
+        PVFS_object_ref dfile;
+        sprintf(name,"%d.dfile",i);
+
+        /* get this objects attributes */
+        dfile.handle = stranded_handles[i];
+        dfile.fs_id = parent_ref.fs_id;
+        ret = PVFS_fsck_get_attributes(fsck_options, &dfile, 
+                                       creds, &attributes);
+       
+        /* If get attributes fails skip to next, Only try to rescue dfiles */
+        if(ret || attributes.attr.objtype != PVFS_TYPE_DATAFILE)
+        {
+            continue;
+        }
+        
+        ret = PVFS_mgmt_repair_file(name,parent_ref,attr,&credentials,
+                                    stranded_handles[i],&repair_resp);
+        if(ret < 0)
+        {
+            gossip_err("Unable to repair stranded handle [%llu]",
+                        llu(stranded_handles[i]));
+        }
+        else
+        {
+            const char * server_name = NULL;
+            int j = 0;
+            int server_type = 0;
+            struct server_configuration_s *config;
+            PVFS_BMI_addr_t server_addr;
+            
+            /* get this objects attributes */
+            ret = PVFS_fsck_get_attributes(fsck_options, &dfile, 
+                                           creds, &attributes);
+            if(ret < 0)
+            {
+                PVFS_perror_gossip("PVFS_fsck_get_attributes", ret);
+                gossip_err("Error: unable to retrieve attributes for handle ");
+                gossip_err("[%llu]\n", llu(repair_resp.ref.handle));
+                return(ret);
+            }
+
+            /*Get the pretty server name */
+            config = PINT_get_server_config_struct(*cur_fs);
+            /* find which server the handle is on */
+            ret = PINT_cached_config_map_to_server(&server_addr, 
+                                                   stranded_handles[i], 
+                                                   *cur_fs);
+            if(ret < 0)
+            {
+                PVFS_perror_gossip("PINT_cached_config_map_to_server", ret);
+                gossip_err("Error: could not resolve handle [%llu] to server\n",
+                    llu(stranded_handles[i]));
+                /* release mutex on server config */
+                PINT_put_server_config_struct(config);
+                return(ret);
+            }
+            /* get the index of the server this handle is located on */
+            for(j = 0; j < PINT_handle_wrangler_handlelist.num_servers; j++)
+            {
+                if(PINT_handle_wrangler_handlelist.addr_array[j] == server_addr)
+                {
+                    /* retrieve the server name */
+                    server_name = PINT_cached_config_map_addr(
+                                    config, 
+                                    *cur_fs,
+                                    PINT_handle_wrangler_handlelist.
+                                    addr_array[j],
+                                    &server_type);
+                    break;
+                }
+            }
+
+            /* release mutex on server config */
+            PINT_put_server_config_struct(config);
+
+            printf("%12llu %10d ",llu(stranded_handles[i]),repair_resp.ref.fs_id);
+            printf("%13lld ", lld(attributes.attr.size));
+            printf("  %10s ", server_name);
+            printf("  %10s\n", name);
+        }
+    }
+
+    free(stranded_handles);
+    
+    return ret;
+}
 
 /** 
  * Displays the handles left over from the fsck 
