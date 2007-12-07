@@ -199,7 +199,7 @@ int BMI_sockio_nbrecv(int s,
 	{
 	    return (len - comp);	/* return amount completed */
 	}
-	if (ret == -1 && errno == EINTR)
+	if (ret == -1 && (errno == EINTR || errno == EAGAIN))
 	{
 	    goto nbrecv_restart;
 	}
