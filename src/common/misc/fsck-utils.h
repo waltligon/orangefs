@@ -45,7 +45,6 @@
 struct PINT_fsck_options
 {
     unsigned int fix_errors;             /**< fix errors found */
-    unsigned int repair_stranded_objects; /**< check for stranded objects */
     unsigned int check_stranded_objects; /**< check for stranded objects */
     unsigned int check_symlink_target;   /**< checks symlink target for bad practice */
     unsigned int check_dir_entry_names;  /**< checks dirent names for bad practice */

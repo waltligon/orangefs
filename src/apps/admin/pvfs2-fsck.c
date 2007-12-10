@@ -985,7 +985,6 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
 
-        memset(&handle_ref, 0, sizeof(handle_ref));
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
 

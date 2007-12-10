@@ -26,9 +26,13 @@
 #include "pint-dist-utils.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
-#include "sys-create.h"
 
 extern job_context_id pint_client_sm_context;
+
+enum
+{
+    CREATE_RETRY = 170
+};
 
 /* completion function prototypes */
 static int create_create_comp_fn(
@@ -51,7 +55,7 @@ machine pvfs2_client_create_sm
 {
     state init
     {
-        rung create_init;
+        run create_init;
         default => parent_getattr;
     }
 
@@ -64,14 +68,14 @@ machine pvfs2_client_create_sm
 
     state parent_getattr_inspect
     {
-        rung create_parent_getattr_inspect;
+        run create_parent_getattr_inspect;
         success => dspace_create_setup_msgpair;
         default => cleanup;
     }
 
     state dspace_create_setup_msgpair
     {
-        rung create_dspace_create_setup_msgpair;
+        run create_dspace_create_setup_msgpair;
         success => dspace_create_xfer_msgpair;
         default => cleanup;
     }
@@ -85,7 +89,7 @@ machine pvfs2_client_create_sm
 
     state datafiles_setup_msgpair_array
     {
-        rung create_datafiles_setup_msgpair_array;
+        run create_datafiles_setup_msgpair_array;
         success => datafiles_xfer_msgpair_array;
         default => cleanup;
     }
@@ -99,13 +103,13 @@ machine pvfs2_client_create_sm
 
     state datafiles_failure
     {
-        rung create_datafiles_failure;
+        run create_datafiles_failure;
         default => delete_handles_setup_msgpair_array;
     }
 
     state create_setattr_setup_msgpair
     {
-        rung create_setattr_setup_msgpair;
+        run create_setattr_setup_msgpair;
         success => create_setattr_xfer_msgpair;
         default => cleanup;
     }
@@ -119,13 +123,13 @@ machine pvfs2_client_create_sm
 
     state create_setattr_failure
     {
-        rung create_setattr_failure;
+        run create_setattr_failure;
         default => delete_handles_setup_msgpair_array;
     }
 
     state crdirent_setup_msgpair
     {
-        rung create_crdirent_setup_msgpair;
+        run create_crdirent_setup_msgpair;
         success => crdirent_xfer_msgpair;
         default => crdirent_failure;
     }
@@ -139,13 +143,13 @@ machine pvfs2_client_create_sm
 
     state crdirent_failure
     {
-        rung create_crdirent_failure;
+        run create_crdirent_failure;
         default => delete_handles_setup_msgpair_array;
     }
 
     state delete_handles_setup_msgpair_array
     {
-        rung create_delete_handles_setup_msgpair_array;
+        run create_delete_handles_setup_msgpair_array;
         success => delete_handles_xfer_msgpair_array;
         default => cleanup;
     }
@@ -158,7 +162,7 @@ machine pvfs2_client_create_sm
 
     state cleanup
     {
-        rung create_cleanup;
+        run create_cleanup;
         CREATE_RETRY => init;
         default => terminate;
     }
@@ -373,7 +377,7 @@ PVFS_error PVFS_sys_create(
 
 /****************************************************************/
 
-PINT_sm_action create_init(
+static PINT_sm_action create_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -527,7 +531,7 @@ static int create_delete_handles_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-PINT_sm_action create_dspace_create_setup_msgpair(
+static PINT_sm_action create_dspace_create_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -586,7 +590,7 @@ PINT_sm_action create_dspace_create_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-PINT_sm_action create_datafiles_setup_msgpair_array(
+static PINT_sm_action create_datafiles_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -697,7 +701,7 @@ PINT_sm_action create_datafiles_setup_msgpair_array(
     return SM_ACTION_COMPLETE;
 }
 
-PINT_sm_action create_datafiles_failure(
+static PINT_sm_action create_datafiles_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -708,7 +712,7 @@ PINT_sm_action create_datafiles_failure(
     return SM_ACTION_COMPLETE;
 }
 
-PINT_sm_action create_setattr_setup_msgpair(
+static PINT_sm_action create_setattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -758,7 +762,7 @@ PINT_sm_action create_setattr_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-PINT_sm_action create_setattr_failure(
+static PINT_sm_action create_setattr_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -769,7 +773,7 @@ PINT_sm_action create_setattr_failure(
     return SM_ACTION_COMPLETE;
 }
 
-PINT_sm_action create_crdirent_setup_msgpair(
+static PINT_sm_action create_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -815,7 +819,7 @@ PINT_sm_action create_crdirent_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-PINT_sm_action create_crdirent_failure(
+static PINT_sm_action create_crdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -832,7 +836,7 @@ PINT_sm_action create_crdirent_failure(
 }
 
 /* delete the newly created meta and data handles */
-PINT_sm_action create_delete_handles_setup_msgpair_array(
+static PINT_sm_action create_delete_handles_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -940,7 +944,7 @@ PINT_sm_action create_delete_handles_setup_msgpair_array(
     return SM_ACTION_COMPLETE;
 }
 
-PINT_sm_action create_cleanup(
+static PINT_sm_action create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1040,7 +1044,7 @@ PINT_sm_action create_cleanup(
 /** looks at the attributes of the parent directory and decides if it impacts
  *  the file creation in any way
  */
-PINT_sm_action create_parent_getattr_inspect(
+static PINT_sm_action create_parent_getattr_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
