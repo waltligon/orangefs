@@ -772,10 +772,10 @@ static int pvfs2_readpages_fill_cb(void *_data, struct page *page)
     return 0;
 }
 
-#ifdef HAVE_SPIN_LOCK_ADDR_SPACE_STRUCT
+#if defined(HAVE_SPIN_LOCK_ADDR_SPACE_STRUCT)
 #define lock_mapping_tree(mapping) spin_lock(&mapping->page_lock)
 #define unlock_mapping_tree(mapping) spin_unlock(&mapping->page_lock)
-#elif HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT
+#elif defined(HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT)
 #define lock_mapping_tree(mapping) spin_lock(&mapping->priv_lock)
 #define unlock_mapping_tree(mapping) spin_unlock(&mapping->priv_lock)
 #else
