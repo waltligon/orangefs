@@ -497,6 +497,8 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --logging     <STRING>            debugging mask for log messages
      --logstamp    <STRING>            timestamp type for log messages 
                                        ('none','usec', or 'datetime' are valid)
+     --storage <STRING>                path to pvfs storage directory.
+     --logfile <STRING>                file to place server logging.
      --notrovesync                     sync metadata only upon request
      --server-job-timeout <NUM>        server job timeout value (seconds)
      --client-job-timeout <NUM>        server job timeout value (seconds)
