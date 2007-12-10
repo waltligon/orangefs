@@ -17,6 +17,8 @@
 static int pvfs2_d_revalidate_common(struct dentry* dentry)
 {
     gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: invalidating dentry: %p\n", dentry);
+
+    d_drop(dentry);
     return 0;
 }
 
