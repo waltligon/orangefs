@@ -315,6 +315,30 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     int ret = -1;
     int tmp_mntent_count = 0;
     PVFS_util_tab *current_tab = NULL;
+    char *epenv, *tmp;
+
+    if((epenv = getenv("PVFS2EP")) != NULL)
+    {
+        struct PVFS_sys_mntent *mntent;
+        current_tab = &s_stat_tab_array[0];
+        current_tab->mntent_array = malloc(sizeof(struct PVFS_sys_mntent));
+        mntent = &current_tab->mntent_array[0];
+        strcpy(current_tab->tabfile_name, "PVFSEP");
+        current_tab->mntent_count = 1;
+        mntent->pvfs_config_servers = malloc(sizeof(char *));
+        mntent->pvfs_config_servers[0] = strdup(index(epenv, '=') + 1);
+        mntent->num_pvfs_config_servers = 1;
+        mntent->the_pvfs_config_server = mntent->pvfs_config_servers[0];
+        mntent->pvfs_fs_name = strdup(rindex(mntent->the_pvfs_config_server, '/'));
+        mntent->pvfs_fs_name++;
+        mntent->flowproto = FLOWPROTO_DEFAULT;
+        mntent->encoding = ENCODING_DEFAULT;
+        mntent->mnt_dir = strdup(epenv);
+        tmp = index(mntent->mnt_dir, '=');
+        *tmp = 0;
+        mntent->mnt_opts = strdup("rw");
+        return &s_stat_tab_array[0];
+    }
 
     if (tabfile != NULL)
     {
