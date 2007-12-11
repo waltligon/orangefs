@@ -27,6 +27,7 @@
 #include <assert.h>
 
 #include "sockio.h"
+#include "gossip.h"
 
 /* if the platform provides a MSG_NOSIGNAL option (which disables the
  * generation of signals on broken pipe), then use it
@@ -190,16 +191,12 @@ int BMI_sockio_nbrecv(int s,
     {
       nbrecv_restart:
 	ret = recv(s, buf, comp, DEFAULT_MSG_FLAGS);
-	if (!ret)	/* socket closed */
-	{
-	    errno = EPIPE;
-	    return (-1);
-	}
-	if (ret == -1 && errno == EWOULDBLOCK)
-	{
-	    return (len - comp);	/* return amount completed */
-	}
-	if (ret == -1 && (errno == EINTR || errno == EAGAIN))
+        if (ret == 0)
+        {
+            errno = EPIPE;
+            return (-1);
+        }
+	if (ret == -1 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK))
 	{
 	    goto nbrecv_restart;
 	}
