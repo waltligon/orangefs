@@ -191,7 +191,7 @@ int BMI_sockio_nbrecv(int s,
     {
       nbrecv_restart:
 	ret = recv(s, buf, comp, DEFAULT_MSG_FLAGS);
-        if (ret == 0)
+        if (ret == 0) /* socket closed */
         {
             errno = EPIPE;
             return (-1);
