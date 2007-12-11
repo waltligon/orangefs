@@ -252,7 +252,6 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                 if (attr->u.meta.dist)
                 {
                     PINT_dist_free(attr->u.meta.dist);
-                    memset(attr->u.meta.dist, 0, sizeof(struct PINT_dist_s));
                 }
             }
         }
