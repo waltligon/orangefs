@@ -1336,7 +1336,7 @@ Optional Features:
                           (epoll is enabled by default, this option
 			  ensures no checking is done for x-compiling)
   --disable-epoll         Disable epoll, use poll instead
-  --enable-segv-backtrace Enables back traces in segfault signal handler
+  --disable-segv-backtrace Disables back traces in segfault signal handler
   --enable-shared         Build shared client library
   --enable-static-server  Builds the server static
 
@@ -11885,7 +11885,9 @@ fi
 
 # Check whether --enable-segv-backtrace was given.
 if test "${enable_segv_backtrace+set}" = set; then
-  enableval=$enable_segv_backtrace; PVFS2_SEGV_BACKTRACE=1
+  enableval=$enable_segv_backtrace;
+else
+  PVFS2_SEGV_BACKTRACE=1
 fi
 
 
