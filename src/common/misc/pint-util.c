@@ -252,6 +252,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                 if (attr->u.meta.dist)
                 {
                     PINT_dist_free(attr->u.meta.dist);
+                    attr->u.meta.dist = NULL;
                 }
             }
         }
