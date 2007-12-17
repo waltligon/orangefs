@@ -8,6 +8,12 @@
  *  \ingroup pvfs2linux
  *
  *  Implementation of dentry (directory cache) functions.
+ *
+ *  The combination of d_revalidate, d_compare and d_delete will
+ *  cause each dentry allocated in the kernel to be a one-shot.
+ *
+ *  This removes the need to keep the PVFS caches and the kernel
+ *  cache in sync.
  */
 
 #include "pvfs2-kernel.h"
@@ -72,11 +78,8 @@ static int pvfs2_d_compare(
 {
     gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_compare: called on parent %p\n  (name1: %s| "
                 "name2: %s)\n", parent, d_name->name, name->name);
-
-    /* if we have a match, return 0 (normally called from __d_lookup) */
-    return !((d_name->len == name->len) &&
-             (d_name->hash == name->hash) &&
-             (memcmp(d_name->name, name->name, d_name->len) == 0));
+    /* force a cache miss every time */
+    return 1;
 }
 
 static int pvfs2_d_delete (struct dentry * dentry)
