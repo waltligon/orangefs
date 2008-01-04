@@ -752,9 +752,17 @@ static PINT_sm_action lookup_segment_check_attr_type(
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
     assert(cur_seg);
 
-    PINT_free_object_attr(&(cur_seg->seg_attr));
-    PINT_copy_object_attr(&(cur_seg->seg_attr),
-                          &(sm_p->getattr.attr));
+    if ((cur_seg->seg_attr.objtype == PVFS_TYPE_NONE) ||
+        (cur_seg->seg_attr.objtype == PVFS_TYPE_SYMLINK)) {
+        /*
+         * Got here from getattr.  Else cur_seg already populated by
+         * a combined lookup+attrs from the server.  See function
+         * directly above for why this objtype condition.
+         */
+        PINT_free_object_attr(&(cur_seg->seg_attr));
+        PINT_copy_object_attr(&(cur_seg->seg_attr),
+                              &(sm_p->getattr.attr));
+    }
 
     cur_ctx = GET_CURRENT_CONTEXT(sm_p);
     assert(cur_ctx);
