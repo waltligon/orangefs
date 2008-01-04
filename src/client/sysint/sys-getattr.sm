@@ -472,7 +472,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     }
 
     /* point msgarray to the statically allocated msgpair */
-    if (sm_p->msgarray != &(sm_p->msgpair))
+    if (sm_p->msgarray != NULL && sm_p->msgarray != &(sm_p->msgpair))
     {
 	    free(sm_p->msgarray);
     }
