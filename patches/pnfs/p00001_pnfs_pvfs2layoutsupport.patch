@@ -1,0 +1,753 @@
+
+Modify the NFS exported PVFS2 client to support the PVFS2 pNFS layout driver.
+This is done by supporting the pNFS export operations that manage the pNFS
+data layout information.
+
+When a pNFS client requests a data layout for a file, the exported PVFS2
+client module retrieves the layout from the PVFS2 metadata server and returns
+it to the nfs server.  To retrieve the layout, the pvfs2 getattr operation has
+been modified to retrieve the data servers and their data handles.  The
+exported PVFS2 client performs an upcall to execute the getattr operation,
+encodes the results and sends the layout back to the nfs server process.
+
+A pNFS layout type proc variable has been added so multiple layout types can
+be supported in the future.
+
+This patch compiles against a version of the 2.6.18.3 linux kernel.
+
+---
+
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/include/pvfs2-debug.h                     |    3 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/include/pvfs2-sysint.h                    |    2 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/apps/kernel/linux/pvfs2-client-core.c |   94 ++++
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/client/sysint/client-state-machine.h  |    2 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/client/sysint/sys-getattr.sm          |   22 +
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/io/dev/pint-dev-shared.h              |    5 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/Makefile.in          |   12 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/downcall.h           |    3 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/inode.c              |    2 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pnfs.c               |  204 ++++++++++
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-kernel.h       |    4 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-mod.c          |    4 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-pnfs.h         |   47 ++
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-proc.c         |    7 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-utils.c        |    9 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/super.c              |   18 
+ 16 files changed, 430 insertions(+), 8 deletions(-)
+
+diff -puN include/pvfs2-sysint.h~pvfs2layoutsupport include/pvfs2-sysint.h
+--- pvfs-2.6.3-pnfsfilelayout/include/pvfs2-sysint.h~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/include/pvfs2-sysint.h	2008-01-05 15:53:59.000000000 -0800
+@@ -22,6 +22,7 @@
+ 
+ #include "pvfs2-types.h"
+ #include "pvfs2-request.h"
++#include "pvfs2-attr.h"
+ 
+ /** Holds a non-blocking system interface operation handle. */
+ typedef PVFS_id_gen_t PVFS_sys_op_id;
+@@ -92,6 +93,7 @@ typedef struct PVFS_sysresp_lookup_s PVF
+ struct PVFS_sysresp_getattr_s
+ {
+     PVFS_sys_attr attr;
++    PVFS_metafile_attr layout;
+ };
+ typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
+ 
+diff -puN src/apps/kernel/linux/pvfs2-client.c~pvfs2layoutsupport src/apps/kernel/linux/pvfs2-client.c
+diff -puN src/client/sysint/client-state-machine.h~pvfs2layoutsupport src/client/sysint/client-state-machine.h
+--- pvfs-2.6.3-pnfsfilelayout/src/client/sysint/client-state-machine.h~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/client/sysint/client-state-machine.h	2008-01-05 15:53:59.000000000 -0800
+@@ -405,6 +405,8 @@ typedef struct PINT_sm_getattr_state
+     PVFS_size * size_array;
+     PVFS_size size;
+ 
++    PVFS_metafile_attr layout;
++
+     int flags;
+     
+ } PINT_sm_getattr_state;
+diff -puN src/io/dev/pint-dev-shared.h~pvfs2layoutsupport src/io/dev/pint-dev-shared.h
+--- pvfs-2.6.3-pnfsfilelayout/src/io/dev/pint-dev-shared.h~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/io/dev/pint-dev-shared.h	2008-01-05 17:46:17.000000000 -0800
+@@ -18,6 +18,11 @@
+ #include <sys/ioctl.h>  /* needed for constructing the _IO macros */
+ #endif
+ 
++/* DH: This is also defined in the nfs header files.
++ */
++#define PVFS2_MAX_LAYOUT_LEN 256
++#define PVFS2_MAX_DEVLIST_LEN 256
++
+ /* version number for use in communicating between kernel space and user
+  * space
+  */
+diff -puN src/kernel/linux-2.6/downcall.h~pvfs2layoutsupport src/kernel/linux-2.6/downcall.h
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/downcall.h~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/downcall.h	2008-01-05 17:50:23.000000000 -0800
+@@ -11,6 +11,7 @@
+  */
+ 
+ /* TODO: we might want to try to avoid this inclusion  */
++#include "pvfs2-attr.h"
+ #include "pvfs2-sysint.h"
+ 
+ #ifndef __DOWNCALL_H
+@@ -49,6 +50,8 @@ typedef struct
+ {
+     PVFS_sys_attr attributes;
+     char link_target[PVFS2_NAME_LEN];
++    int layout_size;
++    char layout[PVFS2_MAX_LAYOUT_LEN];
+ } pvfs2_getattr_response_t;
+ 
+ /* the setattr response is a blank downcall */
+diff -puN src/kernel/linux-2.6/Makefile.in~pvfs2layoutsupport src/kernel/linux-2.6/Makefile.in
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/Makefile.in~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/Makefile.in	2008-01-05 15:53:59.000000000 -0800
+@@ -49,23 +49,27 @@ csrc = \
+     xattr-trusted.c \
+     xattr-default.c \
+     waitqueue.c \
+-    pvfs2-proc.c
++    pvfs2-proc.c \
++    pnfs.c
+ hsrc = \
+     pvfs2-kernel.h \
+     pvfs2-dev-proto.h \
+     pvfs2-bufmap.h \
+     upcall.h \
+     downcall.h \
+-    pvfs2-proc.h
++    pvfs2-proc.h \
++    pvfs2-pnfs.h
+ 
+ objs = $(csrc:.c=.o)
+ othergen = pvfs2.o pvfs2.ko pvfs2.mod.c pvfs2.mod.o
+ othergendir = .tmp_versions  # around 2.6.6 this is generated locally
+ cmds = $(patsubst %,.%.cmd,$(objs) $(othergen))
+ 
++KDIR := @LINUX_KERNEL_SRC@
+ ifneq ($(KERNELRELEASE),)
+ 
+ EXTRA_CFLAGS = \
++    -I$(KDIR)/include/linux \
+     -I$(absolute_src_dir)/ \
+     -I$(absolute_build_dir)/ \
+     -I$(absolute_src_dir)/include \
+@@ -74,6 +78,9 @@ EXTRA_CFLAGS = \
+     -I$(absolute_src_dir)/src/common/quickhash \
+ 	 -I$(absolute_src_dir)/src/proto \
+     -I$(absolute_src_dir)/src/common/gossip \
++    -I$(absolute_src_dir)/src/io/trove \
++    -I$(absolute_src_dir)/src/io/description \
++    -I$(absolute_src_dir)/src/proto \
+     -I$(absolute_src_dir)/src/common/misc
+ 
+ EXTRA_CFLAGS += @MMAP_RA_CACHE@
+@@ -90,7 +97,6 @@ else
+ 
+ #KDIR	:= /lib/modules/$(shell uname -r)/build
+ #KDIR	:= /usr/src/linux-$(shell uname -r)
+-KDIR    := @LINUX_KERNEL_SRC@
+ PWD	:= $(shell pwd)
+ 
+ default: links
+diff -puN src/kernel/linux-2.6/pvfs2-kernel.h~pvfs2layoutsupport src/kernel/linux-2.6/pvfs2-kernel.h
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-kernel.h~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-kernel.h	2008-01-05 17:50:23.000000000 -0800
+@@ -382,6 +382,8 @@ typedef struct
+     unsigned long pinode_flags;
+     /* All allocated pvfs2_inode_t objects are chained to a list */
+     struct list_head list;
++    int layout_size;
++    char layout[PVFS2_MAX_LAYOUT_LEN];
+ } pvfs2_inode_t;
+ 
+ #define P_ATIME_FLAG 0
+@@ -989,6 +991,8 @@ do {                                    
+ int service_operation(pvfs2_kernel_op_t* op, const char* op_name, 
+     int flags);
+ 
++extern int layouttype;
++
+ /** handles two possible error cases, depending on context.
+  *
+  *  by design, our vfs i/o errors need to be handled in one of two ways,
+diff -puN include/pvfs2-debug.h~pvfs2layoutsupport include/pvfs2-debug.h
+--- pvfs-2.6.3-pnfsfilelayout/include/pvfs2-debug.h~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/include/pvfs2-debug.h	2008-01-05 15:53:59.000000000 -0800
+@@ -99,8 +99,9 @@ const char *PVFS_debug_get_next_debug_ke
+ #define GOSSIP_PROC_DEBUG             ((uint64_t)1 << 12)
+ #define GOSSIP_XATTR_DEBUG            ((uint64_t)1 << 13)
+ #define GOSSIP_INIT_DEBUG             ((uint64_t)1 << 14)
++#define GOSSIP_PNFS_DEBUG             ((uint64_t)1 << 15)
+ 
+-#define GOSSIP_MAX_NR                 15
++#define GOSSIP_MAX_NR                 16
+ #define GOSSIP_MAX_DEBUG              (((uint64_t)1 << GOSSIP_MAX_NR) - 1)
+ 
+ /*
+diff -puN src/kernel/linux-2.6/pvfs2-mod.c~pvfs2layoutsupport src/kernel/linux-2.6/pvfs2-mod.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-mod.c~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-mod.c	2008-01-05 17:50:23.000000000 -0800
+@@ -10,6 +10,8 @@
+ #include "pvfs2-kernel.h"
+ #include "pvfs2-proc.h"
+ #include "pvfs2-internal.h"
++#include "pvfs2-pnfs.h"
++#include "nfs4.h"
+ 
+ #ifndef PVFS2_VERSION
+ #define PVFS2_VERSION "Unknown"
+@@ -27,6 +29,8 @@ static int hash_table_size = 509;
+ int gossip_debug_mask = 0;
+ int op_timeout_secs = PVFS2_DEFAULT_OP_TIMEOUT_SECS;
+ 
++int layouttype = LAYOUT_PVFS2;
++
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("PVFS2 Development Team");
+ MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
+diff -puN src/kernel/linux-2.6/pvfs2-proc.c~pvfs2layoutsupport src/kernel/linux-2.6/pvfs2-proc.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-proc.c~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-proc.c	2008-01-05 17:52:21.000000000 -0800
+@@ -12,6 +12,8 @@
+ #include <linux/sysctl.h>
+ #include <linux/proc_fs.h>
+ #include "pvfs2-proc.h"
++#include "pvfs2-pnfs.h"
++#include "nfs4.h"
+ 
+ #ifndef PVFS2_VERSION
+ #define PVFS2_VERSION "Unknown"
+@@ -260,6 +262,8 @@ static struct pvfs2_param_extra perf_res
+ };
+ static int min_debug[] = {0}, max_debug[] = {GOSSIP_MAX_DEBUG};
+ static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
++/* DH: LAYOUT_NFSV4_FILES defined in the nfs header files */
++static int min_layouttype[] = {LAYOUT_NFSV4_FILES}, max_layouttype[] = {5};
+ static ctl_table pvfs2_acache_table[] = {
+     /* controls acache timeout */
+     {1, "timeout-msecs", NULL, sizeof(int), 0644, NULL,
+@@ -324,6 +328,9 @@ static ctl_table pvfs2_table[] = {
+     {7, "perf-counters", NULL, 0, 0555, pvfs2_pc_table},
+     /* subdir for ncache control */
+     {8, "ncache", NULL, 0, 0555, pvfs2_ncache_table},
++    {9, "layouttype", &layouttype, sizeof(int), 0644, NULL,
++        &proc_dointvec_minmax, &sysctl_intvec,
++        NULL, &min_layouttype, &max_layouttype},
+     {0}
+ };
+ static ctl_table fs_table[] = {
+diff -puN src/apps/kernel/linux/pvfs2-client-core.c~pvfs2layoutsupport src/apps/kernel/linux/pvfs2-client-core.c
+--- pvfs-2.6.3-pnfsfilelayout/src/apps/kernel/linux/pvfs2-client-core.c~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/apps/kernel/linux/pvfs2-client-core.c	2008-01-05 17:50:23.000000000 -0800
+@@ -15,6 +15,7 @@
+ #include <signal.h>
+ #include <getopt.h>
+ 
++#define __PINT_REQPROTO_ENCODE_FUNCS_C
+ #include "pvfs2.h"
+ #include "gossip.h"
+ #include "job.h"
+@@ -543,6 +544,80 @@ static PVFS_error post_symlink_request(v
+     return ret;
+ }
+ 
++/* DH: Copy from the PVFS_metafile_attr struct into a contiguous
++  * region which can be sent back to the I/O module on the client
++  */
++ static int
++ pnfs_serialize_layout(pvfs2_getattr_response_t* getattr, PVFS_metafile_attr* layout, PVFS_object_ref* refn)
++ {
++     char* buffer = getattr->layout;
++     int dfiles_size,dist_size,blob_size = 0;
++     int ret;
++
++     gossip_debug(GOSSIP_CLIENT_DEBUG,"serialize_layout: Begin\n");
++     if (layout->dfile_count <= 0 || layout->dist_size <= 0)
++     {
++ 	gossip_debug(GOSSIP_CLIENT_DEBUG,"serialize_layout: No layout to serialize\n");
++ 	return 0;
++     }
++     dfiles_size = layout->dfile_count  * sizeof(PVFS_handle);
++     dist_size = PINT_DIST_PACK_SIZE(layout->dist);
++     blob_size = dfiles_size + dist_size;
++
++     /* Add on 4 bytes for count of dfiles and 4 for total blob size
++      * plus 4 bytes for the fs_id
++      * Total blob size is required since we are using the ioctl
++      * interface which doesn't allow passing in the size of the blob
++      */
++     blob_size += 12;
++
++     gossip_debug(GOSSIP_CLIENT_DEBUG,
++		  "serialize_layout: Blob sz:%d #dfiles: %d dfiles sz:%d dist sz:%d\n",
++		  blob_size,
++		  layout->dfile_count,
++		  dfiles_size,
++		  dist_size);
++
++     /* Ensure size of blob isn't larger than the max */
++     if (blob_size > PVFS2_MAX_LAYOUT_LEN) {
++ 	gossip_err("serialize_layout: Error!  Size of layout is > than max size %d\n",
++		   (int)PVFS2_MAX_LAYOUT_LEN);
++	ret = -EIO;
++ 	goto out_cleanup;
++     }
++     if (layout->dfile_array == NULL) {
++ 	gossip_err("serialize_layout: Error!  dfile_array is NULL\n");
++	ret = -EIO;
++ 	goto out_cleanup;
++     }
++     if (layout->dist == NULL) {
++ 	gossip_err("serialize_layout: Error!  dist is NULL\n");
++	ret = -EIO;
++ 	goto out_cleanup;
++     }
++
++     /* Add blob size */
++     encode_int32_t(&buffer, &blob_size);
++
++     /* Add fs_id */
++     encode_int32_t(&buffer, &refn->fs_id);
++
++     encode_PVFS_metafile_attr_dfiles(&buffer, layout); /* dfile array */
++     encode_PVFS_metafile_attr_dist(&buffer, layout); /* dist */
++
++     gossip_debug(GOSSIP_CLIENT_DEBUG,"fs_id:%d\n", refn->fs_id);
++     gossip_debug(GOSSIP_CLIENT_DEBUG,"# dfiles:%d\n", layout->dfile_count);
++     gossip_debug(GOSSIP_CLIENT_DEBUG,"dfile #0:%llu\n", llu(layout->dfile_array[0]));
++     PINT_dist_dump(layout->dist);
++
++     ret = blob_size;
++out_cleanup:
++     free(layout->dfile_array);
++     PINT_dist_free(layout->dist);
++     gossip_debug(GOSSIP_CLIENT_DEBUG,"serialize_layout: (err:%d)\n", ret);
++     return ret;
++}
++
+ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
+ {
+     PVFS_error ret = -PVFS_EINVAL;
+@@ -2089,6 +2164,7 @@ static inline void package_downcall_memb
+     vfs_request_t *vfs_request, int *error_code)
+ {
+     int ret = -PVFS_EINVAL;
++    int layout_bytes_cp = 0;
+     assert(vfs_request);
+     assert(error_code);
+ 
+@@ -2214,6 +2290,24 @@ static inline void package_downcall_memb
+ 
+                     free(attr->link_target);
+                 }
++
++		/* DH: This should return the dfiles and dist since
++		 * PVFS_ATTR_SYS_ALL includes PVFS_ATTR_SYS_SIZE which requires them
++		 * I will now return the layout in all cases.
++		 * Note: It is cached in the kernel after the first request.
++		 */
++		/* Serialize the layout so it can be sent in the downcall */
++		layout_bytes_cp = pnfs_serialize_layout(&vfs_request->out_downcall.resp.getattr,
++							&vfs_request->response.getattr.layout,
++							&vfs_request->in_upcall.req.getattr.refn);
++
++		/* If there was an error, fail the entire getattr request */
++		if (layout_bytes_cp < 0) {
++		    *error_code = layout_bytes_cp;
++		    layout_bytes_cp = 0;
++		}
++		gossip_debug(GOSSIP_CLIENT_DEBUG,"lbc: %d)\n", layout_bytes_cp);
++		vfs_request->out_downcall.resp.getattr.layout_size = layout_bytes_cp;
+             }
+             break;
+         case PVFS2_VFS_OP_SETATTR:
+diff -puN src/client/sysint/sys-getattr.sm~pvfs2layoutsupport src/client/sysint/sys-getattr.sm
+--- pvfs-2.6.3-pnfsfilelayout/src/client/sysint/sys-getattr.sm~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/client/sysint/sys-getattr.sm	2008-01-05 15:53:59.000000000 -0800
+@@ -807,6 +807,8 @@ static int getattr_set_sys_response(PINT
+ {
+     PVFS_sysresp_getattr * sysresp = NULL;
+     PVFS_object_attr *attr = NULL;
++    PVFS_metafile_attr *layout = NULL;
++    PVFS_size df_array_size;
+ 
+     if(js_p->error_code != 0)
+     {
+@@ -815,6 +817,7 @@ static int getattr_set_sys_response(PINT
+     }
+ 
+     attr = &sm_p->getattr.attr;
++    layout = &sm_p->getattr.attr.u.meta;
+     assert(attr);
+     
+     /* If we get to this state action, 
+@@ -904,6 +907,25 @@ static int getattr_set_sys_response(PINT
+     sysresp->attr.size  = 0;
+     sysresp->attr.objtype = attr->objtype;
+ 
++    /* DH: Set the values of the layout that were stored in the cache. */
++    if(attr->objtype == PVFS_TYPE_METAFILE &&
++       sm_p->getattr.req_attrmask & PVFS_ATTR_META_DFILES &&
++       sm_p->getattr.req_attrmask & PVFS_ATTR_META_DIST) {
++	gossip_debug(GOSSIP_CLIENT_DEBUG, "pNFS: Setting layout\n");
++	/* file handles */
++	df_array_size = layout->dfile_count * sizeof(PVFS_handle);
++	sysresp->layout.dfile_count = layout->dfile_count;
++	sysresp->layout.dfile_array = malloc(df_array_size);
++	if (!sysresp->layout.dfile_array) {
++	    js_p->error_code = -PVFS_ENOMEM;
++	    return 0;
++	}
++	memcpy(sysresp->layout.dfile_array, layout->dfile_array, df_array_size);
++	/* dist */
++	sysresp->layout.dist = PINT_dist_copy(layout->dist);
++	sysresp->layout.dist_size = layout->dist_size;
++    }
++
+     if (js_p->error_code == 0)
+     {
+         /* convert outgoing attribute mask based on what we got */
+diff -puN src/kernel/linux-2.6/inode.c~pvfs2layoutsupport src/kernel/linux-2.6/inode.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/inode.c~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/inode.c	2008-01-05 15:53:59.000000000 -0800
+@@ -503,6 +503,8 @@ struct inode *pvfs2_get_custom_inode_com
+             return NULL;
+         }
+ 
++	pvfs2_inode->layout_size = -1;
++
+         /*
+          * Since we are using the same function to create a new on-disk object
+          * as well as to create an in-memory object, the mode of the object
+diff -puN /dev/null src/kernel/linux-2.6/pnfs.c
+--- /dev/null	2007-11-26 10:11:24.475597181 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pnfs.c	2008-01-05 17:50:23.000000000 -0800
+@@ -0,0 +1,204 @@
++/*
++ * (C) 2001 Clemson University and The University of Chicago
++ *
++ * See COPYING in top-level directory.
++ */
++
++#include "pvfs2-kernel.h"
++#include "pvfs2-pnfs.h"
++
++#include "param.h"
++#include "sunrpc/svc.h"
++#include "sunrpc/debug.h"
++#include "nfsd/nfsd.h"
++#include "nfs4.h"
++#include "nfsd/state.h"
++#include "nfsd/pnfsd.h"
++
++#include "nfsd/nfs4layoutxdr.h"
++
++/* used to protect the layout information for an inode */
++spinlock_t pvfs2_layout_lock = SPIN_LOCK_UNLOCKED;
++
++/****** Common Functions ******/
++static int
++pvfs2_layout_type(void)
++{
++    return layouttype;
++}
++
++/****** PVFS2 Layout Functions ******/
++
++/* Set pvfs2 layout information for return to nfsd.
++ * DH-TODO: This is copying from the pvfs2_inode_t struct
++ * (which exists in a cache), to NFSD alloc'd memory.  It
++ * is probably better that NFSD manages its own memory, so
++ * even though there is copying from the downcall struct to
++ * the pvfs2_inode_t and now to nfsd, this may make sense.
++ * Better to optimize the downcall -> pvfs2_inode_t copy.
++ */
++static int
++set_pvfs2_layout(struct nfsd4_pnfs_layoutget* req, void* layout, int layout_size)
++{
++    struct pvfs2_layout* lay_t;
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Begin copying %d bytes\n",__FUNCTION__,layout_size);
++    if (req->lg_layout)
++    {
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Existing layout, freeing existing memory\n",__FUNCTION__);
++	kfree(req->lg_layout);
++    }
++
++    if (layout_size > req->lg_mxcnt)
++    {
++	gossip_err("%s: Layout blob (%d) is larger than buffer (%d)\n",
++	       __FUNCTION__,
++	       layout_size,
++	       req->lg_mxcnt);
++	return -EIO;
++    }
++
++    lay_t = (struct pvfs2_layout*)kmalloc(sizeof(struct pvfs2_layout), GFP_KERNEL);
++    lay_t->layout = layout;
++    lay_t->length = layout_size;
++
++    /* set return layout for nfsd */
++    req->lg_layout = (void*)lay_t;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: XDR PVFS2 LAYOUT\n", __FUNCTION__);
++    gossip_debug(GOSSIP_PNFS_DEBUG,"\tblob size:%d\n", ((int*)layout)[0]);
++    gossip_debug(GOSSIP_PNFS_DEBUG,"\tfsid:%d\n", ((int*)layout)[1]);
++    gossip_debug(GOSSIP_PNFS_DEBUG,"\t# dfiles:%d\n", ((int*)layout)[2]);
++    layout += 12;
++    gossip_debug(GOSSIP_PNFS_DEBUG,"\tdfile 0:%llu\n", ((u64*)layout)[0]);
++
++    return 0;
++}
++
++/* Retrieves pvfs2 pNFS layout from mds */
++static int
++pvfs2_pvfs2layout_getattr(struct inode * inode, int attributes)
++{
++    pvfs2_inode_t* pvfs2_inode = PVFS2_I(inode);
++    int ret;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Start\n", __FUNCTION__);
++    spin_lock(&pvfs2_layout_lock);
++
++    /* Check if layout has already been retrieve for this inode */
++    if (pvfs2_inode->layout_size <= 0)
++    {
++	/* perform upcall to retrieve layout */
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Retrieving pNFS layout\n", __FUNCTION__);
++        ret = pvfs2_inode_getattr(inode, attributes);
++	if (ret || pvfs2_inode->layout_size <= 0)
++	{
++	    gossip_err("%s: Error!  Could not retrieve layout (%d)\n",__FUNCTION__,ret);
++	    ret = -ENOSYS;
++	}
++    } else {
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Using cached pNFS layout\n", __FUNCTION__);
++	ret = 0;
++    }
++
++    spin_unlock(&pvfs2_layout_lock);
++    return ret;
++}
++
++/* Retrieves pvfs2 data layout information about the specified file.
++ * return- positive 0
++ * negative -ENOSYS or pvfs2_inode_getattr error
++ */
++static int
++pvfs2_layout_get(struct inode * inode, void* buf)
++{
++    int ret;
++    struct nfsd4_pnfs_layoutget *layout_request = (struct nfsd4_pnfs_layoutget*)buf;
++    pvfs2_inode_t* pvfs2_inode = PVFS2_I(inode);
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: off:%Lu ex:%Lu macc:%d iomode:%d\n", __FUNCTION__,
++		layout_request->lg_seg.offset,
++		layout_request->lg_seg.length,
++		layout_request->lg_mxcnt,
++		layout_request->lg_seg.iomode);
++
++    if ((ret = pvfs2_pvfs2layout_getattr(inode, PVFS_ATTR_META_ALL)) < 0)
++	return -ENOSYS;
++
++    ret = set_pvfs2_layout(layout_request,
++                           pvfs2_inode->layout,
++                           pvfs2_inode->layout_size);
++    if (ret)
++	gossip_err("%s: Error!  Could not copy attributes (%d)\n",__FUNCTION__,ret);
++
++    return ret;
++}
++
++static void
++pvfs2_layout_free(void *layout)
++{
++    struct pvfs2_layout* lay_t;
++
++    if (!layout)
++	return;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"pvfs2: Freeing server layout struct\n");
++    lay_t = (struct pvfs2_layout*)layout;
++    kfree(lay_t);
++}
++
++/* pNFS: encodes opaque layout
++ * Arg: resp - xdr buffer pointer
++ * layout - file system defined
++ * Ret: new value of xdr buffer pointer
++   int (*layout_encode)(u32 *p, u32 *end, void *layout);
++ */
++static int
++pvfs2_layout_encode(u32 *p, u32 *end, void *layout)
++{
++    struct pvfs2_layout *plo;
++    int lay_length;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Encoding pvfs2 layout\n", __FUNCTION__);
++
++    if (!layout)
++    {
++	gossip_err("%s: ERROR! No layout to encode.\n", __FUNCTION__);
++	return -ENOMEM;
++    }
++
++    plo = (struct pvfs2_layout*)layout;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Layout length %d\n", __FUNCTION__, plo->length);
++
++    lay_length = 4 + plo->length;
++    if (p + XDR_QUADLEN(lay_length) > end)
++    {
++	gossip_err("Layout length (%d) exceeds available xdr buffer",plo->length);
++	return -ENOMEM;
++    }
++
++    /* Write length and layout */
++    WRITE32(plo->length);
++    WRITEMEM(plo->layout, plo->length);
++
++    /* update xdr pointer */
++    return lay_length;
++}
++
++/* export ops for each layout type */
++struct export_operations pvfs2layout_export_ops =
++{
++    .layout_type   = pvfs2_layout_type,
++    .layout_get    = pvfs2_layout_get,
++    .layout_free   = pvfs2_layout_free,
++    .layout_encode = pvfs2_layout_encode,
++};
++
++/*
++ * Local variables:
++ *  c-indent-level: 4
++ *  c-basic-offset: 4
++ * End:
++ *
++ * vim: ts=8 sts=4 sw=4 expandtab
++ */
+diff -puN /dev/null src/kernel/linux-2.6/pvfs2-pnfs.h
+--- /dev/null	2007-11-26 10:11:24.475597181 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-pnfs.h	2008-01-05 17:50:23.000000000 -0800
+@@ -0,0 +1,47 @@
++/*
++ * (C) 2006 CITI @ the University of Michigan
++ *
++ * See COPYING in top-level directory.
++ */
++
++/** \defgroup pvfs2linux PVFS2 Linux kernel support
++ *
++ *  pNFS definitions
++ *
++ * @{
++ */
++
++/** \file
++ *  Declarations and macros for the pNFS Linux kernel support.
++ */
++
++#ifndef __PVFS2_PNFS_H
++#define __PVFS2_PNFS_H
++
++/* pnfs-pvfs2 layout structure */
++struct pvfs2_layout {
++	u32     length;
++	void	*layout;
++};
++
++extern struct export_operations pvfs2layout_export_ops;
++
++/* Structs need to be defined just to compile kernel module since they
++ * are used in include/linux/nfs4_pnfs.h.
++ */
++struct nfs_write_data;
++struct nfs_read_data;
++struct pnfs_layoutcommit_arg;
++struct pnfs_layoutcommit_res;
++
++#endif
++/* @} */
++
++/*
++ * Local variables:
++ *  c-indent-level: 4
++ *  c-basic-offset: 4
++ * End:
++ *
++ * vim: ts=8 sts=4 sw=4 expandtab
++ */
+diff -puN src/kernel/linux-2.6/pvfs2-utils.c~pvfs2layoutsupport src/kernel/linux-2.6/pvfs2-utils.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-utils.c~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-utils.c	2008-01-05 15:53:59.000000000 -0800
+@@ -510,6 +510,15 @@ int pvfs2_inode_getattr(struct inode *in
+                 ret = -ENOENT;
+                 goto copy_attr_failure;
+             }
++	    /* DH: Copy layout blob for pnfs */
++	    gossip_debug(GOSSIP_PNFS_DEBUG,
++			 "%s: Server copy layout from userland size:%d\n",
++			 __FUNCTION__,new_op->downcall.resp.getattr.layout_size);
++	    pvfs2_inode->layout_size = new_op->downcall.resp.getattr.layout_size;
++	    if (pvfs2_inode->layout_size > 0)
++	    {
++		memcpy(pvfs2_inode->layout,new_op->downcall.resp.getattr.layout,pvfs2_inode->layout_size);
++	    }
+         }
+ 
+       copy_attr_failure:
+diff -puN src/kernel/linux-2.6/super.c~pvfs2layoutsupport src/kernel/linux-2.6/super.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/super.c~pvfs2layoutsupport	2008-01-05 15:53:59.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/super.c	2008-01-05 17:50:23.000000000 -0800
+@@ -7,6 +7,8 @@
+ #include "pvfs2-kernel.h"
+ #include "pvfs2-bufmap.h"
+ #include "pvfs2-internal.h"
++#include "pvfs2-pnfs.h"
++#include "nfs4.h"
+ 
+ /* list for storing pvfs2 specific superblocks in use */
+ LIST_HEAD(pvfs2_superblocks);
+@@ -245,7 +247,7 @@ static void pvfs2_read_inode(
+     }
+ }
+ 
+-#else /* !PVFS2_LINUX_KERNEL_2_4 */
++#else /* PVFS2_LINUX_KERNEL_2_4 */
+ 
+ static void pvfs2_read_inode(
+     struct inode *inode)
+@@ -1018,8 +1020,6 @@ struct super_block* pvfs2_get_sb(
+ 
+ #else /* !PVFS2_LINUX_KERNEL_2_4 */
+ 
+-static struct export_operations pvfs2_export_ops = {};
+-
+ int pvfs2_fill_sb(
+     struct super_block *sb,
+     void *data,
+@@ -1097,7 +1097,17 @@ int pvfs2_fill_sb(
+     }
+     root_dentry->d_op = &pvfs2_dentry_operations;
+ 
+-    sb->s_export_op = &pvfs2_export_ops;
++
++    /* Set layout export operations for each layout type */
++    switch (layouttype) {
++        case LAYOUT_PVFS2:
++	    gossip_debug(GOSSIP_PNFS_DEBUG,"Setting pvfs2 layout export ops\n");
++	    sb->s_export_op = &pvfs2layout_export_ops;
++	    break;
++        default:
++	    gossip_err("Invalid layouttype, no export ops to set! (%d)\n", layouttype);
++    }
++
+     sb->s_root = root_dentry;
+     return 0;
+ }
+_
