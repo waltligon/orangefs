@@ -2,8 +2,10 @@ DIR := io/bmi
 
 TESTSRC += \
 	$(DIR)/test-bmi-client.c \
+	$(DIR)/test-bmi-client-eagerbug.c \
 	$(DIR)/test-bmi-client-list.c \
 	$(DIR)/test-bmi-server.c \
+	$(DIR)/test-bmi-server-eagerbug.c \
 	$(DIR)/test-bmi-server-list.c \
 	$(DIR)/pingpong.c
 

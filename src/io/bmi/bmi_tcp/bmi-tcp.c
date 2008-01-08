@@ -2410,9 +2410,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 
 	/* whoohoo- it is already done! */
 	/* copy buffer out to list segments; handle short case */
-	for (i = 0; i < query_op->list_count; i++)
+	for (i = 0; i < list_count; i++)
 	{
-	    copy_size = query_op->size_list[i];
+	    copy_size = size_list[i];
 	    if (copy_size + total_copied > query_op->actual_size)
 	    {
 		copy_size = query_op->actual_size - total_copied;
@@ -2454,9 +2454,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 
 	/* copy what we have so far into the correct buffers */
 	total_copied = 0;
-	for (i = 0; i < query_op->list_count; i++)
+	for (i = 0; i < list_count; i++)
 	{
-	    copy_size = query_op->size_list[i];
+	    copy_size = size_list[i];
 	    if (copy_size + total_copied > query_op->amt_complete)
 	    {
 		copy_size = query_op->amt_complete - total_copied;

@@ -67,6 +67,7 @@ int main(
     bmi_context_id context;
     char method[24], *cp;
     int len;
+    char testeagerbuf1[] = "aaaccc";
 
     /* grab any command line options */
     user_opts = parse_args(argc, argv);
@@ -77,7 +78,7 @@ int main(
 
     /* set debugging stuff */
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, GOSSIP_BMI_DEBUG_ALL);
+    /* gossip_set_debug_mask(1, GOSSIP_BMI_DEBUG_ALL); */
 
     /* convert address to bmi method type by prefixing bmi_ */
     cp = strchr(user_opts->hostid, ':');
@@ -161,14 +162,6 @@ int main(
 	    return (-1);
 	}
 
-	if (in_test_user_ptr != out_test_user_ptr)
-	{
-	    fprintf(stderr, "1st ptr failure.\n");
-	}
-	else
-	{
-	    fprintf(stderr, "1st ptr success.\n");
-	}
 	out_test_user_ptr = NULL;
     }
 
@@ -196,14 +189,6 @@ int main(
 	{
 	    fprintf(stderr, "Ack recv failed.\n");
 	    return (-1);
-	}
-	if (in_test_user_ptr != out_test_user_ptr)
-	{
-	    fprintf(stderr, "2nd ptr failure.\n");
-	}
-	else
-	{
-	    fprintf(stderr, "2nd ptr success.\n");
 	}
 	out_test_user_ptr = NULL;
     }
@@ -269,13 +254,67 @@ int main(
 	out_test_user_ptr = NULL;
     }
 
+    /* final send to test eager bug *****************************/
+    ret = BMI_post_send(&(client_ops[0]), server_addr, testeagerbuf1,
+			6, BMI_EXT_ALLOC, 1, NULL, context);
+    if (ret < 0)
+    {
+	errno = -ret;
+	perror("BMI_post_send");
+	return (-1);
+    }
+    if (ret == 0)
+    {
+	/* turning this into a blocking call for testing :) */
+	/* check for completion of data payload send */
+	do
+	{
+	    ret = BMI_test(client_ops[0], &outcount, &error_code,
+			   &actual_size, NULL, 10, context);
+	} while (ret == 0 && outcount == 0);
+
+	if (ret < 0 || error_code != 0)
+	{
+	    fprintf(stderr, "Data payload send failed.\n");
+	    return (-1);
+	}
+    }
+
+    /* let the server get ahead of us */
+    sleep(10);
+
+    ret = BMI_post_send(&(client_ops[0]), server_addr, testeagerbuf1,
+			6, BMI_EXT_ALLOC, 1, NULL, context);
+    if (ret < 0)
+    {
+	errno = -ret;
+	perror("BMI_post_send");
+	return (-1);
+    }
+    if (ret == 0)
+    {
+	/* turning this into a blocking call for testing :) */
+	/* check for completion of data payload send */
+	do
+	{
+	    ret = BMI_test(client_ops[0], &outcount, &error_code,
+			   &actual_size, NULL, 10, context);
+	} while (ret == 0 && outcount == 0);
+
+	if (ret < 0 || error_code != 0)
+	{
+	    fprintf(stderr, "Data payload send failed.\n");
+	    return (-1);
+	}
+    }
+
     /* free up the message buffers */
     BMI_memfree(server_addr, send_buffer, user_opts->message_size, BMI_SEND);
     BMI_memfree(server_addr, my_req, sizeof(struct server_request), BMI_SEND);
     BMI_memfree(server_addr, my_ack, sizeof(struct server_ack), BMI_RECV);
 
     /* try out rev lookup */
-    printf("rev_lookup() output: %s\n", BMI_addr_rev_lookup(server_addr));
+    /* printf("rev_lookup() output: %s\n", BMI_addr_rev_lookup(server_addr)); */
 
     /* shutdown the local interface */
     BMI_close_context(context);
