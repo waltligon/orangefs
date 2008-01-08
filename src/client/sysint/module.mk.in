@@ -15,7 +15,6 @@ CSRC := \
 
 CLIENT_SMCGEN := \
 	$(DIR)/remove.c \
-	$(DIR)/lookup-ncache.c \
 	$(DIR)/sys-getattr.c \
 	$(DIR)/sys-setattr.c \
 	$(DIR)/sys-get-eattr.c \
