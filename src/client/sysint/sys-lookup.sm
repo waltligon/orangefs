@@ -43,7 +43,6 @@ enum
     LOOKUP_TYPE_RELATIVE_LN = 5,
     LOOKUP_TYPE_ABSOLUTE_LN = 6,
     LOOKUP_TYPE_LN_NO_FOLLOW = 7,
-    LOOKUP_NCACHE_HIT_FASTPATH = 8
 };
 
 static int lookup_segment_lookup_comp_fn(
@@ -62,14 +61,6 @@ static void finalize_context(
 
 machine pvfs2_client_lookup_sm
 {
-    state lookup_init
-    {
-	run lookup_init;
-	success => lookup_segment_lookup_setup_msgpair;
-        LOOKUP_NCACHE_HIT_FASTPATH => lookup_cleanup;
-        default => lookup_cleanup;
-    }
-
     state lookup_segment_lookup_setup_msgpair
     {
 	run lookup_segment_lookup_setup_msgpair;
@@ -594,26 +585,6 @@ PVFS_error PVFS_sys_lookup(
 
 /****************************************************************/
 
-static PINT_sm_action lookup_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_init\n");
-
-    assert(js_p->error_code == 0);
-
-    /* check the ncache to see if we can bypass this entire lookup */
-    if (PINT_ncache_get_cached_entry(
-                (const char*)sm_p->u.lookup.orig_pathname, 
-                &sm_p->u.lookup.lookup_resp->ref,
-                (const PVFS_object_ref*) &(sm_p->u.lookup.starting_refn)) == 0)
-    {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup: ncache fast path!\n");
-        js_p->error_code = LOOKUP_NCACHE_HIT_FASTPATH;
-    }
-    return SM_ACTION_COMPLETE;
-}
-
 static PINT_sm_action lookup_segment_lookup_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -1016,12 +987,6 @@ static PINT_sm_action lookup_cleanup(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_cleanup\n");
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-
-    if (js_p->error_code == LOOKUP_NCACHE_HIT_FASTPATH)
-    {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup fast path exiting\n");
-        js_p->error_code = 0;
-    }
 
     sm_p->error_code = js_p->error_code;
 
