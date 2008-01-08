@@ -510,9 +510,6 @@ typedef struct PINT_client_sm
 		  * jobs for some states; typically set and
 		  * then decremented to zero as jobs complete */
 
-    /* indicates that an ncache hit has been made */ 
-    int ncache_hit;
-
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
     /* generic dirent array used by both readdir and readdirplus state machines */
