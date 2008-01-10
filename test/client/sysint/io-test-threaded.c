@@ -25,8 +25,6 @@
 /* NOTE: this is not in bytes, but rather a number of ints to read and write */
 #define DEFAULT_IO_SIZE 8*1024*1024
 
-#define NUM_THREADS 2
-
 struct thread_info
 {
     PVFS_object_ref* pinode_refn;
@@ -36,6 +34,8 @@ struct thread_info
 };
 
 void* thread_fn(void* foo);
+pthread_mutex_t error_count_mutex = PTHREAD_MUTEX_INITIALIZER;
+int error_count = 0;
 
 int main(int argc, char **argv)
 {
@@ -57,12 +57,26 @@ int main(int argc, char **argv)
     PVFS_Request mem_req;
     void *buffer = NULL;
     struct thread_info info;
-    pthread_t thread_id_array[NUM_THREADS];
+    pthread_t* thread_id_array;
+    int num_threads = 1;
 
-    if (argc != 2)
+    if (argc != 3)
     {
-	fprintf(stderr, "Usage: %s <file name>\n", argv[0]);
+	fprintf(stderr, "Usage: %s <num threads> <file name>\n", argv[0]);
 	return (-1);
+    }
+
+    if(sscanf(argv[1], "%d", &num_threads) != 1)
+    {
+	fprintf(stderr, "Usage: %s <num threads> <file name>\n", argv[0]);
+	return (-1);
+    }
+
+    thread_id_array = malloc(num_threads* sizeof(pthread_t));
+    if(!thread_id_array)
+    {
+        perror("malloc");
+        return(-1);
     }
 
     /* create a buffer for running I/O on */
@@ -91,13 +105,13 @@ int main(int argc, char **argv)
 	return (-1);
     }
 
-    if (argv[1][0] == '/')
+    if (argv[2][0] == '/')
     {
-        snprintf(name, 512, "%s", argv[1]);
+        snprintf(name, 512, "%s", argv[2]);
     }
     else
     {
-        snprintf(name, 512, "/%s", argv[1]);
+        snprintf(name, 512, "/%s", argv[2]);
     }
 
     PVFS_util_gen_credentials(&credentials);
@@ -106,8 +120,6 @@ int main(int argc, char **argv)
     if (ret == -PVFS_ENOENT)
     {
         PVFS_sysresp_getparent gp_resp;
-
-	printf("IO-TEST: lookup failed; creating new file.\n");
 
         memset(&gp_resp, 0, sizeof(PVFS_sysresp_getparent));
 	ret = PVFS_sys_getparent(fs_id, name, &credentials, &gp_resp);
@@ -142,9 +154,6 @@ int main(int argc, char **argv)
     }
     else
     {
-	printf("IO-TEST: lookup succeeded; performing I/O on "
-               "existing file.\n");
-
 	pinode_refn.fs_id = fs_id;
 	pinode_refn.handle = resp_lk.ref.handle;
     }
@@ -152,9 +161,6 @@ int main(int argc, char **argv)
 	/**************************************************************
 	 * carry out I/O operation
 	 */
-
-    printf("IO-TEST: performing write on handle: %ld, fs: %d\n",
-	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
 
     buffer = io_buffer;
     buffer_size = io_size * sizeof(int);
@@ -181,8 +187,6 @@ int main(int argc, char **argv)
 	return (-1);
     }
 
-    printf("IO-TEST: wrote %d bytes.\n", (int) resp_io.total_completed);
-
     /* fill in information for threads */
     info.pinode_refn = &pinode_refn;
     info.file_req = &file_req;
@@ -190,13 +194,13 @@ int main(int argc, char **argv)
     info.credentials = &credentials;
 
     /* launch threads then wait for them to finish */
-    for(i=0; i<NUM_THREADS; i++)
+    for(i=0; i<num_threads; i++)
     {
         ret = pthread_create(&thread_id_array[i], NULL, thread_fn, &info);
         assert(ret == 0);
     }
 
-    for(i=0; i<NUM_THREADS; i++)
+    for(i=0; i<num_threads; i++)
     {
         pthread_join(thread_id_array[i], NULL);
     }
@@ -215,7 +219,20 @@ int main(int argc, char **argv)
 
     free(filename);
     free(io_buffer);
-    return (0);
+
+    pthread_mutex_lock(&error_count_mutex);
+    if(error_count != 0)
+    {
+        fprintf(stderr, "Error: %d threads had problems\n", error_count);
+        ret = -1;
+    }
+    else
+    {
+        ret = 0;
+    }
+    pthread_mutex_unlock(&error_count_mutex);
+
+    return (ret);
 }
 
 void* thread_fn(void* foo)
@@ -233,28 +250,32 @@ void* thread_fn(void* foo)
     if (!io_buffer)
     {
         perror("malloc");
-        /* TODO: how to report error */
+        pthread_mutex_lock(&error_count_mutex);
+        error_count++;
+        pthread_mutex_unlock(&error_count_mutex);
 	return (NULL);
     }
 
     memset(io_buffer, 0, io_size * sizeof(int));
 
     /* verify */
-    printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
-	   (long) info->pinode_refn->handle, (int) info->pinode_refn->fs_id);
-
     ret = PVFS_sys_read(*info->pinode_refn, *info->file_req, 0, io_buffer, *info->mem_req,
 			info->credentials, &resp_io);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_read failure", ret);
-        /* TODO: how to report error */
+        pthread_mutex_lock(&error_count_mutex);
+        error_count++;
+        pthread_mutex_unlock(&error_count_mutex);
 	return (NULL);
     }
-    printf("IO-TEST: read %d bytes.\n", (int) resp_io.total_completed);
     if ((io_size * sizeof(int)) != resp_io.total_completed)
     {
-	fprintf(stderr, "Error: SHORT READ! skipping verification...\n");
+	fprintf(stderr, "Error: SHORT READ!\n");
+        pthread_mutex_lock(&error_count_mutex);
+        error_count++;
+        pthread_mutex_unlock(&error_count_mutex);
+        return(NULL);
     }
     else
     {
@@ -272,10 +293,10 @@ void* thread_fn(void* foo)
 	if (errors != 0)
 	{
 	    fprintf(stderr, "ERROR: found %d errors\n", errors);
-	}
-	else
-	{
-	    printf("IO-TEST: no errors found.\n");
+            pthread_mutex_lock(&error_count_mutex);
+            error_count++;
+            pthread_mutex_unlock(&error_count_mutex);
+            return(NULL);
 	}
     }
 
