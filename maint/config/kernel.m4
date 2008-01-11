@@ -849,7 +849,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
-	AC_MSG_CHECKING(if kernel address_space struct has a spin_lock field)
+	AC_MSG_CHECKING(if kernel address_space struct has a spin_lock field named page_lock)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>

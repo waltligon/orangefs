@@ -11440,8 +11440,8 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-	{ echo "$as_me:$LINENO: checking if kernel address_space struct has a spin_lock field" >&5
-echo $ECHO_N "checking if kernel address_space struct has a spin_lock field... $ECHO_C" >&6; }
+	{ echo "$as_me:$LINENO: checking if kernel address_space struct has a spin_lock field named page_lock" >&5
+echo $ECHO_N "checking if kernel address_space struct has a spin_lock field named page_lock... $ECHO_C" >&6; }
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -11549,8 +11549,6 @@ else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
-	{ echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6; }
 	{ echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6; }
 
