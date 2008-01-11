@@ -858,7 +858,20 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		spin_lock(&as.page_lock);
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_SPIN_LOCK_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock instead of rw_lock]),
+	AC_DEFINE(HAVE_SPIN_LOCK_PAGE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock member named page_lock instead of rw_lock]),
+	AC_MSG_RESULT(no)
+	)
+
+        AC_MSG_CHECKING(if kernel address_space struct has a rwlock_t field named tree_lock)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		read_lock(&as.tree_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock member named tree_lock instead of rw_lock]),
 	AC_MSG_RESULT(no)
 	)
 
