@@ -112,17 +112,34 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
-	dnl 2.6.20 deprecated kmem_cache_t
+	dnl 2.6.20 deprecated kmem_cache_t; some old ones do not have struct
+	dnl kmem_cache, but may have kmem_cache_s.  It's a mess.  Just look
+	dnl for this, and assume _t if not found.
+	dnl This test relies on gcc complaining about declaring a struct
+	dnl in a parameter list.  Fragile, but nothing better is available
+	dnl to check for the existence of a struct.  We cannot see the
+	dnl definition of the struct in the kernel, it's private to the
+	dnl slab implementation.  And C lets you declare structs freely as
+	dnl long as you don't try to deal with their contents.
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for struct kmem_cache in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/slab.h>
-		static struct kmem_cache;
+
+		int foo(struct kmem_cache *s)
+		{
+		    return (s == NULL) ? 3 : 4;
+		}
 	], [],
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_STRUCT_KMEM_CACHE, 1, Define if struct kmem_cache is defined in kernel),
+		have_kmem_cache=yes,
+		AC_DEFINE(HAVE_STRUCT_KMEM_CACHE, 1, Define if struct kmem_cache is defined in kernel)
+		have_kmem_cache=no
 		AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
 
 	dnl 2.6.20 removed SLAB_KERNEL.  Need to use GFP_KERNEL instead
 	AC_MSG_CHECKING(for SLAB_KERNEL flag in kernel)
