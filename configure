@@ -8361,6 +8361,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
 		#define __KERNEL__
+		#include <linux/kernel.h>
 		#include <linux/slab.h>
 
 		int foo(struct kmem_cache *s)
@@ -8395,18 +8396,16 @@ eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
        } && test -s conftest.$ac_objext; then
   { echo "$as_me:$LINENO: result: yes" >&5
 echo "${ECHO_T}yes" >&6; }
-		have_kmem_cache=yes
-else
-  echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
 
 cat >>confdefs.h <<\_ACEOF
 #define HAVE_STRUCT_KMEM_CACHE 1
 _ACEOF
 
-		have_kmem_cache=no
-		{ echo "$as_me:$LINENO: result: no" >&5
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6; }
 
 fi
@@ -11448,6 +11447,70 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+        							tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ echo "$as_me:$LINENO: checking for two-param kmem_cache_create constructor" >&5
+echo $ECHO_N "checking for two-param kmem_cache_create constructor... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		void ctor(struct kmem_cache *cachep, void *req)
+		{
+		}
+
+int
+main ()
+{
+
+		kmem_cache_create("config-test", 0, 0, 0, ctor);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+	CFLAGS=$tmp_cflags
 
 	{ echo "$as_me:$LINENO: checking if kernel address_space struct has a spin_lock field named page_lock" >&5
 echo $ECHO_N "checking if kernel address_space struct has a spin_lock field named page_lock... $ECHO_C" >&6; }
