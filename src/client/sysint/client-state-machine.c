@@ -91,8 +91,8 @@ static int conditional_remove_sm_if_in_completion_list(PINT_smcb *smcb)
             }
             else
             {
-                memmove(s_completion_list[i],
-                        s_completion_list[i+1],
+                memmove(&s_completion_list[i],
+                        &s_completion_list[i+1],
                         (s_completion_list_index - (i + 1)) *
                         sizeof(PINT_smcb *));
             }
