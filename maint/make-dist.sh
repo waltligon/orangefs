@@ -19,19 +19,20 @@ if test -z $2; then
     exit 1
 fi
 
+BUILDDIR=$(pwd)
 SRCDIR="$1"
 PVFS2_VERSION="$2"
 
 if test "x$SRCDIR" = "x."; then
-    SRCDIR=`pwd`
+    SRCIR=`pwd`
     echo "Assuming top-level source directory is $SRCDIR"
 fi
 
 STARTDIR=`pwd`
 TARGETBASE="pvfs-$PVFS2_VERSION"
 TARGETDIR="/tmp/$TARGETBASE"
-TARFILE_NAME="$SRCDIR/pvfs-$PVFS2_VERSION.tar"
-TARBALL_NAME="$SRCDIR/pvfs-$PVFS2_VERSION.tar.gz"
+TARFILE_NAME="$BUILDDIR/pvfs-$PVFS2_VERSION.tar"
+TARBALL_NAME="$BUILDDIR/pvfs-$PVFS2_VERSION.tar.gz"
 TAR=`which tar`
 GZIP=`which gzip`
 
@@ -50,7 +51,6 @@ fi
 ##################
 make clean
 make docs
-make statecomp
 
 if test -d $TARGETDIR; then
     rm -rf $TARGETDIR
@@ -72,8 +72,8 @@ for f in `find . -name module.mk`; do rm -rf $f; done
 for f in `find . -name "*.log"`; do rm -rf $f; done
 for f in `find . -name "*.toc"`; do rm -rf $f; done
 for f in `find . -name "*.aux"`; do rm -rf $f; done
-rm Makefile pvfs2-config.h PVFS2-GLOBAL-TODO.txt
-rm src/common/statecomp/statecomp
+rm -f Makefile pvfs2-config.h PVFS2-GLOBAL-TODO.txt
+rm -f src/common/statecomp/statecomp
 
 # dump some special options into the top level module.mk.in
 echo "DIST_RELEASE = 1" >> module.mk.in
