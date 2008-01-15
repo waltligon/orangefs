@@ -232,6 +232,8 @@ int main(int argc, char **argv)
     }
     pthread_mutex_unlock(&error_count_mutex);
 
+    free(thread_id_array);
+
     return (ret);
 }
 
@@ -299,6 +301,8 @@ void* thread_fn(void* foo)
             return(NULL);
 	}
     }
+
+    free(io_buffer);
 
     return(NULL);
 }
