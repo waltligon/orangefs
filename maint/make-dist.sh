@@ -51,6 +51,7 @@ fi
 ##################
 make clean
 make docs
+make statecompgen
 
 if test -d $TARGETDIR; then
     rm -rf $TARGETDIR
