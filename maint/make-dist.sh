@@ -59,6 +59,9 @@ fi
 mkdir $TARGETDIR
 
 cp -f --no-dereference -R $SRCDIR/* $TARGETDIR
+cp $BUILDDIR/src/common/statecomp/parser.h $TARGETDIR/src/common/statecomp/
+cp $BUILDDIR/src/common/statecomp/parser.c $TARGETDIR/src/common/statecomp/
+cp $BUILDDIR/src/common/statecomp/scanner.c $TARGETDIR/src/common/statecomp/
 
 cd $TARGETDIR
 
