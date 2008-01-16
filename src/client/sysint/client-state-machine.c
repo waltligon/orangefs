@@ -370,6 +370,7 @@ PVFS_error PINT_client_state_machine_post(
     /* save operation type; mark operation as unfinished */
     sm_p->user_ptr = user_ptr;
 
+    gen_mutex_lock(&test_mutex);
     /*
       start state machine and continue advancing while we're getting
       immediate completions
@@ -380,6 +381,7 @@ PVFS_error PINT_client_state_machine_post(
     if(sm_ret < 0)
     {
         /* state machine code failed */
+        gen_mutex_unlock(&test_mutex);
         return sm_ret;
     }
 
@@ -416,6 +418,7 @@ PVFS_error PINT_client_state_machine_post(
                     lld((op_id ? *op_id : -1)),
                     ret);
     }
+    gen_mutex_unlock(&test_mutex);
     return js.error_code;
 }
 
