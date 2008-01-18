@@ -54,24 +54,18 @@ extern "C" {
 
 /*
   for more efficient host filesystem accesses, we have a simple
-  *_MAX_NUM_BUCKETS define that can be thought of more or less as
-  buckets for storing bstreams based on a simple hash of the unique
-  handle/coll_id combination.
+  DBPF_BSTREAM_MAX_NUM_BUCKETS define that can be thought of more or
+  less as buckets for storing bstreams based on a simple hash of the
+  handle.
 
   in practice, this means we spread all bstreams into
-  *_MAX_NUM_BUCKETS directories instead of keeping all bstream entries
-  in a flat bstream directory on the host filesystem.
+  DBPF_BSTREAM_MAX_NUM_BUCKETS directories instead of keeping all bstream
+  entries in a flat bstream directory on the host filesystem.
 */
-#define DBPF_KEYVAL_MAX_NUM_BUCKETS   32
 #define DBPF_BSTREAM_MAX_NUM_BUCKETS  64
 
-#define DBPF_KEYVAL_GET_BUCKET(__handle, __id)                           \
-(((__id << ((sizeof(__id) - 1) * 8)) | __handle) %                       \
-   DBPF_KEYVAL_MAX_NUM_BUCKETS)
-
-#define DBPF_BSTREAM_GET_BUCKET(__handle, __id)                          \
-(((__id << ((sizeof(__id) - 1) * 8)) | __handle) %                       \
-   DBPF_BSTREAM_MAX_NUM_BUCKETS)
+#define DBPF_BSTREAM_GET_BUCKET(__handle)                                \
+((__handle) % DBPF_BSTREAM_MAX_NUM_BUCKETS)
 
 #define DBPF_EVENT_START(__op, __id)                                     \
  PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
@@ -135,7 +129,7 @@ do {                                                                     \
 do {                                                                      \
   snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%08llx.bstream",                \
            __stoname, __cid, BSTREAM_DIRNAME,                             \
-           llu(DBPF_BSTREAM_GET_BUCKET(__handle, __cid)), llu(__handle)); \
+           llu(DBPF_BSTREAM_GET_BUCKET(__handle)), llu(__handle));        \
 } while (0)
 
 /* arguments are: buf, path_max, stoname, collid, handle */
