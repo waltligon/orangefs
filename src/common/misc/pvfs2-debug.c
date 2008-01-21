@@ -107,14 +107,14 @@ static __keyword_mask_t s_keyword_mask_map[] =
     /* Display the  hostnames instead of IP addrs in debug output */
     { "access_hostnames", GOSSIP_ACCESS_HOSTNAMES },
     /* Show the client device events */
-    { "dev", GOSSIP_DEV_DEBUG },
+    { "user_dev", GOSSIP_USER_DEV_DEBUG },
     /* Debug the fsck tool */
     { "fsck", GOSSIP_FSCK_DEBUG },
     { "bstream", GOSSIP_BSTREAM_DEBUG },
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose",
       (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG |
-                       GOSSIP_ENDECODE_DEBUG))
+                       GOSSIP_ENDECODE_DEBUG | GOSSIP_USER_DEV_DEBUG))
     },
     /* No debug output */
     { "none", GOSSIP_NO_DEBUG },
