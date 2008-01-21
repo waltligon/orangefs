@@ -365,7 +365,7 @@ static int initialize_context(
 
             slash_str = orig_pathname;
             for (i = 0; i < cur_seg_index; i++) {
-                slash_str = strrchr(slash_str, '/');
+                slash_str = strchr(slash_str, '/');
                 if (slash_str == NULL) {
                     break;
                 }
