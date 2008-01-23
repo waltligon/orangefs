@@ -346,7 +346,7 @@ AC_TRY_COMPILE(
      	#include <aio.h>
     ], 
     [
-    	struct aiocb;
+    	struct aiocb aiocb;
 	aiocb.__error_code = 0;
     ],
     AC_MSG_RESULT(yes)
@@ -362,7 +362,7 @@ AC_TRY_COMPILE(
         #include <aio.h>
     ],
     [
-        struct aiocb;
+        struct aiocb aiocb;
 	aiocb.__return_value = 0;
     ],
     AC_MSG_RESULT(yes)
@@ -616,10 +616,28 @@ AC_ARG_ENABLE(epoll,
   test_for_epoll
 ])
 
+#if defined(REG_EIP)
+#  define REG_INSTRUCTION_POINTER REG_EIP
+#elif defined(REG_RIP)
+#  define REG_INSTRUCTION_POINTER REG_RIP
+#else
+#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
+#endif
+
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
 [  --disable-segv-backtrace Disables back traces in segfault signal handler],,
-    PVFS2_SEGV_BACKTRACE=1)
+    AC_MSG_CHECKING(if segv backtrace capable)
+    AC_TRY_COMPILE([
+#if !defined(REG_EIP) && !defined(REG_RIP)
+		   choke me
+#endif
+		   ], [],
+		   AC_MSG_RESULT(yes)
+    		   PVFS2_SEGV_BACKTRACE=1,
+		   AC_MSG_RESULT(no)
+    )
+)
 AC_SUBST(PVFS2_SEGV_BACKTRACE)
 
 dnl shared or static client library
