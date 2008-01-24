@@ -379,6 +379,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
+        CASE(PVFS_SERV_STUFFED_CREATE, stuffed_create);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -473,6 +474,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_STUFFED_CREATE, stuffed_create);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -577,6 +579,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_STUFFED_CREATE, stuffed_create);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -661,6 +664,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_STUFFED_CREATE, stuffed_create);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -765,7 +769,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		decode_free(req->u.mgmt_dspace_info_list.handle_array);
 		break;
 
-	    case PVFS_SERV_SETATTR:
+	    case PVFS_SERV_STUFFED_CREATE:
+		decode_free(req->u.stuffed_create.metafile_handle_extent_array.extent_array);
+		decode_free(req->u.stuffed_create.datafile_handle_extent_array.extent_array);
+		break;
+
+case PVFS_SERV_SETATTR:
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
 		    decode_free(req->u.setattr.attr.u.meta.dist);
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
@@ -904,6 +913,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_STATFS:
                 case PVFS_SERV_WRITE_COMPLETION:
                 case PVFS_SERV_PROTO_ERROR:
+                case PVFS_SERV_STUFFED_CREATE:
                     /* nothing to free */
                     break;
 

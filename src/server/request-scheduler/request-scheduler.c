@@ -346,6 +346,9 @@ int PINT_req_sched_target_handle(
     case PVFS_SERV_STATFS:
 	*fs_id = req->u.statfs.fs_id;
 	return (1);
+    case PVFS_SERV_STUFFED_CREATE:
+	*readonly_flag = 0;
+	return (1);
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_PERF_UPDATE:
     case PVFS_SERV_JOB_TIMER:

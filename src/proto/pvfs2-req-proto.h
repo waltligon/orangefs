@@ -75,6 +75,7 @@ enum PVFS_server_op
     PVFS_SERV_SMALL_IO = 33,
     PVFS_SERV_LISTATTR = 34,
     PVFS_SERV_BATCH_CREATE = 35,
+    PVFS_SERV_STUFFED_CREATE = 36,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -137,6 +138,69 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
 #define PVFS_REQ_LIMIT_LISTATTR 64
+
+/* stuffed create *********************************************************/
+/* - used to create a stuffed object.  This creates a metadata handle,
+ * a datafile handle, and links the datafile handle to the metadata handle.
+ * It also sets the attributes on the metadata. */
+
+struct PVFS_servreq_stuffed_create
+{
+    PVFS_fs_id fs_id;
+    PVFS_object_attr attr;
+
+    /*
+      an array of handle extents that we use to suggest to
+      the server from which handle range to allocate for the
+      newly created handle(s).  To request a single handle,
+      a single extent with first = last should be used.
+    */
+    PVFS_handle_extent_array metafile_handle_extent_array;
+
+    PVFS_handle_extent_array datafile_handle_extent_array;
+};
+endecode_fields_5_struct(
+    PVFS_servreq_stuffed_create,
+    PVFS_fs_id, fs_id,
+    skip4,,
+    PVFS_object_attr, attr,
+    PVFS_handle_extent_array, metafile_handle_extent_array,
+    PVFS_handle_extent_array, datafile_handle_extent_array)
+#define extra_size_PVFS_servreq_stuffed_create \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
+     PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
+
+#define PINT_SERVREQ_STUFFED_CREATE_FILL(__req,                                \
+                                         __creds,                              \
+                                         __fsid,                               \
+                                         __md_ext_array,                       \
+                                         __df_ext_array,                       \
+                                         __objtype,                            \
+                                         __attr,                               \
+                                         __extra_mask)                         \
+do {                                                                           \
+    memset(&(__req), 0, sizeof(__req));                                        \
+    (__req).op = PVFS_SERV_STUFFED_CREATE;                                     \
+    (__req).credentials = (__creds);                                           \
+    (__req).u.stuffed_create.fs_id = (__fsid);                                 \
+    (__attr).objtype = (__objtype);                                            \
+    (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                       \
+    PINT_CONVERT_ATTR(&(__req).u.stuffed_create.attr, &(__attr), __extra_mask);\
+    (__req).u.create.handle_extent_array.extent_count =                        \
+        (__ext_array).extent_count;                                            \
+    (__req).u.create.handle_extent_array.extent_array =                        \
+        (__ext_array).extent_array;                                            \
+} while (0)
+
+struct PVFS_servresp_stuffed_create
+{
+    PVFS_handle metafile_handle;
+    PVFS_handle datafile_handle;
+};
+endecode_fields_2_struct(
+    PVFS_servresp_stuffed_create,
+    PVFS_handle, metafile_handle,
+    PVFS_handle, datafile_handle)
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
@@ -1586,6 +1650,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
+        struct PVFS_servreq_stuffed_create stuffed_create;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1637,6 +1702,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
+        struct PVFS_servresp_stuffed_create stuffed_create;
     } u;
 };
 endecode_fields_2_struct(

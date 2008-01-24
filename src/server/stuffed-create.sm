@@ -1,0 +1,378 @@
+/* 
+ * (C) 2001 The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
+#include "pvfs2-internal.h"
+#include "pint-util.h"
+
+%%
+
+machine pvfs2_stuffed_create_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => create_metafile;
+        default => final_response;
+    }
+
+    state create_metafile
+    {
+        run create_metafile;
+        success => create_datafile;
+        default => final_response;
+    }
+
+    state create_datafile
+    {
+        run create_datafile;
+        success => write_keyvals;
+        default => remove_metafile_object;
+    }
+
+    state write_keyvals
+    {
+        run write_keyvals;
+        success => setobj_attrib;
+        default => remove_datafile_object;
+    }
+
+    state setobj_attrib
+    {
+        run setattr_setobj_attribs;
+        success => setup_resp;
+        default => remove_keyvals;
+    }
+
+    state setup_resp
+    {
+        run setup_resp;
+        default => final_response;
+    }
+
+    state remove_datafile_object
+    {
+        run remove_datafile_object;
+        success => remove_metafile_object;
+        default => final_response;
+    }
+
+    state remove_metafile_object
+    {
+        run remove_metafile_object;
+        default => final_response;
+    }
+
+    state remove_keyvals
+    {
+        run remove_keyvals;
+        success => remove_datafile_object;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static int create_metafile(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t i;
+
+    ret = job_trove_dspace_create(
+        s_op->req->u.stuffed_create.fs_id,
+        &s_op->req->u.stuffed_create.metafile_handle_extent_array,
+        PVFS_TYPE_METAFILE,
+        NULL,
+        0,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context);
+
+    return(ret);
+}
+
+static int create_datafile(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t i;
+
+    /* we only get here if create_metafile succeeded */
+    assert(js_p->error_code == 0);
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "Stuffed metafile handle created: %llu\n",
+        llu(js_p->handle));
+    s_op->resp.u.stuffed_create.metafile_handle = js_p->handle;
+
+    /* now create the datafile handle */
+    ret = job_trove_dspace_create(
+        s_op->req->u.stuffed_create.fs_id,
+        &s_op->req->u.stuffed_create.datafile_handle_extent_array,
+        PVFS_TYPE_DATAFILE,
+        NULL,
+        TROVE_SYNC,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context);
+
+    return(ret);
+}
+
+static PINT_sm_action remove_metafile_object(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+
+    ret = job_trove_dspace_remove(
+        s_op->req->u.stuffed_create.fs_id,
+        s_op->resp.u.stuffed_create.metafile_handle,
+        0,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
+    return ret;
+}
+
+static PINT_sm_action remove_datafile_object(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+
+    ret = job_trove_dspace_remove(
+        s_op->req->u.stuffed_create.fs_id,
+        s_op->resp.u.stuffed_create.datafile_handle,
+        0,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
+    return ret;
+}
+
+static PINT_sm_action remove_keyvals(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+
+    /* the keyval keys and vals should still be valid here */
+    ret = job_trove_keyval_remove_list(
+        s_op->req->u.stuffed_create.fs_id,
+        s_op->resp.u.stuffed_create.metafile_handle,
+        s_op->key_a, s_op->val_a, s_op->error_a,
+        2, TROVE_SYNC, NULL, smcb, 0, js_p, &j_id, server_job_context);
+
+    return ret;
+}
+
+static PINT_sm_action write_keyvals(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+
+    assert(js_p->error_code == 0);
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "Stuffed metafile handle created: %llu\n",
+        llu(js_p->handle));
+    s_op->resp.u.stuffed_create.datafile_handle = js_p->handle;
+
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * 2);
+    if(!s_op->key_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * 2);
+    if(!s_op->val_a)
+    {
+        free(s_op->key_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->key_a[0].buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
+
+    s_op->val_a[0].buffer = &s_op->resp.u.stuffed_create.datafile_handle;
+    s_op->val_a[0].buffer_sz = sizeof(PVFS_handle);
+
+    s_op->key_a[1].buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
+
+    s_op->val_a[1].buffer_sz = s_op->req->u.stuffed_create.attr.u.meta.dist_size;
+    s_op->val_a[1].buffer = malloc(s_op->val_a[1].buffer_sz);
+    if(!s_op->val_a[1].buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    PINT_dist_encode(s_op->val_a[1].buffer,
+                     s_op->req->u.stuffed_create.attr.u.meta.dist);
+
+    job_trove_keyval_write_list(
+        s_op->req->u.stuffed_create.fs_id, s_op->resp.u.stuffed_create.metafile_handle,
+        s_op->key_a, s_op->val_a,
+        2, TROVE_SYNC, NULL, smcb, 0, js_p, &j_id, server_job_context);
+
+    return ret;
+}
+
+static PINT_sm_action setattr_setobj_attribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+    PVFS_object_attr *a_p = NULL;
+    PVFS_object_attr *dspace_a_p = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+
+    a_p = &s_op->req->u.stuffed_create.attr;
+
+     /* 
+      * Remember that mtime is versioned on disk! so convert it here..
+      * It is better to do it here than change the PVFS_object_attr_overwrite_setable
+      * macro, since there are many more users of it, I think.
+      */
+     if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
+     {
+         PVFS_time orig_mtime = a_p->mtime;
+         a_p->mtime = PINT_util_mktime_version(orig_mtime);
+         gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
+                 "to %llu\n\tmtime is %llu\n",
+                 llu(a_p->mtime), llu(orig_mtime));
+     }
+
+     /*
+        we have the attribs stored in the dspace, as well as the
+        requested attribs to store.  overwrite the ones that are setable
+        and specified by the mask value in the request; macro defined in
+        pvfs2-storage.h
+        */
+     PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
+
+     gossip_debug(
+         GOSSIP_SERVER_DEBUG,
+         "[STUFFED CREATE]: WRITING attrs: [owner = %d, group = %d\n\t"
+         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+         "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
+         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
+         dspace_a_p->objtype, llu(dspace_a_p->atime),
+         llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
+         (int)dspace_a_p->u.meta.dfile_count,
+         (int)dspace_a_p->u.meta.dist_size);
+
+     /* translate attrs to storage attr format */
+     ds_attr = &(s_op->ds_attr);
+     PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
+
+     ret = job_trove_dspace_setattr(
+         s_op->req->u.stuffed_create.fs_id, s_op->resp.u.stuffed_create.metafile_handle,
+         ds_attr,
+         TROVE_SYNC,
+         smcb, 0, js_p, &j_id, server_job_context);
+
+     return ret;
+}
+
+static int setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (js_p->error_code == 0)
+    {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+                    "stuffed_create: new metadata handle: %llu, "
+                    "new datafile handle: %llu.\n",
+                    llu(s_op->resp.u.stuffed_create.metafile_handle),
+                    llu(s_op->resp.u.stuffed_create.datafile_handle));
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+
+/*
+ * Function: create_cleanup
+ *
+ * Params:   server_op *b, 
+ *           job_status_s* js_p
+ *
+ * Pre:      None
+ *
+ * Post:     None
+ *
+ * Returns:  int
+ *
+ * Synopsis: free memory and return
+ *           
+ */
+static int cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if(s_op->key_a)
+    {
+        free(s_op->key_a);
+    }
+
+    if(s_op->val_a)
+    {
+        if(s_op->val_a[1].buffer)
+        {
+            free(s_op->val_a[1].buffer);
+        }
+        free(s_op->val_a);
+    }
+
+    return(server_state_machine_complete(smcb));
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

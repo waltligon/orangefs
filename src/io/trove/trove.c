@@ -590,6 +590,54 @@ int trove_keyval_write_list(
            out_op_id_p);
 }
 
+/** Initiate storing of multiple keyword/value pairs to the same
+ *  data space as a single operation.
+ */
+int trove_keyval_remove_list(
+    TROVE_coll_id coll_id,
+    TROVE_handle handle,
+    TROVE_keyval_s* key_array,
+    TROVE_keyval_s* val_array,
+    int *error_array,
+    int count,
+    TROVE_ds_flags flags,
+    TROVE_vtag_s* vtag,
+    void* user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id* out_op_id_p)
+{
+    int i;
+    TROVE_method_id method_id;
+
+    method_id = global_trove_method_callback(coll_id);
+    if(method_id < 0)
+    {
+	return -TROVE_EINVAL;
+    }
+
+    /* Check arguments */
+    for (i = 0; i < count; i++)
+    {
+	if (key_array[i].buffer_sz < 2)
+	    return -TROVE_EINVAL;
+	if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+	    return -TROVE_EINVAL;
+    }
+
+    return keyval_method_table[method_id]->keyval_remove_list(
+           coll_id,
+           handle,
+           key_array,
+           val_array,
+	   error_array,
+           count,
+           flags,
+           vtag,
+           user_ptr,
+           context_id,
+           out_op_id_p);
+}
+
 /** Initiate movement of all keyword/value pairs to storage for a given
  *  data space.
  */

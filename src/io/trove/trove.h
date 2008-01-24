@@ -325,6 +325,18 @@ int trove_keyval_write_list(
 			    TROVE_context_id context_id,
 			    TROVE_op_id *out_op_id_p);
 
+int trove_keyval_remove_list(TROVE_coll_id coll_id,
+                             TROVE_handle handle,
+                             TROVE_keyval_s *key_array,
+                             TROVE_keyval_s *val_array,
+                             int *error_array,
+                             int count,
+                             TROVE_ds_flags flags,
+                             TROVE_vtag_s *vtag,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p);
+
 int trove_keyval_flush(TROVE_coll_id coll_id,
                        TROVE_handle handle,
                        TROVE_ds_flags flags,

@@ -422,6 +422,21 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
 			    job_id_t * id,
 			    job_context_id context_id);
 
+/* remove a list of key/value entries */
+int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
+                                  PVFS_handle handle,
+                                  PVFS_ds_keyval * key_a,
+                                  PVFS_ds_keyval * val_a,
+                                  int * error_a,
+                                  int count,
+                                  PVFS_ds_flags flags,
+                                  PVFS_vtag * vtag,
+                                  void *user_ptr,
+                                  job_aint status_user_tag,
+                                  job_status_s * out_status_p,
+                                  job_id_t * id,
+                                  job_context_id context_id);
+
 /* check consistency of a key/value pair for a given vtag */
 int job_trove_keyval_validate(PVFS_fs_id coll_id,
 			      PVFS_handle handle,

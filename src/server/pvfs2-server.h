@@ -325,6 +325,7 @@ typedef struct PINT_server_op
     PVFS_ds_keyval key, val; 
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
+    int *error_a;
 
     int free_val;
 
@@ -442,6 +443,7 @@ extern struct PINT_state_machine_s pvfs2_set_eattr_list_sm;
 extern struct PINT_state_machine_s pvfs2_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_list_eattr_list_sm;
+extern struct PINT_state_machine_s pvfs2_stuffed_create_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;

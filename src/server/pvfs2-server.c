@@ -407,7 +407,7 @@ struct PINT_server_req_params PINT_server_req_table[] =
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_list_attr_sm},
-        
+
     /* 35 */
     {PVFS_SERV_BATCH_CREATE,
         "batch_create",
@@ -415,6 +415,12 @@ struct PINT_server_req_params PINT_server_req_table[] =
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_batch_create_sm},
 
+    /* 36 */
+    {PVFS_SERV_STUFFED_CREATE,
+        "stuffed_create",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_stuffed_create_sm}
 };
 
 struct server_configuration_s *PINT_get_server_config(void)

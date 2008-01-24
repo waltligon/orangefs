@@ -119,6 +119,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p);
+static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p);
@@ -586,6 +587,131 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
                     1, PINT_PERF_SUB);
 
 return_error:
+    return ret;
+}
+
+static int dbpf_keyval_remove_list(TROVE_coll_id coll_id,
+                                  TROVE_handle handle,
+                                  TROVE_keyval_s *key_array,
+                                  TROVE_keyval_s *val_array,
+                                  int *error_array,
+                                  int count,
+                                  TROVE_ds_flags flags,
+                                  TROVE_vtag_s *vtag,
+                                  void *user_ptr,
+                                  TROVE_context_id context_id,
+                                  TROVE_op_id *out_op_id_p)
+{
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
+    struct dbpf_collection *coll_p = NULL;
+    int ret;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
+
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_WRITE_LIST,
+        coll_p,
+        handle,
+        dbpf_keyval_remove_list_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
+    {
+        return ret;
+    }
+
+   /* initialize the op-specific members */
+    op_p->u.k_remove_list.key_array = key_array;
+    op_p->u.k_remove_list.val_array = val_array;
+    op_p->u.k_remove_list.error_array = error_array;
+    op_p->u.k_remove_list.count = count;
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_ADD);
+
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+}
+
+static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
+{
+    int ret = -TROVE_EINVAL;
+    DBT key, data;
+    int k;
+    TROVE_keyval_handle_info info;
+    struct dbpf_keyval_db_entry key_entry;
+    int remove_count = 0;
+
+    /* read each key to see if it is present */
+    for (k = 0; k < op_p->u.k_remove_list.count; k++)
+    {
+        ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db,
+                                    op_p->handle,
+                                    &op_p->u.k_remove_list.key_array[k],
+                                    &op_p->u.k_remove_list.val_array[k]);
+        if(ret != 0)
+        {
+            op_p->u.k_remove_list.error_array[k] = ret;
+        }
+        else
+        {
+            remove_count++;
+        }
+    }
+
+    if(op_p->flags & TROVE_KEYVAL_HANDLE_COUNT)
+    {
+        key_entry.handle = op_p->handle;
+        memset(&key, 0, sizeof(key));
+        memset(&data, 0, sizeof(data));
+        key.flags = DB_DBT_USERMEM;
+        key.data = &key_entry;
+        key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
+        data.data = &info;
+        data.ulen = sizeof(TROVE_keyval_handle_info);
+        data.flags = DB_DBT_USERMEM;
+
+        ret = op_p->coll_p->keyval_db->get(
+            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        if(ret == DB_NOTFOUND)
+        {
+            /* doesn't exist yet so we can set to 0 */
+            memset(&info, 0, sizeof(TROVE_keyval_handle_info));
+            data.size = sizeof(TROVE_keyval_handle_info);
+        }
+        else if(ret != 0)
+        {
+            op_p->coll_p->keyval_db->err(
+                op_p->coll_p->keyval_db, ret, "DB->get");
+            return -dbpf_db_error_to_trove_error(ret);
+        }
+
+        info.count -= remove_count;
+
+        ret = op_p->coll_p->keyval_db->put(
+            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        if(ret != 0)
+        {
+            op_p->coll_p->keyval_db->err(
+                op_p->coll_p->keyval_db, ret, 
+                "keyval_db->put keyval handle info ops");
+            return -dbpf_db_error_to_trove_error(ret);
+        }
+    }
+
+    ret = DBPF_OP_COMPLETE;
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
+
     return ret;
 }
 
@@ -1862,6 +1988,7 @@ struct TROVE_keyval_ops dbpf_keyval_ops =
     dbpf_keyval_read,
     dbpf_keyval_write,
     dbpf_keyval_remove,
+    dbpf_keyval_remove_list,
     dbpf_keyval_validate,
     dbpf_keyval_iterate,
     dbpf_keyval_iterate_keys,

@@ -279,6 +279,10 @@ static void get_fs_intent(struct PVFS_server_req *req, PVFS_fs_id *fsid, int *re
             *fsid = req->u.listeattr.fs_id;
             *read_only = 1;
             break;
+        case PVFS_SERV_STUFFED_CREATE:
+            *fsid = req->u.create.fs_id;
+            *read_only = 0;
+            break;
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_MGMT_EVENT_MON:

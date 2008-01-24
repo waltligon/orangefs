@@ -200,7 +200,7 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
 {
     {&pvfs2_client_remove_sm},
-    {&pvfs2_client_create_sm},
+    {&pvfs2_client_create_stuffed_sm},
     {&pvfs2_client_mkdir_sm},
     {&pvfs2_client_symlink_sm},
     {&pvfs2_client_sysint_getattr_sm},
