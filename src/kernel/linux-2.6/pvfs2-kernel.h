@@ -1264,18 +1264,6 @@ static inline void i_size_write(struct inode *inode, loff_t i_size)
 }
 #endif
 
-#ifndef HAVE_KZALLOC
-static void *kzalloc(size_t size, gfp_t mask)
-{
-    void *ptr;
-    ptr = kmalloc(size, mask);
-    if (ptr) {
-        memset(ptr, 0, size);
-    }
-    return ptr;
-}
-#endif
-
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 static inline unsigned int diff(struct timeval *end, struct timeval *begin)
