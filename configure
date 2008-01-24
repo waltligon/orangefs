@@ -12013,14 +12013,6 @@ else
 fi
 
 
-#if defined(REG_EIP)
-#  define REG_INSTRUCTION_POINTER REG_EIP
-#elif defined(REG_RIP)
-#  define REG_INSTRUCTION_POINTER REG_RIP
-#else
-#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
-#endif
-
 # Check whether --enable-segv-backtrace was given.
 if test "${enable_segv_backtrace+set}" = set; then
   enableval=$enable_segv_backtrace;
@@ -12034,6 +12026,9 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
 #if !defined(REG_EIP) && !defined(REG_RIP)
 		   choke me
 #endif

@@ -616,19 +616,14 @@ AC_ARG_ENABLE(epoll,
   test_for_epoll
 ])
 
-#if defined(REG_EIP)
-#  define REG_INSTRUCTION_POINTER REG_EIP
-#elif defined(REG_RIP)
-#  define REG_INSTRUCTION_POINTER REG_RIP
-#else
-#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
-#endif
-
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
 [  --disable-segv-backtrace Disables back traces in segfault signal handler],,
     AC_MSG_CHECKING(if segv backtrace capable)
     AC_TRY_COMPILE([
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
 #if !defined(REG_EIP) && !defined(REG_RIP)
 		   choke me
 #endif
