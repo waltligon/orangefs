@@ -222,6 +222,9 @@ int PINT_req_sched_target_handle(
     case PVFS_SERV_CREATE:
 	*readonly_flag = 0;
 	return (1);
+    case PVFS_SERV_BATCH_CREATE:
+	*readonly_flag = 0;
+	return (1);
     case PVFS_SERV_REMOVE:
 	*readonly_flag = 0;
 	*handle = req->u.remove.handle;

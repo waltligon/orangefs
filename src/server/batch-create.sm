@@ -1,0 +1,92 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
+#include "pvfs2-internal.h"
+
+%%
+
+machine pvfs2_batch_create_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => setup_resp;
+        default => final_response;
+    }
+
+    state setup_resp
+    {
+        run batch_create_setup_resp;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run batch_create_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/* batch_create_setup_resp()
+ *
+ * fills in the response structure based on results of previous operation
+ */
+static int batch_create_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG, "batch_create: hello world!\n");
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+
+/*
+ * Function: batch_create_cleanup
+ *
+ * Params:   server_op *b, 
+ *           job_status_s* js_p
+ *
+ * Pre:      None
+ *
+ * Post:     None
+ *
+ * Returns:  int
+ *
+ * Synopsis: free memory and return
+ *           
+ */
+static int batch_create_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return(server_state_machine_complete(smcb));
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

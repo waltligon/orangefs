@@ -410,6 +410,7 @@ extern struct PINT_state_machine_s pvfs2_get_attr_sm;
 extern struct PINT_state_machine_s pvfs2_list_attr_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_sm;
 extern struct PINT_state_machine_s pvfs2_create_sm;
+extern struct PINT_state_machine_s pvfs2_batch_create_sm;
 extern struct PINT_state_machine_s pvfs2_crdirent_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_readdir_sm;
