@@ -99,6 +99,7 @@ static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
 static void flow_callback(flow_descriptor* flow_d);
 #ifndef __PVFS2_JOB_THREADED__
+static gen_mutex_t work_cycle_mutex = GEN_MUTEX_INITIALIZER;
 static void do_one_work_cycle_all(int idle_time_ms);
 #endif
 
@@ -4658,7 +4659,11 @@ static int completion_query_context(job_id_t * out_id_array_p,
  */
 static void do_one_work_cycle_all(int idle_time_ms)
 {
-    int total_pending_count = bmi_pending_count + bmi_unexp_pending_count
+    int total_pending_count = 0;
+    
+    gen_mutex_lock(&work_cycle_mutex);
+
+    total_pending_count = bmi_pending_count + bmi_unexp_pending_count
         + flow_pending_count + dev_unexp_pending_count + trove_pending_count;
 
     if (bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
@@ -4687,6 +4692,7 @@ static void do_one_work_cycle_all(int idle_time_ms)
          nanosleep(&ts, NULL); 
     }
 
+    gen_mutex_unlock(&work_cycle_mutex);
     return;
 }
 #endif

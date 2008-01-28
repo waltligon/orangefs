@@ -36,6 +36,7 @@ job_context_id pint_client_sm_context = -1;
 static int s_completion_list_index = 0;
 static PINT_smcb *s_completion_list[MAX_RETURNED_JOBS] = {NULL};
 static gen_mutex_t s_completion_list_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t test_mutex = GEN_MUTEX_INITIALIZER;
 
 #define CLIENT_SM_ASSERT_INITIALIZED()  \
 do { assert(pint_client_sm_context != -1); } while(0)
@@ -369,6 +370,7 @@ PVFS_error PINT_client_state_machine_post(
     /* save operation type; mark operation as unfinished */
     sm_p->user_ptr = user_ptr;
 
+    gen_mutex_lock(&test_mutex);
     /*
       start state machine and continue advancing while we're getting
       immediate completions
@@ -379,6 +381,7 @@ PVFS_error PINT_client_state_machine_post(
     if(sm_ret < 0)
     {
         /* state machine code failed */
+        gen_mutex_unlock(&test_mutex);
         return sm_ret;
     }
 
@@ -415,6 +418,7 @@ PVFS_error PINT_client_state_machine_post(
                     lld((op_id ? *op_id : -1)),
                     ret);
     }
+    gen_mutex_unlock(&test_mutex);
     return js.error_code;
 }
 
@@ -574,18 +578,22 @@ PVFS_error PINT_client_state_machine_test(
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
                  "PINT_client_state_machine_test id %lld\n",lld(op_id));
 
+    gen_mutex_lock(&test_mutex);
+
     CLIENT_SM_ASSERT_INITIALIZED();
 
     job_count = MAX_RETURNED_JOBS;
 
     if (!error_code)
     {
+        gen_mutex_unlock(&test_mutex);
         return ret;
     }
 
     smcb = PINT_id_gen_safe_lookup(op_id);
     if (!smcb)
     {
+        gen_mutex_unlock(&test_mutex);
         return ret;
     }
 
@@ -594,6 +602,7 @@ PVFS_error PINT_client_state_machine_test(
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         *error_code = sm_p->error_code;
         conditional_remove_sm_if_in_completion_list(smcb);
+        gen_mutex_unlock(&test_mutex);
         return 0;
     }
 
@@ -636,6 +645,7 @@ PVFS_error PINT_client_state_machine_test(
         *error_code = sm_p->error_code;
         conditional_remove_sm_if_in_completion_list(smcb);
     }
+    gen_mutex_unlock(&test_mutex);
     return 0;
 }
 
@@ -658,17 +668,21 @@ PVFS_error PINT_client_state_machine_testsome(
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *smcb_p_array[MAX_RETURNED_JOBS] = {NULL};
 
+    gen_mutex_lock(&test_mutex);
+
     CLIENT_SM_ASSERT_INITIALIZED();
 
     if (!op_id_array || !op_count || !error_code_array)
     {
         PVFS_perror_gossip("PINT_client_state_machine_testsome", ret);
+        gen_mutex_unlock(&test_mutex);
         return ret;
     }
 
     if ((*op_count < 1) || (*op_count > MAX_RETURNED_JOBS))
     {
         PVFS_perror_gossip("testsome() got invalid op_count", ret);
+        gen_mutex_unlock(&test_mutex);
         return ret;
     }
 
@@ -683,6 +697,7 @@ PVFS_error PINT_client_state_machine_testsome(
     /* return them if found */
     if ((ret == 0) && (*op_count > 0))
     {
+        gen_mutex_unlock(&test_mutex);
         return ret;
     }
 
@@ -718,8 +733,10 @@ PVFS_error PINT_client_state_machine_testsome(
     }
 
     /* terminated SMs have added themselves to the completion list */
-    return completion_list_retrieve_completed(
+    ret = completion_list_retrieve_completed(
         op_id_array, user_ptr_array, error_code_array, limit, op_count);
+    gen_mutex_unlock(&test_mutex);
+    return(ret);
 }
 
 /** Continually test on a specific state machine until it completes.
