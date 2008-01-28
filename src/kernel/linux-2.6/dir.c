@@ -878,6 +878,43 @@ static int pvfs2_readdirplus_lite(
 }
 #endif
 
+/** Change the file pointer position for an instance of an open dir.
+ *
+ *  \note If .llseek is overriden, we must acquire lock as described in
+ *        Documentation/filesystems/Locking.
+ */
+loff_t pvfs2_dir_llseek(struct file *file, loff_t offset, int origin)
+{
+    /* offsets 0 and 1 are fine */
+
+    if (origin == SEEK_SET && offset == 2)
+    {
+	gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_dir_llseek: setting READDIR_START\n");
+        /* offset 2 _really_ means the first true pvfs entry, skip . and .. */
+        offset = PVFS_READDIR_START;
+    }
+    else if (origin == SEEK_SET && ((offset == 3) || (offset == 4)))
+    {
+        /* we don't have any way to specify this; if we set offset to 
+         * 0 or 1 then pvfs_readdir() will think you want "." or ".."
+         */
+        gossip_err("PVFS can't seek directories to offset 3 or 4!\n");
+        return(-EINVAL);
+    }
+    else if (origin == SEEK_SET && offset > 4)
+    {
+	gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_dir_llseek: guessing directory token\n");
+        /* contrive what the pvfs readdir token probably is, assuming that
+         * we need to skip two entries as well */
+        offset -= 3;
+    }
+
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_dir_llseek: offset is %ld | origin is %d\n",
+                (long)offset, origin);
+
+    return generic_file_llseek(file, offset, origin);
+}
+
 /** PVFS2 implementation of VFS directory operations */
 struct file_operations pvfs2_dir_operations =
 {
@@ -885,7 +922,8 @@ struct file_operations pvfs2_dir_operations =
     read : generic_read_dir,
     readdir : pvfs2_readdir,
     open : pvfs2_file_open,
-    release : pvfs2_file_release
+    release : pvfs2_file_release,
+    llseek : pvfs2_dir_llseek
 #else
     .read = generic_read_dir,
     .readdir = pvfs2_readdir,
@@ -896,7 +934,8 @@ struct file_operations pvfs2_dir_operations =
     .readdirplus_lite = pvfs2_readdirplus_lite,
 #endif
     .open = pvfs2_file_open,
-    .release = pvfs2_file_release
+    .release = pvfs2_file_release,
+    .llseek = pvfs2_dir_llseek
 #endif
 };
 
