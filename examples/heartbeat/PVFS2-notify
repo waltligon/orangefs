@@ -21,7 +21,12 @@ MAILTOFILE=$VARRUN/PVFS2_notify
 #######################################################################
 # Initialization:
 
+# newer versions of heartbeat have moved the ocf-shellfuncs  file
+if [ -f /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs ] ; then
+. /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs
+else
 . /usr/lib/heartbeat/ocf-shellfuncs
+fi
 
 #######################################################################
 
@@ -31,7 +36,7 @@ us=`uname -n`
 
 usage() {
   echo "Usage: $0 {start|stop|status|monitor|meta-data|validate-all}"
-  echo "$Id: PVFS2-notify,v 1.1 2007-11-07 21:54:12 slang Exp $"
+  echo "$Id: PVFS2-notify,v 1.1.2.1 2008-01-28 20:07:23 pcarns Exp $"
 }
 
 meta_data() {

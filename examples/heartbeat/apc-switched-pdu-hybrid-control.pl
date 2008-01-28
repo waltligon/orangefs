@@ -45,7 +45,6 @@ else
 my $snmp_output = `$snmp_command 2>&1`;
 if ( $? == 0 )
 {
-   print "Success, snmp\n";
    exit 0;
 }
 
@@ -55,7 +54,6 @@ my $ssh_command = "/usr/bin/apc-switched-pdu-ssh-control.exp $host $ssh_user $ss
 my $ssh_output = `$ssh_command 2>&1`;
 if ( $? == 0 )
 {
-   print "Success, ssh\n";
    exit 0;
 }
 

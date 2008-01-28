@@ -16,6 +16,7 @@
 #include <db.h>
 #include <time.h>
 #include <stdlib.h>
+#include <glob.h>
 #include "trove.h"
 
 #ifdef HAVE_MALLOC_H
@@ -47,6 +48,7 @@ extern int TROVE_shm_key_hint;
 
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
+static void unlink_db_cache_files(const char* path);
 
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
 
@@ -74,16 +76,33 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
     }
 
     /* we start by making sure any old environment remnants are cleaned up */
-    ret = db_env_create(&dbenv, 0);
-    if (ret != 0) 
+    if(my_storage_p->flags & TROVE_DB_CACHE_MMAP)
     {
-        gossip_err("dbpf_env_create: could not create "
-                   "any environment handle: %s\n", 
-                   db_strerror(ret));
-        return 0;
+        /* mmap case: use env->remove function */
+        ret = db_env_create(&dbenv, 0);
+        if (ret != 0) 
+        {
+            gossip_err("dbpf_env_create: could not create "
+                       "any environment handle: %s\n", 
+                       db_strerror(ret));
+            *error = ret;
+            return NULL;
+        }
+
+        /* don't check return code here; we don't care if it fails */
+        dbenv->remove(dbenv, path, DB_FORCE);
     }
-    /* don't check return code here; we don't care if it fails */
-    dbenv->remove(dbenv, path, DB_FORCE);
+    else
+    {
+        /* shm case */
+        /* destroy any old __db.??? files to make sure we don't accidentially 
+         * reuse a shmid and collide with a server process that is already
+         * running on this node.  We don't use env->remove because it could
+         * interfere with shm regions already allocated by another server 
+         * process
+         */
+        unlink_db_cache_files(path);
+    }
 
 retry:
     ret = db_env_create(&dbenv, 0);
@@ -134,6 +153,8 @@ retry:
     else
     {
         /* default to using shm style cache */
+
+
         gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf using shm key: %d\n",
                      (646567223+TROVE_shm_key_hint));
         ret = dbenv->set_shm_key(dbenv, (646567223+TROVE_shm_key_hint));
@@ -164,13 +185,7 @@ retry:
          * before using it again */
 
         if (ret == EAGAIN) {
-            ret = dbenv->remove(dbenv, path, DB_FORCE);
-            if (ret != 0)
-            {
-                gossip_lerr("dbpf_remove(%s): %s\n", path, db_strerror(ret));
-                *error = ret;
-                return NULL;
-            }
+            unlink_db_cache_files(path);
             assert(my_storage_p != NULL);
             my_storage_p->flags |= TROVE_DB_CACHE_MMAP;
             goto retry;
@@ -180,15 +195,7 @@ retry:
          * open returns an EINVAL, retry with DB_PRIVATE.
          */
         if(ret == EINVAL) {
-
-            ret = dbenv->remove(dbenv, path, DB_FORCE);
-            if(ret != 0)
-            {
-                gossip_lerr("dbpf_remove(%s): %s\n", path, db_strerror(ret));
-                *error = ret;
-                return NULL;
-            }
-            assert(my_storage_p != NULL);
+            unlink_db_cache_files(path);
             ret = dbenv->open(dbenv, path, 
                               DB_CREATE|
                               DB_THREAD|
@@ -212,6 +219,7 @@ retry:
             return NULL;
         }
     }
+
     return dbenv;
 }
 
@@ -1916,6 +1924,36 @@ char *dbpf_op_type_to_str(enum dbpf_op_type op_type)
         }
     }
     return ret;
+}
+
+static void unlink_db_cache_files(const char* path)
+{
+    char* db_region_file = NULL;
+    glob_t pglob;
+    int ret;
+    int i;
+    
+    db_region_file = malloc(PATH_MAX);
+    if(!db_region_file)
+    {
+        return;
+    }
+
+    snprintf(db_region_file, PATH_MAX, "%s/__db.???", path);
+
+    ret = glob(db_region_file, 0, NULL, &pglob);
+    if(ret == 0)
+    {
+        for(i=0; i<pglob.gl_pathc; i++)
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG, "Unlinking old db cache file: %s\n", pglob.gl_pathv[i]);
+            unlink(pglob.gl_pathv[i]);   
+        }
+        globfree(&pglob);
+    }
+    free(db_region_file);
+
+    return;
 }
 
 /*
