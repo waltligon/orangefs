@@ -1,0 +1,136 @@
+/*
+ * (C) 2008 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+/*
+ * This is an example of a server state machine that pjmp's several more
+ * server state machines.  The original server_op is copied to the new
+ * SMs, in a real situation fields would need to be set up correctly for
+ * the new SMs.  Also any return data would need to be retrieved after
+ * execution
+ */
+
+/* code at the top of the file is plain C code. */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+
+/* state actions must are automatically declared */
+
+/* helper functions and other declarations go here too */
+
+#define NEWSMS 10 /* number of new state machines to spawn */
+
+enum
+{
+    RETVAL = 1
+    ONETASK = 3
+    OTHERTASK = 4
+};
+
+%%
+
+/* after the double percent goes the machine declaration */
+
+machine my_machine_sm 
+{
+    state state_1
+     {
+         run state_action_1;
+          success => state_2;  /* success is return value 0 */
+          default => state_4;
+     }
+
+     state state_2
+     {
+         jump a_nested_state_machine_sm;
+          RETVAL => state_3;
+     }
+
+     state state_3
+     {
+         pjmp state_action_3
+          {
+              /* values here are set up in state_action_3 */
+              ONETASK => parallel_state_machine_1;
+              OTHERTASK => parallel_state_machine_2;
+              RETVAL => parallel_state_machine_3;
+          }
+          default => state_4;
+     }
+
+     state state_4
+     {
+         /* this state action cleans up after the pjmp */
+         run state_action_4;
+          default => terminate;
+     }
+}
+
+%%
+
+/* after the second double percent all code is in plain C */
+/* here we implement all of the state actions */
+
+static PINT_sm_action state_action_1 (
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return SM_ACTION_COMPLETE;
+}
+
+/* this state action sets up the pjmp */
+static PINT_sm_action state_action_3 (
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *sop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int s;
+    /* for each state machine to be spawned, push a frame */
+    for (s = 0; s <= NEWSMS; s++)
+    {
+        int tasknum;
+        PINT_server_op *new_frame = malloc(sizeof(struct PINT_server_op));
+        /* set up new frame here */
+        memncpy(new_frame, sizeof(struct PINT_server_op), s_op);
+        if (s < NEWSMS/2)
+            tasknum = ONETASK;
+        else if (s == NEWSMS-1)
+            tasknum = RETVAL;
+        else
+            tasknum = OTHERTASK;
+        PINT_sm_push_frame(smcb, tasknum, new_frame);
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+/* this state action cleans up after the pjmp */
+static PINT_sm_action state_action_4 (
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *sop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int s, *err_p;
+    /* for each state machine to be spawned, push a frame */
+    for (s = 0; s <= NEWSMS; s++)
+    {
+        PINT_server_op *old_frame;
+        old_frame = PINT_sm_pop_frame(smcb, err_p);
+        /* extract any data needed from frame here */
+        free(old_frame);
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+
