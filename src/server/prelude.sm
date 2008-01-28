@@ -179,6 +179,10 @@ static void get_fs_intent(struct PVFS_server_req *req, PVFS_fs_id *fsid, int *re
             *fsid = req->u.create.fs_id;
             *read_only = 0;
             break;
+        case PVFS_SERV_BATCH_CREATE:
+            *fsid = req->u.batch_create.fs_id;
+            *read_only = 0;
+            break;
         case PVFS_SERV_REMOVE:
             *fsid = req->u.remove.fs_id;
             *read_only = 0;

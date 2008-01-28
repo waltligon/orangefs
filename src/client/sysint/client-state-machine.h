@@ -74,10 +74,10 @@ struct PINT_client_remove_sm
     int	retry_count;
 };
 
-struct PINT_client_create_stuffed_sm
+struct PINT_client_create_sm
 {
     char *object_name;                /* input parameter */
-    PVFS_sysresp_stuffed_create *create_resp; /* in/out parameter*/
+    PVFS_sysresp_create *create_resp; /* in/out parameter*/
     PVFS_sys_attr sys_attr;           /* input parameter */
 
     int retry_count;
@@ -87,6 +87,9 @@ struct PINT_client_create_stuffed_sm
     PINT_dist *dist;
     PVFS_sys_layout layout;
     PVFS_handle metafile_handle;
+    PVFS_handle *datafile_handles;
+    PVFS_BMI_addr_t *data_server_addrs;
+    PVFS_handle_extent_array *io_handle_extent_array;
     PVFS_object_attr cache_attr;
 };
 
