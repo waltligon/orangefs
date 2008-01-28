@@ -27,7 +27,12 @@
 
 VARRUN=/var/run
 
+# newer versions of heartbeat have moved the ocf-shellfuncs  file
+if [ -f /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs ] ; then
+. /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs
+else
 . /usr/lib/heartbeat/ocf-shellfuncs
+fi
 
 #######################################################################
 #
@@ -172,8 +177,18 @@ stop_pvfs2() {
     if
       ProcessRunning $PVFS2PID
     then
-      ocf_log info "$CMD still running ($PVFS2PID)."
-      false
+      sleep 1
+      kill -9 $PVFS2PID >/dev/null 2>&1
+      ocf_log warn "Killing (-9) pvfs2-server PID $PVFS2PID"
+      sleep 5
+      if
+        ProcessRunning $PVFS2PID
+      then
+        ocf_log info "$CMD still running ($PVFS2PID)."
+        false
+      else
+        ocf_log info "$CMD stopped."
+      fi
     else
       ocf_log info "$CMD stopped."
     fi

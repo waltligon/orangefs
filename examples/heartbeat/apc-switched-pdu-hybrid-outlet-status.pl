@@ -18,49 +18,37 @@ my $ssh_pass;
 my $snmp_user;
 my $snmp_pass;
 my $outlet;
-my $cmd;
 
 my $snmp_command;
 
 &process_args;
 
-if($cmd eq "on")
-{
-   $snmp_command = "snmpset -v3 -a MD5 -l authNoPriv -u $snmp_user -A $snmp_pass -m \"/var/lib/filesystems/powernet387.mib\" $host PowerNet-MIB::rPDUOutletControlOutletCommand.$outlet = 1";
-}
-elsif($cmd eq "off")
-{
-   $snmp_command = "snmpset -v3 -a MD5 -l authNoPriv -u $snmp_user -A $snmp_pass -m \"/var/lib/filesystems/powernet387.mib\" $host PowerNet-MIB::rPDUOutletControlOutletCommand.$outlet = 2";
-}
-elsif($cmd eq "reboot")
-{
-   $snmp_command = "snmpset -v3 -a MD5 -l authNoPriv -u $snmp_user -A $snmp_pass -m \"/var/lib/filesystems/powernet387.mib\" $host PowerNet-MIB::rPDUOutletControlOutletCommand.$outlet = 3";
-}
-else
-{
-   die("Error: $cmd is not a valid outlet command.\n");
-}
+$snmp_command = "snmpget -v3 -a MD5 -l authNoPriv -u $snmp_user -A $snmp_pass -m \"/var/lib/filesystems/powernet387.mib\" $host PowerNet-MIB::rPDUOutletControlOutletCommand.$outlet";
 
-# try snmp first
 my $snmp_output = `$snmp_command 2>&1`;
 if ( $? == 0 )
 {
+   if($snmp_output =~ /immediateOn/)
+   {
+      print "On\n";
+   }
+   elsif($snmp_output =~ /immediateOff/)
+   {
+      print "Off\n";
+   }
+   else
+   {
+      print "Unknown\n";
+   }
+
    exit 0;
 }
 
-# fall back to ssh
-my $ssh_command = "/usr/bin/apc-switched-pdu-ssh-control.exp $host $ssh_user $ssh_pass $outlet $cmd";
+# no fall back to ssh implemented in this script
 
-my $ssh_output = `$ssh_command 2>&1`;
-if ( $? == 0 )
-{
-   exit 0;
-}
-
-# if we reach this point, then neither worked
 print "Error: failed to contact APC unit.\n";
 print "SNMP output: $snmp_output";
-print "SSH output: $ssh_output";
+print "SSH unsupported in this utility.\n";
 
 exit 1;
 
@@ -68,7 +56,7 @@ sub process_args
 {
    # Parse the command line options
    # For a description of the command line options see &print_help
-   use vars qw( $opt_help $opt_host $opt_ssh_user $opt_ssh_pass $opt_snmp_user $opt_snmp_pass $opt_outlet $opt_cmd);
+   use vars qw( $opt_help $opt_host $opt_ssh_user $opt_ssh_pass $opt_snmp_user $opt_snmp_pass $opt_outlet);
 
    Getopt::Long::Configure( "no_ignore_case", "bundling");
    GetOptions( "help",
@@ -77,8 +65,7 @@ sub process_args
                "ssh-pass=s",
                "snmp-user=s",
                "snmp-pass=s",
-               "outlet=i",
-               "cmd=s");
+               "outlet=i");
 
    if ($opt_help)
    {
@@ -87,7 +74,7 @@ sub process_args
    }
 
    if(!$opt_host || !$opt_ssh_user || !$opt_ssh_pass || 
-      !$opt_snmp_user || !$opt_snmp_pass || !$opt_outlet || !$opt_cmd)
+      !$opt_snmp_user || !$opt_snmp_pass || !$opt_outlet)
    {
       &print_help;
       die "Error: missing arguments.\n";
@@ -99,7 +86,6 @@ sub process_args
    $snmp_user = $opt_snmp_user;
    $snmp_pass = $opt_snmp_pass;
    $outlet = $opt_outlet;
-   $cmd = $opt_cmd;
 }
 
 
@@ -108,10 +94,11 @@ sub print_help {
 
    print <<EOF;
 
-This script will control a single outlet on an APC power strip.  It will 
-first attempt communication via SNMP and then fall back to ssh if that fails.
+This script will check the status of a single outlet on an APC power strip.  
+It will only attempt communication via SNMP at this time (although it accepts
+arguments for ssh authentication for future use).
 
-usage: apc-switched-pdu-hybrid-control.pl <options>
+usage: apc-switched-pdu-hybrid-outlet-status.pl <options>
 
 options:
    --help                   print this help and exit
@@ -121,7 +108,6 @@ options:
    --snmp-user   <STRING>   SNMP username for APC unit
    --snmp-pass   <STRING>   SNMP authentication pass phrase (MD5) for APC unit
    --outlet      <INTEGER>  APC outlet to control
-   --cmd         <on|off|reboot> control command to send (on, off, or reboot)
 
 EOF
 }
