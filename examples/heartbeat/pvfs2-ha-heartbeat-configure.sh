@@ -30,6 +30,7 @@ echo "auto_failback off" >> ${OUTDIR}/ha.cf
 echo "use_logd no" >> ${OUTDIR}/ha.cf
 echo "respawn hacluster /usr/lib/heartbeat/cibmon -d" >> ${OUTDIR}/ha.cf
 echo "crm yes" >> ${OUTDIR}/ha.cf
+echo "compression bz2" >> ${OUTDIR}/ha.cf
 
 # shift arguments down
 shift

@@ -155,7 +155,7 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
-static int parse_port_from_host_id(char* host_id);
+static int generate_shm_key_hint(void);
 static char *guess_alias(void);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
@@ -901,8 +901,8 @@ static int server_initialize_subsystems(
     char buf[16] = {0};
     PVFS_fs_id orig_fsid;
     PVFS_ds_flags init_flags = 0;
-    int port_num = 0;
     int bmi_flags = BMI_INIT_SERVER;
+    int shm_key_hint;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -959,15 +959,11 @@ static int server_initialize_subsystems(
     /* this should never fail */
     assert(ret == 0);
 
-    /* parse port number and allow trove to use it to help differentiate
-     * shmem regions if needed
-     */
-    port_num = parse_port_from_host_id(server_config.host_id);
-    if(port_num > 0)
-    {
-        ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &port_num);
-        assert(ret == 0);
-    }
+    /* help trove chose a differentiating shm key if needed for Berkeley DB */
+    shm_key_hint = generate_shm_key_hint();
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Server using shm key hint: %d\n", shm_key_hint);
+    ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
+    assert(ret == 0);
 
     if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
                                                "mmap")))
@@ -2024,37 +2020,6 @@ struct server_configuration_s *get_server_config_struct(void)
     return &server_config;
 }
 
-/* parse_port_from_host_id()
- *
- * attempts to parse the port number from a BMI address.  Returns port number
- * on success, -1 on failure
- */
-static int parse_port_from_host_id(char* host_id)
-{
-    int ret = -1;
-    int port_num;
-    char* port_index;
-    char* colon_index;
-
-    /* see if we have a <proto>://<hostname>:<port> format */
-    port_index = rindex(host_id, ':');
-    colon_index = index(host_id, ':');
-    /* if so, parse the port number */
-    if(port_index && (port_index != colon_index))
-    {
-        port_index++;
-        ret = sscanf(port_index, "%d", &port_num);
-    }
-
-    /* report error if we don't find a valid port number in the string */
-    if(ret != 1)
-    {
-        return(-1);
-    }
-    
-    return(port_num);
-}
-
 /* server_op_get_machine()
  * 
  * looks up the state machine for the op * given and returns it, or
@@ -2180,6 +2145,46 @@ static char *guess_alias(void)
         *tmpstr = 0;
     }
     return strdup(tmp_alias);
+}
+
+/* generate_shm_key_hing()
+ *
+ * Makes a best effort to produce a unique shm key (for Trove's Berkeley
+ * DB use) for each server.  By default it will base this on the server's
+ * position in the fs.conf, but it will fall back to using a random number
+ *
+ * returns integer key
+ */
+static int generate_shm_key_hint(void)
+{
+    int server_index = 1;
+    struct host_alias_s *cur_alias = NULL;
+
+    PINT_llist *cur = server_config.host_aliases;
+
+    /* iterate through list of aliases in configuration file */
+    while(cur)
+    {
+        cur_alias = PINT_llist_head(cur);
+        if(strcmp(cur_alias->bmi_address, server_config.host_id) == 0)
+        {
+            /* match */
+            /* space the shm keys out by 10 to allow for Berkeley DB using 
+             * using more than one key on each server
+             */
+            return(server_index*10);        
+        }
+
+        server_index++;
+        cur = PINT_llist_next(cur);
+    }
+    
+    /* If we reach this point, we didn't find this server in the alias list.
+     * This is not a normal situation, but fall back to using a random
+     * number for the key just to be safe.
+     */
+    srand((unsigned int)time(NULL));
+    return(rand());
 }
 
 /*
