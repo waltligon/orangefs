@@ -512,7 +512,7 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
                                     NULL, &db_key, &db_data, 0);
     if (ret != 0)
     {
-        gossip_lerr("dbpf_collection_geteattr: %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_geteattr: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
 
