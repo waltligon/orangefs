@@ -2133,7 +2133,7 @@ static char *guess_alias(void)
     return strdup(tmp_alias);
 }
 
-/* generate_shm_key_hing()
+/* generate_shm_key_hint()
  *
  * Makes a best effort to produce a unique shm key (for Trove's Berkeley
  * DB use) for each server.  By default it will base this on the server's
@@ -2152,6 +2152,10 @@ static int generate_shm_key_hint(void)
     while(cur)
     {
         cur_alias = PINT_llist_head(cur);
+        if(!cur_alias)
+        {
+            break;
+        }
         if(strcmp(cur_alias->bmi_address, server_config.host_id) == 0)
         {
             /* match */
