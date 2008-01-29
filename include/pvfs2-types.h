@@ -265,7 +265,8 @@ typedef enum
     PVFS_TYPE_DATAFILE =    (1 << 1),
     PVFS_TYPE_DIRECTORY =   (1 << 2),
     PVFS_TYPE_SYMLINK =     (1 << 3),
-    PVFS_TYPE_DIRDATA =     (1 << 4)
+    PVFS_TYPE_DIRDATA =     (1 << 4),
+    PVFS_TYPE_INTERNAL =    (1 << 5)   /* for the server's private use */
 } PVFS_ds_type;
 
 #define decode_PVFS_ds_type decode_enum

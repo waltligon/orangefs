@@ -126,6 +126,9 @@ static int create_setup_resp(
             case PVFS_TYPE_DIRDATA:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,    
                     "new handle: %llu, type dirdata.\n", llu(js_p->handle));
+            case PVFS_TYPE_INTERNAL:
+                PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,    
+                    "new handle: %llu, type internal.\n", llu(js_p->handle));
                 break;
         }
     }

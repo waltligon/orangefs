@@ -299,6 +299,68 @@ int PINT_handle_load_mapping(
     return ret;
 }
 
+/* PINT_cached_config_get_meta()
+ *
+ * Find the extent array for a specified meta server.
+ * This array MUST NOT be freed by the caller, nor cached for
+ * later use.
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_cached_config_get_meta(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    const char* host,
+    PVFS_handle_extent_array *ext_array)
+{
+    struct host_handle_mapping_s *cur_mapping = NULL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    PINT_llist* server_cursor;
+
+    if (!config || !ext_array)
+    {
+        return(-PVFS_EINVAL);
+    }
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if (!hash_link)
+    {
+        return(-PVFS_EINVAL);
+    }
+
+    cur_config_cache = qlist_entry(
+       hash_link, struct config_fs_cache_s, hash_link);
+
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+    assert(cur_config_cache->meta_server_cursor);
+
+    server_cursor = 
+        cur_config_cache->fs->meta_handle_ranges;
+    cur_mapping = PINT_llist_head(server_cursor);
+
+    while(cur_mapping && strcmp(cur_mapping->alias_mapping->bmi_address, host))
+    {
+        server_cursor = PINT_llist_next(server_cursor);
+        cur_mapping = PINT_llist_head(server_cursor);
+    }
+
+    /* didn't find the server */
+    if(!cur_mapping)
+    {
+        return(-PVFS_EINVAL);
+    }
+
+    ext_array->extent_count =
+        cur_mapping->handle_extent_array.extent_count;
+    ext_array->extent_array =
+        cur_mapping->handle_extent_array.extent_array;
+
+    return(0);
+}
+
+
 /* PINT_cached_config_get_next_meta()
  *
  * returns the bmi address of a random server that should be used to

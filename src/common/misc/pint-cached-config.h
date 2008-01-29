@@ -37,6 +37,12 @@ int PINT_cached_config_map_alias(
     const char *alias,
     PVFS_BMI_addr_t *addr);
 
+int PINT_cached_config_get_meta(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    const char* host,
+    PVFS_handle_extent_array *ext_array);
+
 int PINT_cached_config_get_next_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
