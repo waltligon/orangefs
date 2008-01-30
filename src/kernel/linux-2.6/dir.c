@@ -15,6 +15,11 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-internal.h"
 
+/* older kernels did not define this in fs.h */
+#ifndef SEEK_SET
+#define SEEK_SET 0
+#endif
+
 typedef struct 
 {
     int buffer_index;
