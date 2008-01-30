@@ -1,0 +1,101 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+
+#include "pvfs2-server.h"
+#include "pint-perf-counter.h"
+#include "server-config.h"
+
+%%
+
+machine pvfs2_precreate_pool_refiller_sm
+{
+	state wait_for_threshold 
+	{
+		run wait_for_threshold_fn;
+		success => setup_batch_create;
+		default => error;
+	}
+
+	state setup_batch_create 
+	{
+		run setup_batch_create_fn;
+		success => wait_for_threshold;
+		default => error;
+	}
+
+        state error
+        {
+                run error_fn;
+                default => terminate;
+        }
+}
+
+%%
+
+/* wait_for_threshold_fn()
+ *
+ * TODO: properly comment this
+ */
+static PINT_sm_action wait_for_threshold_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "TMP: pretenting to wait for the pool to get low (15 sec).\n");
+
+    return(job_req_sched_post_timer(15000,
+	smcb,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context));
+}
+
+/* setup_batch_create_fn()
+ *
+ * TODO: properly comment
+ */
+static PINT_sm_action setup_batch_create_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "TMP: I would like to get precreated handles from %s and put store them in %llu.\n", 
+        s_op->u.precreate_pool_refiller.host,
+        s_op->u.precreate_pool_refiller.pool_handle);
+
+    js_p->error_code = 0;
+    return(1);
+}
+
+
+/* error_fn()
+ *
+ * TODO: properly comment
+ */
+static PINT_sm_action error_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return (server_state_machine_complete(smcb));
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

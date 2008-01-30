@@ -87,6 +87,7 @@ static void lebf_initialize(void)
 	switch (i) {
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_PERF_UPDATE:
+	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
 	    case PVFS_SERV_JOB_TIMER:
 		/* never used, skip initialization */
 		continue;
@@ -390,6 +391,7 @@ static int lebf_encode_req(
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
 	    gossip_err("%s: invalid operation %d\n", __func__, req->op);
@@ -492,6 +494,7 @@ static int lebf_encode_resp(
 
         case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_err("%s: invalid operation %d\n", __func__, resp->op);
@@ -589,6 +592,7 @@ static int lebf_decode_req(
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
 	case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
@@ -682,6 +686,7 @@ static int lebf_decode_resp(
 
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
@@ -812,6 +817,7 @@ case PVFS_SERV_SETATTR:
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PERF_UPDATE:
+	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
 	    case PVFS_SERV_JOB_TIMER:
 	    case PVFS_SERV_PROTO_ERROR:
             case PVFS_SERV_NUM_OPS:  /* sentinel */
@@ -919,6 +925,7 @@ case PVFS_SERV_SETATTR:
 
                 case PVFS_SERV_INVALID:
                 case PVFS_SERV_PERF_UPDATE:
+                case PVFS_SERV_PRECREATE_POOL_REFILLER:
                 case PVFS_SERV_JOB_TIMER:
                 case PVFS_SERV_NUM_OPS:  /* sentinel */
                     gossip_lerr("%s: invalid response operation %d.\n",

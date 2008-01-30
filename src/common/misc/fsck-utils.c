@@ -1021,6 +1021,9 @@ int PVFS_fsck_get_attributes(
     case PVFS_TYPE_DIRDATA:
         gossip_debug(GOSSIP_FSCK_DEBUG, "dirdata\n");
         break;
+    case PVFS_TYPE_INTERNAL:
+        gossip_debug(GOSSIP_FSCK_DEBUG, "internal\n");
+        break;
     }
     gossip_debug(GOSSIP_FSCK_DEBUG, "\n");
 
@@ -1547,6 +1550,9 @@ static int PINT_handle_wrangler_display_stranded_handles(
                     break;
                 case PVFS_TYPE_DIRDATA:
                     printf("dirdata  ");
+                    break;
+                case PVFS_TYPE_INTERNAL:
+                    printf("internal  ");
                     break;
                 }
                 printf("   %s\n", server_name);

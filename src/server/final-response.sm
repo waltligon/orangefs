@@ -212,7 +212,9 @@ static const struct {
     { PVFS_SERV_LISTEATTR, "PVFS_SERV_LISTEATTR" },
     { PVFS_SERV_SMALL_IO, "PVFS_SERV_SMALL_IO" },  
     { PVFS_SERV_LISTATTR, "PVFS_SERV_LISTATTR" },  /* 34 */
-    { PVFS_SERV_BATCH_CREATE, "PVFS_SERV_BATCH_CREATE" } /* 35 */
+    { PVFS_SERV_BATCH_CREATE, "PVFS_SERV_BATCH_CREATE" }, /* 35 */
+    { PVFS_SERV_PRECREATE_POOL_REFILLER, 
+        "PVFS_SERV_PRECREATE_POOL_REFILLER" } /* 36 */
 };
 
 static void PINT_gossip_err_server_resp(
@@ -273,6 +275,9 @@ static void PINT_gossip_err_server_resp(
                         break;
                     case PVFS_TYPE_DIRDATA:
                         gossip_err("DIRDATA [ n/a ]\n");
+                        break;
+                    case PVFS_TYPE_INTERNAL:
+                        gossip_err("INTERNAL [ n/a ]\n");
                         break;
                     case PVFS_TYPE_NONE:
                         gossip_err("NONE [ n/a ]\n");

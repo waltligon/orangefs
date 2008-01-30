@@ -292,6 +292,7 @@ static void get_fs_intent(struct PVFS_server_req *req, PVFS_fs_id *fsid, int *re
         case PVFS_SERV_MGMT_EVENT_MON:
         case PVFS_SERV_MGMT_PERF_MON:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_GETCONFIG:

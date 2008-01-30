@@ -351,6 +351,7 @@ int PINT_req_sched_target_handle(
 	return (1);
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_PERF_UPDATE:
+    case PVFS_SERV_PRECREATE_POOL_REFILLER:
     case PVFS_SERV_JOB_TIMER:
     case PVFS_SERV_PROTO_ERROR:
     case PVFS_SERV_NUM_OPS:   /* sentinel */

@@ -76,6 +76,7 @@ enum PVFS_server_op
     PVFS_SERV_LISTATTR = 34,
     PVFS_SERV_BATCH_CREATE = 35,
     PVFS_SERV_STUFFED_CREATE = 36,
+    PVFS_SERV_PRECREATE_POOL_REFILLER = 37, /* not a real protocol request */
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -271,9 +272,9 @@ struct PVFS_servreq_batch_create
 endecode_fields_5_struct(
     PVFS_servreq_batch_create,
     PVFS_fs_id, fs_id,
-    skip4,,
     PVFS_ds_type, object_type,
     uint32_t, object_count,
+    skip4,,
     PVFS_handle_extent_array, handle_extent_array)
 #define extra_size_PVFS_servreq_batch_create \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))

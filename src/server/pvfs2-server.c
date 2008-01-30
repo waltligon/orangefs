@@ -164,6 +164,8 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
     PVFS_handle* pool_handle);
 static int precreate_pool_register_server(const char* host, PVFS_fs_id fsid,
     PVFS_handle pool_handle);
+static int precreate_pool_launch_refiller(const char* host, PVFS_fs_id fsid,
+    PVFS_handle pool_handle);
 
 static QLIST_HEAD(precreate_pool_list);
 struct precreate_pool
@@ -437,7 +439,14 @@ struct PINT_server_req_params PINT_server_req_table[] =
         "stuffed_create",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_stuffed_create_sm}
+        &pvfs2_stuffed_create_sm},
+
+    /* 37 */
+    {PVFS_SERV_PRECREATE_POOL_REFILLER,
+        "precreate_pool_refiller",
+        PINT_SERVER_CHECK_INVALID,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_precreate_pool_refiller_sm}
 };
 
 struct server_configuration_s *PINT_get_server_config(void)
@@ -2281,6 +2290,16 @@ static int precreate_pool_initialize(void)
                     gossip_err("Error: precreate_pool_initialize failed to register pool for %s\n", server_config.host_id);
                     return(ret);
                 }
+
+                /* launch sm to take care of refilling */
+                ret = precreate_pool_launch_refiller(cur_alias->bmi_address,
+                    cur_fs->coll_id, pool_handle);
+                if(ret < 0)
+                {
+                    gossip_err("Error: precreate_pool_initialize failed to launch refiller SM for %s\n", server_config.host_id);
+                    /* TODO: how to clean up here? */
+                    return(ret);
+                }
             }
             cur_h = PINT_llist_next(cur_h);
         }
@@ -2495,6 +2514,43 @@ static int precreate_pool_register_server(
 
     /* stash the info where we can search and find it later */
     qlist_add(&tmp_pool->list_link, &precreate_pool_list);
+
+    return(0);
+}
+
+static int precreate_pool_launch_refiller(const char* host, PVFS_fs_id fsid,
+    PVFS_handle pool_handle)
+{
+    struct PINT_smcb *tmp_smcb = NULL;
+    struct PINT_server_op *s_op;
+    int ret;
+
+    /* allocate smcb */
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_PRECREATE_POOL_REFILLER,
+        &(tmp_smcb));
+    if (ret < 0)
+    {
+        return(ret);
+    }
+
+    s_op = PINT_sm_frame(tmp_smcb, PINT_FRAME_CURRENT);
+    s_op->u.precreate_pool_refiller.host = strdup(host);
+    if(!s_op->u.precreate_pool_refiller.host)
+    {
+        PINT_smcb_free(tmp_smcb);
+        return(ret);
+    }
+    s_op->u.precreate_pool_refiller.pool_handle = pool_handle;
+    s_op->u.precreate_pool_refiller.fsid = fsid;
+
+    /* start sm */
+    ret = server_state_machine_start_noreq(tmp_smcb);
+    if (ret < 0)
+    {
+        free(s_op->u.precreate_pool_refiller.host);
+        PINT_smcb_free(tmp_smcb);
+        return(ret);
+    }
 
     return(0);
 }

@@ -235,6 +235,13 @@ struct PINT_server_mgmt_remove_dirent_op
     PVFS_handle dirdata_handle;
 };
 
+struct PINT_server_precreate_pool_refiller_op
+{
+    PVFS_handle pool_handle;
+    PVFS_fs_id fsid;
+    char* host;
+};
+
 struct PINT_server_mgmt_get_dirdata_op
 {
     PVFS_handle dirdata_handle;
@@ -385,6 +392,8 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+        struct PINT_server_precreate_pool_refiller_op
+            precreate_pool_refiller;
     } u;
 
 } PINT_server_op;
@@ -445,6 +454,7 @@ extern struct PINT_state_machine_s pvfs2_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_list_eattr_list_sm;
 extern struct PINT_state_machine_s pvfs2_stuffed_create_sm;
+extern struct PINT_state_machine_s pvfs2_precreate_pool_refiller_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
