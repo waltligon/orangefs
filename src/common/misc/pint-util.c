@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <unistd.h>
 
 #include "gen-locks.h"
 #include "pint-util.h"
@@ -332,6 +333,16 @@ PVFS_time PINT_util_mktime_version(PVFS_time time)
 PVFS_time PINT_util_mkversion_time(PVFS_time version)
 {
     return (PVFS_time)(version >> 32);
+}
+
+void PINT_util_gen_credentials(
+    PVFS_credentials *credentials)
+{
+    assert(credentials);
+
+    memset(credentials, 0, sizeof(PVFS_credentials));
+    credentials->uid = geteuid();
+    credentials->gid = getegid();
 }
 
 /*

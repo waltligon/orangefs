@@ -717,20 +717,6 @@ do {                                                               \
     PINT_put_server_config_struct(server_config);                  \
 } while(0)
 
-#define PINT_init_msgpair(sm_p, msg_p)                         \
-do {                                                           \
-    msg_p = &sm_p->msgpair;                                    \
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));           \
-    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))\
-    {                                                          \
-        free(sm_p->msgarray);                                  \
-        sm_p->msgarray = NULL;                                 \
-    }                                                          \
-    sm_p->msgarray = msg_p;                                    \
-    sm_p->msgarray_count = 1;                                  \
-} while(0)
-
-
 /************************************
  * state-machine.h included here
  ************************************/

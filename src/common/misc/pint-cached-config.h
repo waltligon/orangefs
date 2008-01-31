@@ -37,10 +37,11 @@ int PINT_cached_config_map_alias(
     const char *alias,
     PVFS_BMI_addr_t *addr);
 
-int PINT_cached_config_get_meta(
+int PINT_cached_config_get_server(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     const char* host,
+    PVFS_ds_type type,
     PVFS_handle_extent_array *ext_array);
 
 int PINT_cached_config_get_next_meta(
@@ -48,6 +49,13 @@ int PINT_cached_config_get_next_meta(
     PVFS_fs_id fsid,
     PVFS_BMI_addr_t *meta_addr,
     PVFS_handle_extent_array *meta_extent_array);
+
+int PINT_cached_config_get_io(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    const char* host,
+    PVFS_BMI_addr_t *io_addr,
+    PVFS_handle_extent_array *ext_array);
 
 int PINT_cached_config_get_next_io(
     struct server_configuration_s *config,

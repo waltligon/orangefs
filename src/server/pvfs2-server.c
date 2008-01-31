@@ -164,8 +164,8 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
     PVFS_handle* pool_handle);
 static int precreate_pool_register_server(const char* host, PVFS_fs_id fsid,
     PVFS_handle pool_handle);
-static int precreate_pool_launch_refiller(const char* host, PVFS_fs_id fsid,
-    PVFS_handle pool_handle);
+static int precreate_pool_launch_refiller(const char* host, 
+    PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle);
 
 static QLIST_HEAD(precreate_pool_list);
 struct precreate_pool
@@ -2243,12 +2243,15 @@ static int generate_shm_key_hint(void)
  */
 static int precreate_pool_initialize(void)
 {
-    struct host_alias_s *cur_alias = NULL;
     PINT_llist *cur_f = server_config.file_systems;
-    PINT_llist *cur_h = NULL;
     struct filesystem_configuration_s *cur_fs;
     int ret = -1;
     PVFS_handle pool_handle;
+    int server_count;
+    PVFS_BMI_addr_t* addr_array;
+    const char* host;
+    int i;
+    int server_type;
 
     /* TODO: check if I am a meta server; if not bail out! */
 
@@ -2261,20 +2264,41 @@ static int precreate_pool_initialize(void)
             break;
         }
 
-        /* iterate through list of aliases in configuration file */
-        cur_h = server_config.host_aliases;
-        while(cur_h)
+        /* how many I/O servers do we have? */
+        ret = PINT_cached_config_count_servers(&server_config,
+            cur_fs->coll_id, PINT_SERVER_TYPE_IO, &server_count);
+        if(ret < 0)
         {
-            cur_alias = PINT_llist_head(cur_h);
-            if(!cur_alias)
-            {
-                break;
-            }
-            if(!strcmp(cur_alias->bmi_address, server_config.host_id) == 0)
+            /* TODO: handle properly */
+            return(ret);
+        }
+        
+        addr_array = malloc(server_count*sizeof(PVFS_BMI_addr_t));
+        if(!addr_array)
+        {
+            /* TODO: handle properly */
+            return(-PVFS_ENOMEM);
+        }
+
+        /* resolve addrs for each I/O server */
+        ret = PINT_cached_config_get_server_array(
+            &server_config, cur_fs->coll_id, PINT_SERVER_TYPE_IO,
+            addr_array, &server_count);
+        if(ret < 0)
+        {
+            /* TODO: handle properly */
+            return(ret);
+        }
+
+        for(i=0; i<server_count; i++)
+        {
+            host = PINT_cached_config_map_addr(&server_config,
+                cur_fs->coll_id, addr_array[i], &server_type);
+            if(!strcmp(host, server_config.host_id) == 0)
             {
                 /* this is a peer server */
                 /* make sure a pool exists for that server,fsid pair */
-                ret = precreate_pool_setup_server(cur_alias->bmi_address, 
+                ret = precreate_pool_setup_server(host, 
                     cur_fs->coll_id, &pool_handle);
                 if(ret < 0)
                 {
@@ -2283,7 +2307,7 @@ static int precreate_pool_initialize(void)
                 }
 
                 /* get our in memory structures ready to use this pool */
-                ret = precreate_pool_register_server(cur_alias->bmi_address, 
+                ret = precreate_pool_register_server(host, 
                     cur_fs->coll_id, pool_handle);
                 if(ret < 0)
                 {
@@ -2292,7 +2316,7 @@ static int precreate_pool_initialize(void)
                 }
 
                 /* launch sm to take care of refilling */
-                ret = precreate_pool_launch_refiller(cur_alias->bmi_address,
+                ret = precreate_pool_launch_refiller(host, addr_array[i],
                     cur_fs->coll_id, pool_handle);
                 if(ret < 0)
                 {
@@ -2301,12 +2325,9 @@ static int precreate_pool_initialize(void)
                     return(ret);
                 }
             }
-            cur_h = PINT_llist_next(cur_h);
         }
         cur_f = PINT_llist_next(cur_f);
     }
-
-    /* TODO: kick off refiller state machines */
 
     return(0);
 }
@@ -2392,8 +2413,8 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
         gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool didn't find handle for %s; creating now.\n", host);
 
         /* find extent array for ourselves */
-        ret = PINT_cached_config_get_meta(&server_config,
-            fsid, server_config.host_id, &ext_array);
+        ret = PINT_cached_config_get_server(&server_config,
+            fsid, server_config.host_id, PINT_SERVER_TYPE_META, &ext_array);
         if(ret < 0)
         {
             gossip_err("Error: PINT_cached_condig_get_meta() failure.\n");
@@ -2518,8 +2539,8 @@ static int precreate_pool_register_server(
     return(0);
 }
 
-static int precreate_pool_launch_refiller(const char* host, PVFS_fs_id fsid,
-    PVFS_handle pool_handle)
+static int precreate_pool_launch_refiller(const char* host, 
+    PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle)
 {
     struct PINT_smcb *tmp_smcb = NULL;
     struct PINT_server_op *s_op;
@@ -2540,8 +2561,20 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_fs_id fsid,
         PINT_smcb_free(tmp_smcb);
         return(ret);
     }
+
+    ret = PINT_cached_config_get_server(&server_config,
+        fsid, host, PINT_SERVER_TYPE_IO, 
+        &s_op->u.precreate_pool_refiller.data_handle_extent_array);
+    if(ret < 0)
+    {
+        free(s_op->u.precreate_pool_refiller.host);
+        PINT_smcb_free(tmp_smcb);
+        return(ret);
+    }
+
     s_op->u.precreate_pool_refiller.pool_handle = pool_handle;
     s_op->u.precreate_pool_refiller.fsid = fsid;
+    s_op->u.precreate_pool_refiller.host_addr = addr;
 
     /* start sm */
     ret = server_state_machine_start_noreq(tmp_smcb);

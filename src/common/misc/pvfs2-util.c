@@ -31,6 +31,7 @@
 #include "realpath.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 
 #ifdef HAVE_MNTENT_H
 
@@ -152,16 +153,6 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     free(mntent->pvfs_fs_name);
     free(mntent);
     return;
-}
-
-void PVFS_util_gen_credentials(
-    PVFS_credentials *credentials)
-{
-    assert(credentials);
-
-    memset(credentials, 0, sizeof(PVFS_credentials));
-    credentials->uid = geteuid();
-    credentials->gid = getegid();
 }
 
 int PVFS_util_get_umask(void)
@@ -1918,6 +1909,12 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
     }
     return ret;
 #undef NUM_MODES
+}
+
+void PVFS_util_gen_credentials(
+    PVFS_credentials *credentials)
+{
+    return(PINT_util_gen_credentials(credentials));
 }
 
 /*

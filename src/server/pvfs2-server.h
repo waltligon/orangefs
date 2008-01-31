@@ -240,6 +240,8 @@ struct PINT_server_precreate_pool_refiller_op
     PVFS_handle pool_handle;
     PVFS_fs_id fsid;
     char* host;
+    PVFS_BMI_addr_t host_addr;
+    PVFS_handle_extent_array data_handle_extent_array;
 };
 
 struct PINT_server_mgmt_get_dirdata_op

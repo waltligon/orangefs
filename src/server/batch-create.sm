@@ -54,7 +54,7 @@ static int batch_create_setup_resp(
 {
     gossip_debug(GOSSIP_SERVER_DEBUG, "batch_create: hello world!\n");
 
-    js_p->error_code = 0;
+    js_p->error_code = -PVFS_ENOSYS;
     return SM_ACTION_COMPLETE;
 }
 
