@@ -78,6 +78,10 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
             {
                 gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: lookup failure or no match.\n");
                 op_release(new_op);
+                /* mark the inode as bad so that d_delete will be aggressive
+                 * about dropping the dentry
+                 */
+                pvfs2_make_bad_inode(inode);
                 return(0);
             }
             
@@ -104,7 +108,16 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
 static int pvfs2_d_delete (struct dentry * dentry)
 {
     gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_delete: called on dentry %p.\n", dentry);
-    return 1;
+    if(dentry->d_inode && is_bad_inode(dentry->d_inode))
+    {
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_delete: returning 1 (bad inode).\n");
+        return 1;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_delete: returning 0 (inode looks ok).\n");
+        return 0;
+    }
 }
 
 /* should return 1 if dentry can still be trusted, else 0 */
