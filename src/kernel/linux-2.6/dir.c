@@ -15,11 +15,6 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-internal.h"
 
-/* older kernels did not define this in fs.h */
-#ifndef SEEK_SET
-#define SEEK_SET 0
-#endif
-
 typedef struct 
 {
     int buffer_index;
@@ -128,7 +123,6 @@ static int pvfs2_readdir(
     struct dentry *dentry = file->f_dentry;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
-
 
     pos = (PVFS_ds_position)file->f_pos;
     /* are we done? */
@@ -271,23 +265,30 @@ static int pvfs2_readdir(
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
                 {
+                    if(token_set && (i < 2))
+                    {
+                        gossip_err("Filldir failed on one of the first two true PVFS directory entries.\n");
+                        gossip_err("Duplicate entries may appear.\n");
+                    }
                     ret = 0;
                     break;
                 }
-                file->f_pos++;
+
+                if(i == 0 && token_set)
+                {
+                    /* first true PVFS directory was filled in; reset f_pos
+                     * to sync up with token
+                     */
+                    file->f_pos = 0;
+                }
+                else
+                {
+                    file->f_pos++;
+                }
                 pos++;
             }
-            /* For the first time around, use the token 
-             * returned by the readdir response */
-            if (token_set == 1) 
-            {
-                if (i == rhandle.readdir_response.pvfs_dirent_outcount)
-                    file->f_pos = rhandle.readdir_response.token;
-                else 
-                    file->f_pos = i;
-            }
             gossip_debug(GOSSIP_DIR_DEBUG, 
-                         "pos = %llu, file->f_pos should have been %ld\n", 
+                         "pos = %llu, file->f_pos should have been %ld\n",
                          llu(pos),
                          (unsigned long) file->f_pos);
         }
@@ -883,43 +884,6 @@ static int pvfs2_readdirplus_lite(
 }
 #endif
 
-/** Change the file pointer position for an instance of an open dir.
- *
- *  \note If .llseek is overriden, we must acquire lock as described in
- *        Documentation/filesystems/Locking.
- */
-loff_t pvfs2_dir_llseek(struct file *file, loff_t offset, int origin)
-{
-    /* offsets 0 and 1 are fine */
-
-    if (origin == SEEK_SET && offset == 2)
-    {
-	gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_dir_llseek: setting READDIR_START\n");
-        /* offset 2 _really_ means the first true pvfs entry, skip . and .. */
-        offset = PVFS_READDIR_START;
-    }
-    else if (origin == SEEK_SET && ((offset == 3) || (offset == 4)))
-    {
-        /* we don't have any way to specify this; if we set offset to 
-         * 0 or 1 then pvfs_readdir() will think you want "." or ".."
-         */
-        gossip_err("PVFS can't seek directories to offset 3 or 4!\n");
-        return(-EINVAL);
-    }
-    else if (origin == SEEK_SET && offset > 4)
-    {
-	gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_dir_llseek: guessing directory token\n");
-        /* contrive what the pvfs readdir token probably is, assuming that
-         * we need to skip two entries as well */
-        offset -= 3;
-    }
-
-    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_dir_llseek: offset is %ld | origin is %d\n",
-                (long)offset, origin);
-
-    return generic_file_llseek(file, offset, origin);
-}
-
 /** PVFS2 implementation of VFS directory operations */
 struct file_operations pvfs2_dir_operations =
 {
@@ -940,7 +904,6 @@ struct file_operations pvfs2_dir_operations =
 #endif
     .open = pvfs2_file_open,
     .release = pvfs2_file_release,
-    .llseek = pvfs2_dir_llseek
 #endif
 };
 
