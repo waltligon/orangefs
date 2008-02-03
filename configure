@@ -15403,7 +15403,7 @@ fi
 	CPPFLAGS="$CPPFLAGS $PORTALS_INCS"
 
 	PORTALS_LIBS="$libs"
-	LIBS="$LIBS $PORTALS_LIBS"
+	LIBS="$save_libs $PORTALS_LIBS"
 
 	{ echo "$as_me:$LINENO: checking for portals3.h header" >&5
 echo $ECHO_N "checking for portals3.h header... $ECHO_C" >&6; }
@@ -15510,7 +15510,7 @@ rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lportals"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -15558,7 +15558,7 @@ rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -16809,7 +16809,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT 1
+#define HAVE_GETMNTENT
 _ACEOF
 
 else
