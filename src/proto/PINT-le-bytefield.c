@@ -106,7 +106,9 @@ static void lebf_initialize(void)
 		/* can request a range of handles */
 		req.u.batch_create.handle_extent_array.extent_count = 0;
 		req.u.batch_create.object_count = 0;
+		resp.u.batch_create.handle_count = 0;
 		reqsize = extra_size_PVFS_servreq_batch_create;
+		respsize = extra_size_PVFS_servresp_batch_create;
 		break;
 	    case PVFS_SERV_CREATE:
 		/* can request a range of handles */

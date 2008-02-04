@@ -244,6 +244,12 @@ struct PINT_server_precreate_pool_refiller_op
     PVFS_handle_extent_array data_handle_extent_array;
 };
 
+struct PINT_server_batch_create_op
+{
+    int saved_error_code;
+    int batch_index;
+};
+
 struct PINT_server_mgmt_get_dirdata_op
 {
     PVFS_handle dirdata_handle;
@@ -396,6 +402,7 @@ typedef struct PINT_server_op
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
         struct PINT_server_precreate_pool_refiller_op
             precreate_pool_refiller;
+        struct PINT_server_batch_create_op batch_create;
     } u;
 
 } PINT_server_op;
