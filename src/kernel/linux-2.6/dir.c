@@ -265,6 +265,7 @@ static int pvfs2_readdir(
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
                 {
+                    gossip_debug(GOSSIP_DIR_DEBUG, "filldir() failed.\n");
                     if(token_set && (i < 2))
                     {
                         gossip_err("Filldir failed on one of the first two true PVFS directory entries.\n");
@@ -273,20 +274,26 @@ static int pvfs2_readdir(
                     ret = 0;
                     break;
                 }
-
-                if(i == 0 && token_set)
-                {
-                    /* first true PVFS directory was filled in; reset f_pos
-                     * to sync up with token
-                     */
-                    file->f_pos = 0;
-                }
-                else
-                {
-                    file->f_pos++;
-                }
+                file->f_pos++;
                 pos++;
             }
+            /* For the first time around, use the token 
+             * returned by the readdir response */
+            if (token_set == 1) 
+            {
+                /* this means that all of the filldir calls succeeded */
+                if (i == rhandle.readdir_response.pvfs_dirent_outcount)
+                {
+                    file->f_pos = rhandle.readdir_response.token;
+                }
+                else 
+                {
+                    /* this means a filldir call failed */
+                    file->f_pos = i - 1;
+                    gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  Setting f_pos to: %ld\n", (unsigned long) file->f_pos);
+                }
+            }
+
             gossip_debug(GOSSIP_DIR_DEBUG, 
                          "pos = %llu, file->f_pos should have been %ld\n",
                          llu(pos),
