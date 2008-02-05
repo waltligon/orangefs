@@ -309,8 +309,11 @@ int trove_keyval_read(
     /* Check arguments */
     if (key_p->buffer_sz < 2)
 	return -TROVE_EINVAL;
-    if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
-	return -TROVE_EINVAL;
+    if(!(flags & TROVE_BINARY_KEY))
+    {
+        if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
+	    return -TROVE_EINVAL;
+    }
 
     return keyval_method_table[method_id]->keyval_read(
            coll_id,
@@ -353,8 +356,11 @@ int trove_keyval_write(
     /* Check arguments */
     if (key_p->buffer_sz < 2)
 	return -TROVE_EINVAL;
-    if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
-	return -TROVE_EINVAL;
+    if(!(flags & TROVE_BINARY_KEY))
+    {
+        if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
+	    return -TROVE_EINVAL;
+    }
 
     return keyval_method_table[method_id]->keyval_write(
            coll_id,
@@ -526,8 +532,11 @@ int trove_keyval_read_list(
     {
 	if (key_array[i].buffer_sz < 2)
 	    return -TROVE_EINVAL;
-	if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
-	    return -TROVE_EINVAL;
+        if(!(flags & TROVE_BINARY_KEY))
+        {
+	    if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+	        return -TROVE_EINVAL;
+        }
     }
 
     return keyval_method_table[method_id]->keyval_read_list(
@@ -573,8 +582,11 @@ int trove_keyval_write_list(
     {
 	if (key_array[i].buffer_sz < 2)
 	    return -TROVE_EINVAL;
-	if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
-	    return -TROVE_EINVAL;
+        if(!(flags & TROVE_BINARY_KEY))
+        {
+	    if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+	        return -TROVE_EINVAL;
+        }
     }
 
     return keyval_method_table[method_id]->keyval_write_list(
@@ -620,8 +632,11 @@ int trove_keyval_remove_list(
     {
 	if (key_array[i].buffer_sz < 2)
 	    return -TROVE_EINVAL;
-	if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
-	    return -TROVE_EINVAL;
+        if(!(flags & TROVE_BINARY_KEY))
+        {
+            if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+                return -TROVE_EINVAL;
+        }
     }
 
     return keyval_method_table[method_id]->keyval_remove_list(

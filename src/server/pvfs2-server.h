@@ -238,6 +238,7 @@ struct PINT_server_mgmt_remove_dirent_op
 struct PINT_server_precreate_pool_refiller_op
 {
     PVFS_handle pool_handle;
+    PVFS_handle* precreate_handle_array;
     PVFS_fs_id fsid;
     char* host;
     PVFS_BMI_addr_t host_addr;

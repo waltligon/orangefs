@@ -27,6 +27,13 @@ static int batch_create_comp_fn(
 
 machine pvfs2_precreate_pool_refiller_sm
 {
+        state setup
+        {
+                run setup_fn;
+                success => wait_for_threshold;
+                default => error;
+        }
+
 	state wait_for_threshold 
 	{
 		run wait_for_threshold_fn;
@@ -44,6 +51,13 @@ machine pvfs2_precreate_pool_refiller_sm
         state msgpair_xfer_batch_create
         {
                 jump pvfs2_msgpairarray_sm;
+                success => store_handles;
+                default => error;
+        }
+
+        state store_handles
+        {
+                run store_handles_fn;
                 success => wait_for_threshold;
                 default => error;
         }
@@ -75,6 +89,26 @@ static PINT_sm_action wait_for_threshold_fn(
 	&tmp_id,
 	server_job_context));
 }
+
+ /* TODO: properly comment this */
+static PINT_sm_action store_handles_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+
+    return(job_precreate_pool_fill(
+        s_op->u.precreate_pool_refiller.pool_handle,
+        s_op->u.precreate_pool_refiller.fsid,
+        s_op->u.precreate_pool_refiller.precreate_handle_array,
+        POOL_BATCH_SIZE,
+	smcb,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context));
+}
+
 
 /* setup_batch_create_fn()
  *
@@ -121,6 +155,28 @@ static PINT_sm_action setup_batch_create_fn(
 }
 
 
+/* setup_fn()
+ *
+ * TODO: properly comment
+ */
+static PINT_sm_action setup_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+        
+    s_op->u.precreate_pool_refiller.precreate_handle_array = 
+        malloc(POOL_BATCH_SIZE * sizeof(PVFS_handle));
+    if(!s_op->u.precreate_pool_refiller.precreate_handle_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return(SM_ACTION_COMPLETE);
+    }
+
+    js_p->error_code = 0;
+    return(SM_ACTION_COMPLETE);
+}
+
+
 /* error_fn()
  *
  * TODO: properly comment
@@ -133,6 +189,11 @@ static PINT_sm_action error_fn(
     gossip_err("Error: precreate_pool_refiller for %s exiting.\n",
         s_op->u.precreate_pool_refiller.host);
         
+    if(s_op->u.precreate_pool_refiller.precreate_handle_array)
+    {
+        free(s_op->u.precreate_pool_refiller.precreate_handle_array);
+    }
+
     return (server_state_machine_complete(smcb));
 }
 
@@ -162,14 +223,14 @@ static int batch_create_comp_fn(void *v_p,
 
     for(i = 0; i<resp_p->u.batch_create.handle_count; i++)
     {
+        s_op->u.precreate_pool_refiller.precreate_handle_array[i] = 
+            resp_p->u.batch_create.handle_array[i];
+
         gossip_debug(GOSSIP_SERVER_DEBUG,
             "Got batch created handle: %llu from: %s\n",
             llu(resp_p->u.batch_create.handle_array[i]),
             s_op->u.precreate_pool_refiller.host);
     }
-
-    /* TODO: do something useful here */
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Throwing them away...\n");
 
     return 0;
 }
