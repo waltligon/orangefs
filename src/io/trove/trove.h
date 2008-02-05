@@ -59,7 +59,8 @@ enum
 
     TROVE_DB_CACHE_MMAP          = 1 << 5,
     TROVE_DB_CACHE_SYS           = 1 << 6,
-    TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7
+    TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7,
+    TROVE_BINARY_KEY             = 1 << 8
 };
 
 enum

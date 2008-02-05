@@ -361,11 +361,14 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     u_int32_t dbflags = 0;
     struct dbpf_keyval_db_entry key_entry;
 
-    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "dbpf_keyval_write_op_svc: handle: %llu, key: %*s\n",
-                 llu(op_p->handle),
-                 op_p->u.k_write.key.buffer_sz,
-                 (char *)op_p->u.k_write.key.buffer);
+    if(!(op_p->flags & TROVE_BINARY_KEY))
+    {
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                     "dbpf_keyval_write_op_svc: handle: %llu, key: %*s\n",
+                     llu(op_p->handle),
+                     op_p->u.k_write.key.buffer_sz,
+                     (char *)op_p->u.k_write.key.buffer);
+    }
 
     key_entry.handle = op_p->handle;
 
@@ -561,11 +564,14 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
 
-    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "dbpf_keyval_remove_op_svc: handle: %llu, key: %*s\n",
-                 llu(op_p->handle),
-                 op_p->u.k_remove.key.buffer_sz,
-                 (char *)op_p->u.k_remove.key.buffer);
+    if(!(op_p->flags & TROVE_BINARY_KEY))
+    {
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                     "dbpf_keyval_remove_op_svc: handle: %llu, key: %*s\n",
+                     llu(op_p->handle),
+                     op_p->u.k_remove.key.buffer_sz,
+                     (char *)op_p->u.k_remove.key.buffer);
+    }
                  
     ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db, 
                                 op_p->handle,
@@ -1454,9 +1460,12 @@ int PINT_dbpf_keyval_iterate(
             goto return_error;
         }
 
+        #if 0 
+        /* not safe to print this if binary keys may be present */
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "iterate key: %*s, val: %llu\n", 
                      key->read_sz, (char *)key->buffer, 
                      (val ? llu(*(PVFS_handle *)val->buffer) : 0));
+        #endif
 
         if(callback)
         {
@@ -1492,9 +1501,12 @@ static int dbpf_keyval_do_remove(
     struct dbpf_keyval_db_entry key_entry;
     DBT db_key, db_val;
 
+    #if 0
+    /* not safe to print this if it may be a binary key */
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "PINT_dbpf_keyval_remove: handle (%llu), key: (%d) %*s\n",
                  llu(handle), key->buffer_sz, key->buffer_sz, (char *)key->buffer);
+    #endif
 
     key_entry.handle = handle;
     memcpy(key_entry.key, key->buffer, key->buffer_sz);
@@ -1744,9 +1756,8 @@ static int dbpf_keyval_iterate_cursor_get(
     if (ret != 0)
     {
         gossip_lerr("Failed to perform cursor get:"
-                    "\n\thandle: %llu\n\ttype: %d\n\tkey: %s\n\tdb error: %s\n",
-                    llu(key_entry.handle), db_flags, 
-                    key_entry.key, db_strerror(ret));
+                    "\n\thandle: %llu\n\ttype: %d\n\tdb error: %s\n",
+                    llu(key_entry.handle), db_flags, db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1979,7 +1990,7 @@ int PINT_trove_dbpf_keyval_compare(
     }
 
     /* must be equal */
-    return (strncmp(db_entry_a->key, db_entry_b->key, 
+    return (memcmp(db_entry_a->key, db_entry_b->key, 
                     DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
 }
 
