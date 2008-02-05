@@ -219,7 +219,7 @@ typedef struct PVFS_sys_layout_s
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL     ((PVFS_handle)0)
 #define PVFS_FS_ID_NULL       ((PVFS_fs_id)0)
-#define PVFS_OP_NULL            ((id_gen_t)0)
+#define PVFS_OP_NULL         ((PVFS_id_gen_t)0)
 #define PVFS_BMI_ADDR_NULL ((PVFS_BMI_addr_t)0)
 #define PVFS_ITERATE_START    (INT32_MAX - 1)
 #define PVFS_ITERATE_END      (INT32_MAX - 2)
