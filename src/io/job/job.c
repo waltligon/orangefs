@@ -4392,7 +4392,8 @@ static void precreate_pool_thread_mgr_callback(
                             jd->u.precreate_pool.key_array, 
                             jd->u.precreate_pool.val_array, 
                             count, 
-                            TROVE_BINARY_KEY|TROVE_SYNC|TROVE_KEYVAL_HANDLE_COUNT,
+                            TROVE_BINARY_KEY|TROVE_SYNC|
+                            TROVE_NOOVERWRITE|TROVE_KEYVAL_HANDLE_COUNT,
                             NULL, 
                             &jd->trove_callback, 
                             global_trove_context,

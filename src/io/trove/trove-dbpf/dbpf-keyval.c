@@ -1250,6 +1250,16 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
                      "of %s\n", (char *)op_p->u.k_write_list.key_array[k].buffer);
 
+        if(op_p->flags & TROVE_NOOVERWRITE)
+        {
+            ret = dbpf_keyval_handle_info_ops(
+                op_p, DBPF_KEYVAL_HANDLE_COUNT_INCREMENT);
+            if(ret != 0)
+            {
+                goto return_error;
+            }
+        }
+
         /*
            now that the data is written to disk, update the cache if it's
            an attr keyval we manage.
