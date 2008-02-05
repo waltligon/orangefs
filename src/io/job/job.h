@@ -593,12 +593,19 @@ int job_precreate_pool_fill(
  
 int job_precreate_pool_check_level(
     PVFS_handle precreate_pool,
+    int threshold,
     int* precreate_handle_count,
     void *user_ptr,
     job_aint status_user_tag,
     job_status_s * out_status_p,
     job_id_t * id,
     job_context_id context_id);
+
+int job_precreate_pool_register_server(
+    const char* host, 
+    PVFS_fs_id fsid, 
+    PVFS_handle pool_handle, 
+    int count);
    
 /******************************************************************
  * job test/wait for completion functions 

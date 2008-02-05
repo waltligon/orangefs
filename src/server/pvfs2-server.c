@@ -162,20 +162,10 @@ static void precreate_pool_finalize(void);
 static int precreate_pool_initialize(void);
 static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
     PVFS_handle* pool_handle);
-static int precreate_pool_register_server(const char* host, PVFS_fs_id fsid,
-    PVFS_handle pool_handle);
 static int precreate_pool_launch_refiller(const char* host, 
     PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle);
-
-static QLIST_HEAD(precreate_pool_list);
-struct precreate_pool
-{
-    struct qlist_head list_link;
-    char* host;
-    PVFS_fs_id fsid;
-    PVFS_handle pool_handle;
-    uint32_t pool_count; 
-};
+static int precreate_pool_count(
+    PVFS_fs_id fsid, PVFS_handle pool_handle, int* count);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
@@ -2252,6 +2242,7 @@ static int precreate_pool_initialize(void)
     const char* host;
     int i;
     int server_type;
+    int handle_count;
 
     /* TODO: check if I am a meta server; if not bail out! */
 
@@ -2306,9 +2297,19 @@ static int precreate_pool_initialize(void)
                     return(ret);
                 }
 
-                /* get our in memory structures ready to use this pool */
-                ret = precreate_pool_register_server(host, 
-                    cur_fs->coll_id, pool_handle);
+                /* count current handles */
+                ret = precreate_pool_count(cur_fs->coll_id, pool_handle, 
+                    &handle_count);
+                if(ret < 0)
+                {
+                    gossip_err("Error: precreate_pool_initialize failed to count pool for %s\n", server_config.host_id);
+                    return(ret);
+                }
+
+                /* prepare the job interface to use this pool */
+                ret = job_precreate_pool_register_server(host, 
+                    cur_fs->coll_id, pool_handle, handle_count);
+                assert(ret != 0);
                 if(ret < 0)
                 {
                     gossip_err("Error: precreate_pool_initialize failed to register pool for %s\n", server_config.host_id);
@@ -2338,21 +2339,7 @@ static int precreate_pool_initialize(void)
  */
 static void precreate_pool_finalize(void)
 {
-    struct qlist_head* iterator;
-    struct qlist_head* scratch;
-    struct precreate_pool* pool;
-
-    /* run through our precreate pools and clean up our in memory
-     * book keeping information 
-     */
-    qlist_for_each_safe(iterator, scratch, &precreate_pool_list)
-    {
-        pool = qlist_entry(iterator, struct precreate_pool, 
-            list_link);
-        free(pool->host);
-        free(pool);
-    }
-
+    /* anything to do here? */
     return;
 }
 
@@ -2466,15 +2453,13 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
     return(0);
 }
 
-/* precreate_pool_register_server()
+/* precreate_pool_count()
  *
- * This function gets the pool API ready to be accessed for this server
  * TODO: comment this properly
  */
-static int precreate_pool_register_server(
-    const char* host, PVFS_fs_id fsid, PVFS_handle pool_handle)
+static int precreate_pool_count(
+    PVFS_fs_id fsid, PVFS_handle pool_handle, int* count)
 {
-    struct precreate_pool* tmp_pool;
     int ret;
     job_status_s js;
     job_id_t job_id;
@@ -2505,36 +2490,7 @@ static int precreate_pool_register_server(
         return(js.error_code);
     }
 
-    /* create a little struct to track the pool information for this peer
-     * server 
-     */
-    tmp_pool = malloc(sizeof(*tmp_pool));
-    if(!tmp_pool)
-    {
-        return(-ENOMEM);
-    }
-
-    tmp_pool->host = strdup(host);
-    if(!tmp_pool->host)
-    {
-        free(tmp_pool);
-        return(-ENOMEM);
-    }
-
-    tmp_pool->fsid = fsid;
-    tmp_pool->pool_handle = pool_handle;
-    tmp_pool->pool_count = handle_info.count;
-
-    /* TODO: am I using the right printf conversions here? */
-    /* TODO: looks like change-fsid uses those PRIu32 type things, not
-     * sure if that's the right idea or not 
-     */
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-        "Initial pool count for host %s, fsid %d: %d\n", host, (int)fsid,
-        (int)handle_info.count);
-
-    /* stash the info where we can search and find it later */
-    qlist_add(&tmp_pool->list_link, &precreate_pool_list);
+    *count = handle_info.count;
 
     return(0);
 }

@@ -69,6 +69,16 @@ enum
     thread_wait_timeout = 10000        /* usecs */
 };
 
+static QLIST_HEAD(precreate_pool_list);
+struct precreate_pool
+{
+    struct qlist_head list_link;
+    char* host;
+    PVFS_fs_id fsid;
+    PVFS_handle pool_handle;
+    uint32_t pool_count; 
+};
+
 /********************************************************
  * function prototypes
  */
@@ -4980,8 +4990,62 @@ int job_precreate_pool_fill(
     return (0);
 }
  
+int job_precreate_pool_register_server(
+    const char* host, 
+    PVFS_fs_id fsid, 
+    PVFS_handle pool_handle, 
+    int count)
+{
+    struct precreate_pool* tmp_pool;
+
+    /* create a little struct to track the pool information for this peer
+     * server 
+     */
+    tmp_pool = malloc(sizeof(*tmp_pool));
+    if(!tmp_pool)
+    {
+        return(-ENOMEM);
+    }
+
+    tmp_pool->host = strdup(host);
+    if(!tmp_pool->host)
+    {
+        free(tmp_pool);
+        return(-ENOMEM);
+    }
+
+    tmp_pool->fsid = fsid;
+    tmp_pool->pool_handle = pool_handle;
+    tmp_pool->pool_count = count;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+        "Initial pool count for host %s, fsid %d: %d\n", host, (int)fsid,
+        count);
+
+    /* stash the info where we can search and find it later */
+    qlist_add(&tmp_pool->list_link, &precreate_pool_list);
+
+#if 0
+    /* here are the steps to tear down these data structures if needed */
+    struct qlist_head* iterator;
+    struct qlist_head* scratch;
+    struct precreate_pool* pool;
+
+    qlist_for_each_safe(iterator, scratch, &precreate_pool_list)
+    {
+        pool = qlist_entry(iterator, struct precreate_pool,
+            list_link);
+        free(pool->host);
+        free(pool);
+    }
+#endif
+
+    return(1);
+}
+   
 int job_precreate_pool_check_level(
     PVFS_handle precreate_pool,
+    int threshold,
     int* precreate_handle_count,
     void *user_ptr,
     job_aint status_user_tag,
@@ -4989,6 +5053,7 @@ int job_precreate_pool_check_level(
     job_id_t * id,
     job_context_id context_id)
 {
+    /* TODO: implement this */
 
     return(-PVFS_ENOSYS);
 }
