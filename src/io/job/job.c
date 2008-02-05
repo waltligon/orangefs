@@ -4276,6 +4276,115 @@ static void teardown_queues(void)
     return;
 }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
+
+/* precreate_pool_thread_mgr_callback()
+ *
+ * callback function executed by the thread manager for precreate pool 
+ * when a trove operation completes
+ *
+ * no return value
+ */
+static void precreate_pool_thread_mgr_callback(
+    void* data, 
+    PVFS_error error_code)
+{
+    struct job_desc* jd = (struct job_desc*)data; 
+    assert(jd);
+    int ret;
+    int count = 0;
+    int i;
+
+    gen_mutex_lock(&initialized_mutex);
+    if(initialized == 0)
+    {
+        /* The job interface has been shutdown.  Silently ignore callback. */
+        gen_mutex_unlock(&initialized_mutex);
+        return;
+    }
+    gen_mutex_unlock(&initialized_mutex);
+
+    /* TODO: what to do here?  Do we unwind or what? */
+    assert(error_code == 0);
+
+    if(jd->u.precreate_pool.id == PVFS_OP_NULL)
+    {
+        /* this is the first post */
+    }
+    else
+    {
+        /* a trove operation completed successfully */
+        jd->u.precreate_pool.precreate_handle_index += 
+            PRECREATE_POOL_MAX_KEYS;
+        trove_pending_count--;
+    }
+
+    /* are we done? */
+    if(jd->u.precreate_pool.precreate_handle_index >= 
+        jd->u.precreate_pool.precreate_handle_count)
+    {
+        gen_mutex_lock(&completion_mutex);
+
+        /* set job descriptor fields and put into completion queue */
+        jd->u.precreate_pool.error_code = 0;
+        job_desc_q_add(completion_queue_array[jd->context_id], 
+                       jd);
+        /* set completed flag while holding queue lock */
+        jd->completed_flag = 1;
+
+#ifdef __PVFS2_JOB_THREADED__
+        /* wake up anyone waiting for completion */
+        pthread_cond_signal(&completion_cond);
+#endif
+        gen_mutex_unlock(&completion_mutex);
+        return;
+    }
+
+    /* fill in information for next keyval write */
+    for(i=jd->u.precreate_pool.precreate_handle_index; 
+        (i < jd->u.precreate_pool.precreate_handle_count &&
+        (i < (jd->u.precreate_pool.precreate_handle_index
+           + PRECREATE_POOL_MAX_KEYS)));
+        i++)
+    {
+        jd->u.precreate_pool.key_array[count].buffer = 
+            &jd->u.precreate_pool.precreate_handle_array[i];
+        jd->u.precreate_pool.key_array[count].buffer_sz = sizeof(PVFS_handle);
+        count++;
+
+        /* always leave the values zeroed out */
+    }
+
+    ret = trove_keyval_write_list(jd->u.precreate_pool.fsid, 
+                            jd->u.precreate_pool.precreate_pool,
+                            jd->u.precreate_pool.key_array, 
+                            jd->u.precreate_pool.val_array, 
+                            count, 
+                            TROVE_BINARY_KEY|TROVE_SYNC,
+                            NULL, 
+                            &jd->trove_callback, 
+                            global_trove_context,
+                            &(jd->u.precreate_pool.id));
+    
+    trove_pending_count++;
+
+    /* TODO: what to do here?  Do we unwind or what? */
+    assert(ret >=0);
+
+    if(ret == 1)
+    {
+        /* make up an id so that the callback thinks of this as an async
+         * completion
+         */
+        jd->u.precreate_pool.id = 1;
+        precreate_pool_thread_mgr_callback(jd, 0);
+    }
+
+    return;
+}
+#endif /* __PVFS2_TROVE_SUPPORT__ */
+
+
 /* trove_thread_mgr_callback()
  *
  * callback function executed by the thread manager for Trove when a Trove 
@@ -4520,6 +4629,9 @@ static void fill_status(struct job_desc *jd,
         break;
     case JOB_NULL:
         status->error_code = jd->u.null_info.error_code;
+        break;
+    case JOB_PRECREATE_POOL:
+        status->error_code = jd->u.precreate_pool.error_code;
         break;
     }
 
@@ -4816,6 +4928,72 @@ static void flow_callback(flow_descriptor* flow_d)
 
     return;
 }
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+
+/* job_precreate_pool_fill()
+ *
+ * fills in handles for a precreate pool 
+ *
+ * returns 0 on success, 1 on immediate completion, and -PVFS_errno on
+ * failure
+ */
+int job_precreate_pool_fill(
+    PVFS_handle precreate_pool,
+    PVFS_fs_id fsid,
+    PVFS_handle* precreate_handle_array,
+    int precreate_handle_count,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id)
+{
+    struct job_desc *jd = NULL;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store information
+     */
+    jd = alloc_job_desc(JOB_PRECREATE_POOL);
+    if (!jd)
+    {
+        return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = precreate_pool_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    jd->u.precreate_pool.precreate_pool = precreate_pool;
+    jd->u.precreate_pool.precreate_handle_array = precreate_handle_array;
+    jd->u.precreate_pool.precreate_handle_count = precreate_handle_count;
+    jd->u.precreate_pool.precreate_handle_index = 0;
+    jd->u.precreate_pool.id = PVFS_OP_NULL;
+    jd->u.precreate_pool.fsid = fsid;
+
+    /* reuse the logic for trove op completion to get this started */
+    precreate_pool_thread_mgr_callback(jd, 0);
+
+    /* for the moment, this type of job cannot immediately complete */
+
+    *id = jd->job_id;
+    return (0);
+}
+ 
+int job_precreate_pool_check_level(
+    PVFS_handle precreate_pool,
+    int* precreate_handle_count,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id)
+{
+
+    return(-PVFS_ENOSYS);
+}
+ 
+#endif /* __PVFS2_TROVE_SUPPORT__ */
 
 /*
  * Local variables:

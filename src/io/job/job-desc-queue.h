@@ -42,6 +42,28 @@ struct trove_desc
     int count;
 };
 
+/* assuming we should probably cap how many keys we dump into trove
+ * at once so it doesn't clog up the op queue
+ */
+#define PRECREATE_POOL_MAX_KEYS 32
+
+/* describes precreate pool operations */
+struct precreate_pool_desc
+{
+    PVFS_handle precreate_pool;
+    PVFS_fs_id fsid;
+    PVFS_handle* precreate_handle_array;
+    int precreate_handle_count;
+    int precreate_handle_index;
+
+    TROVE_keyval_s key_array[PRECREATE_POOL_MAX_KEYS];
+    TROVE_keyval_s val_array[PRECREATE_POOL_MAX_KEYS];
+
+    TROVE_op_id id;
+    
+    PVFS_error error_code;
+};
+
 /* describes unexpected BMI operations */
 struct bmi_unexp_desc
 {
@@ -85,6 +107,7 @@ enum job_type
     JOB_REQ_SCHED,
     JOB_DEV_UNEXP,
     JOB_REQ_SCHED_TIMER,
+    JOB_PRECREATE_POOL,
     JOB_NULL
 };
 
@@ -111,6 +134,7 @@ struct job_desc
 	struct req_sched_desc req_sched;
 	struct dev_unexp_desc dev_unexp;
 	struct null_info_desc null_info;
+        struct precreate_pool_desc precreate_pool;
     }
     u;
 
