@@ -18,7 +18,9 @@
 #include "pint-util.h"
 
 /* TODO: make this bigger and not hard coded */
-#define POOL_BATCH_SIZE 16
+#define POOL_BATCH_SIZE 128
+/* TODO: make this bigger and not hard coded */
+#define POOL_THRESHOLD 512
 
 static int batch_create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -78,11 +80,13 @@ machine pvfs2_precreate_pool_refiller_sm
 static PINT_sm_action wait_for_threshold_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "TMP: pretenting to wait for the pool to get low (15 sec).\n");
-
-    return(job_req_sched_post_timer(15000,
+    return(job_precreate_pool_check_level(
+        s_op->u.precreate_pool_refiller.pool_handle,
+        s_op->u.precreate_pool_refiller.fsid,
+        POOL_THRESHOLD,
 	smcb,
 	0,
 	js_p,

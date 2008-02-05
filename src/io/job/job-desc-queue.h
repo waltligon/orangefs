@@ -55,6 +55,7 @@ struct precreate_pool_desc
     PVFS_handle* precreate_handle_array;
     int precreate_handle_count;
     int precreate_handle_index;
+    int posted_count;
 
     TROVE_keyval_s key_array[PRECREATE_POOL_MAX_KEYS];
     TROVE_keyval_s val_array[PRECREATE_POOL_MAX_KEYS];

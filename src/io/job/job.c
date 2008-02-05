@@ -69,6 +69,8 @@ enum
     thread_wait_timeout = 10000        /* usecs */
 };
 
+#ifdef __PVFS2_TROVE_SUPPORT__
+static gen_mutex_t precreate_pool_mutex = GEN_MUTEX_INITIALIZER;
 static QLIST_HEAD(precreate_pool_list);
 struct precreate_pool
 {
@@ -78,6 +80,7 @@ struct precreate_pool
     PVFS_handle pool_handle;
     uint32_t pool_count; 
 };
+#endif /* __PVFS2_TROVE_SUPPORT__ */
 
 /********************************************************
  * function prototypes
@@ -4304,6 +4307,8 @@ static void precreate_pool_thread_mgr_callback(
     int ret;
     int count = 0;
     int i;
+    struct qlist_head* iterator;
+    struct precreate_pool* pool;
 
     gen_mutex_lock(&initialized_mutex);
     if(initialized == 0)
@@ -4325,8 +4330,23 @@ static void precreate_pool_thread_mgr_callback(
     {
         /* a trove operation completed successfully */
         jd->u.precreate_pool.precreate_handle_index += 
-            PRECREATE_POOL_MAX_KEYS;
+            jd->u.precreate_pool.posted_count;
         trove_pending_count--;
+
+        /* increment in-memory count for this pool */
+        gen_mutex_lock(&precreate_pool_mutex);
+        qlist_for_each(iterator, &precreate_pool_list)
+        {
+            pool = qlist_entry(iterator, struct precreate_pool,
+                list_link);
+            if(pool->pool_handle == jd->u.precreate_pool.precreate_pool &&
+                pool->fsid == jd->u.precreate_pool.fsid)
+            {
+                pool->pool_count += jd->u.precreate_pool.posted_count;
+                break;
+            }
+        }
+        gen_mutex_unlock(&precreate_pool_mutex);
     }
 
     /* are we done? */
@@ -4365,12 +4385,14 @@ static void precreate_pool_thread_mgr_callback(
         /* always leave the values zeroed out */
     }
 
+    jd->u.precreate_pool.posted_count = count;
+
     ret = trove_keyval_write_list(jd->u.precreate_pool.fsid, 
                             jd->u.precreate_pool.precreate_pool,
                             jd->u.precreate_pool.key_array, 
                             jd->u.precreate_pool.val_array, 
                             count, 
-                            TROVE_BINARY_KEY|TROVE_SYNC,
+                            TROVE_BINARY_KEY|TROVE_SYNC|TROVE_KEYVAL_HANDLE_COUNT,
                             NULL, 
                             &jd->trove_callback, 
                             global_trove_context,
@@ -5045,17 +5067,46 @@ int job_precreate_pool_register_server(
    
 int job_precreate_pool_check_level(
     PVFS_handle precreate_pool,
+    PVFS_fs_id fsid,
     int threshold,
-    int* precreate_handle_count,
     void *user_ptr,
     job_aint status_user_tag,
     job_status_s * out_status_p,
     job_id_t * id,
     job_context_id context_id)
 {
-    /* TODO: implement this */
+    struct qlist_head* iterator;
+    struct precreate_pool* pool;
 
-    return(-PVFS_ENOSYS);
+    gen_mutex_lock(&precreate_pool_mutex);
+    qlist_for_each(iterator, &precreate_pool_list)
+    {
+        pool = qlist_entry(iterator, struct precreate_pool,
+            list_link);
+        if(pool->pool_handle == precreate_pool &&
+            pool->fsid == fsid)
+        {
+            if(pool->pool_count < threshold)
+            {
+                /* handle count is below the threshold */
+                out_status_p->error_code = 0;
+                gen_mutex_unlock(&precreate_pool_mutex);
+                gossip_debug(GOSSIP_SERVER_DEBUG, "found pool count low.\n");
+                return(1);
+            }
+            else
+            {
+                /* TODO: finish this part; for now we just launch into space */
+                gen_mutex_unlock(&precreate_pool_mutex);
+                gossip_debug(GOSSIP_SERVER_DEBUG, "found pool count high.\n");
+                return(0);
+            }
+            break;
+        }
+    }
+    gen_mutex_unlock(&precreate_pool_mutex);
+
+    return(-PVFS_EINVAL);
 }
  
 #endif /* __PVFS2_TROVE_SUPPORT__ */
