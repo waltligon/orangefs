@@ -1,0 +1,61 @@
+
+DIR := io/description
+DEBUG_IO_DESC_DIR := $(DIR)
+
+DEBUG_IO_DESC_DIR_SRC := \
+	$(DIR)/debug1.c\
+	$(DIR)/debug2.c\
+	$(DIR)/debug3.c\
+	$(DIR)/debug4.c\
+	$(DIR)/debug5.c\
+	$(DIR)/debug6.c\
+	$(DIR)/debug7.c\
+	$(DIR)/debug8.c\
+	$(DIR)/debug9.c\
+	$(DIR)/debug10.c\
+	$(DIR)/debug11.c\
+	$(DIR)/debug12.c\
+	$(DIR)/debug13.c\
+	$(DIR)/debug14.c\
+# disabled, broken:
+#	$(DIR)/debug15.c\
+#	$(DIR)/debug16.c\
+#	$(DIR)/debug17.c\
+#	$(DIR)/debug18.c\
+#	$(DIR)/debug19.c\
+#	$(DIR)/debug20.c\
+#	$(DIR)/debug21.c\
+#	$(DIR)/debug_olap.c\
+#	$(DIR)/debug_commit.c
+
+TEST_IO_DESC_DIR_SRC := \
+	$(DIR)/test-pack1.c\
+	$(DIR)/test-encode-basic.c\
+	$(DIR)/test-encode-complex-out.c\
+	$(DIR)/test-encode-complex-in.c\
+	$(DIR)/test-encode-twice-out.c\
+	$(DIR)/test-encode-twice-in.c\
+	$(DIR)/test-romio-noncontig-pattern.c\
+	$(DIR)/test-romio-noncontig-pattern2.c\
+	$(DIR)/test-romio-noncontig-pattern3.c\
+	$(DIR)/test-truncate.c \
+	$(DIR)/test-many-datafiles-import.c \
+	$(DIR)/test-zero-fill.c
+# disabled, broken:
+#	$(DIR)/test-req1.c\
+
+#MISCSRC += $(DIR)/debug-main.c
+
+TESTSRC += $(TEST_IO_DESC_DIR_SRC)
+TESTSRC += $(DEBUG_IO_DESC_DIR_SRC)
+
+LOCALTESTS := $(patsubst %.c,%, $(DEBUG_IO_DESC_DIR_SRC))
+$(LOCALTESTS): %: %.o $(DEBUG_IO_DESC_DIR)/debug-main.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(DEBUG_IO_DESC_DIR)/debug-main.o $(LDFLAGS) $(LIBS) -o $@
+
+LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_DESC_DIR_SRC))
+$(LOCALTESTS): %: %.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(LIBS) -o $@
+

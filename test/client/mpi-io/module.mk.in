@@ -1,0 +1,6 @@
+DIR := client/mpi-io
+
+MPIIOTESTSRC += \
+	$(DIR)/mpi-io-test.c \
+	$(DIR)/mpi-md-test.c \
+	$(DIR)/mpi-unbalanced-test.c

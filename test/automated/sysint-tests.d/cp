@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# run through a bunch of possible command line arguments for pvfs2-cp:
+
+nr_errors=0
+
+# copy_test: 
+#  the idea is we copy a file from local to pvfs2 and back again, seeing if
+#  any differences show up as a result.
+#
+#  usage:  copy_test <src> <dest> <local> 
+#   where <src> is the original local file (source of the 1st copy)
+#         <dest> is a pvfs2 file (destination of the 1st copy, src of the 2nd
+#                 copy) 
+#         <local> is a different local file (dest of the 2nd copy)
+copy_test() 
+{
+	src=$1
+	dest=$2
+	local=$3
+	shift 3 
+	${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-cp $src $dest $@
+	${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-cp $dest $local $@
+
+	diff $src $local 
+	if [ $? -ne 0 ] ; then
+		nr_errors=$((nr_errors+1)) 
+		echo "$local differs from $src"
+	fi
+}
+
+
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure0\
+	${PVFS2_DEST}/config0 
+
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure1\
+	${PVFS2_DEST}/config1 -s 128 
+
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure2\
+	${PVFS2_DEST}/config2 -s $((1024*1024))
+
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure3\
+	${PVFS2_DEST}/config3 -n 1
+
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure4\
+	${PVFS2_DEST}/config4 -n 10
+
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure5\
+	${PVFS2_DEST}/config5 -b 128
+
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure6\
+	${PVFS2_DEST}/config6 -b $((1024*1024))
+
+if [ $nr_errors -ne 0 ] ; then 
+	echo "$nr_errors errors found"
+	exit 1
+fi

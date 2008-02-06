@@ -1,0 +1,16 @@
+#!/bin/sh
+# a little one-liner to ensure consistent tag names
+# run this from a projects working directory
+# assumes release tags are "pvfs2-X-Y-Z
+
+if [ $# -ne 1 ] ; then
+	echo "usage: $0 VERSION"
+	echo "example: $0 1.0.0"
+	exit -1
+fi
+
+VERSION=$1
+# can't have spaces, periods, colons, commas, or any other symbols 
+CVS_TAG=pvfs2-$(echo $1 | tr ' .:;,' -)
+
+cvs tag $CVS_TAG 

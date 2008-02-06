@@ -1,0 +1,16 @@
+notes on how to run benchmarks in this directory:
+
+driver_latency:
+===========================
+
+minimum options: 
+mpirun -np 2 ./driver_latency -m bmi_tcp
+
+full options:
+mpirun -np 2 ./driver_latency -m <method> -l <message len> 
+-p (to preallocate BMI mem) -r (to reuse buffers)
+
+other opts (not valid in driver_latency):
+===========================
+-s <num servers> -t <total len> 
+
