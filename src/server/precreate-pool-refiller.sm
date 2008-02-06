@@ -124,6 +124,7 @@ static PINT_sm_action setup_batch_create_fn(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_credentials creds;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated handles from %s and put store them in %llu.\n", 
         s_op->u.precreate_pool_refiller.host,
@@ -131,12 +132,16 @@ static PINT_sm_action setup_batch_create_fn(
 
     PINT_init_msgpair(s_op, msg_p);
 
-    /* TODO: need appropriate retry configuration here, this is just a 
-     * preliminary setup
+    /* note: we are acting like a client in this case, so use client timeout
+     * and delay values
      */
-    s_op->msgarray_params.job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;
-    s_op->msgarray_params.retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
-    s_op->msgarray_params.retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
+    s_op->msgarray_params.job_timeout = user_opts->client_job_bmi_timeout;
+    s_op->msgarray_params.retry_delay = user_opts->client_retry_delay_ms;
+
+    /* we want to retry forever, though; servers may not be started at the
+     * same time
+     */
+    s_op->msgarray_params.retry_limit = INT_MAX;
 
     msg_p->svr_addr = s_op->u.precreate_pool_refiller.host_addr;
     PINT_util_gen_credentials(&creds);
