@@ -15,6 +15,7 @@
 #include "pvfs2-server.h"
 #include "pint-event.h"
 #include "pvfs2-internal.h"
+#include "pint-cached-config.h"
 
 static int check_fs_id(PVFS_fs_id fs_id);
 
@@ -50,6 +51,9 @@ machine pvfs2_setparam_sm
 
 %%
 
+/* temporary */
+static PVFS_handle* test_handle_array = NULL;
+
 /* setparam_work()
  *
  * actually does the "work" involved in setting a runtime server parameter
@@ -66,6 +70,9 @@ static PINT_sm_action setparam_work(
     struct server_configuration_s *user_opts;
     struct filesystem_configuration_s *fs_conf;
     char buf[16] = {0};
+
+    /* these are temporary */
+    int test_precreate_count = 0;
  
     switch(s_op->req->u.mgmt_setparam.param)
     {
@@ -157,6 +164,51 @@ static PINT_sm_action setparam_work(
             /* no work to do here; request scheduler has already handled */
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
+        case PVFS_SERV_PARAM_TEST_PRECREATE:
+            user_opts = get_server_config_struct();
+            s_op->resp.u.mgmt_setparam.old_value = 0;
+            gossip_debug(GOSSIP_SERVER_DEBUG, " - TEST_PRECREATE "
+                         "on fs_id %d\n", 
+                         s_op->req->u.mgmt_setparam.fs_id);
+
+            /* count how many I/O servers are in the file system */
+            ret = PINT_cached_config_count_servers(
+                user_opts,
+                s_op->req->u.mgmt_setparam.fs_id,
+                PINT_SERVER_TYPE_IO,
+                &test_precreate_count);
+            if(ret < 0)
+            {
+                js_p->error_code = ret;
+                return(SM_ACTION_COMPLETE);
+            }
+
+            /* decrement by one (exclude this local server) */
+            test_precreate_count--;
+
+            /* allocate some storage for handles */
+            if(test_handle_array)
+            {
+                free(test_handle_array);
+            }
+            test_handle_array = malloc(test_precreate_count*sizeof(PVFS_handle));
+            if(!test_handle_array)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return(SM_ACTION_COMPLETE);
+            }
+
+            /* try to get precreated handle */
+            /* note that server strings can be set to NULL to just get
+             * handles for default servers 
+             */
+            ret = job_precreate_pool_get_handles(
+                s_op->req->u.mgmt_setparam.fs_id, 
+                test_precreate_count,
+                NULL,
+                test_handle_array,
+                smcb, 0, js_p, &tmp_id, server_job_context);
+            return(ret);
     }
 
     gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",

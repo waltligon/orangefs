@@ -5110,6 +5110,27 @@ int job_precreate_pool_check_level(
     return(-PVFS_EINVAL);
 }
  
+/* TODO: comment properly */
+int job_precreate_pool_get_handles(
+    PVFS_fs_id fsid,
+    int count,
+    const char** servers,
+    PVFS_handle* handle_array,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id)
+{
+    /* TODO: implement */
+
+    /* TODO: log the handle array on the way out */
+
+    out_status_p->error_code = -PVFS_ENOSYS;
+    return(1);
+}
+
+
 #endif /* __PVFS2_TROVE_SUPPORT__ */
 
 /*
