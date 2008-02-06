@@ -1237,8 +1237,17 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
             op_p->u.k_write_list.key_array[k].buffer_sz);
 
         data.flags = 0;
-        data.data = op_p->u.k_write_list.val_array[k].buffer;
-        data.size = data.ulen = op_p->u.k_write_list.val_array[k].buffer_sz;
+        /* allow NULL val array (writes an empty value to each position */
+        if(!op_p->u.k_write_list.val_array)
+        {
+            data.data = NULL;
+            data.size = data.ulen = 0;
+        }
+        else
+        {
+            data.data = op_p->u.k_write_list.val_array[k].buffer;
+            data.size = data.ulen = op_p->u.k_write_list.val_array[k].buffer_sz;
+        }
 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
@@ -1282,7 +1291,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         {
             if (dbpf_attr_cache_elem_set_data_based_on_key(
                     ref, key_entry.key,
-                    op_p->u.k_write_list.val_array[k].buffer, data.size))
+                    data.data, data.size))
             {
                 /*
 NOTE: this can happen if the keyword isn't registered,
