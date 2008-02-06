@@ -181,6 +181,9 @@ int PINT_dbpf_keyval_iterate(
     TROVE_ds_position pos,
     PINT_dbpf_keyval_iterate_callback callback);
 
+int PINT_dbpf_dspace_remove_keyval(
+    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+
 struct dbpf_storage
 {
     TROVE_ds_flags flags;

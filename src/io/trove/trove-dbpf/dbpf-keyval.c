@@ -805,6 +805,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 {
     int count, ret;
     uint64_t tmp_pos = 0;
+    PINT_dbpf_keyval_iterate_callback tmp_callback = NULL;
 
     assert(*op_p->u.k_iterate.count_p > 0);
 
@@ -827,6 +828,11 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
         return 1;
     }
 
+    if(op_p->flags & TROVE_KEYVAL_ITERATE_REMOVE)
+    {
+        tmp_callback = PINT_dbpf_dspace_remove_keyval;
+    }
+
     ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db,
                                    op_p->handle,
                                    op_p->coll_p->pcache,
@@ -834,7 +840,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
                                    op_p->u.k_iterate.val_array,
                                    &count,
                                    *op_p->u.k_iterate.position_p,
-                                   NULL);
+                                   tmp_callback);
     if (ret == -TROVE_ENOENT)
     {
         *op_p->u.k_iterate.position_p = TROVE_ITERATE_END;
@@ -952,6 +958,7 @@ static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
 static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
 {
     int count, ret;
+    PINT_dbpf_keyval_iterate_callback tmp_callback = NULL;
 
     count = *op_p->u.k_iterate_keys.count_p;
 
@@ -965,6 +972,11 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
         return 1;
     }
 
+    if(op_p->flags & TROVE_KEYVAL_ITERATE_REMOVE)
+    {
+        tmp_callback = PINT_dbpf_dspace_remove_keyval;
+    }
+
     ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db,
                                    op_p->handle,
                                    op_p->coll_p->pcache,
@@ -973,7 +985,7 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
                                    NULL,
                                    &count,
                                    *op_p->u.k_iterate_keys.position_p,
-                                   NULL);
+                                   tmp_callback);
     if (ret == -TROVE_ENOENT)
     {
         *op_p->u.k_iterate_keys.position_p = TROVE_ITERATE_END;

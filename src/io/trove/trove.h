@@ -60,7 +60,8 @@ enum
     TROVE_DB_CACHE_MMAP          = 1 << 5,
     TROVE_DB_CACHE_SYS           = 1 << 6,
     TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7,
-    TROVE_BINARY_KEY             = 1 << 8
+    TROVE_BINARY_KEY             = 1 << 8, /* tell trove this is a binary key */
+    TROVE_KEYVAL_ITERATE_REMOVE  = 1 << 9  /* tell trove to delete keyvals as it iterates */
 };
 
 enum
