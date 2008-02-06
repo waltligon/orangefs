@@ -142,6 +142,7 @@ static PINT_sm_action setup_batch_create_fn(
      * same time
      */
     s_op->msgarray_params.retry_limit = INT_MAX;
+    s_op->msgarray_params.quiet_flag = 1;
 
     msg_p->svr_addr = s_op->u.precreate_pool_refiller.host_addr;
     PINT_util_gen_credentials(&creds);

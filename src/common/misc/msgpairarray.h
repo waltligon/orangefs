@@ -83,6 +83,7 @@ typedef struct PINT_sm_msgpair_params_s
     int retry_delay;
     int retry_limit;
     job_context_id job_context;
+    int quiet_flag;   /* if set, cuts down on error messages during retry */
 
     /* comp_ct used to keep up with number of operations remaining */
     int comp_ct;

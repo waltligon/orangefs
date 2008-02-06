@@ -507,7 +507,14 @@ static PINT_sm_action msgpairarray_completion_fn(
 
         if (msg_p->op_status != 0)
         {
-            PVFS_perror_gossip("msgpair failed, will retry", msg_p->op_status);
+            if(sm_p->msgarray_params.quiet_flag)
+            {
+                gossip_debug(GOSSIP_MSGPAIR_DEBUG, "msgpair failed, will retry, status: %d\n", msg_p->op_status); 
+            }
+            else
+            {
+                PVFS_perror_gossip("msgpair failed, will retry", msg_p->op_status);
+            }
                        
             ++need_retry;
             continue;
