@@ -806,6 +806,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
     int count, ret;
     uint64_t tmp_pos = 0;
     PINT_dbpf_keyval_iterate_callback tmp_callback = NULL;
+    int i;
 
     assert(*op_p->u.k_iterate.count_p > 0);
 
@@ -875,6 +876,18 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
                 *op_p->u.k_iterate.position_p,
                 op_p->u.k_iterate.key_array[count-1].buffer, 
                 op_p->u.k_iterate.key_array[count-1].read_sz);
+        }
+
+        if(op_p->flags & TROVE_KEYVAL_ITERATE_REMOVE)
+        {
+            for(i=0; i<count; i++)
+            {
+                ret = dbpf_keyval_handle_info_ops(op_p, DBPF_KEYVAL_HANDLE_COUNT_DECREMENT);
+                if(ret < 0)
+                {
+                    return(ret);
+                }
+            }
         }
     }
     
@@ -959,6 +972,7 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
 {
     int count, ret;
     PINT_dbpf_keyval_iterate_callback tmp_callback = NULL;
+    int i;
 
     count = *op_p->u.k_iterate_keys.count_p;
 
@@ -1013,6 +1027,17 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
                 *op_p->u.k_iterate_keys.position_p,
                 op_p->u.k_iterate_keys.key_array[count-1].buffer,
                 op_p->u.k_iterate_keys.key_array[count-1].read_sz);
+        }
+        if(op_p->flags & TROVE_KEYVAL_ITERATE_REMOVE)
+        {
+            for(i=0; i<count; i++)
+            {
+                ret = dbpf_keyval_handle_info_ops(op_p, DBPF_KEYVAL_HANDLE_COUNT_DECREMENT);
+                if(ret < 0)
+                {
+                    return(ret);
+                }
+            }
         }
     }
 
