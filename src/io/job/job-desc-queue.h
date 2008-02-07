@@ -56,9 +56,12 @@ struct precreate_pool_desc
     int precreate_handle_count;
     int precreate_handle_index;
     int posted_count;
+    const char** servers;
+    struct qlist_head* current_pool;
+    int trove_pending;
 
+    /* TODO: does this make the job descriptor too big? */
     TROVE_keyval_s key_array[PRECREATE_POOL_MAX_KEYS];
-    TROVE_keyval_s val_array[PRECREATE_POOL_MAX_KEYS];
 
     TROVE_op_id id;
     
