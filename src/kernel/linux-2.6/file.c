@@ -3234,6 +3234,11 @@ static ssize_t pvfs2_sendfile(struct file *filp, loff_t *ppos,
 
 #endif
 
+int pvfs2_lock(struct file *f, int flags, struct file_lock *lock)
+{
+    return -ENOSYS;
+}
+
 /** PVFS2 implementation of VFS file operations */
 struct file_operations pvfs2_file_operations =
 {
@@ -3256,6 +3261,7 @@ struct file_operations pvfs2_file_operations =
     /* for >= 2.6.19 */
     .aio_read = pvfs2_file_aio_read_iovec,
     .aio_write = pvfs2_file_aio_write_iovec,
+    .lock = pvfs2_lock,
 #else
     .readv = pvfs2_file_readv,
     .writev = pvfs2_file_writev,
@@ -3278,6 +3284,7 @@ struct file_operations pvfs2_file_operations =
 #ifdef HAVE_WRITEX_FILE_OPERATIONS
     .writex = pvfs2_file_writex,
 #endif
+    .lock = pvfs2_lock,
 #endif
 };
 
