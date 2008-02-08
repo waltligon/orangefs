@@ -68,6 +68,7 @@ typedef struct PINT_smcb
     struct PINT_state_s *state_stack[PINT_STATE_STACK_SIZE];
 
     struct qlist_head frames;
+    int frame_count;
 
     /* usage specific routinet to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int);
@@ -152,14 +153,6 @@ enum {
 #define SM_STATE_RETURN -1
 #define SM_NESTED_STATE 1
 
-#define SM_NONE   0
-#define SM_NEXT   1
-#define SM_RETURN 2
-#define SM_EXTERN 3
-#define SM_NESTED 5
-#define SM_JUMP   6
-#define SM_TERMINATE 7
-
 /* Prototypes for functions provided by user */
 int PINT_state_machine_complete(void *);
 
@@ -196,9 +189,10 @@ int PINT_smcb_alloc(struct PINT_smcb **, int, int,
 void PINT_smcb_free(struct PINT_smcb *);
 void *PINT_sm_frame(struct PINT_smcb *, int);
 int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);
-void *PINT_sm_pop_frame(struct PINT_smcb *smcb, int *error_code);
-
-int PINT_sm_pop_error(PINT_smcb *smcb, PVFS_error ret);
+void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
+                        int *task_id,
+                        int *error_code,
+                        int *remaining);
 
 /* This macro is used in calls to PINT_sm_fram() */
 #define PINT_FRAME_CURRENT 0
