@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.62 2007-12-05 20:03:17 pw Exp $
+ * $Id: ib.c,v 1.63 2008-02-08 22:04:19 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -217,8 +217,9 @@ static int ib_check_cq(void)
 		    assert(0, "%s: unknown send state %s (%d) of sq %p",
 		           __func__, sq_state_name(sq->state.send),
 			   sq->state.send, sq);
-		debug(2, "%s: send to %s completed locally: -> %s",
-		      __func__, bh->c->peername, sq_state_name(sq->state.send));
+		debug(2, "%s: send to %s completed locally: sq %p -> %s",
+		      __func__, bh->c->peername, sq,
+		      sq_state_name(sq->state.send));
 
 	    } else {
 		struct ib_work *rq = sq;  /* rename */
@@ -229,8 +230,9 @@ static int ib_check_cq(void)
 		else
 		    assert(0, "%s: unknown send state %s of rq %p",
 		           __func__, rq_state_name(rq->state.recv), rq);
-		debug(2, "%s: send to %s completed locally: -> %s",
-		      __func__, bh->c->peername, rq_state_name(rq->state.recv));
+		debug(2, "%s: send to %s completed locally: rq %p -> %s",
+		      __func__, bh->c->peername, rq,
+		      rq_state_name(rq->state.recv));
 	    }
 
 	    qlist_add_tail(&bh->list, &bh->c->eager_send_buf_free);
@@ -599,7 +601,8 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
 
 	rq = NULL;
 	qlist_for_each_entry(rqt, &ib_device->recvq, list) {
-	    if (rqt->c == c && rqt->rts_mop_id == mh_rts_done.mop_id) {
+	    if (rqt->c == c && rqt->rts_mop_id == mh_rts_done.mop_id &&
+		rqt->state.recv == RQ_RTS_WAITING_RTS_DONE) {
 		rq = rqt;
 		break;
 	    }
@@ -607,9 +610,6 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
 
 	assert(rq, "%s: mop_id %llx in RTS_DONE message not found",
 	       __func__, llu(mh_rts_done.mop_id));
-	assert(rq->state.recv == RQ_RTS_WAITING_RTS_DONE,
-	       "%s: RTS_DONE to rq wrong state %s",
-	       __func__, rq_state_name(rq->state.recv));
 
 #if MEMCACHE_BOUNCEBUF
 	memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
