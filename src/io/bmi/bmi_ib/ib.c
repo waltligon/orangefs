@@ -5,8 +5,6 @@
  * Copyright (C) 2006 Kyle Schochenmaier <kschoche@scl.ameslab.gov>
  *
  * See COPYING in top-level directory.
- *
- * $Id: ib.c,v 1.63 2008-02-08 22:04:19 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>

@@ -4,8 +4,6 @@
  * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
- *
- * $Id: ib.h,v 1.30 2007-11-15 15:50:59 slang Exp $
  */
 #ifndef __ib_h
 #define __ib_h
