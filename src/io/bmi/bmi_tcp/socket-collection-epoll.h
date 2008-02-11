@@ -120,6 +120,7 @@ do { \
 do { \
     struct epoll_event event;\
     struct tcp_addr* tcp_data = (m)->method_data; \
+    tcp_data->write_ref_count = 0; \
     memset(&event, 0, sizeof(event));\
     event.events = 0;\
     event.data.ptr = tcp_data->map;\
