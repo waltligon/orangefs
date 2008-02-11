@@ -4695,9 +4695,11 @@ static void fill_status(struct job_desc *jd,
     assert(jd);
     assert(status);
 
+#if 0
     gossip_debug(GOSSIP_JOB_DEBUG,
         "job fill_status() for id: %llu, type: %d\n",
         llu(jd->job_id), jd->type);
+#endif
 
     status->status_user_tag = jd->status_user_tag;
 
