@@ -146,7 +146,7 @@ static PINT_sm_action lookup_init(
                      "(# of segments:%u)\n",
                      s_op->req->u.lookup_path.path,
                      s_op->req->u.lookup_path.fs_id,
-                     llu(s_op->req->u.lookup_path.starting_handle),
+                     llu(s_op->req->u.lookup_path.handle),
                      s_op->req->u.lookup_path.attrmask,
                      s_op->u.lookup.seg_ct);
     if ((s_op->u.lookup.seg_ct < 0) ||
@@ -217,7 +217,7 @@ static PINT_sm_action lookup_read_object_metadata(
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
     {
-        handle = s_op->req->u.lookup_path.starting_handle;
+        handle = s_op->req->u.lookup_path.handle;
         ds_attr = &(s_op->u.lookup.ds_attr_array[0]);
     }
     else
@@ -500,7 +500,7 @@ static PINT_sm_action lookup_read_directory_entry_handle(
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
     {
-        handle = s_op->req->u.lookup_path.starting_handle;
+        handle = s_op->req->u.lookup_path.handle;
     }
     else
     {
@@ -652,6 +652,17 @@ static PINT_sm_action lookup_cleanup(
     }
     return(server_state_machine_complete(smcb));
 }
+
+PINT_GET_OBJECT_REF_DEFINE(lookup_path);
+
+struct PINT_server_req_params pvfs2_lookup_params =
+{
+    .string_name = "lookup_path",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_lookup_path,
+    .state_machine = &pvfs2_lookup_sm
+};
 
 /*
  * Local variables:

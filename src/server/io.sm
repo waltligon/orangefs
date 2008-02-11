@@ -386,6 +386,28 @@ static PINT_sm_action io_send_completion_ack(
     return err;
 }
 
+static inline int PINT_server_req_access_io(
+    struct PVFS_server_req *req)
+{
+    if(req->u.io.io_type == PVFS_IO_READ)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+PINT_GET_OBJECT_REF_DEFINE(io);
+
+struct PINT_server_req_params pvfs2_io_params =
+{
+    .string_name = "io",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_access_io,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_io,
+    .state_machine = &pvfs2_io_sm
+};
+
 /*
  * Local variables:
  *  mode: c

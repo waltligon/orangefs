@@ -77,6 +77,18 @@ static PINT_sm_action mgmt_remove_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+PINT_GET_OBJECT_REF_DEFINE(mgmt_remove_object);
+
+struct PINT_server_req_params pvfs2_mgmt_remove_object_params =
+{
+    .string_name = "mgmt-remove-object",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_mgmt_remove_object,
+    .state_machine = &pvfs2_mgmt_remove_object_sm
+};
+
 /*
  * Local variables:
  *  mode: c

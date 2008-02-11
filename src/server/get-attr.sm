@@ -1087,6 +1087,18 @@ static PINT_sm_action getattr_interpret_dir_hint(
     return SM_ACTION_COMPLETE;
 }
 
+PINT_GET_OBJECT_REF_DEFINE(getattr);
+
+struct PINT_server_req_params pvfs2_get_attr_params =
+{
+    .string_name = "getattr",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .access_type = PINT_server_req_readonly,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_getattr,
+    .state_machine = &pvfs2_get_attr_sm
+};
+
 /*
  * Local variables:
  *  mode: c

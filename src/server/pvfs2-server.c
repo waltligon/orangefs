@@ -160,255 +160,6 @@ static char *guess_alias(void);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
-/* table of incoming request types and associated parameters */
-struct PINT_server_req_params PINT_server_req_table[] =
-{
-    /* 0 */
-    {PVFS_SERV_INVALID,
-        "invalid",
-        PINT_SERVER_CHECK_INVALID,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        NULL},
-
-    /* 1 */
-    {PVFS_SERV_CREATE,
-        "create",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_create_sm},
-
-    /* 2 */
-    {PVFS_SERV_REMOVE,
-        "remove",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_remove_sm},
-
-    /* 3 */
-    {PVFS_SERV_IO,
-        "io",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_io_sm},
-
-    /* 4 */
-    {PVFS_SERV_GETATTR,
-        "getattr",
-        PINT_SERVER_CHECK_ATTR,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_get_attr_sm},
-
-    /* 5 */
-    {PVFS_SERV_SETATTR,
-        "setattr",
-        PINT_SERVER_CHECK_ATTR,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_set_attr_sm},
-
-    /* 6 */
-    {PVFS_SERV_LOOKUP_PATH,
-        "lookup_path",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_lookup_sm},
-
-    /* 7 */
-    {PVFS_SERV_CRDIRENT,
-        "crdirent",
-        PINT_SERVER_CHECK_CRDIRENT,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_crdirent_sm},
-
-    /* 8 */
-    {PVFS_SERV_RMDIRENT,
-        "rmdirent",
-        PINT_SERVER_CHECK_WRITE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_rmdirent_sm},
-
-    /* 9 */
-    {PVFS_SERV_CHDIRENT,
-        "chdirent",
-        PINT_SERVER_CHECK_WRITE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_chdirent_sm},
-
-    /* 10 */
-    {PVFS_SERV_TRUNCATE,
-        "truncate",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_truncate_sm},
-
-    /* 11 */
-    {PVFS_SERV_MKDIR,
-        "mkdir",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_mkdir_sm},
-
-    /* 12 */
-    {PVFS_SERV_READDIR,
-        "readdir",
-        PINT_SERVER_CHECK_READ,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_readdir_sm},
-
-    /* 13 */
-    {PVFS_SERV_GETCONFIG,
-        "getconfig",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_get_config_sm},
-
-    /* 14 */
-    {PVFS_SERV_WRITE_COMPLETION,
-        "write_completion",
-        PINT_SERVER_CHECK_INVALID,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        NULL},
-
-    /* 15 */
-    {PVFS_SERV_FLUSH,
-        "flush",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_flush_sm},
-
-    /* 16 */
-    {PVFS_SERV_MGMT_SETPARAM,
-        "mgmt_setparam",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_setparam_sm},
-
-    /* 17 */
-    {PVFS_SERV_MGMT_NOOP,
-        "mgmt_noop",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_noop_sm},
-
-    /* 18 */
-    {PVFS_SERV_STATFS,
-        "statfs",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_statfs_sm},
-
-    /* 19 */
-    {PVFS_SERV_PERF_UPDATE,
-        "perf_update",
-        PINT_SERVER_CHECK_INVALID,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_perf_update_sm},
-
-    /* 20 */
-    {PVFS_SERV_MGMT_PERF_MON,
-        "mgmt_perf_mon",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_perf_mon_sm},
-
-    /* 21 */
-    {PVFS_SERV_MGMT_ITERATE_HANDLES,
-        "mgmt_iterate_handles",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_iterate_handles_sm},
-
-    /* 22 */
-    {PVFS_SERV_MGMT_DSPACE_INFO_LIST,
-        "mgmt_dspace_info_list",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        NULL},
-
-    /* 23 */
-    {PVFS_SERV_MGMT_EVENT_MON,
-        "mgmt_event_mon",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_event_mon_sm},
-
-    /* 24 */
-    {PVFS_SERV_MGMT_REMOVE_OBJECT,
-        "mgmt-remove-object",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_mgmt_remove_object_sm},
-
-    /* 25 */
-    {PVFS_SERV_MGMT_REMOVE_DIRENT,
-        "mgmt-remove-dirent",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_mgmt_remove_dirent_sm},
-
-    /* 26 */
-    {PVFS_SERV_MGMT_GET_DIRDATA_HANDLE,
-        "mgmt-get-dirdata-handle",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_mgmt_get_dirdata_handle_sm},
-
-    /* 27 */
-    {PVFS_SERV_JOB_TIMER,
-        "job_timer",
-        PINT_SERVER_CHECK_INVALID,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_job_timer_sm},
-
-    /* 28 */
-    {PVFS_SERV_PROTO_ERROR,
-        "proto_error",
-        PINT_SERVER_CHECK_INVALID,
-        PINT_SERVER_ATTRIBS_REQUIRED,
-        &pvfs2_proto_error_sm},
-
-    /* 29 */
-    {PVFS_SERV_GETEATTR,
-        "geteattr",
-        PINT_SERVER_CHECK_ATTR,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_get_eattr_sm},
-
-    /* 30 */
-    {PVFS_SERV_SETEATTR,
-        "seteattr",
-        PINT_SERVER_CHECK_ATTR,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_set_eattr_sm},
-
-    /* 31 */
-    {PVFS_SERV_DELEATTR,
-        "deleattr",
-        PINT_SERVER_CHECK_ATTR,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_del_eattr_sm},
-
-    /* 32 */
-    {PVFS_SERV_LISTEATTR,
-        "listeattr",
-        PINT_SERVER_CHECK_ATTR,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_list_eattr_sm},
-
-    /* 33 */
-    {PVFS_SERV_SMALL_IO,
-        "small_io",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_small_io_sm},
-
-    /* 34 */
-    {PVFS_SERV_LISTATTR,
-        "listattr",
-        PINT_SERVER_CHECK_NONE,
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_list_attr_sm},
-};
-
 struct server_configuration_s *PINT_get_server_config(void)
 {
     return &server_config;
@@ -1969,7 +1720,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "server_state_machine_complete %p\n",smcb);
-    
+
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
     PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
@@ -1981,9 +1732,11 @@ int server_state_machine_complete(PINT_smcb *smcb)
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
+    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
     BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
                         s_op->unexp_bmi_buff.buffer);
     s_op->unexp_bmi_buff.buffer = NULL;
+
 
    /* Remove s_op from the inprogress_sop_list */
     qlist_del(&s_op->next);
@@ -2028,7 +1781,7 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op)
     default :
         {
             if (op >= 0 && op < PVFS_SERV_NUM_OPS)
-                return PINT_server_req_table[op].sm;
+                return PINT_server_req_table[op].params->state_machine;
             else
                 return NULL;
             break;
@@ -2054,9 +1807,6 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                               const char * format,
                               ...)
 {
-    PVFS_handle handle;    
-    PVFS_fs_id fsid;
-    int flag;
     static char pint_access_buffer[GOSSIP_BUF_SIZE];
     struct passwd* pw;
     struct group* gr;
@@ -2068,7 +1818,6 @@ void PINT_server_access_debug(PINT_server_op * s_op,
     {
         va_start(ap, format);
 
-        PINT_req_sched_target_handle(s_op->req, 0, &handle, &fsid, &flag);
         pw = getpwuid(s_op->req->credentials.uid);
         gr = getgrgid(s_op->req->credentials.gid);
         snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
@@ -2076,7 +1825,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
             ((pw) ? pw->pw_name : "UNKNOWN"),
             ((gr) ? gr->gr_name : "UNKNOWN"),
             BMI_addr_rev_lookup_unexpected(s_op->addr),
-            llu(handle),
+            llu(s_op->target_handle),
             s_op,
             PINT_map_server_op_to_string(s_op->req->op),
             format);
@@ -2087,23 +1836,6 @@ void PINT_server_access_debug(PINT_server_op * s_op,
     }
 }
 #endif
-
-/*
- * PINT_map_server_op_to_string()
- *
- * provides a string representation of the server operation number
- *
- * returns a pointer to a static string (DONT FREE IT) on success,
- * null on failure
- */
-const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
-{
-    const char *s = NULL;
-
-    if (op >= 0 && op < PVFS_SERV_NUM_OPS)
-        s = PINT_server_req_table[op].string_name;
-    return s;
-}
 
 static char *guess_alias(void)
 {

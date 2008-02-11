@@ -117,6 +117,17 @@ static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+PINT_GET_OBJECT_REF_DEFINE(mgmt_get_dirdata_handle);
+
+struct PINT_server_req_params pvfs2_mgmt_get_dirdata_handle_params =
+{
+    .string_name = "mgmt-get-dirdata-handle",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_mgmt_get_dirdata_handle,
+    .state_machine = &pvfs2_mgmt_get_dirdata_handle_sm
+};
+
 /*
  * Local variables:
  *  mode: c

@@ -312,6 +312,14 @@ static int reallocate_static_arrays_if_needed(void)
     return(0);
 }
 
+struct PINT_server_req_params pvfs2_perf_mon_params =
+{
+    .string_name = "mgmt_perf_mon",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .get_object_ref = PINT_get_object_ref_mgmt_perf_mon,
+    .state_machine = &pvfs2_perf_mon_sm
+};
+
 /*
  * Local variables:
  *  mode: c

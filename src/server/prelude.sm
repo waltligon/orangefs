@@ -29,7 +29,7 @@ enum {
 
 %%
 
-nested machine pvfs2_prelude_sm
+nested machine pvfs2_prelude_work_sm
 {
     state req_sched
     {
@@ -64,7 +64,36 @@ nested machine pvfs2_prelude_sm
     }
 }
 
+nested machine pvfs2_prelude_sm
+{
+    state setup
+    {
+        run prelude_setup;
+        default => prelude_work;
+    }
+
+    state prelude_work
+    {
+        jump pvfs2_prelude_work_sm;
+        default => return;
+    }
+}
+
 %%
+
+static PINT_sm_action prelude_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    ret = PINT_server_req_get_object_ref(
+        s_op->req, &s_op->target_fs_id, &s_op->target_handle);
+    s_op->access_type = PINT_server_req_get_access_type(s_op->req);
+    s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
+
+    return SM_ACTION_COMPLETE;
+}
 
 /* prelude_req_sched()
  *
@@ -82,23 +111,9 @@ static PINT_sm_action prelude_req_sched(
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
 
-    /* this is the first state for every normal pvfs2 server state
-     * machine, so we get to do some housekeeping here.  In
-     * particular, bump up the reference count on the bmi address that
-     * we are using
-     */
-    BMI_set_info(s_op->addr, BMI_INC_ADDR_REF, NULL);
-
-    /* this is a bit of a hack; if we are changing server mode we must
-     * preserve the old mode value before calling req scheduler
-     */
-    if ((s_op->op == PVFS_SERV_MGMT_SETPARAM) &&
-        (s_op->req->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE))
-    {
-        s_op->resp.u.mgmt_setparam.old_value = PINT_req_sched_get_mode();
-    }
-    
-    ret = job_req_sched_post(s_op->req, 0, smcb, 0, js_p,
+    ret = job_req_sched_post(s_op->op, s_op->target_fs_id, s_op->target_handle,
+                             s_op->access_type, s_op->sched_policy,
+                             smcb, 0, js_p,
                              &(s_op->scheduled_id), server_job_context);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
@@ -114,7 +129,7 @@ static PINT_sm_action prelude_getattr_if_needed(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL, readonly_flag = 0;
+    int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
@@ -122,23 +137,6 @@ static PINT_sm_action prelude_getattr_if_needed(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
-
-    /* first, run a request scheduler utility function that tells us
-     * what handle this request will operate on
-     */
-    ret = PINT_req_sched_target_handle(
-        s_op->req, 0, &s_op->target_handle, 
-        &s_op->target_fs_id, &readonly_flag);
-
-    if (ret < 0)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "PINT_req_sched_target_handle "
-                     "returned %d ret, skipping getattr on handle %llu\n",
-                     ret, llu(s_op->target_handle));
-
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
 
     /* if the handle is 0, that indicates that the request does not
      * operate on a specific handle, so there is nothing we can do
@@ -163,137 +161,6 @@ static PINT_sm_action prelude_getattr_if_needed(
         0, js_p, &tmp_id, server_job_context);
 
     return ret;
-}
-
-static void get_fs_intent(struct PVFS_server_req *req, PVFS_fs_id *fsid, int *read_only)
-{
-    if (req == NULL)
-    {
-        *fsid = PVFS_FS_ID_NULL;
-        *read_only = -1;
-        return;
-    }
-    switch (req->op)
-    {
-        case PVFS_SERV_CREATE:
-            *fsid = req->u.create.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_REMOVE:
-            *fsid = req->u.remove.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_IO:
-            *fsid = req->u.io.fs_id;
-            *read_only = (req->u.io.io_type == PVFS_IO_READ) ? 1 : 0;
-            break;
-        case PVFS_SERV_SMALL_IO:
-            *fsid = req->u.small_io.fs_id;
-            *read_only = (req->u.small_io.io_type == PVFS_IO_READ) ? 1 : 0;
-            break;
-        case PVFS_SERV_GETATTR:
-            *fsid = req->u.getattr.fs_id;
-            *read_only = 1;
-            break;
-        case PVFS_SERV_LISTATTR:
-            *fsid = req->u.listattr.fs_id;
-            *read_only = 1;
-            break;
-        case PVFS_SERV_SETATTR:
-            *fsid = req->u.setattr.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_LOOKUP_PATH:
-            *fsid = req->u.lookup_path.fs_id;
-            *read_only = 1;
-            break;
-        case PVFS_SERV_CRDIRENT:
-            *fsid = req->u.crdirent.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_RMDIRENT:
-            *fsid = req->u.rmdirent.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_CHDIRENT:
-            *fsid = req->u.chdirent.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_TRUNCATE:
-            *fsid = req->u.truncate.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_MKDIR:
-            *fsid = req->u.mkdir.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_READDIR:
-            *fsid = req->u.readdir.fs_id;
-            *read_only = 1;
-            break;
-        case PVFS_SERV_FLUSH:
-            *fsid = req->u.flush.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_MGMT_SETPARAM:
-            *fsid = req->u.mgmt_setparam.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_STATFS:
-            *fsid = req->u.statfs.fs_id;
-            *read_only = 1;
-            break;
-        case PVFS_SERV_MGMT_ITERATE_HANDLES:
-            *fsid = req->u.mgmt_iterate_handles.fs_id;
-            *read_only = 1;
-            break;
-        case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
-            *fsid = req->u.mgmt_dspace_info_list.fs_id;
-            *read_only = 1;
-            break;
-        case PVFS_SERV_MGMT_REMOVE_OBJECT:
-            *fsid = req->u.mgmt_remove_object.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_MGMT_REMOVE_DIRENT:
-            *fsid = req->u.mgmt_remove_dirent.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-            *fsid = req->u.mgmt_get_dirdata_handle.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_GETEATTR:
-            *fsid = req->u.geteattr.fs_id;
-            *read_only = 1;
-            break;
-        case PVFS_SERV_SETEATTR:
-            *fsid = req->u.seteattr.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_DELEATTR:
-            *fsid = req->u.deleattr.fs_id;
-            *read_only = 0;
-            break;
-        case PVFS_SERV_LISTEATTR:
-            *fsid = req->u.listeattr.fs_id;
-            *read_only = 1;
-            break;
-        case PVFS_SERV_PROTO_ERROR:
-        case PVFS_SERV_JOB_TIMER:
-        case PVFS_SERV_MGMT_EVENT_MON:
-        case PVFS_SERV_MGMT_PERF_MON:
-        case PVFS_SERV_PERF_UPDATE:
-        case PVFS_SERV_MGMT_NOOP:
-        case PVFS_SERV_WRITE_COMPLETION:
-        case PVFS_SERV_GETCONFIG:
-        case PVFS_SERV_NUM_OPS:
-        case PVFS_SERV_INVALID:
-            *fsid = PVFS_FS_ID_NULL;
-            *read_only = -1;
-            break;
-    }
-    return;
 }
 
 static void get_anon_ids(struct filesystem_configuration_s *fsconfig,
@@ -473,7 +340,6 @@ static PINT_sm_action prelude_perm_check(
     PVFS_uid translated_uid = s_op->req->credentials.uid;
     PVFS_gid translated_gid = s_op->req->credentials.gid;
     PVFS_fs_id  fsid = PVFS_FS_ID_NULL;
-    int  rdonly = -1;
     int squashed_flag = 0;
     int skip_acl_flag = 0;
 
@@ -492,34 +358,14 @@ static PINT_sm_action prelude_perm_check(
     /* Set the target object attribute pointer.. used later by the acl check */
     s_op->target_object_attr = obj_attr;
 
-    /* Commenting out the below block for now.  I think this code is
-     * deprecated?  Even if not all of the attributes have been filled in
-     * yet, we should still be able to read them after the object has been
-     * created.  If this change seems stable then we need to also come back
-     * and remove the PINT_SERVER_ATTRIBS_NOT_REQUIRED flag. -Phil 4-13-2006
-     */
-#if 0
-    /* the next thing we need to do is interpret the error code from
-     * reading the attributes.  Normally it is an error if that step
-     * failed, but we have to look for the special case in which we
-     * set attributes on a file that did not have attributes
-     * previously.
-     */
-    if (PINT_server_req_table[s_op->req->op].attrib_flags ==
-        PINT_SERVER_ATTRIBS_NOT_REQUIRED)
-    {
-        js_p->error_code = 0;
-    }
-#endif
-    
-    get_fs_intent(s_op->req, &fsid, &rdonly);
-    if (fsid != PVFS_FS_ID_NULL)
+    if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
         /*
          * if we are exporting a volume readonly, disallow any operation that modifies
          * the state of the file-system.
          */
-        if (permit_operation(fsid, rdonly, s_op->addr) < 0)
+        if (permit_operation(
+                s_op->target_fs_id, s_op->access_type, s_op->addr) < 0)
         {
             js_p->error_code = -PVFS_EROFS;
             return SM_ACTION_COMPLETE;
@@ -566,7 +412,7 @@ static PINT_sm_action prelude_perm_check(
         ((s_op->attr.mask & PVFS_ATTR_COMMON_GID) ? "yes" : "no"),
         s_op->attr.group, translated_gid);
     
-    switch(PINT_server_req_table[s_op->req->op].perm)
+    switch(PINT_server_req_get_perms(s_op->req))
     {
         case PINT_SERVER_CHECK_WRITE:
             js_p->error_code = PINT_check_mode(
@@ -633,7 +479,9 @@ static PINT_sm_action prelude_perm_check(
             }
             break;
         case PINT_SERVER_CHECK_NONE:
-            if(squashed_flag && !rdonly && ((s_op->req->op == PVFS_SERV_IO) ||
+            if(squashed_flag &&
+               !PINT_server_req_get_access_type(s_op->req) &&
+               ((s_op->req->op == PVFS_SERV_IO) ||
                 (s_op->req->op == PVFS_SERV_SMALL_IO) ||
                 (s_op->req->op == PVFS_SERV_TRUNCATE)))
             {
@@ -754,7 +602,7 @@ static PINT_sm_action prelude_check_acls(
         js_p->error_code = -PVFS_EINVAL;
         goto cleanup;
     }
-    switch (PINT_server_req_table[s_op->req->op].perm)
+    switch (PINT_server_req_get_perms(s_op->req))
     {
         case PINT_SERVER_CHECK_WRITE:
         default:

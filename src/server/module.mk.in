@@ -53,8 +53,8 @@ ifdef BUILD_SERVER
 		SMCGEN += $(SERVER_SMCGEN)
 
 	# server code that will be linked manually, not included in library
-	MISCSRC += \
-		$(DIR)/pvfs2-server.c
+	SERVERBINSRC += \
+		$(DIR)/pvfs2-server.c $(DIR)/pvfs2-server-req.c
 
 	# to stat the fs, need to know about handle statistics
 	MODCFLAGS_$(DIR)/statfs.c = \
