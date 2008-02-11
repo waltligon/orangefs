@@ -93,7 +93,6 @@ struct PINT_server_req_params pvfs2_event_mon_params =
 {
     .string_name = "mgmt_event_mon",
     .perm = PINT_SERVER_CHECK_NONE,
-    .get_object_ref = PINT_get_object_ref_mgmt_event_mon,
     .state_machine = &pvfs2_event_mon_sm
 };
 

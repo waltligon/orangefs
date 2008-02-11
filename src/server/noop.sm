@@ -53,7 +53,6 @@ struct PINT_server_req_params pvfs2_noop_params =
     .string_name = "noop",
     .perm = PINT_SERVER_CHECK_NONE,
     .access_type = PINT_server_req_readonly,
-    .get_object_ref = PINT_get_object_ref_noop,
     .state_machine = &pvfs2_noop_sm
 };
 

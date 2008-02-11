@@ -5,6 +5,7 @@
  */
 
 #include "pvfs2-server.h"
+#include <assert.h>
 
 /* server operation state machines */
 extern struct PINT_server_req_params pvfs2_get_config_params;
@@ -149,8 +150,6 @@ int PINT_server_req_get_object_ref(
  */
 const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
-    const char *s = NULL;
-
     CHECK_OP(op);
     return PINT_server_req_table[op].params->string_name;
 }
