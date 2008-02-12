@@ -5243,6 +5243,7 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
     TROVE_op_id tmp_id;
     int ret;
     struct precreate_pool_get_trove* tmp_trove;
+    struct qlist_head* iterator;
 
     /* we better still have handles to retrieve */
     assert(jd->u.precreate_pool.precreate_handle_index < 
@@ -5256,9 +5257,27 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
     {
         if(jd->u.precreate_pool.servers)
         {
-            /* caller wanted specific servers */
-            /* TODO: implement this */
-            assert(0);
+            /* caller wanted specific servers ; search through list and 
+             * set current pool to appropriate entry for this server
+             */
+            jd->u.precreate_pool.current_pool = NULL; /* sentinal */
+            qlist_for_each(iterator, &precreate_pool_list)
+            {
+                pool = qlist_entry(iterator, struct precreate_pool,
+                    list_link);
+                if(!strcmp(pool->host, jd->u.precreate_pool.servers[jd->u.precreate_pool.precreate_handle_index]))
+                {
+                    jd->u.precreate_pool.current_pool = iterator;
+                    break;
+                }
+            }
+            if(!jd->u.precreate_pool.current_pool)
+            {
+                /* TODO: figure out what to do with this.  Someone gave us
+                 * bad args but we are late detecting it
+                 */
+                assert(0);
+            }
         }
         else
         {
