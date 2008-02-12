@@ -789,48 +789,15 @@ AC_ARG_WITH(bmi-tcp,
 )
 AC_SUBST(BUILD_BMI_TCP)
 
-dnl configure options for GM install path
-GM_HOME=
-AC_ARG_WITH(gm,
-[  --with-gm=<dir>         Location of the GM installation (default no GM)],
-    if test -z "$withval" -o "$withval" = yes ; then
-	AC_MSG_ERROR([Option --with-gm requires the path to your GM tree.])
-    elif test "$withval" != no ; then
-	GM_HOME="$withval"
-    fi
-)
-if test -n "$GM_HOME" ; then
-    save_cppflags="$CPPFLAGS"
-    CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
-    AC_CHECK_HEADER(gm.h,, AC_MSG_ERROR([Header gm.h not found.]))
-    BUILD_GM=1
-    CPPFLAGS="$save_cppflags"
-fi
-AC_SUBST(GM_HOME)
-AC_SUBST(BUILD_GM)
+dnl
+dnl Configure bmi_gm, if --with-gm or a variant given.
+dnl
+AX_GM
 
-dnl configure options for MX install path
-MX_HOME=
-AC_ARG_WITH(mx,
-[  --with-mx=<dir>         Location of the MX installation (default no MX)],
-    if test -z "$withval" -o "$withval" = yes ; then
-	AC_MSG_ERROR([Option --with-mx requires the path to your MX tree.])
-    elif test "$withval" != no ; then
-	MX_HOME="$withval"
-    fi
-)
-if test -n "$MX_HOME" ; then
-    CPPFLAGS="$CPPFLAGS -I ${MX_HOME}/include"
-    AC_CHECK_HEADER(myriexpress.h,, AC_MSG_ERROR([Header myriexpress.h not found.]))
-    BUILD_MX=1
-    CPPFLAGS="$CPPFLAGS_OLD"
-    CFLAGS="${CFLAGS} -I${MX_HOME}/include"
-    LDFLAGS="$LDFLAGS -L${MX_HOME}/lib"
-    SERVER_LDFLAGS="$SERVER_LDFLAGS -L${MX_HOME}/lib"
-    LIBS="$LIBS -lmyriexpress"
-fi
-AC_SUBST(MX_HOME)
-AC_SUBST(BUILD_MX)
+dnl
+dnl Configure bmi_mx, if --with-mx or a variant given.
+dnl
+AX_MX
 
 dnl
 dnl Configure bmi_ib, if --with-ib or a variant given.

@@ -299,32 +299,24 @@ endif
 # enable GM if configure detected it
 
 ifdef BUILD_GM
-	CFLAGS += -I @GM_HOME@/include -I @GM_HOME@/include/gm
-	CFLAGS += -D__STATIC_METHOD_BMI_GM__
-	# TODO: later on we will want the ability to modify this at configure
-	# time
-	CFLAGS += -DENABLE_GM_BUFPOOL
-	LDFLAGS += -L@GM_HOME@/lib
-	SERVER_LDFLAGS += -L@GM_HOME@/lib
-	LIBS += -lgm
-	LIBS_THREADED += -lgm
-	SERVERLIBS += -lgm
+    # other settings in bmi_gm/module.mk.in
+    CFLAGS += -D__STATIC_METHOD_BMI_GM__
+    GMLIBS := -L@GM_LIBDIR@ -lgm
+    LIBS += $(GMLIBS)
+    LIBS_THREADED += $(GMLIBS)
+    SERVERLIBS += $(GMLIBS)
 endif
 
 ################################################################
 # enable MX if configure detected it
 
 ifdef BUILD_MX
-	CFLAGS += -I @MX_HOME@/include
-	CFLAGS += -D__STATIC_METHOD_BMI_MX__
-	# TODO: later on we will want the ability to modify this at configure
-	# time
-	CFLAGS += -g -O0
-	LDFLAGS += -L@MX_HOME@/lib
-	SERVER_LDFLAGS += -L@MX_HOME@/lib
-	LIBS += -lmyriexpress -lpthread
-	LIBS_THREADED += -lmyriexpress -lpthread
-	SERVERLIBS += -lmyriexpress -lpthread
+    # other settings in bmi_mx/module.mk.in
+    CFLAGS += -D__STATIC_METHOD_BMI_MX__
+    MXLIBS := -L@MX_LIBDIR@ -lmyriexpress -lpthread
+    LIBS += $(MXLIBS)
+    LIBS_THREADED += $(MXLIBS)
+    SERVERLIBS += $(MXLIBS)
 endif
 
 #####################################

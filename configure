@@ -712,10 +712,12 @@ NEEDS_LIBRT
 TARGET_OS_DARWIN
 TARGET_OS_LINUX
 BUILD_BMI_TCP
-GM_HOME
 BUILD_GM
-MX_HOME
+GM_INCDIR
+GM_LIBDIR
 BUILD_MX
+MX_INCDIR
+MX_LIBDIR
 BUILD_IB
 IB_INCDIR
 IB_LIBDIR
@@ -1355,8 +1357,12 @@ Optional Packages:
   --with-valgrind=<path>  Use valgrind annotations for debugging.
   --with-db=<dir>         Location of installed DB package (default=/usr)
   --without-bmi-tcp       Disable BMI TCP method
-  --with-gm=<dir>         Location of the GM installation (default no GM)
-  --with-mx=<dir>         Location of the MX installation (default no MX)
+  --with-gm=<dir>     Location of the GM install (default no GM)
+  --with-gm-includes=<dir>  Location of the GM includes
+  --with-gm-libs=<dir>      Location of the GM libraries
+  --with-mx=<dir>     Location of the MX install (default no MX)
+  --with-mx-includes=<dir>  Location of the MX includes
+  --with-mx-libs=<dir>      Location of the MX libraries
   --with-ib=<dir>         Location of the IB installation (default no IB)
   --with-ib-includes=<dir>      Location of the IB includes
   --with-ib-libs=<dir>          Location of the IB libraries
@@ -14439,24 +14445,62 @@ fi
 
 
 
-GM_HOME=
+
+                    gm_home=
 
 # Check whether --with-gm was given.
 if test "${with_gm+set}" = set; then
   withval=$with_gm; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-gm requires the path to your GM tree." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-gm requires the path to your GM tree." >&5
 echo "$as_me: error: Option --with-gm requires the path to your GM tree." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	GM_HOME="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    gm_home="$withval"
+	fi
 
 fi
 
-if test -n "$GM_HOME" ; then
-    save_cppflags="$CPPFLAGS"
-    CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
-    if test "${ac_cv_header_gm_h+set}" = set; then
+
+# Check whether --with-gm-includes was given.
+if test "${with_gm_includes+set}" = set; then
+  withval=$with_gm_includes; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-gm-includes requires path to GM headers." >&5
+echo "$as_me: error: Option --with-gm-includes requires path to GM headers." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    GM_INCDIR="$withval"
+	fi
+
+fi
+
+
+# Check whether --with-gm-libs was given.
+if test "${with_gm_libs+set}" = set; then
+  withval=$with_gm_libs; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-gm-libs requires path to GM libraries." >&5
+echo "$as_me: error: Option --with-gm-libs requires path to GM libraries." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    GM_LIBDIR="$withval"
+	fi
+
+fi
+
+            if test -n "$gm_home" ; then
+	if test -z "$GM_INCDIR"; then
+	    GM_INCDIR=$gm_home/include
+	fi
+	if test -z "$GM_LIBDIR"; then
+	    GM_LIBDIR=$gm_home/lib64
+	    if test ! -d "$GM_LIBDIR" ; then
+		GM_LIBDIR=$gm_home/lib
+	    fi
+	fi
+    fi
+        if test -n "$GM_INCDIR$GM_LIBDIR" ; then
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$GM_INCDIR -I$GM_INCDIR/gm"
+	if test "${ac_cv_header_gm_h+set}" = set; then
   { echo "$as_me:$LINENO: checking for gm.h" >&5
 echo $ECHO_N "checking for gm.h... $ECHO_C" >&6; }
 if test "${ac_cv_header_gm_h+set}" = set; then
@@ -14590,29 +14634,77 @@ echo "$as_me: error: Header gm.h not found." >&2;}
 fi
 
 
-    BUILD_GM=1
-    CPPFLAGS="$save_cppflags"
-fi
+			if test ! -f $GM_LIBDIR/libgm.so ; then
+	    if test ! -f $GM_LIBDIR/libgm.a ; then
+		{ { echo "$as_me:$LINENO: error: Neither GM library libgm.so or libgm.a found." >&5
+echo "$as_me: error: Neither GM library libgm.so or libgm.a found." >&2;}
+   { (exit 1); exit 1; }; }
+	    fi
+	fi
+	BUILD_GM=1
+	CPPFLAGS="$save_cppflags"
+    fi
 
 
 
-MX_HOME=
+
+
+
+                    mx_home=
 
 # Check whether --with-mx was given.
 if test "${with_mx+set}" = set; then
   withval=$with_mx; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-mx requires the path to your MX tree." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-mx requires the path to your MX tree." >&5
 echo "$as_me: error: Option --with-mx requires the path to your MX tree." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	MX_HOME="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    mx_home="$withval"
+	fi
 
 fi
 
-if test -n "$MX_HOME" ; then
-    CPPFLAGS="$CPPFLAGS -I ${MX_HOME}/include"
-    if test "${ac_cv_header_myriexpress_h+set}" = set; then
+
+# Check whether --with-mx-includes was given.
+if test "${with_mx_includes+set}" = set; then
+  withval=$with_mx_includes; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-mx-includes requires path to MX headers." >&5
+echo "$as_me: error: Option --with-mx-includes requires path to MX headers." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    MX_INCDIR="$withval"
+	fi
+
+fi
+
+
+# Check whether --with-mx-libs was given.
+if test "${with_mx_libs+set}" = set; then
+  withval=$with_mx_libs; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-mx-libs requires path to MX libraries." >&5
+echo "$as_me: error: Option --with-mx-libs requires path to MX libraries." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    MX_LIBDIR="$withval"
+	fi
+
+fi
+
+            if test -n "$mx_home" ; then
+	if test -z "$MX_INCDIR"; then
+	    MX_INCDIR=$mx_home/include
+	fi
+	if test -z "$MX_LIBDIR"; then
+	    MX_LIBDIR=$mx_home/lib64
+	    if test ! -d "$MX_LIBDIR" ; then
+		MX_LIBDIR=$mx_home/lib
+	    fi
+	fi
+    fi
+        if test -n "$MX_INCDIR$MX_LIBDIR" ; then
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$MX_INCDIR -I$MX_INCDIR/mx"
+	if test "${ac_cv_header_myriexpress_h+set}" = set; then
   { echo "$as_me:$LINENO: checking for myriexpress.h" >&5
 echo $ECHO_N "checking for myriexpress.h... $ECHO_C" >&6; }
 if test "${ac_cv_header_myriexpress_h+set}" = set; then
@@ -14746,13 +14838,18 @@ echo "$as_me: error: Header myriexpress.h not found." >&2;}
 fi
 
 
-    BUILD_MX=1
-    CPPFLAGS="$CPPFLAGS_OLD"
-    CFLAGS="${CFLAGS} -I${MX_HOME}/include"
-    LDFLAGS="$LDFLAGS -L${MX_HOME}/lib"
-    SERVER_LDFLAGS="$SERVER_LDFLAGS -L${MX_HOME}/lib"
-    LIBS="$LIBS -lmyriexpress"
-fi
+			if test ! -f $MX_LIBDIR/libmyriexpress.so ; then
+	    if test ! -f $MX_LIBDIR/libmyriexpress.a ; then
+		{ { echo "$as_me:$LINENO: error: Neither MX library libmyriexpress.so or libmyriexpress.a found." >&5
+echo "$as_me: error: Neither MX library libmyriexpress.so or libmyriexpress.a found." >&2;}
+   { (exit 1); exit 1; }; }
+	    fi
+	fi
+	BUILD_MX=1
+	CPPFLAGS="$save_cppflags"
+    fi
+
+
 
 
 
@@ -18423,10 +18520,12 @@ for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
 TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
 BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
-GM_HOME!$GM_HOME$ac_delim
 BUILD_GM!$BUILD_GM$ac_delim
-MX_HOME!$MX_HOME$ac_delim
+GM_INCDIR!$GM_INCDIR$ac_delim
+GM_LIBDIR!$GM_LIBDIR$ac_delim
 BUILD_MX!$BUILD_MX$ac_delim
+MX_INCDIR!$MX_INCDIR$ac_delim
+MX_LIBDIR!$MX_LIBDIR$ac_delim
 BUILD_IB!$BUILD_IB$ac_delim
 IB_INCDIR!$IB_INCDIR$ac_delim
 IB_LIBDIR!$IB_LIBDIR$ac_delim
@@ -18445,7 +18544,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 22; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 24; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5

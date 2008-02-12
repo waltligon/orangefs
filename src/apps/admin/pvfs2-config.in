@@ -47,7 +47,7 @@ while test $# -gt 0; do
     --libs|--static-libs)
 	libflags="-L@libdir@ -lpvfs2 @LIBS@ @THREAD_LIB@" 
 	if [ x"@BUILD_GM@" = x"1" ]; then
-		libflags="$libflags -L@GM_HOME@/lib -lgm"
+		libflags="$libflags -L@GM_LIBDIR@ -lgm"
 	fi
 	if [ x"@BUILD_IB@" = x"1" ]; then
 		libflags="$libflags -L@IB_LIBDIR@ -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
@@ -56,7 +56,7 @@ while test $# -gt 0; do
 		libflags="$libflags -L@OPENIB_LIBDIR@ -libverbs"
 	fi
 	if [ x"@BUILD_MX@" = x"1" ]; then
-		libflags="$libflags -L@MX_HOME@/lib -lmyriexpress"
+		libflags="$libflags -L@MX_LIBDIR@ -lmyriexpress -lpthread"
 	fi
 	if [ x"@BUILD_PORTALS@" = x"1" ]; then
 		libflags="$libflags @PORTALS_LIBS@"
@@ -70,7 +70,7 @@ while test $# -gt 0; do
 		libflags="$libflags -lrt"
 	fi
 	if [ x"@BUILD_GM@" = x"1" ]; then
-		libflags="$libflags -L@GM_HOME@/lib -lgm"
+		libflags="$libflags -L@GM_LIBDIR@ -lgm"
 	fi
 	if [ x"@BUILD_IB@" = x"1" ]; then
 		libflags="$libflags -L@IB_LIBDIR@ -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
@@ -79,7 +79,7 @@ while test $# -gt 0; do
 		libflags="$libflags -L@OPENIB_LIBDIR@ -libverbs"
 	fi
 	if [ x"@BUILD_MX@" = x"1" ]; then
-		libflags="$libflags -L@MX_HOME@/lib -lmyriexpress"
+		libflags="$libflags -L@MX_LIBDIR@ -lmyriexpress -lpthread"
 	fi
 	if [ x"@BUILD_PORTALS@" = x"1" ]; then
 		libflags="$libflags @PORTALS_LIBS@"
