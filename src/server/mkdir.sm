@@ -308,6 +308,22 @@ static PINT_sm_action mkdir_prep_sm(
     return SM_ACTION_COMPLETE;
 }
 
+static inline int PINT_get_object_ref_mkdir(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.mkdir.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+};
+
+struct PINT_server_req_params pvfs2_mkdir_params =
+{
+    .string_name = "mkdir",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .state_machine = &pvfs2_mkdir_sm
+};
+
 /*
  * Local variables:
  *  mode: c

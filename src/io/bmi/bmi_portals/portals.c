@@ -1,7 +1,7 @@
 /*
  * Portals BMI method.
  *
- * Copyright (C) 2007 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2007-8 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  */
@@ -1426,8 +1426,7 @@ static struct bmi_method_addr *bmip_alloc_method_addr(const char *hostname,
     /* room for a peername tacked on the end too, no more than 10 digits */
     extra = sizeof(*pma) + 2 * (strlen(hostname) + 1) + 10 + 1;
 
-    map = alloc_method_addr(bmi_portals_method_id, extra);
-    map->ops = &bmi_portals_ops;
+    map = bmi_alloc_method_addr(bmi_portals_method_id, extra);
     pma = map->method_data;
 
     pma->hostname = (void *) &pma[1];
@@ -1899,15 +1898,19 @@ static int bmip_initialize(struct bmi_method_addr *listen_addr,
 	goto out;
     }
 
-    /* global debugging on all NIs */
-    /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | PTL_DBG_NI_ALL); */
+/*
+ * utcp has shorter names for debug symbols; define catamount to these
+ * even though it never prints anything.
+ */
+#ifndef PTL_DBG_ALL
+#define  PTL_DBG_ALL PTL_DEBUG_ALL
+#define  PTL_DBG_NI_ALL PTL_DEBUG_NI_ALL
+#endif
+
+    PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | PTL_DBG_NI_ALL);
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | 0x001f0000); */
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | 0x00000000); */
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_DROP | 0x00000000); */
-
-    /* catamount has different debug symbols, but never prints anything */
-    PtlNIDebug(PTL_INVALID_HANDLE, PTL_DEBUG_ALL | PTL_DEBUG_NI_ALL);
-    /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DEBUG_DROP | 0x00000000); */
 
     /*
      * Allocate and build MDs for a queue of unexpected messages from

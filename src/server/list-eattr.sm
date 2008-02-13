@@ -238,6 +238,17 @@ static PINT_sm_action listeattr_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+PINT_GET_OBJECT_REF_DEFINE(listeattr);
+
+struct PINT_server_req_params pvfs2_list_eattr_params =
+{
+    .string_name = "listeattr",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_listeattr,
+    .state_machine = &pvfs2_list_eattr_sm
+};
+
 /*
  * Local variables:
  *  mode: c

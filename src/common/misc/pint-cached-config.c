@@ -388,7 +388,7 @@ int PINT_cached_config_get_next_meta(
     return ret;
 }
 
-int PINT_cached_config_get_extents(
+static int PINT_cached_config_get_extents(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     PVFS_BMI_addr_t *addr,

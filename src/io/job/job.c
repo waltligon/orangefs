@@ -99,6 +99,7 @@ static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
 static void flow_callback(flow_descriptor* flow_d);
 #ifndef __PVFS2_JOB_THREADED__
+static gen_mutex_t work_cycle_mutex = GEN_MUTEX_INITIALIZER;
 static void do_one_work_cycle_all(int idle_time_ms);
 #endif
 
@@ -961,8 +962,11 @@ int job_dev_write_list(void** buffer_list,
  * returns 0 on success, -errno on failure, and 1 on immediate
  * completion 
  */
-int job_req_sched_post(struct PVFS_server_req *in_request,
-                       int req_index,
+int job_req_sched_post(enum PVFS_server_op op,
+                       PVFS_fs_id fs_id,
+                       PVFS_handle handle,
+                       int read_only,
+                       int schedule,
                        void *user_ptr,
                        job_aint status_user_tag,
                        job_status_s * out_status_p,
@@ -992,7 +996,8 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
 
-    ret = PINT_req_sched_post(in_request, req_index, jd, &(jd->u.req_sched.id));
+    ret = PINT_req_sched_post(
+        op, fs_id, handle, read_only, schedule, jd, &(jd->u.req_sched.id));
 
     if (ret < 0)
     {
@@ -1019,6 +1024,51 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
      */
     *id = jd->job_id;
 
+    return (0);
+}
+
+int job_req_sched_change_mode(enum PVFS_server_mode mode,
+                              void *user_ptr,
+                              job_aint status_user_tag,
+                              job_status_s *out_status_p,
+                              job_id_t *id,
+                              job_context_id context_id)
+{
+    struct job_desc *jd = NULL;
+    int ret = -1;
+
+    jd = alloc_job_desc(JOB_REQ_SCHED);
+    if(!jd)
+    {
+        return (errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->u.req_sched.post_flag = 1;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+
+    ret = PINT_req_sched_change_mode(mode, jd, &(jd->u.req_sched.id));
+    if (ret < 0)
+    {
+        /* error posting */
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        *id = jd->job_id;
+        /* don't delete the job desc until a matching release comes through */
+        return (1);
+    }
+
+    *id = jd->job_id;
     return (0);
 }
 
@@ -4658,7 +4708,11 @@ static int completion_query_context(job_id_t * out_id_array_p,
  */
 static void do_one_work_cycle_all(int idle_time_ms)
 {
-    int total_pending_count = bmi_pending_count + bmi_unexp_pending_count
+    int total_pending_count = 0;
+    
+    gen_mutex_lock(&work_cycle_mutex);
+
+    total_pending_count = bmi_pending_count + bmi_unexp_pending_count
         + flow_pending_count + dev_unexp_pending_count + trove_pending_count;
 
     if (bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
@@ -4687,6 +4741,7 @@ static void do_one_work_cycle_all(int idle_time_ms)
          nanosleep(&ts, NULL); 
     }
 
+    gen_mutex_unlock(&work_cycle_mutex);
     return;
 }
 #endif

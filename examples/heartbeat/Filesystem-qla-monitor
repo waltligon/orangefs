@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: Filesystem-qla-monitor,v 1.1 2007-11-07 21:54:12 slang Exp $
+# $Id: Filesystem-qla-monitor,v 1.1.4.1 2008-02-13 19:48:37 walt Exp $
 #
 # Support:      linux-ha@lists.linux-ha.org
 # License:      GNU General Public License (GPL)
@@ -81,7 +81,12 @@
 #######################################################################
 # Initialization:
 
+# newer versions of heartbeat have moved the ocf-shellfuncs  file
+if [ -f /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs ] ; then
+. /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs
+else
 . /usr/lib/heartbeat/ocf-shellfuncs
+fi
 
 #######################################################################
 
@@ -103,7 +108,7 @@ check_util () {
 usage() {
 	cat <<-EOT
 	usage: $0 {start|stop|status|monitor|validate-all|meta-data}
-	$Id: Filesystem-qla-monitor,v 1.1 2007-11-07 21:54:12 slang Exp $
+	$Id: Filesystem-qla-monitor,v 1.1.4.1 2008-02-13 19:48:37 walt Exp $
 	EOT
 }
 

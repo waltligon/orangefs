@@ -236,6 +236,12 @@ static int server_parse_config(
         {
             ret = PINT_parse_config(config, fs_template, NULL);
         }
+        else
+        {
+            gossip_err("Failed to write fs.conf buffer to temp file: %s: %s\n",
+                       fs_template, strerror(errno));
+        }
+    
         close(fs_fd);
 
         remove(fs_template);
@@ -267,7 +273,8 @@ static PINT_sm_action server_get_config_setup_msgpair(
     {
         gossip_lerr("Failed to resolve BMI address %s\n",
                     sm_p->u.get_config.mntent->the_pvfs_config_server);
-        return ret;
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p);
@@ -314,7 +321,7 @@ static PINT_sm_action server_get_config_parse(
             gossip_err("Failed to get_config from host %s\n",
                        sm_p->u.get_config.mntent->the_pvfs_config_server); 
             js_p->error_code = ret;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
     }
 
@@ -340,7 +347,7 @@ static PINT_sm_action server_get_config_parse(
                        "directory or in the /tmp directory\n\n");
 
             js_p->error_code = -PVFS_ENODEV;
-            return(1);
+            return SM_ACTION_COMPLETE;
         }
 
         sm_p->u.get_config.mntent->fs_id = cur_fs->coll_id;

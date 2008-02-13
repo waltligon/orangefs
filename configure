@@ -712,10 +712,12 @@ NEEDS_LIBRT
 TARGET_OS_DARWIN
 TARGET_OS_LINUX
 BUILD_BMI_TCP
-GM_HOME
 BUILD_GM
-MX_HOME
+GM_INCDIR
+GM_LIBDIR
 BUILD_MX
+MX_INCDIR
+MX_LIBDIR
 BUILD_IB
 IB_INCDIR
 IB_LIBDIR
@@ -1336,7 +1338,7 @@ Optional Features:
                           (epoll is enabled by default, this option
 			  ensures no checking is done for x-compiling)
   --disable-epoll         Disable epoll, use poll instead
-  --enable-segv-backtrace Enables back traces in segfault signal handler
+  --disable-segv-backtrace Disables back traces in segfault signal handler
   --enable-shared         Build shared client library
   --enable-static-server  Builds the server static
 
@@ -1355,8 +1357,12 @@ Optional Packages:
   --with-valgrind=<path>  Use valgrind annotations for debugging.
   --with-db=<dir>         Location of installed DB package (default=/usr)
   --without-bmi-tcp       Disable BMI TCP method
-  --with-gm=<dir>         Location of the GM installation (default no GM)
-  --with-mx=<dir>         Location of the MX installation (default no MX)
+  --with-gm=<dir>     Location of the GM install (default no GM)
+  --with-gm-includes=<dir>  Location of the GM includes
+  --with-gm-libs=<dir>      Location of the GM libraries
+  --with-mx=<dir>     Location of the MX install (default no MX)
+  --with-mx-includes=<dir>  Location of the MX includes
+  --with-mx-libs=<dir>      Location of the MX libraries
   --with-ib=<dir>         Location of the IB installation (default no IB)
   --with-ib-includes=<dir>      Location of the IB includes
   --with-ib-libs=<dir>          Location of the IB libraries
@@ -1835,9 +1841,9 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=2
 PVFS2_MINOR=7
-PVFS2_SUB=0
-PVFS2_PRE=""
-#PVFS2_PRE="pre1-$CONFIGURE_TIME"
+PVFS2_SUB=1
+#PVFS2_PRE=""
+PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE
 
@@ -7025,7 +7031,7 @@ int
 main ()
 {
 
-    	struct aiocb;
+    	struct aiocb aiocb;
 	aiocb.__error_code = 0;
 
   ;
@@ -7083,7 +7089,7 @@ int
 main ()
 {
 
-        struct aiocb;
+        struct aiocb aiocb;
 	aiocb.__return_value = 0;
 
   ;
@@ -8349,7 +8355,9 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-		{ echo "$as_me:$LINENO: checking for struct kmem_cache in kernel" >&5
+									        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+	{ echo "$as_me:$LINENO: checking for struct kmem_cache in kernel" >&5
 echo $ECHO_N "checking for struct kmem_cache in kernel... $ECHO_C" >&6; }
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
@@ -8359,8 +8367,13 @@ cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
 		#define __KERNEL__
+		#include <linux/kernel.h>
 		#include <linux/slab.h>
-		static struct kmem_cache;
+
+		int foo(struct kmem_cache *s)
+		{
+		    return (s == NULL) ? 3 : 4;
+		}
 
 int
 main ()
@@ -8404,6 +8417,7 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
 
 		{ echo "$as_me:$LINENO: checking for SLAB_KERNEL flag in kernel" >&5
 echo $ECHO_N "checking for SLAB_KERNEL flag in kernel... $ECHO_C" >&6; }
@@ -11440,6 +11454,302 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+        							tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ echo "$as_me:$LINENO: checking for two-param kmem_cache_create constructor" >&5
+echo $ECHO_N "checking for two-param kmem_cache_create constructor... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		void ctor(struct kmem_cache *cachep, void *req)
+		{
+		}
+
+int
+main ()
+{
+
+		kmem_cache_create("config-test", 0, 0, 0, ctor);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+	CFLAGS=$tmp_cflags
+
+	{ echo "$as_me:$LINENO: checking if kernel address_space struct has a spin_lock field named page_lock" >&5
+echo $ECHO_N "checking if kernel address_space struct has a spin_lock field named page_lock... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+
+int
+main ()
+{
+
+		struct address_space as;
+		spin_lock(&as.page_lock);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_SPIN_LOCK_PAGE_ADDR_SPACE_STRUCT 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+        { echo "$as_me:$LINENO: checking if kernel address_space struct has a rwlock_t field named tree_lock" >&5
+echo $ECHO_N "checking if kernel address_space struct has a rwlock_t field named tree_lock... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+
+int
+main ()
+{
+
+		struct address_space as;
+		read_lock(&as.tree_lock);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	{ echo "$as_me:$LINENO: checking if kernel address_space struct has a priv_lock field - from RT linux" >&5
+echo $ECHO_N "checking if kernel address_space struct has a priv_lock field - from RT linux... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+
+int
+main ()
+{
+
+		struct address_space as;
+		spin_lock(&as.priv_lock);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	{ echo "$as_me:$LINENO: checking if kernel defines mapping_nrpages macro - from RT linux" >&5
+echo $ECHO_N "checking if kernel defines mapping_nrpages macro - from RT linux... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+
+int
+main ()
+{
+
+		struct address_space idata;
+		int i = mapping_nrpages(&idata);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_MAPPING_NRPAGES_MACRO 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 	CFLAGS=$oldcflags
 
 
@@ -11711,7 +12021,63 @@ fi
 
 # Check whether --enable-segv-backtrace was given.
 if test "${enable_segv_backtrace+set}" = set; then
-  enableval=$enable_segv_backtrace; PVFS2_SEGV_BACKTRACE=1
+  enableval=$enable_segv_backtrace;
+else
+  { echo "$as_me:$LINENO: checking if segv backtrace capable" >&5
+echo $ECHO_N "checking if segv backtrace capable... $ECHO_C" >&6; }
+    cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
+#if !defined(REG_EIP) && !defined(REG_RIP)
+		   choke me
+#endif
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+    		   PVFS2_SEGV_BACKTRACE=1
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 fi
 
 
@@ -14079,24 +14445,62 @@ fi
 
 
 
-GM_HOME=
+
+                    gm_home=
 
 # Check whether --with-gm was given.
 if test "${with_gm+set}" = set; then
   withval=$with_gm; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-gm requires the path to your GM tree." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-gm requires the path to your GM tree." >&5
 echo "$as_me: error: Option --with-gm requires the path to your GM tree." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	GM_HOME="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    gm_home="$withval"
+	fi
 
 fi
 
-if test -n "$GM_HOME" ; then
-    save_cppflags="$CPPFLAGS"
-    CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
-    if test "${ac_cv_header_gm_h+set}" = set; then
+
+# Check whether --with-gm-includes was given.
+if test "${with_gm_includes+set}" = set; then
+  withval=$with_gm_includes; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-gm-includes requires path to GM headers." >&5
+echo "$as_me: error: Option --with-gm-includes requires path to GM headers." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    GM_INCDIR="$withval"
+	fi
+
+fi
+
+
+# Check whether --with-gm-libs was given.
+if test "${with_gm_libs+set}" = set; then
+  withval=$with_gm_libs; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-gm-libs requires path to GM libraries." >&5
+echo "$as_me: error: Option --with-gm-libs requires path to GM libraries." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    GM_LIBDIR="$withval"
+	fi
+
+fi
+
+            if test -n "$gm_home" ; then
+	if test -z "$GM_INCDIR"; then
+	    GM_INCDIR=$gm_home/include
+	fi
+	if test -z "$GM_LIBDIR"; then
+	    GM_LIBDIR=$gm_home/lib64
+	    if test ! -d "$GM_LIBDIR" ; then
+		GM_LIBDIR=$gm_home/lib
+	    fi
+	fi
+    fi
+        if test -n "$GM_INCDIR$GM_LIBDIR" ; then
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$GM_INCDIR -I$GM_INCDIR/gm"
+	if test "${ac_cv_header_gm_h+set}" = set; then
   { echo "$as_me:$LINENO: checking for gm.h" >&5
 echo $ECHO_N "checking for gm.h... $ECHO_C" >&6; }
 if test "${ac_cv_header_gm_h+set}" = set; then
@@ -14230,29 +14634,77 @@ echo "$as_me: error: Header gm.h not found." >&2;}
 fi
 
 
-    BUILD_GM=1
-    CPPFLAGS="$save_cppflags"
-fi
+			if test ! -f $GM_LIBDIR/libgm.so ; then
+	    if test ! -f $GM_LIBDIR/libgm.a ; then
+		{ { echo "$as_me:$LINENO: error: Neither GM library libgm.so or libgm.a found." >&5
+echo "$as_me: error: Neither GM library libgm.so or libgm.a found." >&2;}
+   { (exit 1); exit 1; }; }
+	    fi
+	fi
+	BUILD_GM=1
+	CPPFLAGS="$save_cppflags"
+    fi
 
 
 
-MX_HOME=
+
+
+
+                    mx_home=
 
 # Check whether --with-mx was given.
 if test "${with_mx+set}" = set; then
   withval=$with_mx; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-mx requires the path to your MX tree." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-mx requires the path to your MX tree." >&5
 echo "$as_me: error: Option --with-mx requires the path to your MX tree." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	MX_HOME="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    mx_home="$withval"
+	fi
 
 fi
 
-if test -n "$MX_HOME" ; then
-    CPPFLAGS="$CPPFLAGS -I ${MX_HOME}/include"
-    if test "${ac_cv_header_myriexpress_h+set}" = set; then
+
+# Check whether --with-mx-includes was given.
+if test "${with_mx_includes+set}" = set; then
+  withval=$with_mx_includes; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-mx-includes requires path to MX headers." >&5
+echo "$as_me: error: Option --with-mx-includes requires path to MX headers." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    MX_INCDIR="$withval"
+	fi
+
+fi
+
+
+# Check whether --with-mx-libs was given.
+if test "${with_mx_libs+set}" = set; then
+  withval=$with_mx_libs; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-mx-libs requires path to MX libraries." >&5
+echo "$as_me: error: Option --with-mx-libs requires path to MX libraries." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    MX_LIBDIR="$withval"
+	fi
+
+fi
+
+            if test -n "$mx_home" ; then
+	if test -z "$MX_INCDIR"; then
+	    MX_INCDIR=$mx_home/include
+	fi
+	if test -z "$MX_LIBDIR"; then
+	    MX_LIBDIR=$mx_home/lib64
+	    if test ! -d "$MX_LIBDIR" ; then
+		MX_LIBDIR=$mx_home/lib
+	    fi
+	fi
+    fi
+        if test -n "$MX_INCDIR$MX_LIBDIR" ; then
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$MX_INCDIR -I$MX_INCDIR/mx"
+	if test "${ac_cv_header_myriexpress_h+set}" = set; then
   { echo "$as_me:$LINENO: checking for myriexpress.h" >&5
 echo $ECHO_N "checking for myriexpress.h... $ECHO_C" >&6; }
 if test "${ac_cv_header_myriexpress_h+set}" = set; then
@@ -14386,13 +14838,18 @@ echo "$as_me: error: Header myriexpress.h not found." >&2;}
 fi
 
 
-    BUILD_MX=1
-    CPPFLAGS="$CPPFLAGS_OLD"
-    CFLAGS="${CFLAGS} -I${MX_HOME}/include"
-    LDFLAGS="$LDFLAGS -L${MX_HOME}/lib"
-    SERVER_LDFLAGS="$SERVER_LDFLAGS -L${MX_HOME}/lib"
-    LIBS="$LIBS -lmyriexpress"
-fi
+			if test ! -f $MX_LIBDIR/libmyriexpress.so ; then
+	    if test ! -f $MX_LIBDIR/libmyriexpress.a ; then
+		{ { echo "$as_me:$LINENO: error: Neither MX library libmyriexpress.so or libmyriexpress.a found." >&5
+echo "$as_me: error: Neither MX library libmyriexpress.so or libmyriexpress.a found." >&2;}
+   { (exit 1); exit 1; }; }
+	    fi
+	fi
+	BUILD_MX=1
+	CPPFLAGS="$save_cppflags"
+    fi
+
+
 
 
 
@@ -15043,7 +15500,7 @@ fi
 	CPPFLAGS="$CPPFLAGS $PORTALS_INCS"
 
 	PORTALS_LIBS="$libs"
-	LIBS="$LIBS $PORTALS_LIBS"
+	LIBS="$save_libs $PORTALS_LIBS"
 
 	{ echo "$as_me:$LINENO: checking for portals3.h header" >&5
 echo $ECHO_N "checking for portals3.h header... $ECHO_C" >&6; }
@@ -15150,7 +15607,7 @@ rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lportals"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -15198,7 +15655,7 @@ rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -16449,7 +16906,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT 1
+#define HAVE_GETMNTENT
 _ACEOF
 
 else
@@ -18063,10 +18520,12 @@ for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
 TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
 BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
-GM_HOME!$GM_HOME$ac_delim
 BUILD_GM!$BUILD_GM$ac_delim
-MX_HOME!$MX_HOME$ac_delim
+GM_INCDIR!$GM_INCDIR$ac_delim
+GM_LIBDIR!$GM_LIBDIR$ac_delim
 BUILD_MX!$BUILD_MX$ac_delim
+MX_INCDIR!$MX_INCDIR$ac_delim
+MX_LIBDIR!$MX_LIBDIR$ac_delim
 BUILD_IB!$BUILD_IB$ac_delim
 IB_INCDIR!$IB_INCDIR$ac_delim
 IB_LIBDIR!$IB_LIBDIR$ac_delim
@@ -18085,7 +18544,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 22; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 24; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5

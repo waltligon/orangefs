@@ -299,32 +299,24 @@ endif
 # enable GM if configure detected it
 
 ifdef BUILD_GM
-	CFLAGS += -I @GM_HOME@/include -I @GM_HOME@/include/gm
-	CFLAGS += -D__STATIC_METHOD_BMI_GM__
-	# TODO: later on we will want the ability to modify this at configure
-	# time
-	CFLAGS += -DENABLE_GM_BUFPOOL
-	LDFLAGS += -L@GM_HOME@/lib
-	SERVER_LDFLAGS += -L@GM_HOME@/lib
-	LIBS += -lgm
-	LIBS_THREADED += -lgm
-	SERVERLIBS += -lgm
+    # other settings in bmi_gm/module.mk.in
+    CFLAGS += -D__STATIC_METHOD_BMI_GM__
+    GMLIBS := -L@GM_LIBDIR@ -lgm
+    LIBS += $(GMLIBS)
+    LIBS_THREADED += $(GMLIBS)
+    SERVERLIBS += $(GMLIBS)
 endif
 
 ################################################################
 # enable MX if configure detected it
 
 ifdef BUILD_MX
-	CFLAGS += -I @MX_HOME@/include
-	CFLAGS += -D__STATIC_METHOD_BMI_MX__
-	# TODO: later on we will want the ability to modify this at configure
-	# time
-	CFLAGS += -g -O0
-	LDFLAGS += -L@MX_HOME@/lib
-	SERVER_LDFLAGS += -L@MX_HOME@/lib
-	LIBS += -lmyriexpress -lpthread
-	LIBS_THREADED += -lmyriexpress -lpthread
-	SERVERLIBS += -lmyriexpress -lpthread
+    # other settings in bmi_mx/module.mk.in
+    CFLAGS += -D__STATIC_METHOD_BMI_MX__
+    MXLIBS := -L@MX_LIBDIR@ -lmyriexpress -lpthread
+    LIBS += $(MXLIBS)
+    LIBS_THREADED += $(MXLIBS)
+    SERVERLIBS += $(MXLIBS)
 endif
 
 #####################################
@@ -401,6 +393,8 @@ ADMINSRC_SERVER :=
 LIBSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
+# SERVERBINSRC is source files that don't get added to the server library but must be added to the server binary
+SERVERBINSRC :=
 # DOCSRC is source code for documentation
 DOCSRC :=
 # VISSRC is the source code for visualization tools
@@ -493,6 +487,9 @@ ifdef BUILD_SERVER
     SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
     # SERVERDEPENDS is a list of dependency files for the server
     SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
+    # SERVERBINOBJS is a list of objects not in SERVEROBJS to put into the server
+    SERVERBINOBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERBINSRC)))
+    SERVERBINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERBINSRC)))
 endif
 
 # MISCOBJS is a list of misc. objects not in the above categories
@@ -545,7 +542,8 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) \
+DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(SERVERBINDEPENDS) \
+    $(MISCDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
     $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS))
 
@@ -560,6 +558,9 @@ admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 # target for building kernel driver userland programs
 kernapps: $(KERNAPPS) $(KERNAPPSTHR)
+
+# this is needed for the make dist
+statecompgen: $(STATECOMPGEN)
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -600,7 +601,7 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 # SHORT_NAME and the object
 
 # rule for building the pvfs2 server
-$(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a 
+$(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a 
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
@@ -766,7 +767,8 @@ docsclean:
 # top rule for cleaning up tree
 clean:: 
 	$(Q) "  CLEAN"
-	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) $(SERVEROBJS) $(MISCOBJS) \
+	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) \
+		$(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
 		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\

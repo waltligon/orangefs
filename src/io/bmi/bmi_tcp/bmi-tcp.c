@@ -287,7 +287,7 @@ static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr);
 static void bmi_set_sock_buffers(int socket);
 
 /* exported method interface */
-struct bmi_method_ops bmi_tcp_ops = {
+const struct bmi_method_ops bmi_tcp_ops = {
     .method_name = BMI_tcp_method_name,
     .initialize = BMI_tcp_initialize,
     .finalize = BMI_tcp_finalize,
@@ -1939,8 +1939,6 @@ bmi_method_addr_p alloc_tcp_method_addr(void)
 	return (NULL);
     }
 
-    my_method_addr->ops = &bmi_tcp_ops;
-
     /* note that we trust the alloc_method_addr() function to have zeroed
      * out the structures for us already 
      */
@@ -2412,9 +2410,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 
 	/* whoohoo- it is already done! */
 	/* copy buffer out to list segments; handle short case */
-	for (i = 0; i < query_op->list_count; i++)
+	for (i = 0; i < list_count; i++)
 	{
-	    copy_size = query_op->size_list[i];
+	    copy_size = size_list[i];
 	    if (copy_size + total_copied > query_op->actual_size)
 	    {
 		copy_size = query_op->actual_size - total_copied;
@@ -2456,9 +2454,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 
 	/* copy what we have so far into the correct buffers */
 	total_copied = 0;
-	for (i = 0; i < query_op->list_count; i++)
+	for (i = 0; i < list_count; i++)
 	{
-	    copy_size = query_op->size_list[i];
+	    copy_size = size_list[i];
 	    if (copy_size + total_copied > query_op->amt_complete)
 	    {
 		copy_size = query_op->amt_complete - total_copied;
@@ -3006,7 +3004,7 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
     if (ret < TCP_ENC_HDR_SIZE)
     {
 	tmp_errno = errno;
-	gossip_err("Error: BMI_sockio_brecv: %s\n", strerror(tmp_errno));
+	gossip_err("Error: BMI_sockio_nbrecv: %s\n", strerror(tmp_errno));
 	tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-tmp_errno));
 	return (0);
     }

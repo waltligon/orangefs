@@ -4,8 +4,6 @@
  * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
- *
- * $Id: util.c,v 1.12 2007-07-22 16:15:01 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>

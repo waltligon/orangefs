@@ -2578,7 +2578,7 @@ static int io_zero_fill_holes(
         PVFS_size real_bstream_size, actual_bstream_size;
 
         fdata.server_nr = (datafile_index_array ? datafile_index_array[i] : i);
-        actual_bstream_size = datafile_size_array[fdata.server_nr];
+        actual_bstream_size = datafile_size_array[i];
 
         fdata.fsize = actual_bstream_size;
 

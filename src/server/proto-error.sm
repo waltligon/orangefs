@@ -95,6 +95,12 @@ static PINT_sm_action proto_error_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+struct PINT_server_req_params pvfs2_proto_error_params =
+{
+    .string_name = "proto_error",
+    .state_machine = &pvfs2_proto_error_sm
+};
+
 
 /*
  * Local variables:

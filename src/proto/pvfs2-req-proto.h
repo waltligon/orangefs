@@ -408,7 +408,7 @@ struct PVFS_servreq_lookup_path
 {
     char *path;                  /* path name */
     PVFS_fs_id fs_id;            /* file system */
-    PVFS_handle starting_handle; /* handle of path parent */
+    PVFS_handle handle; /* handle of path parent */
     /* mask of attribs to return with lookup results */
     uint32_t attrmask;
 };
@@ -417,7 +417,7 @@ endecode_fields_5_struct(
     string, path,
     PVFS_fs_id, fs_id,
     skip4,,
-    PVFS_handle, starting_handle,
+    PVFS_handle, handle,
     uint32_t, attrmask)
 #define extra_size_PVFS_servreq_lookup_path \
   roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES + 1)
@@ -434,7 +434,7 @@ do {                                                   \
     (__req).credentials = (__creds);                   \
     (__req).u.lookup_path.path = (__path);             \
     (__req).u.lookup_path.fs_id = (__fsid);            \
-    (__req).u.lookup_path.starting_handle = (__handle);\
+    (__req).u.lookup_path.handle = (__handle);\
     (__req).u.lookup_path.attrmask = (__amask);        \
 } while (0)
 
@@ -519,14 +519,14 @@ struct PVFS_servreq_crdirent
 {
     char *name;                /* name of new entry */
     PVFS_handle new_handle;    /* handle of new entry */
-    PVFS_handle parent_handle; /* handle of directory */
+    PVFS_handle handle; /* handle of directory */
     PVFS_fs_id fs_id;          /* file system */
 };
 endecode_fields_4_struct(
     PVFS_servreq_crdirent,
     string, name,
     PVFS_handle, new_handle,
-    PVFS_handle, parent_handle,
+    PVFS_handle, handle,
     PVFS_fs_id, fs_id)
 #define extra_size_PVFS_servreq_crdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -535,7 +535,7 @@ endecode_fields_4_struct(
                                    __creds,         \
                                    __name,          \
                                    __new_handle,    \
-                                   __parent_handle, \
+                                   __handle,        \
                                    __fs_id)         \
 do {                                                \
     memset(&(__req), 0, sizeof(__req));             \
@@ -543,8 +543,8 @@ do {                                                \
     (__req).credentials = (__creds);                \
     (__req).u.crdirent.name = (__name);             \
     (__req).u.crdirent.new_handle = (__new_handle); \
-    (__req).u.crdirent.parent_handle =              \
-       (__parent_handle);                           \
+    (__req).u.crdirent.handle =                     \
+       (__handle);                           \
     (__req).u.crdirent.fs_id = (__fs_id);           \
 } while (0)
 
@@ -554,13 +554,13 @@ do {                                                \
 struct PVFS_servreq_rmdirent
 {
     char *entry;               /* name of entry to remove */
-    PVFS_handle parent_handle; /* handle of directory */
+    PVFS_handle handle; /* handle of directory */
     PVFS_fs_id fs_id;          /* file system */
 };
 endecode_fields_3_struct(
     PVFS_servreq_rmdirent,
     string, entry,
-    PVFS_handle, parent_handle,
+    PVFS_handle, handle,
     PVFS_fs_id, fs_id)
 #define extra_size_PVFS_servreq_rmdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -575,7 +575,7 @@ do {                                              \
     (__req).op = PVFS_SERV_RMDIRENT;              \
     (__req).credentials = (__creds);              \
     (__req).u.rmdirent.fs_id = (__fsid);          \
-    (__req).u.rmdirent.parent_handle = (__handle);\
+    (__req).u.rmdirent.handle = (__handle);       \
     (__req).u.rmdirent.entry = (__entry);         \
 } while (0);
 
@@ -594,14 +594,14 @@ struct PVFS_servreq_chdirent
 {
     char *entry;                   /* name of entry to remove */
     PVFS_handle new_dirent_handle; /* handle of directory */
-    PVFS_handle parent_handle;     /* handle of directory */
+    PVFS_handle handle;     /* handle of directory */
     PVFS_fs_id fs_id;              /* file system */
 };
 endecode_fields_4_struct(
     PVFS_servreq_chdirent,
     string, entry,
     PVFS_handle, new_dirent_handle,
-    PVFS_handle, parent_handle,
+    PVFS_handle, handle,
     PVFS_fs_id, fs_id)
 #define extra_size_PVFS_servreq_chdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -609,7 +609,7 @@ endecode_fields_4_struct(
 #define PINT_SERVREQ_CHDIRENT_FILL(__req,          \
                                    __creds,        \
                                    __fsid,         \
-                                   __parent_handle,\
+                                   __handle,       \
                                    __new_dirent,   \
                                    __entry)        \
 do {                                               \
@@ -617,8 +617,8 @@ do {                                               \
     (__req).op = PVFS_SERV_CHDIRENT;               \
     (__req).credentials = (__creds);               \
     (__req).u.chdirent.fs_id = (__fsid);           \
-    (__req).u.chdirent.parent_handle =             \
-        (__parent_handle);                         \
+    (__req).u.chdirent.handle =                    \
+        (__handle);                                \
     (__req).u.chdirent.new_dirent_handle =         \
         (__new_dirent);                            \
     (__req).u.chdirent.entry = (__entry);          \

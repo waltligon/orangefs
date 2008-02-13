@@ -23,6 +23,7 @@
 #ifndef __PVFS2_MGMT_H
 #define __PVFS2_MGMT_H
 
+#include "pvfs2-sysint.h"
 #include "pvfs2-types.h"
 
 /* non-blocking mgmt operation handle */
@@ -361,12 +362,34 @@ int PVFS_mgmt_testsome(
 
 int PVFS_mgmt_cancel(PVFS_mgmt_op_id op_id);
 
+PVFS_error PVFS_imgmt_repair_file(
+    char *object_name,
+    PVFS_object_ref parent_ref,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials,
+    PVFS_handle handle,
+    PVFS_sysresp_create *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_repair_file(
+    char *object_name,
+    PVFS_object_ref parent_ref,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials,
+    PVFS_handle handle,
+    PVFS_sysresp_create *resp);
+                        
 int PVFS_mgmt_get_config(
     const PVFS_fs_id* fsid,
     PVFS_BMI_addr_t* addr,
     char* fs_buf,
     int fs_buf_size);
 
+PVFS_error PVFS_mgmt_map_handle(
+    PVFS_fs_id fs_id,
+    PVFS_handle handle,
+    PVFS_BMI_addr_t *addr);
 
 #endif /* __PVFS2_MGMT_H */
 

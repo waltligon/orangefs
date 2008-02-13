@@ -5,8 +5,6 @@
  * Copyright (C) 2006 Kyle Schochenmaier <kschoche@scl.ameslab.gov>
  *
  * See COPYING in top-level directory.
- *
- * $Id: ib.c,v 1.58.2.1 2007-11-09 00:32:05 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -217,8 +215,9 @@ static int ib_check_cq(void)
 		    assert(0, "%s: unknown send state %s (%d) of sq %p",
 		           __func__, sq_state_name(sq->state.send),
 			   sq->state.send, sq);
-		debug(2, "%s: send to %s completed locally: -> %s",
-		      __func__, bh->c->peername, sq_state_name(sq->state.send));
+		debug(2, "%s: send to %s completed locally: sq %p -> %s",
+		      __func__, bh->c->peername, sq,
+		      sq_state_name(sq->state.send));
 
 	    } else {
 		struct ib_work *rq = sq;  /* rename */
@@ -229,8 +228,9 @@ static int ib_check_cq(void)
 		else
 		    assert(0, "%s: unknown send state %s of rq %p",
 		           __func__, rq_state_name(rq->state.recv), rq);
-		debug(2, "%s: send to %s completed locally: -> %s",
-		      __func__, bh->c->peername, rq_state_name(rq->state.recv));
+		debug(2, "%s: send to %s completed locally: rq %p -> %s",
+		      __func__, bh->c->peername, rq,
+		      rq_state_name(rq->state.recv));
 	    }
 
 	    qlist_add_tail(&bh->list, &bh->c->eager_send_buf_free);
@@ -599,7 +599,8 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
 
 	rq = NULL;
 	qlist_for_each_entry(rqt, &ib_device->recvq, list) {
-	    if (rqt->c == c && rqt->rts_mop_id == mh_rts_done.mop_id) {
+	    if (rqt->c == c && rqt->rts_mop_id == mh_rts_done.mop_id &&
+		rqt->state.recv == RQ_RTS_WAITING_RTS_DONE) {
 		rq = rqt;
 		break;
 	    }
@@ -607,9 +608,6 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
 
 	assert(rq, "%s: mop_id %llx in RTS_DONE message not found",
 	       __func__, llu(mh_rts_done.mop_id));
-	assert(rq->state.recv == RQ_RTS_WAITING_RTS_DONE,
-	       "%s: RTS_DONE to rq wrong state %s",
-	       __func__, rq_state_name(rq->state.recv));
 
 #if MEMCACHE_BOUNCEBUF
 	memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
@@ -1541,7 +1539,7 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
     struct bmi_method_addr *map;
     ib_method_addr_t *ibmap;
 
-    map = alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
+    map = bmi_alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
     ibmap = map->method_data;
     ibmap->c = c;
     ibmap->hostname = hostname;
@@ -1609,7 +1607,6 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
     else
     {
 	map = ib_alloc_method_addr(0, hostname, port);  /* alloc new one */
-	map->ops = &bmi_ib_ops;
 	/* but don't call bmi_method_addr_reg_callback! */
     }
 
@@ -1939,7 +1936,6 @@ static int BMI_ib_set_info(int option, void *param __unused)
 	ib_method_addr_t *ibmap = map->method_data;
 	free(ibmap->hostname);
 	free(map);
-	bmi_method_addr_forget_callback(ibmap->c->bmi_addr);
 	break;
     }
     case BMI_OPTIMISTIC_BUFFER_REG: {

@@ -112,17 +112,33 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
-	dnl 2.6.20 deprecated kmem_cache_t
+	dnl 2.6.20 deprecated kmem_cache_t; some old ones do not have struct
+	dnl kmem_cache, but may have kmem_cache_s.  It's a mess.  Just look
+	dnl for this, and assume _t if not found.
+	dnl This test relies on gcc complaining about declaring a struct
+	dnl in a parameter list.  Fragile, but nothing better is available
+	dnl to check for the existence of a struct.  We cannot see the
+	dnl definition of the struct in the kernel, it's private to the
+	dnl slab implementation.  And C lets you declare structs freely as
+	dnl long as you don't try to deal with their contents.
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for struct kmem_cache in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#include <linux/kernel.h>
 		#include <linux/slab.h>
-		static struct kmem_cache;
+
+		int foo(struct kmem_cache *s)
+		{
+		    return (s == NULL) ? 3 : 4;
+		}
 	], [],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_STRUCT_KMEM_CACHE, 1, Define if struct kmem_cache is defined in kernel),
 		AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
 
 	dnl 2.6.20 removed SLAB_KERNEL.  Need to use GFP_KERNEL instead
 	AC_MSG_CHECKING(for SLAB_KERNEL flag in kernel)
@@ -846,6 +862,84 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM, 1, [Define if kernel kmem_cache_create has destructor param]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl 2.6.24 changed the constructor parameter signature of
+	dnl kmem_cache_create.  Check for this newer two-param style and
+	dnl if not, assume it is old.  Note we can get away with just
+	dnl struct kmem_cache (and not kmem_cache_t) as that change happened
+	dnl in older kernels.  If they don't match, gcc complains about
+	dnl passing argument ... from incompatible pointer type, hence the
+	dnl need for the -Werror.
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for two-param kmem_cache_create constructor)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		void ctor(struct kmem_cache *cachep, void *req)
+		{
+		}
+	], [
+		kmem_cache_create("config-test", 0, 0, 0, ctor);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM, 1, [Define if kernel kmem_cache_create constructor has new-style two-parameter form]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
+	AC_MSG_CHECKING(if kernel address_space struct has a spin_lock field named page_lock)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		spin_lock(&as.page_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SPIN_LOCK_PAGE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock member named page_lock instead of rw_lock]),
+	AC_MSG_RESULT(no)
+	)
+
+        AC_MSG_CHECKING(if kernel address_space struct has a rwlock_t field named tree_lock)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		read_lock(&as.tree_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock member named tree_lock instead of rw_lock]),
+	AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(if kernel address_space struct has a priv_lock field - from RT linux)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		spin_lock(&as.priv_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock for private data instead of rw_lock -- used by RT linux]),
+	AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(if kernel defines mapping_nrpages macro - from RT linux)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space idata;
+		int i = mapping_nrpages(&idata);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_MAPPING_NRPAGES_MACRO, 1, [Define if kernel defines mapping_nrpages macro -- defined by RT linux]),
 	AC_MSG_RESULT(no)
 	)
 

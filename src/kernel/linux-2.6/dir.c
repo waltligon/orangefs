@@ -124,7 +124,6 @@ static int pvfs2_readdir(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-
     pos = (PVFS_ds_position)file->f_pos;
     /* are we done? */
     if (pos == PVFS_READDIR_END)
@@ -138,7 +137,7 @@ static int pvfs2_readdir(
     gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir called on %s (pos=%d)\n",
                  dentry->d_name.name, (int)pos);
 
-    switch (pos)
+    switch ((uint32_t)pos)
     {
 	/*
 	   if we're just starting, populate the "." and ".." entries
@@ -266,6 +265,12 @@ static int pvfs2_readdir(
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
                 {
+                    gossip_debug(GOSSIP_DIR_DEBUG, "filldir() failed.\n");
+                    if(token_set && (i < 2))
+                    {
+                        gossip_err("Filldir failed on one of the first two true PVFS directory entries.\n");
+                        gossip_err("Duplicate entries may appear.\n");
+                    }
                     ret = 0;
                     break;
                 }
@@ -276,13 +281,21 @@ static int pvfs2_readdir(
              * returned by the readdir response */
             if (token_set == 1) 
             {
+                /* this means that all of the filldir calls succeeded */
                 if (i == rhandle.readdir_response.pvfs_dirent_outcount)
+                {
                     file->f_pos = rhandle.readdir_response.token;
+                }
                 else 
-                    file->f_pos = i;
+                {
+                    /* this means a filldir call failed */
+                    file->f_pos = i - 1;
+                    gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  Setting f_pos to: %ld\n", (unsigned long) file->f_pos);
+                }
             }
+
             gossip_debug(GOSSIP_DIR_DEBUG, 
-                         "pos = %llu, file->f_pos should have been %ld\n", 
+                         "pos = %llu, file->f_pos should have been %ld\n",
                          llu(pos),
                          (unsigned long) file->f_pos);
         }
@@ -885,7 +898,8 @@ struct file_operations pvfs2_dir_operations =
     read : generic_read_dir,
     readdir : pvfs2_readdir,
     open : pvfs2_file_open,
-    release : pvfs2_file_release
+    release : pvfs2_file_release,
+    llseek : pvfs2_dir_llseek
 #else
     .read = generic_read_dir,
     .readdir = pvfs2_readdir,
@@ -896,7 +910,7 @@ struct file_operations pvfs2_dir_operations =
     .readdirplus_lite = pvfs2_readdirplus_lite,
 #endif
     .open = pvfs2_file_open,
-    .release = pvfs2_file_release
+    .release = pvfs2_file_release,
 #endif
 };
 

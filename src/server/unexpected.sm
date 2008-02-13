@@ -99,6 +99,10 @@ static PINT_sm_action unexpected_map(
          */
         gossip_lerr("Error: post unexpected failure when restarting.\n");
     }
+
+    /* Bump up the reference count on the bmi address that we are using */
+    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_INC_ADDR_REF, NULL);
+
     /* restart as new request state machine */
     memset(js_p, 0, sizeof(job_status_s));
     ret = server_state_machine_start(smcb, js_p);

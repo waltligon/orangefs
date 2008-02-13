@@ -35,14 +35,8 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: parent not found.\n");
     }
     
-    if (inode == NULL) {
-        return 1;
-    }
     if (inode && parent_inode)
     {
-        if (is_bad_inode(inode)) {
-            return 0;
-        }
         /* first perform a lookup to make sure that the object not only
          * exists, but is still in the expected place in the name space 
          */
@@ -79,30 +73,18 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
                 new_op, "pvfs2_lookup", 
                 get_interruptible_flag(parent_inode));
 
-            if ((new_op->downcall.status != 0)) {
-                gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: lookup failure.\n");
-                op_release(new_op);
-                return 0;
-            }
-            /* no match */
-            if (!match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
+            if((new_op->downcall.status != 0) || 
+                    !match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
             {
-                struct inode *res_inode;
-
-                /* Find or allocate a new inode for this new handle */
-                res_inode = pvfs2_iget(parent_inode->i_sb, &new_op->downcall.resp.lookup.refn);
-                if (res_inode != NULL) {
-                    /* associate with the given dentry */
-                    pvfs2_d_splice_alias(dentry, res_inode);
-                    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: associated inode %llu)\n",
-                                 llu(get_handle_from_ino(res_inode)));
-                    inode = res_inode;
-                } else {
-                    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: lookup failure or no match.\n");
-                    op_release(new_op);
-                    return(0);
-                }
+                gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: lookup failure or no match.\n");
+                op_release(new_op);
+                /* mark the inode as bad so that d_delete will be aggressive
+                 * about dropping the dentry
+                 */
+                pvfs2_make_bad_inode(inode);
+                return(0);
             }
+            
             op_release(new_op);
         }
         else
@@ -121,6 +103,21 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         gossip_debug(GOSSIP_DCACHE_DEBUG, "\n");
     }
     return ret;
+}
+
+static int pvfs2_d_delete (struct dentry * dentry)
+{
+    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_delete: called on dentry %p.\n", dentry);
+    if(dentry->d_inode && is_bad_inode(dentry->d_inode))
+    {
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_delete: returning 1 (bad inode).\n");
+        return 1;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_delete: returning 0 (inode looks ok).\n");
+        return 0;
+    }
 }
 
 /* should return 1 if dentry can still be trusted, else 0 */
@@ -187,6 +184,7 @@ struct dentry_operations pvfs2_dentry_operations =
     .d_revalidate = pvfs2_d_revalidate,
     .d_hash = pvfs2_d_hash,
     .d_compare = pvfs2_d_compare,
+    .d_delete = pvfs2_d_delete,
 };
 
 /*

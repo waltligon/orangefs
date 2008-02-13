@@ -31,7 +31,6 @@ typedef struct
 
     PVFS_fs_id fs_id;
 
-    gen_mutex_t server_config_mutex;
     struct server_configuration_s *server_config;
     int ref_count; /* allows same config to be added multiple times */
 } server_config_t;
@@ -112,7 +111,6 @@ int PINT_server_config_mgr_finalize(void)
 
                     PINT_config_release(config->server_config);
                     free(config->server_config);
-                    gen_mutex_destroy(&config->server_config_mutex);
                     free(config);
                 }
             } while(hash_link);
@@ -254,8 +252,6 @@ int PINT_server_config_mgr_add_config(
         }
         memset(config, 0, sizeof(server_config_t));
 
-        gen_mutex_init(&config->server_config_mutex);
-
         config->server_config = config_s;
         config->fs_id = fs_id;
         config->ref_count = 1;
@@ -279,7 +275,6 @@ int PINT_server_config_mgr_add_config(
     if (config)
     {
         qhash_search_and_remove(s_fsid_to_config_table, &fs_id);
-        gen_mutex_destroy(&config->server_config_mutex);
         free(config);
     }
     gen_mutex_unlock(&s_server_config_mgr_mutex);
@@ -326,13 +321,6 @@ int PINT_server_config_mgr_remove_config(
                 PINT_config_release(config->server_config);
                 free(config->server_config);
 
-                if(gen_mutex_trylock(&config->server_config_mutex) == EBUSY)
-                {
-                    gossip_err("FIXME: Destroying mutex that is in use!\n");
-                }
-                gen_mutex_unlock(&config->server_config_mutex);
-                gen_mutex_destroy(&config->server_config_mutex);
-
                 free(config);
                 config = NULL;
             }
@@ -373,10 +361,15 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
                 GOSSIP_CLIENT_DEBUG, "server_config_mgr: LOCKING config "
                 "object %p with fs_id %d\n", config, fs_id);
 #endif
-            gen_mutex_lock(&config->server_config_mutex);
             ret = config->server_config;
         }
-        gen_mutex_unlock(&s_server_config_mgr_mutex);
+        /* if we find a match, then old onto the mutex and let the caller 
+         * release it in a put_config call
+         */
+        if(!ret)
+        {
+            gen_mutex_unlock(&s_server_config_mgr_mutex);
+        }
     }
     return ret;
 }
@@ -391,7 +384,6 @@ void __PINT_server_config_mgr_put_config(
 
     if (SC_MGR_INITIALIZED() && config_s)
     {
-        gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK( );
 
         cur = config_s->file_systems;
@@ -412,7 +404,6 @@ void __PINT_server_config_mgr_put_config(
                 GOSSIP_CLIENT_DEBUG, "server_config_mgr: "
                 "UNLOCKING config object %p\n", config);
 #endif
-            gen_mutex_unlock(&config->server_config_mutex);
         }
         gen_mutex_unlock(&s_server_config_mgr_mutex);
     }

@@ -72,6 +72,7 @@
 #define GOSSIP_BMI_DEBUG_MX            ((uint64_t)1 << 50)
 #define GOSSIP_BSTREAM_DEBUG           ((uint64_t)1 << 51)
 #define GOSSIP_BMI_DEBUG_PORTALS       ((uint64_t)1 << 52)
+#define GOSSIP_USER_DEV_DEBUG          ((uint64_t)1 << 53)
 
 /* NOTE: if you want your gossip flag to be controllable from 
  * pvfs2-set-debugmask you have to add it in

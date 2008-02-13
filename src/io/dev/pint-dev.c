@@ -210,8 +210,8 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         desc[i].count = params[i].dev_buffer_count;
 
         gossip_get_debug_mask(&debug_on, &debug_mask);
-        gossip_set_debug_mask(1, GOSSIP_DEV_DEBUG);
-        gossip_debug(GOSSIP_DEV_DEBUG,
+        gossip_set_debug_mask(1, GOSSIP_USER_DEV_DEBUG);
+        gossip_debug(GOSSIP_USER_DEV_DEBUG,
             "[INFO]: Mapping pointer %p for I/O.\n", ptr);
         gossip_set_debug_mask(debug_on, debug_mask);
 
@@ -328,7 +328,7 @@ int PINT_dev_test_unexpected(
     pfd.fd = pdev_fd;
     pfd.events = POLLIN;
 
-    gossip_debug(GOSSIP_DEV_DEBUG, 
+    gossip_debug(GOSSIP_USER_DEV_DEBUG, 
                  "[DEV]: Entered %s: incount: %d, timeout: %d\n",
                  __func__, incount, max_idle_time);
 
@@ -367,7 +367,7 @@ int PINT_dev_test_unexpected(
             /* device is emptied */
             if (avail == 0)
             {
-                gossip_debug(GOSSIP_DEV_DEBUG,
+                gossip_debug(GOSSIP_USER_DEV_DEBUG,
                              "[DEV]: Exiting %s: incount: %d, device empty!\n",
                              __func__, incount);
                 return ((*outcount > 0) ? 1 : 0);
@@ -417,7 +417,7 @@ int PINT_dev_test_unexpected(
             /* assume we are done and return */
           safe_exit:
             free(buffer);
-            gossip_debug(GOSSIP_DEV_DEBUG,
+            gossip_debug(GOSSIP_USER_DEV_DEBUG,
                          "[DEV]: %s Exit: "
                          "incount: %d, outcount: %d, bytes available: %d\n",
                          __func__, incount, *outcount, avail);
@@ -489,7 +489,7 @@ int PINT_dev_test_unexpected(
 
     } while((*outcount < incount) && avail);
 
-    gossip_debug(GOSSIP_DEV_DEBUG,
+    gossip_debug(GOSSIP_USER_DEV_DEBUG,
                  "[DEV]: %s Exit: "
                  "incount: %d, outcount: %d, bytes available: %d\n",
                  __func__, incount, *outcount, avail);

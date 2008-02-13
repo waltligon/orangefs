@@ -111,7 +111,8 @@ static PINT_sm_action state_action_3 (
 static PINT_sm_action state_action_4 (
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    PINT_server_op *sop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* get frame from bottom of stack */
+    PINT_server_op *sop = PINT_sm_frame(smcb, -1);
     int s, *err_p;
     /* for each state machine to be spawned, push a frame */
     for (s = 0; s <= NEWSMS; s++)
