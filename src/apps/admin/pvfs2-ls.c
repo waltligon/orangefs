@@ -832,6 +832,8 @@ int main(int argc, char **argv)
     }
 
     PVFS_sys_finalize();
+    if (user_opts)
+        free(user_opts)
 
     return(ret);
 }
