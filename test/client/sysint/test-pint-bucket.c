@@ -111,7 +111,7 @@ int main(int argc, char **argv)
         }
         printf("Loading mappings of filesystem %s\n",
                cur_fs->file_system_name);
-        if (PINT_handle_load_mapping(&server_config,cur_fs))
+        if (PINT_cached_config_handle_load_mapping(cur_fs))
         {
             fprintf(stderr, "PINT_handle_load_mapping failure.\n");
             return(-1);
@@ -151,10 +151,8 @@ int main(int argc, char **argv)
         printf("\n");
         for(j = 0; j < NUM_META_SERVERS_TO_QUERY; j++)
         {
-            if (PINT_cached_config_get_next_meta(&server_config,
-                                          fs_ids[i],
-                                          &m_addr,
-                                          &meta_handle_extent_array))
+            if (PINT_cached_config_get_next_meta(
+		    fs_ids[i], &m_addr, &meta_handle_extent_array))
             {
                 fprintf(stderr, "PINT_cached_config_get_next_meta failure.\n");
                 return(-1);
@@ -172,9 +170,9 @@ int main(int argc, char **argv)
             }
         }
 
-        if (PINT_cached_config_get_next_io(&server_config, fs_ids[i],
-                                    NUM_DATA_SERVERS_TO_QUERY,
-                                    d_addr, data_handle_extent_array))
+        if (PINT_cached_config_get_next_io(
+		fs_ids[i], NUM_DATA_SERVERS_TO_QUERY,
+		d_addr, data_handle_extent_array))
         {
             fprintf(stderr, "PINT_cached_config_get_next_io failure.\n");
             return(-1);
