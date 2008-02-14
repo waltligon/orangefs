@@ -84,6 +84,7 @@ typedef struct PINT_smcb
     job_context_id context; /* job context when waiting for children */
     int (*terminate_fn)(struct PINT_smcb *, job_status_s *);
     void *user_ptr; /* external user pointer */
+    int immediate; /* specifies immediate completion of the state machine */
 } PINT_smcb;
 
 #define PINT_SET_OP_COMPLETE do{PINT_smcb_set_complete(smcb);} while (0)
@@ -177,6 +178,7 @@ PINT_sm_action PINT_state_machine_continue(
 int PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
 int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
 int PINT_smcb_op(struct PINT_smcb *smcb);
+int PINT_smcb_immediate_completion(struct PINT_smcb *smcb);
 void PINT_smcb_set_complete(struct PINT_smcb *smcb);
 int PINT_smcb_invalid_op(struct PINT_smcb *smcb);
 int PINT_smcb_complete(struct PINT_smcb *smcb);

@@ -226,27 +226,34 @@ static int write_device_response(
     job_status_s *jstat,
     job_context_id context);
 
-#define write_inlined_device_response(vfs_request)            \
-do {                                                          \
-    void *buffer_list[MAX_LIST_SIZE];                         \
-    int size_list[MAX_LIST_SIZE];                             \
-    int list_size = 0, total_size = 0;                        \
-                                                              \
-    log_operation_timing(vfs_request);                        \
-    buffer_list[0] = &vfs_request->out_downcall;              \
-    size_list[0] = sizeof(pvfs2_downcall_t);                  \
-    total_size = sizeof(pvfs2_downcall_t);                    \
-    list_size = 1;                                            \
-    ret = write_device_response(                              \
-        buffer_list,size_list,list_size, total_size,          \
-        vfs_request->info.tag, &vfs_request->op_id,           \
-        &vfs_request->jstat, s_client_dev_context);           \
-    if (ret < 0)                                              \
-    {                                                         \
-        gossip_err("write_device_response failed (tag=%lld)\n",\
-                   lld(vfs_request->info.tag));                \
-    }                                                         \
-    vfs_request->was_handled_inline = 1;                      \
+#define write_inlined_device_response(vfs_request)                           \
+do {                                                                         \
+    void *buffer_list[MAX_LIST_SIZE];                                        \
+    int size_list[MAX_LIST_SIZE];                                            \
+    int list_size = 0, total_size = 0;                                       \
+                                                                             \
+    log_operation_timing(vfs_request);                                       \
+    buffer_list[0] = &vfs_request->out_downcall;                             \
+    size_list[0] = sizeof(pvfs2_downcall_t);                                 \
+    total_size = sizeof(pvfs2_downcall_t);                                   \
+    list_size = 1;                                                           \
+    if(vfs_request->out_downcall.trailer_size > 0)                           \
+    {                                                                        \
+        buffer_list[1] = vfs_request->out_downcall.trailer_buf;              \
+        size_list[1] = vfs_request->out_downcall.trailer_size;               \
+        list_size++;                                                         \
+        total_size += vfs_request->out_downcall.trailer_size;                \
+    }                                                                        \
+    ret = write_device_response(                                             \
+        buffer_list,size_list,list_size, total_size,                         \
+        vfs_request->info.tag, &vfs_request->op_id,                          \
+        &vfs_request->jstat, s_client_dev_context);                          \
+    if (ret < 0)                                                             \
+    {                                                                        \
+        gossip_err("write_device_response failed (tag=%lld)\n",              \
+                   lld(vfs_request->info.tag));                              \
+    }                                                                        \
+    vfs_request->was_handled_inline = 1;                                     \
 } while(0)
 
 static void client_segfault_handler(int signum)

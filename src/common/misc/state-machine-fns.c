@@ -201,19 +201,25 @@ PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
 {
     PINT_sm_action ret;
 
+    /* set the state machine to being completed immediately.  We
+     * unset this bit once the state machine is deferred.
+     */
+    smcb->immediate = 1;
+
     /* run the current state action function */
     ret = PINT_state_machine_invoke(smcb, r);
     if (ret == SM_ACTION_COMPLETE || ret == SM_ACTION_TERMINATE)
     {
         /* keep running until state machine deferrs or terminates */
         ret = PINT_state_machine_continue(smcb, r);
-        
-        /* note that if ret == SM_ACTION_TERMINATE, we _don't_ call
-         * PINT_state_machine_terminate here because that adds the smcb
-         * to the completion list.  We don't want to do that on immediate
-         * completion
-         */
     }
+
+    if(ret == SM_ACTION_DEFERRED)
+    {
+        /* this state machine isn't completing immediately */
+        smcb->immediate = 0;
+    }
+
     return ret;
 }
 
@@ -397,6 +403,11 @@ int PINT_smcb_set_op(struct PINT_smcb *smcb, int op)
 {
     smcb->op = op;
     return PINT_state_machine_locate(smcb);
+}
+
+int PINT_smcb_immediate_completion(struct PINT_smcb *smcb)
+{
+    return smcb->immediate;
 }
 
 /* Function: PINT_smcb_op
