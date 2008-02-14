@@ -191,11 +191,11 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                              "Reloading handle mappings for fs_id %d\n",
                              cur_fs->coll_id);
 
-                ret = PINT_handle_load_mapping(
-                    config->server_config, cur_fs);
+                ret = PINT_cached_config_handle_load_mapping(cur_fs);
                 if (ret)
                 {
-                    PVFS_perror("PINT_handle_load_mapping failed", ret);
+                    PVFS_perror(
+                        "PINT_cached_config_handle_load_mapping failed", ret);
                     gen_mutex_unlock(&s_server_config_mgr_mutex);
                     return ret;
                 }

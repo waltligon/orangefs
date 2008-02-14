@@ -135,7 +135,6 @@ int PVFS_fsck_check_server_configs(
     char *fs_config_diff = NULL;
     char *reference_config_server = NULL;
     const char *server_name = NULL;
-    struct server_configuration_s *server_config_struct = NULL;
     FILE *pin = NULL;
     char line[130] = { 0 };
     char *cmd = NULL;
@@ -181,14 +180,9 @@ int PVFS_fsck_check_server_configs(
         server_name = NULL;
 
         /* get the pretty server name */
-        server_config_struct = PINT_get_server_config_struct(*cur_fs);
         server_name = PINT_cached_config_map_addr(
-                        server_config_struct,
-                        *cur_fs,
-                        addresses[i], &server_type);
+                        *cur_fs, addresses[i], &server_type);
         assert(server_name);
-
-        PINT_put_server_config_struct(server_config_struct);
 
         fs_config = calloc(FS_CONFIG_BUFFER_SIZE, sizeof(char));
         if (fs_config == NULL)
@@ -1475,21 +1469,15 @@ static int PINT_handle_wrangler_display_stranded_handles(
     int server_type = 0;
     PVFS_sysresp_getattr attributes;
     PVFS_object_ref pref;
-    struct server_configuration_s *config;
     const char *server_name = NULL;
     int header = 0;
 
     for (i = 0; i < PINT_handle_wrangler_handlelist.num_servers; i++)
     {
         /* get the pretty server name */
-        config = PINT_get_server_config_struct(*cur_fs);
-        server_name = PINT_cached_config_map_addr(config,
-                                                  *cur_fs,
-                                                  PINT_handle_wrangler_handlelist.
-                                                  addr_array[i], &server_type);
-
-        /* release mutex on server config */
-        PINT_put_server_config_struct(config);
+        server_name = PINT_cached_config_map_addr(
+            *cur_fs, PINT_handle_wrangler_handlelist.
+            addr_array[i], &server_type);
 
         for (j = 0; j < PINT_handle_wrangler_handlelist.size_array[i]; j++)
         {

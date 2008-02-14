@@ -57,7 +57,6 @@ PVFS_error PVFS_isys_statfs(
 {
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
-    struct server_configuration_s *server_config = NULL;
     int ret = -1;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -75,12 +74,9 @@ PVFS_error PVFS_isys_statfs(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* count the number of servers */
-    server_config = PINT_get_server_config_struct(fs_id);
-    assert(server_config);
     ret = PINT_cached_config_count_servers(
-        server_config, fs_id,  PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+        fs_id,  PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
         &sm_p->u.statfs_list.count);
-    PINT_put_server_config_struct(server_config);
     if (ret < 0)
     {
         PINT_smcb_free(smcb);
@@ -106,12 +102,9 @@ PVFS_error PVFS_isys_statfs(
     }
 
     /* generate default list of servers */
-    server_config = PINT_get_server_config_struct(fs_id);
-    assert(server_config);
     ret = PINT_cached_config_get_server_array(
-        server_config, fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+        fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
         sm_p->u.statfs_list.addr_array, &sm_p->u.statfs_list.count);
-    PINT_put_server_config_struct(server_config);
     if (ret < 0)
     {
         free(sm_p->u.statfs_list.addr_array);

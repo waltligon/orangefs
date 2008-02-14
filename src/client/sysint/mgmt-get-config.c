@@ -68,7 +68,7 @@ int PVFS_mgmt_get_config(
     config = PINT_get_server_config_struct(*fsid);
 
     mntent.the_pvfs_config_server =
-        (char*)PINT_cached_config_map_addr(config, *fsid, *addr, &server_type);
+        (char*)PINT_cached_config_map_addr(*fsid, *addr, &server_type);
 
     PINT_put_server_config_struct(config);
 
