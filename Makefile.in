@@ -406,8 +406,7 @@ VISMISCSRC :=
 KARMASRC :=
 # userland helper programs for kernel drivers
 KERNAPPSRC :=
-#
-KERNAPPSTHRSRC :=
+KERNAPPTHRSRC :=
 # MISCSRC are sources that don't fall into the other categories
 MISCSRC := 
 # c files generated from state machines
@@ -425,18 +424,18 @@ SERVER_STUB := src/server/pvfs2-server-stub
 SERVER := src/server/pvfs2-server
 endif
 
-# LIBRARIES is a list of the pvfs2 client libraries
+# LIBRARIES is a list of the pvfs2 client libraries that will be installed
 LIBRARIES :=
 LIBRARIES_THREADED :=
 ifeq ($(build_shared),yes)
 LIBRARIES_SHARED = lib/libpvfs2.so
 LIBRARIES += $(LIBRARIES_SHARED)
+LIBRARIES_THREADED += lib/libpvfs2-threaded.so
 endif
 ifeq ($(build_static),yes)
 LIBRARIES_STATIC = lib/libpvfs2.a
 LIBRARIES += $(LIBRARIES_STATIC)
-LIBRARIES_THREADED_STATIC = lib/libpvfs2-threaded.a
-LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
+LIBRARIES_THREADED += lib/libpvfs2-threaded.a
 endif
 
 ################################################################
@@ -498,14 +497,21 @@ MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
 MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
 
 # KERNAPPOBJS is a list of kernel driver userland objects
-KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC)))
+KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC))) \
+               $(patsubst %.c,%-threaded.o, $(filter %.c,$(KERNAPPTHRSRC)))
 # KERNAPPS is a list of kernel driver userland executables
 KERNAPPS := $(patsubst %.c,%, $(filter %.c, $(KERNAPPSRC)))
+KERNAPPSTHR := $(patsubst %.c,%, $(filter %.c, $(KERNAPPTHRSRC)))
 # KERNAPPDEPENDS is a list of dependency files for kernel driver userland
 # objects
-KERNAPPDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KERNAPPSRC)))
-
-KERNAPPSTHR := $(patsubst %.c,%-threaded, $(filter %.c, $(KERNAPPSTHRSRC)))
+KERNAPPDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KERNAPPSRC) $(KERNAPPTHRSRC)))
+# Be sure to build/install the threaded lib too; just pick the shared
+# one if configure asked for both.
+ifneq (,$(KERNAPPSTHR))
+ifeq (,$(filter $(firstword $(LIBRARIES_THREADED)),$(LIBRARIES)))
+LIBRARIES += $(firstword $(LIBRARIES_THREADED))
+endif
+endif
 
 # VISOBJS is a list of visualization program objects
 VISOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISSRC)))
@@ -715,8 +721,11 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 # all applications depend on the pvfs2 library
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
+
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS_THREADED) $(call modldflags,$<)
 
 # special rules to build state machine compiler using build host compiler
 $(STATECOMPOBJS): %.o: %.c
@@ -943,7 +952,7 @@ just_kmod_install: just_kmod
 .PHONY: kmod_install
 kmod_install: kmod kernapps just_kmod_install
 	install -d $(prefix)/sbin
-	install -m 755 $(KERNAPPS) $(prefix)/sbin
+	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(prefix)/sbin
 endif
 
 ifneq (,$(LINUX24_KERNEL_SRC))
@@ -964,7 +973,7 @@ just_kmod24_install: just_kmod24
 .PHONY: kmod24_install
 kmod24_install: kmod24 kernapps just_kmod24_install
 	install -d $(prefix)/sbin
-	install -m 755 $(KERNAPPS) $(prefix)/sbin
+	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(prefix)/sbin
 	install -m 755 src/apps/kernel/linux/mount.pvfs2 $(prefix)/sbin
 	@echo ""
 	@echo "For improved linux-2.4 support,"

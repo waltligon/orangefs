@@ -28,7 +28,6 @@
 
 #define PVFS2_CLIENT_CORE_SUFFIX  "-core"
 #define PVFS2_CLIENT_CORE_NAME "pvfs2-client" PVFS2_CLIENT_CORE_SUFFIX
-#define PVFS2_CLIENT_CORE_THR_SUFFIX "-threaded"
 
 static char s_client_core_path[PATH_MAX];
 
@@ -59,7 +58,6 @@ typedef struct
     char *logstamp;
     char *dev_buffer_count;
     char *dev_buffer_size;
-    int threaded;
     char *logtype;
 } options_t;
 
@@ -282,15 +280,7 @@ static int monitor_pvfs2_client(options_t *opts)
         {
             sleep(1);
 
-            if(opts->threaded)
-            {
-                arg_list[0] = PVFS2_CLIENT_CORE_NAME PVFS2_CLIENT_CORE_THR_SUFFIX;
-            }
-            else
-            {
-                arg_list[0] = PVFS2_CLIENT_CORE_NAME;
-            }
-
+            arg_list[0] = PVFS2_CLIENT_CORE_NAME;
             arg_index = 1;
             arg_list[arg_index++] = "-a";
             arg_list[arg_index++] = opts->acache_timeout;
@@ -429,7 +419,6 @@ static void print_help(char *progname)
            "PATH\n");
     printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
-    printf("--threaded                    use threaded client\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -460,7 +449,6 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"gossip-mask",1,0,0},
         {"path",1,0,0},
         {"logstamp",1,0,0},
-        {"threaded",0,0,0},
         {0,0,0,0}
     };
 
@@ -569,11 +557,6 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     opts->gossip_mask = optarg;
                     break;
                 }
-                else if (strcmp("threaded", cur_option) == 0)
-                {
-                    opts->threaded = 1;
-                    break;
-                }
                 break;
             case 'h':
           do_help:
@@ -644,17 +627,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
 
     if (!opts->path)
     {
-        if(opts->threaded)
-        {
-            sprintf(s_client_core_path, 
-                    "%s" PVFS2_CLIENT_CORE_SUFFIX PVFS2_CLIENT_CORE_THR_SUFFIX, 
-                    argv[0]);
-        }
-        else
-        {
-            sprintf(s_client_core_path, "%s" PVFS2_CLIENT_CORE_SUFFIX,
-                    argv[0]);
-        }
+        sprintf(s_client_core_path, "%s" PVFS2_CLIENT_CORE_SUFFIX, argv[0]);
         opts->path = s_client_core_path;
     }
 

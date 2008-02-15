@@ -692,6 +692,7 @@ build_static
 REDHAT_RELEASE
 NPTL_WORKAROUND
 MISC_TROVE_FLAGS
+THREADED_KMOD_HELPER
 LINUX_KERNEL_SRC
 LINUX24_KERNEL_SRC
 LINUX24_KERNEL_MINOR_VER
@@ -1331,6 +1332,7 @@ Optional Features:
   --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks
   --disable-kernel-aio    Forcibly disable kernel aio
   --enable-kernel-sendfile    Forcibly enable kernel sendfile
+  --enable-threaded-kmod-helper  Use threads in the kernel helper application
   --enable-fast           Disable optional debugging, enable optimizations.
   --enable-strict         Turn on strict compiler warnings
   --enable-verbose-build  Enables full output during build process
@@ -5965,6 +5967,58 @@ fi
 
 
 
+
+#
+# Threading options.
+#
+# Client - thread-safe or not
+#   --disable-thread-safety : chooses null or posix locking mechanism
+#   For applications that know they are not multi-threaded, or choose
+#   to handle locking themselves, this configure option can be used to
+#   slightly decrease library-induced latency by removing the locking.
+#
+# Client - job threading
+#   libpvfs2-threaded.{so,a} with __PVFS2_JOB_THREADED__
+#   This option causes the client library to spawn an extra thread
+#   to handle network communications.  In this way, it is possible
+#   that the library can handle new and completed requests from
+#   the application while also interacting with the network.
+#
+#   These separate libraries can not be built using the existing
+#   configure mechanism.  They are only built if required by the
+#   kernel module helper.
+#
+# Server - three options:
+#   trove
+#     (hack Makefile.in)
+#   job
+#     (hack Makefile.in)
+#   aio
+#     --disable-aio-threaded-callbacks
+#
+#   Trove (storage) and job threading in the server are implemented
+#   using #defines, but not exported through the configure mechanism.
+#   AIO threaded callbacks are a separate thread used in conjunction
+#   with trove, and can be disabled through a configure option as
+#   AIO has been found to be buggy on many systems.
+#
+#
+# Kernel module helper - job threading
+#   --enable-threaded-kmod-helper
+#
+#   This is a special client that "helps" applications that access PVFS
+#   through the kernel using normal VFS calls (e.g. "ls").  This
+#   configure options builds it using __PVFS2_JOB_THREADED__ as described
+#   above.  That enables a thread for the network layer and a thread
+#   for the kernel interface.  This has the potential to increase the
+#   rate at which concurrent operations are processed, but has the potential
+#   drawback of somewhat higher overhead for a single operation and lack
+#   of testing.
+#
+#   Enabling this options causes one of libpvfs2-threaded.{so,a} to be
+#   built, depending on --enable-shared and --enable-static.  If both are
+#   enabled, the shared library takes precedence.
+#
 
 { echo "$as_me:$LINENO: checking for client library thread safety support" >&5
 echo $ECHO_N "checking for client library thread safety support... $ECHO_C" >&6; }
@@ -11758,6 +11812,16 @@ cat >>confdefs.h <<\_ACEOF
 _ACEOF
 
 fi
+
+# Check whether --enable-threaded-kmod-helper was given.
+if test "${enable_threaded_kmod_helper+set}" = set; then
+  enableval=$enable_threaded_kmod_helper;  if test "x$enableval" = "xyes" ; then
+    THREADED_KMOD_HELPER=yes
+  fi
+
+fi
+
+
 
 BUILD_ABSOLUTE_TOP=`pwd`
 SRC_RELATIVE_TOP=$srcdir
@@ -18459,6 +18523,7 @@ build_static!$build_static$ac_delim
 REDHAT_RELEASE!$REDHAT_RELEASE$ac_delim
 NPTL_WORKAROUND!$NPTL_WORKAROUND$ac_delim
 MISC_TROVE_FLAGS!$MISC_TROVE_FLAGS$ac_delim
+THREADED_KMOD_HELPER!$THREADED_KMOD_HELPER$ac_delim
 LINUX_KERNEL_SRC!$LINUX_KERNEL_SRC$ac_delim
 LINUX24_KERNEL_SRC!$LINUX24_KERNEL_SRC$ac_delim
 LINUX24_KERNEL_MINOR_VER!$LINUX24_KERNEL_MINOR_VER$ac_delim
@@ -18476,7 +18541,6 @@ GNUC!$GNUC$ac_delim
 DB_CFLAGS!$DB_CFLAGS$ac_delim
 DB_LIB!$DB_LIB$ac_delim
 NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
-TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -18518,6 +18582,7 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
 TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
 BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
 BUILD_GM!$BUILD_GM$ac_delim
@@ -18544,7 +18609,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 24; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 25; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
