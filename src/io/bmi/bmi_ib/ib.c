@@ -1488,7 +1488,10 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 		memcache_deregister(ib_device->memcache, &sq->buflist);
 #  if MEMCACHE_EARLY_REG
 	    /* pin when sending rts, so also must dereg in this state */
-	    if (sq->state.send == SQ_WAITING_CTS)
+	    if (sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION ||
+	        sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS ||
+	        sq->state.send == SQ_WAITING_CTS ||
+		sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION)
 		memcache_deregister(ib_device->memcache, &sq->buflist);
 #  endif
 #endif
@@ -1503,7 +1506,8 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 		memcache_deregister(ib_device->memcache, &rq->buflist);
 #  if MEMCACHE_EARLY_REG
 	    /* pin on post, dereg all these */
-	    if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER)
+	    if (rq->state.recv == RQ_RTS_WAITING_CTS_SEND_COMPLETION ||
+	        rq->state.recv == RQ_RTS_WAITING_RTS_DONE)
 		memcache_deregister(ib_device->memcache, &rq->buflist);
 	    if (rq->state.recv == RQ_WAITING_INCOMING
 	      && rq->buflist.tot_len > ib_device->eager_buf_payload)
