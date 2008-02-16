@@ -8061,6 +8061,9 @@ if test -n "$lk_src" ; then
 
 	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
 
+                	if test -n "${ARCH}" ; then
+		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include"
+	fi
 
 	{ echo "$as_me:$LINENO: checking for i_size_write in kernel" >&5
 echo $ECHO_N "checking for i_size_write in kernel... $ECHO_C" >&6; }
@@ -16970,7 +16973,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT
+#define HAVE_GETMNTENT 1
 _ACEOF
 
 else
