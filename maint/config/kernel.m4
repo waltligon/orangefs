@@ -17,6 +17,11 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
 
+        dnl we probably need additional includes if this build is intended
+        dnl for a different architecture
+	if test -n "${ARCH}" ; then
+		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include"
+	fi
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
 	dnl if this test passes, the kernel does not have it
