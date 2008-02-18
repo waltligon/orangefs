@@ -31,12 +31,6 @@
  */
 #define MAX_NUM_DIRENTS    32
 
-/*
-  arbitrarily restrict the number of paths
-  that this ls version can take as arguments
-*/
-#define MAX_NUM_PATHS       8
-
 /* optional parameters, filled in by parse_args() */
 struct options
 {
@@ -51,7 +45,7 @@ struct options
     int list_no_owner;
     int list_inode;
     int list_use_si_units;
-    char *start[MAX_NUM_PATHS];
+    char **start;
     int num_starts;
 };
 
@@ -683,19 +677,17 @@ static struct options* parse_args(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
     }
+    tmp_opts->start = (char **) calloc(1, (argc-optind+1) * sizeof(char *));
+    if (tmp_opts->start == NULL) {
+       exit(EXIT_FAILURE);
+    }
 
     for(i = optind; i < argc; i++)
     {
-        if (tmp_opts->num_starts < MAX_NUM_PATHS)
-        {
-            tmp_opts->start[i-optind] = argv[i];
-            tmp_opts->num_starts++;
-        }
-        else
-        {
-            fprintf(stderr,"Ignoring path %s\n",argv[i]);
-        }
+         tmp_opts->start[i-optind] = argv[i];
+         tmp_opts->num_starts++;
     }
+    assert(tmp_opts->num_starts < (argc - optind + 1));
     return tmp_opts;
 }
 
@@ -738,8 +730,8 @@ static void usage(int argc, char** argv)
 int main(int argc, char **argv)
 {
     int ret = -1, i = 0;
-    char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
-    PVFS_fs_id fs_id_array[MAX_NUM_PATHS] = {0};
+    char **pvfs_path;
+    PVFS_fs_id *fs_id_array = NULL;
     const PVFS_util_tab* tab;
     struct options* user_opts = NULL;
     char current_dir[PVFS_NAME_MAX] = {0};
@@ -761,12 +753,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    for(i = 0; i < MAX_NUM_PATHS; i++)
-    {
-        memset(pvfs_path[i],0,PVFS_NAME_MAX);
-    }
-
-    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
+        ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
@@ -797,6 +784,28 @@ int main(int argc, char **argv)
 		 tab->mntent_array[0].mnt_dir);
 	user_opts->start[0] = current_dir;
 	user_opts->num_starts = 1;
+    }
+
+    pvfs_path = (char **) calloc(1, user_opts->num_starts * sizeof(char *));
+    if (!pvfs_path)
+    {
+       fprintf(stderr, "Could not alloc memory\n");
+       return -1;
+    }
+    for(i = 0; i < user_opts->num_starts; i++)
+    {
+       pvfs_path[i] = (char *) calloc(1, PVFS_NAME_MAX);
+       if (pvfs_path[i] == NULL) 
+       {
+         fprintf(stderr, "Could not alloc memory\n");
+         return -1;
+       }
+    }
+    fs_id_array = (PVFS_fs_id *) calloc(1, user_opts->num_starts * sizeof(*fs_id_array));
+    if (fs_id_array == NULL)
+    {
+      fprintf(stderr, "Could not alloc memory\n");
+      return -1;
     }
 
     for(i = 0; i < user_opts->num_starts; i++)
@@ -830,8 +839,18 @@ int main(int argc, char **argv)
             printf("\n");
         }
     }
+    for (i = 0; i < user_opts->num_starts; i++) 
+    {
+      free(pvfs_path[i]);
+    }
+    free(user_opts->start);
+    free(pvfs_path);
+    free(fs_id_array);
+    free(user_opts);
 
     PVFS_sys_finalize();
+    if (user_opts)
+        free(user_opts);
 
     return(ret);
 }
