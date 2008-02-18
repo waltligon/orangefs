@@ -594,7 +594,7 @@ int job_precreate_pool_fill(
 int job_precreate_pool_check_level(
     PVFS_handle precreate_pool,
     PVFS_fs_id fsid,
-    int threshold,
+    int low_threshold,
     void *user_ptr,
     job_aint status_user_tag,
     job_status_s * out_status_p,

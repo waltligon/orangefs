@@ -73,6 +73,8 @@ enum
 #ifdef __PVFS2_TROVE_SUPPORT__
 static gen_mutex_t precreate_pool_mutex = GEN_MUTEX_INITIALIZER;
 static QLIST_HEAD(precreate_pool_list);
+static QLIST_HEAD(precreate_pool_check_level_list);
+static QLIST_HEAD(precreate_pool_get_handles_list);
 struct precreate_pool
 {
     struct qlist_head list_link;
@@ -5155,7 +5157,7 @@ int job_precreate_pool_register_server(
 int job_precreate_pool_check_level(
     PVFS_handle precreate_pool,
     PVFS_fs_id fsid,
-    int threshold,
+    int low_threshold,
     void *user_ptr,
     job_aint status_user_tag,
     job_status_s * out_status_p,
@@ -5164,6 +5166,7 @@ int job_precreate_pool_check_level(
 {
     struct qlist_head* iterator;
     struct precreate_pool* pool;
+    struct job_desc *jd = NULL;
 
     gen_mutex_lock(&precreate_pool_mutex);
     qlist_for_each(iterator, &precreate_pool_list)
@@ -5173,9 +5176,9 @@ int job_precreate_pool_check_level(
         if(pool->pool_handle == precreate_pool &&
             pool->fsid == fsid)
         {
-            if(pool->pool_count < threshold)
+            if(pool->pool_count < low_threshold)
             {
-                /* handle count is below the threshold */
+                /* handle count is below the low threshold */
                 out_status_p->error_code = 0;
                 gen_mutex_unlock(&precreate_pool_mutex);
                 gossip_debug(GOSSIP_JOB_DEBUG, "found pool count low.\n");
@@ -5183,7 +5186,22 @@ int job_precreate_pool_check_level(
             }
             else
             {
-                /* TODO: finish this part; for now we just launch into space */
+                /* we are above threshold right now; queue up until it drops */
+                jd = alloc_job_desc(JOB_PRECREATE_POOL);
+                if (!jd)
+                {
+                    /* TODO: handle this */
+                    assert(0);
+                }
+                jd->job_user_ptr = user_ptr;
+                jd->context_id = context_id;
+                jd->status_user_tag = status_user_tag;
+                jd->u.precreate_pool.precreate_pool = precreate_pool;
+                jd->u.precreate_pool.fsid = fsid;
+                jd->u.precreate_pool.low_threshold = low_threshold;
+                *id = jd->job_id;
+
+                qlist_add(&jd->job_desc_q_link, &precreate_pool_check_level_list);
                 gen_mutex_unlock(&precreate_pool_mutex);
                 gossip_debug(GOSSIP_JOB_DEBUG, "found pool count high.\n");
                 return(0);
@@ -5244,6 +5262,8 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
     int ret;
     struct precreate_pool_get_trove* tmp_trove;
     struct qlist_head* iterator;
+    struct qlist_head* scratch;
+    struct job_desc* jd_checker;
 
     /* we better still have handles to retrieve */
     assert(jd->u.precreate_pool.precreate_handle_index < 
@@ -5310,6 +5330,33 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
         /* go ahead and decrement count to avoid races with other consumers */
         /* TODO: remember to bump this up if trove op fails */
         pool->pool_count--;
+
+        /* is anyone waiting to check the count of this pool? */
+        if(!qlist_empty(&precreate_pool_check_level_list))
+        {
+            qlist_for_each_safe(iterator, scratch, 
+                &precreate_pool_check_level_list)
+            {
+                jd_checker = qlist_entry(iterator, struct job_desc,
+                    job_desc_q_link);
+                if(pool->pool_count < jd_checker->u.precreate_pool.low_threshold)
+                {
+                    /* the pool level is low */
+                    gossip_debug(GOSSIP_JOB_DEBUG, "Pool count low, waking up waiter for handle %llu.\n", llu(jd_checker->u.precreate_pool.precreate_pool));
+                    qlist_del(&jd_checker->job_desc_q_link);
+
+                    /* move waiting job to completion queue */
+                    gen_mutex_lock(&completion_mutex);        
+                    job_desc_q_add(completion_queue_array[jd->context_id], jd_checker);
+                    jd->completed_flag = 1;
+#ifdef __PVFS2_JOB_THREADED__
+                    /* wake up anyone waiting for completion */
+                    pthread_cond_signal(&completion_cond);
+#endif
+                    gen_mutex_unlock(&completion_mutex);        
+                }
+            }
+        }
 
         /* somewhere to stash trove variables per operation */
         tmp_trove = malloc(sizeof(*tmp_trove));
