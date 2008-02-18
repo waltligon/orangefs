@@ -5252,7 +5252,15 @@ int job_precreate_pool_check_level(
     return(-PVFS_EINVAL);
 }
  
-/* TODO: comment properly */
+/* job_precreate_pool_get_handles()
+ *
+ * Retrieves a set of datafile handles from one or more precreate pools.
+ * Servers may be specified using bmi addresses in the servers array.  If
+ * servers is NULL, then it will provide handles from pools in round robin
+ * manner.
+ *
+ * returns 0 on success, 1 on immediate completion, and -PVFS_errno on failure
+ */
 int job_precreate_pool_get_handles(
     PVFS_fs_id fsid,
     int count,
@@ -5292,7 +5300,15 @@ int job_precreate_pool_get_handles(
     return(0);
 }
 
-/* TODO: comment properly */
+/* precreate_pool_get_post_next()
+ *
+ * Internal function used by job_precreate_pool_get_handles().  This
+ * function will attempt to retrieve as many precreated handles from trove
+ * as possible.  If a pool is empty, then this function will queue up to be
+ * executed again later.
+ *
+ * no return value
+ */
 static void precreate_pool_get_post_next(struct job_desc* jd)
 {
     struct precreate_pool* pool;

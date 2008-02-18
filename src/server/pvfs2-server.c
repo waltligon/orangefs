@@ -2227,7 +2227,7 @@ static int generate_shm_key_hint(void)
 
 /* precreate_pool_initialize()
  * 
- * TODO: comment fn properly
+ * starts the infrastructure for managing pools of precreated handles
  *
  * returns 0 on success, -PVFS_error on failure
  */
@@ -2335,11 +2335,11 @@ static int precreate_pool_initialize(void)
 
 /* precreate_pool_finalize()
  *
- * TODO: comment fn properly
+ * shuts down infrastructure for managing pools of precreated handles
  */
 static void precreate_pool_finalize(void)
 {
-    /* anything to do here? */
+    /* TODO: anything to do here? */
     return;
 }
 
@@ -2347,7 +2347,6 @@ static void precreate_pool_finalize(void)
  *  
  * This function makes sure that a pool is present for the specified server
  *
- * TODO: comment fn properly 
  */
 static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
     PVFS_handle* pool_handle)
@@ -2455,7 +2454,7 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
 
 /* precreate_pool_count()
  *
- * TODO: comment this properly
+ * counts the number of handles stored in a persistent precreate pool
  */
 static int precreate_pool_count(
     PVFS_fs_id fsid, PVFS_handle pool_handle, int* count)

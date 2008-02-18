@@ -75,7 +75,8 @@ machine pvfs2_precreate_pool_refiller_sm
 
 /* wait_for_threshold_fn()
  *
- * TODO: properly comment this
+ * waits until the pool count has dropped below a low threshold before
+ * proceeding
  */
 static PINT_sm_action wait_for_threshold_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -94,7 +95,10 @@ static PINT_sm_action wait_for_threshold_fn(
 	server_job_context));
 }
 
- /* TODO: properly comment this */
+ /* store_handles_fn()
+  *
+  * stores a set of precreated handles persistently within precreate pools
+  */
 static PINT_sm_action store_handles_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -116,7 +120,8 @@ static PINT_sm_action store_handles_fn(
 
 /* setup_batch_create_fn()
  *
- * TODO: properly comment
+ * prepares a req/resp pair to another server to precreate a batch of
+ * handles
  */
 static PINT_sm_action setup_batch_create_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -167,7 +172,8 @@ static PINT_sm_action setup_batch_create_fn(
 
 /* setup_fn()
  *
- * TODO: properly comment
+ * initial state to allocate memory for use through the remainder of the
+ * state machine's life
  */
 static PINT_sm_action setup_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -189,7 +195,7 @@ static PINT_sm_action setup_fn(
 
 /* error_fn()
  *
- * TODO: properly comment
+ * handles error transitions
  */
 static PINT_sm_action error_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -210,7 +216,8 @@ static PINT_sm_action error_fn(
 
 /* batch_create_comp_fn()
  *
- * TODO: properly comment
+ * msgpair completion function to handle processing batch create response i
+ * from another server
  */
 static int batch_create_comp_fn(void *v_p,
                                  struct PVFS_server_resp *resp_p,
