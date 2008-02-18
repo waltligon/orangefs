@@ -134,7 +134,11 @@ PVFS_error PVFS_isys_fs_add(
     if (i == mntent->num_pvfs_config_servers)
     {
         gossip_err("%s: Failed to initialize any appropriate "
-                   "BMI methods.\n", __func__);
+                   "BMI methods for addresses:\n", __func__);
+        for(i = 0; i < mntent->num_pvfs_config_servers; ++i)
+        {
+            gossip_err("\t%s\n", mntent->pvfs_config_servers[i]);
+        }
         gen_mutex_unlock(&mt_config);
         return(ret);
     }
