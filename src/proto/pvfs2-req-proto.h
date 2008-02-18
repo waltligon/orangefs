@@ -92,8 +92,10 @@ enum PVFS_server_op
 
 /* max size of opaque distribution parameters */
 #define PVFS_REQ_LIMIT_DIST_BYTES         1024
-/* max size of each configuration file transmitted to clients */
-#define PVFS_REQ_LIMIT_CONFIG_FILE_BYTES  16384
+/* max size of each configuration file transmitted to clients.
+ * Note: If you change this value, you should change the $req_limit
+ * in pvfs2-genconfig as well. */
+#define PVFS_REQ_LIMIT_CONFIG_FILE_BYTES  65536
 /* max size of all path strings */
 #define PVFS_REQ_LIMIT_PATH_NAME_BYTES    PVFS_NAME_MAX
 /* max size of strings representing a single path element */
