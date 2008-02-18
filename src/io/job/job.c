@@ -4382,12 +4382,17 @@ static void precreate_pool_fill_thread_mgr_callback(
     PVFS_error error_code)
 {
     struct job_desc* jd = (struct job_desc*)data; 
-    assert(jd);
+    struct job_desc* jd_checker; 
     int ret;
     int count = 0;
     int i;
     struct qlist_head* iterator;
+    struct qlist_head* scratch;
     struct precreate_pool* pool;
+    int awoken_count = 0;
+    QLIST_HEAD(tmp_list);
+
+    assert(jd);
 
     gen_mutex_lock(&initialized_mutex);
     if(initialized == 0)
@@ -4428,7 +4433,40 @@ static void precreate_pool_fill_thread_mgr_callback(
                 break;
             }
         }
+
+        /* find out if anyone was sleeping because the pool was empty */
+        gossip_debug(GOSSIP_JOB_DEBUG, "checking for get_handles() sleepers\n");
+        qlist_for_each_safe(iterator, scratch, 
+            &precreate_pool_get_handles_list)
+        {
+            jd_checker = qlist_entry(iterator, struct job_desc,
+                job_desc_q_link);
+            gossip_debug(GOSSIP_JOB_DEBUG, "checking for get_handles() sleeper, jd on handle %llu\n", jd_checker->u.precreate_pool.precreate_pool);
+            if(jd_checker->u.precreate_pool.precreate_pool == pool->pool_handle)
+            {
+                awoken_count++;
+                /* put them on a new local queue */
+                qlist_del(&jd_checker->job_desc_q_link);
+                qlist_add(&jd_checker->job_desc_q_link, &tmp_list);
+                gossip_debug(GOSSIP_JOB_DEBUG, "Found someone waiting on handles from precreate pool %llu\n", pool->pool_handle);
+            }
+            if(awoken_count == jd->u.precreate_pool.posted_count)
+            {
+                /* that's as many as we should wake up right now */
+                break;
+            }
+        }
         gen_mutex_unlock(&precreate_pool_mutex);
+
+        /* now that we have collected the sleepers into our own private
+         * queue, we can push them without the precreate_pool_mutex held
+         */
+        qlist_for_each(iterator, &tmp_list)
+        {
+            jd_checker = qlist_entry(iterator, struct job_desc,
+                job_desc_q_link);
+            precreate_pool_get_post_next(jd_checker);
+        }
     }
 
     /* are we done? */
@@ -5264,10 +5302,15 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
     struct qlist_head* iterator;
     struct qlist_head* scratch;
     struct job_desc* jd_checker;
+    struct qlist_head* old_pool;
+
+    gossip_debug(GOSSIP_JOB_DEBUG, "precreate_pool_get_post_next\n");
 
     /* we better still have handles to retrieve */
     assert(jd->u.precreate_pool.precreate_handle_index < 
         jd->u.precreate_pool.precreate_handle_count);
+
+    old_pool = jd->u.precreate_pool.current_pool;
 
     gen_mutex_lock(&precreate_pool_mutex);
     for(;
@@ -5321,11 +5364,18 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
 
         if(pool->pool_count < 1)
         {
-            /* TODO: implement this */
-            /* need to rewind current_pool and queue to try again after
-             * refill
-             */
-            assert(0);
+            /* mark what pool we are waiting on */
+            jd->u.precreate_pool.precreate_pool = pool->pool_handle;
+
+            /* rewind current pool */
+            jd->u.precreate_pool.current_pool = old_pool;
+
+            /* queue up until the count for this pool increases */
+            qlist_add(&jd->job_desc_q_link, &precreate_pool_get_handles_list);
+            gossip_debug(GOSSIP_JOB_DEBUG, "Found empty precreate pool %llu\n", pool->pool_handle);
+            
+            gen_mutex_unlock(&precreate_pool_mutex);
+            return;
         }
         /* go ahead and decrement count to avoid races with other consumers */
         /* TODO: remember to bump this up if trove op fails */
