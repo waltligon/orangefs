@@ -59,6 +59,7 @@ int service_operation(
 retry_servicing:
     op->downcall.status = 0;
     gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: service_operation: %s %p\n", op_name, op);
+    gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: operation posted by process: %s, pid: %i\n", current->comm, current->pid);
 
     /* mask out signals if this operation is not to be interrupted */
     if(!(flags & PVFS2_OP_INTERRUPTIBLE)) 
