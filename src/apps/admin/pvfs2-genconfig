@@ -1505,7 +1505,6 @@ my $client_job_timeout = get_client_job_timeout();
 
 if (!$opt_quiet) {
     print $OUT "Writing fs config file... ";
-    print $OUT "done\n";
 }
 
 emit_defaults($output_target, $num_unexp_reqs,
@@ -1528,8 +1527,22 @@ if ($opt_metaspec) {
 if ($using_stdout == 0)
 {
     close($output_target);
+
+    my $req_limit = 65536;
+
+    if(-s $ARGV[0] > $req_limit)
+    {
+        my $size = (-s $ARGV[0]);
+        print STDERR
+"Warning: Generated config file: " . $ARGV[0] . "\n" .
+"has size: $size, which is larger than the current PVFS request: $req_limit\n" .
+"Increase the value of PVFS_REQ_LIMIT_CONFIG_FILE_BYTES in src/proto/pvfs2-req-proto.h\n";
+    }
 }
 
+if (!$opt_quiet) {
+    print $OUT "done\n";
+}
 
 # Local variables:
 #  c-indent-level: 4
