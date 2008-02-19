@@ -948,5 +948,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+	dnl Starting with 2.6.25-rc1, .read_inode goes away.
+	AC_MSG_CHECKING(if kernel super_operations contains read_inode field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct super_operations sops;
+		sops.read_inode(NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_READ_INODE, 1, [Define if kernel super_operations contains read_inode field]),
+	AC_MSG_RESULT(no)
+	)
+
 	CFLAGS=$oldcflags
 ])

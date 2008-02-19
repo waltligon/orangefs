@@ -464,7 +464,7 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
             }
 #endif
             /* issue a call to read the inode */
-            sb->s_op->read_inode(inode);
+            pvfs2_read_inode(inode);
             unlock_new_inode(inode);
         }
 #endif

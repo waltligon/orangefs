@@ -262,6 +262,9 @@
 /* Define if struct file_operations in kernel has readx callback */
 #undef HAVE_READX_FILE_OPERATIONS
 
+/* Define if kernel super_operations contains read_inode field */
+#undef HAVE_READ_INODE
+
 /* Define if kernel has register_ioctl32_conversion */
 #undef HAVE_REGISTER_IOCTL32_CONVERSION
 
