@@ -121,6 +121,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_MGMT_EVENT_MON_COUNT 2048
 /* max number of handles returned by any operation using an array of handles */
 #define PVFS_REQ_LIMIT_HANDLES_COUNT 1024
+/* max number of handles that can be created at once using batch create */
+#define PVFS_REQ_LIMIT_BATCH_CREATE 8192
 /* max number of handles returned by mgmt iterate handles op */
 #define PVFS_REQ_LIMIT_MGMT_ITERATE_HANDLES_COUNT \
   PVFS_REQ_LIMIT_HANDLES_COUNT
@@ -309,7 +311,7 @@ endecode_fields_1a_struct(
     uint32_t, handle_count,
     PVFS_handle, handle_array)
 #define extra_size_PVFS_servresp_batch_create \
-  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+  (PVFS_REQ_LIMIT_BATCH_CREATE * sizeof(PVFS_handle))
 
 /* remove *****************************************************/
 /* - used to remove an existing metafile or datafile object */

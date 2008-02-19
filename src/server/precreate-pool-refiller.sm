@@ -17,11 +17,6 @@
 #include "server-config.h"
 #include "pint-util.h"
 
-/* TODO: make this bigger and not hard coded */
-#define POOL_BATCH_SIZE 128
-/* TODO: make this bigger and not hard coded */
-#define POOL_THRESHOLD 512
-
 static int batch_create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
@@ -83,11 +78,12 @@ static PINT_sm_action wait_for_threshold_fn(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     return(job_precreate_pool_check_level(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
-        POOL_THRESHOLD,
+        user_opts->precreate_low_threshold,
 	smcb,
 	0,
 	js_p,
@@ -104,12 +100,13 @@ static PINT_sm_action store_handles_fn(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     return(job_precreate_pool_fill(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
         s_op->u.precreate_pool_refiller.precreate_handle_array,
-        POOL_BATCH_SIZE,
+        user_opts->precreate_batch_size,
 	smcb,
 	0,
 	js_p,
@@ -157,7 +154,7 @@ static PINT_sm_action setup_batch_create_fn(
         creds,
         s_op->u.precreate_pool_refiller.fsid,
         PVFS_TYPE_DATAFILE,
-        POOL_BATCH_SIZE,
+        user_opts->precreate_batch_size,
         s_op->u.precreate_pool_refiller.data_handle_extent_array);
 
     msg_p->fs_id = s_op->u.precreate_pool_refiller.fsid;
@@ -179,9 +176,10 @@ static PINT_sm_action setup_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct server_configuration_s *user_opts = get_server_config_struct();
         
     s_op->u.precreate_pool_refiller.precreate_handle_array = 
-        malloc(POOL_BATCH_SIZE * sizeof(PVFS_handle));
+        malloc(user_opts->precreate_batch_size * sizeof(PVFS_handle));
     if(!s_op->u.precreate_pool_refiller.precreate_handle_array)
     {
         js_p->error_code = -PVFS_ENOMEM;

@@ -104,6 +104,8 @@ static DOTCONF_CB(get_server_job_bmi_timeout);
 static DOTCONF_CB(get_server_job_flow_timeout);
 static DOTCONF_CB(get_client_job_bmi_timeout);
 static DOTCONF_CB(get_client_job_flow_timeout);
+static DOTCONF_CB(get_precreate_batch_size);
+static DOTCONF_CB(get_precreate_low_threshold);
 static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
 static DOTCONF_CB(get_secret_key);
@@ -614,6 +616,16 @@ static const configoption_t options[] =
      {"ClientRetryDelayMilliSecs",ARG_INT, get_client_retry_delay,NULL,
          CTX_DEFAULTS, "2000"},
 
+     /* Specifies the number of handles to be preceated at a time from each
+      * server using the batch create request.
+      */
+     {"PrecreateBatchSize",ARG_INT, get_precreate_batch_size,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "2048"},
+ 
+     /* Precreate pools will be "topped off" if they fall below this value */
+     {"PrecreateLowThreshold",ARG_INT, get_precreate_low_threshold,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "1536"},
+
      /* This specifies the frequency (in milliseconds) 
       * that performance monitor should be updated
       * when the pvfs server is running in admin mode.
@@ -940,6 +952,8 @@ int PINT_parse_config(
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
     config_s->trove_max_concurrent_io = 16;
+    config_s->precreate_batch_size = PVFS2_PRECREATE_BATCH_SIZE_DEFAULT;
+    config_s->precreate_low_threshold = PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT;
 
     if (cache_config_files(config_s, global_config_filename))
     {
@@ -1414,6 +1428,32 @@ DOTCONF_CB(get_server_job_bmi_timeout)
         return NULL;
     }
     config_s->server_job_bmi_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_precreate_batch_size)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    config_s->precreate_batch_size = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_precreate_low_threshold)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    config_s->precreate_low_threshold = cmd->data.value;
     return NULL;
 }
 

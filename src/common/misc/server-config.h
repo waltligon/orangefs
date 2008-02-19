@@ -150,6 +150,8 @@ typedef struct server_configuration_s
     int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
+    int  precreate_batch_size;
+    int  precreate_low_threshold;
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
