@@ -207,6 +207,7 @@ int PINT_req_sched_change_mode(enum PVFS_server_mode mode,
     {
         return (-errno);
     }
+    memset(mode_element, 0, sizeof(*mode_element));
 
     mode_element->user_ptr = user_ptr;
     id_gen_fast_register(id, mode_element);
@@ -354,6 +355,7 @@ int PINT_req_sched_post(
     {
 	return (-errno);
     }
+    memset(tmp_element, 0, sizeof(*tmp_element));
 
     tmp_element->op = op;
     tmp_element->user_ptr = in_user_ptr;
@@ -363,6 +365,7 @@ int PINT_req_sched_post(
     tmp_element->handle = handle;
     tmp_element->list_head = NULL;
     tmp_element->readonly_flag = readonly_flag;
+    tmp_element->mode_change = 0;
 
     if(!readonly_flag && !PVFS_SERV_IS_MGMT_OP(op))
     {
@@ -554,6 +557,7 @@ int PINT_req_sched_post_timer(
     {
 	return (-errno);
     }
+    memset(tmp_element, 0, sizeof(*tmp_element));
 
     tmp_element->user_ptr = in_user_ptr;
     id_gen_fast_register(out_id, tmp_element);
@@ -562,6 +566,7 @@ int PINT_req_sched_post_timer(
     tmp_element->handle = PVFS_HANDLE_NULL;
     gettimeofday(&tmp_element->tv, NULL);
     tmp_element->list_head = NULL;
+    tmp_element->mode_change = 0;
 
     /* set time to future, based on msecs arg */
     tmp_element->tv.tv_sec += msecs/1000;
