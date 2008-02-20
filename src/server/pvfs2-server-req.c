@@ -86,14 +86,16 @@ struct PINT_server_req_entry PINT_server_req_table[] =
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)
 
-inline int PINT_server_req_readonly(struct PVFS_server_req *req)
+enum PINT_server_req_access_type PINT_server_req_readonly(
+                                    struct PVFS_server_req *req)
 {
-    return 1;
+    return PINT_SERVER_REQ_READONLY;
 }
 
-inline int PINT_server_req_modify(struct PVFS_server_req *req)
+enum PINT_server_req_access_type PINT_server_req_modify(
+                                    struct PVFS_server_req *req)
 {
-    return 0;
+    return PINT_SERVER_REQ_MODIFY;
 }
 
 enum PINT_server_req_permissions

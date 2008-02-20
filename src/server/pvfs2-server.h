@@ -97,10 +97,10 @@ static inline int PINT_get_object_ref_##req_name(                        \
     return 0;                                                            \
 }
 
-typedef int (*PINT_server_req_access_callback)(struct PVFS_server_req *req);
-
-int PINT_server_req_readonly(struct PVFS_server_req *req);
-int PINT_server_req_modify(struct PVFS_server_req *req);
+enum PINT_server_req_access_type PINT_server_req_readonly(
+                                    struct PVFS_server_req *req);
+enum PINT_server_req_access_type PINT_server_req_modify(
+                                    struct PVFS_server_req *req);
 
 struct PINT_server_req_params
 {
@@ -121,7 +121,8 @@ struct PINT_server_req_params
      * Default functions PINT_server_req_readonly and PINT_server_req_modify
      * are used for requests that always require the same access type.
      */
-    PINT_server_req_access_callback access_type;
+    enum PINT_server_req_access_type (*access_type)(
+                                        struct PVFS_server_req *req);
 
     /* Specifies the scheduling policy for the request.  In some cases,
      * we can bypass the request scheduler and proceed directly with the

@@ -289,15 +289,20 @@ static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, PVF
     return 0;
 }
 
-static int permit_operation(PVFS_fs_id fsid, int read_only, PVFS_BMI_addr_t client_addr)
+/*
+ * Return zero if this operation should be allowed.
+ */
+static int permit_operation(PVFS_fs_id fsid,
+                            enum PINT_server_req_access_type access_type,
+                            PVFS_BMI_addr_t client_addr)
 { 
     int exp_flags = 0; 
     struct server_configuration_s *serv_config = NULL;
     struct filesystem_configuration_s * fsconfig = NULL;
 
-    if (read_only == 1)
+    if (access_type == PINT_SERVER_REQ_READONLY)
     {
-        return 0;
+        return 0;  /* anything that doesn't modify state is okay */
     }
     serv_config = PINT_get_server_config();
     fsconfig = PINT_config_find_fs_id(serv_config, fsid);
@@ -480,7 +485,7 @@ static PINT_sm_action prelude_perm_check(
             break;
         case PINT_SERVER_CHECK_NONE:
             if(squashed_flag &&
-               !PINT_server_req_get_access_type(s_op->req) &&
+               PINT_server_req_get_access_type(s_op->req) == PINT_SERVER_REQ_MODIFY &&
                ((s_op->req->op == PVFS_SERV_IO) ||
                 (s_op->req->op == PVFS_SERV_SMALL_IO) ||
                 (s_op->req->op == PVFS_SERV_TRUNCATE)))

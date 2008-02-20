@@ -379,14 +379,14 @@ static PINT_sm_action io_send_completion_ack(
     return err;
 }
 
-static inline int PINT_server_req_access_io(
+static enum PINT_server_req_access_type PINT_server_req_access_io(
     struct PVFS_server_req *req)
 {
     if(req->u.io.io_type == PVFS_IO_READ)
     {
-        return 1;
+        return PINT_SERVER_REQ_READONLY;
     }
-    return 0;
+    return PINT_SERVER_REQ_MODIFY;
 }
 
 PINT_GET_OBJECT_REF_DEFINE(io);
