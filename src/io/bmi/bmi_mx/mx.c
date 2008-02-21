@@ -1637,7 +1637,7 @@ bmx_post_rx(struct bmx_ctx *rx)
                         segs = rx->mxc_seg_list;
                 }
                 mxret = mx_irecv(bmi_mx->bmx_ep, segs, rx->mxc_nseg,
-                                 rx->mxc_match, -1ULL, (void *) rx, &rx->mxc_mxreq);
+                                 rx->mxc_match, BMX_MASK, (void *) rx, &rx->mxc_mxreq);
                 if (mxret != MX_SUCCESS) {
                         ret = -BMI_ENOMEM;
                         bmx_deq_pending_ctx(rx);        /* uses peer lock */
@@ -1865,7 +1865,7 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
                 debug(BMX_DB_CTX, "%s rx match= 0x%llx length= %lld", __func__,
                                 llu(rx->mxc_match), lld(rx->mxc_nob));
                 mxret = mx_irecv(bmi_mx->bmx_ep, &rx->mxc_seg, rx->mxc_nseg,
-                                 rx->mxc_match, -1ULL, (void *) rx, &rx->mxc_mxreq);
+                                 rx->mxc_match, BMX_MASK, (void *) rx, &rx->mxc_mxreq);
                 if (mxret != MX_SUCCESS) {
                         debug((BMX_DB_MX|BMX_DB_CTX), "mx_irecv() failed with %s for an "
                                         "unexpected recv with tag %d length %d",
@@ -1921,7 +1921,7 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                         debug(BMX_DB_CONN, "%s rx match= 0x%llx length= %lld", 
                                         __func__, llu(rx->mxc_match), lld(rx->mxc_nob));
                         mxret = mx_irecv(bmi_mx->bmx_ep, &rx->mxc_seg, rx->mxc_nseg,
-                                         rx->mxc_match, -1ULL, (void *) rx, &rx->mxc_mxreq);
+                                         rx->mxc_match, BMX_MASK, (void *) rx, &rx->mxc_mxreq);
                         if (mxret != MX_SUCCESS) {
                                 debug(BMX_DB_CONN, "mx_irecv() failed for an "
                                                 "unexpected recv with %s", 

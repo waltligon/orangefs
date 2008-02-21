@@ -122,6 +122,8 @@ typedef struct qlist_head list_t;       /* easier to type */
  *     0-31     Version
  */
 
+#define BMX_MASK (~0ULL)
+
 #define BMX_MAX_PEER_ID ((1<<20) - 1)     /* 20 bits - actually 1,048,574 peers
                                            1 to 1,048,575 */
 
