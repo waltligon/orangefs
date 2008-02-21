@@ -8,7 +8,6 @@
 #define PVFS2_INTERNAL_H
 
 #include "pvfs2-config.h"
-#include "bmi.h"
 
 /* Printf wrappers for 32- and 64-bit compatibility.  Imagine trying
  * to print out a PVFS_handle, which is typedefed to a uint64_t.  On
