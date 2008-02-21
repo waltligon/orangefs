@@ -53,6 +53,7 @@ static pthread_t dev_thread_id;
 
 static pthread_cond_t bmi_test_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t trove_test_cond = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t dev_unexp_test_cond = PTHREAD_COND_INITIALIZER;
 #endif /* __PVFS2_JOB_THREADED__ */
 
 /* used to indicate that a bmi testcontext is in progress; we can't simply
@@ -299,8 +300,21 @@ static void *dev_thread_function(void *ptr)
     {
 	gen_mutex_lock(&dev_mutex);
 	incount = dev_unexp_count;
+        while(incount == 0)
+        {
+            /* we need to wait until more unexp dev operations are posted */
+#ifdef __PVFS2_JOB_THREADED__
+            pthread_cond_wait(&dev_unexp_test_cond, &dev_mutex);
+            incount = dev_unexp_count;
+#else
+            gen_mutex_unlock(&dev_mutex);
+            return(NULL);
+#endif
+        }
 	if(incount > THREAD_MGR_TEST_COUNT)
+        {
 	    incount = THREAD_MGR_TEST_COUNT;
+        }
 	gen_mutex_unlock(&dev_mutex);
 
 	ret = PINT_dev_test_unexpected(
@@ -747,6 +761,13 @@ int PINT_thread_mgr_dev_unexp_handler(
     }
     dev_unexp_fn = fn;
     dev_unexp_count++;
+    if(dev_unexp_count == 1)
+    {
+        /* signal worker thread that may have been waiting for more ops */
+#ifdef __PVFS2_JOB_THREADED__
+        pthread_cond_signal(&dev_unexp_test_cond);
+#endif
+    }
     gen_mutex_unlock(&dev_mutex);
     return(0);
 }

@@ -4350,7 +4350,10 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
     gen_mutex_lock(&dev_unexp_mutex);
     /* remove the operation from the pending dev_unexp queue */
     tmp_desc = job_desc_q_shownext(dev_unexp_queue);
-    assert(tmp_desc != NULL);        /* TODO: fix this */
+    /* if the thread mgr accounting is accurate, then there _must_ be a
+     * dev_unexp job posted for us to hit this point.
+     */
+    assert(tmp_desc != NULL);
     if (tmp_desc->completed_flag == 0)
     {
         job_desc_q_remove(tmp_desc);

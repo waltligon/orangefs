@@ -320,6 +320,11 @@ int PINT_dev_test_unexpected(
     void *buffer = NULL;
     pvfs2_upcall_t *upc = NULL;
 
+    if(incount < 1)
+    {
+        return(-PVFS_EINVAL);
+    }
+
     /* prepare to read max upcall size (magic nr and tag included) */
     int read_size = pdev_max_upsize;
     
