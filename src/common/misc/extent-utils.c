@@ -68,6 +68,33 @@ int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
             (handle < ext->last+1));
 }
 
+/* PINT_handle_in_extent_array()
+ *
+ * Parameters:
+ * PVFS_handle_extent_array    - array of extents
+ * PVFS_handle                 - a handle
+ *
+ * Returns 1 if the specified handle is within any of the
+ * extents in the specified list of extents.  Returns 0
+ * otherwise.
+ *
+ */
+int PINT_handle_in_extent_array(
+    PVFS_handle_extent_array *ext_array, PVFS_handle handle)
+{
+    int i, ret;
+    for(i = 0; i < ext_array->extent_count; ++i)
+    {
+        ret = PINT_handle_in_extent(&ext_array->extent_array[i], handle);
+        if(ret)
+        {
+            return ret;
+        }
+    }
+    return 0;
+}
+
+
 /* PINT_handle_in_extent_list()
  *
  * Parameters:
@@ -115,32 +142,17 @@ int PINT_handle_in_extent_list(
  * returns the 0 on success and fills in the specified count argument
  * with the extent count total.  returns -PVFS_error on error
  */
-int PINT_extent_list_count_total(
-    PINT_llist *extent_list, uint64_t *count)
+int PINT_extent_array_count_total(
+    PVFS_handle_extent_array *extent_array)
 {
-    int ret = -PVFS_EINVAL;
-    PINT_llist *cur = NULL;
-    PVFS_handle_extent *cur_extent = NULL;
+    int i, count = 0;
 
-    if (extent_list && count)
+    for(i = 0; i < extent_array->extent_count; ++i)
     {
-        *count = 0;
-
-        cur = extent_list;
-        while(cur)
-        {
-            cur_extent = PINT_llist_head(cur);
-            if (!cur_extent)
-            {
-                break;
-            }
-
-            *count += (cur_extent->last - cur_extent->first + 1);
-            cur = PINT_llist_next(cur);
-        }
-        ret = 0;
+        count += (extent_array->extent_array[i].last -
+                  extent_array->extent_array[i].first + 1);
     }
-    return ret;
+    return count;
 }
 
 /* PINT_release_extent_list()
