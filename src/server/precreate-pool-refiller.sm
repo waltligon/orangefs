@@ -130,7 +130,7 @@ static PINT_sm_action setup_batch_create_fn(
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated handles from %s and put store them in %llu.\n", 
         s_op->u.precreate_pool_refiller.host,
-        s_op->u.precreate_pool_refiller.pool_handle);
+        llu(s_op->u.precreate_pool_refiller.pool_handle));
 
     PINT_init_msgpair(s_op, msg_p);
 
@@ -250,6 +250,12 @@ static int batch_create_comp_fn(void *v_p,
     return 0;
 }
 
+struct PINT_server_req_params pvfs2_precreate_pool_refiller_params =
+{
+    .string_name = "precreate_pool_refiller",
+    .perm = PINT_SERVER_CHECK_INVALID,
+    .state_machine = &pvfs2_precreate_pool_refiller_sm
+};
 
 /*
  * Local variables:

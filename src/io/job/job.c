@@ -996,8 +996,11 @@ int job_dev_write_list(void** buffer_list,
  * returns 0 on success, -errno on failure, and 1 on immediate
  * completion 
  */
-int job_req_sched_post(struct PVFS_server_req *in_request,
-                       int req_index,
+int job_req_sched_post(enum PVFS_server_op op,
+                       PVFS_fs_id fs_id,
+                       PVFS_handle handle,
+                       int read_only,
+                       int schedule,
                        void *user_ptr,
                        job_aint status_user_tag,
                        job_status_s * out_status_p,
@@ -1027,7 +1030,8 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
 
-    ret = PINT_req_sched_post(in_request, req_index, jd, &(jd->u.req_sched.id));
+    ret = PINT_req_sched_post(
+        op, fs_id, handle, read_only, schedule, jd, &(jd->u.req_sched.id));
 
     if (ret < 0)
     {
@@ -1054,6 +1058,51 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
      */
     *id = jd->job_id;
 
+    return (0);
+}
+
+int job_req_sched_change_mode(enum PVFS_server_mode mode,
+                              void *user_ptr,
+                              job_aint status_user_tag,
+                              job_status_s *out_status_p,
+                              job_id_t *id,
+                              job_context_id context_id)
+{
+    struct job_desc *jd = NULL;
+    int ret = -1;
+
+    jd = alloc_job_desc(JOB_REQ_SCHED);
+    if(!jd)
+    {
+        return (errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->u.req_sched.post_flag = 1;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+
+    ret = PINT_req_sched_change_mode(mode, jd, &(jd->u.req_sched.id));
+    if (ret < 0)
+    {
+        /* error posting */
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        *id = jd->job_id;
+        /* don't delete the job desc until a matching release comes through */
+        return (1);
+    }
+
+    *id = jd->job_id;
     return (0);
 }
 
@@ -4441,14 +4490,14 @@ static void precreate_pool_fill_thread_mgr_callback(
         {
             jd_checker = qlist_entry(iterator, struct job_desc,
                 job_desc_q_link);
-            gossip_debug(GOSSIP_JOB_DEBUG, "checking for get_handles() sleeper, jd on handle %llu\n", jd_checker->u.precreate_pool.precreate_pool);
+            gossip_debug(GOSSIP_JOB_DEBUG, "checking for get_handles() sleeper, jd on handle %llu\n", llu(jd_checker->u.precreate_pool.precreate_pool));
             if(jd_checker->u.precreate_pool.precreate_pool == pool->pool_handle)
             {
                 awoken_count++;
                 /* put them on a new local queue */
                 qlist_del(&jd_checker->job_desc_q_link);
                 qlist_add(&jd_checker->job_desc_q_link, &tmp_list);
-                gossip_debug(GOSSIP_JOB_DEBUG, "Found someone waiting on handles from precreate pool %llu\n", pool->pool_handle);
+                gossip_debug(GOSSIP_JOB_DEBUG, "Found someone waiting on handles from precreate pool %llu\n", llu(pool->pool_handle));
             }
             if(awoken_count == jd->u.precreate_pool.posted_count)
             {
@@ -5388,7 +5437,7 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
 
             /* queue up until the count for this pool increases */
             qlist_add(&jd->job_desc_q_link, &precreate_pool_get_handles_list);
-            gossip_debug(GOSSIP_JOB_DEBUG, "Found empty precreate pool %llu\n", pool->pool_handle);
+            gossip_debug(GOSSIP_JOB_DEBUG, "Found empty precreate pool %llu\n", llu(pool->pool_handle));
             
             gen_mutex_unlock(&precreate_pool_mutex);
             return;

@@ -16,8 +16,10 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "gen-locks.h"
 #include "pint-util.h"
+#include "bmi.h"
 
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
@@ -343,6 +345,21 @@ void PINT_util_gen_credentials(
     memset(credentials, 0, sizeof(PVFS_credentials));
     credentials->uid = geteuid();
     credentials->gid = getegid();
+}
+
+inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
+{
+    const char *addr_str;
+
+    addr_str = BMI_addr_rev_lookup(*x);
+    encode_string(pptr, &addr_str);
+}
+
+inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
+{
+    char *addr_string;
+    decode_string(pptr, &addr_string);
+    BMI_addr_lookup(x, addr_string);
 }
 
 /*

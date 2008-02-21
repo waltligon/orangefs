@@ -384,6 +384,18 @@ static PINT_sm_action remove_setup_work(
     return SM_ACTION_COMPLETE;
 }
 
+PINT_GET_OBJECT_REF_DEFINE(remove);
+
+struct PINT_server_req_params pvfs2_remove_params =
+{
+    .string_name = "remove",
+    .get_object_ref = PINT_get_object_ref_remove,
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .state_machine = &pvfs2_remove_sm
+};
+
 
 /*
  * Local variables:

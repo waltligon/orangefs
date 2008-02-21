@@ -115,6 +115,8 @@ typedef struct filesystem_configuration_s
 
     PVFS_uid exp_anon_uid;
     PVFS_gid exp_anon_gid;
+
+    int32_t small_file_size;
 } filesystem_configuration_s;
 
 typedef struct distribution_param_configuration_s

@@ -89,7 +89,12 @@ static PINT_sm_action event_mon_do_work(
     return SM_ACTION_COMPLETE;
 }
 
-
+struct PINT_server_req_params pvfs2_event_mon_params =
+{
+    .string_name = "mgmt_event_mon",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .state_machine = &pvfs2_event_mon_sm
+};
 
 /*
  * Local variables:

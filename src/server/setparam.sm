@@ -16,6 +16,7 @@
 #include "pint-event.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
+#include "request-scheduler/request-scheduler.h"
 
 static int check_fs_id(PVFS_fs_id fs_id);
 
@@ -71,7 +72,6 @@ static PINT_sm_action setparam_work(
     struct server_configuration_s *user_opts;
     struct filesystem_configuration_s *fs_conf;
     char buf[16] = {0};
-    int i;
 
     /* these are temporary */
     int test_precreate_count = 0;
@@ -163,9 +163,14 @@ static PINT_sm_action setparam_work(
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
         case PVFS_SERV_PARAM_MODE:
-            /* no work to do here; request scheduler has already handled */
+
+            s_op->resp.u.mgmt_setparam.old_value = PINT_req_sched_get_mode();
+            ret = job_req_sched_change_mode(s_op->req->u.mgmt_setparam.value,
+                                            NULL, 0, js_p, &s_op->scheduled_id,
+                                            server_job_context);
+
             js_p->error_code = 0;
-            return SM_ACTION_COMPLETE;
+            return ret;
         case PVFS_SERV_PARAM_TEST_PRECREATE:
             user_opts = get_server_config_struct();
             s_op->resp.u.mgmt_setparam.old_value = 0;
@@ -175,7 +180,6 @@ static PINT_sm_action setparam_work(
 
             /* count how many I/O servers are in the file system */
             ret = PINT_cached_config_count_servers(
-                user_opts,
                 s_op->req->u.mgmt_setparam.fs_id,
                 PINT_SERVER_TYPE_IO,
                 &test_precreate_count);
@@ -314,6 +318,24 @@ check_failed:
 
     return ret;
 }
+
+static inline int PINT_get_object_ref_setparam(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.mgmt_setparam.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+};
+
+struct PINT_server_req_params pvfs2_setparam_params =
+{
+    .string_name = "mgmt_setparam",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_setparam,
+    .state_machine = &pvfs2_setparam_sm
+};
 
 /*
  * Local variables:

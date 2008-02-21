@@ -75,8 +75,9 @@ enum PVFS_server_op
     PVFS_SERV_SMALL_IO = 33,
     PVFS_SERV_LISTATTR = 34,
     PVFS_SERV_BATCH_CREATE = 35,
-    PVFS_SERV_STUFFED_CREATE = 36,
     PVFS_SERV_PRECREATE_POOL_REFILLER = 37, /* not a real protocol request */
+    PVFS_SERV_BATCH_REMOVE = 38,
+    PVFS_SERV_UNSTUFF = 39,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -142,12 +143,12 @@ enum PVFS_server_op
 /* max number of handles for which we return attributes */
 #define PVFS_REQ_LIMIT_LISTATTR 64
 
-/* stuffed create *********************************************************/
-/* - used to create a stuffed object.  This creates a metadata handle,
+/* create *********************************************************/
+/* - used to create an object.  This creates a metadata handle,
  * a datafile handle, and links the datafile handle to the metadata handle.
  * It also sets the attributes on the metadata. */
 
-struct PVFS_servreq_stuffed_create
+struct PVFS_servreq_create
 {
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
@@ -159,100 +160,71 @@ struct PVFS_servreq_stuffed_create
       a single extent with first = last should be used.
     */
     PVFS_handle_extent_array metafile_handle_extent_array;
-
     PVFS_handle_extent_array datafile_handle_extent_array;
+
+    int32_t num_dfiles_req;
+    PVFS_sys_layout layout;
 };
-endecode_fields_5_struct(
-    PVFS_servreq_stuffed_create,
+endecode_fields_7_struct(
+    PVFS_servreq_create,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_object_attr, attr,
     PVFS_handle_extent_array, metafile_handle_extent_array,
-    PVFS_handle_extent_array, datafile_handle_extent_array)
-#define extra_size_PVFS_servreq_stuffed_create \
-    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
-     PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
+    PVFS_handle_extent_array, datafile_handle_extent_array,
+    int32_t, num_dfiles_req,
+    PVFS_sys_layout, layout)
 
-#define PINT_SERVREQ_STUFFED_CREATE_FILL(__req,                                \
-                                         __creds,                              \
-                                         __fsid,                               \
-                                         __md_ext_array,                       \
-                                         __df_ext_array,                       \
-                                         __objtype,                            \
-                                         __attr,                               \
-                                         __extra_mask)                         \
-do {                                                                           \
-    memset(&(__req), 0, sizeof(__req));                                        \
-    (__req).op = PVFS_SERV_STUFFED_CREATE;                                     \
-    (__req).credentials = (__creds);                                           \
-    (__req).u.stuffed_create.fs_id = (__fsid);                                 \
-    (__attr).objtype = (__objtype);                                            \
-    (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                       \
-    PINT_CONVERT_ATTR(&(__req).u.stuffed_create.attr, &(__attr), __extra_mask);\
-    (__req).u.create.handle_extent_array.extent_count =                        \
-        (__ext_array).extent_count;                                            \
-    (__req).u.create.handle_extent_array.extent_array =                        \
-        (__ext_array).extent_array;                                            \
-} while (0)
-
-struct PVFS_servresp_stuffed_create
-{
-    PVFS_handle metafile_handle;
-    PVFS_handle datafile_handle;
-};
-endecode_fields_2_struct(
-    PVFS_servresp_stuffed_create,
-    PVFS_handle, metafile_handle,
-    PVFS_handle, datafile_handle)
-
-/* create *********************************************************/
-/* - used to create new metafile and datafile objects */
-
-struct PVFS_servreq_create
-{
-    PVFS_fs_id fs_id;
-    PVFS_ds_type object_type;
-
-    /*
-      an array of handle extents that we use to suggest to
-      the server from which handle range to allocate for the
-      newly created handle(s).  To request a single handle,
-      a single extent with first = last should be used.
-    */
-    PVFS_handle_extent_array handle_extent_array;
-};
-endecode_fields_3_struct(
-    PVFS_servreq_create,
-    PVFS_fs_id, fs_id,
-    PVFS_ds_type, object_type,
-    PVFS_handle_extent_array, handle_extent_array)
 #define extra_size_PVFS_servreq_create \
-    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
+     PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
+     extra_size_PVFS_object_attr)
 
-#define PINT_SERVREQ_CREATE_FILL(__req,                \
-                                 __creds,              \
-                                 __fsid,               \
-                                 __objtype,            \
-                                 __ext_array)          \
-do {                                                   \
-    memset(&(__req), 0, sizeof(__req));                \
-    (__req).op = PVFS_SERV_CREATE;                     \
-    (__req).credentials = (__creds);                   \
-    (__req).u.create.fs_id = (__fsid);                 \
-    (__req).u.create.object_type = (__objtype);        \
-    (__req).u.create.handle_extent_array.extent_count =\
-        (__ext_array).extent_count;                    \
-    (__req).u.create.handle_extent_array.extent_array =\
-        (__ext_array).extent_array;                    \
+#define PINT_SERVREQ_CREATE_FILL(__req,                                    \
+                                 __creds,                                  \
+                                 __fsid,                                   \
+                                 __md_ext_array,                           \
+                                 __df_ext_array,                           \
+                                 __attr,                                   \
+                                 __layout)                                 \
+do {                                                                       \
+    int mask;                                                              \
+    memset(&(__req), 0, sizeof(__req));                                    \
+    (__req).op = PVFS_SERV_CREATE;                                         \
+    (__req).credentials = (__creds);                                       \
+    (__req).u.create.fs_id = (__fsid);                                     \
+    (__attr).objtype = PVFS_TYPE_METAFILE;                                 \
+    mask = (__attr).mask;                                                  \
+    (__attr).mask = PVFS_ATTR_COMMON_ALL;                                  \
+    (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                   \
+    PINT_copy_object_attr(&(__req).u.create.attr, &(__attr));              \
+    (__req).u.create.attr.mask |= mask;                                    \
+    (__req).u.create.metafile_handle_extent_array.extent_count =           \
+        (__md_ext_array).extent_count;                                     \
+    (__req).u.create.metafile_handle_extent_array.extent_array =           \
+        (__md_ext_array).extent_array;                                     \
+    (__req).u.create.datafile_handle_extent_array.extent_count =           \
+        (__df_ext_array).extent_count;                                     \
+    (__req).u.create.datafile_handle_extent_array.extent_array =           \
+        (__df_ext_array).extent_array;                                     \
+    (__req).u.create.layout = __layout;                                    \
 } while (0)
 
 struct PVFS_servresp_create
 {
-    PVFS_handle handle;
+    PVFS_handle metafile_handle;
+    int32_t stuffed;
+    int32_t datafile_count;
+    PVFS_handle *datafile_handles;
 };
-endecode_fields_1_struct(
+endecode_fields_2a_struct(
     PVFS_servresp_create,
-    PVFS_handle, handle)
+    PVFS_handle, metafile_handle,
+    int32_t, stuffed,
+    int32_t, datafile_count,
+    PVFS_handle, datafile_handles)
+#define extra_size_PVFS_servresp_create \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
 /* batch_create *********************************************************/
 /* - used to create new multiple metafile and datafile objects */
@@ -336,6 +308,34 @@ do {                                      \
     (__req).credentials = (__creds);      \
     (__req).u.remove.fs_id = (__fsid);    \
     (__req).u.remove.handle = (__handle); \
+} while (0)
+
+struct PVFS_servreq_batch_remove
+{
+    PVFS_fs_id  fs_id;
+    int32_t handle_count;
+    PVFS_handle *handles;
+};
+endecode_fields_1a_struct(
+    PVFS_servreq_batch_remove,
+    PVFS_fs_id, fs_id,
+    int32_t, handle_count,
+    PVFS_handle, handles)
+#define extra_size_PVFS_servreq_batch_remove \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+
+#define PINT_SERVREQ_BATCH_REMOVE_FILL(__req,        \
+                                       __creds,      \
+                                       __fsid,       \
+                                       __count,      \
+                                       __handles)    \
+do {                                                 \
+    memset(&(__req), 0, sizeof(__req));              \
+    (__req).op = PVFS_SERV_BATCH_REMOVE;             \
+    (__req).credentials = (__creds);                 \
+    (__req).u.batch_remove.fs_id = (__fsid);         \
+    (__req).u.batch_remove.handle_count = (__count); \
+    (__req).u.batch_remove.handles = (__handles);    \
 } while (0)
 
 /* mgmt_remove_object */
@@ -492,6 +492,45 @@ endecode_fields_1_struct(
 #define extra_size_PVFS_servresp_getattr \
     extra_size_PVFS_object_attr
 
+/* migrate_stuffed ****************************************************/
+/* - creates the datafile handles for the file.  This allows a stuffed
+ * file to migrate to a large one. */
+
+struct PVFS_servreq_unstuff
+{
+    PVFS_handle handle; /* handle of target object */
+    PVFS_fs_id fs_id;   /* file system */
+};
+endecode_fields_2_struct(
+    PVFS_servreq_unstuff,
+    PVFS_handle, handle,
+    PVFS_fs_id, fs_id)
+
+#define PINT_SERVREQ_UNSTUFF_FILL(__req,           \
+                                  __creds,         \
+                                  __fsid,          \
+                                  __handle)        \
+do {                                               \
+    memset(&(__req), 0, sizeof(__req));            \
+    (__req).op = PVFS_SERV_UNSTUFF;                \
+    (__req).credentials = (__creds);               \
+    (__req).u.getattr.fs_id = (__fsid);            \
+    (__req).u.getattr.handle = (__handle);         \
+} while (0)
+
+struct PVFS_servresp_unstuff
+{
+    /* return the entire object's attributes, which includes the
+     * new datafile handles for the migrated file.
+     */
+    PVFS_object_attr attr;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_unstuff,
+    PVFS_object_attr, attr)
+#define extra_size_PVFS_servresp_unstuff \
+    extra_size_PVFS_object_attr
+
 /* setattr ****************************************************/
 /* - sets attributes specified by mask of PVFS_ATTR_XXX values */
 
@@ -535,7 +574,7 @@ struct PVFS_servreq_lookup_path
 {
     char *path;                  /* path name */
     PVFS_fs_id fs_id;            /* file system */
-    PVFS_handle starting_handle; /* handle of path parent */
+    PVFS_handle handle; /* handle of path parent */
     /* mask of attribs to return with lookup results */
     uint32_t attrmask;
 };
@@ -544,7 +583,7 @@ endecode_fields_5_struct(
     string, path,
     PVFS_fs_id, fs_id,
     skip4,,
-    PVFS_handle, starting_handle,
+    PVFS_handle, handle,
     uint32_t, attrmask)
 #define extra_size_PVFS_servreq_lookup_path \
   roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES + 1)
@@ -561,7 +600,7 @@ do {                                                   \
     (__req).credentials = (__creds);                   \
     (__req).u.lookup_path.path = (__path);             \
     (__req).u.lookup_path.fs_id = (__fsid);            \
-    (__req).u.lookup_path.starting_handle = (__handle);\
+    (__req).u.lookup_path.handle = (__handle);\
     (__req).u.lookup_path.attrmask = (__amask);        \
 } while (0)
 
@@ -646,14 +685,14 @@ struct PVFS_servreq_crdirent
 {
     char *name;                /* name of new entry */
     PVFS_handle new_handle;    /* handle of new entry */
-    PVFS_handle parent_handle; /* handle of directory */
+    PVFS_handle handle; /* handle of directory */
     PVFS_fs_id fs_id;          /* file system */
 };
 endecode_fields_4_struct(
     PVFS_servreq_crdirent,
     string, name,
     PVFS_handle, new_handle,
-    PVFS_handle, parent_handle,
+    PVFS_handle, handle,
     PVFS_fs_id, fs_id)
 #define extra_size_PVFS_servreq_crdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -662,7 +701,7 @@ endecode_fields_4_struct(
                                    __creds,         \
                                    __name,          \
                                    __new_handle,    \
-                                   __parent_handle, \
+                                   __handle,        \
                                    __fs_id)         \
 do {                                                \
     memset(&(__req), 0, sizeof(__req));             \
@@ -670,8 +709,8 @@ do {                                                \
     (__req).credentials = (__creds);                \
     (__req).u.crdirent.name = (__name);             \
     (__req).u.crdirent.new_handle = (__new_handle); \
-    (__req).u.crdirent.parent_handle =              \
-       (__parent_handle);                           \
+    (__req).u.crdirent.handle =                     \
+       (__handle);                           \
     (__req).u.crdirent.fs_id = (__fs_id);           \
 } while (0)
 
@@ -681,13 +720,13 @@ do {                                                \
 struct PVFS_servreq_rmdirent
 {
     char *entry;               /* name of entry to remove */
-    PVFS_handle parent_handle; /* handle of directory */
+    PVFS_handle handle; /* handle of directory */
     PVFS_fs_id fs_id;          /* file system */
 };
 endecode_fields_3_struct(
     PVFS_servreq_rmdirent,
     string, entry,
-    PVFS_handle, parent_handle,
+    PVFS_handle, handle,
     PVFS_fs_id, fs_id)
 #define extra_size_PVFS_servreq_rmdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -702,7 +741,7 @@ do {                                              \
     (__req).op = PVFS_SERV_RMDIRENT;              \
     (__req).credentials = (__creds);              \
     (__req).u.rmdirent.fs_id = (__fsid);          \
-    (__req).u.rmdirent.parent_handle = (__handle);\
+    (__req).u.rmdirent.handle = (__handle);       \
     (__req).u.rmdirent.entry = (__entry);         \
 } while (0);
 
@@ -721,14 +760,14 @@ struct PVFS_servreq_chdirent
 {
     char *entry;                   /* name of entry to remove */
     PVFS_handle new_dirent_handle; /* handle of directory */
-    PVFS_handle parent_handle;     /* handle of directory */
+    PVFS_handle handle;     /* handle of directory */
     PVFS_fs_id fs_id;              /* file system */
 };
 endecode_fields_4_struct(
     PVFS_servreq_chdirent,
     string, entry,
     PVFS_handle, new_dirent_handle,
-    PVFS_handle, parent_handle,
+    PVFS_handle, handle,
     PVFS_fs_id, fs_id)
 #define extra_size_PVFS_servreq_chdirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -736,7 +775,7 @@ endecode_fields_4_struct(
 #define PINT_SERVREQ_CHDIRENT_FILL(__req,          \
                                    __creds,        \
                                    __fsid,         \
-                                   __parent_handle,\
+                                   __handle,       \
                                    __new_dirent,   \
                                    __entry)        \
 do {                                               \
@@ -744,8 +783,8 @@ do {                                               \
     (__req).op = PVFS_SERV_CHDIRENT;               \
     (__req).credentials = (__creds);               \
     (__req).u.chdirent.fs_id = (__fsid);           \
-    (__req).u.chdirent.parent_handle =             \
-        (__parent_handle);                         \
+    (__req).u.chdirent.handle =                    \
+        (__handle);                                \
     (__req).u.chdirent.new_dirent_handle =         \
         (__new_dirent);                            \
     (__req).u.chdirent.entry = (__entry);          \
@@ -1625,8 +1664,10 @@ struct PVFS_server_req
     union
     {
         struct PVFS_servreq_create create;
+        struct PVFS_servreq_unstuff unstuff;
         struct PVFS_servreq_batch_create batch_create;
         struct PVFS_servreq_remove remove;
+        struct PVFS_servreq_batch_remove batch_remove;
         struct PVFS_servreq_io io;
         struct PVFS_servreq_getattr getattr;
         struct PVFS_servreq_setattr setattr;
@@ -1653,7 +1694,6 @@ struct PVFS_server_req
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
-        struct PVFS_servreq_stuffed_create stuffed_create;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1684,6 +1724,7 @@ struct PVFS_server_resp
     union
     {
         struct PVFS_servresp_create create;
+        struct PVFS_servresp_unstuff unstuff;
         struct PVFS_servresp_batch_create batch_create;
         struct PVFS_servresp_getattr getattr;
         struct PVFS_servresp_mkdir mkdir;
@@ -1705,7 +1746,6 @@ struct PVFS_server_resp
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
-        struct PVFS_servresp_stuffed_create stuffed_create;
     } u;
 };
 endecode_fields_2_struct(

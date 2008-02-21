@@ -35,7 +35,8 @@ enum
     IO_RETRY_NODELAY,
     IO_GET_DATAFILE_SIZE,
     IO_ANALYZE_SIZE_RESULTS,
-    IO_DO_SMALL_IO
+    IO_DO_SMALL_IO,
+    IO_UNSTUFF
 };
 
 /* Helper functions local to sys-io.sm. */
@@ -142,6 +143,28 @@ machine pvfs2_client_io_sm
     state io_getattr
     {
         jump pvfs2_client_getattr_sm;
+        success => inspect_attr;
+        default => io_cleanup;
+    }
+
+    state inspect_attr
+    {
+        run io_inspect_attr;
+        IO_UNSTUFF => unstuff_setup_msgpair;
+        success => io_datafile_setup_msgpairs;
+        default => io_cleanup;
+    }
+
+    state unstuff_setup_msgpair
+    {
+        run io_unstuff_setup_msgpair;
+        success => unstuff_xfer_msgpair;
+        default => io_cleanup;
+    }
+
+    state unstuff_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
         success => io_datafile_setup_msgpairs;
         default => io_cleanup;
     }
@@ -394,6 +417,31 @@ static PINT_sm_action io_init(
             sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action io_inspect_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (PINT_smcb_cancelled(smcb))
+    {
+        js_p->error_code = -PVFS_ECANCEL;
+    }
+
+    js_p->error_code = 0;
+
+    /* TODO: Need to check the IO type, the offset and size, and if the file
+     * is currently stuffed.
+     */
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action io_unstuff_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+
+    js_p->error_code = -PVFS_ENOSYS;
     return SM_ACTION_COMPLETE;
 }
 

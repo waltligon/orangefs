@@ -170,13 +170,24 @@ int job_dev_write_list(void** buffer_list,
 		       job_context_id context_id);
 
 /* request scheduler post */
-int job_req_sched_post(struct PVFS_server_req *in_request,
-		       int req_index,
+int job_req_sched_post(enum PVFS_server_op op,
+                       PVFS_fs_id fs_id,
+                       PVFS_handle handle,
+                       int readonly,
+                       int schedule,
 		       void *user_ptr,
 		       job_aint status_user_tag,
 		       job_status_s * out_status_p,
 		       job_id_t * id,
 		       job_context_id context_id);
+
+/* change the mode */
+int job_req_sched_change_mode(enum PVFS_server_mode mode,
+                              void *user_ptr,
+                              job_aint status_user_tag,
+                              job_status_s *out_status_p,
+                              job_id_t *id,
+                              job_context_id context_id);
 
 int job_req_sched_post_timer(int msecs,
 		       void *user_ptr,
@@ -510,6 +521,17 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
 			    job_context_id context_id);
+
+/* remove a list of data space objects (byte stream and key/value) */
+int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
+                                 int count,
+                                 PVFS_handle *handles,
+                                 PVFS_ds_flags flags,
+                                 void *user_ptr,
+                                 job_aint status_user_tag,
+                                 job_status_s * out_status_p,
+                                 job_id_t * id,
+                                 job_context_id context_id);
 
 /* verify that a given dataspace exists and discover its type */
 int job_trove_dspace_verify(PVFS_fs_id coll_id,

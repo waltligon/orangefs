@@ -71,6 +71,9 @@ struct PVFS_metafile_attr_s
     /* list of datafiles */
     PVFS_handle *dfile_array;
     uint32_t dfile_count;
+
+    int32_t stuffed_size;
+
     PVFS_metafile_hint hint;
 };
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;

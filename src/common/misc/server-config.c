@@ -112,6 +112,7 @@ static DOTCONF_CB(get_secret_key);
 static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
 static DOTCONF_CB(get_trove_method);
+static DOTCONF_CB(get_small_file_size);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -908,6 +909,9 @@ static const configoption_t options[] =
      * client operations.
      */
     {"SecretKey",ARG_STR, get_secret_key,NULL,CTX_FILESYSTEM,NULL},
+
+    /* Specifies the size of the small file transition point */
+    {"SmallFileSize", ARG_INT, get_small_file_size, NULL, CTX_FILESYSTEM, NULL},
 
     LAST_OPTION
 };
@@ -2643,6 +2647,20 @@ DOTCONF_CB(get_trove_method)
     }
     return NULL;
 }
+
+DOTCONF_CB(get_small_file_size)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    /* we must be in a storagehints inside a filesystem context */
+    struct filesystem_configuration_s *fs_conf =
+        (struct filesystem_configuration_s *) PINT_llist_head(config_s->file_systems);
+
+    fs_conf->small_file_size = cmd->data.value;
+    return NULL;
+}
+
 
 /*
  * Function: PINT_config_release

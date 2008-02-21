@@ -10,6 +10,7 @@ ifdef BUILD_SERVER
 		$(DIR)/lookup.c \
 		$(DIR)/create.c \
 		$(DIR)/batch-create.c \
+		$(DIR)/batch-remove.c \
 		$(DIR)/crdirent.c \
 		$(DIR)/set-attr.c \
 		$(DIR)/mkdir.c \
@@ -42,7 +43,6 @@ ifdef BUILD_SERVER
 		$(DIR)/del-eattr.c \
 		$(DIR)/list-eattr.c \
 		$(DIR)/unexpected.c \
-		$(DIR)/stuffed-create.c \
 		$(DIR)/precreate-pool-refiller.c
 
 	# c files that should be added to server library
@@ -56,8 +56,8 @@ ifdef BUILD_SERVER
 		SMCGEN += $(SERVER_SMCGEN)
 
 	# server code that will be linked manually, not included in library
-	MISCSRC += \
-		$(DIR)/pvfs2-server.c
+	SERVERBINSRC += \
+		$(DIR)/pvfs2-server.c $(DIR)/pvfs2-server-req.c
 
 	# to stat the fs, need to know about handle statistics
 	MODCFLAGS_$(DIR)/statfs.c = \

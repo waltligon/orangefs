@@ -336,6 +336,13 @@ static int batch_create_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+struct PINT_server_req_params pvfs2_batch_create_params =
+{
+    .string_name = "batch_create",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .state_machine = &pvfs2_batch_create_sm
+};
 
 /*
  * Local variables:

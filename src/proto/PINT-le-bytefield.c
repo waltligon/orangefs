@@ -112,10 +112,17 @@ static void lebf_initialize(void)
 		break;
 	    case PVFS_SERV_CREATE:
 		/* can request a range of handles */
-		req.u.create.handle_extent_array.extent_count = 0;
+		req.u.create.metafile_handle_extent_array.extent_count = 0;
+		req.u.create.datafile_handle_extent_array.extent_count = 0;
 		reqsize = extra_size_PVFS_servreq_create;
+                respsize = extra_size_PVFS_servresp_create;
 	    case PVFS_SERV_REMOVE:
 		/* nothing special, let normal encoding work */
+		break;
+	    case PVFS_SERV_BATCH_REMOVE:
+		req.u.batch_remove.handles = NULL;
+		req.u.batch_remove.handle_count = 0;
+		reqsize = extra_size_PVFS_servreq_batch_remove;
 		break;
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 		/* nothing special, let normal encoding work */
@@ -355,7 +362,9 @@ static int lebf_encode_req(
 	/* call standard function defined in headers */
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
 	CASE(PVFS_SERV_BATCH_CREATE, batch_create);
+        CASE(PVFS_SERV_BATCH_REMOVE, batch_remove);
 	CASE(PVFS_SERV_REMOVE, remove);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
@@ -382,7 +391,6 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
-        CASE(PVFS_SERV_STUFFED_CREATE, stuffed_create);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -459,6 +467,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETCONFIG, getconfig);
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
         CASE(PVFS_SERV_BATCH_CREATE, batch_create);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
@@ -478,7 +487,6 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
-        CASE(PVFS_SERV_STUFFED_CREATE, stuffed_create);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -490,6 +498,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_TRUNCATE:
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_PROTO_ERROR:
             /* nothing else */
             break;
@@ -557,7 +566,9 @@ static int lebf_decode_req(
 	/* call standard function defined in headers */
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
 	CASE(PVFS_SERV_BATCH_CREATE, batch_create);
+        CASE(PVFS_SERV_BATCH_REMOVE, batch_remove);
 	CASE(PVFS_SERV_REMOVE, remove);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
@@ -584,7 +595,6 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
-        CASE(PVFS_SERV_STUFFED_CREATE, stuffed_create);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -651,6 +661,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETCONFIG, getconfig);
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
 	CASE(PVFS_SERV_BATCH_CREATE, batch_create);
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
@@ -670,9 +681,9 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
-        CASE(PVFS_SERV_STUFFED_CREATE, stuffed_create);
 
         case PVFS_SERV_REMOVE:
+        case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
         case PVFS_SERV_SETATTR:
@@ -747,7 +758,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	switch (req->op) {
 
 	    case PVFS_SERV_CREATE:
-		decode_free(req->u.create.handle_extent_array.extent_array);
+		decode_free(req->u.create.metafile_handle_extent_array.extent_array);
+		decode_free(req->u.create.datafile_handle_extent_array.extent_array);
 		break;
 
 	    case PVFS_SERV_BATCH_CREATE:
@@ -776,12 +788,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		decode_free(req->u.mgmt_dspace_info_list.handle_array);
 		break;
 
-	    case PVFS_SERV_STUFFED_CREATE:
-		decode_free(req->u.stuffed_create.metafile_handle_extent_array.extent_array);
-		decode_free(req->u.stuffed_create.datafile_handle_extent_array.extent_array);
-		break;
-
-case PVFS_SERV_SETATTR:
+            case PVFS_SERV_SETATTR:
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
 		    decode_free(req->u.setattr.attr.u.meta.dist);
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
@@ -814,6 +821,8 @@ case PVFS_SERV_SETATTR:
 	    case PVFS_SERV_SETEATTR:
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
+            case PVFS_SERV_BATCH_REMOVE:
+            case PVFS_SERV_UNSTUFF:
 		/* nothing to free */
 		break;
 	    case PVFS_SERV_INVALID:
@@ -870,6 +879,13 @@ case PVFS_SERV_SETATTR:
                         decode_free(resp->u.getattr.attr.u.meta.dfile_array);
                     break;
 
+                case PVFS_SERV_UNSTUFF:
+                    if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DIST)
+                        decode_free(resp->u.unstuff.attr.u.meta.dist);
+                    if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DFILES)
+                        decode_free(resp->u.unstuff.attr.u.meta.dfile_array);
+                    break;
+
                 case PVFS_SERV_MGMT_EVENT_MON:
                     decode_free(resp->u.mgmt_event_mon.event_array);
                     break;
@@ -921,7 +937,7 @@ case PVFS_SERV_SETATTR:
                 case PVFS_SERV_STATFS:
                 case PVFS_SERV_WRITE_COMPLETION:
                 case PVFS_SERV_PROTO_ERROR:
-                case PVFS_SERV_STUFFED_CREATE:
+                case PVFS_SERV_BATCH_REMOVE:
                     /* nothing to free */
                     break;
 

@@ -195,6 +195,18 @@ static PINT_sm_action deleattr_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+PINT_GET_OBJECT_REF_DEFINE(deleattr);
+
+struct PINT_server_req_params pvfs2_del_eattr_params =
+{
+    .string_name = "del_eattr",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_deleattr,
+    .state_machine = &pvfs2_del_eattr_sm
+};
+
 /*
  * Local variables:
  *  mode: c

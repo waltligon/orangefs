@@ -77,8 +77,8 @@ struct PINT_client_remove_sm
 struct PINT_client_create_sm
 {
     char *object_name;                /* input parameter */
-    PVFS_sysresp_create *create_resp; /* in/out parameter*/
-    PVFS_sys_attr sys_attr;           /* input parameter */
+    PVFS_object_attr attr;            /* input parameter */
+    PVFS_sysresp_create *create_resp; /* in/out parameter */
 
     int retry_count;
     int num_data_files;
@@ -86,11 +86,14 @@ struct PINT_client_create_sm
 
     PINT_dist *dist;
     PVFS_sys_layout layout;
+
     PVFS_handle metafile_handle;
+    int datafile_count;
     PVFS_handle *datafile_handles;
-    PVFS_BMI_addr_t *data_server_addrs;
-    PVFS_handle_extent_array *io_handle_extent_array;
+    int stuffed;
+
     PVFS_object_attr cache_attr;
+    PVFS_handle handles[2];
 };
 
 struct PINT_client_mkdir_sm
@@ -536,7 +539,7 @@ typedef struct PINT_client_sm
     union
     {
 	struct PINT_client_remove_sm remove;
-	struct PINT_client_create_sm create;
+        struct PINT_client_create_sm create;
 	struct PINT_client_mkdir_sm mkdir;
 	struct PINT_client_symlink_sm sym;
 	struct PINT_client_getattr_sm getattr;
