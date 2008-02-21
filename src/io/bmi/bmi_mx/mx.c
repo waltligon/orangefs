@@ -37,7 +37,7 @@ bmx_peer_connect(struct bmx_peer *peer);
 
 /**** TX/RX handling functions **************************************/
 
-void
+static void
 bmx_ctx_free(struct bmx_ctx *ctx)
 {
         if (ctx == NULL) return;
@@ -60,7 +60,7 @@ bmx_ctx_free(struct bmx_ctx *ctx)
         return;
 }
 
-int
+static int
 bmx_ctx_alloc(struct bmx_ctx **ctxp, enum bmx_req_type type)
 {
         struct bmx_ctx *ctx     = NULL;
@@ -142,7 +142,7 @@ bmx_ctx_alloc(struct bmx_ctx **ctxp, enum bmx_req_type type)
         return 0;
 }
 
-void
+static void
 bmx_ctx_init(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer   = NULL;
@@ -191,7 +191,7 @@ bmx_ctx_init(struct bmx_ctx *ctx)
 }
 
 /* add to peer's queued txs/rxs list */
-void
+static void
 bmx_q_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
@@ -206,7 +206,7 @@ bmx_q_ctx(struct bmx_ctx *ctx)
 }
 
 /* remove from peer's queued txs/rxs list */
-void
+static void
 bmx_deq_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
@@ -220,7 +220,7 @@ bmx_deq_ctx(struct bmx_ctx *ctx)
 }
 
 /* add to peer's pending rxs list */
-void
+static void
 bmx_q_pending_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
@@ -237,7 +237,7 @@ bmx_q_pending_ctx(struct bmx_ctx *ctx)
 }
 
 /* remove from peer's pending rxs list */
-void
+static void
 bmx_deq_pending_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
@@ -256,7 +256,7 @@ bmx_deq_pending_ctx(struct bmx_ctx *ctx)
 }
 
 /* add to the global canceled list */
-void
+static void
 bmx_q_canceled_ctx(struct bmx_ctx *ctx, bmi_error_code_t error)
 {
         ctx->mxc_state = BMX_CTX_CANCELED;
@@ -270,7 +270,7 @@ bmx_q_canceled_ctx(struct bmx_ctx *ctx, bmi_error_code_t error)
         return;
 }
 
-struct bmx_ctx *
+static struct bmx_ctx *
 bmx_get_idle_rx(void)
 {
         struct bmx_ctx  *rx     = NULL;
@@ -301,7 +301,7 @@ bmx_get_idle_rx(void)
         return rx;
 }
 
-void
+static void
 bmx_put_idle_rx(struct bmx_ctx *rx)
 {
         if (rx == NULL) {
@@ -326,7 +326,7 @@ bmx_put_idle_rx(struct bmx_ctx *rx)
         return;
 }
 
-void
+static void
 bmx_reduce_idle_rxs(int count)
 {
         int              i      = 0;
@@ -342,7 +342,7 @@ bmx_reduce_idle_rxs(int count)
         return;
 }
 
-struct bmx_ctx *
+static struct bmx_ctx *
 bmx_get_idle_tx(void)
 {
         struct bmx_ctx  *tx     = NULL;
@@ -373,7 +373,7 @@ bmx_get_idle_tx(void)
         return tx;
 }
 
-void
+static void
 bmx_put_idle_tx(struct bmx_ctx *tx)
 {
         if (tx == NULL) {
@@ -400,7 +400,7 @@ bmx_put_idle_tx(struct bmx_ctx *tx)
 
 /**** peername parsing functions **************************************/
 
-int
+static int
 bmx_verify_hostname(char *host)
 {
         int             ret     = 0;
@@ -423,7 +423,7 @@ bmx_verify_hostname(char *host)
         return 0;
 }
 
-int
+static int
 bmx_verify_num_str(char *num_str)
 {
         int             ret     = 0;
@@ -447,7 +447,7 @@ bmx_verify_num_str(char *num_str)
  * returns 0 and we do not know that it failed. 
  * This handles legal hostnames (1-63 chars) include a-zA-Z0-9 as well as . and -
  * It will accept IPv4 addresses but not IPv6 (too many semicolons) */
-int
+static int
 bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint32_t *ep_id)
 {
         int             ret             = 0;
@@ -564,7 +564,7 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
 
 /**** peer handling functions **************************************/
 
-void
+static void
 bmx_peer_free(struct bmx_peer *peer)
 {
         struct bmx_method_addr *mxmap = peer->mxp_mxmap;
@@ -586,7 +586,7 @@ bmx_peer_free(struct bmx_peer *peer)
         return;
 }
 
-void
+static void
 bmx_peer_addref(struct bmx_peer *peer)
 {
         gen_mutex_lock(&peer->mxp_lock);
@@ -596,7 +596,7 @@ bmx_peer_addref(struct bmx_peer *peer)
         return;
 }
 
-void
+static void
 bmx_peer_decref(struct bmx_peer *peer)
 {
         debug(BMX_DB_FUNC, "entering %s", __func__);
@@ -629,7 +629,7 @@ bmx_peer_decref(struct bmx_peer *peer)
         return;
 }
 
-int
+static int
 bmx_peer_alloc(struct bmx_peer **peerp, struct bmx_method_addr *mxmap)
 {
         int              i              = 0;
@@ -712,7 +712,7 @@ bmx_peer_alloc(struct bmx_peer **peerp, struct bmx_method_addr *mxmap)
         return 0;
 }
 
-int
+static int
 bmx_peer_init_state(struct bmx_peer *peer)
 {
         int             ret     = 0;
@@ -743,7 +743,7 @@ bmx_peer_init_state(struct bmx_peer *peer)
 /**** startup/shutdown functions **************************************/
 
 /* init bmi_mx */
-int
+static int
 bmx_globals_init(int method_id)
 {
 #if BMX_MEM_ACCT
@@ -797,7 +797,7 @@ bmx_globals_init(int method_id)
 }
 
 
-int
+static int
 bmx_open_endpoint(mx_endpoint_t *ep, uint32_t board, uint32_t ep_id)
 {
         mx_return_t     mxret   = MX_SUCCESS;
@@ -849,6 +849,8 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
         int             i       = 0;
         int             ret     = 0;
         mx_return_t     mxret   = MX_SUCCESS;
+
+        debug(BMX_DB_FUNC, "entering %s", __func__);
 
 #if BMX_LOGGING
         MPE_Init_log();
@@ -958,6 +960,8 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
 #if BMX_MEM_ACCT
         debug(BMX_DB_MEM, "memory used at end of initialization %lld", llu(mem_used));
 #endif
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
         return 0;
 }
 
@@ -1177,7 +1181,7 @@ BMI_mx_get_info(int option, void *inout_parameter)
 #define BMX_IO_BUF      1
 #define BMX_UNEX_BUF    2
 
-void *
+static void *
 bmx_memalloc(bmi_size_t size, int type)
 {
         void                    *buf    = NULL;
@@ -1308,7 +1312,7 @@ BMI_mx_unexpected_free(void *buf)
         return 0;
 }
 
-void
+static void
 bmx_parse_match(uint64_t match, uint8_t *type, uint32_t *id, uint32_t *tag)
 {
         *type   = (uint8_t)  (match >> 60);
@@ -1317,7 +1321,7 @@ bmx_parse_match(uint64_t match, uint8_t *type, uint32_t *id, uint32_t *tag)
         return;
 }
 
-void
+static void
 bmx_create_match(struct bmx_ctx *ctx)
 {
         int             connect = 0;
@@ -1353,7 +1357,7 @@ bmx_create_match(struct bmx_ctx *ctx)
         return;
 }
 
-bmi_error_code_t
+static bmi_error_code_t
 bmx_mx_to_bmi_errno(enum mx_status_code code)
 {
         int     err     = 0;

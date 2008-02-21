@@ -192,17 +192,17 @@ enum bmx_peer_state {
 
 struct bmx_method_addr
 {
-        struct method_addr *mxm_map;        /* peer's method_addr */
-        const char         *mxm_peername;   /* mx://hostname/board/ep_id  */
-        const char         *mxm_hostname;   /* peer's hostname */
-        uint32_t            mxm_board;      /* peer's MX board index */
-        uint32_t            mxm_ep_id;      /* peer's MX endpoint ID */
-        struct bmx_peer    *mxm_peer;       /* peer pointer */
+        struct bmi_method_addr  *mxm_map;        /* peer's bmi_method_addrt */
+        const char              *mxm_peername;   /* mx://hostname/board/ep_id  */
+        const char              *mxm_hostname;   /* peer's hostname */
+        uint32_t                 mxm_board;      /* peer's MX board index */
+        uint32_t                 mxm_ep_id;      /* peer's MX endpoint ID */
+        struct bmx_peer         *mxm_peer;       /* peer pointer */
 };
 
 struct bmx_peer
 {
-        struct method_addr     *mxp_map;        /* his method_addr * */
+        struct bmi_method_addr *mxp_map;        /* his bmi_method_addr * */
         struct bmx_method_addr *mxp_mxmap;      /* his bmx_method_addr */
         uint64_t                mxp_nic_id;     /* his NIC id */
         mx_endpoint_addr_t      mxp_epa;        /* his MX endpoint address */
