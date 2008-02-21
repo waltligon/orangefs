@@ -232,6 +232,15 @@ static PINT_sm_action request_datafiles(
 
     s_op->resp.u.create.datafile_count = s_op->u.create.num_io_servers;
 
+    s_op->resp.u.create.datafile_handles = malloc(
+        sizeof(*s_op->resp.u.create.datafile_handles) *
+        s_op->resp.u.create.datafile_count);
+    if(!s_op->resp.u.create.datafile_handles)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
     ret = job_precreate_pool_get_handles(
         s_op->req->u.create.fs_id,
         s_op->u.create.num_io_servers,

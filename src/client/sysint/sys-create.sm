@@ -445,19 +445,26 @@ static PINT_sm_action create_create_setup_msgpair(
 
     PINT_init_msgpair(sm_p, msg_p);
 
-    server_config = PINT_get_server_config_struct(
-        sm_p->object_ref.fs_id);
-
     ret = PINT_cached_config_get_next_meta(
         sm_p->object_ref.fs_id, &msg_p->svr_addr, &meta_handle_extent_array);
+    if(ret != 0)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
 
-    ret = PINT_cached_config_get_next_io(
+    ret = PINT_cached_config_get_server(
         sm_p->object_ref.fs_id,
-        1, &msg_p->svr_addr, &data_handle_extent_array);
-
-    PINT_put_server_config_struct(server_config);
-
-    if (ret)
+        BMI_addr_rev_lookup(msg_p->svr_addr),
+        PINT_SERVER_TYPE_META,
+        &data_handle_extent_array);
+    if(ret == -PVFS_ENOENT)
+    {
+        data_handle_extent_array.extent_count = 0;
+        data_handle_extent_array.extent_array = NULL;
+    }
+    else if (ret != 0)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
