@@ -1,0 +1,263 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ *
+ * Changes by Acxiom Corporation to add dirent_count field to attributes
+ * Copyright © Acxiom Corporation, 2005.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-types.h"
+#include "pvfs2-types-debug.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+
+enum
+{
+    ALREADY_BIG
+};
+
+%%
+
+machine pvfs2_unstuff_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => get_keyvals;
+        default => setup_resp;
+    }
+
+    state get_keyvals
+    {
+        run get_keyvals;
+        success => inspect_keyvals;
+        default => setup_resp;
+    }
+
+    state inspect_keyvals
+    {
+        run inspect_keyvals;
+        success => get_handles;
+        ALREADY_BIG => do_getattr;
+        default => setup_resp;
+    }
+
+    state do_getattr
+    {
+        jump pvfs2_get_attr_work_sm;
+        default => setup_resp;
+    }
+
+    state get_handles
+    {
+        run get_handles;
+        success => set_handles_on_object;
+        default => setup_resp;
+    }
+
+    state set_handles_on_object
+    {
+        run set_handles_on_object;
+        success => update_dfile_count;
+        default => setup_resp;
+    }
+
+    state update_dfile_count
+    {
+        run update_dfile_count;
+        success => remove_layout;
+        default => setup_resp;
+    }
+
+    state remove_layout
+    {
+        run remove_layout;
+        default => setup_resp;
+    }
+
+    state setup_resp
+    {
+        run setup_resp;
+        success => final_response;
+        default => cleanup;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run cleanup;
+        default => terminate;
+    }
+}
+
+
+%%
+
+static PINT_sm_action get_keyvals(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    s_op->kevyal_count = 3;
+    s_op->key_a = malloc(sizeof(*s_op->key_a) * s_op->keyval_count);
+    if(!s_op->key_a)
+    {
+
+    }
+    s_op->val_a = malloc(sizeof(*s_op->val_a) * s_op->keyval_count);
+    if(!s_op->val_a)
+    {
+
+    }
+
+    s_op->error_a = malloc(sizeof(*s_op->error_a) * s_op->keyval_count);
+    if(!s_op->error_a)
+    {
+
+    }
+
+    s_op->key_a[kind].buffer = Trove_Common_Keys[METAFILE_LAYOUT_KEY].key;
+    s_op->key_a[kind].buffer_sz = Trove_Common_Keys[METAFILE_LAYOUT_KEY].size;
+
+    s_op->val_a[kind].buffer =
+        &s_op->u.unstuff.layout.algorithm;
+    s_op->val_a[kind].buffer_sz =
+        sizeof(s_op->u.unstuff.layout.algorithm);
+
+    ++kind;
+    s_op->key_a[kind].buffer = Trove_Common_Keys[NUM_DFILES_REQ_KEY].key;
+    s_op->key_a[kind].buffer_sz = Trove_Common_Keys[NUM_DFILES_REQ_KEY].size;
+
+    s_op->val_a[kind].buffer = &s_op->u.unstuff.num_dfiles_req;
+    s_op->val_a[kind].buffer_sz = sizeof(s_op->u.unstuff.num_dfiles_req);
+
+    ++kind;
+    s_op->key_a[kind].buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
+    s_op->key_a[kind].buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
+
+    dfile_array = malloc(sizeof(*dfile_array) * s_op->attr.u.meta.dfile_count);
+    if(!dfile_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->val_a[kind].buffer = dfile_array;
+
+    ret = job_trove_keyval_read_list(
+        s_op->req->u.unstuff.fs_id,
+        s_op->req->u.unstuff.handle,
+        s_op->key_a, s_op->val_a, s_op->error_a, s_op->keyval_count,
+        0, NULL, smcb, 0, js_p, &job_id, server_job_context);
+    if(ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    return ret;
+}
+
+static PINT_sm_action inspect_keyvals(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if(s_op->error_a[0] != 0)
+    {
+        /* no layout, so either it was removed (signalling unstuff already
+         * occurring, or this file was never stuffed
+         */
+        js_p->error_code = ALREADY_BIG;
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action get_handles(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret;
+    job_id_t j_id;
+    char **server_names;
+    int num_io_servers;
+    PVFS_handle *dfile_array;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    ret = PINT_get_server_list(s_op->req->u.unstuff.fs_id,
+                               s_op->attr.u.meta.dist,
+                               s_op->u.unstuff.num_dfiles_req - 1,
+                               &s_op->u.unstuff.layout,
+                               &server_names,
+                               &num_io_servers);
+    if(ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    dfile_array = malloc(sizeof(*dfile_array) * (num_io_servers + 1));
+    if(!dfile_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* set the first datafile as the stuffed one that already exists */
+    dfile_array[0] = *(PVFS_handle *)(s_op->val_a[2].buffer);
+
+    s_op->resp.u.unstuff.attr.u.meta.dfile_array = dfile_array;
+    s_op->resp.u.unstuff.attr.u.meta.dfile_count = num_io_servers + 1;
+
+    dfile_array++;
+    ret = job_precreate_pool_get_handles(
+        s_op->req->u.unstuff.fs_id,
+        num_io_servers,
+        dfile_array,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
+    if(ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    return ret;
+}
+
+PINT_GET_OBJECT_REF_DEFINE(unstuff);
+
+struct PINT_server_req_params pvfs2_unstuff_params =
+{
+    .string_name = "unstuff",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_unstuff,
+    .state_machine = &pvfs2_unstuff_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+
