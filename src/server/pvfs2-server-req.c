@@ -5,7 +5,7 @@
  */
 
 #include "pvfs2-server.h"
-#include <assert.h>
+#include "assert.h"
 
 /* server operation state machines */
 extern struct PINT_server_req_params pvfs2_get_config_params;
@@ -43,6 +43,10 @@ extern struct PINT_server_req_params pvfs2_set_eattr_params;
 extern struct PINT_server_req_params pvfs2_set_eattr_list_params;
 extern struct PINT_server_req_params pvfs2_del_eattr_params;
 extern struct PINT_server_req_params pvfs2_list_eattr_params;
+extern struct PINT_server_req_params pvfs2_batch_create_params;
+extern struct PINT_server_req_params pvfs2_batch_remove_params;
+extern struct PINT_server_req_params pvfs2_stuffed_create_params;
+extern struct PINT_server_req_params pvfs2_precreate_pool_refiller_params;
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
@@ -82,20 +86,21 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 32 */ {PVFS_SERV_LISTEATTR, &pvfs2_list_eattr_params},
     /* 33 */ {PVFS_SERV_SMALL_IO, &pvfs2_small_io_params},
     /* 34 */ {PVFS_SERV_LISTATTR, &pvfs2_list_attr_params},
+    /* 35 */ {PVFS_SERV_BATCH_CREATE, &pvfs2_batch_create_params},
+    /* 36 */ {PVFS_SERV_BATCH_REMOVE, &pvfs2_batch_remove_params},
+    /* 37 */ {PVFS_SERV_PRECREATE_POOL_REFILLER, &pvfs2_precreate_pool_refiller_params},
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)
 
-enum PINT_server_req_access_type PINT_server_req_readonly(
-                                    struct PVFS_server_req *req)
+inline int PINT_server_req_readonly(struct PVFS_server_req *req)
 {
-    return PINT_SERVER_REQ_READONLY;
+    return 1;
 }
 
-enum PINT_server_req_access_type PINT_server_req_modify(
-                                    struct PVFS_server_req *req)
+inline int PINT_server_req_modify(struct PVFS_server_req *req)
 {
-    return PINT_SERVER_REQ_MODIFY;
+    return 0;
 }
 
 enum PINT_server_req_permissions
