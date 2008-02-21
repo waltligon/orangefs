@@ -1124,7 +1124,13 @@ BMI_mx_set_info(int option, void *inout_parameter)
                                                 mxmap->mxm_peername : "NULL", map,
                                                 mxmap);
                                 if (bmi_mx != NULL) {
+                                        PVFS_BMI_addr_t addr;
                                         peer = mxmap->mxm_peer;
+                                        if (peer != NULL) {
+                                                addr = peer->mxp_bmi_addr;
+                                                if (addr != 0)
+                                                        bmi_method_addr_forget_callback(addr);
+                                        }
                                         bmx_peer_disconnect(peer, 1, BMI_ENETRESET);
                                 }
                                 if (!mxmap->mxm_peername) free((void *) mxmap->mxm_peername);
@@ -2304,7 +2310,14 @@ bmx_handle_icon_ack(void)
                         mx_isend(bmi_mx->bmx_ep, &tx->mxc_seg, tx->mxc_nseg, peer->mxp_epa,
                                  tx->mxc_match, (void *) tx, &tx->mxc_mxreq);
                         if (!peer->mxp_exist) {
-                                bmi_method_addr_reg_callback(peer->mxp_map);
+                                peer->mxp_bmi_addr =
+                                        bmi_method_addr_reg_callback(peer->mxp_map);
+                                if (peer->mxp_bmi_addr == 0) {
+                                        debug(BMX_DB_ERR, "%s: "
+                                                "bmi_method_addr_reg_callback "
+                                                "failed", __func__);
+                                        exit(1);
+                                }
                                 peer->mxp_exist = 1;
                         }
                 }

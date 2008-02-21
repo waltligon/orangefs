@@ -219,6 +219,8 @@ struct bmx_peer
 
         list_t                  mxp_list;       /* hang this on bmx_peers */
         gen_mutex_t             mxp_lock;       /* peer lock */
+
+        PVFS_BMI_addr_t         mxp_bmi_addr;   /* bmi_method_addr_[reg|forget]_callback */
 };
 
 enum bmx_req_type {
