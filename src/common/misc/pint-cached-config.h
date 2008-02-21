@@ -111,6 +111,11 @@ int PINT_cached_config_get_server_handle_count(
     PVFS_fs_id fs_id,
     uint64_t *handle_count);
 
+int PINT_cached_config_check_type(
+    PVFS_fs_id fsid,
+    const char *server_addr_str,
+    int* server_type);
+
 int PINT_cached_config_get_root_handle(
     PVFS_fs_id fsid,
     PVFS_handle *fh_root);

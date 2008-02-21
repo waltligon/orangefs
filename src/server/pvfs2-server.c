@@ -1958,8 +1958,6 @@ static int precreate_pool_initialize(void)
     int server_type;
     int handle_count;
 
-    /* TODO: check if I am a meta server; if not bail out! */
-
     /* iterate through list of file systems */
     while(cur_f)
     {
@@ -1967,6 +1965,25 @@ static int precreate_pool_initialize(void)
         if (!cur_fs)
         {
             break;
+        }
+
+        /* am I a meta server in this file system? */
+        ret = PINT_cached_config_check_type(
+            cur_fs->coll_id,
+            server_config.host_id,
+            &server_type);
+        if(ret < 0)
+        {
+            /* TODO: handle properly */
+            return(ret);
+        }
+        if(!(server_type & PINT_SERVER_TYPE_META))
+        {
+            /* This server is not a meta server for this file system; 
+             * skip doing any precreate setup steps.
+             */
+            cur_f = PINT_llist_next(cur_f);
+            continue;
         }
 
         /* how many I/O servers do we have? */
@@ -2117,7 +2134,7 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
             fsid, server_config.host_id, PINT_SERVER_TYPE_META, &ext_array);
         if(ret < 0)
         {
-            gossip_err("Error: PINT_cached_condig_get_meta() failure.\n");
+            gossip_err("Error: PINT_cached_config_get_meta() failure.\n");
             free(key.buffer);
             return(ret);
         }
