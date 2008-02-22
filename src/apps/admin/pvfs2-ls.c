@@ -846,7 +846,6 @@ int main(int argc, char **argv)
     free(user_opts->start);
     free(pvfs_path);
     free(fs_id_array);
-    free(user_opts);
 
     PVFS_sys_finalize();
     if (user_opts)
