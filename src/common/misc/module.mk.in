@@ -34,7 +34,8 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/tcache.c \
 	     $(DIR)/state-machine-fns.c \
 	     $(DIR)/void.c \
-	     $(DIR)/pint-eattr.c
+	     $(DIR)/pint-eattr.c \
+	  	  $(DIR)/msgpairarray.c 
 
 MODCFLAGS_$(DIR)/server-config.c = \
    -I$(srcdir)/src/server

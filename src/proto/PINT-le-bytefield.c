@@ -106,6 +106,11 @@ static void lebf_initialize(void)
 		req.u.create.handle_extent_array.extent_count = 0;
 		reqsize = extra_size_PVFS_servreq_create;
 		break;
+	    case PVFS_SERV_CREATE_FILE:
+		/* can request a range of handles */
+		req.u.create_file.handle_extent_array.extent_count = 0;
+		reqsize = extra_size_PVFS_servreq_create_file;
+		break;
 	    case PVFS_SERV_REMOVE:
 		/* nothing special, let normal encoding work */
 		break;
@@ -373,6 +378,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
+	CASE(PVFS_SERV_CREATE_FILE, create_file);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -466,6 +472,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_CREATE_FILE, create_file);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -569,6 +576,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+	CASE(PVFS_SERV_CREATE_FILE, create_file);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -652,6 +660,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+	CASE(PVFS_SERV_CREATE_FILE, create_file);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -762,6 +771,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (req->u.listattr.handles)
                     decode_free(req->u.listattr.handles);
 
+	    case PVFS_SERV_CREATE_FILE:
+		decode_free(req->u.create_file.handle_extent_array.extent_array);
+		break;
+
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
 	    case PVFS_SERV_REMOVE:
@@ -867,6 +880,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     }
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_CREATE:
+                case PVFS_SERV_CREATE_FILE:
                 case PVFS_SERV_REMOVE:
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:
                 case PVFS_SERV_MGMT_REMOVE_DIRENT:

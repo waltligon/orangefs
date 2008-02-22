@@ -31,6 +31,6 @@ Step in adding a syscall to the client:
 
 4) add entries to identify the state machine
 		src/client/sysint/client-state-machine.c
-		PINT_client_state_machine_post()
+		PINT_client_sm_sys_table[]
 		PINT_client_get_name_str()
 		 

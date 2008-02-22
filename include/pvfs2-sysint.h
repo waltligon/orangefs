@@ -112,6 +112,13 @@ struct PVFS_sysresp_create_s
 };
 typedef struct PVFS_sysresp_create_s PVFS_sysresp_create;
 
+/** Holds results of a create_file operation (reference to new file). */
+struct PVFS_sysresp_create_file_s
+{
+    PVFS_object_ref ref;
+};
+typedef struct PVFS_sysresp_create_file_s PVFS_sysresp_create_file;
+
 /* remove */
 /* no data returned in remove response */
 
@@ -355,6 +362,26 @@ PVFS_error PVFS_isys_create(
     void *user_ptr);
 
 PVFS_error PVFS_sys_create(
+    char *entry_name,
+    PVFS_object_ref ref,
+    PVFS_sys_attr attr,
+    const PVFS_credentials *credentials,
+    PVFS_sys_dist *dist,
+    PVFS_sys_layout *layout,
+    PVFS_sysresp_create *resp);
+
+PVFS_error PVFS_isys_create_file(
+    char *entry_name,
+    PVFS_object_ref ref,
+    PVFS_sys_attr attr,
+    const PVFS_credentials *credentials,
+    PVFS_sys_dist *dist,
+    PVFS_sys_layout *layout,
+    PVFS_sysresp_create *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_create_file(
     char *entry_name,
     PVFS_object_ref ref,
     PVFS_sys_attr attr,

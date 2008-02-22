@@ -26,7 +26,7 @@
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
-#define PVFS2_PROTO_MINOR 0
+#define PVFS2_PROTO_MINOR 1
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 /* we set the maximum possible size of a small I/O packed message as 64K.  This
@@ -74,6 +74,7 @@ enum PVFS_server_op
     PVFS_SERV_LISTEATTR = 32,
     PVFS_SERV_SMALL_IO = 33,
     PVFS_SERV_LISTATTR = 34,
+    PVFS_SERV_CREATE_FILE = 35,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -184,6 +185,55 @@ struct PVFS_servresp_create
 };
 endecode_fields_1_struct(
     PVFS_servresp_create,
+    PVFS_handle, handle)
+
+/* create_file ************************************************/
+/* - A server-to-server collective file create */
+
+struct PVFS_servreq_create_file
+{
+    PVFS_fs_id fs_id;
+    PVFS_ds_type object_type;
+
+    /*
+      an array of handle extents that we use to suggest to
+      the server from which handle range to allocate for the
+      newly created handle(s).  To request a single handle,
+      a single extent with first = last should be used.
+    */
+    PVFS_handle_extent_array handle_extent_array;
+};
+endecode_fields_3_struct(
+    PVFS_servreq_create_file,
+    PVFS_fs_id, fs_id,
+    PVFS_ds_type, object_type,
+    PVFS_handle_extent_array, handle_extent_array)
+#define extra_size_PVFS_servreq_create_file \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
+
+#define PINT_SERVREQ_CREATE_FILE_FILL(__req,           \
+                                      __creds,         \
+                                      __fsid,          \
+                                      __objtype,       \
+                                      __ext_array)     \
+do {                                                   \
+    memset(&(__req), 0, sizeof(__req));                \
+    (__req).op = PVFS_SERV_CREATE_FILE;                \
+    (__req).credentials = (__creds);                   \
+    (__req).u.create_file.fs_id = (__fsid);            \
+    (__req).u.create_file.object_type = (__objtype);   \
+    (__req).u.create_file.handle_extent_array.extent_count =\
+        (__ext_array).extent_count;                    \
+    (__req).u.create_file.handle_extent_array.extent_array =\
+        (__ext_array).extent_array;                    \
+} while (0)
+
+struct PVFS_servresp_create_file
+{
+    PVFS_handle handle;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_create_file,
     PVFS_handle, handle)
 
 /* remove *****************************************************/
@@ -1525,6 +1575,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
+        struct PVFS_servreq_create_file create_file;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1575,6 +1626,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
+        struct PVFS_servresp_create_file create_file;
     } u;
 };
 endecode_fields_2_struct(

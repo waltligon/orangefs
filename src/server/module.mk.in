@@ -9,6 +9,8 @@ ifdef BUILD_SERVER
 		$(DIR)/setparam.c \
 		$(DIR)/lookup.c \
 		$(DIR)/create.c \
+		$(DIR)/create-file.c \
+		$(DIR)/rmt-getattr.c \
 		$(DIR)/crdirent.c \
 		$(DIR)/set-attr.c \
 		$(DIR)/mkdir.c \

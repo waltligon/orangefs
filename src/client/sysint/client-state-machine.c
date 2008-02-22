@@ -219,6 +219,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_statfs_sm},
     {&pvfs2_fs_add_sm},
     {&pvfs2_client_readdirplus_sm},
+    {&pvfs2_client_create_file_sm},
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
@@ -849,6 +850,7 @@ const char *PINT_client_get_name_str(int op_type)
     {
         { PVFS_SYS_REMOVE, "PVFS_SYS_REMOVE" },
         { PVFS_SYS_CREATE, "PVFS_SYS_CREATE" },
+        { PVFS_SYS_CREATE_FILE, "PVFS_SYS_CREATE_FILE" },
         { PVFS_SYS_MKDIR, "PVFS_SYS_MKDIR" },
         { PVFS_SYS_SYMLINK, "PVFS_SYS_SYMLINK" },
         { PVFS_SYS_READDIR, "PVFS_SYS_READDIR" },

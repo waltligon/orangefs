@@ -46,7 +46,7 @@ void gen_machine(char *machine_name)
     /* dump forward declarations of all the states */
     for (s=states; s; s=s->next)
     {
-        if(s->action == ACTION_RUN)
+        if(s->action == ACTION_RUN || s->action == ACTION_PJMP)
             gen_runfunc_decl(s->function_or_machine);
         gen_state_decl(s->name);
     }
@@ -203,7 +203,7 @@ void gen_state_action(enum state_action action,
 	    break;
 	case ACTION_PJMP:
 	    fprintf(out_file, "\t .flag = SM_PJMP ,\n");
-            fprintf(out_file, "\t .action.func = &%s ,\n", run_func);
+            fprintf(out_file, "\t .action.func = %s ,\n", run_func);
             fprintf(out_file,"\t .pjtbl = ST_%s_pjtbl ,\n", state_name);
             fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
 	    break;

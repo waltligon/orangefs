@@ -74,6 +74,25 @@ struct PINT_client_remove_sm
     int	retry_count;
 };
 
+struct PINT_client_create_file_sm
+{
+    char *object_name;                          /* input parameter */
+    PVFS_sysresp_create_file *create_file_resp; /* in/out parameter*/
+    PVFS_sys_attr sys_attr;                     /* input parameter */
+
+    int retry_count;
+    int num_data_files;
+    int stored_error_code;
+
+    PINT_dist *dist;
+    PVFS_sys_layout layout;
+    PVFS_handle metafile_handle;
+    PVFS_handle *datafile_handles;
+    PVFS_BMI_addr_t *data_server_addrs;
+    PVFS_handle_extent_array *io_handle_extent_array;
+    PVFS_object_attr cache_attr;
+};
+
 struct PINT_client_create_sm
 {
     char *object_name;                /* input parameter */
@@ -537,6 +556,7 @@ typedef struct PINT_client_sm
     {
 	struct PINT_client_remove_sm remove;
 	struct PINT_client_create_sm create;
+	struct PINT_client_create_file_sm create_file;
 	struct PINT_client_mkdir_sm mkdir;
 	struct PINT_client_symlink_sm sym;
 	struct PINT_client_getattr_sm getattr;
@@ -642,6 +662,7 @@ enum
     PVFS_SYS_STATFS                = 18,
     PVFS_SYS_FS_ADD                = 19,
     PVFS_SYS_READDIRPLUS           = 20,
+    PVFS_SYS_CREATE_FILE           = 21,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -764,6 +785,7 @@ extern struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[];
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
+extern struct PINT_state_machine_s pvfs2_client_create_file_sm;
 extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;

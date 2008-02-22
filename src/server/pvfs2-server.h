@@ -473,6 +473,8 @@ extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
+extern struct PINT_state_machine_s pvfs2_create_file_work_sm;
+extern struct PINT_state_machine_s pvfs2_server_getattr_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
