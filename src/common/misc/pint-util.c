@@ -248,6 +248,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                 if (attr->u.meta.dfile_array)
                 {
                     free(attr->u.meta.dfile_array);
+                    attr->u.meta.dfile_array = NULL;
                 }
             }
             if (attr->mask & PVFS_ATTR_META_DIST)

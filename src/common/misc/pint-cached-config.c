@@ -1116,9 +1116,9 @@ int PINT_cached_config_get_server_name(
         assert(cur_config_cache->fs);
 
         server_cursor = cur_config_cache->fs->meta_handle_ranges;
-        while(server_cursor)
+        cur_mapping = PINT_llist_head(server_cursor);
+        while(cur_mapping)
         {
-            cur_mapping = PINT_llist_head(server_cursor);
             server_cursor = PINT_llist_next(server_cursor);
 
             if(PINT_handle_in_extent_array(
@@ -1128,12 +1128,13 @@ int PINT_cached_config_get_server_name(
                         max_server_name_len);
                 return 0;
             }
+            cur_mapping = PINT_llist_head(server_cursor);
         }
 
-        server_cursor = cur_config_cache->fs->meta_handle_ranges;
-        while(server_cursor)
+        server_cursor = cur_config_cache->fs->data_handle_ranges;
+        cur_mapping = PINT_llist_head(server_cursor);
+        while(cur_mapping)
         {
-            cur_mapping = PINT_llist_head(server_cursor);
             server_cursor = PINT_llist_next(server_cursor);
 
             if(PINT_handle_in_extent_array(
@@ -1143,6 +1144,7 @@ int PINT_cached_config_get_server_name(
                         max_server_name_len);
                 return 0;
             }
+            cur_mapping = PINT_llist_head(server_cursor);
         }
     }
 

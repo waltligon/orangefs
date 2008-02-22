@@ -36,6 +36,8 @@
 #define PVFS_ATTR_META_ALL \
 (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES)
 
+#define PVFS_ATTR_META_STUFFED_SIZE (1 << 12)
+
 /* internal attribute masks for datafile objects */
 #define PVFS_ATTR_DATA_SIZE            (1 << 15)
 #define PVFS_ATTR_DATA_ALL   PVFS_ATTR_DATA_SIZE

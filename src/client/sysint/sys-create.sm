@@ -381,6 +381,7 @@ static int create_comp_fn(void *v_p,
     /* otherwise, just stash the newly created meta handle */
     sm_p->u.create.metafile_handle =
         resp_p->u.create.metafile_handle;
+    sm_p->u.create.datafile_count = resp_p->u.create.datafile_count;
     sm_p->u.create.datafile_handles = malloc(
         sizeof(*sm_p->u.create.datafile_handles) *
         sm_p->u.create.datafile_count);
@@ -434,7 +435,6 @@ static PINT_sm_action create_create_setup_msgpair(
     PVFS_handle_extent_array meta_handle_extent_array;
     PVFS_handle_extent_array data_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
-    struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
@@ -645,7 +645,7 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.datafile_handles = NULL;
         sm_p->u.create.datafile_count = 0;
 
-        sm_p->u.create.attr.mask |= PVFS_ATTR_DATA_SIZE;
+        sm_p->u.create.attr.mask |= PVFS_ATTR_META_STUFFED_SIZE;
         sm_p->u.create.attr.u.meta.stuffed_size = 0;
 
         /* we only insert a cache entry if the entire create succeeds,

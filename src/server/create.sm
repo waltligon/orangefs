@@ -152,8 +152,9 @@ static int check_stuffed(
     server_configuration_s *config = get_server_config_struct();
     PVFS_BMI_addr_t myaddr;
     PVFS_sys_layout *layout;
-    layout = &s_op->req->u.create.layout;
     int ret;
+
+    s_op->resp.u.create.metafile_handle = js_p->handle;
 
     assert(config);
     ret = BMI_addr_lookup(&myaddr, config->host_id);
@@ -164,6 +165,7 @@ static int check_stuffed(
         return SM_ACTION_COMPLETE;
     }
 
+    layout = &s_op->req->u.create.layout;
     if(layout->algorithm != PVFS_SYS_LAYOUT_LIST)
     {
         /* is this metadata server also IO? */
@@ -192,7 +194,6 @@ static int create_stuffed_datafile(
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "Stuffed metafile handle created: %llu\n",
         llu(js_p->handle));
-    s_op->resp.u.create.metafile_handle = js_p->handle;
 
     /* now create the datafile handle */
     ret = job_trove_dspace_create(
@@ -230,6 +231,7 @@ static PINT_sm_action request_datafiles(
         return SM_ACTION_COMPLETE;
     }
 
+    s_op->req->u.create.attr.u.meta.dfile_count = s_op->u.create.num_io_servers;
     s_op->resp.u.create.datafile_count = s_op->u.create.num_io_servers;
 
     s_op->resp.u.create.datafile_handles = malloc(

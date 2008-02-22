@@ -1691,6 +1691,7 @@ static inline int io_decode_ack_response(
         {
             PVFS_perror_gossip("io_process_context_recv (op_status)",
                                cur_ctx->msg.op_status);
+            gossip_err("server: %s\n", BMI_addr_rev_lookup(cur_ctx->msg.svr_addr));
             ret = cur_ctx->msg.op_status;
         }
 

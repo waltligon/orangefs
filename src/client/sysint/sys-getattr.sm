@@ -357,6 +357,7 @@ static PINT_sm_action getattr_acache_lookup(
     if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE)
     {
         trimmed_mask &= (PVFS_ATTR_META_ALL |
+                         PVFS_ATTR_META_STUFFED_SIZE |
                          PVFS_ATTR_DATA_SIZE |
                          PVFS_ATTR_COMMON_ALL);
     }
@@ -416,7 +417,7 @@ static PINT_sm_action getattr_acache_lookup(
                      "[%llu]\n", llu(object_ref.handle));
         return SM_ACTION_COMPLETE;
     }
-  
+
     /* we missed */
     /* clean out the attributes we got from the cache; this will be
      * overwritten when we request updated information from the server

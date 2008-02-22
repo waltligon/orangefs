@@ -69,7 +69,8 @@ nested machine pvfs2_get_attr_work_sm
     state read_metafile_keyvals
     {
         run getattr_read_metafile_keyvals;
-        default => interpret_metafile_keyvals;
+        success => interpret_metafile_keyvals;
+        default => setup_resp;
     }
 
     state interpret_metafile_keyvals
@@ -466,7 +467,7 @@ static PINT_sm_action getattr_read_metafile_keyvals(
     }
 
     s_op->free_a = malloc(sizeof(*s_op->free_a) * keyval_count);
-    if(!s_op->val_a)
+    if(!s_op->free_a)
     {
         free(s_op->key_a);
         free(s_op->val_a);
@@ -476,6 +477,17 @@ static PINT_sm_action getattr_read_metafile_keyvals(
         return SM_ACTION_COMPLETE;
     }
 
+    s_op->error_a = malloc(sizeof(*s_op->error_a) * keyval_count);
+    if(!s_op->error_a)
+    {
+        free(s_op->key_a);
+        free(s_op->val_a);
+        free(s_op->free_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        s_op->resp.u.getattr.attr.mask &=
+            ~(PVFS_ATTR_META_DIST|PVFS_ATTR_META_DFILES);
+        return SM_ACTION_COMPLETE;
+    }
 
     buf = (char *) malloc(sizeof(s_op->resp.u.getattr.attr.u.meta.hint) + 1);
     if (!buf)
@@ -601,7 +613,7 @@ static PINT_sm_action getattr_read_metafile_keyvals(
         s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DIST;
 
         s_op->val_a[kind].buffer_sz = s_op->resp.u.getattr.attr.u.meta.dist_size;
-        s_op->val_a[kind].buffer = malloc(s_op->val.buffer_sz);
+        s_op->val_a[kind].buffer = malloc(s_op->val_a[kind].buffer_sz);
         if (!s_op->val_a[kind].buffer)
         {
             gossip_err("Cannot allocate dist of size %d\n",
@@ -652,6 +664,28 @@ static PINT_sm_action getattr_interpret_metafile_keyvals(
         return SM_ACTION_COMPLETE;
     }
 
+    ++kind;
+
+    if(s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES &&
+       s_op->error_a[kind] != 0)
+    {
+        js_p->error_code = s_op->error_a[kind];
+        return SM_ACTION_COMPLETE;
+    }
+
+    ++kind;
+
+    if(s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST &&
+       s_op->error_a[kind] == 0)
+    {
+        PINT_dist_decode(&s_op->resp.u.getattr.attr.u.meta.dist,
+                         s_op->val_a[kind].buffer);
+    }
+    else if(s_op->error_a[kind] != 0)
+    {
+        js_p->error_code = s_op->error_a[kind];
+    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -666,7 +700,7 @@ static PINT_sm_action getattr_read_stuffed_size(
 
     js_p->error_code = 0;
 
-    if(!(s_op->req->u.getattr.attrmask & PVFS_ATTR_DATA_SIZE))
+    if(!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_STUFFED_SIZE))
     {
         /* skip trying to get the size of the stuffed file if its not requested */
         return SM_ACTION_COMPLETE;
@@ -727,7 +761,7 @@ static PINT_sm_action getattr_interpret_stuffed_size(
     if(js_p->error_code == 0)
     {
         s_op->resp.u.getattr.attr.u.meta.stuffed_size = s_op->ds_attr.b_size;
-        s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_DATA_SIZE;
+        s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_STUFFED_SIZE;
     }
 
     return SM_ACTION_COMPLETE;
@@ -749,10 +783,6 @@ static PINT_sm_action getattr_setup_resp(
     }
     if(js_p->error_code < 0)
     {
-        if(s_op->val.buffer)
-        {
-            free(s_op->val.buffer);
-        }
         return SM_ACTION_COMPLETE;
     }
 
@@ -781,10 +811,6 @@ static PINT_sm_action getattr_setup_resp(
 
         if (resp_attr->mask & PVFS_ATTR_META_DIST)
         {
-            assert(s_op->val.buffer);
-            PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
-            free(s_op->val.buffer);
-
             if(resp_attr->u.meta.dist == 0) {
                 gossip_err("Found dist of 0 for handle %llu,%d\n",
                         llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
@@ -792,7 +818,7 @@ static PINT_sm_action getattr_setup_resp(
                 js_p->error_code = -PVFS_EIO;
                 return SM_ACTION_COMPLETE;
             }
-            
+
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                          "  also returning dist size of %d\n",
                          resp_attr->u.meta.dist_size);
@@ -886,12 +912,20 @@ static PINT_sm_action getattr_cleanup(
         free(s_op->key_a);
         s_op->key_a = NULL;
     }
+    if(s_op->free_a)
+    {
+        free(s_op->free_a);
+        s_op->free_a = NULL;
+    }
     if(s_op->error_a)
     {
         free(s_op->error_a);
         s_op->error_a = NULL;
     }
 
+    s_op->resp.u.getattr.attr.u.meta.dist = NULL;
+    s_op->resp.u.getattr.attr.u.meta.dfile_array = NULL;
+    s_op->resp.u.getattr.attr.u.meta.dfile_count = 0;
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return(server_state_machine_complete(smcb));
 }
