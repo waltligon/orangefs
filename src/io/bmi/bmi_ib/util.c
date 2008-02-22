@@ -113,7 +113,7 @@ void * __hidden
 qlist_del_head(struct qlist_head *list)
 {
     struct qlist_head *h;
-    assert(!qlist_empty(list), "%s: empty list %p", __func__, list);
+    bmi_ib_assert(!qlist_empty(list), "%s: empty list %p", __func__, list);
     h = list->next;
     qlist_del(h);
     return h;

@@ -464,14 +464,17 @@ void memcache_cache_flush(void *md);
 #  define debug(lvl,fmt,...) do { } while (0)
 #endif
 
+/*
+ * Varargs form of assert().
+ */
 #if !defined(NDEBUG)
-#define assert(cond,fmt,args...) \
+#define bmi_ib_assert(cond, fmt, args...) \
     do { \
 	if (bmi_ib_unlikely(!(cond))) \
-	    error(fmt,##args); \
+	    error(fmt, ##args); \
     } while (0)
 #else
-#  define assert(cond,fmt,...) do { } while (0)
+#  define bmi_ib_assert(cond, fmt, ...) do { } while (0)
 #endif
 
 #endif  /* __ib_h */

@@ -167,12 +167,12 @@ static int vapi_new_connection(ib_connection_t *c, int sock, int is_server)
 
     /* share connection information across TCP */
     /* sanity check sizes of things (actually only 24 bits in qp_num) */
-    assert(sizeof(ch_in.lid) == sizeof(uint16_t),
-      "%s: connection_handshake.lid size %d expecting %d", __func__,
-      (int) sizeof(ch_in.lid), (int) sizeof(u_int16_t));
-    assert(sizeof(ch_in.qp_num) == sizeof(uint32_t),
-      "%s: connection_handshake.qp_num size %d expecting %d", __func__,
-      (int) sizeof(ch_in.qp_num), (int) sizeof(uint32_t));
+    bmi_ib_assert(sizeof(ch_in.lid) == sizeof(uint16_t),
+		  "%s: connection_handshake.lid size %d expecting %d",
+		  __func__, (int) sizeof(ch_in.lid), (int) sizeof(u_int16_t));
+    bmi_ib_assert(sizeof(ch_in.qp_num) == sizeof(uint32_t),
+		  "%s: connection_handshake.qp_num size %d expecting %d",
+		  __func__, (int) sizeof(ch_in.qp_num), (int) sizeof(uint32_t));
 
     /* convert all to network order and back */
     ch_out.lid = htobmi16(vd->nic_lid);

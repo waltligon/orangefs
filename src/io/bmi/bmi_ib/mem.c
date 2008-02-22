@@ -203,8 +203,8 @@ memcache_memfree(void *md, void *buf, bmi_size_t len)
     if (c) {
 	debug(4, "%s: cache free buf %p len %lld", __func__, c->buf,
 	      lld(c->len));
-	assert(c->count == 1, "%s: buf %p len %lld count = %d, expected 1",
-	       __func__, c->buf, lld(c->len), c->count);
+	bmi_ib_assert(c->count == 1, "%s: buf %p len %lld count %d, expected 1",
+		      __func__, c->buf, lld(c->len), c->count);
 	/* cache it */
 	--c->count;
 	qlist_del(&c->list);

@@ -177,9 +177,9 @@ static int ib_check_cq(void)
 	    debug(3, "%s: sq %p %s", __func__, sq,
 	          sq_state_name(sq->state.send));
 
-	    assert(sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION,
-	           "%s: wrong send state %s", __func__,
-		   sq_state_name(sq->state.send));
+	    bmi_ib_assert(sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION,
+			  "%s: wrong send state %s", __func__,
+			  sq_state_name(sq->state.send));
 
 	    sq->state.send = SQ_WAITING_RTS_DONE_BUFFER;
 
@@ -212,9 +212,9 @@ static int ib_check_cq(void)
 		else if (state == SQ_WAITING_RTS_DONE_SEND_COMPLETION)
 		    sq->state.send = SQ_WAITING_USER_TEST;
 		else
-		    assert(0, "%s: unknown send state %s (%d) of sq %p",
-		           __func__, sq_state_name(sq->state.send),
-			   sq->state.send, sq);
+		    bmi_ib_assert(0, "%s: unknown send state %s (%d) of sq %p",
+				  __func__, sq_state_name(sq->state.send),
+				  sq->state.send, sq);
 		debug(2, "%s: send to %s completed locally: sq %p -> %s",
 		      __func__, bh->c->peername, sq,
 		      sq_state_name(sq->state.send));
@@ -226,8 +226,8 @@ static int ib_check_cq(void)
 		if (state == RQ_RTS_WAITING_CTS_SEND_COMPLETION)
 		    rq->state.recv = RQ_RTS_WAITING_RTS_DONE;
 		else
-		    assert(0, "%s: unknown send state %s of rq %p",
-		           __func__, rq_state_name(rq->state.recv), rq);
+		    bmi_ib_assert(0, "%s: unknown send state %s of rq %p",
+				  __func__, rq_state_name(rq->state.recv), rq);
 		debug(2, "%s: send to %s completed locally: rq %p -> %s",
 		      __func__, bh->c->peername, rq,
 		      rq_state_name(rq->state.recv));
@@ -264,8 +264,8 @@ static struct buf_head *get_eager_buf(ib_connection_t *c)
     if (c->send_credit > 0) {
 	--c->send_credit;
 	bh = qlist_try_del_head(&c->eager_send_buf_free);
-	assert(bh, "%s: empty eager_send_buf_free list, peer %s", __func__,
-	       c->peername);
+	bmi_ib_assert(bh, "%s: empty eager_send_buf_free list, peer %s",
+		      __func__, c->peername);
     }
     return bh;
 }
@@ -286,7 +286,7 @@ static void post_rr(ib_connection_t *c, struct buf_head *bh)
 	/* one credit saved back for just this situation, do not check */
 	--c->send_credit;
 	bh = qlist_try_del_head(&c->eager_send_buf_free);
-	assert(bh, "%s: empty eager_send_buf_free list", __func__);
+	bmi_ib_assert(bh, "%s: empty eager_send_buf_free list", __func__);
 	bh->sq = NULL;
 	debug(2, "%s: return %d credits to %s", __func__, c->return_credit,
 	      c->peername);
@@ -306,8 +306,9 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
     ib_connection_t *c = sq->c;
 
     debug(3, "%s: sq %p", __func__, sq);
-    assert(sq->state.send == SQ_WAITING_BUFFER, "%s: wrong send state %s",
-           __func__, sq_state_name(sq->state.send));
+    bmi_ib_assert(sq->state.send == SQ_WAITING_BUFFER,
+		  "%s: wrong send state %s", __func__,
+		  sq_state_name(sq->state.send));
 
     bh = get_eager_buf(c);
     if (!bh) {
@@ -404,9 +405,10 @@ encourage_send_incoming_cts(struct buf_head *bh, u_int32_t byte_len)
 
     debug(2, "%s: sq %p %s mopid %llx len %u", __func__, sq,
           sq_state_name(sq->state.send), llu(mh_cts.rts_mop_id), byte_len);
-    assert(sq->state.send == SQ_WAITING_CTS
-           || sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION,
-	   "%s: wrong send state %s", __func__, sq_state_name(sq->state.send));
+    bmi_ib_assert(sq->state.send == SQ_WAITING_CTS ||
+		  sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION,
+		  "%s: wrong send state %s", __func__,
+		  sq_state_name(sq->state.send));
 
     /* message; cts content; list of buffers, lengths, and keys */
     want = sizeof(mh_cts)
@@ -606,8 +608,8 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
 	    }
 	}
 
-	assert(rq, "%s: mop_id %llx in RTS_DONE message not found",
-	       __func__, llu(mh_rts_done.mop_id));
+	bmi_ib_assert(rq, "%s: mop_id %llx in RTS_DONE message not found",
+		      __func__, llu(mh_rts_done.mop_id));
 
 #if MEMCACHE_BOUNCEBUF
 	memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
