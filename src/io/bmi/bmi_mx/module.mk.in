@@ -25,6 +25,6 @@ SERVERSRC += $(src)
 #
 # Extra cflags for files in this directory.
 #
-MODCFLAGS_$(DIR) := -I@MX_INCLUDES@ 
+MODCFLAGS_$(DIR) := -I@MX_INCDIR@ 
 
 endif  # BUILD_MX
