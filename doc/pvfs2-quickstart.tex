@@ -186,7 +186,7 @@ every field.  We will use the hostname ``testhost'' rather than
 
 \begin{verbatim}
 root@testhost:~# /usr/bin/pvfs2-genconfig  \
-	/etc/pvfs2-fs.conf /etc/pvfs2-server.conf
+	/etc/pvfs2-fs.conf
 **********************************************************************
 	Welcome to the PVFS2 Configuration Generator:
 
@@ -231,7 +231,6 @@ Choose a directory for each server to store data in.
 * Enter directory name: [Default is /pvfs2-storage-space]: 
 
 Writing fs config file... Done.
-Writing 1 server config file(s)... Done.
 
 Configuration complete!
 \end{verbatim}
@@ -249,16 +248,14 @@ a storage space in /pvfs2-storage-space as specified in the configuration
 files.
 
 \begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
-	/etc/pvfs2-server.conf-testhost -f
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf -f
 \end{verbatim}
 
 Once the above step is done, you can start the server in normal mode 
 as follows:
 
 \begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
-		/etc/pvfs2-server.conf-testhost
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf
 \end{verbatim}
 
 All log messages will be directed to /tmp/pvfs2-server.log, unless you specified
@@ -267,8 +264,7 @@ pvfs2-server in the foreground and direct all messages to stderr, then
 you may run the server as follows:
 
 \begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
-	/etc/pvfs2-server.conf-testhost -d
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf -d
 \end{verbatim}
 
 \subsubsection{Automatic server startup and shutdown}
@@ -464,7 +460,7 @@ command on each machine that will act as a server.
 
 \begin{verbatim}
 root@cluster1:~# /usr/local/pvfs2/bin/pvfs2-genconfig  \
-	/etc/pvfs2-fs.conf /etc/pvfs2-server.conf
+	/etc/pvfs2-fs.conf
 **********************************************************************
         Welcome to the PVFS2 Configuration Generator:
 
@@ -524,7 +520,6 @@ Choose a directory for each server to store data in.
 * Enter directory name: [Default is /pvfs2-storage-space]: 
 
 Writing fs config file... Done.
-Writing 8 server config file(s)... Done.
 
 Configuration complete!
 \end{verbatim}
@@ -536,11 +531,7 @@ setting more aggressive, high performance values.
 We have now made all the config files for an 8-node storage cluster:
 \begin{verbatim}
 root@cluster1:~# ls /etc/pvfs2/foo/
-pvfs2-fs.conf               pvfs2-server.conf-cluster5
-pvfs2-server.conf-cluster1  pvfs2-server.conf-cluster6
-pvfs2-server.conf-cluster2  pvfs2-server.conf-cluster7
-pvfs2-server.conf-cluster3  pvfs2-server.conf-cluster8
-pvfs2-server.conf-cluster4
+pvfs2-fs.conf
 \end{verbatim}
 
 Now the config files must be copied out to all of the server nodes.  If you 
@@ -557,7 +548,6 @@ each machine.
 
 \begin{verbatim}
 root@cluster1:~# for i in `seq 1 8`; do
-> scp /etc/pvfs2-server.conf-cluster\${i} cluster\${i}:/etc/
 > scp /etc/pvfs2-fs.conf cluster\${i}:/etc/
 > scp /usr/src/pvfs2/examples/pvfs2-server.rc \
     cluster\${i}:/etc/rc.d/init.d/pvfs2-server
@@ -573,16 +563,14 @@ does not already exist.  Run the following command on every metadata
 or IO node in the cluster:
 
 \begin{verbatim}
-root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
-	/etc/pvfs2-server.conf -f
+root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf -f
 \end{verbatim}
 
 Then once the storage space is created, start the server for real with a
 command like this on every metadata or IO node in the cluster:
 
 \begin{verbatim}
-root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
-	/etc/pvfs2-server.conf
+root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf
 \end{verbatim}
 
 If you want to run the server in the foreground (e.g. for debugging), use the
