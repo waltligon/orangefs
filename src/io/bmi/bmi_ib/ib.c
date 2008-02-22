@@ -452,7 +452,7 @@ find_matching_recv(rq_state_t statemask, const ib_connection_t *c,
 static struct ib_work *
 alloc_new_recv(ib_connection_t *c, struct buf_head *bh)
 {
-    struct ib_work *rq = Malloc(sizeof(*rq));
+    struct ib_work *rq = bmi_ib_malloc(sizeof(*rq));
     rq->type = BMI_RECV;
     rq->c = c;
     ++rq->c->refcnt;
@@ -730,7 +730,7 @@ send_cts(struct ib_work *rq)
 	reg_recv_buflist.buf.recv = &reg_recv_buflist_buf;
 	reg_recv_buflist.len = &reg_recv_buflist_len;
 	reg_recv_buflist.tot_len = reg_recv_buflist_len;
-	reg_recv_buflist_buf = Malloc(reg_recv_buflist_len);
+	reg_recv_buflist_buf = bmi_ib_malloc(reg_recv_buflist_len);
 	memcache_register(ib_device->memcache, &reg_recv_buflist);
     }
     if (rq->buflist.tot_len > reg_recv_buflist_len)
@@ -818,7 +818,7 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
     ibmap = remote_map->method_data;
 
     /* alloc and build new sendq structure */
-    sq = Malloc(sizeof(*sq));
+    sq = bmi_ib_malloc(sizeof(*sq));
     sq->type = BMI_SEND;
     sq->state.send = SQ_WAITING_BUFFER;
 
@@ -869,7 +869,7 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
     qlist_add_tail(&sq->list, &ib_device->sendq);
 
     /* generate identifier used by caller to test for message later */
-    mop = Malloc(sizeof(*mop));
+    mop = bmi_ib_malloc(sizeof(*mop));
     id_gen_fast_register(&mop->op_id, mop);
     mop->addr = remote_map;  /* set of function pointers, essentially */
     mop->method_data = sq;
@@ -995,7 +995,7 @@ post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 	  __func__, lld(tot_expected_len), lld(rq->buflist.tot_len));
 
     /* generate identifier used by caller to test for message later */
-    mop = Malloc(sizeof(*mop));
+    mop = bmi_ib_malloc(sizeof(*mop));
     id_gen_fast_register(&mop->op_id, mop);
     mop->addr = remote_map;  /* set of function pointers, essentially */
     mop->method_data = rq;
@@ -1386,7 +1386,7 @@ restart:
 	    debug(2, "%s: found waiting testunexpected", __func__);
 	    ui->error_code = 0;
 	    ui->addr = c->remote_map;  /* hand back permanent method_addr */
-	    ui->buffer = Malloc((unsigned long) rq->actual_len);
+	    ui->buffer = bmi_ib_malloc((unsigned long) rq->actual_len);
 	    ui->size = rq->actual_len;
 	    memcpy(ui->buffer,
 	           (msg_header_eager_t *) rq->bh->buf + 1,
@@ -1575,7 +1575,7 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
 	error("%s: no ':' found", __func__);
 
     /* copy to permanent storage */
-    hostname = Malloc((unsigned long) (cp - s + 1));
+    hostname = bmi_ib_malloc((unsigned long) (cp - s + 1));
     strncpy(hostname, s, (size_t) (cp-s));
     hostname[cp-s] = '\0';
 
@@ -1623,19 +1623,19 @@ static ib_connection_t *ib_new_connection(int sock, const char *peername,
     ib_connection_t *c;
     int i, ret;
 
-    c = Malloc(sizeof(*c));
+    c = bmi_ib_malloc(sizeof(*c));
     c->peername = strdup(peername);
 
     /* fill send and recv free lists and buf heads */
-    c->eager_send_buf_contig = Malloc(ib_device->eager_buf_num
+    c->eager_send_buf_contig = bmi_ib_malloc(ib_device->eager_buf_num
       * ib_device->eager_buf_size);
-    c->eager_recv_buf_contig = Malloc(ib_device->eager_buf_num
+    c->eager_recv_buf_contig = bmi_ib_malloc(ib_device->eager_buf_num
       * ib_device->eager_buf_size);
     INIT_QLIST_HEAD(&c->eager_send_buf_free);
     INIT_QLIST_HEAD(&c->eager_recv_buf_free);
-    c->eager_send_buf_head_contig = Malloc(ib_device->eager_buf_num
+    c->eager_send_buf_head_contig = bmi_ib_malloc(ib_device->eager_buf_num
       * sizeof(*c->eager_send_buf_head_contig));
-    c->eager_recv_buf_head_contig = Malloc(ib_device->eager_buf_num
+    c->eager_recv_buf_head_contig = bmi_ib_malloc(ib_device->eager_buf_num
       * sizeof(*c->eager_recv_buf_head_contig));
     for (i=0; i<ib_device->eager_buf_num; i++) {
 	struct buf_head *ebs = &c->eager_send_buf_head_contig[i];
@@ -1982,7 +1982,7 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr, int method_id,
 
     bmi_ib_method_id = method_id;
 
-    ib_device = Malloc(sizeof(*ib_device));
+    ib_device = bmi_ib_malloc(sizeof(*ib_device));
 
     /* try, in order, OpenIB then VAPI; set up function pointers */
     ret = 1;

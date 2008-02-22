@@ -94,7 +94,7 @@ warning_xerrno(int errnum, const char *fmt, ...)
 }
 
 void * __attribute__((malloc)) __hidden
-Malloc(unsigned long n)
+bmi_ib_malloc(unsigned long n)
 {
     char *x;
 
