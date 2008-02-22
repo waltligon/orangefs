@@ -522,7 +522,6 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
                 free(s);
                 return -1;
         }
-        strcpy(host, s);
 
         if (colon1_found) {
                 bd = (uint32_t) strtol(colon1, NULL, 0);
@@ -1031,6 +1030,9 @@ BMI_mx_finalize(void)
         }
 #endif
 
+        if (bmi_mx->bmx_hostname) free(bmi_mx->bmx_hostname);
+        if (bmi_mx->bmx_peername) free(bmi_mx->bmx_peername);
+
         bmi_mx = NULL;
 
         gen_mutex_unlock(&tmp->bmx_lock);
@@ -1132,15 +1134,25 @@ BMI_mx_set_info(int option, void *inout_parameter)
                                         peer = mxmap->mxm_peer;
                                         if (peer != NULL) {
                                                 addr = peer->mxp_bmi_addr;
-                                                if (addr != 0)
+                                                if (addr != 0) {
+                                                        debug(BMX_DB_PEER, "calling "
+                                                              "bmi_method_addr_forget_callback"
+                                                              "on %s", peer->mxp_mxmap->mxm_peername);
                                                         bmi_method_addr_forget_callback(addr);
+                                                }
                                         }
                                         bmx_peer_disconnect(peer, 1, BMI_ENETRESET);
                                 }
-                                if (!mxmap->mxm_peername) free((void *) mxmap->mxm_peername);
-                                mxmap->mxm_peername = NULL;
-                                if (!mxmap->mxm_hostname) free((void *) mxmap->mxm_hostname);
-                                mxmap->mxm_hostname = NULL;
+                                if (mxmap->mxm_peername) {
+                                        debug(BMX_DB_MEM, "freeing mxm_peername");
+                                        free((void *) mxmap->mxm_peername);
+                                        mxmap->mxm_peername = NULL;
+                                }
+                                if (mxmap->mxm_hostname) {
+                                        debug(BMX_DB_MEM, "freeing mxm_hostname");
+                                        free((void *) mxmap->mxm_hostname);
+                                        mxmap->mxm_hostname = NULL;
+                                }
                                 debug(BMX_DB_PEER, "freeing map 0x%p", map);
                                 free(map);
                         }
@@ -1896,7 +1908,8 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
 
         rx = bmx_get_idle_rx();
         if (rx != NULL) {
-                mx_get_endpoint_addr_context(source, (void **) &peer);
+                void *foo = &peer;
+                mx_get_endpoint_addr_context(source, &foo);
                 if (peer == NULL) {
                         debug(BMX_DB_PEER, "unknown peer sent message 0x%llx "
                                         "length %u", llu(match), length);
@@ -1996,7 +2009,10 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                         debug(BMX_DB_ERR, "server receiving CONN_ACK");
                         exit(1);
                 }
-                mx_get_endpoint_addr_context(source, (void **) &peer);
+                {
+                        void *foo = &peer;
+                        mx_get_endpoint_addr_context(source, &foo);
+                }
                 if (peer == NULL) {
                         debug((BMX_DB_CONN|BMX_DB_PEER), "receiving CONN_ACK but "
                                         "the endpoint context does not have a peer");
@@ -2021,7 +2037,8 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                 break;
         case BMX_MSG_UNEXPECTED:
                 if (!bmi_mx->bmx_is_server) {
-                        mx_get_endpoint_addr_context(source, (void **) &peer);
+                        void *foo = &peer;
+                        mx_get_endpoint_addr_context(source, &foo);
                         debug(BMX_DB_ERR, "client receiving unexpected message "
                                 "from %s with mask 0x%llx length %u",
                                 peer == NULL ? "unknown" : peer->mxp_mxmap->mxm_peername,
@@ -2227,7 +2244,10 @@ bmx_handle_conn_req(void)
                                 bmx_put_idle_rx(rx);
                                 continue;
                         }
-                        mx_get_endpoint_addr_context(status.source, (void **) &peer);
+                        {
+                                void *foo = &peer;
+                                mx_get_endpoint_addr_context(status.source, &foo);
+                        }
                         if (peer == NULL) { /* new peer */
                                 int             ret             = 0;
                                 char           *host            = NULL;
@@ -2365,6 +2385,8 @@ bmx_handle_icon_ack(void)
                         mx_isend(bmi_mx->bmx_ep, &tx->mxc_seg, tx->mxc_nseg, peer->mxp_epa,
                                  tx->mxc_match, (void *) tx, &tx->mxc_mxreq);
                         if (!peer->mxp_exist) {
+                                debug(BMX_DB_PEER, "calling bmi_method_addr_reg_callback"
+                                      "on %s", peer->mxp_mxmap->mxm_peername);
                                 peer->mxp_bmi_addr =
                                         bmi_method_addr_reg_callback(peer->mxp_map);
                                 if (peer->mxp_bmi_addr == 0) {
