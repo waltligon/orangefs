@@ -143,7 +143,7 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
     }
     ((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
     ((struct sockaddr_in *) saddrp)->sin_port = htons((u_short) service);
-    bcopy(hep->h_addr, (char *) &(((struct sockaddr_in *) saddrp)->sin_addr),
+    memcpy((char *) &(((struct sockaddr_in *) saddrp)->sin_addr), hep->h_addr, 
 	  hep->h_length);
     return (0);
 }
@@ -170,7 +170,7 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
 
     ((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
     ((struct sockaddr_in *) saddrp)->sin_port = htons((u_short) service);
-    bcopy(&addr, (char *) &(((struct sockaddr_in *) saddrp)->sin_addr),
+    memcpy((char *) &(((struct sockaddr_in *) saddrp)->sin_addr), &addr, 
 	  sizeof(addr));
 
     return 0;
