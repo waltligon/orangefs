@@ -191,7 +191,7 @@ diff -puN src/apps/kernel/linux/pvfs2-client-core.c~nfslayoutsupport src/apps/ke
 +	    gossip_err("service_pnfs_get_devlist: Could not retrieve server array\n");
 +	    goto out_free;
 +	}
-+	bcopy(hep->h_addr, &(io_server.sin_addr.s_addr), hep->h_length);
++	memcpy(&(io_server.sin_addr.s_addr), hep->h_addr, hep->h_length);
 +	ip_addr = inet_ntoa(io_server.sin_addr);
 +	/* add ip addr to downcall result */
 +	encode_string(&buffer, &ip_addr);

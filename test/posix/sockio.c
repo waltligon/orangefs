@@ -85,8 +85,9 @@ int init_sock(struct sockaddr *saddrp, char *name, int service)
 	}
 	((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
 	((struct sockaddr_in *)saddrp)->sin_port = htons((u_short)service);
-	bcopy(hep->h_addr, (char *)&(((struct sockaddr_in *)saddrp)->sin_addr),
-		hep->h_length);
+	memcpy((char *)&(((struct sockaddr_in *)saddrp)->sin_addr), 
+            hep->h_addr, 
+            hep->h_length);
 	return(0);
 }
 
