@@ -5487,7 +5487,6 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
             return;
         }
         /* go ahead and decrement count to avoid races with other consumers */
-        /* TODO: remember to bump this up if trove op fails */
         pool->pool_count--;
 
         /* is anyone waiting to check the count of this pool? */
@@ -5547,7 +5546,19 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
                             &tmp_trove->trove_callback, 
                             global_trove_context,
                             &tmp_id);
-        trove_pending_count++;
+        if(ret < 0)
+        {
+            /* TODO: fix this */
+            assert(0);
+        }
+        else if(ret == 1)
+        {
+            precreate_pool_get_thread_mgr_callback(tmp_trove, 0);
+        }
+        else
+        {
+            trove_pending_count++;
+        }
     }
     gen_mutex_unlock(&precreate_pool_mutex);
 }
