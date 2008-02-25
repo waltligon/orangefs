@@ -59,6 +59,7 @@ struct precreate_pool_desc
     const char** servers;
     struct qlist_head* current_pool;
     int trove_pending;
+    int trove_posted;
     int low_threshold;
 
     /* TODO: does this make the job descriptor too big? */

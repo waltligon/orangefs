@@ -4452,8 +4452,24 @@ static void precreate_pool_fill_thread_mgr_callback(
     }
     gen_mutex_unlock(&initialized_mutex);
 
-    /* TODO: what to do here?  Do we unwind or what? */
-    assert(error_code == 0);
+    if(error_code != 0)
+    {
+        gossip_err("Error: unable to write all precreated handles to pool.\n");
+        gossip_err("Warning: fsck may be needed to recover stranded handles.\n");
+        gen_mutex_lock(&completion_mutex);
+
+        /* set job descriptor fields and put into completion queue */
+        jd->u.precreate_pool.error_code = error_code;
+        job_desc_q_add(completion_queue_array[jd->context_id], jd);
+        /* set completed flag while holding queue lock */
+        jd->completed_flag = 1;
+#ifdef __PVFS2_JOB_THREADED__
+        /* wake up anyone waiting for completion */
+        pthread_cond_signal(&completion_cond);
+#endif
+        gen_mutex_unlock(&completion_mutex);
+        return;
+    }
 
     if(jd->u.precreate_pool.id == PVFS_OP_NULL)
     {
@@ -5492,6 +5508,7 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
         tmp_trove->trove_callback.data = tmp_trove;
 
         /* post trove operation to pull out a handle */
+        /* TODO: what if this immediately returns? */
         ret = trove_keyval_iterate_keys(
                             pool->fsid, 
                             pool->pool_handle,
