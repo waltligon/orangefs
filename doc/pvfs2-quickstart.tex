@@ -263,6 +263,14 @@ you may run the server as follows:
 bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf -d
 \end{verbatim}
 
+On startup, the PVFS2 server uses the hostname of the machine that it
+is running on to determine necessary information from the configuration
+file.  If the hostname doesn't match any of the addresses specified in
+the config file, then then you must use the -a option.  For example,
+each of above command lines could include ``-a testhost'' to
+specify that the server is using the \texttt{testhost} alias in the
+configuration file.
+
 \subsubsection{Automatic server startup and shutdown}
 \label{sec:rc}
 
