@@ -4586,8 +4586,24 @@ static void precreate_pool_fill_thread_mgr_callback(
     
     trove_pending_count++;
 
-    /* TODO: what to do here?  Do we unwind or what? */
-    assert(ret >=0);
+    if(ret < 0)
+    {
+        gossip_err("Error: unable to write all precreated handles to pool.\n");
+        gossip_err("Warning: fsck may be needed to recover stranded handles.\n");
+        gen_mutex_lock(&completion_mutex);
+
+        /* set job descriptor fields and put into completion queue */
+        jd->u.precreate_pool.error_code = ret;
+        job_desc_q_add(completion_queue_array[jd->context_id], jd);
+        /* set completed flag while holding queue lock */
+        jd->completed_flag = 1;
+#ifdef __PVFS2_JOB_THREADED__
+        /* wake up anyone waiting for completion */
+        pthread_cond_signal(&completion_cond);
+#endif
+        gen_mutex_unlock(&completion_mutex);
+        return;
+    }
 
     if(ret == 1)
     {
