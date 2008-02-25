@@ -4731,7 +4731,7 @@ static void bmi_thread_mgr_unexp_handler(
     gen_mutex_lock(&bmi_unexp_mutex);
     /* remove the operation from the pending bmi_unexp queue */
     tmp_desc = job_desc_q_shownext(bmi_unexp_queue);
-    assert(tmp_desc != NULL);        /* TODO: fix this */
+    assert(tmp_desc != NULL);
     if (tmp_desc->completed_flag == 0)
     {
         job_desc_q_remove(tmp_desc);
@@ -4851,9 +4851,6 @@ static void fill_status(struct job_desc *jd,
         status->error_code = jd->u.req_sched.error_code;
         break;
     case JOB_TROVE:
-        /* TODO: make this work out for whatever type of trove
-         * operation this is...
-         */
         status->error_code = jd->u.trove.state;
         status->actual_size = jd->u.trove.actual_size;
         status->vtag = jd->u.trove.vtag;
@@ -4909,7 +4906,7 @@ static int do_one_test_cycle_req_sched(void)
     {
         /* critical failure */
         /* TODO: can I clean up anything else here? */
-        gossip_lerr("Error: critical BMI failure.\n");
+        gossip_lerr("Error: critical request scheduler failure.\n");
         return (ret);
     }
 
@@ -5027,7 +5024,12 @@ static int completion_query_some(job_id_t * id_array,
     return(1);
 }
 
-/* TODO: fill in comment */
+/* completion_query_context()
+ *
+ * retrieves completed jobs from specified context
+ * 
+ * returns 1 if anything completed, 0 otherwise 
+ */
 static int completion_query_context(job_id_t * out_id_array_p,
                                   int *inout_count_p,
                                   void **returned_user_ptr_array,
