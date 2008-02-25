@@ -5278,6 +5278,12 @@ int job_precreate_pool_register_server(
     return(1);
 }
    
+/* job_precreate_pool_check_level()
+ *
+ * checks to see if the current pool level is below a specified threshold
+ *
+ * returns 1 on immediate completion, 0 if level is not low enough yet
+ */
 int job_precreate_pool_check_level(
     PVFS_handle precreate_pool,
     PVFS_fs_id fsid,
@@ -5314,8 +5320,9 @@ int job_precreate_pool_check_level(
                 jd = alloc_job_desc(JOB_PRECREATE_POOL);
                 if (!jd)
                 {
-                    /* TODO: handle this */
-                    assert(0);
+                    out_status_p->error_code = -PVFS_ENOMEM;
+                    gen_mutex_unlock(&precreate_pool_mutex);
+                    return(1);
                 }
                 jd->job_user_ptr = user_ptr;
                 jd->context_id = context_id;
