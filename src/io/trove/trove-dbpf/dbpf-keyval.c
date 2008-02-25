@@ -285,9 +285,12 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
          * NOTE: this can happen if the keyword isn't registered, or if
          * there is no associated cache_elem for this key
          */
-        gossip_debug(
-            GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
-            "(key is %s)\n", (char *)key_entry.key);
+        if(!(op_p->flags & TROVE_BINARY_KEY))
+        {
+            gossip_debug(
+                GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
+                "(key is %s)\n", (char *)key_entry.key);
+        }
     }
     else
     {
@@ -430,13 +433,16 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         }
     }
 
-    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
-                 llu(key_entry.handle), 
-                 op_p->u.k_write.key.buffer_sz,
-                 key_entry.key,
-                 op_p->u.k_write.key.buffer_sz,
-                 key.size);
+    if(!(op_p->flags & TROVE_BINARY_KEY))
+    {
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                     "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
+                     llu(key_entry.handle), 
+                     op_p->u.k_write.key.buffer_sz,
+                     key_entry.key,
+                     op_p->u.k_write.key.buffer_sz,
+                     key.size);
+    }
 
     ret = op_p->coll_p->keyval_db->put(
         op_p->coll_p->keyval_db, NULL, &key, &data, dbflags);
@@ -453,8 +459,11 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
-                 "of %s\n", (char *)key_entry.key);
+    if(!(op_p->flags & TROVE_BINARY_KEY))
+    {
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
+                     "of %s\n", (char *)key_entry.key);
+    }
 
     if(op_p->flags & TROVE_NOOVERWRITE)
     {
@@ -482,9 +491,12 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
              * NOTE: this can happen if the keyword isn't registered,
              * or if there is no associated cache_elem for this key
              */
-            gossip_debug(
-                GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
-                "(key is %s)\n", (char *)key_entry.key);
+            if(!(op_p->flags & TROVE_BINARY_KEY))
+            {
+                gossip_debug(
+                    GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
+                    "(key is %s)\n", (char *)key_entry.key);
+            }
         }
         else
         {
@@ -1293,8 +1305,11 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
             goto return_error;
         }
 
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
-                     "of %s\n", (char *)op_p->u.k_write_list.key_array[k].buffer);
+        if(!(op_p->flags & TROVE_BINARY_KEY))
+        {
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
+                         "of %s\n", (char *)op_p->u.k_write_list.key_array[k].buffer);
+        }
 
         if(op_p->flags & TROVE_NOOVERWRITE)
         {
@@ -1322,10 +1337,13 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
 NOTE: this can happen if the keyword isn't registered,
 or if there is no associated cache_elem for this key
 */
-                gossip_debug(
-                    GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
-                    "(key is %s)\n", 
-                    (char *)key_entry.key);
+                if(!(op_p->flags & TROVE_BINARY_KEY))
+                {
+                    gossip_debug(
+                        GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
+                        "(key is %s)\n", 
+                        (char *)key_entry.key);
+                }
             }
             else
             {
