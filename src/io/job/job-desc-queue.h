@@ -50,6 +50,9 @@ struct trove_desc
 /* describes precreate pool operations */
 struct precreate_pool_desc
 {
+    /* TODO: is all of this stuff still needed with new arch. of
+     * get_handles()? 
+     */
     PVFS_handle precreate_pool;
     PVFS_fs_id fsid;
     PVFS_handle* precreate_handle_array;
@@ -59,8 +62,8 @@ struct precreate_pool_desc
     const char** servers;
     struct qlist_head* current_pool;
     int trove_pending;
-    int trove_posted;
     int low_threshold;
+    void* data;
 
     /* TODO: does this make the job descriptor too big? */
     TROVE_keyval_s key_array[PRECREATE_POOL_MAX_KEYS];

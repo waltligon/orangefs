@@ -91,6 +91,7 @@ struct precreate_pool_get_trove
     PVFS_ds_keyval key;
     int count;
     struct PINT_thread_mgr_trove_callback trove_callback;
+    struct precreate_pool* pool;
 };
 #endif /* __PVFS2_TROVE_SUPPORT__ */
 
@@ -131,10 +132,13 @@ static void do_one_work_cycle_all(int idle_time_ms);
 static void precreate_pool_get_thread_mgr_callback(
     void* data, 
     PVFS_error error_code);
+static void precreate_pool_get_thread_mgr_callback_unlocked(
+    void* data, 
+    PVFS_error error_code);
 static void precreate_pool_fill_thread_mgr_callback(
     void* data, 
     PVFS_error error_code);
-static void precreate_pool_get_post_next(struct job_desc* jd);
+static void precreate_pool_get_handles_try_post(struct job_desc* jd);
 #endif
 
 /********************************************************
@@ -4361,14 +4365,14 @@ static void teardown_queues(void)
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 
-/* precreate_pool_get_thread_mgr_callback()
+/* precreate_pool_get_thread_mgr_callback_unlocked()
  *
  * callback function executed by the thread manager for precreate pool get
  * when a trove operation completes
  *
  * no return value
  */
-static void precreate_pool_get_thread_mgr_callback(
+static void precreate_pool_get_thread_mgr_callback_unlocked(
     void* data, 
     PVFS_error error_code)
 {
@@ -4383,20 +4387,25 @@ static void precreate_pool_get_thread_mgr_callback(
     }
     gen_mutex_unlock(&initialized_mutex);
 
-    /* TODO: handle this */
-    assert(error_code == 0);
+    if(error_code == 0)
+    {
+        gossip_debug(GOSSIP_JOB_DEBUG,
+            "Got precreated handle: %llu\n",
+            llu(*((PVFS_handle*)tmp_trove->key.buffer)));
+    }
 
     trove_pending_count--;
-
-    gossip_debug(GOSSIP_JOB_DEBUG,
-        "Got precreated handle: %llu\n",
-        llu(*((PVFS_handle*)tmp_trove->key.buffer)));
-
-    /* TODO: lock this trove_pending variable? */
     tmp_trove->jd->u.precreate_pool.trove_pending--;
+
+    /* don't overwrite error codes from other trove ops */
+    if(tmp_trove->jd->u.precreate_pool.error_code == 0)
+    {
+        tmp_trove->jd->u.precreate_pool.error_code = error_code;
+    }
+
+    /* is this job done? */
     if(tmp_trove->jd->u.precreate_pool.trove_pending == 0)
     {
-        /* get_handles is complete */
         gen_mutex_lock(&completion_mutex);
 
         /* set job descriptor fields and put into completion queue */
@@ -4406,17 +4415,33 @@ static void precreate_pool_get_thread_mgr_callback(
         /* set completed flag while holding queue lock */
         tmp_trove->jd->completed_flag = 1;
 
-        free(tmp_trove);
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */
         pthread_cond_signal(&completion_cond);
 #endif
+        free(tmp_trove->jd->u.precreate_pool.data);
         gen_mutex_unlock(&completion_mutex);
         return;
     }
 
-    free(tmp_trove);
     return;
+}
+
+
+/* precreate_pool_get_thread_mgr_callback()
+ *
+ * callback function executed by the thread manager for precreate pool get
+ * when a trove operation completes
+ *
+ * no return value
+ */
+static void precreate_pool_get_thread_mgr_callback(
+    void* data, 
+    PVFS_error error_code)
+{
+    gen_mutex_lock(&precreate_pool_mutex);
+    precreate_pool_get_thread_mgr_callback_unlocked(data, error_code);
+    gen_mutex_unlock(&precreate_pool_mutex);
 }
 
 /* precreate_pool_fill_thread_mgr_callback()
@@ -4499,22 +4524,20 @@ static void precreate_pool_fill_thread_mgr_callback(
             }
         }
 
-        /* find out if anyone was sleeping because the pool was empty */
+        /* find out if anyone was sleeping because a pool was empty */
         gossip_debug(GOSSIP_JOB_DEBUG, "checking for get_handles() sleepers\n");
         qlist_for_each_safe(iterator, scratch, 
             &precreate_pool_get_handles_list)
         {
             jd_checker = qlist_entry(iterator, struct job_desc,
                 job_desc_q_link);
-            gossip_debug(GOSSIP_JOB_DEBUG, "checking for get_handles() sleeper, jd on handle %llu\n", llu(jd_checker->u.precreate_pool.precreate_pool));
-            if(jd_checker->u.precreate_pool.precreate_pool == pool->pool_handle)
-            {
-                awoken_count++;
-                /* put them on a new local queue */
-                qlist_del(&jd_checker->job_desc_q_link);
-                qlist_add(&jd_checker->job_desc_q_link, &tmp_list);
-                gossip_debug(GOSSIP_JOB_DEBUG, "Found someone waiting on handles from precreate pool %llu\n", llu(pool->pool_handle));
-            }
+
+            awoken_count++;
+            /* put them on a new local queue */
+            qlist_del(&jd_checker->job_desc_q_link);
+            qlist_add(&jd_checker->job_desc_q_link, &tmp_list);
+            gossip_debug(GOSSIP_JOB_DEBUG, "Found someone waiting to get handles from precreate pool\n");
+
             if(awoken_count == jd->u.precreate_pool.posted_count)
             {
                 /* that's as many as we should wake up right now */
@@ -4530,7 +4553,7 @@ static void precreate_pool_fill_thread_mgr_callback(
         {
             jd_checker = qlist_entry(iterator, struct job_desc,
                 job_desc_q_link);
-            precreate_pool_get_post_next(jd_checker);
+            precreate_pool_get_handles_try_post(jd_checker);
         }
     }
 
@@ -5367,13 +5390,17 @@ int job_precreate_pool_get_handles(
 {
     struct job_desc *jd = NULL;
 
-    /* create the job desc first, even though we may not use it.  This
-     * gives us somewhere to store information
-     */
+    if(count < 0)
+    {
+        out_status_p->error_code = -PVFS_EINVAL;
+        return(1);
+    }
+
     jd = alloc_job_desc(JOB_PRECREATE_POOL);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return(1);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -5384,48 +5411,80 @@ int job_precreate_pool_get_handles(
     jd->u.precreate_pool.id = PVFS_OP_NULL;
     jd->u.precreate_pool.fsid = fsid;
     jd->u.precreate_pool.servers = servers;
-    jd->u.precreate_pool.trove_pending = count;
+    jd->u.precreate_pool.trove_pending = 0;
     
-    precreate_pool_get_post_next(jd);
+    precreate_pool_get_handles_try_post(jd);
 
     /* for the moment, this type of job cannot immediately complete */
     *id = jd->job_id;
     return(0);
 }
 
-/* precreate_pool_get_post_next()
+/* precreate_pool_get_handles_try_post()
  *
  * Internal function used by job_precreate_pool_get_handles().  This
- * function will attempt to retrieve as many precreated handles from trove
- * as possible.  If a pool is empty, then this function will queue up to be
- * executed again later.
+ * function will check to see if all pools are ready (at least one handle
+ * available) and then post all required trove operations
  *
  * no return value
  */
-static void precreate_pool_get_post_next(struct job_desc* jd)
+static void precreate_pool_get_handles_try_post(struct job_desc* jd)
 {
     struct precreate_pool* pool;
     TROVE_op_id tmp_id;
     int ret;
-    struct precreate_pool_get_trove* tmp_trove;
+    struct precreate_pool_get_trove* tmp_trove_array;
     struct qlist_head* iterator;
     struct qlist_head* scratch;
     struct job_desc* jd_checker;
-    struct qlist_head* old_pool;
+    int i;
 
-    gossip_debug(GOSSIP_JOB_DEBUG, "precreate_pool_get_post_next\n");
-
-    /* we better still have handles to retrieve */
-    assert(jd->u.precreate_pool.precreate_handle_index < 
-        jd->u.precreate_pool.precreate_handle_count);
-
-    old_pool = jd->u.precreate_pool.current_pool;
+    gossip_debug(GOSSIP_JOB_DEBUG, "precreate_pool_get_handles_try_post\n");
 
     gen_mutex_lock(&precreate_pool_mutex);
-    for(;
-        jd->u.precreate_pool.precreate_handle_index <
-        jd->u.precreate_pool.precreate_handle_count;
-        jd->u.precreate_pool.precreate_handle_index++)
+
+    /* check pool list, go back to sleep if any are empty */
+    qlist_for_each(iterator, &precreate_pool_list)
+    {
+        pool = qlist_entry(iterator, struct precreate_pool,
+            list_link);
+        if(pool->pool_count < 1)
+        {
+            /* queue up until the count for this pool increases */
+            qlist_add(&jd->job_desc_q_link, &precreate_pool_get_handles_list);
+            gossip_debug(GOSSIP_JOB_DEBUG, "Found empty precreate pool %llu\n", llu(pool->pool_handle));
+            
+            gen_mutex_unlock(&precreate_pool_mutex);
+            return;
+        }
+    }
+
+    /* if we get to this point, set up necessary information for all trove 
+     * operations needed to service job
+     */
+    tmp_trove_array = malloc(jd->u.precreate_pool.precreate_handle_count *
+        sizeof(struct precreate_pool_get_trove));
+    if(!tmp_trove_array)
+    {
+        gen_mutex_unlock(&precreate_pool_mutex);
+        gen_mutex_lock(&completion_mutex);        
+        jd->u.precreate_pool.error_code = -PVFS_ENOMEM;
+        job_desc_q_add(completion_queue_array[jd->context_id], jd);
+        jd->completed_flag = 1;
+#ifdef __PVFS2_JOB_THREADED__
+        /* wake up anyone waiting for completion */
+        pthread_cond_signal(&completion_cond);
+#endif
+        gen_mutex_unlock(&completion_mutex);        
+        return;
+
+    }
+    jd->u.precreate_pool.data = tmp_trove_array;
+
+    /* translate reqested servers and set up necessary fields to post 
+     * trove operations
+     */
+    for(i=0; i<jd->u.precreate_pool.precreate_handle_count; i++)
     {
         if(jd->u.precreate_pool.servers)
         {
@@ -5437,7 +5496,7 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
             {
                 pool = qlist_entry(iterator, struct precreate_pool,
                     list_link);
-                if(!strcmp(pool->host, jd->u.precreate_pool.servers[jd->u.precreate_pool.precreate_handle_index]))
+                if(!strcmp(pool->host, jd->u.precreate_pool.servers[i]))
                 {
                     jd->u.precreate_pool.current_pool = iterator;
                     break;
@@ -5445,10 +5504,22 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
             }
             if(!jd->u.precreate_pool.current_pool)
             {
-                /* TODO: figure out what to do with this.  Someone gave us
-                 * bad args but we are late detecting it
-                 */
-                assert(0);
+                gossip_err("Error: get_handles(): unknown server: %s\n",
+                    jd->u.precreate_pool.servers[i]);
+
+                free(tmp_trove_array);
+                gen_mutex_unlock(&precreate_pool_mutex);
+
+                gen_mutex_lock(&completion_mutex);        
+                jd->u.precreate_pool.error_code = -PVFS_EINVAL;
+                job_desc_q_add(completion_queue_array[jd->context_id], jd);
+                jd->completed_flag = 1;
+        #ifdef __PVFS2_JOB_THREADED__
+                /* wake up anyone waiting for completion */
+                pthread_cond_signal(&completion_cond);
+        #endif
+                gen_mutex_unlock(&completion_mutex);        
+                return;
             }
         }
         else
@@ -5468,26 +5539,26 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
             }
         }
 
-        pool = qlist_entry(jd->u.precreate_pool.current_pool, 
+        tmp_trove_array[i].pool = qlist_entry(jd->u.precreate_pool.current_pool, 
             struct precreate_pool, list_link);
 
-        if(pool->pool_count < 1)
-        {
-            /* mark what pool we are waiting on */
-            jd->u.precreate_pool.precreate_pool = pool->pool_handle;
+        tmp_trove_array[i].jd = jd;
+        tmp_trove_array[i].pos = PVFS_ITERATE_START;
+        tmp_trove_array[i].count = 1;
+        tmp_trove_array[i].key.buffer 
+            = &jd->u.precreate_pool.precreate_handle_array[i];
+        tmp_trove_array[i].key.buffer_sz = sizeof(PVFS_handle);
+        tmp_trove_array[i].trove_callback.fn 
+            = precreate_pool_get_thread_mgr_callback;
+        tmp_trove_array[i].trove_callback.data 
+            = &tmp_trove_array[i];
+    }
 
-            /* rewind current pool */
-            jd->u.precreate_pool.current_pool = old_pool;
-
-            /* queue up until the count for this pool increases */
-            qlist_add(&jd->job_desc_q_link, &precreate_pool_get_handles_list);
-            gossip_debug(GOSSIP_JOB_DEBUG, "Found empty precreate pool %llu\n", llu(pool->pool_handle));
-            
-            gen_mutex_unlock(&precreate_pool_mutex);
-            return;
-        }
+    /* post all trove operations at once */
+    for(i=0; i<jd->u.precreate_pool.precreate_handle_count; i++)
+    { 
         /* go ahead and decrement count to avoid races with other consumers */
-        pool->pool_count--;
+        tmp_trove_array[i].pool->pool_count--;
 
         /* is anyone waiting to check the count of this pool? */
         if(!qlist_empty(&precreate_pool_check_level_list))
@@ -5497,7 +5568,10 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
             {
                 jd_checker = qlist_entry(iterator, struct job_desc,
                     job_desc_q_link);
-                if(pool->pool_count < jd_checker->u.precreate_pool.low_threshold)
+                if(jd_checker->u.precreate_pool.precreate_pool == 
+                    tmp_trove_array[i].pool->pool_handle &&
+                    tmp_trove_array[i].pool->pool_count < 
+                    jd_checker->u.precreate_pool.low_threshold)
                 {
                     /* the pool level is low */
                     gossip_debug(GOSSIP_JOB_DEBUG, "Pool count low, waking up waiter for handle %llu.\n", llu(jd_checker->u.precreate_pool.precreate_pool));
@@ -5516,48 +5590,35 @@ static void precreate_pool_get_post_next(struct job_desc* jd)
             }
         }
 
-        /* somewhere to stash trove variables per operation */
-        tmp_trove = malloc(sizeof(*tmp_trove));
-        if(!tmp_trove)
-        {
-            /* TODO: handle this */
-            assert(0);
-        }
-        tmp_trove->jd = jd;
-        tmp_trove->pos = PVFS_ITERATE_START;
-        tmp_trove->count = 1;
-        tmp_trove->key.buffer = &jd->u.precreate_pool.precreate_handle_array[jd->u.precreate_pool.precreate_handle_index];
-        tmp_trove->key.buffer_sz = sizeof(PVFS_handle);
-        tmp_trove->trove_callback.fn = precreate_pool_get_thread_mgr_callback;
-        tmp_trove->trove_callback.data = tmp_trove;
-
         /* post trove operation to pull out a handle */
-        /* TODO: what if this immediately returns? */
         ret = trove_keyval_iterate_keys(
-                            pool->fsid, 
-                            pool->pool_handle,
-                            &tmp_trove->pos,
-                            &tmp_trove->key,
-                            &tmp_trove->count,
-                            TROVE_BINARY_KEY|TROVE_SYNC|
-                            TROVE_KEYVAL_HANDLE_COUNT|
-                            TROVE_KEYVAL_ITERATE_REMOVE,
-                            NULL, 
-                            &tmp_trove->trove_callback, 
-                            global_trove_context,
-                            &tmp_id);
+            tmp_trove_array[i].pool->fsid, 
+            tmp_trove_array[i].pool->pool_handle,
+            &tmp_trove_array[i].pos,
+            &tmp_trove_array[i].key,
+            &tmp_trove_array[i].count,
+            TROVE_BINARY_KEY|TROVE_SYNC|
+            TROVE_KEYVAL_HANDLE_COUNT|
+            TROVE_KEYVAL_ITERATE_REMOVE,
+            NULL, 
+            &tmp_trove_array[i].trove_callback, 
+            global_trove_context,
+            &tmp_id);
         if(ret < 0)
         {
-            /* TODO: fix this */
-            assert(0);
+            precreate_pool_get_thread_mgr_callback_unlocked(
+                &tmp_trove_array[i], ret);
         }
         else if(ret == 1)
         {
-            precreate_pool_get_thread_mgr_callback(tmp_trove, 0);
+            precreate_pool_get_thread_mgr_callback_unlocked(
+                &tmp_trove_array[i], 0);
         }
         else
         {
+            /* callback will be triggered later */
             trove_pending_count++;
+            jd->u.precreate_pool.trove_pending++;
         }
     }
     gen_mutex_unlock(&precreate_pool_mutex);

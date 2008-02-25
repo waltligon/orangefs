@@ -715,6 +715,10 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
 
         info.count -= remove_count;
 
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                 "[DBPF KEYVAL]: handle_info keyval_remove_list: handle: %llu, count: %d\n",
+                 llu(op_p->handle), info.count); 
+
         ret = op_p->coll_p->keyval_db->put(
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
         if(ret != 0)
@@ -1286,13 +1290,16 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
             data.size = data.ulen = op_p->u.k_write_list.val_array[k].buffer_sz;
         }
 
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
-                     llu(key_entry.handle), 
-                     op_p->u.k_write_list.key_array[k].buffer_sz,
-                     key_entry.key,
-                     op_p->u.k_write_list.key_array[k].buffer_sz,
-                     key.size);
+        if(!(op_p->flags & TROVE_BINARY_KEY))
+        {
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                         "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
+                         llu(key_entry.handle), 
+                         op_p->u.k_write_list.key_array[k].buffer_sz,
+                         key_entry.key,
+                         op_p->u.k_write_list.key_array[k].buffer_sz,
+                         key.size);
+        }
 
         ret = op_p->coll_p->keyval_db->put(
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
@@ -1996,6 +2003,13 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         }
         else if(action == DBPF_KEYVAL_HANDLE_COUNT_DECREMENT)
         {
+            if(info.count <= 0)
+            {
+                gossip_lerr(
+                     "[DBPF KEYVAL]: ERROR: handle_info "
+                     "count decrement: handle: %llu, value: %d\n",
+                     llu(op_p->handle), info.count);
+            }
             assert(info.count > 0);
 
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
