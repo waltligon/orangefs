@@ -1974,7 +1974,9 @@ static int precreate_pool_initialize(void)
             &server_type);
         if(ret < 0)
         {
-            /* TODO: handle properly */
+            gossip_err("Error: %s not found in configuration file.\n", 
+                server_config.host_id);
+            gossip_err("Error: configuration file is inconsistent.\n");
             return(ret);
         }
         if(!(server_type & PINT_SERVER_TYPE_META))
@@ -1991,14 +1993,15 @@ static int precreate_pool_initialize(void)
             cur_fs->coll_id, PINT_SERVER_TYPE_IO, &server_count);
         if(ret < 0)
         {
-            /* TODO: handle properly */
+            gossip_err("Error: unable to count servers for fsid: %d\n", 
+                (int)cur_fs->coll_id);
             return(ret);
         }
         
         addr_array = malloc(server_count*sizeof(PVFS_BMI_addr_t));
         if(!addr_array)
         {
-            /* TODO: handle properly */
+            gossip_err("Error: unable to allocate book keeping information for precreate pools.\n");
             return(-PVFS_ENOMEM);
         }
 
@@ -2008,7 +2011,8 @@ static int precreate_pool_initialize(void)
             addr_array, &server_count);
         if(ret < 0)
         {
-            /* TODO: handle properly */
+            gossip_err("Error: unable retrieve servers for fsid: %d\n", 
+                (int)cur_fs->coll_id);
             return(ret);
         }
 
@@ -2053,7 +2057,6 @@ static int precreate_pool_initialize(void)
                 if(ret < 0)
                 {
                     gossip_err("Error: precreate_pool_initialize failed to launch refiller SM for %s\n", server_config.host_id);
-                    /* TODO: how to clean up here? */
                     return(ret);
                 }
             }
@@ -2071,6 +2074,7 @@ static int precreate_pool_initialize(void)
 static void precreate_pool_finalize(void)
 {
     /* TODO: anything to do here? */
+    /* TODO: maybe try to stop pending refiller sms? */
     return;
 }
 
@@ -2166,7 +2170,8 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
         }
         if(ret < 0 || js.error_code)
         {
-            /* TODO: fill this in; need to delete the hand we created too */ 
+            gossip_err("Error: failed to record precreate pool handle.\n");
+            gossip_err("Warning: fsck may be needed to recover lost handle.\n");
             free(key.buffer);
             return(ret < 0 ? ret : js.error_code);
         }

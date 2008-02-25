@@ -28,40 +28,41 @@ machine pvfs2_precreate_pool_refiller_sm
         {
                 run setup_fn;
                 success => wait_for_threshold;
-                default => error;
+                default => error_retry;
         }
 
 	state wait_for_threshold 
 	{
 		run wait_for_threshold_fn;
 		success => setup_batch_create;
-		default => error;
+		default => error_retry;
 	}
 
 	state setup_batch_create 
 	{
 		run setup_batch_create_fn;
 		success => msgpair_xfer_batch_create;
-		default => error;
+		default => error_retry;
 	}
 
         state msgpair_xfer_batch_create
         {
                 jump pvfs2_msgpairarray_sm;
                 success => store_handles;
-                default => error;
+                default => error_retry;
         }
 
         state store_handles
         {
                 run store_handles_fn;
                 success => wait_for_threshold;
-                default => error;
+                default => error_retry;
         }
 
-        state error
+        state error_retry
         {
                 run error_fn;
+                success => setup;
                 default => terminate;
         }
 }
@@ -198,17 +199,25 @@ static PINT_sm_action setup_fn(
 static PINT_sm_action error_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    job_id_t tmp_id;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_err("Error: precreate_pool_refiller for %s exiting.\n",
+    gossip_err("Error: precreate_pool_refiller for %s encountered error.\n",
         s_op->u.precreate_pool_refiller.host);
+    gossip_err("Error: sleeping for 30 seconds before retrying.\n");
         
     if(s_op->u.precreate_pool_refiller.precreate_handle_array)
     {
         free(s_op->u.precreate_pool_refiller.precreate_handle_array);
     }
 
-    return (server_state_machine_complete(smcb));
+    return(job_req_sched_post_timer(
+        (30*1000),
+	smcb,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context));
 }
 
 
@@ -231,7 +240,6 @@ static int batch_create_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-        /* TODO: do something useful here */
         PVFS_perror_gossip("batch_create request got", resp_p->status);
 	return resp_p->status;
     }
