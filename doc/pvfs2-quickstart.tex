@@ -171,14 +171,10 @@ several questions to determine your desired configuration.  Please pay
 particular attention to the listing of the metadata servers and I/O
 servers.  In this example we will use ``testhost'' for both.
 
-The pvfs2-genconfig tool will generate two configuration files.  One
-is a file system configuration file that will be identical for all
-servers (if we had more than one).  The second is a server specific
-configuration file that will be different for each server.  The server
-specific files have the hostname of the server that they belong to
-appended to the file name.  This script should be excuted as root, so
-that we can place the configuration files in their default /etc/
-locations.
+The pvfs2-genconfig tool will generate a single file system configuration
+file that will be identical for all servers.  This script should be
+excuted as root, so that we can place the configuration file in its
+default /etc/ location.
 
 In this simple configuration, we can accept the default options for
 every field.  We will use the hostname ``testhost'' rather than
@@ -235,7 +231,7 @@ Writing fs config file... Done.
 Configuration complete!
 \end{verbatim}
 
-The generated config files will have conservative default values.  The PVFS2
+The generated config file will have conservative default values.  The PVFS2
 Users Guide has more information about the settings and the consequences of
 setting more aggressive, high performance values.
 
@@ -266,6 +262,14 @@ you may run the server as follows:
 \begin{verbatim}
 bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf -d
 \end{verbatim}
+
+On startup, the PVFS2 server uses the hostname of the machine that it
+is running on to determine necessary information from the configuration
+file.  If the hostname doesn't match any of the addresses specified in
+the config file, then then you must use the -a option.  For example,
+each of above command lines could include ``-a testhost'' to
+specify that the server is using the \texttt{testhost} alias in the
+configuration file.
 
 \subsubsection{Automatic server startup and shutdown}
 \label{sec:rc}
