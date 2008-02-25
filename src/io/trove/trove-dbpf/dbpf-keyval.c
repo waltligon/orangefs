@@ -181,7 +181,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
 
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     cache_elem = dbpf_attr_cache_elem_lookup(ref);
-    if (cache_elem)
+    if (cache_elem && (!(flags & TROVE_BINARY_KEY)))
     {
         dbpf_keyval_pair_cache_elem_t *keyval_pair =
             dbpf_attr_cache_elem_get_data_based_on_key(
@@ -276,30 +276,30 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     op_p->u.k_read.val->read_sz = data.size;
 
     /* cache this data in the attr cache if we can */
-    gen_mutex_lock(&dbpf_attr_cache_mutex);
-    if (dbpf_attr_cache_elem_set_data_based_on_key(
-            ref, key_entry.key,
-            op_p->u.k_read.val->buffer, data.size))
+    if(!(op_p->flags & TROVE_BINARY_KEY))
     {
-        /*
-         * NOTE: this can happen if the keyword isn't registered, or if
-         * there is no associated cache_elem for this key
-         */
-        if(!(op_p->flags & TROVE_BINARY_KEY))
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
+        if (dbpf_attr_cache_elem_set_data_based_on_key(
+                ref, key_entry.key,
+                op_p->u.k_read.val->buffer, data.size))
         {
+            /*
+             * NOTE: this can happen if the keyword isn't registered, or if
+             * there is no associated cache_elem for this key
+             */
             gossip_debug(
                 GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
                 "(key is %s)\n", (char *)key_entry.key);
         }
+        else
+        {
+            gossip_debug(
+                GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
+                "retrieved (key is %s)\n",
+                (char *)key_entry.key);
+        }
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
-    else
-    {
-        gossip_debug(
-            GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
-            "retrieved (key is %s)\n",
-            (char *)key_entry.key);
-    }
-    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     return 1;
 
@@ -479,35 +479,34 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
      * now that the data is written to disk, update the cache if it's
      * an attr keyval we manage.
      */
-    gen_mutex_lock(&dbpf_attr_cache_mutex);
-    cache_elem = dbpf_attr_cache_elem_lookup(ref);
-    if (cache_elem)
+    if(!(op_p->flags & TROVE_BINARY_KEY))
     {
-        if (dbpf_attr_cache_elem_set_data_based_on_key(
-                ref, key_entry.key,
-                op_p->u.k_write.val.buffer, data.size))
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
+        cache_elem = dbpf_attr_cache_elem_lookup(ref);
+        if (cache_elem)
         {
-            /*
-             * NOTE: this can happen if the keyword isn't registered,
-             * or if there is no associated cache_elem for this key
-             */
-            if(!(op_p->flags & TROVE_BINARY_KEY))
+            if (dbpf_attr_cache_elem_set_data_based_on_key(
+                    ref, key_entry.key,
+                    op_p->u.k_write.val.buffer, data.size))
             {
+                /*
+                 * NOTE: this can happen if the keyword isn't registered,
+                 * or if there is no associated cache_elem for this key
+                 */
                 gossip_debug(
                     GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
                     "(key is %s)\n", (char *)key_entry.key);
             }
+            else
+            {
+                gossip_debug(
+                    GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
+                    "written (key is %s)\n",
+                    (char *)key_entry.key);
+            }
         }
-        else
-        {
-            gossip_debug(
-                GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
-                "written (key is %s)\n",
-                (char *)key_entry.key);
-        }
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
-
-    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     ret = DBPF_OP_COMPLETE;
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
@@ -1332,35 +1331,35 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
            now that the data is written to disk, update the cache if it's
            an attr keyval we manage.
            */
-        gen_mutex_lock(&dbpf_attr_cache_mutex);
-        cache_elem = dbpf_attr_cache_elem_lookup(ref);
-        if (cache_elem)
+        if(!(op_p->flags & TROVE_BINARY_KEY))
         {
-            if (dbpf_attr_cache_elem_set_data_based_on_key(
-                    ref, key_entry.key,
-                    data.data, data.size))
+            gen_mutex_lock(&dbpf_attr_cache_mutex);
+            cache_elem = dbpf_attr_cache_elem_lookup(ref);
+            if (cache_elem)
             {
-                /*
-NOTE: this can happen if the keyword isn't registered,
-or if there is no associated cache_elem for this key
-*/
-                if(!(op_p->flags & TROVE_BINARY_KEY))
+                if (dbpf_attr_cache_elem_set_data_based_on_key(
+                        ref, key_entry.key,
+                        data.data, data.size))
                 {
+                    /*
+    NOTE: this can happen if the keyword isn't registered,
+    or if there is no associated cache_elem for this key
+    */
                     gossip_debug(
                         GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
                         "(key is %s)\n", 
                         (char *)key_entry.key);
                 }
+                else
+                {
+                    gossip_debug(
+                        GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
+                        "written (key is %s)\n",
+                        (char *)key_entry.key);
+                }
             }
-            else
-            {
-                gossip_debug(
-                    GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
-                    "written (key is %s)\n",
-                    (char *)key_entry.key);
-            }
+            gen_mutex_unlock(&dbpf_attr_cache_mutex);
         }
-        gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
 
     ret = DBPF_OP_COMPLETE;
