@@ -4564,10 +4564,13 @@ static void precreate_pool_fill_thread_mgr_callback(
         /* now that we have collected the sleepers into our own private
          * queue, we can push them without the precreate_pool_mutex held
          */
-        qlist_for_each(iterator, &tmp_list)
+        gossip_debug(GOSSIP_JOB_DEBUG, "About to push on get_handles() sleepers.\n");
+        qlist_for_each_safe(iterator, scratch, &tmp_list)
         {
             jd_checker = qlist_entry(iterator, struct job_desc,
                 job_desc_q_link);
+            qlist_del(&jd_checker->job_desc_q_link);
+            gossip_debug(GOSSIP_JOB_DEBUG, "Pushing get_handles() sleeper for jd: %p.\n", jd_checker);
             precreate_pool_get_handles_try_post(jd_checker);
         }
     }
