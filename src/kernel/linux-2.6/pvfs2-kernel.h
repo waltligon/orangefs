@@ -1251,23 +1251,32 @@ static inline int dcache_dir_close(struct inode *inode, struct file *file)
 }
 #endif /* PVFS2_LINUX_KERNEL_2_4_MINOR_VER */
 
-/* some 2.4 kernels backport a lot of stuff from 2.6, so we have to
- * feature-test instead of relying on kernel versions */
-#ifndef HAVE_I_SIZE_READ
-static inline loff_t i_size_read(struct inode *inode)
-{
-    return inode->i_size;
-}
-#endif
-
-#ifndef HAVE_I_SIZE_WRITE
-static inline void i_size_write(struct inode *inode, loff_t i_size)
-{
-    inode->i_size = i_size;
-}
-#endif
-
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+static inline void pvfs2_i_size_write(struct inode *inode, loff_t i_size)
+{
+#ifndef HAVE_I_SIZE_WRITE
+    inode->i_size = i_size;
+#else
+    #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+    mutex_lock(&inode->i_mutex);
+    #endif
+    i_size_write(inode, i_size);
+    #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+    mutex_unlock(&inode->i_mutex);
+    #endif
+#endif
+    return;
+}
+
+static inline loff_t pvfs2_i_size_read(struct inode *inode)
+{
+#ifndef HAVE_I_SIZE_READ
+    return inode->i_size;
+#else
+    return i_size_read(inode);
+#endif
+}
 
 static inline unsigned int diff(struct timeval *end, struct timeval *begin)
 {

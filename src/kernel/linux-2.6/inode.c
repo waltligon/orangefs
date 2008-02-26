@@ -160,7 +160,7 @@ struct address_space_operations pvfs2_address_operations =
  */
 void pvfs2_truncate(struct inode *inode)
 {
-    loff_t orig_size = i_size_read(inode);
+    loff_t orig_size = pvfs2_i_size_read(inode);
 
     if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
         return;
@@ -171,7 +171,7 @@ void pvfs2_truncate(struct inode *inode)
      * although the mtime updates are propagated lazily!
      */
     if (pvfs2_truncate_inode(inode, inode->i_size) == 0
-            && (orig_size != i_size_read(inode)))
+            && (orig_size != pvfs2_i_size_read(inode)))
     {
         pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
         SetMtimeFlag(pvfs2_inode);

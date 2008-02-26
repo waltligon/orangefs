@@ -306,7 +306,7 @@ int copy_attributes_to_inode(
                             "attribute type %x\n", attrs->objtype);
         }
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: copy_attributes_to_inode: setting i_mode to %o, i_size to %lu\n",
-                inode->i_mode, (unsigned long)i_size_read(inode));
+                inode->i_mode, (unsigned long)pvfs2_i_size_read(inode));
     }
     return ret;
 }
@@ -1773,7 +1773,7 @@ static int do_encode_opaque_handle(char *dst, struct inode *inode)
     h.atime  = pvfs2_convert_time_field(&inode->i_atime);
     h.mtime  = pvfs2_convert_time_field(&inode->i_mtime);
     h.ctime  = pvfs2_convert_time_field(&inode->i_ctime);
-    h.size   = i_size_read(inode);
+    h.size   = pvfs2_i_size_read(inode);
     h.mask   |= PVFS_ATTR_SYS_SIZE;
     h.objtype = PVFS_TYPE_METAFILE;
     /* Serialize into the buffer */
