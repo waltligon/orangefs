@@ -512,6 +512,20 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 			    job_id_t * id,
 			    job_context_id context_id);
 
+/* create a set of new data space objects */
+int job_trove_dspace_create_list(PVFS_fs_id coll_id,
+			    PVFS_handle_extent_array *handle_extent_array,
+                            PVFS_handle* out_handle_arry,
+                            int count,
+			    PVFS_ds_type type,
+			    void *hint,
+                            PVFS_ds_flags flags,
+			    void *user_ptr,
+			    job_aint status_user_tag,
+			    job_status_s * out_status_p,
+			    job_id_t * id,
+			    job_context_id context_id);
+
 /* remove an entire data space object (byte stream and key/value) */
 int job_trove_dspace_remove(PVFS_fs_id coll_id,
 			    PVFS_handle handle,

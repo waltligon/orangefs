@@ -3273,6 +3273,97 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     return (0);
 }
 
+/* job_trove_dspace_create_list()
+ *
+ * create a new data space object 
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on
+ * failure
+ */
+int job_trove_dspace_create_list(PVFS_fs_id coll_id,
+                            PVFS_handle_extent_array *handle_extent_array,
+                            PVFS_handle* out_handle_array,
+                            int count,
+                            PVFS_ds_type type,
+                            void *hint,
+                            PVFS_ds_flags flags,
+                            void *user_ptr,
+                            job_aint status_user_tag,
+                            job_status_s * out_status_p,
+                            job_id_t * id,
+                            job_context_id context_id)
+{
+    /* post a dspace create list.  If it completes (or fails) immediately, then
+     * return and fill in the status structure.  If it needs to be tested
+     * for completion later, then queue up a job_desc structure.
+     */
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    void* user_ptr_internal;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+        return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->u.trove.handle = PVFS_HANDLE_NULL;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, jd->job_id);
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_dspace_create_list(coll_id,
+                              handle_extent_array,
+                              out_handle_array,
+                              count,
+                              type,
+                              hint, flags,
+                              user_ptr_internal, 
+                              global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0)
+    {
+        /* error posting trove operation */
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        return (ret);
+    }
+
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    *id = jd->job_id;
+    trove_pending_count++;
+    jd->event_type = PVFS_EVENT_TROVE_DSPACE_CREATE;
+
+    return (0);
+}
+
 /* job_trove_dspace_remove()
  *
  * remove an entire data space object (byte stream and key/value) 
