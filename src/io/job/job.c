@@ -70,6 +70,11 @@ enum
     thread_wait_timeout = 10000        /* usecs */
 };
 
+/* cap how many keys we dump into trove at once when filling precreate pools
+ * so that it doesn't clog up trove queues
+ */
+#define PRECREATE_POOL_MAX_KEYS 32
+
 #ifdef __PVFS2_TROVE_SUPPORT__
 static gen_mutex_t precreate_pool_mutex = GEN_MUTEX_INITIALIZER;
 static QLIST_HEAD(precreate_pool_list);
@@ -4483,6 +4488,7 @@ static void precreate_pool_fill_thread_mgr_callback(
     {
         gossip_err("Error: unable to write all precreated handles to pool.\n");
         gossip_err("Warning: fsck may be needed to recover stranded handles.\n");
+        free(jd->u.precreate_pool.key_array);
         gen_mutex_lock(&completion_mutex);
 
         /* set job descriptor fields and put into completion queue */
@@ -4570,6 +4576,7 @@ static void precreate_pool_fill_thread_mgr_callback(
     if(jd->u.precreate_pool.precreate_handle_index >= 
         jd->u.precreate_pool.precreate_handle_count)
     {
+        free(jd->u.precreate_pool.key_array);
         gen_mutex_lock(&completion_mutex);
 
         /* set job descriptor fields and put into completion queue */
@@ -5249,6 +5256,14 @@ int job_precreate_pool_fill(
     jd->u.precreate_pool.precreate_handle_index = 0;
     jd->u.precreate_pool.first_callback_flag = 1;
     jd->u.precreate_pool.fsid = fsid;
+    jd->u.precreate_pool.key_array = 
+        malloc(PRECREATE_POOL_MAX_KEYS*sizeof(TROVE_keyval_s));
+    if(!jd->u.precreate_pool.key_array)
+    {
+        dealloc_job_desc(jd);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return(1);
+    }
 
     /* reuse the logic for trove op completion to get this started */
     precreate_pool_fill_thread_mgr_callback(jd, 0);

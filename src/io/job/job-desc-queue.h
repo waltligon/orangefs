@@ -42,17 +42,9 @@ struct trove_desc
     int count;
 };
 
-/* assuming we should probably cap how many keys we dump into trove
- * at once so it doesn't clog up the op queue
- */
-#define PRECREATE_POOL_MAX_KEYS 32
-
 /* describes precreate pool operations */
 struct precreate_pool_desc
 {
-    /* TODO: is all of this stuff still needed with new arch. of
-     * get_handles()? 
-     */
     PVFS_handle precreate_pool;
     PVFS_fs_id fsid;
     PVFS_handle* precreate_handle_array;
@@ -65,10 +57,7 @@ struct precreate_pool_desc
     int low_threshold;
     void* data;
     int first_callback_flag;
-
-    /* TODO: does this make the job descriptor too big? */
-    TROVE_keyval_s key_array[PRECREATE_POOL_MAX_KEYS];
-
+    TROVE_keyval_s* key_array;
     
     PVFS_error error_code;
 };
