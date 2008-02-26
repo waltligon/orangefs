@@ -55,13 +55,11 @@ static PINT_sm_action unexpected_post(
     ret = job_bmi_unexp(&s_op->unexp_bmi_buff, smcb, 0,
                         js_p, &j_id, JOB_NO_IMMED_COMPLETE,
                         server_job_context);
-    if (ret < 0)
+    if(ret == SM_ACTION_COMPLETE)
     {
         PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
-        js_p->error_code = ret;
         return SM_ACTION_TERMINATE;
     }
-
     return SM_ACTION_DEFERRED;
 }
 
