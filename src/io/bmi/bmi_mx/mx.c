@@ -451,7 +451,6 @@ static int
 bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint32_t *ep_id)
 {
         int             ret             = 0;
-        int             len             = 0;
         int             colon1_found    = 0;
         int             colon2_found    = 0;
         char           *s               = NULL;
@@ -510,7 +509,6 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
                     NULL != strchr(colon2, ':')) {
                         debug(BMX_DB_INFO, "parse_peername() too many ':' (%s %s)", 
                                            colon1, colon2);
-                        len = sizeof(*s);
                         free(s);
                         return -1;
                 }
@@ -699,6 +697,9 @@ bmx_peer_alloc(struct bmx_peer **peerp, struct bmx_method_addr *mxmap)
                 }
                 bmx_put_idle_rx(rx);
         }
+
+        /* on servers with server-to-server comms, we are racing 
+         * between method_addr_lookup() and handle_conn_req() */
 
         bmx_peer_addref(peer); /* for the peers list */
         gen_mutex_lock(&bmi_mx->bmx_peers_lock);
@@ -1449,6 +1450,8 @@ bmx_ensure_connected(struct bmx_method_addr *mxmap)
         int             ret     = 0;
         struct bmx_peer *peer   = mxmap->mxm_peer;
 
+        /* NOTE: can this happen? we call peer_alloc() when using 
+         * method_addr_lookup() */
         if (peer == NULL) {
                 ret = bmx_peer_alloc(&peer, mxmap);
                 if (ret != 0) {
@@ -1894,6 +1897,7 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
         int             ret     = 0;
         struct bmx_ctx  *rx     = NULL;
         struct bmx_peer *peer   = NULL;
+        void            *peerp  = (void *) &peer;
         mx_return_t     mxret   = MX_SUCCESS;
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
@@ -1908,8 +1912,8 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
 
         rx = bmx_get_idle_rx();
         if (rx != NULL) {
-                void *foo = &peer;
-                mx_get_endpoint_addr_context(source, &foo);
+                mx_get_endpoint_addr_context(source, &peerp);
+                peer = (struct bmx_peer *) peerp;
                 if (peer == NULL) {
                         debug(BMX_DB_PEER, "unknown peer sent message 0x%llx "
                                         "length %u", llu(match), length);
@@ -1967,6 +1971,7 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
         uint32_t                id      = 0;
         uint32_t                tag     = 0;
         struct bmx_peer         *peer   = NULL;
+        void                    *peerp  = &peer;
         mx_return_t             mxret   = MX_SUCCESS;
 
         bmx_parse_match(match_value, &type, &id, &tag);
@@ -2009,10 +2014,8 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                         debug(BMX_DB_ERR, "server receiving CONN_ACK");
                         exit(1);
                 }
-                {
-                        void *foo = &peer;
-                        mx_get_endpoint_addr_context(source, &foo);
-                }
+                mx_get_endpoint_addr_context(source, &peerp);
+                peer = (struct bmx_peer *) peerp;
                 if (peer == NULL) {
                         debug((BMX_DB_CONN|BMX_DB_PEER), "receiving CONN_ACK but "
                                         "the endpoint context does not have a peer");
@@ -2037,8 +2040,9 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                 break;
         case BMX_MSG_UNEXPECTED:
                 if (!bmi_mx->bmx_is_server) {
-                        void *foo = &peer;
-                        mx_get_endpoint_addr_context(source, &foo);
+                        void *peerp = &peer;
+                        mx_get_endpoint_addr_context(source, &peerp);
+                        peer = (struct bmx_peer *) peerp;
                         debug(BMX_DB_ERR, "client receiving unexpected message "
                                 "from %s with mask 0x%llx length %u",
                                 peer == NULL ? "unknown" : peer->mxp_mxmap->mxm_peername,
@@ -2245,8 +2249,9 @@ bmx_handle_conn_req(void)
                                 continue;
                         }
                         {
-                                void *foo = &peer;
-                                mx_get_endpoint_addr_context(status.source, &foo);
+                                void *peerp = &peer;
+                                mx_get_endpoint_addr_context(status.source, &peerp);
+                                peer = (struct bmx_peer *) peerp;
                         }
                         if (peer == NULL) { /* new peer */
                                 int             ret             = 0;
@@ -2863,10 +2868,11 @@ static struct bmi_method_addr *
 BMI_mx_method_addr_lookup(const char *id)
 {
         int                     ret     = 0;
+        int                     len     = 0;
         char                   *host    = NULL;
         uint32_t                board   = 0;
         uint32_t                ep_id   = 0;
-        struct bmi_method_addr     *map     = NULL;
+        struct bmi_method_addr *map     = NULL;
         struct bmx_method_addr *mxmap   = NULL;
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
@@ -2888,7 +2894,8 @@ BMI_mx_method_addr_lookup(const char *id)
                             mxmap->mxm_board == board &&
                             mxmap->mxm_ep_id == ep_id) {
                                 map = peer->mxp_map;
-                                BMX_FREE(host, sizeof(*host));
+                                len = strlen(host);
+                                BMX_FREE(host, len);
                                 break;
                         }
                 }
