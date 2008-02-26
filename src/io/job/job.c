@@ -383,7 +383,8 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ERROR_CODE(errno);
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = size;
@@ -479,7 +480,8 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ERROR_CODE(errno);
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = total_size;
@@ -572,7 +574,8 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-        return (-ENOMEM);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -658,7 +661,8 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-        return (-ENOMEM);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -737,7 +741,8 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     jd = alloc_job_desc(JOB_BMI_UNEXP);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi_unexp.info = bmi_unexp_d;
@@ -764,7 +769,8 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
             /* error testing */
             dealloc_job_desc(jd);
             jd = NULL;
-            return (ret);
+            out_status_p->error_code = ret;
+            return 1;
         }
 
         if (outcount == 1)
@@ -860,7 +866,8 @@ int job_dev_unexp(
     jd = alloc_job_desc(JOB_DEV_UNEXP);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.dev_unexp.info = dev_unexp_d;
@@ -878,7 +885,8 @@ int job_dev_unexp(
             /* error testing */
             dealloc_job_desc(jd);
             jd = NULL;
-            return (ret);
+            out_status_p->error_code = ret;
+            return 1;
         }
 
         if (outcount == 1)
@@ -1032,7 +1040,8 @@ int job_req_sched_post(enum PVFS_server_op op,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.req_sched.post_flag = 1;
@@ -1083,7 +1092,8 @@ int job_req_sched_change_mode(enum PVFS_server_mode mode,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if(!jd)
     {
-        return (errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.req_sched.post_flag = 1;
@@ -1141,7 +1151,8 @@ int job_req_sched_post_timer(int msecs,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1204,7 +1215,8 @@ int job_req_sched_release(job_id_t in_completed_id,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1229,15 +1241,13 @@ int job_req_sched_release(job_id_t in_completed_id,
     dealloc_job_desc(match_jd);
     match_jd = NULL;
 
-    /* NOTE: I am letting the return value propigate here, rather
-     * than just setting the status.  Failure here is bad...
-     */
     if (ret < 0)
     {
         /* error posting */
         dealloc_job_desc(jd);
         jd = NULL;
-        return (ret);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
 
     if (ret == 1)
@@ -1283,7 +1293,8 @@ int job_flow(flow_descriptor * flow_d,
     jd = alloc_job_desc(JOB_FLOW);
     if (!jd)
     {
-        return (-ENOMEM);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.flow.flow_d = flow_d;
@@ -1397,7 +1408,8 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
@@ -1486,7 +1498,8 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1584,7 +1597,8 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
@@ -1673,7 +1687,8 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1761,7 +1776,8 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1842,7 +1858,8 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1930,7 +1947,8 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2017,7 +2035,8 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2105,7 +2124,8 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2186,7 +2206,8 @@ int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2269,7 +2290,8 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2345,7 +2367,8 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2433,7 +2456,8 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2519,7 +2543,8 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2607,7 +2632,8 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2693,7 +2719,8 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2762,7 +2789,8 @@ int job_trove_bstream_validate(PVFS_fs_id coll_id,
                                job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
-    return (-ENOSYS);
+    out_status_p->error_code = -PVFS_ENOSYS;
+    return 1;
 }
 
 /* job_trove_keyval_remove()
@@ -2798,7 +2826,8 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2868,7 +2897,8 @@ int job_trove_keyval_validate(PVFS_fs_id coll_id,
                               job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
-    return (-ENOSYS);
+    out_status_p->error_code = -PVFS_ENOSYS;
+    return 1;
 }
 
 /* job_trove_keyval_iterate()
@@ -2906,7 +2936,8 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2999,7 +3030,8 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -3090,7 +3122,8 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -3182,7 +3215,8 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.handle = PVFS_HANDLE_NULL;
@@ -3269,7 +3303,8 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3351,7 +3386,8 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3469,7 +3505,8 @@ int job_trove_fs_create(char *collname,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3530,7 +3567,8 @@ int job_trove_fs_remove(char *collname,
                         job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
-    return (-ENOSYS);
+    out_status_p->error_code = -PVFS_ENOSYS;
+    return 1;
 }
 
 /* job_trove_fs_lookup()
@@ -3561,7 +3599,8 @@ int job_trove_fs_lookup(char *collname,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3604,7 +3643,8 @@ int job_trove_fs_lookup(char *collname,
     /* there is no way we can test on this if we don't know the coll_id */
     gossip_lerr("Error: trove_collection_lookup() returned 0 ???\n");
 
-    return (-EINVAL);
+    out_status_p->error_code = -PVFS_EINVAL;
+    return 1;
 }
 
 /* job_trove_fs_set_eattr()
@@ -3638,7 +3678,8 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3716,7 +3757,8 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3784,7 +3826,8 @@ int job_null(
     jd = alloc_job_desc(JOB_NULL);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
