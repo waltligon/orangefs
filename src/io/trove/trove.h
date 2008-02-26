@@ -364,6 +364,17 @@ int trove_dspace_create(TROVE_coll_id coll_id,
 			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p);
 
+int trove_dspace_create_list(TROVE_coll_id coll_id,
+			TROVE_handle_extent_array *handle_extent_array,
+                        TROVE_handle *out_handle_array,
+                        int count,
+			TROVE_ds_type type,
+			TROVE_keyval_s *hint,
+			TROVE_ds_flags flags,
+			void *user_ptr,
+			TROVE_context_id context_id,
+			TROVE_op_id *out_op_id_p);
+
 int trove_dspace_remove(TROVE_coll_id coll_id,
 			TROVE_handle handle,
                         TROVE_ds_flags flags,

@@ -247,6 +247,16 @@ struct dbpf_dspace_create_op
     /* hint? */
 };
 
+struct dbpf_dspace_create_list_op
+{
+    TROVE_handle_extent_array extent_array;
+    TROVE_handle *out_handle_array_p;
+    TROVE_ds_type type;
+    int count;
+    /* hint? */
+};
+
+
 /* struct dbpf_dspace_remove_op {}; -- nothing belongs in here */
 
 struct dbpf_dspace_iterate_handles_op
@@ -466,6 +476,7 @@ enum dbpf_op_type
     DSPACE_GETATTR,
     DSPACE_SETATTR,
     DSPACE_GETATTR_LIST,
+    DSPACE_CREATE_LIST,
 };
 
 #define DBPF_OP_DOES_SYNC(__op)    \
@@ -473,6 +484,7 @@ enum dbpf_op_type
      __op == KEYVAL_REMOVE_KEY  || \
      __op == KEYVAL_WRITE_LIST  || \
      __op == DSPACE_CREATE      || \
+     __op == DSPACE_CREATE_LIST || \
      __op == DSPACE_REMOVE      || \
      __op == DSPACE_SETATTR)
 
@@ -515,6 +527,7 @@ struct dbpf_op
          * defined just below the prototypes for the functions.
          */
         struct dbpf_dspace_create_op d_create;
+        struct dbpf_dspace_create_list_op d_create_list;
         struct dbpf_dspace_iterate_handles_op d_iterate_handles;
         struct dbpf_dspace_verify_op d_verify;
         struct dbpf_dspace_getattr_op d_getattr;

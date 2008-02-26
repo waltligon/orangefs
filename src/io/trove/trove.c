@@ -707,6 +707,41 @@ int trove_keyval_get_handle_info(TROVE_coll_id coll_id,
 	out_op_id_p);
 }
 
+/** Initiate creation of multiple new data spaces.
+ */
+int trove_dspace_create_list(
+    TROVE_coll_id coll_id,
+    TROVE_handle_extent_array* handle_extent_array,
+    TROVE_handle* out_handle_array,
+    int count,
+    TROVE_ds_type type,
+    TROVE_keyval_s* hint,
+    TROVE_ds_flags flags,
+    void* user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id* out_op_id_p)
+{
+    TROVE_method_id method_id;
+
+    method_id = global_trove_method_callback(coll_id);
+    if(method_id < 0)
+    {
+	return -TROVE_EINVAL;
+    }
+
+    return dspace_method_table[method_id]->dspace_create_list(
+           coll_id,
+           handle_extent_array,
+           out_handle_array,
+           count,
+           type,
+           hint,
+           flags,
+           user_ptr,
+           context_id,
+           out_op_id_p);
+}
+
 /** Initiate creation of a new data space.
  */
 int trove_dspace_create(

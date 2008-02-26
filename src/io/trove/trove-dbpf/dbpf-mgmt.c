@@ -1905,7 +1905,8 @@ static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
     { DSPACE_ITERATE_HANDLES, "DSPACE_ITERATE_HANDLES" },
     { DSPACE_VERIFY, "DSPACE_VERIFY" },
     { DSPACE_GETATTR, "DSPACE_GETATTR" },
-    { DSPACE_SETATTR, "DSPACE_SETATTR" }
+    { DSPACE_SETATTR, "DSPACE_SETATTR" },
+    { DSPACE_CREATE_LIST, "DSPACE_CREATE_LIST" }
 };
 
 char *dbpf_op_type_to_str(enum dbpf_op_type op_type)
