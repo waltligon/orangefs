@@ -5261,6 +5261,64 @@ static void flow_callback(flow_descriptor* flow_d)
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 
+/* job_precreate_pool_fill_signal_error()
+ *
+ * used for the entity responsible for filling the pool to indicate when
+ * there are errors preventing it from making progress.  The error_code will
+ * be propigated to get_handles() callers that are sleeping if the pool is
+ * empty
+ *
+ * returns 0 on success, 1 on immediate completion, and -PVFS_errno on
+ * failure
+ */
+int job_precreate_pool_fill_signal_error(
+    PVFS_handle precreate_pool,
+    PVFS_fs_id fsid,
+    int error_code,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id)
+{
+    struct job_desc* jd_checker; 
+    struct qlist_head* iterator;
+    struct qlist_head* scratch;
+
+    gossip_debug(GOSSIP_FLOW_DEBUG, "job_precreate_pool_fill_signal_error() called.\n");
+    /* note: this function always processes immediately (returns 1) */
+
+    gen_mutex_lock(&precreate_pool_mutex);
+    /* see if anyone is waiting on pool handles */
+    qlist_for_each_safe(iterator, scratch, &precreate_pool_get_handles_list)
+    {
+        jd_checker = qlist_entry(iterator, struct job_desc,
+            job_desc_q_link);
+
+        qlist_del(&jd_checker->job_desc_q_link);
+
+        gossip_debug(GOSSIP_FLOW_DEBUG, "job_precreate_pool_fill_signal_error() waking up a get_handles() caller.\n");
+        gen_mutex_lock(&completion_mutex);
+
+        /* set job descriptor fields and put into completion queue */
+        jd_checker->u.precreate_pool.error_code = error_code;
+        job_desc_q_add(completion_queue_array[jd_checker->context_id], 
+                       jd_checker);
+        /* set completed flag while holding queue lock */
+        jd_checker->completed_flag = 1;
+
+#ifdef __PVFS2_JOB_THREADED__
+        /* wake up anyone waiting for completion */
+        pthread_cond_signal(&completion_cond);
+#endif
+        gen_mutex_unlock(&completion_mutex);
+    }
+    gen_mutex_unlock(&precreate_pool_mutex);
+
+    out_status_p->error_code = 0;
+    return(1);
+}
+
 /* job_precreate_pool_fill()
  *
  * fills in handles for a precreate pool 

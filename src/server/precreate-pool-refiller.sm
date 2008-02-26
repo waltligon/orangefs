@@ -49,7 +49,13 @@ machine pvfs2_precreate_pool_refiller_sm
         {
                 jump pvfs2_msgpairarray_sm;
                 success => store_handles;
-                default => error_retry;
+                default => msgpair_retry;
+        }
+
+        state msgpair_retry
+        {
+                run msgpair_retry_fn;
+                default => setup_batch_create;
         }
 
         state store_handles
@@ -68,6 +74,28 @@ machine pvfs2_precreate_pool_refiller_sm
 }
 
 %%
+
+/* msgpair_retry_fn()
+ *
+ * handles anything that needs to happen between sets of msgpair retries
+ */
+static PINT_sm_action msgpair_retry_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+
+    /* signal anyone waiting on get_handles() that we are having trouble */
+    return(job_precreate_pool_fill_signal_error(
+        s_op->u.precreate_pool_refiller.pool_handle,
+        s_op->u.precreate_pool_refiller.fsid,
+        js_p->error_code,
+	smcb,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context));
+}
 
 /* wait_for_threshold_fn()
  *
@@ -140,11 +168,7 @@ static PINT_sm_action setup_batch_create_fn(
      */
     s_op->msgarray_params.job_timeout = user_opts->client_job_bmi_timeout;
     s_op->msgarray_params.retry_delay = user_opts->client_retry_delay_ms;
-
-    /* we want to retry forever, though; servers may not be started at the
-     * same time
-     */
-    s_op->msgarray_params.retry_limit = INT_MAX;
+    s_op->msgarray_params.retry_limit = user_opts->client_retry_limit;
     s_op->msgarray_params.quiet_flag = 1;
 
     msg_p->svr_addr = s_op->u.precreate_pool_refiller.host_addr;
