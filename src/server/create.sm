@@ -422,12 +422,6 @@ static PINT_sm_action write_keyvals(
         s_op->key_a, s_op->val_a,
         keyval_count, TROVE_SYNC, NULL, smcb,
         0, js_p, &j_id, server_job_context);
-    if(ret < 0)
-    {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
     return ret;
 }
 
