@@ -53,8 +53,11 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 
 %%
 
+/* this machine launches the main machine below */
+/* mostly here to convert from a server to a client SM frame */
 machine pvfs2_create_file_sm
 {
+    /* all server SMs run prelude for scheduler and security */
     state prelude
     {
         jump pvfs2_prelude_sm;
@@ -64,19 +67,22 @@ machine pvfs2_create_file_sm
 
     state create
     {
+        /* set up for jump to client SM */
         pjmp create_file_setup
         {
-            default => pvfs2_create_file_sm;
+            default => pvfs2_create_file_work_sm;
         }
         default => setup_resp;
     }
 
+    /* copy results back to server SM and prepare resp */
     state setup_resp
     {
         run create_file_resp;
         default => final_response;
     }
 
+    /* send response */
     state final_response
     {
         jump pvfs2_final_response_sm;
@@ -90,6 +96,8 @@ machine pvfs2_create_file_sm
     }
 }
 
+/* This SM was moved here from the client to allow server to */
+/* server collective processing of file create */
 machine pvfs2_create_file_work_sm
 {
     state init
@@ -98,8 +106,11 @@ machine pvfs2_create_file_work_sm
         default => parent_getattr;
     }
 
+    /* send request to Meta server with parent's attribs */
+    /* this could be local */
     state parent_getattr
     {
+        /* this is a client SM for doing a getattr from a server */
         jump pvfs2_server_getattr_sm;
         success => parent_getattr_inspect;
         default => cleanup;
@@ -112,6 +123,8 @@ machine pvfs2_create_file_work_sm
         default => cleanup;
     }
 
+    /* set up to create Metadata for new file */
+    /* this should be local and no need a msgpair */
     state dspace_create_setup_msgpair
     {
         run create_dspace_create_setup_msgpair;
@@ -119,6 +132,7 @@ machine pvfs2_create_file_work_sm
         default => cleanup;
     }
 
+    /* execute request - this state should go away */
     state dspace_create_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
@@ -126,6 +140,9 @@ machine pvfs2_create_file_work_sm
         default => cleanup;
     }
 
+    /* set up to create N datafiles on various servers */
+    /* some of these might be local and should be handled locally */
+    /* this is where the tree-based stuff will go */
     state datafiles_setup_msgpair_array
     {
         run create_datafiles_setup_msgpair_array;
@@ -133,6 +150,7 @@ machine pvfs2_create_file_work_sm
         default => cleanup;
     }
 
+    /* execute messages */
     state datafiles_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
@@ -146,6 +164,8 @@ machine pvfs2_create_file_work_sm
         default => delete_handles_setup_msgpair_array;
     }
 
+    /* write datafile handles to metadata */
+    /* this should be local and not need a msgpair */
     state create_setattr_setup_msgpair
     {
         run create_setattr_setup_msgpair;
@@ -153,6 +173,7 @@ machine pvfs2_create_file_work_sm
         default => cleanup;
     }
 
+    /* this should go away */
     state create_setattr_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
@@ -166,6 +187,7 @@ machine pvfs2_create_file_work_sm
         default => delete_handles_setup_msgpair_array;
     }
 
+    /* set up to create dir entry - could be local */
     state crdirent_setup_msgpair
     {
         run create_crdirent_setup_msgpair;
@@ -173,6 +195,7 @@ machine pvfs2_create_file_work_sm
         default => crdirent_failure;
     }
 
+    /* execute messages */
     state crdirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
@@ -186,6 +209,7 @@ machine pvfs2_create_file_work_sm
         default => delete_handles_setup_msgpair_array;
     }
 
+    /* set up to send message to delete handles in event of failure */
     state delete_handles_setup_msgpair_array
     {
         run create_delete_handles_setup_msgpair_array;
@@ -193,6 +217,7 @@ machine pvfs2_create_file_work_sm
         default => cleanup;
     }
 
+    /* execute messages */
     state delete_handles_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
@@ -209,6 +234,12 @@ machine pvfs2_create_file_work_sm
 
 %%
 
+/* action files for the main SM */
+
+/* In this function transfer arguments from the request to the struct */
+/* in the client SM - set all other values in client SM, create a push */
+/* stack frame */
+
 static PINT_sm_action create_file_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -216,12 +247,17 @@ static PINT_sm_action create_file_setup(
     return (SM_ACTION_COMPLETE);
 }
 
+/* the one thing that returns from the create file is an object handle
+ * copy back to server SM and set up response */
+
 static PINT_sm_action create_file_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     return (SM_ACTION_COMPLETE);
 }
+
+/* free anything hanging around */
 
 static PINT_sm_action create_file_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -292,7 +328,7 @@ PVFS_error PVFS_isys_create(
         return -PVFS_ENOMEM;
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
+/* this will go to create_file_setup */
     PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.create.object_name = object_name;
@@ -303,6 +339,7 @@ PVFS_error PVFS_isys_create(
     sm_p->u.create.retry_count = 0;
     sm_p->parent_ref = parent_ref;
 
+/* this should be left on the client */
     /* copy layout to sm struct */
     if(layout)
     {
@@ -328,6 +365,7 @@ PVFS_error PVFS_isys_create(
 
     sm_p->object_ref = parent_ref;
 
+/* this should be left on the client and passed with request */
     /* If the user specifies a distribution use that
        else, use the default distribution */
     if (dist)
@@ -357,6 +395,7 @@ PVFS_error PVFS_isys_create(
         }
     }
 
+/* this should be in a field in the request - done on client */
     /* If an application hint has been provided, use that to request dfile
        else, if a tabfile hint has been provided, use that instead*/
     num_dfiles_req = 0;
@@ -558,6 +597,12 @@ static int create_delete_handles_comp_fn(void *v_p,
     return resp_p->status;
 }
 
+/* check to be sure everything referenced off off sm_p is either set */
+/* in the main machine, or generated in one of these state actions */
+
+/* this is the metafile create - should be all local */
+/* we either need to get code from set_attr or call a */
+/* nested state machine */
 static PINT_sm_action create_dspace_create_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -606,7 +651,7 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
-        PVFS_TYPE_METAFILE,
+        PVFS_TYPE_METAFILE,     /* This is the metafile create */
         meta_handle_extent_array);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
@@ -617,6 +662,10 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
+/* sets up an array to create N datafiles */
+/* some of these might be local and should be */
+/* handled differently  - this will e re-written */
+/* to do tree-based collective communication */
 static PINT_sm_action create_datafiles_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -708,7 +757,7 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
-            PVFS_TYPE_DATAFILE,
+            PVFS_TYPE_DATAFILE,     /* this creates a datafile */
             sm_p->u.create.io_handle_extent_array[i]);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,  "posting datafile[%d] create "
@@ -739,6 +788,7 @@ static PINT_sm_action create_datafiles_failure(
     return SM_ACTION_COMPLETE;
 }
 
+/* this writes metadata to the metafile - this should now be local */
 static PINT_sm_action create_setattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -800,6 +850,7 @@ static PINT_sm_action create_setattr_failure(
     return SM_ACTION_COMPLETE;
 }
 
+/* this creates a directory entry - this may or may not be local */
 static PINT_sm_action create_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -1212,6 +1263,7 @@ static PINT_sm_action create_parent_getattr_inspect(
     return SM_ACTION_COMPLETE;
 }
 
+/* this function shouldn't be needed here at all */
 /**
  * Returns the default distribution, or NULL if the distribution could not
  * be created.  The default distribution is read from the server
