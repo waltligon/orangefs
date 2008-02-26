@@ -400,7 +400,13 @@ struct PINT_server_eattr_op
 {
     void *buffer;
 };
-    
+
+struct PINT_server_unstuff_op
+{
+    enum PVFS_sys_layout_algorithm algorithm;
+    int num_dfiles_req;
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -487,6 +493,7 @@ typedef struct PINT_server_op
             precreate_pool_refiller;
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
+        struct PINT_server_unstuff_op unstuff;
     } u;
 
 } PINT_server_op;
