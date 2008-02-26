@@ -64,11 +64,11 @@ struct precreate_pool_desc
     int trove_pending;
     int low_threshold;
     void* data;
+    int first_callback_flag;
 
     /* TODO: does this make the job descriptor too big? */
     TROVE_keyval_s key_array[PRECREATE_POOL_MAX_KEYS];
 
-    TROVE_op_id id;
     
     PVFS_error error_code;
 };

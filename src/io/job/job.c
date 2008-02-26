@@ -2112,6 +2112,7 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
+    gossip_debug(GOSSIP_JOB_DEBUG, "job_trove_keyval_write_list() posting trove_keyval_write_list()\n");
     ret = trove_keyval_write_list(coll_id, handle,
                              key_array, val_array,
                              count, flags,
@@ -4465,6 +4466,7 @@ static void precreate_pool_fill_thread_mgr_callback(
     struct precreate_pool* pool;
     int awoken_count = 0;
     QLIST_HEAD(tmp_list);
+    job_id_t tmp_id;
 
     assert(jd);
 
@@ -4496,12 +4498,15 @@ static void precreate_pool_fill_thread_mgr_callback(
         return;
     }
 
-    if(jd->u.precreate_pool.id == PVFS_OP_NULL)
+    if(jd->u.precreate_pool.first_callback_flag == 1)
     {
         /* this is the first post */
+        gossip_debug(GOSSIP_JOB_DEBUG, "precreate_pool_fill_thread_mgr_callback() first post.\n");
+        jd->u.precreate_pool.first_callback_flag = 0;
     }
     else
     {
+        gossip_debug(GOSSIP_JOB_DEBUG, "precreate_pool_fill_thread_mgr_callback() completed trove op.\n");
         /* a trove operation completed successfully */
         jd->u.precreate_pool.precreate_handle_index += 
             jd->u.precreate_pool.posted_count;
@@ -4520,6 +4525,10 @@ static void precreate_pool_fill_thread_mgr_callback(
                 pool->fsid == jd->u.precreate_pool.fsid)
             {
                 pool->pool_count += jd->u.precreate_pool.posted_count;
+                gossip_debug(GOSSIP_JOB_DEBUG, 
+                    "Pool count for handle %llu incremented to %d\n", 
+                    llu(pool->pool_handle), 
+                    pool->pool_count);
                 break;
             }
         }
@@ -4594,7 +4603,7 @@ static void precreate_pool_fill_thread_mgr_callback(
     }
 
     jd->u.precreate_pool.posted_count = count;
-
+    gossip_debug(GOSSIP_JOB_DEBUG, "job_precreate_pool_fill() posting trove_keyval_write_list()\n");
     ret = trove_keyval_write_list(jd->u.precreate_pool.fsid, 
                             jd->u.precreate_pool.precreate_pool,
                             jd->u.precreate_pool.key_array, 
@@ -4605,7 +4614,7 @@ static void precreate_pool_fill_thread_mgr_callback(
                             NULL, 
                             &jd->trove_callback, 
                             global_trove_context,
-                            &(jd->u.precreate_pool.id));
+                            &tmp_id);
     
     trove_pending_count++;
 
@@ -4627,14 +4636,14 @@ static void precreate_pool_fill_thread_mgr_callback(
         gen_mutex_unlock(&completion_mutex);
         return;
     }
-
-    if(ret == 1)
+    else if(ret == 1)
     {
-        /* make up an id so that the callback thinks of this as an async
-         * completion
-         */
-        jd->u.precreate_pool.id = 1;
+        gossip_debug(GOSSIP_JOB_DEBUG, "trove_keyval_write_list() immediate completion\n");
         precreate_pool_fill_thread_mgr_callback(jd, 0);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_JOB_DEBUG, "trove_keyval_write_list() returned zero\n");
     }
 
     return;
@@ -5219,6 +5228,8 @@ int job_precreate_pool_fill(
 {
     struct job_desc *jd = NULL;
 
+    gossip_debug(GOSSIP_JOB_DEBUG, "job_precreate_pool_fill() called.\n");
+
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store information
      */
@@ -5236,7 +5247,7 @@ int job_precreate_pool_fill(
     jd->u.precreate_pool.precreate_handle_array = precreate_handle_array;
     jd->u.precreate_pool.precreate_handle_count = precreate_handle_count;
     jd->u.precreate_pool.precreate_handle_index = 0;
-    jd->u.precreate_pool.id = PVFS_OP_NULL;
+    jd->u.precreate_pool.first_callback_flag = 1;
     jd->u.precreate_pool.fsid = fsid;
 
     /* reuse the logic for trove op completion to get this started */
@@ -5275,6 +5286,10 @@ int job_precreate_pool_register_server(
     tmp_pool->fsid = fsid;
     tmp_pool->pool_handle = pool_handle;
     tmp_pool->pool_count = count;
+    gossip_debug(GOSSIP_JOB_DEBUG, 
+        "Pool count for handle %llu initially set to %d\n", 
+        llu(tmp_pool->pool_handle), 
+        tmp_pool->pool_count);
 
     gossip_debug(GOSSIP_JOB_DEBUG,
         "Initial pool count for host %s, fsid %d: %d\n", host, (int)fsid,
@@ -5408,7 +5423,6 @@ int job_precreate_pool_get_handles(
     jd->u.precreate_pool.precreate_handle_array = handle_array;
     jd->u.precreate_pool.precreate_handle_count = count;
     jd->u.precreate_pool.precreate_handle_index = 0;
-    jd->u.precreate_pool.id = PVFS_OP_NULL;
     jd->u.precreate_pool.fsid = fsid;
     jd->u.precreate_pool.servers = servers;
     jd->u.precreate_pool.trove_pending = 0;
@@ -5559,6 +5573,10 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
     { 
         /* go ahead and decrement count to avoid races with other consumers */
         tmp_trove_array[i].pool->pool_count--;
+        gossip_debug(GOSSIP_JOB_DEBUG, 
+            "Pool count for handle %llu decremented to %d\n", 
+            llu(tmp_trove_array[i].pool->pool_handle), 
+            tmp_trove_array[i].pool->pool_count);
 
         /* is anyone waiting to check the count of this pool? */
         if(!qlist_empty(&precreate_pool_check_level_list))
