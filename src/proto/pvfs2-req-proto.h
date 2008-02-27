@@ -190,6 +190,11 @@ endecode_fields_1_struct(
 /* create_file ************************************************/
 /* - A server-to-server collective file create */
 
+/* add/remove to/from this struct as needed to pass arguments in */
+/* to the state machine.  Remove object_type, add parent_handle */
+/* add info from set_attr for standard metadata, distribution */
+/* etc.  Add num_datafiles. Expand extent_array to cover for each */
+/* datafile, add file name (see crdirent) */
 struct PVFS_servreq_create_file
 {
     PVFS_fs_id fs_id;
@@ -228,6 +233,8 @@ do {                                                   \
         (__ext_array).extent_array;                    \
 } while (0)
 
+/* add as needed for all return values - return attributes */
+/* as in get_attr, including datafile handles */
 struct PVFS_servresp_create_file
 {
     PVFS_handle handle;

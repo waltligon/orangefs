@@ -34,6 +34,7 @@ enum
     CREATE_RETRY = 170
 };
 
+/* Won't need all of these - only one for the one request */
 /* completion function prototypes */
 static int create_create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -170,6 +171,10 @@ machine pvfs2_client_create_file_sm
 
 %%
 
+/* will need to edit proto struct to pass these arguments in */
+/* an internal form - see constituent requests to determine */
+/* proto format - create, set_attr, crdirent should have relevant */
+/* formats for object_name, parent_ref, attr, dist, layout */
 /** Initiate creation of a file with a specified distribution.
  */
 PVFS_error PVFS_isys_create_file(
@@ -231,6 +236,8 @@ PVFS_error PVFS_isys_create_file(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+/* edit this to set up the create-file request */
+/* this should be the main changes in this routine */
     PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.create.object_name = object_name;
@@ -399,6 +406,7 @@ static PINT_sm_action create_init(
             pint_client_sm_context);
     }
 
+/* here you set up the proto struct getting ready to send */
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
@@ -409,6 +417,8 @@ static PINT_sm_action create_init(
    return SM_ACTION_COMPLETE;
 }
 
+/* you will only need one completion function for the one request sent
+ * */
 static int create_create_comp_fn(void *v_p,
                                  struct PVFS_server_resp *resp_p,
                                  int index)
@@ -435,6 +445,7 @@ static int create_create_comp_fn(void *v_p,
     return 0;
 }
 
+/* get rid of these */
 static int create_datafiles_comp_fn(void *v_p,
                                     struct PVFS_server_resp *resp_p,
                                     int index)
@@ -482,6 +493,7 @@ static int create_datafiles_comp_fn(void *v_p,
     return 0;
 }
 
+/* get rid of this */
 static int create_setattr_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)
@@ -507,6 +519,7 @@ static int create_setattr_comp_fn(void *v_p,
     return resp_p->status;
 }
 
+/* get rid of this */
 static int create_crdirent_comp_fn(void *v_p,
                                    struct PVFS_server_resp *resp_p,
                                    int index)
@@ -517,6 +530,7 @@ static int create_crdirent_comp_fn(void *v_p,
     return resp_p->status;
 }
 
+/* get rid of this */
 static int create_delete_handles_comp_fn(void *v_p,
                                          struct PVFS_server_resp *resp_p,
                                          int index)
@@ -533,6 +547,7 @@ static int create_delete_handles_comp_fn(void *v_p,
     return resp_p->status;
 }
 
+/* get rid of this */
 static PINT_sm_action create_dspace_create_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -592,6 +607,7 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
+/* get rid of this */
 static PINT_sm_action create_datafiles_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -703,6 +719,7 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
     return SM_ACTION_COMPLETE;
 }
 
+/* get rid of this */
 static PINT_sm_action create_datafiles_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -714,6 +731,7 @@ static PINT_sm_action create_datafiles_failure(
     return SM_ACTION_COMPLETE;
 }
 
+/* get rid of this */
 static PINT_sm_action create_setattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -764,6 +782,7 @@ static PINT_sm_action create_setattr_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
+/* ought to keep one failure function - this is a good template */
 static PINT_sm_action create_setattr_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -775,6 +794,7 @@ static PINT_sm_action create_setattr_failure(
     return SM_ACTION_COMPLETE;
 }
 
+/* get rid of this */
 static PINT_sm_action create_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -821,6 +841,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
+/* get rid of this */
 static PINT_sm_action create_crdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -837,6 +858,7 @@ static PINT_sm_action create_crdirent_failure(
     return SM_ACTION_COMPLETE;
 }
 
+/* get rid of this */
 /* delete the newly created meta and data handles */
 static PINT_sm_action create_delete_handles_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -946,6 +968,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     return SM_ACTION_COMPLETE;
 }
 
+/* you need a cleanup function - use this as a template */
 static PINT_sm_action create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
