@@ -2965,7 +2965,19 @@ BMI_mx_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
                 break;
         case BMX_CTX_PENDING:
                 if (ctx->mxc_type == BMX_REQ_TX) {
-                        bmx_peer_disconnect(peer, 1, BMI_ENETRESET);
+                        /* see if it completed first */
+                        mx_test(bmi_mx->bmx_ep, &ctx->mxc_mxreq, &ctx->mxc_mxstat, &result);
+                        if (result == 1) {
+                                debug(BMX_DB_CTX, "%s completed TX op_id %llu "
+                                      "mxc_state %d peer state %d status.code %s",
+                                      __func__, llu(ctx->mxc_mop->op_id), ctx->mxc_state, 
+                                      peer->mxp_state, mx_strstatus(ctx->mxc_mxstat.code));
+                                bmx_deq_pending_ctx(ctx);
+                                bmx_q_canceled_ctx(ctx,  BMI_ECANCEL);
+                        } else {
+                                /* and if not, then disconnect() */
+                                bmx_peer_disconnect(peer, 1, BMI_ENETRESET);
+                        }
                 } else { /* BMX_REQ_RX */
                         mx_cancel(bmi_mx->bmx_ep, &ctx->mxc_mxreq, &result);
                         if (result == 1) {
