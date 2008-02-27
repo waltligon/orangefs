@@ -11397,7 +11397,7 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-		{ echo "$as_me:$LINENO: checking if kernel has device classes" >&5
+	                        	{ echo "$as_me:$LINENO: checking if kernel has device classes" >&5
 echo $ECHO_N "checking if kernel has device classes... $ECHO_C" >&6; }
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
@@ -11413,7 +11413,7 @@ int
 main ()
 {
 
-	    class_create(NULL, "pvfs2")
+	    class_device_destroy(NULL, "pvfs2")
 
   ;
   return 0;
@@ -17031,7 +17031,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT
+#define HAVE_GETMNTENT 1
 _ACEOF
 
 else

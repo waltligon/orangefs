@@ -845,15 +845,18 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 
 	dnl old linux kernels do not have class_create and related functions
+        dnl
+        dnl check for class_device_destroy() to weed out RHEL4 kernels that
+        dnl have some class functions but not others
 	AC_MSG_CHECKING(if kernel has device classes)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/device.h>
 	], [
-	    class_create(NULL, "pvfs2")
+	    class_device_destroy(NULL, "pvfs2")
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_KERNEL_DEVICE_CLASSES, 1, Define if kernel lacks device classes),
+	AC_DEFINE(HAVE_KERNEL_DEVICE_CLASSES, 1, Define if kernel has device classes),
 	AC_MSG_RESULT(no)
 	)
 

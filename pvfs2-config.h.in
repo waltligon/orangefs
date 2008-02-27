@@ -156,7 +156,7 @@
 /* Define if kernel has i_size_write */
 #undef HAVE_I_SIZE_WRITE
 
-/* Define if kernel lacks device classes */
+/* Define if kernel has device classes */
 #undef HAVE_KERNEL_DEVICE_CLASSES
 
 /* Define if kernel kmem_cache_create constructor has new-style two-parameter
