@@ -13,8 +13,6 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-#define ALL_DONE 100
-
 %%
 
 machine pvfs2_batch_create_sm
@@ -22,13 +20,6 @@ machine pvfs2_batch_create_sm
     state prelude
     {
         jump pvfs2_prelude_sm;
-        success => create_prepare;
-        default => final_response;
-    }
-
-    state create_prepare
-    {
-        run batch_create_create_prepare;
         success => create;
         default => final_response;
     }
@@ -36,33 +27,6 @@ machine pvfs2_batch_create_sm
     state create
     {
         run batch_create_create;
-        default => create_looper;
-    }
-
-    state create_looper
-    {
-        run batch_create_create_looper;
-        success => create;
-        ALL_DONE => create_looper_finish;
-        default => remove;
-    }
-
-    state remove
-    {
-        run batch_create_remove;
-        default => remove_looper;
-    }
-
-    state remove_looper
-    {
-        run batch_create_remove_looper;
-        success => remove;
-        default => final_response;
-    }
-
-    state create_looper_finish
-    {
-        run batch_create_create_looper_finish;
         default => final_response;
     }
 
@@ -81,106 +45,6 @@ machine pvfs2_batch_create_sm
 
 %%
 
-/*
- * Function: batch_create_remove_looper
- *
- * Params:   server_op *s_op, 
- *           job_status_s* js_p
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: loop over create operations.
- */
-static int batch_create_remove_looper(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1;
-
-    if(js_p->error_code)
-    {
-        /* hrm.  A remove failed, but we want to report the original error
-         * code that led to this.
-         */
-        gossip_err("Warning: failed cleanup from batch_create().\n");
-        gossip_err("Warning: stranded handles may result.\n");
-        if(s_op->u.batch_create.saved_error_code)
-        {
-            js_p->error_code = s_op->u.batch_create.saved_error_code;
-        }
-        return(SM_ACTION_COMPLETE);
-    }
-
-    s_op->u.batch_create.batch_index--;
-
-    if(s_op->u.batch_create.batch_index > 0)
-    {
-        /* more work to do */
-        js_p->error_code = 0;
-        ret = SM_ACTION_COMPLETE; 
-    }
-    else
-    {
-        /* done cleaning up objects, report original create error */
-        js_p->error_code = s_op->u.batch_create.saved_error_code;;
-        ret = SM_ACTION_COMPLETE;
-    }
-
-    return(ret);
-}
-
-
-/*
- * Function: batch_create_create_looper
- *
- * Params:   server_op *s_op, 
- *           job_status_s* js_p
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: loop over create operations.
- */
-static int batch_create_create_looper(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1;
-
-    if(js_p->error_code)
-    {
-        s_op->u.batch_create.saved_error_code = js_p->error_code;
-        return(SM_ACTION_COMPLETE);
-    }
-
-    s_op->resp.u.batch_create.handle_array[s_op->u.batch_create.batch_index] =
-        js_p->handle;
-    s_op->u.batch_create.batch_index++;
-    s_op->resp.u.batch_create.handle_count++;
-
-    if(s_op->u.batch_create.batch_index < 
-        s_op->req->u.batch_create.object_count)
-    {
-        /* more work to do */
-        js_p->error_code = 0;
-        ret = SM_ACTION_COMPLETE; 
-    }
-    else
-    {
-        /* done creating objects */
-        js_p->error_code = ALL_DONE;
-        ret = SM_ACTION_COMPLETE;
-    }
-
-    return(ret);
-}
 
 /*
  * Function: batch_create_create
@@ -203,9 +67,29 @@ static int batch_create_create(
     int ret = -1;
     job_id_t i;
 
-    ret = job_trove_dspace_create(
+    if(s_op->req->u.batch_create.object_count < 1)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return(SM_ACTION_COMPLETE);
+    }
+
+    s_op->resp.u.batch_create.handle_count 
+        = s_op->req->u.batch_create.object_count;
+
+    /* allocate some space to hold the handles we create */
+    s_op->resp.u.batch_create.handle_array = 
+        malloc(s_op->req->u.batch_create.object_count * sizeof(PVFS_handle));
+    if(!s_op->resp.u.batch_create.handle_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return(SM_ACTION_COMPLETE);
+    }
+
+    ret = job_trove_dspace_create_list(
         s_op->req->u.batch_create.fs_id,
         &s_op->req->u.batch_create.handle_extent_array,
+        s_op->resp.u.batch_create.handle_array,
+        s_op->req->u.batch_create.object_count,
         s_op->req->u.batch_create.object_type,
         NULL,
         TROVE_SYNC,
@@ -217,96 +101,6 @@ static int batch_create_create(
 
      return(ret);
 }
-
-/*
- * Function: batch_create_remove
- *
- * Params:   server_op *s_op, 
- *           job_status_s* js_p
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: Remove a dataspace (cleanup after error).
- */
-static int batch_create_remove(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1;
-    job_id_t i;
-
-    if(s_op->u.batch_create.batch_index < 1)
-    {
-        /* nothing to clean up */
-        js_p->error_code = 0;
-        return(SM_ACTION_COMPLETE);
-    }
-
-    /* work backwards through the handle array created so far */
-    ret = job_trove_dspace_remove(
-        s_op->req->u.batch_create.fs_id,
-        s_op->resp.u.batch_create.handle_array[
-            s_op->u.batch_create.batch_index],
-        TROVE_SYNC,
-        smcb,
-        0,
-        js_p,
-        &i,
-        server_job_context);
-
-    return(ret);
-}
-
-
-/* batch_create_create_looper_finish()
- *
- * fills in the response structure based on results of previous operation
- */
-static int batch_create_create_looper_finish(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    /* the sole purpose of this state is to clear out the special "ALL_DONE"
-     * error code if we are successful
-     */
-    assert(js_p->error_code == ALL_DONE);
-
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
-}
-
-
-/* batch_create_create_prepare()
- *
- * fills in the response structure based on results of previous operation
- */
-static int batch_create_create_prepare(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    if(s_op->req->u.batch_create.object_count < 1)
-    {
-        js_p->error_code = -PVFS_EINVAL;
-        return(SM_ACTION_COMPLETE);
-    }
-
-    /* allocate some space to hold the handles we create */
-    s_op->resp.u.batch_create.handle_array = 
-        malloc(s_op->req->u.batch_create.object_count * sizeof(PVFS_handle));
-    if(!s_op->resp.u.batch_create.handle_array)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return(SM_ACTION_COMPLETE);
-    }
-
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
-}
-
 
 /*
  * Function: batch_create_cleanup
@@ -327,6 +121,17 @@ static int batch_create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
+
+    if(s_op->resp.status == 0)
+    {
+        for(i=0; i<s_op->resp.u.batch_create.handle_count; i++)
+        {
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG, "Batch created: %llu\n",
+                llu(s_op->resp.u.batch_create.handle_array[i]));
+        }
+    }
 
     if(s_op->resp.u.batch_create.handle_array)
     {

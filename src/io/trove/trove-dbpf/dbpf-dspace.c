@@ -541,8 +541,9 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
                         1, PINT_PERF_SUB);
 
         op_p->u.d_create_list.out_handle_array_p[i] = new_handle;
-        return DBPF_OP_COMPLETE;
     }
+
+    return DBPF_OP_COMPLETE;
 
 return_error:
 
