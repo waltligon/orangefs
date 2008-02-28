@@ -697,6 +697,8 @@ static PINT_sm_action getattr_read_stuffed_size(
 
     if(js_p->error_code == -TROVE_ENOENT)
     {
+        gossip_debug(
+            GOSSIP_GETATTR_DEBUG, "Getattr detected non-stuffed file.\n");
         /* this means that the keyval fields used to indicate a file is
          * stuffed are not present.  Clear mask accordingly and continue.
          */
@@ -705,6 +707,8 @@ static PINT_sm_action getattr_read_stuffed_size(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_debug(
+        GOSSIP_GETATTR_DEBUG, "Getattr detected stuffed file.\n");
     /* otherwise, we found keyval fields indicating that the file is
      * stuffed.  It does not matter if the client asked for the size or not;
      * we must retrieve a valid stuffed_size value for the attrs.
