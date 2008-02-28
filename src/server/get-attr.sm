@@ -89,8 +89,7 @@ nested machine pvfs2_get_attr_work_sm
     state read_metafile_distribution_if_required
     {
         run getattr_read_metafile_distribution_if_required;
-        success => interpret_metafile_distribution;
-        default => setup_resp;
+        default => interpret_metafile_distribution;
     }
 
     state interpret_metafile_distribution
@@ -752,6 +751,15 @@ static PINT_sm_action interpret_metafile_distribution(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
+    
+    if(js_p->error_code < 0)
+    {
+        if(s_op->val.buffer)
+        {
+            free(s_op->val.buffer);
+        }
+        return SM_ACTION_COMPLETE;
+    }
 
     assert(s_op->val.buffer);
     PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
@@ -785,10 +793,6 @@ static PINT_sm_action getattr_setup_resp(
     }
     if(js_p->error_code < 0)
     {
-        if(s_op->val.buffer)
-        {
-            free(s_op->val.buffer);
-        }
         return SM_ACTION_COMPLETE;
     }
 
