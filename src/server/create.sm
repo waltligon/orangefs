@@ -326,24 +326,23 @@ static PINT_sm_action setup_stuffed_datafile_handle(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_handle *harray;
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "Stuffed metafile handle created: %llu\n",
         llu(js_p->handle));
     assert(js_p->error_code == 0);
 
-    harray = malloc(sizeof(PVFS_handle));
-    if(!harray)
+    s_op->resp.u.create.datafile_handles = malloc(sizeof(PVFS_handle));
+    if(!s_op->resp.u.create.datafile_handles)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-    harray[0] = js_p->handle;
-
-    s_op->resp.u.create.datafile_handles = harray;
+    s_op->req->u.create.attr.u.meta.dfile_count = 1;
     s_op->resp.u.create.datafile_count = 1;
+    s_op->resp.u.create.datafile_handles[0] = js_p->handle;
+
     return SM_ACTION_COMPLETE;
 }
 
