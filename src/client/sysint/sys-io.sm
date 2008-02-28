@@ -2809,6 +2809,44 @@ static void io_contexts_destroy(PINT_client_sm *sm_p)
     sm_p->u.io.context_count = 0;
 }
 
+/* check_if_unstuff_needed()
+ *
+ * looks at the I/O pattern requested and compares against the distribution
+ * to determine if a stuffed file would have to be "unstuffed" in order to
+ * service the request
+ *
+ * returns 0 and fills in unstuff_flag if successful.  Returns -PVFS_errno
+ * on failure.
+ */
+static int check_if_unstuff_needed(
+    PVFS_Request mem_req,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PINT_dist *dist_p,
+    uint32_t mask,
+    int* unstuff_flag)
+{
+
+    /* TODO: fill this in */
+
+    /* look at inverted UNSTUFFED mask field to see if we are already
+     * unstuffed
+     */
+
+    /* calculate highest offset in I/O request */
+
+    /* use next_mapped_offset() to determine what the first offset is that
+     * leaves server 0 (pass in arguments for a 2 server setup,
+     * logical_offset 0, and server_nr 1)
+     */
+
+    /* compare highest offset in I/O request to first offset that leaves
+     * server 0 to determine if we need to unstuff the file
+     */
+
+    return(-PVFS_ENOSYS);
+}
+
 /*
  * Local variables:
  *  mode: c
