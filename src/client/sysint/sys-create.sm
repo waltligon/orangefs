@@ -645,8 +645,16 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.datafile_handles = NULL;
         sm_p->u.create.datafile_count = 0;
 
-        sm_p->u.create.attr.mask |= PVFS_ATTR_META_STUFFED_SIZE;
-        sm_p->u.create.attr.u.meta.stuffed_size = 0;
+        if(sm_p->u.create.stuffed)
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "created stuffed file\n");
+            sm_p->u.create.attr.u.meta.stuffed_size = 0;
+        }
+        else
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "created un-stuffed file\n");
+            sm_p->u.create.attr.mask |= PVFS_ATTR_META_UNSTUFFED;
+        }
 
         /* we only insert a cache entry if the entire create succeeds,
          * i.e. crdirent succeeded.  set size to 0 */

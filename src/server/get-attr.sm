@@ -697,9 +697,9 @@ static PINT_sm_action getattr_read_stuffed_size(
         gossip_debug(
             GOSSIP_GETATTR_DEBUG, "Getattr detected non-stuffed file.\n");
         /* this means that the keyval fields used to indicate a file is
-         * stuffed are not present.  Clear mask accordingly and continue.
+         * stuffed are not present.  Set mask accordingly and continue.
          */
-        s_op->resp.u.getattr.attr.mask &= (~(PVFS_ATTR_META_STUFFED_SIZE));
+        s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_UNSTUFFED;
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -716,7 +716,7 @@ static PINT_sm_action getattr_read_stuffed_size(
      * stuffed.  It does not matter if the client asked for the size or not;
      * we must retrieve a valid stuffed_size value for the attrs.
      */
-    s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_STUFFED_SIZE;
+    s_op->resp.u.getattr.attr.mask &= (~(PVFS_ATTR_META_UNSTUFFED));
 
     return(job_trove_dspace_getattr(
         s_op->req->u.getattr.fs_id,

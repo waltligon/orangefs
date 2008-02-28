@@ -357,7 +357,7 @@ static PINT_sm_action getattr_acache_lookup(
     if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE)
     {
         trimmed_mask &= (PVFS_ATTR_META_ALL |
-                         PVFS_ATTR_META_STUFFED_SIZE |
+                         PVFS_ATTR_META_UNSTUFFED |
                          PVFS_ATTR_DATA_SIZE |
                          PVFS_ATTR_COMMON_ALL);
     }
