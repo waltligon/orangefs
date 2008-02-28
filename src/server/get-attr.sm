@@ -102,9 +102,7 @@ nested machine pvfs2_get_attr_work_sm
     state detect_stuffed
     {
         run getattr_detect_stuffed;
-        success => read_stuffed_size;
-        TROVE_ENOENT => read_stuffed_size;
-        default => setup_resp;
+        default => read_stuffed_size;
     }
 
     state read_stuffed_size
@@ -703,6 +701,12 @@ static PINT_sm_action getattr_read_stuffed_size(
          */
         s_op->resp.u.getattr.attr.mask &= (~(PVFS_ATTR_META_STUFFED_SIZE));
         js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+    if(js_p->error_code)
+    {
+        /* any other error code here is just a normal error case */
+        /* preserve error code and catch next error transition */
         return SM_ACTION_COMPLETE;
     }
 
