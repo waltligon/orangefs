@@ -121,6 +121,16 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 src->u.dir.dirent_count;
         }
 
+        if((src->objtype == PVFS_TYPE_DATAFILE) &&
+            (!(src->mask & PVFS_ATTR_META_UNSTUFFED)))
+        {
+            /* if this is a metafile, and does _not_ appear to be stuffed,
+             * then we should propigate the stuffed_size
+             */
+            dest->u.meta.stuffed_size = 
+                src->u.meta.stuffed_size;
+        }
+
         if (src->mask & PVFS_ATTR_DIR_HINT)
         {
             dest->u.dir.hint.dfile_count = 

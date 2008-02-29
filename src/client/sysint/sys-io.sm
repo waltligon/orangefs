@@ -2933,7 +2933,6 @@ static int unstuff_comp_fn(
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_size tmp_size = 0;
 
     gossip_debug(GOSSIP_IO_DEBUG,
 		"unstuff completion fn: unstuff_comp_fn\n");
@@ -2950,14 +2949,10 @@ static int unstuff_comp_fn(
     }
 
     assert(resp_p->op == PVFS_SERV_UNSTUFF);
-
-    /* stuffed size is not the same integer type as PVFS_size, convert here */
-    tmp_size += resp_p->u.unstuff.attr.u.meta.stuffed_size;
     
-    /* TODO: don't I need to convert something here? */
     PINT_acache_update(sm_p->object_ref,
         &resp_p->u.unstuff.attr,
-        &tmp_size);
+        NULL);
 
     return(0);
 }

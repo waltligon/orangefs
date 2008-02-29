@@ -1652,6 +1652,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     {
         sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
     }
+
+    /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
+     * outside of the system interface
+     */
     return sys_mask;
 }
 
