@@ -81,8 +81,7 @@ machine pvfs2_unstuff_sm
     state setup_resp
     {
         run setup_resp;
-        success => final_response;
-        default => cleanup;
+        default => final_response;
     }
 
     state final_response
@@ -140,6 +139,7 @@ static PINT_sm_action get_keyvals(
     }
     memset(s_op->free_a, 0, sizeof(*s_op->free_a) * s_op->keyval_count);
 
+    /* kind = 0 */
     s_op->key_a[kind].buffer = Trove_Common_Keys[METAFILE_LAYOUT_KEY].key;
     s_op->key_a[kind].buffer_sz = Trove_Common_Keys[METAFILE_LAYOUT_KEY].size;
 
@@ -147,6 +147,7 @@ static PINT_sm_action get_keyvals(
     s_op->val_a[kind].buffer_sz = sizeof(s_op->u.unstuff.algorithm);
 
     ++kind;
+    /* kind = 1 */
     s_op->key_a[kind].buffer = Trove_Common_Keys[NUM_DFILES_REQ_KEY].key;
     s_op->key_a[kind].buffer_sz = Trove_Common_Keys[NUM_DFILES_REQ_KEY].size;
 
@@ -154,9 +155,15 @@ static PINT_sm_action get_keyvals(
     s_op->val_a[kind].buffer_sz = sizeof(s_op->u.unstuff.num_dfiles_req);
 
     ++kind;
+    /* kind = 3 */
     s_op->key_a[kind].buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key_a[kind].buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
 
+    /* TODO: does meta.dfile_count know how many handles we have stored here?  
+     * I think it may be 1 if the file is stuffed... 
+     */
+    /* TODO: should dfile_array pointer be aimed at meta.dfile_array?
+     */
     dfile_array = malloc(sizeof(*dfile_array) * s_op->attr.u.meta.dfile_count);
     if(!dfile_array)
     {
@@ -165,9 +172,12 @@ static PINT_sm_action get_keyvals(
     }
 
     s_op->val_a[kind].buffer = dfile_array;
+    s_op->val_a[kind].buffer_sz = 
+        sizeof(*dfile_array) * s_op->attr.u.meta.dfile_count;
     s_op->free_a[kind] = 1;
 
     ++kind;
+    /* kind = 4 */
     s_op->key_a[kind].buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key_a[kind].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
 
@@ -180,6 +190,9 @@ static PINT_sm_action get_keyvals(
     }
     s_op->free_a[kind] = 1;
     s_op->attr.u.meta.dist = s_op->val_a[kind].buffer;
+    /* TODO: should we mark free_a for dfile_array and dist, or use
+     * free_object_attr()?
+     */
 
     ret = job_trove_keyval_read_list(
         s_op->req->u.unstuff.fs_id,
@@ -229,6 +242,11 @@ static PINT_sm_action get_handles(
     PVFS_handle stuffed_handle;
     const char **server_names;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* TODO: pick back up here */
+    /* exit early for now */
+    js_p->error_code = -PVFS_ENOSYS;
+    return SM_ACTION_COMPLETE;
 
     layout.algorithm = s_op->u.unstuff.algorithm;
     layout.server_list.count = 0;
@@ -375,7 +393,7 @@ static PINT_sm_action cleanup(
         free(s_op->key_a);
     }
 
-    return SM_ACTION_COMPLETE;
+    return (server_state_machine_complete(smcb));
 }
 
 PINT_GET_OBJECT_REF_DEFINE(unstuff);
