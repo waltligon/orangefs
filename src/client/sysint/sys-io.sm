@@ -111,6 +111,11 @@ static int unstuff_needed(
     PINT_dist *dist_p,
     uint32_t mask);
 
+static int unstuff_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i);
+
 /* misc constants and helper macros */
 #define IO_RECV_COMPLETED                                    1
 
@@ -454,9 +459,34 @@ static PINT_sm_action io_inspect_attr(
 static PINT_sm_action io_unstuff_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    /* TODO: pick up here */
-    gossip_err("Error: io_unstuff_setup_msgpair() is unimplemented.\n");
-    js_p->error_code = -PVFS_ENOSYS;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+
+    js_p->error_code = 0;
+
+    PINT_SERVREQ_UNSTUFF_FILL(
+            sm_p->msgpair.req,
+            (*sm_p->cred_p),
+            sm_p->object_ref.fs_id,
+            sm_p->object_ref.handle);
+
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
+    sm_p->msgpair.handle = sm_p->object_ref.handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
+    sm_p->msgpair.comp_fn = unstuff_comp_fn;
+
+    ret = PINT_cached_config_map_to_server(
+            &sm_p->msgpair.svr_addr,
+            sm_p->msgpair.handle,
+            sm_p->msgpair.fs_id);
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -2889,6 +2919,46 @@ static int unstuff_needed(
     }
 
     gossip_debug(GOSSIP_IO_DEBUG, "sys-io will not unstuff the file.\n");
+    return(0);
+}
+
+/* unstuff_comp_fn()
+ *
+ * completion function for unstuff msgpair array
+ */
+static int unstuff_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_size tmp_size = 0;
+
+    gossip_debug(GOSSIP_IO_DEBUG,
+		"unstuff completion fn: unstuff_comp_fn\n");
+
+    /* only posted one msgpair */
+    assert(i==0);
+
+    if (resp_p->status != 0)
+    {
+        gossip_debug(GOSSIP_IO_DEBUG,
+            "unstuff negative response with error code: %d\n", 
+            resp_p->status);
+        return resp_p->status;
+    }
+
+    assert(resp_p->op == PVFS_SERV_UNSTUFF);
+
+    /* stuffed size is not the same integer type as PVFS_size, convert here */
+    tmp_size += resp_p->u.unstuff.attr.u.meta.stuffed_size;
+    
+    /* TODO: don't I need to convert something here? */
+    PINT_acache_update(sm_p->object_ref,
+        &resp_p->u.unstuff.attr,
+        &tmp_size);
+
     return(0);
 }
 
