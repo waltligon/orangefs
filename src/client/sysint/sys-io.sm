@@ -24,6 +24,7 @@
 #include "pvfs2-internal.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
+#define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE)
 
 extern job_context_id pint_client_sm_context;
 
@@ -399,7 +400,7 @@ static PINT_sm_action io_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE, 
+        IO_ATTR_MASKS, 
         PVFS_TYPE_METAFILE,
         0);
        
@@ -464,11 +465,16 @@ static PINT_sm_action io_unstuff_setup_msgpair(
 
     js_p->error_code = 0;
 
+    /* note that unstuff must request the same attr mask that we requested
+     * earlier.  If the file has already been unstuffed then we need an 
+     * updated authoritative copy of all of the attrs relevant to I/O.
+     */
     PINT_SERVREQ_UNSTUFF_FILL(
             sm_p->msgpair.req,
             (*sm_p->cred_p),
             sm_p->object_ref.fs_id,
-            sm_p->object_ref.handle);
+            sm_p->object_ref.handle,
+            IO_ATTR_MASKS);
 
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;

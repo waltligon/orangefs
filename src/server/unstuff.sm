@@ -32,6 +32,26 @@ machine pvfs2_unstuff_sm
     state prelude
     {
         jump pvfs2_prelude_sm;
+        success => getattr_setup;
+        default => setup_resp;
+    }
+
+    state getattr_setup
+    {
+        run getattr_setup;
+        success => getattr_do_work;
+        default => setup_resp;
+    }
+
+    state getattr_do_work
+    {
+        jump pvfs2_get_attr_work_sm;
+        default => getattr_interpret;
+    }
+
+    state getattr_interpret
+    {
+        run getattr_interpret;
         success => get_keyvals;
         default => setup_resp;
     }
@@ -243,10 +263,6 @@ static PINT_sm_action get_handles(
     const char **server_names;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* TODO: pick back up here */
-    /* exit early for now */
-    js_p->error_code = -PVFS_ENOSYS;
-    return SM_ACTION_COMPLETE;
 
     layout.algorithm = s_op->u.unstuff.algorithm;
     layout.server_list.count = 0;
@@ -395,6 +411,72 @@ static PINT_sm_action cleanup(
 
     return (server_state_machine_complete(smcb));
 }
+
+/* TODO: comment */
+static PINT_sm_action getattr_setup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *getattr_op;
+    int ret;
+
+    js_p->error_code = 0;
+
+    getattr_op = malloc(sizeof(*getattr_op));
+    if(!getattr_op)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(getattr_op, 0, sizeof(*getattr_op));
+
+    /* TODO: can we come up with a way to clean up and nail down what has 
+     * to be set in order to run this nested machine?  This seems fragile.
+     */
+
+    /* need attrs that the prelude read already */
+    getattr_op->attr = s_op->attr;
+    /* need a valid request structure for some generic features like access
+     * logging 
+     */
+    getattr_op->req = s_op->req;
+    /* need to fill in the input parameters to the getattr nested machine */
+    getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
+    getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
+    getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
+
+    ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+    if(ret < 0)
+    {
+        js_p->error_code = ret;
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* TODO: comment */
+static PINT_sm_action getattr_interpret(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *getattr_op;
+    struct PINT_server_op *s_op;
+    int task_id;
+    int remaining;
+
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, 
+        &remaining);
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    s_op->resp.u.unstuff.attr = getattr_op->resp.u.getattr.attr;
+
+    free(getattr_op);
+
+    /* TODO: pick back up here */
+    /* exit early for now */
+    js_p->error_code = -PVFS_ENOSYS;
+    return SM_ACTION_COMPLETE;
+}
+
 
 PINT_GET_OBJECT_REF_DEFINE(unstuff);
 

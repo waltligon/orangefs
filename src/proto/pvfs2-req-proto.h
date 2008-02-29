@@ -500,22 +500,26 @@ struct PVFS_servreq_unstuff
 {
     PVFS_handle handle; /* handle of target object */
     PVFS_fs_id fs_id;   /* file system */
+    uint32_t attrmask;  /* mask of desired attributes */
 };
-endecode_fields_2_struct(
+endecode_fields_3_struct(
     PVFS_servreq_unstuff,
     PVFS_handle, handle,
-    PVFS_fs_id, fs_id)
+    PVFS_fs_id, fs_id,
+    uint32_t, attrmask)
 
 #define PINT_SERVREQ_UNSTUFF_FILL(__req,           \
                                   __creds,         \
                                   __fsid,          \
-                                  __handle)        \
+                                  __handle,        \
+                                  __amask)         \
 do {                                               \
     memset(&(__req), 0, sizeof(__req));            \
     (__req).op = PVFS_SERV_UNSTUFF;                \
     (__req).credentials = (__creds);               \
     (__req).u.unstuff.fs_id = (__fsid);            \
     (__req).u.unstuff.handle = (__handle);         \
+    (__req).u.unstuff.attrmask = (__amask);        \
 } while (0)
 
 struct PVFS_servresp_unstuff
