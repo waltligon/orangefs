@@ -131,8 +131,10 @@ static PINT_sm_action remove_complete(
     struct PINT_server_op *remove_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *s_op;
     int error_code;
+    int task_id;
+    int remaining;
 
-    s_op = PINT_sm_pop_frame(smcb, &error_code);
+    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
 
     free(remove_op);
 
