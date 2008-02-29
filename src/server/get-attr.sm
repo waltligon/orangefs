@@ -604,6 +604,9 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
 	return SM_ACTION_COMPLETE;
     }
 
+    /* TODO: we need to safety check the read_sz after this completes to 
+     * make sure we didn't get fewer handles than we expected.
+     */
     s_op->val.buffer = s_op->resp.u.getattr.attr.u.meta.dfile_array;
     s_op->val.buffer_sz = (dfile_count * sizeof(PVFS_handle));
 

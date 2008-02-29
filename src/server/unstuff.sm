@@ -270,6 +270,15 @@ static PINT_sm_action set_handles_on_object(
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "job_precreate_pool_get_handles() returned %d\n", js_p->error_code);
 
+    /* TODO: pick back up here */
+    /* need to free old dfile_array in attrs and replace with dfile_array
+     * now stored in u.unstuff.  Need to likewise replace dfile_count in
+     * attrs with dfile count stored in u.unstuff (as num_dfiles_req).  Both
+     * then need to be committed to disk.  Probably need to reverse the order
+     * here so that the count goes is stored first; otherwise if we fail on
+     * the second step then we run the risk of buffer overrun later.
+     */
+
     /* TODO: temporary */
     js_p->error_code = -PVFS_ENOSYS;
     return SM_ACTION_COMPLETE;
