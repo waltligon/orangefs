@@ -75,9 +75,9 @@ enum PVFS_server_op
     PVFS_SERV_SMALL_IO = 33,
     PVFS_SERV_LISTATTR = 34,
     PVFS_SERV_BATCH_CREATE = 35,
+    PVFS_SERV_BATCH_REMOVE = 36,
     PVFS_SERV_PRECREATE_POOL_REFILLER = 37, /* not a real protocol request */
-    PVFS_SERV_BATCH_REMOVE = 38,
-    PVFS_SERV_UNSTUFF = 39,
+    PVFS_SERV_UNSTUFF = 38,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
