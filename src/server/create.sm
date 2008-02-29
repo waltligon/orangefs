@@ -414,6 +414,9 @@ static PINT_sm_action write_keyvals(
         s_op->key_a[3].buffer = Trove_Common_Keys[NUM_DFILES_REQ_KEY].key;
         s_op->key_a[3].buffer_sz = Trove_Common_Keys[NUM_DFILES_REQ_KEY].size;
 
+        gossip_debug(
+            GOSSIP_SERVER_DEBUG, "create storing NUM_DFILES_REQ_KEY value of %d\n",
+            s_op->req->u.create.num_dfiles_req);
         s_op->val_a[3].buffer = &s_op->req->u.create.num_dfiles_req;
         s_op->val_a[3].buffer_sz = sizeof(s_op->req->u.create.num_dfiles_req);
     }

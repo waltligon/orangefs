@@ -186,6 +186,7 @@ endecode_fields_7_struct(
                                  __md_ext_array,                           \
                                  __df_ext_array,                           \
                                  __attr,                                   \
+                                 __num_dfiles_req,                         \
                                  __layout)                                 \
 do {                                                                       \
     int mask;                                                              \
@@ -193,6 +194,7 @@ do {                                                                       \
     (__req).op = PVFS_SERV_CREATE;                                         \
     (__req).credentials = (__creds);                                       \
     (__req).u.create.fs_id = (__fsid);                                     \
+    (__req).u.create.num_dfiles_req = (__num_dfiles_req);                  \
     (__attr).objtype = PVFS_TYPE_METAFILE;                                 \
     mask = (__attr).mask;                                                  \
     (__attr).mask = PVFS_ATTR_COMMON_ALL;                                  \
