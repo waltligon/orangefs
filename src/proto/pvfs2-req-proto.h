@@ -492,7 +492,7 @@ endecode_fields_1_struct(
 #define extra_size_PVFS_servresp_getattr \
     extra_size_PVFS_object_attr
 
-/* migrate_stuffed ****************************************************/
+/* unstuff ****************************************************/
 /* - creates the datafile handles for the file.  This allows a stuffed
  * file to migrate to a large one. */
 
@@ -514,8 +514,8 @@ do {                                               \
     memset(&(__req), 0, sizeof(__req));            \
     (__req).op = PVFS_SERV_UNSTUFF;                \
     (__req).credentials = (__creds);               \
-    (__req).u.getattr.fs_id = (__fsid);            \
-    (__req).u.getattr.handle = (__handle);         \
+    (__req).u.unstuff.fs_id = (__fsid);            \
+    (__req).u.unstuff.handle = (__handle);         \
 } while (0)
 
 struct PVFS_servresp_unstuff
