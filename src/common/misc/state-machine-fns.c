@@ -656,7 +656,7 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb, int *error_code)
         return NULL;
     }
 
-    frame_entry = qlist_entry(&smcb->frames.next, struct PINT_frame_s, link);
+    frame_entry = qlist_entry(smcb->frames.next, struct PINT_frame_s, link);
     qlist_del(smcb->frames.next);
 
     frame = frame_entry->frame;
