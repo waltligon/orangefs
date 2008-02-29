@@ -213,59 +213,47 @@ static PINT_sm_action get_handles(
 {
     int ret;
     job_id_t j_id;
-    int num_io_servers;
-    PVFS_handle *dfile_array;
     PVFS_sys_layout layout;
-    PVFS_handle stuffed_handle;
-    const char **server_names;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    /* TODO: pick back up here; returning early for now */
-    js_p->error_code = -PVFS_ENOSYS;
-    return SM_ACTION_COMPLETE;
 
     layout.algorithm = s_op->u.unstuff.algorithm;
     layout.server_list.count = 0;
     layout.server_list.servers = NULL;
 
-    ret = PINT_cached_config_get_server_list(
-        s_op->req->u.unstuff.fs_id,
-        s_op->attr.u.meta.dist,
-        (s_op->u.unstuff.num_dfiles_req - 1),
-        &layout,
-        &server_names,
-        &num_io_servers);
-    if(ret < 0)
+    /* TODO: check to see if num_dfiles_req == 1, that is a special case */
+    /* TODO: also check to make sure num_dfiles_req is >=1 for sanity */
+
+    /* TODO: add support for list layouts later */
+    if(layout.algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)
     {
-        js_p->error_code = ret;
+        gossip_err("Error: unstuff doesn't support layout algorithm: %d\n", 
+            layout.algorithm);
+        js_p->error_code = -PVFS_ENOSYS;
         return SM_ACTION_COMPLETE;
     }
 
-    dfile_array = s_op->val_a[2].buffer;
-
-    stuffed_handle = dfile_array[0];
-
-    dfile_array = realloc(dfile_array,
-                          sizeof(*dfile_array) * (num_io_servers + 1));
-    if(!dfile_array)
+    /* allocate room for final number of handles we want */
+    /* TODO: remember to free this if get_handles fails */
+    s_op->u.unstuff.dfile_array = 
+        malloc(s_op->u.unstuff.num_dfiles_req * sizeof(PVFS_handle));
+    if(!s_op->u.unstuff.dfile_array)
     {
-        s_op->val_a[3].buffer = NULL;
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-    /* set the first datafile as the stuffed one that already exists */
-    dfile_array[0] = stuffed_handle;
+    /* the very first handle should be our current stuffed handle */
+    s_op->u.unstuff.dfile_array[0] 
+        = s_op->resp.u.unstuff.attr.u.meta.dfile_array[0];
 
-    s_op->resp.u.unstuff.attr.u.meta.dfile_array = dfile_array;
-    s_op->resp.u.unstuff.attr.u.meta.dfile_count = num_io_servers + 1;
-
-    dfile_array++;
+    /* NOTE: we are leaving the existing resp attr structure alone until we
+     * get a successful answer from get_handles() and commit to disk
+     */
     ret = job_precreate_pool_get_handles(
         s_op->req->u.unstuff.fs_id,
-        num_io_servers,
-        server_names,
-        dfile_array,
+        (s_op->u.unstuff.num_dfiles_req-1),
+        NULL,
+        &s_op->u.unstuff.dfile_array[1],
         smcb,
         0,
         js_p,
@@ -279,6 +267,12 @@ static PINT_sm_action set_handles_on_object(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t j_id;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "job_precreate_pool_get_handles() returned %d\n", js_p->error_code);
+
+    /* TODO: temporary */
+    js_p->error_code = -PVFS_ENOSYS;
+    return SM_ACTION_COMPLETE;
 
     return job_trove_keyval_write(
         s_op->req->u.unstuff.fs_id,

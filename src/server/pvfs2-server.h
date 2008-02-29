@@ -405,6 +405,7 @@ struct PINT_server_eattr_op
 
 struct PINT_server_unstuff_op
 {
+    PVFS_handle* dfile_array;
     enum PVFS_sys_layout_algorithm algorithm;
     int num_dfiles_req;
 };
