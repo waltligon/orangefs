@@ -204,7 +204,10 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     encode_PVFS_ds_type(pptr, &(x)->objtype); \
     if ((x)->objtype == PVFS_TYPE_METAFILE && \
         (!((x)->mask & PVFS_ATTR_META_UNSTUFFED))) \
+    { \
         encode_int32_t(pptr, &(x)->u.meta.stuffed_size); \
+        encode_skip4(pptr,); \
+    } \
     if ((x)->mask & PVFS_ATTR_META_DIST) \
 	encode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \
@@ -228,7 +231,10 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     decode_PVFS_ds_type(pptr, &(x)->objtype); \
     if ((x)->objtype == PVFS_TYPE_METAFILE && \
         (!((x)->mask & PVFS_ATTR_META_UNSTUFFED))) \
+    { \
         decode_int32_t(pptr, &(x)->u.meta.stuffed_size); \
+        decode_skip4(pptr,); \
+    } \
     if ((x)->mask & PVFS_ATTR_META_DIST) \
 	decode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \
