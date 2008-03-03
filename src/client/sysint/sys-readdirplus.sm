@@ -754,7 +754,7 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_LISTATTR_DEBUG,
-                 "readdirplus_fetch_attrs_comp_fn called\n");
+                 "readdirplus_fetch_sizes_comp_fn called\n");
     assert(resp_p->op == PVFS_SERV_LISTATTR);
 
     /* Mark all handles in this server range as having failed a stat */
