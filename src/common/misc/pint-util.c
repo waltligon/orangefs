@@ -121,7 +121,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 src->u.dir.dirent_count;
         }
 
-        if((src->objtype == PVFS_TYPE_DATAFILE) &&
+        if((src->objtype == PVFS_TYPE_METAFILE) &&
             (!(src->mask & PVFS_ATTR_META_UNSTUFFED)))
         {
             /* if this is a metafile, and does _not_ appear to be stuffed,
