@@ -2960,6 +2960,10 @@ static int unstuff_comp_fn(
         &resp_p->u.unstuff.attr,
         NULL);
 
+    /* replace attrs found by getattr */
+    /* PINT_copy_object_attr() takes care of releasing old memory */
+    PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
+
     return(0);
 }
 
