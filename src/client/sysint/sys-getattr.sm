@@ -581,6 +581,16 @@ static int getattr_object_getattr_comp_fn(
                  */
                 if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
                 {
+                    /* is the file stuffed? */
+                    if(!(attr->mask & PVFS_ATTR_META_UNSTUFFED))
+                    {
+                        /* we can compute the size without doing any more
+                         * getattr requests
+                         */
+                        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                            "getattr_object_getattr_comp_fn: detected stuffed file.\n");
+                        return(0);
+                    }
                     /* if caller asked for the size, then we need
                      * to jump to the datafile_getattr state, which
                      * will retrieve the datafile sizes for us.
@@ -754,18 +764,29 @@ static PINT_sm_action getattr_acache_insert(
         if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE &&
             sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
         {                                           
-            /* compute size as requested */
-            assert(sm_p->getattr.attr.u.meta.dist);
-            assert(sm_p->getattr.attr.u.meta.dist->methods &&
-                   sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
-            
-            sm_p->getattr.size =
-                (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
-                sm_p->getattr.attr.u.meta.dist->params,
-                sm_p->getattr.attr.u.meta.dfile_count,
-                sm_p->getattr.size_array);
+            if(!(sm_p->getattr.attr.mask & PVFS_ATTR_META_UNSTUFFED))
+            {
+                /* stuffed file case */
+                sm_p->getattr.size = sm_p->getattr.attr.u.meta.stuffed_size;
+                tmp_size = &sm_p->getattr.size;
+                gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert calculated stuffed logical size of %lld\n", lld(*tmp_size));
+            }
+            else
+            {
+                /* compute size as requested */
+                assert(sm_p->getattr.attr.u.meta.dist);
+                assert(sm_p->getattr.attr.u.meta.dist->methods &&
+                       sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
+                
+                sm_p->getattr.size =
+                    (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
+                    sm_p->getattr.attr.u.meta.dist->params,
+                    sm_p->getattr.attr.u.meta.dfile_count,
+                    sm_p->getattr.size_array);
 
-            tmp_size = &sm_p->getattr.size;
+                tmp_size = &sm_p->getattr.size;
+                gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert calculated unstuffed logical size of %lld\n", lld(*tmp_size));
+            }
         }
 
         PINT_acache_update(sm_p->getattr.object_ref,

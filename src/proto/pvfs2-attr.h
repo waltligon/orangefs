@@ -202,6 +202,9 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     encode_PVFS_time(pptr, &(x)->ctime); \
     encode_uint32_t(pptr, &(x)->mask); \
     encode_PVFS_ds_type(pptr, &(x)->objtype); \
+    if ((x)->objtype == PVFS_TYPE_METAFILE && \
+        (!((x)->mask & PVFS_ATTR_META_UNSTUFFED))) \
+        encode_int32_t(pptr, &(x)->u.meta.stuffed_size); \
     if ((x)->mask & PVFS_ATTR_META_DIST) \
 	encode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \
@@ -223,6 +226,9 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     decode_PVFS_time(pptr, &(x)->ctime); \
     decode_uint32_t(pptr, &(x)->mask); \
     decode_PVFS_ds_type(pptr, &(x)->objtype); \
+    if ((x)->objtype == PVFS_TYPE_METAFILE && \
+        (!((x)->mask & PVFS_ATTR_META_UNSTUFFED))) \
+        decode_int32_t(pptr, &(x)->u.meta.stuffed_size); \
     if ((x)->mask & PVFS_ATTR_META_DIST) \
 	decode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \
@@ -240,8 +246,10 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 #define extra_size_PVFS_object_attr_dir  (PVFS_REQ_LIMIT_DIST_BYTES + \
   PVFS_REQ_LIMIT_DIST_NAME + roundup8(sizeof(PVFS_directory_attr)))
 
+/* room for distribution, stuffed_size, and dfile array */
 #define extra_size_PVFS_object_attr_meta (PVFS_REQ_LIMIT_DIST_BYTES + \
-  PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle))
+  sizeof(int32_t) + \
+  PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle)) 
 
 #define extra_size_PVFS_object_attr_symlink (PVFS_REQ_LIMIT_PATH_NAME_BYTES)
 
