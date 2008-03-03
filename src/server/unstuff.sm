@@ -70,8 +70,7 @@ machine pvfs2_unstuff_sm
     state get_handles
     {
         run get_handles;
-        success => set_handles_on_object;
-        default => setup_resp;
+        default => set_handles_on_object;
     }
 
     state set_handles_on_object
@@ -197,12 +196,6 @@ static PINT_sm_action inspect_keyvals(
         }
     }
 
-    /* go ahead and free up keyval structures as soon as we are done with
-     * them 
-     */
-    free(s_op->val_a);
-    free(s_op->key_a);
-    free(s_op->error_a);
 
     /* pass along error code for next state to handle */
     return SM_ACTION_COMPLETE;
@@ -220,8 +213,7 @@ static PINT_sm_action get_handles(
     layout.server_list.count = 0;
     layout.server_list.servers = NULL;
 
-    /* TODO: check to see if num_dfiles_req == 1, that is a special case */
-    /* TODO: also check to make sure num_dfiles_req is >=1 for sanity */
+    /* TODO: check to make sure num_dfiles_req is >=1 for sanity */
 
     /* TODO: add support for list layouts later */
     if(layout.algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)
@@ -233,7 +225,6 @@ static PINT_sm_action get_handles(
     }
 
     /* allocate room for final number of handles we want */
-    /* TODO: remember to free this if get_handles fails */
     s_op->u.unstuff.dfile_array = 
         malloc(s_op->u.unstuff.num_dfiles_req * sizeof(PVFS_handle));
     if(!s_op->u.unstuff.dfile_array)
@@ -245,6 +236,15 @@ static PINT_sm_action get_handles(
     /* the very first handle should be our current stuffed handle */
     s_op->u.unstuff.dfile_array[0] 
         = s_op->resp.u.unstuff.attr.u.meta.dfile_array[0];
+
+    if(s_op->u.unstuff.num_dfiles_req == 1)
+    {
+        /* special case; we are unstuffing to 1 datafile.  There is no need
+         * to retrieve any additional handles
+         */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
 
     /* NOTE: we are leaving the existing resp attr structure alone until we
      * get a successful answer from get_handles() and commit to disk
@@ -270,24 +270,38 @@ static PINT_sm_action set_handles_on_object(
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "job_precreate_pool_get_handles() returned %d\n", js_p->error_code);
 
-    /* TODO: pick back up here */
-    /* need to free old dfile_array in attrs and replace with dfile_array
-     * now stored in u.unstuff.  Need to likewise replace dfile_count in
-     * attrs with dfile count stored in u.unstuff (as num_dfiles_req).  Both
-     * then need to be committed to disk.  Probably need to reverse the order
-     * here so that the count goes is stored first; otherwise if we fail on
-     * the second step then we run the risk of buffer overrun later.
-     */
+    if(js_p->error_code < 0)
+    {
+        /* we failed to retrieve any handles */
+        if(s_op->u.unstuff.dfile_array)
+        {
+            free(s_op->u.unstuff.dfile_array);
+            /* preserve error code */
+            return SM_ACTION_COMPLETE;
+        }
+    }
 
-    /* TODO: temporary */
-    js_p->error_code = -PVFS_ENOSYS;
-    return SM_ACTION_COMPLETE;
+    /* replace dfile information in attr structure */
+    free(s_op->resp.u.unstuff.attr.u.meta.dfile_array);
+    s_op->resp.u.unstuff.attr.u.meta.dfile_array 
+        = s_op->u.unstuff.dfile_array;
+    s_op->resp.u.unstuff.attr.u.meta.dfile_count 
+        = s_op->u.unstuff.num_dfiles_req;
+
+    /* write new datafile handles to disk */
+    s_op->key.buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
+
+    s_op->val.buffer = 
+        s_op->resp.u.unstuff.attr.u.meta.dfile_array; 
+    s_op->val.buffer_sz =
+        s_op->resp.u.unstuff.attr.u.meta.dfile_count * sizeof(PVFS_handle);
 
     return job_trove_keyval_write(
         s_op->req->u.unstuff.fs_id,
         s_op->req->u.unstuff.handle,
-        &s_op->key_a[2],
-        &s_op->val_a[2],
+        &s_op->key,
+        &s_op->val,
         0, NULL, smcb, 0, js_p, &j_id, server_job_context);
 }
 
@@ -319,6 +333,8 @@ static PINT_sm_action remove_layout(
     /* remove the layout and num_dfiles_req keyvals as the layout has
      * now been chosen.
      */
+    /* TODO: should these all be explicitly set to TROVE_SYNC, or is that a
+     * server configuration thing? */
     return job_trove_keyval_remove_list(
         s_op->req->u.unstuff.fs_id, s_op->req->u.unstuff.handle,
         s_op->key_a,
@@ -333,8 +349,7 @@ static PINT_sm_action setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    s_op->resp.u.unstuff.attr = s_op->attr;
+    /*  TODO: may be able to eliminate this step */
     return SM_ACTION_COMPLETE;
 }
 
@@ -342,6 +357,19 @@ static PINT_sm_action cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if(s_op->val_a)
+    {
+        free(s_op->val_a);
+    }
+    if(s_op->key_a)
+    {
+        free(s_op->key_a);
+    }
+    if(s_op->error_a)
+    {
+        free(s_op->error_a);
+    }
 
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return (server_state_machine_complete(smcb));

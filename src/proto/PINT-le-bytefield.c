@@ -146,6 +146,10 @@ static void lebf_initialize(void)
 		resp.u.getattr.attr.mask = 0;
 		respsize = extra_size_PVFS_servresp_getattr;
 		break;
+	    case PVFS_SERV_UNSTUFF:
+		resp.u.unstuff.attr.mask = 0;
+		respsize = extra_size_PVFS_servresp_getattr;
+		break;
 	    case PVFS_SERV_SETATTR:
 		req.u.setattr.attr.mask = 0;
 		reqsize = extra_size_PVFS_servreq_setattr;
