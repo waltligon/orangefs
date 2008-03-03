@@ -49,7 +49,7 @@ static void lebf_initialize(void)
 {
     struct PVFS_server_req req = {0};
     struct PVFS_server_resp resp = {0};
-    int i;
+    enum PVFS_server_op op_type;
     int reqsize, respsize;
     int noreq;
     PINT_dist tmp_dist;
@@ -79,12 +79,12 @@ static void lebf_initialize(void)
 
     initializing_sizes = 1;
 
-    for (i=0; i<PVFS_SERV_NUM_OPS; i++) {
-	req.op = resp.op = i;
+    for (op_type=0; op_type<PVFS_SERV_NUM_OPS; op_type++) {
+	req.op = resp.op = op_type;
 	reqsize = 0;
 	respsize = 0;
 	noreq = 0;
-	switch (i) {
+	switch (op_type) {
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_PERF_UPDATE:
 	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
@@ -191,6 +191,9 @@ static void lebf_initialize(void)
 	    case PVFS_SERV_STATFS:
 		/* nothing special */
 		break;
+	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
+		/* nothing special */
+		break;
 	    case PVFS_SERV_WRITE_COMPLETION:
 		/* only a response, but nothing special there */
 		noreq = 1;
@@ -242,10 +245,13 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_listattr;
                 respsize = extra_size_PVFS_servresp_listattr;
                 break;
+            case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
+                assert(0);
+                break;
 	}
 	/* since these take the max size when mallocing in the encode,
 	 * give them a huge number, then later fix it. */
-	max_size_array[i].req = max_size_array[i].resp = init_big_size;
+	max_size_array[op_type].req = max_size_array[op_type].resp = init_big_size;
 
 	if (noreq)
 	    reqsize = 0;
@@ -256,12 +262,12 @@ static void lebf_initialize(void)
 
 	if (reqsize > init_big_size)
 	    gossip_err("%s: op %d reqsize %d exceeded prealloced %d\n",
-	      __func__, i, reqsize, init_big_size);
+	      __func__, op_type, reqsize, init_big_size);
 	if (respsize > init_big_size)
 	    gossip_err("%s: op %d respsize %d exceeded prealloced %d\n",
-	      __func__, i, respsize, init_big_size);
-	max_size_array[i].req = reqsize;
-	max_size_array[i].resp = respsize;
+	      __func__, op_type, respsize, init_big_size);
+	max_size_array[op_type].req = reqsize;
+	max_size_array[op_type].resp = respsize;
     }
 
     /* clean up stuff just used for initialization */
