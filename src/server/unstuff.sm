@@ -315,7 +315,7 @@ static PINT_sm_action update_dfile_count(
      * (acquired from prelude) with the modified datafile array,
      * and convert it to the dspace form for writing.
      */
-    PVFS_object_attr_to_ds_attr(&s_op->attr, &s_op->ds_attr);
+    PVFS_object_attr_to_ds_attr(&s_op->resp.u.unstuff.attr, &s_op->ds_attr);
 
     return job_trove_dspace_setattr(
         s_op->req->u.unstuff.fs_id, s_op->req->u.unstuff.handle,
