@@ -188,11 +188,18 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
                 cache_elem, key_p->buffer);
         if (keyval_pair)
         {
-            dbpf_attr_cache_keyval_pair_fetch_cached_data(
-                cache_elem, keyval_pair, val_p->buffer,
-                &val_p->buffer_sz);
             val_p->read_sz = val_p->buffer_sz;
+            /* note: dbpf_attr_cache_keyval_pair_fetch_cached_data() will
+             * update read_sz appropriately
+             */
+            ret = dbpf_attr_cache_keyval_pair_fetch_cached_data(
+                cache_elem, keyval_pair, val_p->buffer,
+                &val_p->read_sz);
             gen_mutex_unlock(&dbpf_attr_cache_mutex);
+            if(ret < 0)
+            {
+                return ret;
+            }
             return 1;
         }
     }
