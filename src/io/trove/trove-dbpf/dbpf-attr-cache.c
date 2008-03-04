@@ -347,6 +347,11 @@ int dbpf_attr_cache_keyval_pair_fetch_cached_data(
     {
         if (cache_elem && keyval_pair)
         {
+            if(*target_data_sz < keyval_pair->data_sz)
+            {
+                /* cached value is too big for buffer */
+                return(-TROVE_EINVAL);
+            }
             memcpy(target_data, keyval_pair->data, keyval_pair->data_sz);
             *target_data_sz = keyval_pair->data_sz;
             ret = 0;
