@@ -1133,15 +1133,6 @@ BMI_mx_set_info(int option, void *inout_parameter)
                                 if (bmi_mx != NULL) {
                                         PVFS_BMI_addr_t addr;
                                         peer = mxmap->mxm_peer;
-                                        if (peer != NULL) {
-                                                addr = peer->mxp_bmi_addr;
-                                                if (addr != 0) {
-                                                        debug(BMX_DB_PEER, "calling "
-                                                              "bmi_method_addr_forget_callback"
-                                                              "on %s", peer->mxp_mxmap->mxm_peername);
-                                                        bmi_method_addr_forget_callback(addr);
-                                                }
-                                        }
                                         bmx_peer_disconnect(peer, 1, BMI_ENETRESET);
                                 }
                                 if (mxmap->mxm_peername) {
