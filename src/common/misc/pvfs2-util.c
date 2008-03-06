@@ -1601,6 +1601,25 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
+    if(sys_attrmask & PVFS_ATTR_SYS_UID)
+        attrmask |= PVFS_ATTR_COMMON_UID;
+    if(sys_attrmask & PVFS_ATTR_SYS_GID)
+        attrmask |= PVFS_ATTR_COMMON_GID;
+    if(sys_attrmask & PVFS_ATTR_SYS_PERM)
+        attrmask |= PVFS_ATTR_COMMON_PERM;
+    if(sys_attrmask & PVFS_ATTR_SYS_ATIME)
+        attrmask |= PVFS_ATTR_COMMON_ATIME;
+    if(sys_attrmask & PVFS_ATTR_SYS_CTIME)
+        attrmask |= PVFS_ATTR_COMMON_CTIME;
+    if(sys_attrmask & PVFS_ATTR_SYS_MTIME)
+        attrmask |= PVFS_ATTR_COMMON_MTIME;
+    if(sys_attrmask & PVFS_ATTR_SYS_TYPE)
+        attrmask |= PVFS_ATTR_COMMON_TYPE;
+    if(sys_attrmask & PVFS_ATTR_SYS_ATIME_SET)
+        attrmask |= PVFS_ATTR_COMMON_ATIME_SET;
+    if(sys_attrmask & PVFS_ATTR_SYS_MTIME_SET)
+        attrmask |= PVFS_ATTR_COMMON_MTIME_SET;
+
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "attrmask being passed to server: ");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
