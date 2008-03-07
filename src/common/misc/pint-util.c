@@ -278,6 +278,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     attr->u.sym.target_path)
                 {
                     free(attr->u.sym.target_path);
+                    attr->u.sym.target_path = NULL;
                 }
             }
         }
@@ -288,10 +289,12 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                 if (attr->u.dir.hint.dist_name)
                 {
                     free(attr->u.dir.hint.dist_name);
+                    attr->u.dir.hint.dist_name = NULL;
                 }
                 if (attr->u.dir.hint.dist_params)
                 {
                     free(attr->u.dir.hint.dist_params);
+                    attr->u.dir.hint.dist_params = NULL;
                 }
             }
         }

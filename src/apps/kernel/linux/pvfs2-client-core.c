@@ -188,6 +188,7 @@ static struct PVFS_dev_map_desc s_io_desc[NUM_MAP_DESC];
 static struct PINT_dev_params s_desc_params[NUM_MAP_DESC];
 
 static struct PINT_perf_counter* acache_pc = NULL;
+static struct PINT_perf_counter* static_acache_pc = NULL;
 static struct PINT_perf_counter* ncache_pc = NULL;
 
 /* used only for deleting all allocated vfs_request objects */
@@ -1163,6 +1164,22 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             break;
 
+        case PVFS2_PERF_COUNT_REQUEST_STATIC_ACACHE:
+            tmp_str = PINT_perf_generate_text(static_acache_pc,
+                PERF_COUNT_BUF_SIZE);
+            if(!tmp_str)
+            {
+                vfs_request->out_downcall.status = -PVFS_EINVAL;
+            }
+            else
+            {
+                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                    tmp_str, PERF_COUNT_BUF_SIZE);
+                free(tmp_str);
+                vfs_request->out_downcall.status = 0;
+            }
+            break;
+
         case PVFS2_PERF_COUNT_REQUEST_NCACHE:
             tmp_str = PINT_perf_generate_text(ncache_pc,
                 PERF_COUNT_BUF_SIZE);
@@ -1226,6 +1243,22 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             tmp_param = ACACHE_RECLAIM_PERCENTAGE;
             tmp_subsystem = ACACHE;
             break;
+        case PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_TIMEOUT_MSECS:
+            tmp_param = STATIC_ACACHE_TIMEOUT_MSECS;
+            tmp_subsystem = ACACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_HARD_LIMIT:
+            tmp_param = STATIC_ACACHE_HARD_LIMIT;
+            tmp_subsystem = ACACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_SOFT_LIMIT:
+            tmp_param = STATIC_ACACHE_SOFT_LIMIT;
+            tmp_subsystem = ACACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_RECLAIM_PERCENTAGE:
+            tmp_param = STATIC_ACACHE_RECLAIM_PERCENTAGE;
+            tmp_subsystem = ACACHE;
+            break;
         case PVFS2_PARAM_REQUEST_OP_NCACHE_TIMEOUT_MSECS:
             tmp_param = NCACHE_TIMEOUT_MSECS;
             tmp_subsystem = NCACHE;
@@ -1273,6 +1306,8 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 ret = PINT_perf_set_info(
                     acache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
                 ret = PINT_perf_set_info(
+                    static_acache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
+                ret = PINT_perf_set_info(
                     ncache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
             }    
             vfs_request->out_downcall.status = ret;
@@ -1284,6 +1319,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 PVFS2_PARAM_REQUEST_SET)
             {
                 PINT_perf_reset(acache_pc);
+                PINT_perf_reset(static_acache_pc);
                 PINT_perf_reset(ncache_pc);
             }    
             vfs_request->out_downcall.resp.param.value = 0;
@@ -3114,6 +3150,7 @@ int main(int argc, char **argv)
     struct tm *local_time = NULL;
     uint64_t debug_mask = GOSSIP_NO_DEBUG;
     PINT_client_sm *acache_timer_sm_p = NULL;
+    PINT_client_sm *static_acache_timer_sm_p = NULL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *ncache_timer_sm_p = NULL;
 
@@ -3245,7 +3282,22 @@ int main(int argc, char **argv)
         gossip_err("Error: PINT_perf_set_info (history_size).\n");
         return(ret);
     }
-    PINT_acache_enable_perf_counter(acache_pc);
+
+    static_acache_pc = PINT_perf_initialize(acache_keys);
+    if(!static_acache_pc)
+    {
+        gossip_err("Error: PINT_perf_initialize failure.\n");
+        return(-PVFS_ENOMEM);
+    }
+    ret = PINT_perf_set_info(static_acache_pc, PINT_PERF_HISTORY_SIZE,
+        s_opts.perf_history_size);
+    if(ret < 0)
+    {
+        gossip_err("Error: PINT_perf_set_info (history_size).\n");
+        return(ret);
+    }
+
+    PINT_acache_enable_perf_counter(acache_pc, static_acache_pc);
 
     /* start performance counters for ncache */
     ncache_pc = PINT_perf_initialize(ncache_keys);
@@ -3293,6 +3345,26 @@ int main(int argc, char **argv)
     {
         return(-PVFS_ENOMEM);
     }
+    static_acache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    static_acache_timer_sm_p->u.perf_count_timer.interval_secs = 
+        &s_opts.perf_time_interval_secs;
+    static_acache_timer_sm_p->u.perf_count_timer.pc = static_acache_pc;
+    ret = PINT_client_state_machine_post(smcb, NULL, NULL);
+    if (ret < 0)
+    {
+        gossip_lerr("Error posting acache timer.\n");
+        return(ret);
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
+            sizeof(struct PINT_client_sm),
+            client_op_state_get_machine,
+            client_state_machine_terminate,
+            s_client_dev_context);
+    if (!smcb)
+    {
+        return(-PVFS_ENOMEM);
+    }
     ncache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
@@ -3304,43 +3376,6 @@ int main(int argc, char **argv)
         return(ret);
     }
 
-#if 0
-    /* old timer code */
-    acache_timer_sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
-    if(!acache_timer_sm_p)
-    {
-	return(-PVFS_ENOMEM);
-    }
-    memset(acache_timer_sm_p, 0, sizeof(*acache_timer_sm_p));
-    acache_timer_sm_p->u.perf_count_timer.interval_secs = 
-        &s_opts.perf_time_interval_secs;
-    acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
-    ret = PINT_client_state_machine_post(
-        acache_timer_sm_p, PVFS_CLIENT_PERF_COUNT_TIMER, NULL, NULL);
-    if (ret < 0)
-    {
-        return(ret);
-    }
-
-    /* start a timer to roll over performance counters (ncache) */
-    ncache_timer_sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
-    if(!ncache_timer_sm_p)
-    {
-	return(-PVFS_ENOMEM);
-    }
-    memset(ncache_timer_sm_p, 0, sizeof(*ncache_timer_sm_p));
-    ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
-        &s_opts.perf_time_interval_secs;
-    ncache_timer_sm_p->u.perf_count_timer.pc = ncache_pc;
-    ret = PINT_client_state_machine_post(
-        ncache_timer_sm_p, PVFS_CLIENT_PERF_COUNT_TIMER, NULL, NULL);
-    if (ret < 0)
-    {
-        return(ret);
-    }
-
-    /* end of old code */
-#endif
     ret = initialize_ops_in_progress_table();
     if (ret)
     {

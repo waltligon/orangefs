@@ -52,6 +52,10 @@
 #define PVFS_ATTR_DIR_ALL \
 (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT)
 
+/* attributes that do not change once set */
+#define PVFS_STATIC_ATTR_MASK \
+(PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_META_DIST|PVFS_ATTR_META_DFILES)
+
 /* extended hint attributes for a metafile object */
 struct PVFS_metafile_hint_s
 {
