@@ -9545,11 +9545,9 @@ echo "${ECHO_T}$gcc_version" >&6; }
 		fi
 	fi
 
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror $extra_gcc_flags"
-		{ echo "$as_me:$LINENO: checking if statfs callbacks' arguments in kernel has struct dentry argument" >&5
-echo $ECHO_N "checking if statfs callbacks' arguments in kernel has struct dentry argument... $ECHO_C" >&6; }
-			cat >conftest.$ac_ext <<_ACEOF
+	{ echo "$as_me:$LINENO: checking for dentry argument in kernel super_operations statfs" >&5
+echo $ECHO_N "checking for dentry argument in kernel super_operations statfs... $ECHO_C" >&6; }
+															cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -9558,15 +9556,15 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 		#define __KERNEL__
 		#include <linux/fs.h>
-		extern int pvfs_statfs(struct dentry *, struct kstatfs *);
-			  static struct super_operations s_op = {
-				  .statfs = pvfs_statfs,
-			  };
+		int vfs_statfs(struct dentry *de, struct kstatfs *kfs)
+		{
+			return 0;
+		}
 
 int
 main ()
 {
- s_op.statfs = 0;
+
   ;
   return 0;
 }
@@ -9606,9 +9604,9 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-	{ echo "$as_me:$LINENO: checking if get_sb callback in kernel has struct vfsmount argument" >&5
-echo $ECHO_N "checking if get_sb callback in kernel has struct vfsmount argument... $ECHO_C" >&6; }
-			cat >conftest.$ac_ext <<_ACEOF
+	{ echo "$as_me:$LINENO: checking for vfsmount argument in kernel file_system_type get_sb" >&5
+echo $ECHO_N "checking for vfsmount argument in kernel file_system_type get_sb... $ECHO_C" >&6; }
+										cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -9617,16 +9615,19 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 		#define __KERNEL__
 		#include <linux/fs.h>
-		#include <linux/mount.h>
-		extern int pvfs_get_sb(struct file_system_type *fst, int flags, const char *devname, void *data, struct vfsmount *);
-			  static struct file_system_type fst = {
-				  .get_sb = pvfs_get_sb,
-			  };
+		int get_sb_bdev(struct file_system_type *fs_type, int flags,
+				const char *dev_name, void *data,
+				int (*fill_super)(struct super_block *, void *,
+						  int),
+				struct vfsmount *vfsm)
+		{
+			return 0;
+		}
 
 int
 main ()
 {
-fst.get_sb = 0;
+
   ;
   return 0;
 }
@@ -9665,7 +9666,6 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-	CFLAGS=$tmp_cflags
 
 	{ echo "$as_me:$LINENO: checking for xattr support in kernel" >&5
 echo $ECHO_N "checking for xattr support in kernel... $ECHO_C" >&6; }
@@ -17031,7 +17031,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT 1
+#define HAVE_GETMNTENT
 _ACEOF
 
 else

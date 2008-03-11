@@ -55,7 +55,7 @@
 /* Define if DB has get_pagesize function */
 #undef HAVE_DB_GET_PAGESIZE
 
-/* Define if statfs callback has struct dentry argument */
+/* Define if super_operations statfs has dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
 /* Define to 1 if you have the <execinfo.h> header file. */
@@ -370,7 +370,7 @@
 /* Define if include file valgrind.h exists */
 #undef HAVE_VALGRIND_H
 
-/* Define if get_sb callback has struct vfsmount argument */
+/* Define if file_system_type get_sb has vfsmount argument */
 #undef HAVE_VFSMOUNT_GETSB
 
 /* Define if struct file_operations in kernel has writev callback */
