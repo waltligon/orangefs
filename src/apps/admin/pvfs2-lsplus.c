@@ -189,7 +189,7 @@ void print_entry_attr(
     char *owner = empty_str, *group = empty_str;
     char *inode = empty_str;
     time_t mtime;
-    struct tm *time = localtime(&mtime);
+    struct tm *time;    
     PVFS_size size = 0;
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
     char scratch_size[16] = {0}, scratch_inode[16] = {0};
@@ -205,6 +205,7 @@ void print_entry_attr(
         return;
     }
     mtime = (time_t)attr->mtime;
+    time = localtime(&mtime);
 
     snprintf(scratch_owner,16,"%d",(int)attr->owner);
     snprintf(scratch_group,16,"%d",(int)attr->group);
@@ -354,6 +355,11 @@ void print_entry(
     int attr_error,
     struct options *opts)
 {
+    int ret = -1;
+    PVFS_object_ref ref;
+    PVFS_credentials credentials;
+    PVFS_sysresp_getattr getattr_response;
+
     if (!opts->list_long)
     {
         if (opts->list_inode)
@@ -368,7 +374,34 @@ void print_entry(
     }
 
     if (attr_error == 0)
-        print_entry_attr(handle, entry_name, attr, opts);
+    {
+        if(!attr)
+        {
+            /* missing attributes (possibly for . or .. entries); get them
+             * the old fashioned way
+             */
+            ref.handle = handle;
+            ref.fs_id = fs_id;
+
+            memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
+            PVFS_util_gen_credentials(&credentials);
+
+            ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
+                &credentials, &getattr_response);
+            if (ret)
+            {
+                fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
+                    llu(handle),fs_id);
+                PVFS_perror("Getattr failure", ret);
+                return;
+            }
+            print_entry_attr(handle, entry_name,  &getattr_response.attr, opts);
+        }
+        else
+        {
+            print_entry_attr(handle, entry_name, attr, opts);
+        }
+    }
 }
 
 static double Wtime(void)
