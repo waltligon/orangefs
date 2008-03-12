@@ -77,11 +77,9 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
     if (smcb->parent_smcb)
     {
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
-                     "[SM Terminating Child]: (%p) %s:%s (error_code: %d)\n",
+                     "[SM Terminating Child]: (%p) (error_code: %d)\n",
                      smcb,
                      /* skip pvfs2_ */
-                     PINT_state_machine_current_machine_name(smcb),
-                     PINT_state_machine_current_state_name(smcb),
                      (int32_t)r->error_code);
          assert(smcb->parent_smcb->children_running > 0);
 
