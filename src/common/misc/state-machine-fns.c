@@ -617,6 +617,7 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
         next = smcb->frames.next;
         while(i < index)
         {
+            i++;
             next = next->next;
         }
         frame_entry = qlist_entry(next, struct PINT_frame_s, link);
