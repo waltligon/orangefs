@@ -13889,8 +13889,6 @@ if test "x$BUILD_SERVER" = "x1"; then
 
 { echo "$as_me:$LINENO: checking if server lib needs -lrt" >&5
 echo $ECHO_N "checking if server lib needs -lrt... $ECHO_C" >&6; }
-oldldflags=$LDFLAGS
-
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -13933,7 +13931,8 @@ else
 sed 's/^/| /' conftest.$ac_ext >&5
 
 
-		LDFLAGS="$LDFLAGS -lrt"
+		oldlibs=$LIBS
+		LIBS="$LIBS -lrt"
 		cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -13984,13 +13983,12 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
+		LIBS=$oldlibs
 
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
-
-LDFLAGS=$oldldflags
 
 fi
 
