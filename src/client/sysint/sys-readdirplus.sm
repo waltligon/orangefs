@@ -730,7 +730,7 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
-            sm_p->u.readdirplus.attrmask,
+            PVFS_ATTR_DATA_SIZE,
             sm_p->u.readdirplus.handle_count[i],
             sm_p->u.readdirplus.handles[i]);
         msg_p->fs_id = sm_p->object_ref.fs_id;
