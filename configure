@@ -17321,15 +17321,17 @@ done
 
 # Check whether --enable-static-server was given.
 if test "${enable_static_server+set}" = set; then
-  enableval=$enable_static_server;
-	SERVER_LDFLAGS="$LDFLAGS -static"
-
+  enableval=$enable_static_server;  staticserver=$enableval
 else
-
-	SERVER_LDFLAGS="$LDFLAGS -rdynamic"
-
+   staticserver="no"
 fi
 
+
+if test "$staticserver" = "yes"; then
+	SERVER_LDFLAGS="$LDFLAGS -static"
+else
+	SERVER_LDFLAGS="$LDFLAGS -rdynamic"
+fi
 
 
 
