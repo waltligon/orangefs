@@ -935,6 +935,14 @@ static PINT_sm_action getattr_get_dirent_count(
     int ret;
     job_id_t tmp_id;
 
+    /* The only way to get here is after trying to read the dirdata handle.
+     * The results of that operation have already been stored directly in
+     * u.getattr.dirent_handle, so go ahead and clear the value buffer here
+     * to make sure that later logic doesn't attempt to free it.
+     */
+    s_op->val.buffer = NULL;
+    s_op->val.buffer_sz = 0;
+
     if (!(s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT))
     {
          /* the caller didn't really want the dirent count; skip to get
