@@ -1588,6 +1588,7 @@ int server_state_machine_start(
     {
         s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
         ret = PINT_smcb_set_op(smcb, s_op->req->op);
+        s_op->op = s_op->req->op;
     }
     else
     {
