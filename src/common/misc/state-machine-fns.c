@@ -48,7 +48,7 @@ struct PINT_frame_s
 static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *);
 static void PINT_push_state(struct PINT_smcb *, struct PINT_state_s *);
 static struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id);
-static void PINT_sm_start_child_frames(struct PINT_smcb *smcb);
+static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_started);
 
 /* Function: PINT_state_machine_halt(void)
    Params: None
@@ -127,6 +127,7 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
     PINT_sm_action retval;
     const char * state_name;
     const char * machine_name;
+    int children_started = 0;
 
     if (!(smcb) || !(smcb->current_state) ||
             !(smcb->current_state->flag == SM_RUN ||
@@ -179,8 +180,13 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
     if (retval == SM_ACTION_COMPLETE && smcb->current_state->flag == SM_PJMP)
     {
         /* start child SMs */
-        PINT_sm_start_child_frames(smcb);
-        if (smcb->children_running > 0)
+        PINT_sm_start_child_frames(smcb, &children_started);
+        /* if any children were started, then we return DEFERRED (even
+         * though they may have all completed immediately).  The last child
+         * issues a job_null that will drive progress from here and we don't
+         * want to cause a double transition.
+         */
+        if (children_started > 0)
             retval = SM_ACTION_DEFERRED;
         else
             retval = SM_ACTION_COMPLETE;
@@ -717,14 +723,15 @@ static int child_sm_frame_terminate(struct PINT_smcb * smcb, job_status_s * js_p
 }
 
 /* Function: PINT_sm_start_child_frames
- * Params: pointer to an smcb pointer
+ * Params: pointer to an smcb pointer and pointer to count of children
+ *      started
  * Returns: number of children started
  * Synopsis: This starts all the enw child SMs based on the frame_stack
  *      This is called by the invoke function above which expects the
  *      number of children to be returned to decide if the state is
  *      deferred or not.
  */
-static void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
+static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_started)
 {
     int retval;
     struct PINT_smcb *new_sm;
@@ -735,6 +742,30 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
     assert(smcb);
 
     memset(&r, 0, sizeof(job_status_s));
+
+    *children_started = 0;
+
+    /* Iterate once up front to determine how many children we are going to
+     * run.  This has to be set before starting any children, otherwise if
+     * the first one immediately completes it will mistakenly believe it is
+     * the last one and signal the parent.
+     */
+    qlist_for_each(f, &smcb->frames)
+    {
+        /* skip the last since its the parent frame */
+        if(f->next == &smcb->frames)
+        {
+            break;
+        }
+        /* increment parent's counter */
+        smcb->children_running++;
+    }
+
+    /* let the caller know how many children are being started; it won't be
+     * able to tell from the running_count because they may all immediately
+     * complete before we leave this function.
+     */
+    *children_started = smcb->children_running;
 
     qlist_for_each(f, &smcb->frames)
     {
@@ -751,8 +782,6 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb)
                 child_sm_frame_terminate, smcb->context);
         /* set parent smcb pointer */
         new_sm->parent_smcb = smcb;
-        /* increment parent's counter */
-        smcb->children_running++;
         /* assign frame */
         PINT_sm_push_frame(new_sm, frame_entry->task_id, frame_entry->frame);
         /* locate SM to run */
