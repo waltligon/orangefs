@@ -46,6 +46,8 @@ enum
     STATE_DONE     = 12
 };
 
+static void free_nested_getattr_data(struct PINT_server_op *s_op);
+
 %%
 
 nested machine pvfs2_get_attr_work_sm
@@ -704,6 +706,7 @@ static PINT_sm_action getattr_setup_resp(
     }
     if(js_p->error_code < 0)
     {
+        free_nested_getattr_data(s_op);
         return SM_ACTION_COMPLETE;
     }
 
@@ -739,6 +742,7 @@ static PINT_sm_action getattr_setup_resp(
                 gossip_err("Found dist of 0 for handle %llu,%d\n",
                         llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
                 PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
+                free_nested_getattr_data(s_op);
                 js_p->error_code = -PVFS_EIO;
                 return SM_ACTION_COMPLETE;
             }
@@ -781,6 +785,7 @@ static PINT_sm_action getattr_setup_resp(
                        s_op->u.getattr.fs_id);
             PVFS_perror("Symlink retrieval failure",js_p->error_code);
 
+            free_nested_getattr_data(s_op);
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
         }
@@ -810,19 +815,15 @@ static PINT_sm_action getattr_setup_resp(
                         s_op->resp.u.getattr.attr.mask);
 #endif
 
+    free_nested_getattr_data(s_op);
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static void free_nested_getattr_data(struct PINT_server_op *s_op)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* free up anything that was set up specifically by this nested machine */
     if(s_op->val_a)
     {
-        if(s_op->val_a[NUM_DFILES_KEY].buffer)
-        {
-            free(s_op->val_a[NUM_DFILES_KEY].buffer);
-        }
         free(s_op->val_a);
         s_op->val_a = NULL;
     }
@@ -839,7 +840,16 @@ static PINT_sm_action getattr_cleanup(
     if(s_op->free_val)
     {
         free(s_op->val.buffer);
+        s_op->val.buffer = NULL;
     }
+
+    return;
+}
+
+static PINT_sm_action getattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return(server_state_machine_complete(smcb));
@@ -1165,6 +1175,9 @@ static PINT_sm_action getattr_interpret_dir_hint(
             {
                 dfile_count = 0;
             }
+        }
+        if(s_op->val_a[NUM_DFILES_KEY].buffer)
+        {
             free(s_op->val_a[NUM_DFILES_KEY].buffer);
             s_op->val_a[NUM_DFILES_KEY].buffer = NULL;
             s_op->val_a[NUM_DFILES_KEY].buffer_sz = 0;
