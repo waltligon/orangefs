@@ -327,7 +327,11 @@ static ctl_table pvfs2_acache_table[] = {
         .proc_handler = &pvfs2_param_proc_handler,
         .extra1 = &acache_rec_extra,
     },
+#ifdef PVFS2_LINUX_KERNEL_2_4
     {0}
+#else
+    {.ctl_name = 0}
+#endif
 };
 static ctl_table pvfs2_static_acache_table[] = {
     /* controls static acache timeout */
@@ -366,7 +370,11 @@ static ctl_table pvfs2_static_acache_table[] = {
         .proc_handler = &pvfs2_param_proc_handler,
         .extra1 = &static_acache_rec_extra,
     },
+#ifdef PVFS2_LINUX_KERNEL_2_4
     {0}
+#else
+    {.ctl_name = 0}
+#endif
 };
 
 static ctl_table pvfs2_ncache_table[] = {
@@ -406,7 +414,11 @@ static ctl_table pvfs2_ncache_table[] = {
         .proc_handler = &pvfs2_param_proc_handler,
         .extra1 = &ncache_rec_extra
     },
+#ifdef PVFS2_LINUX_KERNEL_2_4
     {0}
+#else
+    {.ctl_name = 0}
+#endif
 };
 static int acache_perf_count = PVFS2_PERF_COUNT_REQUEST_ACACHE;
 static int static_acache_perf_count = PVFS2_PERF_COUNT_REQUEST_STATIC_ACACHE;
@@ -436,7 +448,11 @@ static ctl_table pvfs2_pc_table[] = {
         .proc_handler = pvfs2_pc_proc_handler,
         .extra1 = &ncache_perf_count
     },
+#ifdef PVFS2_LINUX_KERNEL_2_4
     {0}
+#else
+    {.ctl_name = 0}
+#endif
 };
 
 pvfs2_stats g_pvfs2_stats;
@@ -475,7 +491,11 @@ static ctl_table pvfs2_stats_table[] = {
         .mode     = 0444,
         .proc_handler = &proc_dointvec,
     },
+#ifdef PVFS2_LINUX_KERNEL_2_4
     {0}
+#else
+    {.ctl_name = 0}
+#endif
 };
 
 static ctl_table pvfs2_table[] = {
@@ -569,7 +589,11 @@ static ctl_table pvfs2_table[] = {
         .mode = 0555,
         .child = pvfs2_stats_table
     },
+#ifdef PVFS2_LINUX_KERNEL_2_4
     {0}
+#else
+    {.ctl_name = 0}
+#endif
 };
 static ctl_table fs_table[] = {
     {
@@ -578,7 +602,11 @@ static ctl_table fs_table[] = {
         .mode = 0555,
         .child = pvfs2_table
     },
+#ifdef PVFS2_LINUX_KERNEL_2_4
     {0}
+#else
+    {.ctl_name = 0}
+#endif
 };
 #endif
 
