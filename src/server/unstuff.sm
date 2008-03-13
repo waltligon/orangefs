@@ -431,6 +431,9 @@ static PINT_sm_action getattr_interpret(
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     s_op->resp.u.unstuff.attr = getattr_op->resp.u.getattr.attr;
+    /* TODO: need to do the same cleanup steps that getattr_cleanup() does,
+     * except for free_object_attr().
+     */
 
     free(getattr_op);
 
