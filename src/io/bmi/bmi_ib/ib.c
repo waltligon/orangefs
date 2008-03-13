@@ -211,6 +211,8 @@ static int ib_check_cq(void)
 		    sq->state.send = SQ_WAITING_DATA_SEND_COMPLETION;
 		else if (state == SQ_WAITING_RTS_DONE_SEND_COMPLETION)
 		    sq->state.send = SQ_WAITING_USER_TEST;
+		else if (state == SQ_CANCELLED)
+		    ;
 		else
 		    bmi_ib_assert(0, "%s: unknown send state %s (%d) of sq %p",
 				  __func__, sq_state_name(sq->state.send),
@@ -225,8 +227,10 @@ static int ib_check_cq(void)
 		
 		if (state == RQ_RTS_WAITING_CTS_SEND_COMPLETION)
 		    rq->state.recv = RQ_RTS_WAITING_RTS_DONE;
+		else if (state == RQ_CANCELLED)
+		    ;
 		else
-		    bmi_ib_assert(0, "%s: unknown send state %s of rq %p",
+		    bmi_ib_assert(0, "%s: unknown recv state %s of rq %p",
 				  __func__, rq_state_name(rq->state.recv), rq);
 		debug(2, "%s: send to %s completed locally: rq %p -> %s",
 		      __func__, bh->c->peername, rq,
