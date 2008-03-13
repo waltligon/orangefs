@@ -157,6 +157,8 @@ LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LIBS += -lpvfs2 @LIBS@ 
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
+# need to include external dependency libs when building shared libraries
+DEPLIBS := @LIBS@
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
@@ -285,6 +287,7 @@ endif
 LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
 LIBS += @THREAD_LIB@
+DEPLIBS += @THREAD_LIB@
 LIBS_THREADED += @THREAD_LIB@
 
 ################################################################
@@ -303,6 +306,7 @@ ifdef BUILD_GM
     CFLAGS += -D__STATIC_METHOD_BMI_GM__
     GMLIBS := -L@GM_LIBDIR@ -lgm
     LIBS += $(GMLIBS)
+    DEPLIBS += $(GMLIBS)
     LIBS_THREADED += $(GMLIBS)
     SERVERLIBS += $(GMLIBS)
 endif
@@ -315,6 +319,7 @@ ifdef BUILD_MX
     CFLAGS += -D__STATIC_METHOD_BMI_MX__
     MXLIBS := -L@MX_LIBDIR@ -lmyriexpress -lpthread
     LIBS += $(MXLIBS)
+    DEPLIBS += $(MXLIBS)
     LIBS_THREADED += $(MXLIBS)
     SERVERLIBS += $(MXLIBS)
 endif
@@ -328,6 +333,7 @@ ifdef BUILD_IB
     IBLIBS := -L@IB_LIBDIR@ \
 	      -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
     LIBS += $(IBLIBS)
+    DEPLIBS += $(IBLIBS)
     LIBS_THREADED += $(IBLIBS)
     SERVERLIBS += $(IBLIBS)
 endif
@@ -338,6 +344,7 @@ ifndef BUILD_IB
 endif
     OPENIBLIBS := -L@OPENIB_LIBDIR@ -libverbs
     LIBS += $(OPENIBLIBS)
+    DEPLIBS += $(OPENIBLIBS)
     LIBS_THREADED += $(OPENIBLIBS)
     SERVERLIBS += $(OPENIBLIBS)
 endif
@@ -348,6 +355,7 @@ ifdef BUILD_PORTALS
 ifneq (,@PORTALS_LIBS@)
     PORTALS_LIBS := @PORTALS_LIBS@
     LIBS += $(PORTALS_LIBS)
+    DEPLIBS += $(PORTALS_LIBS)
     LIBS_THREADED += $(PORTALS_LIBS)
     SERVERLIBS += $(PORTALS_LIBS)
 endif
@@ -637,13 +645,13 @@ lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
 lib/libpvfs2.so: $(LIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -o $@ $(LIBPICOBJS)
+	$(E)$(LDSHARED) -o $@ $(LIBPICOBJS) $(DEPLIBS)
 
 # rule for building the pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -o $@ $(LIBTHREADEDPICOBJS)
+	$(E)$(LDSHARED) -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
