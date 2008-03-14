@@ -415,18 +415,6 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	fi
 
-	dnl certain Fedora FC5 kernel header files throw extra (spurious)
-	dnl warnings, which -Wno-pointer-sign silences, but that option is 
-	dnl only supported by gcc-4.
-	if test "x$GCC" = "xyes" ; then
-		AC_MSG_CHECKING(for gcc major version)
-		gcc_version=`$CC --version| head -1 | tr . ' ' | cut -d ' ' -f 3`
-		AC_MSG_RESULT($gcc_version)
-		if test $gcc_version -gt 3 ; then
-			extra_gcc_flags="-Wno-pointer-sign  -Wno-strict-aliasing -Wno-strict-aliasing=2"
-		fi
-	fi
-
 	AC_MSG_CHECKING(for dentry argument in kernel super_operations statfs)
 	dnl Rely on the fact that there is an external vfs_statfs that is
 	dnl of the same type as the .statfs in struct super_operations to

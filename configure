@@ -9534,17 +9534,6 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 	fi
 
-				if test "x$GCC" = "xyes" ; then
-		{ echo "$as_me:$LINENO: checking for gcc major version" >&5
-echo $ECHO_N "checking for gcc major version... $ECHO_C" >&6; }
-		gcc_version=`$CC --version| head -1 | tr . ' ' | cut -d ' ' -f 3`
-		{ echo "$as_me:$LINENO: result: $gcc_version" >&5
-echo "${ECHO_T}$gcc_version" >&6; }
-		if test $gcc_version -gt 3 ; then
-			extra_gcc_flags="-Wno-pointer-sign  -Wno-strict-aliasing -Wno-strict-aliasing=2"
-		fi
-	fi
-
 	{ echo "$as_me:$LINENO: checking for dentry argument in kernel super_operations statfs" >&5
 echo $ECHO_N "checking for dentry argument in kernel super_operations statfs... $ECHO_C" >&6; }
 															cat >conftest.$ac_ext <<_ACEOF
