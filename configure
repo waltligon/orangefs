@@ -6072,7 +6072,7 @@ echo $ECHO_N "checking for openssl library... $ECHO_C" >&6; }
             LDFLAGS="$LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
             SERVER_LDFLAGS="$SERVER_LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
         fi
-        LIBS="$LIBS -lcrypt -lssl"
+        LIBS="$LIBS -lcrypto -lssl"
 
         cat >conftest.$ac_ext <<_ACEOF
 #include "openssl/bio.h"
@@ -6446,7 +6446,7 @@ else
     { echo "$as_me:$LINENO: checking for openssl library" >&5
 echo $ECHO_N "checking for openssl library... $ECHO_C" >&6; }
     TMPLIBS=${LIBS}
-    LIBS="$LIBS -lcrypt -lssl"
+    LIBS="$LIBS -lcrypto -lssl"
 
     cat >conftest.$ac_ext <<_ACEOF
 #include "openssl/bio.h"
