@@ -250,6 +250,7 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
             {
                 s_op->u.listattr.attr_a[j] = getattr_op->resp.u.getattr.attr;
                 s_op->u.listattr.errors[j] = tmp_err;
+                free(getattr_op);
                 break;
             }
         }
