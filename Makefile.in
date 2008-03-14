@@ -67,6 +67,7 @@ INSTALL = @INSTALL@
 # TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
+LN_S = ln -snf
 BUILD_BMI_TCP = @BUILD_BMI_TCP@
 BUILD_GM = @BUILD_GM@
 BUILD_MX = @BUILD_MX@
@@ -168,6 +169,10 @@ TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
 NPTL_WORKAROUND = @NPTL_WORKAROUND@
 STRICT_CFLAGS = @STRICT_CFLAGS@
+SO_VER = @PVFS2_VERSION_MAJOR@
+SO_MINOR = @PVFS2_VERSION_MINOR@
+SO_RELEASE = @PVFS2_VERSION_SUB@
+SO_FULLVER = $(SO_VER).$(SO_MINOR).$(SO_RELEASE)
 # for Solaris:
 # LIBS += -lsocket -lnsl
 
@@ -649,13 +654,13 @@ lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
 lib/libpvfs2.so: $(LIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -o $@ $(LIBPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so -o $@ $(LIBPICOBJS) $(DEPLIBS)
 
 # rule for building the pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
@@ -917,7 +922,18 @@ install:: all install_doc
 	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(includedir)
 
 	install -d $(libdir)
-	install -m 755 $(LIBRARIES) $(libdir)
+ifneq (,$(LIBRARIES_STATIC))
+	for i in $(notdir $(LIBRARIES_STATIC)) ; do \
+	    install -m 755 lib/$$i $(libdir) ;\
+	done
+endif
+ifneq (,$(LIBRARIES_SHARED))
+	for i in $(notdir $(LIBRARIES_SHARED)) ; do \
+	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
+	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
+	done
+endif
 
 ifdef TARGET_OS_DARWIN
 #       TOC needs to be regenerated in libs after they get moved

@@ -651,6 +651,9 @@ build_alias
 host_alias
 target_alias
 PVFS2_VERSION
+PVFS2_VERSION_MAJOR
+PVFS2_VERSION_MINOR
+PVFS2_VERSION_SUB
 build
 build_cpu
 build_vendor
@@ -1841,28 +1844,31 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
-PVFS2_MAJOR=2
-PVFS2_MINOR=7
-PVFS2_SUB=1
+PVFS2_VERSION_MAJOR=2
+PVFS2_VERSION_MINOR=7
+PVFS2_VERSION_SUB=1
 #PVFS2_PRE=""
-PVFS2_PRE="pre1-$CONFIGURE_TIME"
+PVFS2_VERSION_PRE="pre1-$CONFIGURE_TIME"
 
-PVFS2_VERSION=$PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE
+PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB$PVFS2_VERSION_PRE
 
 
 cat >>confdefs.h <<_ACEOF
-#define PVFS2_VERSION_MAJOR $PVFS2_MAJOR
+#define PVFS2_VERSION_MAJOR $PVFS2_VERSION_MAJOR
 _ACEOF
 
 
 cat >>confdefs.h <<_ACEOF
-#define PVFS2_VERSION_MINOR $PVFS2_MINOR
+#define PVFS2_VERSION_MINOR $PVFS2_VERSION_MINOR
 _ACEOF
 
 
 cat >>confdefs.h <<_ACEOF
-#define PVFS2_VERSION_SUB $PVFS2_SUB
+#define PVFS2_VERSION_SUB $PVFS2_VERSION_SUB
 _ACEOF
+
+
+
 
 
 # Make sure we can run config.sub.
@@ -18532,6 +18538,9 @@ build_alias!$build_alias$ac_delim
 host_alias!$host_alias$ac_delim
 target_alias!$target_alias$ac_delim
 PVFS2_VERSION!$PVFS2_VERSION$ac_delim
+PVFS2_VERSION_MAJOR!$PVFS2_VERSION_MAJOR$ac_delim
+PVFS2_VERSION_MINOR!$PVFS2_VERSION_MINOR$ac_delim
+PVFS2_VERSION_SUB!$PVFS2_VERSION_SUB$ac_delim
 build!$build$ac_delim
 build_cpu!$build_cpu$ac_delim
 build_vendor!$build_vendor$ac_delim
@@ -18588,9 +18597,6 @@ PVFS2_SEGV_BACKTRACE!$PVFS2_SEGV_BACKTRACE$ac_delim
 build_shared!$build_shared$ac_delim
 INTELC!$INTELC$ac_delim
 GNUC!$GNUC$ac_delim
-DB_CFLAGS!$DB_CFLAGS$ac_delim
-DB_LIB!$DB_LIB$ac_delim
-NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -18632,6 +18638,9 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+DB_CFLAGS!$DB_CFLAGS$ac_delim
+DB_LIB!$DB_LIB$ac_delim
+NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
 TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
 TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
 BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
@@ -18659,7 +18668,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 25; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 28; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
