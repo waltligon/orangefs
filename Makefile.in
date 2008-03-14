@@ -49,13 +49,17 @@
 ###############################################################
 # Generic makefile setup 
 
-# define a few generic variables that we need to use
+# define a few generic variables that we need to use; DESTDIR may
+# be overridden on the command line during make install
 DESTDIR =
 srcdir = @srcdir@
-prefix = $(DESTDIR)@prefix@
-datarootdir = $(DESTDIR)@datarootdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+includedir = $(DESTDIR)@includedir@
 mandir = $(DESTDIR)@mandir@
-exec_prefix = $(DESTDIR)@exec_prefix@
+sbindir = $(DESTDIR)@sbindir@
+bindir = $(DESTDIR)@bindir@
+libdir = $(DESTDIR)@libdir@
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
@@ -902,43 +906,43 @@ install_doc:
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
 
 install:: all install_doc
-	install -d $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-request.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-debug.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-types.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-util.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(prefix)/include
+	install -d $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-types.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-util.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(includedir)
 
-	install -d $(prefix)/lib
-	install -m 755 $(LIBRARIES) $(prefix)/lib
+	install -d $(libdir)
+	install -m 755 $(LIBRARIES) $(libdir)
 
 ifdef TARGET_OS_DARWIN
 #       TOC needs to be regenerated in libs after they get moved
 	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES))
 endif
 
-	install -d $(prefix)/bin
-	install -m 755 $(ADMINTOOLS) $(prefix)/bin
-	install -m 755 src/apps/admin/pvfs2-config $(prefix)/bin
+	install -d $(bindir)
+	install -m 755 $(ADMINTOOLS) $(bindir)
+	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(prefix)/bin
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(prefix)/bin
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 ifdef BUILD_KARMA
-	install -m 755 $(KARMA) $(prefix)/bin
+	install -m 755 $(KARMA) $(bindir)
 endif
 
-	install -d $(prefix)/sbin
+	install -d $(sbindir)
 
 ifdef BUILD_SERVER
-	install -m 755 $(ADMINTOOLS_SERVER) $(prefix)/bin
+	install -m 755 $(ADMINTOOLS_SERVER) $(bindir)
     ifeq ($(NPTL_WORKAROUND),)
-	install -m 755 $(SERVER) $(prefix)/sbin
+	install -m 755 $(SERVER) $(sbindir)
     else
-	install -m 755 $(srcdir)/$(SERVER_STUB) $(prefix)/sbin/pvfs2-server
-	install -m 755 $(SERVER) $(prefix)/sbin/pvfs2-server.bin
+	install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
+	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
     endif
 endif
 
@@ -959,8 +963,8 @@ just_kmod_install: just_kmod
 
 .PHONY: kmod_install
 kmod_install: kmod kernapps just_kmod_install
-	install -d $(prefix)/sbin
-	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(prefix)/sbin
+	install -d $(sbindir)
+	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(sbindir)
 endif
 
 ifneq (,$(LINUX24_KERNEL_SRC))
@@ -980,11 +984,11 @@ just_kmod24_install: just_kmod24
 
 .PHONY: kmod24_install
 kmod24_install: kmod24 kernapps just_kmod24_install
-	install -d $(prefix)/sbin
-	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(prefix)/sbin
-	install -m 755 src/apps/kernel/linux/mount.pvfs2 $(prefix)/sbin
+	install -d $(sbindir)
+	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(sbindir)
+	install -m 755 src/apps/kernel/linux/mount.pvfs2 $(sbindir)
 	@echo ""
 	@echo "For improved linux-2.4 support,"
-	@echo "install $(prefix)/sbin/mount.pvfs2 to /sbin/mount.pvfs2"
+	@echo "install $(sbindir)/mount.pvfs2 to /sbin/mount.pvfs2"
 	@echo ""
 endif
