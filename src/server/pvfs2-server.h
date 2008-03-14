@@ -385,16 +385,10 @@ struct PINT_server_getattr_op
 
 struct PINT_server_listattr_op
 {
-    uint32_t nhandles;
-    PVFS_handle *handles;
-    PVFS_size dirent_count;
-    PVFS_fs_id fs_id;
     PVFS_object_attr *attr_a;
     PVFS_ds_attributes *ds_attr_a;
     PVFS_error *errors;
-    uint32_t attrmask;
-    uint32_t handle_index;
-    PVFS_ds_keyval_handle_info keyval_handle_info;
+    int parallel_sms;
 };
 
 /* this is used in both set_eattr, get_eattr and list_eattr */
