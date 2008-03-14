@@ -46,6 +46,8 @@ enum
     STATE_DONE     = 12
 };
 
+static void free_nested_getattr_data(struct PINT_server_op *s_op);
+
 %%
 
 nested machine pvfs2_get_attr_work_sm
@@ -404,8 +406,14 @@ static PINT_sm_action getattr_read_symlink_target(
 	return SM_ACTION_COMPLETE;
     }
 
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
     s_op->val.buffer = s_op->resp.u.getattr.attr.u.sym.target_path;
     s_op->val.buffer_sz = s_op->resp.u.getattr.attr.u.sym.target_path_len;
+    /* this will get cleaned up with attr structure */
+    s_op->free_val = 0;
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
@@ -451,11 +459,6 @@ static PINT_sm_action getattr_interpret_metafile_hint(
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
     }
-    if (s_op->val.buffer)
-    {
-        free(s_op->val.buffer);
-        s_op->val.buffer = NULL;
-    }
     return 1;
 }
 
@@ -483,8 +486,13 @@ static PINT_sm_action getattr_read_metafile_hint(
     s_op->key.buffer = Trove_Special_Keys[METAFILE_HINT_KEY].key;
     s_op->key.buffer_sz = Trove_Special_Keys[METAFILE_HINT_KEY].size;
 
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
     s_op->val.buffer = buf;
     s_op->val.buffer_sz = sizeof(s_op->resp.u.getattr.attr.u.meta.hint) + 1;
+    s_op->free_val = 1;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
 		 "  reading metafile hint (coll_id = %d, "
@@ -577,8 +585,14 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
 	return SM_ACTION_COMPLETE;
     }
 
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
     s_op->val.buffer = s_op->resp.u.getattr.attr.u.meta.dfile_array;
     s_op->val.buffer_sz = (dfile_count * sizeof(PVFS_handle));
+    /* this will get cleaned up with attr structure */
+    s_op->free_val = 0;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
 		 "  reading %d datafile handles (coll_id = %d, "
@@ -638,6 +652,10 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     /* add mask value to indicate the distribution is filled */
     s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DIST;
 
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
     s_op->val.buffer_sz = s_op->resp.u.getattr.attr.u.meta.dist_size; 
     s_op->val.buffer = malloc(s_op->val.buffer_sz);
     if (!s_op->val.buffer)
@@ -675,10 +693,7 @@ static PINT_sm_action getattr_setup_resp(
     }
     if(js_p->error_code < 0)
     {
-        if(s_op->val.buffer)
-        {
-            free(s_op->val.buffer);
-        }
+        free_nested_getattr_data(s_op);
         return SM_ACTION_COMPLETE;
     }
 
@@ -709,12 +724,12 @@ static PINT_sm_action getattr_setup_resp(
         {
             assert(s_op->val.buffer);
             PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
-            free(s_op->val.buffer);
 
             if(resp_attr->u.meta.dist == 0) {
                 gossip_err("Found dist of 0 for handle %llu,%d\n",
                         llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
                 PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
+                free_nested_getattr_data(s_op);
                 js_p->error_code = -PVFS_EIO;
                 return SM_ACTION_COMPLETE;
             }
@@ -757,6 +772,7 @@ static PINT_sm_action getattr_setup_resp(
                        s_op->u.getattr.fs_id);
             PVFS_perror("Symlink retrieval failure",js_p->error_code);
 
+            free_nested_getattr_data(s_op);
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
         }
@@ -786,19 +802,15 @@ static PINT_sm_action getattr_setup_resp(
                         s_op->resp.u.getattr.attr.mask);
 #endif
 
+    free_nested_getattr_data(s_op);
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static void free_nested_getattr_data(struct PINT_server_op *s_op)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* free up anything that was set up specifically by this nested machine */
     if(s_op->val_a)
     {
-        if(s_op->val_a[NUM_DFILES_KEY].buffer)
-        {
-            free(s_op->val_a[NUM_DFILES_KEY].buffer);
-        }
         free(s_op->val_a);
         s_op->val_a = NULL;
     }
@@ -812,6 +824,19 @@ static PINT_sm_action getattr_cleanup(
         free(s_op->u.getattr.err_array);
         s_op->u.getattr.err_array = NULL;
     }
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+        s_op->val.buffer = NULL;
+    }
+
+    return;
+}
+
+static PINT_sm_action getattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return(server_state_machine_complete(smcb));
@@ -838,8 +863,13 @@ static PINT_sm_action getattr_get_dirdata_handle(
 
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
     s_op->val.buffer = &s_op->u.getattr.dirent_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
+    s_op->free_val = 0;
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
@@ -1072,6 +1102,9 @@ static PINT_sm_action getattr_interpret_dir_hint(
             {
                 dfile_count = 0;
             }
+        }
+        if(s_op->val_a[NUM_DFILES_KEY].buffer)
+        {
             free(s_op->val_a[NUM_DFILES_KEY].buffer);
             s_op->val_a[NUM_DFILES_KEY].buffer = NULL;
             s_op->val_a[NUM_DFILES_KEY].buffer_sz = 0;
