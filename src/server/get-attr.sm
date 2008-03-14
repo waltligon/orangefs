@@ -1106,8 +1106,8 @@ static PINT_sm_action getattr_get_dir_hint(
 
     js_p->error_code = 0;
     ret = job_trove_keyval_read_list(
-        s_op->req->u.getattr.fs_id, 
-        s_op->req->u.getattr.handle,
+        s_op->u.getattr.fs_id, 
+        s_op->u.getattr.handle,
         s_op->key_a, s_op->val_a, s_op->u.getattr.err_array, NUM_SPECIAL_KEYS,
         0, NULL, smcb, 0, js_p, &tmp_id,
         server_job_context);
