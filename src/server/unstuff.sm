@@ -30,14 +30,14 @@ machine pvfs2_unstuff_sm
     {
         jump pvfs2_prelude_sm;
         success => getattr_setup;
-        default => setup_resp;
+        default => final_response;
     }
 
     state getattr_setup
     {
         run getattr_setup;
         success => getattr_do_work;
-        default => setup_resp;
+        default => final_response;
     }
 
     state getattr_do_work
@@ -50,21 +50,21 @@ machine pvfs2_unstuff_sm
     {
         run getattr_interpret;
         STATE_UNSTUFF => get_keyvals;
-        default => setup_resp;
+        default => final_response;
     }
 
     state get_keyvals
     {
         run get_keyvals;
         success => inspect_keyvals;
-        default => setup_resp;
+        default => final_response;
     }
 
     state inspect_keyvals
     {
         run inspect_keyvals;
         success => get_handles;
-        default => setup_resp;
+        default => final_response;
     }
 
     state get_handles
@@ -77,25 +77,19 @@ machine pvfs2_unstuff_sm
     {
         run set_handles_on_object;
         success => update_dfile_count;
-        default => setup_resp;
+        default => final_response;
     }
 
     state update_dfile_count
     {
         run update_dfile_count;
         success => remove_layout;
-        default => setup_resp;
+        default => final_response;
     }
 
     state remove_layout
     {
         run remove_layout;
-        default => setup_resp;
-    }
-
-    state setup_resp
-    {
-        run setup_resp;
         default => final_response;
     }
 
@@ -345,14 +339,6 @@ static PINT_sm_action remove_layout(
         smcb, 0, js_p, &j_id, server_job_context);
 }
 
-static PINT_sm_action setup_resp(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    /*  TODO: may be able to eliminate this step */
-    return SM_ACTION_COMPLETE;
-}
-
 static PINT_sm_action cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -375,7 +361,6 @@ static PINT_sm_action cleanup(
     return (server_state_machine_complete(smcb));
 }
 
-/* TODO: comment */
 static PINT_sm_action getattr_setup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -417,7 +402,6 @@ static PINT_sm_action getattr_setup(
     return SM_ACTION_COMPLETE;
 }
 
-/* TODO: comment */
 static PINT_sm_action getattr_interpret(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -431,15 +415,16 @@ static PINT_sm_action getattr_interpret(
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     s_op->resp.u.unstuff.attr = getattr_op->resp.u.getattr.attr;
-    /* TODO: need to do the same cleanup steps that getattr_cleanup() does,
-     * except for free_object_attr().
-     */
 
     free(getattr_op);
 
     /* TODO: TEMPORARY!
      * valgrind seems to think that error_code is uninitialized; need to
      * track down later
+     */
+    /* TODO: that error value out of pop_frame() works fine with pjmp (see
+     * list-attr); maybe it just isn't used for frames pushed on 
+     * regular nested machines?
      */
     js_p->error_code = 0;
 
