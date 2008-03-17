@@ -181,6 +181,7 @@ int parse_args(int argc, char **argv)
 				break;
 			case 'i':
 				opt_do_indep = 1;
+				break;
 			case '?':
 			case ':':
 			default:
