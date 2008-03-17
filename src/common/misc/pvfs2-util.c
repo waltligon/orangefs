@@ -1172,9 +1172,9 @@ int PVFS_util_init_defaults(void)
 #define KILOBYTE                1024
 #define MEGABYTE   (1024 * KILOBYTE)
 #define GIGABYTE   (1024 * MEGABYTE)
-/*
 #define TERABYTE   (1024 * GIGABYTE)
 #define PETABYTE   (1024 * TERABYTE)
+/*
 #define EXABYTE    (1024 * PETABYTE)
 #define ZETTABYTE  (1024 * EXABYTE)
 #define YOTTABYTE  (1024 * ZETTABYTE)
@@ -1185,31 +1185,31 @@ int PVFS_util_init_defaults(void)
 #define SI_KILOBYTE                   1000
 #define SI_MEGABYTE   (1000 * SI_KILOBYTE)
 #define SI_GIGABYTE   (1000 * SI_MEGABYTE)
-/*
 #define SI_TERABYTE  (1000 * SI_GIGABYTE)
 #define SI_PETABYTE  (1000 * SI_TERABYTE)
+/*
 #define SI_EXABYTE   (1000 * SI_PETABYTE)
 #define SI_ZETTABYTE (1000 * SI_EXABYTE)
 #define SI_YOTTABYTE (1000 * SI_ZETTABYTE)
 */
-#define NUM_SIZES                  3
+#define NUM_SIZES                  5
 
 static PVFS_size PINT_s_size_table[NUM_SIZES] =
 {
-    /*YOTTABYTE, ZETTABYTE, EXABYTE, PETABYTE, TERABYTE, */
-    GIGABYTE, MEGABYTE, KILOBYTE
+    /*YOTTABYTE, ZETTABYTE, EXABYTE, */
+    PETABYTE, TERABYTE, GIGABYTE, MEGABYTE, KILOBYTE
 };
 
 static PVFS_size PINT_s_si_size_table[NUM_SIZES] =
 {
-    /*SI_YOTTABYTE, SI_ZETTABYTE, SI_EXABYTE, SI_PETABYTE, SI_TERABYTE, */
-    SI_GIGABYTE, SI_MEGABYTE, SI_KILOBYTE
+    /*SI_YOTTABYTE, SI_ZETTABYTE, SI_EXABYTE, */
+    SI_PETABYTE, SI_TERABYTE, SI_GIGABYTE, SI_MEGABYTE, SI_KILOBYTE
 };
 
 static const char *PINT_s_str_size_table[NUM_SIZES] =
 {
-    /*"Y", "Z", "E", "P","T", */
-    "G", "M", "K"
+    /*"Y", "Z", "E", */
+    "P","T", "G", "M", "K"
 };
 
 /*
