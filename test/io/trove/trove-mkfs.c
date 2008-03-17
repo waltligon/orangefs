@@ -59,7 +59,7 @@ int main(int argc, char **argv)
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(
             TROVE_METHOD_DBPF, file_system, &coll_id, NULL, &op_id);
-    if (ret != -1) {
+    if (ret == 0) {
 	fprintf(stderr, "collection lookup succeeded before it should.\n");
 	return -1;
     }
