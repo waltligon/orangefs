@@ -397,7 +397,7 @@ static ctl_table pvfs2_stats_table[] = {
         .mode     = 0444,
         .proc_handler = &proc_dointvec,
     },
-    {.ctl_name = 0},
+    {.ctl_name = 0}
 };
 
 static ctl_table pvfs2_table[] = {
