@@ -88,24 +88,34 @@ void *dbpf_thread_function(void *ptr)
         /* check if we any have ops to service in our work queue */
         gen_mutex_lock(&dbpf_op_queue_mutex);
         op_queued_empty = qlist_empty(&dbpf_op_queue);
-        gen_mutex_unlock(&dbpf_op_queue_mutex);
 
         if (!op_queued_empty)
         {
+            gen_mutex_unlock(&dbpf_op_queue_mutex);
             dbpf_do_one_work_cycle(&out_count);
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+            if(out_count == 0)
+            {
+                /* if we aren't using aio callbacks, and the outcount is
+                 * zero, then that means that the only ops in the queue are
+                 * I/O operations that we can do nothing with except call
+                 * aio_error() repeatedly.  
+                 */
+                /* There is no convenient way to handle this.  Just sleep
+                 * breifly to prevent busy spin (which means we may sleep
+                 * through a metadata op being posted).  If someone cares about
+                 * optimizing this case then the solution is to explicitly
+                 * track if any of the operations in the queue are metadata
+                 * operations or not so that we know up front to do a
+                 * cond_timedwait() here.
+                 */
+                wait_time.tv_sec = 0;
+                wait_time.tv_nsec = 1000;
+                nanosleep(&wait_time, NULL);
+            }
+#endif
         }
-
-        /*
-          if we have no work to do, wait nicely until an operation to
-          be serviced has entered the system.
-
-          if the queue isn't empty, and the out_count is 0, that means
-          that we're driving i/o operations without using the aio
-          callback completion.  we sleep between those calls to avoid
-          busy waiting (i.e. the timedwait call is okay in those
-          cases)
-        */
-        if ((op_queued_empty) || (!op_queued_empty && (out_count == 0)))
+        else
         {
             /* compute how long to wait */
             gettimeofday(&base, NULL);
@@ -119,7 +129,6 @@ void *dbpf_thread_function(void *ptr)
                 wait_time.tv_sec++;
             }
 
-            gen_mutex_lock(&dbpf_op_queue_mutex);
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
                                          &dbpf_op_queue_mutex,
                                          &wait_time);
