@@ -8,7 +8,11 @@
  * The timing and command-line parsing were so useful that this was further
  * extended to test resize operations
  *
- * usage:  -d /path/to/directory -n number_of_files [-O] [-R]
+ * And while the default (and most useful) mode is to compare collective
+ * open/create/resize, it is sometimes instructive to compare with independent
+ * access
+ *
+ * usage:  -d /path/to/directory -n number_of_files [-O] [-R] [-i]
  */
 
 #include <string.h>
@@ -138,6 +142,7 @@ int opt_nfiles;
 char opt_basedir[PATH_MAX];
 int opt_do_open=0;
 int opt_do_resize=0;
+int opt_do_indep=0;
 
 void usage(char *name);
 int parse_args(int argc, char **argv);
@@ -147,17 +152,20 @@ int test_resize(int rank, int iterations, char * test_dir, MPI_Info info);
 
 void usage(char *name)
 {
-	fprintf(stderr, "usage: %s -d /path/to/directory -n #_of_files [TEST}\n", name);
+	fprintf(stderr, "usage: %s -d /path/to/directory -n #_of_files [TEST] [MODE]\n", name);
 	fprintf(stderr, "   where TEST is one of:\n"
 			"     -O       test file open times\n"
-			"     -R       test file resize times\n");
+			"     -R       test file resize times\n"
+			"   and MODE is one of:\n"
+			"     -i       independent operations\n"
+			"     -c       collective operations (default)\n");
 
 		exit(-1);
 }
 int parse_args(int argc, char **argv)
 {
 	int c;
-	while ( (c = getopt(argc, argv, "d:n:OR")) != -1 ) {
+	while ( (c = getopt(argc, argv, "d:n:ORic")) != -1 ) {
 		switch (c) {
 			case 'd':
 				strncpy(opt_basedir, optarg, PATH_MAX);
@@ -170,6 +178,9 @@ int parse_args(int argc, char **argv)
 				break;
 			case 'R':
 				opt_do_resize = 1;
+				break;
+			case 'i':
+				opt_do_indep = 1;
 				break;
 			case '?':
 			case ':':
@@ -224,13 +235,15 @@ int main(int argc, char **argv)
 	if (rank == 0) {
 		printf("%d procs ", nprocs);
 		if (opt_do_open) {
-			printf("%f seconds to open %d files: %f secs/open\n", 
-					total_time, opt_nfiles, 
-					(total_time)/opt_nfiles);
+			printf("%f seconds to open %d files: %f secs/open: %s\n", 
+				total_time, opt_nfiles, 
+				(total_time)/opt_nfiles, 
+				(opt_do_indep? "independent" : "collective"));
 		} else if (opt_do_resize) {
-			printf("%f seconds to perform %d resize ops: %f secs/operation\n", 
-					total_time, opt_nfiles, 
-					(total_time)/opt_nfiles);
+			printf("%f seconds to perform %d resize ops: %f secs/operation: %s\n", 
+				total_time, opt_nfiles, 
+				(total_time)/opt_nfiles,
+				(opt_do_indep? "independent" : "collective"));
 		}
 			
 	}
@@ -245,11 +258,15 @@ int test_opens(int nfiles, char * test_dir, MPI_Info info)
 	int i;
 	char test_file[PATH_MAX];
 	MPI_File fh;
+	MPI_Comm comm = MPI_COMM_WORLD;
 	int errcode;
+
+	if (opt_do_indep) 
+		comm = MPI_COMM_SELF;
 
 	for (i=0; i<nfiles; i++) {
 		snprintf(test_file, PATH_MAX, "%s/testfile.%d", test_dir, i);
-		errcode = MPI_File_open(MPI_COMM_WORLD, test_file, 
+		errcode = MPI_File_open(comm, test_file, 
 				MPI_MODE_CREATE|MPI_MODE_RDWR, info, &fh);
 		if (errcode != MPI_SUCCESS) {
 			handle_error(errcode, "MPI_File_open");
@@ -277,9 +294,13 @@ int test_resize(int rank, int iterations, char * test_dir, MPI_Info info)
 	MPI_File fh;
 	int errcode;
 	MPI_Offset size;
+	MPI_Comm comm = MPI_COMM_WORLD;
+
+	if (opt_do_indep) 
+		comm = MPI_COMM_SELF;
 
 	snprintf(test_file, PATH_MAX, "%s/testfile", test_dir);
-	errcode = MPI_File_open(MPI_COMM_WORLD, test_file, 
+	errcode = MPI_File_open(comm, test_file, 
 			MPI_MODE_CREATE|MPI_MODE_RDWR, info, &fh);
 	if (errcode != MPI_SUCCESS) {
 		handle_error(errcode, "MPI_File_open");
