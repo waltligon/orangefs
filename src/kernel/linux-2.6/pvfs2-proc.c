@@ -260,6 +260,7 @@ static struct pvfs2_param_extra perf_reset_extra = {
 };
 static int min_debug[] = {0}, max_debug[] = {GOSSIP_MAX_DEBUG};
 static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
+static int min_slot_timeout_secs[] = {0}, max_slot_timeout_secs[] = {INT_MAX};
 
 static ctl_table pvfs2_acache_table[] = {
     /* controls acache timeout */
@@ -424,6 +425,18 @@ static ctl_table pvfs2_table[] = {
         .strategy = &sysctl_intvec,
         .extra1 = &min_op_timeout_secs,
         .extra2 = &max_op_timeout_secs
+    },
+    /* slot timeout */
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(2),
+        .procname = "slot-timeout-secs",
+        .data = &slot_timeout_secs,
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &proc_dointvec_minmax,
+        .strategy = &sysctl_intvec,
+        .extra1 = &min_slot_timeout_secs,
+        .extra2 = &max_slot_timeout_secs
     },
     /* time interval for client side performance counters */
     {

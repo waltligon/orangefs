@@ -143,6 +143,8 @@ typedef unsigned long sector_t;
 #define PVFS2_DEFAULT_OP_TIMEOUT_SECS       20
 #endif
 
+#define PVFS2_DEFAULT_SLOT_TIMEOUT_SECS     1800 /* 30 minutes */
+
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
 
 #define PVFS2_DEVREQ_MAGIC             0x20030529
@@ -927,6 +929,7 @@ extern struct semaphore devreq_semaphore;
 extern struct semaphore request_semaphore;
 extern int debug;
 extern int op_timeout_secs;
+extern int slot_timeout_secs;
 extern struct list_head pvfs2_superblocks;
 extern spinlock_t pvfs2_superblocks_lock;
 extern struct list_head pvfs2_request_list;
