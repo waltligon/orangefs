@@ -428,7 +428,7 @@ static ctl_table pvfs2_table[] = {
     },
     /* slot timeout */
     {
-        .ctl_name = UNNUMBERED_OR_VAL(2),
+        .ctl_name = 3,
         .procname = "slot-timeout-secs",
         .data = &slot_timeout_secs,
         .maxlen = sizeof(int),
@@ -440,7 +440,7 @@ static ctl_table pvfs2_table[] = {
     },
     /* time interval for client side performance counters */
     {
-        .ctl_name = 3,
+        .ctl_name = 4,
         .procname = "perf-time-interval-secs",
         .maxlen = sizeof(int), 
         .mode = 0644,
@@ -449,7 +449,7 @@ static ctl_table pvfs2_table[] = {
     },
     /* time interval for client side performance counters */
     {
-        .ctl_name = 4,
+        .ctl_name = 5,
         .procname = "perf-history-size",
         .maxlen = sizeof(int),
         .mode = 0644,
@@ -458,7 +458,7 @@ static ctl_table pvfs2_table[] = {
     },
     /* reset performance counters */
     {
-        .ctl_name = 5,
+        .ctl_name = 6,
         .procname = "perf-counter-reset",
         .maxlen = sizeof(int),
         .mode = 0644,
@@ -467,14 +467,14 @@ static ctl_table pvfs2_table[] = {
     },
     /* subdir for acache control */
     {
-        .ctl_name = 6,
+        .ctl_name = 7,
         .procname = "acache",
         .maxlen = 0,
         .mode = 0555,
         .child = pvfs2_acache_table
     },
     {
-        .ctl_name = 7,
+        .ctl_name = 8,
         .procname = "perf-counters",
         .maxlen = 0,
         .mode = 0555,
@@ -482,7 +482,7 @@ static ctl_table pvfs2_table[] = {
     },
     /* subdir for ncache control */
     {
-        .ctl_name = 8,
+        .ctl_name = 9,
         .procname = "ncache",
         .maxlen = 0,
         .mode = 0555,
@@ -490,7 +490,7 @@ static ctl_table pvfs2_table[] = {
     },
     /* statistics maintained by the kernel module (output only below this) */
     {
-        .ctl_name = 9,
+        .ctl_name = 10,
         .procname = "stats",
         .maxlen = 0,
         .mode = 0555,
