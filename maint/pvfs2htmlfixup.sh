@@ -17,4 +17,4 @@ perl -p -i -e 's~^.*top_of_page.*$~~' $basename.php
 perl -p -i -e 's~</ADDRESS>~</ADDRESS></table></table></table><?include("../../../../bottom.php"); ?>~' $basename.php
 perl -p -i -e 's~ALIGN="CENTER"~ALIGN="LEFT"~' $basename.php
 perl -p -i -e 's~align="center"~align="left"~' $basename.php
-perl -p -i -e "s~$target.html~index.php~" $basename.php
+perl -p -i -e "s~$target.html~$target.php~" $basename.php
