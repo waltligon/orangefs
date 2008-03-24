@@ -40,13 +40,15 @@ void mpi_print_error(int errcode, char *str);
 void pvfs_prep(int rank, int* n_ops);
 void pvfs_mktestdir(int rank, int* n_ops);
 void pvfs_rmtestdir(int rank, int* n_ops);
+void pvfs_create(int rank, int* n_ops);
+void pvfs_rm(int rank, int* n_ops);
 void pvfs_print_error(int errcode, char *str);
 
 int* vfs_fds = NULL;
 struct stat* vfs_stats = NULL;
 char* vfs_buf = NULL;
 
-int* pvfs_handles = NULL;
+PVFS_object_ref* pvfs_refs = NULL;
 char* pvfs_buf = NULL;
 PVFS_object_ref pvfs_basedir;
 PVFS_object_ref pvfs_testdir;
@@ -92,8 +94,8 @@ struct api_ops api_table[] = {
         .prep = pvfs_prep,
         .mktestdir = pvfs_mktestdir,
         .rmtestdir = pvfs_rmtestdir,
-        .create = NULL,
-        .rm = NULL,
+        .create = pvfs_create,
+        .rm = pvfs_rm,
         .readdir = NULL,
         .readdir_and_stat = NULL,
         .readdirplus = NULL,
@@ -598,7 +600,7 @@ void pvfs_mktestdir(int rank, int* n_ops)
     sprintf(test_dir, "rank%d", rank);
 
     attr.owner = pvfs_creds.uid;
-    attr.owner = pvfs_creds.gid;
+    attr.group = pvfs_creds.gid;
     attr.perms = PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
@@ -672,6 +674,40 @@ void vfs_write(int rank, int* n_ops)
 }
 
 
+void pvfs_create(int rank, int* n_ops)
+{
+    char test_file[PATH_MAX];
+    PVFS_sys_attr attr;
+    PVFS_sysresp_create resp_create;
+    int ret;
+
+    int i;
+
+    *n_ops = opt_nfiles;
+
+    attr.owner = pvfs_creds.uid;
+    attr.group = pvfs_creds.gid;
+    attr.perms = PVFS_U_WRITE|PVFS_U_READ;
+    attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+
+    for(i=0; i<opt_nfiles; i++)
+    {
+        sprintf(test_file, "%d", i);
+
+        ret = PVFS_sys_create(test_file, pvfs_testdir, attr, &pvfs_creds,
+            NULL, NULL, &resp_create);
+        if(ret < 0)
+        {
+            handle_error(ret, "PVFS_sys_create");
+        }
+
+        pvfs_refs[i] = resp_create.ref;
+    }
+
+    return;
+}
+
+
 void vfs_create(int rank, int* n_ops)
 {
     char test_file[PATH_MAX];
@@ -694,6 +730,29 @@ void vfs_create(int rank, int* n_ops)
 
     return;
 }
+
+void pvfs_rm(int rank, int* n_ops)
+{
+    char test_file[PATH_MAX];
+    int ret;
+    int i;
+
+    *n_ops = opt_nfiles;
+
+    for(i=0; i<opt_nfiles; i++)
+    {
+        sprintf(test_file, "%d", i);
+
+        ret = PVFS_sys_remove(test_file, pvfs_testdir, &pvfs_creds);
+        if(ret < 0)
+        {
+            handle_error(ret, "PVFS_sys_remove");
+        }
+    }
+
+    return;
+}
+
 
 void vfs_rm(int rank, int* n_ops)
 {
@@ -756,8 +815,8 @@ void pvfs_prep(int rank, int* n_ops)
     }
 
     /* set up an array of handles to keep track of files */
-    pvfs_handles = malloc(opt_nfiles*sizeof(PVFS_handle));
-    if(!pvfs_handles)
+    pvfs_refs = malloc(opt_nfiles*sizeof(*pvfs_refs));
+    if(!pvfs_refs)
     {
         handle_error(errno, "malloc");
     }
