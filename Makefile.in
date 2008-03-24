@@ -561,6 +561,9 @@ admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 # target for building kernel driver userland programs
 kernapps: $(KERNAPPS) $(KERNAPPSTHR)
 
+# this is needed for the make dist
+statecompgen: $(STATECOMPGEN)
+
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
 # dependencies---only the kernel source tree can do that.
@@ -759,9 +762,13 @@ publish: docs
 
 # rule for cleaning up documentation
 # latex2html puts all its output in a directory
+# don't get rid of generated files in dist releases
 docsclean: 
-	rm -f $(DOCSPS) $(DOCSPDF) $(DOCSCRUFT)
+	rm -f $(DOCSCRUFT)
+ifndef DIST_RELEASE
+	rm -f $(DOCSPS) $(DOCSPDF)
 	rm -rf $(basename $(DOCSHTML))
+endif
 
 # top rule for cleaning up tree
 clean:: 
