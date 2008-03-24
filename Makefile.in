@@ -786,9 +786,13 @@ publish: docs
 
 # rule for cleaning up documentation
 # latex2html puts all its output in a directory
+# don't get rid of generated files in dist releases
 docsclean: 
-	rm -f $(DOCSPS) $(DOCSPDF) $(DOCSCRUFT)
+	rm -f $(DOCSCRUFT)
+ifndef DIST_RELEASE
+	rm -f $(DOCSPS) $(DOCSPDF)
 	rm -rf $(basename $(DOCSHTML))
+endif
 
 # top rule for cleaning up tree
 clean:: 

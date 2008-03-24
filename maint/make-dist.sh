@@ -49,21 +49,49 @@ fi
 ##################
 # start processing
 ##################
-make clean
-make docs
-make statecompgen
 
+# new directory to construct release in
 if test -d $TARGETDIR; then
     rm -rf $TARGETDIR
 fi
 mkdir $TARGETDIR
+if [ $? -ne 0 ]
+then
+    exit 1
+fi
 
+# copy source over
 cp -f --no-dereference -R $SRCDIR/* $TARGETDIR
-cp $BUILDDIR/src/common/statecomp/parser.h $TARGETDIR/src/common/statecomp/
-cp $BUILDDIR/src/common/statecomp/parser.c $TARGETDIR/src/common/statecomp/
-cp $BUILDDIR/src/common/statecomp/scanner.c $TARGETDIR/src/common/statecomp/
 
 cd $TARGETDIR
+
+# dump some special options into the top level module.mk.in
+echo "DIST_RELEASE = 1" >> module.mk.in
+
+# configure, build docs and state machine files
+./configure
+if [ $? -ne 0 ]
+then
+    exit 1
+fi
+make docs
+if [ $? -ne 0 ]
+then
+    exit 1
+fi
+make statecompgen
+if [ $? -ne 0 ]
+then
+    exit 1
+fi
+
+# clean out extra files (distclean will not remove .sm or doc files if
+# DIST_RELEASE is set)
+make distclean
+if [ $? -ne 0 ]
+then
+    exit 1
+fi
 
 # clean out cvs directories and other cruft (if any)
 for f in `find . | grep CVS`; do rm -rf $f; done
@@ -78,9 +106,6 @@ for f in `find . -name "*.toc"`; do rm -rf $f; done
 for f in `find . -name "*.aux"`; do rm -rf $f; done
 rm -f Makefile pvfs2-config.h PVFS2-GLOBAL-TODO.txt
 rm -f src/common/statecomp/statecomp
-
-# dump some special options into the top level module.mk.in
-echo "DIST_RELEASE = 1" >> module.mk.in
 
 # make sure the cleaned up directory exists
 cd /tmp
