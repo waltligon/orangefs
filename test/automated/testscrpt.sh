@@ -93,6 +93,7 @@ teardown_vfs() {
 }
 
 setup_vfs() {
+	dmesg -c >/dev/null
 	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
 	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
 		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
@@ -164,7 +165,7 @@ buildfail() {
 
 setupfail() {
 	echo "Failure in setup"
-	dmesg | tail -20 > ${PVFS2_DEST}/dmesg
+	dmesg > ${PVFS2_DEST}/dmesg
 	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
 		${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* | \
 		${TINDERSCRIPT}  ${TESTNAME}-${CVS_TAG} test_failed $STARTTIME 
