@@ -22,6 +22,7 @@
 #include <dirent.h>
 
 #include <mpi.h>
+#include "pvfs2.h"
 
 void vfs_mktestdir(int rank, int* n_ops);
 void vfs_rmtestdir(int rank, int* n_ops);
@@ -36,10 +37,20 @@ void vfs_print_error(int errcode, char *str);
 
 void mpi_print_error(int errcode, char *str); 
 
+void pvfs_prep(int rank, int* n_ops);
+void pvfs_mktestdir(int rank, int* n_ops);
+void pvfs_rmtestdir(int rank, int* n_ops);
+void pvfs_print_error(int errcode, char *str);
+
 int* vfs_fds = NULL;
-DIR* vfs_dir = NULL;
 struct stat* vfs_stats = NULL;
 char* vfs_buf = NULL;
+
+int* pvfs_handles = NULL;
+char* pvfs_buf = NULL;
+PVFS_object_ref pvfs_basedir;
+PVFS_object_ref pvfs_testdir;
+PVFS_credentials pvfs_creds;
 
 int current_size = -1;
 
@@ -78,9 +89,9 @@ struct api_ops api_table[] = {
     },
     {
         .name = "PVFS system interface",
-        .prep = NULL,
-        .mktestdir = NULL,
-        .rmtestdir = NULL,
+        .prep = pvfs_prep,
+        .mktestdir = pvfs_mktestdir,
+        .rmtestdir = pvfs_rmtestdir,
         .create = NULL,
         .rm = NULL,
         .readdir = NULL,
@@ -89,7 +100,7 @@ struct api_ops api_table[] = {
         .read = NULL,
         .write = NULL,
         .unstuff = NULL,
-        .print_error = NULL,
+        .print_error = pvfs_print_error,
     },
     {
         .name = "MPI-IO",
@@ -207,11 +218,19 @@ void handle_error(
     MPI_Abort(MPI_COMM_WORLD, 1);
 }
 
+void pvfs_print_error(
+    int errcode,
+    char *str)
+{
+    PVFS_perror(str, errcode);
+}
+
+
 void vfs_print_error(
     int errcode,
     char *str)
 {
-    perror(str);
+    fprintf(stderr, "%s: %s\n", str, strerror(errcode));
 }
 
 void mpi_print_error(
@@ -504,13 +523,16 @@ int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name,
 {
     double test_start, test_end, local_elapsed;
 
-    if (rank == 0)
+    if(fn)
     {
-        printf("# Pause...\n");
-    }
+        /* pause a bit to let local caches timeout (if applicable) */
+        if (rank == 0)
+        {
+            printf("# Pause...\n");
+        }
 
-    /* pause a bit to let local caches timeout (if applicable) */
-    sleep(5);
+        sleep(5);
+    }
 
     if (rank == 0)
     {
@@ -545,6 +567,52 @@ int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name,
 
     return(0);
 }
+
+void pvfs_rmtestdir(int rank, int* n_ops)
+{
+    int ret;
+    char test_dir[PATH_MAX];
+
+    sprintf(test_dir, "rank%d", rank);
+
+    *n_ops = 1;
+
+    ret = PVFS_sys_remove(test_dir, pvfs_basedir, &pvfs_creds);
+    if(ret < 0)
+    {
+        handle_error(ret, "PVFS_sys_remove");
+    }
+    
+    return;
+}
+
+void pvfs_mktestdir(int rank, int* n_ops)
+{
+    int ret;
+    PVFS_sysresp_mkdir resp_mkdir;
+    char test_dir[PATH_MAX];
+    PVFS_sys_attr attr;
+
+    *n_ops = 1;
+
+    sprintf(test_dir, "rank%d", rank);
+
+    attr.owner = pvfs_creds.uid;
+    attr.owner = pvfs_creds.gid;
+    attr.perms = PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ;
+    attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+
+    ret = PVFS_sys_mkdir(test_dir, pvfs_basedir, attr, &pvfs_creds, &resp_mkdir);
+    if(ret < 0)
+    {
+        handle_error(ret, "PVFS_sys_mkdir");
+    }
+
+    pvfs_testdir = resp_mkdir.ref;
+
+    return;
+}
+
 
 void vfs_mktestdir(int rank, int* n_ops)
 {
@@ -669,6 +737,67 @@ void vfs_rmtestdir(int rank, int* n_ops)
     return;
 }
 
+void pvfs_prep(int rank, int* n_ops)
+{
+    int i;
+    int biggest;
+    int ret;
+    char pvfs_path[PATH_MAX];
+    PVFS_fs_id fs_id;
+    PVFS_sysresp_lookup resp_lookup;
+
+    *n_ops = 1;
+
+    /* initialize pvfs library */
+    ret = PVFS_util_init_defaults();
+    if(ret < 0)
+    {
+        handle_error(ret, "init");
+    }
+
+    /* set up an array of handles to keep track of files */
+    pvfs_handles = malloc(opt_nfiles*sizeof(PVFS_handle));
+    if(!pvfs_handles)
+    {
+        handle_error(errno, "malloc");
+    }
+
+    biggest = (opt_size > opt_size2 ? opt_size : opt_size2);
+
+    /* a bufer to read and write from */
+    pvfs_buf = malloc(biggest);
+    if(!pvfs_buf)
+    {
+        handle_error(errno, "malloc");
+    }
+    /* fill a pattern in */
+    memset(pvfs_buf, 0, biggest);
+    for(i=0; i<biggest; i++)
+    {
+        pvfs_buf[i] += biggest;
+    }
+
+    /* find the base directory */
+    ret = PVFS_util_resolve(opt_basedir, &fs_id, pvfs_path, PATH_MAX);
+    if(ret < 0)
+    {
+        handle_error(ret, "PVFS_util_resolve");
+    }
+
+    PVFS_util_gen_credentials(&pvfs_creds);
+
+    ret = PVFS_sys_lookup(fs_id, pvfs_path, &pvfs_creds, &resp_lookup, 
+        PVFS2_LOOKUP_LINK_FOLLOW);
+    if(ret < 0)
+    {
+        handle_error(ret, "PVFS_sys_lookup");
+    }
+    pvfs_basedir = resp_lookup.ref;
+
+    return;
+}
+
+
 void vfs_prep(int rank, int* n_ops)
 {
     int i;
@@ -713,6 +842,7 @@ void vfs_readdir(int rank, int* n_ops)
     char test_dir[PATH_MAX];
     int i;
     struct dirent* dent;
+    DIR* vfs_dir = NULL;
 
     *n_ops = opt_nfiles + 2; /* . and .. entries */
 
@@ -744,6 +874,7 @@ void vfs_readdir_and_stat(int rank, int* n_ops)
     int i;
     struct dirent* dent;
     int ret;
+    DIR* vfs_dir = NULL;
 
     *n_ops = opt_nfiles + 2; /* . and .. entries */
 
