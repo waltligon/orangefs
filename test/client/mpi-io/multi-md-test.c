@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <dirent.h>
 
 #include <mpi.h>
 
@@ -25,8 +26,12 @@ void vfs_rmtestdir(int rank, int* n_ops);
 void vfs_create(int rank, int* n_ops);
 void vfs_rm(int rank, int* n_ops);
 void vfs_prep(int rank, int* n_ops);
+void vfs_readdir(int rank, int* n_ops);
+void vfs_readdir_and_stat(int rank, int* n_ops);
 
 int* vfs_fds = NULL;
+DIR* vfs_dir = NULL;
+struct stat* vfs_stats = NULL;
 
 struct api_ops
 {
@@ -36,6 +41,12 @@ struct api_ops
     void (*rmtestdir) (int rank, int* n_ops);
     void (*create) (int rank, int* n_ops);
     void (*rm) (int rank, int* n_ops);
+    void (*readdir) (int rank, int* n_ops);
+    void (*readdir_and_stat) (int rank, int* n_ops);
+    void (*readdirplus) (int rank, int* n_ops);
+    void (*write) (int rank, int* n_ops);
+    void (*read) (int rank, int* n_ops);
+    void (*unstuff) (int rank, int* n_ops);
 };
 
 struct api_ops api_table[] = {
@@ -46,6 +57,12 @@ struct api_ops api_table[] = {
         .rmtestdir = vfs_rmtestdir,
         .create = vfs_create,
         .rm = vfs_rm,
+        .readdir = vfs_readdir,
+        .readdir_and_stat = vfs_readdir_and_stat,
+        .readdirplus = NULL,
+        .read = NULL,
+        .write = NULL,
+        .unstuff = NULL,
     },
     {
         .name = "PVFS system interface",
@@ -54,6 +71,12 @@ struct api_ops api_table[] = {
         .rmtestdir = NULL,
         .create = NULL,
         .rm = NULL,
+        .readdir = NULL,
+        .readdir_and_stat = NULL,
+        .readdirplus = NULL,
+        .read = NULL,
+        .write = NULL,
+        .unstuff = NULL,
     },
     {
         .name = "MPI-IO",
@@ -62,6 +85,12 @@ struct api_ops api_table[] = {
         .rmtestdir = vfs_rmtestdir, /* borrow vfs rmdir */
         .create = NULL,
         .rm = NULL,
+        .readdir = NULL,
+        .readdir_and_stat = NULL,
+        .readdirplus = NULL,
+        .read = NULL,
+        .write = NULL,
+        .unstuff = NULL,
     },
     {0}
 };
@@ -200,6 +229,37 @@ int main(
         rank);
     test++;
 
+    /* readdir */
+    result_array[test].op = "readdir";
+    run_test_phase(
+        &result_array[test].time, 
+        &result_array[test].n_ops,
+        result_array[test].op, 
+        api_table[opt_api].readdir, 
+        rank);
+    test++;
+
+    /* readdir and stat */
+    result_array[test].op = "readdir_and_stat";
+    run_test_phase(
+        &result_array[test].time, 
+        &result_array[test].n_ops,
+        result_array[test].op, 
+        api_table[opt_api].readdir_and_stat, 
+        rank);
+    test++;
+
+    /* readdirplus */
+    result_array[test].op = "readdirplus";
+    run_test_phase(
+        &result_array[test].time, 
+        &result_array[test].n_ops,
+        result_array[test].op, 
+        api_table[opt_api].readdirplus, 
+        rank);
+    test++;
+
+
     /* remove files */
     result_array[test].op = "rm";
     run_test_phase(
@@ -252,6 +312,14 @@ int run_test_phase(double* elapsed_time, int* n_ops, char* fn_name,
     void (*fn)(int, int*), int rank)
 {
     double test_start, test_end, local_elapsed;
+
+    if (rank == 0)
+    {
+        printf("# Pause...\n");
+    }
+
+    /* pause a bit to let local caches timeout (if applicable) */
+    sleep(5);
 
     if (rank == 0)
     {
@@ -370,6 +438,7 @@ void vfs_rmtestdir(int rank, int* n_ops)
 
 void vfs_prep(int rank, int* n_ops)
 {
+
     *n_ops = 1;
 
     /* set up an array of file descriptors to keep track of open files */
@@ -379,6 +448,80 @@ void vfs_prep(int rank, int* n_ops)
         handle_error(-errno, "malloc");
     }
 
+    /* ditto for stat results */
+    vfs_stats = malloc((opt_nfiles+2)*sizeof(struct stat));
+    if(!vfs_stats)
+    {
+        handle_error(-errno, "malloc");
+    }
+
+    return;
+}
+
+void vfs_readdir(int rank, int* n_ops)
+{
+    char test_dir[PATH_MAX];
+    int i;
+    struct dirent* dent;
+
+    *n_ops = opt_nfiles + 2; /* . and .. entries */
+
+    sprintf(test_dir, "%s/rank%d", opt_basedir, rank);
+    vfs_dir = opendir(test_dir);
+    if(!vfs_dir)
+    {
+        handle_error(-errno, "opendir");
+    }
+
+    for(i=0; i<(*n_ops); i++)
+    {
+        dent = readdir(vfs_dir);
+        if(!dent)
+        {
+            handle_error(-errno, "creat");
+        }
+    }
+
+    return;
+
+}
+
+void vfs_readdir_and_stat(int rank, int* n_ops)
+{
+    char test_dir[PATH_MAX];
+    char test_file[PATH_MAX];
+    int fname_off = 0;
+    int i;
+    struct dirent* dent;
+    int ret;
+
+    *n_ops = opt_nfiles + 2; /* . and .. entries */
+
+    sprintf(test_dir, "%s/rank%d", opt_basedir, rank);
+    vfs_dir = opendir(test_dir);
+    if(!vfs_dir)
+    {
+        handle_error(-errno, "opendir");
+    }
+    
+    fname_off = sprintf(test_file, "%s/rank%d/", opt_basedir, rank);
+
+    for(i=0; i<(*n_ops); i++)
+    {
+        dent = readdir(vfs_dir);
+        if(!dent)
+        {
+            handle_error(-errno, "creat");
+        }
+        sprintf(&test_file[fname_off], "%s", dent->d_name);
+        ret = stat(test_file, &vfs_stats[i]);
+        if(ret != 0)
+        {
+            handle_error(-errno, "stat");
+        }
+    }
+
+    return;
 }
 
 
