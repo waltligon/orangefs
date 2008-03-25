@@ -17,105 +17,125 @@
 static int pvfs2_d_revalidate_common(struct dentry* dentry)
 {
     int ret = 0;
-    struct inode *inode = (dentry ? dentry->d_inode : NULL);
+    struct inode *inode;
     struct inode *parent_inode = NULL; 
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL;
 
-    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: called on dentry %p.\n", dentry);
+    gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: called on dentry %p.\n",
+                 __func__, dentry);
+
+    /* find inode from dentry */
+    if(!dentry || !dentry->d_inode)
+    {
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: inode not valid.\n", __func__);
+        return 0;
+    }
+
+    gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: inode valid.\n", __func__);
+    inode = dentry->d_inode;
 
     /* find parent inode */
-    if(dentry && dentry->d_parent)
+    if(!dentry || !dentry->d_parent)
     {
-        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: parent found.\n");
-        parent_inode = dentry->d_parent->d_inode;
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: parent not found.\n", __func__);
+        return 0; /* not valid */
     }
-    else
+
+    gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: parent found.\n", __func__);
+    parent_inode = dentry->d_parent->d_inode;
+
+    /* first perform a lookup to make sure that the object not only
+     * exists, but is still in the expected place in the name space 
+     */
+    if (!is_root_handle(inode))
     {
-        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: parent not found.\n");
-    }
-    
-    if (inode && parent_inode)
-    {
-        /* first perform a lookup to make sure that the object not only
-         * exists, but is still in the expected place in the name space 
-         */
-        if (!is_root_handle(inode))
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: attempting lookup.\n", __func__);
+        new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
+        if (!new_op)
         {
-            gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: attempting lookup.\n");
-            new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
-            if (!new_op)
-            {
-                return 0;
-            }
-            new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
-            parent = PVFS2_I(parent_inode);
-            if (parent && parent->refn.handle != PVFS_HANDLE_NULL && parent->refn.fs_id != PVFS_FS_ID_NULL)
-            {
-                new_op->upcall.req.lookup.parent_refn = parent->refn;
-            }
-            else
-            {
-#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET5_LOCKED)
-                gossip_lerr("Critical error: i_ino cannot be relied upon when using iget5/iget4\n");
-                op_release(new_op);
-                return 0;
-#endif
-                new_op->upcall.req.lookup.parent_refn.handle =
-                    get_handle_from_ino(parent_inode);
-                new_op->upcall.req.lookup.parent_refn.fs_id =
-                    PVFS2_SB(parent_inode->i_sb)->fs_id;
-            }
-            strncpy(new_op->upcall.req.lookup.d_name,
-                    dentry->d_name.name, PVFS2_NAME_LEN);
-
-            ret = service_operation(
-                new_op, "pvfs2_lookup", 
-                get_interruptible_flag(parent_inode));
-
-            if((new_op->downcall.status != 0) || 
-                    !match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
-            {
-                gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: lookup failure or no match.\n");
-                op_release(new_op);
-                /* mark the inode as bad so that d_delete will be aggressive
-                 * about dropping the dentry
-                 */
-                pvfs2_make_bad_inode(inode);
-                return(0);
-            }
-            
-            op_release(new_op);
+            return 0;
+        }
+        new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
+        parent = PVFS2_I(parent_inode);
+        if (parent && parent->refn.handle != PVFS_HANDLE_NULL &&
+            parent->refn.fs_id != PVFS_FS_ID_NULL)
+        {
+            new_op->upcall.req.lookup.parent_refn = parent->refn;
         }
         else
         {
-            gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: root handle, lookup skipped.\n");
+#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET5_LOCKED)
+            gossip_lerr("Critical error: i_ino cannot be relied "
+                        "upon when using iget5/iget4\n");
+            op_release(new_op);
+            return 0;
+#endif
+            new_op->upcall.req.lookup.parent_refn.handle =
+                get_handle_from_ino(parent_inode);
+            new_op->upcall.req.lookup.parent_refn.fs_id =
+                PVFS2_SB(parent_inode->i_sb)->fs_id;
+        }
+        strncpy(new_op->upcall.req.lookup.d_name,
+                dentry->d_name.name, PVFS2_NAME_LEN);
+
+        ret = service_operation(
+            new_op, "pvfs2_lookup", 
+            get_interruptible_flag(parent_inode));
+
+        if((new_op->downcall.status != 0) || 
+           !match_handle(new_op->downcall.resp.lookup.refn.handle, inode))
+        {
+            gossip_debug(
+                GOSSIP_DCACHE_DEBUG,
+                "%s: lookup failure or no match.\n", __func__);
+            op_release(new_op);
+            /* mark the inode as bad so that d_delete will be aggressive
+             * about dropping the dentry
+             */
+            pvfs2_make_bad_inode(inode);
+            return 0;
         }
 
-        /* now perform revalidation */
-        gossip_debug(GOSSIP_DCACHE_DEBUG, " (inode %llu)\n",
-                    llu(get_handle_from_ino(inode)));
-        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_revalidate_common: calling pvfs2_internal_revalidate().\n");
-        ret = pvfs2_internal_revalidate(inode);
+        op_release(new_op);
     }
     else
     {
-        gossip_debug(GOSSIP_DCACHE_DEBUG, "\n");
+        gossip_debug(GOSSIP_DCACHE_DEBUG,
+                     "%s: root handle, lookup skipped.\n", __func__);
     }
-    return ret;
+
+    /* now perform getattr */
+    gossip_debug(GOSSIP_DCACHE_DEBUG,
+                 "%s: doing getattr: inode: %p, handle: %llu)\n",
+                 __func__, inode, llu(get_handle_from_ino(inode)));
+    mutex_lock(&inode->i_mutex);
+    ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT);
+    mutex_unlock(&inode->i_mutex);
+    gossip_debug(GOSSIP_DCACHE_DEBUG,
+                 "%s: getattr %s (ret = %d), returning %s for dentry\n",
+                 __func__,
+                 (ret == 0 ? "succeeded" : "failed"),
+                 ret,
+                 (ret == 0 ? "valid" : "INVALID"));
+
+    return ((ret == 0) ? 1 : 0);
 }
 
 static int pvfs2_d_delete (struct dentry * dentry)
 {
-    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_delete: called on dentry %p.\n", dentry);
+    gossip_debug(GOSSIP_DCACHE_DEBUG,
+                 "%s: called on dentry %p.\n", __func__, dentry);
     if(dentry->d_inode && is_bad_inode(dentry->d_inode))
     {
-        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_delete: returning 1 (bad inode).\n");
+        gossip_debug(GOSSIP_DCACHE_DEBUG,
+                     "%s: returning 1 (bad inode).\n", __func__);
         return 1;
     }
     else
     {
-        gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_delete: returning 0 (inode looks ok).\n");
+        gossip_debug(GOSSIP_DCACHE_DEBUG,
+                     "%s: returning 0 (inode looks ok).\n", __func__);
         return 0;
     }
 }
@@ -141,8 +161,8 @@ static int pvfs2_d_revalidate(
     if (nd && (nd->flags & LOOKUP_FOLLOW) &&
         (!nd->flags & LOOKUP_CREATE))
     {
-        gossip_debug(GOSSIP_DCACHE_DEBUG, "\npvfs2_d_revalidate: Trusting intent; "
-                    "skipping getattr\n");
+        gossip_debug(GOSSIP_DCACHE_DEBUG,
+                     "\n%s: Trusting intent; skipping getattr\n", __func__);
         return 1;
     }
     return(pvfs2_d_revalidate_common(dentry));

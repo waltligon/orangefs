@@ -129,7 +129,7 @@ int copy_attributes_to_inode(
     char *symname)
 {
     int ret = -1;
-    int perm_mode = 0, old_mode = 0;
+    int perm_mode = 0;
     pvfs2_inode_t *pvfs2_inode = NULL;
     loff_t inode_size = 0, rounded_up_size = 0;
 
@@ -227,9 +227,6 @@ int copy_attributes_to_inode(
         inode->i_mtime.tv_nsec = 0;
         inode->i_ctime.tv_nsec = 0;
 #endif
-        old_mode = inode->i_mode;
-        inode->i_mode = 0;
-
         if (attrs->perms & PVFS_O_EXECUTE)
             perm_mode |= S_IXOTH;
         if (attrs->perms & PVFS_O_WRITE)
@@ -257,7 +254,7 @@ int copy_attributes_to_inode(
         if (get_suid_flag(inode) == 1 && (attrs->perms & PVFS_U_SUID))
             perm_mode |= S_ISUID;
 
-        inode->i_mode |= perm_mode;
+        inode->i_mode = perm_mode;
 
         if (is_root_handle(inode))
         {
