@@ -29,7 +29,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
     if(!dentry || !dentry->d_inode)
     {
         gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: inode not valid.\n", __func__);
-        return 0;
+        goto invalid_exit;
     }
 
     gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: inode valid.\n", __func__);
@@ -39,7 +39,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
     if(!dentry || !dentry->d_parent)
     {
         gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: parent not found.\n", __func__);
-        return 0; /* not valid */
+        goto invalid_exit;
     }
 
     gossip_debug(GOSSIP_DCACHE_DEBUG, "%s: parent found.\n", __func__);
@@ -54,7 +54,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
         if (!new_op)
         {
-            return 0;
+            goto invalid_exit;
         }
         new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
         parent = PVFS2_I(parent_inode);
@@ -69,7 +69,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
             gossip_lerr("Critical error: i_ino cannot be relied "
                         "upon when using iget5/iget4\n");
             op_release(new_op);
-            return 0;
+            goto invalid_exit;
 #endif
             new_op->upcall.req.lookup.parent_refn.handle =
                 get_handle_from_ino(parent_inode);
@@ -94,7 +94,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
              * about dropping the dentry
              */
             pvfs2_make_bad_inode(inode);
-            return 0;
+            goto invalid_exit;
         }
 
         op_release(new_op);
@@ -118,8 +118,16 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
                  (ret == 0 ? "succeeded" : "failed"),
                  ret,
                  (ret == 0 ? "valid" : "INVALID"));
+    if(ret != 0)
+    {
+        goto invalid_exit;
+    }
 
-    return ((ret == 0) ? 1 : 0);
+    /* dentry is valid! */
+    return 1;
+
+invalid_exit:
+    return 0;
 }
 
 static int pvfs2_d_delete (struct dentry * dentry)
