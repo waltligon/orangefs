@@ -1172,37 +1172,6 @@ do                                                \
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
-
-/************************************
- * misc convenience functions
- ************************************/
-static inline int pvfs2_internal_revalidate(
-    struct inode *inode)
-{
-    int ret = -EINVAL;
-    if (inode)
-    {
-        /*
-         * The dentry revalidating function expects that all fields of the inode
-         * would be refreshed, so we dont have much of a choice here too.
-         */
-        ret = ((pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) == 0) ? 1 : 0);
-#if 0
-/* Calling make_bad_inode() here results in a bad reference count on the
- * inode.  It therefore gets cached until the module is unloaded, when we get 
- * a "VFS: Busy inodes after unmount. Self-destruct in 5 seconds." error
- * message.  It is better to just let it be cleaned up naturally after 
- * validation failure. -Phil
- */
-        if (ret == 0)
-        {
-            pvfs2_make_bad_inode(inode);
-        }
-#endif
-    }
-    return ret;
-}
-
 #ifdef PVFS2_LINUX_KERNEL_2_4
 /*
   based on code from 2.6.x's fs/libfs.c with required macro support
