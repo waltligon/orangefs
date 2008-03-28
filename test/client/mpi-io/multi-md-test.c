@@ -42,12 +42,19 @@ void pvfs_mktestdir(int rank, int* n_ops);
 void pvfs_rmtestdir(int rank, int* n_ops);
 void pvfs_create(int rank, int* n_ops);
 void pvfs_rm(int rank, int* n_ops);
+void pvfs_readdir(int rank, int* n_ops);
+void pvfs_readdir_and_stat(int rank, int* n_ops);
+void pvfs_readdirplus(int rank, int* n_ops);
+void pvfs_read(int rank, int* n_ops);
+void pvfs_write(int rank, int* n_ops);
+
 void pvfs_print_error(int errcode, char *str);
 
 int* vfs_fds = NULL;
 struct stat* vfs_stats = NULL;
 char* vfs_buf = NULL;
 
+#define PVFS_DIRENT_COUNT 32
 PVFS_object_ref* pvfs_refs = NULL;
 char* pvfs_buf = NULL;
 PVFS_object_ref pvfs_basedir;
@@ -90,17 +97,17 @@ struct api_ops api_table[] = {
         .print_error = vfs_print_error,
     },
     {
-        .name = "PVFS system interface",
+        .name = "PVFS_sys",
         .prep = pvfs_prep,
         .mktestdir = pvfs_mktestdir,
         .rmtestdir = pvfs_rmtestdir,
         .create = pvfs_create,
         .rm = pvfs_rm,
-        .readdir = NULL,
-        .readdir_and_stat = NULL,
-        .readdirplus = NULL,
-        .read = NULL,
-        .write = NULL,
+        .readdir = pvfs_readdir,
+        .readdir_and_stat = pvfs_readdir_and_stat,
+        .readdirplus = pvfs_readdirplus,
+        .read = pvfs_read,
+        .write = pvfs_write,
         .unstuff = NULL,
         .print_error = pvfs_print_error,
     },
@@ -634,6 +641,62 @@ void vfs_mktestdir(int rank, int* n_ops)
     return;
 }
 
+void pvfs_write(int rank, int* n_ops)
+{
+    int i;
+    int ret;
+    PVFS_sysresp_io resp_io;
+    PVFS_Request mem_req, file_req;
+
+    *n_ops = opt_nfiles;
+
+    file_req = PVFS_BYTE;
+    PVFS_Request_contiguous(current_size, PVFS_BYTE, &mem_req);
+
+    for(i=0; i<opt_nfiles; i++)
+    {
+        ret = PVFS_sys_write(pvfs_refs[i], file_req, 0, pvfs_buf, mem_req,
+            &pvfs_creds, &resp_io);
+        if(ret < 0)
+        {
+            handle_error(ret, "PVFS_sys_read");
+        }
+    }
+
+    PVFS_Request_free(&mem_req);
+
+    return;
+}
+
+
+void pvfs_read(int rank, int* n_ops)
+{
+    int i;
+    int ret;
+    PVFS_sysresp_io resp_io;
+    PVFS_Request mem_req, file_req;
+
+    *n_ops = opt_nfiles;
+
+    file_req = PVFS_BYTE;
+    PVFS_Request_contiguous(current_size, PVFS_BYTE, &mem_req);
+
+    for(i=0; i<opt_nfiles; i++)
+    {
+        ret = PVFS_sys_read(pvfs_refs[i], file_req, 0, pvfs_buf, mem_req,
+            &pvfs_creds, &resp_io);
+        if(ret < 0)
+        {
+            handle_error(ret, "PVFS_sys_read");
+        }
+    }
+
+    PVFS_Request_free(&mem_req);
+
+    return;
+}
+
+
 void vfs_read(int rank, int* n_ops)
 {
     int i;
@@ -895,6 +958,120 @@ void vfs_prep(int rank, int* n_ops)
 
     return;
 }
+
+
+void pvfs_readdirplus(int rank, int* n_ops)
+{
+    PVFS_sysresp_readdirplus rdplus_response;
+    int ret;
+    int total_entries = 0;
+    PVFS_ds_position token = PVFS_READDIR_START;
+    int i;
+
+    *n_ops = opt_nfiles;
+
+    do
+    {
+        ret = PVFS_sys_readdirplus(pvfs_testdir, token, PVFS_DIRENT_COUNT,
+            &pvfs_creds, 
+            PVFS_ATTR_SYS_ALL_NOHINT,
+            &rdplus_response);
+        if(ret < 0)
+        {
+            handle_error(ret, "PVFS_sys_readdirplus");
+        }
+        total_entries += rdplus_response.pvfs_dirent_outcount;
+        if(rdplus_response.pvfs_dirent_outcount)
+        {
+            for(i=0; i< rdplus_response.pvfs_dirent_outcount; i++)
+            {
+                PVFS_util_release_sys_attr(&rdplus_response.attr_array[i]);
+                if(rdplus_response.stat_err_array[i] != 0)
+                {
+                    handle_error(ret, "PVFS_sys_readdirplus attr");
+                }
+            }
+            free(rdplus_response.dirent_array);
+            free(rdplus_response.stat_err_array);
+            free(rdplus_response.attr_array);
+        }
+    } while(total_entries < opt_nfiles);
+
+    return;
+}
+
+
+void pvfs_readdir(int rank, int* n_ops)
+{
+    PVFS_sysresp_readdir rd_response;
+    int ret;
+    int total_entries = 0;
+    PVFS_ds_position token = PVFS_READDIR_START;
+
+    *n_ops = opt_nfiles;
+
+    do
+    {
+        ret = PVFS_sys_readdir(pvfs_testdir, token, PVFS_DIRENT_COUNT,
+            &pvfs_creds, &rd_response);
+        if(ret < 0)
+        {
+            handle_error(ret, "PVFS_sys_readdir");
+        }
+        total_entries += rd_response.pvfs_dirent_outcount;
+        if(rd_response.pvfs_dirent_outcount)
+        {
+            free(rd_response.dirent_array);
+        }
+    } while(total_entries < opt_nfiles);
+
+    return;
+}
+
+void pvfs_readdir_and_stat(int rank, int* n_ops)
+{
+    PVFS_sysresp_readdir rd_response;
+    PVFS_sysresp_getattr getattr_response;
+    int ret;
+    int total_entries = 0;
+    PVFS_ds_position token = PVFS_READDIR_START;
+    PVFS_object_ref tmp_ref;
+    int i;
+
+    *n_ops = opt_nfiles;
+
+    do
+    {
+        ret = PVFS_sys_readdir(pvfs_testdir, token, PVFS_DIRENT_COUNT,
+            &pvfs_creds, &rd_response);
+        if(ret < 0)
+        {
+            handle_error(ret, "PVFS_sys_readdir");
+        }
+
+        for(i=0; i< rd_response.pvfs_dirent_outcount; i++)
+        {
+            tmp_ref.handle = rd_response.dirent_array[i].handle;
+            tmp_ref.fs_id = pvfs_testdir.fs_id;
+            ret = PVFS_sys_getattr(tmp_ref, PVFS_ATTR_SYS_ALL_NOHINT,
+                &pvfs_creds, &getattr_response);
+            if(ret < 0)
+            {
+                handle_error(ret, "PVFS_sys_getattr");
+            }
+            PVFS_util_release_sys_attr(&getattr_response.attr);
+        }
+
+        total_entries += rd_response.pvfs_dirent_outcount;
+        if(rd_response.pvfs_dirent_outcount)
+        {
+            free(rd_response.dirent_array);
+        }
+    } while(total_entries < opt_nfiles);
+
+    return;
+}
+
 
 void vfs_readdir(int rank, int* n_ops)
 {
