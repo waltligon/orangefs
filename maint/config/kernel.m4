@@ -121,6 +121,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_CHECKING(for struct kmem_cache in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
+		#include <linux/kernel.h>
 		#include <linux/slab.h>
 		static struct kmem_cache;
 	], [],
@@ -856,6 +857,32 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM, 1, [Define if kernel kmem_cache_create has destructor param]),
 	AC_MSG_RESULT(no)
 	)
+
+	dnl 2.6.24 changed the constructor parameter signature of
+	dnl kmem_cache_create.  Check for this newer two-param style and
+	dnl if not, assume it is old.  Note we can get away with just
+	dnl struct kmem_cache (and not kmem_cache_t) as that change happened
+	dnl in older kernels.  If they don't match, gcc complains about
+	dnl passing argument ... from incompatible pointer type, hence the
+	dnl need for the -Werror.
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for two-param kmem_cache_create constructor)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		void ctor(struct kmem_cache *cachep, void *req)
+		{
+		}
+	], [
+		kmem_cache_create("config-test", 0, 0, 0, ctor);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM, 1, [Define if kernel kmem_cache_create constructor has new-style two-parameter form]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(if kernel address_space struct has a spin_lock field)
 	AC_TRY_COMPILE([
