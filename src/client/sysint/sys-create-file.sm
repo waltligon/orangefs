@@ -395,7 +395,12 @@ static PINT_sm_action create_file_setup_msgpair(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
-        PVFS_TYPE_METAFILE,
+        sm_p->parent_ref.handle,
+        sm_p->u.create_file.object_name,
+        sm_p->u.create_file.attr,
+        PVFS_ATTR_META_ALL /*sm_p->u.create_file.sys_attr*/,
+        sm_p->u.create_file.dist,
+        sm_p->u.create_file.num_data_files,
         meta_handle_extent_array);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
