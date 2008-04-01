@@ -202,10 +202,17 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
     }
 }
 
+
 static void dev_req_cache_ctor(
+#ifdef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+    struct kmem_cache *cachep,
+    void *req
+#else
     void *req,
     pvfs2_kmem_cache_t * cachep,
-    unsigned long flags)
+    unsigned long flags
+#endif
+)
 {
     memset(req, 0, sizeof(MAX_ALIGNED_DEV_REQ_DOWNSIZE));
 }
@@ -264,11 +271,17 @@ void dev_req_release(void *buffer)
 }
 
 static void pvfs2_inode_cache_ctor(
-    void *new_pvfs2_inode,
+#ifdef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+    struct kmem_cache *cachep,
+    void *req
+#else
+    void *req,
     pvfs2_kmem_cache_t * cachep,
-    unsigned long flags)
+    unsigned long flags
+#endif
+)
 {
-    pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *)new_pvfs2_inode;
+    pvfs2_inode_t *pvfs2_inode = req;
 
     memset(pvfs2_inode, 0, sizeof(pvfs2_inode_t));
     ClearInitFlag(pvfs2_inode);
@@ -382,9 +395,15 @@ void pvfs2_inode_release(pvfs2_inode_t *pinode)
 #ifdef HAVE_AIO_VFS_SUPPORT
 
 static void kiocb_ctor(
+#ifdef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+    struct kmem_cache *cachep,
+    void *req
+#else
     void *req,
     pvfs2_kmem_cache_t * cachep,
-    unsigned long flags)
+    unsigned long flags
+#endif
+)
 {
     memset(req, 0, sizeof(pvfs2_kiocb));
 }

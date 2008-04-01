@@ -159,6 +159,10 @@
 /* Define if kernel has device classes */
 #undef HAVE_KERNEL_DEVICE_CLASSES
 
+/* Define if kernel kmem_cache_create constructor has new-style two-parameter
+   form */
+#undef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+
 /* Define if kernel kmem_cache_create has destructor param */
 #undef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
 
