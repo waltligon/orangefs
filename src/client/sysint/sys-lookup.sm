@@ -43,7 +43,6 @@ enum
     LOOKUP_TYPE_RELATIVE_LN = 5,
     LOOKUP_TYPE_ABSOLUTE_LN = 6,
     LOOKUP_TYPE_LN_NO_FOLLOW = 7,
-    LOOKUP_NCACHE_HIT_FASTPATH = 8
 };
 
 static int lookup_segment_lookup_comp_fn(
@@ -62,24 +61,30 @@ static void finalize_context(
 
 machine pvfs2_client_lookup_sm
 {
-    state lookup_init
+    state lookup_segment_start
     {
-	run lookup_init;
-	success => lookup_segment_lookup_setup_msgpair;
-        LOOKUP_NCACHE_HIT_FASTPATH => lookup_cleanup;
-        default => lookup_cleanup;
+	run lookup_segment_start;
+        success => lookup_segment_query_ncache;
+	default => lookup_segment_lookup_failure;
     }
 
-    state lookup_segment_lookup_setup_msgpair
+    state lookup_segment_query_ncache
     {
-	run lookup_segment_lookup_setup_msgpair;
+        run lookup_segment_query_ncache;
+        success => lookup_segment_verify_attr_present;
+        default => lookup_segment_setup_msgpair;
+    }
+
+    state lookup_segment_setup_msgpair
+    {
+	run lookup_segment_setup_msgpair;
         success => lookup_segment_lookup_xfer_msgpair;
 	default => lookup_segment_lookup_failure;
     }
 
     state lookup_segment_lookup_xfer_msgpair
     {
-        jump pvfs2_client_lookup_ncache_sm;
+        jump pvfs2_msgpairarray_sm;
 	success => lookup_segment_verify_attr_present;
         default => lookup_segment_lookup_failure;
     }
@@ -118,21 +123,21 @@ machine pvfs2_client_lookup_sm
     state lookup_context_check_completion
     {
         run lookup_context_check_completion;
-        LOOKUP_CONTINUE => lookup_segment_lookup_setup_msgpair;
+        LOOKUP_CONTINUE => lookup_segment_start;
         default => lookup_cleanup;
     }
 
     state lookup_segment_handle_relative_link
     {
         run lookup_segment_handle_relative_link;
-        success => lookup_segment_lookup_setup_msgpair;
+        success => lookup_segment_start;
         default => lookup_cleanup;
     }
 
     state lookup_segment_handle_absolute_link
     {
         run lookup_segment_handle_absolute_link;
-        success => lookup_segment_lookup_setup_msgpair;
+        success => lookup_segment_start;
         default => lookup_cleanup;
     }
 
@@ -594,28 +599,61 @@ PVFS_error PVFS_sys_lookup(
 
 /****************************************************************/
 
-static PINT_sm_action lookup_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+/*
+ * Reset for next segment lookup.
+ */
+static PINT_sm_action lookup_segment_start(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s\n", __func__);
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_init\n");
+    PINT_client_lookup_sm_segment *cur_seg;
+    PVFS_object_ref parent_ref, object_ref;
+    int ret;
+    
+    cur_seg = GET_CURRENT_SEGMENT(sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: segment [%s]\n", __func__,
+                 cur_seg->seg_name);
 
-    assert(js_p->error_code == 0);
+    parent_ref.fs_id = cur_seg->seg_starting_refn.fs_id;
+    parent_ref.handle = cur_seg->seg_starting_refn.handle;
 
-    /* check the ncache to see if we can bypass this entire lookup */
-    if (PINT_ncache_get_cached_entry(
-                (const char*)sm_p->u.lookup.orig_pathname, 
-                &sm_p->u.lookup.lookup_resp->ref,
-                (const PVFS_object_ref*) &(sm_p->u.lookup.starting_refn)) == 0)
+    ret = PINT_ncache_get_cached_entry(cur_seg->seg_name, &object_ref,
+                                       &parent_ref);
+    if (ret == 0)
     {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup: ncache fast path!\n");
-        js_p->error_code = LOOKUP_NCACHE_HIT_FASTPATH;
+        gossip_debug(GOSSIP_NCACHE_DEBUG,
+                     "*** ncache hit on first segment of %s (%llu|%d)\n",
+                     cur_seg->seg_name, llu(object_ref.handle),
+                     object_ref.fs_id);
+
+        cur_seg->seg_resolved_refn.handle = object_ref.handle;
+        cur_seg->seg_resolved_refn.fs_id = object_ref.fs_id;
+        js_p->error_code = 0;  /* hit */
+    } else {
+        gossip_debug(GOSSIP_NCACHE_DEBUG,
+                     "*** ncache clean miss on first segment of %s\n",
+                     cur_seg->seg_name);
+
+        js_p->error_code = 1;  /* miss */
     }
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action lookup_segment_lookup_setup_msgpair(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+/*
+ * This is called if the ncache lookup failed.  It builds the msgpair
+ * so that the next state can jump into xfer msgpair.
+ */
+static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -623,9 +661,7 @@ static PINT_sm_action lookup_segment_lookup_setup_msgpair(
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *seg_to_lookup = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_lookup_setup_msgpair\n");
-
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s\n", __func__);
     js_p->error_code = 0;
 
     /* do a lookup on the current segment of the current context */
@@ -644,8 +680,8 @@ static PINT_sm_action lookup_segment_lookup_setup_msgpair(
       seg_to_lookup is set to seg_name, and never seg_remaining.  that
       guarantees we're issuing a lookup on a single path segment
     */
-    seg_to_lookup = (cur_seg->seg_remaining ? cur_seg->seg_remaining :
-                     cur_seg->seg_name);
+    seg_to_lookup = cur_seg->seg_remaining ? cur_seg->seg_remaining :
+                    cur_seg->seg_name;
 
     PINT_init_msgpair(sm_p, msg_p);
 
@@ -685,6 +721,11 @@ static PINT_sm_action lookup_segment_lookup_failure(
     return SM_ACTION_COMPLETE;
 }
 
+/*
+ * We get here either if the ncache hit, or the xfer msgpair finished
+ * successfully.  In the ncache hit case, seg_attr will be all zeroes,
+ * so it will head into getattr, which may hit in its own acache.
+ */
 static PINT_sm_action lookup_segment_verify_attr_present(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -752,9 +793,17 @@ static PINT_sm_action lookup_segment_check_attr_type(
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
     assert(cur_seg);
 
-    PINT_free_object_attr(&(cur_seg->seg_attr));
-    PINT_copy_object_attr(&(cur_seg->seg_attr),
-                          &(sm_p->getattr.attr));
+    if ((cur_seg->seg_attr.objtype == PVFS_TYPE_NONE) ||
+        (cur_seg->seg_attr.objtype == PVFS_TYPE_SYMLINK)) {
+        /*
+         * Got here from getattr.  Else cur_seg already populated by
+         * a combined lookup+attrs from the server.  See function
+         * directly above for why this objtype condition.
+         */
+        PINT_free_object_attr(&(cur_seg->seg_attr));
+        PINT_copy_object_attr(&(cur_seg->seg_attr),
+                              &(sm_p->getattr.attr));
+    }
 
     cur_ctx = GET_CURRENT_CONTEXT(sm_p);
     assert(cur_ctx);
@@ -1009,12 +1058,6 @@ static PINT_sm_action lookup_cleanup(
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    if (js_p->error_code == LOOKUP_NCACHE_HIT_FASTPATH)
-    {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup fast path exiting\n");
-        js_p->error_code = 0;
-    }
-
     sm_p->error_code = js_p->error_code;
 
     /* clean up all used memory for this lookup */
@@ -1116,23 +1159,20 @@ static int lookup_segment_lookup_comp_fn(
                 &(resp_p->u.lookup_path.attr_array[i]));
         }
         
-        if (!sm_p->ncache_hit)
-        {
-            gossip_debug(
-                GOSSIP_NCACHE_DEBUG, "*** ncache update on %s "
-                                     "target (%llu|%d) "
-                                     "parent (%llu|%d)\n",
-                cur_seg->seg_name,
-                llu(last_resolved_refn.handle),
-                last_resolved_refn.fs_id,
-                llu(cur_seg->seg_starting_refn.handle),
-                cur_seg->seg_starting_refn.fs_id);
+        gossip_debug(
+            GOSSIP_NCACHE_DEBUG, "*** ncache update on %s "
+                                 "target (%llu|%d) "
+                                 "parent (%llu|%d)\n",
+            cur_seg->seg_name,
+            llu(last_resolved_refn.handle),
+            last_resolved_refn.fs_id,
+            llu(cur_seg->seg_starting_refn.handle),
+            cur_seg->seg_starting_refn.fs_id);
 
-            PINT_ncache_update(
-                    (const char*) cur_seg->seg_name,
-                    (const PVFS_object_ref*) &(last_resolved_refn),
-                    (const PVFS_object_ref*) &(cur_seg->seg_starting_refn));
-        }
+        PINT_ncache_update(
+                (const char*) cur_seg->seg_name,
+                (const PVFS_object_ref*) &(last_resolved_refn),
+                (const PVFS_object_ref*) &(cur_seg->seg_starting_refn));
     }
     assert(i == resp_p->u.lookup_path.handle_count);
 

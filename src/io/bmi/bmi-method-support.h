@@ -42,10 +42,9 @@
 struct bmi_method_addr
 {
     int method_type;
-    struct bmi_method_ops *ops;
     void *method_data;		/* area to be used by specific methods */
 };
-typedef struct bmi_method_addr bmi_method_addr_st, *bmi_method_addr_p;
+typedef struct bmi_method_addr *bmi_method_addr_p;
 
 /* used to describe unexpected messages that arrive */
 struct bmi_method_unexpected_info
@@ -184,7 +183,7 @@ struct method_op
     void *buffer;		/* the memory region to transfer */
     bmi_size_t actual_size;	/* total size of the transfer */
     bmi_size_t expected_size;	/* expected size of the transfer */
-    bmi_method_addr_st *addr;	/* peer address involved in the communication */
+    bmi_method_addr_p addr;	/* peer address involved in the communication */
     int mode;		/* operation mode */
     bmi_context_id context_id;  /* context */
     struct qlist_head op_list_entry;	/* op_list link */

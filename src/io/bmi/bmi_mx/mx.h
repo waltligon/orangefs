@@ -107,8 +107,7 @@ typedef struct qlist_head list_t;       /* easier to type */
 /* BMX [UN]EXPECTED msgs use the 64-bits of the match info as follows:
  *    Bits      Description
  *    60-63     Msg type
- *    56-59     Reserved for credits if implemented
- *    52-55     Reserved
+ *    52-59     Reserved
  *    32-51     Peer id (of the sender, assigned by receiver)
  *     0-31     bmi_msg_tag_t
  */
@@ -116,14 +115,20 @@ typedef struct qlist_head list_t;       /* easier to type */
 /* BMX CONN_[REQ|ACK] msgs use the 64-bits of the match info as follows:
  *    Bits      Description
  *    60-63     Msg type
- *    56-59     Reserved for credits if implemented
- *    52-55     Reserved
+ *    52-59     Reserved
  *    32-51     Peer id (to use when contacting the sender)
  *     0-31     Version
  */
 
-#define BMX_MAX_PEER_ID ((1<<20) - 1)     /* 20 bits - actually 1,048,574 peers
+#define BMX_MSG_SHIFT   60
+#define BMX_ID_SHIFT    32
+#define BMX_MASK_ALL    (~0ULL)
+#define BMX_MASK_MSG    (0xFULL << BMX_MSG_SHIFT)
+
+#define BMX_MAX_PEER_ID ((1<<20) - 1)   /* 20 bits - actually 1,048,574 peers
                                            1 to 1,048,575 */
+#define BMX_MAX_TAG     (~0U)            /* 32 bits */
+
 
 #define BMX_TIMEOUT     (20 * 1000)       /* msg timeout in milliseconds */
 
@@ -146,6 +151,7 @@ struct bmx_data
         uint32_t            bmx_board;          /* my MX board index */
         uint32_t            bmx_ep_id;          /* my MX endpoint ID */
         mx_endpoint_t       bmx_ep;             /* my MX endpoint */
+        uint32_t            bmx_sid;            /* my MX session id */
         int                 bmx_is_server;      /* am I a server? */
 
         list_t              bmx_peers;          /* list of all peers */
@@ -161,6 +167,11 @@ struct bmx_data
 
         list_t              bmx_canceled;       /* canceled reqs waiting for test */
         gen_mutex_t         bmx_canceled_lock;  /* canceled list lock */
+
+        list_t              bmx_unex_txs;       /* completed unexpected sends */
+        gen_mutex_t         bmx_unex_txs_lock;  /* completed unexpected sends lock */
+        list_t              bmx_unex_rxs;       /* completed unexpected recvs */
+        gen_mutex_t         bmx_unex_rxs_lock;  /* completed unexpected recvs lock */
 
         uint32_t            bmx_next_id;        /* for the next peer_id */
         gen_mutex_t         bmx_lock;           /* global lock - use for global rxs,
@@ -190,20 +201,21 @@ enum bmx_peer_state {
 
 struct bmx_method_addr
 {
-        struct method_addr *mxm_map;        /* peer's method_addr */
-        const char         *mxm_peername;   /* mx://hostname/board/ep_id  */
-        const char         *mxm_hostname;   /* peer's hostname */
-        uint32_t            mxm_board;      /* peer's MX board index */
-        uint32_t            mxm_ep_id;      /* peer's MX endpoint ID */
-        struct bmx_peer    *mxm_peer;       /* peer pointer */
+        struct bmi_method_addr  *mxm_map;        /* peer's bmi_method_addrt */
+        const char              *mxm_peername;   /* mx://hostname/board/ep_id  */
+        const char              *mxm_hostname;   /* peer's hostname */
+        uint32_t                 mxm_board;      /* peer's MX board index */
+        uint32_t                 mxm_ep_id;      /* peer's MX endpoint ID */
+        struct bmx_peer         *mxm_peer;       /* peer pointer */
 };
 
 struct bmx_peer
 {
-        struct method_addr     *mxp_map;        /* his method_addr * */
+        struct bmi_method_addr *mxp_map;        /* his bmi_method_addr * */
         struct bmx_method_addr *mxp_mxmap;      /* his bmx_method_addr */
         uint64_t                mxp_nic_id;     /* his NIC id */
         mx_endpoint_addr_t      mxp_epa;        /* his MX endpoint address */
+        uint32_t                mxp_sid;        /* his MX session id */
         int                     mxp_exist;      /* have we connected before? */
 
         enum bmx_peer_state     mxp_state;      /* INIT, WAIT, READY, DISCONNECT */
@@ -292,7 +304,7 @@ struct bmx_connreq
 
 #if BMX_DEBUG
 /* set the mask to the BMX_DB_* errors that you want gossip to report */
-#define BMX_DB_MASK (BMX_DB_ERR|BMX_DB_WARN)
+#define BMX_DB_MASK (BMX_DB_ERR|BMX_DB_WARN|BMX_DB_ALL)
 #define debug(lvl,fmt,args...)                                                 \
   do {                                                                         \
       if (lvl & BMX_DB_MASK) {                                                 \

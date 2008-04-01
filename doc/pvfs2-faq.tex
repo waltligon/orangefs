@@ -720,6 +720,18 @@ kernel is officially released.
 
 This section covers issues related to the performance of PVFS.
 
+\subsection{I configured PVFS with support for multiple intercdonnects (e.g. Infiniband and TCP), but see low performance}
+\label{sec:multi-method-badperf}
+
+When multiple interconnects are enabled, PVFS will poll both interfaces.  This
+gives PVFS maximum flexiblity, but does incur a performance penalty when one
+interface is not being used.  For highest performance, configure PVFS with only
+one fast method.  Consult the \texttt{without-bmi-tcp} option or omit the
+\texttt{with-<METHOD>} option when configuring PVFS.  
+
+Note that it can sometimes be useful to have multiple interconnects enabled.
+The right choice depends a lot on your situation.
+
 \subsection{I ran Bonnie and/or IOzone and the performance is terrible.
 Why? Is there anything I can do?}
 \label{sec:badperf}

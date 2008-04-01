@@ -893,7 +893,20 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		spin_lock(&as.page_lock);
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_SPIN_LOCK_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock instead of rw_lock]),
+	AC_DEFINE(HAVE_SPIN_LOCK_PAGE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock member named page_lock instead of rw_lock]),
+	AC_MSG_RESULT(no)
+	)
+
+        AC_MSG_CHECKING(if kernel address_space struct has a rwlock_t field named tree_lock)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		read_lock(&as.tree_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock member named tree_lock instead of rw_lock]),
 	AC_MSG_RESULT(no)
 	)
 
@@ -920,6 +933,20 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_MAPPING_NRPAGES_MACRO, 1, [Define if kernel defines mapping_nrpages macro -- defined by RT linux]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl Starting with 2.6.25-rc1, .read_inode goes away.
+	AC_MSG_CHECKING(if kernel super_operations contains read_inode field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct super_operations sops;
+		sops.read_inode(NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_READ_INODE, 1, [Define if kernel super_operations contains read_inode field]),
 	AC_MSG_RESULT(no)
 	)
 

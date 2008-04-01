@@ -28,18 +28,18 @@ int     recvunex_start;
 int     recvunex_finish;
 #endif
 
-struct bmi_method_ops bmi_mx_ops;
-
 mx_unexp_handler_action_t
 bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                       uint64_t match_value, uint32_t length, void *data_if_available);
 
 static int
 bmx_peer_connect(struct bmx_peer *peer);
+static void
+bmx_create_peername(void);
 
 /**** TX/RX handling functions **************************************/
 
-void
+static void
 bmx_ctx_free(struct bmx_ctx *ctx)
 {
         if (ctx == NULL) return;
@@ -62,7 +62,7 @@ bmx_ctx_free(struct bmx_ctx *ctx)
         return;
 }
 
-int
+static int
 bmx_ctx_alloc(struct bmx_ctx **ctxp, enum bmx_req_type type)
 {
         struct bmx_ctx *ctx     = NULL;
@@ -144,7 +144,7 @@ bmx_ctx_alloc(struct bmx_ctx **ctxp, enum bmx_req_type type)
         return 0;
 }
 
-void
+static void
 bmx_ctx_init(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer   = NULL;
@@ -193,7 +193,7 @@ bmx_ctx_init(struct bmx_ctx *ctx)
 }
 
 /* add to peer's queued txs/rxs list */
-void
+static void
 bmx_q_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
@@ -208,7 +208,7 @@ bmx_q_ctx(struct bmx_ctx *ctx)
 }
 
 /* remove from peer's queued txs/rxs list */
-void
+static void
 bmx_deq_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
@@ -222,7 +222,7 @@ bmx_deq_ctx(struct bmx_ctx *ctx)
 }
 
 /* add to peer's pending rxs list */
-void
+static void
 bmx_q_pending_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
@@ -239,7 +239,7 @@ bmx_q_pending_ctx(struct bmx_ctx *ctx)
 }
 
 /* remove from peer's pending rxs list */
-void
+static void
 bmx_deq_pending_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
@@ -258,7 +258,7 @@ bmx_deq_pending_ctx(struct bmx_ctx *ctx)
 }
 
 /* add to the global canceled list */
-void
+static void
 bmx_q_canceled_ctx(struct bmx_ctx *ctx, bmi_error_code_t error)
 {
         ctx->mxc_state = BMX_CTX_CANCELED;
@@ -272,7 +272,7 @@ bmx_q_canceled_ctx(struct bmx_ctx *ctx, bmi_error_code_t error)
         return;
 }
 
-struct bmx_ctx *
+static struct bmx_ctx *
 bmx_get_idle_rx(void)
 {
         struct bmx_ctx  *rx     = NULL;
@@ -303,7 +303,7 @@ bmx_get_idle_rx(void)
         return rx;
 }
 
-void
+static void
 bmx_put_idle_rx(struct bmx_ctx *rx)
 {
         if (rx == NULL) {
@@ -328,7 +328,7 @@ bmx_put_idle_rx(struct bmx_ctx *rx)
         return;
 }
 
-void
+static void
 bmx_reduce_idle_rxs(int count)
 {
         int              i      = 0;
@@ -344,7 +344,7 @@ bmx_reduce_idle_rxs(int count)
         return;
 }
 
-struct bmx_ctx *
+static struct bmx_ctx *
 bmx_get_idle_tx(void)
 {
         struct bmx_ctx  *tx     = NULL;
@@ -375,7 +375,7 @@ bmx_get_idle_tx(void)
         return tx;
 }
 
-void
+static void
 bmx_put_idle_tx(struct bmx_ctx *tx)
 {
         if (tx == NULL) {
@@ -402,7 +402,7 @@ bmx_put_idle_tx(struct bmx_ctx *tx)
 
 /**** peername parsing functions **************************************/
 
-int
+static int
 bmx_verify_hostname(char *host)
 {
         int             ret     = 0;
@@ -425,7 +425,7 @@ bmx_verify_hostname(char *host)
         return 0;
 }
 
-int
+static int
 bmx_verify_num_str(char *num_str)
 {
         int             ret     = 0;
@@ -449,11 +449,10 @@ bmx_verify_num_str(char *num_str)
  * returns 0 and we do not know that it failed. 
  * This handles legal hostnames (1-63 chars) include a-zA-Z0-9 as well as . and -
  * It will accept IPv4 addresses but not IPv6 (too many semicolons) */
-int
+static int
 bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint32_t *ep_id)
 {
         int             ret             = 0;
-        int             len             = 0;
         int             colon1_found    = 0;
         int             colon2_found    = 0;
         char           *s               = NULL;
@@ -512,7 +511,6 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
                     NULL != strchr(colon2, ':')) {
                         debug(BMX_DB_INFO, "parse_peername() too many ':' (%s %s)", 
                                            colon1, colon2);
-                        len = sizeof(*s);
                         free(s);
                         return -1;
                 }
@@ -524,7 +522,6 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
                 free(s);
                 return -1;
         }
-        strcpy(host, s);
 
         if (colon1_found) {
                 bd = (uint32_t) strtol(colon1, NULL, 0);
@@ -566,7 +563,7 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
 
 /**** peer handling functions **************************************/
 
-void
+static void
 bmx_peer_free(struct bmx_peer *peer)
 {
         struct bmx_method_addr *mxmap = peer->mxp_mxmap;
@@ -588,7 +585,7 @@ bmx_peer_free(struct bmx_peer *peer)
         return;
 }
 
-void
+static void
 bmx_peer_addref(struct bmx_peer *peer)
 {
         gen_mutex_lock(&peer->mxp_lock);
@@ -598,9 +595,10 @@ bmx_peer_addref(struct bmx_peer *peer)
         return;
 }
 
-void
+static void
 bmx_peer_decref(struct bmx_peer *peer)
 {
+        debug(BMX_DB_FUNC, "entering %s", __func__);
         gen_mutex_lock(&peer->mxp_lock);
         if (peer->mxp_refcount == 0) {
                 debug(BMX_DB_WARN, "peer_decref() called for %s when refcount == 0",
@@ -609,6 +607,8 @@ bmx_peer_decref(struct bmx_peer *peer)
         peer->mxp_refcount--;
         if (peer->mxp_refcount == 1 && peer->mxp_state == BMX_PEER_DISCONNECT) {
                 /* all txs and rxs are completed or canceled, reset state */
+                debug(BMX_DB_PEER, "Setting peer %s to BMX_PEER_INIT",
+                                   peer->mxp_mxmap->mxm_peername);
                 peer->mxp_state = BMX_PEER_INIT;
         }
         gen_mutex_unlock(&peer->mxp_lock);
@@ -624,10 +624,11 @@ bmx_peer_decref(struct bmx_peer *peer)
                 gen_mutex_unlock(&bmi_mx->bmx_lock);
                 bmx_peer_free(peer);
         }
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
         return;
 }
 
-int
+static int
 bmx_peer_alloc(struct bmx_peer **peerp, struct bmx_method_addr *mxmap)
 {
         int              i              = 0;
@@ -699,6 +700,9 @@ bmx_peer_alloc(struct bmx_peer **peerp, struct bmx_method_addr *mxmap)
                 bmx_put_idle_rx(rx);
         }
 
+        /* on servers with server-to-server comms, we are racing 
+         * between method_addr_lookup() and handle_conn_req() */
+
         bmx_peer_addref(peer); /* for the peers list */
         gen_mutex_lock(&bmi_mx->bmx_peers_lock);
         qlist_add_tail(&peer->mxp_list, &bmi_mx->bmx_peers);
@@ -710,10 +714,12 @@ bmx_peer_alloc(struct bmx_peer **peerp, struct bmx_method_addr *mxmap)
         return 0;
 }
 
-int
+static int
 bmx_peer_init_state(struct bmx_peer *peer)
 {
         int             ret     = 0;
+
+        debug(BMX_DB_FUNC, "entering %s", __func__);
 
         gen_mutex_lock(&peer->mxp_lock);
 
@@ -724,10 +730,14 @@ bmx_peer_init_state(struct bmx_peer *peer)
                 ret = -1;
         } else {
                 /* ok to init */
+                debug(BMX_DB_PEER, "Setting peer %s to BMX_PEER_INIT",
+                                   peer->mxp_mxmap->mxm_peername);
                 peer->mxp_state = BMX_PEER_INIT;
         }
 
         gen_mutex_unlock(&peer->mxp_lock);
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
 
         return 0;
 }
@@ -735,7 +745,7 @@ bmx_peer_init_state(struct bmx_peer *peer)
 /**** startup/shutdown functions **************************************/
 
 /* init bmi_mx */
-int
+static int
 bmx_globals_init(int method_id)
 {
 #if BMX_MEM_ACCT
@@ -754,6 +764,7 @@ bmx_globals_init(int method_id)
         /* bmi_mx->bmx_board */
         /* bmi_mx->bmx_ep_id */
         /* bmi_mx->bmx_ep */
+        /* bmi_mx->bmx_sid */
         /* bmi_mx->bmx_is_server */
 
         INIT_QLIST_HEAD(&bmi_mx->bmx_peers);
@@ -769,6 +780,11 @@ bmx_globals_init(int method_id)
 
         INIT_QLIST_HEAD(&bmi_mx->bmx_canceled);
         gen_mutex_init(&bmi_mx->bmx_canceled_lock);
+
+        INIT_QLIST_HEAD(&bmi_mx->bmx_unex_txs);
+        gen_mutex_init(&bmi_mx->bmx_unex_txs_lock);
+        INIT_QLIST_HEAD(&bmi_mx->bmx_unex_rxs);
+        gen_mutex_init(&bmi_mx->bmx_unex_rxs_lock);
 
         bmi_mx->bmx_next_id = 1;
         gen_mutex_init(&bmi_mx->bmx_lock);      /* global lock, use for global txs,
@@ -789,7 +805,7 @@ bmx_globals_init(int method_id)
 }
 
 
-int
+static int
 bmx_open_endpoint(mx_endpoint_t *ep, uint32_t board, uint32_t ep_id)
 {
         mx_return_t     mxret   = MX_SUCCESS;
@@ -803,7 +819,7 @@ bmx_open_endpoint(mx_endpoint_t *ep, uint32_t board, uint32_t ep_id)
          * matching recvs. */
         param.key = MX_PARAM_CONTEXT_ID;
         param.val.context_id.bits = 4;
-        param.val.context_id.shift = 60;
+        param.val.context_id.shift = BMX_MSG_SHIFT;
 
         mxret = mx_open_endpoint(board, ep_id, BMX_MAGIC,
                                  &param, 1, ep);
@@ -841,6 +857,8 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
         int             i       = 0;
         int             ret     = 0;
         mx_return_t     mxret   = MX_SUCCESS;
+
+        debug(BMX_DB_FUNC, "entering %s", __func__);
 
 #if BMX_LOGGING
         MPE_Init_log();
@@ -909,11 +927,16 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
         if (init_flags & BMI_INIT_SERVER) {
                 struct bmx_ctx         *rx     = NULL;
                 struct bmx_method_addr *mxmap  = listen_addr->method_data;
+                mx_endpoint_addr_t      epa;
+                uint32_t                ep_id   = 0;
+                uint32_t                sid     = 0;
+                uint64_t                nic_id  = 0ULL;
 
                 bmi_mx->bmx_hostname = (char *) mxmap->mxm_hostname;
                 bmi_mx->bmx_board = mxmap->mxm_board;
                 bmi_mx->bmx_ep_id = mxmap->mxm_ep_id;
                 bmi_mx->bmx_is_server = 1;
+                bmx_create_peername();
 
                 ret = bmx_open_endpoint(&bmi_mx->bmx_ep, mxmap->mxm_board, mxmap->mxm_ep_id);
                 if (ret != 0) {
@@ -921,6 +944,12 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
                         BMX_FREE(bmi_mx, sizeof(*bmi_mx));
                         exit(1);
                 }
+
+                /* get our MX session id */
+                mx_get_endpoint_addr(bmi_mx->bmx_ep, &epa);
+                mx_decompose_endpoint_addr2(epa, &nic_id, &ep_id, &sid);
+                bmi_mx->bmx_sid = sid;
+
                 /* We allocate BMX_PEER_RX_NUM when we peer_alloc()
                  * Allocate some here to catch the peer CONN_REQ */
                 for (i = 0; i < BMX_SERVER_RXS; i++) {
@@ -950,6 +979,8 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
 #if BMX_MEM_ACCT
         debug(BMX_DB_MEM, "memory used at end of initialization %lld", llu(mem_used));
 #endif
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
         return 0;
 }
 
@@ -1019,6 +1050,9 @@ BMI_mx_finalize(void)
         }
 #endif
 
+        if (bmi_mx->bmx_hostname) free(bmi_mx->bmx_hostname);
+        if (bmi_mx->bmx_peername) free(bmi_mx->bmx_peername);
+
         bmi_mx = NULL;
 
         gen_mutex_unlock(&tmp->bmx_lock);
@@ -1062,6 +1096,8 @@ bmx_peer_disconnect(struct bmx_peer *peer, int mx_dis, bmi_error_code_t err)
                 gen_mutex_unlock(&peer->mxp_lock);
                 return;
         }
+        debug(BMX_DB_PEER, "Setting peer %s to BMX_PEER_DISCONNECT",
+                           peer->mxp_mxmap->mxm_peername);
         peer->mxp_state = BMX_PEER_DISCONNECT;
 
         /* cancel queued txs */
@@ -1117,10 +1153,16 @@ BMI_mx_set_info(int option, void *inout_parameter)
                                         peer = mxmap->mxm_peer;
                                         bmx_peer_disconnect(peer, 1, BMI_ENETRESET);
                                 }
-                                if (!mxmap->mxm_peername) free((void *) mxmap->mxm_peername);
-                                mxmap->mxm_peername = NULL;
-                                if (!mxmap->mxm_hostname) free((void *) mxmap->mxm_hostname);
-                                mxmap->mxm_hostname = NULL;
+                                if (mxmap->mxm_peername) {
+                                        debug(BMX_DB_MEM, "freeing mxm_peername");
+                                        free((void *) mxmap->mxm_peername);
+                                        mxmap->mxm_peername = NULL;
+                                }
+                                if (mxmap->mxm_hostname) {
+                                        debug(BMX_DB_MEM, "freeing mxm_hostname");
+                                        free((void *) mxmap->mxm_hostname);
+                                        mxmap->mxm_hostname = NULL;
+                                }
                                 debug(BMX_DB_PEER, "freeing map 0x%p", map);
                                 free(map);
                         }
@@ -1161,7 +1203,7 @@ BMI_mx_get_info(int option, void *inout_parameter)
 #define BMX_IO_BUF      1
 #define BMX_UNEX_BUF    2
 
-void *
+static void *
 bmx_memalloc(bmi_size_t size, int type)
 {
         void                    *buf    = NULL;
@@ -1292,16 +1334,16 @@ BMI_mx_unexpected_free(void *buf)
         return 0;
 }
 
-void
+static void
 bmx_parse_match(uint64_t match, uint8_t *type, uint32_t *id, uint32_t *tag)
 {
-        *type   = (uint8_t)  (match >> 60);
-        *id     = (uint32_t) ((match >> 32) & 0xFFFFF); /* 20 bits */
-        *tag    = (uint32_t) (match & 0xFFFFFFFF);
+        *type   = (uint8_t)  (match >> BMX_MSG_SHIFT);
+        *id     = (uint32_t) ((match >> BMX_ID_SHIFT) & BMX_MAX_PEER_ID); /* 20 bits */
+        *tag    = (uint32_t) (match & BMX_MAX_TAG); /* 32 bits */
         return;
 }
 
-void
+static void
 bmx_create_match(struct bmx_ctx *ctx)
 {
         int             connect = 0;
@@ -1332,12 +1374,12 @@ bmx_create_match(struct bmx_ctx *ctx)
                 exit(1);
         }
 
-        ctx->mxc_match = (type << 60) | (id << 32) | tag;
+        ctx->mxc_match = (type << BMX_MSG_SHIFT) | (id << BMX_ID_SHIFT) | tag;
 
         return;
 }
 
-bmi_error_code_t
+static bmi_error_code_t
 bmx_mx_to_bmi_errno(enum mx_status_code code)
 {
         int     err     = 0;
@@ -1417,6 +1459,8 @@ bmx_ensure_connected(struct bmx_method_addr *mxmap)
         int             ret     = 0;
         struct bmx_peer *peer   = mxmap->mxm_peer;
 
+        /* NOTE: can this happen? we call peer_alloc() when using 
+         * method_addr_lookup() */
         if (peer == NULL) {
                 ret = bmx_peer_alloc(&peer, mxmap);
                 if (ret != 0) {
@@ -1559,10 +1603,15 @@ BMI_mx_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  enum bmi_buffer_type buffer_flag __unused,
                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
+        int ret = 0;
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
-        return bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
+        ret = bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
                                     tag, user_ptr, context_id, 0);
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
+        return ret;
 }
 
 static int
@@ -1571,10 +1620,16 @@ BMI_mx_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                       bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
                       bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
+        int ret = 0;
+
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
-        return bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
+        ret = bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
                                     total_size, tag, user_ptr, context_id, 0);
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
+        return ret;
 }
 
 static int
@@ -1583,10 +1638,16 @@ BMI_mx_post_sendunexpected(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  enum bmi_buffer_type buffer_flag __unused,
                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
+        int ret = 0;
+
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
-        return bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
+        ret = bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
                                     tag, user_ptr, context_id, 1);
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
+        return ret;
 }
 
 static int
@@ -1595,10 +1656,16 @@ BMI_mx_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_
                   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
                   bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
+        int ret = 0;
+
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
-        return bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
+        ret = bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
                                     total_size, tag, user_ptr, context_id, 1);
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
+        return ret;
 }
 
 /* if (peer->mxp_state == BMX_PEER_READY)
@@ -1627,7 +1694,7 @@ bmx_post_rx(struct bmx_ctx *rx)
                         segs = rx->mxc_seg_list;
                 }
                 mxret = mx_irecv(bmi_mx->bmx_ep, segs, rx->mxc_nseg,
-                                 rx->mxc_match, -1ULL, (void *) rx, &rx->mxc_mxreq);
+                                 rx->mxc_match, BMX_MASK_ALL, (void *) rx, &rx->mxc_mxreq);
                 if (mxret != MX_SUCCESS) {
                         ret = -BMI_ENOMEM;
                         bmx_deq_pending_ctx(rx);        /* uses peer lock */
@@ -1744,10 +1811,16 @@ BMI_mx_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
                  bmi_context_id context_id)
 {
+        int ret = 0;
+
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
-        return bmx_post_recv_common(id, remote_map, 1, &buffer, &expected_len,
+        ret = bmx_post_recv_common(id, remote_map, 1, &buffer, &expected_len,
                                     expected_len, tag, user_ptr, context_id);
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
+        return ret;
 }
 
 static int
@@ -1757,10 +1830,16 @@ BMI_mx_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
                bmi_context_id context_id)
 {
+        int ret = 0;
+
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
-        return bmx_post_recv_common(id, remote_map, list_count, buffers, sizes,
+        ret = bmx_post_recv_common(id, remote_map, list_count, buffers, sizes,
                                     tot_expected_len, tag, user_ptr, context_id);
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
+        return ret;
 }
 
 static void
@@ -1768,6 +1847,8 @@ bmx_peer_post_queued_rxs(struct bmx_peer *peer)
 {
         struct bmx_ctx  *rx             = NULL;
         list_t          *queued_rxs     = &peer->mxp_queued_rxs;
+
+        debug(BMX_DB_FUNC, "entering %s", __func__);
 
         gen_mutex_lock(&peer->mxp_lock);
         while (!qlist_empty(queued_rxs)) {
@@ -1783,6 +1864,8 @@ bmx_peer_post_queued_rxs(struct bmx_peer *peer)
         }
         gen_mutex_unlock(&peer->mxp_lock);
 
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
         return;
 }
 
@@ -1791,6 +1874,8 @@ bmx_peer_post_queued_txs(struct bmx_peer *peer)
 {
         struct bmx_ctx  *tx             = NULL;
         list_t          *queued_txs     = &peer->mxp_queued_txs;
+
+        debug(BMX_DB_FUNC, "entering %s", __func__);
 
         gen_mutex_lock(&peer->mxp_lock);
         while (!qlist_empty(queued_txs)) {
@@ -1808,6 +1893,8 @@ bmx_peer_post_queued_txs(struct bmx_peer *peer)
         }
         gen_mutex_unlock(&peer->mxp_lock);
 
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
         return;
 }
 
@@ -1819,7 +1906,10 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
         int             ret     = 0;
         struct bmx_ctx  *rx     = NULL;
         struct bmx_peer *peer   = NULL;
+        void            *peerp  = (void *) &peer;
         mx_return_t     mxret   = MX_SUCCESS;
+
+        debug(BMX_DB_FUNC, "entering %s", __func__);
 
         if (id == 0 && tag == 0 && type == 0) {
                 bmx_parse_match(match, &type, &id, &tag);
@@ -1831,7 +1921,8 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
 
         rx = bmx_get_idle_rx();
         if (rx != NULL) {
-                mx_get_endpoint_addr_context(source, (void **) &peer);
+                mx_get_endpoint_addr_context(source, &peerp);
+                peer = (struct bmx_peer *) peerp;
                 if (peer == NULL) {
                         debug(BMX_DB_PEER, "unknown peer sent message 0x%llx "
                                         "length %u", llu(match), length);
@@ -1855,7 +1946,7 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
                 debug(BMX_DB_CTX, "%s rx match= 0x%llx length= %lld", __func__,
                                 llu(rx->mxc_match), lld(rx->mxc_nob));
                 mxret = mx_irecv(bmi_mx->bmx_ep, &rx->mxc_seg, rx->mxc_nseg,
-                                 rx->mxc_match, -1ULL, (void *) rx, &rx->mxc_mxreq);
+                                 rx->mxc_match, BMX_MASK_ALL, (void *) rx, &rx->mxc_mxreq);
                 if (mxret != MX_SUCCESS) {
                         debug((BMX_DB_MX|BMX_DB_CTX), "mx_irecv() failed with %s for an "
                                         "unexpected recv with tag %d length %d",
@@ -1866,6 +1957,8 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
         } else {
                 ret = -1;
         }
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
 
         return ret;
 }
@@ -1887,6 +1980,7 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
         uint32_t                id      = 0;
         uint32_t                tag     = 0;
         struct bmx_peer         *peer   = NULL;
+        void                    *peerp  = &peer;
         mx_return_t             mxret   = MX_SUCCESS;
 
         bmx_parse_match(match_value, &type, &id, &tag);
@@ -1911,7 +2005,7 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                         debug(BMX_DB_CONN, "%s rx match= 0x%llx length= %lld", 
                                         __func__, llu(rx->mxc_match), lld(rx->mxc_nob));
                         mxret = mx_irecv(bmi_mx->bmx_ep, &rx->mxc_seg, rx->mxc_nseg,
-                                         rx->mxc_match, -1ULL, (void *) rx, &rx->mxc_mxreq);
+                                         rx->mxc_match, BMX_MASK_ALL, (void *) rx, &rx->mxc_mxreq);
                         if (mxret != MX_SUCCESS) {
                                 debug(BMX_DB_CONN, "mx_irecv() failed for an "
                                                 "unexpected recv with %s", 
@@ -1925,11 +2019,8 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                 break;
         case BMX_MSG_CONN_ACK:
                 /* the server is replying to our CONN_REQ */
-                if (bmi_mx->bmx_is_server) {
-                        debug(BMX_DB_ERR, "server receiving CONN_ACK");
-                        exit(1);
-                }
-                mx_get_endpoint_addr_context(source, (void **) &peer);
+                mx_get_endpoint_addr_context(source, &peerp);
+                peer = (struct bmx_peer *) peerp;
                 if (peer == NULL) {
                         debug((BMX_DB_CONN|BMX_DB_PEER), "receiving CONN_ACK but "
                                         "the endpoint context does not have a peer");
@@ -1954,7 +2045,9 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
                 break;
         case BMX_MSG_UNEXPECTED:
                 if (!bmi_mx->bmx_is_server) {
-                        mx_get_endpoint_addr_context(source, (void **) &peer);
+                        void *peerp = &peer;
+                        mx_get_endpoint_addr_context(source, &peerp);
+                        peer = (struct bmx_peer *) peerp;
                         debug(BMX_DB_ERR, "client receiving unexpected message "
                                 "from %s with mask 0x%llx length %u",
                                 peer == NULL ? "unknown" : peer->mxp_mxmap->mxm_peername,
@@ -1989,6 +2082,8 @@ bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board
         struct bmi_method_addr      *map            = NULL;
         struct bmx_method_addr  *mxmap          = NULL;
 
+        debug(BMX_DB_FUNC, "entering %s", __func__);
+
         if (bmi_mx == NULL) {
                 map = bmi_alloc_method_addr(
                     tmp_id, (bmi_size_t) sizeof(*mxmap));
@@ -1997,8 +2092,6 @@ bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board
         }
         if (map == NULL) return NULL;
 
-        map->ops = &bmi_mx_ops;
-
         mxmap = map->method_data;
         mxmap->mxm_map = map;
         mxmap->mxm_peername = strdup(peername);
@@ -2006,6 +2099,8 @@ bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board
         mxmap->mxm_board = board;
         mxmap->mxm_ep_id = ep_id;
         /* mxmap->mxm_peer */
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
 
         return map;
 }
@@ -2023,10 +2118,9 @@ bmx_handle_icon_req(void)
 {
         uint32_t        result  = 0;
 
-        if (bmi_mx->bmx_is_server) return;
         do {
-                uint64_t        match   = (uint64_t) BMX_MSG_ICON_REQ << 60;
-                uint64_t        mask    = (uint64_t) 0xF << 60;
+                uint64_t        match   = (uint64_t) BMX_MSG_ICON_REQ << BMX_MSG_SHIFT;
+                uint64_t        mask    = BMX_MASK_MSG;
                 mx_status_t     status;
 
                 mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
@@ -2096,7 +2190,7 @@ bmx_handle_icon_req(void)
         return;
 }
 
-/* test for CONN_REQ messages (on the server)
+/* test for received CONN_REQ messages (on the server)
  * if found
  *    create peer
  *    create mxmap
@@ -2106,9 +2200,9 @@ static void
 bmx_handle_conn_req(void)
 {
         uint32_t        result  = 0;
-        uint64_t        match   = (uint64_t) BMX_MSG_CONN_REQ << 60;
-        uint64_t        mask    = (uint64_t) 0xF << 60;
-        uint64_t        ack     = (uint64_t) BMX_MSG_ICON_ACK << 60;
+        uint64_t        match   = (uint64_t) BMX_MSG_CONN_REQ << BMX_MSG_SHIFT;
+        uint64_t        mask    = BMX_MASK_MSG;
+        uint64_t        ack     = (uint64_t) BMX_MSG_ICON_ACK << BMX_MSG_SHIFT;
         mx_status_t     status;
 
         do {
@@ -2116,7 +2210,10 @@ bmx_handle_conn_req(void)
                 if (result) {
                         uint8_t                 type    = 0;
                         uint32_t                id      = 0;
+                        uint32_t                sid     = 0;
                         uint32_t                version = 0;
+                        uint64_t                nic_id  = 0ULL;
+                        uint32_t                ep_id   = 0;
                         mx_request_t            request;
                         struct bmx_ctx          *rx     = NULL;
                         struct bmx_peer         *peer   = NULL;
@@ -2141,7 +2238,6 @@ bmx_handle_conn_req(void)
                                 continue;
                         }
                         bmx_parse_match(rx->mxc_match, &type, &id, &version);
-
                         if (version != BMX_VERSION) {
                                 /* TODO send error conn_ack */
                                 debug(BMX_DB_WARN, "version mismatch with peer "
@@ -2158,7 +2254,13 @@ bmx_handle_conn_req(void)
                                 bmx_put_idle_rx(rx);
                                 continue;
                         }
-                        mx_get_endpoint_addr_context(status.source, (void **) &peer);
+                        mx_decompose_endpoint_addr2(status.source, &nic_id,
+                                                    &ep_id, &sid);
+                        {
+                                void *peerp = &peer;
+                                mx_get_endpoint_addr_context(status.source, &peerp);
+                                peer = (struct bmx_peer *) peerp;
+                        }
                         if (peer == NULL) { /* new peer */
                                 int             ret             = 0;
                                 char           *host            = NULL;
@@ -2198,16 +2300,21 @@ bmx_handle_conn_req(void)
                                         bmx_put_idle_rx(rx);
                                         continue;
                                 }
-                        } else { /* reconnecting peer */
+                        } else if (sid != peer->mxp_sid) { /* reconnecting peer */
                                 /* cancel queued txs and rxs, pending rxs */
-                                debug((BMX_DB_CONN|BMX_DB_PEER), "%s peer %s reconnecting",
-                                                __func__, peer->mxp_mxmap->mxm_peername);
-                                bmx_peer_disconnect(peer, 0, BMI_ENETRESET);
+                                debug((BMX_DB_CONN|BMX_DB_PEER), "%s peer "
+                                      "%s reconnecting", __func__, 
+                                      peer->mxp_mxmap->mxm_peername);
+                                if (peer->mxp_state == BMX_PEER_READY)
+                                        bmx_peer_disconnect(peer, 0, BMI_ENETRESET);
                                 mxmap = peer->mxp_mxmap;
                         }
                         gen_mutex_lock(&peer->mxp_lock);
+                        debug(BMX_DB_PEER, "Setting peer %s to BMX_PEER_WAIT",
+                                           peer->mxp_mxmap->mxm_peername);
                         peer->mxp_state = BMX_PEER_WAIT;
                         peer->mxp_tx_id = id;
+                        peer->mxp_sid = sid;
                         gen_mutex_unlock(&peer->mxp_lock);
                         bmx_peer_addref(peer); /* add ref until completion of CONN_ACK */
                         mx_iconnect(bmi_mx->bmx_ep, peer->mxp_nic_id, mxmap->mxm_ep_id,
@@ -2236,8 +2343,8 @@ bmx_handle_icon_ack(void)
 
         if (!bmi_mx->bmx_is_server) return;
         do {
-                uint64_t        match   = (uint64_t) BMX_MSG_ICON_ACK << 60;
-                uint64_t        mask    = (uint64_t) 0xF << 60;
+                uint64_t        match   = (uint64_t) BMX_MSG_ICON_ACK << BMX_MSG_SHIFT;
+                uint64_t        mask    = BMX_MASK_MSG;
                 mx_status_t     status;
 
                 mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
@@ -2259,6 +2366,8 @@ bmx_handle_icon_ack(void)
                         }
                         gen_mutex_lock(&peer->mxp_lock);
                         peer->mxp_epa = status.source;
+                        debug(BMX_DB_PEER, "Setting peer %s to BMX_PEER_READY",
+                                           peer->mxp_mxmap->mxm_peername);
                         peer->mxp_state = BMX_PEER_READY;
                         /* NOTE no need to call bmx_peer_post_queued_[rxs|txs]()
                          * since the server should not have any queued msgs */
@@ -2292,6 +2401,8 @@ bmx_handle_icon_ack(void)
                         mx_isend(bmi_mx->bmx_ep, &tx->mxc_seg, tx->mxc_nseg, peer->mxp_epa,
                                  tx->mxc_match, (void *) tx, &tx->mxc_mxreq);
                         if (!peer->mxp_exist) {
+                                debug(BMX_DB_PEER, "calling bmi_method_addr_reg_callback"
+                                      "on %s", peer->mxp_mxmap->mxm_peername);
                                 bmi_method_addr_reg_callback(peer->mxp_map);
                                 peer->mxp_exist = 1;
                         }
@@ -2311,10 +2422,10 @@ bmx_handle_conn_ack(void)
         uint32_t        result  = 0;
         struct bmx_ctx  *tx     = NULL;
 
-        if (!bmi_mx->bmx_is_server) return;
+        if (!bmi_mx->bmx_is_server) goto out;
         do {
-                uint64_t        match   = (uint64_t) BMX_MSG_CONN_ACK << 60;
-                uint64_t        mask    = (uint64_t) 0xF << 60;
+                uint64_t        match   = (uint64_t) BMX_MSG_CONN_ACK << BMX_MSG_SHIFT;
+                uint64_t        mask    = BMX_MASK_MSG;
                 mx_status_t     status;
 
                 mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
@@ -2327,17 +2438,26 @@ bmx_handle_conn_ack(void)
                 }
         } while (result);
 
+out:
         return;
 }
 
 static void
 bmx_connection_handlers(void)
 {
+        static int      count   = 0;
+        int             print   = (count++ % 1000 == 0);
+
+        if (print)
+                debug(BMX_DB_FUNC, "entering %s", __func__);
+
         /* push connection messages along */
         bmx_handle_icon_req();
         bmx_handle_conn_req();
         bmx_handle_icon_ack();
         bmx_handle_conn_ack();
+        if (print)
+                debug(BMX_DB_FUNC, "leaving %s", __func__);
         return;
 }
 
@@ -2429,12 +2549,20 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 {
         int             i               = 0;
         int             completed       = 0;
+        int             old             = 0;
         uint64_t        match           = 0ULL;
-        uint64_t        mask            = (uint64_t) 0xF << 60;
+        uint64_t        mask            = BMX_MASK_MSG;
         struct bmx_ctx  *ctx            = NULL;
         struct bmx_peer *peer           = NULL;
         list_t          *canceled       = &bmi_mx->bmx_canceled;
         int             wait            = 0;
+        static int      count           = 0;
+        int             print           = 0;
+
+        if (count++ % 1000 == 0) {
+                debug(BMX_DB_FUNC, "entering %s", __func__);
+                print = 1;
+        }
 
         bmx_connection_handlers();
 
@@ -2469,11 +2597,13 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
         /* return completed messages
          * we will always try (incount - completed) times even
          *     if some iterations have no result */
-        match = (uint64_t) BMX_MSG_EXPECTED << 60;
+
+        match = (uint64_t) BMX_MSG_EXPECTED << BMX_MSG_SHIFT;
         for (i = completed; i < incount; i++) {
                 uint32_t        result  = 0;
                 mx_status_t     status;
-                int             old     = completed;
+
+                old = completed;
 
                 if (wait == 0 || wait == 2) {
                         mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
@@ -2531,77 +2661,118 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
         }
 
         /* check for completed unexpected sends */
-        match = (uint64_t) BMX_MSG_UNEXPECTED << 60;
-        if (!bmi_mx->bmx_is_server) { /* client */
-                int     old     = completed;
-                for (i = completed; i < incount; i++) {
-                        uint32_t        result  = 0;
-                        mx_status_t     status;
 
+        match = (uint64_t) BMX_MSG_UNEXPECTED << BMX_MSG_SHIFT;
+
+        old = completed;
+
+        for (i = completed; i < incount; i++) {
+                uint32_t        result  = 0;
+                mx_status_t     status;
+                list_t          *l      = &bmi_mx->bmx_unex_txs;
+                int             again   = 1;
+
+                ctx = NULL;
+
+                gen_mutex_lock(&bmi_mx->bmx_unex_txs_lock);
+                if (!qlist_empty(l)) {
+                        ctx = qlist_entry(l->next, struct bmx_ctx, mxc_list);
+                        peer = ctx->mxc_peer;
+                        qlist_del_init(&ctx->mxc_list);
+                        result = 1;
+                }
+                gen_mutex_unlock(&bmi_mx->bmx_unex_txs_lock);
+
+                while (!ctx && again) {
+                        again = 0;
                         mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
                         if (result) {
                                 ctx = (struct bmx_ctx *) status.context;
                                 peer = ctx->mxc_peer;
-                                debug(BMX_DB_CTX, "%s completing unexpected %s with "
-                                                "match 0x%llx for %s with op_id %llu", 
-                                                __func__, 
-                                                ctx->mxc_type == BMX_REQ_TX ? "TX" : "RX",
-                                                llu(ctx->mxc_match), 
-                                                peer->mxp_mxmap->mxm_peername,
-                                                llu(ctx->mxc_mop->op_id));
-        
-                                if (!qlist_empty(&ctx->mxc_list)) {
-                                        gen_mutex_lock(&peer->mxp_lock);
-                                        qlist_del_init(&ctx->mxc_list);
-                                        gen_mutex_unlock(&peer->mxp_lock);
+                                gen_mutex_lock(&peer->mxp_lock);
+                                qlist_del_init(&ctx->mxc_list);
+                                gen_mutex_unlock(&peer->mxp_lock);
+                                if (ctx->mxc_type == BMX_REQ_RX) {
+                                        /* queue until testunexpected is called */
+                                        gen_mutex_lock(&bmi_mx->bmx_unex_rxs_lock);
+                                        qlist_add_tail(&bmi_mx->bmx_unex_rxs, &ctx->mxc_list);
+                                        gen_mutex_unlock(&bmi_mx->bmx_unex_rxs_lock);
+                                        result = 0;
+                                        again = 1;
                                 }
-                                outids[completed] = ctx->mxc_mop->op_id;
-                                if (status.code == MX_SUCCESS) {
-                                        errs[completed] = 0;
-                                        sizes[completed] = status.xfer_length;
-                                } else {
-                                        errs[completed] = bmx_mx_to_bmi_errno(status.code);
-                                }
-                                if (user_ptrs)
-                                        user_ptrs[completed] = ctx->mxc_mop->user_ptr;
-                                id_gen_fast_unregister(ctx->mxc_mop->op_id);
-                                BMX_FREE(ctx->mxc_mop, sizeof(*ctx->mxc_mop));
-                                completed++;
-#if BMX_LOGGING
-                                MPE_Log_event(sendunex_finish, (int) ctx->mxc_tag, NULL);
-#endif
-
-                                if (ctx->mxc_type == BMX_REQ_TX) {
-                                        bmx_put_idle_tx(ctx);
-                                } else {
-                                        bmx_put_idle_rx(ctx);
-                                }
-                                bmx_peer_decref(peer); /* drop the ref taken in [send|recv]_common */
                         }
                 }
-                if (completed - old > 0) {
-                        debug(BMX_DB_CTX, "%s found %d unexpected tx messages", 
-                              __func__, completed - old);
+                if (result) {
+                        debug(BMX_DB_CTX, "%s completing unexpected %s with "
+                                        "match 0x%llx for %s with op_id %llu", 
+                                        __func__, 
+                                        ctx->mxc_type == BMX_REQ_TX ? "TX" : "RX",
+                                        llu(ctx->mxc_match), 
+                                        peer->mxp_mxmap->mxm_peername,
+                                        llu(ctx->mxc_mop->op_id));
+
+                        if (!qlist_empty(&ctx->mxc_list)) {
+                                gen_mutex_lock(&peer->mxp_lock);
+                                qlist_del_init(&ctx->mxc_list);
+                                gen_mutex_unlock(&peer->mxp_lock);
+                        }
+                        outids[completed] = ctx->mxc_mop->op_id;
+                        if (status.code == MX_SUCCESS) {
+                                errs[completed] = 0;
+                                sizes[completed] = status.xfer_length;
+                        } else {
+                                errs[completed] = bmx_mx_to_bmi_errno(status.code);
+                        }
+                        if (user_ptrs)
+                                user_ptrs[completed] = ctx->mxc_mop->user_ptr;
+                        id_gen_fast_unregister(ctx->mxc_mop->op_id);
+                        BMX_FREE(ctx->mxc_mop, sizeof(*ctx->mxc_mop));
+                        completed++;
+#if BMX_LOGGING
+                        MPE_Log_event(sendunex_finish, (int) ctx->mxc_tag, NULL);
+#endif
+
+                        bmx_put_idle_tx(ctx);
+                        bmx_peer_decref(peer); /* drop the ref taken in [send|recv]_common */
                 }
         }
+        if (completed - old > 0) {
+                debug(BMX_DB_CTX, "%s found %d unexpected tx messages", 
+              __func__, completed - old);
+        }
+
+        if (print)
+                debug(BMX_DB_FUNC, "leaving %s", __func__);
 
         *outcount = completed;
         return completed;
 }
 
+/* test for unexpected receives only, not unex sends */
 static int
 BMI_mx_testunexpected(int incount __unused, int *outcount,
             struct bmi_method_unexpected_info *ui, int max_idle_time __unused)
 {
         uint32_t        result  = 0;
-        uint64_t        match   = (uint64_t) BMX_MSG_UNEXPECTED << 60;
-        uint64_t        mask    = (uint64_t) 0xF << 60;
+        uint64_t        match   = ((uint64_t) BMX_MSG_UNEXPECTED << BMX_MSG_SHIFT);
+        uint64_t        mask    = BMX_MASK_MSG;
         mx_status_t     status;
+        static int      count   = 0;
+        int             print   = 0;
+        struct bmx_ctx  *rx     = NULL;
+        struct bmx_peer *peer   = NULL;
+        list_t          *l      = &bmi_mx->bmx_unex_rxs;
+        int             again   = 1;
+
+        if (count++ % 1000 == 0) {
+                debug(BMX_DB_FUNC, "entering %s", __func__);
+                print = 1;
+        }
 
         bmx_connection_handlers();
 
         /* if the unexpected handler cannot get a rx, it does not post a receive.
-         * probe for unexpected and post a rx */
+         * probe for unexpected and post a rx. */
         mx_iprobe(bmi_mx->bmx_ep, match, mask, &status, &result);
         if (result) {
                 int     ret     = 0;
@@ -2613,13 +2784,39 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
                 }
         }
 
-        /* check for unexpected messages */
+        /* check for unexpected receives */
         *outcount = 0;
-        mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
+
+        gen_mutex_lock(&bmi_mx->bmx_unex_rxs_lock);
+        if (!qlist_empty(l)) {
+                rx = qlist_entry(l->next, struct bmx_ctx, mxc_list);
+                peer = rx->mxc_peer;
+                qlist_del_init(&rx->mxc_list);
+                result = 1;
+        }
+        gen_mutex_unlock(&bmi_mx->bmx_unex_rxs_lock);
+
+        while (!rx && again) {
+                again = 0;
+                mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
+                if (result) {
+                        rx   = (struct bmx_ctx *) status.context;
+                        peer = rx->mxc_peer;
+                        if (rx->mxc_type == BMX_REQ_TX) {
+                                gen_mutex_lock(&peer->mxp_lock);
+                                qlist_del_init(&rx->mxc_list);
+                                gen_mutex_unlock(&peer->mxp_lock);
+                                gen_mutex_lock(&bmi_mx->bmx_unex_txs_lock);
+                                qlist_add_tail(&bmi_mx->bmx_unex_txs, &rx->mxc_list);
+                                gen_mutex_unlock(&bmi_mx->bmx_unex_txs_lock);
+                                result = 0;
+                                again = 1;
+                        }
+                }
+        }
+
         if (result) {
-                struct bmx_ctx  *rx   = (struct bmx_ctx *) status.context;
-                struct bmx_peer *peer = rx->mxc_peer;
-                debug(BMX_DB_CTX, "*** %s completing RX with match 0x%llx for %s",
+                debug(BMX_DB_CTX, "%s completing RX with match 0x%llx for %s",
                                 __func__, llu(rx->mxc_match), peer->mxp_mxmap->mxm_peername);
 
                 ui->error_code = 0;
@@ -2632,11 +2829,6 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
                 rx->mxc_seg.segment_ptr = rx->mxc_buffer;
                 ui->tag = rx->mxc_tag;
 
-                if (!qlist_empty(&rx->mxc_list)) {
-                        gen_mutex_lock(&peer->mxp_lock);
-                        qlist_del_init(&rx->mxc_list);
-                        gen_mutex_unlock(&peer->mxp_lock);
-                }
 #if BMX_LOGGING
                 MPE_Log_event(recvunex_finish, (int) rx->mxc_tag, NULL);
 #endif
@@ -2644,6 +2836,9 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
                 bmx_peer_decref(peer); /* drop the ref taken in unexpected_recv() */
                 *outcount = 1;
         }
+        if (print)
+                debug(BMX_DB_FUNC, "leaving %s", __func__);
+
         return 0;
 }
 
@@ -2664,14 +2859,15 @@ bmx_peer_connect(struct bmx_peer *peer)
         int                     ret    = 0;
         uint64_t                nic_id = 0ULL;
         mx_request_t            request;
-        uint64_t                match  = (uint64_t) BMX_MSG_ICON_REQ << 60;
+        uint64_t                match  = (uint64_t) BMX_MSG_ICON_REQ << BMX_MSG_SHIFT;
         struct bmx_method_addr *mxmap  = peer->mxp_mxmap;
 
-        if (bmi_mx->bmx_is_server) {
-                return 1;
-        }
+        debug(BMX_DB_FUNC, "entering %s", __func__);
+
         gen_mutex_lock(&peer->mxp_lock);
         if (peer->mxp_state == BMX_PEER_INIT) {
+                debug(BMX_DB_PEER, "Setting peer %s to BMX_PEER_WAIT",
+                                   peer->mxp_mxmap->mxm_peername);
                 peer->mxp_state = BMX_PEER_WAIT;
         } else {
                 gen_mutex_unlock(&peer->mxp_lock);
@@ -2697,7 +2893,8 @@ bmx_peer_connect(struct bmx_peer *peer)
                 }
                 mx_get_endpoint_addr(bmi_mx->bmx_ep, &epa);
                 /* get our nic_id and ep_id */
-                mx_decompose_endpoint_addr(epa, &nic_id, &bmi_mx->bmx_ep_id);
+                mx_decompose_endpoint_addr2(epa, &nic_id, &bmi_mx->bmx_ep_id,
+                                            &bmi_mx->bmx_sid);
                 /* get our hostname */
                 mx_nic_id_to_hostname(nic_id, host);
                 bmi_mx->bmx_hostname = strdup(host);
@@ -2718,6 +2915,9 @@ bmx_peer_connect(struct bmx_peer *peer)
          * by calling mx_iconnect() w/BMX_MSG_ICON_REQ */
         mx_iconnect(bmi_mx->bmx_ep, peer->mxp_nic_id, mxmap->mxm_ep_id,
                     BMX_MAGIC, match, (void *) peer, &request);
+
+        debug(BMX_DB_FUNC, "leaving %s", __func__);
+
         return ret;
 }
 
@@ -2733,10 +2933,11 @@ static struct bmi_method_addr *
 BMI_mx_method_addr_lookup(const char *id)
 {
         int                     ret     = 0;
+        int                     len     = 0;
         char                   *host    = NULL;
         uint32_t                board   = 0;
         uint32_t                ep_id   = 0;
-        struct bmi_method_addr     *map     = NULL;
+        struct bmi_method_addr *map     = NULL;
         struct bmx_method_addr *mxmap   = NULL;
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
@@ -2758,7 +2959,8 @@ BMI_mx_method_addr_lookup(const char *id)
                             mxmap->mxm_board == board &&
                             mxmap->mxm_ep_id == ep_id) {
                                 map = peer->mxp_map;
-                                BMX_FREE(host, sizeof(*host));
+                                len = strlen(host);
+                                BMX_FREE(host, len);
                                 break;
                         }
                 }
@@ -2767,7 +2969,7 @@ BMI_mx_method_addr_lookup(const char *id)
         
         if (map == NULL) {
                 map = bmx_alloc_method_addr(id, host, board, ep_id);
-                if (bmi_mx != NULL && ! bmi_mx->bmx_is_server) { /* we are a client */
+                if (bmi_mx != NULL) {
                         struct bmx_peer *peer   = NULL;
 
                         mxmap = map->method_data;
@@ -2828,7 +3030,19 @@ BMI_mx_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
                 break;
         case BMX_CTX_PENDING:
                 if (ctx->mxc_type == BMX_REQ_TX) {
-                        bmx_peer_disconnect(peer, 1, BMI_ENETRESET);
+                        /* see if it completed first */
+                        mx_test(bmi_mx->bmx_ep, &ctx->mxc_mxreq, &ctx->mxc_mxstat, &result);
+                        if (result == 1) {
+                                debug(BMX_DB_CTX, "%s completed TX op_id %llu "
+                                      "mxc_state %d peer state %d status.code %s",
+                                      __func__, llu(ctx->mxc_mop->op_id), ctx->mxc_state, 
+                                      peer->mxp_state, mx_strstatus(ctx->mxc_mxstat.code));
+                                bmx_deq_pending_ctx(ctx);
+                                bmx_q_canceled_ctx(ctx,  BMI_ECANCEL);
+                        } else {
+                                /* and if not, then disconnect() */
+                                bmx_peer_disconnect(peer, 1, BMI_ENETRESET);
+                        }
                 } else { /* BMX_REQ_RX */
                         mx_cancel(bmi_mx->bmx_ep, &ctx->mxc_mxreq, &result);
                         if (result == 1) {
@@ -2861,7 +3075,7 @@ BMI_mx_rev_lookup(struct bmi_method_addr *meth)
 }
 
 
-struct bmi_method_ops bmi_mx_ops = 
+const struct bmi_method_ops bmi_mx_ops = 
 {
     .method_name               = "bmi_mx",
     .initialize                = BMI_mx_initialize,

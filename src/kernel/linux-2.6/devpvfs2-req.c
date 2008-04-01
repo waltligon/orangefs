@@ -30,7 +30,9 @@ gossip_err("'lsof | grep %s' (run this as root)\n",                   \
 gossip_err("  open_access_count = %d\n", open_access_count);          \
 gossip_err("*****************************************************\n")
 
+#ifdef HAVE_KERNEL_DEVICE_CLASSES
 static struct class *pvfs2_dev_class;
+#endif
 
 static int pvfs2_devreq_open(
     struct inode *inode,

@@ -148,7 +148,7 @@ int BMI_gm_get_unexp_maxsize(void);
 char BMI_gm_method_name[] = "bmi_gm";
 
 /* exported method interface */
-struct bmi_method_ops bmi_gm_ops = {
+const struct bmi_method_ops bmi_gm_ops = {
     .method_name = BMI_gm_method_name,
     .initialize = BMI_gm_initialize,
     .finalize = BMI_gm_finalize,
@@ -2063,7 +2063,6 @@ static bmi_method_addr_p alloc_gm_method_addr(void)
 	return (NULL);
     }
 
-    my_method_addr->ops = &bmi_gm_ops;
     /* note that we trust the alloc_method_addr() function to have zeroed
      * out the structures for us already 
      */

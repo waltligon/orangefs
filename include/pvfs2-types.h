@@ -22,7 +22,6 @@
 #include <sys/time.h>
 #include <limits.h>
 #include <errno.h>
-#include <malloc.h>  /* pick up potential offsetof defn */
 #endif
 
 #ifndef INT32_MAX
@@ -32,10 +31,6 @@
 
 #ifndef NAME_MAX
 #define NAME_MAX 255
-#endif
-
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 #endif
 
 /* figure out the size of a pointer */
@@ -776,7 +771,7 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
         PVFS_ERROR_CODE(((positive ? error :               \
                              abs(error))) & ~mask)];       \
     }                                                      \
-    return (positive ? ret : -ret);                        \
+    return ret;                        			   \
 }                                                          \
 DECLARE_ERRNO_MAPPING()
 #define PVFS_ERROR_TO_ERRNO(__error) PVFS_get_errno_mapping(__error)

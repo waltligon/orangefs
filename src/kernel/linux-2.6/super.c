@@ -214,7 +214,7 @@ static void pvfs2_destroy_inode(struct inode *inode)
     }
 }
 
-static void pvfs2_read_inode(
+void pvfs2_read_inode(
     struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
@@ -247,7 +247,7 @@ static void pvfs2_read_inode(
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
 
-static void pvfs2_read_inode(
+void pvfs2_read_inode(
     struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = NULL;
@@ -848,7 +848,9 @@ struct super_operations pvfs2_s_ops =
     .drop_inode = generic_delete_inode,
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,
+#ifdef HAVE_READ_INODE
     .read_inode = pvfs2_read_inode,
+#endif
     .dirty_inode = pvfs2_dirty_inode,
     .put_inode = pvfs2_put_inode,
     .statfs = pvfs2_statfs,

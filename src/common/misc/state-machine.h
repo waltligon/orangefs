@@ -68,6 +68,7 @@ typedef struct PINT_smcb
     struct PINT_state_s *state_stack[PINT_STATE_STACK_SIZE];
 
     struct qlist_head frames;
+    int frame_count;
 
     /* usage specific routinet to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int);
@@ -83,6 +84,7 @@ typedef struct PINT_smcb
     job_context_id context; /* job context when waiting for children */
     int (*terminate_fn)(struct PINT_smcb *, job_status_s *);
     void *user_ptr; /* external user pointer */
+    int immediate; /* specifies immediate completion of the state machine */
 } PINT_smcb;
 
 #define PINT_SET_OP_COMPLETE do{PINT_smcb_set_complete(smcb);} while (0)
@@ -152,14 +154,6 @@ enum {
 #define SM_STATE_RETURN -1
 #define SM_NESTED_STATE 1
 
-#define SM_NONE   0
-#define SM_NEXT   1
-#define SM_RETURN 2
-#define SM_EXTERN 3
-#define SM_NESTED 5
-#define SM_JUMP   6
-#define SM_TERMINATE 7
-
 /* Prototypes for functions provided by user */
 int PINT_state_machine_complete(void *);
 
@@ -167,11 +161,11 @@ int PINT_state_machine_complete(void *);
  * We assume the first 6 characters of every state machine name are "pvfs2_".
  */
 #define PINT_state_machine_current_machine_name(smcb) \
-    (((smcb)->current_state->parent_machine->name) + 6)
+    ((smcb)->current_state ? (((smcb)->current_state->parent_machine->name) + 6) : "UNKNOWN")
 
 /* This macro returns the current state invoked */
 #define PINT_state_machine_current_state_name(smcb) \
-    ((smcb)->current_state->state_name)
+    ((smcb)->current_state ? ((smcb)->current_state->state_name) : "UNKNOWN")
 
 /* Prototypes for functions defined in by state machine code */
 int PINT_state_machine_halt(void);
@@ -184,6 +178,7 @@ PINT_sm_action PINT_state_machine_continue(
 int PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
 int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
 int PINT_smcb_op(struct PINT_smcb *smcb);
+int PINT_smcb_immediate_completion(struct PINT_smcb *smcb);
 void PINT_smcb_set_complete(struct PINT_smcb *smcb);
 int PINT_smcb_invalid_op(struct PINT_smcb *smcb);
 int PINT_smcb_complete(struct PINT_smcb *smcb);
@@ -196,9 +191,10 @@ int PINT_smcb_alloc(struct PINT_smcb **, int, int,
 void PINT_smcb_free(struct PINT_smcb *);
 void *PINT_sm_frame(struct PINT_smcb *, int);
 int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);
-void *PINT_sm_pop_frame(struct PINT_smcb *smcb, int *error_code);
-
-int PINT_sm_pop_error(PINT_smcb *smcb, PVFS_error ret);
+void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
+                        int *task_id,
+                        int *error_code,
+                        int *remaining);
 
 /* This macro is used in calls to PINT_sm_fram() */
 #define PINT_FRAME_CURRENT 0

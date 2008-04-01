@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.58.2.4 2007-11-24 21:24:46 slang Exp $
+ * $Id: ib.c,v 1.58.2.5 2008-04-01 23:25:10 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -179,9 +179,9 @@ static int ib_check_cq(void)
 	    debug(3, "%s: sq %p %s", __func__, sq,
 	          sq_state_name(sq->state.send));
 
-	    assert(sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION,
-	           "%s: wrong send state %s", __func__,
-		   sq_state_name(sq->state.send));
+	    bmi_ib_assert(sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION,
+			  "%s: wrong send state %s", __func__,
+			  sq_state_name(sq->state.send));
 
 	    sq->state.send = SQ_WAITING_RTS_DONE_BUFFER;
 
@@ -213,12 +213,15 @@ static int ib_check_cq(void)
 		    sq->state.send = SQ_WAITING_DATA_SEND_COMPLETION;
 		else if (state == SQ_WAITING_RTS_DONE_SEND_COMPLETION)
 		    sq->state.send = SQ_WAITING_USER_TEST;
+		else if (state == SQ_CANCELLED)
+		    ;
 		else
-		    assert(0, "%s: unknown send state %s (%d) of sq %p",
-		           __func__, sq_state_name(sq->state.send),
-			   sq->state.send, sq);
-		debug(2, "%s: send to %s completed locally: -> %s",
-		      __func__, bh->c->peername, sq_state_name(sq->state.send));
+		    bmi_ib_assert(0, "%s: unknown send state %s (%d) of sq %p",
+				  __func__, sq_state_name(sq->state.send),
+				  sq->state.send, sq);
+		debug(2, "%s: send to %s completed locally: sq %p -> %s",
+		      __func__, bh->c->peername, sq,
+		      sq_state_name(sq->state.send));
 
 	    } else {
 		struct ib_work *rq = sq;  /* rename */
@@ -226,11 +229,14 @@ static int ib_check_cq(void)
 		
 		if (state == RQ_RTS_WAITING_CTS_SEND_COMPLETION)
 		    rq->state.recv = RQ_RTS_WAITING_RTS_DONE;
+		else if (state == RQ_CANCELLED)
+		    ;
 		else
-		    assert(0, "%s: unknown send state %s of rq %p",
-		           __func__, rq_state_name(rq->state.recv), rq);
-		debug(2, "%s: send to %s completed locally: -> %s",
-		      __func__, bh->c->peername, rq_state_name(rq->state.recv));
+		    bmi_ib_assert(0, "%s: unknown recv state %s of rq %p",
+				  __func__, rq_state_name(rq->state.recv), rq);
+		debug(2, "%s: send to %s completed locally: rq %p -> %s",
+		      __func__, bh->c->peername, rq,
+		      rq_state_name(rq->state.recv));
 	    }
 
 	    qlist_add_tail(&bh->list, &bh->c->eager_send_buf_free);
@@ -264,8 +270,8 @@ static struct buf_head *get_eager_buf(ib_connection_t *c)
     if (c->send_credit > 0) {
 	--c->send_credit;
 	bh = qlist_try_del_head(&c->eager_send_buf_free);
-	assert(bh, "%s: empty eager_send_buf_free list, peer %s", __func__,
-	       c->peername);
+	bmi_ib_assert(bh, "%s: empty eager_send_buf_free list, peer %s",
+		      __func__, c->peername);
     }
     return bh;
 }
@@ -286,7 +292,7 @@ static void post_rr(ib_connection_t *c, struct buf_head *bh)
 	/* one credit saved back for just this situation, do not check */
 	--c->send_credit;
 	bh = qlist_try_del_head(&c->eager_send_buf_free);
-	assert(bh, "%s: empty eager_send_buf_free list", __func__);
+	bmi_ib_assert(bh, "%s: empty eager_send_buf_free list", __func__);
 	bh->sq = NULL;
 	debug(2, "%s: return %d credits to %s", __func__, c->return_credit,
 	      c->peername);
@@ -306,8 +312,9 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
     ib_connection_t *c = sq->c;
 
     debug(3, "%s: sq %p", __func__, sq);
-    assert(sq->state.send == SQ_WAITING_BUFFER, "%s: wrong send state %s",
-           __func__, sq_state_name(sq->state.send));
+    bmi_ib_assert(sq->state.send == SQ_WAITING_BUFFER,
+		  "%s: wrong send state %s", __func__,
+		  sq_state_name(sq->state.send));
 
     bh = get_eager_buf(c);
     if (!bh) {
@@ -404,9 +411,10 @@ encourage_send_incoming_cts(struct buf_head *bh, u_int32_t byte_len)
 
     debug(2, "%s: sq %p %s mopid %llx len %u", __func__, sq,
           sq_state_name(sq->state.send), llu(mh_cts.rts_mop_id), byte_len);
-    assert(sq->state.send == SQ_WAITING_CTS
-           || sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION,
-	   "%s: wrong send state %s", __func__, sq_state_name(sq->state.send));
+    bmi_ib_assert(sq->state.send == SQ_WAITING_CTS ||
+		  sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION,
+		  "%s: wrong send state %s", __func__,
+		  sq_state_name(sq->state.send));
 
     /* message; cts content; list of buffers, lengths, and keys */
     want = sizeof(mh_cts)
@@ -452,7 +460,7 @@ find_matching_recv(rq_state_t statemask, const ib_connection_t *c,
 static struct ib_work *
 alloc_new_recv(ib_connection_t *c, struct buf_head *bh)
 {
-    struct ib_work *rq = Malloc(sizeof(*rq));
+    struct ib_work *rq = bmi_ib_malloc(sizeof(*rq));
     rq->type = BMI_RECV;
     rq->c = c;
     ++rq->c->refcnt;
@@ -599,17 +607,15 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
 
 	rq = NULL;
 	qlist_for_each_entry(rqt, &ib_device->recvq, list) {
-	    if (rqt->c == c && rqt->rts_mop_id == mh_rts_done.mop_id) {
+	    if (rqt->c == c && rqt->rts_mop_id == mh_rts_done.mop_id &&
+		rqt->state.recv == RQ_RTS_WAITING_RTS_DONE) {
 		rq = rqt;
 		break;
 	    }
 	}
 
-	assert(rq, "%s: mop_id %llx in RTS_DONE message not found",
-	       __func__, llu(mh_rts_done.mop_id));
-	assert(rq->state.recv == RQ_RTS_WAITING_RTS_DONE,
-	       "%s: RTS_DONE to rq wrong state %s",
-	       __func__, rq_state_name(rq->state.recv));
+	bmi_ib_assert(rq, "%s: mop_id %llx in RTS_DONE message not found",
+		      __func__, llu(mh_rts_done.mop_id));
 
 #if MEMCACHE_BOUNCEBUF
 	memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
@@ -732,7 +738,7 @@ send_cts(struct ib_work *rq)
 	reg_recv_buflist.buf.recv = &reg_recv_buflist_buf;
 	reg_recv_buflist.len = &reg_recv_buflist_len;
 	reg_recv_buflist.tot_len = reg_recv_buflist_len;
-	reg_recv_buflist_buf = Malloc(reg_recv_buflist_len);
+	reg_recv_buflist_buf = bmi_ib_malloc(reg_recv_buflist_len);
 	memcache_register(ib_device->memcache, &reg_recv_buflist);
     }
     if (rq->buflist.tot_len > reg_recv_buflist_len)
@@ -820,7 +826,7 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
     ibmap = remote_map->method_data;
 
     /* alloc and build new sendq structure */
-    sq = Malloc(sizeof(*sq));
+    sq = bmi_ib_malloc(sizeof(*sq));
     sq->type = BMI_SEND;
     sq->state.send = SQ_WAITING_BUFFER;
 
@@ -871,7 +877,7 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
     qlist_add_tail(&sq->list, &ib_device->sendq);
 
     /* generate identifier used by caller to test for message later */
-    mop = Malloc(sizeof(*mop));
+    mop = bmi_ib_malloc(sizeof(*mop));
     id_gen_fast_register(&mop->op_id, mop);
     mop->addr = remote_map;  /* set of function pointers, essentially */
     mop->method_data = sq;
@@ -997,7 +1003,7 @@ post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 	  __func__, lld(tot_expected_len), lld(rq->buflist.tot_len));
 
     /* generate identifier used by caller to test for message later */
-    mop = Malloc(sizeof(*mop));
+    mop = bmi_ib_malloc(sizeof(*mop));
     id_gen_fast_register(&mop->op_id, mop);
     mop->addr = remote_map;  /* set of function pointers, essentially */
     mop->method_data = rq;
@@ -1388,7 +1394,7 @@ restart:
 	    debug(2, "%s: found waiting testunexpected", __func__);
 	    ui->error_code = 0;
 	    ui->addr = c->remote_map;  /* hand back permanent method_addr */
-	    ui->buffer = Malloc((unsigned long) rq->actual_len);
+	    ui->buffer = bmi_ib_malloc((unsigned long) rq->actual_len);
 	    ui->size = rq->actual_len;
 	    memcpy(ui->buffer,
 	           (msg_header_eager_t *) rq->bh->buf + 1,
@@ -1490,7 +1496,10 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 		memcache_deregister(ib_device->memcache, &sq->buflist);
 #  if MEMCACHE_EARLY_REG
 	    /* pin when sending rts, so also must dereg in this state */
-	    if (sq->state.send == SQ_WAITING_CTS)
+	    if (sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION ||
+	        sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS ||
+	        sq->state.send == SQ_WAITING_CTS ||
+		sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION)
 		memcache_deregister(ib_device->memcache, &sq->buflist);
 #  endif
 #endif
@@ -1505,7 +1514,8 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 		memcache_deregister(ib_device->memcache, &rq->buflist);
 #  if MEMCACHE_EARLY_REG
 	    /* pin on post, dereg all these */
-	    if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER)
+	    if (rq->state.recv == RQ_RTS_WAITING_CTS_SEND_COMPLETION ||
+	        rq->state.recv == RQ_RTS_WAITING_RTS_DONE)
 		memcache_deregister(ib_device->memcache, &rq->buflist);
 	    if (rq->state.recv == RQ_WAITING_INCOMING
 	      && rq->buflist.tot_len > ib_device->eager_buf_payload)
@@ -1573,7 +1583,7 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
 	error("%s: no ':' found", __func__);
 
     /* copy to permanent storage */
-    hostname = Malloc((unsigned long) (cp - s + 1));
+    hostname = bmi_ib_malloc((unsigned long) (cp - s + 1));
     strncpy(hostname, s, (size_t) (cp-s));
     hostname[cp-s] = '\0';
 
@@ -1622,19 +1632,19 @@ static ib_connection_t *ib_new_connection(int sock, const char *peername,
     ib_connection_t *c;
     int i, ret;
 
-    c = Malloc(sizeof(*c));
+    c = bmi_ib_malloc(sizeof(*c));
     c->peername = strdup(peername);
 
     /* fill send and recv free lists and buf heads */
-    c->eager_send_buf_contig = Malloc(ib_device->eager_buf_num
+    c->eager_send_buf_contig = bmi_ib_malloc(ib_device->eager_buf_num
       * ib_device->eager_buf_size);
-    c->eager_recv_buf_contig = Malloc(ib_device->eager_buf_num
+    c->eager_recv_buf_contig = bmi_ib_malloc(ib_device->eager_buf_num
       * ib_device->eager_buf_size);
     INIT_QLIST_HEAD(&c->eager_send_buf_free);
     INIT_QLIST_HEAD(&c->eager_recv_buf_free);
-    c->eager_send_buf_head_contig = Malloc(ib_device->eager_buf_num
+    c->eager_send_buf_head_contig = bmi_ib_malloc(ib_device->eager_buf_num
       * sizeof(*c->eager_send_buf_head_contig));
-    c->eager_recv_buf_head_contig = Malloc(ib_device->eager_buf_num
+    c->eager_recv_buf_head_contig = bmi_ib_malloc(ib_device->eager_buf_num
       * sizeof(*c->eager_recv_buf_head_contig));
     for (i=0; i<ib_device->eager_buf_num; i++) {
 	struct buf_head *ebs = &c->eager_send_buf_head_contig[i];
@@ -1939,7 +1949,6 @@ static int BMI_ib_set_info(int option, void *param __unused)
 	ib_method_addr_t *ibmap = map->method_data;
 	free(ibmap->hostname);
 	free(map);
-	bmi_method_addr_forget_callback(ibmap->c->bmi_addr);
 	break;
     }
     case BMI_OPTIMISTIC_BUFFER_REG: {
@@ -1982,7 +1991,7 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr, int method_id,
 
     bmi_ib_method_id = method_id;
 
-    ib_device = Malloc(sizeof(*ib_device));
+    ib_device = bmi_ib_malloc(sizeof(*ib_device));
 
     /* try, in order, OpenIB then VAPI; set up function pointers */
     ret = 1;

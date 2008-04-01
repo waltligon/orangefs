@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.12.2.1 2007-11-09 00:32:05 slang Exp $
+ * $Id: vapi.c,v 1.12.2.2 2008-04-01 23:25:10 slang Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -117,7 +117,7 @@ static int vapi_new_connection(ib_connection_t *c, int sock, int is_server)
 	VAPI_qp_num_t qp_num;
     } ch_in, ch_out;
 
-    vc = Malloc(sizeof(*vc));
+    vc = bmi_ib_malloc(sizeof(*vc));
     c->priv = vc;
 
     /* register memory region, recv */
@@ -169,12 +169,12 @@ static int vapi_new_connection(ib_connection_t *c, int sock, int is_server)
 
     /* share connection information across TCP */
     /* sanity check sizes of things (actually only 24 bits in qp_num) */
-    assert(sizeof(ch_in.lid) == sizeof(uint16_t),
-      "%s: connection_handshake.lid size %d expecting %d", __func__,
-      (int) sizeof(ch_in.lid), (int) sizeof(u_int16_t));
-    assert(sizeof(ch_in.qp_num) == sizeof(uint32_t),
-      "%s: connection_handshake.qp_num size %d expecting %d", __func__,
-      (int) sizeof(ch_in.qp_num), (int) sizeof(uint32_t));
+    bmi_ib_assert(sizeof(ch_in.lid) == sizeof(uint16_t),
+		  "%s: connection_handshake.lid size %d expecting %d",
+		  __func__, (int) sizeof(ch_in.lid), (int) sizeof(u_int16_t));
+    bmi_ib_assert(sizeof(ch_in.qp_num) == sizeof(uint32_t),
+		  "%s: connection_handshake.qp_num size %d expecting %d",
+		  __func__, (int) sizeof(ch_in.qp_num), (int) sizeof(uint32_t));
 
     /* convert all to network order and back */
     ch_out.lid = htobmi16(vd->nic_lid);
@@ -250,7 +250,8 @@ static void verify_prop_caps(VAPI_qp_cap_t *cap)
 	vd->sg_max_len = cap->max_sg_size_sq;
 	if (cap->max_sg_size_rq < vd->sg_max_len)
 	    vd->sg_max_len = cap->max_sg_size_rq;
-	vd->sg_tmp_array = Malloc(vd->sg_max_len * sizeof(*vd->sg_tmp_array));
+	vd->sg_tmp_array = bmi_ib_malloc(vd->sg_max_len *
+					 sizeof(*vd->sg_tmp_array));
     } else {
 	if (cap->max_sg_size_sq < vd->sg_max_len)
 	    error(
@@ -489,7 +490,7 @@ static void vapi_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
 	reg_send_buflist.buf.recv = &reg_send_buflist_buf;
 	reg_send_buflist.len = &reg_send_buflist_len;
 	reg_send_buflist.tot_len = reg_send_buflist_len;
-	reg_send_buflist_buf = Malloc(reg_send_buflist_len);
+	reg_send_buflist_buf = bmi_ib_malloc(reg_send_buflist_len);
 	memcache_register(ib_device->memcache, &reg_send_buflist);
     }
     if (sq->buflist.tot_len > reg_send_buflist_len)
@@ -899,7 +900,7 @@ int vapi_ib_initialize(void)
     if (num_hcas > 1)
 	warning("%s: found %d HCAs, choosing the first", __func__, num_hcas);
 
-    vd = Malloc(sizeof(*vd));
+    vd = bmi_ib_malloc(sizeof(*vd));
     ib_device->priv = vd;
 
     /* set the function pointers for vapi */

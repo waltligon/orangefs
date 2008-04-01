@@ -12,7 +12,7 @@ AC_DEFUN([AX_OPENSSL],
             LDFLAGS="$LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
             SERVER_LDFLAGS="$SERVER_LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
         fi
-        LIBS="$LIBS -lcrypt -lssl"
+        LIBS="$LIBS -lcrypto -lssl"
     
         AC_COMPILE_IFELSE(
     	    [#include "openssl/bio.h"],
@@ -36,7 +36,7 @@ AC_DEFUN([AX_OPENSSL_OPTIONAL],
 [
     AC_MSG_CHECKING([for openssl library])
     TMPLIBS=${LIBS}
-    LIBS="$LIBS -lcrypt -lssl"
+    LIBS="$LIBS -lcrypto -lssl"
 
     AC_COMPILE_IFELSE(
       [#include "openssl/bio.h"],

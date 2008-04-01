@@ -1,10 +1,30 @@
-BUILD_MX = @BUILD_MX@
+#
+# Makefile stub for bmi_mx.
+#
+# Copyright (C) 2008 Pete Wyckoff <pw@osc.edu>
+#
+# See COPYING in top-level directory.
+#
 
-# only build MX module if configure detected MX 
-ifdef BUILD_MX
-	DIR := src/io/bmi/bmi_mx
-	LIBSRC += \
-		$(DIR)/mx.c
-	SERVERSRC += \
-		$(DIR)/mx.c
-endif
+# only do any of this if configure decided to use MX
+ifneq (,$(BUILD_MX))
+
+#
+# Local definitions.
+#
+DIR := src/io/bmi/bmi_mx
+cfiles := mx.c
+
+#
+# Export these to the top Makefile to tell it what to build.
+#
+src := $(patsubst %,$(DIR)/%,$(cfiles))
+LIBSRC    += $(src)
+SERVERSRC += $(src)
+
+#
+# Extra cflags for files in this directory.
+#
+MODCFLAGS_$(DIR) := -I@MX_INCDIR@ 
+
+endif  # BUILD_MX

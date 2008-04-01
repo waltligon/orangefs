@@ -195,11 +195,7 @@ int BMI_sockio_nbrecv(int s,
 	    errno = EPIPE;
 	    return (-1);
 	}
-	if (ret == -1 && errno == EWOULDBLOCK)
-	{
-	    return (len - comp);	/* return amount completed */
-	}
-	if (ret == -1 && (errno == EINTR || errno == EAGAIN))
+	if (ret == -1 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK))
 	{
 	    goto nbrecv_restart;
 	}

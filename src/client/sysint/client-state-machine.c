@@ -301,7 +301,8 @@ int client_state_machine_terminate(
 
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
-            (cancelled_io_jobs_are_pending(smcb))))
+            (cancelled_io_jobs_are_pending(smcb))) &&
+        !PINT_smcb_immediate_completion(smcb))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
                 "add smcb %p to completion list\n", smcb);

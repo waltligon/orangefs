@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.29.2.1 2007-11-15 15:19:14 slang Exp $
+ * $Id: ib.h,v 1.29.2.2 2008-04-01 23:25:10 slang Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -400,7 +400,7 @@ void warning_errno(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void warning_xerrno(int errnum, const char *fmt, ...)
   __attribute__((format(printf,2,3)));
 void info(const char *fmt, ...) __attribute__((format(printf,1,2)));
-void *Malloc(unsigned long n) __attribute__((malloc));
+void *bmi_ib_malloc(unsigned long n) __attribute__((malloc));
 void *qlist_del_head(struct qlist_head *list);
 void *qlist_try_del_head(struct qlist_head *list);
 const char *sq_state_name(sq_state_t num);
@@ -466,14 +466,17 @@ void memcache_cache_flush(void *md);
 #  define debug(lvl,fmt,...) do { } while (0)
 #endif
 
+/*
+ * Varargs form of assert().
+ */
 #if !defined(NDEBUG)
-#define assert(cond,fmt,args...) \
+#define bmi_ib_assert(cond, fmt, args...) \
     do { \
 	if (bmi_ib_unlikely(!(cond))) \
-	    error(fmt,##args); \
+	    error(fmt, ##args); \
     } while (0)
 #else
-#  define assert(cond,fmt,...) do { } while (0)
+#  define bmi_ib_assert(cond, fmt, ...) do { } while (0)
 #endif
 
 #endif  /* __ib_h */

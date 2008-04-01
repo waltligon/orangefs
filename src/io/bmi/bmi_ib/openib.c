@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.14 2007-07-18 20:36:12 pw Exp $
+ * $Id: openib.c,v 1.14.4.1 2008-04-01 23:25:10 slang Exp $
  */
 #include <string.h>
 #include <errno.h>
@@ -117,7 +117,7 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
     } ch_in, ch_out;
 
     /* build new connection/context */
-    oc = Malloc(sizeof(*oc));
+    oc = bmi_ib_malloc(sizeof(*oc));
     c->priv = oc;
 
     /* register memory region, Recv side */
@@ -165,7 +165,8 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
 	od->sg_max_len = att.cap.max_send_sge;
 	if (att.cap.max_recv_sge < od->sg_max_len)
 	    od->sg_max_len = att.cap.max_recv_sge;
-	od->sg_tmp_array = Malloc(od->sg_max_len * sizeof(*od->sg_tmp_array));
+	od->sg_tmp_array = bmi_ib_malloc(od->sg_max_len *
+					 sizeof(*od->sg_tmp_array));
     } else {
 	if (att.cap.max_send_sge < od->sg_max_len)
 	    error("%s: new conn has smaller send SG array size %d vs %d",
@@ -479,7 +480,7 @@ static void openib_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
         reg_send_buflist.buf.recv = &reg_send_buflist_buf;
         reg_send_buflist.len = &reg_send_buflist_len;
         reg_send_buflist.tot_len = reg_send_buflist_len;
-        reg_send_buflist_buf = Malloc(reg_send_buflist_len);
+	reg_send_buflist_buf = bmi_ib_malloc(reg_send_buflist_len);
         memcache_register(ib_device->memcache, &reg_send_buflist, BMI_SEND);
     }
     if (sq->buflist.tot_len > reg_send_buflist_len)
@@ -879,7 +880,7 @@ int openib_ib_initialize(void)
     }
     VALGRIND_MAKE_MEM_DEFINED(ctx, sizeof(*ctx));
 
-    od = Malloc(sizeof(*od));
+    od = bmi_ib_malloc(sizeof(*od));
     ib_device->priv = od;
 
     /* set the function pointers for openib */
