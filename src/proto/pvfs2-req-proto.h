@@ -17,6 +17,7 @@
 #include "pvfs2-request.h"
 #include "pint-request.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-sysint.h"
 
 /* update PVFS2_PROTO_MAJOR on wire protocol changes that break backwards
  * compatibility (such as changing the semantics or protocol fields for an
@@ -198,7 +199,11 @@ endecode_fields_1_struct(
 struct PVFS_servreq_create_file
 {
     PVFS_fs_id fs_id;
-    PVFS_ds_type object_type;
+    PVFS_handle parent_handle;
+    char *object_name;                /* name of new entry */
+    PVFS_object_attr attr;
+    PINT_dist *dist;
+    uint32_t num_data_files;
 
     /*
       an array of handle extents that we use to suggest to
@@ -207,11 +212,17 @@ struct PVFS_servreq_create_file
       a single extent with first = last should be used.
     */
     PVFS_handle_extent_array handle_extent_array;
+
+    PVFS_BMI_addr_t data_server_addrs;
 };
-endecode_fields_3_struct(
+endecode_fields_7_struct(
     PVFS_servreq_create_file,
     PVFS_fs_id, fs_id,
-    PVFS_ds_type, object_type,
+    PVFS_handle, parent_handle,
+    string, object_name,
+    PVFS_object_attr, attr,
+    PINT_dist, dist,
+    uint32_t, num_data_files,
     PVFS_handle_extent_array, handle_extent_array)
 #define extra_size_PVFS_servreq_create_file \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
@@ -219,14 +230,23 @@ endecode_fields_3_struct(
 #define PINT_SERVREQ_CREATE_FILE_FILL(__req,           \
                                       __creds,         \
                                       __fsid,          \
-                                      __objtype,       \
+                                      __parent_handle, \
+                                      __object_name,   \
+                                      __attr,          \
+                                      __extra_amask,   \
+                                      __dist,          \
+                                      __num_data_files,\
                                       __ext_array)     \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_CREATE_FILE;                \
     (__req).credentials = (__creds);                   \
     (__req).u.create_file.fs_id = (__fsid);            \
-    (__req).u.create_file.object_type = (__objtype);   \
+    (__req).u.create_file.parent_handle = (__parent_handle); \
+    (__req).u.create_file.object_name = (__object_name);\
+    PINT_CONVERT_ATTR(&(__req).u.create_file.attr, &(__attr), __extra_amask);\
+    (__req).u.create_file.dist = (__dist);\
+    (__req).u.create_file.num_data_files = (__num_data_files);\
     (__req).u.create_file.handle_extent_array.extent_count =\
         (__ext_array).extent_count;                    \
     (__req).u.create_file.handle_extent_array.extent_array =\

@@ -30,6 +30,9 @@
 #include "pint-dist-utils.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "extent-utils.h"
+
+extern job_context_id pint_client_sm_context;
 
 enum
 {
@@ -37,19 +40,12 @@ enum
 };
 
 /* completion function prototypes */
-static int create_create_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int create_datafiles_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
-static int create_setattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int create_crdirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int create_delete_handles_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
-
-/* misc helper functions */
-static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 
 %%
 
@@ -103,41 +99,39 @@ machine pvfs2_create_file_work_sm
     state init
     {
         run create_init;
-        default => parent_getattr;
+        default => parent_getattr_local;
+    }
+
+    /* See if the parent's attribs are stored locally */
+    state parent_getattr_local
+    {
+        run create_getattr_local;
+        success => parent_getattr_inspect;
+        default => parent_getattr_remote;
     }
 
     /* send request to Meta server with parent's attribs */
-    /* this could be local */
-    state parent_getattr
+    state parent_getattr_remote
     {
         /* this is a client SM for doing a getattr from a server */
         jump pvfs2_server_getattr_sm;
         success => parent_getattr_inspect;
-        default => cleanup;
+        default => cleanup_work;
     }
 
     state parent_getattr_inspect
     {
         run create_parent_getattr_inspect;
-        success => dspace_create_setup_msgpair;
-        default => cleanup;
+        success => dspace_create;
+        default => cleanup_work;
     }
 
     /* set up to create Metadata for new file */
-    /* this should be local and no need a msgpair */
-    state dspace_create_setup_msgpair
+    state dspace_create
     {
-        run create_dspace_create_setup_msgpair;
-        success => dspace_create_xfer_msgpair;
-        default => cleanup;
-    }
-
-    /* execute request - this state should go away */
-    state dspace_create_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
+        run create_dspace_create;
         success => datafiles_setup_msgpair_array;
-        default => cleanup;
+        default => cleanup_work;
     }
 
     /* set up to create N datafiles on various servers */
@@ -147,14 +141,14 @@ machine pvfs2_create_file_work_sm
     {
         run create_datafiles_setup_msgpair_array;
         success => datafiles_xfer_msgpair_array;
-        default => cleanup;
+        default => cleanup_work;
     }
 
     /* execute messages */
     state datafiles_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
-        success => create_setattr_setup_msgpair;
+        success => setattr_setup;
         default => datafiles_failure;
     }
 
@@ -164,27 +158,19 @@ machine pvfs2_create_file_work_sm
         default => delete_handles_setup_msgpair_array;
     }
 
-    /* write datafile handles to metadata */
-    /* this should be local and not need a msgpair */
-    state create_setattr_setup_msgpair
+    /* write datafile handles to metadata. This is local.*/
+    state setattr_setup
     {
-        run create_setattr_setup_msgpair;
-        success => create_setattr_xfer_msgpair;
-        default => cleanup;
+        run create_setattr_setup;
+        success => create_setattr;
+        default => cleanup_work;
     }
 
-    /* this should go away */
-    state create_setattr_xfer_msgpair
+    state create_setattr
     {
-        jump pvfs2_msgpairarray_sm;
+        jump pvfs2_set_attr_work_sm;
         success => crdirent_setup_msgpair;
-        default => create_setattr_failure;
-    }
-
-    state create_setattr_failure
-    {
-        run create_setattr_failure;
-        default => delete_handles_setup_msgpair_array;
+        default => cleanup_work;
     }
 
     /* set up to create dir entry - could be local */
@@ -199,7 +185,7 @@ machine pvfs2_create_file_work_sm
     state crdirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => cleanup;
+        success => cleanup_work;
         default => crdirent_failure;
     }
 
@@ -214,14 +200,14 @@ machine pvfs2_create_file_work_sm
     {
         run create_delete_handles_setup_msgpair_array;
         success => delete_handles_xfer_msgpair_array;
-        default => cleanup;
+        default => cleanup_work;
     }
 
     /* execute messages */
     state delete_handles_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
-        default => cleanup;
+        default => cleanup_work;
     }
 
     state cleanup_work
@@ -243,8 +229,57 @@ machine pvfs2_create_file_work_sm
 static PINT_sm_action create_file_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_setup entered\n");
+
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    return (SM_ACTION_COMPLETE);
+
+    struct PINT_client_sm *sm_p = malloc(sizeof(struct PINT_client_sm));
+    if(!sm_p)
+    {
+        return -PVFS_ENOMEM;
+    }
+    /* zero out all members */
+    memset(sm_p, 0, sizeof(struct PINT_client_sm));
+    PINT_sm_push_frame(smcb, 0, sm_p);
+
+    /* Copied this from #define PINT_init_msgarray_params in client-state-machine.h
+     * because PINT_get_server_config_struct(__fsid) was not available on the server
+     * side. Use get_server_config_struct() instead. 
+     */
+    {
+        PINT_sm_msgpair_params *mpp = &sm_p->msgarray_params;
+        struct server_configuration_s *server_config =
+            get_server_config_struct();
+        mpp->job_context = server_job_context;
+        if (server_config)
+        {
+            mpp->job_timeout = server_config->client_job_bmi_timeout;
+            mpp->retry_limit = server_config->client_retry_limit;
+            mpp->retry_delay = server_config->client_retry_delay_ms;
+        }
+        else
+        {
+            mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;
+            mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
+            mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
+        }
+    }
+
+    sm_p->cred_p = &(s_op->req->credentials);
+    sm_p->u.create_file.object_name = s_op->req->u.create_file.object_name;
+    sm_p->u.create_file.attr = s_op->req->u.create_file.attr;
+#if 0
+    PVFS_util_copy_sys_attr(&sm_p->u.create_file.sys_attr, &s_op->req->u.create_file.sys_attr);
+#endif
+    sm_p->u.create_file.parent_handle = s_op->req->u.create_file.parent_handle;
+    sm_p->u.create_file.dist = s_op->req->u.create_file.dist;
+    sm_p->u.create_file.num_data_files = s_op->req->u.create_file.num_data_files;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Creating file %s under %llu, %d\n",
+        sm_p->u.create_file.object_name, llu(sm_p->u.create_file.parent_handle),
+        sm_p->u.create_file.fs_id);
+
+    return(SM_ACTION_COMPLETE);
 }
 
 /* the one thing that returns from the create file is an object handle
@@ -254,6 +289,40 @@ static PINT_sm_action create_file_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (js_p->error_code == 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
+                     llu(js_p->handle));
+        s_op->resp.u.create_file.handle = js_p->handle;
+        switch(s_op->req->u.create_file.attr.objtype)
+        {
+            case PVFS_TYPE_NONE:
+                PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+                    "new handle: %llu, type unknown.\n", llu(js_p->handle));
+                break;
+            case PVFS_TYPE_METAFILE:
+                PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+                    "new handle: %llu, type metafile.\n", llu(js_p->handle));
+                break;
+            case PVFS_TYPE_DATAFILE:
+                PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+                    "new handle: %llu, type datafile.\n", llu(js_p->handle));
+                break;
+            case PVFS_TYPE_DIRECTORY:
+                PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+                    "new handle: %llu, type directory.\n", llu(js_p->handle));
+                break;
+            case PVFS_TYPE_SYMLINK:
+                PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+                    "new handle: %llu, type symlink.\n", llu(js_p->handle));
+                break;
+            case PVFS_TYPE_DIRDATA:
+                PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+                    "new handle: %llu, type dirdata.\n", llu(js_p->handle));
+                break;
+        }
+    }
+
     return (SM_ACTION_COMPLETE);
 }
 
@@ -262,184 +331,16 @@ static PINT_sm_action create_file_resp(
 static PINT_sm_action create_file_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int task_id;
+    int error_code;
+
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    assert(sm_p);
+    free(sm_p);
+    PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     return (SM_ACTION_COMPLETE);
 }
 
-/** Initiate creation of a file with a specified distribution.
- */
-
-#if 0
-PVFS_error PVFS_isys_create(
-    char *object_name,
-    PVFS_object_ref parent_ref,
-    PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
-    PVFS_sys_dist *dist,
-    PVFS_sys_layout *layout,
-    PVFS_sysresp_create *resp,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr)
-{
-    PVFS_error ret = -PVFS_EINVAL;
-    PINT_smcb *smcb = NULL;
-    PINT_client_sm *sm_p = NULL;
-    int num_dfiles_req;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
-
-    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
-        (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
-        (object_name == NULL) || (resp == NULL))
-    {
-        gossip_err("invalid (NULL) required argument\n");
-        return ret;
-    }
-
-    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
-    {
-        gossip_lerr("PVFS_isys_create() failure: invalid attribute mask: %d, "
-                    "expected SYS_ALL_SETABLE (%d)\n",
-                    attr.mask, PVFS_ATTR_SYS_ALL_SETABLE);
-        return ret;
-    }
-
-    if ((attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) &&
-        ((attr.dfile_count < 1) ||
-         (attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
-    {
-	gossip_err("Error: invalid number of datafiles (%d) specified "
-                   "in PVFS_sys_create().\n", (int)attr.dfile_count);
-	return ret;
-    }
-
-    if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
-    {
-        return -PVFS_ENAMETOOLONG;
-    }
-
-    PINT_smcb_alloc(&smcb, PVFS_SYS_CREATE,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             server_job_context);
-    if (smcb == NULL)
-    {
-        return -PVFS_ENOMEM;
-    }
-    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-/* this will go to create_file_setup */
-    PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
-    sm_p->u.create.object_name = object_name;
-    sm_p->u.create.create_resp = resp;
-    sm_p->u.create.datafile_handles = NULL;
-    PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
-    sm_p->u.create.stored_error_code = 0;
-    sm_p->u.create.retry_count = 0;
-    sm_p->parent_ref = parent_ref;
-
-/* this should be left on the client */
-    /* copy layout to sm struct */
-    if(layout)
-    {
-        sm_p->u.create.layout.algorithm = layout->algorithm;
-        if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
-        {
-            sm_p->u.create.layout.server_list.count = layout->server_list.count;
-            sm_p->u.create.layout.server_list.servers =
-                malloc(layout->server_list.count * sizeof(PVFS_BMI_addr_t));
-            if(!sm_p->u.create.layout.server_list.servers)
-            {
-                return -PVFS_ENOMEM;
-            }
-            memcpy(sm_p->u.create.layout.server_list.servers,
-                   layout->server_list.servers,
-                   layout->server_list.count * sizeof(PVFS_BMI_addr_t));
-        }
-    }
-    else
-    {
-        sm_p->u.create.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
-    }
-
-    sm_p->object_ref = parent_ref;
-
-/* this should be left on the client and passed with request */
-    /* If the user specifies a distribution use that
-       else, use the default distribution */
-    if (dist)
-    {
-        if (!dist->name)
-        {
-            PINT_smcb_free(smcb);
-            return -PVFS_EINVAL;
-        }
-
-        sm_p->u.create.dist = PINT_dist_create(dist->name);
-        if (!sm_p->u.create.dist)
-        {
-            PINT_smcb_free(smcb);
-            return -PVFS_ENOMEM;
-        }
-        sm_p->u.create.dist->params = dist->params;
-    }
-    else
-    {
-        /* Get the default distribution */
-        sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
-        if (!sm_p->u.create.dist)
-        {
-            PINT_smcb_free(smcb);
-            return -PVFS_ENOMEM;
-        }
-    }
-
-/* this should be in a field in the request - done on client */
-    /* If an application hint has been provided, use that to request dfile
-       else, if a tabfile hint has been provided, use that instead*/
-    num_dfiles_req = 0;
-    if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
-    {
-        num_dfiles_req = attr.dfile_count;
-    }
-    else
-    {
-        /* Check the mount options */
-        int rc;
-        struct PVFS_sys_mntent mntent;
-
-        rc = PVFS_util_get_mntent_copy(sm_p->object_ref.fs_id, &mntent);
-        if (0 == rc)
-        {
-            num_dfiles_req = mntent.default_num_dfiles;
-            PVFS_util_free_mntent(&mntent);
-        }
-    }
-
-    /* Determine the number of dfiles, passing in client hints to
-       override any server hints */
-    ret = PINT_cached_config_get_num_dfiles(sm_p->object_ref.fs_id,
-                                            sm_p->u.create.dist,
-                                            num_dfiles_req,
-                                            &sm_p->u.create.num_data_files);
-
-    if (ret < 0)
-    {
-        gossip_err("Failed to get number of data servers\n");
-        PINT_smcb_free(smcb);
-        return ret;
-    }
-
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Creating file %s under %llu, %d\n",
-        object_name, llu(parent_ref.handle), parent_ref.fs_id);
-          
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
-}
-
-#endif
 
 /****************************************************************/
 
@@ -473,32 +374,6 @@ static PINT_sm_action create_init(
    return SM_ACTION_COMPLETE;
 }
 
-static int create_create_comp_fn(void *v_p,
-                                 struct PVFS_server_resp *resp_p,
-                                 int index)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_create_comp_fn\n");
-
-    assert(resp_p->op == PVFS_SERV_CREATE);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-
-    /* otherwise, just stash the newly created meta handle */
-    sm_p->u.create.metafile_handle = resp_p->u.create.handle;
-
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %llu\n",
-        llu(sm_p->u.create.metafile_handle));
-
-    return 0;
-}
-
 static int create_datafiles_comp_fn(void *v_p,
                                     struct PVFS_server_resp *resp_p,
                                     int index)
@@ -517,58 +392,33 @@ static int create_datafiles_comp_fn(void *v_p,
                    "for file: %s\n", 
                    __func__, 
                    BMI_addr_rev_lookup(
-                       sm_p->u.create.data_server_addrs[index]),
-                       sm_p->u.create.object_name);
+                       sm_p->u.create_file.data_server_addrs[index]),
+                       sm_p->u.create_file.object_name);
         PVFS_perror_gossip("Creation failure", resp_p->status);
 	return resp_p->status;
     }
 
     /* allocate memory for the data handles if we haven't already */
-    if (sm_p->u.create.datafile_handles == NULL)
+    if (sm_p->u.create_file.datafile_handles == NULL)
     {
-        sm_p->u.create.datafile_handles = (PVFS_handle *)malloc(
-            sm_p->u.create.num_data_files * sizeof(PVFS_handle));
+        sm_p->u.create_file.datafile_handles = (PVFS_handle *)malloc(
+            sm_p->u.create_file.num_data_files * sizeof(PVFS_handle));
 
-        if (sm_p->u.create.datafile_handles == NULL)
+        if (sm_p->u.create_file.datafile_handles == NULL)
         {
             gossip_err("create: Failed to allocate data handle array\n");
             return -PVFS_ENOMEM;
         }
-        memset(sm_p->u.create.datafile_handles, 0,
-               sm_p->u.create.num_data_files * sizeof(PVFS_handle));
+        memset(sm_p->u.create_file.datafile_handles, 0,
+               sm_p->u.create_file.num_data_files * sizeof(PVFS_handle));
     }
 
     /* otherwise, just stash the newly created data file handle */
-    sm_p->u.create.datafile_handles[index] = resp_p->u.create.handle;
+    sm_p->u.create_file.datafile_handles[index] = resp_p->u.create_file.handle;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Datafile handle %d is %llu\n",
-                 index, llu(sm_p->u.create.datafile_handles[index]));
+                 index, llu(sm_p->u.create_file.datafile_handles[index]));
     return 0;
-}
-
-static int create_setattr_comp_fn(void *v_p,
-                                  struct PVFS_server_resp *resp_p,
-                                  int index)
-{
-    int res;
-    PVFS_object_ref refn;
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_setattr_comp_fn\n");
-
-    assert(resp_p->op == PVFS_SERV_SETATTR);
-
-    refn.fs_id = sm_p->msgpair.fs_id;
-    refn.handle = sm_p->msgpair.handle;
-
-    res = PINT_copy_object_attr(&sm_p->u.create.cache_attr,
-                                &sm_p->msgpair.req.u.setattr.attr);
-    if(res != 0)
-    {
-        return res;
-    }
-
-    return resp_p->status;
 }
 
 static int create_crdirent_comp_fn(void *v_p,
@@ -601,63 +451,50 @@ static int create_delete_handles_comp_fn(void *v_p,
 /* in the main machine, or generated in one of these state actions */
 
 /* this is the metafile create - should be all local */
-/* we either need to get code from set_attr or call a */
-/* nested state machine */
-static PINT_sm_action create_dspace_create_setup_msgpair(
+static PINT_sm_action create_dspace_create(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    PVFS_handle_extent_array meta_handle_extent_array;
-    PINT_sm_msgpair_state *msg_p = NULL;
-    struct server_configuration_s *server_config = NULL;
+    job_id_t i;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
-                 "dspace_create_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: dspace_create\n");
 
     js_p->error_code = 0;
 
-    if (sm_p->u.create.num_data_files > PVFS_REQ_LIMIT_DFILE_COUNT)
+    if (sm_p->u.create_file.num_data_files > PVFS_REQ_LIMIT_DFILE_COUNT)
     {
-        sm_p->u.create.num_data_files = PVFS_REQ_LIMIT_DFILE_COUNT;
+        sm_p->u.create_file.num_data_files = PVFS_REQ_LIMIT_DFILE_COUNT;
         gossip_err("Warning: reducing number of data "
                      "files to PVFS_REQ_LIMIT_DFILE_COUNT\n");
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "need to create %d datafiles\n",
-                 sm_p->u.create.num_data_files);
+                 sm_p->u.create_file.num_data_files);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
+    ret = job_trove_dspace_create(
+        sm_p->u.create_file.fs_id,
+        sm_p->u.create_file.metafile_handle_extent_array,
+        sm_p->u.create_file.attr.objtype,
+        NULL,
+        TROVE_SYNC ,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context);
 
-    PINT_init_msgpair(sm_p, msg_p);
-
-    server_config = __PINT_server_config_mgr_get_config(
-        sm_p->object_ref.fs_id);
-
-    ret = PINT_cached_config_get_next_meta(
-        server_config, sm_p->object_ref.fs_id,
-        &msg_p->svr_addr, &meta_handle_extent_array);
-
-    __PINT_server_config_mgr_put_config(server_config);
-
-    if (ret)
+    if (js_p->error_code != 0)
     {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
+	return js_p->error_code;
     }
 
-    PINT_SERVREQ_CREATE_FILL(
-        msg_p->req,
-        *sm_p->cred_p,
-        sm_p->object_ref.fs_id,
-        PVFS_TYPE_METAFILE,     /* This is the metafile create */
-        meta_handle_extent_array);
+    /* otherwise, just stash the newly created meta handle */
+    sm_p->u.create_file.metafile_handle = js_p->handle;
 
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = meta_handle_extent_array.extent_array[0].first;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = create_create_comp_fn;
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %llu\n",
+        llu(sm_p->u.create_file.metafile_handle));
 
     return SM_ACTION_COMPLETE;
 }
@@ -679,13 +516,13 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
     js_p->error_code = 0;
 
     /* allocate handle extent array objects */
-    if (sm_p->u.create.io_handle_extent_array == NULL)
+    if (sm_p->u.create_file.io_handle_extent_array == NULL)
     {
-        sm_p->u.create.io_handle_extent_array = (PVFS_handle_extent_array *)
-            malloc(sm_p->u.create.num_data_files *
+        sm_p->u.create_file.io_handle_extent_array = (PVFS_handle_extent_array *)
+            malloc(sm_p->u.create_file.num_data_files *
                    sizeof(PVFS_handle_extent_array));
     }
-    if (!sm_p->u.create.io_handle_extent_array)
+    if (!sm_p->u.create_file.io_handle_extent_array)
     {
         gossip_err("create: failed to allocate handle_extent_array\n"); 
         js_p->error_code = -PVFS_ENOMEM;
@@ -693,36 +530,33 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
     }
 
     /* allocate data server bmi address array */
-    if (sm_p->u.create.data_server_addrs == NULL)
+    if (sm_p->u.create_file.data_server_addrs == NULL)
     {
-        sm_p->u.create.data_server_addrs = (PVFS_BMI_addr_t *)malloc(
-            sm_p->u.create.num_data_files * sizeof(PVFS_BMI_addr_t));
+        sm_p->u.create_file.data_server_addrs = (PVFS_BMI_addr_t *)malloc(
+            sm_p->u.create_file.num_data_files * sizeof(PVFS_BMI_addr_t));
     }
-    if (!sm_p->u.create.data_server_addrs)
+    if (!sm_p->u.create_file.data_server_addrs)
     {
         gossip_err("create: failed to allocate data server addrs\n"); 
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-    server_config = __PINT_server_config_mgr_get_config(
-        sm_p->object_ref.fs_id);
+    server_config = get_server_config_struct();
 
     ret = PINT_cached_config_map_servers(
         server_config,
         sm_p->object_ref.fs_id,
-        &sm_p->u.create.num_data_files,
-        &sm_p->u.create.layout,
-        sm_p->u.create.data_server_addrs,
-        sm_p->u.create.io_handle_extent_array);
+        &sm_p->u.create_file.num_data_files,
+        &sm_p->u.create_file.layout,
+        sm_p->u.create_file.data_server_addrs,
+        sm_p->u.create_file.io_handle_extent_array);
     if(ret < 0)
     {
         gossip_err("create: failed to map the layout to a set of IO servers\n");
         js_p->error_code = ret;
         return 1;
     }
-
-    __PINT_server_config_mgr_put_config(server_config);
 
     if (ret)
     {
@@ -739,17 +573,17 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
         free(sm_p->msgarray);
     }
     sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        (sm_p->u.create.num_data_files * sizeof(PINT_sm_msgpair_state)));
+        (sm_p->u.create_file.num_data_files * sizeof(PINT_sm_msgpair_state)));
     if (sm_p->msgarray == NULL)
     {
         gossip_err("create: failed to allocate msgarray\n");
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    sm_p->msgarray_count = sm_p->u.create.num_data_files;
+    sm_p->msgarray_count = sm_p->u.create_file.num_data_files;
 
     /* for each datafile, prepare to post a create send/recv pair */
-    for(i = 0; i < sm_p->u.create.num_data_files; i++)
+    for(i = 0; i < sm_p->u.create_file.num_data_files; i++)
     {
         PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
@@ -758,21 +592,21 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             PVFS_TYPE_DATAFILE,     /* this creates a datafile */
-            sm_p->u.create.io_handle_extent_array[i]);
+            sm_p->u.create_file.io_handle_extent_array[i]);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,  "posting datafile[%d] create "
                      "with extents %llu-%llu\n", i,
-                     llu(sm_p->u.create.io_handle_extent_array[i].
+                     llu(sm_p->u.create_file.io_handle_extent_array[i].
                         extent_array[0].first),
-                     llu(sm_p->u.create.io_handle_extent_array[i].
+                     llu(sm_p->u.create_file.io_handle_extent_array[i].
                         extent_array[0].last));
 
         msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = sm_p->u.create.io_handle_extent_array[i].
+        msg_p->handle = sm_p->u.create_file.io_handle_extent_array[i].
             extent_array[0].first;
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = create_datafiles_comp_fn;
-        msg_p->svr_addr = sm_p->u.create.data_server_addrs[i];
+        msg_p->svr_addr = sm_p->u.create_file.data_server_addrs[i];
     }
     return SM_ACTION_COMPLETE;
 }
@@ -781,7 +615,7 @@ static PINT_sm_action create_datafiles_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    sm_p->u.create.stored_error_code = js_p->error_code;
+    sm_p->u.create_file.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: datafiles_failure\n");
@@ -789,42 +623,63 @@ static PINT_sm_action create_datafiles_failure(
 }
 
 /* this writes metadata to the metafile - this should now be local */
-static PINT_sm_action create_setattr_setup_msgpair(
+
+/* setup and push a new frame for calling the nested set-attr state machine */
+static PINT_sm_action create_setattr_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
-    PINT_sm_msgpair_state *msg_p = NULL;
+    struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: setattr_setup_msgpair\n");
 
-    js_p->error_code = 0;
+    if(!s_op)
+    {
+        return -PVFS_ENOMEM;
+    }
+    /* zero out all members */
+    memset(s_op, 0, sizeof(struct PINT_server_op));
+    PINT_sm_push_frame(smcb, 0, s_op);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting setattr req\n");
+    s_op->op = PVFS_SERV_SETATTR;
+/*
+    s_op->credentials.uid = sm_p->cred_p->uid;
+    s_op->credentials.gid = sm_p->cred_p->gid;
+*/
+    s_op->u.setattr.handle = sm_p->object_ref.handle;
+    s_op->u.setattr.fs_id = sm_p->object_ref.fs_id;
+    s_op->u.setattr.attr = sm_p->u.create_file.attr;
+    s_op->u.setattr.attr.u.meta.dfile_array =
+        sm_p->u.create_file.datafile_handles;
+    s_op->u.setattr.attr.u.meta.dfile_count =
+        sm_p->u.create_file.num_data_files;
+    s_op->u.setattr.attr.u.meta.dist =
+        sm_p->u.create_file.dist;
+    s_op->u.setattr.attr.u.meta.dist_size =
+        PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
 
-    PINT_init_msgpair(sm_p, msg_p);
-
+#if 0
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
-        sm_p->u.create.metafile_handle,
+        sm_p->u.create_file.metafile_handle,
         PVFS_TYPE_METAFILE,
-        sm_p->u.create.sys_attr,
+        sm_p->u.create_file.attr,
         PVFS_ATTR_META_ALL);
 
     msg_p->req.u.setattr.attr.u.meta.dfile_array =
-        sm_p->u.create.datafile_handles;
+        sm_p->u.create_file.datafile_handles;
     msg_p->req.u.setattr.attr.u.meta.dfile_count =
-        sm_p->u.create.num_data_files;
+        sm_p->u.create_file.num_data_files;
     msg_p->req.u.setattr.attr.u.meta.dist =
-        sm_p->u.create.dist;
+        sm_p->u.create_file.dist;
     msg_p->req.u.setattr.attr.u.meta.dist_size =
-        PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
+        PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->u.create.metafile_handle;
+    msg_p->handle = sm_p->u.create_file.metafile_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_setattr_comp_fn;
 
@@ -836,17 +691,7 @@ static PINT_sm_action create_setattr_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action create_setattr_failure(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    sm_p->u.create.stored_error_code = js_p->error_code;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create state: setattr_failure\n");
+#endif
     return SM_ACTION_COMPLETE;
 }
 
@@ -867,16 +712,16 @@ static PINT_sm_action create_crdirent_setup_msgpair(
                  "create: %s: posting crdirent req: parent handle: %llu, "
                  "name: %s, handle: %llu\n",
                  __func__,
-                 llu(sm_p->object_ref.handle), sm_p->u.create.object_name,
-                 llu(sm_p->u.create.metafile_handle));
+                 llu(sm_p->object_ref.handle), sm_p->u.create_file.object_name,
+                 llu(sm_p->u.create_file.metafile_handle));
 
     PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
         *sm_p->cred_p,
-        sm_p->u.create.object_name,
-        sm_p->u.create.metafile_handle,
+        sm_p->u.create_file.object_name,
+        sm_p->u.create_file.metafile_handle,
         sm_p->object_ref.handle,
         sm_p->object_ref.fs_id);
 
@@ -903,9 +748,9 @@ static PINT_sm_action create_crdirent_failure(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
 
-    sm_p->u.create.stored_error_code = js_p->error_code;
+    sm_p->u.create_file.stored_error_code = js_p->error_code;
 
-    if (sm_p->u.create.stored_error_code == -PVFS_EEXIST)
+    if (sm_p->u.create_file.stored_error_code == -PVFS_EEXIST)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
                      "dirent already exists!\n");
@@ -929,7 +774,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
     ret = PINT_cached_config_map_to_server(
-        &metafile_server_addr, sm_p->u.create.metafile_handle,
+        &metafile_server_addr, sm_p->u.create_file.metafile_handle,
         sm_p->object_ref.fs_id);
 
     if (ret)
@@ -941,15 +786,15 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
 
     /*
       in the case that all datafiles have already been created,
-      actual_count will be (sm_p->u.create.num_data_files + 1).
+      actual_count will be (sm_p->u.create_file.num_data_files + 1).
       otherwise, it will be somewhere between 1 (for the metafile) and
       1 + the number of data files
     */
     actual_count = 1;
-    for(i = 0; i < sm_p->u.create.num_data_files; i++)
+    for(i = 0; i < sm_p->u.create_file.num_data_files; i++)
     {
-        if (sm_p->u.create.datafile_handles &&
-            (sm_p->u.create.datafile_handles[i] != PVFS_HANDLE_NULL))
+        if (sm_p->u.create_file.datafile_handles &&
+            (sm_p->u.create_file.datafile_handles[i] != PVFS_HANDLE_NULL))
         {
             actual_count++;
         }
@@ -970,7 +815,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     }
     sm_p->msgarray_count = actual_count;
 
-    assert(sm_p->u.create.data_server_addrs);
+    assert(sm_p->u.create_file.data_server_addrs);
 
     /*
       for the metafile and each datafile, prepare to post a remove
@@ -990,10 +835,10 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
                 msg_p->req,
                 *sm_p->cred_p,
                 sm_p->object_ref.fs_id,
-                sm_p->u.create.metafile_handle);
+                sm_p->u.create_file.metafile_handle);
 
             msg_p->fs_id = sm_p->object_ref.fs_id;
-            msg_p->handle = sm_p->u.create.metafile_handle;
+            msg_p->handle = sm_p->u.create_file.metafile_handle;
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
             msg_p->svr_addr = metafile_server_addr;
@@ -1007,13 +852,13 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
                 msg_p->req,
                 *sm_p->cred_p,
                 sm_p->object_ref.fs_id,
-                sm_p->u.create.datafile_handles[i]);
+                sm_p->u.create_file.datafile_handles[i]);
 
             msg_p->fs_id = sm_p->object_ref.fs_id;
-            msg_p->handle = sm_p->u.create.datafile_handles[i];
+            msg_p->handle = sm_p->u.create_file.datafile_handles[i];
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
-            msg_p->svr_addr = sm_p->u.create.data_server_addrs[i];
+            msg_p->svr_addr = sm_p->u.create_file.data_server_addrs[i];
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
                          "datafile handle %llu\n", llu(msg_p->handle));
@@ -1027,8 +872,10 @@ static PINT_sm_action create_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref metafile_ref;
+#if 0
     PVFS_size tmp_size = 0;
     int ret;
+#endif
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
 
@@ -1039,84 +886,84 @@ static PINT_sm_action create_cleanup(
      * this code into the server - not much else in it is useful to the
      * server, so I'm leaning to the former
      */
-/*    PVFS_util_release_sys_attr(&sm_p->u.create.sys_attr); */
+/*    PVFS_util_release_sys_attr(&sm_p->u.create_file.sys_attr); */
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    sm_p->error_code = (sm_p->u.create.stored_error_code ?
-                        sm_p->u.create.stored_error_code :
+    sm_p->error_code = (sm_p->u.create_file.stored_error_code ?
+                        sm_p->u.create_file.stored_error_code :
                         js_p->error_code);
 
     memset(&metafile_ref, 0, sizeof(metafile_ref));
 
     if (sm_p->error_code == 0)
     {
-        metafile_ref.handle = sm_p->u.create.metafile_handle;
+        metafile_ref.handle = sm_p->u.create_file.metafile_handle;
         metafile_ref.fs_id = sm_p->object_ref.fs_id;
 
         /* fill in outgoing response fields */
-        sm_p->u.create.create_resp->ref = metafile_ref;
+        sm_p->u.create_file.create_file_resp->ref = metafile_ref;
 
         /* do not maintina ncache and acache on server - only client */
 #if 0
         /* insert newly created metafile into the ncache */
-        PINT_ncache_update((const char*) sm_p->u.create.object_name, 
+        PINT_ncache_update((const char*) sm_p->u.create_file.object_name, 
                            (const PVFS_object_ref*) &metafile_ref, 
                            (const PVFS_object_ref*) &(sm_p->object_ref));
 
         /* we only insert a cache entry if the entire create succeeds,
          * i.e. crdirent succeeded.  set size to 0 */
         ret = PINT_acache_update(metafile_ref,
-                                 &sm_p->u.create.cache_attr,
+                                 &sm_p->u.create_file.cache_attr,
                                  &tmp_size);
-#endif
         if(ret < 0)
         {
             js_p->error_code = ret;
         }
+#endif
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
-             (sm_p->u.create.retry_count < sm_p->msgarray_params.retry_limit))
+             (sm_p->u.create_file.retry_count < sm_p->msgarray_params.retry_limit))
     {
-        sm_p->u.create.stored_error_code = 0;
-        sm_p->u.create.retry_count++;
+        sm_p->u.create_file.stored_error_code = 0;
+        sm_p->u.create_file.retry_count++;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Retrying create operation "
-                     "(attempt number %d)\n", sm_p->u.create.retry_count);
+                     "(attempt number %d)\n", sm_p->u.create_file.retry_count);
 
         js_p->error_code = CREATE_RETRY;
         return SM_ACTION_COMPLETE;
     }
 
-    PINT_free_object_attr(&sm_p->u.create.cache_attr);
+    PINT_free_object_attr(&sm_p->u.create_file.cache_attr);
 
-    if (sm_p->u.create.io_handle_extent_array)
+    if (sm_p->u.create_file.io_handle_extent_array)
     {
-        free(sm_p->u.create.io_handle_extent_array);
-        sm_p->u.create.io_handle_extent_array = NULL;
+        free(sm_p->u.create_file.io_handle_extent_array);
+        sm_p->u.create_file.io_handle_extent_array = NULL;
     }
 
-    if (sm_p->u.create.data_server_addrs)
+    if (sm_p->u.create_file.data_server_addrs)
     {
-        free(sm_p->u.create.data_server_addrs);
-        sm_p->u.create.data_server_addrs = NULL;
+        free(sm_p->u.create_file.data_server_addrs);
+        sm_p->u.create_file.data_server_addrs = NULL;
     }
 
-    if (sm_p->u.create.datafile_handles)
+    if (sm_p->u.create_file.datafile_handles)
     {
-        free(sm_p->u.create.datafile_handles);
-        sm_p->u.create.datafile_handles = NULL;
+        free(sm_p->u.create_file.datafile_handles);
+        sm_p->u.create_file.datafile_handles = NULL;
     }
 
-    if (sm_p->u.create.dist)
+    if (sm_p->u.create_file.dist)
     {
-        PINT_dist_free(sm_p->u.create.dist);
-        sm_p->u.create.dist = NULL;
+        PINT_dist_free(sm_p->u.create_file.dist);
+        sm_p->u.create_file.dist = NULL;
     }
 
-    if(sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LIST)
+    if(sm_p->u.create_file.layout.algorithm == PVFS_SYS_LAYOUT_LIST)
     {
-        free(sm_p->u.create.layout.server_list.servers);
+        free(sm_p->u.create_file.layout.server_list.servers);
     }
 
     if (sm_p->msgarray != &(sm_p->msgpair))
@@ -1127,6 +974,113 @@ static PINT_sm_action create_cleanup(
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
+}
+
+/* In this function determine whether the parent's attribs */
+/* are stored locally. If they are, retrieve them.         */
+static PINT_sm_action create_getattr_local(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct server_configuration_s *config = get_server_config_struct();
+    char server_name[1024];
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create-file state: create_getattr_local\n");
+
+    js_p->error_code = 0;
+
+    PINT_cached_config_get_server_name(server_name, 1024, sm_p->object_ref.handle,
+        sm_p->object_ref.fs_id);
+
+    if (strcmp(config->host_id, server_name)) {
+        /* TODO: perform local lookup. Can we just call the nested get_attr state machine? */
+        struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
+
+        if(!s_op)
+        {
+            return -PVFS_ENOMEM;
+        }
+        /* zero out all members */
+        memset(s_op, 0, sizeof(struct PINT_server_op));
+        PINT_sm_push_frame(smcb, 0, s_op);
+
+        s_op->op = PVFS_SERV_SETATTR;
+/*  TODO: see what really needs to be done with credentials
+ *      s_op->credentials.uid = sm_p->cred_p->uid;
+ *      s_op->credentials.gid = sm_p->cred_p->gid;
+ */
+        s_op->u.setattr.handle = sm_p->object_ref.handle;
+        s_op->u.setattr.fs_id = sm_p->object_ref.fs_id;
+        s_op->u.setattr.attr = sm_p->u.create_file.attr;
+        s_op->u.setattr.attr.u.meta.dfile_array =
+            sm_p->u.create_file.datafile_handles;
+        s_op->u.setattr.attr.u.meta.dfile_count =
+            sm_p->u.create_file.num_data_files;
+        s_op->u.setattr.attr.u.meta.dist =
+            sm_p->u.create_file.dist;
+        s_op->u.setattr.attr.u.meta.dist_size =
+            PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
+
+        return(SM_ACTION_COMPLETE);
+    }
+    else
+    {
+        /* it's not on this server. Fall through to another */
+        /* state to do the lookup on the correct server.    */
+        return(-PVFS_ENOENT);
+    }
+
+#if 0
+PINT_cached_config_get_server(fsid, config->host_id, server_type, &extent_array);
+If you don't care about the server type, you can pass in:
+ PINT_SERVER_TYPE_META|PINT_SERVER_TYPE_IO
+Then with the returned extent_array, you can do:
+is_my_handle = PINT_handle_in_extent_array(&extent_array, your_handle);
+
+    PVFS_handle_extent_array extent_array;
+
+    ret = PINT_cached_config_get_server_array(config, sm_p->object_ref.fs_id,
+        PINT_SERVER_TYPE_META, &extent_array);
+    if (PINT_handle_in_extent_array(&extent_array, sm_p->object_ref.handle))
+    {
+        /* TODO: perform local lookup. Can we just call the nested get_attr state machine? */
+        return(SM_ACTION_COMPLETE);
+    }
+    else
+    {
+        /* it's not on this server. */
+        return(-PVFS_ENOENT);
+    }
+#endif
+
+#if 0   /* Elaine's feeble attempt */
+    ret = PINT_cached_config_map_to_server(&parent_addr,
+        sm_p->u.create_file.parent_handle,
+        sm_p->object_ref.fs_id);
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    current_addr_bmi_str = PINT_config_get_host_addr_ptr(server_config, server_config->host_id);
+    if (current_addr_bmi_str)
+    {
+        ret = BMI_addr_lookup(&current_addr, current_addr_bmi_str);
+    }
+
+    if (BMI_query_addr_range(parent_addr, current_addr_bmi_str, 32))
+    {
+        /* TODO: perform local lookup. Can we just call the nested get_attr state machine? */
+        return(SM_ACTION_COMPLETE);
+    }
+    else
+    {
+        return(-PVFS_ENOENT);
+    }
+#endif
 }
 
 /** looks at the attributes of the parent directory and decides if it impacts
@@ -1155,7 +1109,7 @@ static PINT_sm_action create_parent_getattr_inspect(
         gossip_debug(GOSSIP_CLIENT_DEBUG, "parent has setgid bit set.\n");
         gossip_debug(GOSSIP_CLIENT_DEBUG, " - modifying requested attr "
                                           "for new file.\n");
-        sm_p->u.create.sys_attr.group = attr->group;
+        sm_p->u.create_file.attr.group = attr->group;
         /* note that permission checking is left to server even in this case */
     }
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_parent_getattr: [%p] "
@@ -1173,13 +1127,13 @@ static PINT_sm_action create_parent_getattr_inspect(
     {
         /* Determine the number of dfiles */
         PINT_cached_config_get_num_dfiles(sm_p->object_ref.fs_id,
-                sm_p->u.create.dist,
+                sm_p->u.create_file.dist,
                 num_dfiles_requested_override,
-                &sm_p->u.create.num_data_files);
+                &sm_p->u.create_file.num_data_files);
     }
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
-        sm_p->u.create.num_data_files, num_dfiles_requested_override);
-    current_dist = sm_p->u.create.dist;
+        sm_p->u.create_file.num_data_files, num_dfiles_requested_override);
+    current_dist = sm_p->u.create_file.dist;
     /* We have an overriding distribution name for this directory.. honor that */
     if (attr->u.dir.hint.dist_name_len > 0)
     {
@@ -1194,7 +1148,7 @@ static PINT_sm_action create_parent_getattr_inspect(
                     attr->u.dir.hint.dist_name,
                     current_dist->dist_name);
                 PINT_dist_free(current_dist);
-                sm_p->u.create.dist = new_dist;
+                sm_p->u.create_file.dist = new_dist;
                 current_dist = new_dist;
             }
             else
@@ -1261,81 +1215,6 @@ static PINT_sm_action create_parent_getattr_inspect(
         }
     }
     return SM_ACTION_COMPLETE;
-}
-
-/* this function shouldn't be needed here at all */
-/**
- * Returns the default distribution, or NULL if the distribution could not
- * be created.  The default distribution is read from the server
- * configuration if possible.  If the server config does not specify a
- * default distribution, simple_stripe will be used.
- */
-static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
-{
-    server_configuration_s* server_config = NULL;
-    PINT_dist* dist = NULL;
-
-    /* Retrieve the server configuration (with mutex) */
-    server_config = __PINT_server_config_mgr_get_config(fs_id);
-
-    /* If a default dist is specified in the config, use that
-       else just create a simple_stripe distribution */
-    if (NULL != server_config &&
-        NULL != server_config->default_dist_config.name)
-    {
-        dist = PINT_dist_create(server_config->default_dist_config.name);
-        
-        if (dist)
-        {
-            PINT_llist_p iter = server_config->default_dist_config.param_list;
-
-            /* Set supplied the distribution parameters */
-            while (iter)
-            {
-                int rc;
-                distribution_param_configuration* param =PINT_llist_head(iter);
-
-                /* If we are at the list end, break
-                   else, set the distribution parameter to the given value */
-                if (NULL == param)
-                {
-                    break;
-                }
-                else
-                {
-                    rc = dist->methods->set_param(dist->dist_name,
-                                                  dist->params,
-                                                  param->name,
-                                                  &param->value);
-
-                    if (0 != rc)
-                    {
-                        gossip_err("Error setting distribution parameter\n"
-                                   "  dist: %s\n"
-                                   "  param name: %s\n"
-                                   "  param value: %lld\n",
-                                   dist->dist_name, param->name,
-                                   lld(param->value));
-                    }
-                }
-                iter = PINT_llist_next(iter);
-            }                
-        }
-        else
-        {
-            gossip_err("Error creating default distribution: %s\n",
-                       server_config->default_dist_config.name);
-        }
-    }
-    else
-    {
-        dist = PINT_dist_create(PVFS_DIST_SIMPLE_STRIPE_NAME);
-    }
-
-    /* Release the server config mutex */
-    __PINT_server_config_mgr_put_config(server_config);
-
-    return dist;
 }
 
 static inline int PINT_get_object_ref_create_file(

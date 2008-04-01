@@ -41,7 +41,9 @@
 /* Default client timeout in seconds used to set the timeout for jobs that
  * send or receive request messages.
  */
+#ifndef PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT
 #define PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT 30
+#endif
 
 /* Default number of times to retry restartable client operations. */
 #define PVFS2_CLIENT_RETRY_LIMIT_DEFAULT  (5)
@@ -76,9 +78,13 @@ struct PINT_client_remove_sm
 
 struct PINT_client_create_file_sm
 {
+    PVFS_fs_id fs_id;
+    PVFS_handle parent_handle;
+    PVFS_ds_type object_type;
     char *object_name;                          /* input parameter */
     PVFS_sysresp_create_file *create_file_resp; /* in/out parameter*/
     PVFS_sys_attr sys_attr;                     /* input parameter */
+    PVFS_object_attr attr;                      /* input parameter */
 
     int retry_count;
     int num_data_files;
@@ -86,6 +92,7 @@ struct PINT_client_create_file_sm
 
     PINT_dist *dist;
     PVFS_sys_layout layout;
+    PVFS_handle_extent_array *metafile_handle_extent_array;
     PVFS_handle metafile_handle;
     PVFS_handle *datafile_handles;
     PVFS_BMI_addr_t *data_server_addrs;
