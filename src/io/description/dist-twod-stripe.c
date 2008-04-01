@@ -266,9 +266,9 @@ static PVFS_size logical_file_size(void* params,
     }
 
     gossip_debug(GOSSIP_DIST_DEBUG,
-                 "%s: server_ct: %llu log_size: %llu\n",
+                 "%s: server_ct: %u log_size: %llu\n",
                  __func__,
-                 llu(server_ct),
+                 server_ct,
                  llu(cur_max));
 
     return cur_max;

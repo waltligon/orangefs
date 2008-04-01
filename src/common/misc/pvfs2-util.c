@@ -1192,24 +1192,41 @@ int PVFS_util_init_defaults(void)
 #define SI_ZETTABYTE (1000 * SI_EXABYTE)
 #define SI_YOTTABYTE (1000 * SI_ZETTABYTE)
 */
-#define NUM_SIZES                  5
+
+#if SIZEOF_LONG_INT == 8
+#define NUM_SIZES                      5
+#else
+#define NUM_SIZES                 4 
+#endif
 
 static PVFS_size PINT_s_size_table[NUM_SIZES] =
 {
     /*YOTTABYTE, ZETTABYTE, EXABYTE, */
-    PETABYTE, TERABYTE, GIGABYTE, MEGABYTE, KILOBYTE
+#if SIZEOF_LONG_INT == 8
+    PETABYTE,
+    TERABYTE, 
+#endif
+    GIGABYTE, MEGABYTE, KILOBYTE
 };
 
 static PVFS_size PINT_s_si_size_table[NUM_SIZES] =
 {
     /*SI_YOTTABYTE, SI_ZETTABYTE, SI_EXABYTE, */
-    SI_PETABYTE, SI_TERABYTE, SI_GIGABYTE, SI_MEGABYTE, SI_KILOBYTE
+#if SIZEOF_LONG_INT == 8
+    SI_PETABYTE,
+    SI_TERABYTE,
+#endif
+    SI_GIGABYTE, SI_MEGABYTE, SI_KILOBYTE
 };
 
 static const char *PINT_s_str_size_table[NUM_SIZES] =
 {
     /*"Y", "Z", "E", */
-    "P","T", "G", "M", "K"
+#if SIZEOF_LONG_INT == 8
+    "P",
+    "T", 
+#endif
+    "G", "M", "K"
 };
 
 /*

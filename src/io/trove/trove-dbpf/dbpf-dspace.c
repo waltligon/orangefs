@@ -42,6 +42,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __GNUC__
+#define __unused __attribute__((unused))
+#else
+#define __unused
+#endif
+
 extern pthread_cond_t dbpf_op_completed_cond;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
@@ -530,7 +536,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     TROVE_handle dummy_handle;
     size_t sizeof_handle = 0, sizeof_attr = 0;
     int start_size;
-    void *tmp_ptr;
+    void *tmp_ptr __unused;
     void *tmp_handle;
     void *tmp_attr;
     uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
