@@ -415,14 +415,23 @@ static int batch_remove_handles_comp_fn(void *v_p,
                                         struct PVFS_server_resp *resp_p,
                                         int index)
 {
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    const char* server_name = NULL;
+    int server_type;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "batch_remove_handles_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_BATCH_REMOVE);
 
     if (resp_p->status != 0)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "Failed to remove handle number %d\n", index);
+        msg_p = &sm_p->msgarray[index];
+        server_name = PINT_cached_config_map_addr(msg_p->fs_id, 
+            msg_p->svr_addr, 
+            &server_type);
+        gossip_err("Warning: cleanup failed to remove at least one handle from %s; continuing.\n", server_name);
     }
     return resp_p->status;
 }

@@ -96,6 +96,7 @@ static PINT_sm_action setup_prelude(
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
+    js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
@@ -154,17 +155,17 @@ static PINT_sm_action release(
     job_id_t tmp_id;
     int ret;
 
-    /* TODO: need to check the error code from the actual remove work as
-     * well.  Probably should add an error array to the response so that the
-     * client knows which handles were removed and which weren't
-     */
-
     /* we need to release the scheduled remove request on the target
      * handle.  The schedule call occurred in the prelude_work sm */
 
     if(!s_op->scheduled_id)
     {
         return SM_ACTION_COMPLETE;
+    }
+
+    if(js_p->error_code)
+    {
+        s_op->u.batch_remove.error_code = js_p->error_code;
     }
 
     ret = job_req_sched_release(s_op->scheduled_id, smcb, 0, js_p, &tmp_id,
