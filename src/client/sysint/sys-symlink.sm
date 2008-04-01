@@ -286,7 +286,7 @@ static int symlink_create_comp_fn(void *v_p,
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_create_comp_fn\n");
 
-    assert(resp_p->op == PVFS_SERV_CREATE);
+    assert(resp_p->op == PVFS_SERV_BATCH_CREATE);
 
     if (resp_p->status != 0)
     {
