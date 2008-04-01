@@ -584,8 +584,14 @@ static PINT_sm_action batch_remove_setup_msgpair_array(
         return SM_ACTION_COMPLETE;
     }
 
+    /* TODO: what if more than one datafile handle was filled in, or if some
+     * of the datafiles are not stored on the meta server? 
+     */
+
     sm_p->u.create.handles[0] = sm_p->u.create.metafile_handle;
     sm_p->u.create.handles[1] = sm_p->u.create.datafile_handles[0];
+    
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_BATCH_REMOVE_FILL(
         msg_p->req,

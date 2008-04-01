@@ -154,6 +154,11 @@ static PINT_sm_action release(
     job_id_t tmp_id;
     int ret;
 
+    /* TODO: need to check the error code from the actual remove work as
+     * well.  Probably should add an error array to the response so that the
+     * client knows which handles were removed and which weren't
+     */
+
     /* we need to release the scheduled remove request on the target
      * handle.  The schedule call occurred in the prelude_work sm */
 
