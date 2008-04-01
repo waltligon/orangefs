@@ -344,6 +344,13 @@ struct PINT_server_getattr_op
     PVFS_handle dirent_handle;
 };
 
+struct PINT_server_setattr_op
+{
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
+    PVFS_object_attr attr;
+};
+
 struct PINT_server_listattr_op
 {
     uint32_t nhandles;
@@ -427,6 +434,7 @@ typedef struct PINT_server_op
 	/* request-specific scratch spaces for use during processing */
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
+        struct PINT_server_setattr_op setattr;
         struct PINT_server_listattr_op listattr;
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
@@ -475,6 +483,7 @@ extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_create_file_work_sm;
 extern struct PINT_state_machine_s pvfs2_server_getattr_sm;
+extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
