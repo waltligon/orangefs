@@ -502,7 +502,7 @@ int main(
     /* print all results */
     if (rank == 0)
     {
-        printf("<api>\t<op>\t<file size>\t<procs>\t<n_ops_per_proc>\t<n_ops_total>\t<time>\t<rate_per_proc>\t<rate_total>\n");
+        printf("# <api>\t<op>\t<file_size>\t<procs>\t<n_ops_per_proc>\t<n_ops_total>\t<time>\t<rate_per_proc>\t<rate_total>\n");
         /* this phase only makes one dir per proc */
         for(i=0; i<test; i++)
         {
@@ -539,7 +539,6 @@ int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name,
         {
             printf("# Pause...\n");
         }
-
         sleep(5);
     }
 
@@ -995,6 +994,7 @@ void pvfs_readdirplus(int rank, int* n_ops)
             free(rdplus_response.stat_err_array);
             free(rdplus_response.attr_array);
         }
+        token = rdplus_response.token;
     } while(total_entries < opt_nfiles);
 
     return;
@@ -1023,6 +1023,7 @@ void pvfs_readdir(int rank, int* n_ops)
         {
             free(rd_response.dirent_array);
         }
+        token = rd_response.token;
     } while(total_entries < opt_nfiles);
 
     return;
@@ -1067,6 +1068,7 @@ void pvfs_readdir_and_stat(int rank, int* n_ops)
         {
             free(rd_response.dirent_array);
         }
+        token = rd_response.token;
     } while(total_entries < opt_nfiles);
 
     return;
