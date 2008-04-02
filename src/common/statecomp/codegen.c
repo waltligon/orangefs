@@ -46,7 +46,7 @@ void gen_machine(char *machine_name)
     /* dump forward declarations of all the states */
     for (s=states; s; s=s->next)
     {
-        if(s->action == ACTION_RUN)
+        if(s->action == ACTION_RUN || s->action == ACTION_PJMP)
             gen_runfunc_decl(s->function_or_machine);
         gen_state_decl(s->name);
     }
