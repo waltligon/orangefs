@@ -137,7 +137,7 @@ static int pvfs2_readdir(
     gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir called on %s (pos=%d)\n",
                  dentry->d_name.name, (int)pos);
 
-    switch (pos)
+    switch ((uint32_t)pos)
     {
 	/*
 	   if we're just starting, populate the "." and ".." entries
