@@ -1941,6 +1941,7 @@ static void handle_io_error(
     struct fp_private_data *flow_data)
 {
     int ret;
+    char buf[64] = {0};
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
         "flowproto-multiqueue handle_io_error() called for flow %p.\n",
@@ -1950,8 +1951,9 @@ static void handle_io_error(
     if(flow_data->parent->error_code == 0)
     {
         enum flow_endpoint_type src, dest;
-    
-        gossip_err("%s: flow proto error cleanup started on %p, error_code: %d\n", __func__, flow_data->parent, error_code);
+
+        PVFS_strerror_r(error_code, buf, 64);
+        gossip_err("%s: flow proto error cleanup started on %p: %s\n", __func__, flow_data->parent, buf);
 
         flow_data->parent->error_code = error_code;
         if(q_item)
@@ -2021,8 +2023,9 @@ static void handle_io_error(
 
     if(flow_data->cleanup_pending_count == 0)
     {
-        gossip_err("%s: flow proto %p error cleanup finished, error_code: %d\n",
-            __func__, flow_data->parent, flow_data->parent->error_code);
+        PVFS_strerror_r(flow_data->parent->error_code, buf, 64);
+        gossip_err("%s: flow proto %p error cleanup finished: %s\n",
+            __func__, flow_data->parent, buf);
 
         /* we are finished, make sure error is marked and state is set */
         assert(flow_data->parent->error_code);
