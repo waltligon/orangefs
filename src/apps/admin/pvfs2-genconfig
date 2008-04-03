@@ -309,6 +309,10 @@ sub emit_filesystem
     {
         print $target "\t\tTroveMethod $opt_trovemethod\n";
     }
+    else
+    {
+        print $target "\t\tTroveMethod alt-aio\n";
+    }
 
     print $target "\t</StorageHints>\n";
 
