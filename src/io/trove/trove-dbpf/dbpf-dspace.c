@@ -1232,8 +1232,7 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
         DBT key, data;
         struct open_cache_ref tmp_ref;
         TROVE_object_ref ref;
-        TROVE_size b_size = 0, k_size = 0;
-        DB_BTREE_STAT *k_stat_p = NULL;
+        TROVE_size b_size = 0;
 
         ref.handle = op_p->u.d_getattr_list.handle_array[i];
         ref.fs_id = op_p->coll_p->coll_id;
@@ -1266,28 +1265,6 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
             b_size = (TROVE_size)b_stat.st_size;
         }
 
-        ret = op_p->coll_p->ds_db->stat(op_p->coll_p->ds_db,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_STAT
-                                        (DB_TXN *) NULL,
-#endif
-                                        &k_stat_p,
-#ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
-                                        NULL,
-#endif
-                                        0);
-        if (ret == 0)
-        {
-            k_size = (TROVE_size) k_stat_p->bt_ndata;
-            free(k_stat_p);
-        }
-        else
-        {
-            gossip_err("Error: unable to stat handle %llu (%llx).\n",
-                       llu(op_p->handle), llu(op_p->handle));
-            op_p->u.d_getattr_list.error_p[i] = -TROVE_EIO;
-            continue;
-        }
-
         memset(&key, 0, sizeof(key));
         key.data = &op_p->u.d_getattr_list.handle_array[i];
         key.size = key.ulen = sizeof(TROVE_handle);
@@ -1310,10 +1287,10 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
             "from DISK for key %llu\n\tuid = %d, mode = %d, type = %d, "
-            "dfile_count = %d, dist_size = %d\n\tb_size = %lld, k_size = %lld\n",
+            "dfile_count = %d, dist_size = %d\n\tb_size = %lld\n",
             llu(op_p->u.d_getattr_list.handle_array[i]), (int)s_attr.uid, (int)s_attr.mode,
             (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
-            llu(b_size), llu(k_size));
+            llu(b_size));
 
         attr = &op_p->u.d_getattr_list.attr_p[i];
         trove_ds_stored_to_attr(s_attr, *attr, b_size);
