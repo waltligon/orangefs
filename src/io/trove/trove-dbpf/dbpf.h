@@ -455,6 +455,9 @@ enum dbpf_op_type
     DSPACE_GETATTR,
     DSPACE_SETATTR,
     DSPACE_GETATTR_LIST,
+    /* NOTE: if you change or add items to this list, please update
+     * s_dbpf_op_type_str_map[] accordingly (dbpf-mgmt.c)
+     */
 };
 
 #define DBPF_OP_DOES_SYNC(__op)    \
