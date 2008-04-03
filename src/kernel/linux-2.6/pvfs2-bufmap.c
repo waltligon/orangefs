@@ -24,6 +24,7 @@ inline int pvfs_bufmap_shift_query(void)
 }
 
 static int bufmap_init = 0;
+DECLARE_RWSEM(bufmap_init_sem);
 static struct page **bufmap_page_array = NULL;
 
 /* array to track usage of buffer descriptors */
@@ -108,6 +109,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
                  "(ptr (%p) sz (%d) cnt(%d).\n",
                  user_desc->ptr, user_desc->size, user_desc->count);
 
+    down_write(&bufmap_init_sem);
     if (bufmap_init == 1)
     {
         gossip_err("pvfs2: error: bufmap already initialized.\n");
@@ -171,13 +173,13 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     }
 
     /* map the pages */
-    down_read(&current->mm->mmap_sem);
+    down_write(&current->mm->mmap_sem);
 
     ret = get_user_pages(
         current, current->mm, (unsigned long)user_desc->ptr,
         bufmap_page_count, 1, 0, bufmap_page_array, NULL);
 
-    up_read(&current->mm->mmap_sem);
+    up_write(&current->mm->mmap_sem);
 
     if (ret < 0)
     {
@@ -245,12 +247,14 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     spin_unlock(&readdir_index_lock);
 
     bufmap_init = 1;
+    up_write(&bufmap_init_sem);
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_initialize: exiting normally\n");
     return 0;
 
 init_failure:
     finalize_bufmap_descriptors();
+    up_write(&bufmap_init_sem);
     return ret;
 }
 
@@ -267,10 +271,12 @@ void pvfs_bufmap_finalize(void)
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_finalize: called\n");
 
+    down_write(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_finalize: not yet "
                     "initialized; returning\n");
+        up_write(&bufmap_init_sem);
         return;
     }
 
@@ -284,6 +290,7 @@ void pvfs_bufmap_finalize(void)
     bufmap_init = 0;
 
     finalize_bufmap_descriptors();
+    up_write(&bufmap_init_sem);
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_finalize: exiting normally\n");
 }
 
@@ -378,12 +385,25 @@ static void put_back_slot(struct slot_args *slargs, int buffer_index)
 int pvfs_bufmap_get(int *buffer_index)
 {
     struct slot_args slargs;
+    int ret;
+
+    down_read(&bufmap_init_sem);
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_get: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
+        return -EIO;
+    }
 
     slargs.slot_count = pvfs2_bufmap_desc_count;
     slargs.slot_array = buffer_index_array;
     slargs.slot_lock  = &buffer_index_lock;
     slargs.slot_wq    = &bufmap_waitq;
-    return wait_for_a_slot(&slargs, buffer_index);
+    ret = wait_for_a_slot(&slargs, buffer_index);
+    up_read(&bufmap_init_sem);
+    return(ret);
 }
 
 /* pvfs_bufmap_put()
@@ -396,11 +416,22 @@ void pvfs_bufmap_put(int buffer_index)
 {
     struct slot_args slargs;
 
+    down_read(&bufmap_init_sem);
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_put: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
+        return;
+    }
+
     slargs.slot_count = pvfs2_bufmap_desc_count;
     slargs.slot_array = buffer_index_array;
     slargs.slot_lock  = &buffer_index_lock;
     slargs.slot_wq    = &bufmap_waitq;
     put_back_slot(&slargs, buffer_index);
+    up_read(&bufmap_init_sem);
     return;
 }
 
@@ -417,23 +448,48 @@ void pvfs_bufmap_put(int buffer_index)
 int readdir_index_get(int *buffer_index)
 {
     struct slot_args slargs;
+    int ret;
+
+    down_read(&bufmap_init_sem);
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_get: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
+        return -EIO;
+    }
 
     slargs.slot_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
     slargs.slot_array = readdir_index_array;
     slargs.slot_lock  = &readdir_index_lock;
     slargs.slot_wq    = &readdir_waitq;
-    return wait_for_a_slot(&slargs, buffer_index);
+    ret = wait_for_a_slot(&slargs, buffer_index);
+    up_read(&bufmap_init_sem);
+    return(ret);
 }
 
 void readdir_index_put(int buffer_index)
 {
     struct slot_args slargs;
 
+    down_read(&bufmap_init_sem);
+    if (bufmap_init == 0)
+    {
+        gossip_err("pvfs_bufmap_get: not yet "
+                    "initialized.\n");
+        gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
+        return;
+    }
+
+
     slargs.slot_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
     slargs.slot_array = readdir_index_array;
     slargs.slot_lock  = &readdir_index_lock;
     slargs.slot_wq    = &readdir_waitq;
     put_back_slot(&slargs, buffer_index);
+    up_read(&bufmap_init_sem);
     return;
 }
 
@@ -454,11 +510,13 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, size_t size)
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_user: to %p, from %p, index %d, "
                 "size %zd\n", to, from, buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_err("pvfs_bufmap_copy_to_user: not yet "
                     "initialized.\n");
         gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
 
@@ -475,6 +533,7 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, size_t size)
         if (ret)
         {
             gossip_debug(GOSSIP_BUFMAP_DEBUG, "Failed to copy data to user space %zd\n", ret);
+            up_read(&bufmap_init_sem);
             return -EFAULT;
         }
 
@@ -482,6 +541,7 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, size_t size)
         amt_copied += cur_copy_size;
         index++;
     }
+    up_read(&bufmap_init_sem);
     return 0;
 }
 
@@ -496,11 +556,13 @@ int pvfs_bufmap_copy_to_kernel(
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_kernel: to %p, index %d, size %zd\n",
                 to, buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_err("pvfs_bufmap_copy_to_kernel: not yet "
                     "initialized.\n");
         gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
 
@@ -518,6 +580,7 @@ int pvfs_bufmap_copy_to_kernel(
         amt_copied += cur_copy_size;
         index++;
     }
+    up_read(&bufmap_init_sem);
     return 0;
 }
 
@@ -541,11 +604,13 @@ int pvfs_bufmap_copy_from_user(
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_from_user: from %p, index %d, "
                 "size %zd\n", from, buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_err("pvfs_bufmap_copy_from_user: not yet "
                     "initialized.\n");
         gossip_err("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
 
@@ -569,6 +634,7 @@ int pvfs_bufmap_copy_from_user(
         if (ret)
         {
             gossip_debug(GOSSIP_BUFMAP_DEBUG, "Failed to copy data from user space\n");
+            up_read(&bufmap_init_sem);
             return -EFAULT;
         }
 
@@ -576,6 +642,7 @@ int pvfs_bufmap_copy_from_user(
         amt_copied += cur_copy_size;
         index++;
     }
+    up_read(&bufmap_init_sem);
     return 0;
 }
 
@@ -601,11 +668,13 @@ int pvfs_bufmap_copy_to_pages(int buffer_index,
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_pages: nr_pages %lu,"
                  "index %d, size %zd\n", nr_segs, buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_err("pvfs_bufmap_copy_to_pages: not yet "
                     "initialized.\n");
         gossip_err("pvfs2: please confirm that pvfs2-client is running.\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
 
@@ -615,12 +684,14 @@ int pvfs_bufmap_copy_to_pages(int buffer_index,
         {
             gossip_err("pvfs_bufmap_copy_to_pages: count cannot exceed "
                        "number of pages(%lu)\n", nr_segs);
+            up_read(&bufmap_init_sem);
             return -EIO;
         }
         page = (struct page *) vec[index].iov_base;
         if (page == NULL) {
             gossip_err("pvfs_bufmap_copy_to_pages: invalid page pointer %d\n",
                         index);
+            up_read(&bufmap_init_sem);
             return -EIO;
         }
         amt_remaining = (size - amt_copied);
@@ -648,6 +719,7 @@ int pvfs_bufmap_copy_to_pages(int buffer_index,
         amt_copied += cur_copy_size;
         index++;
     }
+    up_read(&bufmap_init_sem);
     return 0;
 }
 
@@ -673,11 +745,13 @@ int pvfs_bufmap_copy_from_pages(int buffer_index,
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_from_pages: nr_pages %lu "
             "index %d, size %zd\n", nr_segs, buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_err("pvfs_bufmap_copy_from_pages: not yet "
                     "initialized.\n");
         gossip_err("pvfs2: please confirm that pvfs2-client is running.\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
 
@@ -686,11 +760,13 @@ int pvfs_bufmap_copy_from_pages(int buffer_index,
         if (index >= nr_segs) {
             gossip_err("pvfs_bufmap_copy_from_pages: count cannot exceed number of"
                        "pages(%lu)\n", nr_segs);
+            up_read(&bufmap_init_sem);
             return -EIO;
         }
         page = (struct page *) vec[index].iov_base;
         if (page == NULL) {
             gossip_err("pvfs_bufmap_copy_from_pages: invalid page pointer\n");
+            up_read(&bufmap_init_sem);
             return -EIO;
         }
         amt_remaining = (size - amt_copied);
@@ -711,6 +787,7 @@ int pvfs_bufmap_copy_from_pages(int buffer_index,
         amt_copied += cur_copy_size;
         index++;
     }
+    up_read(&bufmap_init_sem);
     return 0;
 }
 
@@ -746,10 +823,12 @@ int pvfs_bufmap_copy_iovec_from_user(
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_iovec_from_user: index %d, "
                 "size %zd\n", buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_iovec_from_user: not yet "
                     "initialized; returning\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
     /*
@@ -760,6 +839,7 @@ int pvfs_bufmap_copy_iovec_from_user(
     if (copied_iovec == NULL)
     {
         gossip_err("pvfs2_bufmap_copy_iovec_from_user: failed allocating memory\n");
+        up_read(&bufmap_init_sem);
         return -ENOMEM;
     }
     memcpy(copied_iovec, iov, nr_segs * sizeof(struct iovec));
@@ -776,6 +856,7 @@ int pvfs_bufmap_copy_iovec_from_user(
         gossip_err("pvfs2_bufmap_copy_iovec_from_user: computed total (%zd) is not equal to (%zd)\n",
                 amt_copied, size);
         kfree(copied_iovec);
+        up_read(&bufmap_init_sem);
         return -EINVAL;
     }
 
@@ -832,6 +913,7 @@ int pvfs_bufmap_copy_iovec_from_user(
         {
             gossip_err("Failed to copy data from user space\n");
             kfree(copied_iovec);
+            up_read(&bufmap_init_sem);
             return -EFAULT;
         }
 
@@ -845,6 +927,7 @@ int pvfs_bufmap_copy_iovec_from_user(
         }
     }
     kfree(copied_iovec);
+    up_read(&bufmap_init_sem);
     return 0;
 }
 
@@ -877,10 +960,12 @@ int pvfs_bufmap_copy_iovec_from_kernel(
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_iovec_from_kernel: index %d, "
                 "size %zd\n", buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_iovec_from_kernel: not yet "
                     "initialized; returning\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
     /*
@@ -891,6 +976,7 @@ int pvfs_bufmap_copy_iovec_from_kernel(
     if (copied_iovec == NULL)
     {
         gossip_err("pvfs2_bufmap_copy_iovec_from_kernel: failed allocating memory\n");
+        up_read(&bufmap_init_sem);
         return -ENOMEM;
     }
     memcpy(copied_iovec, iov, nr_segs * sizeof(struct iovec));
@@ -907,6 +993,7 @@ int pvfs_bufmap_copy_iovec_from_kernel(
         gossip_err("pvfs2_bufmap_copy_iovec_from_kernel: computed total (%zd) is not equal to (%zd)\n",
                 amt_copied, size);
         kfree(copied_iovec);
+        up_read(&bufmap_init_sem);
         return -EINVAL;
     }
 
@@ -961,6 +1048,7 @@ int pvfs_bufmap_copy_iovec_from_kernel(
         }
     }
     kfree(copied_iovec);
+    up_read(&bufmap_init_sem);
     return 0;
 }
 
@@ -991,10 +1079,12 @@ int pvfs_bufmap_copy_to_user_iovec(
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_user_iovec: index %d, "
                 "size %zd\n", buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_to_user_iovec: not yet "
                     "initialized; returning\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
     /*
@@ -1005,6 +1095,7 @@ int pvfs_bufmap_copy_to_user_iovec(
     if (copied_iovec == NULL)
     {
         gossip_err("pvfs2_bufmap_copy_to_user_iovec: failed allocating memory\n");
+        up_read(&bufmap_init_sem);
         return -ENOMEM;
     }
     memcpy(copied_iovec, iov, nr_segs * sizeof(struct iovec));
@@ -1021,6 +1112,7 @@ int pvfs_bufmap_copy_to_user_iovec(
         gossip_err("pvfs2_bufmap_copy_to_user_iovec: computed total (%zd) is less than (%zd)\n",
                 amt_copied, size);
         kfree(copied_iovec);
+        up_read(&bufmap_init_sem);
         return -EINVAL;
     }
 
@@ -1076,6 +1168,7 @@ int pvfs_bufmap_copy_to_user_iovec(
         {
             gossip_err("Failed to copy data to user space\n");
             kfree(copied_iovec);
+            up_read(&bufmap_init_sem);
             return -EFAULT;
         }
 
@@ -1089,6 +1182,7 @@ int pvfs_bufmap_copy_to_user_iovec(
         }
     }
     kfree(copied_iovec);
+    up_read(&bufmap_init_sem);
     return 0;
 }
 
@@ -1117,10 +1211,12 @@ int pvfs_bufmap_copy_to_kernel_iovec(
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_copy_to_kernel_iovec: index %d, "
                 "size %zd\n", buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_to_kernel_iovec: not yet "
                     "initialized; returning\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
     /*
@@ -1131,6 +1227,7 @@ int pvfs_bufmap_copy_to_kernel_iovec(
     if (copied_iovec == NULL)
     {
         gossip_err("pvfs2_bufmap_copy_to_kernel_iovec: failed allocating memory\n");
+        up_read(&bufmap_init_sem);
         return -ENOMEM;
     }
     memcpy(copied_iovec, iov, nr_segs * sizeof(struct iovec));
@@ -1147,6 +1244,7 @@ int pvfs_bufmap_copy_to_kernel_iovec(
         gossip_err("pvfs2_bufmap_copy_to_kernel_iovec: computed total (%zd) is less than (%zd)\n",
                 amt_copied, size);
         kfree(copied_iovec);
+        up_read(&bufmap_init_sem);
         return -EINVAL;
     }
 
@@ -1202,6 +1300,7 @@ int pvfs_bufmap_copy_to_kernel_iovec(
         }
     }
     kfree(copied_iovec);
+    up_read(&bufmap_init_sem);
     return 0;
 }
 
@@ -1242,17 +1341,20 @@ size_t pvfs_bufmap_copy_to_user_task(
             " PID: %d, to %p, from %p, index %d, "
             " size %zd\n", tsk->pid, to, from, buffer_index, size);
 
+    down_read(&bufmap_init_sem);
     if (bufmap_init == 0)
     {
         gossip_err("pvfs2_bufmap_copy_to_user: not yet "
                     "initialized.\n");
         gossip_err("pvfs2: please confirm that pvfs2-client "
                 "daemon is running.\n");
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
     mm = get_task_mm(tsk);
     if (!mm) 
     {
+        up_read(&bufmap_init_sem);
         return -EIO;
     }
     /* 
@@ -1317,6 +1419,7 @@ size_t pvfs_bufmap_copy_to_user_task(
     }
     up_read(&mm->mmap_sem);
     mmput(mm);
+    up_read(&bufmap_init_sem);
     return (amt_copied < size) ? -EFAULT: amt_copied;
 }
 
