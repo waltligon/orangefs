@@ -1252,6 +1252,7 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
             op_p->coll_p->coll_id, op_p->u.d_getattr_list.handle_array[i], 0, &tmp_ref);
         if (ret < 0)
         {
+            b_size = 0;
         }
         else
         {
