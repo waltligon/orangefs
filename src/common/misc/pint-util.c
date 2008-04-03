@@ -183,6 +183,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                         if (dest->u.meta.dfile_array)
                         {
                             free(dest->u.meta.dfile_array);
+                            dest->u.meta.dfile_array = NULL;
                         }
                     }
                     dest->u.meta.dfile_array = malloc(df_array_size);
