@@ -973,8 +973,8 @@ int job_dev_write_list(void** buffer_list,
 int job_req_sched_post(enum PVFS_server_op op,
                        PVFS_fs_id fs_id,
                        PVFS_handle handle,
-                       int read_only,
-                       int schedule,
+                       enum PINT_server_req_access_type access_type,
+                       enum PINT_server_sched_policy sched_policy,
                        void *user_ptr,
                        job_aint status_user_tag,
                        job_status_s * out_status_p,
@@ -1006,7 +1006,7 @@ int job_req_sched_post(enum PVFS_server_op op,
     jd->status_user_tag = status_user_tag;
 
     ret = PINT_req_sched_post(
-        op, fs_id, handle, read_only, schedule, jd, &(jd->u.req_sched.id));
+        op, fs_id, handle, access_type, sched_policy, jd, &(jd->u.req_sched.id));
 
     if (ret < 0)
     {

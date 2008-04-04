@@ -24,6 +24,16 @@
 
 typedef PVFS_id_gen_t req_sched_id;
 typedef int req_sched_error_code;
+enum PINT_server_req_access_type
+{
+    PINT_SERVER_REQ_READONLY = 0,
+    PINT_SERVER_REQ_MODIFY
+};
+enum PINT_server_sched_policy
+{
+    PINT_SERVER_REQ_BYPASS = 0,
+    PINT_SERVER_REQ_SCHEDULE
+};
 
 /* setup and teardown */
 int PINT_req_sched_initialize(
@@ -37,8 +47,8 @@ int PINT_req_sched_finalize(
 int PINT_req_sched_post(enum PVFS_server_op op,
                         PVFS_fs_id fs_id,
                         PVFS_handle handle,
-                        int read_only_flag,
-                        int schedule,
+                        enum PINT_server_req_access_type access_type,
+                        enum PINT_server_sched_policy sched_policy,
 			void *in_user_ptr,
 			req_sched_id * out_id);
 

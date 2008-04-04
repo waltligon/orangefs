@@ -76,18 +76,6 @@ enum PINT_server_req_permissions
                                       needs write and execute */
 };
 
-enum PINT_server_req_access_type
-{
-    PINT_SERVER_REQ_READONLY = 0,
-    PINT_SERVER_REQ_MODIFY
-};
-
-enum PINT_server_sched_policy
-{
-    PINT_SERVER_REQ_BYPASS = 0,
-    PINT_SERVER_REQ_SCHEDULE
-};
-
 #define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
 static inline int PINT_get_object_ref_##req_name(                        \
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
