@@ -34,6 +34,7 @@
 #include "mkspace.h"
 #include "pint-distribution.h"
 #include "pint-dist-utils.h"
+#include "pint-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -45,6 +46,8 @@ typedef struct
     int fs_set;
     int all_set;
     int cleanup_set;
+    char alias[100];
+    int alias_set;
     char fs_conf[PATH_MAX];
 } options_t;
 
@@ -139,6 +142,7 @@ int main(int argc, char **argv)
     /* all parameters read in from fs.conf */
     struct server_configuration_s server_config;
     PINT_llist_p fs_configs;
+    char *server_alias;
     
     /* make sure that the buffers we intend to use for reading keys and
      * values is at least large enough to hold the maximum size of xattr keys
@@ -160,11 +164,29 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    ret = PINT_parse_config(&server_config, opts.fs_conf, NULL);
+    if(opts.alias_set)
+    {
+        server_alias = opts.alias;
+    }
+    else
+    {
+        server_alias = PINT_util_guess_alias();
+    }
+
+    ret = PINT_parse_config(&server_config, opts.fs_conf, server_alias);
     if(ret < 0)
     {
         gossip_err("Error: Please check your config files.\n");
+        if(!opts.alias_set)
+        {
+            free(server_alias);
+        }
         return -1;
+    }
+
+    if(!opts.alias_set)
+    {
+        free(server_alias);
     }
 
     if(opts.all_set)
@@ -389,6 +411,7 @@ static int parse_args(
         {"version",0,0,0},
         {"fs",1,0,0},
         {"all",0,0,0},
+        {"alias",1,0,0},
         {"cleanup",0,0,0},
         {0,0,0,0}
     };
@@ -421,7 +444,12 @@ static int parse_args(
                     opts->all_set = 1;
                     break;
 
-            case 5: /* cleanup */
+            case 5: /* alias */
+                    strncpy(opts->alias, optarg, 99);
+                    opts->alias_set = 1;
+                    break;
+
+            case 6: /* cleanup */
                     opts->cleanup_set = 1;
                     break;
 	    default:
