@@ -1,8 +1,0 @@
-DIR := server
-
-TESTSRC += \
-	$(DIR)/showconfig.c
-
-test/server/showconfig: test/server/showconfig.o lib/libpvfs2-server.a
-	$(Q) "  LD		$@"
-	$(E)$(LD) $^ $(LDFLAGS) $(SERVERLIBS) -o $@
