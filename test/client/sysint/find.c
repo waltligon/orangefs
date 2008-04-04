@@ -155,7 +155,7 @@ int directory_walk(PVFS_fs_id cur_fs,
                 {
                     char buf[PVFS_NAME_MAX] = {0};
                     snprintf(buf,PVFS_NAME_MAX,"%s/%s",
-                             ((full_path && (strcmp(full_path,"/"))) ?
+                             ((strcmp(full_path,"/")) ?
                               full_path : ""),cur_file);
                     print_at_depth(buf,depth);
                 }
