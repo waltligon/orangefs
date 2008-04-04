@@ -504,6 +504,10 @@ static void print_help(
     fprintf(stderr,"--------------\n");
     fprintf(stderr,"  --cleanup          "
             "remove the old collection\n");
+    fprintf(stderr,
+            "  --alias            Specify the alias for this server.\n"
+            "                     The migration tool tries to guess the\n"
+            "                     alias based on the hostname if none is specified.\n");
     fprintf(stderr,"  --verbose          "
             "print verbose messages during execution\n");
     fprintf(stderr,"  --help             "
