@@ -1838,67 +1838,6 @@ void PINT_server_access_debug(PINT_server_op * s_op,
 }
 #endif
 
-/*
- * PINT_map_server_op_to_string()
- *
- * provides a string representation of the server operation number
- *
- * returns a pointer to a static string (DONT FREE IT) on success,
- * null on failure
- */
-const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
-{
-    const char *s = NULL;
-
-    if (op >= 0 && op < PVFS_SERV_NUM_OPS)
-        s = PINT_server_req_table[op].string_name;
-    return s;
-}
-
-/* generate_shm_key_hint()
- *
- * Makes a best effort to produce a unique shm key (for Trove's Berkeley
- * DB use) for each server.  By default it will base this on the server's
- * position in the fs.conf, but it will fall back to using a random number
- *
- * returns integer key
- */
-static int generate_shm_key_hint(void)
-{
-    int server_index = 1;
-    struct host_alias_s *cur_alias = NULL;
-
-    PINT_llist *cur = server_config.host_aliases;
-
-    /* iterate through list of aliases in configuration file */
-    while(cur)
-    {
-        cur_alias = PINT_llist_head(cur);
-        if(!cur_alias)
-        {
-            break;
-        }
-        if(strcmp(cur_alias->bmi_address, server_config.host_id) == 0)
-        {
-            /* match */
-            /* space the shm keys out by 10 to allow for Berkeley DB using 
-             * using more than one key on each server
-             */
-            return(server_index*10);        
-        }
-
-        server_index++;
-        cur = PINT_llist_next(cur);
-    }
-    
-    /* If we reach this point, we didn't find this server in the alias list.
-     * This is not a normal situation, but fall back to using a random
-     * number for the key just to be safe.
-     */
-    srand((unsigned int)time(NULL));
-    return(rand());
-}
-
 /* generate_shm_key_hint()
  *
  * Makes a best effort to produce a unique shm key (for Trove's Berkeley
