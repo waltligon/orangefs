@@ -23,6 +23,8 @@
 #include "gossip.h"
 #include "pvfs2-util.h"
 #include "id-generator.h"
+#include "ncache.h"
+#include "acache.h"
 
 #define MAX_RETURNED_JOBS   256
 
@@ -945,6 +947,84 @@ int PVFS_mgmt_wait(
         out_error,
         "mgmt");
 }
+
+PVFS_error PVFS_sys_set_info(
+    enum PVFS_sys_setinfo_opt option,
+    unsigned int arg)
+{
+    PVFS_error ret = -PVFS_ENOSYS;
+
+    switch(option)
+    {
+        case PVFS_SYS_NCACHE_TIMEOUT_MSECS:
+            ret = PINT_ncache_set_info(NCACHE_TIMEOUT_MSECS, arg);
+            break;
+        case PVFS_SYS_ACACHE_TIMEOUT_MSECS:
+            ret = PINT_acache_set_info(ACACHE_TIMEOUT_MSECS, arg);
+            break;
+        case PVFS_SYS_MSG_TIMEOUT_SECS:
+        case PVFS_SYS_MSG_RETRY_LIMIT:
+        case PVFS_SYS_MSG_RETRY_DELAY_MSECS:
+            ret = -PVFS_ENOSYS;
+            break;
+#if 0
+        /* need some other code cleanup before these can be implemented */
+        case PVFS_SYS_MSG_TIMEOUT_SECS:
+            PINT_sys_msg_timeout_secs = arg;
+            ret = 0;
+            break;
+        case PVFS_SYS_MSG_RETRY_LIMIT:
+            PINT_sys_msg_retry_limit = arg;
+            ret = 0;
+            break;
+        case PVFS_SYS_MSG_RETRY_DELAY_MSECS:
+            PINT_sys_msg_retry_delay_msecs = arg;
+            ret = 0;
+            break;
+#endif
+    }
+
+    return(ret);
+}
+
+PVFS_error PVFS_sys_get_info(
+    enum PVFS_sys_setinfo_opt option,
+    unsigned int* arg)
+{
+    PVFS_error ret = -PVFS_ENOSYS;
+
+    switch(option)
+    {
+        case PVFS_SYS_NCACHE_TIMEOUT_MSECS:
+            ret = PINT_ncache_get_info(NCACHE_TIMEOUT_MSECS, arg);
+            break;
+        case PVFS_SYS_ACACHE_TIMEOUT_MSECS:
+            ret = PINT_acache_get_info(ACACHE_TIMEOUT_MSECS, arg);
+            break;
+        case PVFS_SYS_MSG_TIMEOUT_SECS:
+        case PVFS_SYS_MSG_RETRY_LIMIT:
+        case PVFS_SYS_MSG_RETRY_DELAY_MSECS:
+            ret = -PVFS_ENOSYS;
+            break;
+#if 0
+        case PVFS_SYS_MSG_TIMEOUT_SECS:
+            *arg = PINT_sys_msg_timeout_secs;
+            ret = 0;
+            break;
+        case PVFS_SYS_MSG_RETRY_LIMIT:
+            *arg = PINT_sys_msg_retry_limit;
+            ret = 0;
+            break;
+        case PVFS_SYS_MSG_RETRY_DELAY_MSECS:
+            *arg = PINT_sys_msg_retry_delay_msecs;
+            ret = 0;
+            break;
+#endif
+    }
+
+    return(ret);
+}
+
 
 /*
  * Local variables:
