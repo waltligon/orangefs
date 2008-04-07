@@ -236,6 +236,12 @@ static int server_parse_config(
         {
             ret = PINT_parse_config(config, fs_template, NULL);
         }
+        else
+        {
+            gossip_err("Failed to write fs.conf buffer to temp file: %s: %s\n",
+                       fs_template, strerror(errno));
+        }
+    
         close(fs_fd);
 
         remove(fs_template);

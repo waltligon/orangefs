@@ -1,11 +1,14 @@
 DIR := src/apps/kernel/linux
 
 KERNAPPSRC += \
-	$(DIR)/pvfs2-client-core.c \
 	$(DIR)/pvfs2-client.c 
 
-KERNAPPSTHRSRC += \
-	$(DIR)/pvfs2-client-core.c
+# if requested, build a threaded client core
+ifeq (,@THREADED_KMOD_HELPER@)
+KERNAPPSRC += $(DIR)/pvfs2-client-core.c
+else
+KERNAPPTHRSRC += $(DIR)/pvfs2-client-core.c
+endif
 
 ifneq (,$(LINUX24_KERNEL_SRC))
 KERNAPPSRC += $(DIR)/mount.pvfs2.c

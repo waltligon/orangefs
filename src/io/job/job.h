@@ -17,6 +17,7 @@
 #include "pvfs2-storage.h"
 #include "pvfs2-req-proto.h"
 #include "pint-dev.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 
 typedef PVFS_id_gen_t job_id_t;
 typedef PVFS_context_id job_context_id;
@@ -173,8 +174,8 @@ int job_dev_write_list(void** buffer_list,
 int job_req_sched_post(enum PVFS_server_op op,
                        PVFS_fs_id fs_id,
                        PVFS_handle handle,
-                       int readonly,
-                       int schedule,
+                       enum PINT_server_req_access_type access_type,
+                       enum PINT_server_sched_policy sched_policy,
 		       void *user_ptr,
 		       job_aint status_user_tag,
 		       job_status_s * out_status_p,

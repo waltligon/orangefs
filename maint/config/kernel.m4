@@ -415,54 +415,60 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	fi
 
-	dnl certain Fedora FC5 kernel header files throw extra (spurious)
-	dnl warnings, which -Wno-pointer-sign silences, but that option is 
-	dnl only supported by gcc-4.
-	if test "x$GCC" = "xyes" ; then
-		AC_MSG_CHECKING(for gcc major version)
-		gcc_version=`$CC --version| head -1 | tr . ' ' | cut -d ' ' -f 3`
-		AC_MSG_RESULT($gcc_version)
-		if test $gcc_version -gt 3 ; then
-			extra_gcc_flags="-Wno-pointer-sign  -Wno-strict-aliasing -Wno-strict-aliasing=2"
-		fi
-	fi
-		
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror $extra_gcc_flags"
-	dnl if this test passes, there is a struct dentry* argument
-	AC_MSG_CHECKING(if statfs callbacks' arguments in kernel has struct dentry argument)
-	dnl if this test passes, the kernel has it
-	dnl if this test fails, the kernel does not have it
+	AC_MSG_CHECKING(for dentry argument in kernel super_operations statfs)
+	dnl Rely on the fact that there is an external vfs_statfs that is
+	dnl of the same type as the .statfs in struct super_operations to
+	dnl verify the signature of that function pointer.  There is a single
+	dnl commit in the git history where both changed at the same time
+	dnl from super_block to dentry.
+	dnl
+	dnl The alternative approach of trying to define a s_op.statfs is not
+	dnl as nice because that only throws a warning, requiring -Werror to
+	dnl catch it.  This is a problem if the compiler happens to spit out
+	dnl other spurious warnings that have nothing to do with the test.
+	dnl
+	dnl If this test passes, the kernel uses a struct dentry argument.
+	dnl If this test fails, the kernel uses something else (old struct
+	dnl super_block perhaps).
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		extern int pvfs_statfs(struct dentry *, struct kstatfs *);
-			  static struct super_operations s_op = {
-				  .statfs = pvfs_statfs,
-			  };
-		], [ s_op.statfs = 0; ],
+		int vfs_statfs(struct dentry *de, struct kstatfs *kfs)
+		{
+			return 0;
+		}
+		], [],
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if statfs callback has struct dentry argument),
+		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if super_operations statfs has dentry argument),
 		AC_MSG_RESULT(no)
 	)
 
-	AC_MSG_CHECKING(if get_sb callback in kernel has struct vfsmount argument)
-	dnl if this test passes, the kernel has it
-	dnl if this test fails, the kernel does not have it
+	AC_MSG_CHECKING(for vfsmount argument in kernel file_system_type get_sb)
+	dnl Same trick as above.  A single commit changed mayn things at once:
+	dnl type and signature of file_system_type.get_sb, and signature of
+	dnl get_sb_bdev.  This test is a bit more tenuous, as get_sb_bdev
+	dnl isn't used directly in a file_system_type, but is a popular helper
+	dnl for many FSes.  And it has not exactly the same signature.
+	dnl
+	dnl If this test passes, the kernel has the most modern known form,
+	dnl which includes a stfuct vfsmount argument.
+	dnl If this test fails, the kernel uses something else.
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		#include <linux/mount.h>
-		extern int pvfs_get_sb(struct file_system_type *fst, int flags, const char *devname, void *data, struct vfsmount *);
-			  static struct file_system_type fst = {
-				  .get_sb = pvfs_get_sb,
-			  };
-		], [fst.get_sb = 0;],
+		int get_sb_bdev(struct file_system_type *fs_type, int flags,
+				const char *dev_name, void *data,
+				int (*fill_super)(struct super_block *, void *,
+						  int),
+				struct vfsmount *vfsm)
+		{
+			return 0;
+		}
+		], [],
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if get_sb callback has struct vfsmount argument),
+		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if file_system_type get_sb has vfsmount argument),
 		AC_MSG_RESULT(no)
 	)
-	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(for xattr support in kernel)
 	dnl if this test passes, the kernel has it
@@ -845,15 +851,18 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 
 	dnl old linux kernels do not have class_create and related functions
+        dnl
+        dnl check for class_device_destroy() to weed out RHEL4 kernels that
+        dnl have some class functions but not others
 	AC_MSG_CHECKING(if kernel has device classes)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/device.h>
 	], [
-	    class_create(NULL, "pvfs2")
+	    class_device_destroy(NULL, "pvfs2")
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_KERNEL_DEVICE_CLASSES, 1, Define if kernel lacks device classes),
+	AC_DEFINE(HAVE_KERNEL_DEVICE_CLASSES, 1, Define if kernel has device classes),
 	AC_MSG_RESULT(no)
 	)
 
@@ -945,6 +954,20 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_MAPPING_NRPAGES_MACRO, 1, [Define if kernel defines mapping_nrpages macro -- defined by RT linux]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl Starting with 2.6.25-rc1, .read_inode goes away.
+	AC_MSG_CHECKING(if kernel super_operations contains read_inode field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct super_operations sops;
+		sops.read_inode(NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_READ_INODE, 1, [Define if kernel super_operations contains read_inode field]),
 	AC_MSG_RESULT(no)
 	)
 

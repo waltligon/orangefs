@@ -70,7 +70,8 @@ int PINT_state_machine_halt(void)
  */
 int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
 {
-    struct PINT_frame_s *my_frame, *f;
+    struct PINT_frame_s *f;
+    void *my_frame;
     job_id_t id;
 
     /* notify parent */
@@ -83,11 +84,12 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
                      (int32_t)r->error_code);
          assert(smcb->parent_smcb->children_running > 0);
 
-         my_frame = qlist_entry(
-            smcb->frames.next, struct PINT_frame_s, link);
+         my_frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+         /* this will loop from TOS down to the base frame */
+         /* base frame will not be processed */
          qlist_for_each_entry(f, &smcb->parent_smcb->frames, link)
          {
-             if(my_frame->frame == f->frame)
+             if(my_frame == f->frame)
              {
                  f->error = r->error_code;
                  break;
@@ -209,6 +211,9 @@ PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
      * unset this bit once the state machine is deferred.
      */
     smcb->immediate = 1;
+
+    /* set the base frame to be the current TOS, which should be 0 */
+    smcb->base_frame = smcb->frame_count - 1;
 
     /* run the current state action function */
     ret = PINT_state_machine_invoke(smcb, r);
@@ -518,6 +523,8 @@ int PINT_smcb_alloc(
     memset(*smcb, 0, sizeof(struct PINT_smcb));
 
     INIT_QLIST_HEAD(&(*smcb)->frames);
+    (*smcb)->base_frame = -1; /* no frames yet */
+    (*smcb)->frame_count = 0;
 
     /* if frame_size given, allocate a frame */
     if (frame_size > 0)
@@ -532,6 +539,7 @@ int PINT_smcb_alloc(
         /* zero out all members */
         memset(new_frame, 0, frame_size);
         PINT_sm_push_frame(*smcb, 0, new_frame);
+        (*smcb)->base_frame = 0;
     }
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
@@ -569,62 +577,92 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
 /* Function: PINT_pop_state
  * Params: pointer to an smcb pointer
  * Returns: 
- * Synopsis: pushes a SM pointer onto a stack for
+ * Synopsis: pops a SM pointer off of a stack for
  *      implementing nested SMs - called by the
  *      "next" routine above
  */
 static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
 {
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "[SM pop_state]: (%p) op-id: %d stk-ptr: %d base-frm: %d\n",
+            smcb, smcb->op, smcb->stackptr, smcb->base_frame);
+    
     if(smcb->stackptr == 0)
     {
+        /* this is not an error, we terminate if we return NULL */
+        /* this is return from main */
         return NULL;
     }
-    return smcb->state_stack[--smcb->stackptr];
+
+    smcb->stackptr--;
+    smcb->base_frame = smcb->state_stack[smcb->stackptr].prev_base_frame;
+    return smcb->state_stack[smcb->stackptr].state;
 }
 
 /* Function: PINT_push_state
  * Params: pointer to an smcb pointer
  * Returns: 
- * Synopsis: pops a SM pointer off of a stack for
+ * Synopsis: pushes a SM pointer into a stack for
  *      implementing nested SMs - called by the
  *      "next" routine above
  */
 static void PINT_push_state(struct PINT_smcb *smcb,
                             struct PINT_state_s *p)
 {
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "[SM push_state]: (%p) op-id: %d stk-ptr: %d base-frm: %d\n",
+            smcb, smcb->op, smcb->stackptr, smcb->base_frame);
+
     assert(smcb->stackptr < PINT_STATE_STACK_SIZE);
 
-    smcb->state_stack[smcb->stackptr++] = p;
+    smcb->state_stack[smcb->stackptr].prev_base_frame = smcb->base_frame;
+    smcb->base_frame = smcb->frame_count - 1;
+    smcb->state_stack[smcb->stackptr].state = p;
+    smcb->stackptr++;
 }
 
 /* Function: PINT_sm_frame
  * Params: pointer to smcb, stack index
  * Returns: pointer to frame
  * Synopsis: returns a frame off of the frame stack
+ * An index of 0 indicates the base frame specified in the SMCB
+ * A +'ve index indicates a frame pushed by this SM
+ * A -'ve index indicates a frame from a prior SM
+ * smcb->frames.next is the top of stack
+ * smcb->frames.prev is the bottom of stack
  */
 void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
 {
     struct PINT_frame_s *frame_entry;
-    struct qlist_head *next;
+    struct qlist_head *prev;
+    int target = smcb->base_frame + index;
+
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "[SM frame get]: (%p) op-id: %d index: %d base-frm: %d\n",
+            smcb, smcb->op, index, smcb->base_frame);
 
     if(qlist_empty(&smcb->frames))
     {
-        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                     "FRAME GET smcb %p index %d -> frame: NULL\n",
-                     smcb, index);
+        gossip_err("FRAME GET smcb %p index %d target %d -> List empty\n",
+                     smcb, index, target);
         return NULL;
     }
     else
     {
-        int i = 0;
-
-        next = smcb->frames.next;
-        while(i < index)
+        /* target should be 0 .. frame_count-1 now */
+        if (target < 0 || target >= smcb->frame_count)
         {
-            i++;
-            next = next->next;
+            gossip_err("FRAME GET smcb %p index %d target %d -> Out of range\n",
+                     smcb, index, target);
+            return NULL;
         }
-        frame_entry = qlist_entry(next, struct PINT_frame_s, link);
+        prev = smcb->frames.prev;
+        while(target--)
+        {
+            target--;
+            prev = prev->prev;
+        }
+        frame_entry = qlist_entry(prev, struct PINT_frame_s, link);
         return frame_entry->frame;
     }
 }
@@ -733,9 +771,9 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
 {
     int retval;
     struct PINT_smcb *new_sm;
-    struct PINT_frame_s *frame_entry;
     job_status_s r;
-    struct qlist_head *f;
+    struct PINT_frame_s *f;
+    void *my_frame;
 
     assert(smcb);
 
@@ -743,15 +781,16 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
 
     *children_started = 0;
 
+    my_frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* Iterate once up front to determine how many children we are going to
      * run.  This has to be set before starting any children, otherwise if
      * the first one immediately completes it will mistakenly believe it is
      * the last one and signal the parent.
      */
-    qlist_for_each(f, &smcb->frames)
+    qlist_for_each_entry(f, &smcb->frames, link)
     {
-        /* skip the last since its the parent frame */
-        if(f->next == &smcb->frames)
+        /* run from TOS until the parent frame */
+        if(f->frame == my_frame)
         {
             break;
         }
@@ -765,25 +804,22 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
      */
     *children_started = smcb->children_running;
 
-    qlist_for_each(f, &smcb->frames)
+    qlist_for_each_entry(f, &smcb->frames, link)
     {
-        /* skip the last since its the parent frame */
-        if(f->next == &smcb->frames)
+        /* run from TOS until the parent frame */
+        if(f->frame == my_frame)
         {
             break;
         }
-
-        frame_entry = qlist_entry(f, struct PINT_frame_s, link);
-
         /* allocate smcb */
         PINT_smcb_alloc(&new_sm, smcb->op, 0, NULL,
                 child_sm_frame_terminate, smcb->context);
         /* set parent smcb pointer */
         new_sm->parent_smcb = smcb;
         /* assign frame */
-        PINT_sm_push_frame(new_sm, frame_entry->task_id, frame_entry->frame);
+        PINT_sm_push_frame(new_sm, f->task_id, f->frame);
         /* locate SM to run */
-        new_sm->current_state = PINT_sm_task_map(smcb, frame_entry->task_id);
+        new_sm->current_state = PINT_sm_task_map(smcb, f->task_id);
         /* invoke SM */
         retval = PINT_state_machine_start(new_sm, &r);
         if(retval < 0)

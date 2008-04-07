@@ -24,6 +24,7 @@ TESTSRC += \
 	$(DIR)/io-test.c \
 	$(DIR)/io-test-offset.c \
 	$(DIR)/io-test-threaded.c \
+	$(DIR)/getattr-test-threaded.c \
 	$(DIR)/initialize.c \
 	$(DIR)/initialize-dyn.c \
 	$(DIR)/getparent.c \
@@ -44,6 +45,7 @@ TESTSRC += \
 MODCFLAGS_$(DIR)/io-stress.c := -D_GNU_SOURCE
 MODLDFLAGS_$(DIR) := -lrt
 MODLDFLAGS_$(DIR)/io-test-threaded := -lpthread
+MODLDFLAGS_$(DIR)/getattr-test-threaded := -lpthread
 
 #$(DIR)/io-test-threaded: $(DIR)/io-test-threaded.o
 #	$(Q) "  LD              $@"

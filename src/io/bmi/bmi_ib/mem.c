@@ -4,8 +4,6 @@
  * Copyright (C) 2004-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
- *
- * $Id: mem.c,v 1.14 2007-05-08 21:28:01 pw Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "pvfs2-internal.h"
@@ -205,8 +203,8 @@ memcache_memfree(void *md, void *buf, bmi_size_t len)
     if (c) {
 	debug(4, "%s: cache free buf %p len %lld", __func__, c->buf,
 	      lld(c->len));
-	assert(c->count == 1, "%s: buf %p len %lld count = %d, expected 1",
-	       __func__, c->buf, lld(c->len), c->count);
+	bmi_ib_assert(c->count == 1, "%s: buf %p len %lld count %d, expected 1",
+		      __func__, c->buf, lld(c->len), c->count);
 	/* cache it */
 	--c->count;
 	qlist_del(&c->list);
@@ -230,7 +228,8 @@ memcache_register(void *md, ib_buflist_t *buflist)
     int i, ret;
     memcache_device_t *memcache_device = md;
 
-    buflist->memcache = Malloc(buflist->num * sizeof(*buflist->memcache));
+    buflist->memcache = bmi_ib_malloc(buflist->num *
+				      sizeof(*buflist->memcache));
     gen_mutex_lock(&memcache_device->mutex);
     for (i=0; i<buflist->num; i++) {
 #if ENABLE_MEMCACHE
@@ -258,7 +257,7 @@ memcache_register(void *md, ib_buflist_t *buflist)
 	}
 	buflist->memcache[i] = c;
 #else
-	memcache_entry_t cp = Malloc(sizeof(*cp));
+	memcache_entry_t cp = bmi_ib_malloc(sizeof(*cp));
 	cp->buf = buflist->buf.recv[i];
 	cp->len = buflist->len[i];
 	cp->type = type;
@@ -339,7 +338,7 @@ void *memcache_init(int (*mem_register)(memcache_entry_t *),
 {
     memcache_device_t *memcache_device;
 
-    memcache_device = Malloc(sizeof(*memcache_device));
+    memcache_device = bmi_ib_malloc(sizeof(*memcache_device));
     INIT_QLIST_HEAD(&memcache_device->list);
     gen_mutex_init(&memcache_device->mutex);
     INIT_QLIST_HEAD(&memcache_device->free_chunk_list);

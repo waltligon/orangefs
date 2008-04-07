@@ -111,18 +111,8 @@ static PINT_sm_action prelude_req_sched(
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
 
-    /* this is a bit of a hack; if we are changing server mode we must
-     * preserve the old mode value before calling req scheduler
-     */
-    if ((s_op->op == PVFS_SERV_MGMT_SETPARAM) &&
-        (s_op->req->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE))
-    {
-        s_op->resp.u.mgmt_setparam.old_value = PINT_req_sched_get_mode();
-    }
-
-    ret = job_req_sched_post(s_op->req->op, s_op->target_fs_id,
-                             s_op->target_handle, s_op->access_type,
-                             s_op->sched_policy,
+    ret = job_req_sched_post(s_op->op, s_op->target_fs_id, s_op->target_handle,
+                             s_op->access_type, s_op->sched_policy,
                              smcb, 0, js_p,
                              &(s_op->scheduled_id), server_job_context);
 
@@ -299,15 +289,20 @@ static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, PVF
     return 0;
 }
 
-static int permit_operation(PVFS_fs_id fsid, int read_only, PVFS_BMI_addr_t client_addr)
+/*
+ * Return zero if this operation should be allowed.
+ */
+static int permit_operation(PVFS_fs_id fsid,
+                            enum PINT_server_req_access_type access_type,
+                            PVFS_BMI_addr_t client_addr)
 { 
     int exp_flags = 0; 
     struct server_configuration_s *serv_config = NULL;
     struct filesystem_configuration_s * fsconfig = NULL;
 
-    if (read_only == 1)
+    if (access_type == PINT_SERVER_REQ_READONLY)
     {
-        return 0;
+        return 0;  /* anything that doesn't modify state is okay */
     }
     serv_config = PINT_get_server_config();
     fsconfig = PINT_config_find_fs_id(serv_config, fsid);
@@ -490,7 +485,7 @@ static PINT_sm_action prelude_perm_check(
             break;
         case PINT_SERVER_CHECK_NONE:
             if(squashed_flag &&
-               !PINT_server_req_get_access_type(s_op->req) &&
+               PINT_server_req_get_access_type(s_op->req) == PINT_SERVER_REQ_MODIFY &&
                ((s_op->req->op == PVFS_SERV_IO) ||
                 (s_op->req->op == PVFS_SERV_SMALL_IO) ||
                 (s_op->req->op == PVFS_SERV_TRUNCATE)))
@@ -612,7 +607,7 @@ static PINT_sm_action prelude_check_acls(
         js_p->error_code = -PVFS_EINVAL;
         goto cleanup;
     }
-    switch(PINT_server_req_get_perms(s_op->req))
+    switch (PINT_server_req_get_perms(s_op->req))
     {
         case PINT_SERVER_CHECK_WRITE:
         default:

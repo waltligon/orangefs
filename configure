@@ -651,6 +651,9 @@ build_alias
 host_alias
 target_alias
 PVFS2_VERSION
+PVFS2_VERSION_MAJOR
+PVFS2_VERSION_MINOR
+PVFS2_VERSION_SUB
 build
 build_cpu
 build_vendor
@@ -692,6 +695,7 @@ build_static
 REDHAT_RELEASE
 NPTL_WORKAROUND
 MISC_TROVE_FLAGS
+THREADED_KMOD_HELPER
 LINUX_KERNEL_SRC
 LINUX24_KERNEL_SRC
 LINUX24_KERNEL_MINOR_VER
@@ -712,10 +716,12 @@ NEEDS_LIBRT
 TARGET_OS_DARWIN
 TARGET_OS_LINUX
 BUILD_BMI_TCP
-GM_HOME
 BUILD_GM
-MX_HOME
+GM_INCDIR
+GM_LIBDIR
 BUILD_MX
+MX_INCDIR
+MX_LIBDIR
 BUILD_IB
 IB_INCDIR
 IB_LIBDIR
@@ -1329,6 +1335,7 @@ Optional Features:
   --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks
   --disable-kernel-aio    Forcibly disable kernel aio
   --enable-kernel-sendfile    Forcibly enable kernel sendfile
+  --enable-threaded-kmod-helper  Use threads in the kernel helper application
   --enable-fast           Disable optional debugging, enable optimizations.
   --enable-strict         Turn on strict compiler warnings
   --enable-verbose-build  Enables full output during build process
@@ -1355,8 +1362,12 @@ Optional Packages:
   --with-valgrind=<path>  Use valgrind annotations for debugging.
   --with-db=<dir>         Location of installed DB package (default=/usr)
   --without-bmi-tcp       Disable BMI TCP method
-  --with-gm=<dir>         Location of the GM installation (default no GM)
-  --with-mx=<dir>         Location of the MX installation (default no MX)
+  --with-gm=<dir>     Location of the GM install (default no GM)
+  --with-gm-includes=<dir>  Location of the GM includes
+  --with-gm-libs=<dir>      Location of the GM libraries
+  --with-mx=<dir>     Location of the MX install (default no MX)
+  --with-mx-includes=<dir>  Location of the MX includes
+  --with-mx-libs=<dir>      Location of the MX libraries
   --with-ib=<dir>         Location of the IB installation (default no IB)
   --with-ib-includes=<dir>      Location of the IB includes
   --with-ib-libs=<dir>          Location of the IB libraries
@@ -1833,28 +1844,31 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
-PVFS2_MAJOR=2
-PVFS2_MINOR=7
-PVFS2_SUB=1
+PVFS2_VERSION_MAJOR=2
+PVFS2_VERSION_MINOR=7
+PVFS2_VERSION_SUB=1
 #PVFS2_PRE=""
-PVFS2_PRE="pre1-$CONFIGURE_TIME"
+PVFS2_VERSION_PRE="pre1-$CONFIGURE_TIME"
 
-PVFS2_VERSION=$PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE
+PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB$PVFS2_VERSION_PRE
 
 
 cat >>confdefs.h <<_ACEOF
-#define PVFS2_VERSION_MAJOR $PVFS2_MAJOR
+#define PVFS2_VERSION_MAJOR $PVFS2_VERSION_MAJOR
 _ACEOF
 
 
 cat >>confdefs.h <<_ACEOF
-#define PVFS2_VERSION_MINOR $PVFS2_MINOR
+#define PVFS2_VERSION_MINOR $PVFS2_VERSION_MINOR
 _ACEOF
 
 
 cat >>confdefs.h <<_ACEOF
-#define PVFS2_VERSION_SUB $PVFS2_SUB
+#define PVFS2_VERSION_SUB $PVFS2_VERSION_SUB
 _ACEOF
+
+
+
 
 
 # Make sure we can run config.sub.
@@ -5960,6 +5974,58 @@ fi
 
 
 
+#
+# Threading options.
+#
+# Client - thread-safe or not
+#   --disable-thread-safety : chooses null or posix locking mechanism
+#   For applications that know they are not multi-threaded, or choose
+#   to handle locking themselves, this configure option can be used to
+#   slightly decrease library-induced latency by removing the locking.
+#
+# Client - job threading
+#   libpvfs2-threaded.{so,a} with __PVFS2_JOB_THREADED__
+#   This option causes the client library to spawn an extra thread
+#   to handle network communications.  In this way, it is possible
+#   that the library can handle new and completed requests from
+#   the application while also interacting with the network.
+#
+#   These separate libraries can not be built using the existing
+#   configure mechanism.  They are only built if required by the
+#   kernel module helper.
+#
+# Server - three options:
+#   trove
+#     (hack Makefile.in)
+#   job
+#     (hack Makefile.in)
+#   aio
+#     --disable-aio-threaded-callbacks
+#
+#   Trove (storage) and job threading in the server are implemented
+#   using #defines, but not exported through the configure mechanism.
+#   AIO threaded callbacks are a separate thread used in conjunction
+#   with trove, and can be disabled through a configure option as
+#   AIO has been found to be buggy on many systems.
+#
+#
+# Kernel module helper - job threading
+#   --enable-threaded-kmod-helper
+#
+#   This is a special client that "helps" applications that access PVFS
+#   through the kernel using normal VFS calls (e.g. "ls").  This
+#   configure options builds it using __PVFS2_JOB_THREADED__ as described
+#   above.  That enables a thread for the network layer and a thread
+#   for the kernel interface.  This has the potential to increase the
+#   rate at which concurrent operations are processed, but has the potential
+#   drawback of somewhat higher overhead for a single operation and lack
+#   of testing.
+#
+#   Enabling this options causes one of libpvfs2-threaded.{so,a} to be
+#   built, depending on --enable-shared and --enable-static.  If both are
+#   enabled, the shared library takes precedence.
+#
+
 { echo "$as_me:$LINENO: checking for client library thread safety support" >&5
 echo $ECHO_N "checking for client library thread safety support... $ECHO_C" >&6; }
 # Check whether --enable-thread-safety was given.
@@ -6012,7 +6078,7 @@ echo $ECHO_N "checking for openssl library... $ECHO_C" >&6; }
             LDFLAGS="$LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
             SERVER_LDFLAGS="$SERVER_LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
         fi
-        LIBS="$LIBS -lcrypt -lssl"
+        LIBS="$LIBS -lcrypto -lssl"
 
         cat >conftest.$ac_ext <<_ACEOF
 #include "openssl/bio.h"
@@ -6386,7 +6452,7 @@ else
     { echo "$as_me:$LINENO: checking for openssl library" >&5
 echo $ECHO_N "checking for openssl library... $ECHO_C" >&6; }
     TMPLIBS=${LIBS}
-    LIBS="$LIBS -lcrypt -lssl"
+    LIBS="$LIBS -lcrypto -lssl"
 
     cat >conftest.$ac_ext <<_ACEOF
 #include "openssl/bio.h"
@@ -9474,22 +9540,9 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 	fi
 
-				if test "x$GCC" = "xyes" ; then
-		{ echo "$as_me:$LINENO: checking for gcc major version" >&5
-echo $ECHO_N "checking for gcc major version... $ECHO_C" >&6; }
-		gcc_version=`$CC --version| head -1 | tr . ' ' | cut -d ' ' -f 3`
-		{ echo "$as_me:$LINENO: result: $gcc_version" >&5
-echo "${ECHO_T}$gcc_version" >&6; }
-		if test $gcc_version -gt 3 ; then
-			extra_gcc_flags="-Wno-pointer-sign  -Wno-strict-aliasing -Wno-strict-aliasing=2"
-		fi
-	fi
-
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror $extra_gcc_flags"
-		{ echo "$as_me:$LINENO: checking if statfs callbacks' arguments in kernel has struct dentry argument" >&5
-echo $ECHO_N "checking if statfs callbacks' arguments in kernel has struct dentry argument... $ECHO_C" >&6; }
-			cat >conftest.$ac_ext <<_ACEOF
+	{ echo "$as_me:$LINENO: checking for dentry argument in kernel super_operations statfs" >&5
+echo $ECHO_N "checking for dentry argument in kernel super_operations statfs... $ECHO_C" >&6; }
+															cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -9498,15 +9551,15 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 		#define __KERNEL__
 		#include <linux/fs.h>
-		extern int pvfs_statfs(struct dentry *, struct kstatfs *);
-			  static struct super_operations s_op = {
-				  .statfs = pvfs_statfs,
-			  };
+		int vfs_statfs(struct dentry *de, struct kstatfs *kfs)
+		{
+			return 0;
+		}
 
 int
 main ()
 {
- s_op.statfs = 0;
+
   ;
   return 0;
 }
@@ -9546,9 +9599,9 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-	{ echo "$as_me:$LINENO: checking if get_sb callback in kernel has struct vfsmount argument" >&5
-echo $ECHO_N "checking if get_sb callback in kernel has struct vfsmount argument... $ECHO_C" >&6; }
-			cat >conftest.$ac_ext <<_ACEOF
+	{ echo "$as_me:$LINENO: checking for vfsmount argument in kernel file_system_type get_sb" >&5
+echo $ECHO_N "checking for vfsmount argument in kernel file_system_type get_sb... $ECHO_C" >&6; }
+										cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -9557,16 +9610,19 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 		#define __KERNEL__
 		#include <linux/fs.h>
-		#include <linux/mount.h>
-		extern int pvfs_get_sb(struct file_system_type *fst, int flags, const char *devname, void *data, struct vfsmount *);
-			  static struct file_system_type fst = {
-				  .get_sb = pvfs_get_sb,
-			  };
+		int get_sb_bdev(struct file_system_type *fs_type, int flags,
+				const char *dev_name, void *data,
+				int (*fill_super)(struct super_block *, void *,
+						  int),
+				struct vfsmount *vfsm)
+		{
+			return 0;
+		}
 
 int
 main ()
 {
-fst.get_sb = 0;
+
   ;
   return 0;
 }
@@ -9605,7 +9661,6 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-	CFLAGS=$tmp_cflags
 
 	{ echo "$as_me:$LINENO: checking for xattr support in kernel" >&5
 echo $ECHO_N "checking for xattr support in kernel... $ECHO_C" >&6; }
@@ -11337,7 +11392,7 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-		{ echo "$as_me:$LINENO: checking if kernel has device classes" >&5
+	                        	{ echo "$as_me:$LINENO: checking if kernel has device classes" >&5
 echo $ECHO_N "checking if kernel has device classes... $ECHO_C" >&6; }
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
@@ -11353,7 +11408,7 @@ int
 main ()
 {
 
-	    class_create(NULL, "pvfs2")
+	    class_device_destroy(NULL, "pvfs2")
 
   ;
   return 0;
@@ -11747,6 +11802,64 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+		{ echo "$as_me:$LINENO: checking if kernel super_operations contains read_inode field" >&5
+echo $ECHO_N "checking if kernel super_operations contains read_inode field... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+
+int
+main ()
+{
+
+		struct super_operations sops;
+		sops.read_inode(NULL);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_READ_INODE 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 	CFLAGS=$oldcflags
 
 
@@ -11755,6 +11868,16 @@ cat >>confdefs.h <<\_ACEOF
 _ACEOF
 
 fi
+
+# Check whether --enable-threaded-kmod-helper was given.
+if test "${enable_threaded_kmod_helper+set}" = set; then
+  enableval=$enable_threaded_kmod_helper;  if test "x$enableval" = "xyes" ; then
+    THREADED_KMOD_HELPER=yes
+  fi
+
+fi
+
+
 
 BUILD_ABSOLUTE_TOP=`pwd`
 SRC_RELATIVE_TOP=$srcdir
@@ -13761,8 +13884,6 @@ if test "x$BUILD_SERVER" = "x1"; then
 
 { echo "$as_me:$LINENO: checking if server lib needs -lrt" >&5
 echo $ECHO_N "checking if server lib needs -lrt... $ECHO_C" >&6; }
-oldldflags=$LDFLAGS
-
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -13805,7 +13926,8 @@ else
 sed 's/^/| /' conftest.$ac_ext >&5
 
 
-		LDFLAGS="$LDFLAGS -lrt"
+		oldlibs=$LIBS
+		LIBS="$LIBS -lrt"
 		cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -13856,13 +13978,12 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
+		LIBS=$oldlibs
 
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
-
-LDFLAGS=$oldldflags
 
 fi
 
@@ -14442,24 +14563,62 @@ fi
 
 
 
-GM_HOME=
+
+                    gm_home=
 
 # Check whether --with-gm was given.
 if test "${with_gm+set}" = set; then
   withval=$with_gm; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-gm requires the path to your GM tree." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-gm requires the path to your GM tree." >&5
 echo "$as_me: error: Option --with-gm requires the path to your GM tree." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	GM_HOME="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    gm_home="$withval"
+	fi
 
 fi
 
-if test -n "$GM_HOME" ; then
-    save_cppflags="$CPPFLAGS"
-    CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
-    if test "${ac_cv_header_gm_h+set}" = set; then
+
+# Check whether --with-gm-includes was given.
+if test "${with_gm_includes+set}" = set; then
+  withval=$with_gm_includes; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-gm-includes requires path to GM headers." >&5
+echo "$as_me: error: Option --with-gm-includes requires path to GM headers." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    GM_INCDIR="$withval"
+	fi
+
+fi
+
+
+# Check whether --with-gm-libs was given.
+if test "${with_gm_libs+set}" = set; then
+  withval=$with_gm_libs; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-gm-libs requires path to GM libraries." >&5
+echo "$as_me: error: Option --with-gm-libs requires path to GM libraries." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    GM_LIBDIR="$withval"
+	fi
+
+fi
+
+            if test -n "$gm_home" ; then
+	if test -z "$GM_INCDIR"; then
+	    GM_INCDIR=$gm_home/include
+	fi
+	if test -z "$GM_LIBDIR"; then
+	    GM_LIBDIR=$gm_home/lib64
+	    if test ! -d "$GM_LIBDIR" ; then
+		GM_LIBDIR=$gm_home/lib
+	    fi
+	fi
+    fi
+        if test -n "$GM_INCDIR$GM_LIBDIR" ; then
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$GM_INCDIR -I$GM_INCDIR/gm"
+	if test "${ac_cv_header_gm_h+set}" = set; then
   { echo "$as_me:$LINENO: checking for gm.h" >&5
 echo $ECHO_N "checking for gm.h... $ECHO_C" >&6; }
 if test "${ac_cv_header_gm_h+set}" = set; then
@@ -14593,29 +14752,77 @@ echo "$as_me: error: Header gm.h not found." >&2;}
 fi
 
 
-    BUILD_GM=1
-    CPPFLAGS="$save_cppflags"
-fi
+			if test ! -f $GM_LIBDIR/libgm.so ; then
+	    if test ! -f $GM_LIBDIR/libgm.a ; then
+		{ { echo "$as_me:$LINENO: error: Neither GM library libgm.so or libgm.a found." >&5
+echo "$as_me: error: Neither GM library libgm.so or libgm.a found." >&2;}
+   { (exit 1); exit 1; }; }
+	    fi
+	fi
+	BUILD_GM=1
+	CPPFLAGS="$save_cppflags"
+    fi
 
 
 
-MX_HOME=
+
+
+
+                    mx_home=
 
 # Check whether --with-mx was given.
 if test "${with_mx+set}" = set; then
   withval=$with_mx; if test -z "$withval" -o "$withval" = yes ; then
-	{ { echo "$as_me:$LINENO: error: Option --with-mx requires the path to your MX tree." >&5
+	    { { echo "$as_me:$LINENO: error: Option --with-mx requires the path to your MX tree." >&5
 echo "$as_me: error: Option --with-mx requires the path to your MX tree." >&2;}
    { (exit 1); exit 1; }; }
-    elif test "$withval" != no ; then
-	MX_HOME="$withval"
-    fi
+	elif test "$withval" != no ; then
+	    mx_home="$withval"
+	fi
 
 fi
 
-if test -n "$MX_HOME" ; then
-    CPPFLAGS="$CPPFLAGS -I ${MX_HOME}/include"
-    if test "${ac_cv_header_myriexpress_h+set}" = set; then
+
+# Check whether --with-mx-includes was given.
+if test "${with_mx_includes+set}" = set; then
+  withval=$with_mx_includes; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-mx-includes requires path to MX headers." >&5
+echo "$as_me: error: Option --with-mx-includes requires path to MX headers." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    MX_INCDIR="$withval"
+	fi
+
+fi
+
+
+# Check whether --with-mx-libs was given.
+if test "${with_mx_libs+set}" = set; then
+  withval=$with_mx_libs; if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-mx-libs requires path to MX libraries." >&5
+echo "$as_me: error: Option --with-mx-libs requires path to MX libraries." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    MX_LIBDIR="$withval"
+	fi
+
+fi
+
+            if test -n "$mx_home" ; then
+	if test -z "$MX_INCDIR"; then
+	    MX_INCDIR=$mx_home/include
+	fi
+	if test -z "$MX_LIBDIR"; then
+	    MX_LIBDIR=$mx_home/lib64
+	    if test ! -d "$MX_LIBDIR" ; then
+		MX_LIBDIR=$mx_home/lib
+	    fi
+	fi
+    fi
+        if test -n "$MX_INCDIR$MX_LIBDIR" ; then
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$MX_INCDIR -I$MX_INCDIR/mx"
+	if test "${ac_cv_header_myriexpress_h+set}" = set; then
   { echo "$as_me:$LINENO: checking for myriexpress.h" >&5
 echo $ECHO_N "checking for myriexpress.h... $ECHO_C" >&6; }
 if test "${ac_cv_header_myriexpress_h+set}" = set; then
@@ -14749,13 +14956,18 @@ echo "$as_me: error: Header myriexpress.h not found." >&2;}
 fi
 
 
-    BUILD_MX=1
-    CPPFLAGS="$CPPFLAGS_OLD"
-    CFLAGS="${CFLAGS} -I${MX_HOME}/include"
-    LDFLAGS="$LDFLAGS -L${MX_HOME}/lib"
-    SERVER_LDFLAGS="$SERVER_LDFLAGS -L${MX_HOME}/lib"
-    LIBS="$LIBS -lmyriexpress"
-fi
+			if test ! -f $MX_LIBDIR/libmyriexpress.so ; then
+	    if test ! -f $MX_LIBDIR/libmyriexpress.a ; then
+		{ { echo "$as_me:$LINENO: error: Neither MX library libmyriexpress.so or libmyriexpress.a found." >&5
+echo "$as_me: error: Neither MX library libmyriexpress.so or libmyriexpress.a found." >&2;}
+   { (exit 1); exit 1; }; }
+	    fi
+	fi
+	BUILD_MX=1
+	CPPFLAGS="$save_cppflags"
+    fi
+
+
 
 
 
@@ -15406,7 +15618,7 @@ fi
 	CPPFLAGS="$CPPFLAGS $PORTALS_INCS"
 
 	PORTALS_LIBS="$libs"
-	LIBS="$LIBS $PORTALS_LIBS"
+	LIBS="$save_libs $PORTALS_LIBS"
 
 	{ echo "$as_me:$LINENO: checking for portals3.h header" >&5
 echo $ECHO_N "checking for portals3.h header... $ECHO_C" >&6; }
@@ -15513,7 +15725,7 @@ rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lportals"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -15561,7 +15773,7 @@ rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -16812,7 +17024,7 @@ if test "$ac_res" != no; then
   ac_cv_func_getmntent=yes
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_GETMNTENT 1
+#define HAVE_GETMNTENT
 _ACEOF
 
 else
@@ -17104,15 +17316,17 @@ done
 
 # Check whether --enable-static-server was given.
 if test "${enable_static_server+set}" = set; then
-  enableval=$enable_static_server;
-	SERVER_LDFLAGS="$LDFLAGS -static"
-
+  enableval=$enable_static_server;  staticserver=$enableval
 else
-
-	SERVER_LDFLAGS="$LDFLAGS -rdynamic"
-
+   staticserver="no"
 fi
 
+
+if test "$staticserver" = "yes"; then
+	SERVER_LDFLAGS="$LDFLAGS -static"
+else
+	SERVER_LDFLAGS="$LDFLAGS -rdynamic"
+fi
 
 
 
@@ -18324,6 +18538,9 @@ build_alias!$build_alias$ac_delim
 host_alias!$host_alias$ac_delim
 target_alias!$target_alias$ac_delim
 PVFS2_VERSION!$PVFS2_VERSION$ac_delim
+PVFS2_VERSION_MAJOR!$PVFS2_VERSION_MAJOR$ac_delim
+PVFS2_VERSION_MINOR!$PVFS2_VERSION_MINOR$ac_delim
+PVFS2_VERSION_SUB!$PVFS2_VERSION_SUB$ac_delim
 build!$build$ac_delim
 build_cpu!$build_cpu$ac_delim
 build_vendor!$build_vendor$ac_delim
@@ -18365,6 +18582,7 @@ build_static!$build_static$ac_delim
 REDHAT_RELEASE!$REDHAT_RELEASE$ac_delim
 NPTL_WORKAROUND!$NPTL_WORKAROUND$ac_delim
 MISC_TROVE_FLAGS!$MISC_TROVE_FLAGS$ac_delim
+THREADED_KMOD_HELPER!$THREADED_KMOD_HELPER$ac_delim
 LINUX_KERNEL_SRC!$LINUX_KERNEL_SRC$ac_delim
 LINUX24_KERNEL_SRC!$LINUX24_KERNEL_SRC$ac_delim
 LINUX24_KERNEL_MINOR_VER!$LINUX24_KERNEL_MINOR_VER$ac_delim
@@ -18379,10 +18597,6 @@ PVFS2_SEGV_BACKTRACE!$PVFS2_SEGV_BACKTRACE$ac_delim
 build_shared!$build_shared$ac_delim
 INTELC!$INTELC$ac_delim
 GNUC!$GNUC$ac_delim
-DB_CFLAGS!$DB_CFLAGS$ac_delim
-DB_LIB!$DB_LIB$ac_delim
-NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
-TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -18424,12 +18638,18 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+DB_CFLAGS!$DB_CFLAGS$ac_delim
+DB_LIB!$DB_LIB$ac_delim
+NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
+TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
 TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
 BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
-GM_HOME!$GM_HOME$ac_delim
 BUILD_GM!$BUILD_GM$ac_delim
-MX_HOME!$MX_HOME$ac_delim
+GM_INCDIR!$GM_INCDIR$ac_delim
+GM_LIBDIR!$GM_LIBDIR$ac_delim
 BUILD_MX!$BUILD_MX$ac_delim
+MX_INCDIR!$MX_INCDIR$ac_delim
+MX_LIBDIR!$MX_LIBDIR$ac_delim
 BUILD_IB!$BUILD_IB$ac_delim
 IB_INCDIR!$IB_INCDIR$ac_delim
 IB_LIBDIR!$IB_LIBDIR$ac_delim
@@ -18448,7 +18668,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 22; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 28; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5

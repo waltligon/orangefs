@@ -109,7 +109,7 @@ int main(int argc, char **argv)
         memset(&attr, 0, sizeof(PVFS_sys_attr));
         attr.owner = credentials.uid;
         attr.group = credentials.gid;
-        attr.perms = 0;
+        attr.perms = 0777;
         attr.atime = time(NULL);
         attr.mtime = attr.atime;
         attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;

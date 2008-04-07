@@ -132,6 +132,8 @@ int PINT_util_digest_sha1(const void *input_message, size_t input_length,
 int PINT_util_digest_md5(const void *input_message, size_t input_length,
 		char **output, size_t *output_length);
 
+char *PINT_util_guess_alias(void);
+
 void PINT_util_gen_credentials(
     PVFS_credentials *credentials);
 

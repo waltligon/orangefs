@@ -4,8 +4,6 @@
  * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
- *
- * $Id: util.c,v 1.12 2007-07-22 16:15:01 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -96,7 +94,7 @@ warning_xerrno(int errnum, const char *fmt, ...)
 }
 
 void * __attribute__((malloc)) __hidden
-Malloc(unsigned long n)
+bmi_ib_malloc(unsigned long n)
 {
     char *x;
 
@@ -115,7 +113,7 @@ void * __hidden
 qlist_del_head(struct qlist_head *list)
 {
     struct qlist_head *h;
-    assert(!qlist_empty(list), "%s: empty list %p", __func__, list);
+    bmi_ib_assert(!qlist_empty(list), "%s: empty list %p", __func__, list);
     h = list->next;
     qlist_del(h);
     return h;

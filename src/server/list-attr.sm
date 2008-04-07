@@ -206,31 +206,16 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
     job_status_s *js_p)
 {    
     struct PINT_server_op *getattr_op;
-    struct PINT_server_op *s_op;
+    /* note: this gives us a pointer to the base frame (list_attr), 
+     * _not_ the getattr frames that were previously pushed.
+     */
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int task_id;
     int remaining;
     PVFS_error tmp_err;
     int i, j;
-    int listattr_index = 0;
-
-    /* we need to find the frame of the parent sm first so that we can
-     * store the results of the parallel machines. 
-     */
-    /* TODO: is there a cleaner way to do this?  I don't know how to tell
-     * how many frames were pushed without first iterating and looking for 
-     * the original s_op 
-     */
-    do
-    {
-        s_op = PINT_sm_frame(smcb, listattr_index);
-        listattr_index++;
-    } while(s_op && s_op->op != PVFS_SERV_LISTATTR);
 
     assert(s_op);
-    /* the position in the stack should match the number of parallel
-     * machines we pushed on top of it
-     */
-    assert(s_op->u.listattr.parallel_sms == (listattr_index-1));
     assert(s_op->op == PVFS_SERV_LISTATTR);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 

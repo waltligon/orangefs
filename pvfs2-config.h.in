@@ -55,7 +55,7 @@
 /* Define if DB has get_pagesize function */
 #undef HAVE_DB_GET_PAGESIZE
 
-/* Define if statfs callback has struct dentry argument */
+/* Define if super_operations statfs has dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
 /* Define to 1 if you have the <execinfo.h> header file. */
@@ -156,7 +156,7 @@
 /* Define if kernel has i_size_write */
 #undef HAVE_I_SIZE_WRITE
 
-/* Define if kernel lacks device classes */
+/* Define if kernel has device classes */
 #undef HAVE_KERNEL_DEVICE_CLASSES
 
 /* Define if kernel kmem_cache_create constructor has new-style two-parameter
@@ -261,6 +261,9 @@
 
 /* Define if struct file_operations in kernel has readx callback */
 #undef HAVE_READX_FILE_OPERATIONS
+
+/* Define if kernel super_operations contains read_inode field */
+#undef HAVE_READ_INODE
 
 /* Define if kernel has register_ioctl32_conversion */
 #undef HAVE_REGISTER_IOCTL32_CONVERSION
@@ -367,7 +370,7 @@
 /* Define if include file valgrind.h exists */
 #undef HAVE_VALGRIND_H
 
-/* Define if get_sb callback has struct vfsmount argument */
+/* Define if file_system_type get_sb has vfsmount argument */
 #undef HAVE_VFSMOUNT_GETSB
 
 /* Define if struct file_operations in kernel has writev callback */

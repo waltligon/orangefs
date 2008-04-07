@@ -143,6 +143,8 @@ typedef unsigned long sector_t;
 #define PVFS2_DEFAULT_OP_TIMEOUT_SECS       20
 #endif
 
+#define PVFS2_DEFAULT_SLOT_TIMEOUT_SECS     1800 /* 30 minutes */
+
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
 
 #define PVFS2_DEVREQ_MAGIC             0x20030529
@@ -740,6 +742,9 @@ struct super_block *pvfs2_get_sb(
 #endif
 #endif
 
+void pvfs2_read_inode(
+    struct inode *inode);
+
 void pvfs2_kill_sb(struct super_block *sb);
 int pvfs2_remount(
     struct super_block *sb,
@@ -927,6 +932,7 @@ extern struct semaphore devreq_semaphore;
 extern struct semaphore request_semaphore;
 extern int debug;
 extern int op_timeout_secs;
+extern int slot_timeout_secs;
 extern struct list_head pvfs2_superblocks;
 extern spinlock_t pvfs2_superblocks_lock;
 extern struct list_head pvfs2_request_list;
@@ -1169,37 +1175,6 @@ do                                                \
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
-
-/************************************
- * misc convenience functions
- ************************************/
-static inline int pvfs2_internal_revalidate(
-    struct inode *inode)
-{
-    int ret = -EINVAL;
-    if (inode)
-    {
-        /*
-         * The dentry revalidating function expects that all fields of the inode
-         * would be refreshed, so we dont have much of a choice here too.
-         */
-        ret = ((pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) == 0) ? 1 : 0);
-#if 0
-/* Calling make_bad_inode() here results in a bad reference count on the
- * inode.  It therefore gets cached until the module is unloaded, when we get 
- * a "VFS: Busy inodes after unmount. Self-destruct in 5 seconds." error
- * message.  It is better to just let it be cleaned up naturally after 
- * validation failure. -Phil
- */
-        if (ret == 0)
-        {
-            pvfs2_make_bad_inode(inode);
-        }
-#endif
-    }
-    return ret;
-}
-
 #ifdef PVFS2_LINUX_KERNEL_2_4
 /*
   based on code from 2.6.x's fs/libfs.c with required macro support
@@ -1248,35 +1223,32 @@ static inline int dcache_dir_close(struct inode *inode, struct file *file)
 }
 #endif /* PVFS2_LINUX_KERNEL_2_4_MINOR_VER */
 
-/* some 2.4 kernels backport a lot of stuff from 2.6, so we have to
- * feature-test instead of relying on kernel versions */
-#ifndef HAVE_I_SIZE_READ
-static inline loff_t i_size_read(struct inode *inode)
-{
-    return inode->i_size;
-}
-#endif
-
-#ifndef HAVE_I_SIZE_WRITE
-static inline void i_size_write(struct inode *inode, loff_t i_size)
-{
-    inode->i_size = i_size;
-}
-#endif
-
-#ifndef HAVE_KZALLOC
-static void *kzalloc(size_t size, gfp_t mask)
-{
-    void *ptr;
-    ptr = kmalloc(size, mask);
-    if (ptr) {
-        memset(ptr, 0, size);
-    }
-    return ptr;
-}
-#endif
-
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+static inline void pvfs2_i_size_write(struct inode *inode, loff_t i_size)
+{
+#ifndef HAVE_I_SIZE_WRITE
+    inode->i_size = i_size;
+#else
+    #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+    mutex_lock(&inode->i_mutex);
+    #endif
+    i_size_write(inode, i_size);
+    #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+    mutex_unlock(&inode->i_mutex);
+    #endif
+#endif
+    return;
+}
+
+static inline loff_t pvfs2_i_size_read(struct inode *inode)
+{
+#ifndef HAVE_I_SIZE_READ
+    return inode->i_size;
+#else
+    return i_size_read(inode);
+#endif
+}
 
 static inline unsigned int diff(struct timeval *end, struct timeval *begin)
 {

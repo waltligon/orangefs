@@ -57,6 +57,12 @@ enum PINT_state_code {
  */
 #define PINT_STATE_STACK_SIZE 8
 
+struct PINT_state_stack_s
+{
+    struct PINT_state_s *state;
+    int prev_base_frame;
+};
+
 /* State machine control block - one per running instance of a state
  * machine
  */
@@ -65,10 +71,11 @@ typedef struct PINT_smcb
     /* state machine execution variables */
     int stackptr;
     struct PINT_state_s *current_state;
-    struct PINT_state_s *state_stack[PINT_STATE_STACK_SIZE];
+    struct PINT_state_stack_s state_stack[PINT_STATE_STACK_SIZE];
 
-    struct qlist_head frames;
-    int frame_count;
+    struct qlist_head frames;  /* circular list of frames */
+    int base_frame;   /* index of current base frame */
+    int frame_count;  /* number of frames in list */
 
     /* usage specific routinet to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int);

@@ -713,6 +713,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     data.size = data.ulen = start_size;
     data.flags = DB_DBT_USERMEM;
 
+    tmp_ptr = NULL;
     while(i < *op_p->u.d_iterate_handles.count_p)
     {
         ret = dbc_p->c_get(dbc_p, &key, &data, DB_MULTIPLE_KEY|DB_NEXT);

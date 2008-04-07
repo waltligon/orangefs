@@ -44,6 +44,42 @@ struct config_fs_cache_s
 
 };
 
+#define map_handle_range_to_extent_list(hrange_list)             \
+do { cur = hrange_list;                                          \
+ while(cur) {                                                    \
+     cur_mapping = PINT_llist_head(cur);                         \
+     if (!cur_mapping) break;                                    \
+     assert(cur_mapping->alias_mapping);                         \
+     assert(cur_mapping->alias_mapping->host_alias);             \
+     assert(cur_mapping->handle_range);                          \
+     cur_host_extent_table = malloc(                             \
+         sizeof(struct bmi_host_extent_table_s));                \
+     if (!cur_host_extent_table) {                               \
+         ret = -ENOMEM;                                          \
+         break;                                                  \
+     }                                                           \
+     cur_host_extent_table->bmi_address =                        \
+         cur_mapping->alias_mapping->bmi_address;                \
+     assert(cur_host_extent_table->bmi_address);                 \
+     cur_host_extent_table->extent_list =                        \
+         PINT_create_extent_list(cur_mapping->handle_range);     \
+     if (!cur_host_extent_table->extent_list) {                  \
+         free(cur_host_extent_table);                            \
+         ret = -ENOMEM;                                          \
+         break;                                                  \
+     }                                                           \
+     /*                                                          \
+       add this host to extent list mapping to                   \
+       config cache object's host extent table                   \
+     */                                                          \
+     ret = PINT_llist_add_to_tail(                               \
+         cur_config_fs_cache->bmi_host_extent_tables,            \
+         cur_host_extent_table);                                 \
+     assert(ret == 0);                                           \
+     cur = PINT_llist_next(cur);                                 \
+ } } while(0)
+
+
 struct qhash_table *PINT_fsid_config_cache_table = NULL;
 
 /* these are based on code from src/server/request-scheduler.c */
@@ -383,6 +419,60 @@ int PINT_cached_config_get_next_meta(
     return ret;
 }
 
+static int PINT_cached_config_get_extents(
+    PVFS_fs_id fsid,
+    PVFS_BMI_addr_t *addr,
+    PVFS_handle_extent_array *handle_extents)
+{
+    struct qhash_head *hash_link;
+    struct PINT_llist *server_list;
+    PVFS_BMI_addr_t tmp_addr;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+    int num_io_servers, ret;
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if(!hash_link)
+    {
+        gossip_err("Failed to find a file system matching fsid: %d\n", fsid);
+        return -PVFS_EINVAL;
+    }
+
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
+
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    server_list = cur_config_cache->fs->data_handle_ranges;
+    num_io_servers = PINT_llist_count(server_list);
+
+    while(!PINT_llist_empty(server_list))
+    {
+        cur_mapping = PINT_llist_head(server_list);
+        assert(cur_mapping);
+        server_list = PINT_llist_next(server_list);
+
+        ret = BMI_addr_lookup(
+            &tmp_addr, cur_mapping->alias_mapping->bmi_address);
+        if(ret < 0)
+        {
+            return ret;
+        }
+
+        if(tmp_addr == *addr)
+        {
+            handle_extents->extent_count =
+                cur_mapping->handle_extent_array.extent_count;
+            handle_extents->extent_array =
+                cur_mapping->handle_extent_array.extent_array;
+
+            return 0;
+        }
+    }
+    return -PVFS_ENOENT;
+}
+
 int PINT_cached_config_map_servers(
     PVFS_fs_id fsid,
     int *inout_num_datafiles,
@@ -432,10 +522,9 @@ int PINT_cached_config_map_servers(
             {
                 if(handle_extent_array)
                 {
-                    ret = PINT_cached_config_get_server(
+                    ret = PINT_cached_config_get_extents(
                         fsid,
-                        BMI_addr_rev_lookup(layout->server_list.servers[i]),
-                        PINT_SERVER_TYPE_IO,
+                        &layout->server_list.servers[i],
                         &handle_extent_array[i]);
                     if(ret < 0)
                     {

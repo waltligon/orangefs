@@ -26,12 +26,14 @@ static int hash_compare(void *key, struct qhash_head *link);
 static int hash_table_size = 509;
 int gossip_debug_mask = 0;
 int op_timeout_secs = PVFS2_DEFAULT_OP_TIMEOUT_SECS;
+int slot_timeout_secs = PVFS2_DEFAULT_SLOT_TIMEOUT_SECS;
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("PVFS2 Development Team");
 MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
 MODULE_PARM_DESC(debug, "debugging level (0 for none, 1 for verbose)");
 MODULE_PARM_DESC(op_timeout_secs, "Operation timeout in seconds");
+MODULE_PARM_DESC(slot_timeout_secs, "Slot timeout in seconds");
 MODULE_PARM_DESC(hash_table_size, "size of hash table for operations in progress");
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -44,6 +46,7 @@ DECLARE_FSTYPE(pvfs2_fs_type, "pvfs2", pvfs2_get_sb, 0);
 MODULE_PARM(hash_table_size, "i");
 MODULE_PARM(gossip_debug_mask, "i");
 MODULE_PARM(op_timeout_secs, "i");
+MODULE_PARM(slot_timeout_secs, "i");
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
 
@@ -65,6 +68,7 @@ struct file_system_type pvfs2_fs_type =
 module_param(hash_table_size, int, 0);
 module_param(gossip_debug_mask, int, 0);
 module_param(op_timeout_secs, int, 0);
+module_param(slot_timeout_secs, int, 0);
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
@@ -99,6 +103,11 @@ static int __init pvfs2_init(void)
     if(op_timeout_secs < 0)
     {
         op_timeout_secs = 0;
+    }
+
+    if(slot_timeout_secs < 0)
+    {
+        slot_timeout_secs = 0;
     }
 
     /* initialize global book keeping data structures */

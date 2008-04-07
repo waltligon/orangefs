@@ -129,7 +129,7 @@ int copy_attributes_to_inode(
     char *symname)
 {
     int ret = -1;
-    int perm_mode = 0, old_mode = 0;
+    int perm_mode = 0;
     pvfs2_inode_t *pvfs2_inode = NULL;
     loff_t inode_size = 0, rounded_up_size = 0;
 
@@ -227,9 +227,6 @@ int copy_attributes_to_inode(
         inode->i_mtime.tv_nsec = 0;
         inode->i_ctime.tv_nsec = 0;
 #endif
-        old_mode = inode->i_mode;
-        inode->i_mode = 0;
-
         if (attrs->perms & PVFS_O_EXECUTE)
             perm_mode |= S_IXOTH;
         if (attrs->perms & PVFS_O_WRITE)
@@ -257,7 +254,7 @@ int copy_attributes_to_inode(
         if (get_suid_flag(inode) == 1 && (attrs->perms & PVFS_U_SUID))
             perm_mode |= S_ISUID;
 
-        inode->i_mode |= perm_mode;
+        inode->i_mode = perm_mode;
 
         if (is_root_handle(inode))
         {
@@ -306,7 +303,7 @@ int copy_attributes_to_inode(
                             "attribute type %x\n", attrs->objtype);
         }
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: copy_attributes_to_inode: setting i_mode to %o, i_size to %lu\n",
-                inode->i_mode, (unsigned long)i_size_read(inode));
+                inode->i_mode, (unsigned long)pvfs2_i_size_read(inode));
     }
     return ret;
 }
@@ -1773,7 +1770,7 @@ static int do_encode_opaque_handle(char *dst, struct inode *inode)
     h.atime  = pvfs2_convert_time_field(&inode->i_atime);
     h.mtime  = pvfs2_convert_time_field(&inode->i_mtime);
     h.ctime  = pvfs2_convert_time_field(&inode->i_ctime);
-    h.size   = i_size_read(inode);
+    h.size   = pvfs2_i_size_read(inode);
     h.mask   |= PVFS_ATTR_SYS_SIZE;
     h.objtype = PVFS_TYPE_METAFILE;
     /* Serialize into the buffer */

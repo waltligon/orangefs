@@ -82,8 +82,8 @@ struct req_sched_element
     enum req_sched_states state;	/* state of this element */
     PVFS_handle handle;
     struct timeval tv;			/* used for timer events */
-    int readonly_flag;                  /* indicates a read only operation */
-
+    /* indicates type of access needed by this op */
+    enum PINT_server_req_access_type access_type;
     int mode_change; /* specifies that the element is a mode change */
     enum PVFS_server_mode mode; /* the mode to change to */
 };
@@ -282,10 +282,10 @@ static int PINT_req_sched_schedule_mode_change(void)
     /* NOTE: only transitions to admin mode are ever queued */
     if(sched_count == 0 && !qlist_empty(&mode_queue))
     {
-        next_element = qlist_entry(mode_queue.next, struct req_sched_element,
-                                   list_link);
-        next_element->state = REQ_READY_TO_SCHEDULE;
-        qlist_add_tail(&next_element->ready_link, &ready_queue);
+	next_element = qlist_entry(mode_queue.next, struct req_sched_element,
+	    list_link);
+	next_element->state = REQ_READY_TO_SCHEDULE;
+	qlist_add_tail(&next_element->ready_link, &ready_queue);
     }
     return 0;
 }
@@ -306,14 +306,13 @@ static void PINT_req_sched_do_change_mode(
  *  \return 1 if request should proceed immediately, 0 if the
  *  request will be scheduled later, and -errno on failure
  */
-int PINT_req_sched_post(
-    enum PVFS_server_op op,
-    PVFS_fs_id fs_id,
-    PVFS_handle handle,
-    int readonly_flag,
-    int schedule,
-    void *in_user_ptr,
-    req_sched_id * out_id)
+int PINT_req_sched_post(enum PVFS_server_op op,
+                        PVFS_fs_id fs_id,
+                        PVFS_handle handle,
+                        enum PINT_server_req_access_type access_type,
+                        enum PINT_server_sched_policy sched_policy,
+			void *in_user_ptr,
+			req_sched_id * out_id)
 {
     struct qlist_head *hash_link;
     int ret = -1;
@@ -325,9 +324,9 @@ int PINT_req_sched_post(
     struct qlist_head *iterator;
     int tmp_flag;
 
-    if(!schedule)
+    if(sched_policy == PINT_SERVER_REQ_BYPASS)
     {
-        if(!readonly_flag && !PVFS_SERV_IS_MGMT_OP(op))
+        if(access_type == PINT_SERVER_REQ_MODIFY && !PVFS_SERV_IS_MGMT_OP(op))
         {
             /* if this requests modifies the file system, we have to check
              * to see if we are in admin mode or about to enter admin mode
@@ -364,10 +363,10 @@ int PINT_req_sched_post(
     tmp_element->state = REQ_QUEUED;
     tmp_element->handle = handle;
     tmp_element->list_head = NULL;
-    tmp_element->readonly_flag = readonly_flag;
+    tmp_element->access_type = access_type;
     tmp_element->mode_change = 0;
 
-    if(!readonly_flag && !PVFS_SERV_IS_MGMT_OP(op))
+    if(access_type == PINT_SERVER_REQ_MODIFY && !PVFS_SERV_IS_MGMT_OP(op))
     {
         if(PINT_req_sched_in_admin_mode())
         {
@@ -408,7 +407,9 @@ int PINT_req_sched_post(
     /* return 1 if the list is empty before we add this entry */
     ret = qlist_empty(&(tmp_list->req_list));
     if (ret == 1)
+    {
 	tmp_element->state = REQ_SCHEDULED;
+    }
     else
     {
         /* check queue to see if we can apply any optimizations */
@@ -455,7 +456,7 @@ int PINT_req_sched_post(
                 ret = 0;
             }
 	}
-	else if (readonly_flag &&
+	else if (access_type == PINT_SERVER_REQ_READONLY &&
 	    next_element->state == REQ_SCHEDULED &&
 	    last_element->state == REQ_SCHEDULED)
         {
@@ -468,7 +469,7 @@ int PINT_req_sched_post(
             {
                 tmp_element2 = qlist_entry(iterator, struct req_sched_element,
                     list_link);
-                if(!tmp_element2->readonly_flag)
+                if(tmp_element2->access_type == PINT_SERVER_REQ_MODIFY)
                 {
                     tmp_flag = 1;
                     break;
@@ -498,7 +499,7 @@ int PINT_req_sched_post(
              * dirent request to proceed.
              */
             tmp_element->state = REQ_SCHEDULED;
-            tmp_element->readonly_flag = 1;
+            tmp_element->access_type = PINT_SERVER_REQ_READONLY;
             gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
                          "concurrent dirent op, handle: %llu\n", 
                          llu(handle));
@@ -812,13 +813,13 @@ int PINT_req_sched_release(
                         }
                     }
                 }
-                else if(next_element->readonly_flag)
+                else if(next_element->access_type == PINT_SERVER_REQ_READONLY)
                 {
                     /* keep going as long as the operations are read only;
                      * we let these all go concurrently
                      */
                     while (next_element &&
-                           (next_element->readonly_flag) &&
+                           (next_element->access_type == PINT_SERVER_REQ_READONLY) &&
                            (next_element->list_link.next != &(tmp_list->req_list)))
                     {
                         next_element =
@@ -826,7 +827,7 @@ int PINT_req_sched_release(
                                         struct req_sched_element,
                                         list_link);
                         if (next_element &&
-                            (next_element->readonly_flag))
+                            (next_element->access_type == PINT_SERVER_REQ_READONLY))
                         {
                             gossip_debug(
                                 GOSSIP_REQ_SCHED_DEBUG,

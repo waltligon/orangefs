@@ -20,6 +20,7 @@
 #include "gen-locks.h"
 #include "pint-util.h"
 #include "bmi.h"
+#include "gossip.h"
 
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
@@ -196,6 +197,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                         if (dest->u.meta.dfile_array)
                         {
                             free(dest->u.meta.dfile_array);
+                            dest->u.meta.dfile_array = NULL;
                         }
                     }
                     dest->u.meta.dfile_array = malloc(df_array_size);
@@ -374,6 +376,34 @@ inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
     char *addr_string;
     decode_string(pptr, &addr_string);
     BMI_addr_lookup(x, addr_string);
+}
+
+char *PINT_util_guess_alias(void)
+{
+    char tmp_alias[1024];
+    char *tmpstr;
+    char *alias;
+    int ret;
+
+    /* hmm...failed to find alias as part of the server config filename,
+     * use the hostname to guess
+     */
+    ret = gethostname(tmp_alias, 1024);
+    if(ret != 0)
+    {
+        gossip_err("Failed to get hostname while attempting to guess "
+                   "alias.  Use -a to specify the alias for this server "
+                   "process directly\n");
+        return NULL;
+    }
+    alias = tmp_alias;
+
+    tmpstr = strstr(tmp_alias, ".");
+    if(tmpstr)
+    {
+        *tmpstr = 0;
+    }
+    return strdup(tmp_alias);
 }
 
 /*

@@ -83,18 +83,6 @@ enum PINT_server_req_permissions
                                       needs write and execute */
 };
 
-enum PINT_server_req_access_type
-{
-    PINT_SERVER_REQ_READONLY = 0,
-    PINT_SERVER_REQ_MODIFY
-};
-
-enum PINT_server_sched_policy
-{
-    PINT_SERVER_REQ_BYPASS = 0,
-    PINT_SERVER_REQ_SCHEDULE
-};
-
 #define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
 static inline int PINT_get_object_ref_##req_name(                        \
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
@@ -104,10 +92,10 @@ static inline int PINT_get_object_ref_##req_name(                        \
     return 0;                                                            \
 }
 
-typedef int (*PINT_server_req_access_callback)(struct PVFS_server_req *req);
-
-int PINT_server_req_readonly(struct PVFS_server_req *req);
-int PINT_server_req_modify(struct PVFS_server_req *req);
+enum PINT_server_req_access_type PINT_server_req_readonly(
+                                    struct PVFS_server_req *req);
+enum PINT_server_req_access_type PINT_server_req_modify(
+                                    struct PVFS_server_req *req);
 
 struct PINT_server_req_params
 {
@@ -128,7 +116,8 @@ struct PINT_server_req_params
      * Default functions PINT_server_req_readonly and PINT_server_req_modify
      * are used for requests that always require the same access type.
      */
-    PINT_server_req_access_callback access_type;
+    enum PINT_server_req_access_type (*access_type)(
+                                        struct PVFS_server_req *req);
 
     /* Specifies the scheduling policy for the request.  In some cases,
      * we can bypass the request scheduler and proceed directly with the
@@ -512,6 +501,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
                               ...) __attribute__((format(printf, 3, 4)));
+
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
