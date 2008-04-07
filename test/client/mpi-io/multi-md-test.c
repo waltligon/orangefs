@@ -132,7 +132,18 @@ struct test_results
     int nprocs;
 };
 
-struct test_results result_array[100];
+#define MAX_TEST_COUNT 1000
+
+#define CHECK_MAX_TEST(__x) \
+do { \
+    if(__x > MAX_TEST_COUNT) \
+    { \
+        fprintf(stderr, "Error: exceeded MAX_TEST_COUNT.\n"); \
+        MPI_Abort(MPI_COMM_WORLD, 1); \
+    } \
+} while(0)
+
+struct test_results* result_array;
 
 #ifndef PATH_MAX
 #define PATH_MAX FILENAME_MAX
@@ -271,6 +282,13 @@ int main(
     int test = 0;
     int i;
 
+    result_array = malloc(MAX_TEST_COUNT*sizeof(*result_array));
+    if(!result_array)
+    {
+        perror("malloc");
+        return(-1);
+    }
+
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
@@ -299,6 +317,7 @@ int main(
         rank,
         nprocs);
     test++;
+    CHECK_MAX_TEST(test);
 
     /* make subdir for each proc */
     result_array[test].op = "mktestdir";
@@ -312,6 +331,7 @@ int main(
         rank,
         nprocs);
     test++;
+    CHECK_MAX_TEST(test);
 
     for(i=opt_start_clients; i<=opt_end_clients; i+=opt_interval_clients)
     {
@@ -327,6 +347,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
 
         /* readdir */
         result_array[test].op = "readdir";
@@ -340,6 +361,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
 
         /* readdir and stat */
         result_array[test].op = "readdir_and_stat";
@@ -353,6 +375,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
 
         /* readdirplus */
         result_array[test].op = "readdirplus";
@@ -366,6 +389,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
 
         /* write */
         result_array[test].op = "write";
@@ -379,6 +403,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
 
         /* read */
         result_array[test].op = "read";
@@ -392,6 +417,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
 
         /* readdir */
         result_array[test].op = "readdir";
@@ -405,6 +431,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
 
         /* readdir and stat */
         result_array[test].op = "readdir_and_stat";
@@ -418,6 +445,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
 
         /* readdirplus */
         result_array[test].op = "readdirplus";
@@ -431,6 +459,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
 
         /* remove files */
         result_array[test].op = "rm";
@@ -444,6 +473,7 @@ int main(
             rank,
             i);
         test++;
+        CHECK_MAX_TEST(test);
     }
 
     /* remove subdir for each proc */
@@ -458,7 +488,7 @@ int main(
         rank,
         nprocs);
     test++;
-
+    CHECK_MAX_TEST(test);
 
     /* print all results */
     if (rank == 0)
