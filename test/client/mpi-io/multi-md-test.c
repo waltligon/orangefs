@@ -142,6 +142,7 @@ int opt_nfiles = -1;
 char opt_basedir[PATH_MAX] = {0};
 int opt_size = -1;
 int opt_api = -1; 
+int opt_pause = -1; 
 
 void usage(char *name); 
 int parse_args(int argc, char **argv);
@@ -154,7 +155,7 @@ void usage(char *name)
     int i = 0;
 
     fprintf(stderr,
-        "usage: %s -d base_dir -n num_files_per_proc -s size -a api \n", name);
+        "usage: %s -d base_dir -n num_files_per_proc -s size -a api -p seconds_to_pause\n", name);
     fprintf(stderr, "    where api is one of:\n");
     while(api_table[i].name != NULL)
     {
@@ -170,7 +171,7 @@ int parse_args(
     char **argv)
 {
     int c;
-    while ((c = getopt(argc, argv, "d:n:a:s:")) != -1)
+    while ((c = getopt(argc, argv, "d:n:a:s:p:")) != -1)
     {
         switch (c)
         {
@@ -186,6 +187,9 @@ int parse_args(
         case 'a':
             opt_api = atoi(optarg);
             break;
+        case 'p':
+            opt_pause = atoi(optarg);
+            break;
         case '?':
         case ':':
         default:
@@ -193,7 +197,7 @@ int parse_args(
             exit(-1);
         }
     }
-    if(opt_basedir[0] == 0 || opt_nfiles < 1 || opt_size < 1 || opt_api < 0)
+    if(opt_basedir[0] == 0 || opt_nfiles < 1 || opt_size < 1 || opt_api < 0 || opt_pause < 0)
     {
         usage(argv[0]);
         exit(-1);
@@ -440,7 +444,7 @@ int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name,
         {
             printf("# Pause...\n");
         }
-        sleep(5);
+        sleep(opt_pause);
     }
 
     if (rank == 0)
