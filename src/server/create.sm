@@ -150,6 +150,7 @@ static int check_stuffed(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int server_type;
     server_configuration_s *config = get_server_config_struct();
+    struct filesystem_configuration_s *fs_conf;
     PVFS_BMI_addr_t myaddr;
     PVFS_sys_layout *layout;
     int ret;
@@ -157,6 +158,16 @@ static int check_stuffed(
     s_op->resp.u.create.metafile_handle = js_p->handle;
 
     assert(config);
+
+    /* first find out if the config file option is enabled */
+    fs_conf = PINT_config_find_fs_id(config, 
+        s_op->req->u.create.fs_id);
+    if(fs_conf && fs_conf->file_stuffing == 0)
+    {
+        js_p->error_code = 0;
+        return(SM_ACTION_COMPLETE);
+    }
+
     ret = BMI_addr_lookup(&myaddr, config->host_id);
     if(ret != 0)
     {

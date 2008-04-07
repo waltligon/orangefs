@@ -93,6 +93,7 @@ static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
 static DOTCONF_CB(get_trove_sync_data);
+static DOTCONF_CB(get_file_stuffing);
 static DOTCONF_CB(get_db_cache_size_bytes);
 static DOTCONF_CB(get_trove_max_concurrent_io);
 static DOTCONF_CB(get_db_cache_type);
@@ -626,6 +627,12 @@ static const configoption_t options[] =
      /* Precreate pools will be "topped off" if they fall below this value */
      {"PrecreateLowThreshold",ARG_INT, get_precreate_low_threshold,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS, "1536"},
+
+    /* Specifies if file stuffing should be enabled or not.  Default is
+     * enabled; this option is only provided for benchmarking purposes 
+     */
+    {"FileStuffing",ARG_STR, get_file_stuffing, NULL, 
+        CTX_FILESYSTEM,"yes"},
 
      /* This specifies the frequency (in milliseconds) 
       * that performance monitor should be updated
@@ -1182,6 +1189,7 @@ DOTCONF_CB(enter_filesystem_context)
     fs_conf->trove_sync_data = TROVE_SYNC;
     fs_conf->fp_buffer_size = -1;
     fs_conf->fp_buffers_per_flow = -1;
+    fs_conf->file_stuffing = 1;
 
     if (!config_s->file_systems)
     {
@@ -2188,6 +2196,33 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
     fs_conf->attr_cache_max_num_elems = (int)cmd->data.value;
     return NULL;
 }
+
+DOTCONF_CB(get_file_stuffing)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if(strcasecmp(cmd->data.str, "yes") == 0)
+    {
+        fs_conf->file_stuffing = 1;
+    }
+    else if(strcasecmp(cmd->data.str, "no") == 0)
+    {
+        fs_conf->file_stuffing = 0;
+    }
+    else
+    {
+        return("FileStuffing value must be 'yes' or 'no'.\n");
+    }
+
+    return NULL;
+}
+
 
 DOTCONF_CB(get_trove_sync_meta)
 {

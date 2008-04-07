@@ -86,6 +86,7 @@ typedef struct filesystem_configuration_s
     int immediate_completion;
     int coalescing_high_watermark;
     int coalescing_low_watermark;
+    int file_stuffing;
 
     char *secret_key;
 
