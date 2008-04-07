@@ -8,6 +8,7 @@
  */
 
 #include "mx.h"
+#include "pint-event.h"
 
 static int      tmp_id  = 0;    /* temporary id until bmi_mx is init'ed */
 struct bmx_data *bmi_mx = NULL; /* global state for bmi_mx */
@@ -1486,13 +1487,16 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                      int numbufs, const void *const *buffers, 
                      const bmi_size_t *sizes, bmi_size_t total_size, 
                      bmi_msg_tag_t tag, void *user_ptr,
-                     bmi_context_id context_id, int is_unexpected)
+                     bmi_context_id context_id, int is_unexpected,
+                     PVFS_hint hints)
 {
         struct bmx_ctx          *tx     = NULL;
         struct method_op        *mop    = NULL;
         struct bmx_method_addr  *mxmap  = NULL;
         struct bmx_peer         *peer   = NULL;
         int                      ret    = 0;
+        int32_t                  eid    = 0;
+        int                      len    = 0;
 
 #if BMX_LOGGING
         if (!is_unexpected) {
@@ -1501,6 +1505,16 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                 MPE_Log_event(sendunex_start, (int) tag, NULL);
         }
 #endif
+
+        PINT_EVENT_START(
+            bmi_mx_send_event_id, bmi_mx_pid, NULL, &eid,
+            *(uint32_t *)PINT_hint_get_value_by_type(
+                hints, PINT_HINT_CLIENT_ID, &len),
+            *(uint32_t *)PINT_hint_get_value_by_type(
+                hints, PINT_HINT_REQUEST_ID, &len),
+            *(PVFS_handle *)PINT_hint_get_value_by_type(
+                hints, PINT_HINT_HANDLE, &len),
+            total_size);
 
         mxmap = remote_map->method_data;
 
@@ -1582,6 +1596,7 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
         mop->method_data = tx;
         mop->user_ptr = user_ptr;
         mop->context_id = context_id;
+        mop->event_id = eid;
         *id = mop->op_id;
         tx->mxc_mop = mop;
 
@@ -1601,13 +1616,14 @@ static int
 BMI_mx_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  const void *buffer, bmi_size_t size,
                  enum bmi_buffer_type buffer_flag __unused,
-                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
+                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id,
+                 PVFS_hint hints)
 {
         int ret = 0;
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
         ret = bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
-                                    tag, user_ptr, context_id, 0);
+                                   tag, user_ptr, context_id, 0, hints);
 
         debug(BMX_DB_FUNC, "leaving %s", __func__);
 
@@ -1618,14 +1634,16 @@ static int
 BMI_mx_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                       const void *const *buffers, const bmi_size_t *sizes, int list_count,
                       bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
-                      bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
+                      bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id,
+                      PVFS_hint hints)
 {
         int ret = 0;
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
         ret = bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
-                                    total_size, tag, user_ptr, context_id, 0);
+                                    total_size, tag, user_ptr, context_id, 0,
+                                    hints);
 
         debug(BMX_DB_FUNC, "leaving %s", __func__);
 
@@ -1636,14 +1654,15 @@ static int
 BMI_mx_post_sendunexpected(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  const void *buffer, bmi_size_t size,
                  enum bmi_buffer_type buffer_flag __unused,
-                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
+                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id,
+                 PVFS_hint hints)
 {
         int ret = 0;
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
         ret = bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
-                                    tag, user_ptr, context_id, 1);
+                                   tag, user_ptr, context_id, 1, hints);
 
         debug(BMX_DB_FUNC, "leaving %s", __func__);
 
@@ -1654,14 +1673,16 @@ static int
 BMI_mx_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                   const void *const *buffers, const bmi_size_t *sizes, int list_count,
                   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
-                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
+                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id,
+                  PVFS_hint hints)
 {
         int ret = 0;
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
-        ret = bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
-                                    total_size, tag, user_ptr, context_id, 1);
+        return bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
+                                    total_size, tag, user_ptr, context_id, 1,
+                                    hints);
 
         debug(BMX_DB_FUNC, "leaving %s", __func__);
 
@@ -1713,17 +1734,29 @@ static int
 bmx_post_recv_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                      int numbufs, void *const *buffers, const bmi_size_t *sizes,
                      bmi_size_t tot_expected_len, bmi_msg_tag_t tag,
-                     void *user_ptr, bmi_context_id context_id)
+                     void *user_ptr, bmi_context_id context_id,
+                     PVFS_hint hints)
 {
         int                      ret    = 0;
         struct bmx_ctx          *rx     = NULL;
         struct method_op        *mop    = NULL;
         struct bmx_method_addr  *mxmap  = NULL;
         struct bmx_peer         *peer   = NULL;
+        int                      eid    = 0;
 
 #if BMX_LOGGING
         MPE_Log_event(recv_start, (int) tag, NULL);
 #endif
+
+        PINT_EVENT_START(
+            bmi_mx_recv_event_id, bmi_mx_pid, NULL, &eid,
+            *(uint32_t *)PINT_hint_get_value_by_type(
+                hints, PINT_HINT_CLIENT_ID, &len),
+            *(uint32_t *)PINT_hint_get_value_by_type(
+                hints, PINT_HINT_REQUEST_ID, &len),
+            *(PVFS_handle *)PINT_hint_get_value_by_type(
+                hints, PINT_HINT_HANDLE, &len),
+            tot_expected_len);
 
         mxmap = remote_map->method_data;
 
@@ -1792,6 +1825,7 @@ bmx_post_recv_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
         mop->method_data = rx;
         mop->user_ptr = user_ptr;
         mop->context_id = context_id;
+        mop->event_id = eid;
         *id = mop->op_id;
         rx->mxc_mop = mop;
 
@@ -1809,14 +1843,16 @@ static int
 BMI_mx_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  void *buffer, bmi_size_t expected_len, bmi_size_t *actual_len __unused,
                  enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
-                 bmi_context_id context_id)
+                 bmi_context_id context_id,
+                 PVFS_hint hints)
 {
         int ret = 0;
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
         ret = bmx_post_recv_common(id, remote_map, 1, &buffer, &expected_len,
-                                    expected_len, tag, user_ptr, context_id);
+                                    expected_len, tag, user_ptr, context_id,
+                                    hints);
 
         debug(BMX_DB_FUNC, "leaving %s", __func__);
 
@@ -1828,14 +1864,16 @@ BMI_mx_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                void *const *buffers, const bmi_size_t *sizes, int list_count,
                bmi_size_t tot_expected_len, bmi_size_t *tot_actual_len __unused,
                enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
-               bmi_context_id context_id)
+               bmi_context_id context_id,
+               PVFS_hint hints)
 {
         int ret = 0;
 
         debug(BMX_DB_FUNC, "entering %s", __func__);
 
         ret = bmx_post_recv_common(id, remote_map, list_count, buffers, sizes,
-                                    tot_expected_len, tag, user_ptr, context_id);
+                                    tot_expected_len, tag, user_ptr, context_id,
+                                    hints);
 
         debug(BMX_DB_FUNC, "leaving %s", __func__);
 
@@ -2509,6 +2547,12 @@ BMI_mx_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
                 /* racing with mx_test_any() in textcontext? */
                 mx_test(bmi_mx->bmx_ep, &ctx->mxc_mxreq, &ctx->mxc_mxstat, &result);
                 if (result) {
+                        PINT_EVENT_END(
+                            (ctx->mxc_type == BMX_REQ_TX ?
+                             bmi_mx_send_event_id : bmi_mx_recv_event_id),
+                            bmi_tcp_pid, NULL, ctx->mxc_mop->event_id,
+                            ctx->mxc_mop->op_id, *size);
+
                         *outcount = 1;
                         if (ctx->mxc_mxstat.code == MX_STATUS_SUCCESS) {
                                 *err = 0;
@@ -2637,6 +2681,13 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                         }
                         if (user_ptrs)
                                 user_ptrs[completed] = ctx->mxc_mop->user_ptr;
+
+                        PINT_EVENT_END(
+                            (ctx->mxc_type == BMX_REQ_TX ?
+                             bmi_mx_send_event_id : bmi_mx_recv_event_id),
+                            bmi_tcp_pid, NULL, ctx->mxc_mop->event_id,
+                            ctx->mxc_mop->op_id, status.xfer_length);
+
                         id_gen_fast_unregister(ctx->mxc_mop->op_id);
                         BMX_FREE(ctx->mxc_mop, sizeof(*ctx->mxc_mop));
                         completed++;
@@ -2725,6 +2776,12 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                         }
                         if (user_ptrs)
                                 user_ptrs[completed] = ctx->mxc_mop->user_ptr;
+                        PINT_EVENT_END(
+                            (ctx->mxc_type == BMX_REQ_TX ?
+                             bmi_mx_send_event_id : bmi_mx_recv_event_id),
+                            bmi_mx_pid, NULL, ctx->mxc_mop->event_id,
+                            ctx->mxc_mop->op_id, status.xfer_length);
+
                         id_gen_fast_unregister(ctx->mxc_mop->op_id);
                         BMX_FREE(ctx->mxc_mop, sizeof(*ctx->mxc_mop));
                         completed++;

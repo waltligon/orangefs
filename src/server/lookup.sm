@@ -238,7 +238,7 @@ static PINT_sm_action lookup_read_object_metadata(
     /* get the dspace attributes/metadata */
     ret = job_trove_dspace_getattr(
         s_op->req->u.lookup_path.fs_id, handle, smcb, ds_attr,
-        0, js_p, &j_id, server_job_context);
+        0, js_p, &j_id, server_job_context, s_op->req->hints );
 
     return ret;
 }
@@ -407,11 +407,11 @@ static PINT_sm_action lookup_check_acls_if_needed(
         &s_op->val,
         0,
         NULL,
-        smcb,
+        s_op,
         0,
         js_p,
         &i,
-        server_job_context);
+        server_job_context, s_op->req->hints);
     return SM_ACTION_COMPLETE;
 }
 
@@ -520,7 +520,7 @@ static PINT_sm_action lookup_read_directory_entry_handle(
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id, handle, &s_op->key, &s_op->val,
         0, 
-        NULL, smcb, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -560,7 +560,7 @@ static PINT_sm_action lookup_read_directory_entry(
         &s_op->key, &s_op->val, 
         0, 
         NULL, smcb, 0, js_p, &j_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }

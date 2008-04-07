@@ -105,7 +105,7 @@ int pvfs2_deleattr (PVFS_ds_keyval key, char *destfile) {
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_lookup(cur_fs, pvfs_path,
                           &credentials, &resp_lookup,
-                          PVFS2_LOOKUP_LINK_FOLLOW);
+                          PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)
     {
       PVFS_perror("PVFS_sys_lookup", ret);
@@ -144,7 +144,7 @@ int pvfs2_deleattr (PVFS_ds_keyval key, char *destfile) {
 
   ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
                             parent_ref, &credentials, &resp_lookup,
-                            PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
   if (ret != 0)
   {
     fprintf(stderr, "Target '%s' does not exist!\n", str_buf);
@@ -155,7 +155,7 @@ int pvfs2_deleattr (PVFS_ds_keyval key, char *destfile) {
   /* gossip_set_debug_mask(1,0xffffffffffffffffUL);
    * gossip_enable_stderr();
    */
-  ret = PVFS_sys_deleattr(resp_lookup.ref, &credentials, &key);
+  ret = PVFS_sys_deleattr(resp_lookup.ref, &credentials, &key, NULL);
   if (ret < 0)
   {
       PVFS_perror("deleattr failed with errcode", ret);

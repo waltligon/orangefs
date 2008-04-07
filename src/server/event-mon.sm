@@ -81,10 +81,6 @@ static PINT_sm_action event_mon_do_work(
     s_op->resp.u.mgmt_event_mon.event_count = 
 	s_op->req->u.mgmt_event_mon.event_count;
 
-    /* get events */
-    PINT_event_retrieve(s_op->resp.u.mgmt_event_mon.event_array,
-	s_op->req->u.mgmt_event_mon.event_count);
-
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }

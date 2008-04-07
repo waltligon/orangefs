@@ -61,6 +61,7 @@
 
 /* empty stubs to turn off encoding definition generation */
 #include "pvfs2-encode-stubs.h"
+#include "pvfs2-hint.h"
 
 /* Basic types used throughout the code. */
 typedef uint8_t PVFS_boolean;
@@ -461,11 +462,32 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_FSID_CHECK = 2,  /* verify that an fsid is ok */
     PVFS_SERV_PARAM_ROOT_CHECK = 3,  /* verify existance of root handle */
     PVFS_SERV_PARAM_MODE = 4,        /* change the current server mode */
-    PVFS_SERV_PARAM_EVENT_ON = 5,    /* event logging on or off */
-    PVFS_SERV_PARAM_EVENT_MASKS = 6, /* API masks for event logging */
+    PVFS_SERV_PARAM_EVENT_ENABLE = 5,    /* event enable */
+    PVFS_SERV_PARAM_EVENT_DISABLE = 6, /* event disable */
     PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
     PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
 };
+
+enum PVFS_mgmt_param_type
+{
+    PVFS_MGMT_PARAM_TYPE_UINT64,
+    PVFS_MGMT_PARAM_TYPE_STRING
+} ;
+
+struct PVFS_mgmt_setparam_value
+{
+    enum PVFS_mgmt_param_type type;
+    union
+    {
+        uint64_t value;
+        char *string_value;
+    } u;
+};
+encode_enum_union_2_struct(
+    PVFS_mgmt_setparam_value,
+    type, u,
+    uint64_t, value,        PVFS_MGMT_PARAM_TYPE_UINT64,
+    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING)
 
 enum PVFS_server_mode
 {

@@ -53,6 +53,7 @@ int main(int argc, char **argv)
     PVFS_credentials creds;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_error_details * error_details;
+    struct PVFS_mgmt_setparam_value param_value;
     int count;
 
     /* look at command line arguments */
@@ -168,14 +169,17 @@ int main(int argc, char **argv)
         fprintf(stderr, "Failure: could not create error details\n");
         return(-1);
     }
-            
+
+    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+    param_value.u.value = (uint64_t)cur_fs;
+
     /* check that the fsid exists on all of the servers */
     /* TODO: we need a way to get information out about which server fails
      * in error cases here 
      */
     ret = PVFS_mgmt_setparam_all(
         cur_fs, &creds, PVFS_SERV_PARAM_FSID_CHECK,
-        (uint64_t)cur_fs, NULL, error_details);
+        &param_value, error_details, NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_setparam_all", ret);
@@ -193,7 +197,7 @@ int main(int argc, char **argv)
     printf("\n(7) Verifying that root handle is owned by one server...\n");    
 
     ret = PVFS_sys_lookup(cur_fs, "/", &creds,
-                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if(ret != 0)
     {
 	PVFS_perror("PVFS_sys_lookup", ret);
@@ -202,13 +206,16 @@ int main(int argc, char **argv)
     }
     printf("\n   Root handle: %llu\n", llu(resp_lookup.ref.handle));
 
+    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+    param_value.u.value = (uint64_t)resp_lookup.ref.handle;
+
     /* check that only one server controls root handle */
     /* TODO: we need a way to get information out about which server
      * failed in error cases here
      */
     ret = PVFS_mgmt_setparam_all(
         cur_fs, &creds, PVFS_SERV_PARAM_ROOT_CHECK,
-	(uint64_t)resp_lookup.ref.handle, NULL, error_details);
+        &param_value, error_details, NULL);
 
     if(ret < 0)
     {
@@ -294,7 +301,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     {
 	printf("   %s ",
                PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i]);
+	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
 	if (ret == 0)
 	{
 	    printf("Ok\n");
@@ -336,7 +343,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     {
 	printf("   %s ",
                PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i]);
+	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
 	if (ret == 0)
 	{
 	    printf("Ok\n");

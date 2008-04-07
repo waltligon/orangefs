@@ -264,7 +264,8 @@ static PINT_sm_action msgpairarray_post(
                            &msg_p->recv_status,
                            &msg_p->recv_id,
                            sm_p->msgarray_params.job_context,
-                           sm_p->msgarray_params.job_timeout);
+                           sm_p->msgarray_params.job_timeout,
+                           sm_p->hints);
         if (ret == 0)
         {
             /* perform a quick test to see if the recv failed before posting
@@ -336,7 +337,8 @@ static PINT_sm_action msgpairarray_post(
                                 &msg_p->send_status,
                                 &msg_p->send_id,
                                 sm_p->msgarray_params.job_context,
-                                sm_p->msgarray_params.job_timeout);
+                                sm_p->msgarray_params.job_timeout,
+                                sm_p->hints);
 
          if ((ret < 0) ||
             ((ret == 1) && (msg_p->send_status.error_code != 0)))

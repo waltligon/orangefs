@@ -870,7 +870,8 @@ static void cache_write_callback_fn(void *user_ptr,
 		q_item->cache_req.buffer_type,
         	q_item->parent->tag,
         	&q_item->bmi_callback,
-        	global_bmi_context);
+        	global_bmi_context,
+		q_item->parent->hints);
 
 	/* TODO: error handling */
 	assert(ret >= 0);
@@ -941,7 +942,8 @@ static void cache_read_callback_fn(void *user_ptr,
 		q_item->cache_req.buffer_type,
 		q_item->parent->tag,
 		&q_item->bmi_callback,
-		global_bmi_context);
+		global_bmi_context,
+		q_item->parent->hints);
 		
 	/* TODO: error handling */
 	assert(ret >= 0);

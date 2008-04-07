@@ -28,7 +28,8 @@ struct TROVE_bstream_ops
 			   TROVE_vtag_s *out_vtag, 
 			   void *user_ptr,
 			   TROVE_context_id context_id,
-			   TROVE_op_id *out_op_id_p);
+			   TROVE_op_id *out_op_id_p,
+               PVFS_hint hints);
     
     int (*bstream_write_at)(
 			    TROVE_coll_id coll_id,
@@ -40,7 +41,8 @@ struct TROVE_bstream_ops
 			    TROVE_vtag_s *inout_vtag,
 			    void *user_ptr,
 			    TROVE_context_id context_id,
-			    TROVE_op_id *out_op_id_p);
+			    TROVE_op_id *out_op_id_p,
+                PVFS_hint hints);
     
     int (*bstream_resize)(
 			  TROVE_coll_id coll_id,
@@ -50,7 +52,8 @@ struct TROVE_bstream_ops
 			  TROVE_vtag_s *vtag,
 			  void *user_ptr,
 			  TROVE_context_id context_id,
-			  TROVE_op_id *out_op_id_p);
+			  TROVE_op_id *out_op_id_p,
+              PVFS_hint hints);
     
     int (*bstream_validate)(
 			    TROVE_coll_id coll_id,
@@ -59,7 +62,8 @@ struct TROVE_bstream_ops
 			    TROVE_vtag_s *vtag,
 			    void *user_ptr,
 			    TROVE_context_id context_id,
-			    TROVE_op_id *out_op_id_p);
+			    TROVE_op_id *out_op_id_p,
+                PVFS_hint hints);
     
     int (*bstream_read_list)(
 			     TROVE_coll_id coll_id,
@@ -75,7 +79,8 @@ struct TROVE_bstream_ops
 			     TROVE_vtag_s *out_vtag,
 			     void *user_ptr,
 			     TROVE_context_id context_id,
-			     TROVE_op_id *out_op_id_p);
+			     TROVE_op_id *out_op_id_p,
+                 PVFS_hint hints);
     
     int (*bstream_write_list)(
 			      TROVE_coll_id coll_id,
@@ -91,7 +96,8 @@ struct TROVE_bstream_ops
 			      TROVE_vtag_s *inout_vtag,
 			      void *user_ptr,
 			      TROVE_context_id context_id,
-			      TROVE_op_id *out_op_id_p);
+			      TROVE_op_id *out_op_id_p,
+                  PVFS_hint hints);
 
      int (*bstream_flush)(
 			TROVE_coll_id coll_id,
@@ -99,7 +105,8 @@ struct TROVE_bstream_ops
 			TROVE_ds_flags flags,
 			void *user_ptr,
 			TROVE_context_id context_id,
-			TROVE_op_id *out_op_id_p);
+			TROVE_op_id *out_op_id_p,
+            PVFS_hint hints);
 };
 
 struct TROVE_keyval_ops
@@ -113,7 +120,8 @@ struct TROVE_keyval_ops
 		       TROVE_vtag_s *out_vtag, 
 		       void *user_ptr,
 		       TROVE_context_id context_id,
-		       TROVE_op_id *out_op_id_p);
+		       TROVE_op_id *out_op_id_p,
+               PVFS_hint hints);
     
     int (*keyval_write)(
 			TROVE_coll_id coll_id,
@@ -124,7 +132,8 @@ struct TROVE_keyval_ops
 			TROVE_vtag_s *inout_vtag,
 			void *user_ptr,
 			TROVE_context_id context_id,
-			TROVE_op_id *out_op_id_p);
+			TROVE_op_id *out_op_id_p,
+            PVFS_hint hints);
     
     int (*keyval_remove)(
 			 TROVE_coll_id coll_id,
@@ -135,7 +144,8 @@ struct TROVE_keyval_ops
 			 TROVE_vtag_s *inout_vtag,
 			 void *user_ptr,
 			 TROVE_context_id context_id,
-			 TROVE_op_id *out_op_id_p);
+			 TROVE_op_id *out_op_id_p,
+             PVFS_hint hints);
     
     int (*keyval_validate)(
 			   TROVE_coll_id coll_id,
@@ -144,7 +154,8 @@ struct TROVE_keyval_ops
 			   TROVE_vtag_s *inout_vtag,
 			   void* user_ptr,
 			   TROVE_context_id context_id,
-			   TROVE_op_id *out_op_id_p);
+			   TROVE_op_id *out_op_id_p,
+               PVFS_hint hints);
     
     int (*keyval_iterate)(
 			  TROVE_coll_id coll_id,
@@ -157,7 +168,8 @@ struct TROVE_keyval_ops
 			  TROVE_vtag_s *inout_vtag,
 			  void *user_ptr,
 			  TROVE_context_id context_id,
-			  TROVE_op_id *out_op_id_p);
+			  TROVE_op_id *out_op_id_p,
+              PVFS_hint hints);
     
     int (*keyval_iterate_keys)(
 			       TROVE_coll_id coll_id,
@@ -169,7 +181,8 @@ struct TROVE_keyval_ops
 			       TROVE_vtag_s *vtag,
 			       void *user_ptr,
 			       TROVE_context_id context_id,
-			       TROVE_op_id *out_op_id_p);
+			       TROVE_op_id *out_op_id_p,
+                   PVFS_hint hints);
     
     int (*keyval_read_list)(
 			    TROVE_coll_id coll_id,
@@ -182,7 +195,8 @@ struct TROVE_keyval_ops
 			    TROVE_vtag_s *out_vtag,
 			    void *user_ptr,
 			    TROVE_context_id context_id,
-			    TROVE_op_id *out_op_id_p);
+			    TROVE_op_id *out_op_id_p,
+                PVFS_hint hints);
     
     int (*keyval_write_list)(
 			     TROVE_coll_id coll_id,
@@ -194,14 +208,16 @@ struct TROVE_keyval_ops
 			     TROVE_vtag_s *inout_vtag,
 			     void *user_ptr,
 			     TROVE_context_id context_id,
-			     TROVE_op_id *out_op_id_p);
+			     TROVE_op_id *out_op_id_p,
+                 PVFS_hint hints);
     int (*keyval_flush)(
 			TROVE_coll_id coll_id,
 			TROVE_handle handle,
 			TROVE_ds_flags flags,
 			void *user_ptr,
 			TROVE_context_id context_id,
-			TROVE_op_id *out_op_id_p);
+			TROVE_op_id *out_op_id_p,
+            PVFS_hint hints);
     int (*keyval_get_handle_info)(
         TROVE_coll_id coll_id,
         TROVE_handle handle,
@@ -209,7 +225,8 @@ struct TROVE_keyval_ops
         TROVE_keyval_handle_info *info,
         void *user_ptr,
         TROVE_context_id context_id,
-        TROVE_op_id *out_op_id_p);
+        TROVE_op_id *out_op_id_p,
+        PVFS_hint hints);
 };
 
 struct TROVE_dspace_ops
@@ -223,7 +240,8 @@ struct TROVE_dspace_ops
 			 TROVE_ds_flags flags,
 			 void *user_ptr,
 			 TROVE_context_id context_id,
-			 TROVE_op_id *out_op_id_p);
+			 TROVE_op_id *out_op_id_p,
+             PVFS_hint hints);
     
     int (*dspace_remove)(
 			 TROVE_coll_id coll_id,
@@ -231,7 +249,8 @@ struct TROVE_dspace_ops
 			 TROVE_ds_flags flags,
 			 void *user_ptr,
 			 TROVE_context_id context_id,
-			 TROVE_op_id *out_op_id_p);
+			 TROVE_op_id *out_op_id_p,
+             PVFS_hint hints);
 
     int (*dspace_iterate_handles)(
 			 	  TROVE_coll_id coll_id,
@@ -251,7 +270,8 @@ struct TROVE_dspace_ops
 			 TROVE_ds_flags flags,
 			 void *user_ptr,
 			 TROVE_context_id context_id,
-			 TROVE_op_id *out_op_id_p);
+			 TROVE_op_id *out_op_id_p,
+             PVFS_hint hints);
     
     int (*dspace_getattr)(
 			  TROVE_coll_id coll_id,
@@ -260,7 +280,8 @@ struct TROVE_dspace_ops
 			  TROVE_ds_flags flags,
 			  void *user_ptr,
 			  TROVE_context_id context_id,
-			  TROVE_op_id *out_op_id_p);
+			  TROVE_op_id *out_op_id_p,
+              PVFS_hint hints);
 
     int (*dspace_getattr_list)(
 			  TROVE_coll_id coll_id,
@@ -271,7 +292,8 @@ struct TROVE_dspace_ops
 			  TROVE_ds_flags flags,
 			  void *user_ptr,
 			  TROVE_context_id context_id,
-			  TROVE_op_id *out_op_id_p);
+			  TROVE_op_id *out_op_id_p,
+              PVFS_hint hints);
     
     int (*dspace_setattr)(
 			  TROVE_coll_id coll_id,
@@ -280,7 +302,8 @@ struct TROVE_dspace_ops
 			  TROVE_ds_flags flags,
 			  void *user_ptr,
 			  TROVE_context_id context_id,
-			  TROVE_op_id *out_op_id_p);
+			  TROVE_op_id *out_op_id_p,
+              PVFS_hint hints);
     
     int (*dspace_cancel)(
 		       TROVE_coll_id coll_id,

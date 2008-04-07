@@ -162,6 +162,7 @@ PVFS_error PVFS_isys_getattr(
     const PVFS_credentials *credentials,
     PVFS_sysresp_getattr *resp_p,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -199,6 +200,7 @@ PVFS_error PVFS_isys_getattr(
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
     sm_p->u.getattr.getattr_resp_p = resp_p;
+    PVFS_hint_copy(hints, &sm_p->hints);
     
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
@@ -218,7 +220,8 @@ PVFS_error PVFS_sys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask, 
     const PVFS_credentials *credentials,
-    PVFS_sysresp_getattr *resp_p)
+    PVFS_sysresp_getattr *resp_p,
+    PVFS_hint hints)
 {
     PVFS_error ret, error;
     PVFS_sys_op_id op_id;
@@ -226,7 +229,7 @@ PVFS_error PVFS_sys_getattr(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
 
     ret = PVFS_isys_getattr(ref, attrmask, credentials,
-                            resp_p, &op_id, NULL);
+                            resp_p, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_getattr call", ret);
@@ -455,7 +458,8 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
         *sm_p->cred_p,
         object_ref.fs_id,
         object_ref.handle,
-        sm_p->getattr.req_attrmask);
+        sm_p->getattr.req_attrmask,
+        sm_p->hints);
     
     sm_p->msgpair.fs_id = object_ref.fs_id;
     sm_p->msgpair.handle = object_ref.handle;
@@ -673,7 +677,8 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
             *sm_p->cred_p,
             sm_p->getattr.object_ref.fs_id,
             attr->u.meta.dfile_array[i],
-            PVFS_ATTR_DATA_SIZE);
+            PVFS_ATTR_DATA_SIZE,
+            sm_p->hints);
 
         msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
         msg_p->handle = attr->u.meta.dfile_array[i];

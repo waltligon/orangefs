@@ -141,7 +141,7 @@ int main(int argc, char **argv)
             cur_fs, pvfs_path, 
             &creds, 
             &lookup_resp,
-            PVFS2_LOOKUP_LINK_NO_FOLLOW);
+            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
             
     if (ret != 0)
     {

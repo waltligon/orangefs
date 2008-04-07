@@ -16,11 +16,15 @@
 #include "trove.h"
 #include "pvfs2-internal.h"
 
+#include "pint-event.h"
+#include <stdio.h>
+
 #define THREAD_MGR_TEST_COUNT 5
 #define THREAD_MGR_TEST_TIMEOUT 10
 static int thread_mgr_test_timeout = THREAD_MGR_TEST_TIMEOUT;
 
 /* TODO: organize this stuff better */
+static void *__bmi_thread_function(void *ptr);
 static void *bmi_thread_function(void *ptr);
 static void *trove_thread_function(void *ptr);
 static void *dev_thread_function(void *ptr);
@@ -147,6 +151,15 @@ static void *trove_thread_function(void *ptr)
 }
 
 
+static void *__bmi_thread_function(void *ptr) {
+    void* ret = NULL;
+    PINT_event_thread_start("BMI");
+    ret = bmi_thread_function(ptr);
+    PINT_event_thread_stop();
+    return ret;
+}
+
+
 /* bmi_thread_function()
  *
  * function executed by the thread in charge of BMI
@@ -180,6 +193,7 @@ static void *bmi_thread_function(void *ptr)
 #ifdef __PVFS2_JOB_THREADED__
                 continue;
 #endif
+
                 return NULL;
 	    }
 
@@ -255,6 +269,7 @@ static void *bmi_thread_function(void *ptr)
             gossip_err("bmi_thread_function thread terminating\n");
             break;
 #endif
+
             return NULL;
 	}
 
@@ -473,7 +488,7 @@ int PINT_thread_mgr_bmi_start(void)
 
     bmi_thread_running = 1;
 #ifdef __PVFS2_JOB_THREADED__
-    ret = pthread_create(&bmi_thread_id, NULL, bmi_thread_function, NULL);
+    ret = pthread_create(&bmi_thread_id, NULL, __bmi_thread_function, NULL);
     if(ret != 0)
     {
 	BMI_close_context(global_bmi_context);
@@ -832,7 +847,7 @@ void PINT_thread_mgr_trove_push(int max_idle_time)
 void PINT_thread_mgr_bmi_push(int max_idle_time)
 {
     thread_mgr_test_timeout = max_idle_time;
-    bmi_thread_function(NULL);
+    __bmi_thread_function(NULL);
 }
 
 /*

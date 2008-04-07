@@ -19,6 +19,7 @@
 #include "bmi.h"
 #include "pint-sysint-utils.h"
 #include "pint-cached-config.h"
+#include "pint-util.h"
 #include "server-config.h"
 #include "client-state-machine.h"
 
@@ -54,7 +55,8 @@ PVFS_error PVFS_mgmt_statfs_all(
     PVFS_credentials *credentials,
     struct PVFS_mgmt_server_stat *stat_array,
     int *inout_count_p,
-    PVFS_error_details *details)
+    PVFS_error_details *details,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t *addr_array = NULL;
@@ -96,7 +98,7 @@ PVFS_error PVFS_mgmt_statfs_all(
     
     ret = PVFS_mgmt_statfs_list(
         fs_id, credentials, stat_array, addr_array,
-        real_count, details);
+        real_count, details, hints);
 
     free(addr_array);
 
@@ -112,9 +114,9 @@ PVFS_error PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     enum PVFS_server_param param,
-    uint64_t value,
-    uint64_t *old_value_array,
-    PVFS_error_details *details)
+    struct PVFS_mgmt_setparam_value *value,
+    PVFS_error_details *details,
+    PVFS_hint hints)
 {
     int count = 0;
     PVFS_error ret = -PVFS_EINVAL;
@@ -147,7 +149,7 @@ PVFS_error PVFS_mgmt_setparam_all(
 
     ret = PVFS_mgmt_setparam_list(
         fs_id, credentials, param, value, addr_array,
-        old_value_array, count, details);
+        count, details, hints);
 
     free(addr_array);
 
@@ -160,10 +162,10 @@ PVFS_error PVFS_mgmt_setparam_single(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     enum PVFS_server_param param,
-    uint64_t value,
+    struct PVFS_mgmt_setparam_value *value,
     char *server_addr_str,
-    uint64_t *old_value,
-    PVFS_error_details *details)
+    PVFS_error_details *details,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t addr;
@@ -172,7 +174,7 @@ PVFS_error PVFS_mgmt_setparam_single(
     {
         ret = PVFS_mgmt_setparam_list(
             fs_id, credentials, param, value,
-            &addr, old_value, 1, details);
+            &addr, 1, details, hints);
     }
     return ret;
 }

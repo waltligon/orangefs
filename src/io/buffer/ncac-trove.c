@@ -117,7 +117,7 @@ int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle,
                                   NULL, /* vtag */
                                   user_ptr_array,
                                   context,
-                                  &op_id);
+                                  &op_id, NULL);
 
     if (ret < 0) {
         NCAC_error("trove listio read failed\n");
@@ -212,7 +212,7 @@ int NCAC_aio_write( PVFS_fs_id coll_id,
                                   NULL, /* vtag */
                                   user_ptr_array,
                                   context,
-                                  &op_id);
+                                  &op_id, NULL);
 
     if (ret < 0) {
         NCAC_error("trove listio read failed\n");
@@ -247,7 +247,7 @@ int do_read_for_rmw(PVFS_fs_id coll_id, PVFS_handle handle,
     ret = trove_bstream_read_at(coll_id, handle,
                                 buf, &inout_size,
                                 0, 0, NULL, NULL,
-                                context, &op_id);
+                                context, &op_id, NULL);
 
     DPRINT("do_read_for_rmw; req=%lld\n", op_id);
 
@@ -392,7 +392,7 @@ int init_io_read( PVFS_fs_id coll_id, PVFS_handle handle,
                                   NULL, /* vtag */
                                   user_ptr_array,
                                   context,
-                                  ioreq);
+                                  ioreq, NULL);
 
     if (ret < 0) {
         NCAC_error("trove read at failed\n");

@@ -126,7 +126,7 @@ static inline void format_size_string(
 	    spaces_size_allowed = num_spaces_total;
         }
     }
-	
+
     buf = (char *)malloc(spaces_size_allowed+1);
     assert(buf);
 
@@ -342,6 +342,8 @@ void print_entry(
     PVFS_object_ref ref;
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
+    PVFS_hint hints = PVFS_HINT_NULL;
+    int client_id, req_id;
 
     if (!opts->list_long)
     {
@@ -362,8 +364,15 @@ void print_entry(
     memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
     PVFS_util_gen_credentials(&credentials);
 
+    client_id = random();
+    printf("CLIENT_ID: %d\n", client_id);
+    PVFS_hint_add(&hints, PVFS_HINT_CLIENT_ID_NAME, sizeof(uint32_t), &client_id);
+    req_id = random();
+    printf("REQ_ID: %d\n", req_id);
+    PVFS_hint_add(&hints, PVFS_HINT_REQUEST_ID_NAME, sizeof(uint32_t), &req_id);
+
     ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                           &credentials, &getattr_response);
+                           &credentials, &getattr_response, hints);
     if (ret)
     {
         fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
@@ -399,6 +408,8 @@ int do_list(
     PVFS_ds_position token;
     uint64_t dir_version = 0;
     double begin = 0., end;
+    PVFS_hint hints = PVFS_HINT_NULL;
+    uint32_t client_id, req_id;
 
     name = start;
 
@@ -406,7 +417,7 @@ int do_list(
     PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if(ret < 0)
     {
         PVFS_perror("PVFS_sys_lookup", ret);
@@ -417,9 +428,16 @@ int do_list(
     ref.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
 
+    client_id = random();
+    printf("CLIENT_ID: %d\n", client_id);
+    PVFS_hint_add(&hints, PVFS_HINT_CLIENT_ID_NAME, sizeof(uint32_t), &client_id);
+    req_id = random();
+    printf("REQ_ID: %d\n", req_id);
+    PVFS_hint_add(&hints, PVFS_HINT_REQUEST_ID_NAME, sizeof(uint32_t), &req_id);
+
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                           &credentials, &getattr_response);
+                           &credentials, &getattr_response, hints);
     if(ret == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
@@ -438,7 +456,7 @@ int do_list(
             if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
                 if (PVFS_sys_getparent(ref.fs_id, name, &credentials,
-                                       &getparent_resp) == 0)
+                                       &getparent_resp, NULL) == 0)
                 {
                     print_dot_and_dot_dot_info_if_required(
                         getparent_resp.parent_ref);
@@ -468,10 +486,19 @@ int do_list(
     token = 0;
     do
     {
+        PVFS_hint_free(hints);
+        hints = PVFS_HINT_NULL;
+        client_id = random();
+        printf("CLIENT_ID: %d\n", client_id);
+        PVFS_hint_add(&hints, PVFS_HINT_CLIENT_ID_NAME, sizeof(uint32_t), &client_id);
+        req_id = random();
+        printf("REQ_ID: %d\n", req_id);
+        PVFS_hint_add(&hints, PVFS_HINT_REQUEST_ID_NAME, sizeof(uint32_t), &req_id);
+
         memset(&rd_response, 0, sizeof(PVFS_sysresp_readdir));
         ret = PVFS_sys_readdir(
                 ref, (!token ? PVFS_READDIR_START : token),
-                pvfs_dirent_incount, &credentials, &rd_response);
+                pvfs_dirent_incount, &credentials, &rd_response, hints);
         if(ret < 0)
         {
             PVFS_perror("PVFS_sys_readdir", ret);

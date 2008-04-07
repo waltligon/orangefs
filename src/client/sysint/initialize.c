@@ -28,6 +28,7 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
 #include "pint-util.h"
+#include "pint-event.h"
 
 PINT_smcb *g_smcb = NULL; 
 
@@ -82,6 +83,13 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     if (debug_file)
     {
         gossip_enable_file(debug_file, "w");
+    }
+
+    ret = PINT_event_init(PINT_EVENT_TRACE_TAU);
+    if (ret < 0)
+    {
+        gossip_err("Error initializing event interface.\n");
+        return (ret);
     }
 
     ret = id_gen_safe_initialize();

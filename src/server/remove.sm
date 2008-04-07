@@ -241,10 +241,10 @@ static PINT_sm_action remove_read_dirdata_handle(
 
     ret = job_trove_keyval_read(
         s_op->u.remove.fs_id, s_op->u.remove.handle,
-        &s_op->key, &s_op->val, 
-        0, 
+        &s_op->key, &s_op->val,
+        0,
         NULL, smcb, 0, js_p,
-        &j_id, server_job_context);
+        &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -275,7 +275,7 @@ static PINT_sm_action remove_get_dirent_count(
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -332,7 +332,7 @@ static PINT_sm_action remove_remove_dirdata_dspace(
         0,
         js_p,
         &j_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -355,9 +355,9 @@ static PINT_sm_action remove_remove_dspace(
 
     ret = job_trove_dspace_remove(
         s_op->u.remove.fs_id, s_op->u.remove.handle,
-        TROVE_SYNC, 
+        TROVE_SYNC,
         smcb, 0, js_p,
-        &j_id, server_job_context);
+        &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }

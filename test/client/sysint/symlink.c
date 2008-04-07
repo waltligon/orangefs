@@ -81,7 +81,7 @@ int main(int argc, char **argv)
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_symlink(entry_name, parent_refn, target,
-                           attr, &credentials, &resp_sym);
+                           attr, &credentials, &resp_sym, NULL);
     if (ret < 0)
     {
         printf("symlink failed with errcode = %d\n", ret);

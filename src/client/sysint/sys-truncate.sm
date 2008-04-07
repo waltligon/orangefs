@@ -74,6 +74,7 @@ PVFS_error PVFS_isys_truncate(
     PVFS_size size,
     const PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -111,6 +112,7 @@ PVFS_error PVFS_isys_truncate(
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.truncate.size = size;
     sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
@@ -126,7 +128,8 @@ PVFS_error PVFS_isys_truncate(
 PVFS_error PVFS_sys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
-    const PVFS_credentials *credentials)
+    const PVFS_credentials *credentials,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -134,7 +137,7 @@ PVFS_error PVFS_sys_truncate(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_sys_truncate entered with %lld\n", lld(size));
 
-    ret = PVFS_isys_truncate(ref, size, credentials, &op_id, NULL);
+    ret = PVFS_isys_truncate(ref, size, credentials, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_truncate call", ret);
@@ -221,7 +224,8 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             new_dfile_size,
-            attr->u.meta.dfile_array[i]);
+            attr->u.meta.dfile_array[i],
+            sm_p->hints);
         /*
           no callback. the status will be in the generic response
           structure

@@ -97,7 +97,7 @@ int main(int argc, char **argv)
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
-                             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
         if (rc)
         {
             PVFS_perror("PVFS_sys_lookup", rc);
@@ -122,8 +122,7 @@ int main(int argc, char **argv)
                              attr,
                              &credentials,
                              NULL,
-                             NULL,
-                             &resp_create);
+                             &resp_create, NULL, NULL);
         if (rc)
         {
             fprintf(stderr, "Error: An error occurred while creating %s\n",

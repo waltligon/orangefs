@@ -41,6 +41,18 @@
 #include "pint-util.h"
 #include "dbpf-sync.h"
 
+PINT_event_group trove_dbpf_event_group;
+
+PINT_event_type trove_dbpf_read_event_id;
+PINT_event_type trove_dbpf_write_event_id;
+PINT_event_type trove_dbpf_keyval_write_event_id;
+PINT_event_type trove_dbpf_keyval_read_event_id;
+PINT_event_type trove_dbpf_dspace_create_event_id;
+PINT_event_type trove_dbpf_dspace_getattr_event_id;
+PINT_event_type trove_dbpf_dspace_setattr_event_id;
+
+int dbpf_pid;
+
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
 extern int TROVE_db_cache_size_bytes;
@@ -525,6 +537,88 @@ static int dbpf_initialize(char *stoname,
 {
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
+
+    /* initialize events */
+    PINT_event_define_group("trove_dbpf", &trove_dbpf_event_group);
+
+    /* Define the read event:
+     * START:
+     * (client_id, request_id, metafile_handle,
+     *  datafile_handle, op_id, requested_read_size)
+     * STOP: (size_read)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_read",
+                            "%d%ld%llu%llu%d%d",
+                            "%llu",
+                            &trove_dbpf_read_event_id);
+
+    /* Define the write event:
+     * START:
+     * (client_id, request_id, metafile-handle, datafile-handle, op_id, write size)
+     * STOP: (size_written)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_write",
+                            "%d%ld%llu%llu%d%d",
+                            "%llu",
+                            &trove_dbpf_write_event_id);
+
+    /* Define the keyval read event:
+     * START: (client_id, request_id, metafile-handle, op_id)
+     * STOP: (none)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_keyval_read",
+                            "%d%ld%llu%d",
+                            "",
+                            &trove_dbpf_keyval_read_event_id);
+
+    /* Define the keyval write event:
+     * START:
+     * (client_id, request_id, metafile-handle, keyval-handle, op_id)
+     * STOP: (none)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_keyval_write",
+                            "%d%ld%llu%llu%d",
+                            "",
+                            &trove_dbpf_keyval_write_event_id);
+
+    /* Define the dspace create event:
+     * START:
+     * (client_id, request_id, op_id)
+     * STOP: (new-handle)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_dspace_create",
+                            "%d%ld%llu%d",
+                            "",
+                            &trove_dbpf_dspace_create_event_id);
+
+    /* Define the dspace getattr event:
+     * START:
+     * (client_id, request_id, metafile-handle, op_id)
+     * STOP: (none)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_dspace_getattr",
+                            "%d%ld%llu%d",
+                            "",
+                            &trove_dbpf_dspace_getattr_event_id);
+
+    /* Define the dspace setattr event:
+     * START:
+     * (client_id, request_id, metafile-handle, op_id)
+     * STOP: (none)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_dspace_setattr",
+                            "%d%ld%llu%d",
+                            "",
+                            &trove_dbpf_dspace_setattr_event_id);
+
+    dbpf_pid = getpid();
 
     if (!stoname)
     {

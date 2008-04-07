@@ -71,6 +71,8 @@
 #define endecode_fields_4a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,tn1,n1,ta1,a1)
 #define endecode_fields_5a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,tn1,n1,ta1,a1)
 
+#define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2)
+
 #endif  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
 
 #endif  /* __PVFS2_ENCODE_STUBS_H */

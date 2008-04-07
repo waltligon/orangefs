@@ -168,7 +168,8 @@ static PINT_sm_action small_io_setup_msgpairs(
             sm_p->u.io.file_req,
             sm_p->u.io.file_req_offset,
             regions,
-            PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
+            PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
+            sm_p->hints);
 
         sm_p->msgarray[i].fs_id = sm_p->object_ref.fs_id;
         sm_p->msgarray[i].handle = sm_p->object_ref.handle;

@@ -65,7 +65,7 @@ typedef struct PINT_Request {
 
 #define PVFS_REQUEST_ENCODED_SIZE \
     ((sizeof(PVFS_offset) * 3) + (sizeof(PVFS_size) * 2) + \
-     (sizeof(int32_t) * 7) + (sizeof(uint32_t) * 2) + 4)
+     (sizeof(int32_t) * 6) + (sizeof(uint32_t) * 2) + (sizeof(uint64_t)) + 4)
 
 typedef struct PINT_reqstack {
 	int64_t      el;           /* number of element being processed */

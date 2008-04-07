@@ -107,23 +107,13 @@ int PINT_encode(void* input_buffer,
 	case ENCODING_LE_BFIELD:
 	    if (input_type == PINT_ENCODE_REQ)
 	    {
-		struct PVFS_server_req* tmp_req = input_buffer;
-		ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_REQ,
-		    tmp_req->op, tmp_req);
 		ret =  PINT_encoding_table[enc_type]->op->encode_req(
                     input_buffer, target_msg);
-		ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_REQ,
-		    tmp_req->op, tmp_req, target_msg->total_size);
 	    }
 	    else if (input_type == PINT_ENCODE_RESP)
 	    {
-		struct PVFS_server_resp* tmp_resp = input_buffer;
-		ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_RESP,
-		    tmp_resp->op, tmp_resp);
 		ret =  PINT_encoding_table[enc_type]->op->encode_resp(
                     input_buffer, target_msg);
-		ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_RESP,
-		    tmp_resp->op, tmp_resp, target_msg->total_size);
 	    }
 	    break;
 	default:
@@ -243,28 +233,20 @@ int PINT_decode(void* input_buffer,
 	    target_msg->enc_type = enc_type_recved;
 	    if(input_type == PINT_DECODE_REQ)
 	    {
-		ENCODE_EVENT_START(PVFS_EVENT_API_DECODE_REQ,
-		    0, input_buffer);
 		ret = PINT_encoding_table[i]->op->decode_req(buffer_index,
 		    size_index,
 		    target_msg,
 		    target_addr);
 		tmp_req = target_msg->buffer;
-		ENCODE_EVENT_STOP(PVFS_EVENT_API_DECODE_REQ,
-		    tmp_req->op, input_buffer, size);
 		return(ret);
 	    }
 	    else if(input_type == PINT_DECODE_RESP)
 	    {
-		ENCODE_EVENT_START(PVFS_EVENT_API_DECODE_RESP,
-		    0, input_buffer);
 		ret = PINT_encoding_table[i]->op->decode_resp(buffer_index,
 		    size_index,
 		    target_msg,
 		    target_addr);
 		tmp_resp = target_msg->buffer;
-		ENCODE_EVENT_STOP(PVFS_EVENT_API_DECODE_RESP,
-		    tmp_resp->op, input_buffer, size);
 		return(ret);
 	    }
 	    else

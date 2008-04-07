@@ -94,7 +94,7 @@ int main(int argc,char **argv)
     new_parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_rename(old_entry, old_parent_refn, new_entry, 
-			new_parent_refn, &credentials);
+			new_parent_refn, &credentials, NULL);
     if (ret < 0)
     {
         printf("rename failed with errcode = %d\n",ret);

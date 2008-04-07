@@ -94,7 +94,7 @@ int main(int argc, char **argv)
     memset(&server_config,0,sizeof(struct server_configuration_s));
     for(i=0; i<tab->mntent_count; i++)
     {
-	if (PINT_server_get_config(&server_config, &(tab->mntent_array[i])))
+	if (PINT_server_get_config(&server_config, &(tab->mntent_array[i]), NULL))
 	{
 	    fprintf(stderr, "PINT_server_get_config failure.\n");
 	    return(-1);

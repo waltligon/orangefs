@@ -370,6 +370,7 @@ exit:
 int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
                             enum dbpf_op_state state)
 {
+    PINT_EVENT_END(qop_p->event_type, dbpf_pid, NULL, qop_p->event_id);
     DBPF_COMPLETION_START(qop_p, state);
     DBPF_COMPLETION_SIGNAL();
     DBPF_COMPLETION_FINISH(qop_p->op.context_id);

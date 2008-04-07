@@ -28,6 +28,7 @@
 #include "pint-sysint-utils.h"
 #include "pint-perf-counter.h"
 #include "state-machine.h"
+#include "pvfs2-hint.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
@@ -303,10 +304,9 @@ struct PINT_client_mgmt_setparam_list_sm
 {
     PVFS_fs_id fs_id;
     enum PVFS_server_param param;
-    int64_t value;
+    struct PVFS_mgmt_setparam_value *value;
     PVFS_id_gen_t *addr_array;
     int count;
-    uint64_t *old_value_array;
     int *root_check_status_array;
     PVFS_error_details *details;
 };
@@ -517,6 +517,8 @@ typedef struct PINT_client_sm
 
     /* fetch_config state used by the nested fetch config state machines */
     struct PINT_server_fetch_config_sm_state fetch_config;
+
+    PVFS_hint hints;
 
     /* msgpair array ptr used when operations can be performed
      * concurrently.  this must be allocated within the upper-level

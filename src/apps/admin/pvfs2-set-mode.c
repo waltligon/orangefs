@@ -41,6 +41,7 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_credentials creds;
+    struct PVFS_mgmt_setparam_value param_value;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -70,10 +71,13 @@ int main(int argc, char **argv)
 
     PVFS_util_gen_credentials(&creds);
 
+    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+    param_value.u.value = user_opts->mode;
+
     ret = PVFS_mgmt_setparam_all(cur_fs,
 				 &creds,
 				 PVFS_SERV_PARAM_MODE,
-				 user_opts->mode,
+                                 &param_value,
 				 NULL,
 				 NULL /* detailed errors */);
 

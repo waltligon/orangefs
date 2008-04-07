@@ -430,10 +430,11 @@ static PINT_sm_action getattr_read_symlink_target(
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
-        &(s_op->key), &(s_op->val), 
-        0, 
+        &s_op->key, &s_op->val,
+        0,
         NULL, smcb, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
+
 
     return ret;
 }
@@ -520,7 +521,7 @@ static PINT_sm_action getattr_read_metafile_hint(
         &s_op->key, &s_op->val, 
         0, 
         NULL, smcb, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -617,10 +618,10 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
-        &s_op->key, &s_op->val, 
-        0, 
+        &s_op->key, &s_op->val,
+        0,
         NULL, smcb, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -682,10 +683,10 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
-        &(s_op->key), &(s_op->val), 
-        0, 
+        &(s_op->key), &(s_op->val),
+        0,
         NULL,
-        smcb, 0, js_p, &i, server_job_context);
+        smcb, 0, js_p, &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -746,7 +747,7 @@ static PINT_sm_action getattr_setup_resp(
                 js_p->error_code = -PVFS_EIO;
                 return SM_ACTION_COMPLETE;
             }
-            
+
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                          "  also returning dist size of %d\n",
                          resp_attr->u.meta.dist_size);
@@ -953,7 +954,7 @@ static PINT_sm_action getattr_get_dirdata_handle(
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -983,7 +984,7 @@ static PINT_sm_action getattr_get_dirent_count(
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -1110,7 +1111,7 @@ static PINT_sm_action getattr_get_dir_hint(
         s_op->u.getattr.handle,
         s_op->key_a, s_op->val_a, s_op->u.getattr.err_array, NUM_SPECIAL_KEYS,
         0, NULL, smcb, 0, js_p, &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }

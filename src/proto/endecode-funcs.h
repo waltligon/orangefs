@@ -13,6 +13,8 @@
 #define __SRC_PROTO_ENDECODE_FUNCS_H
 
 #include "src/io/bmi/bmi-byteswap.h"
+#include <stdint.h>
+#include <assert.h>
 
 /*
  * NOTE - Every macro defined here needs to have a stub defined in
@@ -461,6 +463,124 @@ static inline void decode_##name(char **pptr, name *x) { \
     decode_##t12(pptr, &x->x12); \
 }
 
+#define endecode_fields_15_struct(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7, \
+    t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13,t14,x14,t15,x15) \
+static inline void encode_##name(char **pptr, const struct name *x) { \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##t6(pptr, &x->x6); \
+    encode_##t7(pptr, &x->x7); \
+    encode_##t8(pptr, &x->x8); \
+    encode_##t9(pptr, &x->x9); \
+    encode_##t10(pptr, &x->x10); \
+    encode_##t11(pptr, &x->x11); \
+    encode_##t12(pptr, &x->x12); \
+    encode_##t13(pptr, &x->x13); \
+    encode_##t14(pptr, &x->x14); \
+    encode_##t15(pptr, &x->x15); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##t6(pptr, &x->x6); \
+    decode_##t7(pptr, &x->x7); \
+    decode_##t8(pptr, &x->x8); \
+    decode_##t9(pptr, &x->x9); \
+    decode_##t10(pptr, &x->x10); \
+    decode_##t11(pptr, &x->x11); \
+    decode_##t12(pptr, &x->x12); \
+    decode_##t13(pptr, &x->x13); \
+    decode_##t14(pptr, &x->x14); \
+    decode_##t15(pptr, &x->x15); \
+}
+
+#define endecode_fields_16_struct(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7, \
+    t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13,t14,x14,t15,x15,t16,x16) \
+static inline void encode_##name(char **pptr, const struct name *x) { \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##t6(pptr, &x->x6); \
+    encode_##t7(pptr, &x->x7); \
+    encode_##t8(pptr, &x->x8); \
+    encode_##t9(pptr, &x->x9); \
+    encode_##t10(pptr, &x->x10); \
+    encode_##t11(pptr, &x->x11); \
+    encode_##t12(pptr, &x->x12); \
+    encode_##t13(pptr, &x->x13); \
+    encode_##t14(pptr, &x->x14); \
+    encode_##t15(pptr, &x->x15); \
+    encode_##t16(pptr, &x->x16); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##t6(pptr, &x->x6); \
+    decode_##t7(pptr, &x->x7); \
+    decode_##t8(pptr, &x->x8); \
+    decode_##t9(pptr, &x->x9); \
+    decode_##t10(pptr, &x->x10); \
+    decode_##t11(pptr, &x->x11); \
+    decode_##t12(pptr, &x->x12); \
+    decode_##t13(pptr, &x->x13); \
+    decode_##t14(pptr, &x->x14); \
+    decode_##t15(pptr, &x->x15); \
+    decode_##t16(pptr, &x->x16); \
+}
+
+
+#define endecode_fields_17_struct(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7, \
+    t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13,t14,x14,t15,x15,t16,x16,t17,x17) \
+static inline void encode_##name(char **pptr, const struct name *x) { \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##t6(pptr, &x->x6); \
+    encode_##t7(pptr, &x->x7); \
+    encode_##t8(pptr, &x->x8); \
+    encode_##t9(pptr, &x->x9); \
+    encode_##t10(pptr, &x->x10); \
+    encode_##t11(pptr, &x->x11); \
+    encode_##t12(pptr, &x->x12); \
+    encode_##t13(pptr, &x->x13); \
+    encode_##t14(pptr, &x->x14); \
+    encode_##t15(pptr, &x->x15); \
+    encode_##t16(pptr, &x->x16); \
+    encode_##t17(pptr, &x->x17); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##t6(pptr, &x->x6); \
+    decode_##t7(pptr, &x->x7); \
+    decode_##t8(pptr, &x->x8); \
+    decode_##t9(pptr, &x->x9); \
+    decode_##t10(pptr, &x->x10); \
+    decode_##t11(pptr, &x->x11); \
+    decode_##t12(pptr, &x->x12); \
+    decode_##t13(pptr, &x->x13); \
+    decode_##t14(pptr, &x->x14); \
+    decode_##t15(pptr, &x->x15); \
+    decode_##t16(pptr, &x->x16); \
+    decode_##t17(pptr, &x->x17); \
+}
+
 /* ones with arrays that are allocated in the decode */
 
 /* one field then one array */
@@ -675,6 +795,40 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     for (i=0; i<x->n1; i++) \
 	decode_##ta1(pptr, &(x)->a1[i]); \
 }
+
+#define DEFINE_STATIC_ENDECODE_FUNCS(__name__, __type__) \
+__attribute__((unused)) \
+static void encode_func_##__name__(char **pptr, void *x) \
+{ \
+    encode_##__name__(pptr, (__type__ *)x); \
+}; \
+__attribute__((unused)) \
+static void decode_func_##__name__(char **pptr, void *x) \
+{ \
+    decode_##__name__(pptr, (__type__ *)x); \
+}
+
+#define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2)                         \
+static void encode_##name(char **pptr, const struct name *x)                  \
+{                                                                             \
+    encode_enum(pptr, &x->ename);                                             \
+    switch(x->ename)                                                          \
+    {                                                                         \
+        case en1: encode_##ut1(pptr, &x->uname.un1); break;                   \
+        case en2: encode_##ut2(pptr, &x->uname.un2); break;                   \
+        default: assert(0);                                                   \
+    }                                                                         \
+};                                                                            \
+static void decode_##name(char **pptr, struct name *x)                        \
+{                                                                             \
+    decode_enum(pptr, &x->ename);                                             \
+    switch(x->ename)                                                          \
+    {                                                                         \
+        case en1: decode_##ut1(pptr, &x->uname.un1); break;                   \
+        case en2: decode_##ut2(pptr, &x->uname.un2); break;                   \
+        default: assert(0);                                                   \
+    }                                                                         \
+};
 
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
 

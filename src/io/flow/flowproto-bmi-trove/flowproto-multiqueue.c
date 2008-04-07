@@ -752,7 +752,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
             NULL,
             &result_tmp->trove_callback,
             global_trove_context,
-            &result_tmp->posted_id);
+            &result_tmp->posted_id,
+            q_item->parent->hints);
 
         result_tmp = result_tmp->next;
 
@@ -860,7 +861,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
             BMI_PRE_ALLOC,
             q_item->parent->tag,
             &q_item->bmi_callback,
-            global_bmi_context);
+            global_bmi_context,
+            q_item->parent->hints);
         
         if(ret < 0)
         {
@@ -953,7 +955,8 @@ static void trove_read_callback_fn(void *user_ptr,
                 BMI_PRE_ALLOC,
                 q_item->parent->tag,
                 &q_item->bmi_callback,
-                global_bmi_context);
+                global_bmi_context,
+                q_item->parent->hints);
             flow_data->next_seq_to_send++;
             if(q_item->last)
                 flow_data->dest_last_posted = 1;
@@ -1248,7 +1251,8 @@ static int bmi_send_callback_fn(void *user_ptr,
             NULL,
             &result_tmp->trove_callback,
             global_trove_context,
-            &result_tmp->posted_id);
+            &result_tmp->posted_id,
+            flow_data->parent->hints);
 
         result_tmp = result_tmp->next;
 
@@ -1446,7 +1450,8 @@ static void trove_write_callback_fn(void *user_ptr,
             BMI_PRE_ALLOC,
             q_item->parent->tag,
             &q_item->bmi_callback,
-            global_bmi_context);
+            global_bmi_context,
+            q_item->parent->hints);
         
         if(ret < 0)
         {
@@ -1712,7 +1717,8 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         buffer_type,
         q_item->parent->tag,
         &q_item->bmi_callback,
-        global_bmi_context);
+        global_bmi_context,
+        q_item->parent->hints);
 
     if(ret < 0)
     {
@@ -1909,7 +1915,8 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         buffer_type,
         q_item->parent->tag,
         &q_item->bmi_callback,
-        global_bmi_context);
+        global_bmi_context,
+        q_item->parent->hints);
 
     if(ret < 0)
     {

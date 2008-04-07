@@ -37,12 +37,12 @@
 #include "quicklist.h"
 #include "pint-dist-utils.h"
 #include "pint-perf-counter.h"
-#include "pint-event.h"
 #include "id-generator.h"
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
 #include "pvfs2-internal.h"
 #include "src/server/request-scheduler/request-scheduler.h"
+#include "pint-event.h"
 #include "pint-util.h"
 
 #ifndef PVFS2_VERSION
@@ -92,6 +92,8 @@ static struct server_configuration_s server_config;
  */
 static int signal_recvd_flag = 0;
 static pid_t server_controlling_pid = 0;
+
+static PINT_event_id PINT_sm_event_id;
 
 /* A list of all serv_op's posted for unexpected message alone */
 QLIST_HEAD(posted_sop_list);
@@ -641,6 +643,22 @@ static int server_initialize_subsystems(
     int bmi_flags = BMI_INIT_SERVER;
     int shm_key_hint;
 
+    ret = PINT_event_init(PINT_EVENT_TRACE_TAU);
+    if (ret < 0)
+    {
+        gossip_err("Error initializing event interface.\n");
+        return (ret);
+    }
+
+    /* Define the state machine event:
+     *   START: (client_id, request_id, handle, op_id)
+     *   STOP: ()
+     */
+    PINT_event_define_event(
+        NULL, "sm", "%d%d%llu%d", "", &PINT_sm_event_id);
+
+    *server_status_flag |= SERVER_EVENT_INIT;
+
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
     if (ret < 0)
@@ -1028,14 +1046,6 @@ static int server_initialize_subsystems(
     }
     *server_status_flag |= SERVER_PERF_COUNTER_INIT;
 #endif
-
-    ret = PINT_event_initialize(PINT_EVENT_DEFAULT_RING_SIZE);
-    if (ret < 0)
-    {
-        gossip_err("Error initializing event interface.\n");
-        return (ret);
-    }
-    *server_status_flag |= SERVER_EVENT_INIT;
 
     return ret;
 }
@@ -1589,6 +1599,7 @@ int server_state_machine_start(
         s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
         ret = PINT_smcb_set_op(smcb, s_op->req->op);
         s_op->op = s_op->req->op;
+        PVFS_hint_add(&s_op->req->hints, PVFS_HINT_OP_ID_NAME, sizeof(uint32_t), &s_op->req->op);
     }
     else
     {
@@ -1604,8 +1615,12 @@ int server_state_machine_start(
 
     if(s_op->req)
     {
-        PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
-                             0, tmp_id, PVFS_EVENT_FLAG_START);
+        PINT_EVENT_START(PINT_sm_event_id, server_controlling_pid,
+                         NULL, &s_op->event_id,
+                         PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
+                         PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
+                         PINT_HINT_GET_HANDLE(s_op->req->hints),
+                         s_op->req->op);
         s_op->resp.op = s_op->req->op;
     }
 
@@ -1724,12 +1739,18 @@ int server_state_machine_complete(PINT_smcb *smcb)
 
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
-    PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
-                         0, tmp_id, PVFS_EVENT_FLAG_END);
+
+    if(s_op->req)
+    {
+        PINT_EVENT_END(PINT_sm_event_id, server_controlling_pid,
+                       NULL, s_op->event_id, 0);
+    }
 
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
+        PVFS_hint_free(s_op->decoded.stub_dec.req.hints);
+
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 

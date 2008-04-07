@@ -31,6 +31,7 @@
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
 #include "state-machine.h"
+#include "pint-event.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already
  * defined; this allows us to get the dependencies right for
@@ -356,6 +357,8 @@ typedef struct PINT_server_op
     struct qlist_head   next; /* used to queue structures used for unexp style messages */
     int op_cancelled; /* indicates unexp message was cancelled */
     enum PVFS_server_op op;  /* type of operation that we are servicing */
+
+    PINT_event_id event_id;
 
     /* holds id from request scheduler so we can release it later */
     job_id_t scheduled_id; 

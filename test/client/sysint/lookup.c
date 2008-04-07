@@ -63,7 +63,7 @@ int main(int argc,char **argv)
     memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_lk, follow_link);
+                          &resp_lk, follow_link, NULL);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
