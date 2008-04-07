@@ -61,8 +61,6 @@ PVFS_object_ref pvfs_basedir;
 PVFS_object_ref pvfs_testdir;
 PVFS_credentials pvfs_creds;
 
-int current_size = -1;
-
 struct api_ops
 {
     char *name;
@@ -76,7 +74,6 @@ struct api_ops
     void (*readdirplus) (int rank, int* n_ops);
     void (*write) (int rank, int* n_ops);
     void (*read) (int rank, int* n_ops);
-    void (*unstuff) (int rank, int* n_ops);
     void (*print_error) (int errorcode, char* str);
 };
 
@@ -93,7 +90,6 @@ struct api_ops api_table[] = {
         .readdirplus = NULL,
         .read = vfs_read,
         .write = vfs_write,
-        .unstuff = NULL,
         .print_error = vfs_print_error,
     },
     {
@@ -108,7 +104,6 @@ struct api_ops api_table[] = {
         .readdirplus = pvfs_readdirplus,
         .read = pvfs_read,
         .write = pvfs_write,
-        .unstuff = NULL,
         .print_error = pvfs_print_error,
     },
     {
@@ -123,7 +118,6 @@ struct api_ops api_table[] = {
         .readdirplus = NULL,
         .read = NULL,
         .write = NULL,
-        .unstuff = NULL,
         .print_error = mpi_print_error,
     },
     {0}
@@ -147,7 +141,6 @@ extern char *optarg;
 int opt_nfiles = -1;
 char opt_basedir[PATH_MAX] = {0};
 int opt_size = -1;
-int opt_size2 = -1;
 int opt_api = -1; 
 
 void usage(char *name); 
@@ -161,7 +154,7 @@ void usage(char *name)
     int i = 0;
 
     fprintf(stderr,
-        "usage: %s -d base_dir -n num_files_per_proc -s size1 -S size2 -a api \n", name);
+        "usage: %s -d base_dir -n num_files_per_proc -s size -a api \n", name);
     fprintf(stderr, "    where api is one of:\n");
     while(api_table[i].name != NULL)
     {
@@ -177,7 +170,7 @@ int parse_args(
     char **argv)
 {
     int c;
-    while ((c = getopt(argc, argv, "d:n:a:s:S:")) != -1)
+    while ((c = getopt(argc, argv, "d:n:a:s:")) != -1)
     {
         switch (c)
         {
@@ -190,9 +183,6 @@ int parse_args(
         case 's':
             opt_size = atoi(optarg);
             break;
-        case 'S':
-            opt_size2 = atoi(optarg);
-            break;
         case 'a':
             opt_api = atoi(optarg);
             break;
@@ -203,7 +193,7 @@ int parse_args(
             exit(-1);
         }
     }
-    if(opt_basedir[0] == 0 || opt_nfiles < 1 || opt_size < 1 || opt_api < 0 || opt_size2 < 1)
+    if(opt_basedir[0] == 0 || opt_nfiles < 1 || opt_size < 1 || opt_api < 0)
     {
         usage(argv[0]);
         exit(-1);
@@ -265,8 +255,6 @@ int main(
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
     parse_args(argc, argv);
-
-    current_size = 0;
 
     /* do any setup required by the api */
     result_array[test].op = "prep";
@@ -334,9 +322,6 @@ int main(
         rank);
     test++;
 
-    /* use first size */
-    current_size = opt_size;
-
     /* write */
     result_array[test].op = "write";
     run_test_phase(
@@ -402,90 +387,6 @@ int main(
         api_table[opt_api].rm, 
         rank);
     test++;
-
-    current_size = 0;
-
-    /* create files (again) */
-    result_array[test].op = "create";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].create, 
-        rank);
-    test++;
-
-    /* use second size */
-    current_size = opt_size2;
-
-    /* write */
-    result_array[test].op = "write";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].write, 
-        rank);
-    test++;
-
-    /* read */
-    result_array[test].op = "read";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].read, 
-        rank);
-    test++;
-
-    /* readdir */
-    result_array[test].op = "readdir";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].readdir, 
-        rank);
-    test++;
-
-    /* readdir and stat */
-    result_array[test].op = "readdir_and_stat";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].readdir_and_stat, 
-        rank);
-    test++;
-
-    /* readdirplus */
-    result_array[test].op = "readdirplus";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].readdirplus, 
-        rank);
-    test++;
-
-    /* remove files */
-    result_array[test].op = "rm";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].rm, 
-        rank);
-    test++;
-
-    current_size = 0;
 
     /* remove subdir for each proc */
     result_array[test].op = "rmtestdir";
@@ -547,7 +448,7 @@ int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name,
         printf("# Now running [%s] test...\n", fn_name);
     }
 
-    *size = current_size;
+    *size = opt_size;
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -650,7 +551,7 @@ void pvfs_write(int rank, int* n_ops)
     *n_ops = opt_nfiles;
 
     file_req = PVFS_BYTE;
-    PVFS_Request_contiguous(current_size, PVFS_BYTE, &mem_req);
+    PVFS_Request_contiguous(opt_size, PVFS_BYTE, &mem_req);
 
     for(i=0; i<opt_nfiles; i++)
     {
@@ -678,7 +579,7 @@ void pvfs_read(int rank, int* n_ops)
     *n_ops = opt_nfiles;
 
     file_req = PVFS_BYTE;
-    PVFS_Request_contiguous(current_size, PVFS_BYTE, &mem_req);
+    PVFS_Request_contiguous(opt_size, PVFS_BYTE, &mem_req);
 
     for(i=0; i<opt_nfiles; i++)
     {
@@ -705,7 +606,7 @@ void vfs_read(int rank, int* n_ops)
 
     for(i=0; i<opt_nfiles; i++)
     {
-        ret = pread(vfs_fds[i], vfs_buf, current_size, 0);
+        ret = pread(vfs_fds[i], vfs_buf, opt_size, 0);
         if(ret < 0)
         {
             handle_error(errno, "pread");
@@ -725,7 +626,7 @@ void vfs_write(int rank, int* n_ops)
 
     for(i=0; i<opt_nfiles; i++)
     {
-        ret = pwrite(vfs_fds[i], vfs_buf, current_size, 0);
+        ret = pwrite(vfs_fds[i], vfs_buf, opt_size, 0);
         if(ret < 0)
         {
             handle_error(errno, "pwrite");
@@ -861,7 +762,6 @@ void vfs_rmtestdir(int rank, int* n_ops)
 void pvfs_prep(int rank, int* n_ops)
 {
     int i;
-    int biggest;
     int ret;
     char pvfs_path[PATH_MAX];
     PVFS_fs_id fs_id;
@@ -883,19 +783,17 @@ void pvfs_prep(int rank, int* n_ops)
         handle_error(errno, "malloc");
     }
 
-    biggest = (opt_size > opt_size2 ? opt_size : opt_size2);
-
     /* a bufer to read and write from */
-    pvfs_buf = malloc(biggest);
+    pvfs_buf = malloc(opt_size);
     if(!pvfs_buf)
     {
         handle_error(errno, "malloc");
     }
     /* fill a pattern in */
-    memset(pvfs_buf, 0, biggest);
-    for(i=0; i<biggest; i++)
+    memset(pvfs_buf, 0, opt_size);
+    for(i=0; i<opt_size; i++)
     {
-        pvfs_buf[i] += biggest;
+        pvfs_buf[i] += i;
     }
 
     /* find the base directory */
@@ -922,7 +820,6 @@ void pvfs_prep(int rank, int* n_ops)
 void vfs_prep(int rank, int* n_ops)
 {
     int i;
-    int biggest;
 
     *n_ops = 1;
 
@@ -940,19 +837,17 @@ void vfs_prep(int rank, int* n_ops)
         handle_error(errno, "malloc");
     }
 
-    biggest = (opt_size > opt_size2 ? opt_size : opt_size2);
-
     /* a bufer to read and write from */
-    vfs_buf = malloc(biggest);
+    vfs_buf = malloc(opt_size);
     if(!vfs_buf)
     {
         handle_error(errno, "malloc");
     }
     /* fill a pattern in */
-    memset(vfs_buf, 0, biggest);
-    for(i=0; i<biggest; i++)
+    memset(vfs_buf, 0, opt_size);
+    for(i=0; i<opt_size; i++)
     {
-        vfs_buf[i] += biggest;
+        vfs_buf[i] += i;
     }
 
     return;
