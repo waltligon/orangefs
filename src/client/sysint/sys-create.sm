@@ -466,7 +466,7 @@ static PINT_sm_action create_create_setup_msgpair(
     ret = PINT_cached_config_get_server(
         sm_p->object_ref.fs_id,
         BMI_addr_rev_lookup(msg_p->svr_addr),
-        PINT_SERVER_TYPE_META,
+        PINT_SERVER_TYPE_IO,
         &data_handle_extent_array);
     if(ret == -PVFS_ENOENT)
     {
