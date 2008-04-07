@@ -164,6 +164,7 @@ int parse_args(int argc, char **argv);
 void handle_error(int errcode, char *str); 
 int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name, 
     void (*fn)(int, int*), int rank, int procs);
+void print_result(int rank, struct test_results* result);
 
 void usage(char *name)
 {
@@ -282,6 +283,10 @@ int main(
     int test = 0;
     int i;
 
+    /* NOTE: could probably skip tracking each phase and just print and
+     * discard results after each phase.  Hanging onto this for now in case
+     * it is useful later
+     */
     result_array = malloc(MAX_TEST_COUNT*sizeof(*result_array));
     if(!result_array)
     {
@@ -305,6 +310,12 @@ int main(
         return(-1);
     }
 
+    /* key for data tables */
+    if(rank == 0)
+    {
+        printf("# <api>\t<op>\t<file_size>\t<procs>\t<n_ops_per_proc>\t<n_ops_total>\t<time>\t<rate_per_proc>\t<rate_total>\n");
+    }
+
     /* do any setup required by the api */
     result_array[test].op = "prep";
     result_array[test].nprocs = nprocs;
@@ -316,6 +327,7 @@ int main(
         api_table[opt_api].prep, 
         rank,
         nprocs);
+    print_result(rank, &result_array[test]);
     test++;
     CHECK_MAX_TEST(test);
 
@@ -330,6 +342,7 @@ int main(
         api_table[opt_api].mktestdir, 
         rank,
         nprocs);
+    print_result(rank, &result_array[test]);
     test++;
     CHECK_MAX_TEST(test);
 
@@ -346,6 +359,7 @@ int main(
             api_table[opt_api].create, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
 
@@ -360,6 +374,7 @@ int main(
             api_table[opt_api].readdir, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
 
@@ -374,6 +389,7 @@ int main(
             api_table[opt_api].readdir_and_stat, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
 
@@ -388,6 +404,7 @@ int main(
             api_table[opt_api].readdirplus, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
 
@@ -402,6 +419,7 @@ int main(
             api_table[opt_api].write, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
 
@@ -416,6 +434,7 @@ int main(
             api_table[opt_api].read, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
 
@@ -430,6 +449,7 @@ int main(
             api_table[opt_api].readdir, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
 
@@ -444,6 +464,7 @@ int main(
             api_table[opt_api].readdir_and_stat, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
 
@@ -458,6 +479,7 @@ int main(
             api_table[opt_api].readdirplus, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
 
@@ -472,6 +494,7 @@ int main(
             api_table[opt_api].rm, 
             rank,
             i);
+        print_result(rank, &result_array[test]);
         test++;
         CHECK_MAX_TEST(test);
     }
@@ -487,35 +510,35 @@ int main(
         api_table[opt_api].rmtestdir, 
         rank,
         nprocs);
+    print_result(rank, &result_array[test]);
     test++;
     CHECK_MAX_TEST(test);
-
-    /* print all results */
-    if (rank == 0)
-    {
-        printf("# <api>\t<op>\t<file_size>\t<procs>\t<n_ops_per_proc>\t<n_ops_total>\t<time>\t<rate_per_proc>\t<rate_total>\n");
-        /* this phase only makes one dir per proc */
-        for(i=0; i<test; i++)
-        {
-            if(result_array[i].n_ops > 0)
-            {
-                printf("%s\t%s\t%d\t%d\t%d\t%d\t%f\t%f\t%f\n",
-                    api_table[opt_api].name,
-                    result_array[i].op,
-                    result_array[i].size,
-                    result_array[i].nprocs,
-                    result_array[i].n_ops,
-                    result_array[i].n_ops*result_array[i].nprocs,
-                    result_array[i].time,
-                    ((double)result_array[i].n_ops)/result_array[i].time,
-                    ((double)result_array[i].n_ops*result_array[i].nprocs)/result_array[i].time);
-            }
-        }
-    }
 
     MPI_Finalize();
 
     return 0;
+}
+
+void print_result(int rank, struct test_results* result)
+{
+    if (rank == 0)
+    {
+        if(result->n_ops > 0)
+        {
+            printf("%s\t%s\t%d\t%d\t%d\t%d\t%f\t%f\t%f\n",
+                api_table[opt_api].name,
+                result->op,
+                result->size,
+                result->nprocs,
+                result->n_ops,
+                result->n_ops * result->nprocs,
+                result->time,
+                ((double)result->n_ops) / result->time,
+                ((double)result->n_ops * result->nprocs) / result->time);
+        }
+    }
+
+    return;
 }
 
 int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name, 
@@ -544,7 +567,8 @@ int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name,
 
     test_start = MPI_Wtime();
 
-    if(fn)
+    /* if function is defined and we are within the current client count */
+    if(fn && rank < procs)
     {
         /* we assume this aborts if it fails */
         fn(rank, n_ops);
