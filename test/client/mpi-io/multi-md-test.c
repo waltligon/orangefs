@@ -129,6 +129,7 @@ struct test_results
     int n_ops;
     double time;
     int size;
+    int nprocs;
 };
 
 struct test_results result_array[100];
@@ -143,25 +144,31 @@ char opt_basedir[PATH_MAX] = {0};
 int opt_size = -1;
 int opt_api = -1; 
 int opt_pause = -1; 
+int opt_start_clients = -1;
+int opt_end_clients = -1;
+int opt_interval_clients = -1;
 
 void usage(char *name); 
 int parse_args(int argc, char **argv);
 void handle_error(int errcode, char *str); 
 int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name, 
-    void (*fn)(int, int*), int rank);
+    void (*fn)(int, int*), int rank, int procs);
 
 void usage(char *name)
 {
     int i = 0;
 
     fprintf(stderr,
-        "usage: %s -d base_dir -n num_files_per_proc -s size -a api -p seconds_to_pause\n", name);
+        "usage: %s -d base_dir -n num_files_per_proc -s size -a api -p seconds_to_pause -c client_spec\n", name);
     fprintf(stderr, "    where api is one of:\n");
     while(api_table[i].name != NULL)
     {
         fprintf(stderr, "        %d: %s\n", i, api_table[i].name);
         i++;
     }
+    fprintf(stderr, "    and client_spec is of the form:\n");
+    fprintf(stderr, "        <start client count>,<interval>,<end client count>\n");
+    fprintf(stderr, "        and <interval> must be non-zero.\n");
 
     exit(-1);
 }
@@ -171,7 +178,8 @@ int parse_args(
     char **argv)
 {
     int c;
-    while ((c = getopt(argc, argv, "d:n:a:s:p:")) != -1)
+    int ret;
+    while ((c = getopt(argc, argv, "d:n:a:s:p:c:")) != -1)
     {
         switch (c)
         {
@@ -190,6 +198,15 @@ int parse_args(
         case 'p':
             opt_pause = atoi(optarg);
             break;
+        case 'c':
+            ret = sscanf(optarg, "%d,%d,%d", 
+                &opt_start_clients, &opt_interval_clients, &opt_end_clients);
+            if(ret != 3)
+            {
+                usage(argv[0]);
+                exit(-1);
+            }
+            break;
         case '?':
         case ':':
         default:
@@ -197,7 +214,7 @@ int parse_args(
             exit(-1);
         }
     }
-    if(opt_basedir[0] == 0 || opt_nfiles < 1 || opt_size < 1 || opt_api < 0 || opt_pause < 0)
+    if(opt_basedir[0] == 0 || opt_nfiles < 1 || opt_size < 1 || opt_api < 0 || opt_pause < 0 || opt_start_clients < 1 || opt_end_clients < 1 || opt_interval_clients < 1 || opt_start_clients > opt_end_clients)
     {
         usage(argv[0]);
         exit(-1);
@@ -260,147 +277,186 @@ int main(
 
     parse_args(argc, argv);
 
+    if(opt_end_clients > nprocs || opt_start_clients > nprocs)
+    {
+        if(rank == 0)
+        {
+            fprintf(stderr, "Error: not executed with enough processes for client specification.\n");
+        }
+        MPI_Finalize();
+        return(-1);
+    }
+
     /* do any setup required by the api */
     result_array[test].op = "prep";
+    result_array[test].nprocs = nprocs;
     run_test_phase(
         &result_array[test].time, 
         &result_array[test].size,
         &result_array[test].n_ops,
         result_array[test].op, 
         api_table[opt_api].prep, 
-        rank);
+        rank,
+        nprocs);
     test++;
 
     /* make subdir for each proc */
     result_array[test].op = "mktestdir";
+    result_array[test].nprocs = nprocs;
     run_test_phase(
         &result_array[test].time, 
         &result_array[test].size,
         &result_array[test].n_ops,
         result_array[test].op, 
         api_table[opt_api].mktestdir, 
-        rank);
+        rank,
+        nprocs);
     test++;
 
-    /* create files */
-    result_array[test].op = "create";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].create, 
-        rank);
-    test++;
+    for(i=opt_start_clients; i<=opt_end_clients; i+=opt_interval_clients)
+    {
+        /* create files */
+        result_array[test].op = "create";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].create, 
+            rank,
+            i);
+        test++;
 
-    /* readdir */
-    result_array[test].op = "readdir";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].readdir, 
-        rank);
-    test++;
+        /* readdir */
+        result_array[test].op = "readdir";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].readdir, 
+            rank,
+            i);
+        test++;
 
-    /* readdir and stat */
-    result_array[test].op = "readdir_and_stat";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].readdir_and_stat, 
-        rank);
-    test++;
+        /* readdir and stat */
+        result_array[test].op = "readdir_and_stat";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].readdir_and_stat, 
+            rank,
+            i);
+        test++;
 
-    /* readdirplus */
-    result_array[test].op = "readdirplus";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].readdirplus, 
-        rank);
-    test++;
+        /* readdirplus */
+        result_array[test].op = "readdirplus";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].readdirplus, 
+            rank,
+            i);
+        test++;
 
-    /* write */
-    result_array[test].op = "write";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].write, 
-        rank);
-    test++;
+        /* write */
+        result_array[test].op = "write";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].write, 
+            rank,
+            i);
+        test++;
 
-    /* read */
-    result_array[test].op = "read";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].read, 
-        rank);
-    test++;
+        /* read */
+        result_array[test].op = "read";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].read, 
+            rank,
+            i);
+        test++;
 
-    /* readdir */
-    result_array[test].op = "readdir";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].readdir, 
-        rank);
-    test++;
+        /* readdir */
+        result_array[test].op = "readdir";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].readdir, 
+            rank,
+            i);
+        test++;
 
-    /* readdir and stat */
-    result_array[test].op = "readdir_and_stat";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].readdir_and_stat, 
-        rank);
-    test++;
+        /* readdir and stat */
+        result_array[test].op = "readdir_and_stat";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].readdir_and_stat, 
+            rank,
+            i);
+        test++;
 
-    /* readdirplus */
-    result_array[test].op = "readdirplus";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].readdirplus, 
-        rank);
-    test++;
+        /* readdirplus */
+        result_array[test].op = "readdirplus";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].readdirplus, 
+            rank,
+            i);
+        test++;
 
-    /* remove files */
-    result_array[test].op = "rm";
-    run_test_phase(
-        &result_array[test].time, 
-        &result_array[test].size,
-        &result_array[test].n_ops,
-        result_array[test].op, 
-        api_table[opt_api].rm, 
-        rank);
-    test++;
+        /* remove files */
+        result_array[test].op = "rm";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].rm, 
+            rank,
+            i);
+        test++;
+    }
 
     /* remove subdir for each proc */
     result_array[test].op = "rmtestdir";
+    result_array[test].nprocs = nprocs;
     run_test_phase(
         &result_array[test].time, 
         &result_array[test].size,
         &result_array[test].n_ops,
         result_array[test].op, 
         api_table[opt_api].rmtestdir, 
-        rank);
+        rank,
+        nprocs);
     test++;
 
 
@@ -417,12 +473,12 @@ int main(
                     api_table[opt_api].name,
                     result_array[i].op,
                     result_array[i].size,
-                    nprocs,
+                    result_array[i].nprocs,
                     result_array[i].n_ops,
-                    result_array[i].n_ops*nprocs,
+                    result_array[i].n_ops*result_array[i].nprocs,
                     result_array[i].time,
                     ((double)result_array[i].n_ops)/result_array[i].time,
-                    ((double)result_array[i].n_ops*nprocs)/result_array[i].time);
+                    ((double)result_array[i].n_ops*result_array[i].nprocs)/result_array[i].time);
             }
         }
     }
@@ -433,7 +489,7 @@ int main(
 }
 
 int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name, 
-    void (*fn)(int, int*), int rank)
+    void (*fn)(int, int*), int rank, int procs)
 {
     double test_start, test_end, local_elapsed;
 
