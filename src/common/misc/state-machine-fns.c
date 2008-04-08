@@ -657,7 +657,7 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
             return NULL;
         }
         prev = smcb->frames.prev;
-        while(target--)
+        while(target)
         {
             target--;
             prev = prev->prev;
