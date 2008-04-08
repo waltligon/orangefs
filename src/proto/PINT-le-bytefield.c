@@ -112,8 +112,6 @@ static void lebf_initialize(void)
 		break;
 	    case PVFS_SERV_CREATE:
 		/* can request a range of handles */
-		req.u.create.metafile_handle_extent_array.extent_count = 0;
-		req.u.create.datafile_handle_extent_array.extent_count = 0;
 		reqsize = extra_size_PVFS_servreq_create;
                 respsize = extra_size_PVFS_servresp_create;
 	    case PVFS_SERV_REMOVE:
@@ -767,11 +765,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	struct PVFS_server_req *req = &msg->stub_dec.req;
 	switch (req->op) {
 
-	    case PVFS_SERV_CREATE:
-		decode_free(req->u.create.metafile_handle_extent_array.extent_array);
-		decode_free(req->u.create.datafile_handle_extent_array.extent_array);
-		break;
-
 	    case PVFS_SERV_BATCH_CREATE:
 		decode_free(req->u.batch_create.handle_extent_array.extent_array);
 		break;
@@ -833,6 +826,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_UNSTUFF:
+	    case PVFS_SERV_CREATE:
 		/* nothing to free */
 		break;
 	    case PVFS_SERV_INVALID:

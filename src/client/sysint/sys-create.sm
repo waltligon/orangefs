@@ -442,7 +442,6 @@ static PINT_sm_action create_create_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
-    PVFS_handle_extent_array data_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
@@ -463,29 +462,10 @@ static PINT_sm_action create_create_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
-    ret = PINT_cached_config_get_server(
-        sm_p->object_ref.fs_id,
-        BMI_addr_rev_lookup(msg_p->svr_addr),
-        PINT_SERVER_TYPE_IO,
-        &data_handle_extent_array);
-    if(ret == -PVFS_ENOENT)
-    {
-        data_handle_extent_array.extent_count = 0;
-        data_handle_extent_array.extent_array = NULL;
-    }
-    else if (ret != 0)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
-        meta_handle_extent_array,
-        data_handle_extent_array,
         sm_p->u.create.attr,
         sm_p->u.create.num_data_files,
         sm_p->u.create.layout);
@@ -596,6 +576,9 @@ static PINT_sm_action batch_remove_setup_msgpair_array(
     /* TODO: what if more than one datafile handle was filled in, or if some
      * of the datafiles are not stored on the meta server? 
      */
+    /* TODO: convert this to the old cleanup technique that just did an
+     * independent remove operation for each handle involved
+     */
 
     sm_p->u.create.handles[0] = sm_p->u.create.metafile_handle;
     sm_p->u.create.handles[1] = sm_p->u.create.datafile_handles[0];
@@ -671,9 +654,11 @@ static PINT_sm_action create_cleanup(
             gossip_debug(GOSSIP_CLIENT_DEBUG, "created un-stuffed file\n");
             sm_p->u.create.attr.mask |= PVFS_ATTR_META_UNSTUFFED;
         }
+        /* TODO: we could add in the datafile handles to the attrs as well */
 
         /* we only insert a cache entry if the entire create succeeds,
-         * i.e. crdirent succeeded.  set size to 0 */
+         * set size to 0 
+         */ 
         ret = PINT_acache_update(metafile_ref,
                                  &sm_p->u.create.attr,
                                  &tmp_size);

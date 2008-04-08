@@ -132,10 +132,18 @@ static int create_metafile(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t i;
+    PVFS_handle_extent_array meta_handle_ext_array;
+    server_configuration_s *config = get_server_config_struct();
+
+    ret = PINT_cached_config_get_server(
+        s_op->req->u.create.fs_id,
+        config->host_id,
+        PINT_SERVER_TYPE_META,
+        &meta_handle_ext_array);
 
     ret = job_trove_dspace_create(
         s_op->req->u.create.fs_id,
-        &s_op->req->u.create.metafile_handle_extent_array,
+        &meta_handle_ext_array,
         PVFS_TYPE_METAFILE,
         NULL,
         0,
@@ -254,10 +262,18 @@ static int create_local_datafile(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t i;
+    PVFS_handle_extent_array data_handle_ext_array;
+    server_configuration_s *config = get_server_config_struct();
+
+    ret = PINT_cached_config_get_server(
+        s_op->req->u.create.fs_id,
+        config->host_id,
+        PINT_SERVER_TYPE_IO,
+        &data_handle_ext_array);
 
     ret = job_trove_dspace_create(
         s_op->req->u.create.fs_id,
-        &s_op->req->u.create.datafile_handle_extent_array,
+        &data_handle_ext_array,
         PVFS_TYPE_DATAFILE,
         NULL,
         TROVE_SYNC,

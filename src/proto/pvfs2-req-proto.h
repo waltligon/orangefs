@@ -155,38 +155,23 @@ struct PVFS_servreq_create
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
 
-    /*
-      an array of handle extents that we use to suggest to
-      the server from which handle range to allocate for the
-      newly created handle(s).  To request a single handle,
-      a single extent with first = last should be used.
-    */
-    PVFS_handle_extent_array metafile_handle_extent_array;
-    PVFS_handle_extent_array datafile_handle_extent_array;
-
     int32_t num_dfiles_req;
     PVFS_sys_layout layout;
 };
-endecode_fields_7_struct(
+endecode_fields_5_struct(
     PVFS_servreq_create,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_object_attr, attr,
-    PVFS_handle_extent_array, metafile_handle_extent_array,
-    PVFS_handle_extent_array, datafile_handle_extent_array,
     int32_t, num_dfiles_req,
     PVFS_sys_layout, layout)
 
 #define extra_size_PVFS_servreq_create \
-    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
-     PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
-     extra_size_PVFS_object_attr)
+    (extra_size_PVFS_object_attr)
 
 #define PINT_SERVREQ_CREATE_FILL(__req,                                    \
                                  __creds,                                  \
                                  __fsid,                                   \
-                                 __md_ext_array,                           \
-                                 __df_ext_array,                           \
                                  __attr,                                   \
                                  __num_dfiles_req,                         \
                                  __layout)                                 \
@@ -203,14 +188,6 @@ do {                                                                       \
     (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                   \
     PINT_copy_object_attr(&(__req).u.create.attr, &(__attr));              \
     (__req).u.create.attr.mask |= mask;                                    \
-    (__req).u.create.metafile_handle_extent_array.extent_count =           \
-        (__md_ext_array).extent_count;                                     \
-    (__req).u.create.metafile_handle_extent_array.extent_array =           \
-        (__md_ext_array).extent_array;                                     \
-    (__req).u.create.datafile_handle_extent_array.extent_count =           \
-        (__df_ext_array).extent_count;                                     \
-    (__req).u.create.datafile_handle_extent_array.extent_array =           \
-        (__df_ext_array).extent_array;                                     \
     (__req).u.create.layout = __layout;                                    \
 } while (0)
 
