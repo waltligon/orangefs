@@ -212,7 +212,7 @@ machine pvfs2_create_file_work_sm
 
     state cleanup_work
     {
-        run create_cleanup;
+        run create_file_cleanup;
         CREATE_RETRY => init;
         default => terminate;
     }
@@ -867,7 +867,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action create_cleanup(
+static PINT_sm_action create_file_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

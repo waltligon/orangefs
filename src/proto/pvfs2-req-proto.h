@@ -223,7 +223,8 @@ endecode_fields_7_struct(
     PVFS_object_attr, attr,
     PINT_dist, dist,
     uint32_t, num_data_files,
-    PVFS_handle_extent_array, handle_extent_array)
+    PVFS_handle_extent_array, handle_extent_array
+)
 #define extra_size_PVFS_servreq_create_file \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
 
