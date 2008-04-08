@@ -78,9 +78,6 @@ struct PINT_client_remove_sm
 
 struct PINT_client_create_file_sm
 {
-    PVFS_fs_id fs_id;
-    PVFS_handle parent_handle;
-    PVFS_ds_type object_type;
     char *object_name;                          /* input parameter */
     PVFS_sysresp_create_file *create_file_resp; /* in/out parameter*/
     PVFS_sys_attr sys_attr;                     /* input parameter */
@@ -90,9 +87,10 @@ struct PINT_client_create_file_sm
     int num_data_files;
     int stored_error_code;
 
+    PVFS_handle_extent_array *metafile_handle_extent_array;
+
     PINT_dist *dist;
     PVFS_sys_layout layout;
-    PVFS_handle_extent_array *metafile_handle_extent_array;
     PVFS_handle metafile_handle;
     PVFS_handle *datafile_handles;
     PVFS_BMI_addr_t *data_server_addrs;

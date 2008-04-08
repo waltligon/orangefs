@@ -1,5 +1,5 @@
 /* 
- * Copyright © Acxiom Corporation, 2006
+ * (C) 2008 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -212,7 +212,7 @@ machine pvfs2_create_file_work_sm
 
     state cleanup_work
     {
-        run create_file_cleanup;
+        run create_file_work_cleanup;
         CREATE_RETRY => init;
         default => terminate;
     }
@@ -271,13 +271,15 @@ static PINT_sm_action create_file_setup(
 #if 0
     PVFS_util_copy_sys_attr(&sm_p->u.create_file.sys_attr, &s_op->req->u.create_file.sys_attr);
 #endif
-    sm_p->u.create_file.parent_handle = s_op->req->u.create_file.parent_handle;
+    sm_p->parent_ref.handle = s_op->req->u.create_file.parent_handle;
+    sm_p->parent_ref.fs_id = s_op->req->u.create_file.fs_id;
+    sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
     sm_p->u.create_file.dist = s_op->req->u.create_file.dist;
     sm_p->u.create_file.num_data_files = s_op->req->u.create_file.num_data_files;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "Creating file %s under %llu, %d\n",
-        sm_p->u.create_file.object_name, llu(sm_p->u.create_file.parent_handle),
-        sm_p->u.create_file.fs_id);
+        sm_p->u.create_file.object_name, llu(sm_p->parent_ref.handle),
+        sm_p->parent_ref.fs_id);
 
     return(SM_ACTION_COMPLETE);
 }
@@ -473,7 +475,7 @@ static PINT_sm_action create_dspace_create(
                  sm_p->u.create_file.num_data_files);
 
     ret = job_trove_dspace_create(
-        sm_p->u.create_file.fs_id,
+        sm_p->parent_ref.fs_id,
         sm_p->u.create_file.metafile_handle_extent_array,
         sm_p->u.create_file.attr.objtype,
         NULL,
@@ -867,7 +869,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action create_file_cleanup(
+static PINT_sm_action create_file_work_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -994,7 +996,8 @@ static PINT_sm_action create_getattr_local(
         sm_p->object_ref.fs_id);
 
     if (strcmp(config->host_id, server_name)) {
-        /* TODO: perform local lookup. Can we just call the nested get_attr state machine? */
+        /* TODO: perform local lookup. */
+        /* Can we just call the nested get_attr state machine? */
         struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
 
         if(!s_op)
@@ -1028,12 +1031,13 @@ static PINT_sm_action create_getattr_local(
     {
         /* it's not on this server. Fall through to another */
         /* state to do the lookup on the correct server.    */
+        /* need to set up machine for remote lookup here    */
         return(-PVFS_ENOENT);
     }
 
 #if 0
 PINT_cached_config_get_server(fsid, config->host_id, server_type, &extent_array);
-If you don't care about the server type, you can pass in:
+If you donot care about the server type, you can pass in:
  PINT_SERVER_TYPE_META|PINT_SERVER_TYPE_IO
 Then with the returned extent_array, you can do:
 is_my_handle = PINT_handle_in_extent_array(&extent_array, your_handle);
