@@ -17,7 +17,9 @@
 
 enum
 {
-    DO_STUFFED_CREATE = 1
+    DO_STUFFED_CREATE = 1,
+    DO_UNSTUFFED_CREATE_WITH_LOCAL,
+    DO_UNSTUFFED_CREATE_WITHOUT_LOCAL,
 };
 
 %%
@@ -41,22 +43,24 @@ machine pvfs2_create_sm
     state check_stuffed
     {
         run check_stuffed;
-        DO_STUFFED_CREATE => create_stuffed_datafile;
-        success => request_datafiles;
+        DO_STUFFED_CREATE => create_local_datafile;
+        DO_UNSTUFFED_CREATE_WITH_LOCAL => create_local_datafile;
+        DO_UNSTUFFED_CREATE_WITHOUT_LOCAL => request_datafiles;
         default => final_response;
     }
 
-    state create_stuffed_datafile
+    state create_local_datafile
     {
-        run create_stuffed_datafile;
-        success => setup_stuffed_datafile_handle;
+        run create_local_datafile;
+        success => setup_local_datafile_handle;
         default => remove_metafile_object;
     }
 
-    state setup_stuffed_datafile_handle
+    state setup_local_datafile_handle
     {
-        run setup_stuffed_datafile_handle;
-        success => write_keyvals;
+        run setup_local_datafile_handle;
+        DO_STUFFED_CREATE => write_keyvals;
+        DO_UNSTUFFED_CREATE_WITH_LOCAL => request_datafiles;
         default => remove_metafile_object;
     }
 
@@ -154,17 +158,29 @@ static int check_stuffed(
     PVFS_BMI_addr_t myaddr;
     PVFS_sys_layout *layout;
     int ret;
+    const char* svr_name;
 
     s_op->resp.u.create.metafile_handle = js_p->handle;
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "Metafile handle created: %llu\n",
+        llu(js_p->handle));
 
     assert(config);
 
-    /* first find out if the config file option is enabled */
+    /* TODO: implement support for LAYOUT_LIST */
+    layout = &s_op->req->u.create.layout;
+    if(layout->algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)
+    {
+        gossip_err("Error: only round robin layouts are supported right now.\n");
+        js_p->error_code = -PVFS_ENOSYS;
+        return SM_ACTION_COMPLETE;
+    }
+
     fs_conf = PINT_config_find_fs_id(config, 
         s_op->req->u.create.fs_id);
-    if(fs_conf && fs_conf->file_stuffing == 0)
+    if(!fs_conf)
     {
-        js_p->error_code = 0;
+        js_p->error_code = -PVFS_EINVAL;
         return(SM_ACTION_COMPLETE);
     }
 
@@ -176,37 +192,69 @@ static int check_stuffed(
         return SM_ACTION_COMPLETE;
     }
 
-    layout = &s_op->req->u.create.layout;
-    if(layout->algorithm != PVFS_SYS_LAYOUT_LIST)
+    /* is this metadata server also IO? */
+    svr_name = PINT_cached_config_map_addr(s_op->req->u.create.fs_id,
+                                myaddr, &server_type);
+    if(!svr_name)
     {
-        /* is this metadata server also IO? */
-        PINT_cached_config_map_addr(s_op->req->u.create.fs_id,
-                                    myaddr, &server_type);
-        if(server_type & PINT_SERVER_TYPE_IO)
-        {
-            /* we can do a stuffed create here */
-            s_op->resp.u.create.stuffed = 1;
-            js_p->error_code = DO_STUFFED_CREATE;
-        }
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
+    if((server_type & PINT_SERVER_TYPE_IO) && fs_conf->file_stuffing)
+    {    
+        /* we can do a stuffed create here, only one datafile */
+        s_op->req->u.create.attr.u.meta.dfile_count = 1;
+        s_op->resp.u.create.datafile_count = 1;
+        s_op->resp.u.create.datafile_handles = malloc(sizeof(PVFS_handle));
+        if(!s_op->resp.u.create.datafile_handles)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+
+        s_op->resp.u.create.stuffed = 1;
+        js_p->error_code = DO_STUFFED_CREATE;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* file will not be stuffed; need to allocate all datafiles */
+    s_op->req->u.create.attr.u.meta.dfile_count
+        = s_op->req->u.create.num_dfiles_req;
+    s_op->resp.u.create.datafile_count 
+        = s_op->req->u.create.num_dfiles_req;
+    s_op->resp.u.create.datafile_handles = malloc(
+        sizeof(*s_op->resp.u.create.datafile_handles) *
+        s_op->resp.u.create.datafile_count);
+    if(!s_op->resp.u.create.datafile_handles)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if(server_type & PINT_SERVER_TYPE_IO)
+    {
+        /* no stuffing, but we still need to create a local file */
+        s_op->resp.u.create.stuffed = 0;
+        js_p->error_code = DO_UNSTUFFED_CREATE_WITH_LOCAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* if we fall through to this point, there is no stuffing and no
+     * datafiles to create locally
+     */
+    s_op->resp.u.create.stuffed = 0;
+    js_p->error_code = DO_UNSTUFFED_CREATE_WITHOUT_LOCAL;
     return SM_ACTION_COMPLETE;
 }
 
-static int create_stuffed_datafile(
+static int create_local_datafile(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t i;
 
-    /* we only get here if create_metafile succeeded */
-    assert(js_p->error_code == DO_STUFFED_CREATE);
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, "Stuffed metafile handle created: %llu\n",
-        llu(js_p->handle));
-
-    /* now create the datafile handle */
     ret = job_trove_dspace_create(
         s_op->req->u.create.fs_id,
         &s_op->req->u.create.datafile_handle_extent_array,
@@ -228,7 +276,39 @@ static PINT_sm_action request_datafiles(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
+    PVFS_handle* remote_handle_array;
+    int remote_handle_count;
 
+    /* how did we get here? */
+    if(js_p->error_code == DO_UNSTUFFED_CREATE_WITH_LOCAL)
+    {
+        remote_handle_count = s_op->req->u.create.num_dfiles_req - 1;
+        if(remote_handle_count == 0)
+        {
+            /* done: the user only wanted one datafile anyway */
+            js_p->error_code = 0;
+            return SM_ACTION_COMPLETE;
+        }
+        remote_handle_array = &s_op->resp.u.create.datafile_handles[1];
+    }
+    else if(js_p->error_code == DO_UNSTUFFED_CREATE_WITHOUT_LOCAL)
+    {
+        remote_handle_count = s_op->req->u.create.num_dfiles_req;
+        remote_handle_array = s_op->resp.u.create.datafile_handles;
+    }
+    else
+    {
+        /* this transition shouldn't be possible */
+        assert(0);
+    }
+
+    /* TODO: add support for other layout types.  Also figure out if we
+     * need to do anything to be fair with the position of the local
+     * datafile handle in the array (or fairness of the get_handles()
+     * implementation).
+     */
+    /* TODO: this would probably need to happen earlier */
+#if 0
     ret = PINT_cached_config_get_server_list(
         s_op->req->u.create.fs_id,
         s_op->req->u.create.attr.u.meta.dist,
@@ -241,24 +321,13 @@ static PINT_sm_action request_datafiles(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
-
-    s_op->req->u.create.attr.u.meta.dfile_count = s_op->u.create.num_io_servers;
-    s_op->resp.u.create.datafile_count = s_op->u.create.num_io_servers;
-
-    s_op->resp.u.create.datafile_handles = malloc(
-        sizeof(*s_op->resp.u.create.datafile_handles) *
-        s_op->resp.u.create.datafile_count);
-    if(!s_op->resp.u.create.datafile_handles)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
+#endif
 
     ret = job_precreate_pool_get_handles(
         s_op->req->u.create.fs_id,
-        s_op->u.create.num_io_servers,
-        s_op->u.create.io_servers,
-        s_op->resp.u.create.datafile_handles,
+        remote_handle_count,
+        NULL,
+        remote_handle_array,
         smcb,
         0,
         js_p,
@@ -295,6 +364,11 @@ static PINT_sm_action remove_datafile_handles(
     int ret = -1;
     job_id_t j_id;
 
+    /* TODO: how do we keep up with the error code that got us to this
+     * path?  We don't want the return code of the cleanup steps to get
+     * reported in the ack.
+     */
+
     if(s_op->resp.u.create.stuffed)
     {
         ret = job_trove_dspace_remove(
@@ -309,6 +383,7 @@ static PINT_sm_action remove_datafile_handles(
     }
     else
     {
+        /* TODO: need to also remove locally created handle if present */
         /* TODO: */
         gossip_err("We need to give the handles back to the pool somehow..\n");
         assert(0);
@@ -333,26 +408,21 @@ static PINT_sm_action remove_keyvals(
     return ret;
 }
 
-static PINT_sm_action setup_stuffed_datafile_handle(
+static PINT_sm_action setup_local_datafile_handle(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, "Stuffed metafile handle created: %llu\n",
-        llu(js_p->handle));
-    assert(js_p->error_code == 0);
-
-    s_op->resp.u.create.datafile_handles = malloc(sizeof(PVFS_handle));
-    if(!s_op->resp.u.create.datafile_handles)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    s_op->req->u.create.attr.u.meta.dfile_count = 1;
-    s_op->resp.u.create.datafile_count = 1;
     s_op->resp.u.create.datafile_handles[0] = js_p->handle;
+
+    if(s_op->resp.u.create.stuffed)
+    {
+        js_p->error_code = DO_STUFFED_CREATE;
+    }
+    else
+    {
+        js_p->error_code = DO_UNSTUFFED_CREATE_WITH_LOCAL;
+    }
 
     return SM_ACTION_COMPLETE;
 }
