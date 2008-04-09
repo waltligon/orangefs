@@ -158,6 +158,7 @@ int opt_pause = -1;
 int opt_start_clients = -1;
 int opt_end_clients = -1;
 int opt_interval_clients = -1;
+unsigned int opt_timeout = 100;
 
 void usage(char *name); 
 int parse_args(int argc, char **argv);
@@ -171,7 +172,7 @@ void usage(char *name)
     int i = 0;
 
     fprintf(stderr,
-        "usage: %s -d base_dir -n num_files_per_proc -s size -a api -p seconds_to_pause -c client_spec\n", name);
+        "usage: %s -d base_dir -n num_files_per_proc -s size -a api -p seconds_to_pause -c client_spec <-t tcache_timeout_ms>\n", name);
     fprintf(stderr, "    where api is one of:\n");
     while(api_table[i].name != NULL)
     {
@@ -191,7 +192,7 @@ int parse_args(
 {
     int c;
     int ret;
-    while ((c = getopt(argc, argv, "d:n:a:s:p:c:")) != -1)
+    while ((c = getopt(argc, argv, "d:n:a:s:p:c:t:")) != -1)
     {
         switch (c)
         {
@@ -209,6 +210,14 @@ int parse_args(
             break;
         case 'p':
             opt_pause = atoi(optarg);
+            break;
+        case 't':
+            ret = sscanf(optarg, "%u", &opt_timeout);
+            if(ret != 1)
+            {
+                usage(argv[0]);
+                exit(-1);
+            }
             break;
         case 'c':
             ret = sscanf(optarg, "%d,%d,%d", 
@@ -313,6 +322,8 @@ int main(
     /* key for data tables */
     if(rank == 0)
     {
+        printf("# sysint tests using acache and ncache timeout of: %u ms.\n", 
+            opt_timeout);
         printf("# <api>\t<op>\t<file_size>\t<procs>\t<n_ops_per_proc>\t<n_ops_total>\t<time>\t<rate_per_proc>\t<rate_total>\n");
     }
 
@@ -888,6 +899,18 @@ void pvfs_prep(int rank, int* n_ops)
     if(ret < 0)
     {
         handle_error(ret, "init");
+    }
+
+    /* set ncache and acache timeout values */
+    ret = PVFS_sys_set_info(PVFS_SYS_NCACHE_TIMEOUT_MSECS, opt_timeout);
+    if(ret < 0)
+    {
+        handle_error(ret, "PVFS_sys_set_info");
+    }
+    ret = PVFS_sys_set_info(PVFS_SYS_ACACHE_TIMEOUT_MSECS, opt_timeout);
+    if(ret < 0)
+    {
+        handle_error(ret, "PVFS_sys_set_info");
     }
 
     /* set up an array of handles to keep track of files */
