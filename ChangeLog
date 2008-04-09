@@ -2,6 +2,29 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+pvfs-2.7.1
+==============
+
+* support for the latest kernel versions
+
+* kernel module:
+   - fixes to kernel dcache revalidate for multiple clients
+   - fixes to kernel getattr update race conditions
+   - modified kernel slot timeout to be separate (and much longer) from
+     the upcall timeout
+
+* bmi-ib: fixes to infiniband double free bugs
+* bmi-tcp: fixes to eager mode for slower client platforms
+
+* fixes to state machine processing.
+* fixes for the migration utility to work with single config file.
+* memory corruption fixes.
+
+* performance:
+    - removed unecessary locks in server metadata operations
+    - better caching of long-term attributes for IO
+
+
 pvfs-2.7.0
 ==============
 * ib: free cached registrations when out of space (openib only)
