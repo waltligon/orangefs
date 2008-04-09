@@ -49,13 +49,17 @@
 ###############################################################
 # Generic makefile setup 
 
-# define a few generic variables that we need to use
+# define a few generic variables that we need to use; DESTDIR may
+# be overridden on the command line during make install
 DESTDIR =
 srcdir = @srcdir@
-prefix = $(DESTDIR)@prefix@
-datarootdir = $(DESTDIR)@datarootdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+includedir = $(DESTDIR)@includedir@
 mandir = $(DESTDIR)@mandir@
-exec_prefix = $(DESTDIR)@exec_prefix@
+sbindir = $(DESTDIR)@sbindir@
+bindir = $(DESTDIR)@bindir@
+libdir = $(DESTDIR)@libdir@
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
@@ -63,6 +67,7 @@ INSTALL = @INSTALL@
 # TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
+LN_S = ln -snf
 BUILD_BMI_TCP = @BUILD_BMI_TCP@
 BUILD_GM = @BUILD_GM@
 BUILD_MX = @BUILD_MX@
@@ -157,11 +162,17 @@ LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LIBS += -lpvfs2 @LIBS@ 
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
+# need to include external dependency libs when building shared libraries
+DEPLIBS := @LIBS@
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
 NPTL_WORKAROUND = @NPTL_WORKAROUND@
 STRICT_CFLAGS = @STRICT_CFLAGS@
+SO_VER = @PVFS2_VERSION_MAJOR@
+SO_MINOR = @PVFS2_VERSION_MINOR@
+SO_RELEASE = @PVFS2_VERSION_SUB@
+SO_FULLVER = $(SO_VER).$(SO_MINOR).$(SO_RELEASE)
 # for Solaris:
 # LIBS += -lsocket -lnsl
 
@@ -285,6 +296,7 @@ endif
 LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
 LIBS += @THREAD_LIB@
+DEPLIBS += @THREAD_LIB@
 LIBS_THREADED += @THREAD_LIB@
 
 ################################################################
@@ -299,32 +311,26 @@ endif
 # enable GM if configure detected it
 
 ifdef BUILD_GM
-	CFLAGS += -I @GM_HOME@/include -I @GM_HOME@/include/gm
-	CFLAGS += -D__STATIC_METHOD_BMI_GM__
-	# TODO: later on we will want the ability to modify this at configure
-	# time
-	CFLAGS += -DENABLE_GM_BUFPOOL
-	LDFLAGS += -L@GM_HOME@/lib
-	SERVER_LDFLAGS += -L@GM_HOME@/lib
-	LIBS += -lgm
-	LIBS_THREADED += -lgm
-	SERVERLIBS += -lgm
+    # other settings in bmi_gm/module.mk.in
+    CFLAGS += -D__STATIC_METHOD_BMI_GM__
+    GMLIBS := -L@GM_LIBDIR@ -lgm
+    LIBS += $(GMLIBS)
+    DEPLIBS += $(GMLIBS)
+    LIBS_THREADED += $(GMLIBS)
+    SERVERLIBS += $(GMLIBS)
 endif
 
 ################################################################
 # enable MX if configure detected it
 
 ifdef BUILD_MX
-	CFLAGS += -I @MX_HOME@/include
-	CFLAGS += -D__STATIC_METHOD_BMI_MX__
-	# TODO: later on we will want the ability to modify this at configure
-	# time
-	CFLAGS += -g -O0
-	LDFLAGS += -L@MX_HOME@/lib
-	SERVER_LDFLAGS += -L@MX_HOME@/lib
-	LIBS += -lmyriexpress -lpthread
-	LIBS_THREADED += -lmyriexpress -lpthread
-	SERVERLIBS += -lmyriexpress -lpthread
+    # other settings in bmi_mx/module.mk.in
+    CFLAGS += -D__STATIC_METHOD_BMI_MX__
+    MXLIBS := -L@MX_LIBDIR@ -lmyriexpress -lpthread
+    LIBS += $(MXLIBS)
+    DEPLIBS += $(MXLIBS)
+    LIBS_THREADED += $(MXLIBS)
+    SERVERLIBS += $(MXLIBS)
 endif
 
 #####################################
@@ -336,6 +342,7 @@ ifdef BUILD_IB
     IBLIBS := -L@IB_LIBDIR@ \
 	      -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
     LIBS += $(IBLIBS)
+    DEPLIBS += $(IBLIBS)
     LIBS_THREADED += $(IBLIBS)
     SERVERLIBS += $(IBLIBS)
 endif
@@ -346,6 +353,7 @@ ifndef BUILD_IB
 endif
     OPENIBLIBS := -L@OPENIB_LIBDIR@ -libverbs
     LIBS += $(OPENIBLIBS)
+    DEPLIBS += $(OPENIBLIBS)
     LIBS_THREADED += $(OPENIBLIBS)
     SERVERLIBS += $(OPENIBLIBS)
 endif
@@ -356,6 +364,7 @@ ifdef BUILD_PORTALS
 ifneq (,@PORTALS_LIBS@)
     PORTALS_LIBS := @PORTALS_LIBS@
     LIBS += $(PORTALS_LIBS)
+    DEPLIBS += $(PORTALS_LIBS)
     LIBS_THREADED += $(PORTALS_LIBS)
     SERVERLIBS += $(PORTALS_LIBS)
 endif
@@ -401,6 +410,8 @@ ADMINSRC_SERVER :=
 LIBSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
+# SERVERBINSRC is source files that don't get added to the server library but must be added to the server binary
+SERVERBINSRC :=
 # DOCSRC is source code for documentation
 DOCSRC :=
 # VISSRC is the source code for visualization tools
@@ -412,8 +423,7 @@ VISMISCSRC :=
 KARMASRC :=
 # userland helper programs for kernel drivers
 KERNAPPSRC :=
-#
-KERNAPPSTHRSRC :=
+KERNAPPTHRSRC :=
 # MISCSRC are sources that don't fall into the other categories
 MISCSRC := 
 # c files generated from state machines
@@ -431,18 +441,18 @@ SERVER_STUB := src/server/pvfs2-server-stub
 SERVER := src/server/pvfs2-server
 endif
 
-# LIBRARIES is a list of the pvfs2 client libraries
+# LIBRARIES is a list of the pvfs2 client libraries that will be installed
 LIBRARIES :=
 LIBRARIES_THREADED :=
 ifeq ($(build_shared),yes)
 LIBRARIES_SHARED = lib/libpvfs2.so
 LIBRARIES += $(LIBRARIES_SHARED)
+LIBRARIES_THREADED += lib/libpvfs2-threaded.so
 endif
 ifeq ($(build_static),yes)
 LIBRARIES_STATIC = lib/libpvfs2.a
 LIBRARIES += $(LIBRARIES_STATIC)
-LIBRARIES_THREADED_STATIC = lib/libpvfs2-threaded.a
-LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
+LIBRARIES_THREADED += lib/libpvfs2-threaded.a
 endif
 
 ################################################################
@@ -493,6 +503,9 @@ ifdef BUILD_SERVER
     SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
     # SERVERDEPENDS is a list of dependency files for the server
     SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
+    # SERVERBINOBJS is a list of objects not in SERVEROBJS to put into the server
+    SERVERBINOBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERBINSRC)))
+    SERVERBINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERBINSRC)))
 endif
 
 # MISCOBJS is a list of misc. objects not in the above categories
@@ -501,14 +514,21 @@ MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
 MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
 
 # KERNAPPOBJS is a list of kernel driver userland objects
-KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC)))
+KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC))) \
+               $(patsubst %.c,%-threaded.o, $(filter %.c,$(KERNAPPTHRSRC)))
 # KERNAPPS is a list of kernel driver userland executables
 KERNAPPS := $(patsubst %.c,%, $(filter %.c, $(KERNAPPSRC)))
+KERNAPPSTHR := $(patsubst %.c,%, $(filter %.c, $(KERNAPPTHRSRC)))
 # KERNAPPDEPENDS is a list of dependency files for kernel driver userland
 # objects
-KERNAPPDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KERNAPPSRC)))
-
-KERNAPPSTHR := $(patsubst %.c,%-threaded, $(filter %.c, $(KERNAPPSTHRSRC)))
+KERNAPPDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KERNAPPSRC) $(KERNAPPTHRSRC)))
+# Be sure to build/install the threaded lib too; just pick the shared
+# one if configure asked for both.
+ifneq (,$(KERNAPPSTHR))
+ifeq (,$(filter $(firstword $(LIBRARIES_THREADED)),$(LIBRARIES)))
+LIBRARIES += $(firstword $(LIBRARIES_THREADED))
+endif
+endif
 
 # VISOBJS is a list of visualization program objects
 VISOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISSRC)))
@@ -545,7 +565,8 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) \
+DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(SERVERBINDEPENDS) \
+    $(MISCDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
     $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS))
 
@@ -603,7 +624,7 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 # SHORT_NAME and the object
 
 # rule for building the pvfs2 server
-$(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a 
+$(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a 
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
@@ -633,13 +654,13 @@ lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
 lib/libpvfs2.so: $(LIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -o $@ $(LIBPICOBJS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so -o $@ $(LIBPICOBJS) $(DEPLIBS)
 
 # rule for building the pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -o $@ $(LIBTHREADEDPICOBJS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
@@ -717,8 +738,11 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 # all applications depend on the pvfs2 library
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
+
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS_THREADED) $(call modldflags,$<)
 
 # special rules to build state machine compiler using build host compiler
 $(STATECOMPOBJS): %.o: %.c
@@ -773,7 +797,8 @@ endif
 # top rule for cleaning up tree
 clean:: 
 	$(Q) "  CLEAN"
-	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) $(SERVEROBJS) $(MISCOBJS) \
+	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) \
+		$(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
 		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
@@ -890,43 +915,54 @@ install_doc:
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
 
 install:: all install_doc
-	install -d $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-request.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-debug.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-types.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-util.h $(prefix)/include
-	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(prefix)/include
+	install -d $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-types.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-util.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(includedir)
 
-	install -d $(prefix)/lib
-	install -m 755 $(LIBRARIES) $(prefix)/lib
+	install -d $(libdir)
+ifneq (,$(LIBRARIES_STATIC))
+	for i in $(notdir $(LIBRARIES_STATIC)) ; do \
+	    install -m 755 lib/$$i $(libdir) ;\
+	done
+endif
+ifneq (,$(LIBRARIES_SHARED))
+	for i in $(notdir $(LIBRARIES_SHARED)) ; do \
+	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
+	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
+	done
+endif
 
 ifdef TARGET_OS_DARWIN
 #       TOC needs to be regenerated in libs after they get moved
 	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES))
 endif
 
-	install -d $(prefix)/bin
-	install -m 755 $(ADMINTOOLS) $(prefix)/bin
-	install -m 755 src/apps/admin/pvfs2-config $(prefix)/bin
+	install -d $(bindir)
+	install -m 755 $(ADMINTOOLS) $(bindir)
+	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(prefix)/bin
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(prefix)/bin
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 ifdef BUILD_KARMA
-	install -m 755 $(KARMA) $(prefix)/bin
+	install -m 755 $(KARMA) $(bindir)
 endif
 
-	install -d $(prefix)/sbin
+	install -d $(sbindir)
 
 ifdef BUILD_SERVER
-	install -m 755 $(ADMINTOOLS_SERVER) $(prefix)/bin
+	install -m 755 $(ADMINTOOLS_SERVER) $(bindir)
     ifeq ($(NPTL_WORKAROUND),)
-	install -m 755 $(SERVER) $(prefix)/sbin
+	install -m 755 $(SERVER) $(sbindir)
     else
-	install -m 755 $(srcdir)/$(SERVER_STUB) $(prefix)/sbin/pvfs2-server
-	install -m 755 $(SERVER) $(prefix)/sbin/pvfs2-server.bin
+	install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
+	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
     endif
 endif
 
@@ -947,8 +983,8 @@ just_kmod_install: just_kmod
 
 .PHONY: kmod_install
 kmod_install: kmod kernapps just_kmod_install
-	install -d $(prefix)/sbin
-	install -m 755 $(KERNAPPS) $(prefix)/sbin
+	install -d $(sbindir)
+	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(sbindir)
 endif
 
 ifneq (,$(LINUX24_KERNEL_SRC))
@@ -968,11 +1004,11 @@ just_kmod24_install: just_kmod24
 
 .PHONY: kmod24_install
 kmod24_install: kmod24 kernapps just_kmod24_install
-	install -d $(prefix)/sbin
-	install -m 755 $(KERNAPPS) $(prefix)/sbin
-	install -m 755 src/apps/kernel/linux/mount.pvfs2 $(prefix)/sbin
+	install -d $(sbindir)
+	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(sbindir)
+	install -m 755 src/apps/kernel/linux/mount.pvfs2 $(sbindir)
 	@echo ""
 	@echo "For improved linux-2.4 support,"
-	@echo "install $(prefix)/sbin/mount.pvfs2 to /sbin/mount.pvfs2"
+	@echo "install $(sbindir)/mount.pvfs2 to /sbin/mount.pvfs2"
 	@echo ""
 endif
