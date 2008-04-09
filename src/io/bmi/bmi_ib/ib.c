@@ -5,8 +5,6 @@
  * Copyright (C) 2006 Kyle Schochenmaier <kschoche@scl.ameslab.gov>
  *
  * See COPYING in top-level directory.
- *
- * $Id: ib.c,v 1.58.2.5 2008-04-01 23:25:10 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -1498,8 +1496,7 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 	    /* pin when sending rts, so also must dereg in this state */
 	    if (sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION ||
 	        sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS ||
-	        sq->state.send == SQ_WAITING_CTS ||
-		sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION)
+	        sq->state.send == SQ_WAITING_CTS)
 		memcache_deregister(ib_device->memcache, &sq->buflist);
 #  endif
 #endif
@@ -1514,8 +1511,7 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 		memcache_deregister(ib_device->memcache, &rq->buflist);
 #  if MEMCACHE_EARLY_REG
 	    /* pin on post, dereg all these */
-	    if (rq->state.recv == RQ_RTS_WAITING_CTS_SEND_COMPLETION ||
-	        rq->state.recv == RQ_RTS_WAITING_RTS_DONE)
+	    if (rq->state.recv == RQ_RTS_WAITING_CTS_SEND_COMPLETION)
 		memcache_deregister(ib_device->memcache, &rq->buflist);
 	    if (rq->state.recv == RQ_WAITING_INCOMING
 	      && rq->buflist.tot_len > ib_device->eager_buf_payload)
@@ -1619,7 +1615,6 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
     else
     {
 	map = ib_alloc_method_addr(0, hostname, port);  /* alloc new one */
-	map->ops = &bmi_ib_ops;
 	/* but don't call bmi_method_addr_reg_callback! */
     }
 

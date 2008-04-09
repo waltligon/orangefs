@@ -5,8 +5,6 @@
  * Copyright (C) 2006 Kyle Schochenmaier <kschoche@scl.ameslab.gov>
  *
  * See COPYING in top-level directory.
- *
- * $Id: openib.c,v 1.14.4.1 2008-04-01 23:25:10 slang Exp $
  */
 #include <string.h>
 #include <errno.h>

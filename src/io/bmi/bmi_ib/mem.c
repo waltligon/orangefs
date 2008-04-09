@@ -4,8 +4,6 @@
  * Copyright (C) 2004-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
- *
- * $Id: mem.c,v 1.14.4.1 2008-04-01 23:25:10 slang Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "pvfs2-internal.h"

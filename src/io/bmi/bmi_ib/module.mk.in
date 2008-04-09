@@ -5,8 +5,6 @@
 #
 # See COPYING in top-level directory.
 #
-# $Id: module.mk.in,v 1.13 2006-09-16 20:55:13 pw Exp $
-#
 
 # only do any of this if configure decided to use IB on OpenIB
 ifneq (,$(BUILD_IB)$(BUILD_OPENIB))

@@ -4,8 +4,6 @@
  * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
- *
- * $Id: vapi.c,v 1.12.2.2 2008-04-01 23:25:10 slang Exp $
  */
 #include <stdio.h>
 #include <string.h>
