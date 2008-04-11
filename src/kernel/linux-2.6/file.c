@@ -1130,7 +1130,7 @@ out:
 static ssize_t wait_for_cached_io(struct rw_options *old_rw, struct iovec *vec, 
         int nr_segs, size_t total_size)
 {
-    ssize_t err = 0, total_actual_io;
+    ssize_t err = 0, total_actual_io = 0;
     struct rw_options rw;
     loff_t isize, offset;
 
