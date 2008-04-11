@@ -1225,17 +1225,29 @@ static inline int dcache_dir_close(struct inode *inode, struct file *file)
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
+#ifdef HAVE_I_SEM_IN_STRUCT_INODE
+#define pvfs2_inode_lock(__i) do \
+{ down(&(__i)->i_sem); } while (0)
+#define pvfs2_inode_unlock(__i) do \
+{ up(&(__i)->i_sem); } while (0)
+#else
+#define pvfs2_inode_lock(__i) do \
+{ mutex_lock(&(__i)->i_mutex); } while (0)
+#define pvfs2_inode_unlock(__i) do \
+{ mutex_unlock(&(__i)->i_mutex); } while (0)
+#endif /* HAVE_I_SEM_IN_STRUCT_INODE */
+
 static inline void pvfs2_i_size_write(struct inode *inode, loff_t i_size)
 {
 #ifndef HAVE_I_SIZE_WRITE
     inode->i_size = i_size;
 #else
     #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
-    mutex_lock(&inode->i_mutex);
+    pvfs2_inode_lock(inode);
     #endif
     i_size_write(inode, i_size);
     #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
-    mutex_unlock(&inode->i_mutex);
+    pvfs2_inode_unlock(inode);
     #endif
 #endif
     return;
