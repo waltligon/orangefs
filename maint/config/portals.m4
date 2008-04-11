@@ -74,7 +74,7 @@ AC_DEFUN([AX_PORTALS],
 	CPPFLAGS="$CPPFLAGS $PORTALS_INCS"
 
 	PORTALS_LIBS="$libs"
-	LIBS="$LIBS $PORTALS_LIBS"
+	LIBS="$save_libs $PORTALS_LIBS"
 
 	AC_MSG_CHECKING([for portals3.h header])
 	ok=no
@@ -102,7 +102,7 @@ AC_DEFUN([AX_PORTALS],
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lportals"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    AC_TRY_LINK(
 		[#include <portals/portals3.h>],
 		[int m, n; m = PtlInit(&n);],
@@ -111,7 +111,7 @@ AC_DEFUN([AX_PORTALS],
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    AC_TRY_LINK(
 		[#include <portals/portals3.h>],
 		[int m, n; m = PtlInit(&n);],

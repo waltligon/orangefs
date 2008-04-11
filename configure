@@ -8418,7 +8418,9 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-		{ echo "$as_me:$LINENO: checking for struct kmem_cache in kernel" >&5
+									        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+	{ echo "$as_me:$LINENO: checking for struct kmem_cache in kernel" >&5
 echo $ECHO_N "checking for struct kmem_cache in kernel... $ECHO_C" >&6; }
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
@@ -8430,7 +8432,11 @@ cat >>conftest.$ac_ext <<_ACEOF
 		#define __KERNEL__
 		#include <linux/kernel.h>
 		#include <linux/slab.h>
-		static struct kmem_cache;
+
+		int foo(struct kmem_cache *s)
+		{
+		    return (s == NULL) ? 3 : 4;
+		}
 
 int
 main ()
@@ -8474,6 +8480,7 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
 
 		{ echo "$as_me:$LINENO: checking for SLAB_KERNEL flag in kernel" >&5
 echo $ECHO_N "checking for SLAB_KERNEL flag in kernel... $ECHO_C" >&6; }
@@ -9544,11 +9551,9 @@ echo "${ECHO_T}$gcc_version" >&6; }
 		fi
 	fi
 
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror $extra_gcc_flags"
-		{ echo "$as_me:$LINENO: checking if statfs callbacks' arguments in kernel has struct dentry argument" >&5
-echo $ECHO_N "checking if statfs callbacks' arguments in kernel has struct dentry argument... $ECHO_C" >&6; }
-			cat >conftest.$ac_ext <<_ACEOF
+	{ echo "$as_me:$LINENO: checking for dentry argument in kernel super_operations statfs" >&5
+echo $ECHO_N "checking for dentry argument in kernel super_operations statfs... $ECHO_C" >&6; }
+															cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -9557,15 +9562,15 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 		#define __KERNEL__
 		#include <linux/fs.h>
-		extern int pvfs_statfs(struct dentry *, struct kstatfs *);
-			  static struct super_operations s_op = {
-				  .statfs = pvfs_statfs,
-			  };
+		int vfs_statfs(struct dentry *de, struct kstatfs *kfs)
+		{
+			return 0;
+		}
 
 int
 main ()
 {
- s_op.statfs = 0;
+
   ;
   return 0;
 }
@@ -9605,9 +9610,9 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-	{ echo "$as_me:$LINENO: checking if get_sb callback in kernel has struct vfsmount argument" >&5
-echo $ECHO_N "checking if get_sb callback in kernel has struct vfsmount argument... $ECHO_C" >&6; }
-			cat >conftest.$ac_ext <<_ACEOF
+	{ echo "$as_me:$LINENO: checking for vfsmount argument in kernel file_system_type get_sb" >&5
+echo $ECHO_N "checking for vfsmount argument in kernel file_system_type get_sb... $ECHO_C" >&6; }
+										cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -9616,16 +9621,19 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 		#define __KERNEL__
 		#include <linux/fs.h>
-		#include <linux/mount.h>
-		extern int pvfs_get_sb(struct file_system_type *fst, int flags, const char *devname, void *data, struct vfsmount *);
-			  static struct file_system_type fst = {
-				  .get_sb = pvfs_get_sb,
-			  };
+		int get_sb_bdev(struct file_system_type *fs_type, int flags,
+				const char *dev_name, void *data,
+				int (*fill_super)(struct super_block *, void *,
+						  int),
+				struct vfsmount *vfsm)
+		{
+			return 0;
+		}
 
 int
 main ()
 {
-fst.get_sb = 0;
+
   ;
   return 0;
 }
@@ -9664,7 +9672,6 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-	CFLAGS=$tmp_cflags
 
 	{ echo "$as_me:$LINENO: checking for xattr support in kernel" >&5
 echo $ECHO_N "checking for xattr support in kernel... $ECHO_C" >&6; }
@@ -11510,7 +11517,7 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-								tmp_cflags=$CFLAGS
+        							tmp_cflags=$CFLAGS
 	CFLAGS="$CFLAGS -Werror"
 	{ echo "$as_me:$LINENO: checking for two-param kmem_cache_create constructor" >&5
 echo $ECHO_N "checking for two-param kmem_cache_create constructor... $ECHO_C" >&6; }
@@ -11574,8 +11581,8 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 	CFLAGS=$tmp_cflags
 
-	{ echo "$as_me:$LINENO: checking if kernel address_space struct has a spin_lock field" >&5
-echo $ECHO_N "checking if kernel address_space struct has a spin_lock field... $ECHO_C" >&6; }
+	{ echo "$as_me:$LINENO: checking if kernel address_space struct has a spin_lock field named page_lock" >&5
+echo $ECHO_N "checking if kernel address_space struct has a spin_lock field named page_lock... $ECHO_C" >&6; }
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -15627,7 +15634,7 @@ fi
 	CPPFLAGS="$CPPFLAGS $PORTALS_INCS"
 
 	PORTALS_LIBS="$libs"
-	LIBS="$LIBS $PORTALS_LIBS"
+	LIBS="$save_libs $PORTALS_LIBS"
 
 	{ echo "$as_me:$LINENO: checking for portals3.h header" >&5
 echo $ECHO_N "checking for portals3.h header... $ECHO_C" >&6; }
@@ -15734,7 +15741,7 @@ rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lportals"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -15782,7 +15789,7 @@ rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
-	    LIBS="$LIBS $PORTALS_LIBS"
+	    LIBS="$save_libs $PORTALS_LIBS"
 	    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF

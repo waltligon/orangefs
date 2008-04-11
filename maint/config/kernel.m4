@@ -117,18 +117,33 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
-	dnl 2.6.20 deprecated kmem_cache_t
+	dnl 2.6.20 deprecated kmem_cache_t; some old ones do not have struct
+	dnl kmem_cache, but may have kmem_cache_s.  It's a mess.  Just look
+	dnl for this, and assume _t if not found.
+	dnl This test relies on gcc complaining about declaring a struct
+	dnl in a parameter list.  Fragile, but nothing better is available
+	dnl to check for the existence of a struct.  We cannot see the
+	dnl definition of the struct in the kernel, it's private to the
+	dnl slab implementation.  And C lets you declare structs freely as
+	dnl long as you don't try to deal with their contents.
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for struct kmem_cache in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/kernel.h>
 		#include <linux/slab.h>
-		static struct kmem_cache;
+
+		int foo(struct kmem_cache *s)
+		{
+		    return (s == NULL) ? 3 : 4;
+		}
 	], [],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_STRUCT_KMEM_CACHE, 1, Define if struct kmem_cache is defined in kernel),
 		AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
 
 	dnl 2.6.20 removed SLAB_KERNEL.  Need to use GFP_KERNEL instead
 	AC_MSG_CHECKING(for SLAB_KERNEL flag in kernel)
@@ -411,43 +426,61 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			extra_gcc_flags="-Wno-pointer-sign  -Wno-strict-aliasing -Wno-strict-aliasing=2"
 		fi
 	fi
-		
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror $extra_gcc_flags"
-	dnl if this test passes, there is a struct dentry* argument
-	AC_MSG_CHECKING(if statfs callbacks' arguments in kernel has struct dentry argument)
-	dnl if this test passes, the kernel has it
-	dnl if this test fails, the kernel does not have it
+
+	AC_MSG_CHECKING(for dentry argument in kernel super_operations statfs)
+	dnl Rely on the fact that there is an external vfs_statfs that is
+	dnl of the same type as the .statfs in struct super_operations to
+	dnl verify the signature of that function pointer.  There is a single
+	dnl commit in the git history where both changed at the same time
+	dnl from super_block to dentry.
+	dnl
+	dnl The alternative approach of trying to define a s_op.statfs is not
+	dnl as nice because that only throws a warning, requiring -Werror to
+	dnl catch it.  This is a problem if the compiler happens to spit out
+	dnl other spurious warnings that have nothing to do with the test.
+	dnl
+	dnl If this test passes, the kernel uses a struct dentry argument.
+	dnl If this test fails, the kernel uses something else (old struct
+	dnl super_block perhaps).
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		extern int pvfs_statfs(struct dentry *, struct kstatfs *);
-			  static struct super_operations s_op = {
-				  .statfs = pvfs_statfs,
-			  };
-		], [ s_op.statfs = 0; ],
+		int vfs_statfs(struct dentry *de, struct kstatfs *kfs)
+		{
+			return 0;
+		}
+		], [],
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if statfs callback has struct dentry argument),
+		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if super_operations statfs has dentry argument),
 		AC_MSG_RESULT(no)
 	)
 
-	AC_MSG_CHECKING(if get_sb callback in kernel has struct vfsmount argument)
-	dnl if this test passes, the kernel has it
-	dnl if this test fails, the kernel does not have it
+	AC_MSG_CHECKING(for vfsmount argument in kernel file_system_type get_sb)
+	dnl Same trick as above.  A single commit changed mayn things at once:
+	dnl type and signature of file_system_type.get_sb, and signature of
+	dnl get_sb_bdev.  This test is a bit more tenuous, as get_sb_bdev
+	dnl isn't used directly in a file_system_type, but is a popular helper
+	dnl for many FSes.  And it has not exactly the same signature.
+	dnl
+	dnl If this test passes, the kernel has the most modern known form,
+	dnl which includes a stfuct vfsmount argument.
+	dnl If this test fails, the kernel uses something else.
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		#include <linux/mount.h>
-		extern int pvfs_get_sb(struct file_system_type *fst, int flags, const char *devname, void *data, struct vfsmount *);
-			  static struct file_system_type fst = {
-				  .get_sb = pvfs_get_sb,
-			  };
-		], [fst.get_sb = 0;],
+		int get_sb_bdev(struct file_system_type *fs_type, int flags,
+				const char *dev_name, void *data,
+				int (*fill_super)(struct super_block *, void *,
+						  int),
+				struct vfsmount *vfsm)
+		{
+			return 0;
+		}
+		], [],
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if get_sb callback has struct vfsmount argument),
+		AC_DEFINE(HAVE_VFSMOUNT_GETSB, 1, Define if file_system_type get_sb has vfsmount argument),
 		AC_MSG_RESULT(no)
 	)
-	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(for xattr support in kernel)
 	dnl if this test passes, the kernel has it
@@ -858,7 +891,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
-	dnl 2.6.24 changed the constructor parameter signature of
+        dnl 2.6.24 changed the constructor parameter signature of
 	dnl kmem_cache_create.  Check for this newer two-param style and
 	dnl if not, assume it is old.  Note we can get away with just
 	dnl struct kmem_cache (and not kmem_cache_t) as that change happened
@@ -884,7 +917,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 	CFLAGS=$tmp_cflags
 
-	AC_MSG_CHECKING(if kernel address_space struct has a spin_lock field)
+	AC_MSG_CHECKING(if kernel address_space struct has a spin_lock field named page_lock)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
