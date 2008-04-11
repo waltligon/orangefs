@@ -19,10 +19,18 @@ pvfs-2.7.1
 * fixes to state machine processing.
 * fixes for the migration utility to work with single config file.
 * memory corruption fixes.
+* improved support for multithreaded system interface usage
 
 * performance:
     - removed unecessary locks in server metadata operations
     - better caching of long-term attributes for IO
+    - improved pvfs2-lsplus and readdirplus() performance
+
+* configuration:
+    --enable-threaded-kmod configure time option replaces -threaded run time
+      option to pvfs2-client
+    - segfault backtraces enabled by default
+    - HA script examples updated for use with Heartbeat 2.1.2 and newer
 
 
 pvfs-2.7.0
