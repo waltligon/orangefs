@@ -68,6 +68,33 @@ AC_DEFUN([AX_MX],
     AC_SUBST(BUILD_MX)
     AC_SUBST(MX_INCDIR)
     AC_SUBST(MX_LIBDIR)
+
+    if test -n "$BUILD_MX" ; then
+        dnl Check for existence of mx_decompose_endpoint_addr2
+        save_ldflags="$LDFLAGS"
+        LDFLAGS="-L$MX_LIBDIR $LDFLAGS"
+	save_libs="$LIBS"
+	LIBS="-lmyriexpress -lpthread $LIBS"
+        save_cppflags="$CPPFLAGS"
+        CPPFLAGS="$CPPFLAGS -I$MX_INCDIR"
+
+        AC_MSG_CHECKING(for mx_decompose_endpoint_addr2)
+        AC_TRY_LINK([
+            #include "mx_extensions.h"
+            #include <stdlib.h>
+        ], [ 
+            mx_endpoint_addr_t epa;
+            mx_decompose_endpoint_addr2(epa, NULL, NULL, NULL);
+        ],
+            AC_MSG_RESULT(yes),
+            AC_MSG_RESULT(no)
+	    AC_MSG_ERROR([Function mx_decompose_endpoint_addr2() not found.])
+        )
+
+        LDFLAGS="$save_ldflags"
+        CPPFLAGS="$save_cppflags"
+        LIBS="$save_libs"
+    fi
 ])
 
 dnl vim: set ft=config :
