@@ -1172,31 +1172,28 @@ int PVFS_util_init_defaults(void)
 #define KILOBYTE                1024
 #define MEGABYTE   (1024 * KILOBYTE)
 #define GIGABYTE   (1024 * MEGABYTE)
-#define TERABYTE   (1024 * GIGABYTE)
-#define PETABYTE   (1024 * TERABYTE)
-/*
-#define EXABYTE    (1024 * PETABYTE)
-#define ZETTABYTE  (1024 * EXABYTE)
-#define YOTTABYTE  (1024 * ZETTABYTE)
-*/
+#define TERABYTE   (1024llu * GIGABYTE)
+#define PETABYTE   (1024llu * TERABYTE)
+#define EXABYTE    (1024llu * ETABYTE)
+#define ZETTABYTE  (1024llu * EXABYTE)
+#define YOTTABYTE  (1024llu * ZETTABYTE)
+
 /*****************/
 /* si size units */
 /*****************/
 #define SI_KILOBYTE                   1000
 #define SI_MEGABYTE   (1000 * SI_KILOBYTE)
 #define SI_GIGABYTE   (1000 * SI_MEGABYTE)
-#define SI_TERABYTE  (1000 * SI_GIGABYTE)
-#define SI_PETABYTE  (1000 * SI_TERABYTE)
-/*
-#define SI_EXABYTE   (1000 * SI_PETABYTE)
-#define SI_ZETTABYTE (1000 * SI_EXABYTE)
-#define SI_YOTTABYTE (1000 * SI_ZETTABYTE)
-*/
+#define SI_TERABYTE  (1000llu * SI_GIGABYTE)
+#define SI_PETABYTE  (1000llu * SI_TERABYTE)
+#define SI_EXABYTE   (1000llu * SI_PETABYTE)
+#define SI_ZETTABYTE (1000llu * SI_EXABYTE)
+#define SI_YOTTABYTE (1000llu * SI_ZETTABYTE)
 
 #if SIZEOF_LONG_INT == 8
 #define NUM_SIZES                      5
 #else
-#define NUM_SIZES                 4 
+#define NUM_SIZES                      4
 #endif
 
 static PVFS_size PINT_s_size_table[NUM_SIZES] =
@@ -1204,7 +1201,7 @@ static PVFS_size PINT_s_size_table[NUM_SIZES] =
     /*YOTTABYTE, ZETTABYTE, EXABYTE, */
 #if SIZEOF_LONG_INT == 8
     PETABYTE,
-    TERABYTE, 
+    TERABYTE,
 #endif
     GIGABYTE, MEGABYTE, KILOBYTE
 };
@@ -1224,7 +1221,7 @@ static const char *PINT_s_str_size_table[NUM_SIZES] =
     /*"Y", "Z", "E", */
 #if SIZEOF_LONG_INT == 8
     "P",
-    "T", 
+    "T",
 #endif
     "G", "M", "K"
 };
