@@ -202,7 +202,6 @@ struct PVFS_servreq_create_file
     PVFS_handle parent_handle;
     char *object_name;                /* name of new entry */
     PVFS_object_attr attr;
-    PINT_dist *dist;
     uint32_t num_data_files;
 
     /*
@@ -211,9 +210,7 @@ struct PVFS_servreq_create_file
       newly created handle(s).  To request a single handle,
       a single extent with first = last should be used.
     */
-    PVFS_handle_extent_array handle_extent_array;
-
-    PVFS_BMI_addr_t data_server_addrs;
+    PVFS_handle_extent_array meta_handle_extent_array;
 };
 endecode_fields_7_struct(
     PVFS_servreq_create_file,
@@ -221,9 +218,9 @@ endecode_fields_7_struct(
     PVFS_handle, parent_handle,
     string, object_name,
     PVFS_object_attr, attr,
-    PINT_dist, dist,
     uint32_t, num_data_files,
-    PVFS_handle_extent_array, handle_extent_array
+    uint32_t, num_data_files2,
+    PVFS_handle_extent_array, meta_handle_extent_array
 )
 #define extra_size_PVFS_servreq_create_file \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
@@ -235,9 +232,9 @@ endecode_fields_7_struct(
                                       __object_name,   \
                                       __attr,          \
                                       __extra_amask,   \
-                                      __dist,          \
                                       __num_data_files,\
-                                      __ext_array)     \
+                                      __num_data_files2,\
+                                      __meta_handle_ext_array)\
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_CREATE_FILE;                \
@@ -246,12 +243,11 @@ do {                                                   \
     (__req).u.create_file.parent_handle = (__parent_handle); \
     (__req).u.create_file.object_name = (__object_name);\
     PINT_CONVERT_ATTR(&(__req).u.create_file.attr, &(__attr), __extra_amask);\
-    (__req).u.create_file.dist = (__dist);\
     (__req).u.create_file.num_data_files = (__num_data_files);\
-    (__req).u.create_file.handle_extent_array.extent_count =\
-        (__ext_array).extent_count;                    \
-    (__req).u.create_file.handle_extent_array.extent_array =\
-        (__ext_array).extent_array;                    \
+    (__req).u.create_file.meta_handle_extent_array.extent_count =\
+        (__meta_handle_ext_array).extent_count;                    \
+    (__req).u.create_file.meta_handle_extent_array.extent_array =\
+        (__meta_handle_ext_array).extent_array;                    \
 } while (0)
 
 /* add as needed for all return values - return attributes */

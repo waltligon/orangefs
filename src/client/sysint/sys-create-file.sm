@@ -157,9 +157,9 @@ PVFS_error PVFS_isys_create_file(
     sm_p->u.create_file.object_name = object_name;
     sm_p->u.create_file.create_file_resp = resp;
     PVFS_util_copy_sys_attr(&sm_p->u.create_file.sys_attr, &attr);
+    sm_p->u.create_file.num_data_files = 0;
 
     sm_p->u.create_file.retry_count = 0;
-    sm_p->u.create_file.num_data_files = 0;
     sm_p->u.create_file.stored_error_code = 0;
 
     sm_p->u.create_file.datafile_handles = NULL;
@@ -395,6 +395,7 @@ static PINT_sm_action create_file_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
+gossip_debug(GOSSIP_CLIENT_DEBUG, "create_file: object_name = %s\n", sm_p->u.create_file.object_name);
     /* set up create-file request */
     PINT_SERVREQ_CREATE_FILE_FILL(
         msg_p->req,
@@ -404,7 +405,7 @@ static PINT_sm_action create_file_setup_msgpair(
         sm_p->u.create_file.object_name,
         sm_p->u.create_file.attr,
         PVFS_ATTR_META_ALL /*sm_p->u.create_file.sys_attr*/,
-        sm_p->u.create_file.dist,
+        sm_p->u.create_file.num_data_files,
         sm_p->u.create_file.num_data_files,
         meta_handle_extent_array);
 
@@ -488,12 +489,6 @@ static PINT_sm_action create_file_cleanup(
     }
 
     PINT_free_object_attr(&sm_p->u.create_file.cache_attr);
-
-    if (sm_p->u.create_file.io_handle_extent_array)
-    {
-        free(sm_p->u.create_file.io_handle_extent_array);
-        sm_p->u.create_file.io_handle_extent_array = NULL;
-    }
 
     if (sm_p->u.create_file.data_server_addrs)
     {

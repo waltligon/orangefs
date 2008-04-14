@@ -240,7 +240,6 @@ static PINT_sm_action create_file_setup(
     }
     /* zero out all members */
     memset(sm_p, 0, sizeof(struct PINT_client_sm));
-    PINT_sm_push_frame(smcb, 0, sm_p);
 
     /* Copied this from #define PINT_init_msgarray_params in client-state-machine.h
      * because PINT_get_server_config_struct(__fsid) was not available on the server
@@ -266,21 +265,23 @@ static PINT_sm_action create_file_setup(
     }
 
     sm_p->cred_p = &(s_op->req->credentials);
+gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_setup: s_op->req->u.create_file.object_name = %s\n", s_op->req->u.create_file.object_name);
     sm_p->u.create_file.object_name = s_op->req->u.create_file.object_name;
     sm_p->u.create_file.attr = s_op->req->u.create_file.attr;
-#if 0
-    PVFS_util_copy_sys_attr(&sm_p->u.create_file.sys_attr, &s_op->req->u.create_file.sys_attr);
-#endif
     sm_p->parent_ref.handle = s_op->req->u.create_file.parent_handle;
     sm_p->parent_ref.fs_id = s_op->req->u.create_file.fs_id;
     sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
-    sm_p->u.create_file.dist = s_op->req->u.create_file.dist;
     sm_p->u.create_file.num_data_files = s_op->req->u.create_file.num_data_files;
+    sm_p->u.create_file.meta_handle_extent_array.extent_count =
+           s_op->req->u.create_file.meta_handle_extent_array.extent_count;
+    sm_p->u.create_file.meta_handle_extent_array.extent_array =
+           s_op->req->u.create_file.meta_handle_extent_array.extent_array;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "Creating file %s under %llu, %d\n",
         sm_p->u.create_file.object_name, llu(sm_p->parent_ref.handle),
         sm_p->parent_ref.fs_id);
 
+    PINT_sm_push_frame(smcb, 0, sm_p);
     return(SM_ACTION_COMPLETE);
 }
 
@@ -476,7 +477,7 @@ static PINT_sm_action create_dspace_create(
 
     ret = job_trove_dspace_create(
         sm_p->parent_ref.fs_id,
-        sm_p->u.create_file.metafile_handle_extent_array,
+        &sm_p->u.create_file.meta_handle_extent_array,
         sm_p->u.create_file.attr.objtype,
         NULL,
         TROVE_SYNC ,
@@ -511,6 +512,7 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     struct server_configuration_s *server_config = NULL;
+    PVFS_handle_extent_array *io_handle_extent_array;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "datafiles_setup_msgpair_array\n");
@@ -518,13 +520,11 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
     js_p->error_code = 0;
 
     /* allocate handle extent array objects */
-    if (sm_p->u.create_file.io_handle_extent_array == NULL)
-    {
-        sm_p->u.create_file.io_handle_extent_array = (PVFS_handle_extent_array *)
-            malloc(sm_p->u.create_file.num_data_files *
-                   sizeof(PVFS_handle_extent_array));
-    }
-    if (!sm_p->u.create_file.io_handle_extent_array)
+/* TODO: need to free io_handle_extent_array */
+    io_handle_extent_array = (PVFS_handle_extent_array *)
+        malloc(sm_p->u.create_file.num_data_files *
+               sizeof(PVFS_handle_extent_array));
+    if (!io_handle_extent_array)
     {
         gossip_err("create: failed to allocate handle_extent_array\n"); 
         js_p->error_code = -PVFS_ENOMEM;
@@ -552,7 +552,7 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
         &sm_p->u.create_file.num_data_files,
         &sm_p->u.create_file.layout,
         sm_p->u.create_file.data_server_addrs,
-        sm_p->u.create_file.io_handle_extent_array);
+        io_handle_extent_array);
     if(ret < 0)
     {
         gossip_err("create: failed to map the layout to a set of IO servers\n");
@@ -594,17 +594,17 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             PVFS_TYPE_DATAFILE,     /* this creates a datafile */
-            sm_p->u.create_file.io_handle_extent_array[i]);
+            io_handle_extent_array[i]);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,  "posting datafile[%d] create "
                      "with extents %llu-%llu\n", i,
-                     llu(sm_p->u.create_file.io_handle_extent_array[i].
+                     llu(io_handle_extent_array[i].
                         extent_array[0].first),
-                     llu(sm_p->u.create_file.io_handle_extent_array[i].
+                     llu(io_handle_extent_array[i].
                         extent_array[0].last));
 
         msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = sm_p->u.create_file.io_handle_extent_array[i].
+        msg_p->handle = io_handle_extent_array[i].
             extent_array[0].first;
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = create_datafiles_comp_fn;
@@ -939,12 +939,6 @@ static PINT_sm_action create_file_work_cleanup(
 
     PINT_free_object_attr(&sm_p->u.create_file.cache_attr);
 
-    if (sm_p->u.create_file.io_handle_extent_array)
-    {
-        free(sm_p->u.create_file.io_handle_extent_array);
-        sm_p->u.create_file.io_handle_extent_array = NULL;
-    }
-
     if (sm_p->u.create_file.data_server_addrs)
     {
         free(sm_p->u.create_file.data_server_addrs);
@@ -963,10 +957,12 @@ static PINT_sm_action create_file_work_cleanup(
         sm_p->u.create_file.dist = NULL;
     }
 
+#if 0
     if(sm_p->u.create_file.layout.algorithm == PVFS_SYS_LAYOUT_LIST)
     {
         free(sm_p->u.create_file.layout.server_list.servers);
     }
+#endif
 
     if (sm_p->msgarray != &(sm_p->msgpair))
     {
@@ -992,12 +988,11 @@ static PINT_sm_action create_getattr_local(
 
     js_p->error_code = 0;
 
-    PINT_cached_config_get_server_name(server_name, 1024, sm_p->object_ref.handle,
-        sm_p->object_ref.fs_id);
+    PINT_cached_config_get_server_name(server_name, 1024, sm_p->parent_ref.handle,
+        sm_p->parent_ref.fs_id);
 
     if (strcmp(config->host_id, server_name)) {
-        /* TODO: perform local lookup. */
-        /* Can we just call the nested get_attr state machine? */
+        /* Call the nested get_attr state machine? */
         struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
 
         if(!s_op)
@@ -1008,22 +1003,19 @@ static PINT_sm_action create_getattr_local(
         memset(s_op, 0, sizeof(struct PINT_server_op));
         PINT_sm_push_frame(smcb, 0, s_op);
 
-        s_op->op = PVFS_SERV_SETATTR;
+        s_op->op = PVFS_SERV_GETATTR;
 /*  TODO: see what really needs to be done with credentials
  *      s_op->credentials.uid = sm_p->cred_p->uid;
  *      s_op->credentials.gid = sm_p->cred_p->gid;
  */
-        s_op->u.setattr.handle = sm_p->object_ref.handle;
-        s_op->u.setattr.fs_id = sm_p->object_ref.fs_id;
-        s_op->u.setattr.attr = sm_p->u.create_file.attr;
-        s_op->u.setattr.attr.u.meta.dfile_array =
-            sm_p->u.create_file.datafile_handles;
-        s_op->u.setattr.attr.u.meta.dfile_count =
-            sm_p->u.create_file.num_data_files;
-        s_op->u.setattr.attr.u.meta.dist =
-            sm_p->u.create_file.dist;
-        s_op->u.setattr.attr.u.meta.dist_size =
-            PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
+        s_op->u.getattr.handle = sm_p->parent_ref.handle;
+        s_op->u.getattr.fs_id = sm_p->parent_ref.fs_id;
+
+/* ??? */
+        s_op->u.getattr.attrmask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
+#if 0
+/*        s_op->u.getattr.ref_type = PVFS_TYPE_DIRECTORY; */
+#endif
 
         return(SM_ACTION_COMPLETE);
     }
@@ -1034,57 +1026,6 @@ static PINT_sm_action create_getattr_local(
         /* need to set up machine for remote lookup here    */
         return(-PVFS_ENOENT);
     }
-
-#if 0
-PINT_cached_config_get_server(fsid, config->host_id, server_type, &extent_array);
-If you donot care about the server type, you can pass in:
- PINT_SERVER_TYPE_META|PINT_SERVER_TYPE_IO
-Then with the returned extent_array, you can do:
-is_my_handle = PINT_handle_in_extent_array(&extent_array, your_handle);
-
-    PVFS_handle_extent_array extent_array;
-
-    ret = PINT_cached_config_get_server_array(config, sm_p->object_ref.fs_id,
-        PINT_SERVER_TYPE_META, &extent_array);
-    if (PINT_handle_in_extent_array(&extent_array, sm_p->object_ref.handle))
-    {
-        /* TODO: perform local lookup. Can we just call the nested get_attr state machine? */
-        return(SM_ACTION_COMPLETE);
-    }
-    else
-    {
-        /* it's not on this server. */
-        return(-PVFS_ENOENT);
-    }
-#endif
-
-#if 0   /* Elaine's feeble attempt */
-    ret = PINT_cached_config_map_to_server(&parent_addr,
-        sm_p->u.create_file.parent_handle,
-        sm_p->object_ref.fs_id);
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
-    current_addr_bmi_str = PINT_config_get_host_addr_ptr(server_config, server_config->host_id);
-    if (current_addr_bmi_str)
-    {
-        ret = BMI_addr_lookup(&current_addr, current_addr_bmi_str);
-    }
-
-    if (BMI_query_addr_range(parent_addr, current_addr_bmi_str, 32))
-    {
-        /* TODO: perform local lookup. Can we just call the nested get_attr state machine? */
-        return(SM_ACTION_COMPLETE);
-    }
-    else
-    {
-        return(-PVFS_ENOENT);
-    }
-#endif
 }
 
 /** looks at the attributes of the parent directory and decides if it impacts
