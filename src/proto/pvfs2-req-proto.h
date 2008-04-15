@@ -196,32 +196,33 @@ endecode_fields_1_struct(
 /* add info from set_attr for standard metadata, distribution */
 /* etc.  Add num_datafiles. Expand extent_array to cover for each */
 /* datafile, add file name (see crdirent) */
-struct PVFS_servreq_create_file
-{
-    PVFS_fs_id fs_id;
-    PVFS_handle parent_handle;
-    char *object_name;                /* name of new entry */
-    PVFS_object_attr attr;
-    uint32_t num_data_files;
 
-    /*
+    /* meta_handle_extent_array argument (below):
       an array of handle extents that we use to suggest to
       the server from which handle range to allocate for the
       newly created handle(s).  To request a single handle,
       a single extent with first = last should be used.
     */
+
+struct PVFS_servreq_create_file
+{
+    char *object_name;                /* name of new entry */
+    PVFS_handle parent_handle;
+    PVFS_fs_id fs_id;
+    uint32_t num_data_files;
     PVFS_handle_extent_array meta_handle_extent_array;
+    PVFS_object_attr attr;
 };
 endecode_fields_7_struct(
     PVFS_servreq_create_file,
-    PVFS_fs_id, fs_id,
-    PVFS_handle, parent_handle,
     string, object_name,
-    PVFS_object_attr, attr,
+    PVFS_handle, parent_handle,
+    PVFS_fs_id, fs_id,
     uint32_t, num_data_files,
-    uint32_t, num_data_files2,
-    PVFS_handle_extent_array, meta_handle_extent_array
-)
+    PVFS_handle_extent_array, meta_handle_extent_array,
+    PVFS_object_attr, attr,
+    skip4,)
+
 #define extra_size_PVFS_servreq_create_file \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
 
@@ -233,7 +234,6 @@ endecode_fields_7_struct(
                                       __attr,          \
                                       __extra_amask,   \
                                       __num_data_files,\
-                                      __num_data_files2,\
                                       __meta_handle_ext_array)\
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \

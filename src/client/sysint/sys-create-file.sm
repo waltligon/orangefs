@@ -406,7 +406,6 @@ gossip_debug(GOSSIP_CLIENT_DEBUG, "create_file: object_name = %s\n", sm_p->u.cre
         sm_p->u.create_file.attr,
         PVFS_ATTR_META_ALL /*sm_p->u.create_file.sys_attr*/,
         sm_p->u.create_file.num_data_files,
-        sm_p->u.create_file.num_data_files,
         meta_handle_extent_array);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
