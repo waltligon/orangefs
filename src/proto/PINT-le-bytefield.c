@@ -108,7 +108,7 @@ static void lebf_initialize(void)
 		break;
 	    case PVFS_SERV_CREATE_FILE:
 		/* can request a range of handles */
-		req.u.create_file.handle_extent_array.extent_count = 0;
+		req.u.create_file.meta_handle_extent_array.extent_count = 0;
 		reqsize = extra_size_PVFS_servreq_create_file;
 		break;
 	    case PVFS_SERV_REMOVE:
@@ -772,7 +772,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     decode_free(req->u.listattr.handles);
 
 	    case PVFS_SERV_CREATE_FILE:
-		decode_free(req->u.create_file.handle_extent_array.extent_array);
+		decode_free(req->u.create_file.meta_handle_extent_array.extent_array);
 		break;
 
 	    case PVFS_SERV_GETCONFIG:
