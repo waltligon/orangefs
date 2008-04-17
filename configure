@@ -1324,7 +1324,6 @@ Optional Features:
   --disable-server Disables building of PVFS2 server
   --disable-karma-mem-usage-stats Disables memory usage stats in karma
   --disable-perf-counters Disables pvfs2-server performance counters
-  --disable-disk-io       Disables pvfs2-server disk I/O (for testing)
   --enable-mmap-racache   Enables mmap-readahead in kernel interface
   --enable-trusted-connections  Enable connects only from trusted hosts/ports
                                 (experimental, off by default)
@@ -6838,15 +6837,6 @@ fi
 if test "${enable_perf_counters+set}" = set; then
   enableval=$enable_perf_counters; if test "x$enableval" = "xno" ; then
     CFLAGS="$CFLAGS -D__PVFS2_DISABLE_PERF_COUNTERS__"
-fi
-
-fi
-
-
-# Check whether --enable-disk-io was given.
-if test "${enable_disk_io+set}" = set; then
-  enableval=$enable_disk_io; if test "x$enableval" = "xno" ; then
-    CFLAGS="$CFLAGS -D__PVFS2_DISABLE_DISK_IO__"
 fi
 
 fi
