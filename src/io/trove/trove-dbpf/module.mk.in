@@ -15,7 +15,8 @@ SERVERSRC += \
 	$(DIR)/dbpf-mgmt.c \
 	$(DIR)/dbpf-keyval-pcache.c \
 	$(DIR)/dbpf-sync.c \
-	$(DIR)/dbpf-alt-aio.c 
+	$(DIR)/dbpf-alt-aio.c \
+	$(DIR)/dbpf-null-aio.c 
 
 # Grab trove-ledger.h from handle-mgmt.  Also make _GNU_SOURCE definition 
 # required for access to pread/pwrite on Linux.  _XOPEN_SOURCE seems to be
