@@ -33,6 +33,7 @@ void vfs_readdir(int rank, int* n_ops);
 void vfs_readdir_and_stat(int rank, int* n_ops);
 void vfs_write(int rank, int* n_ops);
 void vfs_read(int rank, int* n_ops);
+void vfs_close(int rank, int* n_ops);
 void vfs_print_error(int errcode, char *str); 
 
 void mpi_print_error(int errcode, char *str); 
@@ -74,6 +75,7 @@ struct api_ops
     void (*readdirplus) (int rank, int* n_ops);
     void (*write) (int rank, int* n_ops);
     void (*read) (int rank, int* n_ops);
+    void (*close) (int rank, int* n_ops);
     void (*print_error) (int errorcode, char* str);
 };
 
@@ -90,6 +92,7 @@ struct api_ops api_table[] = {
         .readdirplus = NULL,
         .read = vfs_read,
         .write = vfs_write,
+        .close = vfs_close,
         .print_error = vfs_print_error,
     },
     {
@@ -104,6 +107,7 @@ struct api_ops api_table[] = {
         .readdirplus = pvfs_readdirplus,
         .read = pvfs_read,
         .write = pvfs_write,
+        .close = NULL,
         .print_error = pvfs_print_error,
     },
     {
@@ -118,6 +122,7 @@ struct api_ops api_table[] = {
         .readdirplus = NULL,
         .read = NULL,
         .write = NULL,
+        .close = NULL,
         .print_error = mpi_print_error,
     },
     {0}
@@ -494,6 +499,21 @@ int main(
         test++;
         CHECK_MAX_TEST(test);
 
+        /* close files */
+        result_array[test].op = "close";
+        result_array[test].nprocs = i;
+        run_test_phase(
+            &result_array[test].time, 
+            &result_array[test].size,
+            &result_array[test].n_ops,
+            result_array[test].op, 
+            api_table[opt_api].close, 
+            rank,
+            i);
+        print_result(rank, &result_array[test]);
+        test++;
+        CHECK_MAX_TEST(test);
+
         /* remove files */
         result_array[test].op = "rm";
         result_array[test].nprocs = i;
@@ -811,6 +831,25 @@ void vfs_create(int rank, int* n_ops)
 
         vfs_fds[i] = open(test_file, (O_CREAT|O_RDWR), (S_IWUSR|S_IRUSR));
         if(vfs_fds[i] < 0)
+        {
+            handle_error(errno, "creat");
+        }
+    }
+
+    return;
+}
+
+void vfs_close(int rank, int* n_ops)
+{
+    int i;
+    int ret;
+
+    *n_ops = opt_nfiles;
+
+    for(i=0; i<opt_nfiles; i++)
+    {
+        ret = close(vfs_fds[i]);
+        if(ret < 0)
         {
             handle_error(errno, "creat");
         }
