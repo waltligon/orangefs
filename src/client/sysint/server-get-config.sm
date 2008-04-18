@@ -326,7 +326,8 @@ static PINT_sm_action server_get_config_parse(
         if (!cur_fs)
         {
             gossip_err("Warning:\n Cannot retrieve information about "
-                    "pvfstab entry %s\n",
+                    "filesystem %s at tab entry: %s\n",
+                    sm_p->u.get_config.mntent->pvfs_fs_name,
                     sm_p->u.get_config.mntent->the_pvfs_config_server);
 
             /*
