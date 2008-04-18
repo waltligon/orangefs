@@ -391,7 +391,8 @@ static int create_comp_fn(void *v_p,
     }
     memcpy(sm_p->u.create.datafile_handles,
            resp_p->u.create.datafile_handles,
-           resp_p->u.create.datafile_count);
+           (sizeof(*sm_p->u.create.datafile_handles) *
+           resp_p->u.create.datafile_count));
     sm_p->u.create.stuffed = resp_p->u.create.stuffed;
 
     gossip_debug(
@@ -654,7 +655,14 @@ static PINT_sm_action create_cleanup(
             gossip_debug(GOSSIP_CLIENT_DEBUG, "created un-stuffed file\n");
             sm_p->u.create.attr.mask |= PVFS_ATTR_META_UNSTUFFED;
         }
-        /* TODO: we could add in the datafile handles to the attrs as well */
+
+        if(sm_p->u.create.dist)
+        {
+            sm_p->u.create.attr.u.meta.dist = sm_p->u.create.dist;
+            sm_p->u.create.attr.u.meta.dist_size = PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
+            sm_p->u.create.dist = NULL;
+            sm_p->u.create.attr.mask |= PVFS_ATTR_META_DIST;
+        }
 
         /* we only insert a cache entry if the entire create succeeds,
          * set size to 0 
@@ -681,12 +689,6 @@ static PINT_sm_action create_cleanup(
     }
 
     PINT_free_object_attr(&sm_p->u.create.cache_attr);
-
-    if (sm_p->u.create.dist)
-    {
-        PINT_dist_free(sm_p->u.create.dist);
-        sm_p->u.create.dist = NULL;
-    }
 
     if(sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LIST)
     {
