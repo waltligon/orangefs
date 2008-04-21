@@ -4607,6 +4607,7 @@ static void precreate_pool_fill_thread_mgr_callback(
     int awoken_count = 0;
     QLIST_HEAD(tmp_list);
     job_id_t tmp_id;
+    int extra_trove_flags = 0;
 
     assert(jd);
 
@@ -4748,14 +4749,23 @@ static void precreate_pool_fill_thread_mgr_callback(
     }
 
     jd->u.precreate_pool.posted_count = count;
+
+    if((jd->u.precreate_pool.posted_count 
+        + jd->u.precreate_pool.precreate_handle_index) 
+        >= jd->u.precreate_pool.precreate_handle_count)
+    {
+        /* this will be the last set written; sync db */
+        extra_trove_flags |= TROVE_SYNC;
+    }
+
     gossip_debug(GOSSIP_JOB_DEBUG, "job_precreate_pool_fill() posting trove_keyval_write_list()\n");
     ret = trove_keyval_write_list(jd->u.precreate_pool.fsid, 
                             jd->u.precreate_pool.precreate_pool,
                             jd->u.precreate_pool.key_array, 
                             NULL, 
                             count, 
-                            TROVE_BINARY_KEY|TROVE_SYNC|
-                            TROVE_NOOVERWRITE|TROVE_KEYVAL_HANDLE_COUNT,
+                            (TROVE_BINARY_KEY|TROVE_NOOVERWRITE|
+                            TROVE_KEYVAL_HANDLE_COUNT|extra_trove_flags),
                             NULL, 
                             &jd->trove_callback, 
                             global_trove_context,
@@ -5820,13 +5830,18 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         }
 
         /* post trove operation to pull out a handle */
+        /* TODO: need an API hook to toggle TROVE_SYNC here; for now we can
+         * assume that we don't need it because create.sm always issues a
+         * keyval_write_list() with the sync flag set after retrieving
+         * handles
+         */
         ret = trove_keyval_iterate_keys(
             tmp_trove_array[i].pool->fsid, 
             tmp_trove_array[i].pool->pool_handle,
             &tmp_trove_array[i].pos,
             &tmp_trove_array[i].key,
             &tmp_trove_array[i].count,
-            TROVE_BINARY_KEY|TROVE_SYNC|
+            TROVE_BINARY_KEY|
             TROVE_KEYVAL_HANDLE_COUNT|
             TROVE_KEYVAL_ITERATE_REMOVE,
             NULL, 

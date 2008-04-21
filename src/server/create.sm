@@ -271,12 +271,15 @@ static int create_local_datafile(
         PINT_SERVER_TYPE_IO,
         &data_handle_ext_array);
 
+    /* deliberately not setting SYNC flag, because both the attrs and
+     * keyvals will be synced in later states
+     */
     ret = job_trove_dspace_create(
         s_op->req->u.create.fs_id,
         &data_handle_ext_array,
         PVFS_TYPE_DATAFILE,
         NULL,
-        TROVE_SYNC,
+        0,
         smcb,
         0,
         js_p,
