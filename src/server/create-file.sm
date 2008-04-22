@@ -991,7 +991,7 @@ static PINT_sm_action create_getattr_local(
     PINT_cached_config_get_server_name(server_name, 1024, sm_p->parent_ref.handle,
         sm_p->parent_ref.fs_id);
 
-    if (strcmp(config->host_id, server_name)) {
+    if (! strcmp(config->host_id, server_name)) {
         /* Call the nested get_attr state machine? */
         struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
 
@@ -1024,6 +1024,7 @@ static PINT_sm_action create_getattr_local(
         /* it's not on this server. Fall through to another */
         /* state to do the lookup on the correct server.    */
         /* need to set up machine for remote lookup here    */
+/* TODO: What should this return value really be? */
         return(-PVFS_ENOENT);
     }
 }
