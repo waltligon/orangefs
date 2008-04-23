@@ -133,6 +133,7 @@ struct test_results
     char* op;
     int n_ops;
     double time;
+    double min_time;
     int size;
     int nprocs;
 };
@@ -168,7 +169,7 @@ unsigned int opt_timeout = 100;
 void usage(char *name); 
 int parse_args(int argc, char **argv);
 void handle_error(int errcode, char *str); 
-int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name, 
+int run_test_phase(double* elapsed_time, double* min_elapsed_time, int* size, int* n_ops, char* fn_name, 
     void (*fn)(int, int*), int rank, int procs);
 void print_result(int rank, struct test_results* result);
 
@@ -329,7 +330,7 @@ int main(
     {
         printf("# sysint tests using acache and ncache timeout of: %u ms.\n", 
             opt_timeout);
-        printf("# <api>\t<op>\t<file_size>\t<procs>\t<n_ops_per_proc>\t<n_ops_total>\t<time>\t<rate_per_proc>\t<rate_total>\n");
+        printf("# <api>\t<op>\t<file_size>\t<procs>\t<n_ops_per_proc>\t<n_ops_total>\t<time>\t<rate_per_proc>\t<rate_total>\t<min time>\n");
     }
 
     /* do any setup required by the api */
@@ -337,6 +338,7 @@ int main(
     result_array[test].nprocs = nprocs;
     run_test_phase(
         &result_array[test].time, 
+        &result_array[test].min_time, 
         &result_array[test].size,
         &result_array[test].n_ops,
         result_array[test].op, 
@@ -352,6 +354,7 @@ int main(
     result_array[test].nprocs = nprocs;
     run_test_phase(
         &result_array[test].time, 
+        &result_array[test].min_time, 
         &result_array[test].size,
         &result_array[test].n_ops,
         result_array[test].op, 
@@ -369,6 +372,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -384,6 +388,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -399,6 +404,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -414,6 +420,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -429,6 +436,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -444,6 +452,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -459,6 +468,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -474,6 +484,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -489,6 +500,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -504,6 +516,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -519,6 +532,7 @@ int main(
         result_array[test].nprocs = i;
         run_test_phase(
             &result_array[test].time, 
+            &result_array[test].min_time, 
             &result_array[test].size,
             &result_array[test].n_ops,
             result_array[test].op, 
@@ -535,6 +549,7 @@ int main(
     result_array[test].nprocs = nprocs;
     run_test_phase(
         &result_array[test].time, 
+        &result_array[test].min_time, 
         &result_array[test].size,
         &result_array[test].n_ops,
         result_array[test].op, 
@@ -556,7 +571,7 @@ void print_result(int rank, struct test_results* result)
     {
         if(result->n_ops > 0)
         {
-            printf("%s\t%s\t%d\t%d\t%d\t%d\t%f\t%f\t%f\n",
+            printf("%s\t%s\t%d\t%d\t%d\t%d\t%f\t%f\t%f\t%f\n",
                 api_table[opt_api].name,
                 result->op,
                 result->size,
@@ -565,14 +580,15 @@ void print_result(int rank, struct test_results* result)
                 result->n_ops * result->nprocs,
                 result->time,
                 ((double)result->n_ops) / result->time,
-                ((double)result->n_ops * result->nprocs) / result->time);
+                ((double)result->n_ops * result->nprocs) / result->time,
+                result->min_time);
         }
     }
 
     return;
 }
 
-int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name, 
+int run_test_phase(double* elapsed_time, double* min_elapsed_time, int* size, int* n_ops, char* fn_name, 
     void (*fn)(int, int*), int rank, int procs)
 {
     double test_start, test_end, local_elapsed;
@@ -618,6 +634,8 @@ int run_test_phase(double* elapsed_time, int* size, int* n_ops, char* fn_name,
 
     MPI_Allreduce(&local_elapsed, elapsed_time, 1,
                   MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&local_elapsed, min_elapsed_time, 1,
+                  MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
 
     return(0);
 }
