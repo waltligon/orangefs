@@ -133,7 +133,7 @@ static int pvfs2_releasepage(struct page *page, gfp_t foo)
 
 struct backing_dev_info pvfs2_backing_dev_info =
 {
-    .ra_pages = 1024,
+    .ra_pages = 0,
 #ifdef HAVE_BDI_MEMORY_BACKED
     /* old interface, up through 2.6.11 */
     .memory_backed = 1 /* does not contribute to dirty memory */
