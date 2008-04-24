@@ -1,0 +1,121 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+
+#include "pvfs2-server.h"
+#include "pint-perf-counter.h"
+#include "server-config.h"
+
+%%
+
+machine pvfs2_perf_update_sm
+{
+	state do_work 
+	{
+		run perf_update_do_work;
+		success => do_work;
+		default => error;
+	}
+
+	state error 
+	{
+		run perf_update_error;
+		default => terminate;
+	}
+}
+
+%%
+
+/* perf_update_error()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action perf_update_error(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_err("Error: stopping server performance monitoring.\n");
+
+    PINT_perf_finalize(PINT_server_pc);
+
+    return(server_state_machine_complete(smcb));
+}
+
+/* perf_update_do_work()
+ *
+ * resets counters, updates metrices, etc- this is intended to be called
+ * repeatedly on a regular interval
+ */
+static PINT_sm_action perf_update_do_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    job_id_t tmp_id;
+    uint64_t current_mask = 0;
+    int current_debug_on = 0;
+    char* tmp_text;
+    char* ptr;
+    char* token;
+    char delim[] = "\n";
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+#if 0
+    PINT_STATE_DEBUG("do_work");
+#endif
+    
+    /* log current statistics if the gossip mask permits */
+    gossip_get_debug_mask(&current_debug_on, &current_mask);
+    if(current_mask & GOSSIP_PERFCOUNTER_DEBUG)
+    {
+        tmp_text = PINT_perf_generate_text(PINT_server_pc, 4096);
+        if(tmp_text)
+        {
+            token = strtok_r(tmp_text, delim, &ptr);
+            while(token)
+            {
+                gossip_perf_log("%s\n", token);
+                token = strtok_r(NULL, delim, &ptr);
+            }
+            free(tmp_text);
+        }
+    }
+    
+    /* roll over to next set of statistics */
+    PINT_perf_rollover(PINT_server_pc);
+	
+    /* post another timer */
+    return(job_req_sched_post_timer(user_opts->perf_update_interval,
+	smcb,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context));
+}
+
+struct PINT_server_req_params pvfs2_perf_update_params =
+{
+    .string_name = "perf_update",
+    .state_machine = &pvfs2_perf_update_sm
+};
+
+
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

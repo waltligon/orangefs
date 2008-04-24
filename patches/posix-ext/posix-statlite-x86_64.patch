@@ -1,0 +1,77 @@
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/x86_64/ia32/sys_ia32.c vanilla-new/arch/x86_64/ia32/sys_ia32.c
+--- vanilla/arch/x86_64/ia32/sys_ia32.c	2006-05-09 18:53:48.000000000 -0500
++++ vanilla-new/arch/x86_64/ia32/sys_ia32.c	2006-05-18 20:35:24.000000000 -0500
+@@ -234,13 +234,13 @@
+ 			 return -EFAULT;
+ 	}
+ 	if (SLITE_MTIME(stat_lite->lite_mask)) {
+-	    if (__put_user (stat->mtime.tv_sec, &ubuf->st_mtime) ||
+-			 __put_user (stat->mtime.tv_nsec, &ubuf->st_mtime_nsec))
++	    if (__put_user (stat_lite->mtime.tv_sec, &ubuf->st_mtime) ||
++			 __put_user (stat_lite->mtime.tv_nsec, &ubuf->st_mtime_nsec))
+ 			 return -EFAULT;
+ 	}
+ 	if (SLITE_CTIME(stat_lite->lite_mask)) {
+-	    if (__put_user (stat->ctime.tv_sec, &ubuf->st_ctime) ||
+-			 __put_user (stat->ctime.tv_nsec, &ubuf->st_ctime_nsec))
++	    if (__put_user (stat_lite->ctime.tv_sec, &ubuf->st_ctime) ||
++			 __put_user (stat_lite->ctime.tv_nsec, &ubuf->st_ctime_nsec))
+ 			 return -EFAULT;
+ 	}
+ 	if (SLITE_BLKSIZE(stat_lite->lite_mask)) {
+@@ -248,7 +248,7 @@
+ 			 return -EFAULT;
+ 	}
+ 	if (SLITE_BLOCKS(stat_lite->lite_mask)) {
+-		 if (__put_user (stat->blocks, &ubuf->st_blocks))
++		 if (__put_user (stat_lite->blocks, &ubuf->st_blocks))
+ 			return -EFAULT;
+ 	}
+ 	return 0;
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/ia32.h vanilla-new/include/asm-x86_64/ia32.h
+--- vanilla/include/asm-x86_64/ia32.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/asm-x86_64/ia32.h	2006-05-18 20:34:22.000000000 -0500
+@@ -78,6 +78,43 @@
+ 	unsigned long long	st_ino;
+ } __attribute__((packed));
+ 
++/* This matches struct stat64_lite in glibc2.2, hence the absolutely
++ * insane amounts of padding around dev_t's.
++ */
++struct stat64_lite {
++	unsigned long long	st_dev;
++	unsigned char		__pad0[4];
++
++#define STAT64_HAS_BROKEN_ST_INO	1
++	unsigned int		__st_ino;
++
++	unsigned int		st_mode;
++	unsigned int		st_nlink;
++
++	unsigned int		st_uid;
++	unsigned int		st_gid;
++
++	unsigned long long	st_rdev;
++	unsigned char		__pad3[4];
++
++	unsigned long  st_litemask;
++	unsigned char  __pad5[4];
++
++	long long		st_size;
++	unsigned int		st_blksize;
++
++	long long		st_blocks;/* Number 512-byte blocks allocated. */
++
++	unsigned 		st_atime;
++	unsigned 		st_atime_nsec;
++	unsigned 		st_mtime;
++	unsigned 		st_mtime_nsec;
++	unsigned 		st_ctime;
++	unsigned 		st_ctime_nsec;
++
++	unsigned long long	st_ino;
++} __attribute__((packed));
++
+ typedef struct compat_siginfo{
+ 	int si_signo;
+ 	int si_errno;

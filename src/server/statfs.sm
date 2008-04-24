@@ -1,0 +1,173 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <assert.h>
+
+#include "pvfs2-server.h"
+#include "trove-handle-mgmt.h"
+#include "pint-cached-config.h"
+
+#ifdef HAVE_SYSINFO
+#include <sys/sysinfo.h>
+#endif
+
+%%
+
+machine pvfs2_statfs_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        default => do_statfs;
+    }
+
+    state do_statfs
+    {
+        run statfs_do_statfs;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run statfs_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/* statfs_do_statfs()
+ *
+ * issue the trove call to retrieve fs statistics
+ */
+static PINT_sm_action statfs_do_statfs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    TROVE_context_id tmp_context;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    /* first try to gather handle statistics */
+    ret = trove_handle_get_statistics(
+        s_op->req->u.statfs.fs_id,
+        &s_op->resp.u.statfs.stat.handles_available_count);
+
+    if (ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* find out how many total handles this server controls */
+    ret = PINT_cached_config_get_server_handle_count(
+        user_opts->host_id, s_op->req->u.statfs.fs_id,
+        &s_op->resp.u.statfs.stat.handles_total_count);
+    if(ret < 0)
+    {   
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* we need a context to be able to make the getinfo call */
+    ret = trove_open_context(s_op->req->u.statfs.fs_id, &tmp_context);
+    if (ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = trove_collection_getinfo(
+        s_op->req->u.statfs.fs_id, tmp_context,
+        PVFS_COLLECTION_STATFS, &(s_op->resp.u.statfs.stat));
+
+    /* close context regardless of whether getinfo was successful */
+    trove_close_context(s_op->req->u.statfs.fs_id, tmp_context);
+    
+    /* getinfo should always return immediately, no testing needed */
+    assert(ret != 0);
+
+#ifdef HAVE_SYSINFO
+    {
+        struct sysinfo system_metrics;
+        memset(&system_metrics, 0, sizeof(struct sysinfo));
+        if (sysinfo(&system_metrics) == 0)
+        {
+            s_op->resp.u.statfs.stat.ram_total_bytes = (uint64_t)
+                (system_metrics.totalram * system_metrics.mem_unit);
+            s_op->resp.u.statfs.stat.ram_free_bytes = (uint64_t)
+                (system_metrics.freeram * system_metrics.mem_unit);
+            s_op->resp.u.statfs.stat.uptime_seconds = (uint64_t)
+                system_metrics.uptime;
+            s_op->resp.u.statfs.stat.load_1 = (uint64_t)
+                system_metrics.loads[0];
+            s_op->resp.u.statfs.stat.load_5 = (uint64_t)
+                system_metrics.loads[1];
+            s_op->resp.u.statfs.stat.load_15 = (uint64_t)
+                system_metrics.loads[2];
+        }
+    }
+#else
+    s_op->resp.u.statfs.stat.ram_total_bytes = 0;
+    s_op->resp.u.statfs.stat.ram_free_bytes = 0;
+    s_op->resp.u.statfs.stat.uptime_seconds = 0;
+    s_op->resp.u.statfs.stat.load_1 = 0;
+    s_op->resp.u.statfs.stat.load_5 = 0;
+    s_op->resp.u.statfs.stat.load_15 = 0;
+#endif
+
+    js_p->error_code = ((ret != 1) ? ret : 0);
+    return SM_ACTION_COMPLETE;
+}
+
+
+/* statfs_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action statfs_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return(server_state_machine_complete(smcb));
+}
+
+static inline int PINT_get_object_ref_statfs(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.statfs.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+}
+
+struct PINT_server_req_params pvfs2_statfs_params =
+{
+    .string_name = "statfs",
+    .get_object_ref = PINT_get_object_ref_statfs,
+    .state_machine = &pvfs2_statfs_sm
+};
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

@@ -1,0 +1,19 @@
+DIR := kernel/linux-2.6
+
+ifeq ($(LIBAIO_EXISTS),1)
+
+TESTSRC += \
+	$(DIR)/aio_test_append.c \
+	$(DIR)/aio_test_correctness.c \
+	$(DIR)/aio_test_sparse.c \
+	$(DIR)/file_fsync.c \
+	$(DIR)/file_open.c \
+	$(DIR)/file_read.c \
+	$(DIR)/file_write.c \
+	$(DIR)/io-hole-test.c \
+	$(DIR)/threaded_write.c
+
+MODLDFLAGS_$(DIR) := -laio
+
+endif
+

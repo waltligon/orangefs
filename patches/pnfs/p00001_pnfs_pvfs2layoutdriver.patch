@@ -1,0 +1,1759 @@
+
+
+Transform pvfs2 client into the pvfs2 layout driver.
+
+The pNFS client handles all metadata operations, relying
+only on the layout driver to perform I/O to the data servers.
+Essentially the pvfs2 layout driver is a subset of the full
+pvfs2 client, it only requires the read and write operations.
+
+The interface between the pNFS client and the layout driver
+is the functions listed in the pvfs2layout_io_operations and
+pvfs2layout_policy_operations operation structures.  The former
+controls all I/O to the data servers, while the former
+provides policy information to the pNFS client.
+
+Before the pNFS client can perform I/O, it must retrieve
+the data layout from the pNFS server.  Once this is done,
+it passes an opaque buffer to the layout driver, which
+parses the layout in pvfs2layout_set_layout.  A new
+upcall then moves the layout to the user level. A new
+state machine in sys-pnfs.c places the layout information
+(a set of servers and their handles) into the pvfs2 client
+cache.  Normally this cache would expire, but this patch
+disables this, allowing the pNFS client to control the
+expiration of the layout information.
+
+There is 2 possible I/O paths into the pvfs2 layout driver.
+1. The first does not use the page cache (which is unusual
+for the nfs client), passing memory buffers directly to
+the pvfs2layout_file_read/write functions.
+
+2. In the second I/O path, the nfs client uses the page cache
+and passes a list of pages to the pvfs2 layout driver using the
+pvfs2layout_read_pagelist and pvfs2layout_write_pagelist
+functions. 
+
+Other details:
+1. Renames op cache to pvfs2_pnfs_op_cache
+2. Renames device request cache to pvfs2_pnfs_devreqcache
+3. Renames inode cache to pvfs2_pnfs_inode_cache
+4. Renames device name to pvfs2-pnfs (will be in /dev)
+5. Initializes (at the user level) the /dev/pvfs2-pnfs module.
+6. Uses /dev/pvfs2-pnfs to allow a standard pvfs2 client and
+a pNFS client to run on the same machine.
+
+
+
+---
+
+ pvfs2-1.5.1-ld-dhildeb/Makefile.in                               |    2 
+ pvfs2-1.5.1-ld-dhildeb/include/pvfs2-sysint.h                    |   12 
+ pvfs2-1.5.1-ld-dhildeb/src/apps/kernel/linux/pvfs2-client-core.c |   45 
+ pvfs2-1.5.1-ld-dhildeb/src/client/sysint/acache.c                |   24 
+ pvfs2-1.5.1-ld-dhildeb/src/client/sysint/module.mk.in            |    3 
+ pvfs2-1.5.1-ld-dhildeb/src/client/sysint/sys-getattr.sm          |   23 
+ pvfs2-1.5.1-ld-dhildeb/src/client/sysint/sys-pnfs.c              |  135 ++
+ pvfs2-1.5.1-ld-dhildeb/src/io/dev/pint-dev.c                     |    2 
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/Makefile.in          |   17 
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/file.c               |  629 +++++++++-
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-bufmap.c       |   72 +
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-bufmap.h       |   10 
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-cache.c        |   16 
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-dev-proto.h    |    1 
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-kernel.h       |   24 
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-mod.c          |   42 
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-pnfs.h         |   14 
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-proc.c         |   13 
+ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/upcall.h             |    8 
+ 19 files changed, 1021 insertions(+), 71 deletions(-)
+
+diff -puN include/pvfs2-sysint.h~pvfs2layoutdriver include/pvfs2-sysint.h
+--- pvfs2-1.5.1-ld/include/pvfs2-sysint.h~pvfs2layoutdriver	2008-01-05 18:08:55.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/include/pvfs2-sysint.h	2008-01-05 18:08:55.000000000 -0800
+@@ -270,6 +270,18 @@ PVFS_error PVFS_isys_setattr(
+     PVFS_sys_op_id *op_id,
+     void *user_ptr);
+ 
++PVFS_error PVFS_isys_setlayout(
++     PVFS_object_ref ref,
++     void* layout,
++     PVFS_credentials *credentials,
++     PVFS_sys_op_id *op_id,
++     void *user_ptr);
++
++PVFS_error PVFS_sys_setlayout(
++     PVFS_object_ref ref,
++     void* layout,
++     PVFS_credentials *credentials);
++
+ PVFS_error PVFS_sys_setattr(
+     PVFS_object_ref ref,
+     PVFS_sys_attr attr,
+diff -puN Makefile.in~pvfs2layoutdriver Makefile.in
+--- pvfs2-1.5.1-ld/Makefile.in~pvfs2layoutdriver	2008-01-05 18:08:55.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/Makefile.in	2008-01-05 18:08:55.000000000 -0800
+@@ -865,7 +865,7 @@ KMOD_DIR ?= $(kmod_prefix)/lib/modules/$
+ .PHONY: just_kmod_install
+ just_kmod_install: just_kmod
+ 	install -d $(KMOD_DIR)
+-	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(KMOD_DIR)
++	install -m 755 src/kernel/linux-2.6/pvfs2-pnfs.ko $(KMOD_DIR)
+ 
+ .PHONY: kmod_install
+ kmod_install: kmod kernapps just_kmod_install
+diff -puN src/kernel/linux-2.6/Makefile.in~pvfs2layoutdriver src/kernel/linux-2.6/Makefile.in
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/Makefile.in~pvfs2layoutdriver	2008-01-05 18:08:55.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/Makefile.in	2008-01-05 18:08:55.000000000 -0800
+@@ -56,16 +56,24 @@ hsrc = \
+     pvfs2-bufmap.h \
+     upcall.h \
+     downcall.h \
+-    pvfs2-proc.h
++    pvfs2-proc.h \
++    downcall.h \
++    pvfs2-pnfs.h
+ 
+ objs = $(csrc:.c=.o)
+-othergen = pvfs2.o pvfs2.ko pvfs2.mod.c pvfs2.mod.o
++othergen = pvfs2-pnfs.o pvfs2-pnfs.ko pvfs2.mod.c pvfs2.mod.o
+ othergendir = .tmp_versions  # around 2.6.6 this is generated locally
+ cmds = $(patsubst %,.%.cmd,$(objs) $(othergen))
+ 
++KDIR    := @LINUX_KERNEL_SRC@
+ ifneq ($(KERNELRELEASE),)
+ 
+ EXTRA_CFLAGS = \
++    -I$(KDIR)/include/linux \
++    -I$(KDIR)/arch/um/os-Linux/include \
++    -I$(KDIR)/arch/um/kernel/skas \
++    -I$(KDIR)/arch/um/kernel/skas/include \
++    -I$(KDIR)/arch/um/include \
+     -I$(absolute_src_dir)/ \
+     -I$(absolute_build_dir)/ \
+     -I$(absolute_src_dir)/include \
+@@ -81,14 +89,13 @@ EXTRA_CFLAGS += -DPVFS2_VERSION="\"@PVFS
+ # debugging output or features
+ #EXTRA_CFLAGS += -DPVFS2_KERNEL_DEBUG
+ 
+-obj-m += pvfs2.o
+-pvfs2-objs := $(objs)
++obj-m += pvfs2-pnfs.o
++pvfs2-pnfs-objs := $(objs)
+ 
+ else
+ 
+ #KDIR	:= /lib/modules/$(shell uname -r)/build
+ #KDIR	:= /usr/src/linux-$(shell uname -r)
+-KDIR    := @LINUX_KERNEL_SRC@
+ PWD	:= $(shell pwd)
+ 
+ default: links
+diff -puN src/kernel/linux-2.6/pvfs2-dev-proto.h~pvfs2layoutdriver src/kernel/linux-2.6/pvfs2-dev-proto.h
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/pvfs2-dev-proto.h~pvfs2layoutdriver	2008-01-05 18:08:55.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-dev-proto.h	2008-01-05 18:08:55.000000000 -0800
+@@ -33,6 +33,7 @@
+ #define PVFS2_VFS_OP_REMOVEXATTR       0xFF000013
+ #define PVFS2_VFS_OP_PARAM             0xFF000014
+ #define PVFS2_VFS_OP_PERF_COUNT        0xFF000015
++#define PVFS2_VFS_OP_SET_LAYOUT        0xFF000016
+ #define PVFS2_VFS_OP_CANCEL            0xFF00EE00
+ #define PVFS2_VFS_OP_FSYNC             0xFF00EE01
+ 
+diff -puN /dev/null src/kernel/linux-2.6/pvfs2-pnfs.h
+--- /dev/null	2007-11-26 10:11:24.475597181 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-pnfs.h	2008-01-05 18:49:19.000000000 -0800
+@@ -0,0 +1,14 @@
++/*
++ * (C) 2001 Clemson University and The University of Chicago
++ *
++ * See COPYING in top-level directory.
++ */
++
++#ifndef __PVFS2_PNFS_H
++#define __PVFS2_PNFS_H
++
++#define GET_DATA_LAYOUT_MAXSIZE 1024
++#define IO_THRESHOLD 65536
++#define LAYOUT_PVFS2 4
++
++#endif
+diff -puN src/kernel/linux-2.6/upcall.h~pvfs2layoutdriver src/kernel/linux-2.6/upcall.h
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/upcall.h~pvfs2layoutdriver	2008-01-05 18:08:55.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/upcall.h	2008-01-05 18:08:55.000000000 -0800
+@@ -8,6 +8,7 @@
+ #define __UPCALL_H
+ 
+ #include "pvfs2-sysint.h"
++#include "pvfs2-pnfs.h"
+ 
+ /* Sanitized this header file to fix
+  * 32-64 bit interaction issues between
+@@ -195,6 +196,12 @@ typedef struct
+ 
+ typedef struct
+ {
++    PVFS_object_ref refn;
++    char layout[GET_DATA_LAYOUT_MAXSIZE];
++} pvfs2_setlayout_request_t;
++
++typedef struct
++{
+     int32_t type;
+     int32_t __pad1;
+     PVFS_credentials credentials;
+@@ -224,6 +231,7 @@ typedef struct
+         pvfs2_fsync_request_t fsync;
+         pvfs2_param_request_t param;
+         pvfs2_perf_count_request_t perf_count;
++        pvfs2_setlayout_request_t setlayout;
+     } req;
+ } pvfs2_upcall_t;
+ 
+diff -puN src/apps/kernel/linux/pvfs2-client-core.c~pvfs2layoutdriver src/apps/kernel/linux/pvfs2-client-core.c
+--- pvfs2-1.5.1-ld/src/apps/kernel/linux/pvfs2-client-core.c~pvfs2layoutdriver	2008-01-05 18:09:48.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/apps/kernel/linux/pvfs2-client-core.c	2008-01-05 18:11:31.000000000 -0800
+@@ -78,7 +78,7 @@
+ #include "pvfs2-internal.h"
+ #endif
+ 
+-#define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
++#define DEFAULT_LOGFILE "/tmp/pnfs-client.log"
+ 
+ typedef struct
+ {
+@@ -1560,6 +1560,35 @@ static PVFS_object_ref perform_lookup_on
+     return refn;
+ }
+ 
++/* DH: Initiate set layout fsm
++ */
++static PVFS_error service_setlayout_request(vfs_request_t *vfs_request)
++{
++    PVFS_error ret = -PVFS_EINVAL;
++
++    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
++		 "got a setlayout request for fsid %d | handle %llu\n",
++		 vfs_request->in_upcall.req.setattr.refn.fs_id,
++		 llu(vfs_request->in_upcall.req.setattr.refn.handle));
++
++    ret = PVFS_sys_setlayout(vfs_request->in_upcall.req.setlayout.refn,
++			     vfs_request->in_upcall.req.setlayout.layout,
++			     &vfs_request->in_upcall.credentials);
++    if (ret < 0)
++    {
++	gossip_err("failed to setlayout handle %llu on fsid %d ret %d!\n",
++		   llu(vfs_request->in_upcall.req.setattr.refn.handle),
++		   vfs_request->in_upcall.req.setattr.refn.fs_id,ret);
++    }
++
++    vfs_request->out_downcall.type = PVFS2_VFS_OP_SET_LAYOUT;
++    vfs_request->out_downcall.status = ret;
++
++    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "setlayout ok\n");
++    write_inlined_device_response(vfs_request);
++    return 0;
++}
++
+ PVFS_error write_device_response(
+     void *buffer_list,
+     int *size_list,
+@@ -2072,6 +2101,8 @@ static inline void package_downcall_memb
+             }
+             break;
+         }
++        case PVFS2_VFS_OP_SET_LAYOUT:
++ 	    break;
+         default:
+             gossip_err("Completed upcall of unknown type %x!\n",
+                        vfs_request->in_upcall.type);
+@@ -2286,6 +2317,9 @@ static inline PVFS_error handle_unexp_vf
+             posted_op = 1;
+             ret = post_fsync_request(vfs_request);
+             break;
++        case PVFS2_VFS_OP_SET_LAYOUT:
++ 	    ret = service_setlayout_request(vfs_request);
++            break;
+         case PVFS2_VFS_OP_INVALID:
+         default:
+             gossip_err(
+@@ -2573,12 +2607,13 @@ int main(int argc, char **argv)
+       (re)configure the acache at that time since it's based on the
+       dynamic server configurations)
+     */
+-    ret = PVFS_sys_initialize(debug_mask);
++    /* DH: load default pvfs2tab file*/
++    ret = PVFS_util_init_defaults();
+     if (ret < 0)
+     {
+-        return ret;
++ 	PVFS_perror("PVFS_util_init_defaults", ret);
++	return ret;
+     }
+-
+     ret = gossip_enable_file(s_opts.logfile, "a");
+     if(ret < 0)
+     {
+@@ -2654,7 +2689,7 @@ int main(int argc, char **argv)
+         return ret;
+     }   
+ 
+-    ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
++    ret = PINT_dev_initialize("/dev/pvfs2-pnfs", 0);
+     if (ret < 0)
+     {
+ 	PVFS_perror("PINT_dev_initialize", ret);
+diff -puN src/io/dev/pint-dev.c~pvfs2layoutdriver src/io/dev/pint-dev.c
+--- pvfs2-1.5.1-ld/src/io/dev/pint-dev.c~pvfs2layoutdriver	2008-01-05 18:09:48.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/io/dev/pint-dev.c	2008-01-05 18:09:48.000000000 -0800
+@@ -527,7 +527,7 @@ static int setup_dev_entry(const char *d
+     int ret = -1;
+     struct stat dev_stat;
+ 
+-    ret = parse_devices("/proc/devices", "pvfs2-req", &majornum);
++    ret = parse_devices("/proc/devices", "pvfs2-pnfs", &majornum);
+     if (ret < 0)
+     {
+         gossip_err("Error: unable to parse device file.\n");
+diff -puN src/kernel/linux-2.6/pvfs2-cache.c~pvfs2layoutdriver src/kernel/linux-2.6/pvfs2-cache.c
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/pvfs2-cache.c~pvfs2layoutdriver	2008-01-05 18:09:48.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-cache.c	2008-01-05 18:09:48.000000000 -0800
+@@ -33,7 +33,7 @@ extern int pvfs2_gen_credentials(
+ int op_cache_initialize(void)
+ {
+     op_cache = kmem_cache_create(
+-        "pvfs2_op_cache", sizeof(pvfs2_kernel_op_t),
++        "pvfs2_pnfs_op_cache", sizeof(pvfs2_kernel_op_t),
+         0, PVFS2_CACHE_CREATE_FLAGS, NULL, NULL);
+ 
+     if (!op_cache)
+@@ -53,7 +53,7 @@ int op_cache_finalize(void)
+ {
+     if (kmem_cache_destroy(op_cache) != 0)
+     {
+-        pvfs2_panic("Failed to destroy pvfs2_op_cache\n");
++        pvfs2_panic("Failed to destroy pvfs2_pnfs_op_cache\n");
+         return -EINVAL;
+     }
+     return 0;
+@@ -126,7 +126,7 @@ static void dev_req_cache_ctor(
+ int dev_req_cache_initialize(void)
+ {
+     dev_req_cache = kmem_cache_create(
+-        "pvfs2_devreqcache", MAX_ALIGNED_DEV_REQ_DOWNSIZE, 0,
++        "pvfs2_pnfs_devreqcache", MAX_ALIGNED_DEV_REQ_DOWNSIZE, 0,
+         PVFS2_CACHE_CREATE_FLAGS, dev_req_cache_ctor, NULL);
+ 
+     if (!dev_req_cache)
+@@ -141,7 +141,7 @@ int dev_req_cache_finalize(void)
+ {
+     if (kmem_cache_destroy(dev_req_cache) != 0)
+     {
+-        pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
++        pvfs2_panic("Failed to destroy pvfs2_pnfs_devreqcache\n");
+         return -EINVAL;
+     }
+     return 0;
+@@ -238,13 +238,13 @@ static inline void del_from_pinode_list(
+ int pvfs2_inode_cache_initialize(void)
+ {
+     pvfs2_inode_cache = kmem_cache_create(
+-        "pvfs2_inode_cache", sizeof(pvfs2_inode_t), 0,
++        "pvfs2_pnfs_inode_cache", sizeof(pvfs2_inode_t), 0,
+         PVFS2_CACHE_CREATE_FLAGS, pvfs2_inode_cache_ctor,
+         pvfs2_inode_cache_dtor);
+ 
+     if (!pvfs2_inode_cache)
+     {
+-        pvfs2_panic("Cannot create pvfs2_inode_cache\n");
++        pvfs2_panic("Cannot create pvfs2_pnfs_inode_cache\n");
+         return -ENOMEM;
+     }
+     return 0;
+@@ -264,7 +264,7 @@ int pvfs2_inode_cache_finalize(void)
+     }
+     if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
+     {
+-        pvfs2_panic("Failed to destroy pvfs2_inode_cache\n");
++        pvfs2_panic("Failed to destroy pvfs2_pnfs_inode_cache\n");
+         return -EINVAL;
+     }
+     return 0;
+@@ -326,7 +326,7 @@ static void kiocb_ctor(
+ int kiocb_cache_initialize(void)
+ {
+     pvfs2_kiocb_cache = kmem_cache_create(
+-        "pvfs2_kiocbcache", sizeof(pvfs2_kiocb), 0,
++        "pnfs_kiocbcache", sizeof(pvfs2_kiocb), 0,
+         PVFS2_CACHE_CREATE_FLAGS, kiocb_ctor, NULL);
+ 
+     if (!pvfs2_kiocb_cache)
+diff -puN src/kernel/linux-2.6/pvfs2-kernel.h~pvfs2layoutdriver src/kernel/linux-2.6/pvfs2-kernel.h
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/pvfs2-kernel.h~pvfs2layoutdriver	2008-01-05 18:09:48.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-kernel.h	2008-01-05 18:13:54.000000000 -0800
+@@ -151,11 +151,17 @@ do {                                    
+ #define PVFS2_DEFAULT_OP_TIMEOUT_SECS       60
+ #endif
+ 
+-#define PVFS2_REQDEVICE_NAME          "pvfs2-req"
++ /* DH: Change device for pnfs client in UML */
++#define PVFS2_REQDEVICE_NAME          "pvfs2-pnfs"
++
++struct nfs_write_data;
++struct nfs_read_data;
++struct pnfs_layoutcommit_arg;
++struct pnfs_layoutcommit_res;
+ 
+ #define PVFS2_DEVREQ_MAGIC             0x20030529
+ #define PVFS2_LINK_MAX                 0x000000FF
+-#define PVFS2_OP_RETRY_COUNT           0x00000005
++#define PVFS2_OP_RETRY_COUNT           0x00000001
+ #define PVFS2_SEEK_END                 0x00000002
+ #define PVFS2_MAX_NUM_OPTIONS          0x00000004
+ #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
+@@ -759,6 +765,20 @@ do {                                    
+     buffer_index = -1;                                    \
+ } while(0)
+ 
++#define pnfs_io_error()                                 \
++do {                                                      \
++    if(new_op->op_state != PVFS2_VFS_STATE_SERVICED)      \
++    {                                                     \
++        pvfs2_cancel_op_in_progress(new_op->tag);         \
++        op_release(new_op);                               \
++    }                                                     \
++    else                                                  \
++    {                                                     \
++        wake_up_device_for_return(new_op);                \
++    }                                                     \
++    pvfs_bufmap_put(buffer_index);                        \
++} while(0)
++
+ #ifdef HAVE_AIO_VFS_SUPPORT
+ /* 
+  * This macro differs from the above only in that it does not
+diff -puN src/kernel/linux-2.6/pvfs2-mod.c~pvfs2layoutdriver src/kernel/linux-2.6/pvfs2-mod.c
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/pvfs2-mod.c~pvfs2layoutdriver	2008-01-05 18:09:48.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-mod.c	2008-01-05 18:18:08.000000000 -0800
+@@ -5,10 +5,14 @@
+  * parameters, Copyright © Acxiom Corporation, 2005.
+  *
+  * See COPYING in top-level directory.
++ *
++ * Initializes kernel for pNFS PVFS2 device driver support.
++ * Registers pNFS ops with pNFS client.
+  */
+ 
+ #include "pvfs2-kernel.h"
+ #include "pvfs2-proc.h"
++#include "nfs4_pnfs.h"
+ 
+ #ifndef PVFS2_VERSION
+ #define PVFS2_VERSION "Unknown"
+@@ -23,6 +27,8 @@ extern wait_queue_head_t pvfs2_request_l
+ static int hash_func(void *key, int table_size);
+ static int hash_compare(void *key, struct qhash_head *link);
+ 
++extern struct pnfs_layoutdriver_type pvfs2layout_type;
++
+ /*************************************
+  * global variables declared here
+  *************************************/
+@@ -31,6 +37,12 @@ static int hash_compare(void *key, struc
+ static int hash_table_size = 509;
+ int debug = 0;
+ int op_timeout_secs = PVFS2_DEFAULT_OP_TIMEOUT_SECS;
++int read_threshold = -1;
++int write_threshold = -1;
++int use_pagecache = 0;
++
++/* Callback operations to the pNFS client */
++struct pnfs_client_operations * pnfs_callback_ops;
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("PVFS2 Development Team");
+@@ -99,10 +111,10 @@ spinlock_t pvfs2_request_list_lock = SPI
+ DECLARE_WAIT_QUEUE_HEAD(pvfs2_request_list_waitq);
+ 
+ 
+-static int __init pvfs2_init(void)
++static int __init pnfs_init(void)
+ {
+     int ret = -1;
+-    pvfs2_print("pvfs2: pvfs2_init called\n");
++    pvfs2_print("%s: start\n",__FUNCTION__);
+ 
+     if(debug)
+     {
+@@ -164,14 +176,20 @@ static int __init pvfs2_init(void)
+         ret = -ENOMEM;
+         goto cleanup_device;
+     }
+-    pvfs2_proc_initialize();
+-    ret = register_filesystem(&pvfs2_fs_type);
+ 
+-    if(ret == 0)
++    if (ret == 0)
+     {
+-        printk("pvfs2: module version %s loaded\n", PVFS2_VERSION);
+-        return 0;
++	pvfs2_proc_initialize();
++	/* DH:
++	 * Need to register file_operations struct with global list to indicate
++	 * that PVFS2 is a possible pNFS I/O module
++	 */
++	pnfs_callback_ops = pnfs_register_layoutdriver(&pvfs2layout_type);
++
++	printk("pvfs2: module version %s loaded\n", PVFS2_VERSION);
++	return 0;
+     }
++
+     pvfs2_proc_finalize();
+     qhash_finalize(htable_ops_in_progress);
+ cleanup_device:
+@@ -190,7 +208,7 @@ err:
+     return ret;
+ }
+ 
+-static void __exit pvfs2_exit(void)
++static void __exit pnfs_exit(void)
+ {
+     int i = 0;
+     pvfs2_kernel_op_t *cur_op = NULL;
+@@ -243,7 +261,9 @@ static void __exit pvfs2_exit(void)
+     op_cache_finalize();
+ 
+     qhash_finalize(htable_ops_in_progress);
+-    
++
++    pnfs_unregister_layoutdriver(&pvfs2layout_type);
++
+     printk("pvfs2: module version %s unloaded\n", PVFS2_VERSION);
+ }
+ 
+@@ -265,8 +285,8 @@ static int hash_compare(void *key, struc
+     return (op->tag == *real_tag);
+ }
+ 
+-module_init(pvfs2_init);
+-module_exit(pvfs2_exit);
++module_init(pnfs_init);
++module_exit(pnfs_exit);
+ 
+ /*
+  * Local variables:
+diff -puN src/kernel/linux-2.6/pvfs2-proc.c~pvfs2layoutdriver src/kernel/linux-2.6/pvfs2-proc.c
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/pvfs2-proc.c~pvfs2layoutdriver	2008-01-05 18:09:48.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-proc.c	2008-01-05 18:18:08.000000000 -0800
+@@ -22,6 +22,9 @@ extern int op_timeout_secs;
+ extern spinlock_t pvfs2_request_list_lock;
+ extern struct list_head pvfs2_request_list;
+ extern wait_queue_head_t pvfs2_request_list_waitq;
++extern int read_threshold;
++extern int write_threshold;
++extern int use_pagecache;
+ 
+ #ifdef CONFIG_SYSCTL
+ #include <linux/sysctl.h>
+@@ -248,6 +251,8 @@ static struct pvfs2_param_extra perf_res
+ };
+ static int min_debug[] = {0}, max_debug[] = {1};
+ static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
++static int min_io_threshold[] = {-1}, max_io_threshold[] = {1073741824};
++static int min_pc[] = {0}, max_pc[] = {1};
+ static ctl_table pvfs2_acache_table[] = {
+     /* controls acache timeout */
+     {1, "timeout-msecs", NULL, sizeof(int), 0644, NULL,
+@@ -291,10 +296,16 @@ static ctl_table pvfs2_table[] = {
+     /* subdir for acache control */
+     {6, "acache", NULL, 0, 0555, pvfs2_acache_table},
+     {7, "perf-counters", NULL, 0, 0555, pvfs2_pc_table},
++    {8, "read_threshold", &read_threshold, sizeof(int), 0644, NULL,
++     &proc_dointvec_minmax, &sysctl_intvec, NULL, &min_io_threshold, &max_io_threshold},
++    {9, "write_threshold", &write_threshold, sizeof(int), 0644, NULL,
++     &proc_dointvec_minmax, &sysctl_intvec, NULL, &min_io_threshold, &max_io_threshold},
++    {10, "use_pagecache", &use_pagecache, sizeof(int), 0644, NULL,
++     &proc_dointvec_minmax, &sysctl_intvec, NULL, &min_pc, &max_pc},
+     {0}
+ };
+ static ctl_table fs_table[] = {
+-    {1, "pvfs2", NULL, 0, 0555, pvfs2_table},
++    {1, "pvfs2-pnfs", NULL, 0, 0555, pvfs2_table},
+     {0}
+ };
+ #endif
+diff -puN src/client/sysint/acache.c~pvfs2layoutdriver src/client/sysint/acache.c
+--- pvfs2-1.5.1-ld/src/client/sysint/acache.c~pvfs2layoutdriver	2008-01-05 18:11:31.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/client/sysint/acache.c	2008-01-05 18:11:31.000000000 -0800
+@@ -137,7 +137,17 @@ int PINT_acache_initialize(void)
+         gen_mutex_unlock(&acache_mutex);
+         return(ret);
+     }
+-  
++
++    /* DH: Disable the cache expiration for pNFS */
++    ret = PINT_tcache_set_info(acache, TCACHE_ENABLE_EXPIRATION, 0);
++    if(ret < 0)
++    {
++        gossip_debug(GOSSIP_ACACHE_DEBUG, "Could not disable expiration\n");
++	PINT_tcache_finalize(acache);
++        gen_mutex_unlock(&acache_mutex);
++        return(ret);
++    }
++
+     gen_mutex_unlock(&acache_mutex);
+     return(0);
+ }
+@@ -201,7 +211,7 @@ int PINT_acache_set_info(
+ 
+     return(ret);
+ }
+-  
++
+ /** 
+  * Retrieves a _copy_ of a cached attributes structure.  Also retrieves the
+  * logical file size (if the object in question is a file) and reports the
+@@ -290,6 +300,8 @@ int PINT_acache_get_cached_entry(
+ void PINT_acache_invalidate(
+     PVFS_object_ref refn)
+ {
++/* We can't invalidate anything for pNFS */
++#if 0
+     int ret = -1;
+     struct PINT_tcache_entry* tmp_entry;
+     int tmp_status;
+@@ -316,6 +328,7 @@ void PINT_acache_invalidate(
+                     acache->num_entries, PINT_PERF_SET);
+ 
+     gen_mutex_unlock(&acache_mutex);
++#endif
+     return;
+ }
+   
+@@ -326,6 +339,8 @@ void PINT_acache_invalidate(
+ void PINT_acache_invalidate_size(
+     PVFS_object_ref refn)
+ {
++/* We can't invalidate anything for pNFS */
++#if 0
+     int ret = -1;
+     struct PINT_tcache_entry* tmp_entry;
+     struct acache_payload* tmp_payload;
+@@ -352,6 +367,7 @@ void PINT_acache_invalidate_size(
+                     acache->num_entries, PINT_PERF_SET);
+ 
+     gen_mutex_unlock(&acache_mutex);
++#endif
+     return;
+ }
+   
+@@ -403,7 +419,8 @@ int PINT_acache_update(
+     /* fill in attributes */
+     if(attr)
+     {
+-        ret = PINT_copy_object_attr(&(tmp_payload->attr), attr);
++  	gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: setting attrs\n");
++	ret = PINT_copy_object_attr(&(tmp_payload->attr), attr);
+         if(ret < 0)
+         {
+             free(tmp_payload);
+@@ -415,6 +432,7 @@ int PINT_acache_update(
+     /* fill in size */
+     if(size)
+     {
++	gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: setting size\n");
+         tmp_payload->size = *size;
+         tmp_payload->size_status = 0;
+     }
+diff -puN src/client/sysint/module.mk.in~pvfs2layoutdriver src/client/sysint/module.mk.in
+--- pvfs2-1.5.1-ld/src/client/sysint/module.mk.in~pvfs2layoutdriver	2008-01-05 18:11:31.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/client/sysint/module.mk.in	2008-01-05 18:11:31.000000000 -0800
+@@ -10,7 +10,8 @@ CSRC := \
+ 	$(DIR)/client-state-machine.c \
+ 	$(DIR)/mgmt-misc.c \
+ 	$(DIR)/sys-dist.c \
+-	$(DIR)/error-details.c
++	$(DIR)/error-details.c \
++	$(DIR)/sys-pnfs.c
+ 
+ CLIENT_SMCGEN := \
+ 	$(DIR)/remove.c \
+diff -puN src/client/sysint/sys-getattr.sm~pvfs2layoutdriver src/client/sysint/sys-getattr.sm
+--- pvfs2-1.5.1-ld/src/client/sysint/sys-getattr.sm~pvfs2layoutdriver	2008-01-05 18:11:31.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/client/sysint/sys-getattr.sm	2008-01-05 18:11:31.000000000 -0800
+@@ -359,11 +359,13 @@ static int getattr_acache_lookup(PINT_cl
+         &size_status);
+     if(ret < 0 || attr_status < 0)
+     {
+-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
+-                    " [%llu]\n",
+-                      llu(object_ref.handle));
+-  
+-        js_p->error_code = GETATTR_ACACHE_MISS;
++	/* DH: It is now a fatal error for pnfs.
++	 */
++	gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
++		     " [%llu]\n",
++		     llu(object_ref.handle));
++	gossip_err("acache: Error-Cache Object not found!!!\n");
++        js_p->error_code = -1;
+         return 1;
+     }
+   
+@@ -448,11 +450,14 @@ static int getattr_acache_lookup(PINT_cl
+      * overwritten when we request updated information from the server
+      */
+     PINT_free_object_attr(&sm_p->getattr.attr);
+-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache miss due to mask: "
+-        " [%llu]\n",
+-          llu(object_ref.handle));
+ 
+-    js_p->error_code = GETATTR_ACACHE_MISS;
++    /* DH: It is now a fatal error for pnfs.
++     */
++    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache miss due to mask: "
++		 " [%llu]\n",
++		 llu(object_ref.handle));
++    gossip_err("acache: Error-Cache Object not found!!!\n");
++    js_p->error_code = -1;
+     return 1;
+ }
+ 
+diff -puN /dev/null src/client/sysint/sys-pnfs.c
+--- /dev/null	2007-11-26 10:11:24.475597181 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/client/sysint/sys-pnfs.c	2008-01-05 18:11:31.000000000 -0800
+@@ -0,0 +1,135 @@
++/*
++ * Dean Hildebrand
++ *
++ * This state machine injects the required information into the PVFS2
++ * client cache to perform I/O for pNFS.
++ */
++
++#include <stdlib.h>
++#include <stdio.h>
++#include <string.h>
++#include <assert.h>
++
++#define __PINT_REQPROTO_ENCODE_FUNCS_C
++#include "gossip.h"
++#include "pvfs2-debug.h"
++#include "job.h"
++#include "str-utils.h"
++#include "pint-servreq.h"
++#include "pvfs2-attr.h"
++#include "acache.h"
++#include "pvfs2-internal.h"
++
++extern void PINT_free_object_attr(PVFS_object_attr *attr);
++static int setlayout_inject(PVFS_object_ref refn, void* layout);
++
++/* DH: This is the entry function for the state machine */
++PVFS_error PVFS_sys_setlayout(
++    PVFS_object_ref ref,
++    void* layout,
++    PVFS_credentials *credentials)
++{
++    int ret = -PVFS_EINVAL;
++
++    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setlayout entered\n");
++
++    if ((ref.handle == PVFS_HANDLE_NULL) ||
++	(ref.fs_id == PVFS_FS_ID_NULL)) {
++	gossip_err("PVFS_sys_setlayout: invalid (NULL) required argument\n");
++	return ret;
++    }
++
++    gossip_debug(GOSSIP_CLIENT_DEBUG,
++		 "Doing setlayout on handle %llu on fs %d\n",
++		 ref.handle, ref.fs_id);
++
++    ret = setlayout_inject(ref, layout);
++
++    return ret;
++}
++
++/****************************************************************/
++
++/* Deserialize the layout (dfiles and dist) and set in the
++ * cache attribute struct
++*/
++static int deserialize_layout(char* layout, PVFS_metafile_attr* meta)
++{
++    int blob_size=0, fs_id=0;
++
++    gossip_debug(GOSSIP_CLIENT_DEBUG, "deserialize_layout: Begin\n");
++
++    /* Size of entire opaque object */
++    decode_int32_t(&layout, &blob_size);
++    /* Size of entire opaque object */
++    decode_int32_t(&layout, &fs_id);
++    gossip_debug(GOSSIP_CLIENT_DEBUG,
++		 "deserialize_layout: #bs:%d fsid:%d\n",
++		 blob_size, fs_id);
++
++    /* Deserialize dfile array */
++    decode_PVFS_metafile_attr_dfiles(&layout, meta);
++    gossip_debug(GOSSIP_CLIENT_DEBUG,
++		 "deserialize_layout: #dfiles: %d dfile #0: %llu \n",
++		 meta->dfile_count, llu(meta->dfile_array[0]));
++
++    /* Deserialize distribution struct */
++    decode_PVFS_metafile_attr_dist(&layout, meta);
++    gossip_debug(GOSSIP_CLIENT_DEBUG,
++		 "deserialize_layout: #ds: %d\n",
++		 meta->dist_size);
++    PINT_dist_dump(meta->dist);
++
++    gossip_debug(GOSSIP_CLIENT_DEBUG, "deserialize_layout: End\n");
++    return 0;
++}
++
++/* DH: Place layout in cache */
++static int setlayout_inject(PVFS_object_ref refn, void* layout)
++{
++    int ret = -PVFS_EINVAL;
++    PVFS_object_attr attr;
++    PVFS_size tempsz = 0;
++
++    gossip_debug(GOSSIP_CLIENT_DEBUG, "setlayout_inject: Begin\n");
++
++    if (layout == NULL)
++    {
++	gossip_err("setlayout_inject: Layout is NULL!\n");
++	ret = -EIO;
++	goto out;
++    }
++
++    /* Set (mostly false) attributes on the cached inode */
++    attr.mask = (PVFS_ATTR_META_ALL | PVFS_ATTR_COMMON_ALL);
++    /*    attr.mask &= !(PVFS_ATTR_SYMLNK_TARGET); */
++    attr.objtype = PVFS_TYPE_METAFILE;
++
++    /* Decode the blob layout */
++    if ((ret = deserialize_layout((char*)layout, &attr.u.meta)))
++    {
++	gossip_err("setlayout_inject: Could not deserialize layout %d!\n",ret);
++	goto out;
++    }
++
++    ret = PINT_acache_update(refn, &attr, &tempsz);
++    if (ret)
++    {
++	gossip_err("setlayout_inject: Could not set layout in cache %d!\n",ret);
++    }
++
++    PINT_free_object_attr(&attr);
++out:
++    gossip_debug(GOSSIP_CLIENT_DEBUG, "setlayout_inject: End\n");
++    return ret;
++}
++
++/*
++ * Local variables:
++ *  mode: c
++ *  c-indent-level: 4
++ *  c-basic-offset: 4
++ * End:
++ *
++ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
++ */
+diff -puN src/kernel/linux-2.6/file.c~pvfs2layoutdriver src/kernel/linux-2.6/file.c
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/file.c~pvfs2layoutdriver	2008-01-05 18:13:54.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/file.c	2008-01-05 18:13:54.000000000 -0800
+@@ -16,6 +16,11 @@
+ #include "pvfs2-internal.h"
+ #include <linux/fs.h>
+ #include <linux/pagemap.h>
++#include "bmi-byteswap.h"
++
++#include "nfs4_pnfs.h"
++
++int pvfs2layout_fsync_inode(struct inode* inode, struct dentry *dentry, int datasync, struct pnfs_layout_type * layoutid);
+ 
+ enum {
+     IO_READ = 0,
+@@ -33,6 +38,17 @@ extern int op_timeout_secs;
+ extern struct address_space_operations pvfs2_address_operations;
+ extern struct backing_dev_info pvfs2_backing_dev_info;
+ 
++extern struct pnfs_client_operations * pnfs_callback_ops;
++
++struct pvfs2layout_mount_type {
++    struct super_block* fl_sb;
++    int pnfs_fs_id;
++};
++
++struct pvfs2layout_layout_type {
++    int junk;
++};
++
+ #ifdef PVFS2_LINUX_KERNEL_2_4
+ static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
+     size_t *count, loff_t *ppos);
+@@ -46,6 +62,14 @@ do {                                    
+   wake_up_interruptible(&op->io_completion_waitq);\
+ } while(0)
+ 
++#define pnfs_decode_int32_t(pptr,x) do { \
++        *(x) = bmitoh32(*(int32_t*) *(pptr)); \
++        *(pptr) += 4; \
++} while (0)
++
++extern int read_threshold;
++extern int write_threshold;
++extern int use_pagecache;
+ 
+ /** Called when a process requests to open a file.
+  */
+@@ -126,12 +150,27 @@ struct rw_options {
+     } io;
+ };
+ 
+-static ssize_t do_read_write(struct rw_options *rw)
++/* Set file handle for upcall.
++ */
++void
++set_pvfs2_file_id(PVFS_object_ref* refn, struct inode *inode, struct pnfs_mount_type* mountid)
++{
++    struct pvfs2layout_mount_type* mount_type = (struct pvfs2layout_mount_type*)mountid->mountid;
++
++    /* DH: Since the file reference handle is a hash of the
++     * ino, calculate it
++     */
++    refn->handle = pvfs2_ino_to_handle(inode->i_ino);
++    refn->fs_id = mount_type->pnfs_fs_id;
++    pvfs2_print("%s: handle:%llu fs_id:%d\n",__FUNCTION__,llu(refn->handle),refn->fs_id);
++}
++
++static ssize_t do_read_write(struct rw_options *rw,
++			     struct pnfs_mount_type *mountid)
+ {
+     pvfs2_kernel_op_t *new_op = NULL;
+     int buffer_index = -1;
+     struct inode *inode;
+-    pvfs2_inode_t *pvfs2_inode = NULL;
+     char *current_buf = NULL;
+     size_t count;
+     loff_t *offset;
+@@ -202,7 +241,6 @@ static ssize_t do_read_write(struct rw_o
+         pvfs2_print("%s: proceeding with offset : %ld, size %ld\n",
+                 fnstr, (unsigned long) *offset, (unsigned long) count);
+     }
+-    pvfs2_inode = PVFS2_I(inode);
+ 
+     while(total_count < count)
+     {
+@@ -220,7 +258,9 @@ static ssize_t do_read_write(struct rw_o
+         new_op->upcall.req.io.readahead_size = readahead_size;
+         new_op->upcall.req.io.io_type = 
+             (rw->type == IO_READ) ? PVFS_IO_READ : PVFS_IO_WRITE;
+-        new_op->upcall.req.io.refn = pvfs2_inode->refn;
++	/* DH - Set the file handle */
++	set_pvfs2_file_id(&new_op->upcall.req.io.refn, inode, mountid);
++
+ 
+         ret = pvfs_bufmap_get(&buffer_index);
+         if (ret < 0)
+@@ -348,13 +388,14 @@ out:
+ /** Read data from a specified offset in a file (referenced by inode).
+  *  Data may be placed either in a user or kernel buffer.
+  */
+-ssize_t pvfs2_inode_read(
++ssize_t pvfs2layout_inode_read(
+     struct inode *inode,
+     char __user *buf,
+     size_t count,
+     loff_t *offset,
+     int copy_to_user,
+-    loff_t readahead_size)
++    loff_t readahead_size,
++    struct pnfs_mount_type *mountid)
+ {
+     struct rw_options rw;
+     rw.type = IO_READ;
+@@ -364,12 +405,24 @@ ssize_t pvfs2_inode_read(
+     rw.io.read.inode = inode;
+     rw.io.read.copy_to_user = copy_to_user;
+     rw.io.read.readahead_size = readahead_size;
+-    return do_read_write(&rw); 
++    return do_read_write(&rw, mountid);
++}
++
++size_t pvfs2_inode_read(
++    struct inode *inode,
++    char __user *buf,
++    size_t count,
++    loff_t *offset,
++    int copy_to_user,
++    loff_t readahead_size)
++{
++    return pvfs2layout_inode_read(inode, buf, count, offset, copy_to_user, readahead_size, NULL);
+ }
+ 
+ /** Read data from a specified offset in a file into a user buffer.
+  */
+-ssize_t pvfs2_file_read(
++ssize_t pvfs2layout_file_read(
++    struct pnfs_layout_type * layoutid,
+     struct file *file,
+     char __user *buf,
+     size_t count,
+@@ -380,14 +433,15 @@ ssize_t pvfs2_file_read(
+                  (char *)file->f_dentry->d_name.name : "UNKNOWN"),
+                 (unsigned long) *offset, (unsigned long) count);
+ 
+-    return pvfs2_inode_read(
+-        file->f_dentry->d_inode, buf, count, offset, 1, 0);
++    return pvfs2layout_inode_read(
++        file->f_dentry->d_inode, buf, count, offset, 1, 0, layoutid->mountid);
+ }
+ 
+ /** Write data from a contiguous user buffer into a file at a specified
+  *  offset.
+  */
+-static ssize_t pvfs2_file_write(
++static ssize_t pvfs2layout_file_write(
++    struct pnfs_layout_type * layoutid,
+     struct file *file,
+     const char __user *buf,
+     size_t count,
+@@ -399,7 +453,7 @@ static ssize_t pvfs2_file_write(
+     rw.count = count;
+     rw.offset = offset;
+     rw.io.write.file = file;
+-    return do_read_write(&rw);
++    return do_read_write(&rw, layoutid->mountid);
+ }
+ 
+ /*
+@@ -830,7 +884,6 @@ static ssize_t pvfs2_file_readv(
+     return do_readv_writev(IO_READV, file, iov, nr_segs, offset);
+ }
+ 
+-
+ /** Write data from a several contiguous user buffers (an iovec) into a file at
+  * a specified offset.
+  */
+@@ -843,6 +896,274 @@ static ssize_t pvfs2_file_writev(
+     return do_readv_writev(IO_WRITEV, file, iov, nr_segs, offset);
+ }
+ 
++static ssize_t
++pvfs2layout_read_pagelist(
++    struct pnfs_layout_type *layoutid,
++    struct inode * inode,
++    struct page **pages,
++    unsigned int pgbase,
++    unsigned nr_pages,
++    loff_t offset,
++    size_t count,
++    struct nfs_read_data * nfs_data)
++{
++    int ret = -1;
++    pvfs2_kernel_op_t *new_op = NULL;
++    int buffer_index = -1;
++    size_t amt_complete = 0;
++    size_t total_count = 0, each_count = 0;
++
++    pvfs2_print("%s: Reading ino:%lu pgbase:%d baseshift %d %u@%llu\n", __FUNCTION__, inode->i_ino, pgbase, (pgbase >> PAGE_CACHE_SHIFT) , count, offset);
++
++    while (total_count < count)
++    {
++        new_op = op_alloc();
++        if (!new_op)
++        {
++            ret = -ENOMEM;
++	    goto pnfs_out;
++        }
++
++        new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
++        /* disable read-ahead */
++        new_op->upcall.req.io.readahead_size = 0;
++        new_op->upcall.req.io.io_type = PVFS_IO_READ;
++
++        /* DH - Set the file handle */
++	set_pvfs2_file_id(&new_op->upcall.req.io.refn, inode, layoutid->mountid);
++
++        ret = pvfs_bufmap_get(&buffer_index);
++        if (ret < 0)
++        {
++            pvfs2_error("%s: pvfs_bufmap_get() failure (%d)\n", __FUNCTION__, ret);
++            op_release(new_op);
++            goto pnfs_out;
++        }
++
++        /* how much to transfer in this loop iteration */
++        each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
++                      pvfs_bufmap_size_query() : (count - total_count));
++
++        new_op->upcall.req.io.buf_index = buffer_index;
++        new_op->upcall.req.io.count = each_count;
++        new_op->upcall.req.io.offset = offset;
++
++        ret = service_operation(new_op, "pvfs2layout_read_pagelist", PVFS2_OP_RETRY_COUNT,
++				get_interruptible_flag(inode));
++
++        if (ret < 0)
++        {
++            /* this macro is defined in pvfs2-kernel.h */
++            pnfs_io_error();
++
++            /*
++	      don't write an error to syslog on signaled operation
++              termination unless we've got debugging turned on, as
++              this can happen regularly (i.e. ctrl-c)
++            */
++            if(ret == -EINTR)
++            {
++                pvfs2_print("%s: returning error %d\n", __FUNCTION__, ret);
++            }
++            else
++            {
++		pvfs2_error("%s: error reading from handle %llu -- returning %d \n",
++			    __FUNCTION__,
++			    llu(pvfs2_ino_to_handle(inode->i_ino)), ret);
++            }
++	    goto pnfs_out;
++        }
++        /*
++         * copy data to application by pushing it out to the iovec.
++         * Number of segments to copy so that we don't
++         * overflow the block-size is set in seg_array[], and
++         * ptr points to the appropriate beginning of the
++         * iovec from where data needs to be copied to, and
++         * new_op->downcall.resp.io.amt_complete indicates
++         * the size in bytes that needs to be pushed out
++         */
++        if (new_op->downcall.resp.io.amt_complete)
++        {
++	    ret = pvfs_copy_from_bufmap_to_pages(buffer_index, pages, nr_pages);
++	    if (ret < 0)
++            {
++                pvfs2_error("%s: Failed to copy user buffer.  Please make sure "
++                            "that the pvfs2-client is running.\n", __FUNCTION__);
++                /* put error codes in downcall so that handle_io_error()
++                 * preserves it properly */
++                new_op->downcall.status = ret;
++                pnfs_io_error();
++		goto pnfs_out;
++            }
++        }
++        offset += new_op->downcall.resp.io.amt_complete;
++        total_count += new_op->downcall.resp.io.amt_complete;
++        amt_complete = new_op->downcall.resp.io.amt_complete;
++
++        /*
++          tell the device file owner waiting on I/O that this read has
++          completed and it can return now.  in this exact case, on
++          wakeup the device will free the op, so we *cannot* touch it
++          after this.
++        */
++        wake_up_device_for_return(new_op);
++        pvfs_bufmap_put(buffer_index);
++
++        /* if we got a short write, fall out and return what we got so far.
++         */
++        if (amt_complete < each_count)
++        {
++            break;
++        }
++    }
++
++    /* success of at least some data! */
++    ret = total_count;
++
++pnfs_out:
++    /* Call back into the nfs client to clean up the committed pages */
++    pnfs_callback_ops->nfs_readlist_complete(nfs_data, ret, 1);
++
++    return ret;
++}
++
++/* Write data from a several contiguous user buffers (an iovec)
++ * into a file at a specified offset.
++ */
++static ssize_t pvfs2layout_write_pagelist(
++    struct pnfs_layout_type * layoutid,
++    struct inode * inode,
++    struct page **pages,
++    unsigned int pgbase,
++    unsigned nr_pages,
++    loff_t offset,
++    size_t count,
++    int sync,
++    struct nfs_write_data* nfs_data)
++{
++    int ret = -1;
++    pvfs2_kernel_op_t *new_op = NULL;
++    int buffer_index = -1;
++    size_t amt_complete = 0;
++    size_t total_count = 0, each_count = 0;
++
++    pvfs2_print("%s: Writing ino:%lu pgbase:%d baseshift %d %u@%llu\n", __FUNCTION__, inode->i_ino, pgbase, (pgbase >> PAGE_CACHE_SHIFT) , count, offset);
++
++    while (total_count < count)
++    {
++        new_op = op_alloc();
++        if (!new_op)
++        {
++            ret = -ENOMEM;
++	    goto pnfs_out;
++        }
++
++        new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
++        new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
++        /* DH - Set the file handle */
++	set_pvfs2_file_id(&new_op->upcall.req.io.refn, inode, layoutid->mountid);
++
++        ret = pvfs_bufmap_get(&buffer_index);
++        if (ret < 0)
++        {
++            pvfs2_error("%s: pvfs_bufmap_get() failure (%d)\n", __FUNCTION__, ret);
++            op_release(new_op);
++	    goto pnfs_out;
++        }
++
++        /* how much to transfer in this loop iteration */
++        each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
++                      pvfs_bufmap_size_query() : (count - total_count));
++
++        new_op->upcall.req.io.buf_index = buffer_index;
++        new_op->upcall.req.io.count = each_count;
++        new_op->upcall.req.io.offset = offset;
++        pvfs2_print("%s: nr_pages %u, offset: %llu each_count: %d\n", __FUNCTION__, nr_pages, offset, each_count);
++
++        /*
++         * copy data from application by pulling it out  of the iovec.
++         * Number of segments to copy so that we don't overflow the block-size
++         * is set in seg_array[], and ptr points to the appropriate
++         * beginning of the iovec from where data needs to be copied out,
++         * and each_count indicates the size in bytes that needs to be pulled
++         * out.  */
++        ret = pvfs_copy_from_pages_to_bufmap(buffer_index, pages, nr_pages);
++
++        if (ret < 0)
++        {
++            pvfs2_error("%s: Failed to copy user buffer.  Please make sure "
++                        "that the pvfs2-client is running. %d\n", __FUNCTION__, ret);
++            op_release(new_op);
++            pvfs_bufmap_put(buffer_index);
++	    goto pnfs_out;
++        }
++        ret = service_operation(new_op, "pvfs2layout_write_pagelist", PVFS2_OP_RETRY_COUNT,
++				get_interruptible_flag(inode));
++
++        if (ret < 0)
++        {
++	    pvfs2_error("%s: io downcall status error\n", __FUNCTION__);
++            /* this macro is defined in pvfs2-kernel.h */
++            pnfs_io_error();
++            /*
++	      don't write an error to syslog on signaled operation
++              termination unless we've got debugging turned on, as
++              this can happen regularly (i.e. ctrl-c)
++            */
++            if(ret == -EINTR)
++            {
++                pvfs2_print("%s: returning error %d\n", __FUNCTION__, ret);
++            }
++            else
++            {
++		pvfs2_error("%s: error reading from handle %llu -- returning %d \n",
++			    __FUNCTION__,
++			    llu(pvfs2_ino_to_handle(inode->i_ino)), ret);
++            }
++	    goto pnfs_out;
++        }
++
++        offset += new_op->downcall.resp.io.amt_complete;
++        total_count += new_op->downcall.resp.io.amt_complete;
++        amt_complete = new_op->downcall.resp.io.amt_complete;
++
++        /*
++          tell the device file owner waiting on I/O that this read has
++          completed and it can return now.  in this exact case, on
++          wakeup the device will free the op, so we *cannot* touch it
++          after this.
++        */
++        wake_up_device_for_return(new_op);
++        pvfs_bufmap_put(buffer_index);
++
++        /* if we got a short write, fall out and return what we got so
++         * far TODO: define semantics here- kind of depends on pvfs2
++         * semantics that don't really exist yet
++         */
++        if (amt_complete < each_count)
++        {
++            break;
++        }
++    }
++
++    /* 'sync' is 4 if it the write is stable (nfs.h FLUSH_STABLE) */
++    if (sync == 4)
++    {
++	ret = pvfs2layout_fsync_inode(inode, NULL, sync, layoutid);
++	if (ret)
++	    goto pnfs_out;
++    }
++
++    /* success of at least some data! */
++    ret = total_count;
++
++pnfs_out:
++    /* Call back into the nfs client to clean up the committed pages */
++    pnfs_callback_ops->nfs_writelist_complete(nfs_data, ret);
++
++    return ret;
++}
++
+ #ifdef HAVE_AIO_VFS_SUPPORT
+ /*
+  * NOTES on the aio implementation.
+@@ -1688,7 +2009,8 @@ out_error:
+ 
+ /** Perform a miscellaneous operation on a file.
+  */
+-int pvfs2_ioctl(
++int pvfs2layout_ioctl(
++    struct pnfs_layout_type *layoutid,
+     struct inode *inode,
+     struct file *file,
+     unsigned int cmd,
+@@ -1700,6 +2022,114 @@ int pvfs2_ioctl(
+     return ret;
+ }
+ 
++/* Create a filelayout layout structure and return it
++ * TODO: Require a destroy_layout function in the main interface.
++ */
++struct pnfs_layout_type*
++pvfs2layout_alloc_layout(struct pnfs_mount_type * mountid, struct inode * inode)
++{
++    struct pnfs_layout_type* pnfslay = NULL;
++    struct pvfs2layout_layout_type* nfslay = NULL;
++
++    pnfslay = kmalloc(sizeof(struct pnfs_layout_type), GFP_KERNEL);
++    if (!pnfslay)
++	return NULL;
++    nfslay = kmalloc(sizeof(struct pvfs2layout_layout_type), GFP_KERNEL);
++    if (!nfslay)
++	return NULL;
++
++    pnfslay->layoutid = (void*)nfslay;
++    pnfslay->mountid = mountid;
++    return pnfslay;
++}
++
++/* Free a filelayout layout structure
++ */
++void
++pvfs2layout_free_layout(struct pnfs_layout_type * layoutid, struct inode * inode, loff_t offset, size_t count)
++{
++    struct pvfs2layout_layout_type* pvfs2lay = NULL;
++    if (layoutid)
++	pvfs2lay = (struct pvfs2layout_layout_type*)layoutid->layoutid;
++    if (pvfs2lay != NULL)
++	kfree(pvfs2lay);
++    kfree(layoutid);
++}
++
++/* Decode layout and store in layoutid.  Overwrite any existing layout
++ * information for this file.
++ * I'm currently storing nothing in layoutid;
++ */
++struct pnfs_layout_type*
++pvfs2layout_set_layout(struct pnfs_layout_type* layoutid,
++		      struct inode* inode,
++		      void* layout)
++{
++    pvfs2_kernel_op_t *new_op = NULL;
++    int ret = -ENOTTY, layoutsize = 0, dfilecount = 0;
++    struct pnfs_mount_type * mountid;
++    struct pvfs2layout_mount_type* pvfs2mount;
++    void* layout_ptr = layout;
++
++    pvfs2_print("%s: Begin\n",__FUNCTION__);
++
++    if (!layout) {
++        pvfs2_error("%s: layout null!\n",__FUNCTION__);
++        return NULL;
++    }
++
++    if (!layoutid) {
++        pvfs2_error("%s: layoutid null!\n",__FUNCTION__);
++        return NULL;
++    }
++    mountid = layoutid->mountid;
++
++    if (!mountid) {
++	pvfs2_error("%s: mountid null!\n",__FUNCTION__);
++	return NULL;
++    }
++
++    pvfs2mount = (struct pvfs2layout_mount_type*)mountid->mountid;
++
++    if (!pvfs2mount) {
++	pvfs2_error("%s: pvfs2mount struct null!\n",__FUNCTION__);
++	return NULL;
++    }
++
++    new_op = op_alloc();
++    if (!new_op)
++    {
++	pvfs2_error("%s: kmem_cache_alloc failed!\n",__FUNCTION__);
++	return NULL;
++    }
++    new_op->upcall.type = PVFS2_VFS_OP_SET_LAYOUT;
++
++    /* Set the global fs id.  Current I only handle 1 fs.  I would
++     * need to create a hash of ino to fs_id to handle more */
++    pnfs_decode_int32_t(&layout, &layoutsize);
++    pnfs_decode_int32_t(&layout, &pvfs2mount->pnfs_fs_id);
++
++    /* For debugging, see how many data handles we have */
++    pnfs_decode_int32_t(&layout, &dfilecount);
++    pvfs2_print("%s LAYOUT: bytes: %d fsid: %d, #dfiles: %d\n",__FUNCTION__, layoutsize, pvfs2mount->pnfs_fs_id, dfilecount);
++
++    /* DH - Set the file handle */
++    set_pvfs2_file_id(&new_op->upcall.req.setlayout.refn, inode, layoutid->mountid);
++
++    memcpy(new_op->upcall.req.setlayout.layout, layout_ptr, layoutsize);
++    ret = service_operation(
++	new_op, "pvfs2_file_set_layout", PVFS2_OP_RETRY_COUNT,
++	get_interruptible_flag(inode));
++
++    op_release(new_op);
++
++    if (ret < 0) {
++	    pvfs2_error("%s: returning error %d\n", __FUNCTION__, ret);
++	    return NULL;
++    }
++    return layoutid;
++}
++
+ /** Memory map a region of a file.
+  */
+ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
+@@ -1778,14 +2208,15 @@ int pvfs2_file_release(
+ 
+ /** Push all data for a specific file onto permanent storage.
+  */
+-int pvfs2_fsync(
+-    struct file *file,
++int pvfs2layout_fsync_inode(
++    struct inode* inode,
+     struct dentry *dentry,
+-    int datasync)
++    int datasync,
++    struct pnfs_layout_type * layoutid)
+ {
+     int ret = -EINVAL;
+-    pvfs2_inode_t *pvfs2_inode = PVFS2_I(file->f_dentry->d_inode);
+     pvfs2_kernel_op_t *new_op = NULL;
++    /* DH: There is no longer a PVFS2 inode */
+ 
+     new_op = op_alloc();
+     if (!new_op)
+@@ -1793,10 +2224,12 @@ int pvfs2_fsync(
+         return -ENOMEM;
+     }
+     new_op->upcall.type = PVFS2_VFS_OP_FSYNC;
+-    new_op->upcall.req.fsync.refn = pvfs2_inode->refn;
++
++    /* DH - Set the file handle */
++    set_pvfs2_file_id(&new_op->upcall.req.fsync.refn, inode, layoutid->mountid);
+ 
+     ret = service_operation(new_op, "pvfs2_fsync", 0,
+-                      get_interruptible_flag(file->f_dentry->d_inode));
++                      get_interruptible_flag(inode));
+ 
+     pvfs2_print("pvfs2_fsync got return value of %d\n",ret);
+ 
+@@ -1804,11 +2237,163 @@ int pvfs2_fsync(
+     return ret;
+ }
+ 
++int pvfs2layout_fsync(
++    struct pnfs_layout_type * layoutid,
++    struct file *file,
++    struct dentry *dentry,
++    int datasync)
++{
++    return pvfs2layout_fsync_inode(file->f_dentry->d_inode, dentry, datasync, layoutid);
++}
++
++/* The pNFS client calls this function after flushing pages to the server.
++ * Since pvfs2 doesn't have a way to sync to disk only specific regions of
++ * a file, we just fsync the whole thing
++ */
++int pvfs2layout_commit(struct pnfs_layout_type * layoutid,
++		       struct inode* ino,
++		       struct list_head *pages,
++		       int sync,
++		       struct nfs_write_data *nfs_data)
++{
++    int status;
++    status = pvfs2layout_fsync_inode(ino, NULL, 1, layoutid);
++
++    /* Call back into the nfs client to clean up the committed pages */
++    pnfs_callback_ops->nfs_commit_complete(nfs_data, status);
++
++    return status;
++}
++
+ /** Change the file pointer position for an instance of an open file.
+  *
+  *  \note If .llseek is overriden, we must acquire lock as described in
+  *        Documentation/filesystems/Locking.
+  */
++
++/* Split wsize/rsize chunks so they do not span multiple data servers
++ */
++int
++pvfs2layout_gather_across_stripes(struct pnfs_mount_type* mountid)
++{
++    return 1;
++}
++
++/* Retrieve the blocksize of the file system and return.
++ * TODO: Do other layout drivers require access to a file's layout in order to
++ * determine this value?
++ */
++ssize_t
++pvfs2layout_get_blocksize(struct pnfs_mount_type* mountid)
++{
++    return pvfs_bufmap_size_query();
++}
++
++/* Use the NFSv4 page cache
++*/
++int
++pvfs2layout_use_pagecache(struct pnfs_layout_type* layoutid, struct inode* inode)
++{
++    return use_pagecache;
++}
++
++/* Issue a layoutget in the same compound as OPEN
++ */
++int
++pvfs2layout_layoutget_on_open(struct pnfs_mount_type* mountid)
++{
++    return 0;
++}
++
++/* Below the Write threshold, the pNFS client will use standard NFSv4 write */
++ssize_t
++pvfs2layout_get_write_threshold(struct pnfs_layout_type* layoutid, struct inode* inode)
++{
++    return write_threshold;
++}
++
++/* Below the Read threshold, the pNFS client will use standard NFSv4 read */
++ssize_t
++pvfs2layout_get_read_threshold(struct pnfs_layout_type* layoutid, struct inode* inode)
++{
++    return read_threshold;
++}
++
++struct pnfs_mount_type*
++pvfs2layout_initialize_mountpoint(struct super_block* sb)
++{
++    struct pvfs2layout_mount_type* fl_mt;
++    struct pnfs_mount_type* mt;
++
++    pvfs2_print("%s: Begin\n",__FUNCTION__);
++
++    fl_mt = kmalloc(sizeof(struct pvfs2layout_mount_type), GFP_KERNEL);
++    if (!fl_mt)
++	return NULL;
++    mt = kmalloc(sizeof(struct pnfs_mount_type), GFP_KERNEL);
++    if (!mt)
++	return NULL;
++
++    fl_mt->fl_sb = sb;
++    fl_mt->pnfs_fs_id = -1;
++    mt->mountid = (void*)fl_mt;
++    return mt;
++}
++
++int
++pvfs2layout_uninitialize_mountpoint(struct pnfs_mount_type* mountid)
++{
++    struct filelayout_mount_type* fl_mt = NULL;
++
++    pvfs2_print("%s: Begin\n",__FUNCTION__);
++
++    if (mountid)
++	fl_mt = (struct filelayout_mount_type*)mountid->mountid;
++    if (fl_mt != NULL)
++	kfree(fl_mt);
++    kfree(mountid);
++    return 0;
++}
++
++/* TODO: All over the code I'm returning error values without calling
++ * the pNFS callback functions.  Is this bad when using the
++ * page_cache?  I think so.
++ */
++struct layoutdriver_io_operations pvfs2layout_io_operations =
++{
++    .fsync                   = pvfs2layout_fsync,
++    .commit                  = pvfs2layout_commit,
++    .read_pagelist           = pvfs2layout_read_pagelist,
++    .write_pagelist          = pvfs2layout_write_pagelist,
++    .read                    = pvfs2layout_file_read,
++    .write                   = pvfs2layout_file_write,
++    .set_layout              = pvfs2layout_set_layout,
++    .alloc_layout            = pvfs2layout_alloc_layout,
++    .free_layout             = pvfs2layout_free_layout,
++    .initialize_mountpoint   = pvfs2layout_initialize_mountpoint,
++    .uninitialize_mountpoint = pvfs2layout_uninitialize_mountpoint,
++    .ioctl                   = pvfs2layout_ioctl,
++};
++
++struct layoutdriver_policy_operations pvfs2layout_policy_operations =
++{
++    .gather_across_stripes = pvfs2layout_gather_across_stripes,
++    .get_blocksize         = pvfs2layout_get_blocksize,
++    .use_pagecache         = pvfs2layout_use_pagecache,
++    .layoutget_on_open     = pvfs2layout_layoutget_on_open,
++    .get_read_threshold    = pvfs2layout_get_read_threshold,
++    .get_write_threshold   = pvfs2layout_get_write_threshold,
++};
++
++struct pnfs_layoutdriver_type pvfs2layout_type =
++{
++    .id = LAYOUT_PVFS2,
++    .name = "LAYOUT_PVFS2",
++    .ld_io_ops = &pvfs2layout_io_operations,
++    .ld_policy_ops = &pvfs2layout_policy_operations,
++};
++
++/* CODE NO LONGER USED BEYOND THIS POINT */
+ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
+ {
+     int ret = -EINVAL;
+@@ -2013,19 +2598,15 @@ struct file_operations pvfs2_file_operat
+     fsync : pvfs2_fsync
+ #else
+     .llseek = pvfs2_file_llseek,
+-    .read = pvfs2_file_read,
+-    .write = pvfs2_file_write,
+     .readv = pvfs2_file_readv,
+     .writev = pvfs2_file_writev,
+ #ifdef HAVE_AIO_VFS_SUPPORT
+     .aio_read = pvfs2_file_aio_read,
+     .aio_write = pvfs2_file_aio_write,
+ #endif
+-    .ioctl = pvfs2_ioctl,
+     .mmap = pvfs2_file_mmap,
+     .open = pvfs2_file_open,
+     .release = pvfs2_file_release,
+-    .fsync = pvfs2_fsync,
+ #ifdef HAVE_SENDFILE_VFS_SUPPORT
+     .sendfile = pvfs2_sendfile,
+ #endif
+diff -puN src/kernel/linux-2.6/pvfs2-bufmap.c~pvfs2layoutdriver src/kernel/linux-2.6/pvfs2-bufmap.c
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/pvfs2-bufmap.c~pvfs2layoutdriver	2008-01-05 18:13:54.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-bufmap.c	2008-01-05 18:13:54.000000000 -0800
+@@ -770,6 +770,78 @@ int pvfs_bufmap_copy_to_user_task(
+ 
+ #endif
+ 
++int pvfs_copy_from_pages_to_bufmap(
++    int buffer_index,
++    struct page **pages,
++    unsigned nr_pages)
++{
++    void *to_kaddr = NULL, *respointer = NULL, *from_kaddr = NULL;
++    struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
++    int i;
++
++    pvfs2_print("%s: index %d nr_pages %d\n", __FUNCTION__, buffer_index, nr_pages);
++
++    if (bufmap_init == 0)
++    {
++        pvfs2_print("%s: not yet initialized; returning\n", __FUNCTION__);
++        return 1;
++    }
++
++    for (i = 0; i < nr_pages; i++)
++    {
++	from_kaddr = pvfs2_kmap(pages[i]);
++        to_kaddr = pvfs2_kmap(to->page_array[i]);
++	respointer = memcpy(to_kaddr, from_kaddr, PAGE_SIZE);
++	if (respointer == NULL)
++	{
++	    pvfs2_error("%s: Failed to copy data from kernel space\n", __FUNCTION__);
++	    return -EFAULT;
++	}
++
++        pvfs2_kunmap(to->page_array[i]);
++        pvfs2_kunmap(pages[i]);
++    }
++
++    return 0;
++}
++
++int pvfs_copy_from_bufmap_to_pages(
++    int buffer_index,
++    struct page **pages,
++    unsigned nr_pages)
++{
++    void *to_kaddr = NULL, *respointer = NULL, *from_kaddr = NULL;
++    struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
++    int i;
++
++    pvfs2_print("%s: index %d nr_pages %d\n", __FUNCTION__, buffer_index, nr_pages);
++
++    if (bufmap_init == 0)
++    {
++        pvfs2_print("%s: not yet initialized; returning\n", __FUNCTION__);
++        return 1;
++    }
++
++    for (i = 0; i < nr_pages; i++)
++    {
++	to_kaddr = pvfs2_kmap(pages[i]);
++        from_kaddr = pvfs2_kmap(to->page_array[i]);
++	respointer = memcpy(to_kaddr, from_kaddr, PAGE_SIZE);
++	if (respointer == NULL)
++	{
++	    pvfs2_error("%s: Failed to copy data from kernel space\n", __FUNCTION__);
++	    return -EFAULT;
++	}
++
++        pvfs2_kunmap(to->page_array[i]);
++        pvfs2_kunmap(pages[i]);
++    }
++
++    return 0;
++}
++
++
++
+ /*
+  * Local variables:
+  *  c-indent-level: 4
+diff -puN src/kernel/linux-2.6/pvfs2-bufmap.h~pvfs2layoutdriver src/kernel/linux-2.6/pvfs2-bufmap.h
+--- pvfs2-1.5.1-ld/src/kernel/linux-2.6/pvfs2-bufmap.h~pvfs2layoutdriver	2008-01-05 18:13:54.000000000 -0800
++++ pvfs2-1.5.1-ld-dhildeb/src/kernel/linux-2.6/pvfs2-bufmap.h	2008-01-05 18:13:54.000000000 -0800
+@@ -67,6 +67,16 @@ int pvfs_bufmap_copy_to_user_task(
+         int size);
+ #endif
+ 
++int pvfs_copy_from_bufmap_to_pages(
++    int buffer_index,
++    struct page **pages,
++    unsigned nr_pages);
++
++int pvfs_copy_from_pages_to_bufmap(
++    int buffer_index,
++    struct page **pages,
++    unsigned nr_pages);
++
+ #endif /* __PVFS2_BUFMAP_H */
+ 
+ /*
+_

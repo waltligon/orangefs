@@ -1,0 +1,39 @@
+#!/bin/sh
+# given a bug number (bugzilla.mcs.anl.gov) for which we previously created a
+# branch, merge that branch back into HEAD
+
+CVSROOT=${CVSROOT:-:ext:$USER@cvs.parl.clemson.edu:/projects/cvsroot}
+PROJECT=pvfs2-1
+
+usage="usage: $0 <-d CVSROOT> BUGNUMBER"
+example="example: $0 66"
+
+if [ $# -lt 1 ]; then
+	echo $usage
+	echo $example
+	exit -1
+fi
+
+while getopts "d:" options; do
+	case $options in
+		d) CVSROOT=$OPTARG;;
+		*) 
+			echo $usage
+			echo $example
+			exit -1;
+			;;
+	esac
+done
+
+shift $(($OPTIND - 1))
+
+# check out fresh copy of HEAD of project.  we'll merge the branch into this
+# working copy
+cvs -d $CVSROOT checkout -d pvfs2-HEAD $PROJECT
+cd pvfs2-HEAD
+
+# perform the merge.  TODO: make sure conflicts get flagged somehow
+cvs update -j pvfs2-bugfix-$1
+
+echo "Merge from branch into HEAD complete.  Check for conflicts and commit when done"
+

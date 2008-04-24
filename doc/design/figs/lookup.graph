@@ -1,0 +1,43 @@
+digraph G {
+	size = "10,10";
+
+	// default shape
+	node [shape=box];
+	"incoming request;\ncontains path (string) and filesystem id (int)"
+	->
+	"find the handle for the dataspace that contains\nthe path/handle mapping for the requested file system";
+
+	"find the handle for the dataspace that contains\nthe path/handle mapping for the requested file system"
+	-> 
+	"build an error ack"
+	[label = "failure"];
+
+	"find the handle for the dataspace that contains\nthe path/handle mapping for the requested file system"
+	-> 
+	"submit trove keyval job\n(key=path, value=handle)"
+	[label = "success"];
+
+	
+	"submit trove keyval job\n(key=path, value=handle)"
+	-> 
+	"build an error ack"
+	[label = "failure"];
+
+	"submit trove keyval job\n(key=path, value=handle)"
+	-> 
+	"build a successful ack;\ncontains handle value from previous step"
+	[label = "success"];
+
+	"build a successful ack;\ncontains handle value from previous step"
+	->
+	"submit bmi send job";
+
+	"build an error ack"
+	->
+	"submit bmi send job";
+
+	"submit bmi send job"
+	->
+	"exit state machine";
+	
+}

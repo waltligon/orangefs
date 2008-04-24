@@ -1,0 +1,147 @@
+General (critical)
+-----------------------
+
+add hints to allow reference counting on bmi addresses so that we know when
+they can be safely discarded
+
+General (portability)
+-----------------------
+
+Get rid of dynamic array declarations that are all over the BMI
+code!  This is a stupid hack that only gcc allows.
+
+Replace void* type for memory regions with PVFS_byte or BMI_byte
+types.  Audit code to make sure that buffers are indexed like
+this: (type)((BMI_byte)buffer + offset)
+
+General (non critical)
+-----------------------
+
+implement a mechanism to occasionally (or maybe if resources get low) scan
+addresses with a reference count of 0 to see if any of them can be discarded
+
+reimplement reference-list.c using a hash table instead of linked
+list, to cut down on search time during addr lookups (maybe use
+multiple hash tables to search on sepeate keys)
+
+consider changing the way the testXXX functions are implemented in
+both modules, so that they do not do work with timeout > 0 if the
+desired operation is already completed.  Right now both could
+potentially stall before grabbing a completed operation...
+
+do a better implementation of the testsome and testunexpected
+functions, so that they are more clever about multiplexing between
+multiple modules and splitting up the max_idle_time (right now
+each module is called once with 1/n idle time)
+
+we can probably redo op_list_search as a simpler function - I'm not sure
+we need so much flexibility any more, so maybe we can skip passing
+a whole key into search.
+
+Consider adding _optional_ argument checking code, in particular look
+for stuff like sum of size_list == size in list calls, size >
+expected size, etc.
+
+Document what stuff in the method_op structure must be filled in by
+methods for correct BMI operation, and what is just there for convenience
+
+Implement a mechanism for throttling the amount of eager or unexpected
+messages that a method is allowed to receive at a time.  Right now one
+could stream a huge number of such messages to use up memory buffers
+on a system if the receiver was not posting receives or checking for
+unexpected messages fast enough.
+
+do I need to clean up things in the completion_array[] at finalize
+time?  applies to both GM and TCP modules, maybe to flow and job stuff
+as well - actually, should probably just call close_context from
+upper level before shutting down modules
+
+TCP module:
+-----------------------
+
+optimize locking
+
+do a better job of cleaning out address structures that are no longer in use
+(may need a hint to say when this can be done)
+
+turn off sigpipe (we will just catch errors at system call time)
+
+Do something better than the "enqueue_operation" function - it's
+list of arguments has gotten out of hand, I think...
+
+also clean up use of tcp_msg_header structure- this is also cluttering the
+code, especially when considering what needs to be done to support 
+network encoding of the header.
+
+There are more oportunities for immediate completion on receives
+(specifically, look at the end of tcp_post_recv_rend() when we add to the
+completion queue, and the bottom of tcp_post_recv_eager()).
+We should try to immediately complete towards the end of
+post_recv_rend also (see TODO in comments).
+
+Redo tcp_do_work_recv().  It is huge.
+
+The data reception portions of tcp_post_recv_eager and
+tcp_post_recv_rend could be shared (maybe a separate function also used
+within poll?).
+
+Implement better fd management in the TCP module.  It should detect when
+we are running out of sockets and make efforts to free some up as
+needed.  We already have the means to reconnect if needed- we could scan
+after operations are taken out of the completion queue to look for
+sockets to close without too much difficulty now.  It would rely on a
+hint (see ideas at top of this file) from the caller, however, to know
+when it is safe to kill sockets.
+(look at code from pvfs1:)
+
+	if (getrlimit(RLIMIT_NOFILE, &lim) < 0) {
+		/* not something to die over */
+		LOG("notice: could not discover maximum # of fds.  continuing.\n");
+		my_nofile = -1;
+	}
+	else {
+		my_nofile = lim.rlim_cur;
+		LOG1("open file limit is %d\n", my_nofile);
+	}
+
+GM module:
+-----------------------
+
+optimize locking
+
+implement cancel
+
+make sure all control messages are network encoded somehow
+to work across different architectures
+
+clean up use of qlist (in particular, make use of
+qlist_for_each_safe() when appropriate)
+
+Make sure that GM can handle 0 byte messages; the flow code may trigger
+these occasionally.
+
+Look into possibility of using lookaside list for method_op
+allocation.
+
+Consider doing a malloc() followed by register as opposed to
+dma_malloc() for control buffers- this would be more space efficient and
+would only slow down initialization, not communication (see GM
+FAQ).
+
+Look at mpich-gm (gmpriv.c) and the way that send callbacks are used.
+It looks like (in some cases) that sends are considered completed after
+posting, rather than waiting for callback.  This would explain some of
+the mpi gm client bandwidth (for small messages).
+
+Look into the following projects on top of GM: via, sockets, and opiom
+
+Need to handle erroneous messages in recv cycle (what if not peer, for
+example?).
+
+note that only the ENABLE_GM_BUFPOOL memory buffering method supports
+list operations!
+
+follow up on gm_blocking_receive() bug- it appears to still
+consume 99% cpu when alarms are used, despite report that bug was
+fixed.  For now still using XXX_no_spin() version.
+

@@ -1,0 +1,34 @@
+general stuff:
+--------------------------
+
+- do a better implementation of testsome(), so that it is more
+  clever about dividing time between multiple modules and
+  splitting up the max_idle_time_ms argument
+
+- make an optional flow descriptor checker function that makes sure the
+  flow descriptor fields are set to sane initial values - only use it
+  during development
+
+- probably should get rid of alloca calls, not sure if portable
+  (would be faster to keep static buffers for some of that anyway if
+  possible)
+
+- implement unpost()
+
+- think about how flow timeouts should be handled.  For example,
+  suppose the sender experiences a BMI error and aborts.  The
+  receiver may sit there indefinitely waiting for the next message
+  if no one makes it time out.
+
+- fix error handling.  Document how errors are reported, what short
+  flows mean, etc.
+
+flowproto bmi_trove stuff:
+--------------------------
+
+- do a better implementation of checkworld, so that it is more
+  clever about multiplexing between bmi/trove and dividing up the
+  max_idle_time.
+
+- handle corner cases (look for "TODO" entries in code); mostly error
+  conditions and short I/O conditions that we can't clean up right now

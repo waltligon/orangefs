@@ -1,0 +1,154 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage{html}
+\usepackage{charter}
+\pagestyle{empty}
+
+\topmargin 0.0in
+\textwidth 6.5in
+\textheight 9.0in
+\columnsep 0.25in
+\oddsidemargin 0.0in
+\evensidemargin 0.0in
+\headsep 0.0in
+\headheight 0.0in
+
+\title{PVFS Tuning}
+\author{ PVFS Development Team }
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\thispagestyle{empty}
+
+\section{Introduction}
+
+The default settings for PVFS (those provided and in the source code
+and added to the config files by \texttt{pvfs2-genconfig})
+provide good performance on most systems and for a wide variety of workloads.
+This document describes system level and PVFS specific parameters 
+that can be tuned to improve
+performance on specific hardware, or for specific workloads and usage
+scenarios.  
+
+In general performance tuning should begin with the available hardware
+and system software, to maximize the bandwidth of the network and
+transfer rates of the storage hardware.  From there, PVFS server
+parameters can be tuned to improve performance of the
+entire system, especially
+if specific usage scenarios are targetted.  Finally, file system 
+extended attributes and hints can be tweaked by different users to
+improve individual performance within a system with varying workloads.
+
+Some (especially system level) parameters can be tuned to provide better
+performance without sacrificing another property of the system.  
+Tuning some parameters though, may have a direct effect on the
+performance of other usage scenarios, or some other property of the
+system (such as durability).  
+Our discussion of performance tuning will include the tradeoffs
+that must be made during the tuning process, but the final decisions are best
+made by the administrators to determine the optimal 
+setup that meets the needs of their users.
+
+\section{Cluster Partitioning}
+
+For users that have one use case, and a generic cluster, what's the best
+partition of compute/IO nodes?  Is this section needed?
+
+\section{Storage}
+
+\subsection{Server Configuration}
+
+How many IO servers? \footnote{The FAQ already answers this to some
+degree}
+How many MD servers?
+Should IO and MD servers be shared?
+
+\subsection{Local File System}
+
+\begin{itemize}
+\item ext3
+\item xfs
+\end{itemize}
+
+\subsection{Disk Synchronization}
+
+The easiest way to see an improvement in performance is to set the
+\texttt{TroveSyncMeta} and \texttt{TroveSyncData} attributes to ``no''
+in the \texttt{<StorageHints>} section.  If those attributes are set to
+``no'' then Trove will read and write data from a cache and not the
+underlying file.  Performance will increase greatly, but if the server
+dies at some point, you could lose data.  At this point in PVFS2
+development, server crashes are rare outside of hardware failures.
+PVFS2 developers should probably leave these settings to ``yes''.  If
+PVFS2 hosts the only copy of your data, leave these settings to ``yes''.
+Otherwise, give ``no'' a shot.
+
+Sync or not, metadata, data
+  coalescing
+
+  distributed metadata
+
+\subsection{Metadata}
+\subsubsection{Coalescing}
+
+\subsection{Data}
+
+\section{Networks}
+
+\subsection{Network Independent}
+
+\begin{enumerate}
+\item Unexpected message size
+\item Flow Parameters
+\end{enumerate}
+
+\begin{itemize}
+\item buffer size
+\item count
+\end{itemize}
+
+\subsection{TCP}
+
+\subsubsection{Kernel Parameters}
+\subsubsection{Socket Buffer Sizes}
+\subsubsection{Listening Backlog (?)}
+
+\subsection{Infiniband}
+\subsection{Myrinet Express}
+
+\section{VFS Layer}
+
+\subsection{Maximum I/O Size}
+
+\subsection{Workload Specifics}
+
+\subsection{Extended Attributes}
+
+\subsubsection{Directory Hints}
+
+\begin{itemize}
+\item Number of Datafiles
+\item Stripe Size
+\item Distribution
+\end{itemize}
+
+\section{Workloads}
+
+\subsection{Small files}
+\subsection{Large Files}
+\subsection{Concurrent IO}
+
+\section{Benchmarking}
+
+\begin{itemize}
+\item  mpi-io-test
+\item  mpi-md-test
+\end{itemize}
+
+\section{References}
+
+\end{document}
+
+
+% vim: tw=72

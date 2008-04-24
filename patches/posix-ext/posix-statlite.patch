@@ -1,0 +1,1112 @@
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/i386/kernel/syscall_table.S vanilla-new/arch/i386/kernel/syscall_table.S
+--- vanilla/arch/i386/kernel/syscall_table.S	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/arch/i386/kernel/syscall_table.S	2006-05-05 15:14:31.000000000 -0500
+@@ -312,3 +312,9 @@
+ 	.long sys_unshare		/* 310 */
+ 	.long sys_openg
+ 	.long sys_openfh
++	.long sys_newstatlite
++	.long sys_newlstatlite
++	.long sys_newfstatlite
++	.long sys_statlite64
++	.long sys_lstatlite64
++	.long sys_fstatlite64
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/ia64/kernel/entry.S vanilla-new/arch/ia64/kernel/entry.S
+--- vanilla/arch/ia64/kernel/entry.S	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/arch/ia64/kernel/entry.S	2006-05-05 15:29:07.000000000 -0500
+@@ -1621,5 +1621,8 @@
+ 	data8 sys_unshare
+ 	data8 sys_openg
+ 	data8 sys_openfh
++	data8 sys_newstatlite
++	data8 sys_newlstatlite
++	data8 sys_newfstatlite
+ 
+ 	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/powerpc/kernel/systbl.S vanilla-new/arch/powerpc/kernel/systbl.S
+--- vanilla/arch/powerpc/kernel/systbl.S	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/arch/powerpc/kernel/systbl.S	2006-05-05 17:02:20.000000000 -0500
+@@ -324,3 +324,6 @@
+ SYSCALL(unshare)
+ SYSCALL(openg)
+ SYSCALL(openfh)
++SYSCALL(newstatlite)
++SYSCALL(newlstatlite)
++SYSCALL(newfstatlite)
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/x86_64/ia32/ia32entry.S vanilla-new/arch/x86_64/ia32/ia32entry.S
+--- vanilla/arch/x86_64/ia32/ia32entry.S	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/arch/x86_64/ia32/ia32entry.S	2006-05-05 15:15:16.000000000 -0500
+@@ -690,6 +690,12 @@
+ 	.quad sys_unshare		/* 310 */
+ 	.quad compat_sys_openg
+ 	.quad compat_sys_openfh
++	.quad compat_sys_newstatlite
++	.quad compat_sys_newlstatlite
++	.quad compat_sys_newfstatlite
++	.quad sys32_statlite64
++	.quad sys32_lstatlite64
++	.quad sys32_fstatlite64
+ ia32_syscall_end:		
+ 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
+ 		.quad ni_syscall
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/x86_64/ia32/sys_ia32.c vanilla-new/arch/x86_64/ia32/sys_ia32.c
+--- vanilla/arch/x86_64/ia32/sys_ia32.c	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/arch/x86_64/ia32/sys_ia32.c	2006-05-05 16:17:51.000000000 -0500
+@@ -106,6 +106,59 @@
+ 	return 0;
+ }
+ 
++int cp_compat_statlite(struct kstat_lite *kbuf, struct compat_stat_lite __user *ubuf)
++{
++	typeof(ubuf->st_uid) uid = 0;
++	typeof(ubuf->st_gid) gid = 0;
++	SET_UID(uid, kbuf->uid);
++	SET_GID(gid, kbuf->gid);
++	if (!old_valid_dev(kbuf->dev) || !old_valid_dev(kbuf->rdev))
++		return -EOVERFLOW;
++	if (SLITE_SIZET(kbuf->lite_mask) && kbuf->size >= 0x7fffffff)
++		return -EOVERFLOW;
++	if (!access_ok(VERIFY_WRITE, ubuf, sizeof(struct compat_stat_lite)) ||
++	    __put_user (old_encode_dev(kbuf->dev), &ubuf->st_dev) ||
++	    __put_user (kbuf->ino, &ubuf->st_ino) ||
++	    __put_user (kbuf->mode, &ubuf->st_mode) ||
++	    __put_user (kbuf->nlink, &ubuf->st_nlink) ||
++	    __put_user (uid, &ubuf->st_uid) ||
++	    __put_user (gid, &ubuf->st_gid) ||
++	    __put_user (old_encode_dev(kbuf->rdev), &ubuf->st_rdev))
++		return -EFAULT;
++
++	if (__put_user (kbuf->lite_mask, &ubuf->st_litemask))
++		return -EFAULT;
++
++	if (SLITE_SIZET(kbuf->lite_mask)) {
++	    if (__put_user (kbuf->size, &ubuf->st_size))
++			 return -EFAULT;
++	}
++	if (SLITE_ATIME(kbuf->lite_mask)) {
++	    if (__put_user (kbuf->atime.tv_sec, &ubuf->st_atime) ||
++			 __put_user (kbuf->atime.tv_nsec, &ubuf->st_atime_nsec))
++			 return -EFAULT;
++	}
++	if (SLITE_MTIME(kbuf->lite_mask)) {
++	    if (__put_user (kbuf->mtime.tv_sec, &ubuf->st_mtime) ||
++			 __put_user (kbuf->mtime.tv_nsec, &ubuf->st_mtime_nsec))
++			 return -EFAULT;
++	}
++	if (SLITE_CTIME(kbuf->lite_mask)) {
++	    if (__put_user (kbuf->ctime.tv_sec, &ubuf->st_ctime) ||
++			 __put_user (kbuf->ctime.tv_nsec, &ubuf->st_ctime_nsec))
++			 return -EFAULT;
++	}
++	if (SLITE_BLKSIZE(kbuf->lite_mask)) {
++	    if (__put_user (kbuf->blksize, &ubuf->st_blksize))
++			 return -EFAULT;
++	}
++	if (SLITE_BLOCKS(kbuf->lite_mask)) {
++	    if (__put_user (kbuf->blocks, &ubuf->st_blocks))
++			 return -EFAULT;
++	}
++	return 0;
++}
++
+ asmlinkage long
+ sys32_truncate64(char __user * filename, unsigned long offset_low, unsigned long offset_high)
+ {
+@@ -150,6 +203,57 @@
+ 	return 0;
+ }
+ 
++static int
++cp_stat64_lite(struct stat64_lite __user *ubuf, struct kstat_lite *stat_lite)
++{
++	typeof(ubuf->st_uid) uid = 0;
++	typeof(ubuf->st_gid) gid = 0;
++	SET_UID(uid, stat_lite->uid);
++	SET_GID(gid, stat_lite->gid);
++	if (!access_ok(VERIFY_WRITE, ubuf, sizeof(struct stat64_lite)) ||
++	    __put_user(huge_encode_dev(stat_lite->dev), &ubuf->st_dev) ||
++	    __put_user (stat_lite->ino, &ubuf->__st_ino) ||
++	    __put_user (stat_lite->ino, &ubuf->st_ino) ||
++	    __put_user (stat_lite->mode, &ubuf->st_mode) ||
++	    __put_user (stat_lite->nlink, &ubuf->st_nlink) ||
++	    __put_user (uid, &ubuf->st_uid) ||
++	    __put_user (gid, &ubuf->st_gid) ||
++	    __put_user (huge_encode_dev(stat_lite->rdev), &ubuf->st_rdev))
++		return -EFAULT;
++
++	if (__put_user (stat_lite->lite_mask, &ubuf->st_litemask))
++		return -EFAULT;
++
++	if (SLITE_SIZET(stat_lite->lite_mask)) {
++	    if (__put_user (stat_lite->size, &ubuf->st_size))
++			 return -EFAULT;
++	}
++	if (SLITE_ATIME(stat_lite->lite_mask)) {
++	    if (__put_user (stat_lite->atime.tv_sec, &ubuf->st_atime) ||
++			 __put_user (stat_lite->atime.tv_nsec, &ubuf->st_atime_nsec)) 
++			 return -EFAULT;
++	}
++	if (SLITE_MTIME(stat_lite->lite_mask)) {
++	    if (__put_user (stat->mtime.tv_sec, &ubuf->st_mtime) ||
++			 __put_user (stat->mtime.tv_nsec, &ubuf->st_mtime_nsec))
++			 return -EFAULT;
++	}
++	if (SLITE_CTIME(stat_lite->lite_mask)) {
++	    if (__put_user (stat->ctime.tv_sec, &ubuf->st_ctime) ||
++			 __put_user (stat->ctime.tv_nsec, &ubuf->st_ctime_nsec))
++			 return -EFAULT;
++	}
++	if (SLITE_BLKSIZE(stat_lite->lite_mask)) {
++	    if (__put_user (stat_lite->blksize, &ubuf->st_blksize))
++			 return -EFAULT;
++	}
++	if (SLITE_BLOCKS(stat_lite->lite_mask)) {
++		 if (__put_user (stat->blocks, &ubuf->st_blocks))
++			return -EFAULT;
++	}
++	return 0;
++}
++
+ asmlinkage long
+ sys32_stat64(char __user * filename, struct stat64 __user *statbuf)
+ {
+@@ -161,6 +265,16 @@
+ }
+ 
+ asmlinkage long
++sys32_statlite64(char __user * filename, struct stat64_lite __user *statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int ret = vfs_statlite(filename, &stat_lite);
++	if (!ret)
++		ret = cp_stat64_lite(statlitebuf, &stat_lite);
++	return ret;
++}
++
++asmlinkage long
+ sys32_lstat64(char __user * filename, struct stat64 __user *statbuf)
+ {
+ 	struct kstat stat;
+@@ -171,6 +285,16 @@
+ }
+ 
+ asmlinkage long
++sys32_lstatlite64(char __user * filename, struct stat64_lite __user *statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int ret = vfs_lstatlite(filename, &stat_lite);
++	if (!ret)
++		ret = cp_stat64_lite(statlitebuf, &stat_lite);
++	return ret;
++}
++
++asmlinkage long
+ sys32_fstat64(unsigned int fd, struct stat64 __user *statbuf)
+ {
+ 	struct kstat stat;
+@@ -181,6 +305,16 @@
+ }
+ 
+ asmlinkage long
++sys32_fstatlite64(unsigned int fd, struct stat64_lite __user *statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int ret = vfs_fstatlite(fd, &stat_lite);
++	if (!ret)
++		ret = cp_stat64_lite(statlitebuf, &stat_lite);
++	return ret;
++}
++
++asmlinkage long
+ sys32_fstatat(unsigned int dfd, char __user *filename,
+ 	      struct stat64 __user* statbuf, int flag)
+ {
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/compat.c vanilla-new/fs/compat.c
+--- vanilla/fs/compat.c	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/fs/compat.c	2006-05-05 14:16:16.000000000 -0500
+@@ -103,6 +103,17 @@
+ 	return error;
+ }
+ 
++asmlinkage long compat_sys_newstatlite(char __user * filename,
++		struct compat_stat_lite __user *statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int error = vfs_statlite_fd(AT_FDCWD, filename, &stat_lite);
++
++	if (!error)
++		error = cp_compat_statlite(&stat_lite, statlitebuf);
++	return error;
++}
++
+ asmlinkage long compat_sys_newlstat(char __user * filename,
+ 		struct compat_stat __user *statbuf)
+ {
+@@ -114,6 +125,17 @@
+ 	return error;
+ }
+ 
++asmlinkage long compat_sys_newlstatlite(char __user * filename,
++		struct compat_stat_lite __user *statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int error = vfs_lstatlite_fd(AT_FDCWD, filename, &stat_lite);
++
++	if (!error)
++		error = cp_compat_statlite(&stat_lite, statlitebuf);
++	return error;
++}
++
+ asmlinkage long compat_sys_newfstatat(unsigned int dfd, char __user *filename,
+ 		struct compat_stat __user *statbuf, int flag)
+ {
+@@ -146,6 +168,17 @@
+ 	return error;
+ }
+ 
++asmlinkage long compat_sys_newfstatlite(unsigned int fd,
++		struct compat_stat_lite __user * statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int error = vfs_fstatlite(fd, &stat_lite);
++
++	if (!error)
++		error = cp_compat_statlite(&stat_lite, statlitebuf);
++	return error;
++}
++
+ static int put_compat_statfs(struct compat_statfs __user *ubuf, struct kstatfs *kbuf)
+ {
+ 	
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/stat.c vanilla-new/fs/stat.c
+--- vanilla/fs/stat.c	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/fs/stat.c	2006-05-05 17:12:15.000000000 -0500
+@@ -38,6 +38,33 @@
+ 
+ EXPORT_SYMBOL(generic_fillattr);
+ 
++void generic_fillattr_lite(struct inode *inode, struct kstat_lite *stat_lite)
++{
++	unsigned long lite_mask = stat_lite->lite_mask;
++
++	stat_lite->dev = inode->i_sb->s_dev;
++	stat_lite->ino = inode->i_ino;
++	stat_lite->mode = inode->i_mode;
++	stat_lite->nlink = inode->i_nlink;
++	stat_lite->uid = inode->i_uid;
++	stat_lite->gid = inode->i_gid;
++	stat_lite->rdev = inode->i_rdev;
++	if (SLITE_ATIME(lite_mask))
++		stat_lite->atime = inode->i_atime;
++	if (SLITE_MTIME(lite_mask))
++		stat_lite->mtime = inode->i_mtime;
++	if (SLITE_CTIME(lite_mask))
++		stat_lite->ctime = inode->i_ctime;
++	if (SLITE_SIZET(lite_mask))
++		stat_lite->size = i_size_read(inode);
++	if (SLITE_BLOCKS(lite_mask))
++		stat_lite->blocks = inode->i_blocks;
++	if (SLITE_BLKSIZE(lite_mask))
++		stat_lite->blksize = inode->i_blksize;
++}
++
++EXPORT_SYMBOL_GPL(generic_fillattr_lite);
++
+ int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+ {
+ 	struct inode *inode = dentry->d_inode;
+@@ -63,6 +90,31 @@
+ 
+ EXPORT_SYMBOL(vfs_getattr);
+ 
++int vfs_getattr_lite(struct vfsmount *mnt, struct dentry *dentry, struct kstat_lite *stat_lite)
++{
++	struct inode *inode = dentry->d_inode;
++	int retval;
++
++	retval = security_inode_getattr(mnt, dentry);
++	if (retval)
++		return retval;
++
++	if (inode->i_op->getattr_lite)
++		return inode->i_op->getattr_lite(mnt, dentry, stat_lite);
++
++	generic_fillattr_lite(inode, stat_lite);
++	if (!stat_lite->blksize) {
++		struct super_block *s = inode->i_sb;
++		unsigned blocks;
++		blocks = (stat_lite->size+s->s_blocksize-1) >> s->s_blocksize_bits;
++		stat_lite->blocks = (s->s_blocksize / 512) * blocks;
++		stat_lite->blksize = s->s_blocksize;
++	}
++	return 0;
++}
++
++EXPORT_SYMBOL_GPL(vfs_getattr_lite);
++
+ int vfs_stat_fd(int dfd, char __user *name, struct kstat *stat)
+ {
+ 	struct nameidata nd;
+@@ -76,6 +128,19 @@
+ 	return error;
+ }
+ 
++int vfs_statlite_fd(int dfd, char __user *name, struct kstat_lite *stat_lite)
++{
++	struct nameidata nd;
++	int error;
++
++	error = __user_walk_fd(dfd, name, LOOKUP_FOLLOW, &nd);
++	if (!error) {
++		error = vfs_getattr_lite(nd.mnt, nd.dentry, stat_lite);
++		path_release(&nd);
++	}
++	return error;
++}
++
+ int vfs_stat(char __user *name, struct kstat *stat)
+ {
+ 	return vfs_stat_fd(AT_FDCWD, name, stat);
+@@ -83,6 +148,13 @@
+ 
+ EXPORT_SYMBOL(vfs_stat);
+ 
++int vfs_statlite(char __user *name, struct kstat_lite *stat_lite)
++{
++	return vfs_statlite_fd(AT_FDCWD, name, stat_lite);
++}
++
++EXPORT_SYMBOL_GPL(vfs_statlite);
++
+ int vfs_lstat_fd(int dfd, char __user *name, struct kstat *stat)
+ {
+ 	struct nameidata nd;
+@@ -96,6 +168,19 @@
+ 	return error;
+ }
+ 
++int vfs_lstatlite_fd(int dfd, char __user *name, struct kstat_lite *stat_lite)
++{
++	struct nameidata nd;
++	int error;
++
++	error = __user_walk_fd(dfd, name, 0, &nd);
++	if (!error) {
++		error = vfs_getattr_lite(nd.mnt, nd.dentry, stat_lite);
++		path_release(&nd);
++	}
++	return error;
++}
++
+ int vfs_lstat(char __user *name, struct kstat *stat)
+ {
+ 	return vfs_lstat_fd(AT_FDCWD, name, stat);
+@@ -103,6 +188,13 @@
+ 
+ EXPORT_SYMBOL(vfs_lstat);
+ 
++int vfs_lstatlite(char __user *name, struct kstat_lite *stat_lite)
++{
++	return vfs_lstatlite_fd(AT_FDCWD, name, stat_lite);
++}
++
++EXPORT_SYMBOL_GPL(vfs_lstatlite);
++
+ int vfs_fstat(unsigned int fd, struct kstat *stat)
+ {
+ 	struct file *f = fget(fd);
+@@ -117,6 +209,20 @@
+ 
+ EXPORT_SYMBOL(vfs_fstat);
+ 
++int vfs_fstatlite(unsigned int fd, struct kstat_lite *stat_lite)
++{
++	struct file *f = fget(fd);
++	int error = -EBADF;
++
++	if (f) {
++		error = vfs_getattr_lite(f->f_vfsmnt, f->f_dentry, stat_lite);
++		fput(f);
++	}
++	return error;
++}
++
++EXPORT_SYMBOL_GPL(vfs_fstatlite);
++
+ #ifdef __ARCH_WANT_OLD_STAT
+ 
+ /*
+@@ -239,6 +345,81 @@
+ 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
+ }
+ 
++static int cp_new_statlite(struct kstat_lite *stat_lite, struct stat_lite __user *statlitebuf)
++{
++	struct stat_lite tmp;
++
++#if BITS_PER_LONG == 32
++	if (!old_valid_dev(stat_lite->dev) || !old_valid_dev(stat_lite->rdev))
++		return -EOVERFLOW;
++#else
++	if (!new_valid_dev(stat_lite->dev) || !new_valid_dev(stat_lite->rdev))
++		return -EOVERFLOW;
++#endif
++
++	memset(&tmp, 0, sizeof(tmp));
++#if BITS_PER_LONG == 32
++	tmp.st_dev = old_encode_dev(stat_lite->dev);
++#else
++	tmp.st_dev = new_encode_dev(stat_lite->dev);
++#endif
++	tmp.st_ino = stat_lite->ino;
++	tmp.st_mode = stat_lite->mode;
++	tmp.st_nlink = stat_lite->nlink;
++	if (tmp.st_nlink != stat_lite->nlink)
++		return -EOVERFLOW;
++	SET_UID(tmp.st_uid, stat_lite->uid);
++	SET_GID(tmp.st_gid, stat_lite->gid);
++#if BITS_PER_LONG == 32
++	tmp.st_rdev = old_encode_dev(stat_lite->rdev);
++#else
++	tmp.st_rdev = new_encode_dev(stat_lite->rdev);
++#endif
++#if BITS_PER_LONG == 32
++	if (SLITE_SIZET(stat_lite->lite_mask) && stat_lite->size > MAX_NON_LFS)
++		return -EOVERFLOW;
++#endif
++	if (SLITE_SIZET(stat_lite->lite_mask)) {
++		tmp.st_size = stat_lite->size;
++		tmp.st_litemask |= S_SLITE_SIZET;
++	}
++	if (SLITE_ATIME(stat_lite->lite_mask)) {
++		tmp.st_atime = stat_lite->atime.tv_sec;
++		tmp.st_litemask |= S_SLITE_ATIME;
++	}
++	if (SLITE_MTIME(stat_lite->lite_mask)) {
++		tmp.st_mtime = stat_lite->mtime.tv_sec;
++		tmp.st_litemask |= S_SLITE_MTIME;
++	}
++	if (SLITE_CTIME(stat_lite->lite_mask)) {
++		tmp.st_ctime = stat_lite->ctime.tv_sec;
++		tmp.st_litemask |= S_SLITE_CTIME;
++	}
++#ifdef STAT_HAVE_NSEC
++	if (SLITE_ATIME(stat_lite->lite_mask)) {
++		tmp.st_atime_nsec = stat_lite->atime.tv_nsec;
++		tmp.st_litemask |= S_SLITE_ATIME;
++	}
++	if (SLITE_MTIME(stat_lite->lite_mask)) {
++		tmp.st_mtime_nsec = stat_lite->mtime.tv_nsec;
++		tmp.st_litemask |= S_SLITE_MTIME;
++	}
++	if (SLITE_CTIME(stat_lite->lite_mask)) {
++		tmp.st_ctime_nsec = stat_lite->ctime.tv_nsec;
++		tmp.st_litemask |= S_SLITE_CTIME;
++	}
++#endif
++	if (SLITE_BLOCKS(stat_lite->lite_mask)) {
++		tmp.st_blocks = stat_lite->blocks;
++		tmp.st_litemask |= S_SLITE_BLOCKS;
++	}
++	if (SLITE_BLKSIZE(stat_lite->lite_mask)) {
++		tmp.st_blksize = stat_lite->blksize;
++		tmp.st_litemask |= S_SLITE_BLKSIZE;
++	}
++	return copy_to_user(statlitebuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
++}
++
+ asmlinkage long sys_newstat(char __user *filename, struct stat __user *statbuf)
+ {
+ 	struct kstat stat;
+@@ -250,6 +431,17 @@
+ 	return error;
+ }
+ 
++asmlinkage long sys_newstatlite(char __user *filename, struct stat_lite __user *statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int error = vfs_statlite_fd(AT_FDCWD, filename, &stat_lite);
++
++	if (!error)
++		error = cp_new_statlite(&stat_lite, statlitebuf);
++
++	return error;
++}
++
+ asmlinkage long sys_newlstat(char __user *filename, struct stat __user *statbuf)
+ {
+ 	struct kstat stat;
+@@ -261,6 +453,17 @@
+ 	return error;
+ }
+ 
++asmlinkage long sys_newlstatlite(char __user *filename, struct stat_lite __user *statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int error = vfs_lstatlite_fd(AT_FDCWD, filename, &stat_lite);
++
++	if (!error)
++		error = cp_new_statlite(&stat_lite, statlitebuf);
++
++	return error;
++}
++
+ #ifndef __ARCH_WANT_STAT64
+ asmlinkage long sys_newfstatat(int dfd, char __user *filename,
+ 				struct stat __user *statbuf, int flag)
+@@ -295,6 +498,17 @@
+ 	return error;
+ }
+ 
++asmlinkage long sys_newfstatlite(unsigned int fd, struct stat_lite __user *statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int error = vfs_fstatlite(fd, &stat_lite);
++
++	if (!error)
++		error = cp_new_statlite(&stat_lite, statlitebuf);
++
++	return error;
++}
++
+ asmlinkage long sys_readlinkat(int dfd, const char __user *path,
+ 				char __user *buf, int bufsiz)
+ {
+@@ -366,6 +580,60 @@
+ 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
+ }
+ 
++static long cp_new_stat64_lite(struct kstat_lite *stat_lite, struct stat64_lite __user *statlitebuf)
++{
++	struct stat64_lite tmp;
++
++	memset(&tmp, 0, sizeof(struct stat64_lite));
++#ifdef CONFIG_MIPS
++	/* mips has weird padding, so we don't get 64 bits there */
++	if (!new_valid_dev(stat_lite->dev) || !new_valid_dev(stat_lite->rdev))
++		return -EOVERFLOW;
++	tmp.st_dev = new_encode_dev(stat_lite->dev);
++	tmp.st_rdev = new_encode_dev(stat_lite->rdev);
++#else
++	tmp.st_dev = huge_encode_dev(stat_lite->dev);
++	tmp.st_rdev = huge_encode_dev(stat_lite->rdev);
++#endif
++	tmp.st_ino = stat_lite->ino;
++#ifdef STAT64_HAS_BROKEN_ST_INO
++	tmp.__st_ino = stat_lite->ino;
++#endif
++	tmp.st_mode = stat_lite->mode;
++	tmp.st_nlink = stat_lite->nlink;
++	tmp.st_uid = stat_lite->uid;
++	tmp.st_gid = stat_lite->gid;
++
++	if (SLITE_ATIME(stat_lite->lite_mask)) {
++		tmp.st_atime = stat_lite->atime.tv_sec;
++		tmp.st_atime_nsec = stat_lite->atime.tv_nsec;
++		tmp.st_litemask |= S_SLITE_ATIME;
++	}
++	if (SLITE_MTIME(stat_lite->lite_mask)) {
++		tmp.st_mtime = stat_lite->mtime.tv_sec;
++		tmp.st_mtime_nsec = stat_lite->mtime.tv_nsec;
++		tmp.st_litemask |= S_SLITE_MTIME;
++	}
++	if (SLITE_CTIME(stat_lite->lite_mask)) {
++		tmp.st_ctime = stat_lite->ctime.tv_sec;
++		tmp.st_ctime_nsec = stat_lite->ctime.tv_nsec;
++		tmp.st_litemask |= S_SLITE_CTIME;
++	}
++	if (SLITE_SIZET(stat_lite->lite_mask)) {
++		tmp.st_size = stat_lite->size;
++		tmp.st_litemask |= S_SLITE_SIZET;
++	}
++	if (SLITE_BLOCKS(stat_lite->lite_mask)) {
++		tmp.st_blocks = stat_lite->blocks;
++		tmp.st_litemask |= S_SLITE_BLOCKS;
++	}
++	if (SLITE_BLKSIZE(stat_lite->lite_mask)) {
++		tmp.st_blksize = stat_lite->blksize;
++		tmp.st_litemask |= S_SLITE_BLKSIZE;
++	}
++	return copy_to_user(statlitebuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
++}
++
+ asmlinkage long sys_stat64(char __user * filename, struct stat64 __user * statbuf)
+ {
+ 	struct kstat stat;
+@@ -376,6 +644,18 @@
+ 
+ 	return error;
+ }
++
++asmlinkage long sys_statlite64(char __user * filename, struct stat64_lite __user * statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int error = vfs_statlite(filename, &stat_lite);
++
++	if (!error)
++		error = cp_new_stat64_lite(&stat_lite, statlitebuf);
++
++	return error;
++}
++
+ asmlinkage long sys_lstat64(char __user * filename, struct stat64 __user * statbuf)
+ {
+ 	struct kstat stat;
+@@ -386,6 +666,18 @@
+ 
+ 	return error;
+ }
++
++asmlinkage long sys_lstatlite64(char __user * filename, struct stat64_lite __user * statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int error = vfs_lstatlite(filename, &stat_lite);
++
++	if (!error)
++		error = cp_new_stat64_lite(&stat_lite, statlitebuf);
++
++	return error;
++}
++
+ asmlinkage long sys_fstat64(unsigned long fd, struct stat64 __user * statbuf)
+ {
+ 	struct kstat stat;
+@@ -397,6 +689,17 @@
+ 	return error;
+ }
+ 
++asmlinkage long sys_fstatlite64(unsigned long fd, struct stat64_lite __user * statlitebuf)
++{
++	struct kstat_lite stat_lite;
++	int error = vfs_fstatlite(fd, &stat_lite);
++
++	if (!error)
++		error = cp_new_stat64_lite(&stat_lite, statlitebuf);
++
++	return error;
++}
++
+ asmlinkage long sys_fstatat64(int dfd, char __user *filename,
+ 			       struct stat64 __user *statbuf, int flag)
+ {
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-i386/stat.h vanilla-new/include/asm-i386/stat.h
+--- vanilla/include/asm-i386/stat.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/asm-i386/stat.h	2006-05-05 16:58:22.000000000 -0500
+@@ -36,6 +36,28 @@
+ 	unsigned long  __unused5;
+ };
+ 
++struct stat_lite {
++	unsigned long  st_dev;
++	unsigned long  st_ino;
++	unsigned short st_mode;
++	unsigned short st_nlink;
++	unsigned short st_uid;
++	unsigned short st_gid;
++	unsigned long  st_rdev;
++	unsigned long  st_litemask;
++	unsigned long  st_size;
++	unsigned long  st_blksize;
++	unsigned long  st_blocks;
++	unsigned long  st_atime;
++	unsigned long  st_atime_nsec;
++	unsigned long  st_mtime;
++	unsigned long  st_mtime_nsec;
++	unsigned long  st_ctime;
++	unsigned long  st_ctime_nsec;
++	unsigned long  __unused4;
++	unsigned long  __unused5;
++};
++
+ /* This matches struct stat64 in glibc2.1, hence the absolutely
+  * insane amounts of padding around dev_t's.
+  */
+@@ -75,4 +97,41 @@
+ 
+ #define STAT_HAVE_NSEC 1
+ 
++struct stat64_lite {
++	unsigned long long	st_dev;
++	unsigned char	__pad0[4];
++
++#define STAT64_HAS_BROKEN_ST_INO	1
++	unsigned long	__st_ino;
++
++	unsigned int	st_mode;
++	unsigned int	st_nlink;
++
++	unsigned long	st_uid;
++	unsigned long	st_gid;
++
++	unsigned long long	st_rdev;
++	unsigned char	__pad3[4];
++
++	unsigned long  st_litemask;
++	unsigned char  __pad5[4];
++
++	long long	st_size;
++	unsigned long	st_blksize;
++
++	unsigned long	st_blocks;	/* Number 512-byte blocks allocated. */
++	unsigned long	__pad4;		/* future possible st_blocks high bits */
++
++	unsigned long	st_atime;
++	unsigned long	st_atime_nsec;
++
++	unsigned long	st_mtime;
++	unsigned int	st_mtime_nsec;
++
++	unsigned long	st_ctime;
++	unsigned long	st_ctime_nsec;
++
++	unsigned long long	st_ino;
++};
++
+ #endif
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-i386/unistd.h vanilla-new/include/asm-i386/unistd.h
+--- vanilla/include/asm-i386/unistd.h	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/include/asm-i386/unistd.h	2006-05-05 15:22:38.000000000 -0500
+@@ -318,8 +318,14 @@
+ #define __NR_unshare		310
+ #define __NR_openg      311
+ #define __NR_openfh     312
++#define __NR_newstatlite 313
++#define __NR_newlstatlite 314
++#define __NR_newfstatlite 315
++#define __NR_statlite64  316
++#define __NR_lstatlite64 317
++#define __NR_fstatlite64 318
+ 
+-#define NR_syscalls 313
++#define NR_syscalls 319
+ 
+ /*
+  * user-visible error numbers are in the range -1 - -128: see
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-ia64/unistd.h vanilla-new/include/asm-ia64/unistd.h
+--- vanilla/include/asm-ia64/unistd.h	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/include/asm-ia64/unistd.h	2006-05-05 15:27:03.000000000 -0500
+@@ -287,12 +287,15 @@
+ #define __NR_unshare			1296
+ #define __NR_openg         1297
+ #define __NR_openfh        1298
++#define __NR_statlite      1299
++#define __NR_lstatlite     1300
++#define __NR_fstatlite     1301
+ 
+ #ifdef __KERNEL__
+ 
+ #include <linux/config.h>
+ 
+-#define NR_syscalls			275 /* length of syscall table */
++#define NR_syscalls			278 /* length of syscall table */
+ 
+ #define __ARCH_WANT_SYS_RT_SIGACTION
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-powerpc/stat.h vanilla-new/include/asm-powerpc/stat.h
+--- vanilla/include/asm-powerpc/stat.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/asm-powerpc/stat.h	2006-05-05 11:48:16.000000000 -0500
+@@ -55,6 +55,37 @@
+ #endif
+ };
+ 
++struct stat_lite {
++	unsigned long	st_dev;
++	ino_t		st_ino;
++#ifdef __powerpc64__
++	nlink_t		st_nlink;
++	mode_t		st_mode;
++#else
++	mode_t		st_mode;
++	nlink_t		st_nlink;
++#endif
++	uid_t		st_uid;
++	gid_t		st_gid;
++	unsigned long	st_rdev;
++	unsigned long  st_litemask;
++	off_t		st_size;
++	unsigned long	st_blksize;
++	unsigned long	st_blocks;
++	unsigned long	st_atime;
++	unsigned long	st_atime_nsec;
++	unsigned long	st_mtime;
++	unsigned long	st_mtime_nsec;
++	unsigned long	st_ctime;
++	unsigned long	st_ctime_nsec;
++	unsigned long	__unused4;
++	unsigned long	__unused5;
++#ifdef __powerpc64__
++	unsigned long	__unused6;
++#endif
++};
++
++
+ /* This matches struct stat64 in glibc2.1. Only used for 32 bit. */
+ struct stat64 {
+ 	unsigned long long st_dev;		/* Device.  */
+@@ -78,4 +109,28 @@
+ 	unsigned int	__unused5;
+ };
+ 
++/* This matches struct stat64_lite in glibc2.1. Only used for 32 bit. */
++struct stat64_lite {
++	unsigned long long st_dev;		/* Device.  */
++	unsigned long long st_ino;		/* File serial number.  */
++	unsigned int	st_mode;	/* File mode.  */
++	unsigned int	st_nlink;	/* Link count.  */
++	unsigned int	st_uid;		/* User ID of the file's owner.  */
++	unsigned int	st_gid;		/* Group ID of the file's group. */
++	unsigned long long st_rdev;	/* Device number, if device.  */
++	unsigned short	__pad2;
++	unsigned long  st_litemask;
++	long long	st_size;	/* Size of file, in bytes.  */
++	int		st_blksize;	/* Optimal block size for I/O.  */
++	long long	st_blocks;	/* Number 512-byte blocks allocated. */
++	int		st_atime;	/* Time of last access.  */
++	unsigned int	st_atime_nsec;
++	int		st_mtime;	/* Time of last modification.  */
++	unsigned int	st_mtime_nsec;
++	int		st_ctime;	/* Time of last status change.  */
++	unsigned int	st_ctime_nsec;
++	unsigned int	__unused4;
++	unsigned int	__unused5;
++};
++
+ #endif /* _ASM_POWERPC_STAT_H */
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/compat.h vanilla-new/include/asm-x86_64/compat.h
+--- vanilla/include/asm-x86_64/compat.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/asm-x86_64/compat.h	2006-05-05 13:56:12.000000000 -0500
+@@ -69,6 +69,30 @@
+ 	u32		__unused5;
+ };
+ 
++struct compat_stat_lite {
++	compat_dev_t	st_dev;
++	u16		__pad1;
++	compat_ino_t	st_ino;
++	compat_mode_t	st_mode;
++	compat_nlink_t	st_nlink;
++	__compat_uid_t	st_uid;
++	__compat_gid_t	st_gid;
++	compat_dev_t	st_rdev;
++	u16		__pad2;
++	u32      st_litemask;
++	u32		st_size;
++	u32		st_blksize;
++	u32		st_blocks;
++	u32		st_atime;
++	u32		st_atime_nsec;
++	u32		st_mtime;
++	u32		st_mtime_nsec;
++	u32		st_ctime;
++	u32		st_ctime_nsec;
++	u32		__unused4;
++	u32		__unused5;
++};
++
+ struct compat_flock {
+ 	short		l_type;
+ 	short		l_whence;
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/stat.h vanilla-new/include/asm-x86_64/stat.h
+--- vanilla/include/asm-x86_64/stat.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/asm-x86_64/stat.h	2006-05-05 17:05:54.000000000 -0500
+@@ -26,6 +26,30 @@
+   	long		__unused[3];
+ };
+ 
++struct stat_lite {
++	unsigned long	st_dev;
++	unsigned long	st_ino;
++	unsigned long	st_nlink;
++
++	unsigned int	st_mode;
++	unsigned int	st_uid;
++	unsigned int	st_gid;
++	unsigned int	__pad0;
++	unsigned long	st_rdev;
++	unsigned long  st_litemask;
++	long		st_size;
++	long		st_blksize;
++	long		st_blocks;	/* Number 512-byte blocks allocated. */
++
++	unsigned long	st_atime;
++	unsigned long 	st_atime_nsec; 
++	unsigned long	st_mtime;
++	unsigned long	st_mtime_nsec;
++	unsigned long	st_ctime;
++	unsigned long   st_ctime_nsec;
++  	long		__unused[3];
++};
++
+ /* For 32bit emulation */
+ struct __old_kernel_stat {
+ 	unsigned short st_dev;
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/unistd.h vanilla-new/include/asm-x86_64/unistd.h
+--- vanilla/include/asm-x86_64/unistd.h	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/include/asm-x86_64/unistd.h	2006-05-05 15:18:33.000000000 -0500
+@@ -609,8 +609,14 @@
+ __SYSCALL(__NR_openg,   sys_openg)
+ #define __NR_openfh     274
+ __SYSCALL(__NR_openfh,  sys_openfh)
++#define __NR_newstatlite   275
++__SYSCALL(__NR_newstatlite, sys_newstatlite)
++#define __NR_newlstatlite  276
++__SYSCALL(__NR_newlstatlite, sys_newlstatlite)
++#define __NR_newfstatlite  277
++__SYSCALL(__NR_newfstatlite, sys_newfstatlite)
+ 
+-#define __NR_syscall_max __NR_openfh
++#define __NR_syscall_max __NR_newfstatlite
+ 
+ #ifndef __NO_STUBS
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/compat.h vanilla-new/include/linux/compat.h
+--- vanilla/include/linux/compat.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/linux/compat.h	2006-05-05 16:19:58.000000000 -0500
+@@ -52,6 +52,7 @@
+ } compat_sigset_t;
+ 
+ extern int cp_compat_stat(struct kstat *, struct compat_stat __user *);
++extern int cp_compat_statlite(struct kstat_lite *, struct compat_stat_lite __user *);
+ extern int get_compat_timespec(struct timespec *, const struct compat_timespec __user *);
+ extern int put_compat_timespec(const struct timespec *, struct compat_timespec __user *);
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/fs.h vanilla-new/include/linux/fs.h
+--- vanilla/include/linux/fs.h	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/include/linux/fs.h	2006-05-05 16:55:19.000000000 -0500
+@@ -1065,6 +1065,7 @@
+ 	int (*permission) (struct inode *, int, struct nameidata *);
+ 	int (*setattr) (struct dentry *, struct iattr *);
+ 	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
++	int (*getattr_lite) (struct vfsmount *mnt, struct dentry *, struct kstat_lite *);
+ 	int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
+ 	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
+ 	ssize_t (*listxattr) (struct dentry *, char *, size_t);
+@@ -1702,7 +1703,9 @@
+ extern struct inode_operations page_symlink_inode_operations;
+ extern int generic_readlink(struct dentry *, char __user *, int);
+ extern void generic_fillattr(struct inode *, struct kstat *);
++extern void generic_fillattr_lite(struct inode *, struct kstat_lite *);
+ extern int vfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
++extern int vfs_getattr_lite(struct vfsmount *, struct dentry *, struct kstat_lite *);
+ void inode_add_bytes(struct inode *inode, loff_t bytes);
+ void inode_sub_bytes(struct inode *inode, loff_t bytes);
+ loff_t inode_get_bytes(struct inode *inode);
+@@ -1711,10 +1714,15 @@
+ extern int vfs_readdir(struct file *, filldir_t, void *);
+ 
+ extern int vfs_stat(char __user *, struct kstat *);
++extern int vfs_statlite(char __user *, struct kstat_lite *);
+ extern int vfs_lstat(char __user *, struct kstat *);
++extern int vfs_lstatlite(char __user *, struct kstat_lite *);
+ extern int vfs_stat_fd(int dfd, char __user *, struct kstat *);
++extern int vfs_statlite_fd(int dfd, char __user *, struct kstat_lite *);
+ extern int vfs_lstat_fd(int dfd, char __user *, struct kstat *);
++extern int vfs_lstatlite_fd(int dfd, char __user *, struct kstat_lite *);
+ extern int vfs_fstat(unsigned int, struct kstat *);
++extern int vfs_fstatlite(unsigned int, struct kstat_lite *);
+ 
+ extern int vfs_ioctl(struct file *, unsigned int, unsigned int, unsigned long);
+ 
+@@ -1728,6 +1736,7 @@
+ extern loff_t dcache_dir_lseek(struct file *, loff_t, int);
+ extern int dcache_readdir(struct file *, void *, filldir_t);
+ extern int simple_getattr(struct vfsmount *, struct dentry *, struct kstat *);
++extern int simple_getattr_lite(struct vfsmount *, struct dentry *, struct kstat_lite *);
+ extern int simple_statfs(struct super_block *, struct kstatfs *);
+ extern int simple_link(struct dentry *, struct inode *, struct dentry *);
+ extern int simple_unlink(struct inode *, struct dentry *);
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/stat.h vanilla-new/include/linux/stat.h
+--- vanilla/include/linux/stat.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/linux/stat.h	2006-05-05 17:00:11.000000000 -0500
+@@ -44,6 +44,22 @@
+ #define S_IWOTH 00002
+ #define S_IXOTH 00001
+ 
++#define S_SLITE_SIZET     0x1
++#define S_SLITE_BLKSIZE   0x2
++#define S_SLITE_BLOCKS    0x4
++#define S_SLITE_ATIME     0x8
++#define S_SLITE_MTIME     0x10
++#define S_SLITE_CTIME     0x20
++#define S_SLITE_ALL       (S_SLITE_SIZET | S_SLITE_BLKSIZE | S_SLITE_BLOCKS \
++									S_SLITE_ATIME | S_SLITE_MTIME   | S_SLITE_CTIME)
++
++#define SLITE_SIZET(m)    ((m) & S_SLITE_SIZET)
++#define SLITE_BLKSIZE(m)  ((m) & S_SLITE_BLKSIZE)
++#define SLITE_BLOCKS(m)   ((m) & S_SLITE_BLOCKS)
++#define SLITE_ATIME(m)    ((m) & S_SLITE_ATIME)
++#define SLITE_MTIME(m)    ((m) & S_SLITE_MTIME)
++#define SLITE_CTIME(m)    ((m) & S_SLITE_CTIME)
++
+ #endif
+ 
+ #ifdef __KERNEL__
+@@ -72,6 +88,24 @@
+ 	unsigned long	blocks;
+ };
+ 
++struct kstat_lite {
++	unsigned long	ino;
++	dev_t		dev;
++	umode_t		mode;
++	unsigned int	nlink;
++	uid_t		uid;
++	gid_t		gid;
++	dev_t		rdev;
++	unsigned long  lite_mask;
++	/* Fields below this are optional */
++	loff_t		size;
++	struct timespec  atime;
++	struct timespec	mtime;
++	struct timespec	ctime;
++	unsigned long	blksize;
++	unsigned long	blocks;
++};
++
+ #endif
+ 
+ #endif
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/syscalls.h vanilla-new/include/linux/syscalls.h
+--- vanilla/include/linux/syscalls.h	2006-05-05 13:59:14.000000000 -0500
++++ vanilla-new/include/linux/syscalls.h	2006-05-05 17:12:01.000000000 -0500
+@@ -38,7 +38,9 @@
+ struct shmid_ds;
+ struct sockaddr;
+ struct stat;
++struct stat_lite;
+ struct stat64;
++struct stat64_lite;
+ struct statfs;
+ struct statfs64;
+ struct __sysctl_args;
+@@ -226,16 +228,29 @@
+ 			struct __old_kernel_stat __user *statbuf);
+ asmlinkage long sys_newstat(char __user *filename,
+ 				struct stat __user *statbuf);
++asmlinkage long sys_newstatlite(char __user *filename,
++				struct stat_lite __user *statlitebuf);
+ asmlinkage long sys_newlstat(char __user *filename,
+ 				struct stat __user *statbuf);
++asmlinkage long sys_newlstatlite(char __user *filename,
++				struct stat_lite __user *statlitebuf);
+ asmlinkage long sys_newfstat(unsigned int fd, struct stat __user *statbuf);
++asmlinkage long sys_newfstatlite(unsigned int fd, 
++				struct stat_lite __user *statlitebuf);
+ asmlinkage long sys_ustat(unsigned dev, struct ustat __user *ubuf);
+ #if BITS_PER_LONG == 32
+ asmlinkage long sys_stat64(char __user *filename,
+ 				struct stat64 __user *statbuf);
+-asmlinkage long sys_fstat64(unsigned long fd, struct stat64 __user *statbuf);
++asmlinkage long sys_statlite64(char __user *filename,
++				struct stat64_lite __user *statlitebuf);
++asmlinkage long sys_fstat64(unsigned long fd, 
++				struct stat64 __user *statbuf);
++asmlinkage long sys_fstatlite64(unsigned long fd,
++				struct stat64_lite __user *statlitebuf);
+ asmlinkage long sys_lstat64(char __user *filename,
+ 				struct stat64 __user *statbuf);
++asmlinkage long sys_lstatlite64(char __user *filename,
++				struct stat64_lite __user *statlitebuf);
+ asmlinkage long sys_truncate64(const char __user *path, loff_t length);
+ asmlinkage long sys_ftruncate64(unsigned int fd, loff_t length);
+ #endif

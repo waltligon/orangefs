@@ -1,0 +1,188 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pint-eattr.h"
+
+%%
+
+machine pvfs2_set_eattr_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => verify_eattrib;
+        default => final_response;
+    }
+
+    state verify_eattrib
+    {
+        run seteattr_verify_eattribs;
+        success => setobj_eattrib;
+        default => final_response;
+    }
+
+    state setobj_eattrib
+    {
+        run seteattr_setobj_eattribs;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run seteattr_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * This routine checks keys to confirm that the name spaces are valid.
+ * It also prints debugging information.
+ */
+static int seteattr_verify_eattribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
+    PVFS_object_attr *a_p = NULL;
+    a_p = &s_op->attr;
+
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_SETEATTR_DEBUG,
+                 "  ext attr list write to handle %llu refers to a %s\n\t"
+                 "[owner = %d, group = %d, perms = %o, type = %d]\n",
+                 llu(s_op->req->u.seteattr.handle),
+                 PINT_util_get_object_type(a_p->objtype),
+                 a_p->owner, a_p->group, a_p->perms, a_p->objtype);
+
+    /* iterate through the keys that are being written */
+    for (i = 0; i < s_op->req->u.seteattr.nkey; i++)
+    {
+        js_p->error_code = PINT_eattr_namespace_verify(
+            &s_op->req->u.seteattr.key[i],
+            &s_op->req->u.seteattr.val[i]);
+        if(!js_p->error_code)
+        {
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * This is where the actual extended attrib gets written.
+ * Not much to this, its pretty straight-forward.
+ * 
+ * NOTE: we need to check the value of s_op->req->u.seteattr.flags to determine
+ * the following:
+ *
+ * if (flags & PVFS_XATTR_CREATE)
+ *  we need to make sure that the attribute does not exist. (pure create)
+ * else if (flags & PVFS_XATTR_REPLACE)
+ *  we need to make sure that the attribute does exist. (pure replace)
+ * else it is default operation as before.
+ * We translate this to an internal trove flag 
+ *  (TROVE_NOOVERWRITE, TROVE_ONLYOVERWRITE)
+ */
+static int seteattr_setobj_eattribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+    PVFS_ds_flags trove_flags = 0;
+    job_id_t j_id;
+
+    gossip_debug(
+        GOSSIP_SETEATTR_DEBUG,
+        "  writing keylist [%llu,%d,len %d flags %d]\n",
+        llu(s_op->req->u.seteattr.handle),
+        s_op->req->u.seteattr.fs_id,
+        s_op->req->u.seteattr.nkey, s_op->req->u.seteattr.flags);
+
+    if (s_op->req->u.seteattr.flags & PVFS_XATTR_CREATE)
+    {
+        trove_flags = TROVE_NOOVERWRITE;
+    }
+    else if (s_op->req->u.seteattr.flags & PVFS_XATTR_REPLACE)
+    {
+        trove_flags = TROVE_ONLYOVERWRITE;
+    }
+    trove_flags |= TROVE_SYNC;
+
+    ret = job_trove_keyval_write_list(
+        s_op->req->u.seteattr.fs_id,
+        s_op->req->u.seteattr.handle,
+        s_op->req->u.seteattr.key,
+        s_op->req->u.seteattr.val,
+        s_op->req->u.seteattr.nkey,
+        trove_flags,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
+
+    return ret;
+}
+
+/*
+ * Function: setattr_cleanup
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: free memory and return
+ *           
+ */
+static int seteattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* do I need to free memory from decoding key and val?*/
+    return(server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(seteattr);
+
+struct PINT_server_req_params pvfs2_set_eattr_params =
+{
+    .string_name = "set_eattr",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_seteattr,
+    .state_machine = &pvfs2_set_eattr_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
