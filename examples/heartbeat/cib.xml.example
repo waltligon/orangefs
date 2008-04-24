@@ -41,9 +41,9 @@
          <primitive id="server0_daemon" class="ocf" type="PVFS2" provider="external">
            <instance_attributes id="server0_daemon_iattr">
              <attributes>
-               <nvpair id="server0_daemon_fsconfig" name="fsconfig" value="etc/pvfs2//pvfs2-fs.conf"/>
+               <nvpair id="server0_daemon_fsconfig" name="fsconfig" value="/etc/pvfs2/pvfs2-fs.conf"/>
                <nvpair id="server0_daemon_port" name="port" value="3334"/>
-               <nvpair id="server0_daemon_pidfile" name="pidfile" value="/var/run/virtualnode1.pvfs2_ha_pid"/>
+               <nvpair id="server0_daemon_pidfile" name="pidfile" value="/var/run/virtual1.pvfs2_ha_pid"/>
                <nvpair id="server0_daemon_ip" name="ip" value="192.168.0.1"/>
              </attributes>
            </instance_attributes>
@@ -73,9 +73,9 @@
          <primitive id="server1_daemon" class="ocf" type="PVFS2" provider="external">
            <instance_attributes id="server1_daemon_iattr">
              <attributes>
-               <nvpair id="server1_daemon_fsconfig" name="fsconfig" value="etc/pvfs2//pvfs2-fs.conf"/>
+               <nvpair id="server1_daemon_fsconfig" name="fsconfig" value="/etc/pvfs2/pvfs2-fs.conf"/>
                <nvpair id="server1_daemon_port" name="port" value="3334"/>
-               <nvpair id="server1_daemon_pidfile" name="pidfile" value="/var/run/virtualnode2.pvfs2_ha_pid"/>
+               <nvpair id="server1_daemon_pidfile" name="pidfile" value="/var/run/virtual2.pvfs2_ha_pid"/>
                <nvpair id="server1_daemon_ip" name="ip" value="192.168.0.2"/>
              </attributes>
            </instance_attributes>
@@ -106,9 +106,9 @@
          <primitive id="server2_daemon" class="ocf" type="PVFS2" provider="external">
            <instance_attributes id="server2_daemon_iattr">
              <attributes>
-               <nvpair id="server2_daemon_fsconfig" name="fsconfig" value="etc/pvfs2//pvfs2-fs.conf"/>
+               <nvpair id="server2_daemon_fsconfig" name="fsconfig" value="/etc/pvfs2/pvfs2-fs.conf"/>
                <nvpair id="server2_daemon_port" name="port" value="3334"/>
-               <nvpair id="server2_daemon_pidfile" name="pidfile" value="/var/run/virtualnode3.pvfs2_ha_pid"/>
+               <nvpair id="server2_daemon_pidfile" name="pidfile" value="/var/run/virtual3.pvfs2_ha_pid"/>
                <nvpair id="server2_daemon_ip" name="ip" value="192.168.0.3"/>
              </attributes>
            </instance_attributes>
@@ -139,9 +139,9 @@
          <primitive id="server3_daemon" class="ocf" type="PVFS2" provider="external">
            <instance_attributes id="server3_daemon_iattr">
              <attributes>
-               <nvpair id="server3_daemon_fsconfig" name="fsconfig" value="etc/pvfs2//pvfs2-fs.conf"/>
+               <nvpair id="server3_daemon_fsconfig" name="fsconfig" value="/etc/pvfs2/pvfs2-fs.conf"/>
                <nvpair id="server3_daemon_port" name="port" value="3334"/>
-               <nvpair id="server3_daemon_pidfile" name="pidfile" value="/var/run/virtualnode4.pvfs2_ha_pid"/>
+               <nvpair id="server3_daemon_pidfile" name="pidfile" value="/var/run/virtual4.pvfs2_ha_pid"/>
                <nvpair id="server3_daemon_ip" name="ip" value="192.168.0.4"/>
              </attributes>
            </instance_attributes>
