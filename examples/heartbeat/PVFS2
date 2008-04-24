@@ -13,17 +13,15 @@
 #
 # OCF parameters (required in cib):
 #  OCF_RESKEY_fsconfig
-#  OCF_RESKEY_serverconfig
 #  OCF_RESKEY_port
 #  OCF_RESKEY_pidfile
 #  OCF_RESKEY_ip
 
 # example values:
 #OCF_RESKEY_fsconfig=/root/simple.conf
-#OCF_RESKEY_serverconfig=/root/server.conf-localhost
 #OCF_RESKEY_port=3334
 #OCF_RESKEY_pidfile=/tmp/pvfs2-server.pid
-#OCF_RESKEY_ip=pvfs2ha0001
+#OCF_RESKEY_ip=virtual1
 
 VARRUN=/var/run
 
@@ -129,10 +127,10 @@ start_pvfs2() {
   ulimit -n 100000 && ulimit -c unlimited
 
   # try to create storage space (ok if it fails)
-  $PVFS2D $OCF_RESKEY_fsconfig $OCF_RESKEY_serverconfig -f
+  $PVFS2D $OCF_RESKEY_fsconfig -f
 
   # launch daemon
-  ocf_run $PVFS2D -p $OCF_RESKEY_pidfile $OCF_RESKEY_fsconfig $OCF_RESKEY_serverconfig
+  ocf_run $PVFS2D -p $OCF_RESKEY_pidfile $OCF_RESKEY_fsconfig 
   if
     [ $? -ne 0 ]
   then
@@ -243,13 +241,6 @@ The full path name of file system config file.
 <shortdesc lang="en">fs config file path</shortdesc>
 </parameter>
 
-<parameter name="serverconfig" required="1">
-<longdesc lang="en">
-The full path name of server config file.
-</longdesc>
-<shortdesc lang="en">server config file path</shortdesc>
-</parameter>
-
 <parameter name="port" required="1">
 <longdesc lang="en">
 Port number that server will listen on.
@@ -305,12 +296,6 @@ validate_all_pvfs2() {
 	ocf_log err "Port number $OCF_RESKEY_port is invalid!"
 	exit $OCF_ERR_ARGS
   fi
-
-# serverconfig: make sure the file exists
-if [ ! -f $OCF_RESKEY_serverconfig ]; then
-   ocf_log err "Configuration file $OCF_RESKEY_serverconfig not found!"
-   exit $OCF_ERR_CONFIGURED
-fi
 
 # fsconfig: make sure the file exists
 if [ ! -f $OCF_RESKEY_fsconfig ]; then
