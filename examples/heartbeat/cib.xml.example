@@ -45,6 +45,7 @@
                <nvpair id="server0_daemon_port" name="port" value="3334"/>
                <nvpair id="server0_daemon_pidfile" name="pidfile" value="/var/run/virtual1.pvfs2_ha_pid"/>
                <nvpair id="server0_daemon_ip" name="ip" value="192.168.0.1"/>
+               <nvpair id="server0_daemon_alias" name="alias" value="virtual1"/>
              </attributes>
            </instance_attributes>
            <operations>
@@ -77,6 +78,7 @@
                <nvpair id="server1_daemon_port" name="port" value="3334"/>
                <nvpair id="server1_daemon_pidfile" name="pidfile" value="/var/run/virtual2.pvfs2_ha_pid"/>
                <nvpair id="server1_daemon_ip" name="ip" value="192.168.0.2"/>
+               <nvpair id="server1_daemon_alias" name="alias" value="virtual2"/>
              </attributes>
            </instance_attributes>
            <operations>
@@ -110,6 +112,7 @@
                <nvpair id="server2_daemon_port" name="port" value="3334"/>
                <nvpair id="server2_daemon_pidfile" name="pidfile" value="/var/run/virtual3.pvfs2_ha_pid"/>
                <nvpair id="server2_daemon_ip" name="ip" value="192.168.0.3"/>
+               <nvpair id="server2_daemon_alias" name="alias" value="virtual3"/>
              </attributes>
            </instance_attributes>
            <operations>
@@ -143,6 +146,7 @@
                <nvpair id="server3_daemon_port" name="port" value="3334"/>
                <nvpair id="server3_daemon_pidfile" name="pidfile" value="/var/run/virtual4.pvfs2_ha_pid"/>
                <nvpair id="server3_daemon_ip" name="ip" value="192.168.0.4"/>
+               <nvpair id="server3_daemon_alias" name="alias" value="virtual4"/>
              </attributes>
            </instance_attributes>
            <operations>

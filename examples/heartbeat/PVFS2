@@ -16,12 +16,14 @@
 #  OCF_RESKEY_port
 #  OCF_RESKEY_pidfile
 #  OCF_RESKEY_ip
+#  OCF_RESKEY_alias
 
 # example values:
 #OCF_RESKEY_fsconfig=/root/simple.conf
 #OCF_RESKEY_port=3334
 #OCF_RESKEY_pidfile=/tmp/pvfs2-server.pid
 #OCF_RESKEY_ip=virtual1
+#OCF_RESKEY_alias=virtual1
 
 VARRUN=/var/run
 
@@ -130,7 +132,7 @@ start_pvfs2() {
   $PVFS2D $OCF_RESKEY_fsconfig -f
 
   # launch daemon
-  ocf_run $PVFS2D -p $OCF_RESKEY_pidfile $OCF_RESKEY_fsconfig 
+  ocf_run $PVFS2D -p $OCF_RESKEY_pidfile -a $OCF_RESKEY_alias $OCF_RESKEY_fsconfig 
   if
     [ $? -ne 0 ]
   then
@@ -262,6 +264,12 @@ Virtual ip address that the server will run on.
 <shortdesc lang="en">virtual IP address</shortdesc>
 </parameter>
 
+<parameter name="alias" required="1">
+<longdesc lang="en">
+PVFS server alias to be passed to -a argument.
+</longdesc>
+<shortdesc lang="en">PVFS server alias</shortdesc>
+</parameter>
 
 </parameters>
 
