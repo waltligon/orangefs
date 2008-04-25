@@ -297,9 +297,28 @@ CIB, but it is simpler to begin with a populated XML file on all nodes.
 Heartbeat configuration with 5 nodes and 4 active PVFS servers.  Relevant
 portions of the XML file are outlined below.
 
-This file should be modified to reflect your configuration, and then
-copied into /var/lib/crm/cib.xml on every node in the cluster (including
-spares).
+This file should be modified to reflect your configuration.  You can
+test the validity of the XML with the following commands before
+installing it.  The former checks generic XML syntax, while the latter
+performs Heartbeat specific checking:
+
+\begin{verbatim}
+$ xmllint --noout cib.xml
+$ crm_verify -x cib.xml
+\end{verbatim}
+
+Once your XML is filled in correctly, it must be copied into the correct
+location (with correct ownership) on each node in the cluster:
+
+\begin{verbatim}
+$ cp cib.xml /var/lib/heartbeat/crm
+$ chown hacluster:haclient /var/lib/heartbeat/crm/cib.xml
+\end{verbatim}
+
+Please note that once Heartbeat has been started, it is no longer
+legal to modify cib.xml by hand.  See the \texttt{cibadmin} command line
+tool and Heartbeat information on making modifications to
+existing or online CIB configurations.
 
 \subsection{crm\_config}
 
