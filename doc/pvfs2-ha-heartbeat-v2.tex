@@ -296,8 +296,9 @@ Once your XML is filled in correctly, it must be copied into the correct
 location (with correct ownership) on each node in the cluster:
 
 \begin{verbatim}
+$ mkdir -p /var/lib/heartbeat/crm
 $ cp cib.xml /var/lib/heartbeat/crm
-$ chown hacluster:haclient /var/lib/heartbeat/crm/cib.xml
+$ chown -R hacluster:haclient /var/lib/heartbeat/crm
 \end{verbatim}
 
 Please note that once Heartbeat has been started, it is no longer
