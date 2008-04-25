@@ -161,11 +161,9 @@ may depend on how long it takes for your power control device to safely
 shutdown a node.
 \end{itemize}
 
-Figure~\ref{fig:pvfs2conf} shows one example of how to configure PVFS.
-Only the parameters relevant to the Heartbeat scenario are shown.
+An example PVFS configuration is shown below including the sections
+relevant to Heartbeat:
 
-\begin{figure}
-\begin{scriptsize}
 \begin{verbatim}
 <Defaults>
         ...
@@ -204,12 +202,7 @@ Only the parameters relevant to the Heartbeat scenario are shown.
                 TroveSyncMeta yes
                 TroveSyncData yes
         </StorageHints>
-</Filesystem>
 \end{verbatim}
-\end{scriptsize}
-\caption{Example \texttt{fs.conf} file}
-\label{fig:pvfs2conf}
-\end{figure}
 
 Download, build, and install Heartbeat following the instructions on
 their web site.  No special parameters or options are required.  Do not
@@ -255,17 +248,12 @@ This section describes how to configure the basic Heartbeat daemon
 parameters, which include an authentication key and a list of nodes that
 will participate in the cluster.
 
-Begin by generating a random sha1 key, which is used to secure
-communication between the cluster nodes.  Then run the 
-pvfs2-ha-heartbeat-configure.sh script as shown in
-figure~\ref{fig:haconf} on every node (both active and spare).  You
-should use your multicast address as described in the network
-requirements, your own sha1 key, and a list of
-nodes (including spares) that will participate.
+Begin by generating a random sha1 key, which is used to
+secure communication between the cluster nodes.  Then run the
+pvfs2-ha-heartbeat-configure.sh script on every node (both active
+and spare) as shown below.  Make sure to use the multicast address, sha1
+key, and list of nodes (including spares) appropriate for your environment.
 
-
-\begin{figure}
-\begin{scriptsize}
 \begin{verbatim}
 $ dd if=/dev/urandom count=4 2>/dev/null | openssl dgst -sha1
 dcdebc13c41977eac8cca0023266a8b16d234262
@@ -274,10 +262,6 @@ $ examples/heartbeat/pvfs2-ha-heartbeat-configure.sh /etc/ha.d 225.0.0.1 \
   dcdebc13c41977eac8cca0023266a8b16d234262 \
   node1 node2 node3 node4 node5
 \end{verbatim}
-\end{scriptsize}
-\caption{Example \texttt{pvfs2-ha-heartbeat-configure.sh} commands}
-\label{fig:haconf}
-\end{figure}
 
 You can view the configuration file that this generates in
 /etc/ha.d/ha.cf.  An example ha.cf file (with comments) is provided with
@@ -430,41 +414,28 @@ password, and IP address of corresponding IPMI device.
 
 \section{Starting Heartbeat}
 
-Once the CIB file is completed and installed in the correct location,
-then the Heartbeat services can be started on every node with the
-command in figure~\ref{fig:start}.  The \texttt{crm\_mon} command, when
-run with the arguments shown, will provide a periodically updated view
-of the state of each resource configured within Heartbeat.  Check
-\texttt{/var/log/messages} if any of the groups fail to start.
+Once the CIB file is completed and installed in the correct
+location, then the Heartbeat services can be started on every node.
+The \texttt{crm\_mon} command, when run with the arguments shown,
+will provide a periodically updated view of the state of each resource
+configured within Heartbeat.  Check \texttt{/var/log/messages} if any
+of the groups fail to start.
 
-\begin{figure}
-\begin{scriptsize}
 \begin{verbatim}
 $ /etc/init.d/heartbeat start
-$ # wait until all Heartbeat services started
+$ # wait a few minutes for heartbeat services to start
 $ crm_mon -r
 \end{verbatim}
-\end{scriptsize}
-\caption{Starting Heartbeat services}
-\label{fig:start}
-\end{figure}
 
 \section{Mounting the file system}
 
 Mounting PVFS with high availability is no different than mounting a
 normal PVFS file system, except that you must use the virtual hostname
-for the PVFS server rather than the primary hostname of the node.
-Figure~\ref{fig:mount} provides an example.
+for the PVFS server rather than the primary hostname of the node:
 
-\begin{figure}
-\begin{scriptsize}
 \begin{verbatim}
 $ mount -t pvfs2 tcp://virtual1:3334/pvfs2-fs /mnt/pvfs2
 \end{verbatim}
-\end{scriptsize}
-\caption{Mounting PVFS file system}
-\label{fig:mount}
-\end{figure}
 
 \section{What happens during failover}
 
