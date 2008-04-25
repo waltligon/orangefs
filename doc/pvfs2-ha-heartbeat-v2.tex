@@ -241,12 +241,13 @@ Chassis Power is on
 
 \section{Distributing Heartbeat scripts}
 
-The scripts that are in the \texttt{examples/heartbeat} subdirectory may be
-installed to the following suggested locations on each server node:
-\begin{itemize}
-\item pvfs2-ha-heartbeat-configure.sh: /usr/bin
-\item PVFS2: /usr/lib/ocf/resource.d/external/
-\end{itemize}
+The PVFS2 resource script must be installed and set as runnable on every
+cluster node as follows:
+
+\begin{verbatim}
+$ cp examples/heartbeat/PVFS2 /usr/lib/ocf/resource.d/external/
+$ chmod a+x /usr/lib/ocf/resource.d/external/PVFS2
+\end{verbatim}
 
 \section{Base Heartbeat configuration}
 
@@ -269,7 +270,7 @@ nodes (including spares) that will participate.
 $ dd if=/dev/urandom count=4 2>/dev/null | openssl dgst -sha1
 dcdebc13c41977eac8cca0023266a8b16d234262
 
-$ pvfs2-ha-heartbeat-configure.sh /etc/ha.d 225.0.0.1 \
+$ examples/heartbeat/pvfs2-ha-heartbeat-configure.sh /etc/ha.d 225.0.0.1 \
   dcdebc13c41977eac8cca0023266a8b16d234262 \
   node1 node2 node3 node4 node5
 \end{verbatim}
