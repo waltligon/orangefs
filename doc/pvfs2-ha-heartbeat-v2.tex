@@ -238,6 +238,7 @@ The PVFS2 resource script must be installed and set as runnable on every
 cluster node as follows:
 
 \begin{verbatim}
+$ mkdir -p /usr/lib/ocf/resource.d
 $ cp examples/heartbeat/PVFS2 /usr/lib/ocf/resource.d/external/
 $ chmod a+x /usr/lib/ocf/resource.d/external/PVFS2
 \end{verbatim}
