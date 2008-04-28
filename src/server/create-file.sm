@@ -36,6 +36,12 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
+    LOCAL_ATTRS = 2,
+    REMOTE_ATTRS = 3
+};
+
+enum
+{
     CREATE_RETRY = 170
 };
 
@@ -99,15 +105,32 @@ machine pvfs2_create_file_work_sm
     state init
     {
         run create_init;
-        default => parent_getattr_local;
+        default => locate_attribs;
+    }
+
+    state locate_attribs
+    {
+        run create_find_attrs;
+        LOCAL_ATTRS => parent_getattr_local;
+        REMOTE_ATTRS => parent_getattr_remote;
+/* TODO: error handling */
+        default => parent_getattr_remote;
     }
 
     /* See if the parent's attribs are stored locally */
     state parent_getattr_local
     {
-        run create_getattr_local;
-        success => parent_getattr_inspect;
+        jump pvfs2_get_attr_work_sm;
+        success => parent_getattr_local_cleanup;
+/* TODO: error handling */
         default => parent_getattr_remote;
+    }
+
+    /* Clean up the stack from local getattr */
+    state parent_getattr_local_cleanup
+    {
+        run create_parent_getattr_local_cleanup;
+        default => parent_getattr_inspect;
     }
 
     /* send request to Meta server with parent's attribs */
@@ -265,9 +288,10 @@ static PINT_sm_action create_file_setup(
     }
 
     sm_p->cred_p = &(s_op->req->credentials);
-gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_setup: s_op->req->u.create_file.object_name = %s\n", s_op->req->u.create_file.object_name);
     sm_p->u.create_file.object_name = s_op->req->u.create_file.object_name;
     sm_p->u.create_file.attr = s_op->req->u.create_file.attr;
+/* TODO: Pass this from the client. */
+    sm_p->u.create_file.layout.algorithm = PVFS_SYS_LAYOUT_NONE;
     sm_p->parent_ref.handle = s_op->req->u.create_file.parent_handle;
     sm_p->parent_ref.fs_id = s_op->req->u.create_file.fs_id;
     sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
@@ -974,9 +998,10 @@ static PINT_sm_action create_file_work_cleanup(
     return SM_ACTION_TERMINATE;
 }
 
-/* In this function determine whether the parent's attribs */
-/* are stored locally. If they are, retrieve them.         */
-static PINT_sm_action create_getattr_local(
+/* In this function determine whether the parent's attribs    */
+/* are stored locally. If they are, set up the frame to call  */
+/* the nested get_attr state machine.                         */
+static PINT_sm_action create_find_attrs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -984,7 +1009,7 @@ static PINT_sm_action create_getattr_local(
     char server_name[1024];
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create-file state: create_getattr_local\n");
+                 "create-file state: create_find_attrs\n");
 
     js_p->error_code = 0;
 
@@ -992,7 +1017,7 @@ static PINT_sm_action create_getattr_local(
         sm_p->parent_ref.fs_id);
 
     if (! strcmp(config->host_id, server_name)) {
-        /* Call the nested get_attr state machine? */
+        /* Set up the frame for the nested get_attr state machine */
         struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
 
         if(!s_op)
@@ -1001,32 +1026,37 @@ static PINT_sm_action create_getattr_local(
         }
         /* zero out all members */
         memset(s_op, 0, sizeof(struct PINT_server_op));
-        PINT_sm_push_frame(smcb, 0, s_op);
 
-        s_op->op = PVFS_SERV_GETATTR;
-/*  TODO: see what really needs to be done with credentials
- *      s_op->credentials.uid = sm_p->cred_p->uid;
- *      s_op->credentials.gid = sm_p->cred_p->gid;
- */
         s_op->u.getattr.handle = sm_p->parent_ref.handle;
         s_op->u.getattr.fs_id = sm_p->parent_ref.fs_id;
-
-/* ??? */
         s_op->u.getattr.attrmask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
-#if 0
-/*        s_op->u.getattr.ref_type = PVFS_TYPE_DIRECTORY; */
-#endif
-
+        s_op->attr.mask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
+        s_op->attr.objtype = PVFS_TYPE_DIRECTORY;
+        PINT_sm_push_frame(smcb, 0, s_op);
+        js_p->error_code = LOCAL_ATTRS;
         return(SM_ACTION_COMPLETE);
     }
     else
     {
         /* it's not on this server. Fall through to another */
         /* state to do the lookup on the correct server.    */
-        /* need to set up machine for remote lookup here    */
-/* TODO: What should this return value really be? */
-        return(-PVFS_ENOENT);
+        /* TODO:  set up machine for remote lookup here    */
+        sm_p->getattr.object_ref = sm_p->parent_ref;
+        sm_p->getattr.req_attrmask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
+        js_p->error_code = LOCAL_ATTRS;
+        return(SM_ACTION_COMPLETE);
     }
+}
+
+static PINT_sm_action create_parent_getattr_local_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int task_id;
+    int error_code;
+
+    PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    js_p->error_code = error_code;
+    return(SM_ACTION_COMPLETE);
 }
 
 /** looks at the attributes of the parent directory and decides if it impacts
