@@ -143,6 +143,20 @@ environment when the application starts. Using MX_RCACHE improves performance
 slightly for the metadata and IO servers as well as when using MPI-IO and
 PVFS2.
 
+4. Valid bmi_mx storage paths
+
+Valid bmi_mx storage paths include the MX hostname and the endpoint ID. MX
+hostnames include the UTS hostname and optionally a board index if the machine
+has multiple Myricom NICs. Thus, valid bmi_mx storage paths are either:
+
+mx://hostname:board:ep_id
+
+or
+
+mx://hostname:ep_id
+
+Use the first option if mx_info lists hostname:board and use the second option if mx_info simply shows a hostname.
+
 ======================
 II. bmi_mx Performance
 ======================
