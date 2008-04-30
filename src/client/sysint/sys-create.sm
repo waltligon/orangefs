@@ -39,7 +39,7 @@ static int create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int create_crdirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
-static int batch_remove_handles_comp_fn(
+static int create_delete_handles_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 /* misc helper functions */
@@ -100,17 +100,17 @@ machine pvfs2_client_create_sm
     state crdirent_failure
     {
         run create_crdirent_failure;
-        default => batch_remove_setup_msgpair_array;
+        default => delete_handles_setup_msgpair_array;
     }
 
-    state batch_remove_setup_msgpair_array
+    state delete_handles_setup_msgpair_array
     {
-        run batch_remove_setup_msgpair_array;
-        success => batch_remove_xfer_msgpair_array;
+        run create_delete_handles_setup_msgpair_array;
+        success => delete_handles_xfer_msgpair_array;
         default => cleanup;
     }
 
-    state batch_remove_xfer_msgpair_array
+    state delete_handles_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
         default => cleanup;
@@ -412,31 +412,6 @@ static int create_crdirent_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-static int batch_remove_handles_comp_fn(void *v_p,
-                                        struct PVFS_server_resp *resp_p,
-                                        int index)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    const char* server_name = NULL;
-    int server_type;
-    PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "batch_remove_handles_comp_fn\n");
-
-    assert(resp_p->op == PVFS_SERV_BATCH_REMOVE);
-
-    if (resp_p->status != 0)
-    {
-        msg_p = &sm_p->msgarray[index];
-        server_name = PINT_cached_config_map_addr(msg_p->fs_id, 
-            msg_p->svr_addr, 
-            &server_type);
-        gossip_err("Warning: cleanup failed to remove at least one handle from %s; continuing.\n", server_name);
-    }
-    return resp_p->status;
-}
-
 static PINT_sm_action create_create_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -544,61 +519,6 @@ static PINT_sm_action create_crdirent_failure(
         gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
                      "dirent already exists!\n");
     }
-    return SM_ACTION_COMPLETE;
-}
-
-/* delete the newly created meta and data handles */
-static PINT_sm_action batch_remove_setup_msgpair_array(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
-    PVFS_BMI_addr_t metafile_server_addr;
-    PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
-                 "delete_handles_setup_msgpair_array\n");
-
-    js_p->error_code = 0;
-
-    memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
-
-    ret = PINT_cached_config_map_to_server(
-        &metafile_server_addr, sm_p->u.create.metafile_handle,
-        sm_p->object_ref.fs_id);
-
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
-    /* TODO: what if more than one datafile handle was filled in, or if some
-     * of the datafiles are not stored on the meta server? 
-     */
-    /* TODO: convert this to the old cleanup technique that just did an
-     * independent remove operation for each handle involved
-     */
-
-    sm_p->u.create.handles[0] = sm_p->u.create.metafile_handle;
-    sm_p->u.create.handles[1] = sm_p->u.create.datafile_handles[0];
-    
-    PINT_init_msgpair(sm_p, msg_p);
-
-    PINT_SERVREQ_BATCH_REMOVE_FILL(
-        msg_p->req,
-        *sm_p->cred_p,
-        sm_p->object_ref.fs_id,
-        2,
-        sm_p->u.create.handles);
-
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->u.create.metafile_handle;
-    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-    msg_p->comp_fn = batch_remove_handles_comp_fn;
-    msg_p->svr_addr = metafile_server_addr;
-
     return SM_ACTION_COMPLETE;
 }
 
@@ -926,6 +846,119 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
     PINT_put_server_config_struct(server_config);
 
     return dist;
+}
+
+static int create_delete_handles_comp_fn(void *v_p,
+                                         struct PVFS_server_resp *resp_p,
+                                         int index)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_delete_handles_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_REMOVE);
+
+    if (resp_p->status != 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "Failed to remove handle number %d\n", index);
+    }
+    return resp_p->status;
+}
+
+/* delete the newly created meta and data handles */
+static PINT_sm_action create_delete_handles_setup_msgpair_array(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL, i = 0;
+    PVFS_BMI_addr_t metafile_server_addr;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
+                 "delete_handles_setup_msgpair_array\n");
+
+    js_p->error_code = 0;
+
+    memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
+
+    ret = PINT_cached_config_map_to_server(
+        &metafile_server_addr, sm_p->u.create.metafile_handle,
+        sm_p->object_ref.fs_id);
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
+    {
+        free(sm_p->msgarray);
+    }
+    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
+        ((sm_p->u.create.datafile_count+1) * sizeof(PINT_sm_msgpair_state)));
+
+    if (sm_p->msgarray == NULL)
+    {
+        gossip_err("create: failed to allocate msgarray\n"); 
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    sm_p->msgarray_count = (sm_p->u.create.datafile_count+1);
+
+    /*
+      for the metafile and each datafile, prepare to post a remove
+      send/recv pair
+    */
+    for(i = 0; i < sm_p->msgarray_count; i++)
+    {
+        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "create: posting data file remove req %d\n",i);
+
+        /* arbitrarily handle deletion of the metafile last */
+        if (i == (sm_p->msgarray_count - 1))
+        {
+            PINT_SERVREQ_REMOVE_FILL(
+                msg_p->req,
+                *sm_p->cred_p,
+                sm_p->object_ref.fs_id,
+                sm_p->u.create.metafile_handle);
+
+            msg_p->fs_id = sm_p->object_ref.fs_id;
+            msg_p->handle = sm_p->u.create.metafile_handle;
+            msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+            msg_p->comp_fn = create_delete_handles_comp_fn;
+            msg_p->svr_addr = metafile_server_addr;
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
+                         "metafile handle %llu\n", llu(msg_p->handle));
+        }
+        else
+        {
+            PINT_SERVREQ_REMOVE_FILL(
+                msg_p->req,
+                *sm_p->cred_p,
+                sm_p->object_ref.fs_id,
+                sm_p->u.create.datafile_handles[i]);
+
+            msg_p->fs_id = sm_p->object_ref.fs_id;
+            msg_p->handle = sm_p->u.create.datafile_handles[i];
+            msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+            msg_p->comp_fn = create_delete_handles_comp_fn;
+            ret = PINT_cached_config_map_to_server(
+                &msg_p->svr_addr, sm_p->u.create.datafile_handles[i],
+                sm_p->object_ref.fs_id);
+            if (ret)
+            {
+                gossip_err("Failed to map data server address\n");
+                js_p->error_code = ret;
+                return SM_ACTION_COMPLETE;
+            }
+            gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
+                         "datafile handle %llu\n", llu(msg_p->handle));
+        }
+    }
+    return SM_ACTION_COMPLETE;
 }
 
 /*
