@@ -304,7 +304,7 @@ struct bmx_connreq
 
 #if BMX_DEBUG
 /* set the mask to the BMX_DB_* errors that you want gossip to report */
-#define BMX_DB_MASK (BMX_DB_ERR|BMX_DB_WARN|BMX_DB_ALL)
+#define BMX_DB_MASK (BMX_DB_ERR|BMX_DB_WARN)
 #define debug(lvl,fmt,args...)                                                 \
   do {                                                                         \
       if (lvl & BMX_DB_MASK) {                                                 \
