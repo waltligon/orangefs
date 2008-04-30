@@ -64,9 +64,9 @@ extern job_context_id server_job_context;
 /* Specifies the number of handles to be preceated at a time from each
  * server using the batch create request.
  */
-#define PVFS2_PRECREATE_BATCH_SIZE_DEFAULT 2048
+#define PVFS2_PRECREATE_BATCH_SIZE_DEFAULT 512
 /* precreate pools will be topped off if they fall below this value */
-#define PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT 1536
+#define PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT 256
 
 /* types of permission checking that a server may need to perform for
  * incoming requests

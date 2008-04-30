@@ -622,11 +622,11 @@ static const configoption_t options[] =
       * server using the batch create request.
       */
      {"PrecreateBatchSize",ARG_INT, get_precreate_batch_size,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "2048"},
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "512"},
  
      /* Precreate pools will be "topped off" if they fall below this value */
      {"PrecreateLowThreshold",ARG_INT, get_precreate_low_threshold,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "1536"},
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "256"},
 
     /* Specifies if file stuffing should be enabled or not.  Default is
      * enabled; this option is only provided for benchmarking purposes 
