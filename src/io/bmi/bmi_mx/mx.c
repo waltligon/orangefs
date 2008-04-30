@@ -445,6 +445,7 @@ bmx_verify_num_str(char *num_str)
 
 
 /* parse mx://hostname:board:ep_id/filesystem/
+ * or    mx://hostname:ep_id/filesystem/
  * this is pretty robust but if strtol() fails for board or ep_id, it
  * returns 0 and we do not know that it failed. 
  * This handles legal hostnames (1-63 chars) include a-zA-Z0-9 as well as . and -
@@ -460,7 +461,7 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
         char           *colon2          = NULL;
         char           *fs              = NULL;
         char           *host            = NULL;
-        uint32_t        bd              = 0;
+        uint32_t        bd              = -1;
         uint32_t        ep              = 0;
 
         if (peername == NULL || hostname == NULL || board == NULL || ep_id == NULL) {
@@ -488,7 +489,9 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
         } else {
                 colon2 = strrchr(s, ':');
                 if (colon1 == colon2) {
-                        debug(BMX_DB_INFO, "parse_peername() strrchr() returned the same ':'");
+                        /* colon2_found == 0 */
+                        debug(BMX_DB_INFO, "parse_peername() MX hostname does not "
+                                           "include a board number");
                 } else {
                         colon2_found = 1;
                         *colon2 = '\0';
@@ -496,10 +499,17 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
                 colon1_found = 1;
                 *colon1 = '\0';
         }
-        /* s      = hostname\0board\0ep_id\0filesystem
+        /* if MX hostname includes board number...
+         * s      = hostname\0board\0ep_id\0filesystem
          * colon1 =         \0board\0ep_id\0filesystem
          * colon2 =                \0ep_id\0filesystem
          * fs     =                       \0filesystem
+         *
+         * else if MX hostname does _not_ include a board number...
+         * s      = hostname\0ep_id\0filesystem
+         * colon1 =         \0ep_id\0filesystem
+         * colon2 =         \0ep_id\0filesystem
+         * fs     =                \0filesystem
          */
 
         colon1++;
@@ -523,11 +533,16 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
                 return -1;
         }
 
-        if (colon1_found) {
+        if (colon1_found && colon2_found) {
                 bd = (uint32_t) strtol(colon1, NULL, 0);
-                if (colon2_found) {
-                        ep = (uint32_t) strtol(colon2, NULL, 0);
-                }
+                ep = (uint32_t) strtol(colon2, NULL, 0);
+        } else if (colon1_found && !colon2_found) {
+                ep = (uint32_t) strtol(colon2, NULL, 0);
+        } else {
+                debug(BMX_DB_WARN, "%s is not a valid hostname", host);
+                free(host);
+                free(s);
+                return -1;
         }
 
         ret = bmx_verify_hostname(host);
@@ -657,7 +672,11 @@ bmx_peer_alloc(struct bmx_peer **peerp, struct bmx_method_addr *mxmap)
         INIT_QLIST_HEAD(&peer->mxp_list);
         
         memset(name, 0, sizeof(*name));
-        sprintf(name, "%s:%d", mxmap->mxm_hostname, mxmap->mxm_board);
+        if (mxmap->mxm_board != -1) {
+                sprintf(name, "%s:%d", mxmap->mxm_hostname, mxmap->mxm_board);
+        } else {
+                sprintf(name, "%s", mxmap->mxm_hostname);
+        }
         mxret = mx_hostname_to_nic_id(name, &nic_id);
         if (mxret == MX_SUCCESS) {
                 peer->mxp_nic_id = nic_id;
@@ -821,6 +840,7 @@ bmx_open_endpoint(mx_endpoint_t *ep, uint32_t board, uint32_t ep_id)
         param.val.context_id.bits = 4;
         param.val.context_id.shift = BMX_MSG_SHIFT;
 
+        if (board == -1) board = 0;
         mxret = mx_open_endpoint(board, ep_id, BMX_MAGIC,
                                  &param, 1, ep);
         if (mxret != MX_SUCCESS) {
@@ -1576,8 +1596,8 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                 ret = -BMI_ENOMEM;
                 goto out;
         }
-        debug(BMX_DB_CTX, "TX id_gen_fast_register(%llu)", llu(mop->op_id));
         id_gen_fast_register(&mop->op_id, mop);
+        debug(BMX_DB_CTX, "TX id_gen_fast_register(%llu)", llu(mop->op_id));
         mop->addr = remote_map;  /* set of function pointers, essentially */
         mop->method_data = tx;
         mop->user_ptr = user_ptr;
@@ -1786,8 +1806,8 @@ bmx_post_recv_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                 ret = -BMI_ENOMEM;
                 goto out;
         }
-        debug(BMX_DB_CTX, "RX id_gen_fast_register(%llu)", llu(mop->op_id));
         id_gen_fast_register(&mop->op_id, mop);
+        debug(BMX_DB_CTX, "RX id_gen_fast_register(%llu)", llu(mop->op_id));
         mop->addr = remote_map;  /* set of function pointers, essentially */
         mop->method_data = rx;
         mop->user_ptr = user_ptr;
@@ -2847,8 +2867,15 @@ bmx_create_peername(void)
 {
         char    peername[MX_MAX_HOSTNAME_LEN + 28]; /* mx://host:board:ep_id\0 */
 
-        sprintf(peername, "mx://%s:%u:%u", bmi_mx->bmx_hostname, bmi_mx->bmx_board,
-                bmi_mx->bmx_ep_id);
+        if (bmi_mx->bmx_board != -1) {
+                /* mx://host:board:ep_id\0 */
+                sprintf(peername, "mx://%s:%u:%u", bmi_mx->bmx_hostname,
+                        bmi_mx->bmx_board, bmi_mx->bmx_ep_id);
+        } else {
+                /* mx://host:ep_id\0 */
+                sprintf(peername, "mx://%s:%u", bmi_mx->bmx_hostname, 
+                        bmi_mx->bmx_ep_id);
+        }
         bmi_mx->bmx_peername = strdup(peername);
         return;
 }
@@ -2907,6 +2934,9 @@ bmx_peer_connect(struct bmx_peer *peer)
                 colon = strchr(bmi_mx->bmx_hostname, ':');
                 if (colon != NULL) {
                         *colon = '\0';
+                } else {
+                        /* no board number in our name */
+                        bmi_mx->bmx_board = -1;
                 }
                 /* create our peername */
                 bmx_create_peername();
