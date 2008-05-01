@@ -149,6 +149,7 @@ static int parse_mount_options(
             /* option string did not match any of the known keywords */
             if (j == num_possible_keywords)
             {
+#ifdef PVFS2_LINUX_KERNEL_2_4
                 /* assume we have a device name */
                 if (got_device == 0)
                 {
@@ -167,6 +168,13 @@ static int parse_mount_options(
                     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: multiple device names specified: "
                                 "ignoring %s\n", options[i]);
                 }
+#else
+                /* in the 2.6 kernel, we don't pass device name through this
+                 * path; we must have gotten an unsupported option.
+                 */
+                gossip_err("Error: mount option [%s] is not supported.\n", options[i]);
+                return(-EINVAL);
+#endif
             }
         }
     }
