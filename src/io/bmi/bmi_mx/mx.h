@@ -320,4 +320,14 @@ struct bmx_connreq
 #define debug(lvl,fmt,...) do { } while (0)
 #endif /* BMX_DEBUG */
 
+#define BMX_ENTER                                                               \
+  do {                                                                          \
+        debug(BMX_DB_FUNC, "entering %s", __func__);                            \
+  } while (0);
+
+#define BMX_EXIT                                                                \
+  do {                                                                          \
+        debug(BMX_DB_FUNC, "exiting  %s", __func__);                            \
+  } while (0);
+
 #endif  /* __mx_h */

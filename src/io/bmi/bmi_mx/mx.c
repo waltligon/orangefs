@@ -149,6 +149,8 @@ bmx_ctx_init(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer   = NULL;
 
+        BMX_ENTER;
+
         if (ctx == NULL) return;
 
         peer = ctx->mxc_peer;
@@ -189,6 +191,7 @@ bmx_ctx_init(struct bmx_ctx *ctx)
         /* ctx->mxc_get */
         /* ctx->mxc_put */
 
+        BMX_EXIT;
         return;
 }
 
@@ -200,10 +203,12 @@ bmx_q_ctx(struct bmx_ctx *ctx)
         list_t          *queue = ctx->mxc_type == BMX_REQ_TX ? &peer->mxp_queued_txs :
                                                               &peer->mxp_queued_rxs;
 
+        BMX_ENTER;
         ctx->mxc_state = BMX_CTX_QUEUED;
         gen_mutex_lock(&peer->mxp_lock);
         qlist_add_tail(&ctx->mxc_list, queue);
         gen_mutex_unlock(&peer->mxp_lock);
+        BMX_EXIT;
         return;
 }
 
@@ -213,11 +218,13 @@ bmx_deq_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
 
+        BMX_ENTER;
         if (!qlist_empty(&ctx->mxc_list)) {
                 gen_mutex_lock(&peer->mxp_lock);
                 qlist_del_init(&ctx->mxc_list);
                 gen_mutex_unlock(&peer->mxp_lock);
         }
+        BMX_EXIT;
         return;
 }
 
@@ -227,6 +234,7 @@ bmx_q_pending_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
 
+        BMX_ENTER;
         ctx->mxc_state = BMX_CTX_PENDING;
         if (ctx->mxc_type == BMX_REQ_RX) {
                 if (peer) {
@@ -235,6 +243,7 @@ bmx_q_pending_ctx(struct bmx_ctx *ctx)
                         gen_mutex_unlock(&peer->mxp_lock);
                 }
         }
+        BMX_EXIT;
         return;
 }
 
@@ -244,6 +253,7 @@ bmx_deq_pending_ctx(struct bmx_ctx *ctx)
 {
         struct bmx_peer *peer = ctx->mxc_peer;
 
+        BMX_ENTER;
         if (ctx->mxc_state == BMX_CTX_PENDING) {
                 ctx->mxc_state = BMX_CTX_COMPLETED;
         }
@@ -254,6 +264,7 @@ bmx_deq_pending_ctx(struct bmx_ctx *ctx)
                         gen_mutex_unlock(&peer->mxp_lock);
                 }
         }
+        BMX_EXIT;
         return;
 }
 
@@ -261,6 +272,7 @@ bmx_deq_pending_ctx(struct bmx_ctx *ctx)
 static void
 bmx_q_unex_ctx(struct bmx_ctx *ctx)
 {
+        BMX_ENTER;
         if (ctx->mxc_type == BMX_REQ_RX) {
                 gen_mutex_lock(&bmi_mx->bmx_unex_rxs_lock);
                 qlist_add_tail(&ctx->mxc_list, &bmi_mx->bmx_unex_rxs);
@@ -270,6 +282,7 @@ bmx_q_unex_ctx(struct bmx_ctx *ctx)
                 qlist_add_tail(&ctx->mxc_list, &bmi_mx->bmx_unex_txs);
                 gen_mutex_unlock(&bmi_mx->bmx_unex_txs_lock);
         }
+        BMX_EXIT;
         return;
 }
 
@@ -277,6 +290,7 @@ bmx_q_unex_ctx(struct bmx_ctx *ctx)
 static void
 bmx_q_canceled_ctx(struct bmx_ctx *ctx, bmi_error_code_t error)
 {
+        BMX_ENTER;
         ctx->mxc_state = BMX_CTX_CANCELED;
         if (error < 0)
                 ctx->mxc_mxstat.code = error;
@@ -285,6 +299,7 @@ bmx_q_canceled_ctx(struct bmx_ctx *ctx, bmi_error_code_t error)
         gen_mutex_lock(&bmi_mx->bmx_canceled_lock);
         qlist_add_tail(&ctx->mxc_list, &bmi_mx->bmx_canceled);
         gen_mutex_unlock(&bmi_mx->bmx_canceled_lock);
+        BMX_EXIT;
         return;
 }
 
@@ -629,7 +644,7 @@ bmx_peer_addref(struct bmx_peer *peer)
 static void
 bmx_peer_decref(struct bmx_peer *peer)
 {
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
         gen_mutex_lock(&peer->mxp_lock);
         if (peer->mxp_refcount == 0) {
                 debug(BMX_DB_WARN, "peer_decref() called for %s when refcount == 0",
@@ -655,7 +670,7 @@ bmx_peer_decref(struct bmx_peer *peer)
                 gen_mutex_unlock(&bmi_mx->bmx_lock);
                 bmx_peer_free(peer);
         }
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
         return;
 }
 
@@ -754,7 +769,7 @@ bmx_peer_init_state(struct bmx_peer *peer)
 {
         int             ret     = 0;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         gen_mutex_lock(&peer->mxp_lock);
 
@@ -772,7 +787,7 @@ bmx_peer_init_state(struct bmx_peer *peer)
 
         gen_mutex_unlock(&peer->mxp_lock);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return 0;
 }
@@ -894,7 +909,7 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
         int             ret     = 0;
         mx_return_t     mxret   = MX_SUCCESS;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
 #if BMX_LOGGING
         MPE_Init_log();
@@ -1015,7 +1030,7 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
 #if BMX_MEM_ACCT
         debug(BMX_DB_MEM, "memory used at end of initialization %lld", llu(mem_used));
 #endif
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return 0;
 }
@@ -1025,7 +1040,7 @@ BMI_mx_finalize(void)
 {
         struct bmx_data *tmp = bmi_mx;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         gen_mutex_lock(&tmp->bmx_lock);
 
@@ -1102,7 +1117,7 @@ BMI_mx_finalize(void)
 #if BMX_LOGGING
         MPE_Finish_log("/tmp/bmi_mx.log");
 #endif
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return 0;
 }
@@ -1174,7 +1189,7 @@ BMI_mx_set_info(int option, void *inout_parameter)
         struct bmx_method_addr  *mxmap  = NULL;
         struct bmx_peer         *peer   = NULL;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         switch(option) {
                 case BMI_DROP_ADDR:
@@ -1208,7 +1223,7 @@ BMI_mx_set_info(int option, void *inout_parameter)
                          * handle that correctly. */
                 break;
         }
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return 0;
 }
@@ -1218,7 +1233,7 @@ BMI_mx_get_info(int option, void *inout_parameter)
 {
         int     ret     = 0;
 
-        debug(BMX_DB_FUNC, "entering %s with option=%d", __func__, option);
+        BMX_ENTER;
 
         switch(option) {
                 case BMI_CHECK_MAXSIZE:
@@ -1231,7 +1246,7 @@ BMI_mx_get_info(int option, void *inout_parameter)
                 default:
                         ret = -BMI_ENOSYS;
         }
-        debug(BMX_DB_FUNC, "leaving %s with ret=%d", __func__, ret);
+        BMX_EXIT;
 
         return ret;
 }
@@ -1361,11 +1376,11 @@ BMI_mx_unexpected_free(void *buf)
 {
         int     ret     = 0;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         ret = bmx_memfree(buf, BMX_UNEXPECTED_SIZE, BMX_UNEX_BUF);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return 0;
 }
@@ -1486,6 +1501,7 @@ bmx_post_tx(struct bmx_ctx *tx)
                                 llu(tx->mxc_match), lld(tx->mxc_nob));
                 bmx_q_ctx(tx);  /* uses peer lock */
         }
+        BMX_EXIT;
         return ret;
 }
 
@@ -1640,12 +1656,12 @@ BMI_mx_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
         int ret = 0;
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         ret = bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
                                     tag, user_ptr, context_id, 0);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return ret;
 }
@@ -1658,12 +1674,12 @@ BMI_mx_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 {
         int ret = 0;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         ret = bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
                                     total_size, tag, user_ptr, context_id, 0);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return ret;
 }
@@ -1676,12 +1692,12 @@ BMI_mx_post_sendunexpected(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 {
         int ret = 0;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         ret = bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
                                     tag, user_ptr, context_id, 1);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return ret;
 }
@@ -1694,12 +1710,12 @@ BMI_mx_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_
 {
         int ret = 0;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         ret = bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
                                     total_size, tag, user_ptr, context_id, 1);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return ret;
 }
@@ -1742,6 +1758,7 @@ bmx_post_rx(struct bmx_ctx *rx)
                                 llu(rx->mxc_match), (long long) rx->mxc_nob);
                 bmx_q_ctx(rx);  /* uses peer lock */
         }
+        BMX_EXIT;
         return ret;
 }
 
@@ -1849,12 +1866,12 @@ BMI_mx_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 {
         int ret = 0;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         ret = bmx_post_recv_common(id, remote_map, 1, &buffer, &expected_len,
                                     expected_len, tag, user_ptr, context_id);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return ret;
 }
@@ -1868,12 +1885,12 @@ BMI_mx_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 {
         int ret = 0;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         ret = bmx_post_recv_common(id, remote_map, list_count, buffers, sizes,
                                     tot_expected_len, tag, user_ptr, context_id);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return ret;
 }
@@ -1884,7 +1901,7 @@ bmx_peer_post_queued_rxs(struct bmx_peer *peer)
         struct bmx_ctx  *rx             = NULL;
         list_t          *queued_rxs     = &peer->mxp_queued_rxs;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         gen_mutex_lock(&peer->mxp_lock);
         while (!qlist_empty(queued_rxs)) {
@@ -1900,7 +1917,7 @@ bmx_peer_post_queued_rxs(struct bmx_peer *peer)
         }
         gen_mutex_unlock(&peer->mxp_lock);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return;
 }
@@ -1911,7 +1928,7 @@ bmx_peer_post_queued_txs(struct bmx_peer *peer)
         struct bmx_ctx  *tx             = NULL;
         list_t          *queued_txs     = &peer->mxp_queued_txs;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         gen_mutex_lock(&peer->mxp_lock);
         while (!qlist_empty(queued_txs)) {
@@ -1929,7 +1946,7 @@ bmx_peer_post_queued_txs(struct bmx_peer *peer)
         }
         gen_mutex_unlock(&peer->mxp_lock);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return;
 }
@@ -1945,7 +1962,7 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
         void            *peerp  = (void *) &peer;
         mx_return_t     mxret   = MX_SUCCESS;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         if (id == 0 && tag == 0 && type == 0) {
                 bmx_parse_match(match, &type, &id, &tag);
@@ -1994,7 +2011,7 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
                 ret = -1;
         }
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return ret;
 }
@@ -2118,7 +2135,7 @@ bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board
         struct bmi_method_addr      *map            = NULL;
         struct bmx_method_addr  *mxmap          = NULL;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         if (bmi_mx == NULL) {
                 map = bmi_alloc_method_addr(
@@ -2136,7 +2153,7 @@ bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board
         mxmap->mxm_ep_id = ep_id;
         /* mxmap->mxm_peer */
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return map;
 }
@@ -2490,7 +2507,7 @@ bmx_connection_handlers(void)
         int             print   = (count++ % 1000 == 0);
 
         if (print)
-                debug(BMX_DB_FUNC, "entering %s", __func__);
+                BMX_ENTER;
 
         /* push connection messages along */
         bmx_handle_icon_req();
@@ -2498,7 +2515,7 @@ bmx_connection_handlers(void)
         bmx_handle_icon_ack();
         bmx_handle_conn_ack();
         if (print)
-                debug(BMX_DB_FUNC, "leaving %s", __func__);
+                BMX_EXIT;
         return;
 }
 
@@ -2512,7 +2529,7 @@ BMI_mx_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
         struct bmx_ctx   *ctx   = NULL;
         struct bmx_peer  *peer  = NULL;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         bmx_connection_handlers();
 
@@ -2577,7 +2594,7 @@ BMI_mx_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
                 debug(BMX_DB_CTX, "%s called on %s with state %d", __func__,
                         ctx->mxc_type == BMX_REQ_TX ? "TX" : "RX", ctx->mxc_state);
         }
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return 0;
 }
@@ -2601,7 +2618,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
         int             print           = 0;
 
         if (count++ % 1000 == 0) {
-                debug(BMX_DB_FUNC, "entering %s", __func__);
+                BMX_ENTER;
                 print = 1;
         }
 
@@ -2772,7 +2789,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
         }
 
         if (print)
-                debug(BMX_DB_FUNC, "leaving %s", __func__);
+                BMX_EXIT;
 
         *outcount = completed;
         return completed;
@@ -2796,7 +2813,7 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
         int             again           = 1;
 
         if (count++ % 1000 == 0) {
-                debug(BMX_DB_FUNC, "entering %s", __func__);
+                BMX_ENTER;
                 print = 1;
         }
 
@@ -2865,7 +2882,7 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
                 *outcount = 1;
         }
         if (print)
-                debug(BMX_DB_FUNC, "leaving %s", __func__);
+                BMX_EXIT;
 
         return 0;
 }
@@ -2897,7 +2914,7 @@ bmx_peer_connect(struct bmx_peer *peer)
         uint64_t                match  = (uint64_t) BMX_MSG_ICON_REQ << BMX_MSG_SHIFT;
         struct bmx_method_addr *mxmap  = peer->mxp_mxmap;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         gen_mutex_lock(&peer->mxp_lock);
         if (peer->mxp_state == BMX_PEER_INIT) {
@@ -2954,7 +2971,7 @@ bmx_peer_connect(struct bmx_peer *peer)
         mx_iconnect(bmi_mx->bmx_ep, peer->mxp_nic_id, mxmap->mxm_ep_id,
                     BMX_MAGIC, match, (void *) peer, &request);
 
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return ret;
 }
@@ -2978,7 +2995,7 @@ BMI_mx_method_addr_lookup(const char *id)
         struct bmi_method_addr *map     = NULL;
         struct bmx_method_addr *mxmap   = NULL;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         debug(BMX_DB_INFO, "%s with id %s", __func__, id);
         ret = bmx_parse_peername(id, &host, &board, &ep_id);
@@ -3025,7 +3042,7 @@ BMI_mx_method_addr_lookup(const char *id)
                 }
         }
 out:
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return map;
 }
@@ -3051,7 +3068,7 @@ BMI_mx_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
         struct bmx_peer         *peer   = NULL;
         uint32_t                result  = 0;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         mop = id_gen_fast_lookup(id);
         ctx = mop->method_data;
@@ -3093,7 +3110,7 @@ BMI_mx_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
                 debug(BMX_DB_WARN, "%s called on %s with state %d", __func__,
                         ctx->mxc_type == BMX_REQ_TX ? "TX" : "RX", ctx->mxc_state);
         }
-        debug(BMX_DB_FUNC, "leaving %s", __func__);
+        BMX_EXIT;
 
         return 0;
 }
@@ -3104,7 +3121,7 @@ BMI_mx_rev_lookup(struct bmi_method_addr *meth)
 {
         struct bmx_method_addr  *mxmap = meth->method_data;
 
-        debug(BMX_DB_FUNC, "entering %s", __func__);
+        BMX_ENTER;
 
         if (mxmap->mxm_peer && mxmap->mxm_peer->mxp_state != BMX_PEER_DISCONNECT)
                 return mxmap->mxm_peername;
