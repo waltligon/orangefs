@@ -2724,7 +2724,6 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                 uint32_t        result          = 0;
                 mx_status_t     status;
                 list_t          *unex_txs       = &bmi_mx->bmx_unex_txs;
-                list_t          *unex_rxs       = &bmi_mx->bmx_unex_rxs;
                 int             again           = 1;
 
                 ctx = NULL;
@@ -2809,7 +2808,6 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
         struct bmx_ctx  *rx             = NULL;
         struct bmx_peer *peer           = NULL;
         list_t          *unex_rxs       = &bmi_mx->bmx_unex_rxs;
-        list_t          *unex_txs       = &bmi_mx->bmx_unex_txs;
         int             again           = 1;
 
         if (count++ % 1000 == 0) {
