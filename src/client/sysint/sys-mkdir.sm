@@ -199,7 +199,7 @@ PVFS_error PVFS_isys_mkdir(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
+    PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.mkdir.object_name = object_name;
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
@@ -268,7 +268,7 @@ static PINT_sm_action mkdir_init(
         js_p->error_code = 0;
 
         return job_req_sched_post_timer(
-            sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
+            sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
 
@@ -287,7 +287,7 @@ static int mkdir_msg_comp_fn(void *v_p,
                              int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_object_attr attr;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_msg_comp_fn\n");
@@ -348,7 +348,8 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting mkdir req\n");
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     ret = PINT_cached_config_get_next_meta(
         sm_p->object_ref.fs_id,
@@ -373,6 +374,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
 
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -405,7 +407,8 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
                  llu(sm_p->u.mkdir.metafile_handle),
                  llu(sm_p->object_ref.handle));
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
@@ -429,6 +432,8 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -457,7 +462,8 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(
 
     js_p->error_code = 0;
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     ret = PINT_cached_config_map_to_server(
         &metafile_server_addr, sm_p->u.mkdir.metafile_handle,
@@ -484,6 +490,8 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
                  "directory handle %llu\n", llu(msg_p->handle));
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -531,7 +539,7 @@ static PINT_sm_action mkdir_cleanup(
                            (const PVFS_object_ref*) &(sm_p->object_ref));
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
-             (sm_p->u.mkdir.retry_count < sm_p->msgarray_params.retry_limit))
+             (sm_p->u.mkdir.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
         sm_p->u.mkdir.stored_error_code = 0;
         sm_p->u.mkdir.retry_count++;
@@ -682,30 +690,28 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(
         cur_index++;
     }
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_SETEATTR_FILL(
-            sm_p->msgpair.req,
+            msg_p->req,
             (*sm_p->cred_p),
             sm_p->object_ref.fs_id,
             sm_p->u.mkdir.metafile_handle,
             0,
             eattr_count,
             sm_p->u.mkdir.key_array,
-            sm_p->u.mkdir.val_array
-            );
+            sm_p->u.mkdir.val_array);
 
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
-    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle = sm_p->u.mkdir.metafile_handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->u.mkdir.metafile_handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     /* NOTE: no comp_fn needed. */
 
     ret = PINT_cached_config_map_to_server(
-            &sm_p->msgpair.svr_addr,
-            sm_p->msgpair.handle,
-            sm_p->msgpair.fs_id);
+            &msg_p->svr_addr,
+            msg_p->handle,
+            msg_p->fs_id);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -715,6 +721,8 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(
     {
         js_p->error_code = 0;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 

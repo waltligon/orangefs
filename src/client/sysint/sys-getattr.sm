@@ -194,7 +194,7 @@ PVFS_error PVFS_isys_getattr(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
@@ -204,7 +204,7 @@ PVFS_error PVFS_isys_getattr(
         sm_p->getattr,
         ref,
         PVFS_util_sys_to_object_attr_mask(
-            attrmask), 
+            attrmask),
         PVFS_TYPE_NONE,
         0);
 
@@ -437,12 +437,14 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_object_ref object_ref;
+    PINT_sm_msgpair_state *msg_p;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) %s\n", sm_p, __func__);
 
     js_p->error_code = 0;
 
-    memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     object_ref = sm_p->getattr.object_ref;
 
@@ -451,33 +453,27 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
 
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(
-        sm_p->msgpair.req,
+        msg_p->req,
         *sm_p->cred_p,
         object_ref.fs_id,
         object_ref.handle,
         sm_p->getattr.req_attrmask);
-    
-    sm_p->msgpair.fs_id = object_ref.fs_id;
-    sm_p->msgpair.handle = object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
-    sm_p->msgpair.comp_fn = getattr_object_getattr_comp_fn;
+
+    msg_p->fs_id = object_ref.fs_id;
+    msg_p->handle = object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = getattr_object_getattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-        &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
-        sm_p->msgpair.fs_id);
+        &msg_p->svr_addr, msg_p->handle,
+        msg_p->fs_id);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
 
-    /* point msgarray to the statically allocated msgpair */
-    if (sm_p->msgarray != NULL && sm_p->msgarray != &(sm_p->msgpair))
-    {
-	    free(sm_p->msgarray);
-    }
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -493,7 +489,7 @@ static int getattr_object_getattr_comp_fn(
 {
     PVFS_object_attr *attr = NULL;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
@@ -551,7 +547,7 @@ static int getattr_object_getattr_comp_fn(
     switch (attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
-            if (sm_p->msgpair.req.u.getattr.attrmask &
+            if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DIST)
             {
                 /* if we requested distribution attrs, did the distribution 
@@ -561,7 +557,7 @@ static int getattr_object_getattr_comp_fn(
                 assert(attr->u.meta.dist && (attr->u.meta.dist_size > 0));
             }
 
-            if (sm_p->msgpair.req.u.getattr.attrmask &
+            if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DFILES)
             {
                 /* if we requested the datafile handles for the file, did
@@ -642,26 +638,25 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
+    PINT_sm_msgpair_state *msg_p;
+    int index;
 
     js_p->error_code = 0;
 
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        attr->u.meta.dfile_count * sizeof(PINT_sm_msgpair_state));
-    if (!sm_p->msgarray)
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, attr->u.meta.dfile_count);
+    if(ret != 0)
     {
-        js_p->error_code = -PVFS_ENOMEM;
+        gossip_err("Failed to initialize %d msgpairs\n", attr->u.meta.dfile_count);
+        js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
 
-    sm_p->msgarray_count = attr->u.meta.dfile_count;
-
     /* for each datafile, post a send/recv pair to obtain the size */
-    for(i = 0; i < sm_p->msgarray_count; i++)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, index)
     {
-        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
         assert(msg_p);
 
         gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -681,13 +676,14 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
         msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
     }
 
-    ret = PINT_serv_msgpairarray_resolve_addrs(
-        sm_p->msgarray_count, sm_p->msgarray);
+    ret = PINT_serv_msgpairarray_resolve_addrs(&sm_p->msgarray_op);
     if (ret < 0)
     {
         gossip_lerr("Error: failed to resolve meta server addresses.\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -695,7 +691,7 @@ static int getattr_datafile_getattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     if (resp_p->status != 0)
     {
@@ -729,11 +725,7 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(js_p->error_code == 0)
     {
-        if (sm_p->msgarray)
-        {
-            free(sm_p->msgarray);
-        }
-        sm_p->msgarray = NULL;
+        PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     }
 
     return SM_ACTION_COMPLETE;

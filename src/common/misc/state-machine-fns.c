@@ -16,27 +16,6 @@
 #include "state-machine.h"
 #include "client-state-machine.h"
 
-/* STATE-MACHINE-FNS.C
- *
- * This file implements a small collection of functions used when
- * interacting with the state machine system implemented in
- * state-machine.h.  Probably you'll only need these functions in one
- * file per instance of a state machine implementation.
- *
- * Note that state-machine.h must be included before this is included.
- * This is usually accomplished through including some *other* file that
- * includes state-machine.h, because state-machine.h needs a key #define
- * before it can be included.
- *
- * The PINT_OP_STATE_TABLE has been replaced with a macro that must be #defined
- * instead: PINT_OP_STATE_GET_MACHINE.  
- * This allows the _locate function to be used in the client as well.
- *
- * A good example of this is the pvfs2-server.h in the src/server directory,
- * which includes state-machine.h at the bottom, and server-state-machine.c,
- * which includes first pvfs2-server.h and then state-machine-fns.h.
- */
-
 struct PINT_frame_s
 {
     int task_id;
@@ -685,6 +664,7 @@ int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p)
     }
     newframe->task_id = task_id;
     newframe->frame = frame_p;
+    newframe->error = 0;
     qlist_add(&newframe->link, &smcb->frames);
     smcb->frame_count++;
     return 0;
