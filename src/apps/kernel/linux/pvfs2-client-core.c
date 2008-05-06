@@ -15,6 +15,12 @@
 #include <signal.h>
 #include <getopt.h>
 
+#ifdef __PVFS2_SEGV_BACKTRACE__
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
+#endif
+
 #include "pvfs2.h"
 #include "gossip.h"
 #include "job.h"
@@ -92,7 +98,7 @@ typedef struct
     char* gossip_mask;
     int logstamp_type;
     int logstamp_type_set;
-    int standalone;
+    int child;
     /* kernel module buffer size settings */
     unsigned int dev_buffer_count;
     int dev_buffer_count_set;
@@ -180,6 +186,7 @@ static options_t s_opts;
 
 static job_context_id s_client_dev_context;
 static int s_client_is_processing = 1;
+static int s_client_signal = 0;
 
 /* We have 2 sets of description buffers, one used for staging I/O 
  * and one for readdir/readdirplus */
@@ -259,14 +266,45 @@ do {                                                                         \
 
 static void client_segfault_handler(int signum)
 {
+#ifdef __PVFS2_SEGV_BACKTRACE__
+    void *trace[16];
+    char **messages = (char **)NULL;
+    int i, trace_size = 0;
+    ucontext_t *uc = (ucontext_t *)secret;
+
+    /* Do something useful with siginfo_t */
+    if (sig == SIGSEGV)
+    {
+        gossip_err("PVFS2 client: signal %d, faulty address is %p, " 
+            "from %p\n", sig, info->si_addr, 
+            (void*)uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER]);
+    }
+    else
+    {
+        gossip_err("PVFS2 client: signal %d\n", sig);
+    }
+
+    trace_size = backtrace(trace, 16);
+    /* overwrite sigaction with caller's address */
+    trace[1] = (void *) uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER];
+
+    messages = backtrace_symbols(trace, trace_size);
+    /* skip first stack frame (points here) */
+    for (i=1; i<trace_size; ++i)
+        gossip_err("[bt] %s\n", messages[i]);
+
+    signal_recvd_flag = sig;
+#else
     gossip_err("pvfs2-client-core: caught signal %d\n", signum);
     gossip_disable();
-    abort();
+#endif
+    kill(0, signum);
 }
 
 static void client_core_sig_handler(int signum)
 {
     s_client_is_processing = 0;
+    s_client_signal = signum;
 }
 
 static int hash_key(void *key, int table_size)
@@ -3161,7 +3199,17 @@ int main(int argc, char **argv)
     memset(&s_opts, 0, sizeof(options_t));
     parse_args(argc, argv, &s_opts);
 
-    if(!s_opts.standalone)
+    signal(SIGHUP,  client_core_sig_handler);
+    signal(SIGINT,  client_core_sig_handler);
+    signal(SIGPIPE, client_core_sig_handler);
+    signal(SIGILL,  client_core_sig_handler);
+    signal(SIGTERM, client_core_sig_handler);
+
+    /* we don't want to write a core file if we're running under
+     * the client parent process, because the client-core process
+     * could keep segfaulting, and the client would keep restarting it...
+     */
+    if(s_opts.child)
     {
         struct rlimit lim = {0,0};
 
@@ -3172,10 +3220,6 @@ int main(int argc, char **argv)
             fprintf(stderr, "setrlimit system call failed (%d); "
                     "continuing", ret);
         }
-    }
-    else
-    {
-        signal(SIGHUP,  client_core_sig_handler);
     }
 
     /* convert gossip mask if provided on command line */
@@ -3240,6 +3284,7 @@ int main(int argc, char **argv)
     start_time = time(NULL);
     local_time = localtime(&start_time);
 
+    gossip_err("PVFS Client Daemon Started.  Version %s\n", PVFS2_VERSION);
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,  "***********************"
                  "****************************\n");
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
@@ -3461,6 +3506,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* forward the signal on to the parent */
+    if(s_client_signal)
+    {
+        kill(0, s_client_signal);
+    }
+
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s terminating\n", argv[0]);
     return 0;
 }
@@ -3514,7 +3565,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"logfile",1,0,0},
         {"logtype",1,0,0},
         {"logstamp",1,0,0},
-        {"standalone",0,0,0},
+        {"child",0,0,0},
         {0,0,0,0}
     };
 
@@ -3689,9 +3740,9 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     opts->gossip_mask = optarg;
                 }
-                else if (strcmp("standalone", cur_option) == 0)
+                else if (strcmp("child", cur_option) == 0)
                 {
-                    opts->standalone = 1;
+                    opts->child = 1;
                 }
                 break;
             case 'h':
