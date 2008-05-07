@@ -264,24 +264,33 @@ do {                                                                         \
     vfs_request->was_handled_inline = 1;                                     \
 } while(0)
 
-static void client_segfault_handler(int signum)
-{
 #ifdef __PVFS2_SEGV_BACKTRACE__
+
+#if defined(REG_EIP)
+#  define REG_INSTRUCTION_POINTER REG_EIP
+#elif defined(REG_RIP)
+#  define REG_INSTRUCTION_POINTER REG_RIP
+#else
+#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
+#endif
+
+static void client_segfault_handler(int signum, siginfo_t *info, void *secret)
+{
     void *trace[16];
     char **messages = (char **)NULL;
     int i, trace_size = 0;
     ucontext_t *uc = (ucontext_t *)secret;
 
     /* Do something useful with siginfo_t */
-    if (sig == SIGSEGV)
+    if (signum == SIGSEGV)
     {
         gossip_err("PVFS2 client: signal %d, faulty address is %p, " 
-            "from %p\n", sig, info->si_addr, 
+            "from %p\n", signum, info->si_addr, 
             (void*)uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER]);
     }
     else
     {
-        gossip_err("PVFS2 client: signal %d\n", sig);
+        gossip_err("PVFS2 client: signal %d\n", signum);
     }
 
     trace_size = backtrace(trace, 16);
@@ -293,8 +302,9 @@ static void client_segfault_handler(int signum)
     for (i=1; i<trace_size; ++i)
         gossip_err("[bt] %s\n", messages[i]);
 
-    signal_recvd_flag = sig;
 #else
+static void client_segfault_handler(int signum)
+{
     gossip_err("pvfs2-client-core: caught signal %d\n", signum);
     gossip_disable();
 #endif
@@ -3192,9 +3202,19 @@ int main(int argc, char **argv)
     PINT_smcb *smcb = NULL;
     PINT_client_sm *ncache_timer_sm_p = NULL;
 
+#ifdef __PVFS2_SEGV_BACKTRACE__
+    struct sigaction segv_action;
+
+    segv_action.sa_sigaction = (void *)client_segfault_handler;
+    sigemptyset (&segv_action.sa_mask);
+    segv_action.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONESHOT;
+    sigaction (SIGSEGV, &segv_action, NULL);
+#else
+
     /* if pvfs2-client-core segfaults, at least log the occurence so
      * pvfs2-client won't repeatedly respawn pvfs2-client-core */
     signal(SIGSEGV, client_segfault_handler);
+#endif
 
     memset(&s_opts, 0, sizeof(options_t));
     parse_args(argc, argv, &s_opts);
