@@ -544,7 +544,7 @@ int pvfs2_remount(
 
     if (sb && PVFS2_SB(sb))
     {
-        if (data)
+        if (data && data[0] != '\0')
         {
             ret = parse_mount_options(data, sb, 1);
             if (ret)
