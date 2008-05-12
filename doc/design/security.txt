@@ -1,0 +1,63 @@
+This document outlines the PVFS security model present in src/common/security/
+
+The security module includes two primary data structures: credentials and 
+capabilities.  A credential includes data needed to identify an entity or user
+such as a userid, one or more groupids, and attributes.  A capability includes
+one or more object references (dataspace handles) and a set of allowed access
+modes (read, write, execute, etc.).  Both structures include management fields
+such as a timeout and most importantly a signature field.  These data structures
+are defined in src/common/security/pint-security.h.
+
+The security module defines four primary functions:
+
+PINT_sign_capability
+PINT_verify_capability
+PINT_sign_credential
+PINT_verity_credential
+
+Each of these takes a single argument - a pointer to either a capability or a
+credential.  The verify routines return an integer that is zero if the
+verification fails and non-zero if the verification is passed.  The sign
+function modify the signature files of their respective structures but do no
+modify any other part of the structures.  The verify functions do no modify
+the structures.
+
+Signature and verification are implemented as sub-modules using some form of
+hashing an encoding to create and verify a signature.  In simplest terms the
+contents of the structures, excluding the signature, are hashed to h bits,
+where h is structly less than the number of signature bits s (h < s).  The
+hash key is then padded with s-h random bits, and the s bits are then encoded
+with an encoding routine.  If strong encryption is available it could be used
+as a secure encoding routine.  Encoding routines provide for the use of a key.
+Verify follow the same approach computing the hash key, and uses a decoding
+routine to decode the signature.  The padding is removed from the decoded
+signature and the hash keys are compared.
+
+Key management
+
+Keys are maintained by each server to use in encoding and decoding.  Each
+server maintains its own signing key (private key in a public key crypto system)
+and the verifying keys (public key) of the other servers it interacts with.
+Keys are maintained in a database indexed by a signer ID.  The signer ID
+identifies each entity that might sign a credential or capability including
+trusted signature authorities (CAs).  Credential and Capability structures
+include the signer ID of the entity that produced the signature.  The security
+module functions are responsible for managing the keys based on these IDs as
+provided by the caller.  The sign functions will normally only have access to a
+single signing key and thus will fail if the incorrect ID is specified.  The
+verify functions will look up the ID in the local database to retrieve the
+verifying key, and failing to find it will attempt to contact the signing entity
+and acquire the needed key and add it to the local database.  Failing to 
+retrieve a key cases the verify function to fail.  Note that distinct error
+codes are provided for failure to locate a key versus a failed verification.
+
+The key database is assumed to be relatively small.  Typical entry sizes would
+be 8 bytes for ID, 128 bytes for key, 24 bytes for management = 160 bytes times
+2048 entities is 328K of storage for a rather large system.  A system 3 times
+as large would only use about 1M.  If systems get much larger itmay be prudent
+to implement a partially in-core system.  In the mean time, it is assume the
+database would be implemented as an in-core data structure using a hash table,
+tree, or other similar data structure.  Functions to store the contents of the
+database to a disk file and reload the database from a disk file are part of the
+module and exported functions to initizlize and finalize the module are
+included.
