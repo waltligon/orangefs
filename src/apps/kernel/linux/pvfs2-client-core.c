@@ -1188,7 +1188,6 @@ fail_downcall:
 static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
 {
     char* tmp_str;
-    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a perf count request of type %d\n",
@@ -1249,12 +1248,11 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
         default:
             /* unsupported request, didn't match anything in case statement */
             vfs_request->out_downcall.status = -PVFS_ENOSYS;
-            write_inlined_device_response(vfs_request);
-            return 0;
             break;
     }
 
-    write_inlined_device_response(vfs_request);
+    /* let handle_unexp_vfs_request() function detect completion and handle */
+    vfs_request->op_id = -1;
     return 0;
 }
 
@@ -2669,6 +2667,7 @@ static inline void package_downcall_members(
             break;
         }
         case PVFS2_VFS_OP_FS_UMOUNT:
+        case PVFS2_VFS_OP_PERF_COUNT:
             break;
         default:
             gossip_err("Completed upcall of unknown type %x!\n",
@@ -2863,6 +2862,7 @@ static inline PVFS_error handle_unexp_vfs_request(
             ret = service_fs_umount_request(vfs_request);
             break;
         case PVFS2_VFS_OP_PERF_COUNT:
+            posted_op = 1;
             ret = service_perf_count_request(vfs_request);
             break;
         case PVFS2_VFS_OP_PARAM:
