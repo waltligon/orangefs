@@ -1899,8 +1899,6 @@ err_sizes:
 static PVFS_error service_mmap_ra_flush_request(
     vfs_request_t *vfs_request)
 {
-    PVFS_error ret = -PVFS_EINVAL;
-
     gossip_debug(
         GOSSIP_MMAP_RCACHE_DEBUG, "Flushing mmap-racache elem %llu, %d\n",
         llu(vfs_request->in_upcall.req.ra_cache_flush.refn.handle),
@@ -1912,8 +1910,8 @@ static PVFS_error service_mmap_ra_flush_request(
     /* we need to send a blank success response */
     vfs_request->out_downcall.type = PVFS2_VFS_OP_MMAP_RA_FLUSH;
     vfs_request->out_downcall.status = 0;
+    vfs_request->op_id = -1;
 
-    write_inlined_device_response(vfs_request);
     return 0;
 }
 #endif
