@@ -1935,8 +1935,8 @@ static PVFS_error service_operation_cancellation(
 
     vfs_request->out_downcall.type = PVFS2_VFS_OP_CANCEL;
     vfs_request->out_downcall.status = ret;
+    vfs_request->op_id = -1;
 
-    write_inlined_device_response(vfs_request);
     return 0;
 }
 
@@ -2664,6 +2664,7 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_PERF_COUNT:
         case PVFS2_VFS_OP_PARAM:
         case PVFS2_VFS_OP_FSKEY:
+        case PVFS2_VFS_OP_CANCEL:
             break;
         default:
             gossip_err("Completed upcall of unknown type %x!\n",
@@ -2888,10 +2889,12 @@ static inline PVFS_error handle_unexp_vfs_request(
               flushes are handled inline
             */
         case PVFS2_VFS_OP_MMAP_RA_FLUSH:
+            posted_op = 1;
             ret = service_mmap_ra_flush_request(vfs_request);
             break;
 #endif
         case PVFS2_VFS_OP_CANCEL:
+            posted_op = 1;
             ret = service_operation_cancellation(vfs_request);
             break;
         case PVFS2_VFS_OP_FSYNC:
