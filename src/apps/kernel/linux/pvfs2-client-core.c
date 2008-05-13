@@ -1169,7 +1169,9 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
 ok:
     PVFS_util_free_mntent(&mntent);
 
-    write_inlined_device_response(vfs_request);
+    /* let handle_unexp_vfs_request() function detect completion and handle */
+    vfs_request->op_id = -1;
+
     return 0;
 fail_downcall:
     gossip_err(
@@ -2666,6 +2668,8 @@ static inline void package_downcall_members(
             }
             break;
         }
+        case PVFS2_VFS_OP_FS_UMOUNT:
+            break;
         default:
             gossip_err("Completed upcall of unknown type %x!\n",
                        vfs_request->in_upcall.type);
@@ -2855,6 +2859,7 @@ static inline PVFS_error handle_unexp_vfs_request(
               calls that are serviced inline.
             */
         case PVFS2_VFS_OP_FS_UMOUNT:
+            posted_op = 1;
             ret = service_fs_umount_request(vfs_request);
             break;
         case PVFS2_VFS_OP_PERF_COUNT:
