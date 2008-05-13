@@ -1271,6 +1271,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.param.op);
 
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+    vfs_request->op_id = -1;
 
     switch(vfs_request->in_upcall.req.param.op)
     {
@@ -1337,7 +1338,6 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                     vfs_request->in_upcall.req.param.value;
             }    
             vfs_request->out_downcall.status = 0;
-            write_inlined_device_response(vfs_request);
             return(0);
             break;
         case PVFS2_PARAM_REQUEST_OP_PERF_HISTORY_SIZE:
@@ -1359,7 +1359,6 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                     ncache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
             }    
             vfs_request->out_downcall.status = ret;
-            write_inlined_device_response(vfs_request);
             return(0);
             break;
         case PVFS2_PARAM_REQUEST_OP_PERF_RESET:
@@ -1372,7 +1371,6 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             }    
             vfs_request->out_downcall.resp.param.value = 0;
             vfs_request->out_downcall.status = 0;
-            write_inlined_device_response(vfs_request);
             return(0);
             break;
     }
@@ -1381,7 +1379,6 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
     {
         /* unsupported request, didn't match anything in case statement */
         vfs_request->out_downcall.status = -PVFS_ENOSYS;
-        write_inlined_device_response(vfs_request);
         return 0;
     }
 
@@ -1416,7 +1413,6 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 PINT_ncache_set_info(tmp_param, val);
         }
     }
-    write_inlined_device_response(vfs_request);
     return 0;
 }
 #undef ACACHE 
@@ -2668,6 +2664,7 @@ static inline void package_downcall_members(
         }
         case PVFS2_VFS_OP_FS_UMOUNT:
         case PVFS2_VFS_OP_PERF_COUNT:
+        case PVFS2_VFS_OP_PARAM:
             break;
         default:
             gossip_err("Completed upcall of unknown type %x!\n",
