@@ -1704,8 +1704,8 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         free(vfs_request->io_tmp_buf);
     }
     vfs_request->io_tmp_buf = NULL;
+    vfs_request->op_id = -1;
 
-    write_inlined_device_response(vfs_request);
     return 0;
 #endif /* USE_MMAP_RA_CACHE */
 }
