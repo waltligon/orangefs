@@ -295,6 +295,14 @@ struct PINT_server_mgmt_get_dirdata_op
     PVFS_handle dirdata_handle;
 };
 
+struct PINT_server_create_op
+{
+    PVFS_fs_id fs_id;
+    PVFS_handle_extent_array handle_extent_array;
+    PVFS_ds_type object_type;
+    PVFS_handle handle;
+};
+
 struct PINT_server_getconfig_op
 {
     int strsize; /* used to hold string lengths during getconfig
@@ -450,6 +458,7 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+        struct PINT_server_create_op create;
     } u;
 
 } PINT_server_op;
@@ -484,6 +493,7 @@ extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_create_file_work_sm;
 extern struct PINT_state_machine_s pvfs2_server_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_create_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

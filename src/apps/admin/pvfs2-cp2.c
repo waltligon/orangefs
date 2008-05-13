@@ -609,6 +609,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	    else 
 	    {
                 memset(&stat_buf, 0, sizeof(struct stat));
+/*                memset(&(obj->u.pvfs2.attr), 0, sizeof(obj->u.pvfs2.attr)); */
 
                 /* preserve permissions doing a unix => pvfs2 copy */
                 stat(srcname, &stat_buf);

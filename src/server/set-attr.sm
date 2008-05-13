@@ -270,7 +270,7 @@ static PINT_sm_action setattr_setobj_attribs(
     PVFS_ds_attributes *ds_attr = NULL;
 
     dspace_a_p = &s_op->attr;
-    a_p = &s_op->req->u.setattr.attr;
+    a_p = &s_op->u.setattr.attr;
 
     if (a_p->mask & PVFS_ATTR_META_DFILES)
     {
