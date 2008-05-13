@@ -459,6 +459,8 @@ typedef struct
     struct super_block *sb;
     int    mount_pending;
     struct list_head list;
+    atomic_t pvfs2_inode_alloc_count;
+    atomic_t pvfs2_inode_dealloc_count;
 } pvfs2_sb_info_t;
 
 /** a temporary structure used only for sb mount time that groups the
