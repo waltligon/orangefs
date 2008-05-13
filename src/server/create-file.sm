@@ -944,6 +944,7 @@ static PINT_sm_action create_setattr_setup(
         sm_p->u.create_file.dist;
     s_op->u.setattr.attr.u.meta.dist_size =
         PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
+    s_op->attr = s_op->u.setattr.attr;
 
 #if 0
     PINT_SERVREQ_SETATTR_FILL(
