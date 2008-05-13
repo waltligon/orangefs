@@ -2708,7 +2708,6 @@ static inline PVFS_error handle_unexp_vfs_request(
     vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-    int posted_op = 0;             
 
     assert(vfs_request);
 
@@ -2783,71 +2782,54 @@ static inline PVFS_error handle_unexp_vfs_request(
     switch(vfs_request->in_upcall.type)
     {
         case PVFS2_VFS_OP_LOOKUP:
-            posted_op = 1;
             ret = post_lookup_request(vfs_request);
             break;
         case PVFS2_VFS_OP_CREATE:
-            posted_op = 1;
             ret = post_create_request(vfs_request);
             break;
         case PVFS2_VFS_OP_SYMLINK:
-            posted_op = 1;
             ret = post_symlink_request(vfs_request);
             break;
         case PVFS2_VFS_OP_GETATTR:
-            posted_op = 1;
             ret = post_getattr_request(vfs_request);
             break;
         case PVFS2_VFS_OP_SETATTR:
-            posted_op = 1;
             ret = post_setattr_request(vfs_request);
             break;
         case PVFS2_VFS_OP_REMOVE:
-            posted_op = 1;
             ret = post_remove_request(vfs_request);
             break;
         case PVFS2_VFS_OP_MKDIR:
-            posted_op = 1;
             ret = post_mkdir_request(vfs_request);
             break;
         case PVFS2_VFS_OP_READDIR:
-            posted_op = 1;
             ret = post_readdir_request(vfs_request);
             break;
         case PVFS2_VFS_OP_READDIRPLUS:
-            posted_op = 1;
             ret = post_readdirplus_request(vfs_request);
             break;
         case PVFS2_VFS_OP_RENAME:
-            posted_op = 1;
             ret = post_rename_request(vfs_request);
             break;
         case PVFS2_VFS_OP_TRUNCATE:
-            posted_op = 1;
             ret = post_truncate_request(vfs_request);
             break;
         case PVFS2_VFS_OP_GETXATTR:
-            posted_op = 1;
             ret = post_getxattr_request(vfs_request);
             break;
         case PVFS2_VFS_OP_SETXATTR:
-            posted_op = 1;
             ret = post_setxattr_request(vfs_request);
             break;
         case PVFS2_VFS_OP_REMOVEXATTR:
-            posted_op = 1;
             ret = post_removexattr_request(vfs_request);
             break;
         case PVFS2_VFS_OP_LISTXATTR:
-            posted_op = 1;
             ret = post_listxattr_request(vfs_request);
             break;
         case PVFS2_VFS_OP_STATFS:
-            posted_op = 1;
             ret = post_statfs_request(vfs_request);
             break;
         case PVFS2_VFS_OP_FS_MOUNT:
-            posted_op = 1;
             ret = post_fs_mount_request(vfs_request);
             break;
             /*
@@ -2855,19 +2837,15 @@ static inline PVFS_error handle_unexp_vfs_request(
               calls that are serviced inline.
             */
         case PVFS2_VFS_OP_FS_UMOUNT:
-            posted_op = 1;
             ret = service_fs_umount_request(vfs_request);
             break;
         case PVFS2_VFS_OP_PERF_COUNT:
-            posted_op = 1;
             ret = service_perf_count_request(vfs_request);
             break;
         case PVFS2_VFS_OP_PARAM:
-            posted_op = 1;
             ret = service_param_request(vfs_request);
             break;
         case PVFS2_VFS_OP_FSKEY:
-            posted_op = 1;
             ret = service_fs_key_request(vfs_request);
             break;
             /*
@@ -2876,11 +2854,9 @@ static inline PVFS_error handle_unexp_vfs_request(
               blocking and handled inline
             */
         case PVFS2_VFS_OP_FILE_IO:
-            posted_op = 1;
             ret = post_io_request(vfs_request);
             break;
         case PVFS2_VFS_OP_FILE_IOX:
-            posted_op = 1;
             ret = post_iox_request(vfs_request);
             break;
 #ifdef USE_MMAP_RA_CACHE
@@ -2889,16 +2865,13 @@ static inline PVFS_error handle_unexp_vfs_request(
               flushes are handled inline
             */
         case PVFS2_VFS_OP_MMAP_RA_FLUSH:
-            posted_op = 1;
             ret = service_mmap_ra_flush_request(vfs_request);
             break;
 #endif
         case PVFS2_VFS_OP_CANCEL:
-            posted_op = 1;
             ret = service_operation_cancellation(vfs_request);
             break;
         case PVFS2_VFS_OP_FSYNC:
-            posted_op = 1;
             ret = post_fsync_request(vfs_request);
             break;
         case PVFS2_VFS_OP_INVALID:
@@ -2906,13 +2879,14 @@ static inline PVFS_error handle_unexp_vfs_request(
             gossip_err(
                 "Got an unrecognized/unimplemented vfs operation of "
                 "type %x.\n", vfs_request->in_upcall.type);
+            ret = -PVFS_ENOSYS;
             break;
     }
 
     /* if we failed to post the operation, then we should go ahead and write
      * a generic response down with the error code filled in 
      */
-    if(posted_op == 1 && ret < 0)
+    if(ret < 0)
     {
 #ifndef GOSSIP_DISABLE_DEBUG
         gossip_err(
