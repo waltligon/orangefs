@@ -1489,7 +1489,7 @@ static PVFS_error service_fs_key_request(vfs_request_t *vfs_request)
 out:
     vfs_request->out_downcall.status = ret;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
-    write_inlined_device_response(vfs_request);
+    vfs_request->op_id = -1;
     return 0;
 }
 
@@ -2665,6 +2665,7 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_FS_UMOUNT:
         case PVFS2_VFS_OP_PERF_COUNT:
         case PVFS2_VFS_OP_PARAM:
+        case PVFS2_VFS_OP_FSKEY:
             break;
         default:
             gossip_err("Completed upcall of unknown type %x!\n",
@@ -2863,9 +2864,11 @@ static inline PVFS_error handle_unexp_vfs_request(
             ret = service_perf_count_request(vfs_request);
             break;
         case PVFS2_VFS_OP_PARAM:
+            posted_op = 1;
             ret = service_param_request(vfs_request);
             break;
         case PVFS2_VFS_OP_FSKEY:
+            posted_op = 1;
             ret = service_fs_key_request(vfs_request);
             break;
             /*
