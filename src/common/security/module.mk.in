@@ -1,2 +1,3 @@
 DIR := src/common/security
-SERVERSRC += $(DIR)/pint-security.c
+SERVERSRC += $(DIR)/pint-security.c \
+             $(DIR)/security-hash.c
