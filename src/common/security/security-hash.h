@@ -1,14 +1,16 @@
 #include "quickhash.h"
-#include "pint-security.h"
+#include "pvfs2-types.h"
+#include <stdlib.h>
+#include <openssl/evp.h>
 
-typedef struct {
+struct hash_struct {
 	struct qlist_head hash_link;
-    PVFS_handle range;
+    PVFS_handle handle;
     EVP_PKEY public_key;
-} hash_struct;
+}; 
 
-void SEC_hash_init();
+void SEC_hash_init(void);
 void SEC_add_key(PVFS_handle, EVP_PKEY);
 EVP_PKEY *SEC_lookup_key(PVFS_handle, EVP_PKEY);
-void SEC_hash_finalize();
-bool SEC_compare(void *, struct qhash_head *);
+void SEC_hash_finalize(void);
+int SEC_compare(void *, struct qhash_head *);
