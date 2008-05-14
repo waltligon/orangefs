@@ -51,6 +51,9 @@ endecode_fields_3a (
 
 /* top-level security functions */
 
+int PINT_security_initialize(void);
+int PINT_security_finalize(void);
+
 /* creates a signature from the remaining fields
  * any existing signature is overwritten
  */

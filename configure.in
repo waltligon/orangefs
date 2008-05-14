@@ -1068,6 +1068,7 @@ src/common/gossip/module.mk
 src/common/gen-locks/module.mk
 src/common/llist/module.mk
 src/common/statecomp/module.mk
+src/common/security/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk

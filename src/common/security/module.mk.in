@@ -1,0 +1,2 @@
+DIR := src/common/security
+SERVERSRC += $(DIR)/pint-security.c

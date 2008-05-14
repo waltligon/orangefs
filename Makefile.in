@@ -132,6 +132,7 @@ INCLUDES := \
     src/common/id-generator \
     src/common/gossip \
     src/common/gen-locks \
+    src/common/security \
     src/io/trove \
     src/io/bmi \
     src/io/description \
