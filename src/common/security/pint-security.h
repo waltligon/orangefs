@@ -16,38 +16,38 @@
 
 typedef struct PVFS_capability PVFS_capability;
 struct PVFS_capability {
-	PVFS_sig signature;
+        PVFS_handle owner;
+        PVFS_sig signature;
 	PVFS_time timeout;  /* seconds after epoch to time out */
 	uint32_t op_mask;
 	uint32_t num_handles;
 	PVFS_handle *handle_array;
 };
 
-endecode_fields_3a (
+/*endecode_fields_3a (
 		PVFS_capability,
 		PVFS_sig, signature,
 		PVFS_time, timeout,
 		uint32_t, op_mask,
 		uint32_t, num_handles,
-		PVFS_handle, handle_array)
+		PVFS_handle, handle_array)*/
 
-typedef struct PVFS_credentials PVFS_credentials;
+/*typedef struct PVFS_credentials PVFS_credentials;
 struct PVFS_credentials {
 	PVFS_sig signature;
-	PVFS_time timeout;  /* seconds after epoch to time out */
+	PVFS_time timeout;
 	PVFS_uid userid;
 	uint32_t num_groups;
 	PVFS_gid *group_array;
-};
+};*/
 
-endecode_fields_3a (
+/*endecode_fields_3a (
 	PVFS_credentials,
 	PVFS_sig, signature,
 	PVFS_time, timeout,
 	PVFS_uid, userid,
 	uint32_t, num_groups,
-	PVFS_gid, group_array,
-};
+	PVFS_gid, group_array)*/
 
 /* top-level security functions */
 

@@ -3,26 +3,27 @@
  *
  * See COPYING in top-level directory.
  */
-#ifndef PINT_SECURITY_H
-#define PINT_SECURITY_H
+#ifndef RSA_SECURITY_H
+#define RSA_SECURITY_H
 
+#include <string.h>
 #include "pvfs2-types.h"
 
 /* The PVFS_sig struct should be a multiple of 64 bits - 8 bytes) */
 #define PVFS_RSA_SIG_SIZE 128
 #define PVFS_MSG_DIG_SIZE 96
 
-typedef uchar PVFS_sig[PVFS_RSA_SIG_SIZE];
+typedef unsigned char PVFS_sig[PVFS_RSA_SIG_SIZE];
 
-#define encode_PVFS_sig (pptr,pbuf) do { \
+/*#define encode_PVFS_sig (pptr,pbuf) do {              \
 	memcpy(*(pptr), *(pbuf), PVFS_RSA_SIG_SIZE);
-	*(pptr) += PVFS_RSA_SIG_SIZE;
+         *(pptr) += PVFS_RSA_SIG_SIZE;
 } while (0)
 
 #define decode_PVFS_sig (pptr,pbuf) do { \
 	memcpy(*(pptr), *(pbuf), PVFS_RSA_SIG_SIZE);
-	*(pptr) += PVFS_RSA_SIG_SIZE;
-} while (0)
+         *(pptr) += PVFS_RSA_SIG_SIZE;
+} while (0)*/
 
 #endif
 	
