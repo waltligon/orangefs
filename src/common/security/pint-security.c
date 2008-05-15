@@ -35,7 +35,7 @@ static int security_init_status = 0;
 
 
 static int load_public_keys(char*);
-static int lookup_host_handle(PVFS_handle*, const char*);
+static int lookup_host_handle(uint32_t*, const char*);
 
 
 int PINT_security_initialize(void)
@@ -87,7 +87,8 @@ static int load_public_keys(char *path)
     int ch, ptr;
     static char buf[1024];
     EVP_PKEY *key;
-    PVFS_handle host;
+    uint32_t host;
+    int ret;
 
     keyfile = fopen(path, "r");
     if (keyfile == NULL)
@@ -134,10 +135,19 @@ static int load_public_keys(char *path)
             return -1;
         }
 
-        /* TODO: return value */
-        lookup_host_handle(&host, buf);
+        ret = lookup_host_handle(&host, buf);
+        if (ret == -1)
+        {
+            return -1;
+        }
 
-        /* add to hash */
+        /* add to hash; return value */
+        ret = SECURITY_add_pubkey(host, key);
+        if (ret == -1)
+        {
+            return -1;
+        }
+        
     }
 
     fclose(keyfile);
@@ -145,17 +155,33 @@ static int load_public_keys(char *path)
     return 0;
 }
 
-/* XXX: move to server-config.c ? */
-static int lookup_host_handle(PVFS_handle *host, const char *alias)
+static int lookup_host_handle(uint32_t *host, const char *alias)
 {
     struct server_configuration_s *config;
-
+    PINT_llist *iter;
+    uint32_t index;
+    host_alias_s *a;  
+    
     config = PINT_get_server_config();
     assert(config);
 
-    /* magic */
+    index = 0;
+    for (iter = config->host_aliases; iter != NULL; iter = iter->next)
+    {
+        a = (host_alias_s*)iter->item;
+        if (a == NULL)
+        {
+            continue;
+        }
+        if (strcmp(a->host_alias, alias) == 0)
+        {
+            *host = index;
+            return 0;
+        }
+        index++;
+    }
 
-    return 0;
+    return -1;
 }
 
 /*

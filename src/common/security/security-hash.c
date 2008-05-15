@@ -131,12 +131,12 @@ static int pubkey_compare(void *key, struct qhash_head *link)
 
 static void free_pubkey_entry(void *to_free) 
 {
-	pubkey_entry_t *temp = (pubkey_entry_t *)to_free;
-	if (temp != NULL)
-	{
-		free(temp->pubkey);
-		free(temp);
-	}
+    pubkey_entry_t *temp = (pubkey_entry_t *)to_free;
+    if (temp != NULL)
+    {
+        free(temp->pubkey);
+        free(temp);
+    }
 }
 
 
