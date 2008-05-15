@@ -15,9 +15,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
+#include "bmi.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -26,6 +28,7 @@
 /* optional parameters, filled in by parse_args() */
 struct options
 {
+    char* server_list;
     uint32_t num_files;
     char **filenames;
 };
@@ -37,6 +40,13 @@ int main(int argc, char **argv)
 {
     int ret = -1, i = 0;
     struct options *user_opts = NULL;
+    char* tmp_server;
+    int tmp_server_index;
+    PVFS_sys_layout layout;
+
+    layout.algorithm = PVFS_SYS_LAYOUT_DEFAULT;
+    layout.server_list.count = 0;
+    layout.server_list.servers = NULL;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -62,6 +72,14 @@ int main(int argc, char **argv)
         char *working_file = user_opts->filenames[i];
         char directory[PVFS_NAME_MAX];
         char filename[PVFS_SEGMENT_MAX];
+
+        layout.algorithm = PVFS_SYS_LAYOUT_DEFAULT;
+        layout.server_list.count = 0;
+        if(layout.server_list.servers)
+        {
+            free(layout.server_list.servers);
+        }
+        layout.server_list.servers = NULL;
 
         char pvfs_path[PVFS_NAME_MAX] = {0};
         PVFS_fs_id cur_fs;
@@ -117,12 +135,63 @@ int main(int argc, char **argv)
 
         parent_ref = resp_lookup.ref;
 
+        if(user_opts->server_list)
+        {
+            layout.algorithm = PVFS_SYS_LAYOUT_LIST;
+            layout.server_list.count = 1;
+            tmp_server = user_opts->server_list;
+
+            /* iterate once to count servers */
+            while((tmp_server = index(tmp_server, ',')))
+            {
+                layout.server_list.count++;
+                tmp_server++;
+            }
+
+            layout.server_list.servers = 
+                malloc(layout.server_list.count*sizeof(PVFS_BMI_addr_t));
+            if(!(layout.server_list.servers))
+            {
+                perror("malloc");
+                ret = -1;
+                break;
+            }
+
+            /* split servers out and resolve each addr */
+            tmp_server_index = 0;
+            for(tmp_server = strtok(user_opts->server_list, ","); 
+                tmp_server != NULL;
+                tmp_server = strtok(NULL, ","))
+            {
+                assert(tmp_server_index < layout.server_list.count);
+                
+                /* TODO: is there a way to do this without internal BMI
+                 * functions?
+                 */
+                rc = BMI_addr_lookup(
+                    &layout.server_list.servers[tmp_server_index],
+                    tmp_server);
+                if(rc < 0)
+                {
+                    PVFS_perror("BMI_addr_lookup", rc);
+                    break;
+                }
+                tmp_server_index++;
+            }
+            if(tmp_server_index != layout.server_list.count)
+            {
+                fprintf(stderr, "Error: unable to resolve server list.\n");
+                ret = -1;
+                break;
+            }
+        }
+
         rc = PVFS_sys_create(filename,
                              parent_ref,
                              attr,
                              &credentials,
                              NULL,
-                             NULL,
+                             &layout,
                              &resp_create);
         if (rc)
         {
@@ -135,6 +204,12 @@ int main(int argc, char **argv)
     }
 
     PVFS_sys_finalize();
+
+    if(user_opts->server_list)
+    {
+        free(layout.server_list.servers);
+        free(user_opts->server_list);
+    }
     free(user_opts);
 
     return ret;
@@ -149,7 +224,7 @@ int main(int argc, char **argv)
 static struct options* parse_args(int argc, char **argv)
 {
     int one_opt = 0;
-    char flags[] = "?";
+    char flags[] = "l:?";
     struct options *tmp_opts = NULL;
 
     tmp_opts = (struct options *)malloc(sizeof(struct options));
@@ -160,6 +235,7 @@ static struct options* parse_args(int argc, char **argv)
     memset(tmp_opts, 0, sizeof(struct options));
 
     tmp_opts->filenames = 0;
+    tmp_opts->server_list = NULL;
 
     while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
@@ -168,6 +244,13 @@ static struct options* parse_args(int argc, char **argv)
 	    case('?'):
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
+	    case('l'):
+                tmp_opts->server_list = strdup(optarg);
+                if(!tmp_opts->server_list)
+                {
+                    perror("strdup");
+                    exit(EXIT_FAILURE);
+                }
 	}
     }
 
@@ -194,7 +277,7 @@ static struct options* parse_args(int argc, char **argv)
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: %s [-rf] pvfs2_filename[s]\n", argv[0]);
+    fprintf(stderr, "Usage: %s <-l comma separated layout list> pvfs2_filename[s]\n", argv[0]);
 }
 
 /*
