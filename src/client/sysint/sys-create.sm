@@ -199,6 +199,19 @@ PVFS_error PVFS_isys_create(
     /* copy layout to sm struct */
     if(layout)
     {
+        /* make sure it is a supported layout */
+        switch(layout->algorithm)
+        {
+            /* these are valid */
+            case PVFS_SYS_LAYOUT_ROUND_ROBIN:
+            case PVFS_SYS_LAYOUT_RANDOM:
+            case PVFS_SYS_LAYOUT_LIST:
+                break;
+            /* anything else is not */
+            default:
+                return(-PVFS_EINVAL);
+        }
+
         sm_p->u.create.layout.algorithm = layout->algorithm;
         if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
         {
