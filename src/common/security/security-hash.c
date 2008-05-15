@@ -42,7 +42,7 @@ int SECURITY_hash_initialize(void)
     if (hash_init_status)
     {
         gen_mutex_unlock(&hash_mutex);
-        return -1;
+        return -PVFS_EALREADY;
     }
     
     pubkey_table = qhash_init(pubkey_compare, quickhash_32bit_hash,
@@ -51,7 +51,7 @@ int SECURITY_hash_initialize(void)
     if (pubkey_table == NULL)
     {
     	gen_mutex_unlock(&hash_mutex);
-        return -1;
+        return -PVFS_ENOMEM;
     }
     
     hash_init_status = 1;
@@ -85,7 +85,7 @@ int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey)
     entry = (pubkey_entry_t *)malloc(sizeof(pubkey_entry_t));
     if (entry == NULL)
     {
-        return -1;
+        return -PVFS_ENOMEM;
     }
 
     entry->host = host;

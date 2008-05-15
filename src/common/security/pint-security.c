@@ -15,6 +15,7 @@
 #include <openssl/pem.h>
 
 #include "pvfs2.h"
+#include "pvfs2-types.h"
 #include "pint-eattr.h"
 #include "pvfs2-req-proto.h"
 #include "pvfs2-internal.h"
@@ -40,26 +41,35 @@ static int lookup_host_handle(uint32_t*, const char*);
 
 int PINT_security_initialize(void)
 {
+    int ret;
+
     gen_mutex_lock(&security_init_mutex);
     if (security_init_status)
     {
         gen_mutex_unlock(&security_init_mutex);
-        return -1;
+        return -PVFS_EALREADY;
     }
 
     ERR_load_crypto_strings();
     OpenSSL_add_all_algorithms();
 
-    /* TODO: return value */
-    if (SECURITY_hash_initialize() == -1)
-    	return -1;
+    ret = SECURITY_hash_initialize();
+    if (ret < 0)
+    {
+        return ret;
+    }
     
-    load_public_keys(SECURITY_DEFAULT_KEYSTORE);
+    /* TODO: better error handling */
+    ret = load_public_keys(SECURITY_DEFAULT_KEYSTORE);
+    if (ret < 0)
+    {
+        return -PVFS_EIO;
+    }
 
     security_init_status = 1;
     gen_mutex_unlock(&security_init_mutex);
  
-    return 1;
+    return 0;
 }
 
 int PINT_security_finalize(void)
@@ -68,7 +78,7 @@ int PINT_security_finalize(void)
     if (!security_init_status)
     {
         gen_mutex_unlock(&security_init_mutex);
-        return -1;
+        return -PVFS_EALREADY;
     }
 
     EVP_cleanup();
@@ -78,7 +88,7 @@ int PINT_security_finalize(void)
     security_init_status = 0;
     gen_mutex_unlock(&security_init_mutex);
     
-    return 1;
+    return 0;
 }
 
 static int load_public_keys(char *path)
@@ -136,16 +146,17 @@ static int load_public_keys(char *path)
         }
 
         ret = lookup_host_handle(&host, buf);
-        if (ret == -1)
+        if (ret < 0)
         {
-            return -1;
+            fclose(keyfile);
+            return -2;
         }
 
-        /* add to hash; return value */
         ret = SECURITY_add_pubkey(host, key);
-        if (ret == -1)
+        if (ret < 0)
         {
-            return -1;
+            fclose(keyfile);
+            return -3;
         }
         
     }
