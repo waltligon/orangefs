@@ -14,8 +14,8 @@
 
 
 int SECURITY_hash_initialize(void);
-int SECURITY_add_pubkey(PVFS_handle host, EVP_PKEY *pubkey);
-EVP_PKEY *SECURITY_lookup_pubkey(PVFS_handle host);
+int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey);
+EVP_PKEY *SECURITY_lookup_pubkey(uint32_t host);
 void SECURITY_hash_finalize(void);
 
 

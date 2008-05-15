@@ -22,7 +22,7 @@
 
 typedef struct pubkey_entry_s {
     struct qlist_head hash_link;
-    PVFS_handle host;
+    uint32_t host;
     EVP_PKEY *pubkey;
 } pubkey_entry_t;
 
@@ -45,7 +45,7 @@ int SECURITY_hash_initialize(void)
         return -1;
     }
     
-    pubkey_table = qhash_init(pubkey_compare, quickhash_64bit_hash,
+    pubkey_table = qhash_init(pubkey_compare, quickhash_32bit_hash,
                               DEFAULT_SECURITY_TABLE_SIZE);
 
     if (pubkey_table == NULL)
@@ -76,7 +76,7 @@ void SECURITY_hash_finalize(void)
     gen_mutex_unlock(&hash_mutex);
 }
 
-int SECURITY_add_pubkey(PVFS_handle host, EVP_PKEY *pubkey)
+int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey)
 {    
     gen_mutex_lock(&hash_mutex);
     pubkey_entry_t *entry;
@@ -103,7 +103,7 @@ int SECURITY_add_pubkey(PVFS_handle host, EVP_PKEY *pubkey)
     return 0;
 }
 
-EVP_PKEY *SECURITY_lookup_pubkey(PVFS_handle host)
+EVP_PKEY *SECURITY_lookup_pubkey(uint32_t host)
 {
     struct qhash_head *temp;
     pubkey_entry_t *entry;
@@ -121,7 +121,7 @@ EVP_PKEY *SECURITY_lookup_pubkey(PVFS_handle host)
 
 static int pubkey_compare(void *key, struct qhash_head *link)
 {
-    PVFS_handle host = *((PVFS_handle *)key);
+    uint32_t host = *((uint32_t *)key);
     pubkey_entry_t *temp;
 
     temp = qlist_entry(link, pubkey_entry_t, hash_link);

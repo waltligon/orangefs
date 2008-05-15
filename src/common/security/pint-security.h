@@ -16,7 +16,7 @@
 
 typedef struct PVFS_capability PVFS_capability;
 struct PVFS_capability {
-        PVFS_handle owner;
+        uint32_t owner;
         PVFS_sig signature;
 	PVFS_time timeout;  /* seconds after epoch to time out */
 	uint32_t op_mask;
