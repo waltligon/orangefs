@@ -15,26 +15,32 @@
 
 #define DEFAULT_SECURITY_TABLE_SIZE 71
 
+
+/*  Serialize hash table at some point if wanted */
+
+
 typedef struct pubkey_entry_s {
     struct qlist_head hash_link;
     PVFS_handle host;
     EVP_PKEY *pubkey;
 } pubkey_entry_t;
 
+
 static struct qhash_table *pubkey_table = NULL;
 static int hash_init_status = 0;
-static gen_mutex_t hash_init_mutex = GEN_MUTEX_INITIALIZER;
-static gen_mutex_t hash_pubkey_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t hash_mutex = GEN_MUTEX_INITIALIZER;
+
 
 static int pubkey_compare(void*, struct qhash_head*);
+static void free_pubkey_entry(void*);
 
 
 int SECURITY_hash_initialize(void)
 {
-    gen_mutex_lock(&hash_init_mutex);
+    gen_mutex_lock(&hash_mutex);
     if (hash_init_status)
     {
-        gen_mutex_unlock(&hash_init_mutex);
+        gen_mutex_unlock(&hash_mutex);
         return -1;
     }
     
@@ -43,42 +49,38 @@ int SECURITY_hash_initialize(void)
 
     if (pubkey_table == NULL)
     {
-    	gen_mutex_unlock(&hash_init_mutex);
+    	gen_mutex_unlock(&hash_mutex);
         return -1;
     }
     
     hash_init_status = 1;
-    gen_mutex_unlock(&hash_init_mutex);
+    gen_mutex_unlock(&hash_mutex);
 
     return 0;
 }
 
 void SECURITY_hash_finalize(void)
 {
-    /* qhash_finalize(pubkey_table); // incomplete free */
-    
-    gen_mutex_lock(&hash_init_mutex);
+    gen_mutex_lock(&hash_mutex);
     if (!hash_init_status)
     {
-        gen_mutex_unlock(&hash_init_mutex);
+        gen_mutex_unlock(&hash_mutex);
         return;
     }
     
-    qhash_destroy_and_finalize(pubkey_table, pubkey_entry_t, hash_link, free);
+    qhash_destroy_and_finalize(pubkey_table, pubkey_entry_t, hash_link, free_pubkey_entry);
     
     hash_init_status = 0;
-    gen_mutex_unlock(&hash_init_mutex);
+    gen_mutex_unlock(&hash_mutex);
 }
 
 int SECURITY_add_pubkey(PVFS_handle host, EVP_PKEY *pubkey)
-{
-    /* XXX: who is responsible for keys? */
-    /* XXX: what about duplicates? */
-    
-    gen_mutex_lock(&hash_pubkey_mutex);
+{    
+    gen_mutex_lock(&hash_mutex);
     pubkey_entry_t *entry;
+    struct qhash_head *temp;
 
-    entry = (pubkey_entry_t*)malloc(sizeof(pubkey_entry_t));
+    entry = (pubkey_entry_t *)malloc(sizeof(pubkey_entry_t));
     if (entry == NULL)
     {
         return -1;
@@ -86,9 +88,15 @@ int SECURITY_add_pubkey(PVFS_handle host, EVP_PKEY *pubkey)
 
     entry->host = host;
     entry->pubkey = pubkey;
+    
+    temp = qhash_search_and_remove(pubkey_table, &host);
+    if (temp != NULL) 
+    {
+    	free_pubkey_entry(temp);
+    }
     qhash_add(pubkey_table, &entry->host, &entry->hash_link);
     
-    gen_mutex_unlock(&hash_pubkey_mutex);
+    gen_mutex_unlock(&hash_mutex);
 
     return 0;
 }
@@ -101,7 +109,7 @@ EVP_PKEY *SECURITY_lookup_pubkey(PVFS_handle host)
     temp = qhash_search(pubkey_table, &host);
     if (temp == NULL)
     {
-        return NULL;
+    	return NULL;
     }
 
     entry = qlist_entry(temp, pubkey_entry_t, hash_link);
@@ -119,11 +127,22 @@ static int pubkey_compare(void *key, struct qhash_head *link)
     return (temp->host == host);
 }
 
+static void free_pubkey_entry(void *to_free) 
+{
+	pubkey_entry_t *temp = (pubkey_entry_t *)to_free;
+	if (temp != NULL)
+	{
+		free(temp->pubkey);
+		free(temp);
+	}
+}
+
+
 /*
  * Local variables:
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 expandtab
+ * vim: ts=4 sts=4 sw=4 expandtab
  */
