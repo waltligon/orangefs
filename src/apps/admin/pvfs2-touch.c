@@ -28,6 +28,7 @@
 /* optional parameters, filled in by parse_args() */
 struct options
 {
+    int random;
     char* server_list;
     uint32_t num_files;
     char **filenames;
@@ -135,7 +136,11 @@ int main(int argc, char **argv)
 
         parent_ref = resp_lookup.ref;
 
-        if(user_opts->server_list)
+        if(user_opts->random)
+        {
+            layout.algorithm = PVFS_SYS_LAYOUT_RANDOM;
+        }
+        else if(user_opts->server_list)
         {
             layout.algorithm = PVFS_SYS_LAYOUT_LIST;
             layout.server_list.count = 1;
@@ -224,7 +229,7 @@ int main(int argc, char **argv)
 static struct options* parse_args(int argc, char **argv)
 {
     int one_opt = 0;
-    char flags[] = "l:?";
+    char flags[] = "l:r?";
     struct options *tmp_opts = NULL;
 
     tmp_opts = (struct options *)malloc(sizeof(struct options));
@@ -236,6 +241,7 @@ static struct options* parse_args(int argc, char **argv)
 
     tmp_opts->filenames = 0;
     tmp_opts->server_list = NULL;
+    tmp_opts->random = 0;
 
     while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
@@ -251,7 +257,17 @@ static struct options* parse_args(int argc, char **argv)
                     perror("strdup");
                     exit(EXIT_FAILURE);
                 }
+                break;
+            case('r'):
+                tmp_opts->random = 1;
+                break;
 	}
+    }
+
+    if(tmp_opts->random && tmp_opts->server_list)
+    {
+        fprintf(stderr, "Error: only one of -r or -l may be specified.\n");
+        exit(EXIT_FAILURE);
     }
 
     if (optind < argc)
@@ -277,7 +293,10 @@ static struct options* parse_args(int argc, char **argv)
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: %s <-l comma separated layout list> pvfs2_filename[s]\n", argv[0]);
+    fprintf(stderr, "Usage: %s pvfs2_filename[s]\n", argv[0]);
+    fprintf(stderr, "   optional arguments:\n");
+    fprintf(stderr, "   -l   use list layout (requires comma separated list of servers)\n");
+    fprintf(stderr, "   -r   use random layout\n");
 }
 
 /*
