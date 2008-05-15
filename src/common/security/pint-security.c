@@ -21,6 +21,7 @@
 #include "gossip.h"
 #include "gen-locks.h"
 #include "pint-security.h"
+#include "security-hash.h"
 
 
 /* TODO: move to global configuration */
@@ -29,8 +30,6 @@
 
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
 static int security_init_status = 0;
-
-static gen_mutex_t pubkey_mutex = GEN_MUTEX_INITIALIZER;
 
 
 static int load_public_keys(char*);
@@ -49,6 +48,9 @@ int PINT_security_initialize(void)
     OpenSSL_add_all_algorithms();
 
     /* TODO: return value */
+    if (SECURITY_hash_initialize() == -1)
+    	return -1;
+    
     load_public_keys(SECURITY_DEFAULT_KEYSTORE);
 
     security_init_status = 1;
@@ -68,6 +70,7 @@ int PINT_security_finalize(void)
 
     EVP_cleanup();
     ERR_free_strings();
+    SECURITY_hash_finalize();
 
     security_init_status = 0;
     gen_mutex_unlock(&security_init_mutex);
