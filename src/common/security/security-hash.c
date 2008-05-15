@@ -13,10 +13,11 @@
 #include "security-hash.h"
 #include "gen-locks.h"
 
+
 #define DEFAULT_SECURITY_TABLE_SIZE 71
 
 
-/*  Serialize hash table at some point if wanted */
+/*  TODO: Serialize hash table at some point if wanted */
 
 
 typedef struct pubkey_entry_s {
@@ -68,7 +69,8 @@ void SECURITY_hash_finalize(void)
         return;
     }
     
-    qhash_destroy_and_finalize(pubkey_table, pubkey_entry_t, hash_link, free_pubkey_entry);
+    qhash_destroy_and_finalize(pubkey_table, pubkey_entry_t, hash_link, 
+                               free_pubkey_entry);
     
     hash_init_status = 0;
     gen_mutex_unlock(&hash_mutex);

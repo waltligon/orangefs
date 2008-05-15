@@ -20,6 +20,8 @@
 #include "pvfs2-internal.h"
 #include "gossip.h"
 #include "gen-locks.h"
+#include "server-config.h"
+
 #include "pint-security.h"
 #include "security-hash.h"
 
@@ -33,6 +35,7 @@ static int security_init_status = 0;
 
 
 static int load_public_keys(char*);
+static int lookup_host_handle(PVFS_handle*, const char*);
 
 
 int PINT_security_initialize(void)
@@ -84,6 +87,7 @@ static int load_public_keys(char *path)
     int ch, ptr;
     static char buf[1024];
     EVP_PKEY *key;
+    PVFS_handle host;
 
     keyfile = fopen(path, "r");
     if (keyfile == NULL)
@@ -130,10 +134,26 @@ static int load_public_keys(char *path)
             return -1;
         }
 
-        /* lookup */
+        /* TODO: return value */
+        lookup_host_handle(&host, buf);
 
         /* add to hash */
     }
+
+    fclose(keyfile);
+
+    return 0;
+}
+
+/* XXX: move to server-config.c ? */
+static int lookup_host_handle(PVFS_handle *host, const char *alias)
+{
+    struct server_configuration_s *config;
+
+    config = PINT_get_server_config();
+    assert(config);
+
+    /* magic */
 
     return 0;
 }
