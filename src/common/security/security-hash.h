@@ -1,16 +1,32 @@
-#include "quickhash.h"
-#include "pvfs2-types.h"
-#include <stdlib.h>
+/* 
+ * (C) 2008 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#ifndef _SECURITY_HASH_H_
+#define _SECURITY_HASH_H_
+
+
 #include <openssl/evp.h>
 
-struct hash_struct {
-	struct qlist_head hash_link;
-    PVFS_handle handle;
-    EVP_PKEY public_key;
-}; 
+#include "pvfs2-types.h"
 
-void SEC_hash_init(void);
-void SEC_add_key(PVFS_handle, EVP_PKEY);
-EVP_PKEY *SEC_lookup_key(PVFS_handle, EVP_PKEY);
-void SEC_hash_finalize(void);
-int SEC_compare(void *, struct qhash_head *);
+
+int SECURITY_hash_initialize(void);
+int SECURITY_add_pubkey(PVFS_handle host, EVP_PKEY *pubkey);
+EVP_PKEY *SECURITY_lookup_pubkey(PVFS_handle host);
+void SECURITY_hash_finalize(void);
+
+
+#endif /* _SECURITY_HASH_H_ */
+
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */
