@@ -636,7 +636,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL, i = 0;
+    int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p;
     int index;
@@ -661,17 +661,17 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
 
         gossip_debug(GOSSIP_GETATTR_DEBUG,
                      "  datafile_getattr: getting size for handle %llu\n",
-                     llu(attr->u.meta.dfile_array[i]));
+                     llu(attr->u.meta.dfile_array[index]));
 
         PINT_SERVREQ_GETATTR_FILL(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->getattr.object_ref.fs_id,
-            attr->u.meta.dfile_array[i],
+            attr->u.meta.dfile_array[index],
             PVFS_ATTR_DATA_SIZE);
 
         msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
-        msg_p->handle = attr->u.meta.dfile_array[i];
+        msg_p->handle = attr->u.meta.dfile_array[index];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
     }

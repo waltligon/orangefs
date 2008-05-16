@@ -166,7 +166,6 @@ int PINT_server_get_config(
     sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
     sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
 
-    PINT_msgpair_init(&sm_p->msgarray_op);
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
     sm_p->u.get_config.mntent = mntent_p;
     sm_p->u.get_config.config = config;
@@ -256,17 +255,18 @@ static PINT_sm_action server_get_config_setup_msgpair(
     PVFS_BMI_addr_t serv_addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"get_config state: server_get_config_setup_msgpair\n");
+                 "get_config state: server_get_config_setup_msgpair\n");
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     if (ENCODING_IS_VALID(sm_p->u.get_config.mntent->encoding))
     {
-        sm_p->msgarray_op.msgpair.enc_type = sm_p->u.get_config.mntent->encoding;
+        msg_p->enc_type = sm_p->u.get_config.mntent->encoding;
     }
 
-    msg_p = &sm_p->msgarray_op.msgpair;
-
     ret = BMI_addr_lookup(&serv_addr,
-	    sm_p->u.get_config.mntent->the_pvfs_config_server);
+                          sm_p->u.get_config.mntent->the_pvfs_config_server);
     if (ret < 0)
     {
         gossip_lerr("Failed to resolve BMI address %s\n",

@@ -113,7 +113,7 @@ typedef struct
 
 #define foreach_msgpair(__msgarray_op, __msg_p, __i)          \
     for(__i = 0, __msg_p = &((__msgarray_op)->msgarray[__i]); \
-        i < (__msgarray_op)->count;                           \
+        __i < (__msgarray_op)->count;                         \
         ++__i, __msg_p = &((__msgarray_op)->msgarray[__i]))
 
 /* helper functions */
