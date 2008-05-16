@@ -161,14 +161,12 @@ int PINT_server_get_config(
      * PINT_init_msgarray_params(), because we don't yet have a server
      * configuration file to override default parameters.
      */
-    sm_p->msgarray_params.job_context = pint_client_sm_context;
-    sm_p->msgarray_params.job_timeout = 30;   /* 30 second job timeout */
-    sm_p->msgarray_params.retry_delay = 2000; /* 2 second retry delay */
-    sm_p->msgarray_params.retry_limit = 5;    /* retry up to 5 times */
+    sm_p->msgarray_op.params.job_context = pint_client_sm_context;
+    sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
+    sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
 
-    sm_p->msgarray_count = 1;
-    sm_p->msgarray = &(sm_p->msgpair);
-
+    PINT_msgpair_init(&sm_p->msgarray_op);
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
     sm_p->u.get_config.mntent = mntent_p;
     sm_p->u.get_config.config = config;
@@ -262,10 +260,10 @@ static PINT_sm_action server_get_config_setup_msgpair(
 
     if (ENCODING_IS_VALID(sm_p->u.get_config.mntent->encoding))
     {
-        sm_p->msgpair.enc_type = sm_p->u.get_config.mntent->encoding;
+        sm_p->msgarray_op.msgpair.enc_type = sm_p->u.get_config.mntent->encoding;
     }
 
-    msg_p = &sm_p->msgarray[0];
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     ret = BMI_addr_lookup(&serv_addr,
 	    sm_p->u.get_config.mntent->the_pvfs_config_server);
@@ -285,6 +283,7 @@ static PINT_sm_action server_get_config_setup_msgpair(
     msg_p->comp_fn = server_get_config_comp_fn;
     msg_p->svr_addr = serv_addr;
 
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -332,7 +331,8 @@ static PINT_sm_action server_get_config_parse(
         if (!cur_fs)
         {
             gossip_err("Warning:\n Cannot retrieve information about "
-                    "pvfstab entry %s\n",
+                    "filesystem %s at tab entry: %s\n",
+                    sm_p->u.get_config.mntent->pvfs_fs_name,
                     sm_p->u.get_config.mntent->the_pvfs_config_server);
 
             /*
@@ -376,9 +376,8 @@ static int server_get_config_comp_fn(
     struct PVFS_server_resp *resp_p,
     int i)
 {
-    int j = 0;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     /* only posted one msgpair */
     assert(i==0);
@@ -386,7 +385,7 @@ static int server_get_config_comp_fn(
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */
 
-    if (sm_p->msgarray[i].op_status == 0)
+    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
     {
 	sm_p->u.get_config.fs_config_buf = 
 		strdup(resp_p->u.getconfig.fs_config_buf);
@@ -397,15 +396,9 @@ static int server_get_config_comp_fn(
     /* if this is the last response, check all of the status values
      * and return error code if any requests failed
      */
-    if (i == (sm_p->msgarray_count -1))
+    if (i == (sm_p->msgarray_op.count -1))
     {
-	for (j=0; j < sm_p->msgarray_count; j++)
-	{
-	    if (sm_p->msgarray[j].op_status != 0)
-	    {
-		return(sm_p->msgarray[j].op_status);
-	    }
-	}
+        return PINT_msgarray_status(&sm_p->msgarray_op);
     }
     return 0;
 }
@@ -455,24 +448,22 @@ static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
      * PINT_init_msgarray_params(), because we don't yet have a server
      * configuration file to override default parameters.
      */
-    sm_p->msgarray_params.job_context = pint_client_sm_context;
-    sm_p->msgarray_params.job_timeout = 30;   /* 30 second job timeout */
-    sm_p->msgarray_params.retry_delay = 2000; /* 2 second retry delay */
-    sm_p->msgarray_params.retry_limit = 5;    /* retry up to 5 times */
+    sm_p->msgarray_op.params.job_context = pint_client_sm_context;
+    sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
+    sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
     sm_p->fetch_config.nservers = nservers;
     sm_p->fetch_config.addr_array = servers;
     sm_p->fetch_config.fs_config_bufs = fs_config_bufs;
     sm_p->fetch_config.fs_config_buf_size = fs_config_buf_size;
-    sm_p->msgarray_count = nservers;
-    sm_p->msgarray = (PINT_sm_msgpair_state *) malloc(
-        nservers * sizeof(PINT_sm_msgpair_state));
-    if (!sm_p->msgarray)
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, nservers);
+    if(ret != 0)
     {
         PINT_smcb_free(smcb);
-        return -PVFS_ENOMEM;
+        return ret;
     }
-
 
     ret = PINT_client_state_machine_post(
         smcb, &op_id, NULL);
@@ -505,10 +496,9 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"fetch_config state: server_fetch_config_setup_msgpair\n");
 
-    for (i = 0; i < sm_p->msgarray_count; i++)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        msg_p = &sm_p->msgarray[i];
-        sm_p->msgarray[i].enc_type = sm_p->msgpair.enc_type;
+        sm_p->msgarray_op.msgarray[i].enc_type = sm_p->msgarray_op.msgpair.enc_type;
         PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p);
 
         msg_p->fs_id = PVFS_FS_ID_NULL;
@@ -519,6 +509,8 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
     }
 
     js_p->error_code = 0;
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -526,10 +518,7 @@ static PINT_sm_action server_fetch_config_cleanup(struct PINT_smcb *smcb,
                                     job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     /* preserve js_p->error_code */
 
     return SM_ACTION_COMPLETE;
@@ -540,14 +529,13 @@ static int server_fetch_config_comp_fn(
     struct PVFS_server_resp *resp_p,
     int i)
 {
-    int j = 0;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */
 
-    if (sm_p->msgarray[i].op_status == 0)
+    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
     {
 	sm_p->fetch_config.fs_config_bufs[i] = 
 		strdup(resp_p->u.getconfig.fs_config_buf);
@@ -558,15 +546,9 @@ static int server_fetch_config_comp_fn(
     /* if this is the last response, check all of the status values
      * and return error code if any requests failed
      */
-    if (i == (sm_p->msgarray_count -1))
+    if (i == (sm_p->msgarray_op.count -1))
     {
-	for (j=0; j < sm_p->msgarray_count; j++)
-	{
-	    if (sm_p->msgarray[j].op_status != 0)
-	    {
-		return(sm_p->msgarray[j].op_status);
-	    }
-	}
+        return PINT_msgarray_status(&sm_p->msgarray_op);
     }
     return 0;
 }

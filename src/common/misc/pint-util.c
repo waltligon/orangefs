@@ -14,9 +14,11 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <unistd.h>
 
 #include "gen-locks.h"
 #include "pint-util.h"
+#include "gossip.h"
 
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
@@ -183,6 +185,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                         if (dest->u.meta.dfile_array)
                         {
                             free(dest->u.meta.dfile_array);
+                            dest->u.meta.dfile_array = NULL;
                         }
                     }
                     dest->u.meta.dfile_array = malloc(df_array_size);
@@ -336,6 +339,34 @@ PVFS_time PINT_util_mktime_version(PVFS_time time)
 PVFS_time PINT_util_mkversion_time(PVFS_time version)
 {
     return (PVFS_time)(version >> 32);
+}
+
+char *PINT_util_guess_alias(void)
+{
+    char tmp_alias[1024];
+    char *tmpstr;
+    char *alias;
+    int ret;
+
+    /* hmm...failed to find alias as part of the server config filename,
+     * use the hostname to guess
+     */
+    ret = gethostname(tmp_alias, 1024);
+    if(ret != 0)
+    {
+        gossip_err("Failed to get hostname while attempting to guess "
+                   "alias.  Use -a to specify the alias for this server "
+                   "process directly\n");
+        return NULL;
+    }
+    alias = tmp_alias;
+
+    tmpstr = strstr(tmp_alias, ".");
+    if(tmpstr)
+    {
+        *tmpstr = 0;
+    }
+    return strdup(tmp_alias);
 }
 
 /*

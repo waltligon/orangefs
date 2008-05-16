@@ -43,6 +43,7 @@
 #include "pint-cached-config.h"
 #include "pvfs2-internal.h"
 #include "src/server/request-scheduler/request-scheduler.h"
+#include "pint-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -156,7 +157,6 @@ static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
 static int generate_shm_key_hint(void);
-static char *guess_alias(void);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
@@ -1464,7 +1464,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
     if (s_server_options.server_alias == NULL)
     {
         /* Try to guess the alias from the hostname */
-        s_server_options.server_alias = guess_alias();
+        s_server_options.server_alias = PINT_util_guess_alias();
     }
     return 0;
 }
@@ -1837,34 +1837,6 @@ void PINT_server_access_debug(PINT_server_op * s_op,
     }
 }
 #endif
-
-static char *guess_alias(void)
-{
-    char tmp_alias[1024];
-    char *tmpstr;
-    char *alias;
-    int ret;
-
-    /* hmm...failed to find alias as part of the server config filename,
-     * use the hostname to guess
-     */
-    ret = gethostname(tmp_alias, 1024);
-    if(ret != 0)
-    {
-        gossip_err("Failed to get hostname while attempting to guess "
-                   "alias.  Use -a to specify the alias for this server "
-                   "process directly\n");
-        return NULL;
-    }
-    alias = tmp_alias;
-
-    tmpstr = strstr(tmp_alias, ".");
-    if(tmpstr)
-    {
-        *tmpstr = 0;
-    }
-    return strdup(tmp_alias);
-}
 
 /* generate_shm_key_hint()
  *

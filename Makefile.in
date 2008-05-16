@@ -823,8 +823,11 @@ clean::
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.4 clean
 endif
 
+saveconfig::
+	@sh cp $(srcdir)/config.status $(srcdir)/config.save
+
 # builds a tarball of the source tree suitable for distribution
-dist: $(SMCGEN) cleaner
+dist: saveconfig $(SMCGEN) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
 # some stuff that is cleaned in both distclean and dist targets

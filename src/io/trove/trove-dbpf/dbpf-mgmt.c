@@ -1900,12 +1900,17 @@ static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
     { KEYVAL_READ_LIST, "KEYVAL_READ_LIST" },
     { KEYVAL_WRITE_LIST, "KEYVAL_WRITE_LIST" },
     { KEYVAL_FLUSH, "KEYVAL_FLUSH" },
+    { KEYVAL_GET_HANDLE_INFO, "KEYVAL_GET_HANDLE_INFO" },
     { DSPACE_CREATE, "DSPACE_CREATE" },
     { DSPACE_REMOVE, "DSPACE_REMOVE" },
     { DSPACE_ITERATE_HANDLES, "DSPACE_ITERATE_HANDLES" },
     { DSPACE_VERIFY, "DSPACE_VERIFY" },
     { DSPACE_GETATTR, "DSPACE_GETATTR" },
-    { DSPACE_SETATTR, "DSPACE_SETATTR" }
+    { DSPACE_SETATTR, "DSPACE_SETATTR" },
+    { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" }
+    /* NOTE: this list should be kept in sync with enum dbpf_op_type 
+     * from dbpf.h 
+     */ 
 };
 
 char *dbpf_op_type_to_str(enum dbpf_op_type op_type)

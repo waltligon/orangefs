@@ -198,14 +198,6 @@ AC_ARG_ENABLE(perf-counters,
 fi]
 ,)
 
-dnl a mechanism to turn off disk I/O for testing/debugging
-AC_ARG_ENABLE(disk-io,
-[  --disable-disk-io       Disables pvfs2-server disk I/O (for testing)],
-[if test "x$enableval" = "xno" ; then
-    CFLAGS="$CFLAGS -D__PVFS2_DISABLE_DISK_IO__"
-fi]
-,)
-
 dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
 MMAP_RA_CACHE=""
 AC_ARG_ENABLE(mmap-racache,

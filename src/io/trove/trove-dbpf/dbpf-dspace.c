@@ -93,6 +93,9 @@ static inline void organize_post_op_statistics(
 
 static int dbpf_dspace_remove_keyval(
     void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+static int getattr_one_handle(TROVE_object_ref ref, 
+    TROVE_ds_attributes *attr, 
+    DB* ds_db);
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
@@ -979,9 +982,10 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     TROVE_object_ref ref;
     int i;
+    int cache_hits = 0; 
 
-    /* fast path cache hit; skips queueing */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
+    /* go ahead and try to hit attr cache for all handles up front */ 
     for (i = 0; i < nhandles; i++) 
     {
         ref.handle = handle_array[i];
@@ -998,21 +1002,30 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
                 (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
                 (int)ds_attr_p->dist_size);
 #endif
-            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr fast "
+            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr_list fast "
                          "path attr cache hit on %llu\n (dfile_count=%d | "
                          "dist_size=%d | data_size=%lld)\n", llu(handle_array[i]),
-                         ds_attr_p->dfile_count, ds_attr_p->dist_size,
-                         lld(ds_attr_p->b_size));
+                         ds_attr_p[i].dfile_count, ds_attr_p[i].dist_size,
+                         lld(ds_attr_p[i].b_size));
 
             UPDATE_PERF_METADATA_READ();
             error_array[i] = 0;
-            continue;
+            cache_hits++;
         }
-        break;
+        else
+        {
+            /* no hit; mark attr entry so that we can detect that in the
+             * service routine
+             */
+            ds_attr_p[i].type = PVFS_TYPE_NONE;
+        }
     }
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
+
     /* All handles hit in the cache, return */
-    if (i == nhandles) {
+    if (cache_hits == nhandles) 
+    {
+        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr_list serviced entirely from attr cache.\n");
         return 1;
     }
 
@@ -1038,10 +1051,10 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
                         context_id);
 
     /* initialize op-specific members */
-    q_op_p->op.u.d_getattr_list.count = (nhandles - i);
-    q_op_p->op.u.d_getattr_list.handle_array = &handle_array[i];
-    q_op_p->op.u.d_getattr_list.attr_p = &ds_attr_p[i];
-    q_op_p->op.u.d_getattr_list.error_p = &error_array[i];
+    q_op_p->op.u.d_getattr_list.count = nhandles;
+    q_op_p->op.u.d_getattr_list.handle_array = handle_array;
+    q_op_p->op.u.d_getattr_list.attr_p = ds_attr_p;
+    q_op_p->op.u.d_getattr_list.error_p = error_array;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
@@ -1145,20 +1158,20 @@ return_error:
     return ret;
 }
 
-static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
+static int getattr_one_handle(TROVE_object_ref ref, 
+    TROVE_ds_attributes *attr, 
+    DB* ds_db)
 {
     int ret = -TROVE_EINVAL;
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
-    TROVE_ds_attributes *attr = NULL;
     TROVE_size b_size;
     struct stat b_stat;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     struct open_cache_ref tmp_ref;
 
     /* get an fd for the bstream so we can check size */
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, &tmp_ref);
+        ref.fs_id, ref.handle, 0, &tmp_ref);
     if (ret < 0)
     {
         b_size = 0;
@@ -1169,14 +1182,13 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         dbpf_open_cache_put(&tmp_ref);
         if (ret < 0)
         {
-            ret = -TROVE_EBADF;
-            goto return_error;
+            return(-TROVE_EBADF);
         }
         b_size = (TROVE_size)b_stat.st_size;
     }
 
     memset(&key, 0, sizeof(key));
-    key.data = &op_p->handle;
+    key.data = &ref.handle;
     key.size = key.ulen = sizeof(TROVE_handle);
 
     memset(&data, 0, sizeof(data));
@@ -1185,27 +1197,24 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
     data.flags |= DB_DBT_USERMEM;
 
-    ret = op_p->coll_p->ds_db->get(op_p->coll_p->ds_db, 
-                                   NULL, &key, &data, 0);
+    ret = ds_db->get(ds_db, NULL, &key, &data, 0);
     if (ret != 0)
     {
         if(ret != DB_NOTFOUND)
         {
-            op_p->coll_p->ds_db->err(op_p->coll_p->ds_db, ret, "DB->get");
+            ds_db->err(ds_db, ret, "DB->get");
         }
-        ret = -dbpf_db_error_to_trove_error(ret);
-        goto return_error;
+        return(-dbpf_db_error_to_trove_error(ret));
     }
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
         "from DISK for key %llu\n\tuid = %d, mode = %d, type = %d, "
         "dfile_count = %d, dist_size = %d\n\tb_size = %lld\n",
-        llu(op_p->handle), (int)s_attr.uid, (int)s_attr.mode,
+        llu(ref.handle), (int)s_attr.uid, (int)s_attr.mode,
         (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
         llu(b_size));
 
-    attr = op_p->u.d_getattr.attr_p;
     trove_ds_stored_to_attr(s_attr, *attr, b_size);
 
     /* add retrieved ds_attr to dbpf_attr cache here */
@@ -1213,115 +1222,49 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     dbpf_attr_cache_insert(ref, attr);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
+    return 0;
+}
+
+static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
+{
+    int ret = -TROVE_EINVAL;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+
+    ret = getattr_one_handle(ref, 
+        op_p->u.d_getattr.attr_p, 
+        op_p->coll_p->ds_db);
+
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
     return 1;
-    
-return_error:
-    return ret;
 }
 
 static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
 {
     int i;
+    TROVE_object_ref ref;
 
     for (i = 0; i < op_p->u.d_getattr_list.count; i++)
     {
-        int ret;
-        TROVE_ds_storedattr_s s_attr;
-        TROVE_ds_attributes *attr = NULL;
-        struct stat b_stat;
-        DBT key, data;
-        struct open_cache_ref tmp_ref;
-        TROVE_object_ref ref;
-        TROVE_size b_size = 0, k_size = 0;
-        DB_BTREE_STAT *k_stat_p = NULL;
+        if(op_p->u.d_getattr_list.attr_p[i].type != PVFS_TYPE_NONE)
+        {
+            /* we already serviced this one from the cache at post time;
+             * skip to the next element
+             */
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                "dbpf_dspace_getattr_list_op_svc() skipping element %d resolved from cache.\n", i);
+            continue;
+        }
 
         ref.handle = op_p->u.d_getattr_list.handle_array[i];
         ref.fs_id = op_p->coll_p->coll_id;
-        /* It is still possible that we could hit in the attribute cache because of the way
-         * we do queueing in the getattr_list operation 
-         */
-        if (dbpf_attr_cache_ds_attr_fetch_cached_data(ref, &op_p->u.d_getattr_list.attr_p[i]) == 0)
-        {
-            UPDATE_PERF_METADATA_READ();
-            op_p->u.d_getattr_list.error_p[i] = 0;
-            continue;
-        }
 
-        /* get an fd for the bstream so we can check size */
-        ret = dbpf_open_cache_get(
-            op_p->coll_p->coll_id, op_p->u.d_getattr_list.handle_array[i], 0, &tmp_ref);
-        if (ret < 0)
-        {
-        }
-        else
-        {
-            ret = DBPF_FSTAT(tmp_ref.fd, &b_stat);
-            dbpf_open_cache_put(&tmp_ref);
-            if (ret < 0)
-            {
-                op_p->u.d_getattr_list.error_p[i] = -TROVE_EBADF;
-                continue;
-            }
-            b_size = (TROVE_size)b_stat.st_size;
-        }
-
-        ret = op_p->coll_p->ds_db->stat(op_p->coll_p->ds_db,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_STAT
-                                        (DB_TXN *) NULL,
-#endif
-                                        &k_stat_p,
-#ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
-                                        NULL,
-#endif
-                                        0);
-        if (ret == 0)
-        {
-            k_size = (TROVE_size) k_stat_p->bt_ndata;
-            free(k_stat_p);
-        }
-        else
-        {
-            gossip_err("Error: unable to stat handle %llu (%llx).\n",
-                       llu(op_p->handle), llu(op_p->handle));
-            op_p->u.d_getattr_list.error_p[i] = -TROVE_EIO;
-            continue;
-        }
-
-        memset(&key, 0, sizeof(key));
-        key.data = &op_p->u.d_getattr_list.handle_array[i];
-        key.size = key.ulen = sizeof(TROVE_handle);
-
-        memset(&data, 0, sizeof(data));
-        memset(&s_attr, 0, sizeof(TROVE_ds_storedattr_s));
-        data.data = &s_attr;
-        data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
-        data.flags |= DB_DBT_USERMEM;
-
-        ret = op_p->coll_p->ds_db->get(op_p->coll_p->ds_db, 
-                                       NULL, &key, &data, 0);
-        if (ret != 0)
-        {
-            op_p->coll_p->ds_db->err(op_p->coll_p->ds_db, ret, "DB->get");
-            op_p->u.d_getattr_list.error_p[i] = -TROVE_EIO;
-            continue;
-        }
-
-        gossip_debug(
-            GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
-            "from DISK for key %llu\n\tuid = %d, mode = %d, type = %d, "
-            "dfile_count = %d, dist_size = %d\n\tb_size = %lld, k_size = %lld\n",
-            llu(op_p->u.d_getattr_list.handle_array[i]), (int)s_attr.uid, (int)s_attr.mode,
-            (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
-            llu(b_size), llu(k_size));
-
-        attr = &op_p->u.d_getattr_list.attr_p[i];
-        trove_ds_stored_to_attr(s_attr, *attr, b_size);
-
-        /* add retrieved ds_attr to dbpf_attr cache here */
-        gen_mutex_lock(&dbpf_attr_cache_mutex);
-        dbpf_attr_cache_insert(ref, attr);
-        gen_mutex_unlock(&dbpf_attr_cache_mutex);
-        op_p->u.d_getattr_list.error_p[i] = 0;
+        op_p->u.d_getattr_list.error_p[i] = getattr_one_handle(ref,
+           &op_p->u.d_getattr_list.attr_p[i],
+           op_p->coll_p->ds_db);
     }
 
     return 1;

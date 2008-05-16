@@ -29,12 +29,6 @@
 #include "pint-perf-counter.h"
 #include "state-machine.h"
 
-/* skip everything except #includes if __SM_CHECK_DEP is already defined; this
- * allows us to get the dependencies right for msgpairarray.sm which relies
- * on conflicting headers for dependency information
- */
-#ifndef __SM_CHECK_DEP
-
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
 
@@ -155,14 +149,12 @@ typedef struct PINT_client_io_ctx
     /* the data handle we're responsible for doing I/O on */
     PVFS_handle data_handle;
 
-    /* a reference to the msgpair we're using for communication */
-    PINT_sm_msgpair_state msg;
-
     job_id_t flow_job_id;
     job_status_s flow_status;
     flow_descriptor flow_desc;
     PVFS_msg_tag_t session_tag;
 
+    PINT_sm_msgpair_state msg;
     PINT_client_sm_recv_state write_ack;
 
     /*
@@ -518,16 +510,7 @@ typedef struct PINT_client_sm
     /* fetch_config state used by the nested fetch config state machines */
     struct PINT_server_fetch_config_sm_state fetch_config;
 
-    /* msgpair array ptr used when operations can be performed
-     * concurrently.  this must be allocated within the upper-level
-     * state machine and is used with the msgpairarray sm.
-     * If you have a single msgpair, use the msgpair working space
-     * and pint msgarray at it.
-     */
-    int msgarray_count; /* number of msgpairs in array */
-    PINT_sm_msgpair_state *msgarray; /* array of msgpairs to process */
-    PINT_sm_msgpair_params msgarray_params;
-    PINT_sm_msgpair_state msgpair; /* working space for a single msgpair */
+    PINT_sm_msgarray_op msgarray_op;
 
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
@@ -696,62 +679,26 @@ do {                                                          \
     }                                                         \
 } while(0)
 
-#define PINT_init_msgarray_params(msgarray_params_ptr, __fsid)     \
-do {                                                               \
-    PINT_sm_msgpair_params *mpp = msgarray_params_ptr;             \
-    struct server_configuration_s *server_config =                 \
-        PINT_get_server_config_struct(__fsid);                     \
-    mpp->job_context = pint_client_sm_context;                     \
-    if (server_config)                                             \
-    {                                                              \
-        mpp->job_timeout = server_config->client_job_bmi_timeout;  \
-        mpp->retry_limit = server_config->client_retry_limit;      \
-        mpp->retry_delay = server_config->client_retry_delay_ms;   \
-    }                                                              \
-    else                                                           \
-    {                                                              \
-        mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;   \
-        mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;       \
-        mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;    \
-    }                                                              \
-    PINT_put_server_config_struct(server_config);                  \
+#define PINT_init_msgarray_params(client_sm_p, __fsid)              \
+do {                                                                \
+    PINT_sm_msgpair_params *mpp = &client_sm_p->msgarray_op.params; \
+    struct server_configuration_s *server_config =                  \
+        PINT_get_server_config_struct(__fsid);                      \
+    mpp->job_context = pint_client_sm_context;                      \
+    if (server_config)                                              \
+    {                                                               \
+        mpp->job_timeout = server_config->client_job_bmi_timeout;   \
+        mpp->retry_limit = server_config->client_retry_limit;       \
+        mpp->retry_delay = server_config->client_retry_delay_ms;    \
+    }                                                               \
+    else                                                            \
+    {                                                               \
+        mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;    \
+        mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;        \
+        mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;     \
+    }                                                               \
+    PINT_put_server_config_struct(server_config);                   \
 } while(0)
-
-#define PINT_init_msgpair(sm_p, msg_p)                         \
-do {                                                           \
-    msg_p = &sm_p->msgpair;                                    \
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));           \
-    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))\
-    {                                                          \
-        free(sm_p->msgarray);                                  \
-        sm_p->msgarray = NULL;                                 \
-    }                                                          \
-    sm_p->msgarray = msg_p;                                    \
-    sm_p->msgarray_count = 1;                                  \
-} while(0)
-
-
-/************************************
- * state-machine.h included here
- ************************************/
-#if 0
-#define PINT_OP_STATE       PINT_client_sm
-
-/* This macro allows the generic state-machine-fns.h locate function
- * to access the appropriate sm struct based on the client operation index
- * from the above enum.  Because the enum starts management operations at
- * 70, the management table was separated out from the sys table and the
- * necessary checks and subtractions are made in this macro.
- */
-#define PINT_OP_STATE_GET_MACHINE(_op) \
-    ((_op <= PVFS_OP_SYS_MAXVAL) ? (PINT_client_sm_sys_table[_op - 1].sm) : \
-     ((_op <= PVFS_OP_MGMT_MAXVAL) ?  \
-      (PINT_client_sm_mgmt_table[_op - PVFS_OP_SYS_MAXVAL - 1].sm) : \
-      ((_op == PVFS_SERVER_GET_CONFIG) ? (&pvfs2_server_get_config_sm) : \
-      (_op == PVFS_SERVER_FETCH_CONFIG) ? (&pvfs2_server_fetch_config_sm) : \
-       ((_op == PVFS_CLIENT_JOB_TIMER) ? (&pvfs2_client_job_timer_sm) : \
-        ((_op == PVFS_CLIENT_PERF_COUNT_TIMER) ? (&pvfs2_client_perf_count_timer_sm) : NULL)))))
-#endif
 
 struct PINT_client_op_entry_s
 {
@@ -815,7 +762,6 @@ extern struct PINT_state_machine_s pvfs2_server_fetch_config_nested_sm;
 struct PINT_state_machine_s *client_op_state_get_machine(int);
 int client_state_machine_terminate(struct PINT_smcb *, job_status_s *);
 
-#endif /* __SM_CHECK_DEP */
 #endif /* __PVFS2_CLIENT_STATE_MACHINE_H */
 
 /*

@@ -309,6 +309,10 @@ sub emit_filesystem
     {
         print $target "\t\tTroveMethod $opt_trovemethod\n";
     }
+    else
+    {
+        print $target "\t\tTroveMethod alt-aio\n";
+    }
 
     print $target "\t</StorageHints>\n";
 
@@ -1326,14 +1330,14 @@ GetOptions('protocol=s'    => \$opt_protocol,
 
 if($opt_quiet)
 {
-    # quiet requires a protocol
-    die "Invalid arguments.  See -h for help\n" if(!$opt_protocol);
-
-    if(!($opt_iospec || $opt_metaspec))
+    if(
+        !($opt_protocol && $opt_ioservers && $opt_metaservers) 
+        &&
+        !($opt_iospec && $opt_metaspec)
+    )
     {
-        # quiet requires io servers and meta servers to be specified
-        die "Invalid arguments.  See -h for help\n" if(!$opt_ioservers);
-        die "Invalid arguments.  See -h for help\n" if(!$opt_metaservers);
+        # quiet requires full specification of server addresses somehow
+        die "Invalid arguments for --quiet usage.  See -h for help\n";
     }
 }
 else

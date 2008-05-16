@@ -68,8 +68,8 @@ cd $TARGETDIR
 # dump some special options into the top level module.mk.in
 echo "DIST_RELEASE = 1" >> module.mk.in
 
-# configure, build docs and state machine files
-./configure
+# Run config.save to regenerate files.
+./config.save
 if [ $? -ne 0 ]
 then
     exit 1

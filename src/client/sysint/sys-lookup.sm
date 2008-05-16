@@ -479,7 +479,7 @@ PVFS_error PVFS_isys_ref_lookup(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, fs_id);
+    PINT_init_msgarray_params(sm_p, fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.lookup.orig_pathname = relative_pathname;
     sm_p->u.lookup.starting_refn = parent;
@@ -683,7 +683,8 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     seg_to_lookup = cur_seg->seg_remaining ? cur_seg->seg_remaining :
                     cur_seg->seg_name;
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_LOOKUP_PATH_FILL(
         msg_p->req,
@@ -710,6 +711,8 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1099,7 +1102,7 @@ static int lookup_segment_lookup_comp_fn(
 {
     int i = 0;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     int current_seg_index = sm_p->u.lookup.contexts[
         sm_p->u.lookup.current_context].current_segment;

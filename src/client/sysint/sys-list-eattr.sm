@@ -84,7 +84,7 @@ PVFS_error PVFS_isys_listeattr(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.listeattr.nkey = nkey;
     sm_p->u.listeattr.resp_p = resp_p;
@@ -136,6 +136,7 @@ static PINT_sm_action list_eattr_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     int i;
+    PINT_sm_msgpair_state *msg_p;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"list_eattr state: list_eattr_setup_msgpair\n");
@@ -149,33 +150,35 @@ static PINT_sm_action list_eattr_setup_msgpair(
         sm_p->u.listeattr.size_array[i] =
             sm_p->u.listeattr.resp_p->key_array[i].buffer_sz;
 
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
     PINT_SERVREQ_LISTEATTR_FILL(
-            sm_p->msgpair.req,
+            msg_p->req,
             (*sm_p->cred_p),
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             sm_p->u.listeattr.pos_token,
             sm_p->u.listeattr.nkey,
-            sm_p->u.listeattr.size_array
-            );
+            sm_p->u.listeattr.size_array);
 
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
-    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle = sm_p->object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
-    sm_p->msgpair.comp_fn = list_eattr_comp_fn;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = list_eattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-            &sm_p->msgpair.svr_addr,
-            sm_p->msgpair.handle,
-            sm_p->msgpair.fs_id);
+            &msg_p->svr_addr,
+            msg_p->handle,
+            msg_p->fs_id);
 
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = 0;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -200,7 +203,7 @@ static int list_eattr_comp_fn(
 {
     int ret = 0;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"list_eattr completion fn: list_eattr_comp_fn\n");
@@ -212,9 +215,9 @@ static int list_eattr_comp_fn(
     {
         return resp_p->status;
     }
-    if (sm_p->msgarray[i].op_status != 0)
+    if (sm_p->msgarray_op.msgarray[i].op_status != 0)
     {
-        return sm_p->msgarray[i].op_status;
+        return sm_p->msgarray_op.msgarray[i].op_status;
     }
     sm_p->u.listeattr.resp_p->token = resp_p->u.listeattr.token;
     sm_p->u.listeattr.resp_p->nkey  = resp_p->u.listeattr.nkey;

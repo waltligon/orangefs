@@ -304,7 +304,7 @@ struct bmx_connreq
 
 #if BMX_DEBUG
 /* set the mask to the BMX_DB_* errors that you want gossip to report */
-#define BMX_DB_MASK (BMX_DB_ERR|BMX_DB_WARN|BMX_DB_ALL)
+#define BMX_DB_MASK (BMX_DB_ERR|BMX_DB_WARN)
 #define debug(lvl,fmt,args...)                                                 \
   do {                                                                         \
       if (lvl & BMX_DB_MASK) {                                                 \
@@ -319,5 +319,15 @@ struct bmx_connreq
 #else  /* ! BMX_DEBUG */
 #define debug(lvl,fmt,...) do { } while (0)
 #endif /* BMX_DEBUG */
+
+#define BMX_ENTER                                                               \
+  do {                                                                          \
+        debug(BMX_DB_FUNC, "entering %s", __func__);                            \
+  } while (0);
+
+#define BMX_EXIT                                                                \
+  do {                                                                          \
+        debug(BMX_DB_FUNC, "exiting  %s", __func__);                            \
+  } while (0);
 
 #endif  /* __mx_h */

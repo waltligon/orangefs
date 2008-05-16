@@ -23,6 +23,16 @@
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
 
+/** Options supported by get_info() and set_info(). */
+enum PVFS_sys_setinfo_opt
+{
+    PVFS_SYS_NCACHE_TIMEOUT_MSECS = 1,
+    PVFS_SYS_ACACHE_TIMEOUT_MSECS,
+    PVFS_SYS_MSG_TIMEOUT_SECS,
+    PVFS_SYS_MSG_RETRY_LIMIT,
+    PVFS_SYS_MSG_RETRY_DELAY_MSECS,
+};
+
 /** Holds a non-blocking system interface operation handle. */
 typedef PVFS_id_gen_t PVFS_sys_op_id;
 
@@ -585,6 +595,14 @@ PVFS_error PVFS_sys_listeattr(
     int32_t nkey,
     const PVFS_credentials *credentials,
     PVFS_sysresp_listeattr *resp);
+
+PVFS_error PVFS_sys_set_info(
+    enum PVFS_sys_setinfo_opt option,
+    unsigned int arg);
+
+PVFS_error PVFS_sys_get_info(
+    enum PVFS_sys_setinfo_opt option,
+    unsigned int* arg);
 
 /* exported test functions for isys calls */
 
