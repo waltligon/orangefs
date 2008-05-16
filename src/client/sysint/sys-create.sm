@@ -538,6 +538,7 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
+    int server_type;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
@@ -570,6 +571,16 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
+    /* resolve and print selected server only if gossip debugging enabled */
+    if(gossip_debug_on && (gossip_debug_mask & GOSSIP_CLIENT_DEBUG))
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, 
+            "PVFS_isys_create() selected meta server: %s\n", 
+            PINT_cached_config_map_addr(sm_p->object_ref.fs_id,
+                msg_p->svr_addr,
+                &server_type));
+    }
+
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
         *sm_p->cred_p,
@@ -592,6 +603,7 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     PINT_sm_msgpair_state *msg_p;
+    int server_type;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "datafiles_setup_msgpair_array\n");
@@ -631,18 +643,24 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
         &sm_p->u.create.layout,
         sm_p->u.create.data_server_addrs,
         sm_p->u.create.io_handle_extent_array);
-    if(ret < 0)
-    {
-        gossip_err("create: failed to map the layout to a set of IO servers\n");
-        js_p->error_code = ret;
-        return 1;
-    }
-
     if (ret)
     {
         gossip_err("Failed to retrieve data server addresses\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
+    }
+
+    /* resolve and print selected server only if gossip debugging enabled */
+    if(gossip_debug_on && (gossip_debug_mask & GOSSIP_CLIENT_DEBUG))
+    {
+        for(i = 0; i < sm_p->u.create.num_data_files; i++)
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                "PVFS_isys_create() selected data server: %s\n", 
+                PINT_cached_config_map_addr(sm_p->object_ref.fs_id,
+                    sm_p->u.create.data_server_addrs[i],
+                    &server_type));
+        }
     }
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->u.create.num_data_files);
