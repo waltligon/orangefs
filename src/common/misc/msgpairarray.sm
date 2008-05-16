@@ -661,9 +661,9 @@ static PINT_sm_action msgpairarray_done(
 {
     int task_id, error_code, remaining;
     PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
-    js_p->error_code = error_code;
     return SM_ACTION_COMPLETE;
 }
+
 
 /*********************************************************************
  * helper functions used in conjunction with state machine defined above

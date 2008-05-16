@@ -256,17 +256,19 @@ static PINT_sm_action server_get_config_setup_msgpair(
     PVFS_BMI_addr_t serv_addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"get_config state: server_get_config_setup_msgpair\n");
+                 "get_config state: server_get_config_setup_msgpair\n");
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     if (ENCODING_IS_VALID(sm_p->u.get_config.mntent->encoding))
     {
-        sm_p->msgarray_op.msgpair.enc_type = sm_p->u.get_config.mntent->encoding;
+        msg_p->enc_type = sm_p->u.get_config.mntent->encoding;
     }
 
-    msg_p = &sm_p->msgarray_op.msgpair;
 
     ret = BMI_addr_lookup(&serv_addr,
-	    sm_p->u.get_config.mntent->the_pvfs_config_server);
+                          sm_p->u.get_config.mntent->the_pvfs_config_server);
     if (ret < 0)
     {
         gossip_lerr("Failed to resolve BMI address %s\n",
