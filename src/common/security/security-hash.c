@@ -6,7 +6,7 @@
 
 #include <stdlib.h>
 
-#include <openssl/evp.h>
+#include <openssl/evp.h>	// encryption library
 
 #include "pvfs2-types.h"
 #include "quickhash.h"
@@ -14,6 +14,9 @@
 #include "gen-locks.h"
 
 
+/*	71 seems to be a reasonable size, could be increased
+ *	if collisions start to become a problem. Prime numbers
+ *	are preferred. */
 #define DEFAULT_SECURITY_TABLE_SIZE 71
 
 
@@ -21,21 +24,29 @@
 
 
 typedef struct pubkey_entry_s {
-    struct qlist_head hash_link;
-    uint32_t host;
-    EVP_PKEY *pubkey;
+    struct qlist_head hash_link;	// holds prev/next pointers
+    uint32_t host;					// Host ID
+    EVP_PKEY *pubkey;				// public key for above host ID
 } pubkey_entry_t;
 
 
-static struct qhash_table *pubkey_table = NULL;
-static int hash_init_status = 0;
-static gen_mutex_t hash_mutex = GEN_MUTEX_INITIALIZER;
+static struct qhash_table *pubkey_table = NULL;	// head of the table
+static int hash_init_status = 0;				// 1 = init, 0 = not init
+static gen_mutex_t hash_mutex = GEN_MUTEX_INITIALIZER;	// write mutex
 
 
-static int pubkey_compare(void*, struct qhash_head*);
-static void free_pubkey_entry(void*);
+static int pubkey_compare(void*, struct qhash_head*);	// internal compare
+static void free_pubkey_entry(void*);					// internal free
 
 
+/*	SECURITY_hash_initialize
+ *
+ *	Initializes the hash table for use
+ *
+ *	returns PVFS_EALREADY if already initialized
+ *	returns PVFS_ENOMEM if memory cannot be allocated
+ *	returns 0 on success
+ */
 int SECURITY_hash_initialize(void)
 {
     gen_mutex_lock(&hash_mutex);
@@ -56,10 +67,16 @@ int SECURITY_hash_initialize(void)
     
     hash_init_status = 1;
     gen_mutex_unlock(&hash_mutex);
-
     return 0;
 }
 
+/*	SECURITY_hash_finalize
+ *
+ *	Frees everything allocated within the table
+ *	and anything used to set it up
+ *
+ *	returns nothing
+ */
 void SECURITY_hash_finalize(void)
 {
     gen_mutex_lock(&hash_mutex);
@@ -76,9 +93,18 @@ void SECURITY_hash_finalize(void)
     gen_mutex_unlock(&hash_mutex);
 }
 
+/*	SECURITY_add_pubkey
+ *
+ *	Takes an EVP_PKEY and inserts it into the hash table
+ *	based on the host ID.  If the host ID already
+ *	exists in the table, it's corresponding key is replaced 
+ *	with the new one
+ *
+ *	returns PVFS_ENOMEM if memory cannot be allocated
+ *	returns 0 on success
+ */
 int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey)
 {    
-    gen_mutex_lock(&hash_mutex);
     pubkey_entry_t *entry;
     struct qhash_head *temp;
 
@@ -91,6 +117,9 @@ int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey)
     entry->host = host;
     entry->pubkey = pubkey;
     
+    gen_mutex_lock(&hash_mutex);
+    
+    // remove prior key linked to the host ID if it exists
     temp = qhash_search_and_remove(pubkey_table, &host);
     if (temp != NULL) 
     {
@@ -99,10 +128,16 @@ int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey)
     qhash_add(pubkey_table, &entry->host, &entry->hash_link);
     
     gen_mutex_unlock(&hash_mutex);
-
     return 0;
 }
 
+/*	SECURITY_lookup_pubkey
+ *
+ *	Takes a host ID and returns a pointer to the
+ *	matching EVP_PKEY structure
+ *
+ *	returns NULL if no matching key is found
+ */
 EVP_PKEY *SECURITY_lookup_pubkey(uint32_t host)
 {
     struct qhash_head *temp;
@@ -119,16 +154,34 @@ EVP_PKEY *SECURITY_lookup_pubkey(uint32_t host)
     return entry->pubkey;
 }
 
+/*	pubkey_compare
+ *
+ *	Takes in a key (in this case a host ID) and compares
+ *	it to the value of the host ID contained within the
+ *	structure passed in
+ *
+ *	returns 1 if the IDs match
+ *	returns 0 if they do not match or if the structure is invalid
+ */
 static int pubkey_compare(void *key, struct qhash_head *link)
 {
     uint32_t host = *((uint32_t *)key);
     pubkey_entry_t *temp;
 
     temp = qlist_entry(link, pubkey_entry_t, hash_link);
+    
+    if (temp == NULL) return 0;
 
     return (temp->host == host);
 }
 
+/*	free_pubkey_entry
+ *
+ *	Takes in a pointer to a pubkey_entry_t structure to free
+ *	Frees the key structure within as well as the passed-in struct
+ *
+ *	no return value
+ */
 static void free_pubkey_entry(void *to_free) 
 {
     pubkey_entry_t *temp = (pubkey_entry_t *)to_free;
@@ -138,7 +191,6 @@ static void free_pubkey_entry(void *to_free)
         free(temp);
     }
 }
-
 
 /*
  * Local variables:

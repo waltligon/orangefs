@@ -51,7 +51,23 @@ struct PVFS_credentials {
 
 /* top-level security functions */
 
+/*	PINT_security_initialize	
+ *
+ *	Initializes the security module
+ *	
+ *	returns PVFS_EALREADY if already initialized
+ *	returns PVFS_EIO if key file is missing or invalid
+ *	returns 0 on sucess
+ */
 int PINT_security_initialize(void);
+
+/*	PINT_security_finalize	
+ *
+ *	Finalizes the security module
+ *	
+ *	returns PVFS_EALREADY if already finalized
+ *	returns 0 on sucess
+ */
 int PINT_security_finalize(void);
 
 /* creates a signature from the remaining fields

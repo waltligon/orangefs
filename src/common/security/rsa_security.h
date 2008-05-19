@@ -17,12 +17,12 @@ typedef unsigned char PVFS_sig[PVFS_RSA_SIG_SIZE];
 
 /*#define encode_PVFS_sig (pptr,pbuf) do {              \
 	memcpy(*(pptr), *(pbuf), PVFS_RSA_SIG_SIZE);
-         *(pptr) += PVFS_RSA_SIG_SIZE;
+	*(pptr) += PVFS_RSA_SIG_SIZE;
 } while (0)
 
 #define decode_PVFS_sig (pptr,pbuf) do { \
 	memcpy(*(pptr), *(pbuf), PVFS_RSA_SIG_SIZE);
-         *(pptr) += PVFS_RSA_SIG_SIZE;
+	*(pptr) += PVFS_RSA_SIG_SIZE;
 } while (0)*/
 
 #endif
@@ -33,5 +33,5 @@ typedef unsigned char PVFS_sig[PVFS_RSA_SIG_SIZE];
  *  c-basic-offset: 4
  * End:
  * 	 
- * vim: ts=8 sts=4 sw=4 expandtab
+ * vim: ts=4 sts=4 sw=4 expandtab
  */
