@@ -613,6 +613,7 @@ int pvfs2_flush_inode(struct inode *inode)
      * b) object is a directory and has a nodiratime marker on the fs
      * c) entire file system is mounted with noatime option
      */
+
     if (!((inode->i_flags & S_NOATIME)
             || (inode->i_sb->s_flags & MS_NOATIME)
             || ((inode->i_sb->s_flags & MS_NODIRATIME) && S_ISDIR(inode->i_mode))) && AtimeFlag(pvfs2_inode))
@@ -623,16 +624,18 @@ int pvfs2_flush_inode(struct inode *inode)
     {
         wbattr.ia_mode = inode->i_mode;
         wbattr.ia_valid |= ATTR_MODE;
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_flush_inode (%llu) writing mode %o\n",
-                llu(get_handle_from_ino(inode)), inode->i_mode);
     }
 
     gossip_debug(GOSSIP_UTILS_DEBUG, "*********** pvfs2_flush_inode: %llu "
             "(ia_valid %d)\n", llu(get_handle_from_ino(inode)), wbattr.ia_valid);
     if (wbattr.ia_valid == 0)
     {
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_inode skipping setattr()\n");
         return 0;
     }
+        
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_inode (%llu) writing mode %o\n",
+        llu(get_handle_from_ino(inode)), inode->i_mode);
 
     ret = pvfs2_inode_setattr(inode, &wbattr);
     return ret;
