@@ -116,6 +116,7 @@ int PINT_security_finalize(void)
  *  returns -1 on file I/O error
  *  returns -2 on host lookup failure
  *  returns -3 on hash table failure
+ *  returnw -4 on malloc failure
  *  returns 0 on sucess
  */
 static int load_public_keys(char *path)
@@ -124,7 +125,7 @@ static int load_public_keys(char *path)
     int ch, ptr;
     static char buf[1024];
     EVP_PKEY *key;
-    uint32_t host;
+    char *host;
     int ret;
 
     keyfile = fopen(path, "r");
@@ -172,11 +173,18 @@ static int load_public_keys(char *path)
             return -1;
         }
 
-        ret = lookup_host_handle(&host, buf);
-        if (ret < 0)
+        host = PINT_config_set_host_addr_ptr(PINT_get_server_config(), buf);
+        if (host == NULL)
         {
             fclose(keyfile);
             return -2;
+        }
+        
+        host = strdup(host);
+        if (host == NULL)
+        {
+            fclose(keyfile);
+            return -4;
         }
 
         ret = SECURITY_add_pubkey(host, key);
@@ -193,44 +201,6 @@ static int load_public_keys(char *path)
     return 0;
 }
 
-/*  lookup_host_handle
- *
- *  Searches the server config to find *alias and sets *host to
- *  the index (host ID) when *alias is found.
- *	
- *  returns -1 on lookup failure
- *  returns 0 on sucess, *host contains host ID
- */
-static int lookup_host_handle(uint32_t *host, const char *alias)
-{
-    struct server_configuration_s *config;
-    PINT_llist *iter;
-    uint32_t index;
-    host_alias_s *a;  
-    
-    config = PINT_get_server_config();
-    assert(config);
-
-    index = 0;
-    for (iter = config->host_aliases; iter != NULL; iter = iter->next)
-    {
-        a = (host_alias_s*)iter->item;
-        if (a == NULL)
-        {
-            // end of list
-            continue;
-        }
-        if (strcmp(a->host_alias, alias) == 0)
-        {
-            // matching alias
-            *host = index;
-            return 0;
-        }
-        index++;
-    }
-
-    return -1;
-}
 
 /*
  * Local variables:
