@@ -5,6 +5,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 
 #include <openssl/evp.h>	// encryption library
 
@@ -25,7 +26,7 @@
 
 typedef struct pubkey_entry_s {
     struct qlist_head hash_link;    // holds prev/next pointers
-    uint32_t host;                  // Host ID
+    char *host;                     // BMI host address
     EVP_PKEY *pubkey;               // public key for above host ID
 } pubkey_entry_t;
 
@@ -56,7 +57,7 @@ int SECURITY_hash_initialize(void)
         return -PVFS_EALREADY;
     }
     
-    pubkey_table = qhash_init(pubkey_compare, quickhash_32bit_hash,
+    pubkey_table = qhash_init(pubkey_compare, quickhash_string_hash,
                               DEFAULT_SECURITY_TABLE_SIZE);
 
     if (pubkey_table == NULL)
@@ -96,14 +97,14 @@ void SECURITY_hash_finalize(void)
 /*  SECURITY_add_pubkey
  *
  *  Takes an EVP_PKEY and inserts it into the hash table
- *  based on the host ID.  If the host ID already
+ *  based on the BMI host address.  If the host address already
  *  exists in the table, it's corresponding key is replaced 
  *  with the new one
  *
  *  returns PVFS_ENOMEM if memory cannot be allocated
  *  returns 0 on success
  */
-int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey)
+int SECURITY_add_pubkey(char *host, EVP_PKEY *pubkey)
 {    
     pubkey_entry_t *entry;
     struct qhash_head *temp;
@@ -114,13 +115,17 @@ int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey)
         return -PVFS_ENOMEM;
     }
 
-    entry->host = host;
+    entry->host = strdup(host);
+    if (entry->host == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
     entry->pubkey = pubkey;
     
     gen_mutex_lock(&hash_mutex);
     
-    // remove prior key linked to the host ID if it exists
-    temp = qhash_search_and_remove(pubkey_table, &host);
+    // remove prior key linked to the host address if it exists
+    temp = qhash_search_and_remove(pubkey_table, host);
     if (temp != NULL) 
     {
     	free_pubkey_entry(temp);
@@ -133,17 +138,17 @@ int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey)
 
 /*  SECURITY_lookup_pubkey
  *
- *  Takes a host ID and returns a pointer to the
+ *  Takes a host address and returns a pointer to the
  *  matching EVP_PKEY structure
  *
  *  returns NULL if no matching key is found
  */
-EVP_PKEY *SECURITY_lookup_pubkey(uint32_t host)
+EVP_PKEY *SECURITY_lookup_pubkey(char *host)
 {
     struct qhash_head *temp;
     pubkey_entry_t *entry;
 
-    temp = qhash_search(pubkey_table, &host);
+    temp = qhash_search(pubkey_table, host);
     if (temp == NULL)
     {
     	return NULL;
@@ -156,8 +161,8 @@ EVP_PKEY *SECURITY_lookup_pubkey(uint32_t host)
 
 /*  pubkey_compare
  *
- *  Takes in a key (in this case a host ID) and compares
- *  it to the value of the host ID contained within the
+ *  Takes in a key (in this case a host address) and compares
+ *  it to the value of the host address contained within the
  *  structure passed in
  *
  *  returns 1 if the IDs match
@@ -165,14 +170,14 @@ EVP_PKEY *SECURITY_lookup_pubkey(uint32_t host)
  */
 static int pubkey_compare(void *key, struct qhash_head *link)
 {
-    uint32_t host = *((uint32_t *)key);
+    char *host = ((char *)key);
     pubkey_entry_t *temp;
 
     temp = qlist_entry(link, pubkey_entry_t, hash_link);
     
     if (temp == NULL) return 0;
 
-    return (temp->host == host);
+    return (!strcmp(temp->host, host));
 }
 
 /*  free_pubkey_entry
@@ -188,7 +193,7 @@ static void free_pubkey_entry(void *to_free)
     if (temp != NULL)
     {
         free(temp->pubkey);
-        free(temp);
+        free(temp->host);
     }
 }
 

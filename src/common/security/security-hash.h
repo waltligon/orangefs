@@ -42,7 +42,7 @@ void SECURITY_hash_finalize(void);
  *  returns PVFS_ENOMEM if memory cannot be allocated
  *  returns 0 on success
  */
-int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey);
+int SECURITY_add_pubkey(char *host, EVP_PKEY *pubkey);
 
 /*  SECURITY_lookup_pubkey
  *
@@ -51,7 +51,7 @@ int SECURITY_add_pubkey(uint32_t host, EVP_PKEY *pubkey);
  *
  *  returns NULL if no matching key is found
  */
-EVP_PKEY *SECURITY_lookup_pubkey(uint32_t host);
+EVP_PKEY *SECURITY_lookup_pubkey(char *host);
 
 
 #endif /* _SECURITY_HASH_H_ */
