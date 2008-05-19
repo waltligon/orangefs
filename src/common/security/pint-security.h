@@ -18,7 +18,7 @@ typedef struct PVFS_capability PVFS_capability;
 struct PVFS_capability {
         uint32_t owner;
         PVFS_sig signature;
-	PVFS_time timeout;  /* seconds after epoch to time out */
+	PVFS_time timeout;   /* seconds after epoch to time out */
 	uint32_t op_mask;
 	uint32_t num_handles;
 	PVFS_handle *handle_array;
@@ -49,24 +49,24 @@ struct PVFS_credentials {
 	uint32_t, num_groups,
 	PVFS_gid, group_array)*/
 
-/* top-level security functions */
+/*  top-level security functions */
 
-/*	PINT_security_initialize	
+/*  PINT_security_initialize	
  *
- *	Initializes the security module
+ *  Initializes the security module
  *	
- *	returns PVFS_EALREADY if already initialized
- *	returns PVFS_EIO if key file is missing or invalid
- *	returns 0 on sucess
+ *  returns PVFS_EALREADY if already initialized
+ *  returns PVFS_EIO if key file is missing or invalid
+ *  returns 0 on sucess
  */
 int PINT_security_initialize(void);
 
-/*	PINT_security_finalize	
+/*  PINT_security_finalize	
  *
- *	Finalizes the security module
+ *  Finalizes the security module
  *	
- *	returns PVFS_EALREADY if already finalized
- *	returns 0 on sucess
+ *  returns PVFS_EALREADY if already finalized
+ *  returns 0 on sucess
  */
 int PINT_security_finalize(void);
 

@@ -39,13 +39,13 @@ static int load_public_keys(char*);
 static int lookup_host_handle(uint32_t*, const char*);
 
 
-/*	PINT_security_initialize	
+/*  PINT_security_initialize	
  *
- *	Initializes the security module
+ *  Initializes the security module
  *	
- *	returns PVFS_EALREADY if already initialized
- *	returns PVFS_EIO if key file is missing or invalid
- *	returns 0 on sucess
+ *  returns PVFS_EALREADY if already initialized
+ *  returns PVFS_EIO if key file is missing or invalid
+ *  returns 0 on sucess
  */
 int PINT_security_initialize(void)
 {
@@ -80,12 +80,12 @@ int PINT_security_initialize(void)
     return 0;
 }
 
-/*	PINT_security_finalize	
+/*  PINT_security_finalize	
  *
- *	Finalizes the security module
+ *  Finalizes the security module
  *	
- *	returns PVFS_EALREADY if already finalized
- *	returns 0 on sucess
+ *  returns PVFS_EALREADY if already finalized
+ *  returns 0 on sucess
  */
 int PINT_security_finalize(void)
 {
@@ -106,17 +106,17 @@ int PINT_security_finalize(void)
     return 0;
 }
 
-/*	load_public_keys
+/*  load_public_keys
  *
- *	Internal function to load keys from a file.
- *	File path includes the filename
- *	When finished without error, hash table will be filled
- *	with all host ID / public key pairs.
+ *  Internal function to load keys from a file.
+ *  File path includes the filename
+ *  When finished without error, hash table will be filled
+ *  with all host ID / public key pairs.
  *	
- *	returns -1 on file I/O error
- *	returns -2 on host lookup failure
- *	returns -3 on hash table failure
- *	returns 0 on sucess
+ *  returns -1 on file I/O error
+ *  returns -2 on host lookup failure
+ *  returns -3 on hash table failure
+ *  returns 0 on sucess
  */
 static int load_public_keys(char *path)
 {
@@ -193,13 +193,13 @@ static int load_public_keys(char *path)
     return 0;
 }
 
-/*	lookup_host_handle
+/*  lookup_host_handle
  *
- *	Searches the server config to find *alias and sets *host to
- *	the index (host ID) when *alias is found.
+ *  Searches the server config to find *alias and sets *host to
+ *  the index (host ID) when *alias is found.
  *	
- *	returns -1 on lookup failure
- *	returns 0 on sucess, *host contains host ID
+ *  returns -1 on lookup failure
+ *  returns 0 on sucess, *host contains host ID
  */
 static int lookup_host_handle(uint32_t *host, const char *alias)
 {
@@ -217,12 +217,12 @@ static int lookup_host_handle(uint32_t *host, const char *alias)
         a = (host_alias_s*)iter->item;
         if (a == NULL)
         {
-        	// end of list
+            // end of list
             continue;
         }
         if (strcmp(a->host_alias, alias) == 0)
         {
-        	// matching alias
+            // matching alias
             *host = index;
             return 0;
         }
@@ -238,5 +238,5 @@ static int lookup_host_handle(uint32_t *host, const char *alias)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=4 sts=4 sw=4 expandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */
