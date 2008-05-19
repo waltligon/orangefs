@@ -44,6 +44,7 @@
 #include "pvfs2-internal.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-util.h"
+#include "pint-security.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -434,6 +435,7 @@ static void remove_pidfile(void)
  *
  * Handles:
  * - backgrounding, redirecting logging
+ * - starting the security module
  * - initializing all the subsystems (BMI, Trove, etc.)
  * - setting up the state table used to map new requests to
  *   state machines
@@ -507,6 +509,17 @@ static int server_initialize(
         gossip_err("Error: Could not start server; aborting.\n");
         return ret;
     }
+
+    /* initialize the security module */
+    ret = PINT_security_initialize();
+    if (ret < 0)
+    {
+        gossip_err("Error: Could not initialize security module; "
+                   "aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_SECURITY_INIT;
 
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
@@ -1228,6 +1241,16 @@ static int server_shutdown(
         trove_finalize(server_config.trove_method);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         storage "
                      "interface         [ stopped ]\n");
+    }
+
+    /* XXX: this the right place ? */
+    if (status & SERVER_SECURITY_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting security "
+                     "module            [   ...   ]\n");
+        PINT_security_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
+                     "module            [ stopped ]\n");
     }
 
     if (status & SERVER_ENCODER_INIT)

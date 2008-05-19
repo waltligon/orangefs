@@ -115,7 +115,6 @@ int PINT_security_finalize(void)
  *  returns -1 on file I/O error
  *  returns -2 on host lookup failure
  *  returns -3 on hash table failure
- *  returnw -4 on malloc failure
  *  returns 0 on sucess
  */
 static int load_public_keys(char *path)
@@ -133,14 +132,21 @@ static int load_public_keys(char *path)
         return -1;
     }
 
-    while (!feof(keyfile))
+    ch = fgetc(keyfile);
+
+    while (ch != EOF)
     {
-        do
+        while (isspace(ch))
         {
             ch = fgetc(keyfile);
-        } while(isspace(ch));
+        }
 
-        if ((ch == EOF) || !isalnum(ch))
+        if (ch == EOF)
+        {
+            break;
+        }
+
+        if (!isalnum(ch))
         {
             fclose(keyfile);
             return -1;
@@ -178,13 +184,6 @@ static int load_public_keys(char *path)
             fclose(keyfile);
             return -2;
         }
-        
-        host = strdup(host);
-        if (host == NULL)
-        {
-            fclose(keyfile);
-            return -4;
-        }
 
         ret = SECURITY_add_pubkey(host, key);
         if (ret < 0)
@@ -192,6 +191,8 @@ static int load_public_keys(char *path)
             fclose(keyfile);
             return -3;
         }
+
+        ch = fgetc(keyfile);
         
     }
 
