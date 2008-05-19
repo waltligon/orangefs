@@ -36,7 +36,6 @@ static int security_init_status = 0;
 
 
 static int load_public_keys(char*);
-static int lookup_host_handle(uint32_t*, const char*);
 
 
 /*  PINT_security_initialize	
@@ -173,7 +172,7 @@ static int load_public_keys(char *path)
             return -1;
         }
 
-        host = PINT_config_set_host_addr_ptr(PINT_get_server_config(), buf);
+        host = PINT_config_get_host_addr_ptr(PINT_get_server_config(), buf);
         if (host == NULL)
         {
             fclose(keyfile);
