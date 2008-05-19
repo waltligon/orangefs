@@ -16,13 +16,13 @@
 typedef unsigned char PVFS_sig[PVFS_RSA_SIG_SIZE];
 
 /*#define encode_PVFS_sig (pptr,pbuf) do {              \
-	memcpy(*(pptr), *(pbuf), PVFS_RSA_SIG_SIZE);
-	*(pptr) += PVFS_RSA_SIG_SIZE;
+    memcpy(*(pptr), *(pbuf), PVFS_RSA_SIG_SIZE);
+    *(pptr) += PVFS_RSA_SIG_SIZE;
 } while (0)
 
 #define decode_PVFS_sig (pptr,pbuf) do { \
-	memcpy(*(pptr), *(pbuf), PVFS_RSA_SIG_SIZE);
-	*(pptr) += PVFS_RSA_SIG_SIZE;
+    memcpy(*(pptr), *(pbuf), PVFS_RSA_SIG_SIZE);
+    *(pptr) += PVFS_RSA_SIG_SIZE;
 } while (0)*/
 
 #endif
