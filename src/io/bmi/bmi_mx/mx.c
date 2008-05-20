@@ -2189,7 +2189,7 @@ bmx_handle_icon_req(void)
                                         mxmap->mxm_peername, mx_strstatus(status.code));
 
                         if (status.code != MX_STATUS_SUCCESS) {
-                                debug((BMX_DB_CONN|BMX_DB_PEER|BMX_DB_WARN),
+                                debug((BMX_DB_CONN|BMX_DB_PEER),
                                       "%s: connect to %s failed with %s", __func__,
                                       mxmap->mxm_peername, mx_strstatus(status.code));
                                 bmx_peer_disconnect(peer, 0, bmx_mx_to_bmi_errno(status.code));
