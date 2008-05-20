@@ -212,14 +212,14 @@ int PINT_verify_capability(PVFS_capability *data)
     }
     
     pubkey = SECURITY_lookup_pubkey(buf);
-    free(buf);
-    
+        
     if (pubkey == NULL)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG,
-                     "Public key not found in lookup.\n");
+                     "Public key not found in lookup. Name used: %s\n", buf);
         return 0;
     }
+    free(buf);
 
     md = EVP_sha1();
 
