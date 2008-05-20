@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <assert.h>
 
 #include <openssl/err.h>
@@ -35,7 +36,7 @@ static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
 static int security_init_status = 0;
 
 
-static int load_public_keys(char*);
+static int load_public_keys(const char*);
 
 
 /*  PINT_security_initialize	
@@ -112,12 +113,10 @@ int PINT_security_finalize(void)
  *  When finished without error, hash table will be filled
  *  with all host ID / public key pairs.
  *	
- *  returns -1 on file I/O error
- *  returns -2 on host lookup failure
- *  returns -3 on hash table failure
- *  returns 0 on sucess
+ *  returns -1 on error
+ *  returns 0 on success
  */
-static int load_public_keys(char *path)
+static int load_public_keys(const char *path)
 {
     FILE *keyfile;
     int ch, ptr;
@@ -129,6 +128,7 @@ static int load_public_keys(char *path)
     keyfile = fopen(path, "r");
     if (keyfile == NULL)
     {
+        gossip_err("%s: %s\n", path, strerror(errno));
         return -1;
     }
 
@@ -174,6 +174,8 @@ static int load_public_keys(char *path)
         key = PEM_read_PUBKEY(keyfile, NULL, NULL, NULL);
         if (key == NULL)
         {
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "Error loading public key: "
+                         "%s\n", ERR_error_string(ERR_get_error(), buf));
             fclose(keyfile);
             return -1;
         }
@@ -181,19 +183,23 @@ static int load_public_keys(char *path)
         host = PINT_config_get_host_addr_ptr(PINT_get_server_config(), buf);
         if (host == NULL)
         {
-            fclose(keyfile);
-            return -2;
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "Alias '%s' not found "
+                         "in configuration\n", buf);
         }
-
-        ret = SECURITY_add_pubkey(host, key);
-        if (ret < 0)
+        else
         {
-            fclose(keyfile);
-            return -3;
+            ret = SECURITY_add_pubkey(host, key);
+            if (ret < 0)
+            {
+                PVFS_strerror_r(ret, buf, 1024);
+                gossip_debug(GOSSIP_SECURITY_DEBUG, "Error inserting public "
+                             "key: %s", buf);
+                fclose(keyfile);
+                return -1;
+            }
         }
 
         ch = fgetc(keyfile);
-        
     }
 
     fclose(keyfile);
