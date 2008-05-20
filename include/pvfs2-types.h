@@ -230,8 +230,6 @@ endecode_fields_3(
     enum, algorithm,
     skip4,,
     PVFS_sys_server_list, server_list)
-#define extra_size_PVFS_sys_layout \
-    (PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_BMI_addr_t))
 
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL     ((PVFS_handle)0)
