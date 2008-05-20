@@ -432,6 +432,7 @@ static PINT_sm_action create_create_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
+    int server_type;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
@@ -449,6 +450,16 @@ static PINT_sm_action create_create_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
+    }
+
+    /* resolve and print selected server only if gossip debugging enabled */
+    if(gossip_debug_on && (gossip_debug_mask & GOSSIP_CLIENT_DEBUG))
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, 
+            "PVFS_isys_create() selected meta server: %s\n", 
+            PINT_cached_config_map_addr(sm_p->object_ref.fs_id,
+                msg_p->svr_addr,
+                &server_type));
     }
 
     PINT_SERVREQ_CREATE_FILL(
