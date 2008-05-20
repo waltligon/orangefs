@@ -126,11 +126,12 @@ int SECURITY_add_pubkey(char *host, EVP_PKEY *pubkey)
     
     gen_mutex_lock(&hash_mutex);
     
-    // remove prior key linked to the host address if it exists
+    /* remove prior key linked to the host address if it exists */
     temp = qhash_search_and_remove(pubkey_table, host);
     if (temp != NULL) 
     {
-    	gossip_debug(GOSSIP_SECURITY_DEBUG, "Removed duplicate key from table.\n");
+    	gossip_debug(GOSSIP_SECURITY_DEBUG, 
+    	             "Removed duplicate key from table.\n");
     	free_pubkey_entry(temp);
     }
     qhash_add(pubkey_table, &entry->host, &entry->hash_link);
