@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <openssl/evp.h>	// encryption library
+#include <openssl/evp.h>
 
 #include "pvfs2-types.h"
 #include "quickhash.h"
@@ -25,19 +25,19 @@
 
 
 typedef struct pubkey_entry_s {
-    struct qlist_head hash_link;    // holds prev/next pointers
-    char *host;                     // BMI host address
-    EVP_PKEY *pubkey;               // public key for above host ID
+    struct qlist_head hash_link;    /* holds prev/next pointers */
+    char *host;                     /* BMI host address */
+    EVP_PKEY *pubkey;               /* public key for above host ID */
 } pubkey_entry_t;
 
 
-static struct qhash_table *pubkey_table = NULL;    // head of the table
-static int hash_init_status = 0;                   // 1 = init, 0 = not init
-static gen_mutex_t hash_mutex = GEN_MUTEX_INITIALIZER;    // write mutex
+static struct qhash_table *pubkey_table = NULL;   /* head of the table */
+static int hash_init_status = 0;                  /* 1 = init, 0 = not init */
+static gen_mutex_t hash_mutex = GEN_MUTEX_INITIALIZER;
 
 
-static int pubkey_compare(void*, struct qhash_head*);    // internal compare
-static void free_pubkey_entry(void*);                    // internal free
+static int pubkey_compare(void*, struct qhash_head*);
+static void free_pubkey_entry(void*);
 
 
 /*  SECURITY_hash_initialize

@@ -8,7 +8,7 @@
 #define _SECURITY_HASH_H_
 
 
-#include <openssl/evp.h>	// encryption library
+#include <openssl/evp.h>
 
 #include "pvfs2-types.h"
 
