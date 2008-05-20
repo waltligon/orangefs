@@ -120,6 +120,14 @@ int PINT_security_finalize(void)
     return 0;
 }
 
+/*  PINT_sign_capability
+ *
+ *  Takes in a PVFS_capability structure and creates a signature
+ *  based on the input data
+ *
+ *  returns 0 on success
+ *  returns -1 on error
+ */
 int PINT_sign_capability(PVFS_capability *cap)
 {
     EVP_MD_CTX mdctx;
@@ -172,35 +180,45 @@ int PINT_sign_capability(PVFS_capability *cap)
 
 /*  PINT_verify_capability
  *
- *  Takes in a PVFS_capability structere and checks to see if the
+ *  Takes in a PVFS_capability structure and checks to see if the
  *  signature matches the contents based on the data within
  *
- *  returns 0 on success
- *  returns -1 on error
+ *  returns 1 on success
+ *  returns 0 on error or failure to verify
  */
 int PINT_verify_capability(PVFS_capability *data)
 {
     EVP_MD_CTX mdctx;
     const EVP_MD *md;
     int ret;
-    static char buf[1024];
+    char *buf;
     EVP_PKEY *pubkey;
     
-    PINT_cached_config_get_server_name(buf, 1024, data->owner, data->fsid);
+    buf = (char *)malloc(sizeof(char) * 1024);
     
     if (buf == NULL)
     {
+        return 0;
+    }
+    
+    ret = PINT_cached_config_get_server_name(buf, 1024, data->owner,
+                                             data->fsid);
+    
+    if (ret < 0)
+    {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Server name lookup failed.\n");
-        return -1;
+        free(buf);
+        return 0;
     }
     
     pubkey = SECURITY_lookup_pubkey(buf);
+    free(buf);
     
     if (pubkey == NULL)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG,
                      "Public key not found in lookup.\n");
-        return -1;
+        return 0;
     }
 
     md = EVP_sha1();
@@ -224,18 +242,20 @@ int PINT_verify_capability(PVFS_capability *data)
         else 
         {
             gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure.\n");
-            return -1;
+            EVP_MD_CTX_cleanup(&mdctx);
+            return 0;
         }
     }
     else
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure.\n");
-        return -1;
+        EVP_MD_CTX_cleanup(&mdctx);
+        return 0;
     }
     
     EVP_MD_CTX_cleanup(&mdctx);
 
-    return ret;
+    return 1;
 }
 
 /* load_private_key
