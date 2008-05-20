@@ -31,12 +31,17 @@
 
 /* TODO: move to global configuration */
 #define SECURITY_DEFAULT_KEYSTORE "/tmp/keystore"
+#define SECURITY_DEFAULT_PRIVKEYFILE  "/tmp/privkey.pem"
 
+
+/* the private key used for signing */
+static EVP_PKEY *security_privkey = NULL;
 
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
 static int security_init_status = 0;
 
 
+static int load_private_key(const char*);
 static int load_public_keys(const char*);
 
 
@@ -66,6 +71,12 @@ int PINT_security_initialize(void)
     if (ret < 0)
     {
         return ret;
+    }
+
+    ret = load_private_key(SECURITY_DEFAULT_PRIVKEYFILE);
+    if (ret < 0)
+    {
+        return -PVFS_EIO;
     }
     
     /* TODO: better error handling */
@@ -97,6 +108,8 @@ int PINT_security_finalize(void)
         return -PVFS_EALREADY;
     }
 
+    EVP_PKEY_free(security_privkey);
+
     EVP_cleanup();
     ERR_free_strings();
     SECURITY_hash_finalize();
@@ -104,6 +117,56 @@ int PINT_security_finalize(void)
     security_init_status = 0;
     gen_mutex_unlock(&security_init_mutex);
     
+    return 0;
+}
+
+int PINT_sign_capability(PVFS_capability *cap)
+{
+    EVP_MD_CTX mdctx;
+    unsigned siglen;
+    char buf[256];
+    int ret;
+
+    assert(security_privkey);
+
+    EVP_MD_CTX_init(&mdctx);
+
+    ret = EVP_SignInit_ex(&mdctx, EVP_sha1(), NULL);
+    if (!ret)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
+                         "%s\n", ERR_error_string(ERR_get_error(), buf));
+        EVP_MD_CTX_cleanup(&mdctx);
+        return -1;
+    }
+
+    ret = EVP_SignUpdate(&mdctx, &cap->owner, sizeof(PVFS_handle));
+    ret &= EVP_SignUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
+    ret &= EVP_SignUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
+    ret &= EVP_SignUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
+    ret &= EVP_SignUpdate(&mdctx, &cap->num_handles, sizeof(uint32_t));
+    ret &= EVP_SignUpdate(&mdctx, cap->handle_array, cap->num_handles * 
+                          sizeof(PVFS_handle));
+
+    if (!ret)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
+                         "%s\n", ERR_error_string(ERR_get_error(), buf));
+        EVP_MD_CTX_cleanup(&mdctx);
+        return -1;
+    }
+
+    ret = EVP_SignFinal(&mdctx, cap->signature, &siglen, security_privkey);
+    if (!ret)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
+                         "%s\n", ERR_error_string(ERR_get_error(), buf));
+        EVP_MD_CTX_cleanup(&mdctx);
+        return -1;
+    }
+
+    EVP_MD_CTX_cleanup(&mdctx);        
+
     return 0;
 }
 
@@ -173,6 +236,38 @@ int PINT_verify_capability(PVFS_capability *data)
     EVP_MD_CTX_cleanup(&mdctx);
 
     return ret;
+}
+
+/* load_private_key
+ *
+ * Reads the private key from a file in PEM format.
+ *
+ * returns -1 on error
+ * returns 0 on success
+ */
+static int load_private_key(const char *path)
+{
+    FILE *keyfile;
+    char buf[256];
+
+    keyfile = fopen(path, "r");
+    if (keyfile == NULL)
+    {
+        gossip_err("%s: %s\n", path, strerror(errno));
+        return -1;
+    }
+
+    security_privkey = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
+    if (security_privkey == NULL)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error loading private key: "
+                         "%s\n", ERR_error_string(ERR_get_error(), buf));
+        fclose(keyfile);
+    }
+
+    fclose(keyfile);
+
+    return 0;
 }
 
 /*  load_public_keys
@@ -262,7 +357,7 @@ static int load_public_keys(const char *path)
             {
                 PVFS_strerror_r(ret, buf, 1024);
                 gossip_debug(GOSSIP_SECURITY_DEBUG, "Error inserting public "
-                             "key: %s", buf);
+                             "key: %s\n", buf);
                 fclose(keyfile);
                 return -1;
             }

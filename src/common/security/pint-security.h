@@ -74,7 +74,7 @@ int PINT_security_finalize(void);
 /* creates a signature from the remaining fields
  * any existing signature is overwritten
  */
-void PINT_sign_capability(PVFS_capability *);
+int PINT_sign_capability(PVFS_capability *);
 
 /* computes a signature from the fields and compares 
  * to the existing signature returns non-zero if equal
