@@ -23,6 +23,7 @@
 #include "gossip.h"
 #include "gen-locks.h"
 #include "server-config.h"
+#include "pint-cached-config.h"
 
 #include "pint-security.h"
 #include "security-hash.h"
@@ -104,6 +105,74 @@ int PINT_security_finalize(void)
     gen_mutex_unlock(&security_init_mutex);
     
     return 0;
+}
+
+/*  PINT_verify_capability
+ *
+ *  Takes in a PVFS_capability structere and checks to see if the
+ *  signature matches the contents based on the data within
+ *
+ *  returns 0 on success
+ *  returns -1 on error
+ */
+int PINT_verify_capability(PVFS_capability *data)
+{
+    EVP_MD_CTX mdctx;
+    const EVP_MD *md;
+    int ret;
+    static char buf[1024];
+    EVP_PKEY *pubkey;
+    
+    PINT_cached_config_get_server_name(buf, 1024, data->owner, data->fsid);
+    
+    if (buf == NULL)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Server name lookup failed.\n");
+        return -1;
+    }
+    
+    pubkey = SECURITY_lookup_pubkey(buf);
+    
+    if (pubkey == NULL)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG,
+                     "Public key not found in lookup.\n");
+        return -1;
+    }
+
+    md = EVP_sha1();
+
+    EVP_MD_CTX_init(&mdctx);
+    ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
+    if (ret)
+    {
+        ret = EVP_VerifyUpdate(&mdctx, &(data->owner), sizeof(PVFS_handle));
+        ret &= EVP_VerifyUpdate(&mdctx, &(data->fsid), sizeof(PVFS_fs_id));
+        ret &= EVP_VerifyUpdate(&mdctx, &(data->timeout), sizeof(PVFS_time));
+        ret &= EVP_VerifyUpdate(&mdctx, &(data->op_mask), sizeof(uint32_t));
+        ret &= EVP_VerifyUpdate(&mdctx, &(data->num_handles),
+                                sizeof(uint32_t));
+        ret &= EVP_VerifyUpdate(&mdctx, data->handle_array,
+                                sizeof(PVFS_handle) * data->num_handles);
+        if (ret)
+        {
+            ret = EVP_VerifyFinal(&mdctx, data->signature, 128, pubkey);
+        }
+        else 
+        {
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure.\n");
+            return -1;
+        }
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure.\n");
+        return -1;
+    }
+    
+    EVP_MD_CTX_cleanup(&mdctx);
+
+    return ret;
 }
 
 /*  load_public_keys
