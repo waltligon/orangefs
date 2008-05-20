@@ -167,7 +167,7 @@ endecode_fields_5_struct(
     PVFS_sys_layout, layout)
 
 #define extra_size_PVFS_servreq_create \
-    (extra_size_PVFS_object_attr)
+    (extra_size_PVFS_object_attr + extra_size_PVFS_sys_layout)
 
 #define PINT_SERVREQ_CREATE_FILL(__req,                                    \
                                  __creds,                                  \
