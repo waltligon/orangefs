@@ -24,6 +24,7 @@
 #include "gen-locks.h"
 #include "server-config.h"
 #include "pint-cached-config.h"
+#include "pint-util.h"
 
 #include "pint-security.h"
 #include "security-hash.h"
@@ -32,6 +33,7 @@
 /* TODO: move to global configuration */
 #define SECURITY_DEFAULT_KEYSTORE "/tmp/keystore"
 #define SECURITY_DEFAULT_PRIVKEYFILE  "/tmp/privkey.pem"
+#define SECURITY_DEFAULT_TIMEOUT 0
 
 
 /* the private key used for signing */
@@ -137,6 +139,9 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     assert(security_privkey);
 
+    cap->timeout = PINT_util_get_current_time();
+    cap->timeout += SECURITY_DEFAULT_TIMEOUT;
+
     EVP_MD_CTX_init(&mdctx);
 
     ret = EVP_SignInit_ex(&mdctx, EVP_sha1(), NULL);
@@ -173,7 +178,7 @@ int PINT_sign_capability(PVFS_capability *cap)
         return -1;
     }
 
-    EVP_MD_CTX_cleanup(&mdctx);        
+    EVP_MD_CTX_cleanup(&mdctx);
 
     return 0;
 }
@@ -193,6 +198,11 @@ int PINT_verify_capability(PVFS_capability *data)
     int ret;
     char *buf;
     EVP_PKEY *pubkey;
+
+    if (PINT_util_get_current_time() > data->timeout)
+    {
+        return 0;
+    }
     
     buf = (char *)malloc(sizeof(char) * 1024);
     
