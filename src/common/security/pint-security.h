@@ -9,16 +9,16 @@
 #include "pvfs2-config.h"
 #include "pvfs2-types.h"
 
-/* must include a security module and link it in */
-#include "rsa_security.h"
 
 /* NOTE: add signer ID to each structure */
 
+typedef unsigned char *PVFS_sig;
 typedef struct PVFS_capability PVFS_capability;
 struct PVFS_capability {
         PVFS_handle owner;
         PVFS_fs_id fsid;
         PVFS_sig signature;
+        uint32_t sig_size;
 	PVFS_time timeout;   /* seconds after epoch to time out */
 	uint32_t op_mask;
 	uint32_t num_handles;
