@@ -6,13 +6,15 @@
 #ifndef PINT_SECURITY_H
 #define PINT_SECURITY_H
 
+
 #include "pvfs2-config.h"
 #include "pvfs2-types.h"
 
 
-/* NOTE: add signer ID to each structure */
-
 typedef unsigned char *PVFS_sig;
+
+/* TODO: encode and decode PVFS_sig */
+
 typedef struct PVFS_capability PVFS_capability;
 struct PVFS_capability {
         PVFS_handle owner;

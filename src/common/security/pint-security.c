@@ -31,10 +31,9 @@
 
 
 /* TODO: move to global configuration */
-#define SECURITY_DEFAULT_KEYSTORE "/tmp/keystore"
+#define SECURITY_DEFAULT_KEYSTORE     "/tmp/keystore"
 #define SECURITY_DEFAULT_PRIVKEYFILE  "/tmp/privkey.pem"
-#define SECURITY_DEFAULT_TIMEOUT 3600
-#define SECURITY_ENCRYPTION EVP_sha1()
+#define SECURITY_DEFAULT_TIMEOUT      3600                /* 1 hour */
 
 
 /* the private key used for signing */
@@ -134,6 +133,7 @@ int PINT_security_finalize(void)
 int PINT_sign_capability(PVFS_capability *cap)
 {
     EVP_MD_CTX mdctx;
+    unsigned siglen;
     char buf[256];
     int ret;
 
@@ -144,7 +144,7 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     EVP_MD_CTX_init(&mdctx);
 
-    ret = EVP_SignInit_ex(&mdctx, SECURITY_ENCRYPTION, NULL);
+    ret = EVP_SignInit_ex(&mdctx, EVP_sha1(), NULL);
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
@@ -152,8 +152,6 @@ int PINT_sign_capability(PVFS_capability *cap)
         EVP_MD_CTX_cleanup(&mdctx);
         return -1;
     }
-    cap->signature = (PVFS_sig)malloc(sizeof(EVP_PKEY_size(
-                                                   security_privkey)));
 
     ret = EVP_SignUpdate(&mdctx, &cap->owner, sizeof(PVFS_handle));
     ret &= EVP_SignUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
@@ -171,8 +169,7 @@ int PINT_sign_capability(PVFS_capability *cap)
         return -1;
     }
 
-    ret = EVP_SignFinal(&mdctx, cap->signature, &cap->sig_size, 
-                        security_privkey);
+    ret = EVP_SignFinal(&mdctx, cap->signature, &siglen, security_privkey);
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
@@ -197,6 +194,7 @@ int PINT_sign_capability(PVFS_capability *cap)
 int PINT_verify_capability(PVFS_capability *data)
 {
     EVP_MD_CTX mdctx;
+    const EVP_MD *md;
     int ret;
     char *buf;
     EVP_PKEY *pubkey;
@@ -233,8 +231,10 @@ int PINT_verify_capability(PVFS_capability *data)
     }
     free(buf);
 
+    md = EVP_sha1();
+
     EVP_MD_CTX_init(&mdctx);
-    ret = EVP_VerifyInit_ex(&mdctx, SECURITY_ENCRYPTION, NULL);
+    ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
     if (ret)
     {
         ret = EVP_VerifyUpdate(&mdctx, &(data->owner), sizeof(PVFS_handle));
@@ -247,8 +247,7 @@ int PINT_verify_capability(PVFS_capability *data)
                                 sizeof(PVFS_handle) * data->num_handles);
         if (ret)
         {
-            ret = EVP_VerifyFinal(&mdctx, data->signature, data->sig_size,
-                                  pubkey);
+            ret = EVP_VerifyFinal(&mdctx, data->signature, 128, pubkey);
         }
         else 
         {
