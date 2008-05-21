@@ -406,6 +406,15 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
+/* DSA encryption */
+#undef SECURITY_ENCRYPTION_DSA
+
+/* No encryption */
+#undef SECURITY_ENCRYPTION_NONE
+
+/* RSA encryption */
+#undef SECURITY_ENCRYPTION_RSA
+
 /* The size of a `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 

@@ -180,6 +180,30 @@ AC_ARG_WITH(openssl,
   --without-openssl       Don't build with openssl.],
 	[AX_OPENSSL(${withval})],
 	[AX_OPENSSL_OPTIONAL])
+	
+AC_ARG_ENABLE(security,
+ [  --enable-security[=state type] Specify the states type:
+                      none [default]: No encryption
+                      rsa: RSA encryption
+                      dsa: DSA encryption],
+ [ if   test "x$enableval" = "xnone" ; then
+      SECURITY_TYPE=0
+      AC_DEFINE([SECURITY_ENCRYPTION_NONE], [], [No encryption])
+   elif test "x$enableval" = "xrsa" ; then
+      SECURITY_TYPE=1
+      AC_DEFINE([SECURITY_ENCRYPTION_RSA], [], [RSA encryption])
+   elif test "x$enableval" = "xdsa" ; then
+   	  SECURITY_TYPE=2
+      AC_DEFINE([SECURITY_ENCRYPTION_DSA], [], [DSA encryption])
+   else
+      echo
+      echo "Error!"
+      echo "Unknown encryption type!"
+      exit -1
+   fi
+ ], [SECURITY_TYPE=0
+   AC_DEFINE([SECURITY_ENCRYPTION_NONE], [], [No encryption])
+   ])
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
@@ -1161,6 +1185,14 @@ if test "x$NPTL_WORKAROUND" = "x"; then
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          :  no])
 else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
+fi
+
+if   test "x$SECURITY_TYPE" = "x0" ; then
+   AC_MSG_RESULT([PVFS2 encryption type                             :none])
+elif test "x$SECURITY_TYPE" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 encryption type                             : rsa])
+elif test "x$SECURITY_TYPE" = "x2" ; then
+   AC_MSG_RESULT([PVFS2 encryption type                             : dsa])
 fi
 
 if test "x$BUILD_SERVER" = "x1"; then
