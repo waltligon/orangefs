@@ -51,11 +51,25 @@ static const struct PINT_hint_info hint_types[] = {
      PVFS_HINT_HANDLE_NAME,
      encode_func_uint64_t,
      decode_func_uint64_t,
-     sizeof(uint32_t)},
+     sizeof(PVFS_handle)},
 
     {PINT_HINT_OP_ID,
-     PINT_HINT_TRANSFER,
+     0,
      PVFS_HINT_OP_ID_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_RANK,
+     PINT_HINT_TRANSFER,
+     PVFS_HINT_RANK_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_SERVER_ID,
+     PINT_HINT_TRANSFER,
+     PVFS_HINT_SERVER_ID_NAME,
      encode_func_uint32_t,
      decode_func_uint32_t,
      sizeof(uint32_t)},
@@ -203,16 +217,19 @@ void encode_PINT_hint(char **pptr, const PINT_hint *hint)
     while(tmp_hint)
     {
         /* encode the hint type */
-        encode_uint32_t(pptr, &tmp_hint->type);
-
-        /* if the type is unknown, encode the type string */
-        if(tmp_hint->type == PINT_HINT_UNKNOWN)
+        if(tmp_hint->flags & PINT_HINT_TRANSFER)
         {
-            encode_string(pptr, &tmp_hint->type_string);
-        }
+            encode_uint32_t(pptr, &tmp_hint->type);
 
-        /* encode the hint using the encode function provided */
-        tmp_hint->encode(pptr, tmp_hint->value);
+            /* if the type is unknown, encode the type string */
+            if(tmp_hint->type == PINT_HINT_UNKNOWN)
+            {
+                encode_string(pptr, &tmp_hint->type_string);
+            }
+
+            /* encode the hint using the encode function provided */
+            tmp_hint->encode(pptr, tmp_hint->value);
+        }
 
         tmp_hint = tmp_hint->next;
     }

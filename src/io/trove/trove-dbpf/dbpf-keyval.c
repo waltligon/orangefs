@@ -1506,7 +1506,7 @@ static int dbpf_keyval_iterate_skip_to_position(
         /* strip the session out of the position; we need to use a true
          * integer offset if we get past the cache
          */
-        pos = pos & 0xffff;
+        pos = pos & 0xffffffff;
         return dbpf_keyval_iterate_step_to_position(handle, pos, dbc_p);
     }
 

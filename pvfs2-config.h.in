@@ -150,6 +150,9 @@
 /* Define if struct inode in kernel has i_blksize member */
 #undef HAVE_I_BLKSIZE_IN_STRUCT_INODE
 
+/* Define if struct inode in kernel has i_sem member */
+#undef HAVE_I_SEM_IN_STRUCT_INODE
+
 /* Define if kernel has i_size_read */
 #undef HAVE_I_SIZE_READ
 

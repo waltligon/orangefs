@@ -33,12 +33,6 @@
 #include "state-machine.h"
 #include "pint-event.h"
 
-/* skip everything except #includes if __SM_CHECK_DEP is already
- * defined; this allows us to get the dependencies right for
- * msgpairarray.sm which relies on conflicting headers for dependency
- * information
- */
-#ifndef __SM_CHECK_DEP
 extern job_context_id server_job_context;
 
 #define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
@@ -393,13 +387,7 @@ typedef struct PINT_server_op
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
 
-    /* generic msgpair used with msgpair substate */
-    PINT_sm_msgpair_state msgpair;
-
-    /* state information for msgpairarray nested state machine */
-    int msgarray_count;
-    PINT_sm_msgpair_state *msgarray;
-    PINT_sm_msgpair_params msgarray_params;
+    PINT_sm_msgarray_op msgarray_op;
 
     PVFS_handle target_handle;
     PVFS_fs_id target_fs_id;
@@ -491,7 +479,6 @@ int server_state_machine_start_noreq(
 
 struct PINT_state_machine_s *server_op_state_get_machine(int);
 
-#endif /* __SM_CHECK_DEP */ 
 #endif /* __PVFS_SERVER_H */
 
 /*

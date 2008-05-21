@@ -153,9 +153,13 @@ static void *trove_thread_function(void *ptr)
 
 static void *__bmi_thread_function(void *ptr) {
     void* ret = NULL;
+#ifdef __PVFS2_JOB_THREADED__
     PINT_event_thread_start("BMI");
+#endif
     ret = bmi_thread_function(ptr);
+#ifdef __PVFS2_JOB_THREADED__
     PINT_event_thread_stop();
+#endif
     return ret;
 }
 

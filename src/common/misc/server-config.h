@@ -135,6 +135,7 @@ typedef struct distribution_configuration_s
 typedef struct server_configuration_s
 {
     char *host_id;
+    int host_index;
     char *server_alias;             /* the command line server-alias parameter */
     int my_server_options;
     char *storage_path;

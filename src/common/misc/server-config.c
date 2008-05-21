@@ -140,7 +140,8 @@ static char *get_handle_range_str(
     int meta_handle_range);
 static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
-    char *alias);
+    char *alias,
+    int *index);
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
     PINT_llist *list,
     char *alias);
@@ -876,6 +877,9 @@ static const configoption_t options[] =
     /* This option specifies the method used for trove.  Currently the
      * dbpf method is the default.  Other methods include 'alt-aio'.
      *
+     * The null-aio method is an implementation that does no disk I/O at all
+     * and is only useful for development or debugging purposes.
+     *
      * Note that this option can be specified in either the <a href="#Defaults">
      * Defaults</a> context of the main fs.conf, or in a filesystem specific 
      * <a href="#StorageHints">StorageHints</a>
@@ -973,7 +977,7 @@ int PINT_parse_config(
     {
         struct host_alias_s *halias;
         halias = find_host_alias_ptr_by_alias(
-                                config_s, server_alias_name);
+                                config_s, server_alias_name, &config_s->host_index);
         if (!halias || !halias->bmi_address) 
         {
             gossip_err("Configuration file error. "
@@ -2407,12 +2411,12 @@ DOTCONF_CB(get_range_list)
                     is_new_handle_mapping = 1;
                     handle_mapping->alias_mapping =
                         find_host_alias_ptr_by_alias(
-                            config_s, cmd->data.list[i-1]);
+                            config_s, cmd->data.list[i-1], NULL);
                 }
 
                 assert(handle_mapping->alias_mapping ==
                        find_host_alias_ptr_by_alias(
-                           config_s, cmd->data.list[i-1]));
+                           config_s, cmd->data.list[i-1], NULL));
 
                 if (!handle_mapping->handle_range &&
                     !handle_mapping->handle_extent_array.extent_array)
@@ -2596,6 +2600,10 @@ DOTCONF_CB(get_trove_method)
     else if(!strcmp(cmd->data.str, "alt-aio"))
     {
         *method = TROVE_METHOD_DBPF_ALTAIO;
+    }
+    else if(!strcmp(cmd->data.str, "null-aio"))
+    {
+        *method = TROVE_METHOD_DBPF_NULLAIO;
     }
     else
     {
@@ -3133,17 +3141,20 @@ static void copy_filesystem(
 
 static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
-    char *alias)
+    char *alias,
+    int *index)
 {
     PINT_llist *cur = NULL;
     struct host_alias_s *ret = NULL;
     struct host_alias_s *cur_alias = NULL;
+    int ind = 0;
 
     if (config_s && alias)
     {
         cur = config_s->host_aliases;
         while(cur)
         {
+            ind++;
             cur_alias = PINT_llist_head(cur);
             if (!cur_alias)
             {
@@ -3160,6 +3171,7 @@ static host_alias_s *find_host_alias_ptr_by_alias(
             cur = PINT_llist_next(cur);
         }
     }
+    if(index) *index = ind - 1;
     return ret;
 }
 

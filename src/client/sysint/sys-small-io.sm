@@ -76,22 +76,22 @@ static PINT_sm_action small_io_setup_msgpairs(
     int ret;
     PVFS_handle datafile_handle;
     int regions = 0;
+    PINT_sm_msgpair_state *msg_p;
 
     js_p->error_code = 0;
 
     attr = &sm_p->getattr.attr;
     assert(attr);
-    
+
     /* initialize msgarray */
-    ret = PINT_msgpairarray_init(&sm_p->msgarray, sm_p->u.io.datafile_count);
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->u.io.datafile_count);
     if(ret < 0)
     {
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
-    sm_p->msgarray_count = sm_p->u.io.datafile_count;
 
-    for(i = 0; i < sm_p->u.io.datafile_count; ++i)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         datafile_handle = attr->u.meta.dfile_array[
             sm_p->u.io.datafile_index_array[i]];
@@ -128,9 +128,9 @@ static PINT_sm_action small_io_setup_msgpairs(
 
             result.segs = 0;
             result.bytes = 0;
-            result.offset_array = sm_p->msgarray[i].req.u.small_io.offsets;
-            result.size_array = sm_p->msgarray[i].req.u.small_io.sizes;
-            sm_p->msgarray[i].req.u.small_io.buffer = sm_p->u.io.buffer;
+            result.offset_array = msg_p->req.u.small_io.offsets;
+            result.size_array = msg_p->req.u.small_io.sizes;
+            msg_p->req.u.small_io.buffer = sm_p->u.io.buffer;
 
             ret = PINT_process_request(
                 file_req_state, mem_req_state,
@@ -157,7 +157,7 @@ static PINT_sm_action small_io_setup_msgpairs(
          * the response.  
          */ 
         PINT_SERVREQ_SMALL_IO_FILL(
-            sm_p->msgarray[i].req,
+            msg_p->req,
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             datafile_handle,
@@ -171,13 +171,13 @@ static PINT_sm_action small_io_setup_msgpairs(
             PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
             sm_p->hints);
 
-        sm_p->msgarray[i].fs_id = sm_p->object_ref.fs_id;
-        sm_p->msgarray[i].handle = sm_p->object_ref.handle;
-        sm_p->msgarray[i].retry_flag = PVFS_MSGPAIR_RETRY;
-        sm_p->msgarray[i].comp_fn = small_io_completion_fn;
+        msg_p->fs_id = sm_p->object_ref.fs_id;
+        msg_p->handle = sm_p->object_ref.handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = small_io_completion_fn;
 
         ret = PINT_cached_config_map_to_server(
-            &sm_p->msgarray[i].svr_addr, datafile_handle,
+            &msg_p->svr_addr, datafile_handle,
             sm_p->object_ref.fs_id);
         if(ret < 0)
         {
@@ -188,6 +188,8 @@ static PINT_sm_action small_io_setup_msgpairs(
     }
 
     js_p->error_code = 0;
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -202,7 +204,7 @@ static int small_io_completion_fn(void * user_args,
                                   int index)
 {
     struct PINT_smcb *smcb = (struct PINT_smcb *)user_args;
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     int ret = 0;
 
     assert(resp_p->op == PVFS_SERV_SMALL_IO);
@@ -316,10 +318,7 @@ static int small_io_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_msgpairarray_destroy(sm_p->msgarray);
-    sm_p->msgarray = NULL;
-    sm_p->msgarray_count = 0;
-
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 

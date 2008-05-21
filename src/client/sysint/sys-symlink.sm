@@ -192,7 +192,7 @@ PVFS_error PVFS_isys_symlink(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
+    PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.sym.link_name = entry_name;
     sm_p->u.sym.link_target = target;
@@ -266,7 +266,7 @@ static PINT_sm_action symlink_init(
         js_p->error_code = 0;
 
         ret = job_req_sched_post_timer(
-            sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
+            sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
 
@@ -284,7 +284,8 @@ static int symlink_create_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_create_comp_fn\n");
 
@@ -292,7 +293,7 @@ static int symlink_create_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /* otherwise, just store the newly symlink'd meta handle */
@@ -359,7 +360,8 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     ret = PINT_cached_config_get_next_meta(
         sm_p->object_ref.fs_id,
@@ -385,6 +387,7 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_create_comp_fn;
 
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -408,7 +411,8 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," symlink: posting crdirent req\n");
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
@@ -433,6 +437,8 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -457,7 +463,8 @@ static PINT_sm_action symlink_setattr_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," symlink: posting setattr req\n");
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     /* force permissions to 777 for symbolic links */
     sm_p->u.sym.sys_attr.perms = 0777;
@@ -493,6 +500,8 @@ static PINT_sm_action symlink_setattr_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -514,7 +523,8 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
 
     js_p->error_code = 0;
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
@@ -540,6 +550,8 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -571,7 +583,7 @@ static PINT_sm_action symlink_cleanup(
                            (const PVFS_object_ref*) &(sm_p->object_ref));
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
-             (sm_p->u.sym.retry_count < sm_p->msgarray_params.retry_limit))
+             (sm_p->u.sym.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
         sm_p->u.sym.stored_error_code = 0;
         sm_p->u.sym.retry_count++;
@@ -587,11 +599,7 @@ static PINT_sm_action symlink_cleanup(
         PINT_acache_invalidate(sm_p->object_ref);
     }
 
-    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;

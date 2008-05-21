@@ -34,6 +34,10 @@ PINT_smcb *g_smcb = NULL;
 
 extern job_context_id pint_client_sm_context;
 
+PINT_event_id PINT_client_sys_event_id;
+
+int pint_client_pid;
+
 typedef enum
 {
     CLIENT_NO_INIT         =      0,
@@ -70,6 +74,9 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
     PINT_smcb *smcb = NULL;
     uint64_t debug_mask = 0;
+    char *event_mask = NULL;
+
+    pint_client_pid = getpid();
 
     gossip_enable_stderr();
 
@@ -90,6 +97,18 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     {
         gossip_err("Error initializing event interface.\n");
         return (ret);
+    }
+
+
+    /**
+     * (ClientID, Rank, RequestID, Handle, Sys)
+     */
+    PINT_event_define_event(NULL, "sys", "%d%d%d%llu%d", "", &PINT_client_sys_event_id);
+
+    event_mask = getenv("PVFS2_EVENTMASK");
+    if (event_mask)
+    {
+        PINT_event_enable(event_mask);
     }
 
     ret = id_gen_safe_initialize();

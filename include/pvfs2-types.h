@@ -190,6 +190,7 @@ enum PVFS_sys_layout_algorithm
     /* order the datafiles based on the list specified */
     PVFS_SYS_LAYOUT_LIST = 4
 };
+#define PVFS_SYS_LAYOUT_DEFAULT PVFS_SYS_LAYOUT_ROUND_ROBIN
 
 /* The list of datafile servers that can be passed into PVFS_sys_create
  * to specify the exact layout of a file.  The count parameter will override

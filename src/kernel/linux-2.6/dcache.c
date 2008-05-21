@@ -109,9 +109,9 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
     gossip_debug(GOSSIP_DCACHE_DEBUG,
                  "%s: doing getattr: inode: %p, handle: %llu)\n",
                  __func__, inode, llu(get_handle_from_ino(inode)));
-    mutex_lock(&inode->i_mutex);
+    pvfs2_inode_lock(inode);
     ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT);
-    mutex_unlock(&inode->i_mutex);
+    pvfs2_inode_unlock(inode);
     gossip_debug(GOSSIP_DCACHE_DEBUG,
                  "%s: getattr %s (ret = %d), returning %s for dentry\n",
                  __func__,

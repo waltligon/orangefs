@@ -22,6 +22,7 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
 #include "pint-util.h"
+#include "pint-event.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -59,6 +60,8 @@ int PVFS_sys_finalize()
     PINT_encode_finalize();
 
     PINT_dist_finalize();
+
+    PINT_event_finalize();
 
     PINT_release_pvfstab();
 

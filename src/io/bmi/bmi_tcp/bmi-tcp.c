@@ -485,7 +485,14 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
      */
     PINT_event_define_event(
         &bmi_tcp_event_group,
-        "bmi_send", "%d%ld%llu%d%d", "%d", &bmi_tcp_send_event_id);
+#ifdef __PVFS2_SERVER__
+        "bmi_server_send",
+        "%d%ld%llu%d%d",
+#else
+        "bmi_client_send",
+        "%d%d%ld%llu%d%d",
+#endif
+        "%d", &bmi_tcp_send_event_id);
 
     /* Define the recv event:
      *   START: (client_id, request_id, handle, op_id, recv_size)
@@ -493,7 +500,14 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
      */
     PINT_event_define_event(
         &bmi_tcp_event_group,
-        "bmi_recv", "%ld%ld%llu%d%d", "%d", &bmi_tcp_recv_event_id);
+#ifdef __PVFS2_SERVER__
+        "bmi_server_recv",
+        "%d%ld%llu%d%d",
+#else
+        "bmi_client_recv",
+        "%d%d%ld%llu%d%d",
+#endif
+        "%d", &bmi_tcp_recv_event_id);
 
     gen_mutex_unlock(&interface_mutex);
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
@@ -2390,6 +2404,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 
     PINT_EVENT_START(
         bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, &eid,
+#ifndef __PVFS2_SERVER__
+        PINT_HINT_GET_RANK(hints),
+#endif
         PINT_HINT_GET_CLIENT_ID(hints),
         PINT_HINT_GET_REQUEST_ID(hints),
         PINT_HINT_GET_HANDLE(hints),
@@ -3700,6 +3717,9 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
 
     PINT_EVENT_START(
         bmi_tcp_send_event_id, bmi_tcp_pid, NULL, &eid,
+#ifndef __PVFS2_SERVER__
+        PINT_HINT_GET_RANK(hints),
+#endif
         PINT_HINT_GET_CLIENT_ID(hints),
         PINT_HINT_GET_REQUEST_ID(hints),
         PINT_HINT_GET_HANDLE(hints),

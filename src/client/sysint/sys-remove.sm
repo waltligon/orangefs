@@ -182,12 +182,13 @@ PVFS_error PVFS_isys_remove(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
+    PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.remove.object_name = object_name;
     sm_p->parent_ref  = parent_ref;
     sm_p->u.remove.stored_error_code = 0;
     PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent_ref.handle);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Trying to remove entry %s under %llu,%d\n",
@@ -264,7 +265,8 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
 
     js_p->error_code = 0;
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_RMDIRENT_FILL(
         msg_p->req,
@@ -292,6 +294,8 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -309,7 +313,8 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
 
     js_p->error_code = 0;
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
@@ -340,6 +345,8 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -349,7 +356,7 @@ static int remove_rmdirent_comp_fn(
     int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT);
 
@@ -432,11 +439,7 @@ static PINT_sm_action remove_cleanup(
     PINT_ncache_invalidate((const char*) sm_p->u.remove.object_name,
                            (const PVFS_object_ref*) &(sm_p->parent_ref));
 
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
@@ -452,7 +455,7 @@ static PINT_sm_action remove_generic_timer(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: generic_timer\n");
 
     ret = job_req_sched_post_timer(
-	sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
+	sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
 	pint_client_sm_context);
 
     return ret;
@@ -467,7 +470,7 @@ static PINT_sm_action remove_crdirent_retry_or_fail(
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-        (sm_p->u.remove.retry_count < sm_p->msgarray_params.retry_limit))
+        (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
 	sm_p->u.remove.retry_count++;
 	js_p->error_code = CRDIRENT_RETRY;
@@ -506,7 +509,7 @@ static PINT_sm_action remove_rmdirent_retry_or_fail(
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.remove.retry_count < sm_p->msgarray_params.retry_limit))
+	(sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
 	sm_p->u.remove.retry_count++;
 	js_p->error_code = RMDIRENT_RETRY;

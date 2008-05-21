@@ -23,36 +23,42 @@ extern struct TROVE_bstream_ops dbpf_bstream_ops;
 extern struct TROVE_context_ops dbpf_context_ops;
 
 extern struct TROVE_bstream_ops alt_aio_bstream_ops;
+extern struct TROVE_bstream_ops null_aio_bstream_ops;
 
 /* currently we only have one method for these tables to refer to */
 struct TROVE_mgmt_ops *mgmt_method_table[] =
 {
     &dbpf_mgmt_ops,
-    &dbpf_mgmt_ops /* alt-aio */
+    &dbpf_mgmt_ops, /* alt-aio */
+    &dbpf_mgmt_ops  /* null-aio */
 };
 
 struct TROVE_dspace_ops *dspace_method_table[] =
 {
     &dbpf_dspace_ops,
-    &dbpf_dspace_ops /* alt-aio */
+    &dbpf_dspace_ops, /* alt-aio */
+    &dbpf_dspace_ops  /* null-aio */
 };
 
 struct TROVE_keyval_ops *keyval_method_table[] =
 {
     &dbpf_keyval_ops,
-    &dbpf_keyval_ops /* alt-aio */
+    &dbpf_keyval_ops, /* alt-aio */
+    &dbpf_keyval_ops  /* null-aio */
 };
 
 struct TROVE_bstream_ops *bstream_method_table[] =
 {
     &dbpf_bstream_ops,
-    &alt_aio_bstream_ops
+    &alt_aio_bstream_ops,
+    &null_aio_bstream_ops
 };
 
 struct TROVE_context_ops *context_method_table[] =
 {
     &dbpf_context_ops,
-    &dbpf_context_ops /* alt-aio */
+    &dbpf_context_ops, /* alt-aio */
+    &dbpf_context_ops  /* null-aio */
 };
 
 /* trove_init_mutex, trove_init_status

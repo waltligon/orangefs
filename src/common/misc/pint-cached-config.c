@@ -8,7 +8,10 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <time.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
@@ -114,12 +117,41 @@ static int io_randomized = 0;
  */
 int PINT_cached_config_initialize(void)
 {
+    struct timeval tv;
+    unsigned int seed = 0;
+    char hostname[HOST_NAME_MAX];
+    int ret;
+    int i;
+    int hostnamelen;
+
     if (!PINT_fsid_config_cache_table)
     {
         PINT_fsid_config_cache_table =
             qhash_init(hash_fsid_compare,hash_fsid,11);
     }
-    srand((unsigned int)time(NULL));
+
+    /* include time, pid, and hostname in random seed in order to help avoid
+     * collisions on object placement when many clients are launched 
+     * concurrently 
+     */
+    gettimeofday(&tv, NULL);
+    seed += tv.tv_sec;
+    seed += tv.tv_usec;
+
+    seed += getpid();
+
+    ret = gethostname(hostname, HOST_NAME_MAX);
+    if(ret == 0)
+    {
+        hostnamelen = strlen(hostname);
+        for(i=0; i<hostnamelen; i++)
+        {
+            seed += (hostname[hostnamelen - i - 1] + i*256);
+        }
+    }
+    
+    srand(seed);
+
     return (PINT_fsid_config_cache_table ? 0 : -PVFS_ENOMEM);
 }
 
@@ -448,9 +480,10 @@ int PINT_cached_config_map_servers(
     struct PINT_llist *server_list;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    int num_io_servers, i, j, ret;
+    int num_io_servers, i, ret;
     int start_index = -1;
     int index;
+    int random_attempts;
 
     assert(inout_num_datafiles);
 
@@ -544,8 +577,13 @@ int PINT_cached_config_map_servers(
             break;
 
         case PVFS_SYS_LAYOUT_RANDOM:
+            /* this layout randomizes the order but still uses each server
+             * only once
+             */
 
-            /* all random */
+            /* limit this layout to a number of datafiles no greater than
+             * the number of servers
+             */
             if(num_io_servers < *inout_num_datafiles)
             {
                 *inout_num_datafiles = num_io_servers;
@@ -554,34 +592,51 @@ int PINT_cached_config_map_servers(
             /* init all the addrs to 0, so we know whether we've set an
              * address at a particular index or not
              */
+            memset(addr_array, 0, (*inout_num_datafiles)*sizeof(*addr_array));
+
             for(i = 0; i < *inout_num_datafiles; ++i)
             {
+                /* go through server list in order */
+                cur_mapping = PINT_llist_head(server_list);
+                assert(cur_mapping);
+                server_list = PINT_llist_next(server_list);
+
+                /* select random index into caller's list */
                 index = rand() % *inout_num_datafiles;
-                for(j = 0; j < i; ++j)
+                random_attempts = 1;
+
+                /* if we have already filled that index, try another random
+                 * index 
+                 */ 
+                while(addr_array[index] != 0 && random_attempts < 6)
                 {
-                    if(addr_array[index] == 0)
-                    {
-                        cur_mapping = PINT_llist_head(server_list);
-                        assert(cur_mapping);
-                        server_list = PINT_llist_next(server_list);
+                    index = rand() % *inout_num_datafiles;
+                    random_attempts++;
+                }
 
-                        /* found an unused index */
-                        ret = BMI_addr_lookup(
-                            &addr_array[index],
-                            cur_mapping->alias_mapping->bmi_address);
-                        if (ret)
-                        {
-                            return ret;
-                        }
+                /* if we exhausted a max number of randomization attempts,
+                 * then just go linearly through list
+                 */
+                while(addr_array[index] != 0)
+                {
+                    index = (index + 1) % *inout_num_datafiles;
+                }
 
-                        if(handle_extent_array)
-                        {
-                            handle_extent_array[index].extent_count =
-                                cur_mapping->handle_extent_array.extent_count;
-                            handle_extent_array[index].extent_array =
-                                cur_mapping->handle_extent_array.extent_array;
-                        }
-                    }
+                /* found an unused index */
+                ret = BMI_addr_lookup(
+                    &addr_array[index],
+                    cur_mapping->alias_mapping->bmi_address);
+                if (ret)
+                {
+                    return ret;
+                }
+
+                if(handle_extent_array)
+                {
+                    handle_extent_array[index].extent_count =
+                        cur_mapping->handle_extent_array.extent_count;
+                    handle_extent_array[index].extent_array =
+                        cur_mapping->handle_extent_array.extent_array;
                 }
             }
             break;

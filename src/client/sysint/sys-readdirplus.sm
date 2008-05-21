@@ -149,7 +149,7 @@ PVFS_error PVFS_isys_readdirplus(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -469,6 +469,7 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
 {
     int i, ret;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus state: fetch_attrs_setup\n");
     /* if there are no dirents then return NO_WORK */
@@ -494,21 +495,18 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
          js_p->error_code = -PVFS_EINVAL;
          return SM_ACTION_COMPLETE;
      }
-     sm_p->msgarray_count = sm_p->u.readdirplus.svr_count;
-     sm_p->msgarray = (PINT_sm_msgpair_state *) 
-         calloc(sm_p->msgarray_count, sizeof(PINT_sm_msgpair_state));
-     if (sm_p->msgarray == NULL)
+     ret = PINT_msgpairarray_init(
+         &sm_p->msgarray_op, sm_p->u.readdirplus.svr_count);
+     if(ret != 0)
      {
-         sm_p->msgarray_count = 0;
-         js_p->error_code = -PVFS_ENOMEM;
-         gossip_err("Could not allocate memory %d\n", -PVFS_ENOMEM);
+         gossip_err("Failed to initialize %d msgpairs\n",
+                    sm_p->u.readdirplus.svr_count);
+         js_p->error_code = ret;
          return SM_ACTION_COMPLETE;
      }
-     for (i = 0; i < sm_p->msgarray_count; i++) 
-     {
-        PINT_sm_msgpair_state *msg_p = NULL;
 
-        msg_p = &sm_p->msgarray[i];
+     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+     {
         PINT_SERVREQ_LISTATTR_FILL(
             msg_p->req,
             *sm_p->cred_p,
@@ -525,6 +523,7 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
      }
      /* immediate return. next state jumps to msgpairarray machine */
      js_p->error_code = 0;
+     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
      return SM_ACTION_COMPLETE;
 }
 
@@ -534,14 +533,14 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
                                int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_LISTATTR_DEBUG,
                  "readdirplus_fetch_attrs_comp_fn called\n");
     assert(resp_p->op == PVFS_SERV_LISTATTR);
 
     /* Mark all handles in this server range as having failed a stat */
-    if (sm_p->msgarray[index].op_status != 0) {
+    if (sm_p->msgarray_op.msgarray[index].op_status != 0) {
         int i, handle_index;
         for (i = 0; i < sm_p->u.readdirplus.handle_count[index]; i++) {
             get_handle_index(sm_p->u.readdirplus.input_handle_array,
@@ -551,10 +550,10 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
                             NULL);
             assert(handle_index >= 0);
             sm_p->u.readdirplus.readdirplus_resp->stat_err_array[handle_index] =
-                            sm_p->msgarray[index].op_status;
+                            sm_p->msgarray_op.msgarray[index].op_status;
         }
     }
-    else if (sm_p->msgarray[index].op_status == 0)
+    else if (sm_p->msgarray_op.msgarray[index].op_status == 0)
     {
         /* fetch all errors from the servresp structure and copy the object attributes */
         int i, handle_index;
@@ -584,14 +583,14 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
     /* if this is the last response, check all the status values
        and return error codes if any requests failed
      */
-    if (index == (sm_p->msgarray_count - 1))
+    if (index == (sm_p->msgarray_op.count - 1))
     {
         int i;
-        for (i = 0; i < sm_p->msgarray_count; i++) 
+        for (i = 0; i < sm_p->msgarray_op.count; i++) 
         {
-            if (sm_p->msgarray[i].op_status != 0)
+            if (sm_p->msgarray_op.msgarray[i].op_status != 0)
             {
-                return sm_p->msgarray[i].op_status;
+                return sm_p->msgarray_op.msgarray[i].op_status;
             }
         }
         /* destroy scratch space.. we need to reuse them in phase 2 */
@@ -692,12 +691,10 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
 {
     int i, ret;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p;
 
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
     /* don't need sizes */
     if (!(sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
         && !(sm_p->u.readdirplus.attrmask & PVFS_ATTR_DATA_SIZE)) {
@@ -717,19 +714,18 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
          js_p->error_code = NO_WORK;
          return SM_ACTION_COMPLETE;
      }
-     sm_p->msgarray_count = sm_p->u.readdirplus.svr_count;
-     sm_p->msgarray = (PINT_sm_msgpair_state *) 
-          calloc(sm_p->msgarray_count, sizeof(PINT_sm_msgpair_state));
-     if (sm_p->msgarray == NULL)
+
+     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->u.readdirplus.svr_count);
+     if(ret != 0)
      {
-         js_p->error_code = -PVFS_ENOMEM;
+         gossip_err("Failed to initialize %d msgpairs\n",
+                    sm_p->u.readdirplus.svr_count);
+         js_p->error_code = ret;
          return SM_ACTION_COMPLETE;
      }
-     for (i = 0; i < sm_p->msgarray_count; i++) 
-     {
-        PINT_sm_msgpair_state *msg_p = NULL;
 
-        msg_p = &sm_p->msgarray[i];
+     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+     {
         PINT_SERVREQ_LISTATTR_FILL(
             msg_p->req,
             *sm_p->cred_p,
@@ -747,6 +743,8 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
      }
      /* immediate return. next state jumps to msgpairarray machine */
      js_p->error_code = 0;
+
+     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
      return SM_ACTION_COMPLETE;
 }
 
@@ -756,14 +754,14 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
                                int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_LISTATTR_DEBUG,
                  "readdirplus_fetch_sizes_comp_fn called\n");
     assert(resp_p->op == PVFS_SERV_LISTATTR);
 
     /* Mark all handles in this server range as having failed a stat */
-    if (sm_p->msgarray[index].op_status != 0) {
+    if (sm_p->msgarray_op.msgarray[index].op_status != 0) {
         int i, handle_index, aux_index;
         for (i = 0; i < sm_p->u.readdirplus.handle_count[index]; i++) {
             get_handle_index(sm_p->u.readdirplus.input_handle_array,
@@ -773,10 +771,10 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
                             &aux_index);
             assert(handle_index >= 0 && aux_index >= 0);
             sm_p->u.readdirplus.readdirplus_resp->stat_err_array[handle_index] = 
-                            sm_p->msgarray[index].op_status;
+                            sm_p->msgarray_op.msgarray[index].op_status;
         }
     }
-    else if (sm_p->msgarray[index].op_status == 0)
+    else if (sm_p->msgarray_op.msgarray[index].op_status == 0)
     {
         /* fetch all errors from the servresp structure and copy the object attributes */
         int i, handle_index, aux_index;
@@ -805,16 +803,9 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
     /* If this is the last server response, check all the status values
      * and stash any error codes if any of them failed 
      */
-    if (index == (sm_p->msgarray_count - 1))
+    if (index == (sm_p->msgarray_op.count - 1))
     {
-        int i;
-        for (i = 0; i < sm_p->msgarray_count; i++) 
-        {
-            if (sm_p->msgarray[i].op_status != 0)
-            {
-                return sm_p->msgarray[i].op_status;
-            }
-        }
+        return PINT_msgarray_status(&sm_p->msgarray_op);
     }
     return 0;
 }
@@ -931,11 +922,7 @@ static PINT_sm_action readdirplus_cleanup(
     }
     free(sm_p->u.readdirplus.obj_attr_array);
     sm_p->u.readdirplus.obj_attr_array = NULL;
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }

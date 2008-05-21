@@ -636,7 +636,6 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
             bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0, 1);
             if(flow_data->dest_last_posted)
             {
-                flow_data->initial_posts = 0;
                 break;
             }
         }
@@ -959,7 +958,10 @@ static void trove_read_callback_fn(void *user_ptr,
                 q_item->parent->hints);
             flow_data->next_seq_to_send++;
             if(q_item->last)
+            {
+                flow_data->initial_posts = 0;
                 flow_data->dest_last_posted = 1;
+            }
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
                 "%s: (post send time) ini posts: %d, pending: %d, last: %d\n",
                 __func__,
@@ -1173,7 +1175,10 @@ static int bmi_send_callback_fn(void *user_ptr,
          * is no work to do, trigger manually
          */
         if(flow_data->total_bytes_processed == 0)
+        {
+            flow_data->initial_posts = 0;
             flow_data->dest_last_posted = 1;
+        }
     }
 
     if(bytes_processed == 0)
@@ -1217,6 +1222,7 @@ static int bmi_send_callback_fn(void *user_ptr,
              * to prevent further trying to start other qitems from being
              * posted
              */
+            flow_data->initial_posts = 0;
             flow_data->dest_last_posted = 1;
             return 0;
         }

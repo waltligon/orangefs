@@ -98,10 +98,11 @@ PVFS_error PVFS_isys_flush(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
 
     /* NOTE: This state machine previously multiplied the default job timeout
      * by five to allow for potentially long sync delays.  We instead now set
@@ -170,22 +171,18 @@ static int flush_datafile_setup_msgpairarray(
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->u.meta.dfile_count > 0);
 
-    /* datafile count + 1 metafile */
-    sm_p->msgarray_count = (attr->u.meta.dfile_count + 1);
-
-    /* allocate memory for datafile message pairs and the metafile */
-    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        (sm_p->msgarray_count * sizeof(PINT_sm_msgpair_state)));
-    if (!sm_p->msgarray)
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, (attr->u.meta.dfile_count + 1));
+    if(ret != 0)
     {
-        js_p->error_code = -PVFS_ENOMEM;
+        gossip_err("Failed to initialize %d msgpairs\n",
+                   (attr->u.meta.dfile_count + 1));
+        js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
 
-    for(i = 0; i < sm_p->msgarray_count; i++)
+    /* datafile count + 1 metafile */
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        msg_p = &sm_p->msgarray[i];
-
         if (i < attr->u.meta.dfile_count)
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -205,7 +202,7 @@ static int flush_datafile_setup_msgpairarray(
         }
         else
         {
-            assert(i == (sm_p->msgarray_count - 1));
+            assert(i == (sm_p->msgarray_op.count - 1));
 
             gossip_debug(GOSSIP_CLIENT_DEBUG,
                          "  metafile_flush: flushing handle %llu\n",
@@ -224,13 +221,14 @@ static int flush_datafile_setup_msgpairarray(
         }
     }
 
-    ret = PINT_serv_msgpairarray_resolve_addrs(
-        sm_p->msgarray_count, sm_p->msgarray);
+    ret = PINT_serv_msgpairarray_resolve_addrs(&sm_p->msgarray_op);
     if (ret)
     {
         gossip_err("Error: failed to resolve server addresses.\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -260,11 +258,7 @@ static int flush_cleanup(
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    if (sm_p->msgarray)
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;

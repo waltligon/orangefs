@@ -172,14 +172,12 @@ PVFS_error PVFS_isys_fs_add(
      * PINT_init_msgarray_params(), because we don't yet have a server
      * configuration file to override default parameters.
      */
-    sm_p->msgarray_params.job_context = pint_client_sm_context;
-    sm_p->msgarray_params.job_timeout = 30;   /* 30 second job timeout */
-    sm_p->msgarray_params.retry_delay = 2000; /* 2 second retry delay */
-    sm_p->msgarray_params.retry_limit = 5;    /* retry up to 5 times */
+    sm_p->msgarray_op.params.job_context = pint_client_sm_context;
+    sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
+    sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
 
-    sm_p->msgarray_count = 1;
-    sm_p->msgarray = &(sm_p->msgpair);
-
+    PINT_msgpair_init(&sm_p->msgarray_op);
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
 
     return PINT_client_state_machine_post(
@@ -308,10 +306,9 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    sm_p->msgarray_count = count;
-    sm_p->msgarray = (PINT_sm_msgpair_state *) malloc(
-        count * sizeof(PINT_sm_msgpair_state));
-    if (!sm_p->msgarray)
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, count);
+    if (ret != 0)
     {
         fprintf(stderr, "Could not allocate msgarray for fetch_config\n");
         free(sm_p->fetch_config.addr_array);
@@ -320,7 +317,7 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
         sm_p->fetch_config.fs_config_bufs = NULL;
         free(sm_p->fetch_config.fs_config_buf_size);
         sm_p->fetch_config.fs_config_buf_size = NULL;
-        js_p->error_code = -PVFS_ENOMEM;
+        js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;

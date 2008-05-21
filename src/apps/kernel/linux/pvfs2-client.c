@@ -38,6 +38,9 @@ static char s_client_core_path[PATH_MAX];
 
 #define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
 
+#define CLIENT_RESTART_INTERVAL_SECS 10
+#define CLIENT_MAX_RESTARTS 10
+
 typedef struct
 {
     int verbose;
@@ -59,6 +62,7 @@ typedef struct
     char *dev_buffer_count;
     char *dev_buffer_size;
     char *logtype;
+    char *events;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -172,6 +176,10 @@ static int monitor_pvfs2_client(options_t *opts)
     int dev_init_failures = 0;
     char* arg_list[128] = {NULL};
     int arg_index;
+    int restart_count = 0;
+    struct timeval last_restart, now;
+
+    gettimeofday(&last_restart, NULL);
 
     assert(opts);
 
@@ -239,6 +247,7 @@ static int monitor_pvfs2_client(options_t *opts)
                         break;
                     }
                     core_pid = -1;
+                    sleep(1);
                     continue;
                 }
 
@@ -266,22 +275,42 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 dev_init_failures = 0;
 
-                if (opts->verbose)
-                {
-                    printf("Child process with pid %d was killed by an "
-                           "uncaught signal %d\n", core_pid,
-                           WTERMSIG(ret));
-                }
+                fprintf(stderr,
+                        "Child process with pid %d was killed by an "
+                       "uncaught signal %d\n", core_pid, WTERMSIG(ret));
                 core_pid = -1;
+
+                gettimeofday(&now, NULL);
+
+                if(((now.tv_sec + now.tv_usec*1e-6) -
+                    (last_restart.tv_sec + last_restart.tv_usec*1e-6))
+                   < CLIENT_RESTART_INTERVAL_SECS)
+                {
+                    if(restart_count > CLIENT_MAX_RESTARTS)
+                    {
+                        fprintf(stderr, "Chld process is restarting too quickly "
+                                "(within %d secs) after %d attempts! "
+                                "Aborting the client.\n",
+                                CLIENT_RESTART_INTERVAL_SECS, restart_count);
+                        exit(1);
+                    }
+                }
+                else
+                {
+                    /* reset restart count */
+                    restart_count = 0;
+                }
+
+                last_restart = now;
                 continue;
             }
         }
         else
         {
-            sleep(1);
-
             arg_list[0] = PVFS2_CLIENT_CORE_NAME;
             arg_index = 1;
+
+            arg_list[arg_index++] = "--child";
             arg_list[arg_index++] = "-a";
             arg_list[arg_index++] = opts->acache_timeout;
             arg_list[arg_index++] = "-n";
@@ -369,6 +398,12 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->dev_buffer_size;
                 arg_index+=2;
             }
+            if(opts->events)
+            {
+                arg_list[arg_index] = "--events";
+                arg_list[arg_index+1] = opts->events;
+                arg_index+=2;
+            }
 
             if(opts->verbose)
             {
@@ -449,6 +484,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"gossip-mask",1,0,0},
         {"path",1,0,0},
         {"logstamp",1,0,0},
+        {"events",1,0,0},
         {0,0,0,0}
     };
 
@@ -557,6 +593,11 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     opts->gossip_mask = optarg;
                     break;
                 }
+                else if (strcmp("events", cur_option) == 0)
+                {
+                    opts->events = optarg;
+                }
+
                 break;
             case 'h':
           do_help:

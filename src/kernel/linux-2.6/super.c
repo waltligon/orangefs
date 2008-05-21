@@ -17,7 +17,6 @@ spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
 #ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
 static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keylen);
 #endif
-static atomic_t pvfs2_inode_alloc_count, pvfs2_inode_dealloc_count;
 
 static char *keywords[] = {"intr", "acl", "suid", "noatime", "nodiratime"};
 static int num_possible_keywords = sizeof(keywords)/sizeof(char *);
@@ -149,6 +148,7 @@ static int parse_mount_options(
             /* option string did not match any of the known keywords */
             if (j == num_possible_keywords)
             {
+#ifdef PVFS2_LINUX_KERNEL_2_4
                 /* assume we have a device name */
                 if (got_device == 0)
                 {
@@ -167,6 +167,13 @@ static int parse_mount_options(
                     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2: multiple device names specified: "
                                 "ignoring %s\n", options[i]);
                 }
+#else
+                /* in the 2.6 kernel, we don't pass device name through this
+                 * path; we must have gotten an unsupported option.
+                 */
+                gossip_err("Error: mount option [%s] is not supported.\n", options[i]);
+                return(-EINVAL);
+#endif
             }
         }
     }
@@ -193,7 +200,7 @@ static struct inode *pvfs2_alloc_inode(struct super_block *sb)
     {
         new_inode = &pvfs2_inode->vfs_inode;
         gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_alloc_inode: allocated %p\n", pvfs2_inode);
-        atomic_inc(&pvfs2_inode_alloc_count);
+        atomic_inc(&(PVFS2_SB(sb)->pvfs2_inode_alloc_count));
         new_inode->i_flags &= ~(S_APPEND|S_IMMUTABLE|S_NOATIME);
     }
     return new_inode;
@@ -208,7 +215,7 @@ static void pvfs2_destroy_inode(struct inode *inode)
         gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_destroy_inode: deallocated %p destroying inode %llu\n",
                     pvfs2_inode, llu(get_handle_from_ino(inode)));
 
-        atomic_inc(&pvfs2_inode_dealloc_count);
+        atomic_inc(&(PVFS2_SB(inode->i_sb)->pvfs2_inode_dealloc_count));
         pvfs2_inode_finalize(pvfs2_inode);
         pvfs2_inode_release(pvfs2_inode);
     }
@@ -536,7 +543,7 @@ int pvfs2_remount(
 
     if (sb && PVFS2_SB(sb))
     {
-        if (data)
+        if (data && data[0] != '\0')
         {
             ret = parse_mount_options(data, sb, 1);
             if (ret)
@@ -1307,8 +1314,8 @@ void pvfs2_kill_sb(
 #endif
         {
             int count1, count2;
-            count1 = atomic_read(&pvfs2_inode_alloc_count);
-            count2 = atomic_read(&pvfs2_inode_dealloc_count);
+            count1 = atomic_read(&(PVFS2_SB(sb)->pvfs2_inode_alloc_count));
+            count2 = atomic_read(&(PVFS2_SB(sb)->pvfs2_inode_dealloc_count));
             if (count1 != count2) 
             {
                 gossip_err("pvfs2_kill_sb: (WARNING) number of inode allocs (%d) != number of inode deallocs (%d)\n",

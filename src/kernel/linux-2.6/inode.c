@@ -133,7 +133,7 @@ static int pvfs2_releasepage(struct page *page, gfp_t foo)
 
 struct backing_dev_info pvfs2_backing_dev_info =
 {
-    .ra_pages = 1024,
+    .ra_pages = 0,
 #ifdef HAVE_BDI_MEMORY_BACKED
     /* old interface, up through 2.6.11 */
     .memory_backed = 1 /* does not contribute to dirty memory */
@@ -244,7 +244,21 @@ int pvfs2_getattr(
     int ret = -ENOENT;
     struct inode *inode = dentry->d_inode;
 
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_getattr: called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_INODE_DEBUG, 
+        "pvfs2_getattr: called on %s\n", dentry->d_name.name);
+
+    /* This seems to be the only place to reliably detect mount options
+     * parsed by the VFS layer.  Propigate them to our internal sb structure so
+     * that we can handle lazy time updates properly.
+     */
+    if(mnt->mnt_flags && MNT_NOATIME) 
+    { 
+        inode->i_sb->s_flags |= MS_NOATIME; 
+    } 
+    if(mnt->mnt_flags && MNT_NODIRATIME) 
+    { 
+        inode->i_sb->s_flags |= MS_NODIRATIME; 
+    } 
 
     /*
      * Similar to the above comment, a getattr also expects that all fields/attributes

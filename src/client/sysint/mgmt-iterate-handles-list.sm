@@ -71,6 +71,7 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
 {
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
+    int ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_imgmt_iterate_handles_list() entered.\n");
@@ -92,7 +93,7 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, fs_id);
+    PINT_init_msgarray_params(sm_p, fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.iterate_handles_list.fs_id = fs_id;
     sm_p->u.iterate_handles_list.server_count = server_count;
@@ -103,14 +104,11 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
     sm_p->u.iterate_handles_list.details = details;
     PVFS_hint_copy(hints, &sm_p->hints);
 
-    sm_p->msgarray_count = server_count;
-    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        server_count * sizeof(PINT_sm_msgpair_state));
-    if (sm_p->msgarray == NULL)
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, server_count);
+    if(ret != 0)
     {
-        PVFS_util_release_credentials(sm_p->cred_p);
         PINT_smcb_free(smcb);
-        return -PVFS_ENOMEM;
+        return ret;
     }
 
     return PINT_client_state_machine_post(
@@ -174,16 +172,15 @@ static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
 
     /* setup msgpair array */
     j=0;
-    for(i=0; i < sm_p->u.iterate_handles_list.server_count; i++)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-	msg_p = &sm_p->msgarray[j];
 
 	/* skip servers that have already reached end */
 	/* TODO: use a better #define or something for ITERATE_END */
 	if(sm_p->u.iterate_handles_list.position_array[i]
 	    == PVFS_ITERATE_END)
 	{
-	    sm_p->msgarray_count--;
+	    sm_p->msgarray_op.count--;
 	    sm_p->u.iterate_handles_list.handle_count_array[i] = 0;
 	}
 	else
@@ -205,7 +202,8 @@ static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
     }
 
     /* TODO: be nicer about this, user called function too many times */
-    assert(sm_p->msgarray_count > 0);
+    assert(sm_p->msgarray_op.count > 0);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
 
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;
@@ -226,15 +224,15 @@ static PINT_sm_action mgmt_iterate_handles_list_cleanup(
 
 	for(i = 0; i < sm_p->u.iterate_handles_list.server_count; i++)
         {
-	    if (sm_p->msgarray[i].op_status != 0)
+	    if (sm_p->msgarray_op.msgarray[i].op_status != 0)
 	    {
 		if (errct <
                     sm_p->u.iterate_handles_list.details->count_allocated)
 		{
 		    sm_p->u.iterate_handles_list.details->error[
-                        errct].error = sm_p->msgarray[i].op_status;
+                        errct].error = sm_p->msgarray_op.msgarray[i].op_status;
 		    sm_p->u.iterate_handles_list.details->error[
-                        errct].addr = sm_p->msgarray[i].svr_addr;
+                        errct].addr = sm_p->msgarray_op.msgarray[i].svr_addr;
 		    errct++;
 		}
 		else
@@ -247,10 +245,7 @@ static PINT_sm_action mgmt_iterate_handles_list_cleanup(
 	error = -PVFS_EDETAIL;
     }
 
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-	free(sm_p->msgarray);
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     sm_p->error_code  = error;
 
@@ -264,17 +259,17 @@ static int iterate_handles_list_comp_fn(void *v_p,
 {
     int j = 0;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     /* if this particular request was successful, then collect info from 
      * response
      */
-    if (sm_p->msgarray[i].op_status == 0)
+    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
     {
 	/* first, we have to match this up with the correct array entry */
 	for (j=0; j<sm_p->u.iterate_handles_list.server_count; j++)
 	{
-	    if (sm_p->msgarray[i].svr_addr 
+	    if (sm_p->msgarray_op.msgarray[i].svr_addr 
 		== sm_p->u.iterate_handles_list.addr_array[j])
 	    {
 		break;
@@ -295,15 +290,9 @@ static int iterate_handles_list_comp_fn(void *v_p,
     /* if this is the last response, check all of the status values and 
      * return error code if any requests failed 
      */
-    if (i == (sm_p->msgarray_count -1))
+    if (i == (sm_p->msgarray_op.count -1))
     {
-	for (j=0; j<sm_p->msgarray_count; j++)
-	{
-	    if (sm_p->msgarray[j].op_status != 0)
-	    {
-		return(sm_p->msgarray[j].op_status);
-	    }
-	}
+        return PINT_msgarray_status(&sm_p->msgarray_op);
     }
    
     return 0;
