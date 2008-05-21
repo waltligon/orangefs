@@ -36,15 +36,19 @@
 #define SECURITY_DEFAULT_TIMEOUT      3600                /* 1 hour */
 
 
-/* the private key used for signing */
-static EVP_PKEY *security_privkey = NULL;
-
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
 static int security_init_status = 0;
+
+#ifndef SECURITY_ENCRYPTION_NONE
+
+/* the private key used for signing */
+static EVP_PKEY *security_privkey = NULL;
 
 
 static int load_private_key(const char*);
 static int load_public_keys(const char*);
+
+#endif /* SECURITY_ENCRYPTION_NONE */
 
 
 /*  PINT_security_initialize	
@@ -75,6 +79,8 @@ int PINT_security_initialize(void)
         return ret;
     }
 
+#ifndef SECURITY_ENCRYPTION_NONE
+
     ret = load_private_key(SECURITY_DEFAULT_PRIVKEYFILE);
     if (ret < 0)
     {
@@ -87,6 +93,8 @@ int PINT_security_initialize(void)
     {
         return -PVFS_EIO;
     }
+
+#endif /* SECURITY_ENCRYPTION_NONE */
 
     security_init_status = 1;
     gen_mutex_unlock(&security_init_mutex);
@@ -110,17 +118,22 @@ int PINT_security_finalize(void)
         return -PVFS_EALREADY;
     }
 
+    SECURITY_hash_finalize();
+
+#ifndef SECURITY_ENCRYPTION_NONE
     EVP_PKEY_free(security_privkey);
+#endif
 
     EVP_cleanup();
     ERR_free_strings();
-    SECURITY_hash_finalize();
 
     security_init_status = 0;
     gen_mutex_unlock(&security_init_mutex);
     
     return 0;
 }
+
+#ifndef SECURITY_ENCRYPTION_NONE
 
 /*  PINT_sign_capability
  *
@@ -133,8 +146,8 @@ int PINT_security_finalize(void)
 int PINT_sign_capability(PVFS_capability *cap)
 {
     EVP_MD_CTX mdctx;
-    unsigned siglen;
     char buf[256];
+    const EVP_MD *md;
     int ret;
 
     assert(security_privkey);
@@ -142,9 +155,15 @@ int PINT_sign_capability(PVFS_capability *cap)
     cap->timeout = PINT_util_get_current_time();
     cap->timeout += SECURITY_DEFAULT_TIMEOUT;
 
+#if defined(SECURITY_ENCRYPTION_RSA)
+    md = EVP_sha1();
+#elif defined(SECURITY_ENCRYPTION_DSA)
+    md = EVP_dss1();
+#endif
+
     EVP_MD_CTX_init(&mdctx);
 
-    ret = EVP_SignInit_ex(&mdctx, EVP_sha1(), NULL);
+    ret = EVP_SignInit_ex(&mdctx, md, NULL);
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
@@ -169,7 +188,8 @@ int PINT_sign_capability(PVFS_capability *cap)
         return -1;
     }
 
-    ret = EVP_SignFinal(&mdctx, cap->signature, &siglen, security_privkey);
+    ret = EVP_SignFinal(&mdctx, cap->signature, &cap->sig_size, 
+                        security_privkey);
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
@@ -231,7 +251,11 @@ int PINT_verify_capability(PVFS_capability *data)
     }
     free(buf);
 
+#if defined(SECURITY_ENCRYPTION_RSA)
     md = EVP_sha1();
+#elif defined(SECURITY_ENCRYPTION_DSA)
+    md = EVP_dss1();
+#endif
 
     EVP_MD_CTX_init(&mdctx);
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
@@ -247,7 +271,8 @@ int PINT_verify_capability(PVFS_capability *data)
                                 sizeof(PVFS_handle) * data->num_handles);
         if (ret)
         {
-            ret = EVP_VerifyFinal(&mdctx, data->signature, 128, pubkey);
+            ret = EVP_VerifyFinal(&mdctx, data->signature, data->sig_size, 
+                                  pubkey);
         }
         else 
         {
@@ -400,6 +425,22 @@ static int load_public_keys(const char *path)
 
     return 0;
 }
+
+#else /* SECURITY_ENCRYPTION_NONE */
+
+int PINT_sign_capability(PVFS_capability *cap)
+{
+    cap->sig_size = 0;
+
+    return 0;
+}
+
+int PINT_verify_capability(PVFS_capability *cap)
+{
+    return 1;
+}
+
+#endif /* SECURITY_ENCRYPTION_NONE */
 
 
 /*
