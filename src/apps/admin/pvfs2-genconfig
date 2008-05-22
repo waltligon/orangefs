@@ -9,6 +9,7 @@
 use Term::ReadLine;
 use Getopt::Long;
 use Math::BigInt;
+use File::Basename;
 
 # turn on strictness
 use strict 'vars';
@@ -27,6 +28,8 @@ my $opt_ioservers = '';
 my $opt_metaservers = '';
 my $opt_logfile = '';
 my $opt_storage = '';
+my $opt_pubkey = '';
+my $opt_privkey = '';
 my $opt_trovesync = '1';
 my $opt_trovemethod = '';
 my $opt_quiet = '';
@@ -54,6 +57,9 @@ my %all_endpoints = ();
 
 my $default_storage = undef;
 my $default_logfile = undef;
+my $default_pubkey = undef;
+my $default_privkey = undef;
+my $security_flag = '';
 
 my $bmi_module = undef;
 
@@ -64,6 +70,7 @@ my $IO_ENDPOINT   = 0x2;
 
 my $OUT = undef;
 my $term = undef;
+my $dirname = dirname($ARGV[0]);
 
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
 my $num_unexp_reqs = 50;
@@ -207,6 +214,16 @@ sub emit_defaults
     if(defined($default_logfile))
     {
         print $target "\tLogFile " . $default_logfile . "\n";
+    }
+    
+    if(!($default_pubkey eq ""))
+    {
+        print $target "\tKeyStore " . $default_pubkey . "\n";
+    }
+    
+    if(!($default_privkey eq ""))
+    {
+        print $target "\tServerKey " . $default_privkey . "\n";
     }
 
     print $target "</Defaults>\n";
@@ -780,6 +797,42 @@ sub get_storage
     return $storage;
 }
 
+sub get_pubkey
+{
+	if($security_flag eq "")
+	{
+	    print $OUT "Choose whether or not you compiled with encryption enabled.\n";
+        $security_flag = prompt_word("Did you compile with encryption [Default is n]? ","n");
+    }
+    if(($security_flag eq "n" or $security_flag eq "no"))
+    {
+        return "";
+    }
+    my $pubkey = $dirname . "/keystore";
+    if ($opt_pubkey) {
+        $pubkey = $opt_pubkey;
+    } elsif (!$opt_quiet) {
+        print $OUT "Choose the location and filename of the public key file.\n";
+        $pubkey = prompt_word("Enter public key file location: [Default is " . $dirname . "/keystore]: ",$dirname . "/keystore");
+    }
+    return $pubkey;
+}
+
+sub get_privkey
+{
+    if(($security_flag eq "n" or $security_flag eq "no"))
+    {
+        return "";
+    }
+    my $privkey = $dirname . "/privkey.pem";
+    if ($opt_privkey) {
+        $privkey = $opt_privkey;
+    } elsif (!$opt_quiet) {
+        print $OUT "Choose the location and filename of the private key file.\n";
+        $privkey = prompt_word("Enter private key file location: [Default is " . $dirname . "/privkey.pem]: ",$dirname . "/privkey.pem");
+    }
+    return $privkey;
+}
 
 
 # get host port
@@ -887,6 +940,8 @@ sub get_ionames
     my $portmap = shift;
     my $storage = shift;
     my $logfile = shift;
+    my $pubkey = shift;
+    my $privkey = shift;
     my $ioline = '';
     if ($opt_ioservers) {
         $ioline = $opt_ioservers;
@@ -916,7 +971,9 @@ sub get_ionames
                 HOSTNAME => $io_host, 
                 PORTMAP => $portmap, 
                 STORAGE => $storage, 
-                LOGFILE => $logfile};
+                LOGFILE => $logfile,
+                PUBKEY => $pubkey,
+                PRIVKEY => $privkey};
         }
     }
 }
@@ -926,6 +983,8 @@ sub get_metanames
     my $portmap = shift;
     my $storage = shift;
     my $logfile = shift;
+    my $pubkey = shift;
+    my $privkey = shift;
     my $metaline = '';
     if ($opt_metaservers) {
         $metaline = $opt_metaservers;
@@ -952,7 +1011,9 @@ sub get_metanames
                 HOSTNAME => $meta_host, 
                 PORTMAP => $portmap, 
                 STORAGE => $storage, 
-                LOGFILE => $logfile};
+                LOGFILE => $logfile,
+                PUBKEY => $pubkey,
+                PRIVKEY => $privkey};
         }
     }
 }
@@ -1317,6 +1378,8 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'server-job-timeout=i' => \$opt_server_job_timeout,
     'client-job-timeout=i' => \$opt_client_job_timeout,
     'storage=s'     => \$opt_storage,
+    'pubkey=s'      => \$opt_pubkey,
+    'privkey=s'		=> \$opt_privkey,
     'help'          => \$show_help,
     'quiet!'        => \$opt_quiet,
     'trovesync!'    => \$opt_trovesync,
@@ -1413,9 +1476,11 @@ else
 
     $default_storage = get_storage();
     $default_logfile = get_logfile();
+    $default_pubkey = get_pubkey();
+    $default_privkey = get_privkey();
 
-    get_ionames($portmap, $default_storage, $default_logfile);
-    get_metanames($portmap, $default_storage, $default_logfile);
+    get_ionames($portmap, $default_storage, $default_logfile, $default_pubkey, $default_privkey);
+    get_metanames($portmap, $default_storage, $default_logfile, $default_pubkey, $default_privkey);
 }
 
 # find out if any of the storage or logfile entries in the endpoints
@@ -1440,6 +1505,28 @@ if(needs_default_value(LOGFILE))
 
     set_default_value(LOGFILE, $default_logfile);
     set_default_value(LOGFILE, $default_logfile);
+}
+
+if(needs_default_value(PUBKEY))
+{
+    if(!defined($default_pubkey))
+    {
+        $default_pubkey = get_pubkey();
+    }
+
+    set_default_value(PUBKEY, $default_pubkey);
+    set_default_value(PUBKEY, $default_pubkey);
+}
+
+if(needs_default_value(PRIVKEY))
+{
+    if(!defined($default_pubkey))
+    {
+        $default_privkey = get_privkey();
+    }
+
+    set_default_value(PRIVKEY, $default_privkey);
+    set_default_value(PRIVKEY, $default_privkey);
 }
 
 my $count = scalar(keys %all_endpoints);
