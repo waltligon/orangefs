@@ -799,19 +799,19 @@ sub get_storage
 
 sub get_pubkey
 {
-	my $pubkey = $dirname . "/keystore";
+    my $pubkey = $dirname . "/keystore";
     if ($opt_pubkey) {
         $pubkey = $opt_pubkey;
     } elsif (!$opt_quiet) {
         if($security_flag eq "")
-	{
-	    print $OUT "Choose whether or not you compiled with encryption enabled.\n";
-        $security_flag = prompt_word("Did you compile with encryption [Default is n]? ","n");
-    }
-    if(($security_flag eq "n" or $security_flag eq "no"))
-    {
-        return "";
-    }
+        {
+            print $OUT "Choose whether or not you compiled with encryption enabled.\n";
+            $security_flag = prompt_word("Did you compile with encryption [Default is n]? ","n");
+        }
+        if(($security_flag eq "n" or $security_flag eq "no"))
+        {
+            return "";
+        }
         print $OUT "Choose the location and filename of the public key file.\n";
         $pubkey = prompt_word("Enter public key file location: [Default is " . $dirname . "/keystore]: ",$dirname . "/keystore");
     }
