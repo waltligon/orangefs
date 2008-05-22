@@ -31,8 +31,6 @@
 
 
 /* TODO: move to global configuration */
-#define SECURITY_DEFAULT_KEYSTORE     "/tmp/keystore"
-#define SECURITY_DEFAULT_PRIVKEYFILE  "/tmp/privkey.pem"
 #define SECURITY_DEFAULT_TIMEOUT      3600                /* 1 hour */
 
 
@@ -61,6 +59,7 @@ static int load_public_keys(const char*);
  */
 int PINT_security_initialize(void)
 {
+    const struct server_configuration_s *conf;
     int ret;
 
     gen_mutex_lock(&security_init_mutex);
@@ -76,29 +75,36 @@ int PINT_security_initialize(void)
     ret = SECURITY_hash_initialize();
     if (ret < 0)
     {
+        EVP_cleanup();
+        EVP_free_strings();
+        gen_mutex_unlock(&security_init_mutex);
         return ret;
     }
 
 #ifndef SECURITY_ENCRYPTION_NONE
-    struct server_configuration_s *server_conf = PINT_get_server_config();
-    char *privkey_path = server_conf->serverkey_path;
-    if (privkey_path == NULL)
-        ret = load_private_key(SECURITY_DEFAULT_PRIVKEYFILE);
-    else
-        ret = load_private_key(privkey_path);
+
+    conf = PINT_get_server_config();
+
+    assert(conf->serverkey_path);
+    ret = load_private_key(conf->serverkey_path);
     if (ret < 0)
     {
+        SECURITY_hash_finalize();
+        EVP_cleanup();
+        EVP_free_strings();
+        gen_mutex_unlock(&security_init_mutex);
         return -PVFS_EIO;
     }
-    
-    /* TODO: better error handling */
-    char *pubkey_path = server_conf->keystore_path;
-    if (pubkey_path == NULL)
-        ret = load_public_keys(SECURITY_DEFAULT_KEYSTORE);
-    else
-        ret = load_public_keys(pubkey_path);
+
+    assert(conf->keystore_path);
+    ret = load_public_keys(conf->keystore_path);
     if (ret < 0)
     {
+        EVP_PKEY_free(security_privkey);
+        SECURITY_hash_finalize();
+        EVP_cleanup();
+        EVP_free_strings();
+        gen_mutex_unlock(&security_init_mutex);
         return -PVFS_EIO;
     }
 

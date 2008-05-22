@@ -1031,6 +1031,23 @@ int PINT_parse_config(
                    "No PerfUpdateInterval specified.\n");
         return 1;
     }
+
+#ifndef SECURITY_ENCRYPTION_NONE
+
+    if (!config_s->keystore_path)
+    {
+        gossip_err("Configuration file error. No keystore path specified.\n");
+        return 1;
+    }
+
+    if (!config_s->serverkey_path)
+    {
+        gossip_err("Configuration file error. No server key path "
+                   "specified.\n");
+        return 1;
+    }
+
+#endif /* SECURITY_ENCRYPTION_NONE */
     
     return 0;
 }
