@@ -134,7 +134,7 @@ static PINT_sm_action mgmt_noop_setup_msgpair(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "noop state: mgmt_noop_setup_msgpair\n");
 
-    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgarray_op.msgpair.req, *sm_p->cred_p);
+    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgarray_op.msgpair.req, *sm_p->cred_p, sm_p->hints);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     js_p->error_code = 0;

@@ -282,13 +282,7 @@ static int collect_old_values_comp_fn(
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     int j;
 
-    if ((sm_p->msgarray_op.msgarray[i].op_status == 0) &&
-        (sm_p->u.setparam_list.old_value_array))
-    {
-        sm_p->u.setparam_list.old_value_array[i] =
-            resp_p->u.mgmt_setparam.old_value;
-    }
- 
+
     /* if this is the last response, check all of the status values
      * and return error code if any requests failed
      */

@@ -672,7 +672,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->getattr.object_ref.fs_id,
-            attr->u.meta.dfile_array[i],
+            attr->u.meta.dfile_array[index],
             PVFS_ATTR_DATA_SIZE,
             sm_p->hints);
 

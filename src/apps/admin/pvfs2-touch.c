@@ -196,8 +196,9 @@ int main(int argc, char **argv)
                              attr,
                              &credentials,
                              NULL,
+                             &resp_create,
                              &layout,
-                             &resp_create);
+                             NULL);
         if (rc)
         {
             fprintf(stderr, "Error: An error occurred while creating %s\n",

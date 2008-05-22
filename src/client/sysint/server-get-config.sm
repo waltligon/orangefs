@@ -503,7 +503,7 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         sm_p->msgarray_op.msgarray[i].enc_type = sm_p->msgarray_op.msgpair.enc_type;
-        PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p);
+        PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p, sm_p->hints);
 
         msg_p->fs_id = PVFS_FS_ID_NULL;
         msg_p->handle = PVFS_HANDLE_NULL;
