@@ -111,6 +111,11 @@ static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
 static DOTCONF_CB(get_trove_method);
 
+#ifndef SECURITY_ENCRYPTION_NONE
+static DOTCONF_CB(get_key_store);
+static DOTCONF_CB(get_server_key);
+#endif
+
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
 
@@ -899,6 +904,16 @@ static const configoption_t options[] =
      * client operations.
      */
     {"SecretKey",ARG_STR, get_secret_key,NULL,CTX_FILESYSTEM,NULL},
+	
+#ifndef SECURITY_ENCRYPTION_NONE
+
+    {"KeyStore", ARG_STR, get_key_store, NULL, 
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
+	
+    {"ServerKey", ARG_STR, get_server_key, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
+
+#endif /* SECURITY_ENCRYPTION_NONE */
 
     LAST_OPTION
 };
@@ -2611,6 +2626,40 @@ DOTCONF_CB(get_trove_method)
     return NULL;
 }
 
+#ifndef SECURITY_ENCRYPTION_NONE
+
+DOTCONF_CB(get_key_store)
+{
+    struct server_configuration_s *config_s =
+            (struct server_configuration_s*)cmd->context;	
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    free(config_s->keystore_path);
+    config_s->keystore_path =
+            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_server_key)
+{
+    struct server_configuration_s *config_s =
+            (struct server_configuration_s*)cmd->context;	
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    free(config_s->serverkey_path);
+    config_s->serverkey_path =
+            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+#endif /* SECURITY_ENCRYPTION_NONE */
+
 /*
  * Function: PINT_config_release
  *
@@ -2721,6 +2770,14 @@ void PINT_config_release(struct server_configuration_s *config_s)
             free(config_s->db_cache_type);
             config_s->db_cache_type = NULL;
         }
+
+#ifndef SECURITY_ENCRYPTION_NONE
+        free(config_s->keystore_path);
+        config_s->keystore_path = NULL;
+        free(config_s->serverkey_path);
+        config_s->serverkey_path = NULL;
+#endif
+
     }
 }
 

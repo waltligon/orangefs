@@ -189,6 +189,12 @@ typedef struct server_configuration_s
                                      * be configurable.
                                      */
     int trove_method;
+	
+#ifndef SECURITY_ENCRYPTION_NONE
+	char *keystore_path;
+	char *serverkey_path;
+#endif
+
     void *private_data;
 } server_configuration_s;
 

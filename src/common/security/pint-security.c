@@ -80,15 +80,23 @@ int PINT_security_initialize(void)
     }
 
 #ifndef SECURITY_ENCRYPTION_NONE
-
-    ret = load_private_key(SECURITY_DEFAULT_PRIVKEYFILE);
+    struct server_configuration_s *server_conf = PINT_get_server_config();
+    char *privkey_path = server_conf->serverkey_path;
+    if (privkey_path == NULL)
+        ret = load_private_key(SECURITY_DEFAULT_PRIVKEYFILE);
+    else
+        ret = load_private_key(privkey_path);
     if (ret < 0)
     {
         return -PVFS_EIO;
     }
     
     /* TODO: better error handling */
-    ret = load_public_keys(SECURITY_DEFAULT_KEYSTORE);
+    char *pubkey_path = server_conf->keystore_path;
+    if (pubkey_path == NULL)
+        ret = load_public_keys(SECURITY_DEFAULT_KEYSTORE);
+    else
+        ret = load_public_keys(pubkey_path);
     if (ret < 0)
     {
         return -PVFS_EIO;
