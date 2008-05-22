@@ -982,8 +982,9 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
                 uint32_t                ep_id   = 0;
                 uint32_t                sid     = 0;
                 uint64_t                nic_id  = 0ULL;
+                struct bmx_peer         *peer   = NULL;
 
-                bmi_mx->bmx_hostname = (char *) mxmap->mxm_hostname;
+                bmi_mx->bmx_hostname = strdup(mxmap->mxm_hostname);
                 bmi_mx->bmx_board = mxmap->mxm_board;
                 bmi_mx->bmx_ep_id = mxmap->mxm_ep_id;
                 bmi_mx->bmx_is_server = 1;
@@ -1000,6 +1001,8 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
                 mx_get_endpoint_addr(bmi_mx->bmx_ep, &epa);
                 mx_decompose_endpoint_addr2(epa, &nic_id, &ep_id, &sid);
                 bmi_mx->bmx_sid = sid;
+
+                bmx_peer_alloc(&peer, mxmap);
 
                 /* We allocate BMX_PEER_RX_NUM when we peer_alloc()
                  * Allocate some here to catch the peer CONN_REQ */
@@ -1101,8 +1104,14 @@ BMI_mx_finalize(void)
         }
 #endif
 
-        if (bmi_mx->bmx_hostname) free(bmi_mx->bmx_hostname);
-        if (bmi_mx->bmx_peername) free(bmi_mx->bmx_peername);
+        if (bmi_mx->bmx_hostname) {
+                free(bmi_mx->bmx_hostname);
+                bmi_mx->bmx_hostname = NULL;
+        }
+        if (bmi_mx->bmx_peername) {
+                free(bmi_mx->bmx_peername);
+                bmi_mx->bmx_peername = NULL;
+        }
 
         bmi_mx = NULL;
 
@@ -2148,7 +2157,7 @@ bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board
         mxmap = map->method_data;
         mxmap->mxm_map = map;
         mxmap->mxm_peername = strdup(peername);
-        mxmap->mxm_hostname = hostname;
+        mxmap->mxm_hostname = strdup(hostname);
         mxmap->mxm_board = board;
         mxmap->mxm_ep_id = ep_id;
         /* mxmap->mxm_peer */
@@ -2344,6 +2353,7 @@ bmx_handle_conn_req(void)
                                         bmx_put_idle_rx(rx);
                                         continue;
                                 }
+                                free(host);
                                 mxmap = map->method_data;
                                 ret = bmx_peer_alloc(&peer, mxmap);
                                 if (ret != 0) {
@@ -3038,6 +3048,7 @@ BMI_mx_method_addr_lookup(const char *id)
                                        " failed with %d", __func__, ret);
                         }
                 }
+                if (map != NULL) free(host);
         }
 out:
         BMX_EXIT;
