@@ -76,7 +76,7 @@ int PINT_security_initialize(void)
     if (ret < 0)
     {
         EVP_cleanup();
-        EVP_free_strings();
+        ERR_free_strings();
         gen_mutex_unlock(&security_init_mutex);
         return ret;
     }
@@ -91,7 +91,7 @@ int PINT_security_initialize(void)
     {
         SECURITY_hash_finalize();
         EVP_cleanup();
-        EVP_free_strings();
+        ERR_free_strings();
         gen_mutex_unlock(&security_init_mutex);
         return -PVFS_EIO;
     }
@@ -103,7 +103,7 @@ int PINT_security_initialize(void)
         EVP_PKEY_free(security_privkey);
         SECURITY_hash_finalize();
         EVP_cleanup();
-        EVP_free_strings();
+        ERR_free_strings();
         gen_mutex_unlock(&security_init_mutex);
         return -PVFS_EIO;
     }

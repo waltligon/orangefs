@@ -664,7 +664,6 @@ static PINT_sm_action msgpairarray_done(
     return SM_ACTION_COMPLETE;
 }
 
-
 /*********************************************************************
  * helper functions used in conjunction with state machine defined above
  */

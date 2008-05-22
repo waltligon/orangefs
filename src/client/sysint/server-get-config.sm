@@ -266,7 +266,6 @@ static PINT_sm_action server_get_config_setup_msgpair(
         msg_p->enc_type = sm_p->u.get_config.mntent->encoding;
     }
 
-
     ret = BMI_addr_lookup(&serv_addr,
                           sm_p->u.get_config.mntent->the_pvfs_config_server);
     if (ret < 0)
