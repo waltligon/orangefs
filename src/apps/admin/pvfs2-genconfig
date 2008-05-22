@@ -813,8 +813,8 @@ sub get_pubkey
         {
             return "";
         }
-        print $OUT "Choose the location and filename of the public key file.\n";
-        $pubkey = prompt_word("Enter public key file location: [Default is " . $dirname . "/keystore]: ",$dirname . "/keystore");
+        print $OUT "Choose the path to the public key file.\n";
+        $pubkey = prompt_word("Enter public key file path: [Default is " . $dirname . "/keystore]: ",$dirname . "/keystore");
     }
     return $pubkey;
 }
@@ -829,8 +829,8 @@ sub get_privkey
     if ($opt_privkey) {
         $privkey = $opt_privkey;
     } elsif (!$opt_quiet) {
-        print $OUT "Choose the location and filename of the private key file.\n";
-        $privkey = prompt_word("Enter private key file location: [Default is " . $dirname . "/privkey.pem]: ",$dirname . "/privkey.pem");
+        print $OUT "Choose the path to the private key file.\n";
+        $privkey = prompt_word("Enter private key file path: [Default is " . $dirname . "/privkey.pem]: ",$dirname . "/privkey.pem");
     }
     return $privkey;
 }
