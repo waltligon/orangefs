@@ -10,6 +10,7 @@ use Term::ReadLine;
 use Getopt::Long;
 use Math::BigInt;
 use File::Basename;
+use Cwd 'abs_path';;
 
 # turn on strictness
 use strict 'vars';
@@ -70,7 +71,7 @@ my $IO_ENDPOINT   = 0x2;
 
 my $OUT = undef;
 my $term = undef;
-my $dirname = dirname($ARGV[0]);
+my $dirname = undef;
 
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
 my $num_unexp_reqs = 50;
@@ -1448,6 +1449,7 @@ else
         die "Can't open specified file $ARGV[0]: $!\n";
     }
     $output_target = \*FILEOUT;
+    $dirname = abs_path(dirname($ARGV[0]));
 }
 
 die "-port not allowed with -iospec or -metaspec."
