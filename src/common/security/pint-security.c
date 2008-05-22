@@ -59,7 +59,9 @@ static int load_public_keys(const char*);
  */
 int PINT_security_initialize(void)
 {
+#ifndef SECURITY_ENCRYPTION_NONE
     const struct server_configuration_s *conf;
+#endif /* SECURITY_ENCRYPTION_NONE */
     int ret;
 
     gen_mutex_lock(&security_init_mutex);
