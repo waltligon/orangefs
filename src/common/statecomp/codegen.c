@@ -127,7 +127,7 @@ static int runfunc_compare(void *key, struct qhash_head *link)
 static int runfunc_hash(void *key, int table_size)
 {
     char *k = (char *)key;
-    int h, g;
+    int g, h = 0;
     while(*k)
     {
         h = (h << 4) + *k++;
