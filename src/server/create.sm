@@ -185,6 +185,7 @@ static PINT_sm_action create_setup_op(
     return SM_ACTION_COMPLETE;
 }
 
+#if 0
 static PINT_sm_action getattr_get_dirdata_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -210,6 +211,7 @@ static PINT_sm_action getattr_get_dirdata_handle(
 
     return ret;
 }
+#endif
 
 static inline int PINT_get_object_ref_create(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)

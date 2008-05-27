@@ -22,6 +22,50 @@ enum
 
 %%
 
+nested machine pvfs2_crdirent_work_sm
+{
+    state validate
+    {
+        run crdirent_validate;
+        success => read_directory_entry_handle;
+        INVALID_OBJECT => validation_object_type_failure;
+        default => return;
+    }
+
+    state validation_object_type_failure
+    {
+        run validation_object_type_failure;
+        default => return;
+    }
+
+    state read_directory_entry_handle
+    {
+        run crdirent_read_directory_entry_handle;
+        success => write_directory_entry;
+        default => return;
+    }
+
+    state write_directory_entry
+    {
+        run crdirent_write_directory_entry;
+        success => check_for_req_dir_update;
+        default => return;
+    }
+
+    state check_for_req_dir_update
+    {
+        run crdirent_check_for_req_dir_update;
+        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
+        default => return;
+    }
+
+    state update_directory_attr
+    {
+        run crdirent_update_directory_attr;
+        default => return;
+    }
+}
+
 machine pvfs2_crdirent_sm
 {
     state prelude
@@ -34,47 +78,12 @@ machine pvfs2_crdirent_sm
     state setup_op
     {
         run crdirent_setup_op;
-        default => validate;
+        default => do_work;
     }
 
-    state validate
+    state do_work
     {
-        run crdirent_validate;
-        success => read_directory_entry_handle;
-        INVALID_OBJECT => validation_object_type_failure;
-        default => final_response;
-    }
-
-    state validation_object_type_failure
-    {
-        run validation_object_type_failure;
-        default => final_response;
-    }
-
-    state read_directory_entry_handle
-    {
-        run crdirent_read_directory_entry_handle;
-        success => write_directory_entry;
-        default => final_response;
-    }
-
-    state write_directory_entry
-    {
-        run crdirent_write_directory_entry;
-        success => check_for_req_dir_update;
-        default => final_response;
-    }
-
-    state check_for_req_dir_update
-    {
-        run crdirent_check_for_req_dir_update;
-        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
-        default => final_response;
-    }
-
-    state update_directory_attr
-    {
-        run crdirent_update_directory_attr;
+        jump pvfs2_crdirent_work_sm;
         default => final_response;
     }
 
@@ -326,7 +335,7 @@ static PINT_sm_action crdirent_update_directory_attr(
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
     ret = job_trove_dspace_setattr(
-        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.handle,
+        s_op->u.crdirent.fs_id, s_op->u.crdirent.parent_handle,
         ds_attr, 
         TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context);

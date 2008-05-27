@@ -49,9 +49,9 @@ enum
 #if 0
 static int create_datafiles_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
-#endif
 static int create_crdirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
+#endif
 static int create_delete_handles_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
@@ -113,13 +113,19 @@ machine pvfs2_create_file_work_sm
     state locate_attribs
     {
         run create_find_attrs;
-        LOCAL_ATTRS => parent_getattr_local;
+        LOCAL_ATTRS => parent_getattr_local_prelude;
         REMOTE_ATTRS => parent_getattr_remote;
-/* TODO: error handling */
         default => parent_getattr_remote;
     }
 
-    /* See if the parent's attribs are stored locally */
+    state parent_getattr_local_prelude
+    {
+        jump pvfs2_server_prelude_sm;
+        success => parent_getattr_local;
+        default => final_response;
+    }
+        
+    /* Retrieve the parent's attribs locally */
     state parent_getattr_local
     {
         jump pvfs2_get_attr_work_sm;
@@ -154,11 +160,18 @@ machine pvfs2_create_file_work_sm
     state dspace_create_setup
     {
         run create_dspace_setup;
-        success => dspace_create_local;
+        success => dspace_create_prelude;
         default => cleanup_work;
     }
 
-    state dspace_create_local
+    state dspace_create_prelude
+    {
+        jump pvfs2_server_prelude_sm;
+        success => dspace_create;
+        default => cleanup_work;
+    }
+
+    state dspace_create
     {
         jump pvfs2_create_work_sm;
         success => dspace_create_cleanup;
@@ -187,6 +200,13 @@ machine pvfs2_create_file_work_sm
     state datafiles_create_local_setup
     {
         run create_datafiles_setup;
+        success => datafiles_create_prelude;
+        default => cleanup_work;
+    }
+
+    state datafiles_create_prelude
+    {
+        jump pvfs2_server_prelude_sm;
         success => datafiles_create_local;
         default => cleanup_work;
     }
@@ -237,29 +257,75 @@ machine pvfs2_create_file_work_sm
     state setattr_setup
     {
         run create_setattr_setup;
-        success => create_setattr;
+        success => setattr_prelude;
         default => cleanup_work;
     }
 
-    state create_setattr
+    state setattr_prelude
+    {
+        jump pvfs2_server_prelude_sm;
+        success => do_setattr;
+        default => cleanup_work;
+    }
+
+    state do_setattr
     {
         jump pvfs2_set_attr_work_sm;
-        success => crdirent_setup_msgpair;
+        success => setattr_cleanup;
+        default => cleanup_work;
+    }
+
+    state setattr_cleanup
+    {
+        run create_setattr_cleanup;
+        success => crdirent_setup;
         default => cleanup_work;
     }
 
     /* set up to create dir entry - could be local */
+/*
     state crdirent_setup_msgpair
     {
         run create_crdirent_setup_msgpair;
         success => crdirent_xfer_msgpair;
         default => crdirent_failure;
     }
+*/
 
     /* execute messages */
+/*
     state crdirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
+        success => cleanup_work;
+        default => crdirent_failure;
+    }
+*/
+
+    state crdirent_setup
+    {
+        run create_crdirent_setup;
+        success => crdirent_prelude;
+        default => cleanup_work;
+    }
+
+    state crdirent_prelude
+    {
+        jump pvfs2_server_prelude_sm;
+        success => do_crdirent;
+        default => cleanup_work;
+    }
+
+    state do_crdirent
+    {
+        jump pvfs2_crdirent_work_sm;
+        success => crdirent_cleanup;
+        default => cleanup_work;
+    }
+
+    state crdirent_cleanup
+    {
+        run create_crdirent_cleanup;
         success => cleanup_work;
         default => crdirent_failure;
     }
@@ -369,7 +435,12 @@ static PINT_sm_action create_file_setup(
 static PINT_sm_action create_file_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op;
+    int task_id;
+    int error_code;
+
+    PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
@@ -412,13 +483,9 @@ static PINT_sm_action create_file_resp(
 static PINT_sm_action create_file_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    int task_id;
-    int error_code;
-
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     assert(sm_p);
     free(sm_p);
-    PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     return (SM_ACTION_COMPLETE);
 }
 
@@ -504,6 +571,7 @@ static int create_datafiles_comp_fn(void *v_p,
 }
 #endif
 
+#if 0
 static int create_crdirent_comp_fn(void *v_p,
                                    struct PVFS_server_resp *resp_p,
                                    int index)
@@ -513,6 +581,7 @@ static int create_crdirent_comp_fn(void *v_p,
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
     return resp_p->status;
 }
+#endif
 
 static int create_delete_handles_comp_fn(void *v_p,
                                          struct PVFS_server_resp *resp_p,
@@ -606,9 +675,16 @@ static PINT_sm_action create_dspace_setup(
     }
     /* zero out all members */
     memset(s_op, 0, sizeof(struct PINT_server_op));
+    s_op->op = PVFS_SERV_CREATE;
     s_op->u.create.fs_id = sm_p->object_ref.fs_id;
+/*    s_op->u.create.handle = sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first; */
     s_op->u.create.handle_extent_array = sm_p->u.create_file.meta_handle_extent_array;
     s_op->u.create.object_type = PVFS_TYPE_METAFILE;
+
+    s_op->target_fs_id = sm_p->object_ref.fs_id;
+/*    s_op->target_handle = sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first; */
+    s_op->credentials.uid = sm_p->cred_p->uid;
+    s_op->credentials.gid = sm_p->cred_p->gid;
         
     PINT_sm_push_frame(smcb, 0, s_op);
     return SM_ACTION_COMPLETE;
@@ -717,9 +793,15 @@ static PINT_sm_action create_datafiles_setup(
     }
     /* zero out all members */
     memset(s_op, 0, sizeof(struct PINT_server_op));
+    s_op->op = PVFS_SERV_CREATE;
     s_op->u.create.fs_id = sm_p->object_ref.fs_id;
     s_op->u.create.handle_extent_array = io_handle_extent_array[0];
     s_op->u.create.object_type = PVFS_TYPE_DATAFILE;
+        
+    s_op->target_fs_id = sm_p->object_ref.fs_id;
+    s_op->target_handle = sm_p->object_ref.handle;
+    s_op->credentials.uid = sm_p->cred_p->uid;
+    s_op->credentials.gid = sm_p->cred_p->gid;
         
     PINT_sm_push_frame(smcb, 0, s_op);
  
@@ -917,7 +999,7 @@ static PINT_sm_action create_setattr_setup(
     struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create state: setattr_setup_msgpair\n");
+                 "create state: setattr_setup\n");
 
     if(!s_op)
     {
@@ -945,6 +1027,11 @@ static PINT_sm_action create_setattr_setup(
     s_op->u.setattr.attr.u.meta.dist_size =
         PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
     s_op->attr = s_op->u.setattr.attr;
+
+    s_op->target_fs_id = sm_p->object_ref.fs_id;
+    s_op->target_handle = sm_p->u.create.metafile_handle;
+    s_op->credentials.uid = sm_p->cred_p->uid;
+    s_op->credentials.gid = sm_p->cred_p->gid;
 
 #if 0
     PINT_SERVREQ_SETATTR_FILL(
@@ -982,6 +1069,67 @@ static PINT_sm_action create_setattr_setup(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action create_setattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int task_id;
+    int error_code;
+
+    PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    js_p->error_code = error_code;
+ 
+    return SM_ACTION_COMPLETE;
+}
+
+/* setup and push a new frame for calling the nested crdirent state machine */
+static PINT_sm_action create_crdirent_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create state: crdirent_setup\n");
+
+    if(!s_op)
+    {
+        return -PVFS_ENOMEM;
+    }
+    /* zero out all members */
+    memset(s_op, 0, sizeof(struct PINT_server_op));
+    PINT_sm_push_frame(smcb, 0, s_op);
+
+    s_op->op = PVFS_SERV_CRDIRENT;
+    s_op->attr = sm_p->u.create_file.attr;
+    s_op->u.crdirent.name = sm_p->u.create_file.object_name;
+    s_op->u.crdirent.new_handle = sm_p->u.create_file.metafile_handle;
+    s_op->u.crdirent.parent_handle = sm_p->parent_ref.handle;
+    s_op->u.crdirent.fs_id = sm_p->object_ref.fs_id;
+    s_op->u.crdirent.dir_attr_update_required = 0;
+
+    s_op->target_fs_id = sm_p->object_ref.fs_id;
+/*    s_op->target_handle = sm_p->u.create_file.metafile_handle; */
+    s_op->target_handle = sm_p->parent_ref.handle;
+    s_op->credentials.uid = sm_p->cred_p->uid;
+    s_op->credentials.gid = sm_p->cred_p->gid;
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action create_crdirent_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int task_id;
+    int error_code;
+
+    PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    js_p->error_code = error_code;
+ 
+    return SM_ACTION_COMPLETE;
+}
+
+#if 0
 /* this creates a directory entry - this may or may not be local */
 static PINT_sm_action create_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -1028,6 +1176,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
     }
     return SM_ACTION_COMPLETE;
 }
+#endif
 
 static PINT_sm_action create_crdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -1288,6 +1437,7 @@ static PINT_sm_action create_find_attrs(
         /* zero out all members */
         memset(s_op, 0, sizeof(struct PINT_server_op));
 
+        s_op->op = PVFS_SERV_GETATTR;
         s_op->u.getattr.handle = sm_p->parent_ref.handle;
         s_op->u.getattr.fs_id = sm_p->parent_ref.fs_id;
         s_op->u.getattr.attrmask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
@@ -1295,16 +1445,27 @@ static PINT_sm_action create_find_attrs(
         s_op->attr.objtype = PVFS_TYPE_DIRECTORY;
         PINT_sm_push_frame(smcb, 0, s_op);
         js_p->error_code = LOCAL_ATTRS;
+
+        s_op->target_fs_id = sm_p->parent_ref.fs_id;
+        s_op->target_handle = sm_p->parent_ref.handle;
+        s_op->credentials.uid = sm_p->cred_p->uid;
+        s_op->credentials.gid = sm_p->cred_p->gid;
+/*
+        s_op->access_type = PINT_server_req_table[s_op->op].params->access_type(NULL);
+        s_op->sched_policy = PINT_server_req_table[s_op->op].params->sched_policy;
+*/
         return(SM_ACTION_COMPLETE);
     }
     else
     {
         /* it's not on this server. Fall through to another */
         /* state to do the lookup on the correct server.    */
-        /* TODO:  set up machine for remote lookup here    */
+        /* TODO:  set up machine for remote lookup here. I  */
+        /* think PINT_SM_GETATTR_STATE_FILL should move from*/
+        /* create_init to here.  */
         sm_p->getattr.object_ref = sm_p->parent_ref;
         sm_p->getattr.req_attrmask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
-        js_p->error_code = LOCAL_ATTRS;
+        js_p->error_code = REMOTE_ATTRS;
         return(SM_ACTION_COMPLETE);
     }
 }

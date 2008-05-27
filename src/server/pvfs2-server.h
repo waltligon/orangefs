@@ -434,6 +434,8 @@ typedef struct PINT_server_op
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
 
+    PVFS_credentials credentials;
+
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
 
@@ -485,6 +487,8 @@ void PINT_server_access_debug(PINT_server_op * s_op,
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_work_sm;
+extern struct PINT_state_machine_s pvfs2_server_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_server_prelude_work_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;
 extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;
@@ -494,6 +498,7 @@ extern struct PINT_state_machine_s pvfs2_create_file_work_sm;
 extern struct PINT_state_machine_s pvfs2_server_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_create_work_sm;
+extern struct PINT_state_machine_s pvfs2_crdirent_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
