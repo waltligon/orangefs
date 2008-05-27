@@ -191,9 +191,11 @@ typedef struct server_configuration_s
     int trove_method;
 	
 #ifndef SECURITY_ENCRYPTION_NONE
-	char *keystore_path;
-	char *serverkey_path;
+    char *keystore_path;
+    char *serverkey_path;
 #endif
+
+    int security_timeout;
 
     void *private_data;
 } server_configuration_s;

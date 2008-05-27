@@ -115,6 +115,7 @@ static DOTCONF_CB(get_trove_method);
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 #endif
+static DOTCONF_CB(get_security_timeout);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -914,6 +915,9 @@ static const configoption_t options[] =
         CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
 
 #endif /* SECURITY_ENCRYPTION_NONE */
+
+    {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
+        CTX_DEFAULTS, "3600"},
 
     LAST_OPTION
 };
@@ -2676,6 +2680,14 @@ DOTCONF_CB(get_server_key)
 }
 
 #endif /* SECURITY_ENCRYPTION_NONE */
+
+DOTCONF_CB(get_security_timeout)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->security_timeout = cmd->data.value;
+    return NULL;
+}
 
 /*
  * Function: PINT_config_release

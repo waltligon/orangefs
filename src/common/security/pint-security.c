@@ -30,10 +30,6 @@
 #include "security-hash.h"
 
 
-/* TODO: move to global configuration */
-#define SECURITY_DEFAULT_TIMEOUT      3600                /* 1 hour */
-
-
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
 static int security_init_status = 0;
 
@@ -161,6 +157,7 @@ int PINT_security_finalize(void)
  */
 int PINT_sign_capability(PVFS_capability *cap)
 {
+    const struct server_configuration_s *conf;
     EVP_MD_CTX mdctx;
     char buf[256];
     const EVP_MD *md;
@@ -168,8 +165,10 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     assert(security_privkey);
 
+    conf = PINT_get_server_config();
+
     cap->timeout = PINT_util_get_current_time();
-    cap->timeout += SECURITY_DEFAULT_TIMEOUT;
+    cap->timeout += conf->security_timeout;
 
 #if defined(SECURITY_ENCRYPTION_RSA)
     md = EVP_sha1();
