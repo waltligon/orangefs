@@ -41,7 +41,12 @@ nested machine pvfs2_prelude_work_sm
     state getattr_if_needed
     {
         run prelude_getattr_if_needed;
-        /* return since validation code isn't here yet */
+        default => setup_op;
+    }
+
+    state setup_op
+    {
+        run prelude_setup_op;
         default => return;
     }
 }
@@ -143,6 +148,19 @@ static PINT_sm_action prelude_getattr_if_needed(
         0, js_p, &tmp_id, server_job_context);
 
     return ret;
+}
+
+static PINT_sm_action prelude_setup_op(
+                                       struct PINT_smcb *smcb,
+                                       job_status_s *js_p
+                                       )
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
+    s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
+
+    return SM_ACTION_COMPLETE;
 }
 
 
