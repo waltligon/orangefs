@@ -41,17 +41,19 @@ static long check_group_pw_buffer_size = 0;
 static char* check_group_gr_buffer = NULL;
 static long check_group_gr_buffer_size = 0;
 static int PINT_check_group(uid_t uid, gid_t gid);
+static PINT_sm_action prelude_perm_check(
+        struct PINT_smcb *smcb, job_status_s *js_p);
 static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, 
     PVFS_BMI_addr_t client_addr);
 static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsconfig,
     PVFS_BMI_addr_t client_addr);
 static int iterate_all_squash_wildcards(struct filesystem_configuration_s *fsconfig,
     PVFS_BMI_addr_t client_addr);
-static void get_anon_ids(struct filesystem_configuration_s *fsconfig,
-    PVFS_uid *uid, PVFS_gid *gid);
 static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid, 
     PVFS_uid *translated_uid, PVFS_gid *translated_gid, 
     PVFS_BMI_addr_t client_addr);
+static void get_anon_ids(struct filesystem_configuration_s *fsconfig,
+    PVFS_uid *uid, PVFS_gid *gid);
 static int permit_operation(PVFS_fs_id fsid,
     enum PINT_server_req_access_type access_type, PVFS_BMI_addr_t client_addr);
 
@@ -469,7 +471,7 @@ check_perm:
 }
 
 
-/* PINT_server_get_perm()
+/* prelude_perm_check()
  *
  * this really just marks the spot where we would want to do
  * permission checking, it will be replaced by a couple of states that
