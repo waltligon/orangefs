@@ -1248,10 +1248,10 @@ static int server_shutdown(
     if (status & SERVER_SECURITY_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting security "
-                     "module            [   ...   ]\n");
+                     "module           [   ...   ]\n");
         PINT_security_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
-                     "module            [ stopped ]\n");
+                     "module           [ stopped ]\n");
     }
 
     if (status & SERVER_ENCODER_INIT)

@@ -41,8 +41,6 @@ static long check_group_pw_buffer_size = 0;
 static char* check_group_gr_buffer = NULL;
 static long check_group_gr_buffer_size = 0;
 static int PINT_check_group(uid_t uid, gid_t gid);
-static PINT_sm_action prelude_perm_check(
-        struct PINT_smcb *smcb, job_status_s *js_p);
 static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, 
     PVFS_BMI_addr_t client_addr);
 static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsconfig,
@@ -477,8 +475,8 @@ check_perm:
  * permission checking, it will be replaced by a couple of states that
  * actually perform this task later
  */
-static PINT_sm_action prelude_perm_check(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+PINT_sm_action prelude_perm_check(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *obj_attr = NULL;
@@ -835,7 +833,7 @@ static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, PVF
     return 0;
 }
 
-static PINT_sm_action prelude_check_acls_if_needed(
+PINT_sm_action prelude_check_acls_if_needed(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -843,8 +841,8 @@ static PINT_sm_action prelude_check_acls_if_needed(
     job_id_t i;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: prelude_check_acls_if_needed\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+                 "(%p) %s (prelude sm) state: prelude_check_acls_if_needed\n",
+                 s_op, PINT_map_server_op_to_string(s_op->req->op));
 
     /* If we get here with an invalid fsid and handle, we have to
      * return -PVFS_EACCESS 
@@ -888,7 +886,7 @@ static PINT_sm_action prelude_check_acls_if_needed(
     return ret;
 }
 
-static PINT_sm_action prelude_check_acls(
+PINT_sm_action prelude_check_acls(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
