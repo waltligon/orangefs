@@ -51,6 +51,15 @@
     *(pptr) += 4; \
 } while (0)
 
+#define encode_PVFS_sig(pptr,x) do { \
+    *(char *) *(pptr) = *(x); \
+    *(pptr) += 1; \
+} while (0)
+#define decode_PVFS_sig(pptr,x) do { \
+    *(x) = *(char *) *(pptr); \
+    *(pptr) += 1; \
+} while (0)
+
 #define encode_int32_t(pptr,x) do { \
     *(int32_t*) *(pptr) = htobmi32(*(x)); \
     *(pptr) += 4; \
@@ -674,6 +683,35 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
     for (i=0; i<x->n1; i++) \
 	decode_##ta1(pptr, &(x)->a1[i]); \
+}
+
+/* 2 fields, then an array, then 2 fields, then an array */
+#define endecode_fields_2a2a_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, t3, x3, t4, x4, tn2,n2,ta2,a2) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##tn1(pptr, &x->n1); \
+    for (i=0; i<x->n1; i++) \
+	encode_##ta1(pptr, &(x)->a1[i]); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##tn2(pptr, &x->n2); \
+    for (i=0; i<x->n2; i++) \
+	encode_##ta2(pptr, &(x)->a2[i]); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##tn1(pptr, &x->n1); \
+    x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+    for (i=0; i<x->n1; i++) \
+	decode_##ta1(pptr, &(x)->a1[i]); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##tn2(pptr, &x->n2); \
+    x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+    for (i=0; i<x->n2; i++) \
+	decode_##ta2(pptr, &(x)->a2[i]); \
 }
 
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
