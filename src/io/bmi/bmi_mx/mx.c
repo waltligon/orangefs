@@ -966,6 +966,9 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
         /* return errors, do not abort */
         mx_set_error_handler(MX_ERRORS_RETURN);
 
+        /* only complete sends after they are delivered */
+        setenv("MX_ZOMBIE", "0", 1);
+
         mxret = mx_init();
         if (!(mxret == MX_SUCCESS || mxret == MX_ALREADY_INITIALIZED)) {
                 debug(BMX_DB_WARN, "mx_init() failed with %s", mx_strerror(mxret));
@@ -2778,6 +2781,9 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                                 sizes[completed] = status.xfer_length;
                         } else {
                                 errs[completed] = bmx_mx_to_bmi_errno(status.code);
+                                debug(BMX_DB_CTX, "%s unexpected send completed with "
+                                      "error %s", __func__, mx_strstatus(status.code));
+                                bmx_peer_disconnect(peer, 0, BMI_ENETRESET);
                         }
                         if (user_ptrs)
                                 user_ptrs[completed] = ctx->mxc_mop->user_ptr;
@@ -3116,7 +3122,7 @@ BMI_mx_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
                 }
                 break;
         default:
-                debug(BMX_DB_WARN, "%s called on %s with state %d", __func__,
+                debug(BMX_DB_CTX, "%s called on %s with state %d", __func__,
                         ctx->mxc_type == BMX_REQ_TX ? "TX" : "RX", ctx->mxc_state);
         }
         BMX_EXIT;
