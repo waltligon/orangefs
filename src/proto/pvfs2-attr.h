@@ -13,6 +13,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "pint-distribution.h"
+#include "pint-security.h"
 
 /* internal attribute masks, common to all obj types */
 #define PVFS_ATTR_COMMON_UID   (1 << 0)
@@ -183,6 +184,7 @@ struct PVFS_object_attr
     PVFS_time ctime;
     uint32_t mask;     /* indicates which fields are currently valid */
     PVFS_ds_type objtype; /* defined in pvfs2-types.h */
+    PVFS_capability *capability;
     union
     {
 	PVFS_metafile_attr meta;

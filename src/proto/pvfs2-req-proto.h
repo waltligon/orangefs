@@ -17,6 +17,7 @@
 #include "pvfs2-request.h"
 #include "pint-request.h"
 #include "pvfs2-mgmt.h"
+#include "pint-security.h"
 
 /* update PVFS2_PROTO_MAJOR on wire protocol changes that break backwards
  * compatibility (such as changing the semantics or protocol fields for an
@@ -1497,6 +1498,7 @@ struct PVFS_server_req
 {
     enum PVFS_server_op op;
     PVFS_credentials credentials;
+    PVFS_capability capability;
     union
     {
         struct PVFS_servreq_create create;
