@@ -194,8 +194,9 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
                         int *error_code,
                         int *remaining);
 
-/* This macro is used in calls to PINT_sm_fram() */
+/* These macros are used in calls to PINT_sm_fram() */
 #define PINT_FRAME_CURRENT 0
+#define PINT_FRAME_PREVIOUS 1
 
 struct PINT_state_machine_s pvfs2_void_sm;
 

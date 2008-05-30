@@ -89,7 +89,7 @@ struct PINT_client_create_file_sm
     PINT_dist *dist;                            /* client-side work space */
 
     PVFS_handle_extent_array meta_handle_extent_array; /* client=>server input parameter */
-    PVFS_handle_extent_array io_handle_extent_array; /* server work space */
+    PVFS_handle_extent_array *io_handle_extent_array; /* server work space */
 
     PVFS_sys_layout layout;                     /* client work space */
     PVFS_handle metafile_handle;                /* client/server work space */

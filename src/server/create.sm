@@ -88,6 +88,7 @@ static int create_create(
     int ret = -1;
     job_id_t i;
 
+    js_p->error_code = 0;
     ret = job_trove_dspace_create(
         s_op->u.create.fs_id,
         &s_op->u.create.handle_extent_array,
