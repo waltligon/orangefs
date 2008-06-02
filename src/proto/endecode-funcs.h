@@ -113,6 +113,9 @@
 } while (0)
 #endif
 
+/* determines how much protocol space a string encoding will consume */
+#define encode_string_size_check(pbuf) (strlen(*pbuf) + 5)
+
 #define decode_string(pptr,pbuf) do { \
     u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
     *pbuf = *(pptr) + 4; \

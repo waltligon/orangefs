@@ -21,6 +21,7 @@
 #include "pint-util.h"
 #include "bmi.h"
 #include "gossip.h"
+#include "pvfs2-req-proto.h"
 
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
@@ -371,11 +372,73 @@ inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
     encode_string(pptr, &addr_str);
 }
 
+/* determines how much protocol space a BMI_addr_t encoding will consume */
+inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
+{
+    const char *addr_str;
+    addr_str = BMI_addr_rev_lookup(*x);
+    return(encode_string_size_check(&addr_str));
+}
+
 inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
 {
     char *addr_string;
     decode_string(pptr, &addr_string);
     BMI_addr_lookup(x, addr_string);
+}
+
+inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
+{
+    int tmp_size;
+    int i;
+
+    /* figure out how big this encoding will be first */
+
+    tmp_size = 16; /* enumeration and list count */
+    for(i=0 ; i<x->server_list.count; i++)
+    {
+        /* room for each server encoding */
+        tmp_size += encode_PVFS_BMI_addr_t_size_check(&(x)->server_list.servers[i]);
+    }
+
+    if(tmp_size > PVFS_REQ_LIMIT_LAYOUT)
+    {
+        /* don't try to encode everything.  Just set pptr too high so that
+         * we hit error condition in encode function
+         */
+        gossip_err("Error: layout too large to encode in request protocol.\n");
+        *(pptr) += extra_size_PVFS_servreq_create + 1;
+        return;
+    }
+
+    /* otherwise we are in business */
+    encode_enum(pptr, &x->algorithm);
+    encode_skip4(pptr, NULL);
+    encode_int32_t(pptr, &x->server_list.count);
+    encode_skip4(pptr, NULL);
+    for(i=0 ; i<x->server_list.count; i++)
+    {
+        encode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
+    }
+}
+
+inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
+{
+    int i;
+
+    decode_enum(pptr, &x->algorithm);
+    decode_skip4(pptr, NULL);
+    decode_int32_t(pptr, &x->server_list.count);
+    decode_skip4(pptr, NULL);
+    if(x->server_list.count)
+    {
+        x->server_list.servers = malloc(x->server_list.count*sizeof(*(x->server_list.servers)));
+        assert(x->server_list.servers);
+    }
+    for(i=0 ; i<x->server_list.count; i++)
+    {
+        decode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
+    }
 }
 
 char *PINT_util_guess_alias(void)

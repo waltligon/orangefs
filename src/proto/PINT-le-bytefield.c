@@ -764,7 +764,11 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
     if (input_type == PINT_DECODE_REQ) {
 	struct PVFS_server_req *req = &msg->stub_dec.req;
 	switch (req->op) {
-
+	    case PVFS_SERV_CREATE:
+		if (req->u.create.attr.mask & PVFS_ATTR_META_DIST)
+		    decode_free(req->u.setattr.attr.u.meta.dist);
+                if (req->u.create.layout.server_list.servers)
+                    decode_free(req->u.create.layout.server_list.servers);
 	    case PVFS_SERV_BATCH_CREATE:
 		decode_free(req->u.batch_create.handle_extent_array.extent_array);
 		break;
@@ -826,7 +830,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_UNSTUFF:
-	    case PVFS_SERV_CREATE:
 		/* nothing to free */
 		break;
 	    case PVFS_SERV_INVALID:

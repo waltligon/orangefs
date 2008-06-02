@@ -94,6 +94,8 @@ enum PVFS_server_op
  * parameters used within the request protocol
  */
 
+/* max size of layout information (may include explicit server list */
+#define PVFS_REQ_LIMIT_LAYOUT             4096
 /* max size of opaque distribution parameters */
 #define PVFS_REQ_LIMIT_DIST_BYTES         1024
 /* max size of each configuration file transmitted to clients.
@@ -156,6 +158,8 @@ struct PVFS_servreq_create
     PVFS_object_attr attr;
 
     int32_t num_dfiles_req;
+    /* NOTE: leave layout as final field so that we can deal with encoding
+     * errors */
     PVFS_sys_layout layout;
 };
 endecode_fields_5_struct(
@@ -167,7 +171,7 @@ endecode_fields_5_struct(
     PVFS_sys_layout, layout)
 
 #define extra_size_PVFS_servreq_create \
-    (extra_size_PVFS_object_attr)
+    (extra_size_PVFS_object_attr + extra_size_PVFS_sys_layout)
 
 #define PINT_SERVREQ_CREATE_FILL(__req,                                    \
                                  __creds,                                  \

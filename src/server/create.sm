@@ -177,6 +177,17 @@ static int check_stuffed(
 
     /* TODO: implement support for LAYOUT_LIST */
     layout = &s_op->req->u.create.layout;
+
+    if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
+    {
+        int i;
+        for(i=0; i<layout->server_list.count; i++)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "layout list server %d: %lld\n", 
+                i, lld(layout->server_list.servers[i])); 
+        }
+    }
+
     if(layout->algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)
     {
         gossip_err("Error: only round robin layouts are supported right now.\n");

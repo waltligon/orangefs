@@ -73,8 +73,8 @@ typedef int64_t PVFS_id_gen_t;
 typedef int64_t PVFS_BMI_addr_t;
 
 inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
+inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
 inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
-
 
 #define encode_PVFS_error encode_int32_t
 #define decode_PVFS_error decode_int32_t
@@ -204,11 +204,6 @@ struct PVFS_sys_server_list
     int32_t count;
     PVFS_BMI_addr_t *servers;
 };
-endecode_fields_1a_struct(
-    PVFS_sys_server_list,
-    skip4,,
-    int32_t, count,
-    PVFS_BMI_addr_t, servers)
 
 /* The server laout struct passed to PVFS_sys_create.  The algorithm
  * specifies how the servers are chosen to layout the file.  If the
@@ -225,11 +220,10 @@ typedef struct PVFS_sys_layout_s
      */
     struct PVFS_sys_server_list server_list;
 } PVFS_sys_layout;
-endecode_fields_3(
-    PVFS_sys_layout,
-    enum, algorithm,
-    skip4,,
-    PVFS_sys_server_list, server_list)
+#define extra_size_PVFS_sys_layout PVFS_REQ_LIMIT_LAYOUT
+
+inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
+inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL     ((PVFS_handle)0)
