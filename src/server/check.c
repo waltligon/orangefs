@@ -468,6 +468,84 @@ check_perm:
     return -PVFS_EACCES;
 }
 
+int PINT_perm_check(struct PINT_server_op *s_op)
+{
+    PVFS_capability *caps = &s_op->req->capability;
+    int ret = -PVFS_EINVAL;
+
+    if (s_op->target_fs_id != PVFS_FS_ID_NULL)
+    {
+        /*
+         * if we are exporting a volume readonly, disallow any operation 
+         * that modifies the state of the file-system.
+         */
+        ret = permit_operation(s_op->target_fs_id, s_op->access_type,
+                               s_op->addr);
+        if (ret < 0)
+        {
+            return ret;
+        }
+
+        /* XXX: removed root squashing */
+    }
+
+    /* XXX: removed positive error check */
+
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
+                 "attr mask %d\n\t(capability mask = %d)\n",
+                 PINT_map_server_op_to_string(s_op->req->op),
+                 s_op->attr.mask, caps->op_mask);
+
+    ret = PINT_server_req_get_perms(s_op->req);
+    switch (ret)
+    {
+    case PINT_SERVER_CHECK_WRITE:
+        ret = s_op->attr.perms & 0222 ? 0 : -PVFS_EACCES;
+        break;
+    case PINT_SERVER_CHECK_READ:
+        ret = s_op->attr.perms & 0444 ? 0 : -PVFS_EACCES;
+        break;
+    case PINT_SERVER_CHECK_CRDIRENT:
+        ret = s_op->attr.perms & 0333 ? 0 : -PVFS_EACCES;
+        break;
+    case PINT_SERVER_CHECK_ATTR:
+        /* let datafiles pass through attr check */
+        if (s_op->attr.objtype == PVFS_TYPE_DATAFILE)
+        {
+            ret = 0;
+        }
+        /* for now assume extended attribs are treated
+         * the same as regular attribs as far as permissions
+         */
+        else if (s_op->req->op == PVFS_SERV_GETATTR  ||
+                 s_op->req->op == PVFS_SERV_GETEATTR ||
+                 s_op->req->op == PVFS_SERV_LISTEATTR)
+        {
+            /* getting or listing attributes is always ok --- permission
+             * is checked on the parent directory at read time
+             */
+            ret = 0;
+        }
+        else
+        {
+            ret = -PVFS_EACCES;
+        }
+        break;
+    case PINT_SERVER_CHECK_NONE:
+        /* TODO: figure out how to do the root squash check */
+        break;
+    case PINT_SERVER_CHECK_INVALID:
+        ret = -PVFS_EINVAL;
+        break;
+    }
+
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
+                 "Final permission check for \"%s\" set error code to %d\n", 
+                 PINT_map_server_op_to_string(s_op->req->op),
+                 ret);
+
+    return ret;
+}
 
 /* prelude_perm_check()
  *
@@ -695,15 +773,18 @@ static int permit_operation(PVFS_fs_id fsid,
     {
         return 0;
     }
-    /* Drat. Iterate thru the list of wildcards specified in server_configuration and see
-     * the client address matches. if yes, then we deny permission
+    /* Drat. Iterate thru the list of wildcards specified in 
+     * server_configuration and see if the client address matches. 
+     * If yes, then we deny permission.
      */
     if (iterate_ro_wildcards(fsconfig, client_addr) == 1)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, 
-            "Disallowing read-write operation on a read-only exported file-system\n");
+                     "Disallowing read-write operation on a read-only" 
+                     "exported file-system\n");
         return -EROFS;
     }
+
     return 0;
 }
 
@@ -815,15 +896,17 @@ static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsco
     return 0;
 }
 
-static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, PVFS_BMI_addr_t client_addr)
+static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, 
+                                PVFS_BMI_addr_t client_addr)
 {
     int i;
 
     for (i = 0; i < fsconfig->ro_count; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
-            lld(client_addr), fsconfig->ro_hosts[i]);
-        /* Does the client address match the wildcard specification and/or the netmask specification? */
+                     lld(client_addr), fsconfig->ro_hosts[i]);
+        /* Does the client address match the wildcard specification and/or 
+           the netmask specification? */
         if (BMI_query_addr_range(client_addr, fsconfig->ro_hosts[i],
                 fsconfig->ro_netmasks[i]) == 1)
         {
@@ -950,3 +1033,14 @@ cleanup:
     memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
     return SM_ACTION_COMPLETE;
 }
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

@@ -156,19 +156,29 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
+    /*
+      first we translate the dspace attributes into a more convenient
+      server use-able format.  i.e. a PVFS_object_attr
+    */
     PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
+    s_op->target_object_attr = &s_op->attr;
 
     ret = PINT_verify_capability(&s_op->req->capability);
     if (ret)
     {
-        /* TODO: perform actual permission check */
+        js_p->error_code = PINT_perm_check(s_op);
     }
     else
     {
         js_p->error_code = -PVFS_EACCES;
     }
 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: perm_check (status = %d)\n",
+                 s_op, PINT_map_server_op_to_string(s_op->req->op),
+                 js_p->error_code);
+            
     return SM_ACTION_COMPLETE;
 }
 

@@ -21,6 +21,8 @@ int PINT_check_mode(
 int PINT_check_acls(void *acl_buf, size_t acl_size, 
     PVFS_object_attr *attr,
     PVFS_uid uid, PVFS_gid gid, int want);
+
+int PINT_perm_check(struct PINT_server_op *s_op);
     
 PINT_sm_action prelude_perm_check(
     struct PINT_smcb *smcb, job_status_s *js_p);

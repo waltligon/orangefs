@@ -234,13 +234,17 @@ int PINT_verify_capability(PVFS_capability *data)
     char *buf;
     EVP_PKEY *pubkey;
 
+    if (!data)
+    {
+        return 0;
+    }
+
     if (PINT_util_get_current_time() > data->timeout)
     {
         return 0;
     }
     
-    buf = (char *)malloc(sizeof(char) * 1024);
-    
+    buf = (char *)malloc(sizeof(char) * 1024);   
     if (buf == NULL)
     {
         return 0;
@@ -257,7 +261,6 @@ int PINT_verify_capability(PVFS_capability *data)
     }
     
     pubkey = SECURITY_lookup_pubkey(buf);
-        
     if (pubkey == NULL)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG,
