@@ -80,12 +80,6 @@ machine pvfs2_create_file_sm
     state final_response
     {
         jump pvfs2_final_response_sm;
-        default => cleanup;
-    }
-
-    state cleanup
-    {
-        run create_file_cleanup;
         default => terminate;
     }
 }
@@ -313,14 +307,16 @@ static PINT_sm_action create_file_setup(
 static PINT_sm_action create_file_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_PREVIOUS);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int task_id;
+    int error_code;
 
-    s_op = PINT_sm_frame(smcb, PINT_FRAME_PREVIOUS);
     if (js_p->error_code == 0)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
-                     llu(js_p->handle));
-        s_op->resp.u.create_file.handle = js_p->handle;
+                     llu(sm_p->u.create_file.metafile_handle));
+        s_op->resp.u.create_file.handle = sm_p->u.create_file.metafile_handle;
         switch(s_op->req->u.create_file.attr.objtype)
         {
             case PVFS_TYPE_NONE:
@@ -349,25 +345,11 @@ static PINT_sm_action create_file_resp(
                 break;
         }
     }
-
-    return (SM_ACTION_COMPLETE);
-}
-
-/* free anything hanging around */
-
-static PINT_sm_action create_file_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int task_id;
-    int error_code;
-
-    assert(sm_p);
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     free(sm_p);
+
     return (SM_ACTION_COMPLETE);
 }
-
 
 /****************************************************************/
 
@@ -905,7 +887,7 @@ static PINT_sm_action create_crdirent_cleanup(
     assert(s_op);
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
 //    free(s_op);
-    js_p->error_code = error_code;
+    js_p->error_code = 0;
  
     return SM_ACTION_COMPLETE;
 }
@@ -920,7 +902,7 @@ static PINT_sm_action create_file_work_cleanup(
     int ret;
 #endif
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: work_cleanup\n");
 
     /* this is in common/misc/pvfs2-util.c which is normally only in the
      * client.  They sys_attr is not a flat structure, thus there are
@@ -945,7 +927,7 @@ static PINT_sm_action create_file_work_cleanup(
         metafile_ref.fs_id = sm_p->object_ref.fs_id;
 
         /* fill in outgoing response fields */
-        sm_p->u.create_file.create_file_resp->ref = metafile_ref;
+/*        sm_p->u.create_file.create_file_resp->ref = metafile_ref; */
 
         /* do not maintina ncache and acache on server - only client */
 #if 0
@@ -1005,7 +987,7 @@ static PINT_sm_action create_file_work_cleanup(
     }
 #endif
 
-    if (sm_p->msgarray != &(sm_p->msgpair))
+    if (sm_p->msgarray && sm_p->msgarray != &(sm_p->msgpair))
     {
         free(sm_p->msgarray);
         sm_p->msgarray = NULL;
