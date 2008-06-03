@@ -212,7 +212,11 @@ typedef enum
 struct PINT_server_create_op
 {
     const char **io_servers;
+    const char **remote_io_servers;
     int num_io_servers;
+    PVFS_handle* handle_array; 
+    int handle_array_local_count;
+    int handle_array_remote_count;
 };
 
 /* struct PINT_server_lookup_op
