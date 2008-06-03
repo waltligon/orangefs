@@ -4655,9 +4655,6 @@ static void precreate_pool_fill_thread_mgr_callback(
         trove_pending_count--;
 
         /* increment in-memory count for this pool */
-        /* TODO: could track this now in current_pool variable to avoid
-         * searching again
-         */
         gen_mutex_lock(&precreate_pool_mutex);
         qlist_for_each(iterator, &precreate_pool_list)
         {
