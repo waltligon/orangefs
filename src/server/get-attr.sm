@@ -261,6 +261,22 @@ static PINT_sm_action getattr_verify_attribs(
       have the original client request attr mask
       (s_op->u.getattr.attrmask).
     */
+    
+    /* initial filling out and signing of capability structure */
+/*    if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
+    {
+        resp_attr->capability->owner = s_op->attr.owner;
+        resp_attr->capability->op_mask = s_op->attr.perms;
+        resp_attr->capability->fsid = s_op->u.getattr.fs_id;
+        resp_attr->capability->num_handles = 
+            s_op->resp.u.getattr.attr.u.meta.dfile_count;
+        resp_attr->capability->handle_array = 
+            s_op->resp.u.getattr.attr.u.meta.dfile_array;
+        resp_attr->mask |= PVFS_ATTR_CAPABILITY;
+        resp_attr->capability->signature = 
+        PINT_sign_capability(resp_attr->capability);
+    }
+*/
     if (resp_attr->objtype == PVFS_TYPE_METAFILE)
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");

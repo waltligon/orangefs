@@ -206,6 +206,8 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     encode_PVFS_time(pptr, &(x)->ctime); \
     encode_uint32_t(pptr, &(x)->mask); \
     encode_PVFS_ds_type(pptr, &(x)->objtype); \
+    if ((x)->mask & PVFS_ATTR_CAPABILITY) \
+	encode_PVFS_capability(pptr, (x)->capability); \
     if ((x)->mask & PVFS_ATTR_META_DIST) \
 	encode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \
@@ -227,6 +229,8 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     decode_PVFS_time(pptr, &(x)->ctime); \
     decode_uint32_t(pptr, &(x)->mask); \
     decode_PVFS_ds_type(pptr, &(x)->objtype); \
+    if ((x)->mask & PVFS_ATTR_CAPABILITY) \
+	decode_PVFS_capability(pptr, (x)->capability); \
     if ((x)->mask & PVFS_ATTR_META_DIST) \
 	decode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \

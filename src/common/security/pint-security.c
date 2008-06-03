@@ -234,17 +234,13 @@ int PINT_verify_capability(PVFS_capability *data)
     char *buf;
     EVP_PKEY *pubkey;
 
-    if (!data)
-    {
-        return 0;
-    }
-
     if (PINT_util_get_current_time() > data->timeout)
     {
         return 0;
     }
     
-    buf = (char *)malloc(sizeof(char) * 1024);   
+    buf = (char *)malloc(sizeof(char) * 1024);
+    
     if (buf == NULL)
     {
         return 0;
@@ -261,6 +257,7 @@ int PINT_verify_capability(PVFS_capability *data)
     }
     
     pubkey = SECURITY_lookup_pubkey(buf);
+        
     if (pubkey == NULL)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG,
@@ -460,6 +457,81 @@ int PINT_verify_capability(PVFS_capability *cap)
 
 #endif /* SECURITY_ENCRYPTION_NONE */
 
+int PINT_init_capability(PVFS_capability *cap)
+{
+    int ret = 0;
+    
+#ifndef SECURITY_ENCRYPTION_NONE
+    cap->signature = (unsigned char*)malloc(EVP_PKEY_size(security_privkey));
+    if (cap->signature == NULL)
+    {
+        ret = -PVFS_ENOMEM;
+    }
+#endif /* SECURITY_ENCRYPTION_NONE */
+
+    return ret;
+}
+    
+PVFS_capability *PINT_dup_capability(const PVFS_capability *cap)
+{
+    PVFS_capability *ret = NULL;
+    
+    if (cap)
+    {
+    	ret = (PVFS_capability*)malloc(sizeof(PVFS_capability));
+    	if (ret)
+    	{
+    	    memcpy(ret, cap, sizeof(PVFS_capability));
+    	    ret->handle_array = 
+    	        (PVFS_handle *)malloc(sizeof(PVFS_handle) * cap->num_handles);
+    	    if (ret->handle_array)
+    	    {
+    	        memcpy(ret->handle_array, cap->handle_array, cap->num_handles);
+    	    }
+    	    else
+    	    {
+    	        free(ret);
+    	        ret = NULL;
+    	    }
+#ifndef SECURITY_ENCRYPTION_NONE
+            if (cap->sig_size && ret)
+            {
+    	        ret->signature = (unsigned char*)malloc(cap->sig_size);
+    	        if (ret->signature)
+    	        {
+    	            memcpy(ret->signature, cap->signature, cap->sig_size);
+    	        }
+    	        else
+    	        {
+    	            free(ret->handle_array);
+    	            free(ret);
+    	            ret = NULL;
+    	        }
+    	    }
+#endif /* SECURITY_ENCRYPTION_NONE */
+    	}
+    }
+    return ret;
+}
+
+void PINT_release_capability(PVFS_capability *cap)
+{
+    if (cap)
+    {
+    	free(cap->signature);
+    	free(cap->handle_array);
+    	free(cap);
+    }
+}
+
+int PINT_get_max_sigsize(void)
+{
+#ifndef SECURITY_ENCRYPTION_NONE
+    return EVP_PKEY_size(security_privkey);
+#else /* security disabled */
+    return 0;
+#endif /* SECURITY_ENCRYPTION_NONE */
+}
 
 /*
  * Local variables:

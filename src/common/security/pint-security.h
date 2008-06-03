@@ -98,6 +98,13 @@ void PINT_sign_credentials (PVFS_credentials *);
  */
 int PINT_verify_credentials (PVFS_credentials *);
 
+int PINT_init_capability(PVFS_capability *);
+    
+PVFS_capability *PINT_dup_capability(const PVFS_capability *);
+
+void PINT_release_capability(PVFS_capability *);
+
+int PINT_get_max_sigsize(void);
 
 #endif
 
