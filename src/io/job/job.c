@@ -5615,6 +5615,7 @@ int job_precreate_pool_get_handles(
     int count,
     const char** servers,
     PVFS_handle* handle_array,
+    PVFS_ds_flags flags,
     void *user_ptr,
     job_aint status_user_tag,
     job_status_s * out_status_p,
@@ -5644,6 +5645,7 @@ int job_precreate_pool_get_handles(
     jd->u.precreate_pool.fsid = fsid;
     jd->u.precreate_pool.servers = servers;
     jd->u.precreate_pool.trove_pending = 0;
+    jd->u.precreate_pool.flags = flags;
     
     precreate_pool_get_handles_try_post(jd);
 
@@ -5827,17 +5829,13 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         }
 
         /* post trove operation to pull out a handle */
-        /* TODO: need an API hook to toggle TROVE_SYNC here; for now we can
-         * assume that we don't need it because create.sm always issues a
-         * keyval_write_list() with the sync flag set after retrieving
-         * handles
-         */
         ret = trove_keyval_iterate_keys(
             tmp_trove_array[i].pool->fsid, 
             tmp_trove_array[i].pool->pool_handle,
             &tmp_trove_array[i].pos,
             &tmp_trove_array[i].key,
             &tmp_trove_array[i].count,
+            tmp_trove_array[i].jd->u.precreate_pool.flags|
             TROVE_BINARY_KEY|
             TROVE_KEYVAL_HANDLE_COUNT|
             TROVE_KEYVAL_ITERATE_REMOVE,

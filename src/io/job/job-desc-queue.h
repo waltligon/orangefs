@@ -58,6 +58,7 @@ struct precreate_pool_desc
     void* data;
     int first_callback_flag;
     TROVE_keyval_s* key_array;
+    PVFS_ds_flags flags;
     
     PVFS_error error_code;
 };

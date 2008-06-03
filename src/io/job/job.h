@@ -653,6 +653,7 @@ int job_precreate_pool_get_handles(
     int count,
     const char** servers,
     PVFS_handle* handle_array,
+    PVFS_ds_flags flags,
     void *user_ptr,
     job_aint status_user_tag,
     job_status_s * out_status_p,

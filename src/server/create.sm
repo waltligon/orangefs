@@ -370,6 +370,7 @@ static PINT_sm_action request_datafiles(
         s_op->u.create.handle_array_remote_count,
         s_op->u.create.io_servers,
         s_op->u.create.handle_array,
+        0,
         smcb,
         0,
         js_p,

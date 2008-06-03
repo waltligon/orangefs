@@ -263,6 +263,7 @@ static PINT_sm_action get_handles(
         (s_op->u.unstuff.num_dfiles_req-1),
         NULL,
         &s_op->u.unstuff.dfile_array[1],
+        0,
         smcb,
         0,
         js_p,
