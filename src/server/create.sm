@@ -157,6 +157,7 @@ static int check_stuffed(
     PVFS_sys_layout *layout;
     int ret;
     const char* svr_name;
+    int i;
 
     s_op->resp.u.create.metafile_handle = js_p->handle;
     gossip_debug(
@@ -167,17 +168,14 @@ static int check_stuffed(
 
     layout = &s_op->req->u.create.layout;
 
-#if 0
     if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
     {
-        int i;
         for(i=0; i<layout->server_list.count; i++)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, "layout list server %d: %lld\n", 
                 i, lld(layout->server_list.servers[i])); 
         }
     }
-#endif
 
     fs_conf = PINT_config_find_fs_id(config, 
         s_op->req->u.create.fs_id);
@@ -256,6 +254,12 @@ static int check_stuffed(
     {
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
+    }
+
+    for(i=0; i<s_op->u.create.num_io_servers; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "io_server %d: %s\n", 
+            i, s_op->u.create.io_servers[i]); 
     }
 
     s_op->resp.u.create.stuffed = 0;
@@ -361,7 +365,7 @@ static PINT_sm_action request_datafiles(
     ret = job_precreate_pool_get_handles(
         s_op->req->u.create.fs_id,
         s_op->u.create.handle_array_remote_count,
-        NULL,
+        s_op->u.create.io_servers,
         s_op->u.create.handle_array,
         smcb,
         0,
