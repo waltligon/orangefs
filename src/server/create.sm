@@ -221,19 +221,16 @@ static int check_stuffed(
     }
 
     /* file will not be stuffed; need to allocate all datafiles */
-    s_op->req->u.create.attr.u.meta.dfile_count
-        = s_op->req->u.create.num_dfiles_req;
-    s_op->resp.u.create.datafile_count 
-        = s_op->req->u.create.num_dfiles_req;
+    s_op->u.create.num_io_servers = s_op->req->u.create.num_dfiles_req;
     s_op->resp.u.create.datafile_handles = malloc(
         sizeof(*s_op->resp.u.create.datafile_handles) *
-        s_op->resp.u.create.datafile_count);
+        s_op->u.create.num_io_servers);
     s_op->u.create.handle_array = malloc(
         sizeof(*s_op->u.create.handle_array) *
-        s_op->resp.u.create.datafile_count);
+        s_op->u.create.num_io_servers);
     s_op->u.create.remote_io_servers = malloc(
         sizeof(char*) *
-        s_op->resp.u.create.datafile_count);
+        s_op->u.create.num_io_servers);
     if(!s_op->resp.u.create.datafile_handles || 
         !s_op->u.create.handle_array ||
         !s_op->u.create.remote_io_servers)
@@ -256,6 +253,11 @@ static int check_stuffed(
         return SM_ACTION_COMPLETE;
     }
 
+    /* layout may have adjusted number of datafiles */
+    s_op->req->u.create.attr.u.meta.dfile_count
+        = s_op->u.create.num_io_servers;
+    s_op->resp.u.create.datafile_count 
+        = s_op->u.create.num_io_servers;
     for(i=0; i<s_op->u.create.num_io_servers; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "io_server %d: %s\n", 
