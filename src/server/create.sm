@@ -490,6 +490,7 @@ static PINT_sm_action write_keyvals(
     int i;
     int tmp_index = 0;
     server_configuration_s *config = get_server_config_struct();
+    char* tmpbuf;
 
     if(s_op->u.create.handle_array_remote_count)
     {
@@ -528,6 +529,7 @@ static PINT_sm_action write_keyvals(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
 
     s_op->key_a[0].buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
@@ -555,13 +557,20 @@ static PINT_sm_action write_keyvals(
         s_op->key_a[2].buffer = Trove_Common_Keys[METAFILE_LAYOUT_KEY].key;
         s_op->key_a[2].buffer_sz = Trove_Common_Keys[METAFILE_LAYOUT_KEY].size;
 
-        /* TODO: don't we need to store more than just the algorithm?  Where
-         * does the server_list go if LAYOUT_LIST was used?
-         */ 
-        s_op->val_a[2].buffer =
-            &s_op->req->u.create.layout.algorithm;
-        s_op->val_a[2].buffer_sz =
-            sizeof(s_op->req->u.create.layout.algorithm);
+        s_op->val_a[2].buffer = malloc(PVFS_REQ_LIMIT_LAYOUT);
+        if(!s_op->val_a[2].buffer)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        tmpbuf = s_op->val_a[2].buffer;
+        encode_PVFS_sys_layout(&tmpbuf, &s_op->req->u.create.layout);
+
+        s_op->val_a[2].buffer_sz = (tmpbuf - (char*)s_op->val_a[2].buffer);
+
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "create storing layout of size: %d\n", 
+            s_op->val_a[2].buffer_sz);
 
         s_op->key_a[3].buffer = Trove_Common_Keys[NUM_DFILES_REQ_KEY].key;
         s_op->key_a[3].buffer_sz = Trove_Common_Keys[NUM_DFILES_REQ_KEY].size;
@@ -686,6 +695,10 @@ static int cleanup(
         if(s_op->val_a[1].buffer)
         {
             free(s_op->val_a[1].buffer);
+        }
+        if(s_op->resp.u.create.stuffed && s_op->val_a[2].buffer)
+        {
+            free(s_op->val_a[2].buffer);
         }
         free(s_op->val_a);
     }

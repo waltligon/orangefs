@@ -373,7 +373,7 @@ struct PINT_server_getattr_op
     PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_handle dirent_handle;
-    enum PVFS_sys_layout_algorithm algorithm;
+    int num_dfiles_req;
 };
 
 struct PINT_server_listattr_op
@@ -393,8 +393,9 @@ struct PINT_server_eattr_op
 struct PINT_server_unstuff_op
 {
     PVFS_handle* dfile_array;
-    enum PVFS_sys_layout_algorithm algorithm;
     int num_dfiles_req;
+    PVFS_sys_layout layout;
+    void* encoded_layout;
 };
 
 /* This structure is passed into the void *ptr 
@@ -415,7 +416,6 @@ typedef struct PINT_server_op
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
     int *error_a;
-    int *free_a;
     int keyval_count;
 
     int free_val;

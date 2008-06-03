@@ -139,15 +139,20 @@ static PINT_sm_action get_keyvals(
     }
     memset(s_op->error_a, 0, sizeof(*s_op->error_a) * s_op->keyval_count);
 
+    s_op->u.unstuff.encoded_layout = malloc(PVFS_REQ_LIMIT_LAYOUT);
+    if(!s_op->u.unstuff.encoded_layout)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        goto free_encoded_layout;
+    }
+    memset(s_op->u.unstuff.encoded_layout, 0, PVFS_REQ_LIMIT_LAYOUT);
+
     /* kind = 0 */
     s_op->key_a[kind].buffer = Trove_Common_Keys[METAFILE_LAYOUT_KEY].key;
     s_op->key_a[kind].buffer_sz = Trove_Common_Keys[METAFILE_LAYOUT_KEY].size;
 
-    /* TODO: don't we need to read more than just the algorithm?  What about
-     * the server list (if present)?
-     */
-    s_op->val_a[kind].buffer = &s_op->u.unstuff.algorithm;
-    s_op->val_a[kind].buffer_sz = sizeof(s_op->u.unstuff.algorithm);
+    s_op->val_a[kind].buffer = s_op->u.unstuff.encoded_layout;
+    s_op->val_a[kind].buffer_sz = PVFS_REQ_LIMIT_LAYOUT;
 
     ++kind;
     /* kind = 1 */
@@ -164,10 +169,15 @@ static PINT_sm_action get_keyvals(
         0, NULL, smcb, 0, js_p, &job_id, server_job_context);
     return ret;
 
+free_encoded_layout:
+    free(s_op->u.unstuff.encoded_layout);
+    s_op->u.unstuff.encoded_layout = NULL;
 free_val_array:
     free(s_op->val_a);
+    s_op->val_a = NULL;
 free_key_array:
     free(s_op->key_a);
+    s_op->key_a = NULL;
 error_exit:
     return SM_ACTION_COMPLETE;
 }
@@ -176,6 +186,7 @@ static PINT_sm_action inspect_keyvals(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    char* tmpbuf;
 
     if(js_p->error_code == 0)
     {
@@ -188,8 +199,14 @@ static PINT_sm_action inspect_keyvals(
         {
             js_p->error_code = s_op->error_a[1];
         }
-    }
 
+        if(js_p->error_code == 0)
+        {
+            /* decode layout information */
+            tmpbuf = s_op->u.unstuff.encoded_layout;
+            decode_PVFS_sys_layout(&tmpbuf, &s_op->u.unstuff.layout);
+        }
+    }
 
     /* pass along error code for next state to handle */
     return SM_ACTION_COMPLETE;
@@ -200,20 +217,15 @@ static PINT_sm_action get_handles(
 {
     int ret;
     job_id_t j_id;
-    PVFS_sys_layout layout;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    layout.algorithm = s_op->u.unstuff.algorithm;
-    layout.server_list.count = 0;
-    layout.server_list.servers = NULL;
 
     /* TODO: check to make sure num_dfiles_req is >=1 for sanity */
 
     /* TODO: add support for list layouts later */
-    if(layout.algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)
+    if(s_op->u.unstuff.layout.algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)
     {
         gossip_err("Error: unstuff doesn't support layout algorithm: %d\n", 
-            layout.algorithm);
+            s_op->u.unstuff.layout.algorithm);
         js_p->error_code = -PVFS_ENOSYS;
         return SM_ACTION_COMPLETE;
     }
@@ -344,6 +356,14 @@ static PINT_sm_action cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    if(s_op->u.unstuff.layout.server_list.servers)
+    {
+        free(s_op->u.unstuff.layout.server_list.servers);
+    }
+    if(s_op->u.unstuff.encoded_layout)
+    {
+        free(s_op->u.unstuff.encoded_layout);
+    }
     if(s_op->val_a)
     {
         free(s_op->val_a);
