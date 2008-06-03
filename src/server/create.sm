@@ -23,21 +23,21 @@ machine pvfs2_create_sm
     {
         jump pvfs2_prelude_sm;
         success => create_metafile;
-        default => final_response;
+        default => setup_final_response;
     }
 
     state create_metafile
     {
         run create_metafile;
         success => check_stuffed;
-        default => final_response;
+        default => setup_final_response;
     }
 
     state check_stuffed
     {
         run check_stuffed;
         success => create_local_datafiles;
-        default => final_response;
+        default => setup_final_response;
     }
 
     state create_local_datafiles
@@ -78,26 +78,32 @@ machine pvfs2_create_sm
     state setup_resp
     {
         run setup_resp;
-        default => final_response;
+        default => setup_final_response;
     }
 
     state remove_datafile_handles
     {
         run remove_datafile_handles;
         success => remove_metafile_object;
-        default => final_response;
+        default => setup_final_response;
     }
 
     state remove_metafile_object
     {
         run remove_metafile_object;
-        default => final_response;
+        default => setup_final_response;
     }
 
     state remove_keyvals
     {
         run remove_keyvals;
         success => remove_datafile_handles;
+        default => setup_final_response;
+    }
+
+    state setup_final_response
+    {
+        run setup_final_response;
         default => final_response;
     }
 
@@ -115,6 +121,21 @@ machine pvfs2_create_sm
 }
 
 %%
+
+static int setup_final_response(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* retrieve original error code if present */
+    if(s_op->u.create.saved_error_code)
+    {
+        js_p->error_code = s_op->u.create.saved_error_code;
+    }
+
+    /* otherwise propigate the js_p->error code */
+    return(SM_ACTION_COMPLETE);
+}
 
 static int create_metafile(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -386,6 +407,12 @@ static PINT_sm_action remove_metafile_object(
     int ret = -1;
     job_id_t j_id;
 
+    /* save the error code before we begin cleanup */
+    if(!s_op->u.create.saved_error_code)
+    {
+        s_op->u.create.saved_error_code = js_p->error_code;
+    }
+
     free(s_op->resp.u.create.datafile_handles);
 
     ret = job_trove_dspace_remove(
@@ -407,10 +434,11 @@ static PINT_sm_action remove_datafile_handles(
     int ret = -1;
     job_id_t j_id;
 
-    /* TODO: how do we keep up with the error code that got us to this
-     * path?  We don't want the return code of the cleanup steps to get
-     * reported in the ack.
-     */
+    /* save the error code before we begin cleanup */
+    if(!s_op->u.create.saved_error_code)
+    {
+        s_op->u.create.saved_error_code = js_p->error_code;
+    }
 
     if(s_op->resp.u.create.stuffed)
     {
@@ -440,6 +468,12 @@ static PINT_sm_action remove_keyvals(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
+
+    /* save the error code before we begin cleanup */
+    if(!s_op->u.create.saved_error_code)
+    {
+        s_op->u.create.saved_error_code = js_p->error_code;
+    }
 
     /* the keyval keys and vals should still be valid here */
     ret = job_trove_keyval_remove_list(
