@@ -202,6 +202,7 @@ static int check_stuffed(
         return SM_ACTION_COMPLETE;
     }
 
+    /* for now only support stuffing of ROUND_ROBIN layouts */
     if((server_type & PINT_SERVER_TYPE_IO) && fs_conf->file_stuffing && layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN)
     {    
         /* we can do a stuffed create here, only one datafile */

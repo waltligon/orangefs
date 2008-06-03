@@ -221,9 +221,12 @@ static PINT_sm_action get_handles(
 
     /* TODO: check to make sure num_dfiles_req is >=1 for sanity */
 
-    /* TODO: add support for list layouts later */
     if(s_op->u.unstuff.layout.algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)
     {
+        /* see create.sm; for now the only layout that we use stuffing on is
+         * ROUND_ROBIN.  The storage format supports other layouts if we
+         * want to add support for others later
+         */
         gossip_err("Error: unstuff doesn't support layout algorithm: %d\n", 
             s_op->u.unstuff.layout.algorithm);
         js_p->error_code = -PVFS_ENOSYS;
