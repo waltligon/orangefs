@@ -244,7 +244,7 @@ sub emit_filesystem
         $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count) = @_;
 
     # divide handle range space equally among servers ((2^63)-1 for now)
-    my($total_num_handles_available, $start, $end, $i, $step, $num_ranges);
+    my($total_num_handles_available, $start, $end, $i, $step, $num_ranges, $stuffing);
     $num_ranges = $count;
     $total_num_handles_available = $last_handle->copy();
     $total_num_handles_available->bsub($first_handle);
@@ -263,6 +263,23 @@ sub emit_filesystem
     {
         print $target "\tDefaultNumDFiles $default_num_dfiles\n";
     }
+
+    # Rules for default stuffing setting: only enable it if every I/O server
+    # is also a metadata server, otherwise we would tend to unbalance by
+    # always stuffing on the subset that does metadata.  User can override
+    # if desired.
+    $stuffing = "yes";
+    foreach my $alias (keys %all_endpoints)
+    {
+        if($all_endpoints{$alias}->{TYPE} & $IO_ENDPOINT)
+        {
+            if(!($all_endpoints{$alias}->{TYPE} & $META_ENDPOINT))
+            {
+                $stuffing = "no";
+            }
+        }
+    }
+    print $target "\tFileStuffing $stuffing\n";
 
     print $target "\t<MetaHandleRanges>\n";
     $start = $end = $first_handle->copy();
