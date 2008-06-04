@@ -478,23 +478,16 @@ int PINT_init_capability(PVFS_capability *cap)
     
     if (cap)
     {
-        cap->owner = 0;
-        cap->fsid = 0;
-        cap->sig_size = 0;
-        cap->signature = NULL;
-        cap->timeout = 0;
-        cap->op_mask = 0;
-        cap->num_handles = 0;
-        cap->handle_array = NULL;
+        memset(cap, 0, sizeof(PVFS_capability));
 
 #ifndef SECURITY_ENCRYPTION_NONE
-        cap->signature = (unsigned char*)malloc(EVP_PKEY_size(security_privkey));
+        cap->signature = 
+            (unsigned char*)calloc(1, EVP_PKEY_size(security_privkey));
         if (cap->signature == NULL)
         {
             ret = -PVFS_ENOMEM;
         }
 #endif /* SECURITY_ENCRYPTION_NONE */
-
     }
     else
     {
@@ -517,41 +510,44 @@ PVFS_capability *PINT_dup_capability(const PVFS_capability *cap)
 {
     PVFS_capability *ret = NULL;
     
-    if (cap)
+    if (!cap)
     {
-    	ret = (PVFS_capability*)malloc(sizeof(PVFS_capability));
-    	if (ret)
-    	{
-    	    memcpy(ret, cap, sizeof(PVFS_capability));
-    	    ret->handle_array = 
-    	        (PVFS_handle *)malloc(sizeof(PVFS_handle) * cap->num_handles);
-    	    if (ret->handle_array)
-    	    {
-    	        memcpy(ret->handle_array, cap->handle_array, cap->num_handles);
-    	    }
-    	    else
-    	    {
-    	        free(ret);
-    	        ret = NULL;
-    	    }
-#ifndef SECURITY_ENCRYPTION_NONE
-            if (cap->sig_size && ret)
-            {
-    	        ret->signature = (unsigned char*)malloc(cap->sig_size);
-    	        if (ret->signature)
-    	        {
-    	            memcpy(ret->signature, cap->signature, cap->sig_size);
-    	        }
-    	        else
-    	        {
-    	            free(ret->handle_array);
-    	            free(ret);
-    	            ret = NULL;
-    	        }
-    	    }
-#endif /* SECURITY_ENCRYPTION_NONE */
-    	}
+        return NULL;
     }
+
+    ret = (PVFS_capability*)malloc(sizeof(PVFS_capability));
+    if (!ret)
+    {
+        return NULL;
+    }
+    memcpy(ret, cap, sizeof(PVFS_capability));
+    ret->signature = NULL;
+    ret->handle_array = NULL;
+
+#ifndef SECURITY_ENCRYPTION_NONE
+    ret->signature = (unsigned char*)malloc(EVP_PKEY_size(security_privkey));
+    if (!ret->signature)
+    {
+        free(ret);
+        return NULL;
+    }
+    memcpy(ret->signature, cap->signature, cap->sig_size);
+#endif /* SECURITY_ENCRYPTION_NONE */
+
+    if (cap->num_handles)
+    {
+        ret->handle_array = calloc(cap->num_handles, sizeof(PVFS_handle));
+        if (!ret->handle_array)
+        {
+            free(ret->signature);
+            free(ret);
+            return NULL;
+        }
+        memcpy(ret->handle_array, 
+               cap->handle_array, 
+               cap->num_handles * sizeof(PVFS_handle));
+    }
+    
     return ret;
 }
 
