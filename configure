@@ -1324,17 +1324,21 @@ Optional Features:
   --disable-server Disables building of PVFS2 server
   --disable-karma-mem-usage-stats Disables memory usage stats in karma
   --disable-perf-counters Disables pvfs2-server performance counters
-  --enable-mmap-racache   Enables mmap-readahead in kernel interface
-  --enable-trusted-connections  Enable connects only from trusted hosts/ports
-                                (experimental, off by default)
+  --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel
+                          interface
+  --enable-trusted-connections  **EXPERIMENTAL** Enable connects only
+                          from trusted hosts/ports
   --disable-karma         Disables optional gui.  (Enabled by default)
   --disable-static        Do not build static client library
   --enable-redhat24       Enable workaround for RedHat 2.4 kernel
   --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries
-  --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks
+  --disable-aio-threaded-callbacks  **EXPERIMENTAL** Disable use of AIO
+                          threaded callbacks
   --disable-kernel-aio    Forcibly disable kernel aio
-  --enable-kernel-sendfile    Forcibly enable kernel sendfile
-  --enable-threaded-kmod-helper  Use threads in the kernel helper application
+  --enable-kernel-sendfile   **EXPERIMENTAL** Forcibly enable kernel
+                          sendfile
+  --enable-threaded-kmod-helper  **EXPERIMENTAL** Use threads in the kernel
+                          helper application
   --enable-fast           Disable optional debugging, enable optimizations.
   --enable-strict         Turn on strict compiler warnings
   --enable-verbose-build  Enables full output during build process
