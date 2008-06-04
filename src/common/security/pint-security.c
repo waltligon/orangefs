@@ -192,8 +192,11 @@ int PINT_sign_capability(PVFS_capability *cap)
     ret &= EVP_SignUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
     ret &= EVP_SignUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
     ret &= EVP_SignUpdate(&mdctx, &cap->num_handles, sizeof(uint32_t));
-    ret &= EVP_SignUpdate(&mdctx, cap->handle_array, cap->num_handles * 
+    if (cap->num_handles)
+    {
+        ret &= EVP_SignUpdate(&mdctx, cap->handle_array, cap->num_handles * 
                           sizeof(PVFS_handle));
+    }
 
     if (!ret)
     {
@@ -287,8 +290,11 @@ int PINT_verify_capability(PVFS_capability *data)
         ret &= EVP_VerifyUpdate(&mdctx, &(data->op_mask), sizeof(uint32_t));
         ret &= EVP_VerifyUpdate(&mdctx, &(data->num_handles),
                                 sizeof(uint32_t));
-        ret &= EVP_VerifyUpdate(&mdctx, data->handle_array,
+        if (data->num_handles)
+        {
+            ret &= EVP_VerifyUpdate(&mdctx, data->handle_array,
                                 sizeof(PVFS_handle) * data->num_handles);
+        }
         if (ret)
         {
             ret = EVP_VerifyFinal(&mdctx, data->signature, data->sig_size, 

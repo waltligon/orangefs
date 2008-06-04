@@ -251,6 +251,7 @@ static PINT_sm_action getattr_verify_attribs(
         (int)resp_attr->u.meta.dist_size);
 #endif
 
+    s_op->u.getattr.attrmask |= PVFS_ATTR_CAPABILITY;
     /* initial filling out and signing of capability structure */
     if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
     {
@@ -261,7 +262,7 @@ static PINT_sm_action getattr_verify_attribs(
             if (js_p->error_code)
             {
                 /* init failed */
-                gossip_debug(GOSSIP_SECURITY_DEBUG,"Capability init failed\n");
+                gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability init failed\n");
                 free(resp_cap);
                 return SM_ACTION_COMPLETE;
             }
@@ -269,15 +270,23 @@ static PINT_sm_action getattr_verify_attribs(
             resp_attr->capability->owner = s_op->attr.owner;
             resp_attr->capability->op_mask = s_op->attr.perms;
             resp_attr->capability->fsid = s_op->u.getattr.fs_id;
-            resp_attr->capability->num_handles = 
-                s_op->resp.u.getattr.attr.u.meta.dfile_count;
+            if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
+            {
+                resp_attr->capability->num_handles = 
+                    s_op->resp.u.getattr.attr.u.meta.dfile_count;
+            }
+            else
+            {
+                resp_attr->capability->num_handles = 0;
+            }
             resp_attr->capability->handle_array = 
                 s_op->resp.u.getattr.attr.u.meta.dfile_array;
-            resp_attr->mask |= PVFS_ATTR_CAPABILITY;
+            /* causes client-side seg-fault because of unexpected flag
+            resp_attr->mask |= PVFS_ATTR_CAPABILITY; */
             if (PINT_sign_capability(resp_attr->capability))
             {
                 /* sign failed */
-                gossip_debug(GOSSIP_SECURITY_DEBUG,"Capability sign failed\n");
+                gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability sign failed\n");
                 PINT_release_capability(resp_attr->capability);
                 js_p->error_code = -PVFS_EINVAL;
                 return SM_ACTION_COMPLETE;
@@ -286,7 +295,7 @@ static PINT_sm_action getattr_verify_attribs(
         else
         {
             /* malloc failed */
-            gossip_debug(GOSSIP_SECURITY_DEBUG,"Capability malloc failed\n");
+            gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability malloc failed\n");
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
         }
@@ -737,6 +746,22 @@ static PINT_sm_action getattr_setup_resp(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
+    
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability null? %u\n", 
+        (unsigned int *)resp_attr->capability);
+    if (resp_attr->capability)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Owner: %u\n", 
+            (unsigned int) resp_attr->capability->owner);
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Op mask: %d\n", 
+            resp_attr->capability->op_mask);
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Fsid: %d\n", 
+            resp_attr->capability->fsid);
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Handles: %d\n", 
+            resp_attr->capability->num_handles);
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Sig size: %d\n", 
+            resp_attr->capability->sig_size);
+    }
 
     if(js_p->error_code > 0)
     {
