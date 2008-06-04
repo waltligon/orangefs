@@ -192,6 +192,7 @@ static PINT_sm_action getattr_verify_attribs(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = NULL;
+    PVFS_capability *resp_cap = NULL;
 
     js_p->error_code = 0;
 
@@ -250,6 +251,47 @@ static PINT_sm_action getattr_verify_attribs(
         (int)resp_attr->u.meta.dist_size);
 #endif
 
+    /* initial filling out and signing of capability structure */
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
+    {
+        resp_cap = (PVFS_capability *)malloc(sizeof(PVFS_capability));
+        if (resp_cap)
+        {
+            js_p->error_code = PINT_init_capability(resp_cap);
+            if (js_p->error_code)
+            {
+                /* init failed */
+                gossip_debug(GOSSIP_SECURITY_DEBUG,"Capability init failed\n");
+                free(resp_cap);
+                return SM_ACTION_COMPLETE;
+            }
+            resp_attr->capability = resp_cap;
+            resp_attr->capability->owner = s_op->attr.owner;
+            resp_attr->capability->op_mask = s_op->attr.perms;
+            resp_attr->capability->fsid = s_op->u.getattr.fs_id;
+            resp_attr->capability->num_handles = 
+                s_op->resp.u.getattr.attr.u.meta.dfile_count;
+            resp_attr->capability->handle_array = 
+                s_op->resp.u.getattr.attr.u.meta.dfile_array;
+            resp_attr->mask |= PVFS_ATTR_CAPABILITY;
+            if (PINT_sign_capability(resp_attr->capability))
+            {
+                /* sign failed */
+                gossip_debug(GOSSIP_SECURITY_DEBUG,"Capability sign failed\n");
+                PINT_release_capability(resp_attr->capability);
+                js_p->error_code = -PVFS_EINVAL;
+                return SM_ACTION_COMPLETE;
+            }
+        }
+        else
+        {
+            /* malloc failed */
+            gossip_debug(GOSSIP_SECURITY_DEBUG,"Capability malloc failed\n");
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
     /*
       weed out the attr mask of the response based on what the client
       request asked for.  also, check if we need to retrieve more
@@ -261,22 +303,6 @@ static PINT_sm_action getattr_verify_attribs(
       have the original client request attr mask
       (s_op->u.getattr.attrmask).
     */
-    
-    /* initial filling out and signing of capability structure */
-/*    if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
-    {
-        resp_attr->capability->owner = s_op->attr.owner;
-        resp_attr->capability->op_mask = s_op->attr.perms;
-        resp_attr->capability->fsid = s_op->u.getattr.fs_id;
-        resp_attr->capability->num_handles = 
-            s_op->resp.u.getattr.attr.u.meta.dfile_count;
-        resp_attr->capability->handle_array = 
-            s_op->resp.u.getattr.attr.u.meta.dfile_array;
-        resp_attr->mask |= PVFS_ATTR_CAPABILITY;
-        resp_attr->capability->signature = 
-        PINT_sign_capability(resp_attr->capability);
-    }
-*/
     if (resp_attr->objtype == PVFS_TYPE_METAFILE)
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");
@@ -328,7 +354,7 @@ static PINT_sm_action getattr_verify_attribs(
         resp_attr->u.data.size = s_op->ds_attr.b_size;
         resp_attr->mask |= PVFS_ATTR_DATA_ALL;
 
-	gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
                      "a datafile (size = %lld).\n",
                      llu(s_op->u.getattr.handle),
                      lld(resp_attr->u.data.size));
@@ -369,7 +395,7 @@ static PINT_sm_action getattr_verify_attribs(
     else if (resp_attr->objtype == PVFS_TYPE_DIRDATA)
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
-	gossip_debug(
+    gossip_debug(
             GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
             "a dirdata object. doing nothing special\n",
             llu(s_op->u.getattr.handle));
@@ -378,7 +404,7 @@ static PINT_sm_action getattr_verify_attribs(
     else if (resp_attr->objtype == PVFS_TYPE_SYMLINK)
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
-	gossip_debug(
+    gossip_debug(
             GOSSIP_GETATTR_DEBUG, "  handle %llu refers to a symlink.\n",
             llu(s_op->u.getattr.handle));
 
@@ -428,11 +454,11 @@ static PINT_sm_action getattr_read_symlink_target(
 
     s_op->resp.u.getattr.attr.u.sym.target_path_len = PVFS_NAME_MAX;
     s_op->resp.u.getattr.attr.u.sym.target_path =
-	malloc(s_op->resp.u.getattr.attr.u.sym.target_path_len);
+    malloc(s_op->resp.u.getattr.attr.u.sym.target_path_len);
     if (!s_op->resp.u.getattr.attr.u.sym.target_path)
     {
-	js_p->error_code = -PVFS_ENOMEM;
-	return SM_ACTION_COMPLETE;
+    js_p->error_code = -PVFS_ENOMEM;
+    return SM_ACTION_COMPLETE;
     }
 
     if(s_op->free_val)
@@ -524,12 +550,12 @@ static PINT_sm_action getattr_read_metafile_hint(
     s_op->free_val = 1;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-		 "  reading metafile hint (coll_id = %d, "
+         "  reading metafile hint (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->u.getattr.fs_id,
-		 llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
-		 s_op->key.buffer_sz, s_op->val.buffer,
-		 s_op->val.buffer_sz);
+         s_op->u.getattr.fs_id,
+         llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
+         s_op->key.buffer_sz, s_op->val.buffer,
+         s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
@@ -572,7 +598,7 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
     {
         gossip_err("The requested dfile count of %d is invalid; "
                    "aborting operation.\n", dfile_count);
-	gossip_err(
+    gossip_err(
             "+ attrs read from dspace: (owner = %d, group = %d, "
             "perms = %o, type = %d\n   atime = %lld, mtime = %lld, "
             "ctime = %lld |\n   dfile_count = %d | dist_size = %d)\n",
@@ -586,16 +612,16 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
             (int)s_op->resp.u.getattr.attr.u.meta.dfile_count,
             (int)s_op->resp.u.getattr.attr.u.meta.dist_size);
 
-	gossip_err("handle: %llu (%llx), fsid: %d.\n",
-	    llu(s_op->u.getattr.handle), llu(s_op->u.getattr.handle),
-	    (int)s_op->u.getattr.fs_id);
+    gossip_err("handle: %llu (%llx), fsid: %d.\n",
+        llu(s_op->u.getattr.handle), llu(s_op->u.getattr.handle),
+        (int)s_op->u.getattr.fs_id);
 
         /*If we hit an error the DIST & DFILES are no longer valid*/
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
         
-	js_p->error_code = -PVFS_EOVERFLOW;
-	return SM_ACTION_COMPLETE;
+    js_p->error_code = -PVFS_EOVERFLOW;
+    return SM_ACTION_COMPLETE;
     }
 
     s_op->key.buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
@@ -610,8 +636,8 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
     {
         gossip_err("Cannot allocate dfile array of count %d\n",
                    dfile_count);
-	js_p->error_code = -PVFS_ENOMEM;
-	return SM_ACTION_COMPLETE;
+    js_p->error_code = -PVFS_ENOMEM;
+    return SM_ACTION_COMPLETE;
     }
 
     if(s_op->free_val)
@@ -624,12 +650,12 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
     s_op->free_val = 0;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-		 "  reading %d datafile handles (coll_id = %d, "
+         "  reading %d datafile handles (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-		 dfile_count, s_op->u.getattr.fs_id,
-		 llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
-		 s_op->key.buffer_sz, s_op->val.buffer,
-		 s_op->val.buffer_sz);
+         dfile_count, s_op->u.getattr.fs_id,
+         llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
+         s_op->key.buffer_sz, s_op->val.buffer,
+         s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
@@ -691,8 +717,8 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     {
         gossip_err("Cannot allocate dist of size %d\n",
                    s_op->val.buffer_sz);
-	js_p->error_code = -PVFS_ENOMEM;
-	return SM_ACTION_COMPLETE;
+    js_p->error_code = -PVFS_ENOMEM;
+    return SM_ACTION_COMPLETE;
     }
     s_op->free_val = 1;
 
@@ -823,7 +849,7 @@ static PINT_sm_action getattr_setup_resp(
     gossip_debug(GOSSIP_GETATTR_DEBUG,"@ End %s attributes: sending "
                  "status %d (error = %d)\n",
                  PINT_util_get_object_type(resp_attr->objtype),
-		 s_op->resp.status, js_p->error_code);
+         s_op->resp.status, js_p->error_code);
 
 #if 0
     gossip_debug(GOSSIP_GETATTR_DEBUG, "returning attrmask ");

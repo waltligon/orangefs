@@ -465,22 +465,41 @@ int PINT_verify_capability(PVFS_capability *cap)
 /*  PINT_init_capability
  *
  *  Function to call after creating an initial capability
- *  pointer to initialize needed memory space.
+ *  structure to initialize needed memory space for the signature.
+ *  Sets all fields to 0 or NULL to be safe
  *	
  *  returns -PVFS_ENOMEM on error
+ *  returns -PVFS_EINVAL if passed an invalid structure
  *  returns 0 on success
  */
 int PINT_init_capability(PVFS_capability *cap)
 {
     int ret = 0;
     
-#ifndef SECURITY_ENCRYPTION_NONE
-    cap->signature = (unsigned char*)malloc(EVP_PKEY_size(security_privkey));
-    if (cap->signature == NULL)
+    if (cap)
     {
-        ret = -PVFS_ENOMEM;
-    }
+        cap->owner = 0;
+        cap->fsid = 0;
+        cap->sig_size = 0;
+        cap->signature = NULL;
+        cap->timeout = 0;
+        cap->op_mask = 0;
+        cap->num_handles = 0;
+        cap->handle_array = NULL;
+
+#ifndef SECURITY_ENCRYPTION_NONE
+        cap->signature = (unsigned char*)malloc(EVP_PKEY_size(security_privkey));
+        if (cap->signature == NULL)
+        {
+            ret = -PVFS_ENOMEM;
+        }
 #endif /* SECURITY_ENCRYPTION_NONE */
+
+    }
+    else
+    {
+        ret = -PVFS_EINVAL;
+    }
 
     return ret;
 }
