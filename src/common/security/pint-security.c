@@ -233,6 +233,11 @@ int PINT_verify_capability(PVFS_capability *data)
     int ret;
     char *buf;
     EVP_PKEY *pubkey;
+    
+    if (!data)
+    {
+        return 0;
+    }
 
     if (PINT_util_get_current_time() > data->timeout)
     {
@@ -457,6 +462,14 @@ int PINT_verify_capability(PVFS_capability *cap)
 
 #endif /* SECURITY_ENCRYPTION_NONE */
 
+/*  PINT_init_capability
+ *
+ *  Function to call after creating an initial capability
+ *  pointer to initialize needed memory space.
+ *	
+ *  returns -PVFS_ENOMEM on error
+ *  returns 0 on success
+ */
 int PINT_init_capability(PVFS_capability *cap)
 {
     int ret = 0;
@@ -471,7 +484,16 @@ int PINT_init_capability(PVFS_capability *cap)
 
     return ret;
 }
-    
+
+/*  PINT_dup_capability
+ *
+ *  When passed a valid capability pointer this function will duplicate
+ *  it and return the copy.  User must make sure to free both the new and
+ *  old capabilities as normal.
+ *	
+ *  returns NULL on error
+ *  returns valid PVFS_capability * on success
+ */
 PVFS_capability *PINT_dup_capability(const PVFS_capability *cap)
 {
     PVFS_capability *ret = NULL;
@@ -514,6 +536,12 @@ PVFS_capability *PINT_dup_capability(const PVFS_capability *cap)
     return ret;
 }
 
+/*  PINT_release_capability
+ *
+ *  Frees any memory associated with a capability structure.
+ *	
+ *  no return value
+ */
 void PINT_release_capability(PVFS_capability *cap)
 {
     if (cap)
@@ -524,6 +552,15 @@ void PINT_release_capability(PVFS_capability *cap)
     }
 }
 
+/*  PINT_get_max_sigsize
+ *
+ *  This function probably won't get used, was initially used in the encode
+ *  and decode process although a workaround was found to avoid linking the
+ *  security module in.  Possibly useful later down the road.
+ *	
+ *  returns < 0 on error
+ *  returns maximum signature size on success
+ */
 int PINT_get_max_sigsize(void)
 {
 #ifndef SECURITY_ENCRYPTION_NONE
