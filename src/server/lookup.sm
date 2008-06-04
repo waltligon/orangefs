@@ -412,6 +412,7 @@ static PINT_sm_action lookup_check_acls_if_needed(
         js_p,
         &i,
         server_job_context);
+
     return ret;
 }
 

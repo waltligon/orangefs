@@ -308,7 +308,7 @@ static void client_segfault_handler(int signum)
     gossip_err("pvfs2-client-core: caught signal %d\n", signum);
     gossip_disable();
 #endif
-    kill(0, signum);
+    abort();
 }
 
 static void client_core_sig_handler(int signum)
