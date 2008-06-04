@@ -3259,8 +3259,10 @@ struct file_operations pvfs2_file_operations =
     .write = pvfs2_file_write,
 #ifdef HAVE_COMBINED_AIO_AND_VECTOR
     /* for >= 2.6.19 */
+#ifdef HAVE_AIO_VFS_SUPPORT
     .aio_read = pvfs2_file_aio_read_iovec,
     .aio_write = pvfs2_file_aio_write_iovec,
+#endif
     .lock = pvfs2_lock,
 #else
     .readv = pvfs2_file_readv,
