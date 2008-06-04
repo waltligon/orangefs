@@ -747,8 +747,8 @@ static PINT_sm_action getattr_setup_resp(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
     
-    gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability null? %u\n", 
-        (unsigned int *)resp_attr->capability);
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability ptr: %p\n", 
+                 resp_attr->capability);
     if (resp_attr->capability)
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG,"Owner: %u\n", 
