@@ -214,7 +214,8 @@ struct PINT_server_create_op
     const char **io_servers;
     const char **remote_io_servers;
     int num_io_servers;
-    PVFS_handle* handle_array; 
+    PVFS_handle* handle_array_local; 
+    PVFS_handle* handle_array_remote; 
     int handle_array_local_count;
     int handle_array_remote_count;
     PVFS_error saved_error_code;

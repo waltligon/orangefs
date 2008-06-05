@@ -230,8 +230,8 @@ static int check_stuffed(
         s_op->req->u.create.attr.u.meta.dfile_count = 1;
         s_op->resp.u.create.datafile_count = 1;
         s_op->resp.u.create.datafile_handles = malloc(sizeof(PVFS_handle));
-        s_op->u.create.handle_array = malloc(sizeof(PVFS_handle));
-        if(!s_op->resp.u.create.datafile_handles || !s_op->u.create.handle_array)
+        s_op->u.create.handle_array_local = malloc(sizeof(PVFS_handle));
+        if(!s_op->resp.u.create.datafile_handles || !s_op->u.create.handle_array_local)
         {
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
@@ -247,14 +247,18 @@ static int check_stuffed(
     s_op->resp.u.create.datafile_handles = malloc(
         sizeof(*s_op->resp.u.create.datafile_handles) *
         s_op->u.create.num_io_servers);
-    s_op->u.create.handle_array = malloc(
-        sizeof(*s_op->u.create.handle_array) *
+    s_op->u.create.handle_array_local = malloc(
+        sizeof(*s_op->u.create.handle_array_local) *
+        s_op->u.create.num_io_servers);
+    s_op->u.create.handle_array_remote = malloc(
+        sizeof(*s_op->u.create.handle_array_remote) *
         s_op->u.create.num_io_servers);
     s_op->u.create.remote_io_servers = malloc(
         sizeof(char*) *
         s_op->u.create.num_io_servers);
     if(!s_op->resp.u.create.datafile_handles || 
-        !s_op->u.create.handle_array ||
+        !s_op->u.create.handle_array_local ||
+        !s_op->u.create.handle_array_remote ||
         !s_op->u.create.remote_io_servers)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -359,7 +363,7 @@ static int create_local_datafiles(
     ret = job_trove_dspace_create_list(
         s_op->req->u.create.fs_id,
         &data_handle_ext_array,
-        s_op->u.create.handle_array,
+        s_op->u.create.handle_array_local,
         s_op->u.create.handle_array_local_count,
         PVFS_TYPE_DATAFILE,
         NULL,
@@ -390,7 +394,7 @@ static PINT_sm_action request_datafiles(
         s_op->req->u.create.fs_id,
         s_op->u.create.handle_array_remote_count,
         s_op->u.create.io_servers,
-        s_op->u.create.handle_array,
+        s_op->u.create.handle_array_remote,
         0,
         smcb,
         0,
@@ -455,7 +459,6 @@ static PINT_sm_action remove_datafile_handles(
     else
     {
         /* TODO: need to also remove locally created handle if present */
-        /* TODO: */
         gossip_err("We need to give the handles back to the pool somehow..\n");
         assert(0);
     }
@@ -496,7 +499,7 @@ static PINT_sm_action setup_local_datafile_handles(
     if(s_op->resp.u.create.stuffed)
     {
         s_op->resp.u.create.datafile_handles[0] = 
-            s_op->u.create.handle_array[0];
+            s_op->u.create.handle_array_local[0];
         js_p->error_code = 0;
         return(SM_ACTION_COMPLETE);
     }
@@ -508,7 +511,7 @@ static PINT_sm_action setup_local_datafile_handles(
             if(!strcmp(s_op->u.create.io_servers[i], config->host_id))
             {
                 s_op->resp.u.create.datafile_handles[i] = 
-                    s_op->u.create.handle_array[tmp_index];
+                    s_op->u.create.handle_array_local[tmp_index];
                 tmp_index++;
             }
         }
@@ -536,7 +539,7 @@ static PINT_sm_action write_keyvals(
             if(strcmp(s_op->u.create.io_servers[i], config->host_id))
             {
                 s_op->resp.u.create.datafile_handles[i] = 
-                    s_op->u.create.handle_array[tmp_index];
+                    s_op->u.create.handle_array_remote[tmp_index];
                 tmp_index++;
             }
         }
@@ -744,9 +747,14 @@ static int cleanup(
         free(s_op->resp.u.create.datafile_handles);
     }
 
-    if(s_op->u.create.handle_array)
+    if(s_op->u.create.handle_array_remote)
     {
-        free(s_op->u.create.handle_array);
+        free(s_op->u.create.handle_array_remote);
+    }
+
+    if(s_op->u.create.handle_array_local)
+    {
+        free(s_op->u.create.handle_array_local);
     }
 
     if(s_op->u.create.io_servers)
