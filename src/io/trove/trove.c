@@ -775,6 +775,37 @@ int trove_dspace_create(
            out_op_id_p);
 }
 
+/** Initiate removal of a list of data spaces.
+ */
+int trove_dspace_remove_list(
+    TROVE_coll_id coll_id,
+    TROVE_handle* handle_array,
+    TROVE_ds_state* error_array,
+    int count,
+    TROVE_ds_flags flags,
+    void* user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id* out_op_id_p)
+{
+    TROVE_method_id method_id;
+
+    method_id = global_trove_method_callback(coll_id);
+    if(method_id < 0)
+    {
+	return -TROVE_EINVAL;
+    }
+
+    return dspace_method_table[method_id]->dspace_remove_list(
+           coll_id,
+           handle_array,
+           error_array,
+           count,
+           flags,
+           user_ptr,
+           context_id,
+           out_op_id_p);
+}
+
 /** Initiate removal of a data space.
  */
 int trove_dspace_remove(

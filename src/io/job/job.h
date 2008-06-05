@@ -539,14 +539,15 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 
 /* remove a list of data space objects (byte stream and key/value) */
 int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
-                                 int count,
-                                 PVFS_handle *handles,
-                                 PVFS_ds_flags flags,
-                                 void *user_ptr,
-                                 job_aint status_user_tag,
-                                 job_status_s * out_status_p,
-                                 job_id_t * id,
-                                 job_context_id context_id);
+			    PVFS_handle* handle_array,
+                            PVFS_error *out_error_array,
+                            int count,
+                            PVFS_ds_flags flags,
+			    void *user_ptr,
+			    job_aint status_user_tag,
+			    job_status_s * out_status_p,
+			    job_id_t * id,
+			    job_context_id context_id);
 
 /* verify that a given dataspace exists and discover its type */
 int job_trove_dspace_verify(PVFS_fs_id coll_id,

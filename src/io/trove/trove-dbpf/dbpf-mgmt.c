@@ -1908,7 +1908,8 @@ static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
     { DSPACE_GETATTR, "DSPACE_GETATTR" },
     { DSPACE_SETATTR, "DSPACE_SETATTR" },
     { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" },
-    { DSPACE_CREATE_LIST, "DSPACE_CREATE_LIST" }
+    { DSPACE_CREATE_LIST, "DSPACE_CREATE_LIST" },
+    { DSPACE_REMOVE_LIST, "DSPACE_REMOVE_LIST" }
     /* NOTE: this list should be kept in sync with enum dbpf_op_type 
      * from dbpf.h 
      */ 

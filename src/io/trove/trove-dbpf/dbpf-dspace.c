@@ -107,6 +107,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p);
+static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
@@ -406,6 +407,49 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
     return DBPF_OP_COMPLETE;
 }
 
+static int dbpf_dspace_remove_list(TROVE_coll_id coll_id,
+                              TROVE_handle* handle_array,
+                              TROVE_ds_state *error_array,
+                              int count,
+                              TROVE_ds_flags flags,
+                              void *user_ptr,
+                              TROVE_context_id context_id,
+                              TROVE_op_id *out_op_id_p)
+{
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_collection *coll_p = NULL;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
+
+    dbpf_queued_op_init(
+        q_op_p,
+        DSPACE_REMOVE_LIST,
+        TROVE_HANDLE_NULL,
+        coll_p,
+        dbpf_dspace_remove_list_op_svc,
+        user_ptr,
+        flags,
+        context_id);
+
+    /* initialize op-specific members */
+    q_op_p->op.u.d_remove_list.count = count;
+    q_op_p->op.u.d_remove_list.handle_array = handle_array;
+    q_op_p->op.u.d_remove_list.error_p = error_array;
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
+}
+
 static int dbpf_dspace_remove(TROVE_coll_id coll_id,
                               TROVE_handle handle,
                               TROVE_ds_flags flags,
@@ -513,6 +557,37 @@ static int remove_one_handle(
 
 return_error:
     return ret;
+}
+
+
+static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
+{
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    int ret = -TROVE_EINVAL;
+    int i;
+
+    for(i=0; i<op_p->u.d_remove_list.count; i++)
+    {
+        ref.handle = op_p->u.d_remove_list.handle_array[i];
+        ref.fs_id = op_p->coll_p->coll_id;
+        
+        op_p->u.d_remove_list.error_p[i] = 
+            remove_one_handle(ref, op_p->coll_p);
+    }
+
+    /* we still do a non-coalesced sync of the keyval db here
+     * because we're in a dspace operation
+     */
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db, ret);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_SUB);
+
+    return DBPF_OP_COMPLETE;
 }
 
 
@@ -2023,6 +2098,7 @@ struct TROVE_dspace_ops dbpf_dspace_ops =
     dbpf_dspace_create,
     dbpf_dspace_create_list,
     dbpf_dspace_remove,
+    dbpf_dspace_remove_list,
     dbpf_dspace_iterate_handles,
     dbpf_dspace_verify,
     dbpf_dspace_getattr,

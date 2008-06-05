@@ -258,6 +258,17 @@ struct TROVE_dspace_ops
 			 TROVE_context_id context_id,
 			 TROVE_op_id *out_op_id_p);
 
+    int (*dspace_remove_list)(
+			 TROVE_coll_id coll_id,
+			 TROVE_handle* handle_array,
+                         TROVE_ds_state *error_array,
+                         int count,
+			 TROVE_ds_flags flags,
+			 void *user_ptr,
+			 TROVE_context_id context_id,
+			 TROVE_op_id *out_op_id_p);
+
+
     int (*dspace_iterate_handles)(
 			 	  TROVE_coll_id coll_id,
 				  TROVE_ds_position *position_p,

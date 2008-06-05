@@ -281,6 +281,13 @@ struct dbpf_dspace_getattr_op
     TROVE_ds_attributes_s *attr_p;
 };
 
+struct dbpf_dspace_remove_list_op
+{
+    int count;
+    TROVE_handle          *handle_array;
+    TROVE_ds_state        *error_p;
+};
+
 struct dbpf_dspace_getattr_list_op
 {
     int count;
@@ -477,6 +484,7 @@ enum dbpf_op_type
     DSPACE_SETATTR,
     DSPACE_GETATTR_LIST,
     DSPACE_CREATE_LIST,
+    DSPACE_REMOVE_LIST,
     /* NOTE: if you change or add items to this list, please update
      * s_dbpf_op_type_str_map[] accordingly (dbpf-mgmt.c)
      */
@@ -548,6 +556,7 @@ struct dbpf_op
         struct dbpf_keyval_read_list_op k_write_list;
         struct dbpf_keyval_remove_list_op k_remove_list;
         struct dbpf_dspace_getattr_list_op d_getattr_list;
+        struct dbpf_dspace_remove_list_op d_remove_list;
         struct dbpf_keyval_get_handle_info_op k_get_handle_info;
     } u;
 };
