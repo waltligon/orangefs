@@ -571,8 +571,16 @@ static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
         ref.handle = op_p->u.d_remove_list.handle_array[i];
         ref.fs_id = op_p->coll_p->coll_id;
         
-        op_p->u.d_remove_list.error_p[i] = 
-            remove_one_handle(ref, op_p->coll_p);
+        /* if error_p is NULL, assume that the caller is ignoring errors */
+        if(op_p->u.d_remove_list.error_p)
+        {
+            op_p->u.d_remove_list.error_p[i] = 
+                remove_one_handle(ref, op_p->coll_p);
+        }
+        else
+        {
+                remove_one_handle(ref, op_p->coll_p);
+        }
     }
 
     /* we still do a non-coalesced sync of the keyval db here

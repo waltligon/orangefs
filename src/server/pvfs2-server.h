@@ -219,6 +219,7 @@ struct PINT_server_create_op
     int handle_array_local_count;
     int handle_array_remote_count;
     PVFS_error saved_error_code;
+    int handle_index;
 };
 
 /* struct PINT_server_lookup_op

@@ -5566,7 +5566,38 @@ int job_precreate_pool_fill(
     *id = jd->job_id;
     return (0);
 }
- 
+  
+/* job_precreate_pool_lookup_server()
+ *
+ * resolves a string hostname into a pool handle 
+ */
+int job_precreate_pool_lookup_server(
+    const char* host, 
+    PVFS_fs_id fsid, 
+    PVFS_handle* pool_handle)
+{
+    struct precreate_pool* pool;
+    struct qlist_head* iterator;
+
+    gen_mutex_lock(&precreate_pool_mutex);
+
+    /* check pool list, go back to sleep if any are empty */
+    qlist_for_each(iterator, &precreate_pool_list)
+    {
+        pool = qlist_entry(iterator, struct precreate_pool,
+            list_link);
+        if(!strcmp(pool->host, host) && fsid == pool->fsid)
+        {
+            *pool_handle = pool->pool_handle;
+            gen_mutex_unlock(&precreate_pool_mutex);
+            return(0);
+        }
+    }
+    gen_mutex_unlock(&precreate_pool_mutex);
+
+    return(-PVFS_ENOENT);
+}
+  
 int job_precreate_pool_register_server(
     const char* host, 
     PVFS_fs_id fsid, 

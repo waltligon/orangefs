@@ -15,6 +15,8 @@
 #include "pint-util.h"
 #include "pint-cached-config.h"
 
+#define REPLACE_DONE 100
+
 %%
 
 machine pvfs2_create_sm
@@ -51,21 +53,21 @@ machine pvfs2_create_sm
     {
         run setup_local_datafile_handles;
         success => request_datafiles;
-        default => remove_metafile_object;
+        default => remove_local_datafile_handles;
     }
 
     state request_datafiles
     {
         run request_datafiles;
         success => write_keyvals;
-        default => remove_metafile_object;
+        default => remove_local_datafile_handles;
     }
 
     state write_keyvals
     {
         run write_keyvals;
         success => setobj_attribs;
-        default => remove_datafile_handles;
+        default => replace_remote_datafile_handles;
     }
 
     state setobj_attribs
@@ -81,11 +83,17 @@ machine pvfs2_create_sm
         default => setup_final_response;
     }
 
-    state remove_datafile_handles
+    state remove_local_datafile_handles
     {
-        run remove_datafile_handles;
-        success => remove_metafile_object;
-        default => setup_final_response;
+        run remove_local_datafile_handles;
+        default => remove_metafile_object;
+    }
+
+    state replace_remote_datafile_handles
+    {
+        run replace_remote_datafile_handles;
+        default => replace_remote_datafile_handles;
+        REPLACE_DONE => remove_local_datafile_handles;
     }
 
     state remove_metafile_object
@@ -97,7 +105,7 @@ machine pvfs2_create_sm
     state remove_keyvals
     {
         run remove_keyvals;
-        success => remove_datafile_handles;
+        success => replace_remote_datafile_handles;
         default => setup_final_response;
     }
 
@@ -393,7 +401,7 @@ static PINT_sm_action request_datafiles(
     ret = job_precreate_pool_get_handles(
         s_op->req->u.create.fs_id,
         s_op->u.create.handle_array_remote_count,
-        s_op->u.create.io_servers,
+        s_op->u.create.remote_io_servers,
         s_op->u.create.handle_array_remote,
         0,
         smcb,
@@ -431,7 +439,7 @@ static PINT_sm_action remove_metafile_object(
     return ret;
 }
 
-static PINT_sm_action remove_datafile_handles(
+static PINT_sm_action remove_local_datafile_handles(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -444,25 +452,76 @@ static PINT_sm_action remove_datafile_handles(
         s_op->u.create.saved_error_code = js_p->error_code;
     }
 
-    if(s_op->resp.u.create.stuffed)
+    if(s_op->u.create.handle_array_local_count == 0)
     {
-        ret = job_trove_dspace_remove(
+        /* nothing to do */
+        js_p->error_code = 0;
+        return(SM_ACTION_COMPLETE);
+    }
+
+    ret = job_trove_dspace_remove_list(s_op->req->u.create.fs_id,
+        s_op->u.create.handle_array_local,
+        NULL,
+        s_op->u.create.handle_array_local_count,
+        0,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
+
+    return ret;
+}
+
+static PINT_sm_action replace_remote_datafile_handles(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+    PVFS_handle pool_handle;
+
+    /* save the error code before we begin cleanup */
+    if(!s_op->u.create.saved_error_code)
+    {
+        s_op->u.create.saved_error_code = js_p->error_code;
+    }
+
+    if(s_op->u.create.handle_index < s_op->u.create.handle_array_remote_count)
+    {
+        /* find pool that this handle belongs to */
+        ret = job_precreate_pool_lookup_server(
+            s_op->u.create.remote_io_servers[s_op->u.create.handle_index],
             s_op->req->u.create.fs_id,
-            s_op->resp.u.create.datafile_handles[0],
-            0,
+            &pool_handle);
+        if(ret < 0)
+        {
+            s_op->u.create.handle_index++;
+            js_p->error_code = ret;
+            return(SM_ACTION_COMPLETE);
+        }
+
+        /* return handle to pool */
+        ret = job_precreate_pool_fill(
+            pool_handle,
+            s_op->req->u.create.fs_id,
+            &s_op->u.create.handle_array_remote[s_op->u.create.handle_index],
+            1,
             smcb,
             0,
             js_p,
             &j_id,
             server_job_context);
+
+        s_op->u.create.handle_index++;
+        return(ret);
     }
     else
     {
-        /* TODO: need to also remove locally created handle if present */
-        gossip_err("We need to give the handles back to the pool somehow..\n");
-        assert(0);
+        /* all handles have been replaced */
+        js_p->error_code = REPLACE_DONE;
+        return(SM_ACTION_COMPLETE);
     }
-    return ret;
 }
 
 static PINT_sm_action remove_keyvals(
@@ -530,6 +589,8 @@ static PINT_sm_action write_keyvals(
     int tmp_index = 0;
     server_configuration_s *config = get_server_config_struct();
     char* tmpbuf;
+
+    /* TODO: test path of failure coming out of this state */
 
     if(s_op->u.create.handle_array_remote_count)
     {

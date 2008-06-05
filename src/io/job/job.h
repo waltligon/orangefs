@@ -666,7 +666,12 @@ int job_precreate_pool_register_server(
     PVFS_fs_id fsid, 
     PVFS_handle pool_handle, 
     int count);
-   
+ 
+int job_precreate_pool_lookup_server(
+    const char* host, 
+    PVFS_fs_id fsid, 
+    PVFS_handle* pool_handle);
+  
 /******************************************************************
  * job test/wait for completion functions 
  */
