@@ -447,18 +447,19 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
-static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
+static int remove_one_handle(
+    TROVE_object_ref ref, 
+    struct dbpf_collection* coll_p)
 {
     int count = 0;
     int ret = -TROVE_EINVAL;
     DBT key;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     memset(&key, 0, sizeof(key));
-    key.data = &op_p->handle;
+    key.data = &ref.handle;
     key.size = sizeof(TROVE_handle);
 
-    ret = op_p->coll_p->ds_db->del(op_p->coll_p->ds_db, NULL, &key, 0);
+    ret = coll_p->ds_db->del(coll_p->ds_db, NULL, &key, 0);
     switch (ret)
     {
         case DB_NOTFOUND:
@@ -466,13 +467,13 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
             ret = -TROVE_ENOENT;
             goto return_error;
         default:
-            op_p->coll_p->ds_db->err(
-                op_p->coll_p->ds_db, ret, "dbpf_dspace_remove");
+            coll_p->ds_db->err(
+                coll_p->ds_db, ret, "dbpf_dspace_remove");
             ret = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         case 0:
             gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with "
-                         "handle %llu\n", llu(op_p->handle));
+                         "handle %llu\n", llu(ref.handle));
             break;
     }
 
@@ -484,7 +485,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     /* remove bstream if it exists.  Not a fatal
      * error if this fails (may not have ever been created)
      */
-    ret = dbpf_open_cache_remove(op_p->coll_p->coll_id, op_p->handle);
+    ret = dbpf_open_cache_remove(coll_p->coll_id, ref.handle);
 
     /* remove the keyval entries for this handle if any exist.
      * this way seems a bit messy to me, i.e. we're operating
@@ -493,9 +494,9 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
      * of a handle without having to post more operations though.
      */
     ret = PINT_dbpf_keyval_iterate(
-        op_p->coll_p->keyval_db,
-        op_p->handle,
-        op_p->coll_p->pcache,
+        coll_p->keyval_db,
+        ref.handle,
+        coll_p->pcache,
         NULL,
         NULL,
         &count,
@@ -506,24 +507,39 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
+    /* return handle to free list */
+    trove_handle_free(coll_p->coll_id, ref.handle);
+    return 0;
+
+return_error:
+    return ret;
+}
+
+
+static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
+{
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    int ret = -TROVE_EINVAL;
+
+    ret = remove_one_handle(ref, op_p->coll_p);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
     /* we still do a non-coalesced sync of the keyval db here
      * because we're in a dspace operation
      */
     DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db, ret);
     if(ret < 0)
     {
-        goto return_error;
+        return(ret);
     }
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
-    /* return handle to free list */
-    trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
     return DBPF_OP_COMPLETE;
-
-return_error:
-    return ret;
 }
 
 int PINT_dbpf_dspace_remove_keyval(
