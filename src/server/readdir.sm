@@ -262,7 +262,7 @@ PINT_GET_OBJECT_REF_DEFINE(readdir);
 struct PINT_server_req_params pvfs2_readdir_params =
 {
     .string_name = "readdir",
-    .perm = PINT_SERVER_CHECK_READ,
+    .perm = PINT_server_perm_read,
     .get_object_ref = PINT_get_object_ref_readdir,
     .state_machine = &pvfs2_readdir_sm
 };

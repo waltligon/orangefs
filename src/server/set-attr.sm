@@ -491,7 +491,7 @@ PINT_GET_OBJECT_REF_DEFINE(setattr);
 struct PINT_server_req_params pvfs2_set_attr_params =
 {
     .string_name = "setattr",
-    .perm = PINT_SERVER_CHECK_ATTR,
+    .perm = PINT_server_perm_attr,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_setattr,

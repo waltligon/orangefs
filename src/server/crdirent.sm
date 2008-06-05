@@ -368,7 +368,8 @@ PINT_GET_OBJECT_REF_DEFINE(crdirent);
 struct PINT_server_req_params pvfs2_crdirent_params =
 {
     .string_name = "crdirent",
-    .perm = PINT_SERVER_CHECK_CRDIRENT,
+    .perm = NULL,
+    /*    .perm = PINT_SERVER_CHECK_CRDIRENT,*/
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_crdirent,

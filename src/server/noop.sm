@@ -51,7 +51,7 @@ static PINT_sm_action noop_cleanup(
 struct PINT_server_req_params pvfs2_noop_params =
 {
     .string_name = "noop",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = PINT_server_perm_none,
     .access_type = PINT_server_req_readonly,
     .state_machine = &pvfs2_noop_sm
 };

@@ -140,7 +140,7 @@ static inline int PINT_get_object_ref_iterate_handles(
 struct PINT_server_req_params pvfs2_iterate_handles_params =
 {
     .string_name = "mgmt_iterate_handles",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = PINT_server_perm_none,
     .get_object_ref = PINT_get_object_ref_iterate_handles,
     .state_machine = &pvfs2_iterate_handles_sm
 };

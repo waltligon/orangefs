@@ -98,8 +98,8 @@ enum PINT_server_req_access_type PINT_server_req_modify(
     return PINT_SERVER_REQ_MODIFY;
 }
 
-enum PINT_server_req_permissions
-PINT_server_req_get_perms(struct PVFS_server_req *req)
+PINT_server_req_perm_fun
+PINT_server_req_get_perm_fun(struct PVFS_server_req *req)
 {
     CHECK_OP(req->op);
     return PINT_server_req_table[req->op].params->perm;

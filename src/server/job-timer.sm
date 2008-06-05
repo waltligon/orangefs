@@ -83,7 +83,7 @@ static PINT_sm_action job_timer_do_work(
 struct PINT_server_req_params pvfs2_job_timer_params =
 {
     .string_name = "job_timer",
-    .perm = PINT_SERVER_CHECK_INVALID,
+    .perm = NULL,
     .state_machine = &pvfs2_job_timer_sm
 };
 

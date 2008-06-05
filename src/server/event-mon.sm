@@ -92,7 +92,7 @@ static PINT_sm_action event_mon_do_work(
 struct PINT_server_req_params pvfs2_event_mon_params =
 {
     .string_name = "mgmt_event_mon",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = PINT_server_perm_none,
     .state_machine = &pvfs2_event_mon_sm
 };
 

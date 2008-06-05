@@ -468,9 +468,64 @@ check_perm:
     return -PVFS_EACCES;
 }
 
+/* PINT_server_perm_read
+ *
+ * Verifies that the capability allows read access.
+ * 
+ * Returns 0 on success or negative on error.
+ */
+int PINT_server_perm_read(PINT_server_op *s_op)
+{
+    PVFS_capability *caps = &s_op->req->capability;
+    int ret = -PVFS_EINVAL;
+
+    ret = caps->op_mask & 0444 ? 0 : -PVFS_EACCES;
+    return ret;
+}
+
+/* PINT_server_perm_write
+ *
+ * Verifies that the capability allows write access.
+ * 
+ * Returns 0 on success or negative on error.
+ */
+int PINT_server_perm_write(PINT_server_op *s_op)
+{
+    PVFS_capability *caps = &s_op->req->capability;
+    int ret = -PVFS_EINVAL;
+
+    ret = caps->op_mask & 0222 ? 0 : -PVFS_EACCES;
+    return ret;
+}
+
+/* PINT_server_perm_none
+ *
+ * Ignores permission checking by always allowing access.
+ * 
+ * Always returns 0.
+ */
+int PINT_server_perm_none(PINT_server_op *s_op)
+{
+    return 0;
+}
+
+/* PINT_server_perm_attr
+ *
+ * Work in progress.
+ *
+ * Returns 0 on success or negative on error.
+ */
+int PINT_server_perm_attr(PINT_server_op *s_op)
+{
+    /* TODO: write attr checking code */
+    /* for now just allow everything */
+    return 0;
+}
+
 int PINT_perm_check(struct PINT_server_op *s_op)
 {
     PVFS_capability *caps = &s_op->req->capability;
+    PINT_server_req_perm_fun perm_fun;
     int ret = -PVFS_EINVAL;
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
@@ -496,17 +551,27 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                  PINT_map_server_op_to_string(s_op->req->op),
                  s_op->attr.mask, caps->op_mask);
 
-    ret = PINT_server_req_get_perms(s_op->req);
+    perm_fun = PINT_server_req_get_perm_fun(s_op->req);
+    if (perm_fun)
+    {
+        ret = perm_fun(s_op);
+    }
+    else
+    {
+        ret = -PVFS_EINVAL;
+    }
+
+#if 0
     switch (ret)
     {
     case PINT_SERVER_CHECK_WRITE:
-        ret = s_op->attr.perms & 0222 ? 0 : -PVFS_EACCES;
+        ret = caps->op_mask & 0222 ? 0 : -PVFS_EACCES;
         break;
     case PINT_SERVER_CHECK_READ:
-        ret = s_op->attr.perms & 0444 ? 0 : -PVFS_EACCES;
+        ret = caps->op_mask & 0444 ? 0 : -PVFS_EACCES;
         break;
     case PINT_SERVER_CHECK_CRDIRENT:
-        ret = s_op->attr.perms & 0333 ? 0 : -PVFS_EACCES;
+        ret = caps->op_mask & 0333 ? 0 : -PVFS_EACCES;
         break;
     case PINT_SERVER_CHECK_ATTR:
         /* let datafiles pass through attr check */
@@ -533,11 +598,15 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         break;
     case PINT_SERVER_CHECK_NONE:
         /* TODO: figure out how to do the root squash check */
+        /* maybe a new flag in cap->op_mask? */
+        /* for now just allow everything */
+        ret = 0;
         break;
     case PINT_SERVER_CHECK_INVALID:
         ret = -PVFS_EINVAL;
         break;
     }
+#endif
 
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
                  "Final permission check for \"%s\" set error code to %d\n", 
@@ -547,6 +616,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     return ret;
 }
 
+#if 0
 /* prelude_perm_check()
  *
  * this really just marks the spot where we would want to do
@@ -743,6 +813,7 @@ PINT_sm_action prelude_perm_check(
         js_p->error_code = PRELUDE_RUN_ACL_CHECKS;
     return SM_ACTION_COMPLETE;
 }
+#endif
 
 /*
  * Return zero if this operation should be allowed.
@@ -969,6 +1040,7 @@ PINT_sm_action prelude_check_acls_if_needed(
     return ret;
 }
 
+#if 0
 PINT_sm_action prelude_check_acls(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -1033,6 +1105,7 @@ cleanup:
     memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
     return SM_ACTION_COMPLETE;
 }
+#endif 
 
 
 /*

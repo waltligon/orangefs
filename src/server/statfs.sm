@@ -157,6 +157,7 @@ static inline int PINT_get_object_ref_statfs(
 struct PINT_server_req_params pvfs2_statfs_params =
 {
     .string_name = "statfs",
+    /* XXX: no perms before? */
     .get_object_ref = PINT_get_object_ref_statfs,
     .state_machine = &pvfs2_statfs_sm
 };

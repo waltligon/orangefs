@@ -98,6 +98,7 @@ static PINT_sm_action proto_error_cleanup(
 struct PINT_server_req_params pvfs2_proto_error_params =
 {
     .string_name = "proto_error",
+    /* XXX: no perms before? */
     .state_machine = &pvfs2_proto_error_sm
 };
 

@@ -107,7 +107,7 @@ static PINT_sm_action getconfig_cleanup(
 struct PINT_server_req_params pvfs2_get_config_params =
 {
     .string_name = "getconfig",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = PINT_server_perm_none,
     .state_machine = &pvfs2_get_config_sm
 };
 

@@ -55,93 +55,6 @@ extern job_context_id server_job_context;
 /* number of milliseconds that clients will delay between retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
-/* types of permission checking that a server may need to perform for
- * incoming requests
- */
-enum PINT_server_req_permissions
-{
-    PINT_SERVER_CHECK_INVALID = 0, /* invalid request */
-    PINT_SERVER_CHECK_WRITE = 1,   /* needs write permission */
-    PINT_SERVER_CHECK_READ = 2,    /* needs read permission */
-    PINT_SERVER_CHECK_NONE = 3,    /* needs no permission */
-    PINT_SERVER_CHECK_ATTR = 4,    /* special case for attribute operations; 
-                                      needs ownership */
-    PINT_SERVER_CHECK_CRDIRENT = 5 /* special case for crdirent operations;
-                                      needs write and execute */
-};
-
-#define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
-static inline int PINT_get_object_ref_##req_name(                        \
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
-{                                                                        \
-    *fs_id = req->u.req_name.fs_id;                                      \
-    *handle = req->u.req_name.handle;                                    \
-    return 0;                                                            \
-}
-
-enum PINT_server_req_access_type PINT_server_req_readonly(
-                                    struct PVFS_server_req *req);
-enum PINT_server_req_access_type PINT_server_req_modify(
-                                    struct PVFS_server_req *req);
-
-struct PINT_server_req_params
-{
-    const char* string_name;
-
-    /* For each request that specifies an object ref (fsid,handle) we
-     * get the common attributes on that object and check the permissions.
-     * For the request to proceed the permissions required by this flag
-     * must be met.
-     */
-    enum PINT_server_req_permissions perm;
-
-    /* Specifies the type of access on the object (readonly, modify).  This
-     * is used by the request scheduler to determine 
-     * which requests to queue (block), and which to schedule (proceed).
-     * This is a callback implemented by the request.  For example, sometimes
-     * the io request writes, sometimes it reads.
-     * Default functions PINT_server_req_readonly and PINT_server_req_modify
-     * are used for requests that always require the same access type.
-     */
-    enum PINT_server_req_access_type (*access_type)(
-                                        struct PVFS_server_req *req);
-
-    /* Specifies the scheduling policy for the request.  In some cases,
-     * we can bypass the request scheduler and proceed directly with the
-     * request.
-     */
-    enum PINT_server_sched_policy sched_policy;
-
-    /* A callback implemented by the request to return the object reference
-     * from the server request structure.
-     */
-    int (*get_object_ref)(
-        struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
-
-    /* The state machine that performs the request */
-    struct PINT_state_machine_s *state_machine;
-};
-
-struct PINT_server_req_entry
-{
-    enum PVFS_server_op op_type;
-    struct PINT_server_req_params *params;
-};
-
-extern struct PINT_server_req_entry PINT_server_req_table[];
-
-int PINT_server_req_get_object_ref(
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
-
-enum PINT_server_req_permissions
-PINT_server_req_get_perms(struct PVFS_server_req *req);
-enum PINT_server_req_access_type
-PINT_server_req_get_access_type(struct PVFS_server_req *req);
-enum PINT_server_sched_policy
-PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
-
-const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
-
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {
@@ -417,6 +330,88 @@ typedef struct PINT_server_op
     } u;
 
 } PINT_server_op;
+
+/* XXX: consider passing request only */
+/* in that case we can move this whole block back to the file's top */
+typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
+
+/* default checks that should work for most ops */
+extern int PINT_server_perm_read(PINT_server_op *s_op);
+extern int PINT_server_perm_write(PINT_server_op *s_op);
+extern int PINT_server_perm_none(PINT_server_op *s_op);
+extern int PINT_server_perm_attr(PINT_server_op *s_op);
+
+#define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
+static inline int PINT_get_object_ref_##req_name(                        \
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
+{                                                                        \
+    *fs_id = req->u.req_name.fs_id;                                      \
+    *handle = req->u.req_name.handle;                                    \
+    return 0;                                                            \
+}
+
+enum PINT_server_req_access_type PINT_server_req_readonly(
+                                    struct PVFS_server_req *req);
+enum PINT_server_req_access_type PINT_server_req_modify(
+                                    struct PVFS_server_req *req);
+
+struct PINT_server_req_params
+{
+    const char* string_name;
+
+    /* For each request that specifies an object ref we
+     * call the permission function set by the op state machine
+     * to authorize access. Most ops can use the default functions.
+     */
+    PINT_server_req_perm_fun perm;
+
+    /* Specifies the type of access on the object (readonly, modify).  This
+     * is used by the request scheduler to determine 
+     * which requests to queue (block), and which to schedule (proceed).
+     * This is a callback implemented by the request.  For example, sometimes
+     * the io request writes, sometimes it reads.
+     * Default functions PINT_server_req_readonly and PINT_server_req_modify
+     * are used for requests that always require the same access type.
+     */
+    enum PINT_server_req_access_type (*access_type)(
+                                        struct PVFS_server_req *req);
+
+    /* Specifies the scheduling policy for the request.  In some cases,
+     * we can bypass the request scheduler and proceed directly with the
+     * request.
+     */
+    enum PINT_server_sched_policy sched_policy;
+
+    /* A callback implemented by the request to return the object reference
+     * from the server request structure.
+     */
+    int (*get_object_ref)(
+        struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
+
+    /* The state machine that performs the request */
+    struct PINT_state_machine_s *state_machine;
+};
+
+struct PINT_server_req_entry
+{
+    enum PVFS_server_op op_type;
+    struct PINT_server_req_params *params;
+};
+
+extern struct PINT_server_req_entry PINT_server_req_table[];
+
+int PINT_server_req_get_object_ref(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
+
+PINT_server_req_perm_fun
+PINT_server_req_get_perm_fun(struct PVFS_server_req *req);
+enum PINT_server_req_access_type
+PINT_server_req_get_access_type(struct PVFS_server_req *req);
+enum PINT_server_sched_policy
+PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
+
+const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
+
 
 /* PINT_ACCESS_DEBUG()
  *

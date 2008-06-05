@@ -170,7 +170,7 @@ struct PINT_server_req_params pvfs2_create_params =
 {
     .string_name = "create",
     .get_object_ref = PINT_get_object_ref_create,
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = PINT_server_perm_none,
     .access_type = PINT_server_req_modify,
     .state_machine = &pvfs2_create_sm
 };

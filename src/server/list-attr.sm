@@ -285,7 +285,7 @@ static inline int PINT_get_object_ref_listattr(
 struct PINT_server_req_params pvfs2_list_attr_params =
 {
     .string_name = "list_attr",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = PINT_server_perm_none,
     .access_type = PINT_server_req_readonly,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_listattr,
