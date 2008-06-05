@@ -92,8 +92,8 @@ machine pvfs2_create_sm
     state replace_remote_datafile_handles
     {
         run replace_remote_datafile_handles;
-        default => replace_remote_datafile_handles;
         REPLACE_DONE => remove_local_datafile_handles;
+        default => replace_remote_datafile_handles;
     }
 
     state remove_metafile_object
@@ -589,8 +589,6 @@ static PINT_sm_action write_keyvals(
     int tmp_index = 0;
     server_configuration_s *config = get_server_config_struct();
     char* tmpbuf;
-
-    /* TODO: test path of failure coming out of this state */
 
     if(s_op->u.create.handle_array_remote_count)
     {
