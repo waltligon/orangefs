@@ -96,6 +96,8 @@ struct PINT_client_create_file_sm
     PVFS_handle *datafile_handles;
     PVFS_BMI_addr_t *data_server_addrs;
     PVFS_object_attr cache_attr;
+
+    PVFS_object_attr saved_parent_attr;
 };
 
 struct PINT_client_create_sm

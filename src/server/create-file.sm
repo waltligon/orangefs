@@ -200,14 +200,8 @@ machine pvfs2_create_file_work_sm
     state crdirent_setup
     {
         run create_file_crdirent_setup;
-        success => build_obj_attr;
+        success => do_crdirent;
         default => cleanup_work;
-    }
-
-    state build_obj_attr
-    {
-        run build_obj_attr;
-        default => do_crdirent;
     }
 
     state do_crdirent
@@ -219,7 +213,7 @@ machine pvfs2_create_file_work_sm
 
     state crdirent_cleanup
     {
-        run create_crdirent_cleanup;
+        run create_file_crdirent_cleanup;
         default => cleanup_work;
     }
 
@@ -389,9 +383,6 @@ static PINT_sm_action create_file_init(
     s_op->u.getattr.fs_id = sm_p->parent_ref.fs_id;
     s_op->u.getattr.attrmask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
 
-/*  TODO: Rather than faking s_op->attr.mask and s_op->attr.objtype, 
-          these need to be saved in sm_p. The prelude for the original
-          create-file call retrieved them */
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
     s_op->attr.objtype = PVFS_TYPE_DIRECTORY;
 
@@ -422,6 +413,7 @@ static PINT_sm_action create_file_parent_getattr_cleanup_and_inspect(
     attr = &sm_p->getattr.attr;
     assert(attr);
     memcpy(attr, &s_op->attr, sizeof(attr));
+    memcpy(&sm_p->u.create_file.saved_parent_attr, &s_op->attr, sizeof(PVFS_object_attr));
 
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
 //    free(s_op);
@@ -586,6 +578,7 @@ static PINT_sm_action create_file_dspace_cleanup(
 
     /* stash the newly created meta file handle */
     sm_p->u.create_file.metafile_handle = s_op->resp.u.create.handle;
+    sm_p->u.create_file.metafile_handle = js_p->handle;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Metafile handle %llu\n",
                  llu(sm_p->u.create_file.metafile_handle));
@@ -619,7 +612,6 @@ static PINT_sm_action create_file_datafiles_setup(
                  sm_p->u.create_file.num_data_files);
     
     /* allocate handle extent array objects */
-/* TODO: need to free this */
     sm_p->u.create_file.io_handle_extent_array = (PVFS_handle_extent_array *)
         malloc(sm_p->u.create_file.num_data_files *
                sizeof(PVFS_handle_extent_array));
@@ -737,7 +729,6 @@ static PINT_sm_action create_file_datafiles_local_setup(
 
  
     return ret;
-//    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action create_file_datafiles_local_cleanup_and_setattr_setup(
@@ -754,8 +745,8 @@ static PINT_sm_action create_file_datafiles_local_cleanup_and_setattr_setup(
     assert(s_op);
 
     /* stash the newly created data file handle */
-/*    sm_p->u.create_file.datafile_handles[0] = s_op->resp.u.create.handle; */
-    sm_p->u.create_file.datafile_handles[0] = js_p->handle;
+    sm_p->u.create_file.datafile_handles[0] = s_op->resp.u.create.handle;
+
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Datafile handle %d is %llu\n",
                  0, llu(sm_p->u.create_file.datafile_handles[0]));
@@ -774,12 +765,10 @@ static PINT_sm_action create_file_datafiles_local_cleanup_and_setattr_setup(
         PINT_sm_push_frame(smcb, 0, s_op);
 
         s_op->op = PVFS_SERV_SETATTR;
-    /*
         s_op->credentials.uid = sm_p->cred_p->uid;
         s_op->credentials.gid = sm_p->cred_p->gid;
-    */
-        s_op->u.setattr.handle = sm_p->object_ref.handle;
-        s_op->u.setattr.fs_id = sm_p->object_ref.fs_id;
+        s_op->u.setattr.handle = sm_p->parent_ref.handle;
+        s_op->u.setattr.fs_id = sm_p->parent_ref.fs_id;
         s_op->u.setattr.attr = sm_p->u.create_file.attr;
         s_op->u.setattr.attr.objtype = PVFS_TYPE_METAFILE;
         s_op->u.setattr.attr.u.meta.dfile_array =
@@ -792,14 +781,11 @@ static PINT_sm_action create_file_datafiles_local_cleanup_and_setattr_setup(
             PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
         s_op->attr = s_op->u.setattr.attr;
 
-        s_op->credentials.uid = sm_p->cred_p->uid;
-        s_op->credentials.gid = sm_p->cred_p->gid;
-
         /* TODO: Use a centralized method of obtaining ds_attr
                  that can be called from other places as well.  */
         memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
         ret = job_trove_dspace_getattr(
-            sm_p->object_ref.fs_id, sm_p->u.create.metafile_handle, smcb, &(s_op->ds_attr),
+            sm_p->parent_ref.fs_id, sm_p->u.create_file.metafile_handle, smcb, &(s_op->ds_attr),
             0, js_p, &tmp_id, server_job_context);
 
         js_p->error_code = LOCAL_OPERATION;
@@ -830,8 +816,8 @@ static PINT_sm_action create_file_crdirent_setup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
-    job_id_t tmp_id;
-    int ret = -PVFS_EINVAL;
+/*    job_id_t tmp_id;
+    int ret = -PVFS_EINVAL; */
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup\n");
@@ -845,7 +831,8 @@ static PINT_sm_action create_file_crdirent_setup(
     PINT_sm_push_frame(smcb, 0, s_op);
 
     s_op->op = PVFS_SERV_CRDIRENT;
-    s_op->attr = sm_p->u.create_file.attr;
+    memcpy(&s_op->attr, &sm_p->u.create_file.attr, sizeof(PVFS_object_attr));
+/*    s_op->attr = sm_p->u.create_file.attr; */
     s_op->u.crdirent.name = sm_p->u.create_file.object_name;
     s_op->u.crdirent.new_handle = sm_p->u.create_file.metafile_handle;
     s_op->u.crdirent.parent_handle = sm_p->parent_ref.handle;
@@ -855,29 +842,12 @@ static PINT_sm_action create_file_crdirent_setup(
     s_op->credentials.uid = sm_p->cred_p->uid;
     s_op->credentials.gid = sm_p->cred_p->gid;
 
-    /* TODO: Use a centralized method of obtaining ds_attr
-             that can be called from other places as well.  */
-    memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
-    ret = job_trove_dspace_getattr(
-        sm_p->object_ref.fs_id, sm_p->parent_ref.handle, smcb, &(s_op->ds_attr),
-        0, js_p, &tmp_id, server_job_context);
+    memcpy(&s_op->attr, &sm_p->u.create_file.saved_parent_attr, sizeof(PVFS_object_attr));
 
-
-    js_p->error_code = 0;
-    return ret;
-}
-
-static PINT_sm_action build_obj_attr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
-    s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action create_crdirent_cleanup(
+static PINT_sm_action create_file_crdirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -897,10 +867,6 @@ static PINT_sm_action create_file_work_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref metafile_ref;
-#if 0
-    PVFS_size tmp_size = 0;
-    int ret;
-#endif
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: work_cleanup\n");
 
@@ -925,27 +891,6 @@ static PINT_sm_action create_file_work_cleanup(
     {
         metafile_ref.handle = sm_p->u.create_file.metafile_handle;
         metafile_ref.fs_id = sm_p->object_ref.fs_id;
-
-        /* fill in outgoing response fields */
-/*        sm_p->u.create_file.create_file_resp->ref = metafile_ref; */
-
-        /* do not maintina ncache and acache on server - only client */
-#if 0
-        /* insert newly created metafile into the ncache */
-        PINT_ncache_update((const char*) sm_p->u.create_file.object_name, 
-                           (const PVFS_object_ref*) &metafile_ref, 
-                           (const PVFS_object_ref*) &(sm_p->object_ref));
-
-        /* we only insert a cache entry if the entire create succeeds,
-         * i.e. crdirent succeeded.  set size to 0 */
-        ret = PINT_acache_update(metafile_ref,
-                                 &sm_p->u.create_file.cache_attr,
-                                 &tmp_size);
-        if(ret < 0)
-        {
-            js_p->error_code = ret;
-        }
-#endif
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.create_file.retry_count < sm_p->msgarray_params.retry_limit))
@@ -961,6 +906,12 @@ static PINT_sm_action create_file_work_cleanup(
     }
 
     PINT_free_object_attr(&sm_p->u.create_file.cache_attr);
+
+    if (sm_p->u.create_file.io_handle_extent_array)
+    {
+        free(sm_p->u.create_file.io_handle_extent_array);
+        sm_p->u.create_file.io_handle_extent_array = NULL;
+    }
 
     if (sm_p->u.create_file.data_server_addrs)
     {
