@@ -261,33 +261,51 @@ static PINT_sm_action getattr_verify_attribs(
             js_p->error_code = PINT_init_capability(resp_cap);
             if (js_p->error_code)
             {
-                /* init failed */
-                gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability init failed\n");
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                    "Getattr: Capability init failed\n");
                 free(resp_cap);
                 return SM_ACTION_COMPLETE;
             }
-            resp_attr->capability = resp_cap;
-            resp_attr->capability->owner = s_op->attr.owner;
-            resp_attr->capability->op_mask = s_op->attr.perms;
-            resp_attr->capability->fsid = s_op->u.getattr.fs_id;
+            resp_attr->capability = resp_cap;            
             if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
             {
                 resp_attr->capability->num_handles = 
                     s_op->resp.u.getattr.attr.u.meta.dfile_count;
+                resp_attr->capability->handle_array = (PVFS_handle *)malloc(
+                    sizeof(PVFS_handle) * resp_attr->capability->num_handles);
+                if (resp_attr->capability->handle_array == NULL)
+                {
+                    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                        "Getattr: Malloc for handle array failed\n");
+                    js_p->error_code = -PVFS_EINVAL;
+                    resp_attr->capability = NULL;
+                    free(resp_cap);
+                    return SM_ACTION_COMPLETE;
+                }
+                memcpy(resp_attr->capability->handle_array, 
+                    s_op->resp.u.getattr.attr.u.meta.dfile_array,
+                    sizeof(PVFS_handle) * resp_attr->capability->num_handles);
             }
             else
             {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                        "Getattr: No handle array found\n");
                 resp_attr->capability->num_handles = 0;
+                resp_attr->capability->handle_array = NULL;
             }
-            resp_attr->capability->handle_array = 
-                s_op->resp.u.getattr.attr.u.meta.dfile_array;
+            resp_attr->capability->owner = s_op->attr.owner;
+            resp_attr->capability->op_mask = s_op->attr.perms;
+            resp_attr->capability->fsid = s_op->u.getattr.fs_id;
+            
             /* causes client-side seg-fault because of unexpected flag
             resp_attr->mask |= PVFS_ATTR_CAPABILITY; */
             if (PINT_sign_capability(resp_attr->capability))
             {
                 /* sign failed */
-                gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability sign failed\n");
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                    "Getattr: Capability sign failed\n");
                 PINT_release_capability(resp_attr->capability);
+                resp_attr->capability = NULL;
                 js_p->error_code = -PVFS_EINVAL;
                 return SM_ACTION_COMPLETE;
             }
@@ -295,7 +313,8 @@ static PINT_sm_action getattr_verify_attribs(
         else
         {
             /* malloc failed */
-            gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability malloc failed\n");
+            gossip_debug(GOSSIP_GETATTR_DEBUG,
+                "Getattr: Capability malloc failed\n");
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
         }
