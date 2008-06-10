@@ -1029,6 +1029,7 @@ struct super_block* pvfs2_get_sb(
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
 
+#ifdef HAVE_FHTODENTRY_EXPORT_OPERATIONS
 struct dentry *
 pvfs2_fh_to_dentry(struct super_block *sb, struct fid *fid,
                    int fh_len, int fh_type)
@@ -1067,7 +1068,9 @@ pvfs2_fh_to_dentry(struct super_block *sb, struct fid *fid,
    dentry->d_op = &pvfs2_dentry_operations;
    return dentry;
 }
+#endif /* HAVE_FHTODENTRY_EXPORT_OPERATIONS */
 
+#ifdef HAVE_ENCODEFH_EXPORT_OPERATIONS
 int pvfs2_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len, int connectable)
 {
    struct inode *inode = dentry->d_inode;
@@ -1119,6 +1122,7 @@ int pvfs2_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len, int connecta
 out:
    return type;
 }
+#endif /* HAVE_ENCODEFH_EXPORT_OPERATIONS */
 
 static struct export_operations pvfs2_export_ops = {
 #ifdef HAVE_ENCODEFH_EXPORT_OPERATIONS
