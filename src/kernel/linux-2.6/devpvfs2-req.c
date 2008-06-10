@@ -468,7 +468,7 @@ static ssize_t pvfs2_devreq_writev(
                     && op->upcall.req.io.async_vfs_io == PVFS_VFS_ASYNC_IO)
             {
                 pvfs2_kiocb *x = (pvfs2_kiocb *) op->priv;
-                if (x == NULL || x->buffer == NULL 
+                if (x == NULL || x->iov == NULL 
                         || x->op != op 
                         || x->bytes_to_be_copied <= 0)
                 {
@@ -476,7 +476,7 @@ static ssize_t pvfs2_devreq_writev(
                     {
                         gossip_debug(GOSSIP_DEV_DEBUG, "WARNING: pvfs2_iocb from op"
                                 "has invalid fields! %p, %p(%p), %d\n",
-                                x->buffer, x->op, op, (int) x->bytes_to_be_copied);
+                                x->iov, x->op, op, (int) x->bytes_to_be_copied);
                     }
                     else
                     {
@@ -503,9 +503,9 @@ static ssize_t pvfs2_devreq_writev(
                             && bytes_copied > 0)
                     {
                         /* try and copy it out to user-space */
-                        bytes_copied = pvfs_bufmap_copy_to_user_task(
+                        bytes_copied = pvfs_bufmap_copy_to_user_task_iovec(
                                 x->tsk,
-                                x->buffer,
+                                x->iov, x->nr_segs,
                                 x->buffer_index,
                                 bytes_copied);
                     }

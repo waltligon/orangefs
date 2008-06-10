@@ -328,7 +328,7 @@ static int copy_from_pagecache(struct rw_options *rw,
         gossip_err("copy_from_pagecache: failed allocating memory\n");
         return -ENOMEM;
     }
-    memcpy(copied_iovec, vec, nr_segs * sizeof(struct iovec));
+    memcpy(copied_iovec, vec, nr_segs * sizeof(*copied_iovec));
     /*
      * Go through each segment in the iovec and make sure that
      * the summation of iov_len is greater than the given size.
@@ -635,7 +635,7 @@ repeat:
             count += orig_iovec[seg].iov_len;
             
             memcpy(&new_iovec[tmpnew_nr_segs], &orig_iovec[seg], 
-                    sizeof(struct iovec));
+                    sizeof(*new_iovec));
             tmpnew_nr_segs++;
             sizes[sizes_count]++;
         }
@@ -671,7 +671,7 @@ repeat:
     return 0;
 }
 
-static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs, ssize_t *total_count)
+static long bound_max_iovecs(const struct iovec *curr, unsigned long nr_segs, ssize_t *total_count)
 {
     unsigned long i;
     long max_nr_iovecs;
@@ -1134,7 +1134,7 @@ static ssize_t wait_for_cached_io(struct rw_options *old_rw, struct iovec *vec,
     struct rw_options rw;
     loff_t isize, offset;
 
-    memcpy(&rw, old_rw, sizeof(struct rw_options));
+    memcpy(&rw, old_rw, sizeof(rw));
     if (rw.type != IO_READV) {
         gossip_err("writes are not handled yet!\n");
         return -EOPNOTSUPP;
@@ -1232,9 +1232,9 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         goto out;
     }
     /* Compute total and max number of segments after split */
-    if ((max_new_nr_segs = estimate_max_iovecs(iov, nr_segs, &count)) < 0)
+    if ((max_new_nr_segs = bound_max_iovecs(iov, nr_segs, &count)) < 0)
     {
-        gossip_lerr("%s: could not estimate iovec %lu\n", rw->fnstr, max_new_nr_segs);
+        gossip_lerr("%s: could not bound iovec %lu\n", rw->fnstr, max_new_nr_segs);
         goto out;
     }
     if (rw->type == IO_WRITEV)
@@ -1574,7 +1574,7 @@ static int construct_file_offset_trailer(char **trailer,
     int i;
     struct read_write_x *rwx;
 
-    *trailer_size = seg_count * sizeof(struct read_write_x);
+    *trailer_size = seg_count * sizeof(*rwx);
     *trailer = (char *) vmalloc(*trailer_size);
     if (*trailer == NULL)
     {
@@ -1679,7 +1679,7 @@ repeat:
             count += orig_xtvec[seg].xtv_len;
             
             memcpy(&new_xtvec[tmpnew_nr_segs], &orig_xtvec[seg], 
-                    sizeof(struct xtvec));
+                    sizeof(*new_xtvec));
             tmpnew_nr_segs++;
             sizes[sizes_count]++;
         }
@@ -1716,7 +1716,7 @@ repeat:
 }
 
 static long 
-estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, size_t *total_count)
+bound_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, size_t *total_count)
 {
     unsigned long i;
     long max_nr_xtvecs;
@@ -1943,9 +1943,9 @@ static ssize_t do_readx_writex(struct rw_options *rw)
         goto out;
     }
     /* Compute total and max number of segments after split of the memory vector */
-    if ((max_new_nr_segs_mem = estimate_max_iovecs(iov, nr_segs, &count_mem)) < 0)
+    if ((max_new_nr_segs_mem = bound_max_iovecs(iov, nr_segs, &count_mem)) < 0)
     {
-        gossip_lerr("%s: could not estimate iovec %lu\n", rw->fnstr, max_new_nr_segs_mem);
+        gossip_lerr("%s: could not bound iovec %lu\n", rw->fnstr, max_new_nr_segs_mem);
         goto out;
     }
     xtvec = rw->off.iox.xtvec;
@@ -1957,9 +1957,9 @@ static ssize_t do_readx_writex(struct rw_options *rw)
         goto out;
     }
     /* Calculate the total stream length amd max segments after split of the stream vector */
-    if ((max_new_nr_segs_stream = estimate_max_xtvecs(xtvec, xtnr_segs, &count_stream)) < 0)
+    if ((max_new_nr_segs_stream = bound_max_xtvecs(xtvec, xtnr_segs, &count_stream)) < 0)
     {
-        gossip_lerr("%s: could not estimate xtvec %lu\n", rw->fnstr, max_new_nr_segs_stream);
+        gossip_lerr("%s: could not bound xtvec %lu\n", rw->fnstr, max_new_nr_segs_stream);
         goto out;
     }
     if (count_mem == 0)
@@ -2280,9 +2280,9 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
         error = x->bytes_copied;
         op->priv = NULL;
         spin_unlock(&op->lock);
-        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_aio_retry: buffer %p,"
+        gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_aio_retry: iov %p,"
                 " size %d return %d bytes\n",
-                    x->buffer, (int) x->bytes_to_be_copied, (int) error);
+                    x->iov, (int) x->bytes_to_be_copied, (int) error);
         if (error > 0)
         {
             struct inode *inode = iocb->ki_filp->f_mapping->host;
@@ -2514,6 +2514,11 @@ static void pvfs2_aio_dtor(struct kiocb *iocb)
             x->op->priv = NULL;
             put_op(x->op);
         }
+        if (x->iov) 
+        {
+            kfree(x->iov);
+            x->iov = NULL;
+        }
         x->needs_cleanup = 0;
     }
     gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_aio_dtor: kiocb_release %p\n", x);
@@ -2522,12 +2527,12 @@ static void pvfs2_aio_dtor(struct kiocb *iocb)
     return;
 }
 
-static inline void 
+static inline int 
 fill_default_kiocb(pvfs2_kiocb *x,
         struct task_struct *tsk,
         struct kiocb *iocb, int rw,
         int buffer_index, pvfs2_kernel_op_t *op, 
-        void __user *buffer,
+        const struct iovec *iovec, unsigned long nr_segs,
         loff_t offset, size_t count,
         int (*aio_cancel)(struct kiocb *, struct io_event *))
 {
@@ -2536,13 +2541,23 @@ fill_default_kiocb(pvfs2_kiocb *x,
     x->buffer_index = buffer_index;
     x->op = op;
     x->rw = rw;
-    x->buffer = buffer;
     x->bytes_to_be_copied = count;
     x->offset = offset;
     x->bytes_copied = 0;
     x->needs_cleanup = 1;
     iocb->ki_cancel = aio_cancel;
-    return;
+    /* Allocate a private pointer to store the
+     * iovector since the caller could pass in a
+     * local variable for the iovector.
+     */
+    x->iov = kmalloc(nr_segs * sizeof(*x->iov), PVFS2_BUFMAP_GFP_FLAGS);
+    if (x->iov == NULL) 
+    {
+        return -ENOMEM;
+    }
+    memcpy(x->iov, iovec, nr_segs * sizeof(*x->iov));
+    x->nr_segs = nr_segs;
+    return 0;
 }
 
 /*
@@ -2560,7 +2575,10 @@ fill_default_kiocb(pvfs2_kiocb *x,
  * that get completion notification from interrupt
  * context, we get completion notification from a process
  * context (i.e. the client daemon).
- * TODO: We do not handle vectored aio requests yet
+ * TODO: We handle vectored aio requests now but we do
+ * not handle the case where the total size of IO is
+ * larger than our FS transfer block size (4 MB
+ * default).
  */
 static ssize_t do_aio_read_write(struct rw_options *rw)
 {
@@ -2605,17 +2623,11 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
                 iov, nr_segs);
         goto out_error;
     }
-    if (nr_segs > 1)
-    {
-        gossip_lerr("%s: not implemented yet (aio with %ld segments)\n",
-                rw->fnstr, nr_segs);
-        goto out_error;
-    }
     count = 0;
     /* Compute total and max number of segments after split */
-    if ((max_new_nr_segs = estimate_max_iovecs(iov, nr_segs, &count)) < 0)
+    if ((max_new_nr_segs = bound_max_iovecs(iov, nr_segs, &count)) < 0)
     {
-        gossip_lerr("%s: could not estimate iovecs %ld\n", rw->fnstr, max_new_nr_segs);
+        gossip_lerr("%s: could not bound iovecs %ld\n", rw->fnstr, max_new_nr_segs);
         goto out_error;
     }
     if (unlikely(((ssize_t)count)) < 0)
@@ -2667,7 +2679,6 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
     {
         int buffer_index = -1;
         pvfs2_kernel_op_t *new_op = NULL;
-        char __user *current_buf = (char *) rw->dest.address.iov[0].iov_base;
         pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
         
         new_op = op_alloc(PVFS2_VFS_OP_FILE_IO);
@@ -2700,14 +2711,30 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
         if (rw->type == IO_WRITE)
         {
             /* 
-             * copy the data from the application for writes 
-             * Should this be done here even for async I/O? 
+             * copy the data from the application for writes.
              * We could return -EIOCBRETRY here and have 
              * the data copied in the pvfs2_aio_retry routine,
-             * I think. But I dont see the point in doing that...
+             * I dont see too much point in doing that
+             * since the app would have touched the
+             * memory pages prior to the write and
+             * hence accesses to the page won't block.
              */
-            error = pvfs_bufmap_copy_from_user(
-                    buffer_index, current_buf, count);
+            if (rw->copy_to_user_addresses) 
+            {
+                error = pvfs_bufmap_copy_iovec_from_user(
+                        buffer_index,
+                        iov,
+                        nr_segs,
+                        count);
+            } 
+            else 
+            {
+                error = pvfs_bufmap_copy_iovec_from_kernel(
+                        buffer_index,
+                        iov,
+                        nr_segs,
+                        count);
+            }
             if (error < 0)
             {
                 gossip_err("%s: Failed to copy user buffer %ld. Make sure that pvfs2-client-core"
@@ -2735,21 +2762,33 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
         }
         gossip_debug(GOSSIP_FILE_DEBUG, "kiocb_alloc: %p\n", x);
         /* 
-         * destructor function to make sure that we free
-         * up this allocated piece of memory 
-         */
-        iocb->ki_dtor = pvfs2_aio_dtor;
-        /* 
          * We need to set the cancellation callbacks + 
          * other state information
          * here if the asynchronous request is going to
          * be successfully submitted 
          */
-        fill_default_kiocb(x, current, iocb, 
-                (rw->type == IO_READ) ? PVFS_IO_READ : PVFS_IO_WRITE,
-                buffer_index, new_op, current_buf,
-                *offset, count,
-                &pvfs2_aio_cancel);
+        error = fill_default_kiocb(x, current, iocb, 
+                                   (rw->type == IO_READ) ? PVFS_IO_READ : PVFS_IO_WRITE,
+                                   buffer_index,
+                                   new_op, iov, nr_segs,
+                                   *offset, count,
+                                   &pvfs2_aio_cancel);
+        if (error != 0) 
+        {
+            kiocb_release(x);
+            /* drop the buffer index */
+            pvfs_bufmap_put(buffer_index);
+            gossip_debug(GOSSIP_FILE_DEBUG, "%s: pvfs_bufmap_put %d\n",
+                    rw->fnstr, buffer_index);
+            /* drop the reference count and deallocate */
+            put_op(new_op);
+            goto out_error;
+        }
+        /* 
+         * destructor function to make sure that we free
+         * up this allocated piece of memory 
+         */
+        iocb->ki_dtor = pvfs2_aio_dtor;
         /*
          * We need to be able to retrieve this structure from
          * the op structure as well, since the client-daemon

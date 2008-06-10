@@ -483,6 +483,8 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
         }
 #endif
     }
+    gossip_debug(GOSSIP_INODE_DEBUG, "iget handle %llu, fsid %d hash %ld i_ino %lu\n",
+                 ref->handle, ref->fs_id, hash, inode->i_ino);
     return inode;
 }
 
