@@ -333,7 +333,7 @@ static int create_file_comp_fn(void *v_p,
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_file_comp_fn\n");
 
-    assert(resp_p->op == PVFS_SERV_CREATE);
+    assert(resp_p->op == PVFS_SERV_CREATE_FILE);
 
     if (resp_p->status != 0)
     {
