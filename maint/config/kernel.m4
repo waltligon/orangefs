@@ -1011,5 +1011,33 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+	dnl older 2.6 kernels don't have MNT_NOATIME
+	AC_MSG_CHECKING(if mount.h defines MNT_NOATIME)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/mount.h>
+	], [
+		int flag = MNT_NOATIME;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_MNT_NOATIME, 1, [Define if mount.h contains
+	MNT_NOATIME flags]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl older 2.6 kernels don't have MNT_NODIRATIME
+	AC_MSG_CHECKING(if mount.h defines MNT_NODIRATIME)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/mount.h>
+	], [
+		int flag = MNT_NODIRATIME;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_MNT_NODIRATIME, 1, [Define if mount.h contains
+	MNT_NODIRATIME flags]),
+	AC_MSG_RESULT(no)
+	)
+
 	CFLAGS=$oldcflags
 ])
