@@ -202,6 +202,13 @@ static PINT_sm_action inspect_keyvals(
 
         if(js_p->error_code == 0)
         {
+        
+            /* sanity check num dfiles */
+            if(s_op->u.unstuff.num_dfiles_req < 1)
+            {
+                js_p->error_code = -PVFS_EINVAL;
+            }
+
             /* decode layout information */
             tmpbuf = s_op->u.unstuff.encoded_layout;
             decode_PVFS_sys_layout(&tmpbuf, &s_op->u.unstuff.layout);
@@ -218,8 +225,6 @@ static PINT_sm_action get_handles(
     int ret;
     job_id_t j_id;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    /* TODO: check to make sure num_dfiles_req is >=1 for sanity */
 
     if(s_op->u.unstuff.layout.algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)
     {
