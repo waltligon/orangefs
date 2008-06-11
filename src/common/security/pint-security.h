@@ -11,6 +11,12 @@
 #include "pvfs2-types.h"
 
 
+#define PINT_CAP_EXEC    (1 << 0)
+#define PINT_CAP_WRITE   (1 << 1)
+#define PINT_CAP_READ    (1 << 2)
+#define PINT_CAP_SETATTR (1 << 3)
+
+
 typedef unsigned char *PVFS_sig;
 
 /* TODO: encode and decode PVFS_sig */

@@ -239,7 +239,7 @@ PINT_GET_OBJECT_REF_DEFINE(geteattr);
 struct PINT_server_req_params pvfs2_get_eattr_params =
 {
     .string_name = "get_eattr",
-    .perm = PINT_server_perm_attr,
+    .perm = PINT_server_perm_none,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_geteattr,
     .state_machine = &pvfs2_get_eattr_sm

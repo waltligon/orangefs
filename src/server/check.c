@@ -479,7 +479,7 @@ int PINT_server_perm_read(PINT_server_op *s_op)
     PVFS_capability *caps = &s_op->req->capability;
     int ret = -PVFS_EINVAL;
 
-    ret = caps->op_mask & 0444 ? 0 : -PVFS_EACCES;
+    ret = caps->op_mask & PINT_CAP_READ ? 0 : -PVFS_EACCES;
     return ret;
 }
 
@@ -494,7 +494,7 @@ int PINT_server_perm_write(PINT_server_op *s_op)
     PVFS_capability *caps = &s_op->req->capability;
     int ret = -PVFS_EINVAL;
 
-    ret = caps->op_mask & 0222 ? 0 : -PVFS_EACCES;
+    ret = caps->op_mask & PINT_CAP_WRITE ? 0 : -PVFS_EACCES;
     return ret;
 }
 
@@ -509,13 +509,13 @@ int PINT_server_perm_none(PINT_server_op *s_op)
     return 0;
 }
 
-/* PINT_server_perm_attr
+/* PINT_server_perm_setattr
  *
  * Work in progress.
  *
  * Returns 0 on success or negative on error.
  */
-int PINT_server_perm_attr(PINT_server_op *s_op)
+int PINT_server_perm_setattr(PINT_server_op *s_op)
 {
     /* TODO: write attr checking code */
     /* for now just allow everything */

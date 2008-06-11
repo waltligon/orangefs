@@ -339,7 +339,7 @@ typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
 extern int PINT_server_perm_read(PINT_server_op *s_op);
 extern int PINT_server_perm_write(PINT_server_op *s_op);
 extern int PINT_server_perm_none(PINT_server_op *s_op);
-extern int PINT_server_perm_attr(PINT_server_op *s_op);
+extern int PINT_server_perm_setattr(PINT_server_op *s_op);
 
 #define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
 static inline int PINT_get_object_ref_##req_name(                        \
