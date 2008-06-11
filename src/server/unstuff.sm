@@ -348,8 +348,6 @@ static PINT_sm_action remove_layout(
     /* remove the layout and num_dfiles_req keyvals as the layout has
      * now been chosen.
      */
-    /* TODO: should these all be explicitly set to TROVE_SYNC, or is that a
-     * server configuration thing? */
     return job_trove_keyval_remove_list(
         s_op->req->u.unstuff.fs_id, s_op->req->u.unstuff.handle,
         s_op->key_a,
