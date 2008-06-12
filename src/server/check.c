@@ -544,6 +544,27 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         /* XXX: removed root squashing */
     }
 
+    if (s_op->target_handle != PVFS_HANDLE_NULL)
+    {
+        int index;
+
+        /* ensure we have a capability for the target handle */
+        for (index = 0; index < caps->num_handles; index++)
+        {
+            if (caps->handle_array[index] == s_op->target_handle)
+            {
+                break;
+            }
+        }
+        if (index == caps->num_handles)
+        {
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Attempted to perform "
+                         "an operation on target handle %llu that was "
+                         "not in the capability", llu(s_op->target_handle));
+            return -PVFS_EACCES;
+        }
+    }
+
     /* XXX: removed positive error check */
 
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
