@@ -91,6 +91,12 @@ machine pvfs2_create_file_work_sm
     state init
     {
         run create_file_init;
+        default => init2;
+    }
+
+    state init2
+    {
+        run create_file_init2;
         default => parent_getattr;
     }
 
@@ -353,6 +359,7 @@ static PINT_sm_action create_file_init(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     struct PINT_server_op *s_op;
+    int ret = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create file state: init\n");
 
@@ -387,6 +394,28 @@ static PINT_sm_action create_file_init(
     s_op->attr.objtype = PVFS_TYPE_DIRECTORY;
 
     PINT_sm_push_frame(smcb, 0, s_op);
+
+    /* TODO: Use a centralized method of obtaining ds_attr
+             that can be called from other places as well.  */
+    memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
+    ret = job_trove_dspace_getattr(
+        sm_p->parent_ref.fs_id, sm_p->parent_ref.handle, smcb, &(s_op->ds_attr),
+        0, js_p, &tmp_id, server_job_context);
+ 
+    return ret;
+}
+
+static PINT_sm_action create_file_init2(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *obj_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+
+    ds_attr = &s_op->ds_attr;
+    obj_attr = &s_op->attr;
+    PVFS_ds_attr_to_object_attr(ds_attr, obj_attr);
+    s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
 
     return SM_ACTION_COMPLETE;
 }
@@ -578,7 +607,6 @@ static PINT_sm_action create_file_dspace_cleanup(
 
     /* stash the newly created meta file handle */
     sm_p->u.create_file.metafile_handle = s_op->resp.u.create.handle;
-    sm_p->u.create_file.metafile_handle = js_p->handle;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Metafile handle %llu\n",
                  llu(sm_p->u.create_file.metafile_handle));
@@ -767,10 +795,11 @@ static PINT_sm_action create_file_datafiles_local_cleanup_and_setattr_setup(
         s_op->op = PVFS_SERV_SETATTR;
         s_op->credentials.uid = sm_p->cred_p->uid;
         s_op->credentials.gid = sm_p->cred_p->gid;
-        s_op->u.setattr.handle = sm_p->parent_ref.handle;
+        s_op->u.setattr.handle = sm_p->u.create_file.metafile_handle;
         s_op->u.setattr.fs_id = sm_p->parent_ref.fs_id;
-        s_op->u.setattr.attr = sm_p->u.create_file.attr;
+        memcpy(&s_op->u.setattr.attr, &sm_p->u.create_file.attr, sizeof(PVFS_object_attr));
         s_op->u.setattr.attr.objtype = PVFS_TYPE_METAFILE;
+        s_op->u.setattr.attr.mask = PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL;
         s_op->u.setattr.attr.u.meta.dfile_array =
             sm_p->u.create_file.datafile_handles;
         s_op->u.setattr.attr.u.meta.dfile_count =
@@ -779,7 +808,7 @@ static PINT_sm_action create_file_datafiles_local_cleanup_and_setattr_setup(
             sm_p->u.create_file.dist;
         s_op->u.setattr.attr.u.meta.dist_size =
             PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
-        s_op->attr = s_op->u.setattr.attr;
+/*        s_op->attr = s_op->u.setattr.attr; */
 
         /* TODO: Use a centralized method of obtaining ds_attr
                  that can be called from other places as well.  */
