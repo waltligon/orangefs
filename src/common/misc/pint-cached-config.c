@@ -23,6 +23,11 @@
 #include "extent-utils.h"
 #include "pint-cached-config.h"
 
+/* really old linux distributions (jazz's RHEL 3) don't have this(!?) */
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 64
+#endif
+
 /* maps bmi address to handle ranges/extents */
 struct bmi_host_extent_table_s
 {
