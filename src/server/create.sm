@@ -12,6 +12,7 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-security.h"
 
 %%
 
@@ -164,13 +165,29 @@ static inline int PINT_get_object_ref_create(
     *fs_id = req->u.create.fs_id;
     *handle = PVFS_HANDLE_NULL;
     return 0;
-};
+}
+
+static int perm_create(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_CREATE)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
 
 struct PINT_server_req_params pvfs2_create_params =
 {
     .string_name = "create",
     .get_object_ref = PINT_get_object_ref_create,
-    .perm = PINT_server_perm_none,
+    .perm = perm_create,
     .access_type = PINT_server_req_modify,
     .state_machine = &pvfs2_create_sm
 };
