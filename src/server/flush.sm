@@ -14,6 +14,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
+#include "pint-security.h"
 
 /*
  * if given a metafile, do a keyval flush
@@ -195,12 +196,21 @@ static PINT_sm_action flush_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_flush(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+
+    return ret;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(flush);
 
 struct PINT_server_req_params pvfs2_flush_params =
 {
     .string_name = "flush",
-    .perm = PINT_server_perm_none,
+    .perm = perm_flush,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_flush,

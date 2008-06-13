@@ -13,6 +13,7 @@
 
 #include "pvfs2-server.h"
 #include "pint-event.h"
+#include "pint-security.h"
 
 %%
 
@@ -89,10 +90,19 @@ static PINT_sm_action event_mon_do_work(
     return SM_ACTION_COMPLETE;
 }
 
+static int perm_event_mon(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_event_mon_params =
 {
     .string_name = "mgmt_event_mon",
-    .perm = PINT_server_perm_none,
+    .perm = perm_event_mon,
     .state_machine = &pvfs2_event_mon_sm
 };
 

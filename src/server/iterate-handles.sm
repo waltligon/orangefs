@@ -12,6 +12,7 @@
 
 #include "pvfs2-server.h"
 #include "server-config.h"
+#include "pint-security.h"
 
 %%
 
@@ -129,6 +130,15 @@ static PINT_sm_action iterate_handles_fill_resp(
     return SM_ACTION_COMPLETE;
 }
 
+static int perm_iterate_handles(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+
+    return ret;
+}
+
 static inline int PINT_get_object_ref_iterate_handles(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
@@ -140,7 +150,7 @@ static inline int PINT_get_object_ref_iterate_handles(
 struct PINT_server_req_params pvfs2_iterate_handles_params =
 {
     .string_name = "mgmt_iterate_handles",
-    .perm = PINT_server_perm_none,
+    .perm = perm_iterate_handles,
     .get_object_ref = PINT_get_object_ref_iterate_handles,
     .state_machine = &pvfs2_iterate_handles_sm
 };
