@@ -82,7 +82,8 @@ enum PVFS_server_op
  * These ops must always work, even if the server is in admin mode.
  */
 #define PVFS_SERV_IS_MGMT_OP(x) \
-    ((x) == PVFS_SERV_MGMT_REMOVE_OBJECT \
+    ((x) == PVFS_SERV_MGMT_SETPARAM \
+  || (x) == PVFS_SERV_MGMT_REMOVE_OBJECT \
   || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT)
 
 /******************************************************************/
