@@ -445,16 +445,6 @@ static PINT_sm_action getattr_interpret(
 
     free(getattr_op);
 
-    /* TODO: TEMPORARY!
-     * valgrind seems to think that error_code is uninitialized; need to
-     * track down later
-     */
-    /* TODO: that error value out of pop_frame() works fine with pjmp (see
-     * list-attr); maybe it just isn't used for frames pushed on 
-     * regular nested machines?
-     */
-    js_p->error_code = 0;
-
     if(js_p->error_code)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,

@@ -298,6 +298,23 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 	    }
 	    if (transtbl[i].flag == SM_RETURN)
 	    {
+                struct PINT_frame_s *f;
+                void *my_frame;
+
+                /* save error code from nested machine in case this is being
+                 * executed from a popped frame.  This allows the caller to
+                 * recover a valid error code from PINT_sm_pop_frame().
+                 */
+                my_frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+                qlist_for_each_entry(f, &smcb->frames, link)
+                {
+                    if(my_frame == f->frame)
+                    {
+                        f->error = r->error_code;
+                        break;
+                    }
+                }
+
                 /* if this is a return pop the stack
                  * and we'll continue from the state returned to
                  */
