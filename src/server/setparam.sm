@@ -264,7 +264,6 @@ struct PINT_server_req_params pvfs2_setparam_params =
     .string_name = "mgmt_setparam",
     .perm = PINT_SERVER_CHECK_NONE,
     .access_type = PINT_server_req_modify,
-    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_setparam,
     .state_machine = &pvfs2_setparam_sm
 };
