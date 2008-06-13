@@ -17,6 +17,7 @@
 #include "pvfs2-request.h"
 #include "pint-distribution.h"
 #include "pint-request.h"
+#include "pint-security.h"
 
 %%
 
@@ -245,10 +246,20 @@ static int perm_small_io(PINT_server_op *s_op)
 {
     int ret = -PVFS_EINVAL;
     enum PVFS_io_type type = s_op->req->u.small_io.io_type;
-
-    ret = type == PVFS_IO_READ ? PINT_server_perm_read(s_op) :
-          type == PVFS_IO_WRITE ? PINT_server_perm_write(s_op) :
-          -PVFS_EACCES;
+     
+    if (type == PVFS_IO_READ && s_op->req->capability.op_mask & PINT_CAP_READ)
+    {
+        ret = 0;
+    }
+    else if (type == PVFS_IO_WRITE && s_op->req->capability.op_mask & 
+                     PINT_CAP_WRITE)
+    {
+    	ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
 
     return ret;
 }

@@ -16,6 +16,8 @@
 #define PINT_CAP_READ    (1 << 2)
 #define PINT_CAP_SETATTR (1 << 3)
 #define PINT_CAP_CREATE  (1 << 4)
+#define PINT_CAP_ADMIN   (1 << 5)
+#define PINT_CAP_REMOVE  (1 << 6)
 
 
 typedef unsigned char *PVFS_sig;

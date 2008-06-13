@@ -16,6 +16,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
 #include "trove.h"
+#include "pint-security.h"
 
 enum
 {
@@ -257,12 +258,28 @@ static PINT_sm_action readdir_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_readdir(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_READ)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(readdir);
 
 struct PINT_server_req_params pvfs2_readdir_params =
 {
     .string_name = "readdir",
-    .perm = PINT_server_perm_read,
+    .perm = perm_readdir,
     .get_object_ref = PINT_get_object_ref_readdir,
     .state_machine = &pvfs2_readdir_sm
 };

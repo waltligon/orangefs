@@ -16,6 +16,7 @@
 #include "pint-event.h"
 #include "pvfs2-internal.h"
 #include "request-scheduler/request-scheduler.h"
+#include "pint-security.h"
 
 static int check_fs_id(PVFS_fs_id fs_id);
 
@@ -254,10 +255,26 @@ static inline int PINT_get_object_ref_setparam(
     return 0;
 };
 
+static int perm_setparam(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_ADMIN)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_setparam_params =
 {
     .string_name = "mgmt_setparam",
-    .perm = PINT_server_perm_none,
+    .perm = perm_setparam,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_setparam,

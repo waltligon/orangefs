@@ -13,6 +13,7 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-security.h"
 
 %%
 
@@ -119,10 +120,26 @@ static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
 
 PINT_GET_OBJECT_REF_DEFINE(mgmt_get_dirdata_handle);
 
+static int perm_mgmt_get_dirdata_handle(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_ADMIN)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_mgmt_get_dirdata_handle_params =
 {
     .string_name = "mgmt-get-dirdata-handle",
-    .perm = PINT_server_perm_none,
+    .perm = perm_mgmt_get_dirdata_handle,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_mgmt_get_dirdata_handle,
     .state_machine = &pvfs2_mgmt_get_dirdata_handle_sm

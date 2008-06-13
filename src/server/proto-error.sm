@@ -12,6 +12,7 @@
 
 #include "pvfs2-server.h"
 #include "server-config.h"
+#include "pint-security.h"
 
 %%
 
@@ -95,10 +96,22 @@ static PINT_sm_action proto_error_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_proto_error(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (1)
+    {
+        ret = 0;
+    }
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_proto_error_params =
 {
     .string_name = "proto_error",
-    /* XXX: no perms before? */
+    .perm = perm_proto_error,
     .state_machine = &pvfs2_proto_error_sm
 };
 

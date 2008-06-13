@@ -14,6 +14,7 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 #include "pint-eattr.h"
+#include "pint-security.h"
 
 %%
 
@@ -165,12 +166,28 @@ static int seteattr_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_set_eattr(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_SETATTR)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(seteattr);
 
 struct PINT_server_req_params pvfs2_set_eattr_params =
 {
     .string_name = "set_eattr",
-    .perm = PINT_server_perm_setattr,
+    .perm = perm_set_eattr,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_seteattr,

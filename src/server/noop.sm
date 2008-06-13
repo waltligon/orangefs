@@ -11,6 +11,7 @@
 #include <fcntl.h>
 
 #include "pvfs2-server.h"
+#include "pint-security.h"
 
 %%
 
@@ -48,10 +49,22 @@ static PINT_sm_action noop_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_noop(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (1)
+    {
+        ret = 0;
+    }
+    
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_noop_params =
 {
     .string_name = "noop",
-    .perm = PINT_server_perm_none,
+    .perm = perm_noop,
     .access_type = PINT_server_req_readonly,
     .state_machine = &pvfs2_noop_sm
 };
