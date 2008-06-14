@@ -241,14 +241,11 @@ static PINT_sm_action listeattr_cleanup(
 
 PINT_GET_OBJECT_REF_DEFINE(listeattr);
 
-static int perm_list_eattr(PINT_server_op *s_op)
+static int perm_listeattr(PINT_server_op *s_op)
 {
     int ret;
 
-    if (1)
-    {
-        ret = 0;
-    }
+    ret = 0;
 
     return ret;
 }
@@ -256,7 +253,7 @@ static int perm_list_eattr(PINT_server_op *s_op)
 struct PINT_server_req_params pvfs2_list_eattr_params =
 {
     .string_name = "listeattr",
-    .perm = perm_list_eattr,
+    .perm = perm_listeattr,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_listeattr,
     .state_machine = &pvfs2_list_eattr_sm

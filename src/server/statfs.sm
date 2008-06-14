@@ -159,10 +159,7 @@ static int perm_statfs(PINT_server_op *s_op)
 {
     int ret;
     
-    if (1) 
-    {
-        ret = 0;
-    }
+    ret = 0;
     
     return ret;
 }

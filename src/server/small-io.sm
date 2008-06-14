@@ -245,16 +245,21 @@ static PINT_sm_action small_io_cleanup(
 static int perm_small_io(PINT_server_op *s_op)
 {
     int ret = -PVFS_EINVAL;
+    int mask = 0;
     enum PVFS_io_type type = s_op->req->u.small_io.io_type;
-     
-    if (type == PVFS_IO_READ && s_op->req->capability.op_mask & PINT_CAP_READ)
+
+    if (type == PVFS_IO_READ)
+    {
+        mask = PINT_CAP_READ;
+    }
+    else if (type == PVFS_IO_WRITE)
+    {
+        mask = PINT_CAP_WRITE;
+    }
+
+    if (s_op->req->capability.op_mask & mask)
     {
         ret = 0;
-    }
-    else if (type == PVFS_IO_WRITE && s_op->req->capability.op_mask & 
-                     PINT_CAP_WRITE)
-    {
-    	ret = 0;
     }
     else
     {

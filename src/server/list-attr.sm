@@ -283,14 +283,11 @@ static inline int PINT_get_object_ref_listattr(
     return 0;
 };
 
-static int perm_list_attr(PINT_server_op *s_op)
+static int perm_listattr(PINT_server_op *s_op)
 {
     int ret;
 
-    if (1)
-    {
-        ret = 0;
-    }
+    ret = 0;
     
     return ret;
 }
@@ -298,7 +295,7 @@ static int perm_list_attr(PINT_server_op *s_op)
 struct PINT_server_req_params pvfs2_list_attr_params =
 {
     .string_name = "list_attr",
-    .perm = perm_list_attr,
+    .perm = perm_listattr,
     .access_type = PINT_server_req_readonly,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_listattr,

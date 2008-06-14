@@ -81,22 +81,6 @@ static PINT_sm_action job_timer_do_work(
 	    server_job_context));
 }
 
-static int perm_chdirent(PINT_server_op *s_op)
-{
-    int ret;
-
-    if (s_op->req->capability.op_mask & PINT_CAP_WRITE & PINT_CAP_EXEC)
-    {
-        ret = 0;
-    }
-    else
-    {
-        ret = -PVFS_EACCES;
-    }
-
-    return ret;
-}
-
 static int perm_job_timer(PINT_server_op *s_op)
 {
     int ret;
@@ -119,8 +103,6 @@ struct PINT_server_req_params pvfs2_job_timer_params =
     .perm = perm_job_timer,
     .state_machine = &pvfs2_job_timer_sm
 };
-
-
 
 
 /*
