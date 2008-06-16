@@ -572,7 +572,7 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
     }
 
     /* resolve and print selected server only if gossip debugging enabled */
-    if(gossip_debug_on && (gossip_debug_mask & GOSSIP_CLIENT_DEBUG))
+    if(gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
             "PVFS_isys_create() selected meta server: %s\n", 
@@ -651,7 +651,7 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
     }
 
     /* resolve and print selected server only if gossip debugging enabled */
-    if(gossip_debug_on && (gossip_debug_mask & GOSSIP_CLIENT_DEBUG))
+    if(gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
         for(i = 0; i < sm_p->u.create.num_data_files; i++)
         {
