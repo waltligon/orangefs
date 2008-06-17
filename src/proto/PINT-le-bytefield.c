@@ -766,7 +766,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	switch (req->op) {
 	    case PVFS_SERV_CREATE:
 		if (req->u.create.attr.mask & PVFS_ATTR_META_DIST)
-		    decode_free(req->u.setattr.attr.u.meta.dist);
+		    decode_free(req->u.create.attr.u.meta.dist);
                 if (req->u.create.layout.server_list.servers)
                     decode_free(req->u.create.layout.server_list.servers);
 	    case PVFS_SERV_BATCH_CREATE:
