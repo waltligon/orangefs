@@ -1930,7 +1930,7 @@ static int precreate_pool_initialize(void)
     const char* host;
     int i;
     int server_type;
-    int handle_count;
+    int handle_count = 0;
 
     /* iterate through list of file systems */
     while(cur_f)
