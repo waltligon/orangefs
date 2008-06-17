@@ -335,7 +335,8 @@ static int in_group_p(PVFS_uid uid, PVFS_gid gid, PVFS_gid attr_group)
 
 /*
  * Return 0 if requesting clients is granted want access to the object
- * by the acl. Returns -PVFS_E... otherwise.
+ * by the acl. Returns -PVFS_EIO if ACL is invalid or not found,
+ * returns -PVFS_EACCESS if access is denied
  */
 int PINT_check_acls(void *acl_buf, size_t acl_size, 
     PVFS_object_attr *attr,
@@ -349,8 +350,9 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 
     if (acl_size == 0)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no acl's present.. denying access\n");
-        return -PVFS_EACCES;
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
+            "no acl's present..check metadata instead!\n");
+        return -PVFS_EIO;
     }
 
     /* keyval for ACLs includes a \0. so subtract the thingie */
@@ -369,7 +371,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
     if((acl_size % sizeof(pvfs2_acl_entry)) != 0)
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "invalid acls on object\n");
-        return(-PVFS_EACCES);
+        return(-PVFS_EIO);
     }
     count = acl_size / sizeof(pvfs2_acl_entry);
 
@@ -419,8 +421,8 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
                 if (found)
                 {
                     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(1) PINT_check_acls:"
-                        "returning access denied\n");
-                    return -PVFS_EACCES;
+                        "returning EIO\n");
+                    return -PVFS_EIO;
                 }
                 else
                     goto check_perm;
