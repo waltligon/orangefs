@@ -111,6 +111,9 @@ static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
 static DOTCONF_CB(get_trove_method);
 
+static DOTCONF_CB(get_db_log_buffer_size_bytes);
+static DOTCONF_CB(get_db_log_directory);
+
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
 
@@ -899,6 +902,19 @@ static const configoption_t options[] =
      * client operations.
      */
     {"SecretKey",ARG_STR, get_secret_key,NULL,CTX_FILESYSTEM,NULL},
+
+    /* Specifies the log buffer size of the logging subsystem of berkeley db.
+     */
+    {"DBLogBufferSizeBytes", ARG_INT, get_db_log_buffer_size_bytes, NULL,
+        CTX_STORAGEHINTS,"0"},
+
+    /* Specifies the log directory of the logging subsystem of berkeley db.
+     * Relative path will be considered as relative to the storage path,
+     * absolute path must be under the storage path.
+     */
+    {"DBLogDirectory", ARG_STR, get_db_log_directory, NULL,
+        CTX_STORAGEHINTS, NULL},
+    /*end*/
 
     LAST_OPTION
 };
@@ -2611,6 +2627,69 @@ DOTCONF_CB(get_trove_method)
     return NULL;
 }
 
+DOTCONF_CB(get_db_log_buffer_size_bytes)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->db_log_buffer_size_bytes = cmd->data.value;
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+		 "configure log buffer size to %d bytes.\n",
+		 (int)cmd->data.value);
+    return NULL;
+}
+
+DOTCONF_CB(get_db_log_directory)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    char buf[512] = {0};
+    char *ptr = buf;
+    int len = 0;
+    
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->db_log_directory)
+        free(config_s->db_log_directory);
+    if (cmd->data.str == NULL)
+    {
+	config_s->db_log_directory = NULL;
+    }
+    else
+    {
+	len = strlen(config_s->storage_path);
+	if(strncmp(cmd->data.str, "/", 1) == 0)
+	{/*absolute path for log directory*/
+	    if(strncmp(cmd->data.str, config_s->storage_path, len) == 0)
+	    {
+		config_s->db_log_directory = strdup(cmd->data.str);
+	    }
+	    else
+	    {
+		return "Error: DB log directory must be under the storage space.\n";
+	    }	    
+	}
+	else
+	{/*relative path for log directory*/
+	    if(config_s->storage_path == NULL)
+	    {
+		return "Error: Must configure storage space before configure log directory.\n";
+	    }
+	    strncat(ptr, config_s->storage_path, len);
+	    ptr = ptr + len - 1;
+	    if(strncmp(ptr, "/", 1) != 0)
+	    {
+		strncat(ptr, "/", 1);
+	    }
+	    strncat(ptr, cmd->data.str, strlen(cmd->data.str));
+	    config_s->db_log_directory = strdup(buf);
+	}
+    }
+    return NULL;
+}
+
 /*
  * Function: PINT_config_release
  *
@@ -4068,6 +4147,31 @@ int PINT_config_pvfs2_mkspace(
     PINT_llist *cur = NULL;
     char *cur_meta_handle_range, *cur_data_handle_range = NULL;
     filesystem_configuration_s *cur_fs = NULL;
+    int shm_key_hint = 0;
+
+    /* set the info needed for creating coll_env in pvfs2_mkspace*/
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
+				   &(config->db_cache_size_bytes));
+    /* this should never fail */
+    assert(ret == 0);
+    ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
+				   &(config->trove_max_concurrent_io));
+    /* this should never fail */
+    assert(ret == 0);
+    
+    /* help trove chose a differentiating shm key if needed for Berkeley DB */
+    shm_key_hint = PINT_generate_shm_key_hint(config);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Server using shm key hint: %d\n", shm_key_hint);
+    ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
+    assert(ret == 0);
+    
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_LOG_BUFFER_SIZE_BYTES,
+				   &(config->db_log_buffer_size_bytes));
+    assert(ret == 0);
+    
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_LOG_DIRECTORY,
+				   &(config->db_log_directory));
+    assert(ret == 0);
 
     if (config)
     {
@@ -4219,6 +4323,50 @@ int PINT_config_get_trove_sync_data(
         fs_conf = PINT_config_find_fs_id(config, fs_id);
     }
     return (fs_conf ? fs_conf->trove_sync_data : TROVE_SYNC);
+}
+
+/* PINT_generate_shm_key_hint(struct server_configuration_s *config)
+ *
+ * Makes a best effort to produce a unique shm key (for Trove's Berkeley
+ * DB use) for each server.  By default it will base this on the server's
+ * position in the fs.conf, but it will fall back to using a random number
+ *
+ * returns integer key
+ */
+int PINT_generate_shm_key_hint(struct server_configuration_s *config)
+{
+    int server_index = 1;
+    struct host_alias_s *cur_alias = NULL;
+
+    PINT_llist *cur = config->host_aliases;
+
+    /* iterate through list of aliases in configuration file */
+    while(cur)
+    {
+        cur_alias = PINT_llist_head(cur);
+        if(!cur_alias)
+        {
+            break;
+        }
+        if(strcmp(cur_alias->bmi_address, config->host_id) == 0)
+        {
+            /* match */
+            /* space the shm keys out by 10 to allow for Berkeley DB using 
+             * using more than one key on each server
+             */
+            return(server_index*10);        
+        }
+
+        server_index++;
+        cur = PINT_llist_next(cur);
+    }
+    
+    /* If we reach this point, we didn't find this server in the alias list.
+     * This is not a normal situation, but fall back to using a random
+     * number for the key just to be safe.
+     */
+    srand((unsigned int)time(NULL));
+    return(rand());
 }
 
 #endif

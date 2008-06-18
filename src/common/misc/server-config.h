@@ -190,6 +190,13 @@ typedef struct server_configuration_s
                                      */
     int trove_method;
     void *private_data;
+
+    int db_log_buffer_size_bytes;   /* log buffer size to be used in berkeley db
+				     * if zero, use defaults*/
+    char *db_log_directory;         /* log directory to be used in berkeley db
+				     * if NULL, use defaults
+				     * if it's a relative path, relative to storage path */
+
 } server_configuration_s;
 
 int PINT_parse_config(
@@ -286,6 +293,8 @@ int PINT_config_get_trove_sync_meta(
 int PINT_config_get_trove_sync_data(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
+int PINT_generate_shm_key_hint(
+    struct server_configuration_s *config);
 #endif
 
 /*

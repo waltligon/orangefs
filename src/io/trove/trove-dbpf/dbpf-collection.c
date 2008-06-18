@@ -89,32 +89,41 @@ void dbpf_collection_clear_registered(void)
     {
 	free_ptr = ptr;
 	ptr = ptr->next_p;
-
-        if ((ret = free_ptr->coll_attr_db->sync(
+	
+	/* For transactional db, do checkpointing rather than sync*/
+	if ((ret = free_ptr->coll_env->txn_checkpoint(free_ptr->coll_env, 0, 0, DB_FORCE)) != 0)
+	{
+	    gossip_err("txn_checkpoint(coll_env): %s\n", db_strerror(ret));
+	}    
+	
+	/* checkpointing is environment-wide so no sync on each db needed*/
+        /*if ((ret = free_ptr->coll_attr_db->sync(
                  free_ptr->coll_attr_db, 0)) != 0)
         {
             gossip_err("db_sync(coll_attr_db): %s\n", db_strerror(ret));
-        }
+	    }*/
 
         if ((ret = db_close(free_ptr->coll_attr_db)) != 0) 
         {
             gossip_lerr("db_close(coll_attr_db): %s\n", db_strerror(ret));
         }
 
-        if ((ret = free_ptr->ds_db->sync(free_ptr->ds_db, 0)) != 0)
+	/* checkpointing is environment-wide so no sync on each db needed*/
+        /*if ((ret = free_ptr->ds_db->sync(free_ptr->ds_db, 0)) != 0)
         {
             gossip_err("db_sync(coll_ds_db): %s\n", db_strerror(ret));
-        }
+	    }*/
 
         if ((ret = db_close(free_ptr->ds_db)) != 0) 
         {
             gossip_lerr("db_close(coll_ds_db): %s\n", db_strerror(ret));
         }
 
-        if ((ret = free_ptr->keyval_db->sync(free_ptr->keyval_db, 0)) != 0)
+	/* checkpointing is environment-wide so no sync on each db needed*/
+	/*if ((ret = free_ptr->keyval_db->sync(free_ptr->keyval_db, 0)) != 0)
         {
             gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
-        }
+	    }*/
 
         if ((ret = db_close(free_ptr->keyval_db)) != 0) 
         {

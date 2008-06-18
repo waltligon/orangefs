@@ -18,6 +18,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "trove.h"
 #include "trove-internal.h"
@@ -32,6 +33,10 @@ struct PINT_perf_counter* PINT_server_pc = NULL;
 int TROVE_db_cache_size_bytes = 0;
 int TROVE_shm_key_hint = 0;
 int TROVE_max_concurrent_io = 16;
+/*Rongrong*/
+int TROVE_db_log_buffer_size_bytes = 0;
+char *TROVE_db_log_directory = NULL;
+/*end*/
 
 extern TROVE_method_callback global_trove_method_callback;
 
@@ -1059,7 +1064,16 @@ int trove_collection_setinfo(
         TROVE_max_concurrent_io = *((int*)parameter);
 	return(0);
     }
-
+    if(option == TROVE_DB_LOG_BUFFER_SIZE_BYTES)
+    {
+	TROVE_db_log_buffer_size_bytes = *((int *)parameter);
+	return 0;
+    }
+    if(option == TROVE_DB_LOG_DIRECTORY)
+    {
+	TROVE_db_log_directory = strdup((char *)parameter);
+	return 0;
+    }
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
@@ -1073,4 +1087,5 @@ int trove_collection_setinfo(
            option,
            parameter);
 }
+
 
