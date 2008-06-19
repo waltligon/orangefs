@@ -35,23 +35,23 @@ void SECURITY_hash_finalize(void);
 /*  SECURITY_add_pubkey
  *
  *  Takes an EVP_PKEY and inserts it into the hash table
- *  based on the host ID.  If the host ID already
- *  exists in the table, it's corresponding key is replaced 
+ *  based on the hash key.  If the hash key already
+ *  exists in the table, it's corresponding EVP_PKEY is replaced 
  *  with the new one
  *
  *  returns PVFS_ENOMEM if memory cannot be allocated
  *  returns 0 on success
  */
-int SECURITY_add_pubkey(char *host, EVP_PKEY *pubkey);
+int SECURITY_add_pubkey(char *hash_key, EVP_PKEY *pubkey);
 
 /*  SECURITY_lookup_pubkey
  *
- *  Takes a host ID and returns a pointer to the
+ *  Takes a hash key and returns a pointer to the
  *  matching EVP_PKEY structure
  *
  *  returns NULL if no matching key is found
  */
-EVP_PKEY *SECURITY_lookup_pubkey(char *host);
+EVP_PKEY *SECURITY_lookup_pubkey(char *hash_key);
 
 
 #endif /* _SECURITY_HASH_H_ */
