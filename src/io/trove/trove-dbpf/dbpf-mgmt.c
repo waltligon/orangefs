@@ -45,6 +45,9 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 extern int TROVE_db_cache_size_bytes;
 extern int TROVE_shm_key_hint;
+/*The following two parameters are for db log subsystem configuration*/
+extern int TROVE_db_log_buffer_size_bytes;
+extern char *TROVE_db_log_directory;
 
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
@@ -106,6 +109,7 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 
 retry:
     ret = db_env_create(&dbenv, 0);
+
     if (ret != 0)
     {
         gossip_err("dbpf_getdb_env: %s\n", db_strerror(ret));
@@ -113,14 +117,83 @@ retry:
         return NULL;
     }
 
+    /* Configure the database to use auto commit, nosync write, 
+     * disk sync is done in txn_checkpoint
+     */
+    ret = dbenv->set_flags(dbenv, DB_AUTO_COMMIT | DB_TXN_WRITE_NOSYNC, 1);
+    if(ret != 0)
+    {
+	gossip_err("Error: failed to set db flags: %s\n", 
+		   db_strerror(ret));
+	*error = ret;
+	return NULL;
+    }
+
+    /* TODO: Subsystems Configurations here, parameters might need to be added into
+     * server-config.c???
+     * Locking subsystem configuration is not needed as long as there's only one
+     *     thread accessing the databases.
+     * Logging subsystem configurations: set_lg_bsize, set_lg_dir, set_lg_filemode,
+     *     set_lg_max, set_lg_regionmax
+     * Memory Pool subsystem configurations: set_cachesize (already configured below)
+     * Transaction subsystem configuration is not needed as long as there's only one
+     *     thread (thus one transaction) accessing the database
+     */
+    
+    if(TROVE_db_log_buffer_size_bytes != 0)
+    {
+	/*align the buffer size with memory page size, use 4096B here*/
+	if((TROVE_db_log_buffer_size_bytes & 0xfff) != 0)
+	{
+	    TROVE_db_log_buffer_size_bytes = 
+		((TROVE_db_log_buffer_size_bytes >> 12) + 1) << 12;
+	}
+	gossip_debug(GOSSIP_TROVE_DEBUG,
+		     "dbpf using log buffer size of %d bytes.\n",
+		     TROVE_db_log_buffer_size_bytes);
+	ret = dbenv->set_lg_bsize(dbenv, TROVE_db_log_buffer_size_bytes);
+	if(ret != 0)
+	{
+	    gossip_err("Error: failed to set db log buffer seize: %s\n",
+		       db_strerror(ret));
+	}
+    }
+    else
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG,
+		     "dbpf using the default log buffer size.\n");
+    }
+    if(TROVE_db_log_directory != NULL)
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG,
+		     "dbpf using log directory: %s\n",
+		     TROVE_db_log_directory);
+	ret = dbenv->set_lg_dir(dbenv, TROVE_db_log_directory);
+	if(ret != 0)
+	{
+	    gossip_err("Error: failed to set db log directory: %s\n",
+		       db_strerror(ret));
+	}
+    }
+    else
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG,
+		     "dbpf using the default log directory.\n");
+    }
+    /*end*/
+
     /* set the error callback for all databases opened with this environment */
     dbenv->set_errcall(dbenv, dbpf_db_error_callback);
 
     if(TROVE_db_cache_size_bytes != 0)
     {
-        gossip_debug(
-            GOSSIP_TROVE_DEBUG, "dbpf using cache size of %d bytes.\n",
-            TROVE_db_cache_size_bytes);
+	if((TROVE_db_cache_size_bytes & 0xfff) != 0)
+	{
+	    TROVE_db_cache_size_bytes =
+		((TROVE_db_cache_size_bytes >> 12) + 1) << 12;
+	}
+	gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf using cache size of %d bytes.\n",
+		     TROVE_db_cache_size_bytes);
         ret = dbenv->set_cachesize(dbenv, 0, TROVE_db_cache_size_bytes, 1);
         if(ret != 0)
         {
@@ -139,6 +212,10 @@ retry:
     {
         /* user wants the standard db cache which uses mmap */
         ret = dbenv->open(dbenv, path, 
+			  DB_INIT_TXN| /*init transaction subsystem*/
+			  DB_INIT_LOCK| /*init locking subsystem*/
+			  DB_INIT_LOG| /*init logging subsystem*/
+			  DB_RECOVER| /*normal recovery when startup*/
                           DB_INIT_MPOOL|
                           DB_CREATE|
                           DB_THREAD, 
@@ -167,6 +244,10 @@ retry:
         }
 
         ret = dbenv->open(dbenv, path, 
+			  DB_INIT_TXN| /*init transaction subsystem*/
+			  DB_INIT_LOCK| /*init locking subsystem*/
+			  DB_INIT_LOG| /*init logging subsystem*/
+			  DB_RECOVER| /*normal recovery when startup*/
                           DB_INIT_MPOOL|
                           DB_CREATE|
                           DB_THREAD|
@@ -197,6 +278,11 @@ retry:
         if(ret == EINVAL) {
             unlink_db_cache_files(path);
             ret = dbenv->open(dbenv, path, 
+			      DB_INIT_TXN| /*init transaction subsystem*/
+			      DB_INIT_LOCK| /*init locking subsystem*/
+			      DB_INIT_LOG| /*init logging subsystem*/
+			      DB_RECOVER| /*normal recovery when startup*/
+			      DB_INIT_MPOOL|
                               DB_CREATE|
                               DB_THREAD|
                               DB_PRIVATE, 
@@ -465,7 +551,10 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0);
+    /*For transaction db, use checkpoint instead of sync*/
+    ret = coll_p->coll_env->txn_checkpoint(coll_p->coll_env, 0, 0, DB_FORCE);
+    /*ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0);*/
+
     if (ret != 0)
     {
         gossip_lerr("dbpf_collection_seteattr: %s\n", db_strerror(ret));

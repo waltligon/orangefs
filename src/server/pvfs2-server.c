@@ -156,7 +156,6 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
-static int generate_shm_key_hint(void);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
@@ -698,9 +697,17 @@ static int server_initialize_subsystems(
     assert(ret == 0);
 
     /* help trove chose a differentiating shm key if needed for Berkeley DB */
-    shm_key_hint = generate_shm_key_hint();
+    shm_key_hint = PINT_generate_shm_key_hint(&server_config);
     gossip_debug(GOSSIP_SERVER_DEBUG, "Server using shm key hint: %d\n", shm_key_hint);
     ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
+    assert(ret == 0);
+
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_LOG_BUFFER_SIZE_BYTES,
+                                   &server_config.db_log_buffer_size_bytes);
+    assert(ret == 0);
+
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_LOG_DIRECTORY,
+                                   &server_config.db_log_directory);
     assert(ret == 0);
 
     if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
@@ -1838,50 +1845,6 @@ void PINT_server_access_debug(PINT_server_op * s_op,
     }
 }
 #endif
-
-/* generate_shm_key_hint()
- *
- * Makes a best effort to produce a unique shm key (for Trove's Berkeley
- * DB use) for each server.  By default it will base this on the server's
- * position in the fs.conf, but it will fall back to using a random number
- *
- * returns integer key
- */
-static int generate_shm_key_hint(void)
-{
-    int server_index = 1;
-    struct host_alias_s *cur_alias = NULL;
-
-    PINT_llist *cur = server_config.host_aliases;
-
-    /* iterate through list of aliases in configuration file */
-    while(cur)
-    {
-        cur_alias = PINT_llist_head(cur);
-        if(!cur_alias)
-        {
-            break;
-        }
-        if(strcmp(cur_alias->bmi_address, server_config.host_id) == 0)
-        {
-            /* match */
-            /* space the shm keys out by 10 to allow for Berkeley DB using 
-             * using more than one key on each server
-             */
-            return(server_index*10);        
-        }
-
-        server_index++;
-        cur = PINT_llist_next(cur);
-    }
-    
-    /* If we reach this point, we didn't find this server in the alias list.
-     * This is not a normal situation, but fall back to using a random
-     * number for the key just to be safe.
-     */
-    srand((unsigned int)time(NULL));
-    return(rand());
-}
 
 /*
  * Local variables:

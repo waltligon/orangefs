@@ -30,12 +30,35 @@ static int dbpf_sync_db(
     dbpf_sync_context_t * sync_context)
 {
     int ret; 
+    DB_ENV *dbenv;
+    u_int32_t flagsp;
+
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]:\tcoalesce %d sync start "
                  "in coalesce_queue:%d pending:%d\n",
                  sync_context_type, sync_context->coalesce_counter, 
                  sync_context->sync_counter);
-    ret = dbp->sync(dbp, 0);
+
+    /*use checkpointing instead of sync for transactional db*/
+    dbenv = dbp->get_env(dbp);
+    if(dbenv != NULL)
+    {
+	dbenv->get_open_flags(dbenv, &flagsp);
+	if(flagsp & DB_INIT_TXN)
+	{
+	    ret = dbenv->txn_checkpoint(dbenv, 0, 0, DB_FORCE);
+	}
+	else
+	{
+	    ret = dbp->sync(dbp, 0);
+	}
+	    
+    }
+    else
+    {
+	ret = dbp->sync(dbp, 0);
+    }
+
     if(ret != 0)
     {
         gossip_err("db SYNC failed: %s\n",

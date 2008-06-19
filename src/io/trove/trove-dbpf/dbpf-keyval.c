@@ -1233,6 +1233,8 @@ int PINT_dbpf_keyval_iterate(
 
     int ret = -TROVE_EINVAL, i=0, get_key_count=0;
     DBC *dbc_p = NULL;
+    DB_ENV *dbenv_p = NULL;
+    DB_TXN *txn_p = NULL; //transaction handler
     char keybuffer[PVFS_NAME_MAX];
     TROVE_keyval_s skey;
     TROVE_keyval_s *key;
@@ -1245,15 +1247,42 @@ int PINT_dbpf_keyval_iterate(
     skey.buffer_sz = PVFS_NAME_MAX;
     key = &skey;
 
-    ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
-    if (ret != 0)
+    /* Cursor won't be automatically protected by transaction 
+     * even if DB_AUTO_COMMIT is set. Therefore transaction handler is created
+     */
+    dbenv_p = db_p->get_env(db_p);
+    if(dbenv_p != NULL)
     {
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "Exited: PINT_dpbf_keyval_iterate\n");
-
-        gossip_lerr("db_p->cursor failed: db error %s\n", db_strerror(ret));
-        *count = 0;
-        return -dbpf_db_error_to_trove_error(ret);
+	ret = dbenv_p->txn_begin(dbenv_p, NULL, &txn_p, 0);
+	if (ret != 0)
+	{
+	    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+			 "Exited: PINT_dpbf_keyval_iterate\n");
+	    gossip_lerr("dbenv_p->txn_begin failed: db error %s\n", db_strerror(ret));
+	    *count = 0;
+	    return -dbpf_db_error_to_trove_error(ret);
+	}
+	
+	ret = db_p->cursor(db_p, txn_p, &dbc_p, 0);
+	if (ret != 0)
+	{
+	    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+			 "Exited: PINT_dpbf_keyval_iterate\n");
+	    
+	    gossip_lerr("db_p->cursor failed: db error %s\n", db_strerror(ret));
+	    txn_p->abort(txn_p);
+	    *count = 0;
+	    return -dbpf_db_error_to_trove_error(ret);
+	}
+    }
+    else
+    {
+	gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+		     "Exited: PINT_dpbf_keyval_iterate\n");
+	
+	gossip_lerr("db_p->get_env failed: can't find environment for db\n");
+	*count = 0; 
+	return -TROVE_EINVAL;
     }
 
     if(pos == TROVE_ITERATE_START)
@@ -1359,10 +1388,23 @@ return_error:
     {
         dbc_p->c_close(dbc_p);
     }
-
+    /* If error occured, abort the transaction*/
+    if(ret != 0 && ret != -TROVE_ENOENT)
+    { 
+	gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+		     "PINT_dpbf_keyval_iterate: transaction abort.\n");
+	txn_p->abort(txn_p);
+    }
+    /* otherwise commit the transaction*/
+    else
+    {
+	gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+		     "PINT_dpbf_keyval_iterate: transaction commit.\n");
+	txn_p->commit(txn_p, 0);
+    }
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Exited: PINT_dpbf_keyval_iterate\n");
-
+    
     return ret;
 }
 
@@ -1588,8 +1630,8 @@ static int dbpf_keyval_iterate_cursor_get(
         db_data.data = dummy_data;
         db_data.ulen = PVFS_NAME_MAX;
     }
-
     ret = dbc_p->c_get(dbc_p, &db_key, &db_data, db_flags);
+
     if (ret == DB_NOTFOUND)
     {
         return -TROVE_ENOENT;

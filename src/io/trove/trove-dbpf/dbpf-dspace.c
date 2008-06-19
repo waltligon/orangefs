@@ -526,6 +526,7 @@ static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL, i = 0;
+    DB_TXN *txn_p = NULL;
     DBC *dbc_p = NULL;
     DBT key, data;
     void * multiples_buffer = NULL;
@@ -533,7 +534,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     TROVE_handle dummy_handle;
     size_t sizeof_handle = 0, sizeof_attr = 0;
     int start_size;
-    void *tmp_ptr;
+    void *tmp_ptr = NULL;
     void *tmp_handle;
     void *tmp_attr;
     uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
@@ -545,8 +546,19 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         return 1;
     }
 
+    /* Cursor won't be automatically protected by transaction 
+     * even if DB_AUTO_COMMIT is set. Therefore transaction handler is created
+     */
+    ret = op_p->coll_p->coll_env->txn_begin(op_p->coll_p->coll_env, NULL, &txn_p, 0);
+    if (ret != 0)
+    {
+	ret = -dbpf_db_error_to_trove_error(ret);
+	gossip_err("falied to start the transaction");
+	goto return_error;
+    }
     /* get a cursor */
-    ret = op_p->coll_p->ds_db->cursor(op_p->coll_p->ds_db, NULL, &dbc_p, 0);
+    ret = op_p->coll_p->ds_db->cursor(op_p->coll_p->ds_db, txn_p, &dbc_p, 0);
+
     if (ret != 0)
     {
         ret = -dbpf_db_error_to_trove_error(ret);
@@ -648,7 +660,6 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     data.size = data.ulen = start_size;
     data.flags = DB_DBT_USERMEM;
 
-    tmp_ptr = NULL;
     while(i < *op_p->u.d_iterate_handles.count_p)
     {
         ret = dbc_p->c_get(dbc_p, &key, &data, DB_MULTIPLE_KEY|DB_NEXT);
@@ -790,6 +801,9 @@ return_ok:
         dbc_p->c_close(dbc_p);
     }
 
+    /*Everything is fine, commit the transaction*/
+    txn_p->commit(txn_p, 0);
+
     if(multiples_buffer)
     {
         PINT_mem_aligned_free(multiples_buffer);
@@ -805,6 +819,9 @@ return_error:
     {
         dbc_p->c_close(dbc_p);
     }
+
+    /*Something is wrong, abort the transaction*/
+    txn_p->abort(txn_p);
 
     if(multiples_buffer)
     {
