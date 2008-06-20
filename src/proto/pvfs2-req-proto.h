@@ -1498,6 +1498,7 @@ struct PVFS_server_req
 {
     enum PVFS_server_op op;
     PVFS_credentials credentials;
+    PVFS_credential credential;  /* new version, not yet used */
     PVFS_capability capability;
     union
     {
@@ -1541,12 +1542,16 @@ encode_PVFS_server_req(char **pptr, const struct PVFS_server_req *x) {
 #endif
     *pptr += 4;
     encode_PVFS_credentials(pptr, &x->credentials);
+    encode_PVFS_credential(pptr,&x->credential);
+    encode_PVFS_capability(pptr,&x->capability);
 }
 static inline void
 decode_PVFS_server_req(char **pptr, struct PVFS_server_req *x) {
     decode_enum(pptr, &x->op);
     *pptr += 4;
     decode_PVFS_credentials(pptr, &x->credentials);
+    decode_PVFS_credential(pptr,&x->credential);
+    decode_PVFS_capability(pptr,&x->capability);
 }
 #endif
 
@@ -1556,6 +1561,7 @@ struct PVFS_server_resp
 {
     enum PVFS_server_op op;
     PVFS_error status;
+    PVFS_capability capability;
     union
     {
         struct PVFS_servresp_create create;
@@ -1581,10 +1587,11 @@ struct PVFS_server_resp
         struct PVFS_servresp_listattr listattr;
     } u;
 };
-endecode_fields_2_struct(
+endecode_fields_3_struct(
     PVFS_server_resp,
     enum, op,
-    PVFS_error, status)
+    PVFS_error, status,
+    PVFS_capability, capability)
 
 #endif /* __PVFS2_REQ_PROTO_H */
 

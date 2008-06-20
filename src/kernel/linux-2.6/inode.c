@@ -251,14 +251,18 @@ int pvfs2_getattr(
      * parsed by the VFS layer.  Propigate them to our internal sb structure so
      * that we can handle lazy time updates properly.
      */
+#ifdef HAVE_MNT_NOATIME
     if(mnt->mnt_flags && MNT_NOATIME) 
     { 
         inode->i_sb->s_flags |= MS_NOATIME; 
     } 
+#endif
+#ifdef HAVE_MNT_NODIRATIME
     if(mnt->mnt_flags && MNT_NODIRATIME) 
     { 
         inode->i_sb->s_flags |= MS_NODIRATIME; 
     } 
+#endif
 
     /*
      * Similar to the above comment, a getattr also expects that all fields/attributes
@@ -483,6 +487,8 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
         }
 #endif
     }
+    gossip_debug(GOSSIP_INODE_DEBUG, "iget handle %llu, fsid %d hash %ld i_ino %lu\n",
+                 ref->handle, ref->fs_id, hash, inode->i_ino);
     return inode;
 }
 

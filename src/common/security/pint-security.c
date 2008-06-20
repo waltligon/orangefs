@@ -454,6 +454,10 @@ static int load_public_keys(const char *path)
 
 #else /* SECURITY_ENCRYPTION_NONE */
 
+/*  PINT_sign_capability
+ *
+ *  placeholder for when security is disabled, sets sig size to zero
+ */
 int PINT_sign_capability(PVFS_capability *cap)
 {
     cap->sig_size = 0;
@@ -461,6 +465,10 @@ int PINT_sign_capability(PVFS_capability *cap)
     return 0;
 }
 
+/*  PINT_verify_capability
+ *
+ *  placeholder for when security is disabled, always verifies
+ */
 int PINT_verify_capability(PVFS_capability *cap)
 {
     return 1;

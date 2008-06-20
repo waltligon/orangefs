@@ -55,6 +55,35 @@ extern job_context_id server_job_context;
 /* number of milliseconds that clients will delay between retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
+/* types of permission checking that a server may need to perform for
+ * incoming requests
+ */
+enum PINT_server_req_permissions
+{
+    PINT_SERVER_CHECK_INVALID = 0, /* invalid request */
+    PINT_SERVER_CHECK_WRITE = 1,   /* needs write permission */
+    PINT_SERVER_CHECK_READ = 2,    /* needs read permission */
+    PINT_SERVER_CHECK_NONE = 3,    /* needs no permission */
+    PINT_SERVER_CHECK_ATTR = 4,    /* special case for attribute operations; 
+                                      needs ownership */
+    PINT_SERVER_CHECK_CRDIRENT = 5 /* special case for crdirent operations;
+                                      needs write and execute */
+};
+
+#define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
+static inline int PINT_get_object_ref_##req_name(                        \
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
+{                                                                        \
+    *fs_id = req->u.req_name.fs_id;                                      \
+    *handle = req->u.req_name.handle;                                    \
+    return 0;                                                            \
+}
+
+enum PINT_server_req_access_type PINT_server_req_readonly(
+                                    struct PVFS_server_req *req);
+enum PINT_server_req_access_type PINT_server_req_modify(
+                                    struct PVFS_server_req *req);
+
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {

@@ -562,7 +562,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Attempted to perform "
                          "an operation on target handle %llu that was "
-                         "not in the capability", llu(s_op->target_handle));
+                         "not in the capability\n", llu(s_op->target_handle));
             return -PVFS_EACCES;
         }
     }

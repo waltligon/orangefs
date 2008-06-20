@@ -22,64 +22,70 @@
 
 typedef unsigned char *PVFS_sig;
 
-/* TODO: encode and decode PVFS_sig */
-
 typedef struct PVFS_capability PVFS_capability;
 struct PVFS_capability {
-        PVFS_handle owner;
-        PVFS_fs_id fsid;
-        uint32_t sig_size;
-        PVFS_sig signature;
-	PVFS_time timeout;   /* seconds after epoch to time out */
-	uint32_t op_mask;
-	uint32_t num_handles;
-	PVFS_handle *handle_array;
+    PVFS_handle owner;
+    PVFS_fs_id fsid;
+    uint32_t sig_size;
+    PVFS_sig signature;
+    PVFS_time timeout;   /* seconds after epoch to time out */
+    uint32_t op_mask;
+    uint32_t num_handles;
+    PVFS_handle *handle_array;
 };
 
 endecode_fields_2a2a_struct (
-		PVFS_capability,
-		PVFS_handle, owner,
-                PVFS_fs_id, fsid,
-                uint32_t, sig_size,
-                PVFS_sig, signature,
-		PVFS_time, timeout,
-		uint32_t, op_mask,
-		uint32_t, num_handles,
-		PVFS_handle, handle_array)
+    PVFS_capability,
+    PVFS_handle, owner,
+    PVFS_fs_id, fsid,
+    uint32_t, sig_size,
+    PVFS_sig, signature,
+    PVFS_time, timeout,
+    uint32_t, op_mask,
+    uint32_t, num_handles,
+    PVFS_handle, handle_array)
 
-/*typedef struct PVFS_credentials PVFS_credentials;
-struct PVFS_credentials {
-	PVFS_sig signature;
-	PVFS_time timeout;
-	PVFS_uid userid;
-	uint32_t num_groups;
-	PVFS_gid *group_array;
-};*/
+typedef struct PVFS_credential PVFS_credential;
+struct PVFS_credential {
+    uint32_t serial;
+    PVFS_uid userid;
+    uint32_t num_groups;
+    PVFS_gid *group_array;
+    uint32_t issuer_id_size;
+    char * issuer_id;
+    PVFS_time timeout;
+    uint32_t sig_size;
+    PVFS_sig signature;
+};
 
-/*endecode_fields_3a (
-	PVFS_credentials,
-	PVFS_sig, signature,
-	PVFS_time, timeout,
-	PVFS_uid, userid,
-	uint32_t, num_groups,
-	PVFS_gid, group_array)*/
+endecode_fields_2aa1a_struct (
+    PVFS_credential,
+    uint32_t, serial,
+    PVFS_uid, userid,
+    uint32_t, num_groups,
+    PVFS_gid, group_array,
+    uint32_t, issuer_id_size,
+    char, issuer_id,
+    PVFS_time, timeout,
+    uint32_t, sig_size,
+    PVFS_sig, signature)
 
 /*  top-level security functions */
 
-/*  PINT_security_initialize	
+/*  PINT_security_initialize    
  *
  *  Initializes the security module
- *	
+ *    
  *  returns PVFS_EALREADY if already initialized
  *  returns PVFS_EIO if key file is missing or invalid
  *  returns 0 on sucess
  */
 int PINT_security_initialize(void);
 
-/*  PINT_security_finalize	
+/*  PINT_security_finalize    
  *
  *  Finalizes the security module
- *	
+ *    
  *  returns PVFS_EALREADY if already finalized
  *  returns 0 on sucess
  */
@@ -107,12 +113,46 @@ void PINT_sign_credentials (PVFS_credentials *);
  */
 int PINT_verify_credentials (PVFS_credentials *);
 
+/*  PINT_init_capability
+ *
+ *  Function to call after creating an initial capability
+ *  structure to initialize needed memory space for the signature.
+ *  Sets all fields to 0 or NULL to be safe
+ *	
+ *  returns -PVFS_ENOMEM on error
+ *  returns -PVFS_EINVAL if passed an invalid structure
+ *  returns 0 on success
+ */
 int PINT_init_capability(PVFS_capability *);
-    
+
+/*  PINT_dup_capability
+ *
+ *  When passed a valid capability pointer this function will duplicate
+ *  it and return the copy.  User must make sure to free both the new and
+ *  old capabilities as normal.
+ *	
+ *  returns NULL on error
+ *  returns valid PVFS_capability * on success
+ */
 PVFS_capability *PINT_dup_capability(const PVFS_capability *);
 
+/*  PINT_release_capability
+ *
+ *  Frees any memory associated with a capability structure.
+ *	
+ *  no return value
+ */
 void PINT_release_capability(PVFS_capability *);
 
+/*  PINT_get_max_sigsize
+ *
+ *  This function probably won't get used, was initially used in the encode
+ *  and decode process although a workaround was found to avoid linking the
+ *  security module in.  Possibly useful later down the road.
+ *	
+ *  returns < 0 on error
+ *  returns maximum signature size on success
+ */
 int PINT_get_max_sigsize(void);
 
 #endif

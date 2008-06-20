@@ -60,6 +60,15 @@
     *(pptr) += 1; \
 } while (0)
 
+#define encode_char(pptr,x) do { \
+    *(char *) *(pptr) = *(x); \
+    *(pptr) += 1; \
+} while (0)
+#define decode_char(pptr,x) do { \
+    *(x) = *(char *) *(pptr); \
+    *(pptr) += 1; \
+} while (0)
+
 #define encode_int32_t(pptr,x) do { \
     *(int32_t*) *(pptr) = htobmi32(*(x)); \
     *(pptr) += 4; \
@@ -687,7 +696,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 }
 
 /* 2 fields, then an array, then 2 fields, then an array */
-#define endecode_fields_2a2a_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, t3, x3, t4, x4, tn2,n2,ta2,a2) \
+#define endecode_fields_2a2a_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, t3, x3, t4, x4, tn2, n2, ta2, a2) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
@@ -700,8 +709,9 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t3(pptr, &x->x3); \
     encode_##t4(pptr, &x->x4); \
     encode_##tn2(pptr, &x->n2); \
-    for (i=0; i<x->n2; i++) \
-        encode_##ta2(pptr, &(x)->a2[i]); \
+    if (x->n2 > 0) \
+        for (i=0; i<x->n2; i++) \
+            encode_##ta2(pptr, &(x)->a2[i]); \
     align8(pptr); \
 } \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
@@ -721,9 +731,74 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t3(pptr, &x->x3); \
     decode_##t4(pptr, &x->x4); \
     decode_##tn2(pptr, &x->n2); \
-    x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
-    for (i=0; i<x->n2; i++) \
-        decode_##ta2(pptr, &(x)->a2[i]); \
+    if (x->n2 != 0) \
+    { \
+        x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+        for (i=0; i<x->n2; i++) \
+            decode_##ta2(pptr, &(x)->a2[i]); \
+    } \
+    else \
+        x->a2 = NULL; \
+    align8(pptr); \
+}
+
+/* 2 fields, then two arrays, then 1 field, then an array */
+#define endecode_fields_2aa1a_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, tn2, n2, ta2, a2, t3, x3, tn3, n3, ta3, a3) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    align8(pptr); \
+    encode_##tn1(pptr, &x->n1); \
+    if (x->n1 > 0) \
+        for (i=0; i<x->n1; i++) \
+            encode_##ta1(pptr, &(x)->a1[i]); \
+    align8(pptr); \
+    encode_##tn2(pptr, &x->n2); \
+    if (x->n2 > 0) \
+        for (i=0; i<x->n2; i++) \
+            encode_##ta2(pptr, &(x)->a2[i]); \
+    align8(pptr); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##tn3(pptr, &x->n3); \
+    if (x->n3 > 0) \
+        for (i=0; i<x->n3; i++) \
+            encode_##ta3(pptr, &(x)->a3[i]); \
+    align8(pptr); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    align8(pptr); \
+    decode_##tn1(pptr, &x->n1); \
+    if (x->n1 != 0) \
+    { \
+        x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+        for (i=0; i<x->n1; i++) \
+            decode_##ta1(pptr, &(x)->a1[i]); \
+    } \
+    else \
+        x->a1 = NULL; \
+    align8(pptr); \
+    decode_##tn2(pptr, &x->n2); \
+    if (x->n2 != 0) \
+    { \
+        x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+        for (i=0; i<x->n2; i++) \
+            decode_##ta2(pptr, &(x)->a2[i]); \
+    } \
+    else \
+        x->a2 = NULL; \
+    align8(pptr); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##tn2(pptr, &x->n2); \
+    if (x->n3 != 0) \
+    { \
+        x->a3 = decode_malloc(x->n3 * sizeof(*x->a3)); \
+        for (i=0; i<x->n3; i++) \
+            decode_##ta3(pptr, &(x)->a3[i]); \
+    } \
+    else \
+        x->a3 = NULL; \
     align8(pptr); \
 }
 
