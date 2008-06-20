@@ -152,6 +152,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
                      dbpf_pid, NULL, &q_op_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
                      PINT_HINT_GET_OP_ID(hints));
 
     /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
@@ -976,6 +977,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
                      dbpf_pid, NULL, &q_op_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
                      handle,
                      PINT_HINT_GET_OP_ID(hints));
 
@@ -1123,6 +1125,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
                      dbpf_pid, NULL, &q_op_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
                      handle,
                      PINT_HINT_GET_OP_ID(hints));
 

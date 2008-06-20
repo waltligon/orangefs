@@ -68,15 +68,6 @@ extern "C" {
 #define DBPF_BSTREAM_GET_BUCKET(__handle)                                \
 ((__handle) % DBPF_BSTREAM_MAX_NUM_BUCKETS)
 
-#define DBPF_EVENT_START(event_type, hints, event_id)                   \
-    PINT_EVENT_START(event_type, dbpf_pid, NULL, event_id,              \
-                     PINT_HINT_GET_CLIENT_ID(hints),                    \
-                     PINT_HINT_GET_REQUEST_ID(hints),                   \
-                     PINT_HINT_GET_HANDLE(hints))
-
-#define DBPF_EVENT_END(event_type, event_id)                            \
-    PINT_EVENT_END(event_type, dbpf_pid, NULL, event_id)
-
 #define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)          \
 do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
 

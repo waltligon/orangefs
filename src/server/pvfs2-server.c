@@ -651,11 +651,11 @@ static int server_initialize_subsystems(
     }
 
     /* Define the state machine event:
-     *   START: (client_id, request_id, handle, op_id)
+     *   START: (client_id, request_id, rank, handle, op_id)
      *   STOP: ()
      */
     PINT_event_define_event(
-        NULL, "sm", "%d%d%llu%d", "", &PINT_sm_event_id);
+        NULL, "sm", "%d%d%d%llu%d", "", &PINT_sm_event_id);
 
     *server_status_flag |= SERVER_EVENT_INIT;
 
@@ -1620,6 +1620,7 @@ int server_state_machine_start(
                          NULL, &s_op->event_id,
                          PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                          PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
+                         PINT_HINT_GET_RANK(s_op->req->hints),
                          PINT_HINT_GET_HANDLE(s_op->req->hints),
                          s_op->req->op);
         s_op->resp.op = s_op->req->op;

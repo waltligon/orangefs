@@ -4167,12 +4167,15 @@ static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
     *hints = NULL;
 
     mac = get_mac();
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "mac: %d\n", mac);
     PVFS_hint_add(hints, PVFS_HINT_CLIENT_ID_NAME, sizeof(mac), &mac);
 
     rank = get_rank_from_pid(req->in_upcall.pid);
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "rank: %d\n", rank);
     PVFS_hint_add(hints, PVFS_HINT_RANK_NAME, sizeof(rank), &rank);
 
     reqid = get_reqid_from_rank(rank);
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "reqid: %d\n", reqid);
     PVFS_hint_add(hints, PVFS_HINT_REQUEST_ID_NAME, sizeof(reqid), &reqid);
 }
 
