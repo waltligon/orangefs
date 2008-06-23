@@ -790,7 +790,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
         x->a2 = NULL; \
     align8(pptr); \
     decode_##t3(pptr, &x->x3); \
-    decode_##tn2(pptr, &x->n2); \
+    decode_##tn3(pptr, &x->n3); \
     if (x->n3 != 0) \
     { \
         x->a3 = decode_malloc(x->n3 * sizeof(*x->a3)); \
