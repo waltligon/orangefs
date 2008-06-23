@@ -316,7 +316,84 @@ int PINT_verify_capability(PVFS_capability *data)
     
     EVP_MD_CTX_cleanup(&mdctx);
 
-    return 1;
+    return (ret == 1);
+}
+
+/*  PINT_verify_credential
+ *
+ *  Takes in a PVFS_credential structure and checks to see if the
+ *  signature matches the contents based on the data within
+ *
+ *  returns 1 on success
+ *  returns 0 on error or failure to verify
+ */
+int PINT_verify_credential(PVFS_credential *cred)
+{
+    EVP_MD_CTX mdctx;
+    const EVP_MD *md;
+    EVP_PKEY *pubkey;
+    int ret;
+
+    if (!cred)
+    {
+        return 0;
+    }
+
+    if (PINT_util_get_current_time() > cred->timeout)
+    {
+        return 0;
+    }
+
+    /* TODO: check revocation list against cred->serial */
+
+    pubkey = SECURITY_lookup_pubkey(cred->issuer_id);
+    if (pubkey == NULL)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG,
+                     "Public key not found for issuer: %s\n", 
+                     cred->issuer_id);
+        return 0;
+    }
+
+#if defined(SECURITY_ENCRYPTION_RSA)
+    md = EVP_sha1();
+#elif defined(SECURITY_ENCRYPTION_DSA)
+    md = EVP_dss1();
+#endif
+
+    EVP_MD_CTX_init(&mdctx);
+    ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
+    if (!ret)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure.\n");
+        EVP_MD_CTX_cleanup(&mdctx);
+        return 0;
+    }
+
+    ret = EVP_VerifyUpdate(&mdctx, &cred->serial, sizeof(uint32_t));
+    ret &= EVP_VerifyUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret &= EVP_VerifyUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
+    if (cred->num_groups)
+    {
+        ret &= EVP_VerifyUpdate(&mdctx, cred->group_array,
+                                cred->num_groups * sizeof(PVFS_gid));
+    }
+    ret &= EVP_VerifyUpdate(&mdctx, cred->issuer_id,
+                            (strlen(cred->issuer_id) + 1) * sizeof(char));
+    ret &= EVP_VerifyUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
+    ret &= EVP_VerifyUpdate(&mdctx, &cred->sig_size, sizeof(uint32_t));
+    if (!ret)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure.\n");
+        EVP_MD_CTX_cleanup(&mdctx);
+        return 0;
+    }
+
+    ret = EVP_VerifyFinal(&mdctx, cred->signature, cred->sig_size, pubkey);
+
+    EVP_MD_CTX_cleanup(&mdctx);
+
+    return (ret == 1);
 }
 
 /* load_private_key
@@ -471,7 +548,38 @@ int PINT_sign_capability(PVFS_capability *cap)
  */
 int PINT_verify_capability(PVFS_capability *cap)
 {
-    return 1;
+    int ret;
+    
+    if (PINT_util_get_current_time() > cap->timeout)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = 1;
+    }
+
+    return ret;
+}
+
+/*  PINT_verify_credential
+ *
+ *  placeholder for when security is disabled, always verifies
+ */
+int PINT_verify_credential(PVFS_credential *cred)
+{
+    int ret;
+    
+    if (PINT_util_get_current_time() > cred->timeout)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = 1;
+    }
+
+    return ret;
 }
 
 #endif /* SECURITY_ENCRYPTION_NONE */

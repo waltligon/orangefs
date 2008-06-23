@@ -100,16 +100,11 @@ int PINT_sign_capability(PVFS_capability *);
  */
 int PINT_verify_capability(PVFS_capability *);
 
-/* creates a signature from the remaining fields
- * any existing signature is overwritten
- */
-void PINT_sign_credentials (PVFS_credentials *);
-
 /* computes a signature from the fields and compares 
  * to the existing signature returns non-zero if equal
  * nothing changed in the structure
  */
-int PINT_verify_credentials (PVFS_credentials *);
+int PINT_verify_credential (PVFS_credential *);
 
 /*  PINT_init_capability
  *
