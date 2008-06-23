@@ -51,7 +51,6 @@ struct PVFS_credential {
     PVFS_uid userid;
     uint32_t num_groups;
     PVFS_gid *group_array;
-    uint32_t issuer_id_size;
     char * issuer_id;
     PVFS_time timeout;
     uint32_t sig_size;
@@ -64,8 +63,7 @@ endecode_fields_2aa1a_struct (
     PVFS_uid, userid,
     uint32_t, num_groups,
     PVFS_gid, group_array,
-    uint32_t, issuer_id_size,
-    char, issuer_id,
+    string, issuer_id,
     PVFS_time, timeout,
     uint32_t, sig_size,
     PVFS_sig, signature)

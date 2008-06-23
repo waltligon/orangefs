@@ -742,8 +742,8 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     align8(pptr); \
 }
 
-/* 2 fields, then two arrays, then 1 field, then an array */
-#define endecode_fields_2aa1a_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, tn2, n2, ta2, a2, t3, x3, tn3, n3, ta3, a3) \
+/* 2 fields, then an array, a string, then 1 field, then an array */
+#define endecode_fields_2aa1a_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, ta2, a2, t3, x3, tn3, n3, ta3, a3) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
@@ -753,11 +753,10 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
         for (i=0; i<x->n1; i++) \
             encode_##ta1(pptr, &(x)->a1[i]); \
     align8(pptr); \
-    encode_##tn2(pptr, &x->n2); \
-    if (x->n2 > 0) \
-        for (i=0; i<x->n2; i++) \
-            encode_##ta2(pptr, &(x)->a2[i]); \
-    align8(pptr); \
+    if (x->a2 != NULL) \
+    { \
+        encode_##ta2(pptr, &x->a2); \
+    } \
     encode_##t3(pptr, &x->x3); \
     encode_##tn3(pptr, &x->n3); \
     if (x->n3 > 0) \
@@ -779,16 +778,13 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     else \
         x->a1 = NULL; \
     align8(pptr); \
-    decode_##tn2(pptr, &x->n2); \
-    if (x->n2 != 0) \
+    if (x->a2 != NULL) \
     { \
-        x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
-        for (i=0; i<x->n2; i++) \
-            decode_##ta2(pptr, &(x)->a2[i]); \
+        x->a2 = decode_malloc(strlen(x->a2) * sizeof(*x->a2)); \
+        decode_##ta2(pptr, &x->a2); \
     } \
     else \
         x->a2 = NULL; \
-    align8(pptr); \
     decode_##t3(pptr, &x->x3); \
     decode_##tn3(pptr, &x->n3); \
     if (x->n3 != 0) \
