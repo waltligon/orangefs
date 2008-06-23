@@ -79,11 +79,6 @@ static inline int PINT_get_object_ref_##req_name(                        \
     return 0;                                                            \
 }
 
-enum PINT_server_req_access_type PINT_server_req_readonly(
-                                    struct PVFS_server_req *req);
-enum PINT_server_req_access_type PINT_server_req_modify(
-                                    struct PVFS_server_req *req);
-
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {
