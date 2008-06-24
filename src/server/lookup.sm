@@ -58,6 +58,7 @@ machine pvfs2_lookup_sm
     {
         run lookup_verify_object_metadata;
         LOOKUP_CHECK_DIR_ACLS => read_directory_acls;
+        success => read_directory_entry_handle;
         default => setup_resp;
     }
 
@@ -262,6 +263,7 @@ static PINT_sm_action lookup_verify_object_metadata(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
     PVFS_object_attr *a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
@@ -327,8 +329,37 @@ static PINT_sm_action lookup_verify_object_metadata(
 	return SM_ACTION_COMPLETE;
     }
 
-    /* move on to checking permissions, start with ACL */
-    js_p->error_code = LOOKUP_CHECK_DIR_ACLS;
+    /* if we reach this point, the object is a directory.  Verify that we
+     * have execute permission on the directory before continuing traversal
+     */
+    js_p->error_code = PINT_check_mode(a_p, s_op->req->credentials.uid,
+        s_op->req->credentials.gid, PINT_ACCESS_EXECUTABLE);
+    if(js_p->error_code != 0)
+    {
+        /* doesn't look like we have permission to traverse directory; bail
+         * out
+         */
+        js_p->error_code = LOOKUP_CHECK_DIR_ACLS;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* find the segment that we should look up in the directory */
+    ret = PINT_string_next_segment(
+        s_op->req->u.lookup_path.path, &s_op->u.lookup.segp,
+        &s_op->u.lookup.segstate);
+
+    if(ret != 0)
+    {
+        gossip_err("PINT_string_next_segment failed: path: %s\n",
+                   s_op->req->u.lookup_path.path);
+    }
+    assert(ret == 0);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a directory; will be "
+                 "looking for handle for segment \"%s\" in a bit\n",
+		 s_op->u.lookup.segp);
+
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -389,8 +420,7 @@ static PINT_sm_action lookup_check_acls_if_needed(
 /*
  * Verify if the completed keyval DB operation allows the lookup
  * to proceed or not. i.e. executable privileges on directory
- * for the requesting user or not.  Falls back to file permissions
- * if ACL is invalid or missing.
+ * for the requesting user or not.
  */
 static PINT_sm_action lookup_check_acls(
     struct PINT_smcb *smcb, job_status_s* js_p)
@@ -398,17 +428,6 @@ static PINT_sm_action lookup_check_acls(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *obj_attr = NULL;
     int want = PVFS2_ACL_EXECUTE;
-    PVFS_object_attr *a_p = NULL;
-
-    if (s_op->u.lookup.seg_nr == 0)
-    {
-        a_p = &s_op->attr;
-    }
-    else
-    {
-        a_p = &s_op->resp.u.lookup_path.attr_array[
-            s_op->u.lookup.seg_nr - 1];
-    }
 
     /* The dspace attr must have been read at this point */
     obj_attr = s_op->target_object_attr;
@@ -446,19 +465,6 @@ static PINT_sm_action lookup_check_acls(
                          "object is a directory; will be "
                          "looking for handle for segment \"%s\" in a bit\n",
                          s_op->u.lookup.segp);
-        }
-    }
-    /* if lookup fails because of missing ACL, check normal permissions */
-    else if (js_p->error_code == -PVFS_EIO) 
-    {
-        js_p->error_code = PINT_check_mode(a_p, s_op->req->credentials.uid,
-            s_op->req->credentials.gid, PINT_ACCESS_EXECUTABLE);
-        if(js_p->error_code != 0)
-        {
-            /* doesn't look like we have permission to traverse directory; bail
-             * out
-             */
-            js_p->error_code = -PVFS_EACCES;
         }
     }
 cleanup:
