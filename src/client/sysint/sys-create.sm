@@ -888,9 +888,6 @@ static int create_delete_handles_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-/* TODO: retest this function with new msgpair changes; especially with
- * valgrind
- */
 /* delete the newly created meta and data handles */
 static PINT_sm_action create_delete_handles_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
