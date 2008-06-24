@@ -161,15 +161,16 @@ static PINT_sm_action setup_batch_create_fn(
         s_op->u.precreate_pool_refiller.host,
         llu(s_op->u.precreate_pool_refiller.pool_handle));
 
-    PINT_init_msgpair(s_op, msg_p);
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
 
     /* note: we are acting like a client in this case, so use client timeout
      * and delay values
      */
-    s_op->msgarray_params.job_timeout = user_opts->client_job_bmi_timeout;
-    s_op->msgarray_params.retry_delay = user_opts->client_retry_delay_ms;
-    s_op->msgarray_params.retry_limit = user_opts->client_retry_limit;
-    s_op->msgarray_params.quiet_flag = 1;
+    s_op->msgarray_op.params.job_timeout = user_opts->client_job_bmi_timeout;
+    s_op->msgarray_op.params.retry_delay = user_opts->client_retry_delay_ms;
+    s_op->msgarray_op.params.retry_limit = user_opts->client_retry_limit;
+    s_op->msgarray_op.params.quiet_flag = 1;
 
     msg_p->svr_addr = s_op->u.precreate_pool_refiller.host_addr;
     PINT_util_gen_credentials(&creds);
@@ -187,6 +188,7 @@ static PINT_sm_action setup_batch_create_fn(
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = batch_create_comp_fn;
 
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     js_p->error_code = 0;
     return(SM_ACTION_COMPLETE);
 }
@@ -255,7 +257,7 @@ static int batch_create_comp_fn(void *v_p,
                                  int index)
 {
     PINT_smcb *smcb = v_p;
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     int i;
     
     gossip_debug(GOSSIP_SERVER_DEBUG, "batch_create_comp_fn\n");

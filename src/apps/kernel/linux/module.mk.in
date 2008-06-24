@@ -1,5 +1,7 @@
 DIR := src/apps/kernel/linux
 
+PVFS2_SEGV_BACKTRACE = @PVFS2_SEGV_BACKTRACE@
+
 KERNAPPSRC += \
 	$(DIR)/pvfs2-client.c 
 
@@ -17,6 +19,10 @@ endif
 # get kernel interface defines, and sysint client.h
 MODCFLAGS_$(DIR)/pvfs2-client-core.c = \
   -I$(srcdir)/src/kernel/linux-2.6
+
+ifdef PVFS2_SEGV_BACKTRACE
+	MODCFLAGS_$(DIR)/pvfs2-client-core.c += -D__PVFS2_SEGV_BACKTRACE__
+endif
 
 # explicitly uses pthreads both threaded and not-threaded versions, even if
 # threading is turned off in the rest of libpvfs

@@ -459,6 +459,8 @@ typedef struct
     struct super_block *sb;
     int    mount_pending;
     struct list_head list;
+    atomic_t pvfs2_inode_alloc_count;
+    atomic_t pvfs2_inode_dealloc_count;
 } pvfs2_sb_info_t;
 
 /** a temporary structure used only for sb mount time that groups the
@@ -568,7 +570,8 @@ typedef struct
     struct kiocb *kiocb; /* pointer to the kiocb that kicked this operation */
     int buffer_index; /* buffer index that was used for the I/O */
     pvfs2_kernel_op_t *op; /* pvfs2 kernel operation type */
-    char __user *buffer; /* The user space buffer to which I/O is being staged */
+    struct iovec *iov; /* The user space buffers from/to which I/O is being staged */
+    unsigned long nr_segs; /* number of elements in the iovector */
     int   rw; /* set to indicate the type of the operation */
     loff_t offset; /* file offset */
     size_t bytes_to_be_copied; /* and the count in bytes */
@@ -1225,17 +1228,29 @@ static inline int dcache_dir_close(struct inode *inode, struct file *file)
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
+#ifdef HAVE_I_SEM_IN_STRUCT_INODE
+#define pvfs2_inode_lock(__i) do \
+{ down(&(__i)->i_sem); } while (0)
+#define pvfs2_inode_unlock(__i) do \
+{ up(&(__i)->i_sem); } while (0)
+#else
+#define pvfs2_inode_lock(__i) do \
+{ mutex_lock(&(__i)->i_mutex); } while (0)
+#define pvfs2_inode_unlock(__i) do \
+{ mutex_unlock(&(__i)->i_mutex); } while (0)
+#endif /* HAVE_I_SEM_IN_STRUCT_INODE */
+
 static inline void pvfs2_i_size_write(struct inode *inode, loff_t i_size)
 {
 #ifndef HAVE_I_SIZE_WRITE
     inode->i_size = i_size;
 #else
     #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
-    mutex_lock(&inode->i_mutex);
+    pvfs2_inode_lock(inode);
     #endif
     i_size_write(inode, i_size);
     #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
-    mutex_unlock(&inode->i_mutex);
+    pvfs2_inode_unlock(inode);
     #endif
 #endif
     return;

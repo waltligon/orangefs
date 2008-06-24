@@ -266,7 +266,7 @@ PVFS_error PVFS_isys_rename(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, old_parent_ref.fs_id);
+    PINT_init_msgarray_params(sm_p, old_parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     /*
       this state machine has several hardcoded 2's around because
@@ -366,7 +366,7 @@ static int rename_lookups_comp_fn(
     int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_lookups_comp_fn\n");
 
@@ -427,7 +427,7 @@ static int rename_lookups_comp_fn(
         /* set fs_id and handle for getattr nested sm */
         sm_p->object_ref = sm_p->u.rename.refns[0];
 
-        if(sm_p->msgarray[0].op_status == 0)
+        if(sm_p->msgarray_op.msgarray[0].op_status == 0)
         {
             PINT_SM_GETATTR_STATE_FILL(
                 sm_p->getattr,
@@ -442,7 +442,7 @@ static int rename_lookups_comp_fn(
         else
         {
             /* if the first one failed, maintain its error code */
-            return(sm_p->msgarray[0].op_status);
+            return(sm_p->msgarray_op.msgarray[0].op_status);
         }
     }
     return 0;
@@ -464,7 +464,7 @@ static int rename_rmdirent_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p __attribute__((unused)) =
-        PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_rmdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT);
@@ -488,7 +488,7 @@ static int rename_chdirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_chdirent_comp_fn\n");
 
@@ -517,22 +517,20 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
+    PINT_sm_msgpair_state *msg_p;
 
     js_p->error_code = 0;
 
-    sm_p->msgarray_count = 2;
-    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        sm_p->msgarray_count * sizeof(PINT_sm_msgpair_state));
-    if (sm_p->msgarray == NULL)
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, 2);
+    if(ret != 0)
     {
-        gossip_err("rename: failed to allocate msgarray\n"); 
-        return -PVFS_ENOMEM;
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
     /* prepare to post the lookup send/recv pairs */
-    for(i = 0; i < 2; i++)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "rename: posting lookup[%d] (%lld,%d)\n",
@@ -563,6 +561,8 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
             break;
         }
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -570,11 +570,7 @@ static PINT_sm_action rename_lookups_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if (sm_p->msgarray)
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -589,8 +585,9 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting crdirent req\n");
 
-    assert(sm_p->msgarray);
-    PINT_init_msgpair(sm_p, msg_p);
+    assert(sm_p->msgarray_op.msgarray);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     /*
       hook the 'old' handle up to the new parent with the 'new_entry'
@@ -618,6 +615,8 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -632,7 +631,8 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting rmdirent req\n");
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     /*
       in the normal case, the state machine will lead us here and we
@@ -666,8 +666,10 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
+       js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -764,7 +766,8 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting chdirent req\n");
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     /*
       here, we're exhanging the existing dirent under the 'new' parent
@@ -792,6 +795,8 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -858,12 +863,7 @@ static PINT_sm_action rename_cleanup(
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
-    {
-	free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
-
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }
@@ -876,7 +876,7 @@ static PINT_sm_action rename_generic_timer(
     job_id_t tmp_id;
 
     ret = job_req_sched_post_timer(
-	sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
+	sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
         pint_client_sm_context);
 
     return ret;
@@ -889,7 +889,7 @@ static PINT_sm_action rename_crdirent_retry_or_fail(
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.rename.retry_count < sm_p->msgarray_params.retry_limit))
+	(sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
 	sm_p->u.rename.retry_count++;
 	js_p->error_code = RENAME_CRDIRENT_RETRY;
@@ -918,7 +918,7 @@ static PINT_sm_action rename_rmdirent_retry_or_fail(
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.rename.retry_count < sm_p->msgarray_params.retry_limit))
+	(sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
 	sm_p->u.rename.retry_count++;
 	js_p->error_code = RENAME_RMDIRENT_RETRY;

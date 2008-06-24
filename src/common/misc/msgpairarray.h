@@ -22,6 +22,8 @@ extern struct PINT_state_machine_s pvfs2_msgpairarray_sm;
 #define PVFS_MSGPAIR_RETRY          0xFE
 #define PVFS_MSGPAIR_NO_RETRY       0xFF
 
+#define PINT_MSGPAIR_PARENT_SM -1
+
 /*
  * This structure holds everything that we need for the state of a
  * message pair.  We need arrays of these in some cases, so it's
@@ -77,7 +79,7 @@ typedef struct PINT_sm_msgpair_state_s
 } PINT_sm_msgpair_state;
 
 /* used to pass in parameters that apply to every entry in a msgpair array */
-typedef struct PINT_sm_msgpair_params_s
+typedef struct
 {   
     int job_timeout;
     int retry_delay;
@@ -90,14 +92,40 @@ typedef struct PINT_sm_msgpair_params_s
 
 } PINT_sm_msgpair_params;
 
+typedef struct
+{
+    PINT_sm_msgpair_params params;
+    int count;
+    PINT_sm_msgpair_state *msgarray;
+    PINT_sm_msgpair_state msgpair;
+} PINT_sm_msgarray_op;
+
+#define PINT_msgpair_init(op)                                     \
+    do {                                                          \
+        memset(&(op)->msgpair, 0, sizeof(PINT_sm_msgpair_state)); \
+        if((op)->msgarray != &(op)->msgpair)                      \
+        {                                                         \
+            free((op)->msgarray);                                 \
+            (op)->msgarray = NULL;                                \
+        }                                                         \
+        (op)->count = 1;                                          \
+        (op)->msgarray = &(op)->msgpair;                          \
+    } while(0)
+
+#define foreach_msgpair(__msgarray_op, __msg_p, __i)          \
+    for(__i = 0, __msg_p = &((__msgarray_op)->msgarray[__i]); \
+        __i < (__msgarray_op)->count;                         \
+        ++__i, __msg_p = &((__msgarray_op)->msgarray[__i]))
 
 /* helper functions */
 
 int PINT_msgpairarray_init(
-    PINT_sm_msgpair_state ** msgpairarray,
+    PINT_sm_msgarray_op *op,
     int count);
 
-void PINT_msgpairarray_destroy(PINT_sm_msgpair_state * msgpairarray);
+void PINT_msgpairarray_destroy(PINT_sm_msgarray_op *op);
+
+int PINT_msgarray_status(PINT_sm_msgarray_op *op);
 
 int PINT_serv_decode_resp(
     PVFS_fs_id fs_id,
@@ -114,9 +142,7 @@ int PINT_serv_free_msgpair_resources(
     PVFS_BMI_addr_t *svr_addr_p,
     int max_resp_sz);
 
-int PINT_serv_msgpairarray_resolve_addrs(
-    int count, 
-    PINT_sm_msgpair_state* msgarray);
+int PINT_serv_msgpairarray_resolve_addrs(PINT_sm_msgarray_op *op);
 
 #define PRINT_ENCODING_ERROR(type_str, type)                        \
 do {                                                                \

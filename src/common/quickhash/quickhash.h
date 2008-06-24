@@ -326,7 +326,7 @@ static inline int quickhash_64bit_hash(void *k, int table_size)
 static inline int quickhash_string_hash(void *k, int table_size)
 {
     const char *str = (char *)k;
-    uint32_t h, g;
+    uint32_t g, h = 0;
 
     while(*str)
     {

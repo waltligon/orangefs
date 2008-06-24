@@ -141,7 +141,7 @@ PVFS_error PVFS_isys_truncate(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.truncate.size = size;
     sm_p->object_ref = ref;
@@ -217,13 +217,11 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
         return 1;
     }
 
-    sm_p->msgarray_count = attr->u.meta.dfile_count;
-
-    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        sm_p->msgarray_count * sizeof(PINT_sm_msgpair_state));
-    if (!sm_p->msgarray)
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, attr->u.meta.dfile_count);
+    if(ret != 0)
     {
-        js_p->error_code = -PVFS_ENOMEM;
+        gossip_err("Failed to initialize %d msgpairs\n", attr->u.meta.dfile_count);
+        js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
 
@@ -234,10 +232,8 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     file_data.extend_flag = 1;
 
     /* Construct truncate messages */
-    for (i = 0; i < attr->u.meta.dfile_count; i++)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        msg_p = &sm_p->msgarray[i];
-
         file_data.server_nr = i;
         new_dfile_size = 
             attr->u.meta.dist->methods->logical_to_physical_offset(
@@ -267,14 +263,15 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     }
 
     sm_p->getattr.size = sm_p->u.truncate.size;
-    ret = PINT_serv_msgpairarray_resolve_addrs(
-        sm_p->msgarray_count, sm_p->msgarray);
+    ret = PINT_serv_msgpairarray_resolve_addrs(&sm_p->msgarray_op);
 
     if (ret)
     {
         gossip_err("Error: failed to resolve server addresses.\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -290,11 +287,7 @@ static PINT_sm_action truncate_cleanup(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code = js_p->error_code;
 
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     if(sm_p->error_code == 0)
     {
@@ -393,37 +386,40 @@ static PINT_sm_action truncate_unstuff_setup_msgpair(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     js_p->error_code = 0;
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     /* note that unstuff must request the same attr mask that we requested
      * earlier.  If the file has already been unstuffed then we need an 
      * updated authoritative copy of all of the attrs relevant to I/O.
      */
     PINT_SERVREQ_UNSTUFF_FILL(
-            sm_p->msgpair.req,
+            msg_p->req,
             (*sm_p->cred_p),
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);
 
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
-    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle = sm_p->object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
-    sm_p->msgpair.comp_fn = unstuff_comp_fn;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = unstuff_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-            &sm_p->msgpair.svr_addr,
-            sm_p->msgpair.handle,
-            sm_p->msgpair.fs_id);
+            &msg_p->svr_addr,
+            msg_p->handle,
+            msg_p->fs_id);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
 
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -437,7 +433,7 @@ static int unstuff_comp_fn(
     int i)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"unstuff completion fn: unstuff_comp_fn\n");

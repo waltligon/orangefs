@@ -38,6 +38,9 @@ static char s_client_core_path[PATH_MAX];
 
 #define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
 
+#define CLIENT_RESTART_INTERVAL_SECS 10
+#define CLIENT_MAX_RESTARTS 10
+
 typedef struct
 {
     int verbose;
@@ -172,6 +175,10 @@ static int monitor_pvfs2_client(options_t *opts)
     int dev_init_failures = 0;
     char* arg_list[128] = {NULL};
     int arg_index;
+    int restart_count = 0;
+    struct timeval last_restart, now;
+
+    gettimeofday(&last_restart, NULL);
 
     assert(opts);
 
@@ -239,6 +246,7 @@ static int monitor_pvfs2_client(options_t *opts)
                         break;
                     }
                     core_pid = -1;
+                    sleep(1);
                     continue;
                 }
 
@@ -266,22 +274,56 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 dev_init_failures = 0;
 
-                if (opts->verbose)
+                if(!strcmp(opts->logtype, "file"))
                 {
-                    printf("Child process with pid %d was killed by an "
-                           "uncaught signal %d\n", core_pid,
-                           WTERMSIG(ret));
+                    gossip_enable_file(opts->logfile, "a");
                 }
+                else if(!strcmp(opts->logtype, "syslog"))
+                {
+                    gossip_enable_syslog(LOG_INFO);
+                }
+                else
+                {
+                    gossip_enable_stderr();
+                }
+
+                gossip_err("Child process with pid %d was killed by an "
+                           "uncaught signal %d\n", core_pid, WTERMSIG(ret));
                 core_pid = -1;
+
+                gettimeofday(&now, NULL);
+
+                if(((now.tv_sec + now.tv_usec*1e-6) -
+                    (last_restart.tv_sec + last_restart.tv_usec*1e-6))
+                   < CLIENT_RESTART_INTERVAL_SECS)
+                {
+                    if(restart_count > CLIENT_MAX_RESTARTS)
+                    {
+                        gossip_err("Chld process is restarting too quickly "
+                                   "(within %d secs) after %d attempts! "
+                                   "Aborting the client.\n",
+                                   CLIENT_RESTART_INTERVAL_SECS, restart_count);
+                        exit(1);
+                    }
+                }
+                else
+                {
+                    /* reset restart count */
+                    restart_count = 0;
+                }
+
+                gossip_disable();
+
+                last_restart = now;
                 continue;
             }
         }
         else
         {
-            sleep(1);
-
             arg_list[0] = PVFS2_CLIENT_CORE_NAME;
             arg_index = 1;
+
+            arg_list[arg_index++] = "--child";
             arg_list[arg_index++] = "-a";
             arg_list[arg_index++] = opts->acache_timeout;
             arg_list[arg_index++] = "-n";

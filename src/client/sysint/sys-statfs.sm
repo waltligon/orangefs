@@ -113,7 +113,7 @@ PVFS_error PVFS_isys_statfs(
 	return ret;
     }
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, fs_id);
+    PINT_init_msgarray_params(sm_p, fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.statfs_list.fs_id = fs_id;
     sm_p->u.statfs_list.details = NULL;
@@ -122,16 +122,11 @@ PVFS_error PVFS_isys_statfs(
     memset(sm_p->u.statfs_list.stat_array, 0,
            (sm_p->u.statfs_list.count * sizeof(struct PVFS_mgmt_server_stat)));
 
-    sm_p->msgarray_count = sm_p->u.statfs_list.count;
-    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        (sm_p->msgarray_count * sizeof(PINT_sm_msgpair_state)));
-    if (sm_p->msgarray == NULL)
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->u.statfs_list.count);
+    if(ret != 0)
     {
-        PVFS_util_release_credentials(sm_p->cred_p);
-        free(sm_p->u.statfs_list.addr_array);
-        free(sm_p->u.statfs_list.stat_array);
-        PINT_smcb_free(smcb);
-        return -PVFS_ENOMEM;
+        gossip_err("Failed to initialize %d msgpairs\n", sm_p->u.statfs_list.count);
+        return ret;
     }
 
     return PINT_client_state_machine_post(

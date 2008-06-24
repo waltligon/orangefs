@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-types.h"
@@ -95,8 +96,13 @@ PINT_dist *PINT_dist_create(const char *name)
 	      = (char *) new_dist + roundup8(sizeof(*new_dist));
 	    new_dist->params
 	      = (void *)(new_dist->dist_name + roundup8(new_dist->name_size));
+            /* after lookup there must be enough room to hold name */
+            assert(old_dist.name_size >= (strlen(old_dist.dist_name) + 1));
+            /* copy using length of string passed in by caller
+             * rather than rounded up name_size used for distribution packing
+             */
 	    memcpy(new_dist->dist_name, old_dist.dist_name,
-	      old_dist.name_size);
+	      (strlen(old_dist.dist_name) + 1));
 	    memcpy(new_dist->params, old_dist.params, old_dist.param_size);
 	    /* leave methods pointing to same static functions */
 	}

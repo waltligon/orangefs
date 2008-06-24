@@ -24,12 +24,13 @@ then
 fi
 
 # put mcast information in the middle (ordering is important)
-echo "logfacility user" > ${OUTDIR}/ha.cf
+echo "use_logd yes" > ${OUTDIR}/ha.cf
 echo "mcast eth0 ${MCAST} 3335 1 0" >> ${OUTDIR}/ha.cf
-echo "auto_failback off" >> ${OUTDIR}/ha.cf
-echo "use_logd no" >> ${OUTDIR}/ha.cf
-echo "respawn hacluster /usr/lib/heartbeat/cibmon -d" >> ${OUTDIR}/ha.cf
+echo "auto_failback yes" >> ${OUTDIR}/ha.cf
 echo "crm yes" >> ${OUTDIR}/ha.cf
+echo "keepalive 1" >> ${OUTDIR}/ha.cf
+echo "deadtime 10" >> ${OUTDIR}/ha.cf
+echo "initdead 80" >> ${OUTDIR}/ha.cf
 echo "compression bz2" >> ${OUTDIR}/ha.cf
 
 # shift arguments down

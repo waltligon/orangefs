@@ -896,6 +896,9 @@ static const configoption_t options[] =
     /* This option specifies the method used for trove.  Currently the
      * dbpf method is the default.  Other methods include 'alt-aio'.
      *
+     * The null-aio method is an implementation that does no disk I/O at all
+     * and is only useful for development or debugging purposes.
+     *
      * Note that this option can be specified in either the <a href="#Defaults">
      * Defaults</a> context of the main fs.conf, or in a filesystem specific 
      * <a href="#StorageHints">StorageHints</a>
@@ -2675,6 +2678,10 @@ DOTCONF_CB(get_trove_method)
     else if(!strcmp(cmd->data.str, "alt-aio"))
     {
         *method = TROVE_METHOD_DBPF_ALTAIO;
+    }
+    else if(!strcmp(cmd->data.str, "null-aio"))
+    {
+        *method = TROVE_METHOD_DBPF_NULLAIO;
     }
     else
     {

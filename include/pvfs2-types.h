@@ -476,6 +476,7 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_EVENT_MASKS = 6, /* API masks for event logging */
     PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
     PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
+    PVFS_SERV_PARAM_DROP_CACHES = 9, /* ask server's OS to drop disk caches */
 };
 
 enum PVFS_server_mode

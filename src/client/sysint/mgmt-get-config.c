@@ -61,7 +61,7 @@ int PVFS_mgmt_get_config(
 
     sm_p->u.get_config.persist_config_buffers = 1;
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, *fsid);
+    PINT_init_msgarray_params(sm_p, *fsid);
 
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
 
@@ -82,12 +82,11 @@ int PVFS_mgmt_get_config(
     mntent.pvfs_fs_name = cur_fs->file_system_name;
     sm_p->u.get_config.config = config;
 
-    sm_p->msgpair.enc_type = cur_fs->encoding;
+    sm_p->msgarray_op.msgpair.enc_type = cur_fs->encoding;
 
     sm_p->u.get_config.mntent = &mntent;
 
-    sm_p->msgarray_count = 1;
-    sm_p->msgarray = &(sm_p->msgpair);
+    PINT_msgpair_init(&sm_p->msgarray_op);
 
     ret = PINT_client_state_machine_post(
         smcb, &op_id, NULL);

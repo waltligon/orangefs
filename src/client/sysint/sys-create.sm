@@ -187,7 +187,7 @@ PVFS_error PVFS_isys_create(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
+    PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.create.object_name = object_name;
     sm_p->u.create.create_resp = resp;
@@ -361,7 +361,7 @@ static PINT_sm_action create_init(
         js_p->error_code = 0;
 
         return job_req_sched_post_timer(
-            sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
+            sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
 
@@ -380,8 +380,8 @@ static int create_comp_fn(void *v_p,
                                   int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_create_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_CREATE);
@@ -441,7 +441,8 @@ static PINT_sm_action create_create_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     ret = PINT_cached_config_get_next_meta(
         sm_p->object_ref.fs_id, &msg_p->svr_addr, &meta_handle_extent_array);
@@ -474,13 +475,13 @@ static PINT_sm_action create_create_setup_msgpair(
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = create_comp_fn;
-
     msg_p->req.u.create.attr.u.meta.dfile_count = 0;
     msg_p->req.u.create.attr.u.meta.dist =
         sm_p->u.create.dist;
     msg_p->req.u.create.attr.u.meta.dist_size =
         PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
 
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -503,7 +504,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(
                  llu(sm_p->object_ref.handle), sm_p->u.create.object_name,
                  llu(sm_p->u.create.metafile_handle));
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
@@ -527,6 +529,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -620,7 +624,7 @@ static PINT_sm_action create_cleanup(
         }
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
-             (sm_p->u.create.retry_count < sm_p->msgarray_params.retry_limit))
+             (sm_p->u.create.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
         sm_p->u.create.stored_error_code = 0;
         sm_p->u.create.retry_count++;
@@ -644,11 +648,7 @@ static PINT_sm_action create_cleanup(
         free(sm_p->u.create.datafile_handles);
     }
 
-    if (sm_p->msgarray != &(sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
@@ -888,59 +888,41 @@ static int create_delete_handles_comp_fn(void *v_p,
     return resp_p->status;
 }
 
+/* TODO: retest this function with new msgpair changes; especially with
+ * valgrind
+ */
 /* delete the newly created meta and data handles */
 static PINT_sm_action create_delete_handles_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
-    PVFS_BMI_addr_t metafile_server_addr;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "delete_handles_setup_msgpair_array\n");
 
     js_p->error_code = 0;
 
-    memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
-
-    ret = PINT_cached_config_map_to_server(
-        &metafile_server_addr, sm_p->u.create.metafile_handle,
-        sm_p->object_ref.fs_id);
-    if (ret)
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, (sm_p->u.create.datafile_count+1));
+    if(ret != 0)
     {
-        gossip_err("Failed to map meta server address\n");
+        gossip_err("Failed to initialize %d msgpairs\n", (sm_p->u.create.datafile_count+1));
         js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
+        return(SM_ACTION_COMPLETE);
     }
-
-    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
-    {
-        free(sm_p->msgarray);
-    }
-    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        ((sm_p->u.create.datafile_count+1) * sizeof(PINT_sm_msgpair_state)));
-
-    if (sm_p->msgarray == NULL)
-    {
-        gossip_err("create: failed to allocate msgarray\n"); 
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    sm_p->msgarray_count = (sm_p->u.create.datafile_count+1);
 
     /*
       for the metafile and each datafile, prepare to post a remove
       send/recv pair
     */
-    for(i = 0; i < sm_p->msgarray_count; i++)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
-
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "create: posting data file remove req %d\n",i);
 
         /* arbitrarily handle deletion of the metafile last */
-        if (i == (sm_p->msgarray_count - 1))
+        if (i == sm_p->u.create.datafile_count)
         {
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
@@ -952,7 +934,6 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             msg_p->handle = sm_p->u.create.metafile_handle;
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
-            msg_p->svr_addr = metafile_server_addr;
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
                          "metafile handle %llu\n", llu(msg_p->handle));
@@ -969,19 +950,19 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             msg_p->handle = sm_p->u.create.datafile_handles[i];
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
-            ret = PINT_cached_config_map_to_server(
-                &msg_p->svr_addr, sm_p->u.create.datafile_handles[i],
-                sm_p->object_ref.fs_id);
-            if (ret)
-            {
-                gossip_err("Failed to map data server address\n");
-                js_p->error_code = ret;
-                return SM_ACTION_COMPLETE;
-            }
+
             gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
                          "datafile handle %llu\n", llu(msg_p->handle));
         }
     }
+    ret = PINT_serv_msgpairarray_resolve_addrs(&sm_p->msgarray_op);
+    if(ret)
+    {
+        gossip_err("Error: failed to resolve server addresses.\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 

@@ -319,7 +319,7 @@ PVFS_error PVFS_isys_io(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.io.io_type = io_type;
     sm_p->u.io.file_req = file_req;
@@ -331,7 +331,8 @@ PVFS_error PVFS_isys_io(
     sm_p->u.io.encoding = cur_fs->encoding;
     sm_p->u.io.stored_error_code = 0;
     sm_p->u.io.retry_count = 0;
-    sm_p->msgarray = NULL;
+    sm_p->msgarray_op.msgarray = NULL;
+    sm_p->msgarray_op.count = 0;
     sm_p->u.io.datafile_index_array = NULL;
     sm_p->u.io.datafile_count = 0;
     sm_p->u.io.total_size = 0;
@@ -426,7 +427,7 @@ static PINT_sm_action io_init(
         }
         gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying with delay.\n");
         return job_req_sched_post_timer(
-            sm_p->msgarray_params.retry_delay, smcb, 0, js_p, &tmp_id,
+            sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
     return SM_ACTION_COMPLETE;
@@ -462,37 +463,40 @@ static PINT_sm_action io_unstuff_setup_msgpair(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     js_p->error_code = 0;
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     /* note that unstuff must request the same attr mask that we requested
      * earlier.  If the file has already been unstuffed then we need an 
      * updated authoritative copy of all of the attrs relevant to I/O.
      */
     PINT_SERVREQ_UNSTUFF_FILL(
-            sm_p->msgpair.req,
+            msg_p->req,
             (*sm_p->cred_p),
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             IO_ATTR_MASKS);
 
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
-    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle = sm_p->object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
-    sm_p->msgpair.comp_fn = unstuff_comp_fn;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = unstuff_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-            &sm_p->msgpair.svr_addr,
-            sm_p->msgpair.handle,
-            sm_p->msgpair.fs_id);
+            &msg_p->svr_addr,
+            msg_p->handle,
+            msg_p->fs_id);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
 
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -933,17 +937,17 @@ io_datafile_post_msgpairs_retry(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* give up if beyond retry limit */
     ++sm_p->u.io.retry_count;
-    if (sm_p->u.io.retry_count > sm_p->msgarray_params.retry_limit) {
+    if (sm_p->u.io.retry_count > sm_p->msgarray_op.params.retry_limit) {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d exceeds limit %d\n",
-          __func__, sm_p->u.io.retry_count, sm_p->msgarray_params.retry_delay);
+          __func__, sm_p->u.io.retry_count, sm_p->msgarray_op.params.retry_delay);
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
         return SM_ACTION_COMPLETE;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d, wait %d ms\n", __func__,
-      sm_p->u.io.retry_count, sm_p->msgarray_params.retry_delay);
+      sm_p->u.io.retry_count, sm_p->msgarray_op.params.retry_delay);
 
-    return job_req_sched_post_timer(sm_p->msgarray_params.retry_delay,
+    return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
         smcb, 0, js_p, NULL, pint_client_sm_context);
 }
 
@@ -1145,7 +1149,7 @@ static PINT_sm_action io_datafile_complete_operations(
                    "%s: flow failed, not retrying\n", __func__);
 
                 /* forcing the count high insures that the sm won't restart */
-                sm_p->u.io.retry_count = sm_p->msgarray_params.retry_limit;
+                sm_p->u.io.retry_count = sm_p->msgarray_op.params.retry_limit;
             }
         }
     }
@@ -1190,7 +1194,7 @@ static PINT_sm_action io_datafile_complete_operations(
                 /* bump up the retry count to prevent the state machine from
                  * restarting after this error propigates
                  */
-                sm_p->u.io.retry_count = sm_p->msgarray_params.retry_limit;
+                sm_p->u.io.retry_count = sm_p->msgarray_op.params.retry_limit;
             }
         }
     }
@@ -1353,7 +1357,7 @@ static PINT_sm_action io_analyze_results(
     if (((PVFS_ERROR_CLASS(-ret) == PVFS_ERROR_BMI) ||
          (PVFS_ERROR_CLASS(-ret) == PVFS_ERROR_FLOW) ||
          (ret == -ECONNRESET) || (ret == -PVFS_EPROTO)) &&
-        (sm_p->u.io.retry_count < sm_p->msgarray_params.retry_limit))
+        (sm_p->u.io.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
         assert(!PINT_smcb_cancelled(smcb));
 
@@ -2938,7 +2942,7 @@ static int unstuff_comp_fn(
     int i)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_IO_DEBUG,
 		"unstuff completion fn: unstuff_comp_fn\n");

@@ -85,7 +85,7 @@ PVFS_error PVFS_isys_geteattr_list(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.geteattr.nkey = nkey;
     sm_p->u.geteattr.key_array = key_array;
@@ -150,6 +150,7 @@ static PINT_sm_action get_eattr_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     int i;
+    PINT_sm_msgpair_state *msg_p;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"get_eattr state: get_eattr_setup_msgpair\n");
@@ -165,32 +166,35 @@ static PINT_sm_action get_eattr_setup_msgpair(
         sm_p->u.geteattr.size_array[i] =
             sm_p->u.geteattr.resp_p->val_array[i].buffer_sz;
 
-    PINT_SERVREQ_GETEATTR_FILL(
-            sm_p->msgpair.req,
-            (*sm_p->cred_p),
-            sm_p->object_ref.fs_id,
-            sm_p->object_ref.handle,
-            sm_p->u.geteattr.nkey,
-            sm_p->u.geteattr.key_array,
-            sm_p->u.geteattr.size_array);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
-    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle = sm_p->object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
-    sm_p->msgpair.comp_fn = get_eattr_comp_fn;
+    PINT_SERVREQ_GETEATTR_FILL(
+        msg_p->req,
+        (*sm_p->cred_p),
+        sm_p->object_ref.fs_id,
+        sm_p->object_ref.handle,
+        sm_p->u.geteattr.nkey,
+        sm_p->u.geteattr.key_array,
+        sm_p->u.geteattr.size_array);
+
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = get_eattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-            &sm_p->msgpair.svr_addr,
-            sm_p->msgpair.handle,
-            sm_p->msgpair.fs_id);
+            &msg_p->svr_addr,
+            msg_p->handle,
+            msg_p->fs_id);
 
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = 0;
     }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -221,7 +225,7 @@ static int get_eattr_comp_fn(
     int ret = 0;
     int decode_ret;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"get_eattr completion fn: get_eattr_comp_fn\n");
@@ -238,7 +242,7 @@ static int get_eattr_comp_fn(
      * val struct the user passed in
      */
 
-    if (sm_p->msgarray[i].op_status == 0)
+    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
     {
         int k, mink;
         mink = sm_p->u.geteattr.nkey;
@@ -305,19 +309,19 @@ static int get_eattr_comp_fn(
     }
     else
     {
-        ret = sm_p->msgarray[i].op_status;
+        ret = sm_p->msgarray_op.msgarray[i].op_status;
     }
 
     /* if this is the last response, check all of the status values
      * and return error code if any requests failed
      */
-    if (i == (sm_p->msgarray_count -1))
+    if (i == (sm_p->msgarray_op.count -1))
     {
-	for (j=0; j < sm_p->msgarray_count; j++)
+	for (j=0; j < sm_p->msgarray_op.count; j++)
 	{
-	    if (sm_p->msgarray[j].op_status != 0)
+	    if (sm_p->msgarray_op.msgarray[j].op_status != 0)
 	    {
-		return(sm_p->msgarray[j].op_status);
+		return(sm_p->msgarray_op.msgarray[j].op_status);
 	    }
 	}
     }
