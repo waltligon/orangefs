@@ -142,10 +142,11 @@ int PINT_handle_in_extent_list(
  * returns the 0 on success and fills in the specified count argument
  * with the extent count total.  returns -PVFS_error on error
  */
-int PINT_extent_array_count_total(
+uint64_t PINT_extent_array_count_total(
     PVFS_handle_extent_array *extent_array)
 {
-    int i, count = 0;
+    int i;
+    uint64_t count = 0;
 
     for(i = 0; i < extent_array->extent_count; ++i)
     {

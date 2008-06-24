@@ -22,7 +22,7 @@ int PINT_handle_in_extent_array(
 int PINT_handle_in_extent_list(
     PINT_llist *extent_list,
     PVFS_handle handle);
-int PINT_extent_array_count_total(
+uint64_t PINT_extent_array_count_total(
     PVFS_handle_extent_array *extent_array);
 void PINT_release_extent_list(
     PINT_llist *extent_list);

@@ -1233,7 +1233,7 @@ int PINT_cached_config_get_server_handle_count(
 
         server_mapping = PINT_cached_config_find_server(
             cur_config_cache->fs->data_handle_ranges, server_addr_str);
-        if(!server_mapping)
+        if(server_mapping)
         {
             *handle_count += PINT_extent_array_count_total(
                 &server_mapping->handle_extent_array);
