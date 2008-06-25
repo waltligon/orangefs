@@ -59,6 +59,9 @@ struct precreate_pool_desc
     int first_callback_flag;
     TROVE_keyval_s* key_array;
     PVFS_ds_flags flags;
+    PVFS_ds_position position;
+    PVFS_ds_position pool_index;
+    int count;
     
     PVFS_error error_code;
 };

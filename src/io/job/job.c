@@ -143,6 +143,9 @@ static void precreate_pool_get_thread_mgr_callback_unlocked(
 static void precreate_pool_fill_thread_mgr_callback(
     void* data, 
     PVFS_error error_code);
+static void precreate_pool_iterate_callback(
+    void* data, 
+    PVFS_error error_code);
 static void precreate_pool_get_handles_try_post(struct job_desc* jd);
 #endif
 
@@ -4659,6 +4662,51 @@ static void precreate_pool_get_thread_mgr_callback_unlocked(
 }
 
 
+/* precreate_pool_iterate_callback()
+ *
+ * callback function executed by the thread mgr when a trove iterate
+ * completes
+ *
+ * no return value
+ */
+static void precreate_pool_iterate_callback(
+    void* data, 
+    PVFS_error error_code)
+{    
+    struct job_desc* tmp_desc = (struct job_desc*)data; 
+
+    gen_mutex_lock(&initialized_mutex);
+    if(initialized == 0)
+    {
+        /* The job interface has been shutdown.  Silently ignore callback. */
+        gen_mutex_unlock(&initialized_mutex);
+        return;
+    }
+    gen_mutex_unlock(&initialized_mutex);
+
+    gen_mutex_lock(&completion_mutex);
+    if (tmp_desc->completed_flag == 0)
+    {
+        /* set job descriptor fields and put into completion queue */
+        tmp_desc->u.precreate_pool.error_code = error_code;
+        free(tmp_desc->u.precreate_pool.key_array);
+        job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+                       tmp_desc);
+        /* set completed flag while holding queue lock */
+        tmp_desc->completed_flag = 1;
+
+        trove_pending_count--;
+
+#ifdef __PVFS2_JOB_THREADED__
+        /* wake up anyone waiting for completion */
+        pthread_cond_signal(&completion_cond);
+#endif
+    }
+    gen_mutex_unlock(&completion_mutex);
+
+    return;
+}
+
 /* precreate_pool_get_thread_mgr_callback()
  *
  * callback function executed by the thread manager for precreate pool get
@@ -5146,6 +5194,9 @@ static void fill_status(struct job_desc *jd,
         break;
     case JOB_PRECREATE_POOL:
         status->error_code = jd->u.precreate_pool.error_code;
+        status->count = jd->u.precreate_pool.count;
+        status->position = jd->u.precreate_pool.pool_index << 32;
+        status->position |= jd->u.precreate_pool.position;
         break;
     }
 
@@ -5983,6 +6034,183 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
     }
     gen_mutex_unlock(&precreate_pool_mutex);
 }
+
+/* job_precreate_pool_iterate_handles()
+ * 
+ * similar to the trove iterate handles function, but returns all handles
+ * stored in the precreate pools, including the handles for the pool objects
+ * themselves.
+ */
+int job_precreate_pool_iterate_handles(
+    PVFS_fs_id fsid,
+    PVFS_ds_position position,
+    PVFS_handle* handle_array,
+    int count,
+    PVFS_ds_flags flags,
+    PVFS_vtag* vtag,
+    void* user_ptr,
+    job_aint status_user_tag,
+    job_status_s* out_status_p,
+    job_id_t* id,
+    job_context_id context_id)
+{
+    PVFS_ds_position local_position;
+    PVFS_ds_position pool_index;
+    struct qlist_head* iterator;
+    PVFS_ds_position tmp_index = 1;
+    struct precreate_pool* pool = NULL;
+    int ret;
+    struct job_desc *jd = NULL;
+    void* user_ptr_internal;
+    TROVE_op_id tmp_id;
+    int i;
+
+    /* low order bits are the trove iterate position */
+    local_position = position & 0xffffffff;
+    /* high order bits tell us which pool we are on */
+    pool_index = position >> 32;
+
+    /* we start indexing at one and reserve 0 for the special start and end
+     * values for the entire set of pools
+     */
+    if(pool_index == 0)
+    {
+        if(local_position == PVFS_ITERATE_START)
+        {
+            pool_index = 1;
+        }
+        else
+        {
+            gossip_err("Error: invalid position given to job_precreate_pool_iterate_handles().\n");
+            out_status_p->error_code = -PVFS_EINVAL;
+            return(1);
+        }
+    }
+
+    gen_mutex_lock(&precreate_pool_mutex);
+
+    qlist_for_each(iterator, &precreate_pool_list)
+    {
+        if(tmp_index == pool_index)
+        {
+            pool = qlist_entry(iterator, struct precreate_pool,
+                list_link);
+            break;
+        }
+        tmp_index++;
+    }
+
+    if(!pool)
+    {
+        /* we ran out of pools; iteration is done */
+        gen_mutex_unlock(&precreate_pool_mutex);
+        out_status_p->error_code = 0;
+        out_status_p->count = 0;
+        out_status_p->position = PVFS_ITERATE_END;
+        return(1);
+    }
+
+    if(local_position == PVFS_ITERATE_END)
+    {
+        /* we got all of the handles out of the pool */
+        /* pass back pool handle by itself and go to next pool */
+        handle_array[0] = pool->pool_handle;
+        /* skip to next pool */
+        pool_index++;
+        out_status_p->position = pool_index << 32;
+        out_status_p->position |= PVFS_ITERATE_START;
+        out_status_p->count = 1;
+        out_status_p->error_code = 0;
+        gen_mutex_unlock(&precreate_pool_mutex);
+        return(1);
+    }
+
+    /* get ready to post a job to trove to find handles */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+        gen_mutex_unlock(&precreate_pool_mutex);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    jd->u.precreate_pool.key_array = malloc(count * sizeof(*jd->u.precreate_pool.key_array));
+    if(!jd->u.precreate_pool.key_array)
+    {
+        gen_mutex_unlock(&precreate_pool_mutex);
+        dealloc_job_desc(jd);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    for(i=0; i< jd->u.precreate_pool.count; i++)
+    {
+        jd->u.precreate_pool.key_array[i].buffer = &handle_array[i];
+        jd->u.precreate_pool.key_array[i].buffer_sz = sizeof(handle_array[i]);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->u.precreate_pool.position = local_position;
+    jd->u.precreate_pool.count = count;
+    jd->u.precreate_pool.precreate_handle_array = handle_array;
+    jd->u.precreate_pool.pool_index = pool_index;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = precreate_pool_iterate_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, jd->job_id);
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_keyval_iterate_keys(fsid, pool->pool_handle,
+                               &(jd->u.precreate_pool.position), 
+                               jd->u.precreate_pool.key_array, 
+                               &(jd->u.precreate_pool.count), flags, NULL,
+                               user_ptr_internal, 
+                               global_trove_context, &tmp_id);
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0)
+    {
+        /* error posting trove operation */
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, 0, jd->job_id);
+        free(jd->u.precreate_pool.key_array);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        gen_mutex_unlock(&precreate_pool_mutex);
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->position = pool_index << 32;
+        out_status_p->position |= jd->u.precreate_pool.position;
+        out_status_p->count = jd->u.precreate_pool.count;
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, 0, jd->job_id);
+        free(jd->u.precreate_pool.key_array);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        gen_mutex_unlock(&precreate_pool_mutex);
+        return (ret);
+    }
+
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    *id = jd->job_id;
+    trove_pending_count++;
+    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS;
+    gen_mutex_unlock(&precreate_pool_mutex);
+
+    return (0);
+}
+
+
 
 #endif /* __PVFS2_TROVE_SUPPORT__ */
 
