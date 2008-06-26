@@ -45,6 +45,10 @@ enum
     CREATE_RETRY = 170
 };
 
+/* completion function prototypes */
+static int create_create_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+
 %%
 
 /* this machine launches the main machine below */
@@ -431,6 +435,10 @@ static PINT_sm_action create_file_parent_getattr_cleanup_and_inspect(
     int num_dfiles_requested_override = 0;
     PINT_dist *current_dist; 
     int ret = 0;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    char server_name[1024];
+    struct server_configuration_s *server_config =
+            get_server_config_struct();
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
         "create file state: parent_getattr_cleanup_and_inspect\n");
@@ -445,7 +453,7 @@ static PINT_sm_action create_file_parent_getattr_cleanup_and_inspect(
     memcpy(&sm_p->u.create_file.saved_parent_attr, &s_op->attr, sizeof(PVFS_object_attr));
 
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
-//    free(s_op);
+    free(s_op);
 
     js_p->error_code = error_code;
 
@@ -569,27 +577,46 @@ static PINT_sm_action create_file_parent_getattr_cleanup_and_inspect(
         }
 
         /* TODO: Determine whether the dspace should be created locally
-         * or remotely and setup up for the appropriate place. For now,
-         * just assume local. */
-       
-        /* Set up the frame for the nested create state machine */
-        js_p->error_code = LOCAL_OPERATION;
-        s_op = malloc(sizeof(struct PINT_server_op));
+         * or remotely and setup up for the appropriate place. */
+        PINT_cached_config_get_server_name(server_name, 1024, 
+            sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first, sm_p->object_ref.fs_id);
 
-        if(!s_op)
-        {
-            return -PVFS_ENOMEM;
+        if (! strcmp(server_config->host_id, server_name)) {
+            /* Set up the frame for the nested create state machine */
+            js_p->error_code = LOCAL_OPERATION;
+            s_op = malloc(sizeof(struct PINT_server_op));
+
+            if(!s_op)
+            {
+                return -PVFS_ENOMEM;
+            }
+            /* zero out all members */
+            memset(s_op, 0, sizeof(struct PINT_server_op));
+            s_op->op = PVFS_SERV_CREATE;
+            s_op->u.create.fs_id = sm_p->object_ref.fs_id;
+            s_op->u.create.handle_extent_array.extent_count = sm_p->u.create_file.meta_handle_extent_array.extent_count;
+            s_op->u.create.handle_extent_array.extent_array = sm_p->u.create_file.meta_handle_extent_array.extent_array;
+            s_op->u.create.object_type = PVFS_TYPE_METAFILE;
+            PINT_sm_push_frame(smcb, 0, s_op);
         }
-        /* zero out all members */
-        memset(s_op, 0, sizeof(struct PINT_server_op));
-        s_op->op = PVFS_SERV_CREATE;
-        s_op->u.create.fs_id = sm_p->object_ref.fs_id;
-        s_op->u.create.handle_extent_array = sm_p->u.create_file.meta_handle_extent_array;
-        s_op->u.create.object_type = PVFS_TYPE_METAFILE;
+        else {
+            /* Prepare to send a message for remote execution. */
+            js_p->error_code = REMOTE_OPERATION;
 
+            PINT_init_msgpair(sm_p, msg_p);
 
-        PINT_sm_push_frame(smcb, 0, s_op);
- 
+            PINT_SERVREQ_CREATE_FILL(
+                msg_p->req,
+                *sm_p->cred_p,
+                sm_p->object_ref.fs_id,
+                PVFS_TYPE_METAFILE,
+                sm_p->u.create_file.meta_handle_extent_array);
+
+            msg_p->fs_id = sm_p->object_ref.fs_id;
+            msg_p->handle = sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first;
+            msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+            msg_p->comp_fn = create_create_comp_fn;
+        }
     }
     
     return(SM_ACTION_COMPLETE);
@@ -612,7 +639,7 @@ static PINT_sm_action create_file_dspace_cleanup(
                  llu(sm_p->u.create_file.metafile_handle));
 
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
-//    free(s_op);
+    free(s_op);
     js_p->error_code = error_code;
  
     return SM_ACTION_COMPLETE;
@@ -783,7 +810,7 @@ static PINT_sm_action create_file_datafiles_local_cleanup_and_setattr_setup(
     js_p->error_code = error_code;
 
     if (error_code != 0) {
-//        free(s_op);
+        free(s_op);
     }
     else {
         /* TODO: Determine whether setattr is local or remote and set
@@ -833,7 +860,7 @@ static PINT_sm_action create_file_setattr_cleanup(
 
     assert(s_op);
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
-//    free(s_op);
+    free(s_op);
     js_p->error_code = error_code;
  
     return SM_ACTION_COMPLETE;
@@ -885,7 +912,7 @@ static PINT_sm_action create_file_crdirent_cleanup(
 
     assert(s_op);
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
-//    free(s_op);
+    free(s_op);
     js_p->error_code = 0;
  
     return SM_ACTION_COMPLETE;
@@ -975,6 +1002,32 @@ static PINT_sm_action create_file_work_cleanup(
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
+}
+
+static int create_create_comp_fn(void *v_p,
+                                 struct PVFS_server_resp *resp_p,
+                                 int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_create_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_CREATE);
+
+    if (resp_p->status != 0)
+    {
+        return resp_p->status;
+    }
+
+    /* otherwise, just stash the newly created meta handle */
+    sm_p->u.create.metafile_handle = resp_p->u.create.handle;
+
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %llu\n",
+        llu(sm_p->u.create.metafile_handle));
+
+    return 0;
 }
 
 
