@@ -12,7 +12,7 @@
  * open/create/resize, it is sometimes instructive to compare with independent
  * access
  *
- * usage:  -d /path/to/directory -n number_of_files [-O] [-R] [-i]
+ * usage:  -d /path/to/directory -n number_of_files [-O] [-R] [-S] [-i]
  */
 
 #include <string.h>
@@ -142,13 +142,16 @@ int opt_nfiles;
 char opt_basedir[PATH_MAX];
 int opt_do_open=0;
 int opt_do_resize=0;
+int opt_do_open_sep=0;
 int opt_do_indep=0;
+int ntasks;
 
 void usage(char *name);
 int parse_args(int argc, char **argv);
 void handle_error(int errcode, char *str);
 int test_opens(int nfiles, char * test_dir, MPI_Info info);
 int test_resize(int rank, int iterations, char * test_dir, MPI_Info info);
+int test_opens_sep(int rank, int nfiles, char * test_dir, MPI_Info info);
 
 void usage(char *name)
 {
@@ -156,6 +159,7 @@ void usage(char *name)
 	fprintf(stderr, "   where TEST is one of:\n"
 			"     -O       test file open times\n"
 			"     -R       test file resize times\n"
+		        "     -S       test file open with each client open different files\n"
 			"   and MODE is one of:\n"
 			"     -i       independent operations\n"
 			"     -c       collective operations (default)\n");
@@ -165,7 +169,7 @@ void usage(char *name)
 int parse_args(int argc, char **argv)
 {
 	int c;
-	while ( (c = getopt(argc, argv, "d:n:ORic")) != -1 ) {
+	while ( (c = getopt(argc, argv, "d:n:ORSic")) != -1 ) {
 		switch (c) {
 			case 'd':
 				strncpy(opt_basedir, optarg, PATH_MAX);
@@ -179,6 +183,12 @@ int parse_args(int argc, char **argv)
 			case 'R':
 				opt_do_resize = 1;
 				break;
+		        case 'S':
+			        MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
+				opt_nfiles = opt_nfiles / ntasks * ntasks;
+			        opt_do_open_sep = 1;
+				opt_do_indep = 1;
+				break;
 			case 'i':
 				opt_do_indep = 1;
 				break;
@@ -188,7 +198,7 @@ int parse_args(int argc, char **argv)
 				usage(argv[0]);
 		}
 	}
-	if ( (opt_do_open == 0) && (opt_do_resize == 0) ) {
+	if ( (opt_do_open + opt_do_resize + opt_do_open_sep) != 1) {
 		usage(argv[0]);
 	}
 	return 0;
@@ -225,6 +235,8 @@ int main(int argc, char **argv)
 		test_opens(opt_nfiles, opt_basedir, info);
 	else if (opt_do_resize)
 		test_resize(rank, opt_nfiles, opt_basedir, info);
+	else if (opt_do_open_sep)
+	        test_opens_sep(rank, opt_nfiles, opt_basedir, info);
 
 	test_end = MPI_Wtime();
 	test_time = test_end - test_start;
@@ -234,7 +246,7 @@ int main(int argc, char **argv)
 
 	if (rank == 0) {
 		printf("%d procs ", nprocs);
-		if (opt_do_open) {
+		if (opt_do_open || opt_do_open_sep) {
 			printf("%f seconds to open %d files: %f secs/open: %s\n", 
 				total_time, opt_nfiles, 
 				(total_time)/opt_nfiles, 
@@ -260,7 +272,7 @@ int test_opens(int nfiles, char * test_dir, MPI_Info info)
 	MPI_File fh;
 	MPI_Comm comm = MPI_COMM_WORLD;
 	int errcode;
-
+	
 	if (opt_do_indep) 
 		comm = MPI_COMM_SELF;
 
@@ -277,6 +289,34 @@ int test_opens(int nfiles, char * test_dir, MPI_Info info)
 		}
 
 	}
+	/* since handle_error aborts, if we got here we are a-ok */
+	return 0;
+}
+
+int test_opens_sep(int rank, int nfiles, char * test_dir, MPI_Info info)
+{
+	int i;
+	char test_file[PATH_MAX];
+	MPI_File fh;
+	MPI_Comm comm = MPI_COMM_WORLD;
+	int errcode;
+
+	if (opt_do_indep) 
+		comm = MPI_COMM_SELF;
+
+	for (i=0; i<nfiles/ntasks; i++) {
+		snprintf(test_file, PATH_MAX, "%s/testfile.%d.%d", test_dir, rank, i);
+		errcode = MPI_File_open(comm, test_file, 
+				MPI_MODE_CREATE|MPI_MODE_RDWR, info, &fh);
+		if (errcode != MPI_SUCCESS) {
+			handle_error(errcode, "MPI_File_open");
+		}
+		errcode = MPI_File_close(&fh);
+		if (errcode != MPI_SUCCESS) {
+			handle_error(errcode, "MPI_File_close");
+		}
+	}
+
 	/* since handle_error aborts, if we got here we are a-ok */
 	return 0;
 }

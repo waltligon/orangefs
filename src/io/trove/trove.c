@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "trove.h"
 #include "trove-internal.h"
@@ -1071,7 +1072,14 @@ int trove_collection_setinfo(
     }
     if(option == TROVE_DB_LOG_DIRECTORY)
     {
-	TROVE_db_log_directory = strdup((char *)parameter);
+        if(*(char *)parameter == NULL)
+        {
+	    TROVE_db_log_directory = NULL;
+	}
+	else
+	{
+	    TROVE_db_log_directory = strdup(*(char **)parameter);
+	}
 	return 0;
     }
     method_id = global_trove_method_callback(coll_id);

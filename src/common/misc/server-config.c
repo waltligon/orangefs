@@ -2662,14 +2662,7 @@ DOTCONF_CB(get_db_log_directory)
 	len = strlen(config_s->storage_path);
 	if(strncmp(cmd->data.str, "/", 1) == 0)
 	{/*absolute path for log directory*/
-	    if(strncmp(cmd->data.str, config_s->storage_path, len) == 0)
-	    {
-		config_s->db_log_directory = strdup(cmd->data.str);
-	    }
-	    else
-	    {
-		return "Error: DB log directory must be under the storage space.\n";
-	    }	    
+	    config_s->db_log_directory = strdup(cmd->data.str);
 	}
 	else
 	{/*relative path for log directory*/

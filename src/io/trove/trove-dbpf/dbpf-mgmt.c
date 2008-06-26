@@ -53,6 +53,15 @@ struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 static void unlink_db_cache_files(const char* path);
 
+static int dbpf_db_create(const char *sto_path, 
+                          char *dbname, 
+                          DB_ENV *envp, 
+                          uint32_t flags);
+static DB *dbpf_db_open(
+    const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
+    int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2), uint32_t flags);
+static int dbpf_mkpath(char *pathname, mode_t mode);
+
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
 
 static void dbpf_db_error_callback(
@@ -168,6 +177,12 @@ retry:
 	gossip_debug(GOSSIP_TROVE_DEBUG,
 		     "dbpf using log directory: %s\n",
 		     TROVE_db_log_directory);
+	ret = dbpf_mkpath(TROVE_db_log_directory, 0755);
+	if(ret != 0)
+	{
+	    gossip_err("Error: failed to make path for db log directory %s\n",
+		      TROVE_db_log_directory);
+	}
 	ret = dbenv->set_lg_dir(dbenv, TROVE_db_log_directory);
 	if(ret != 0)
 	{
@@ -343,16 +358,6 @@ int dbpf_putdb_env(DB_ENV *dbenv, const char *path)
     }
     return 0;
 }
-
-static int dbpf_db_create(const char *sto_path, 
-                          char *dbname, 
-                          DB_ENV *envp, 
-                          uint32_t flags);
-static DB *dbpf_db_open(
-    const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
-    int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2), uint32_t flags);
-static int dbpf_mkpath(char *pathname, mode_t mode);
-
 
 int dbpf_collection_getinfo(TROVE_coll_id coll_id,
                             TROVE_context_id context_id,
