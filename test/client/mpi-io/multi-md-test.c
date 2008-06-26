@@ -850,7 +850,7 @@ void vfs_create(int rank, int* n_ops)
         vfs_fds[i] = open(test_file, (O_CREAT|O_RDWR), (S_IWUSR|S_IRUSR));
         if(vfs_fds[i] < 0)
         {
-            handle_error(errno, "creat");
+            handle_error(errno, "open");
         }
     }
 
@@ -869,7 +869,7 @@ void vfs_close(int rank, int* n_ops)
         ret = close(vfs_fds[i]);
         if(ret < 0)
         {
-            handle_error(errno, "creat");
+            handle_error(errno, "close");
         }
     }
 
@@ -1185,7 +1185,7 @@ void vfs_readdir(int rank, int* n_ops)
         dent = readdir(vfs_dir);
         if(!dent)
         {
-            handle_error(errno, "creat");
+            handle_error(errno, "readdir");
         }
     }
 
@@ -1219,7 +1219,7 @@ void vfs_readdir_and_stat(int rank, int* n_ops)
         dent = readdir(vfs_dir);
         if(!dent)
         {
-            handle_error(errno, "creat");
+            handle_error(errno, "readdir");
         }
         sprintf(&test_file[fname_off], "%s", dent->d_name);
         ret = stat(test_file, &vfs_stats[i]);
