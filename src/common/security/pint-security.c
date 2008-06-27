@@ -707,6 +707,70 @@ int PINT_get_max_sigsize(void)
 #endif /* SECURITY_ENCRYPTION_NONE */
 }
 
+void PINT_release_credential(PVFS_credential *cred)
+{
+    if (cred)
+    {
+        free(cred->group_array);
+        free(cred->issuer_id);
+        free(cred->signature);
+        free(cred);
+    }
+}
+
+PVFS_credential *PINT_dup_credential(const PVFS_credential *cred)
+{
+    PVFS_credential *ret = NULL;
+
+    if (!cred)
+    {
+        return NULL;
+    }
+
+    ret = (PVFS_credential*)malloc(sizeof(PVFS_credential));
+    if (!ret)
+    {
+        return NULL;
+    }
+
+    memcpy(ret, cred, sizeof(PVFS_credential));
+    ret->group_array = NULL;
+    ret->issuer_id = NULL;
+    ret->signature = NULL;
+
+    if (cred->num_groups)
+    {
+        ret->group_array = calloc(cred->num_groups, sizeof(PVFS_gid));
+        if (!ret->group_array)
+        {
+            free(ret);
+            return NULL;
+        }
+        memcpy(ret->group_array, cred->group_array, 
+               cred->num_groups * sizeof(PVFS_gid));
+    }
+
+    ret->issuer_id = strdup(cred->issuer_id);
+    if (!ret->issuer_id)
+    {
+        free(ret->group_array);
+        free(ret);
+        return NULL;
+    }
+
+    ret->signature = (unsigned char*)calloc(cred->sig_size, 1);
+    if (!ret->signature)
+    {
+        free(ret->issuer_id);
+        free(ret->group_array);
+        free(ret);
+        return NULL;
+    }
+    memcpy(ret->signature, cred->signature, cred->sig_size);
+
+    return ret;
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4

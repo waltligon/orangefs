@@ -148,6 +148,10 @@ void PINT_release_capability(PVFS_capability *);
  */
 int PINT_get_max_sigsize(void);
 
+PVFS_credential *PINT_dup_credential(const PVFS_credential*);
+
+void PINT_release_credential(PVFS_credential*);
+
 #endif
 
 /*
