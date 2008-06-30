@@ -421,6 +421,7 @@ static int load_private_key(const char *path)
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error loading private key: "
                          "%s\n", ERR_error_string(ERR_get_error(), buf));
         fclose(keyfile);
+        return -1;
     }
 
     fclose(keyfile);
