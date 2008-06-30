@@ -26,6 +26,7 @@
 #include "pint-dist-utils.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-dist-varstrip.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -1080,9 +1081,36 @@ static PINT_sm_action create_parent_getattr_inspect(
         int64_t tmp_val;
         int nparams = 0;
 
+        if (strncmp(current_dist->dist_name, 
+            PVFS_DIST_VARSTRIP_NAME, 
+            PVFS_DIST_VARSTRIP_NAME_SIZE) == 0) 
+        {
+            /* varstrip parameters are a special case; we can't use the
+             * normal split_keyvals function because the : separater is also
+             * used within paramers that only varstrip can parse
+             */ 
+
+            /* look for a "strips:" prefix */
+            if(strstr(attr->u.dir.hint.dist_params, "strips:") 
+                != attr->u.dir.hint.dist_params)
+            {
+                gossip_err("Error: failed to parse directory hints for varstrip distribution.\n");
+                js_p->error_code = -PVFS_EINVAL;
+                return SM_ACTION_COMPLETE;
+            }
+            if(current_dist->methods->set_param(current_dist->dist_name,
+                current_dist->params,
+                "strips",
+                &attr->u.dir.hint.dist_params[strlen("strips:")]))
+            {
+                gossip_err("Error: failed to set directory hints for varstrip distribution.\n");
+                js_p->error_code = -PVFS_EINVAL;
+                return SM_ACTION_COMPLETE;
+            }
+        }
         /* ignore parse errors! */
         /* TODO: why should we ignore parsing errors? */
-        if (PINT_split_keyvals(attr->u.dir.hint.dist_params,
+        else if (PINT_split_keyvals(attr->u.dir.hint.dist_params,
             &nparams, &key, &val) == 0)
         {
             int i;
