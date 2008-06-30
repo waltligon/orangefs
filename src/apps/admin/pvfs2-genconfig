@@ -38,6 +38,7 @@ my $opt_first_handle = '';
 my $opt_last_handle = '';
 my $opt_root_handle = '';
 my $opt_fsid = '';
+my $opt_fsname = '';
 my $opt_default_num_dfiles = '';
 my $opt_default_flow_buffer_size = '';
 my $opt_default_flow_buffer_count = '';
@@ -511,6 +512,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --last-handle  <NUM>              last handle value to reserve
      --root-handle  <NUM>              handle value to reserve for root object
      --fsid         <NUM>              fs identifier value
+     --fsname <STRING>                 fs name
      --default-num-dfiles <NUM>        number of datafiles to use per file
                                        (defaults to number of I/O servers)
      --flow-buffer-size <NUM>          set flowbuffersize in bytes            
@@ -677,6 +679,17 @@ sub get_fsid
         $fsid = int((rand() * 2147483647));
     }
     return $fsid;
+}
+
+sub get_fsname
+{
+    my $fsname;
+    if ($opt_fsname) {
+        $fsname = $opt_fsname;
+    } else {
+        $fsname = "pvfs2-fs";
+    }
+    return $fsname;
 }
 
 sub get_last_handle
@@ -1313,6 +1326,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'flow-buffer-count=i'=> \$opt_default_flow_buffer_count,
     'root-handle=i' => \$opt_root_handle,
     'fsid=i'        => \$opt_fsid,
+    'fsname=s'      => \$opt_fsname,
     'trusted=i'        => \$opt_security,
     'server-job-timeout=i' => \$opt_server_job_timeout,
     'client-job-timeout=i' => \$opt_client_job_timeout,
@@ -1497,6 +1511,7 @@ my $default_flow_buffer_size = get_default_flow_buffer_size();
 my $default_flow_buffer_count = get_default_flow_buffer_count();
 my $root_handle = get_root_handle();
 my $fsid = get_fsid();
+my $fsname = get_fsname();
 my $server_job_timeout = get_server_job_timeout();
 my $client_job_timeout = get_client_job_timeout();
 
@@ -1520,7 +1535,7 @@ if ($opt_security == 1)
         $opt_trusted_network, $opt_trusted_netmask);
 }
 emit_aliases($output_target);
-emit_filesystem($output_target, "pvfs2-fs", $fsid, $root_handle, 
+emit_filesystem($output_target, $fsname , $fsid, $root_handle, 
     $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count);
 
 if ($opt_metaspec) {
