@@ -1072,6 +1072,58 @@ static PINT_sm_action create_parent_getattr_inspect(
         }
     }
 
+    /* okay, we might need to override some dist params as well */
+    if (attr->u.dir.hint.dist_params_len > 0)
+    {
+        /* We have a series of comma separated key:val strings */
+        char **key, **val;
+        int64_t tmp_val;
+        int nparams = 0;
+
+        /* ignore parse errors! */
+        /* TODO: why should we ignore parsing errors? */
+        if (PINT_split_keyvals(attr->u.dir.hint.dist_params,
+            &nparams, &key, &val) == 0)
+        {
+            int i;
+            for (i = 0; i < nparams; i++)
+            {
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "distribution parameter %s, value %s\n",
+                    key[i], val[i]);
+                /* NOTE: just as in server-config.c when parsing "Param" and
+                 * "Value" fields, we will assume that all values are 64 bit
+                 * integers.  The only difference here is that we scan
+                 * directly into a 64 bit integer, rather than converting
+                 * from the int format that dotconf supports.
+                 */
+                ret = sscanf(val[i], SCANF_lld, &tmp_val);
+                if(ret != 1)
+                {
+                    gossip_err("Error: unsupported type for distribution parameter %s, value %s found in directory hints.\n", 
+                        key[i], val[i]);
+                    gossip_err("Error: continuing anyway.\n");
+                }
+                else
+                {
+                    if(current_dist->methods->set_param(current_dist->dist_name,
+                        current_dist->params,
+                        key[i],
+                        &tmp_val))
+                    {
+
+                        gossip_err("Error: could not override hinted distribution parameter %s, value %s found in directory hints\n",
+                            key[i],
+                            val[i]);
+                    }
+                 }
+                 free(key[i]);
+                 free(val[i]);
+            }
+            free(key);
+            free(val);
+        }
+    }
+
     /* priority for determining user's preference for number of data files:
      * 1) count specified in attr's passed into sys_create
      * 2) directory hints
@@ -1121,56 +1173,6 @@ static PINT_sm_action create_parent_getattr_inspect(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
         sm_p->u.create.num_data_files, num_dfiles_requested);
 
-    /* okay, we might need to override some dist params as well */
-    if (attr->u.dir.hint.dist_params_len > 0)
-    {
-        /* We have a series of comma separated key:val strings */
-        char **key, **val;
-        int64_t tmp_val;
-        int nparams = 0;
-
-        /* ignore parse errors! */
-        if (PINT_split_keyvals(attr->u.dir.hint.dist_params,
-            &nparams, &key, &val) == 0)
-        {
-            int i;
-            for (i = 0; i < nparams; i++)
-            {
-                gossip_debug(GOSSIP_CLIENT_DEBUG, "distribution parameter %s, value %s\n",
-                    key[i], val[i]);
-                /* NOTE: just as in server-config.c when parsing "Param" and
-                 * "Value" fields, we will assume that all values are 64 bit
-                 * integers.  The only difference here is that we scan
-                 * directly into a 64 bit integer, rather than converting
-                 * from the int format that dotconf supports.
-                 */
-                ret = sscanf(val[i], SCANF_lld, &tmp_val);
-                if(ret != 1)
-                {
-                    gossip_err("Error: unsupported type for distribution parameter %s, value %s found in directory hints.\n", 
-                        key[i], val[i]);
-                    gossip_err("Error: continuing anyway.\n");
-                }
-                else
-                {
-                    if(current_dist->methods->set_param(current_dist->dist_name,
-                        current_dist->params,
-                        key[i],
-                        &tmp_val))
-                    {
-
-                        gossip_err("Error: could not override hinted distribution parameter %s, value %s found in directory hints\n",
-                            key[i],
-                            val[i]);
-                    }
-                 }
-                 free(key[i]);
-                 free(val[i]);
-            }
-            free(key);
-            free(val);
-        }
-    }
     return SM_ACTION_COMPLETE;
 }
 
