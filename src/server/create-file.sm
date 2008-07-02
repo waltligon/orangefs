@@ -265,11 +265,12 @@ machine pvfs2_create_file_work_sm
 static PINT_sm_action create_file_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p;
+
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_setup entered\n");
 
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    struct PINT_client_sm *sm_p = malloc(sizeof(struct PINT_client_sm));
+    sm_p = malloc(sizeof(struct PINT_client_sm));
     if(!sm_p)
     {
         return -PVFS_ENOMEM;
@@ -335,6 +336,8 @@ static PINT_sm_action create_file_resp(
     int task_id;
     int error_code;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_resp entered\n");
+
     if (js_p->error_code == 0)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
@@ -384,7 +387,7 @@ static PINT_sm_action create_file_init(
     struct PINT_server_op *s_op;
     int ret = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create file state: init\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_init entered\n");
 
     assert((js_p->error_code == 0) ||
            (js_p->error_code == CREATE_RETRY));
@@ -400,7 +403,6 @@ static PINT_sm_action create_file_init(
 
     /* Prepare to retrieve the parent's attributes. */
     s_op = malloc(sizeof(struct PINT_server_op));
-
     if(!s_op)
     {
         return -PVFS_ENOMEM;
@@ -435,12 +437,39 @@ static PINT_sm_action create_file_init2(
     PVFS_object_attr *obj_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_init2 entered\n");
     ds_attr = &s_op->ds_attr;
     obj_attr = &s_op->attr;
     PVFS_ds_attr_to_object_attr(ds_attr, obj_attr);
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
 
     return SM_ACTION_COMPLETE;
+}
+
+static int create_create_comp_fn(void *v_p,
+                                 struct PVFS_server_resp *resp_p,
+                                 int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_create_comp_fn entered\n");
+
+    assert(resp_p->op == PVFS_SERV_CREATE);
+
+    if (resp_p->status != 0)
+    {
+        return resp_p->status;
+    }
+
+    /* otherwise, just stash the newly created meta handle */
+    sm_p->u.create_file.metafile_handle = resp_p->u.create_file.handle;
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "*** Got newly created handle %llu\n",
+        llu(sm_p->u.create_file.metafile_handle));
+
+    return 0;
 }
 
 static PINT_sm_action create_file_parent_getattr_cleanup_and_inspect(
@@ -459,11 +488,7 @@ static PINT_sm_action create_file_parent_getattr_cleanup_and_inspect(
     struct server_configuration_s *server_config =
             get_server_config_struct();
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-        "create file state: parent_getattr_cleanup_and_inspect\n");
-
-    assert(sm_p);
-    assert(s_op);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_parent_getattr_cleanup_and_inspect entered\n");
 
     /* Copy the results before popping the stack. */
     attr = &sm_p->getattr.attr;
@@ -474,26 +499,26 @@ static PINT_sm_action create_file_parent_getattr_cleanup_and_inspect(
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     free(s_op);
     js_p->error_code = error_code;
-
+/* TODO: Why is this necessary? */
 error_code = 0;
 
     if (error_code == 0) {
         /** Look at the attributes of the parent directory and
          *  decide if it impacts the file creation in any way.
          */
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "parent owner: %d, group: %d, perms: %d\n",
+        gossip_debug(GOSSIP_SERVER_DEBUG, "parent owner: %d, group: %d, perms: %d\n",
             (int)attr->owner, (int)attr->group, (int)attr->perms);
 
         /* do we have a setgid bit? */
         if(attr->perms & PVFS_G_SGID)
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "parent has setgid bit set.\n");
-            gossip_debug(GOSSIP_CLIENT_DEBUG, " - modifying requested attr "
+            gossip_debug(GOSSIP_SERVER_DEBUG, "parent has setgid bit set.\n");
+            gossip_debug(GOSSIP_SERVER_DEBUG, " - modifying requested attr "
                                               "for new file.\n");
             sm_p->u.create_file.attr.group = attr->group;
             /* note that permission checking is left to server even in this case */
         }
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "create_parent_getattr: [%p] "
+        gossip_debug(GOSSIP_SERVER_DEBUG, "create_parent_getattr: [%p] "
             "dfile_count     = %d "
             "dist_name_len   = %d "
             "dist_params_len = %d\n",
@@ -512,7 +537,7 @@ error_code = 0;
                     num_dfiles_requested_override,
                     &sm_p->u.create_file.num_data_files);
         }
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
             sm_p->u.create_file.num_data_files, num_dfiles_requested_override);
         current_dist = sm_p->u.create_file.dist;
         /* We have an overriding distribution name for this directory.. honor that */
@@ -525,7 +550,7 @@ error_code = 0;
                 new_dist = PINT_dist_create(attr->u.dir.hint.dist_name);
                 if (new_dist)
                 {
-                    gossip_debug(GOSSIP_CLIENT_DEBUG, "Overridding distribution name to %s instead of %s\n",
+                    gossip_debug(GOSSIP_SERVER_DEBUG, "Overridding distribution name to %s instead of %s\n",
                         attr->u.dir.hint.dist_name,
                         current_dist->dist_name);
                     PINT_dist_free(current_dist);
@@ -534,13 +559,13 @@ error_code = 0;
                 }
                 else
                 {
-                    gossip_debug(GOSSIP_CLIENT_DEBUG, "Could not override distribution name with %s instead of %s\n",
+                    gossip_debug(GOSSIP_SERVER_DEBUG, "Could not override distribution name with %s instead of %s\n",
                         attr->u.dir.hint.dist_name,
                         current_dist->dist_name);
                 }
             }
             else {
-                gossip_debug(GOSSIP_CLIENT_DEBUG, "retaining current distribution name %s\n",
+                gossip_debug(GOSSIP_SERVER_DEBUG, "retaining current distribution name %s\n",
                     current_dist->dist_name);
             }
         }
@@ -560,7 +585,7 @@ error_code = 0;
                 int i;
                 for (i = 0; i < nparams; i++)
                 {
-                    gossip_debug(GOSSIP_CLIENT_DEBUG, "distribution parameter %s, value %s\n",
+                    gossip_debug(GOSSIP_SERVER_DEBUG, "distribution parameter %s, value %s\n",
                         key[i], val[i]);
                     /* NOTE: just as in server-config.c when parsing "Param" and
                      * "Value" fields, we will assume that all values are 64 bit
@@ -597,7 +622,6 @@ error_code = 0;
         }
 
         s_op = malloc(sizeof(struct PINT_server_op));
-
         if(!s_op)
         {
             return -PVFS_ENOMEM;
@@ -609,21 +633,28 @@ error_code = 0;
         /* Determine whether the dspace should be created locally
          * or remotely and setup up for the appropriate place. */
         PINT_cached_config_get_server_name(server_name, 1024, 
-            sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first, sm_p->object_ref.fs_id);
+            sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first,
+            sm_p->object_ref.fs_id);
 
         if (! strcmp(server_config->host_id, server_name)) {
             /* Set up the frame for the nested create state machine */
+            gossip_debug(GOSSIP_SERVER_DEBUG, "create metadata file locally\n");
             js_p->error_code = LOCAL_OPERATION;
+            /* sm_p->u.create_file.location_flag |= METADATA_LOCAL; */
 
             s_op->op = PVFS_SERV_CREATE;
             s_op->u.create.fs_id = sm_p->object_ref.fs_id;
-            s_op->u.create.handle_extent_array.extent_count = sm_p->u.create_file.meta_handle_extent_array.extent_count;
-            s_op->u.create.handle_extent_array.extent_array = sm_p->u.create_file.meta_handle_extent_array.extent_array;
+            s_op->u.create.handle_extent_array.extent_count =
+                sm_p->u.create_file.meta_handle_extent_array.extent_count;
+            s_op->u.create.handle_extent_array.extent_array =
+                sm_p->u.create_file.meta_handle_extent_array.extent_array;
             s_op->u.create.object_type = PVFS_TYPE_METAFILE;
         }
         else {
             /* Prepare to send a message for remote execution. */
+            gossip_debug(GOSSIP_SERVER_DEBUG, "create metadata file remotely\n");
             js_p->error_code = REMOTE_OPERATION;
+            /* sm_p->u.create_file.location_flag |= METADATA_REMOTE; */
 
             PINT_init_msgpair(s_op, msg_p);
 
@@ -638,14 +669,12 @@ error_code = 0;
             msg_p->handle = sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first;
             msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
             msg_p->comp_fn = create_create_comp_fn;
-
             ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                 sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first, sm_p->object_ref.fs_id);
-
             if (ret)
             {
                 gossip_err("Failed to map meta server address\n");
-                js_p->error_code = ret;
+                js_p->error_code = 0;
             }
         }
     }
@@ -661,17 +690,18 @@ static PINT_sm_action create_file_dspace_local_cleanup(
     int task_id;
     int error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create file state: dspace_local_cleanup\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_dspace_local_cleanup entered\n");
 
     /* stash the newly created meta file handle */
     sm_p->u.create_file.metafile_handle = s_op->resp.u.create.handle;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Metafile handle %llu\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Metafile handle %llu\n",
                  llu(sm_p->u.create_file.metafile_handle));
 
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     free(s_op);
     js_p->error_code = error_code;
+/* TODO: Why is this necessary? */
     js_p->error_code = 0;
  
     return SM_ACTION_COMPLETE;
@@ -684,11 +714,12 @@ static PINT_sm_action create_file_dspace_remote_cleanup(
     int task_id;
     int error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create file state: dspace_remote_cleanup\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_dspace_remote_cleanup entered\n");
 
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     free(s_op);
     js_p->error_code = error_code;
+/* TODO: Why is this necessary? */
     js_p->error_code = 0;
  
     return SM_ACTION_COMPLETE;
@@ -703,7 +734,7 @@ static PINT_sm_action create_file_datafiles_setup(
     int i, this_pair;
     char server_name[1024];
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create file state: datafiles_setup\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_datafiles_setup entered\n");
         
     js_p->error_code = 0;
 
@@ -714,7 +745,7 @@ static PINT_sm_action create_file_datafiles_setup(
                      "files to PVFS_REQ_LIMIT_DFILE_COUNT\n");
     }   
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "need to create %d datafiles\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG, "need to create %d datafiles\n",
                  sm_p->u.create_file.num_data_files);
     
     /* allocate handle extent array objects */
@@ -768,12 +799,12 @@ static PINT_sm_action create_file_datafiles_setup(
     js_p->error_code = LOCAL_OPERATION;
     for(i = 0, this_pair = 0; i < sm_p->u.create_file.num_data_files; i++)
     {
-        /* Is this one local? */
         PINT_cached_config_get_server_name(server_name, 1024,
             sm_p->u.create_file.io_handle_extent_array[i].extent_array[0].first, sm_p->parent_ref.fs_id);
         if (strcmp(server_config->host_id, server_name))
         {
             js_p->error_code = REMOTE_OPERATION;
+            break;
         }
     }
     return SM_ACTION_COMPLETE;
@@ -790,12 +821,15 @@ static int create_file_datafiles_comp_fn(void *v_p,
     struct server_configuration_s *server_config =
             get_server_config_struct();
         
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  "create_file_datafiles_comp_fn[%d]\n",index);
     
     assert(resp_p->op == PVFS_SERV_CREATE);
 
     /* Find the one we were creating. */
+    /* TODO: Look for the io extent array that contains this handle rather than using strcmp.
+     * It should work to compare resp_p->u.create.handle to
+     * sm_p->u.create_file.io_handle_extent_array[*].extent_array[0].first and .last */
     for (i = 0, this_pair = -1; i < sm_p->u.create_file.num_data_files && this_pair < index; i++)
     {
         /* Does this one count? */
@@ -838,10 +872,10 @@ static int create_file_datafiles_comp_fn(void *v_p,
                sm_p->u.create_file.num_data_files * sizeof(PVFS_handle));
     }
 
-    /* otherwise, just stash the newly created data file handle */
+    /* stash the newly created data file handle */
     sm_p->u.create_file.datafile_handles[this_pair] = resp_p->u.create.handle;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Datafile handle %d is %llu\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Datafile handle %d is %llu\n",
                  index, llu(sm_p->u.create_file.datafile_handles[this_pair]));
     return 0;
 }
@@ -856,6 +890,8 @@ static PINT_sm_action create_file_datafiles_remote_setup(
             get_server_config_struct();
     char server_name[1024];
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_datafiles_remote_setup entered\n");
+
     js_p->error_code = 0;
 
     /* Handle setup for any datafiles that are to be created remotely. */
@@ -867,7 +903,6 @@ static PINT_sm_action create_file_datafiles_remote_setup(
     }
     /* zero out all members */
     memset(s_op, 0, sizeof(struct PINT_server_op));
-    PINT_sm_push_frame(smcb, 0, s_op);
 
     /* allocate msgarray and set msgarray_count */
     s_op->msgarray = (PINT_sm_msgpair_state *)malloc(
@@ -878,6 +913,7 @@ static PINT_sm_action create_file_datafiles_remote_setup(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    PINT_sm_push_frame(smcb, 0, s_op);
     s_op->msgarray_count = sm_p->u.create_file.num_data_files;
  
     /* for each datafile, prepare to post a create send/recv pair */
@@ -900,7 +936,7 @@ static PINT_sm_action create_file_datafiles_remote_setup(
                 PVFS_TYPE_DATAFILE,
                 sm_p->u.create_file.io_handle_extent_array[i]);
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG,  "posting datafile[%d] create "
+            gossip_debug(GOSSIP_SERVER_DEBUG,  "posting datafile[%d] create "
                          "with extents %llu-%llu\n", i,
                          llu(sm_p->u.create_file.io_handle_extent_array[i].
                             extent_array[0].first),
@@ -926,6 +962,8 @@ static PINT_sm_action create_file_datafiles_remote_cleanup(
     int task_id;
     int error_code;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_datafiles_remote_cleanup entered\n");
+
     /* Clean up the server stack frame that we pushed for remote file creation. */
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     free(s_op);
@@ -944,7 +982,7 @@ static PINT_sm_action create_file_datafiles_local_setup(
     struct server_configuration_s *server_config = get_server_config_struct();
     char server_name[1024];
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create file state: datafiles_local_setup\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_datafiles_local_setup entered\n");
 
     /* allocate memory for the data handles if we haven't already */
     if (sm_p->u.create_file.datafile_handles == NULL)
@@ -969,6 +1007,7 @@ static PINT_sm_action create_file_datafiles_local_setup(
             sm_p->u.create_file.io_handle_extent_array[i].extent_array[0].first, sm_p->parent_ref.fs_id);
         if (! strcmp(server_config->host_id, server_name))
         {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "creating data file locally\n");
             js_p->error_code = LOCAL_OPERATION;
 
             /* Set up the frame for local creates */
@@ -1017,6 +1056,8 @@ static PINT_sm_action create_file_datafiles_local_cleanup(
     struct server_configuration_s *server_config = get_server_config_struct();
     char server_name[1024];
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_datafiles_local_cleanup entered\n");
+
     /* TODO: For now, assuming we do one local datafile. */
     /* stash the newly created data file handle */
     for (i = 0; i < sm_p->u.create_file.num_data_files; i++)
@@ -1028,7 +1069,7 @@ static PINT_sm_action create_file_datafiles_local_cleanup(
         {
             sm_p->u.create_file.datafile_handles[i] = s_op->resp.u.create_file.handle;
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "Datafile handle %d is %llu\n",
+            gossip_debug(GOSSIP_SERVER_DEBUG, "Datafile handle %d is %llu\n",
                          0, llu(sm_p->u.create_file.datafile_handles[i]));
         }
     }
@@ -1047,7 +1088,8 @@ static int create_setattr_comp_fn(void *v_p,
     PVFS_object_ref refn;
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_file_setattr_comp_fn\n");
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_setattr_comp_fn entered\n");
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
 
@@ -1074,6 +1116,8 @@ static PINT_sm_action create_file_setattr_setup(
     struct server_configuration_s *server_config = get_server_config_struct();
     char server_name[1024];
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_setattr_setup entered\n");
+
     assert(sm_p);
 
     s_op = malloc(sizeof(struct PINT_server_op));
@@ -1094,6 +1138,7 @@ static PINT_sm_action create_file_setattr_setup(
 
     if (! strcmp(server_config->host_id, server_name)) {
         /* Set up the frame for the nested create state machine */
+        gossip_debug(GOSSIP_SERVER_DEBUG, "create_file: performing setattr locally\n");
         s_op->op = PVFS_SERV_SETATTR;
         s_op->credentials.uid = sm_p->cred_p->uid;
         s_op->credentials.gid = sm_p->cred_p->gid;
@@ -1126,7 +1171,7 @@ static PINT_sm_action create_file_setattr_setup(
     {
         PINT_sm_msgpair_state *msg_p;
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG," create_file: posting setattr req\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG," create_file: posting setattr req\n");
 
         PINT_init_msgpair(s_op, msg_p);
 
@@ -1175,6 +1220,8 @@ static PINT_sm_action create_file_setattr_cleanup(
     int task_id;
     int error_code;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_setattr_cleanup entered\n");
+
     assert(s_op);
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     free(s_op);
@@ -1193,8 +1240,7 @@ static PINT_sm_action create_file_crdirent_setup(
 /*    job_id_t tmp_id;
     int ret = -PVFS_EINVAL; */
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create state: crdirent_setup\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_crdirent_setup entered\n");
 
     if(!s_op)
     {
@@ -1228,6 +1274,8 @@ static PINT_sm_action create_file_crdirent_cleanup(
     int task_id;
     int error_code;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_crdirent_cleanup entered\n");
+
     assert(s_op);
     PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     free(s_op);
@@ -1242,7 +1290,7 @@ static PINT_sm_action create_file_work_cleanup(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref metafile_ref;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: work_cleanup\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_work_cleanup entered\n");
 
     /* this is in common/misc/pvfs2-util.c which is normally only in the
      * client.  They sys_attr is not a flat structure, thus there are
@@ -1272,7 +1320,7 @@ static PINT_sm_action create_file_work_cleanup(
         sm_p->u.create_file.stored_error_code = 0;
         sm_p->u.create_file.retry_count++;
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "Retrying create operation "
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Retrying create operation "
                      "(attempt number %d)\n", sm_p->u.create_file.retry_count);
 
         js_p->error_code = CREATE_RETRY;
@@ -1321,33 +1369,6 @@ static PINT_sm_action create_file_work_cleanup(
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }
-
-static int create_create_comp_fn(void *v_p,
-                                 struct PVFS_server_resp *resp_p,
-                                 int index)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_create_comp_fn\n");
-
-    assert(resp_p->op == PVFS_SERV_CREATE);
-
-    if (resp_p->status != 0)
-    {
-        return resp_p->status;
-    }
-
-    /* otherwise, just stash the newly created meta handle */
-    sm_p->u.create_file.metafile_handle = resp_p->u.create_file.handle;
-
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %llu\n",
-        llu(sm_p->u.create_file.metafile_handle));
-
-    return 0;
-}
-
 
 static inline int PINT_get_object_ref_create_file(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
