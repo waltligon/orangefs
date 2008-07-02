@@ -146,16 +146,17 @@ sub parse_hostlist
     # hostb
     # hostc{1,2,3}
     #
-    @components = $inputline =~ /(?:,?[ ]*([^{,]+(?:{[^}]+})?))/g;
+    @components = $inputline =~ /(?:,?[ ]*([^{,]+(?:{[^}]+})?[^,]*))/g;
     foreach my $comp (@components)
     {
         # if we've got a component that has {..}, then expand.
         # match the prefix (hostname) and curly brackets
-        if($comp =~ /([^{]+){([^}]+)}/)
+        if($comp =~ /([^{]+){([^}]+)}(.*)$/)
         {
             my $prefix = $1;
             my $ranges = $2;
-            
+            my $suffix = $3;
+
             # split the ranges string on the commas
             foreach my $r (split(/,/, $ranges))
             {
@@ -169,7 +170,7 @@ sub parse_hostlist
                     my ($s, $f) = $r =~ /([0-9]+)-([0-9]+)/; 
                     for(my $i = $s; $i <= $f; ++$i)
                     {
-                        push @hosts, "$prefix$i";
+                        push @hosts, "$prefix$i$suffix";
                     }
                 }
             }
