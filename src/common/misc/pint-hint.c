@@ -13,6 +13,7 @@
 #include "pint-hint.h"
 #include "gossip.h"
 #include <stdio.h>
+#include <pvfs2-debug.h>
 
 DEFINE_STATIC_ENDECODE_FUNCS(uint64_t, uint64_t);
 DEFINE_STATIC_ENDECODE_FUNCS(int64_t, int64_t);
@@ -242,6 +243,9 @@ void decode_PINT_hint(char **pptr, PINT_hint **hint)
     const struct PINT_hint_info *info;
 
     decode_uint32_t(pptr, &count);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "decoding %d hints from request\n",
+                 count);
 
     for(i = 0; i < count; ++i)
     {

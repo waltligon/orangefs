@@ -148,6 +148,10 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     }
 
     q_op_p->event_type = trove_dbpf_dspace_create_event_id;
+    gossip_debug(GOSSIP_TROVE_DEBUG, "create: reqid: %d, rank: %d\n",
+                 PINT_HINT_GET_REQUEST_ID(hints),
+                 PINT_HINT_GET_RANK(hints));
+
     PINT_EVENT_START(q_op_p->event_type,
                      dbpf_pid, NULL, &q_op_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
@@ -973,6 +977,11 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     }
 
     q_op_p->event_type = trove_dbpf_dspace_getattr_event_id;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "getattr: reqid: %d, rank: %d\n",
+                 PINT_HINT_GET_REQUEST_ID(hints),
+                 PINT_HINT_GET_RANK(hints));
+
     PINT_EVENT_START(trove_dbpf_dspace_getattr_event_id,
                      dbpf_pid, NULL, &q_op_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
@@ -1121,6 +1130,10 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     }
 
     q_op_p->event_type = trove_dbpf_dspace_setattr_event_id;
+    gossip_debug(GOSSIP_TROVE_DEBUG, "setattr: reqid: %d, rank: %d\n",
+                 PINT_HINT_GET_REQUEST_ID(hints),
+                 PINT_HINT_GET_RANK(hints));
+
     PINT_EVENT_START(q_op_p->event_type,
                      dbpf_pid, NULL, &q_op_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),

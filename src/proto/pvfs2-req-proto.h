@@ -1585,7 +1585,6 @@ struct PVFS_server_req
 /* insert padding to ensure the union starts on an aligned boundary */
 static inline void
 encode_PVFS_server_req(char **pptr, const struct PVFS_server_req *x) {
-    int count;
     encode_enum(pptr, &x->op);
 #ifdef HAVE_VALGRIND_H
     *(int32_t*) *pptr = 0;  /* else possible memcpy in BMI sees uninit */
@@ -1593,16 +1592,13 @@ encode_PVFS_server_req(char **pptr, const struct PVFS_server_req *x) {
     *pptr += 4;
     encode_PVFS_credentials(pptr, &x->credentials);
     encode_PINT_hint(pptr, x->hints);
-    *pptr +=count;
 }
 static inline void
 decode_PVFS_server_req(char **pptr, struct PVFS_server_req *x) {
-    int count;
     decode_enum(pptr, &x->op);
     *pptr += 4;
     decode_PVFS_credentials(pptr, &x->credentials);
     decode_PINT_hint(pptr, &x->hints);
-    *pptr +=count;
 }
 #endif
 

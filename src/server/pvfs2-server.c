@@ -1616,6 +1616,10 @@ int server_state_machine_start(
 
     if(s_op->req)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "client:%d, reqid:%d, rank:%d\n",
+                     PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
+                     PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
+                     PINT_HINT_GET_RANK(s_op->req->hints));
         PINT_EVENT_START(PINT_sm_event_id, server_controlling_pid,
                          NULL, &s_op->event_id,
                          PINT_HINT_GET_CLIENT_ID(s_op->req->hints),

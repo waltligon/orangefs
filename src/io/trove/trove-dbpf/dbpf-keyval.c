@@ -229,6 +229,11 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
 
     q_op_p->event_type = trove_dbpf_keyval_read_event_id;
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "kv_read: client_id: %d, reqid: %d, rank: %d\n",
+                 PINT_HINT_GET_CLIENT_ID(hints),
+                 PINT_HINT_GET_REQUEST_ID(hints),
+                 PINT_HINT_GET_RANK(hints));
+
     PINT_EVENT_START(trove_dbpf_keyval_read_event_id,
                      dbpf_pid, NULL, &q_op_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
@@ -362,6 +367,10 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     }
 
     q_op_p->event_type = trove_dbpf_keyval_write_event_id;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "kv_write: reqid: %d, rank: %d\n",
+                 PINT_HINT_GET_REQUEST_ID(hints),
+                 PINT_HINT_GET_RANK(hints));
 
     PINT_EVENT_START(trove_dbpf_keyval_write_event_id,
                      dbpf_pid, NULL, &q_op_p->event_id,

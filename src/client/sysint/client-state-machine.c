@@ -26,6 +26,7 @@
 #include "ncache.h"
 #include "acache.h"
 #include "pint-event.h"
+#include "pint-hint.h"
 
 #define MAX_RETURNED_JOBS   256
 
@@ -364,6 +365,8 @@ PVFS_error PINT_client_state_machine_post(
     job_status_s js;
     int pvfs_sys_op __attribute__((unused)) = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PVFS_hint_add_internal(&sm_p->hints, PINT_HINT_OP_ID, sizeof(pvfs_sys_op), &pvfs_sys_op);
 
     PINT_EVENT_START(PINT_client_sys_event_id, pint_client_pid, NULL, &sm_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(sm_p->hints),

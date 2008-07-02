@@ -490,7 +490,7 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
 #else
         "bmi_client_send",
 #endif
-        "%d%d%ld%llu%d%d",
+        "%d%d%d%llu%d%d",
         "%d", &bmi_tcp_send_event_id);
 
     /* Define the recv event:
@@ -504,7 +504,7 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
 #else
         "bmi_client_recv",
 #endif
-        "%d%d%ld%llu%d%d",
+        "%d%d%d%llu%d%d",
         "%d", &bmi_tcp_recv_event_id);
 
     gen_mutex_unlock(&interface_mutex);
@@ -2402,9 +2402,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 
     PINT_EVENT_START(
         bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, &eid,
-        PINT_HINT_GET_RANK(hints),
         PINT_HINT_GET_CLIENT_ID(hints),
         PINT_HINT_GET_REQUEST_ID(hints),
+        PINT_HINT_GET_RANK(hints),
         PINT_HINT_GET_HANDLE(hints),
         PINT_HINT_GET_OP_ID(hints),
         expected_size);
@@ -3713,9 +3713,9 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
 
     PINT_EVENT_START(
         bmi_tcp_send_event_id, bmi_tcp_pid, NULL, &eid,
-        PINT_HINT_GET_RANK(hints),
         PINT_HINT_GET_CLIENT_ID(hints),
         PINT_HINT_GET_REQUEST_ID(hints),
+        PINT_HINT_GET_RANK(hints),
         PINT_HINT_GET_HANDLE(hints),
         PINT_HINT_GET_OP_ID(hints),
         total_size);

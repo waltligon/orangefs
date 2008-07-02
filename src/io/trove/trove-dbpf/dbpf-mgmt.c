@@ -549,7 +549,7 @@ static int dbpf_initialize(char *stoname,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_read",
-                            "%d%ld%ld%llu%llu%d%d",
+                            "%d%d%d%llu%llu%d%d",
                             "%llu",
                             &trove_dbpf_read_event_id);
 
@@ -560,7 +560,7 @@ static int dbpf_initialize(char *stoname,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_write",
-                            "%d%ld%ld%llu%llu%d%d",
+                            "%d%d%d%llu%llu%d%d",
                             "%llu",
                             &trove_dbpf_write_event_id);
 
@@ -570,18 +570,18 @@ static int dbpf_initialize(char *stoname,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_keyval_read",
-                            "%d%ld%ld%llu%d",
+                            "%d%d%d%llu%d",
                             "",
                             &trove_dbpf_keyval_read_event_id);
 
     /* Define the keyval write event:
      * START:
-     * (client_id, request_id, rank, metafile-handle, keyval-handle, op_id)
+     * (client_id, request_id, rank, metafile-handle, op_id)
      * STOP: (none)
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_keyval_write",
-                            "%d%ld%ld%llu%llu%d",
+                            "%d%d%d%llu%d",
                             "",
                             &trove_dbpf_keyval_write_event_id);
 
@@ -592,7 +592,7 @@ static int dbpf_initialize(char *stoname,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_dspace_create",
-                            "%d%ld%ld%d",
+                            "%d%d%d%d",
                             "%llu",
                             &trove_dbpf_dspace_create_event_id);
 
@@ -603,7 +603,7 @@ static int dbpf_initialize(char *stoname,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_dspace_getattr",
-                            "%d%ld%ld%llu%d",
+                            "%d%d%d%llu%d",
                             "",
                             &trove_dbpf_dspace_getattr_event_id);
 
@@ -614,7 +614,7 @@ static int dbpf_initialize(char *stoname,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_dspace_setattr",
-                            "%d%ld%ld%llu%d",
+                            "%d%d%d%llu%d",
                             "",
                             &trove_dbpf_dspace_setattr_event_id);
 
@@ -2045,8 +2045,7 @@ static void unlink_db_cache_files(const char* path)
     {
         for(i=0; i<pglob.gl_pathc; i++)
         {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "Unlinking old db cache file: %s\n", pglob.gl_pathv[i]);
-            unlink(pglob.gl_pathv[i]);   
+            gossip_debug(GOSSIP_TROVE_DEBUG, "Unlinking old db cache file: %s\n", pglob.gl_pathv[i]); unlink(pglob.gl_pathv[i]);   
         }
         globfree(&pglob);
     }

@@ -220,6 +220,16 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
                      "to completion queue\n",
                      qop_p, llu(qop_p->op.handle));
 
+        if(qop_p->event_type == trove_dbpf_dspace_create_event_id)
+        {
+            PINT_EVENT_END(qop_p->event_type, dbpf_pid, NULL, qop_p->event_id,
+                           qop_p->op.u.d_create.out_handle_p);
+        }
+        else
+        {
+            PINT_EVENT_END(qop_p->event_type, dbpf_pid, NULL, qop_p->event_id);
+        }
+
         DBPF_COMPLETION_START(qop_p, OP_COMPLETED);
         (*outcount)++;
 
@@ -230,6 +240,16 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
         while(!dbpf_op_queue_empty(sync_context->sync_queue))
         {
             ready_op = dbpf_op_queue_shownext(sync_context->sync_queue);
+
+            if(ready_op->event_type == trove_dbpf_dspace_create_event_id)
+            {
+                PINT_EVENT_END(ready_op->event_type, dbpf_pid, NULL, ready_op->event_id,
+                               ready_op->op.u.d_create.out_handle_p);
+            }
+            else
+            {
+                PINT_EVENT_END(ready_op->event_type, dbpf_pid, NULL, ready_op->event_id);
+            }
 
             gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                          "[SYNC_COALESCE]: moving op: %p with handle: %llu "
