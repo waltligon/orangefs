@@ -451,7 +451,7 @@ static int create_create_comp_fn(void *v_p,
                                  int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_PREVIOUS);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_create_comp_fn entered\n");
 
@@ -1182,7 +1182,7 @@ static PINT_sm_action create_file_setattr_setup(
             sm_p->u.create_file.metafile_handle,
             PVFS_TYPE_METAFILE,
             sm_p->u.create_file.sys_attr,
-            PVFS_ATTR_META_ALL);
+            PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL);
 
         msg_p->req.u.setattr.attr.u.meta.dfile_array =
             sm_p->u.create_file.datafile_handles;
@@ -1237,8 +1237,6 @@ static PINT_sm_action create_file_crdirent_setup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *s_op = malloc(sizeof(struct PINT_server_op));
-/*    job_id_t tmp_id;
-    int ret = -PVFS_EINVAL; */
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_crdirent_setup entered\n");
 
@@ -1252,7 +1250,6 @@ static PINT_sm_action create_file_crdirent_setup(
 
     s_op->op = PVFS_SERV_CRDIRENT;
     memcpy(&s_op->attr, &sm_p->u.create_file.attr, sizeof(PVFS_object_attr));
-/*    s_op->attr = sm_p->u.create_file.attr; */
     s_op->u.crdirent.name = sm_p->u.create_file.object_name;
     s_op->u.crdirent.new_handle = sm_p->u.create_file.metafile_handle;
     s_op->u.crdirent.parent_handle = sm_p->parent_ref.handle;
