@@ -79,7 +79,7 @@ struct PINT_client_remove_sm
 struct PINT_client_create_file_sm
 {
     char *object_name;                          /* client=>server input parameter */
-    PVFS_sysresp_create_file *create_file_resp; /* client=>server in/out parameter*/
+    PVFS_sysresp_create *create_file_resp;      /* client=>server in/out parameter*/
     PVFS_sys_attr sys_attr;                     /* client=>server input parameter */
     PVFS_object_attr attr;                      /* client=>server input parameter */
     int num_data_files;                         /* client=>server input parameter */

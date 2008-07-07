@@ -415,7 +415,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_getattr resp_getattr;
-    PVFS_sysresp_create_file resp_create;
+    PVFS_sysresp_create resp_create;
     PVFS_object_ref parent_ref;
     PVFS_sys_dist   *new_dist;
     int ret = -1;
