@@ -4,6 +4,15 @@
  *
  * See COPYING in top-level directory.
  */
+/* twod-stripe will take all of the servers in the filesystem and
+ * partition them into num_groups groups.  Data will then be striped to
+ * each group before we move onto the next group.  The strip_factor will
+ * determine how many chunks of strip_size are written to each server
+ * in each group before we transition to the next group.
+ * The striping on the group level is done round-robin in the same
+ * fashion as simple-stripe
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
