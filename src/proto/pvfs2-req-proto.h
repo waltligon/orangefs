@@ -1541,14 +1541,14 @@ encode_PVFS_server_req(char **pptr, const struct PVFS_server_req *x) {
 #endif
     *pptr += 4;
     encode_PVFS_credentials(pptr, &x->credentials);
-    encode_PVFS_capability(pptr,&x->capability);
+    encode_PVFS_capability(pptr, &x->capability);
 }
 static inline void
 decode_PVFS_server_req(char **pptr, struct PVFS_server_req *x) {
     decode_enum(pptr, &x->op);
     *pptr += 4;
     decode_PVFS_credentials(pptr, &x->credentials);
-    decode_PVFS_capability(pptr,&x->capability);
+    decode_PVFS_capability(pptr, &x->capability);
 }
 #endif
 

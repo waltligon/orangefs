@@ -204,7 +204,7 @@ PVFS_error PVFS_isys_getattr(
         sm_p->getattr,
         ref,
         PVFS_util_sys_to_object_attr_mask(
-            attrmask),
+            attrmask) | PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_NONE,
         0);
 
@@ -508,8 +508,24 @@ static int getattr_object_getattr_comp_fn(
      */
     PINT_copy_object_attr(&sm_p->getattr.attr,
                           &resp_p->u.getattr.attr);
-
+                          
     attr =  &sm_p->getattr.attr;
+    
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability ptr: %p\n", 
+         &(resp_p->u.getattr.attr.capability));
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"Owner: %u\n", 
+        (unsigned int) resp_p->u.getattr.attr.capability.owner);
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"Op mask: %d\n", 
+        resp_p->u.getattr.attr.capability.op_mask);
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"Fsid: %d\n", 
+        resp_p->u.getattr.attr.capability.fsid);
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"Handles: %d\n", 
+        resp_p->u.getattr.attr.capability.num_handles);
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"Sig size: %d\n", 
+        resp_p->u.getattr.attr.capability.sig_size);
+    if (resp_p->u.getattr.attr.capability.signature) 
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Sig: %d\n", 
+            resp_p->u.getattr.attr.capability.signature[0]);
 
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
      * a -PVFS_error will be triggered if the

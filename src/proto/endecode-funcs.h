@@ -51,14 +51,8 @@
     *(pptr) += 4; \
 } while (0)
 
-#define encode_PVFS_sig(pptr,x) do { \
-    *(char *) *(pptr) = *(x); \
-    *(pptr) += 1; \
-} while (0)
-#define decode_PVFS_sig(pptr,x) do { \
-    *(x) = *(char *) *(pptr); \
-    *(pptr) += 1; \
-} while (0)
+#define encode_PVFS_sig(pptr,x) encode_char(pptr,x)
+#define decode_PVFS_sig(pptr,x) decode_char(pptr,x)
 
 #define encode_char(pptr,x) do { \
     *(char *) *(pptr) = *(x); \
@@ -700,7 +694,6 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
-    align8(pptr); \
     encode_##tn1(pptr, &x->n1); \
     if (x->n1 > 0) \
         for (i=0; i<x->n1; i++) \
@@ -717,9 +710,8 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
-    align8(pptr); \
     decode_##tn1(pptr, &x->n1); \
-    if (x->n1 != 0) \
+    if (x->n1 > 0) \
     { \
         x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
         for (i=0; i<x->n1; i++) \
@@ -731,7 +723,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t3(pptr, &x->x3); \
     decode_##t4(pptr, &x->x4); \
     decode_##tn2(pptr, &x->n2); \
-    if (x->n2 != 0) \
+    if (x->n2 > 0) \
     { \
         x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
         for (i=0; i<x->n2; i++) \
@@ -769,7 +761,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t2(pptr, &x->x2); \
     align8(pptr); \
     decode_##tn1(pptr, &x->n1); \
-    if (x->n1 != 0) \
+    if (x->n1 > 0) \
     { \
         x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
         for (i=0; i<x->n1; i++) \
@@ -787,7 +779,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
         x->a2 = NULL; \
     decode_##t3(pptr, &x->x3); \
     decode_##tn3(pptr, &x->n3); \
-    if (x->n3 != 0) \
+    if (x->n3 > 0) \
     { \
         x->a3 = decode_malloc(x->n3 * sizeof(*x->a3)); \
         for (i=0; i<x->n3; i++) \
