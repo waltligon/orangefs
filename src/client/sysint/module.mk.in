@@ -5,6 +5,7 @@ CSRC := \
 	$(DIR)/initialize.c \
 	$(DIR)/acache.c \
 	$(DIR)/ncache.c \
+        $(DIR)/capcache.c \
 	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
