@@ -24,7 +24,6 @@
 static int thread_mgr_test_timeout = THREAD_MGR_TEST_TIMEOUT;
 
 /* TODO: organize this stuff better */
-static void *__bmi_thread_function(void *ptr);
 static void *bmi_thread_function(void *ptr);
 static void *trove_thread_function(void *ptr);
 static void *dev_thread_function(void *ptr);
@@ -88,6 +87,7 @@ static void *trove_thread_function(void *ptr)
     int timeout = thread_mgr_test_timeout;
 
 #ifdef __PVFS2_JOB_THREADED__
+    PINT_event_thread_start("TROVE");
     while (trove_thread_running)
 #endif
     {
@@ -147,22 +147,11 @@ static void *trove_thread_function(void *ptr)
                              stat_trove_error_code_array[i]);
 	}
     }
-    return (NULL);
-}
-
-
-static void *__bmi_thread_function(void *ptr) {
-    void* ret = NULL;
-#ifdef __PVFS2_JOB_THREADED__
-    PINT_event_thread_start("BMI");
-#endif
-    ret = bmi_thread_function(ptr);
 #ifdef __PVFS2_JOB_THREADED__
     PINT_event_thread_stop();
 #endif
-    return ret;
+    return (NULL);
 }
-
 
 /* bmi_thread_function()
  *
@@ -178,6 +167,7 @@ static void *bmi_thread_function(void *ptr)
     struct PINT_thread_mgr_bmi_callback *tmp_callback;
 
 #ifdef __PVFS2_JOB_THREADED__
+    PINT_event_thread_start("BMI");
     while (bmi_thread_running)
 #endif
     {
@@ -299,6 +289,9 @@ static void *bmi_thread_function(void *ptr)
 	}
     }
 
+#ifdef __PVFS2_JOB_THREADED__
+    PINT_event_thread_stop();
+#endif
     return (NULL);
 }
 
@@ -492,7 +485,7 @@ int PINT_thread_mgr_bmi_start(void)
 
     bmi_thread_running = 1;
 #ifdef __PVFS2_JOB_THREADED__
-    ret = pthread_create(&bmi_thread_id, NULL, __bmi_thread_function, NULL);
+    ret = pthread_create(&bmi_thread_id, NULL, bmi_thread_function, NULL);
     if(ret != 0)
     {
 	BMI_close_context(global_bmi_context);
@@ -851,7 +844,7 @@ void PINT_thread_mgr_trove_push(int max_idle_time)
 void PINT_thread_mgr_bmi_push(int max_idle_time)
 {
     thread_mgr_test_timeout = max_idle_time;
-    __bmi_thread_function(NULL);
+    bmi_thread_function(NULL);
 }
 
 /*

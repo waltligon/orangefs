@@ -1666,6 +1666,12 @@ static int dbpf_dspace_testcontext(
         }
         ds_id_array[out_count] = cur_op->op.id;
 
+        if(cur_op->event_type == trove_dbpf_read_event_id ||
+           cur_op->event_type == trove_dbpf_write_event_id)
+        {
+            PINT_EVENT_END(
+                cur_op->event_type, dbpf_pid, NULL, cur_op->event_id);
+        }
         organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
         dbpf_queued_op_free(cur_op);
 
