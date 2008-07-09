@@ -7,12 +7,14 @@
  *   (C) 2007 University of Connecticut. All rights reserved.
  *
  *   Author: John A. Chandy
- *   $Date: 2008-07-08 14:58:24 $
- *   $Revision: 1.1.4.1 $
+ *           Sumit Narayan
+ *
+ *   $Date: 2008-07-09 14:23:51 $
+ *   $Revision: 1.1.4.2 $
  *
  */
 
-/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.1.4.1 2008-07-08 14:58:24 sumitn Exp $"; */
+/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.1.4.2 2008-07-09 14:23:51 sumitn Exp $"; */
 char *pvfs2fuse_version = "0.01";
 
 #define FUSE_USE_VERSION 27
@@ -45,7 +47,6 @@ struct pvfs2fuse {
 
 static struct pvfs2fuse pvfs2fuse;
 
-
 #if __LP64__
 #define SET_FUSE_HANDLE( fi, pfh ) \
 	fi->fh = (uint64_t)pfh
@@ -58,7 +59,7 @@ static struct pvfs2fuse pvfs2fuse;
 	*((pvfs_fuse_handle_t **)(&fi->fh))
 #endif
 
-#define PVFS_ERROR_TO_ERRNO_N(x) -1*PVFS_ERROR_TO_ERRNO(x)
+#define PVFS_ERROR_TO_ERRNO_N(x) (-1)*PVFS_ERROR_TO_ERRNO(x)
 
 static void pvfs_fuse_gen_credentials(
    PVFS_credentials *credentials)
@@ -1088,6 +1089,7 @@ int main(int argc, char *argv[])
 	  }
 
 	  PVFS_util_get_mntent_copy( pvfs2fuse.fs_id, &pvfs2fuse.mntent );
+	  /* Set timeouts for PVFS2's name cache and attribute cache */
 	  PVFS_sys_set_info(PVFS_SYS_ACACHE_TIMEOUT_MSECS, 0);
 	  PVFS_sys_set_info(PVFS_SYS_NCACHE_TIMEOUT_MSECS, 0);
    }
