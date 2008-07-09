@@ -215,8 +215,14 @@ TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p)
     q_op_p->op.state = OP_QUEUED;
     tmp_id = q_op_p->op.id;
 
-    dbpf_sync_coalesce_enqueue(q_op_p);
-   
+    if(1)
+    {
+	dbpf_txn_coalesce_enqueue(q_op_p);
+    }
+    else
+    {
+	dbpf_sync_coalesce_enqueue(q_op_p);
+    }
     gen_mutex_unlock(&q_op_p->mutex);
 
 #ifdef __PVFS2_TROVE_THREADED__
@@ -259,7 +265,14 @@ void dbpf_queued_op_dequeue_nolock(dbpf_queued_op_t *q_op_p)
 
     q_op_p->op.state = OP_DEQUEUED;
 
-    dbpf_sync_coalesce_dequeue(q_op_p);
+    if(1)
+    {
+	dbpf_txn_coalesce_dequeue(q_op_p);
+    }
+    else
+    {
+	dbpf_sync_coalesce_dequeue(q_op_p);
+    }
 }
 
 int dbpf_op_init_queued_or_immediate(

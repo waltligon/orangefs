@@ -1072,7 +1072,7 @@ int trove_collection_setinfo(
     }
     if(option == TROVE_DB_LOG_DIRECTORY)
     {
-        if(*(char *)parameter == NULL)
+        if(*(char **)parameter == NULL)
         {
 	    TROVE_db_log_directory = NULL;
 	}

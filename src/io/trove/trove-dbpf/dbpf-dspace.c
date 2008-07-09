@@ -39,6 +39,8 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
+#include "dbpf-sync.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -311,12 +313,20 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     data.size = sizeof(s_attr);
     
     /* create new dataspace entry */
-    ret = op_p->coll_p->ds_db->put(op_p->coll_p->ds_db, NULL, &key, &data, 0);
-    if (ret != 0)
+
+    if(1)
     {
-        gossip_err("error in dspace create (db_p->put failed).\n");
-        ret = -dbpf_db_error_to_trove_error(ret);
-        goto return_error;
+	dbpf_txn_queue_add(op_p->context_id, op_p->coll_p->ds_db, &key, &data);
+    }
+    else
+    {
+	ret = op_p->coll_p->ds_db->put(op_p->coll_p->ds_db, NULL, &key, &data, 0);
+	if (ret != 0)
+	{
+	    gossip_err("error in dspace create (db_p->put failed).\n");
+	    ret = -dbpf_db_error_to_trove_error(ret);
+	    goto return_error;
+	}
     }
 
     trove_ds_stored_to_attr(s_attr, attr, 0);
@@ -1150,14 +1160,21 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
                  (int) s_attr.dist_size);
 #endif
 
-    ret = op_p->coll_p->ds_db->put(
-        op_p->coll_p->ds_db, NULL, &key, &data, 0);
-    if (ret != 0)
+    if(1)
     {
-        op_p->coll_p->ds_db->err(
-            op_p->coll_p->ds_db, ret, "dspace_db->put setattr");
-        ret = -dbpf_db_error_to_trove_error(ret);
-        goto return_error;
+	dbpf_txn_queue_add(op_p->context_id, op_p->coll_p->ds_db, &key, &data);
+    }
+    else
+    {
+	ret = op_p->coll_p->ds_db->put(
+	    op_p->coll_p->ds_db, NULL, &key, &data, 0);
+	if (ret != 0)
+	{
+	    op_p->coll_p->ds_db->err(
+		op_p->coll_p->ds_db, ret, "dspace_db->put setattr");
+	    ret = -dbpf_db_error_to_trove_error(ret);
+	    goto return_error;
+	}
     }
 
     /* now that the disk is updated, update the cache if necessary */

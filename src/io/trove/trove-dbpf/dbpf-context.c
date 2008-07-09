@@ -57,7 +57,14 @@ int dbpf_open_context(
     *context_id = context_index;
     gen_mutex_unlock(&dbpf_context_mutex);
 
-    ret = dbpf_sync_context_init(context_index);
+    if(1)
+    {
+	ret = dbpf_txn_context_init(context_index);
+    }
+    else
+    {
+	ret = dbpf_sync_context_init(context_index);
+    }
     if(ret < 0)
     {
 	return ret;
@@ -86,7 +93,14 @@ int dbpf_close_context(
 
     gen_mutex_unlock(&dbpf_context_mutex);
 
-    dbpf_sync_context_destroy(context_id);
+    if(1)
+    {
+	dbpf_txn_context_destroy(context_id);
+    }
+    else
+    {
+	dbpf_sync_context_destroy(context_id);
+    }
     return 0;
 }
 

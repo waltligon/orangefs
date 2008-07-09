@@ -556,9 +556,7 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    /*For transaction db, use checkpoint instead of sync*/
-    ret = coll_p->coll_env->txn_checkpoint(coll_p->coll_env, 0, 0, DB_FORCE);
-    /*ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0);*/
+    ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0);
 
     if (ret != 0)
     {
@@ -647,6 +645,7 @@ int dbpf_finalize(void)
     int ret = -TROVE_EINVAL;
 
     dbpf_thread_finalize();
+    dbpf_checkpoint_thread_finalize();
     dbpf_open_cache_finalize();
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_finalize();
@@ -1472,6 +1471,12 @@ int dbpf_collection_lookup(char *collname,
         free(coll_p->name);
         free(coll_p);
         return -dbpf_db_error_to_trove_error(ret);
+    }
+
+    ret = dbpf_checkpoint_thread_initialize(coll_p->coll_env);
+    if (ret != 0)
+    {
+	return ret;
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,

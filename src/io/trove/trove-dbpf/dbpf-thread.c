@@ -26,6 +26,7 @@ extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 #ifdef __PVFS2_TROVE_THREADED__
 static pthread_t dbpf_thread;
+static pthread_t dbpf_checkpoint_thread;
 static int dbpf_thread_running = 0;
 pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
 pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
@@ -45,14 +46,15 @@ int dbpf_thread_initialize(void)
                          dbpf_thread_function, NULL);
     if (ret == 0)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
+	gossip_debug(GOSSIP_TROVE_DEBUG,
                      "dbpf_thread_initialize: initialized\n");
+	return 0;
     }
     else
     {
-        dbpf_thread_running = 0;
-        gossip_debug(
-            GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
+	dbpf_thread_running = 0;
+	gossip_debug(
+	    GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
     }
 #endif
     return ret;
@@ -72,7 +74,49 @@ int dbpf_thread_finalize(void)
     return ret;
 }
 
+int dbpf_checkpoint_thread_initialize(DB_ENV *dbenv)
+{
+    int ret = 0;
+#ifdef __PVFS2_TROVE_THREADED__
+    ret = pthread_create(&dbpf_checkpoint_thread, NULL, 
+		   dbpf_checkpoint_thread_function, (void *)dbenv);
+    if(ret == 0)
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG, 
+		     "dbpf_checkpoint_thread_initialize: initialized\n");
+    }
+    else
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG, 
+		     "dbpf_checkpoint_thread_initialize: failed\n");
+    }
+#endif
+    return ret;
+}
+
+int dbpf_checkpoint_thread_finalize(void)
+{
+    int ret = 0;
+#ifdef __PVFS2_TROVE_THREADED__
+    ret = pthread_join(dbpf_checkpoint_thread, NULL);
+#endif
+    return ret;
+}
+
 int synccount = 0;
+
+void *dbpf_checkpoint_thread_function(void *ptr)
+{
+#ifdef __PVFS2_TROVE_THREADED__
+    DB_ENV *dbenv = (DB_ENV *)ptr;
+    while(dbpf_thread_running)
+    {
+	dbenv->txn_checkpoint(dbenv, 512, 1, 0);
+	dbenv->log_archive(dbenv, NULL, DB_ARCH_REMOVE);
+    }
+#endif
+    return ptr;
+}
 
 void *dbpf_thread_function(void *ptr)
 {
@@ -206,7 +250,14 @@ int dbpf_do_one_work_cycle(int *out_count)
              * and move _all_ the ready-to-be-synced operations to the
              * completion queue.
              */
-            ret = dbpf_sync_coalesce(cur_op, (ret == 1 ? 0 : ret), out_count);
+	    if(1)
+	    {
+		ret = dbpf_txn_coalesce(cur_op, (ret == 1 ? 0 : ret), out_count);
+	    }
+	    else
+	    {
+		ret = dbpf_sync_coalesce(cur_op, (ret == 1 ? 0 : ret), out_count);
+	    }
             if(ret < 0)
             {
                 return ret; /* not sure how to recover from failure here */

@@ -38,6 +38,8 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
+#include "dbpf-sync.h"
+
 static uint32_t readdir_session = 0;
 
 extern int synccount;
@@ -441,19 +443,26 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
                  op_p->u.k_write.key.buffer_sz,
                  key.size);
 
-    ret = op_p->coll_p->keyval_db->put(
-        op_p->coll_p->keyval_db, NULL, &key, &data, dbflags);
-    /* Either a put error or key already exists */
-    if (ret != 0 )
+    if(1)
     {
-	gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-		     "keyval_db->put failed. ret=%d\n", ret);
-
-        /*op_p->coll_p->keyval_db->err(
-            op_p->coll_p->keyval_db, ret, "keyval_db->put keyval write");
-	*/
-        ret = -dbpf_db_error_to_trove_error(ret);
-        goto return_error;
+	dbpf_txn_queue_add(op_p->context_id, op_p->coll_p->keyval_db, &key, &data);
+    }
+    else
+    {
+	ret = op_p->coll_p->keyval_db->put(
+	    op_p->coll_p->keyval_db, NULL, &key, &data, dbflags);
+	/* Either a put error or key already exists */
+	if (ret != 0 )
+	{
+	    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+			 "keyval_db->put failed. ret=%d\n", ret);
+	    
+	    /*op_p->coll_p->keyval_db->err(
+	      op_p->coll_p->keyval_db, ret, "keyval_db->put keyval write");
+	    */
+	    ret = -dbpf_db_error_to_trove_error(ret);
+	    goto return_error;
+	}
     }
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
@@ -1111,16 +1120,23 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                      op_p->u.k_write_list.key_array[k].buffer_sz,
                      key.size);
 
-        ret = op_p->coll_p->keyval_db->put(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
-        if (ret != 0)
-        {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, 
-                "keyval_db->put keyval write list");
-            ret = -dbpf_db_error_to_trove_error(ret);
-            goto return_error;
-        }
+	if(1)
+	{
+	    dbpf_txn_queue_add(op_p->context_id, op_p->coll_p->keyval_db, &key, &data);
+	}
+	else
+	{
+	    ret = op_p->coll_p->keyval_db->put(
+		op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+	    if (ret != 0)
+	    {
+		op_p->coll_p->keyval_db->err(
+		    op_p->coll_p->keyval_db, ret, 
+		    "keyval_db->put keyval write list");
+		ret = -dbpf_db_error_to_trove_error(ret);
+		goto return_error;
+	    }
+	}
 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
                      "of %s\n", (char *)op_p->u.k_write_list.key_array[k].buffer);
@@ -1863,15 +1879,22 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
             }
         }
 
-        ret = op_p->coll_p->keyval_db->put(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
-        if(ret != 0)
-        {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, 
-                "keyval_db->put keyval handle info ops");
-            return -dbpf_db_error_to_trove_error(ret);
-        }
+	if(1)
+	{
+	    dbpf_txn_queue_add(op_p->context_id, op_p->coll_p->keyval_db, &key, &data);
+	}
+	else
+	{
+	    ret = op_p->coll_p->keyval_db->put(
+		op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+	    if(ret != 0)
+	    {
+		op_p->coll_p->keyval_db->err(
+		    op_p->coll_p->keyval_db, ret, 
+		    "keyval_db->put keyval handle info ops");
+		return -dbpf_db_error_to_trove_error(ret);
+	    }
+	}
     }
 
     return 0;
