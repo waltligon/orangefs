@@ -9,6 +9,7 @@
 
 #include "pvfs2-config.h"
 #include "pvfs2-types.h"
+#include "security-types.h"
 
 
 #define PINT_CAP_EXEC    (1 << 0)
@@ -19,54 +20,6 @@
 #define PINT_CAP_ADMIN   (1 << 5)
 #define PINT_CAP_REMOVE  (1 << 6)
 
-
-typedef unsigned char *PVFS_sig;
-
-typedef struct PVFS_capability PVFS_capability;
-struct PVFS_capability {
-    PVFS_handle owner;
-    PVFS_fs_id fsid;
-    uint32_t sig_size;
-    PVFS_sig signature;
-    PVFS_time timeout;   /* seconds after epoch to time out */
-    uint32_t op_mask;
-    uint32_t num_handles;
-    PVFS_handle *handle_array;
-};
-
-endecode_fields_2a2a_struct (
-    PVFS_capability,
-    PVFS_handle, owner,
-    PVFS_fs_id, fsid,
-    uint32_t, sig_size,
-    PVFS_sig, signature,
-    PVFS_time, timeout,
-    uint32_t, op_mask,
-    uint32_t, num_handles,
-    PVFS_handle, handle_array)
-
-typedef struct PVFS_credential PVFS_credential;
-struct PVFS_credential {
-    uint32_t serial;
-    PVFS_uid userid;
-    uint32_t num_groups;
-    PVFS_gid *group_array;
-    char * issuer_id;
-    PVFS_time timeout;
-    uint32_t sig_size;
-    PVFS_sig signature;
-};
-
-endecode_fields_2aa1a_struct (
-    PVFS_credential,
-    uint32_t, serial,
-    PVFS_uid, userid,
-    uint32_t, num_groups,
-    PVFS_gid, group_array,
-    string, issuer_id,
-    PVFS_time, timeout,
-    uint32_t, sig_size,
-    PVFS_sig, signature)
 
 /*  top-level security functions */
 
@@ -117,25 +70,6 @@ int PINT_verify_credential (PVFS_credential *);
  *  returns 0 on success
  */
 int PINT_init_capability(PVFS_capability *);
-
-/*  PINT_dup_capability
- *
- *  When passed a valid capability pointer this function will duplicate
- *  it and return the copy.  User must make sure to free both the new and
- *  old capabilities as normal.
- *	
- *  returns NULL on error
- *  returns valid PVFS_capability * on success
- */
-PVFS_capability *PINT_dup_capability(const PVFS_capability *);
-
-/*  PINT_release_capability
- *
- *  Frees any memory associated with a capability structure.
- *	
- *  no return value
- */
-void PINT_release_capability(PVFS_capability *);
 
 /*  PINT_get_max_sigsize
  *

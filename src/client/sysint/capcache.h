@@ -10,7 +10,7 @@
 
 #include "pvfs2-types.h"
 #include "tcache.h"
-#include "pint-security.h"
+#include "security-types.h"
 
 
 #define PINT_capcache_options PINT_tcache_options

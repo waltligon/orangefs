@@ -28,6 +28,8 @@
 
 #include "pint-security.h"
 #include "security-hash.h"
+#include "security-types.h"
+#include "security-util.h"
 
 
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
