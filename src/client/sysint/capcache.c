@@ -171,8 +171,9 @@ int PINT_capcache_insert(PVFS_object_ref *objref, PVFS_capability *capability)
 {
     int ret = -PVFS_EINVAL;
     struct capcache_payload *payload;
+    struct timeval expiration;
     struct PINT_tcache_entry *entry;
-    int status;
+    int tmp;
 
     payload = (struct capcache_payload*)malloc(
                                               sizeof(struct capcache_payload));
@@ -191,14 +192,29 @@ int PINT_capcache_insert(PVFS_object_ref *objref, PVFS_capability *capability)
         return -PVFS_ENOMEM;
     }
 
+    /* TODO: find a better way to convert */
+    expiration.tv_sec = capability->timeout;
+    expiration.tv_usec = 0;
+
     gen_mutex_lock(&capcache_mutex);
 
-    /* TODO: check for old entry and replace */
-    /* TODO: insert new entry */
+    ret = PINT_tcache_lookup(capcache, objref, &entry, &tmp);
+    if (!ret)
+    {
+        PINT_tcache_delete(capcache, entry);
+    }
+
+    ret = PINT_tcache_insert_entry_ex(capcache, objref, payload, 
+                                      &expiration, &tmp);
 
     gen_mutex_unlock(&capcache_mutex);
 
-    return 0;
+    if (ret < 0)
+    {
+        free_payload(payload);
+    }
+
+    return ret;
 }
 
 static int compare_key_entry(void *key, struct qhash_head *link)
