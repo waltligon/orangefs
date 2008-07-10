@@ -275,9 +275,21 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 dev_init_failures = 0;
 
-                fprintf(stderr,
-                        "Child process with pid %d was killed by an "
-                       "uncaught signal %d\n", core_pid, WTERMSIG(ret));
+                if(!strcmp(opts->logtype, "file"))
+                {
+                    gossip_enable_file(opts->logfile, "a");
+                }
+                else if(!strcmp(opts->logtype, "syslog"))
+                {
+                    gossip_enable_syslog(LOG_INFO);
+                }
+                else
+                {
+                    gossip_enable_stderr();
+                }
+
+                gossip_err("Child process with pid %d was killed by an "
+                           "uncaught signal %d\n", core_pid, WTERMSIG(ret));
                 core_pid = -1;
 
                 gettimeofday(&now, NULL);
@@ -288,10 +300,10 @@ static int monitor_pvfs2_client(options_t *opts)
                 {
                     if(restart_count > CLIENT_MAX_RESTARTS)
                     {
-                        fprintf(stderr, "Chld process is restarting too quickly "
-                                "(within %d secs) after %d attempts! "
-                                "Aborting the client.\n",
-                                CLIENT_RESTART_INTERVAL_SECS, restart_count);
+                        gossip_err("Chld process is restarting too quickly "
+                                   "(within %d secs) after %d attempts! "
+                                   "Aborting the client.\n",
+                                   CLIENT_RESTART_INTERVAL_SECS, restart_count);
                         exit(1);
                     }
                 }
@@ -300,6 +312,8 @@ static int monitor_pvfs2_client(options_t *opts)
                     /* reset restart count */
                     restart_count = 0;
                 }
+
+                gossip_disable();
 
                 last_restart = now;
                 continue;

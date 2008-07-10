@@ -659,6 +659,32 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	)
 
+        AC_MSG_CHECKING(for fh_to_dentry member in export_operations in kernel)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/exportfs.h>
+	    ], [
+	    struct export_operations x;
+	    x.fh_to_dentry = NULL;
+	    ],
+	    AC_MSG_RESULT(yes)
+	    AC_DEFINE(HAVE_FHTODENTRY_EXPORT_OPERATIONS, 1, Define if export_operations has an fh_to_dentry member),
+	    AC_MSG_RESULT(no)
+	)
+
+        AC_MSG_CHECKING(for encode_fh member in export_operations in kernel)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/exportfs.h>
+	    ], [
+	    struct export_operations x;
+	    x.encode_fh = NULL;
+	    ],
+	    AC_MSG_RESULT(yes)
+	    AC_DEFINE(HAVE_ENCODEFH_EXPORT_OPERATIONS, 1, Define if export_operations has an encode_fh member),
+	    AC_MSG_RESULT(no)
+	)
+
 	dnl Using -Werror is not an option, because some arches throw lots of
 	dnl warnings that would trigger false negatives.  We know that the
 	dnl change to the releasepage() function signature was accompanied by
@@ -982,6 +1008,34 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_READ_INODE, 1, [Define if kernel super_operations contains read_inode field]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl older 2.6 kernels don't have MNT_NOATIME
+	AC_MSG_CHECKING(if mount.h defines MNT_NOATIME)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/mount.h>
+	], [
+		int flag = MNT_NOATIME;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_MNT_NOATIME, 1, [Define if mount.h contains
+	MNT_NOATIME flags]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl older 2.6 kernels don't have MNT_NODIRATIME
+	AC_MSG_CHECKING(if mount.h defines MNT_NODIRATIME)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/mount.h>
+	], [
+		int flag = MNT_NODIRATIME;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_MNT_NODIRATIME, 1, [Define if mount.h contains
+	MNT_NODIRATIME flags]),
 	AC_MSG_RESULT(no)
 	)
 

@@ -23,6 +23,11 @@
 #include "extent-utils.h"
 #include "pint-cached-config.h"
 
+/* really old linux distributions (jazz's RHEL 3) don't have this(!?) */
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 64
+#endif
+
 /* maps bmi address to handle ranges/extents */
 struct bmi_host_extent_table_s
 {
@@ -992,7 +997,6 @@ int PINT_cached_config_get_num_dfiles(
     int num_dfiles_requested,
     int *num_dfiles)
 {
-    int ret = -PVFS_EINVAL;
     int rc;
     int num_io_servers;
     
@@ -1017,17 +1021,23 @@ int PINT_cached_config_get_num_dfiles(
 
     /* Determine the number of I/O servers available */
     rc = PINT_cached_config_get_num_io(fsid, &num_io_servers);
-    
-    if (0 == rc)
+    if(rc < 0)
     {
-        /* Allow the distribution to apply its hint to the number of
-           dfiles requested and the number of I/O servers available */
-        *num_dfiles = dist->methods->get_num_dfiles(dist->params,
-                                                    num_io_servers,
-                                                    num_dfiles_requested);
-        ret = 0;
+        return(rc);
     }
-    return ret;
+    
+    /* Allow the distribution to apply its hint to the number of
+       dfiles requested and the number of I/O servers available */
+    *num_dfiles = dist->methods->get_num_dfiles(dist->params,
+                                                num_io_servers,
+                                                num_dfiles_requested);
+    if(*num_dfiles < 1)
+    {
+        gossip_err("Error: distribution failure for %d servers and %d requested datafiles.\n", num_io_servers, num_dfiles_requested);
+        return(-PVFS_EINVAL);
+    }
+
+    return 0;
 }
 
 /* PINT_cached_config_get_num_meta()

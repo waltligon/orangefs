@@ -781,7 +781,6 @@ PVFS_error PINT_client_wait_internal(
     {
         smcb = PINT_id_gen_safe_lookup(op_id);
         assert(smcb);
-        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
         do
         {
@@ -793,6 +792,8 @@ PVFS_error PINT_client_wait_internal(
             ret = PINT_client_state_machine_test(op_id, out_error);
 
         } while (!PINT_smcb_complete(smcb) && (ret == 0));
+
+        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
         if (ret)
         {

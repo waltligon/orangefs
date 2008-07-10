@@ -7,6 +7,7 @@
 
 #include "dist-varstrip-parser.h"
 #include "pvfs2-dist-varstrip.h"
+#include "gossip.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -145,6 +146,12 @@ int PINT_dist_strips_parse(
     *count = 0;
     *strips = 0;
 
+    if(!input || strlen(input) == 0)
+    {
+        gossip_err("Error: missing manditory parameters to varstrip_dist distribution.\n");
+        return(-1);
+    }
+
     if (strlen(input) < PVFS_DIST_VARSTRIP_MAX_STRIPS_STRING_LENGTH - 1)
     {
         strcpy(inp, input);
@@ -152,6 +159,7 @@ int PINT_dist_strips_parse(
     else
     {
         /* input string too long, abort */
+        gossip_err("Error: varstrip_dist distribution parameters too long.\n");
         return -1;
     }
 
@@ -160,6 +168,7 @@ int PINT_dist_strips_parse(
     if (!(*strips))        
     {
         /* allocation failed, abort */
+        gossip_err("Error: unable to parse varstrip_dist distribution parameters.\n");
         return -1;
     }
 

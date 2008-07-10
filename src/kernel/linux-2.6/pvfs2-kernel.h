@@ -570,7 +570,8 @@ typedef struct
     struct kiocb *kiocb; /* pointer to the kiocb that kicked this operation */
     int buffer_index; /* buffer index that was used for the I/O */
     pvfs2_kernel_op_t *op; /* pvfs2 kernel operation type */
-    char __user *buffer; /* The user space buffer to which I/O is being staged */
+    struct iovec *iov; /* The user space buffers from/to which I/O is being staged */
+    unsigned long nr_segs; /* number of elements in the iovector */
     int   rw; /* set to indicate the type of the operation */
     loff_t offset; /* file offset */
     size_t bytes_to_be_copied; /* and the count in bytes */

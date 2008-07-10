@@ -15,9 +15,11 @@
 #include "pvfs2-server.h"
 #include "pint-event.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 #include "request-scheduler/request-scheduler.h"
 
 static int check_fs_id(PVFS_fs_id fs_id);
+static int drop_caches(void);
 
 %%
 
@@ -148,6 +150,9 @@ static PINT_sm_action setparam_work(
 
             js_p->error_code = 0;
             return ret;
+        case PVFS_SERV_PARAM_DROP_CACHES:
+            js_p->error_code = drop_caches();
+            return SM_ACTION_COMPLETE;
     }
 
     gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",
@@ -244,10 +249,48 @@ struct PINT_server_req_params pvfs2_setparam_params =
     .string_name = "mgmt_setparam",
     .perm = PINT_SERVER_CHECK_NONE,
     .access_type = PINT_server_req_modify,
-    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_setparam,
     .state_machine = &pvfs2_setparam_sm
 };
+
+/* drop_caches()
+ *
+ * Linux specific, but should fail cleanly on other platforms. 
+ *
+ * This function asks the operating system to sync and drop any in memory
+ * caches that it may have.  Applies globally to all file systems on the
+ * server, not just the PVFS storage space.
+ */
+static int drop_caches(void)
+{
+    int fd;
+    int ret;
+
+    /* try to commit buffer cache first */
+    sync();
+
+    /* open Linux specific control file if present */
+    fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
+    if(fd < 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "Warning: drop_caches not supported.\n");
+        return(-PVFS_EOPNOTSUPP);
+    }
+
+    /* free page cache, dentries, and inodes */
+    ret = write(fd, "3", 2);
+    if(ret < 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "Warning: found drop_caches file but failed to write to it.\n");
+        close(fd);
+        return(-PVFS_EOPNOTSUPP);
+    }
+   
+    close(fd);
+    return(0);
+}
 
 /*
  * Local variables:

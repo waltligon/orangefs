@@ -967,6 +967,9 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
         /* return errors, do not abort */
         mx_set_error_handler(MX_ERRORS_RETURN);
 
+        /* only complete sends after they are delivered */
+        setenv("MX_ZOMBIE", "0", 1);
+
         mxret = mx_init();
         if (!(mxret == MX_SUCCESS || mxret == MX_ALREADY_INITIALIZED)) {
                 debug(BMX_DB_WARN, "mx_init() failed with %s", mx_strerror(mxret));
@@ -983,8 +986,9 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
                 uint32_t                ep_id   = 0;
                 uint32_t                sid     = 0;
                 uint64_t                nic_id  = 0ULL;
+                struct bmx_peer         *peer   = NULL;
 
-                bmi_mx->bmx_hostname = (char *) mxmap->mxm_hostname;
+                bmi_mx->bmx_hostname = strdup(mxmap->mxm_hostname);
                 bmi_mx->bmx_board = mxmap->mxm_board;
                 bmi_mx->bmx_ep_id = mxmap->mxm_ep_id;
                 bmi_mx->bmx_is_server = 1;
@@ -1001,6 +1005,8 @@ BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
                 mx_get_endpoint_addr(bmi_mx->bmx_ep, &epa);
                 mx_decompose_endpoint_addr2(epa, &nic_id, &ep_id, &sid);
                 bmi_mx->bmx_sid = sid;
+
+                bmx_peer_alloc(&peer, mxmap);
 
                 /* We allocate BMX_PEER_RX_NUM when we peer_alloc()
                  * Allocate some here to catch the peer CONN_REQ */
@@ -1102,8 +1108,14 @@ BMI_mx_finalize(void)
         }
 #endif
 
-        if (bmi_mx->bmx_hostname) free(bmi_mx->bmx_hostname);
-        if (bmi_mx->bmx_peername) free(bmi_mx->bmx_peername);
+        if (bmi_mx->bmx_hostname) {
+                free(bmi_mx->bmx_hostname);
+                bmi_mx->bmx_hostname = NULL;
+        }
+        if (bmi_mx->bmx_peername) {
+                free(bmi_mx->bmx_peername);
+                bmi_mx->bmx_peername = NULL;
+        }
 
         bmi_mx = NULL;
 
@@ -2186,7 +2198,7 @@ bmx_alloc_method_addr(const char *peername, const char *hostname, uint32_t board
         mxmap = map->method_data;
         mxmap->mxm_map = map;
         mxmap->mxm_peername = strdup(peername);
-        mxmap->mxm_hostname = hostname;
+        mxmap->mxm_hostname = strdup(hostname);
         mxmap->mxm_board = board;
         mxmap->mxm_ep_id = ep_id;
         /* mxmap->mxm_peer */
@@ -2382,6 +2394,7 @@ bmx_handle_conn_req(void)
                                         bmx_put_idle_rx(rx);
                                         continue;
                                 }
+                                free(host);
                                 mxmap = map->method_data;
                                 ret = bmx_peer_alloc(&peer, mxmap);
                                 if (ret != 0) {
@@ -2819,6 +2832,9 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                                 sizes[completed] = status.xfer_length;
                         } else {
                                 errs[completed] = bmx_mx_to_bmi_errno(status.code);
+                                debug(BMX_DB_CTX, "%s unexpected send completed with "
+                                      "error %s", __func__, mx_strstatus(status.code));
+                                bmx_peer_disconnect(peer, 0, BMI_ENETRESET);
                         }
                         if (user_ptrs)
                                 user_ptrs[completed] = ctx->mxc_mop->user_ptr;
@@ -3095,6 +3111,7 @@ BMI_mx_method_addr_lookup(const char *id)
                                        " failed with %d", __func__, ret);
                         }
                 }
+                if (map != NULL) free(host);
         }
 out:
         BMX_EXIT;
@@ -3162,7 +3179,7 @@ BMI_mx_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
                 }
                 break;
         default:
-                debug(BMX_DB_WARN, "%s called on %s with state %d", __func__,
+                debug(BMX_DB_CTX, "%s called on %s with state %d", __func__,
                         ctx->mxc_type == BMX_REQ_TX ? "TX" : "RX", ctx->mxc_state);
         }
         BMX_EXIT;

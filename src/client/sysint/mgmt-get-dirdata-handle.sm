@@ -165,6 +165,7 @@ static int mgmt_get_dirdata_handle_setup_msgpair(
     js_p->error_code = 0;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_MGMT_GET_DIRDATA_HANDLE_FILL(
         msg_p->req,

@@ -1324,17 +1324,21 @@ Optional Features:
   --disable-server Disables building of PVFS2 server
   --disable-karma-mem-usage-stats Disables memory usage stats in karma
   --disable-perf-counters Disables pvfs2-server performance counters
-  --enable-mmap-racache   Enables mmap-readahead in kernel interface
-  --enable-trusted-connections  Enable connects only from trusted hosts/ports
-                                (experimental, off by default)
+  --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel
+                          interface
+  --enable-trusted-connections  **EXPERIMENTAL** Enable connects only
+                          from trusted hosts/ports
   --disable-karma         Disables optional gui.  (Enabled by default)
   --disable-static        Do not build static client library
   --enable-redhat24       Enable workaround for RedHat 2.4 kernel
   --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries
-  --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks
+  --disable-aio-threaded-callbacks  **EXPERIMENTAL** Disable use of AIO
+                          threaded callbacks
   --disable-kernel-aio    Forcibly disable kernel aio
-  --enable-kernel-sendfile    Forcibly enable kernel sendfile
-  --enable-threaded-kmod-helper  Use threads in the kernel helper application
+  --enable-kernel-sendfile   **EXPERIMENTAL** Forcibly enable kernel
+                          sendfile
+  --enable-threaded-kmod-helper  **EXPERIMENTAL** Use threads in the kernel
+                          helper application
   --enable-fast           Disable optional debugging, enable optimizations.
   --enable-strict         Turn on strict compiler warnings
   --enable-verbose-build  Enables full output during build process
@@ -10683,6 +10687,122 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+        { echo "$as_me:$LINENO: checking for fh_to_dentry member in export_operations in kernel" >&5
+echo $ECHO_N "checking for fh_to_dentry member in export_operations in kernel... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+	    #define __KERNEL__
+	    #include <linux/exportfs.h>
+
+int
+main ()
+{
+
+	    struct export_operations x;
+	    x.fh_to_dentry = NULL;
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_FHTODENTRY_EXPORT_OPERATIONS 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+        { echo "$as_me:$LINENO: checking for encode_fh member in export_operations in kernel" >&5
+echo $ECHO_N "checking for encode_fh member in export_operations in kernel... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+	    #define __KERNEL__
+	    #include <linux/exportfs.h>
+
+int
+main ()
+{
+
+	    struct export_operations x;
+	    x.encode_fh = NULL;
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_ENCODEFH_EXPORT_OPERATIONS 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 								{ echo "$as_me:$LINENO: checking for second arg type int in address_space_operations releasepage" >&5
 echo $ECHO_N "checking for second arg type int in address_space_operations releasepage... $ECHO_C" >&6; }
 	cat >conftest.$ac_ext <<_ACEOF
@@ -11895,6 +12015,120 @@ echo "${ECHO_T}yes" >&6; }
 
 cat >>confdefs.h <<\_ACEOF
 #define HAVE_READ_INODE 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+		{ echo "$as_me:$LINENO: checking if mount.h defines MNT_NOATIME" >&5
+echo $ECHO_N "checking if mount.h defines MNT_NOATIME... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/mount.h>
+
+int
+main ()
+{
+
+		int flag = MNT_NOATIME;
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_MNT_NOATIME 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+		{ echo "$as_me:$LINENO: checking if mount.h defines MNT_NODIRATIME" >&5
+echo $ECHO_N "checking if mount.h defines MNT_NODIRATIME... $ECHO_C" >&6; }
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/mount.h>
+
+int
+main ()
+{
+
+		int flag = MNT_NODIRATIME;
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_MNT_NODIRATIME 1
 _ACEOF
 
 else

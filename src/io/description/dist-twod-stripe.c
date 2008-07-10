@@ -4,6 +4,15 @@
  *
  * See COPYING in top-level directory.
  */
+/* twod-stripe will take all of the servers in the filesystem and
+ * partition them into num_groups groups.  Data will then be striped to
+ * each group before we move onto the next group.  The strip_factor will
+ * determine how many chunks of strip_size are written to each server
+ * in each group before we transition to the next group.
+ * The striping on the group level is done round-robin in the same
+ * fashion as simple-stripe
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -433,29 +442,29 @@ static int set_param(const char* dist_name, void* params,
     }
     else if(strcmp(param_name, "num_groups")==0)
     {
-        if(*(uint32_t*)value <= 0)
+        if(*(int64_t*)value <= 0)
         {
             gossip_err("ERROR: num_groups param <= 0!\n");
         }
         else
         {
             gossip_debug(GOSSIP_DIST_DEBUG,
-                         "%s: num_groups: %d\n",
-                         __func__, *(uint32_t*)value);
-            dparam->num_groups = *(uint32_t*)value;
+                         "%s: num_groups: %lld\n",
+                         __func__, lld(*(int64_t*)value));
+            dparam->num_groups = *(int64_t*)value;
         }
     }
     else if(strcmp(param_name, "group_strip_factor")==0)
     {
-        if(*(uint32_t*)value <= 0)
+        if(*(int64_t*)value <= 0)
             gossip_err("ERROR: group_strip_factor param <= 0!\n");
         else
         {
             gossip_debug(GOSSIP_DIST_DEBUG,
-                         "%s: group_strip_factor: %d\n",
-                         __func__,*(uint32_t*)value);
+                         "%s: group_strip_factor: %lld\n",
+                         __func__,lld(*(int64_t*)value));
 
-            dparam->group_strip_factor = *(uint32_t*)value;
+            dparam->group_strip_factor = *(int64_t*)value;
         }
     }
     else
@@ -470,7 +479,7 @@ static void encode_params(char **pptr, void* params)
     PVFS_twod_stripe_params *dparam =(PVFS_twod_stripe_params*)params;
     encode_uint32_t(pptr,&dparam->num_groups);
     encode_PVFS_size(pptr, &dparam->strip_size);
-    encode_int32_t(pptr,&dparam->group_strip_factor);
+    encode_uint32_t(pptr,&dparam->group_strip_factor);
 }
 
 

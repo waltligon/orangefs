@@ -96,8 +96,15 @@ int pvfs_bufmap_copy_from_pages(
 size_t pvfs_bufmap_copy_to_user_task(
         struct task_struct *tsk,
         void __user *to,
-        int buffer_index, 
-        size_t size);
+        size_t size,
+        int buffer_index,
+        int *buffer_index_offset);
+size_t pvfs_bufmap_copy_to_user_task_iovec(
+        struct task_struct *tsk,
+        struct iovec *iovec,
+        unsigned long nr_segs,
+        int buffer_index,
+        size_t bytes_to_be_copied);
 #endif
 
 #endif /* __PVFS2_BUFMAP_H */

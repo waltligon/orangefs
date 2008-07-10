@@ -967,6 +967,8 @@ struct super_block* pvfs2_get_sb(
     root_object.handle = PVFS2_SB(sb)->root_handle;
     root_object.fs_id  = PVFS2_SB(sb)->fs_id;
 
+    gossip_debug(GOSSIP_SUPER_DEBUG, "get inode %llu, fsid %d\n",
+                 root_object.handle, root_object.fs_id);
     /* alloc and initialize our root directory inode by explicitly requesting
      * the sticky bit to be set */
     root = pvfs2_get_custom_core_inode(
@@ -1027,7 +1029,109 @@ struct super_block* pvfs2_get_sb(
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
 
-static struct export_operations pvfs2_export_ops = {};
+#ifdef HAVE_FHTODENTRY_EXPORT_OPERATIONS
+struct dentry *
+pvfs2_fh_to_dentry(struct super_block *sb, struct fid *fid,
+                   int fh_len, int fh_type)
+{
+   PVFS_object_ref refn;
+   struct inode *inode;
+   struct dentry *dentry;
+
+   if (fh_len < 3 || fh_type > 2) 
+   {
+      return NULL;
+   }
+
+   refn.handle = (u64) (fid->raw[0]) << 32;
+   refn.handle |= (u32) fid->raw[1];
+   refn.fs_id  = (u32) fid->raw[2];
+   gossip_debug(GOSSIP_SUPER_DEBUG, "fh_to_dentry: handle %llu, fs_id %d\n",
+                refn.handle, refn.fs_id);
+
+   inode = pvfs2_iget(sb, &refn);
+   if (inode == NULL)
+   {
+      return ERR_PTR(-ESTALE);
+   }
+   if (IS_ERR(inode))
+   {
+      return (void *) inode;
+   }
+   dentry = d_alloc_anon(inode);
+
+   if (dentry == NULL)
+   {
+      iput(inode);
+      return ERR_PTR(-ENOMEM);
+   }
+   dentry->d_op = &pvfs2_dentry_operations;
+   return dentry;
+}
+#endif /* HAVE_FHTODENTRY_EXPORT_OPERATIONS */
+
+#ifdef HAVE_ENCODEFH_EXPORT_OPERATIONS
+int pvfs2_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len, int connectable)
+{
+   struct inode *inode = dentry->d_inode;
+   int len = *max_len;
+   int type = 1;
+   PVFS_object_ref handle;
+   u32 generation;
+
+   /*
+    * if connectable is specified, parent handle identity has to be stashed
+    * as well.
+    */
+   if (len < 3 || (connectable && len < 6)) {
+      gossip_lerr("fh buffer is too small for encoding\n");
+      type = 255;
+      goto out;
+   }
+
+   handle = PVFS2_I(inode)->refn;
+   generation = inode->i_generation;
+   gossip_debug(GOSSIP_SUPER_DEBUG, "Encoding fh: handle %llu, gen %u, fsid %u\n",
+                handle.handle, generation, handle.fs_id);
+
+   len = 3;
+   fh[0] = handle.handle >> 32;
+   fh[1] = handle.handle & 0xffffffff;
+   fh[2] = handle.fs_id;
+
+   if (connectable && !S_ISDIR(inode->i_mode)) {
+      struct inode *parent;
+
+      spin_lock(&dentry->d_lock);
+
+      parent = dentry->d_parent->d_inode;
+      handle = PVFS2_I(parent)->refn;
+      generation = parent->i_generation;
+      fh[3] = handle.handle >> 32;
+      fh[4] = handle.handle & 0xffffffff;
+      fh[5] = handle.fs_id;
+
+      spin_unlock(&dentry->d_lock);
+      len = 6;
+      type = 2;
+      gossip_debug(GOSSIP_SUPER_DEBUG, "Encoding parent: handle %llu, gen %u, fsid %u\n",
+                  handle.handle, generation, handle.fs_id);
+   }
+   *max_len = len;
+
+out:
+   return type;
+}
+#endif /* HAVE_ENCODEFH_EXPORT_OPERATIONS */
+
+static struct export_operations pvfs2_export_ops = {
+#ifdef HAVE_ENCODEFH_EXPORT_OPERATIONS
+   .encode_fh    = pvfs2_encode_fh,
+#endif
+#ifdef HAVE_FHTODENTRY_EXPORT_OPERATIONS
+   .fh_to_dentry = pvfs2_fh_to_dentry,
+#endif
+};
 
 int pvfs2_fill_sb(
     struct super_block *sb,
@@ -1087,6 +1191,8 @@ int pvfs2_fill_sb(
 
     root_object.handle = PVFS2_SB(sb)->root_handle;
     root_object.fs_id  = PVFS2_SB(sb)->fs_id;
+    gossip_debug(GOSSIP_SUPER_DEBUG, "get inode %llu, fsid %d\n",
+                 root_object.handle, root_object.fs_id);
     /* alloc and initialize our root directory inode. be explicit about sticky
      * bit */
     root = pvfs2_get_custom_core_inode(sb, NULL, (S_IFDIR | 0755 | S_ISVTX),
