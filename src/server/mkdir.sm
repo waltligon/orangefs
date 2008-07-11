@@ -241,7 +241,7 @@ static PINT_sm_action mkdir_write_dirdata_handle(
     ret = job_trove_keyval_write(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
         &s_op->key, &s_op->val, 
-        0,
+        TROVE_SYNC,
         NULL, smcb, 0, js_p, &i, server_job_context);
 
     return ret;
