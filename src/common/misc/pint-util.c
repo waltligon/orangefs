@@ -19,6 +19,7 @@
 #include "gen-locks.h"
 #include "pint-util.h"
 #include "gossip.h"
+#include "security-util.h"
 
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
@@ -231,6 +232,15 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             }
         }
 
+        if (src->mask & PVFS_ATTR_CAPABILITY)
+        {
+            ret = PINT_copy_capability(&src->capability, &dest->capability);
+            if (ret < 0)
+            {
+                return ret;
+            }
+        }
+
 	dest->mask = src->mask;
         ret = 0;
     }
@@ -241,6 +251,14 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
 {
     if (attr)
     {
+        if (attr->mask & PVFS_ATTR_CAPABILITY)
+        {
+            free(attr->capability.signature);
+            attr->capability.signature = NULL;
+            free(attr->capability.handle_array);
+            attr->capability.handle_array = NULL;
+        }
+
         if (attr->objtype == PVFS_TYPE_METAFILE)
         {
             if (attr->mask & PVFS_ATTR_META_DFILES)

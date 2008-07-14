@@ -23,47 +23,63 @@
  */
 PVFS_capability *PINT_dup_capability(const PVFS_capability *cap)
 {
-    PVFS_capability *ret = NULL;
+    PVFS_capability *newcap;
+    int ret;
     
     if (!cap)
     {
         return NULL;
     }
 
-    ret = (PVFS_capability*)malloc(sizeof(PVFS_capability));
-    if (!ret)
+    newcap = (PVFS_capability*)malloc(sizeof(PVFS_capability));
+    if (!newcap)
     {
         return NULL;
     }
-    memcpy(ret, cap, sizeof(PVFS_capability));
-    ret->signature = NULL;
-    ret->handle_array = NULL;
+
+    ret = PINT_copy_capability(cap, newcap);
+    if (ret < 0)
+    {
+        free(newcap);
+        newcap = NULL;
+    }
+
+    return newcap;
+}
+
+int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
+{
+    if (!src || !dest)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    memcpy(dest, src, sizeof(PVFS_capability));
+    dest->signature = NULL;
+    dest->handle_array = NULL;
 
 #ifndef SECURITY_ENCRYPTION_NONE
-    ret->signature = (unsigned char*)malloc(cap->sig_size);
-    if (!ret->signature)
+    dest->signature = (unsigned char*)malloc(src->sig_size);
+    if (!dest->signature)
     {
-        free(ret);
-        return NULL;
+        return -PVFS_ENOMEM;
     }
-    memcpy(ret->signature, cap->signature, cap->sig_size);
+    memcpy(dest->signature, src->signature, src->sig_size);
 #endif /* SECURITY_ENCRYPTION_NONE */
 
-    if (cap->num_handles)
+    if (src->num_handles)
     {
-        ret->handle_array = calloc(cap->num_handles, sizeof(PVFS_handle));
-        if (!ret->handle_array)
+        dest->handle_array = calloc(src->num_handles, sizeof(PVFS_handle));
+        if (!dest->handle_array)
         {
-            free(ret->signature);
-            free(ret);
-            return NULL;
+            free(dest->signature);
+            return -PVFS_ENOMEM;
         }
-        memcpy(ret->handle_array, 
-               cap->handle_array, 
-               cap->num_handles * sizeof(PVFS_handle));
+        memcpy(dest->handle_array, src->handle_array, 
+               src->num_handles * sizeof(PVFS_handle));
     }
-    
-    return ret;
+
+    return 0;
 }
 
 /*  PINT_release_capability

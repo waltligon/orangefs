@@ -17,7 +17,9 @@
  *  returns NULL on error
  *  returns valid PVFS_capability * on success
  */
-PVFS_capability *PINT_dup_capability(const PVFS_capability*);
+PVFS_capability *PINT_dup_capability(const PVFS_capability* cap);
+
+int PINT_copy_capability(const PVFS_capability* src, PVFS_capability* dest);
 
 /*  PINT_release_capability
  *
@@ -25,7 +27,7 @@ PVFS_capability *PINT_dup_capability(const PVFS_capability*);
  *	
  *  no return value
  */
-void PINT_release_capability(PVFS_capability*);
+void PINT_release_capability(PVFS_capability* cap);
 
 
 /*
