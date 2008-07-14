@@ -542,9 +542,9 @@ static inline void itree_breadth_print(itree_t *head_p,
 	    fprintf(stdout, "\nlevel %d: ", old_level);
 	}
 	
-	fprintf(stdout, "{%Ld,%Ld,%Ld,%s} ", 
-		q_pop_p->itree_p->start, q_pop_p->itree_p->end,
-		q_pop_p->itree_p->max, 
+	fprintf(stdout, "{%lld,%lld,%lld,%s} ", 
+		lld(q_pop_p->itree_p->start), lld(q_pop_p->itree_p->end),
+		lld(q_pop_p->itree_p->max), 
 		(q_pop_p->itree_p->color == ITREE_RED ? "r": "b"));
 	free(q_pop_p);
 	count++;
@@ -598,8 +598,8 @@ static inline void itree_inorder_tree_print(itree_t *head_p,
     if (head_p != NIL)
     {
 	itree_inorder_tree_print(head_p->left, NIL);
-	fprintf(stdout, "{%Ld,%Ld,%Ld,%s} ", 
-		head_p->start, head_p->end, head_p->max, 
+	fprintf(stdout, "{%lld,%lld,%lld,%s} ", 
+		lld(head_p->start), lld(head_p->end), lld(head_p->max), 
 		(head_p->color == ITREE_RED ? "r": "b"));
 	itree_inorder_tree_print(head_p->right, NIL);
     }
@@ -635,14 +635,14 @@ static inline int itree_nil_check(itree_t *NIL)
 	fprintf(stdout, 
 		"Error: Nil is wrong.\n"
 		"Color = %d, (should be %d)\n"
-		"Start = %Ld, End = %Ld, Max = %Ld (all should be -1)\n"
-		"Left = %x, Right = %x, Parent = %x (all should be %x)\n",
-		NIL->color, ITREE_NONE, NIL->start, NIL->end, 
-		NIL->max, 
-		(unsigned int) NIL->left, 
-		(unsigned int) NIL->right, 
-		(unsigned int) NIL->parent,
-		(unsigned int) NIL);
+		"Start = %lld, End = %lld, Max = %lld (all should be -1)\n"
+		"Left = %lx, Right = %lx, Parent = %lx (all should be %lx)\n",
+		NIL->color, ITREE_NONE, lld(NIL->start), lld(NIL->end), 
+		lld(NIL->max), 
+		(unsigned long) NIL->left, 
+		(unsigned long) NIL->right, 
+		(unsigned long) NIL->parent,
+		(unsigned long) NIL);
     }
 
     return 0;
@@ -666,81 +666,81 @@ static inline int itree_inorder_tree_check(itree_t *head_p,
 	    if (head_p->start > head_p->parent->start &&
 		head_p->parent->left == head_p)
 	    {
-		fprintf(stdout, "(left) node(%Ld,%Ld,%Ld,%s) has a  "
-			"greater start than parent (%Ld)\n",
-			head_p->start, head_p->end, head_p->max,
+		fprintf(stdout, "(left) node(%lld,%lld,%lld,%s) has a  "
+			"greater start than parent (%lld)\n",
+			lld(head_p->start), lld(head_p->end), lld(head_p->max),
 			(head_p->color == ITREE_RED ? "r": "b"),
-			head_p->parent->start);
+			lld(head_p->parent->start));
 		return -1;
 	    }
 	    if (head_p->start < head_p->parent->start &&
 		head_p->parent->right == head_p)
 	    {
-		fprintf(stdout, "(right) node(%Ld,%Ld,%Ld,%s) has a  "
-			"greater start than parent (%Ld)\n",
-			head_p->start, head_p->end, head_p->max,
+		fprintf(stdout, "(right) node(%lld,%lld,%lld,%s) has a  "
+			"greater start than parent (%lld)\n",
+			lld(head_p->start), lld(head_p->end), lld(head_p->max),
 			(head_p->color == ITREE_RED ? "r": "b"),
-			head_p->parent->start);
+			lld(head_p->parent->start));
 		return -1;
 	    }
 	}
 	if (head_p->left != NIL)
 	    if (head_p->start < head_p->left->start)
 	    {
-		fprintf(stdout, "node(%Ld,%Ld,%Ld,%s) has a  "
-			"lesser start than left child (%Ld)\n",
-			head_p->start, head_p->end, head_p->max,
+		fprintf(stdout, "node(%lld,%lld,%lld,%s) has a  "
+			"lesser start than left child (%lld)\n",
+			lld(head_p->start), lld(head_p->end), lld(head_p->max),
 			(head_p->color == ITREE_RED ? "r": "b"),
-			head_p->left->start);
+			lld(head_p->left->start));
 		return -1;
 	    }
 	if (head_p->right != NIL)
 	    if (head_p->start > head_p->right->start)
 	    {
-		fprintf(stdout, "node(%Ld,%Ld,%Ld,%s) has a  "
-			"greater start than right child (%Ld)\n",
-			head_p->start, head_p->end, head_p->max,
+		fprintf(stdout, "node(%lld,%lld,%lld,%s) has a  "
+			"greater start than right child (%lld)\n",
+			lld(head_p->start), lld(head_p->end), lld(head_p->max),
 			(head_p->color == ITREE_RED ? "r": "b"),
-			head_p->right->start);
+			lld(head_p->right->start));
 		return -1;
 	    }
 	/* Max checks. */
 	if (head_p->max < head_p->end)
 	{
-	    fprintf(stdout, "node(%Ld,%Ld,%Ld,%s) has a  "
-		    "greater end (%Ld)\n",
-		    head_p->start, head_p->end, head_p->max, 
+	    fprintf(stdout, "node(%lldd,%lld,%lld,%s) has a  "
+		    "greater end (%lld)\n",
+		    lld(head_p->start), lld(head_p->end), lld(head_p->max), 
 		    (head_p->color == ITREE_RED ? "r": "b"), 
-		    head_p->end);
+		    lld(head_p->end));
 	    return -1;
 	}
 	if (head_p->max < head_p->left->max)
 	{
-	    fprintf(stdout, "node(%Ld,%Ld,%Ld,%s) has a left child "
-		    "with a greater max (%Ld)\n",
-		    head_p->start, head_p->end, head_p->max, 
+	    fprintf(stdout, "node(%lld,%lld,%lld,%s) has a left child "
+		    "with a greater max (%lld)\n",
+		    lld(head_p->start), lld(head_p->end), lld(head_p->max), 
 		    (head_p->color == ITREE_RED ? "r": "b"), 
-		    head_p->left->max);
+		    lld(head_p->left->max));
 	    return -1;
 	}
 	if (head_p->max < head_p->right->max)
 	{
-	    fprintf(stdout, "node(%Ld,%Ld,%Ld,%s) has a right child "
-		    "with a greater max (%Ld)\n",
-		    head_p->start, head_p->end, head_p->max, 
+	    fprintf(stdout, "node(%lld,%lld,%lld,%s) has a right child "
+		    "with a greater max (%lld)\n",
+		    lld(head_p->start), lld(head_p->end), lld(head_p->max), 
 		    (head_p->color == ITREE_RED ? "r": "b"), 
-		    head_p->right->max);
+		    lld(head_p->right->max));
 	    return -1;
 	}
 	if (head_p->max != head_p->left->max &&
 	    head_p->max != head_p->right->max &&
 	    head_p->max != head_p->end)
 	{
-	    fprintf(stdout, "node(%Ld,%Ld,%Ld,%s) has a max not equal to "
-		    "its end (%Ld) or its childrens' maxes (%Ld,%Ld)\n",
-		    head_p->start, head_p->end, head_p->max, 
+	    fprintf(stdout, "node(%lld,%lld,%lld,%s) has a max not equal to "
+		    "its end (%lld) or its childrens' maxes (%lld,%lld)\n",
+		    lld(head_p->start), lld(head_p->end), lld(head_p->max), 
 		    (head_p->color == ITREE_RED ? "r": "b"), 
-		    head_p->end, head_p->left->max, head_p->right->max);
+		    lld(head_p->end), lld(head_p->left->max), lld(head_p->right->max));
 	    return -1;
 	}
 	

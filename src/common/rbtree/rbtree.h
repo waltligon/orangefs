@@ -460,8 +460,8 @@ static inline void rbtree_breadth_print(rbtree_t *head_p,
 	    fprintf(stdout, "\nlevel %d: ", old_level);
 	}
 	
-	fprintf(stdout, "{%Ld,%s} ", 
-		q_pop_p->rbtree_p->key,
+	fprintf(stdout, "{%lld,%s} ", 
+		lld(q_pop_p->rbtree_p->key),
 		(q_pop_p->rbtree_p->color == RBTREE_RED ? "r": "b"));
 	free(q_pop_p);
     }
@@ -476,7 +476,7 @@ static inline void rbtree_inorder_tree_print(rbtree_t *head_p,
     if (head_p != NIL)
     {
 	rbtree_inorder_tree_print(head_p->left, NIL);
-	fprintf(stdout, "{%Ld,%s} ", head_p->key, 
+	fprintf(stdout, "{%lld,%s} ", lld(head_p->key), 
 		head_p->color == RBTREE_RED ? "r": "b");
 	rbtree_inorder_tree_print(head_p->right, NIL);
     }
@@ -500,38 +500,38 @@ static inline int rbtree_inorder_tree_check(rbtree_t *head_p,
 	    if (head_p->key > head_p->parent->key &&
 		head_p->parent->left == head_p)
 	    {
-		fprintf(stdout, "(left) node(%Ld,%s) has a  "
-			"greater key than parent (%Ld)\n",
-			head_p->key, (head_p->color == RBTREE_RED ? "r": "b"),
-			head_p->parent->key);
+		fprintf(stdout, "(left) node(%lld,%s) has a  "
+			"greater key than parent (%lld)\n",
+			lld(head_p->key), (head_p->color == RBTREE_RED ? "r": "b"),
+			lld(head_p->parent->key));
 		return -1;
 	    }
 	    if (head_p->key < head_p->parent->key &&
 		head_p->parent->right == head_p)
 	    {
-		fprintf(stdout, "(right) node(%Ld,,%s) has a  "
-			"greater key than parent (%Ld)\n",
-			head_p->key, (head_p->color == RBTREE_RED ? "r": "b"),
-			head_p->parent->key);
+		fprintf(stdout, "(right) node(%lld,,%s) has a  "
+			"greater key than parent (%lld)\n",
+			lld(head_p->key), (head_p->color == RBTREE_RED ? "r": "b"),
+			lld(head_p->parent->key));
 		return -1;
 	    }
 	}
 	if (head_p->left != NIL)
 	    if (head_p->key < head_p->left->key)
 	    {
-		fprintf(stdout, "node(%Ld,%s) has a  "
-			"lesser key than left child (%Ld)\n",
-			head_p->key, (head_p->color == RBTREE_RED ? "r": "b"),
-			head_p->left->key);
+		fprintf(stdout, "node(%lld,%s) has a  "
+			"lesser key than left child (%lld)\n",
+			lld(head_p->key), (head_p->color == RBTREE_RED ? "r": "b"),
+			lld(head_p->left->key));
 		return -1;
 	    }
 	if (head_p->right != NIL)
 	    if (head_p->key > head_p->right->key)
 	    {
-		fprintf(stdout, "node(%Ld,%s) has a  "
-			"greater key than right child (%Ld)\n",
-			head_p->key, (head_p->color == RBTREE_RED ? "r": "b"),
-			head_p->right->key);
+		fprintf(stdout, "node(%lld,%s) has a  "
+			"greater key than right child (%lld)\n",
+			lld(head_p->key), (head_p->color == RBTREE_RED ? "r": "b"),
+			lld(head_p->right->key));
 		return -1;
 	    }
 	

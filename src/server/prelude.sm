@@ -319,8 +319,8 @@ static int iterate_all_squash_wildcards(struct filesystem_configuration_s *fscon
 
     for (i = 0; i < fsconfig->all_squash_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %Ld, %s\n",
-            client_addr, fsconfig->all_squash_hosts[i]);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
+            lld(client_addr), fsconfig->all_squash_hosts[i]);
         if (BMI_query_addr_range(client_addr, fsconfig->all_squash_hosts[i],
                 fsconfig->all_squash_netmasks[i]) == 1)
         {
@@ -337,8 +337,8 @@ static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsco
 
     for (i = 0; i < fsconfig->root_squash_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %Ld, %s\n",
-            client_addr, fsconfig->root_squash_hosts[i]);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
+            lld(client_addr), fsconfig->root_squash_hosts[i]);
         if (BMI_query_addr_range(client_addr, fsconfig->root_squash_hosts[i], 
                 fsconfig->root_squash_netmasks[i]) == 1)
         {
@@ -403,8 +403,8 @@ static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, PVF
 
     for (i = 0; i < fsconfig->ro_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %Ld, %s\n",
-            client_addr, fsconfig->ro_hosts[i]);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
+            lld(client_addr), fsconfig->ro_hosts[i]);
         /* Does the client address match the wildcard specification and/or the netmask specification? */
         if (BMI_query_addr_range(client_addr, fsconfig->ro_hosts[i],
                 fsconfig->ro_netmasks[i]) == 1)
