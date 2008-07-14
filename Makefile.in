@@ -123,6 +123,7 @@ INCLUDES := \
     src/common/quicklist \
     src/common/itree \
     src/common/rbtree \
+    src/common/heap \
     src/common/id-generator \
     src/common/gossip \
     src/common/gen-locks \
