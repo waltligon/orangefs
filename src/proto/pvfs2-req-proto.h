@@ -18,6 +18,7 @@
 #include "pint-request.h"
 #include "pvfs2-mgmt.h"
 #include "pint-security.h"
+#include "security-types.h"
 
 /* update PVFS2_PROTO_MAJOR on wire protocol changes that break backwards
  * compatibility (such as changing the semantics or protocol fields for an
@@ -334,25 +335,27 @@ do {                                     \
 
 struct PVFS_servreq_getattr
 {
-    PVFS_handle handle; /* handle of target object */
-    PVFS_fs_id fs_id;   /* file system */
-    uint32_t attrmask;  /* mask of desired attributes */
+    PVFS_handle handle;         /* handle of target object */
+    PVFS_fs_id fs_id;           /* file system */
+    uint32_t attrmask;          /* mask of desired attributes */
+    PVFS_credential credential; /* user credential */
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_getattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    uint32_t, attrmask)
+    uint32_t, attrmask,
+    PVFS_credential, credential)
 
 #define PINT_SERVREQ_GETATTR_FILL(__req,   \
-                                  __creds, \
+                                  __cred,  \
                                   __fsid,  \
                                   __handle,\
                                   __amask) \
 do {                                       \
     memset(&(__req), 0, sizeof(__req));    \
     (__req).op = PVFS_SERV_GETATTR;        \
-    (__req).credentials = (__creds);       \
+    (__req).u.getattr.credential = (__cred);         \
     (__req).u.getattr.fs_id = (__fsid);    \
     (__req).u.getattr.handle = (__handle); \
     (__req).u.getattr.attrmask = (__amask);\

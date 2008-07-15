@@ -23,6 +23,8 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
+#include "security-util.h"
 
 /* pvfs2_client_getattr_sm
  *
@@ -158,8 +160,8 @@ machine pvfs2_client_sysint_getattr_sm
  */
 PVFS_error PVFS_isys_getattr(
     PVFS_object_ref ref,
-    uint32_t attrmask, 
-    const PVFS_credentials *credentials,
+    uint32_t attrmask,
+    const PVFS_credential *credential,
     PVFS_sysresp_getattr *resp_p,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
@@ -195,7 +197,7 @@ PVFS_error PVFS_isys_getattr(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
     sm_p->u.getattr.getattr_resp_p = resp_p;
@@ -215,8 +217,8 @@ PVFS_error PVFS_isys_getattr(
  */
 PVFS_error PVFS_sys_getattr(
     PVFS_object_ref ref,
-    uint32_t attrmask, 
-    const PVFS_credentials *credentials,
+    uint32_t attrmask,
+    const PVFS_credential *credential,
     PVFS_sysresp_getattr *resp_p)
 {
     PVFS_error ret, error;
@@ -224,7 +226,7 @@ PVFS_error PVFS_sys_getattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
 
-    ret = PVFS_isys_getattr(ref, attrmask, credentials,
+    ret = PVFS_isys_getattr(ref, attrmask, credential,
                             resp_p, &op_id, NULL);
     if (ret)
     {
@@ -453,7 +455,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        *sm_p->newcred_p,
         object_ref.fs_id,
         object_ref.handle,
         sm_p->getattr.req_attrmask);
@@ -510,6 +512,7 @@ static int getattr_object_getattr_comp_fn(
                           
     attr =  &sm_p->getattr.attr;
     
+#if 0
     gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability ptr: %p\n", 
          &(resp_p->u.getattr.attr.capability));
     gossip_debug(GOSSIP_GETATTR_DEBUG,"Owner: %u\n", 
@@ -525,6 +528,7 @@ static int getattr_object_getattr_comp_fn(
     if (resp_p->u.getattr.attr.capability.signature) 
         gossip_debug(GOSSIP_GETATTR_DEBUG,"Sig: %d\n", 
             resp_p->u.getattr.attr.capability.signature[0]);
+#endif
 
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
      * a -PVFS_error will be triggered if the
@@ -680,7 +684,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
 
         PINT_SERVREQ_GETATTR_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            *sm_p->newcred_p,
             sm_p->getattr.object_ref.fs_id,
             attr->u.meta.dfile_array[index],
             PVFS_ATTR_DATA_SIZE);

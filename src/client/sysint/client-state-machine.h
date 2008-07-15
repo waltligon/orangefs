@@ -516,6 +516,7 @@ typedef struct PINT_client_sm
     PVFS_object_ref parent_ref;
 
     PVFS_credentials *cred_p;
+    PVFS_credential *newcred_p;
     union
     {
 	struct PINT_client_remove_sm remove;
@@ -678,6 +679,24 @@ do {                                                          \
         return -PVFS_ENOMEM;                                  \
     }                                                         \
 } while(0)
+
+#define PINT_init_sysint_credential(sm_p_newcred_p, user_newcred_p) \
+do                                                                  \
+{                                                                   \
+    if (user_newcred_p == NULL)                                     \
+    {                                                               \
+        gossip_lerr("Invalid user credential! (nil)\n");            \
+        free(sm_p);                                                 \
+        return -PVFS_EINVAL;                                        \
+    }                                                               \
+    sm_p_newcred_p = PINT_dup_credential(user_newcred_p);           \
+    if (!sm_p_newcred_p)                                            \
+    {                                                               \
+        gossip_lerr("Failed to copy user credential\n");            \
+        free(sm_p);                                                 \
+        return -PVFS_ENOMEM;                                        \
+    }                                                               \
+} while (0);
 
 #define PINT_init_msgarray_params(client_sm_p, __fsid)              \
 do {                                                                \

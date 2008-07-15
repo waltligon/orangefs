@@ -22,6 +22,7 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
+#include "security-types.h"
 
 /** Options supported by get_info() and set_info(). */
 enum PVFS_sys_setinfo_opt
@@ -280,7 +281,7 @@ PVFS_error PVFS_sys_lookup(
 PVFS_error PVFS_isys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_getattr *resp,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
@@ -288,7 +289,7 @@ PVFS_error PVFS_isys_getattr(
 PVFS_error PVFS_sys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_getattr *resp);
 
 PVFS_error PVFS_isys_setattr(

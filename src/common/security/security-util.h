@@ -29,6 +29,10 @@ int PINT_copy_capability(const PVFS_capability* src, PVFS_capability* dest);
  */
 void PINT_release_capability(PVFS_capability* cap);
 
+PVFS_credential *PINT_dup_credential(const PVFS_credential *cred);
+
+void PINT_release_credential(PVFS_credential *cred);
+
 
 /*
  * Local variables:
