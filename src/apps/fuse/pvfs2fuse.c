@@ -9,12 +9,12 @@
  *   Author: John A. Chandy
  *           Sumit Narayan
  *
- *   $Date: 2008-07-09 14:23:51 $
- *   $Revision: 1.1.4.2 $
+ *   $Date: 2008-07-15 15:59:05 $
+ *   $Revision: 1.1.4.3 $
  *
  */
 
-/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.1.4.2 2008-07-09 14:23:51 sumitn Exp $"; */
+/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.1.4.3 2008-07-15 15:59:05 sumitn Exp $"; */
 char *pvfs2fuse_version = "0.01";
 
 #define FUSE_USE_VERSION 27
@@ -59,7 +59,15 @@ static struct pvfs2fuse pvfs2fuse;
 	*((pvfs_fuse_handle_t **)(&fi->fh))
 #endif
 
+#define PVFS_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
+#define THIS_PVFS_VERSION \
+     PVFS_VERSION(PVFS2_VERSION_MAJOR, PVFS2_VERSION_MINOR, PVFS2_VERSION_SUB)
+
+#if THIS_PVFS_VERSION > PVFS_VERSION(2,6,3)
 #define PVFS_ERROR_TO_ERRNO_N(x) (-1)*PVFS_ERROR_TO_ERRNO(x)
+#else
+#define PVFS_ERROR_TO_ERRNO_N(x) PVFS_ERROR_TO_ERRNO(x)
+#endif
 
 static void pvfs_fuse_gen_credentials(
    PVFS_credentials *credentials)
