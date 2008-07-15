@@ -322,6 +322,7 @@ typedef struct
 #define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
 #define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
 #define PVFS_ATTR_SYS_DIR_HINT              (1 << 27)
+#define PVFS_ATTR_SYS_CAPABILITY            (1 << 28)
 #define PVFS_ATTR_SYS_UID                   (1 << 0)
 #define PVFS_ATTR_SYS_GID                   (1 << 1)
 #define PVFS_ATTR_SYS_PERM                  (1 << 2)

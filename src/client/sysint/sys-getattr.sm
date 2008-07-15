@@ -203,8 +203,7 @@ PVFS_error PVFS_isys_getattr(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         ref,
-        PVFS_util_sys_to_object_attr_mask(
-            attrmask) | PVFS_ATTR_CAPABILITY,
+        PVFS_util_sys_to_object_attr_mask(attrmask),
         PVFS_TYPE_NONE,
         0);
 

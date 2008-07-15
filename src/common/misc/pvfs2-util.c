@@ -1613,6 +1613,11 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
+    if (sys_attrmask & PVFS_ATTR_SYS_CAPABILITY)
+    {
+        attrmask |= PVFS_ATTR_CAPABILITY;
+    }
+
     if(sys_attrmask & PVFS_ATTR_SYS_UID)
         attrmask |= PVFS_ATTR_COMMON_UID;
     if(sys_attrmask & PVFS_ATTR_SYS_GID)
@@ -1691,6 +1696,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_DIR_HINT)
     {
         sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
+    }
+    if (obj_mask & PVFS_ATTR_CAPABILITY)
+    {
+        sys_mask |= PVFS_ATTR_SYS_CAPABILITY;
     }
     return sys_mask;
 }
