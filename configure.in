@@ -625,7 +625,7 @@ test_for_fuse()
 
        AC_SUBST(FUSE_LDFLAGS)
        AC_SUBST(FUSE_CFLAGS)
-       BUILD_FUSE=1
+       BUILD_FUSE="1"
        AC_SUBST(BUILD_FUSE)
     else
         AC_MSG_RESULT(no)
@@ -642,7 +642,6 @@ if test "x$enableval" = "xyes" ; then
    CFLAGS="$CFLAGS -D__PVFS2_ENABLE_FUSE__"
 fi
 ],
-[test_for_fuse]
 )
 
 # default CFLAGS is -g -O2, unless user set CFLAGS or asked for --enable-fast
