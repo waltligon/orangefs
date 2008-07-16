@@ -259,6 +259,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     memset(&key, 0, sizeof(key));
     key.data = &new_handle;
     key.size = key.ulen = sizeof(new_handle);
+    key.flags = DB_DBT_USERMEM;
 
     memset(&data, 0, sizeof(data));
     data.data = &s_attr;
@@ -871,6 +872,7 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
     key.size = key.ulen = sizeof(TROVE_handle);
+    key.flags = DB_DBT_USERMEM;
 
     memset(&data, 0, sizeof(data));
     data.data = &s_attr;
@@ -1195,6 +1197,7 @@ static int getattr_one_handle(TROVE_object_ref ref,
     memset(&key, 0, sizeof(key));
     key.data = &ref.handle;
     key.size = key.ulen = sizeof(TROVE_handle);
+    key.flags = DB_DBT_USERMEM;
 
     memset(&data, 0, sizeof(data));
     memset(&s_attr, 0, sizeof(TROVE_ds_storedattr_s));
