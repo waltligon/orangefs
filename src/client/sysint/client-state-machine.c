@@ -206,7 +206,8 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_list_eattr_sm},
     {&pvfs2_client_small_io_sm},
     {&pvfs2_client_statfs_sm},
-    {&pvfs2_fs_add_sm}
+    {&pvfs2_fs_add_sm},
+    {&pvfs2_client_lock_sm}
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
@@ -824,6 +825,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_CLIENT_JOB_TIMER, "PVFS_CLIENT_JOB_TIMER" },
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },
         { PVFS_SYS_FS_ADD, "PVFS_SYS_FS_ADD" },
+	{ PVFS_SYS_LOCK, "PVFS_SYS_LOCK" },
         { 0, "UNKNOWN" }
     };
 

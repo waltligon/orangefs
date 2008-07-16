@@ -118,6 +118,11 @@ static void lebf_initialize(void)
 		req.u.mgmt_remove_dirent.entry = tmp_name;
 		reqsize = extra_size_PVFS_servreq_mgmt_remove_dirent;
 		break;
+	    case PVFS_SERV_LOCK:
+                req.u.io.io_dist = &tmp_dist;
+                req.u.io.file_req = &tmp_req;
+                reqsize = extra_size_PVFS_servreq_lock;
+                break;
 	    case PVFS_SERV_IO:
 		req.u.io.io_dist = &tmp_dist;
 		req.u.io.file_req = &tmp_req;
@@ -342,6 +347,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
+	CASE(PVFS_SERV_LOCK, lock);
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
@@ -438,6 +444,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETCONFIG, getconfig);
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
+	CASE(PVFS_SERV_LOCK, lock);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -536,6 +543,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
+	CASE(PVFS_SERV_LOCK, lock);
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
@@ -578,8 +586,9 @@ static int lebf_decode_req(
 
     if (ptr != (char *) input_buffer + input_size)
     {
-	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
-                    __func__, req->op, ptr - (char *) input_buffer, input_size);
+	gossip_lerr("%s: op %u consumed %ld bytes, but message was %d bytes.\n",
+                    __func__, req->op, 
+				(unsigned long)(ptr - (char *) input_buffer), input_size);
 	ret = -PVFS_EPROTO;
     }
 
@@ -622,6 +631,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETCONFIG, getconfig);
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+	CASE(PVFS_SERV_LOCK, lock);
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
@@ -666,8 +676,9 @@ static int lebf_decode_resp(
 #undef CASE
 
     if (ptr != (char *) input_buffer + input_size) {
-	gossip_lerr("%s: op %d consumed %d bytes, but message was %d bytes.\n",
-                    __func__, resp->op, ptr - (char *) input_buffer,
+	gossip_lerr("%s: op %u consumed %ld bytes, but message was %d bytes.\n",
+                    __func__, resp->op, 
+				(unsigned long)(ptr - (char *) input_buffer),
                     input_size);
 	ret = -PVFS_EPROTO;
     }
@@ -716,6 +727,17 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_CREATE:
 		decode_free(req->u.create.handle_extent_array.extent_array);
 		break;
+
+            case PVFS_SERV_LOCK:
+		decode_free(req->u.lock.io_dist);
+
+                /* AC - This information cannot be freed when there is
+		   a lock request is new since it is necessary for the
+		   lock_req.  Therefore, I will free it manually later
+		   on*/
+		if (req->u.lock.file_req != NULL)
+		    decode_free(req->u.lock.file_req);
+                break;
 
 	    case PVFS_SERV_IO:
 		decode_free(req->u.io.io_dist);
@@ -837,6 +859,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
 	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
+	    case PVFS_SERV_LOCK:
 	    case PVFS_SERV_IO:
             case PVFS_SERV_SMALL_IO:
 	    case PVFS_SERV_SETATTR:

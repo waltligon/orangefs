@@ -17,6 +17,7 @@ ifdef BUILD_SERVER
 		$(DIR)/remove.c \
 		$(DIR)/rmdirent.c \
 		$(DIR)/chdirent.c \
+		$(DIR)/lock.c \
 		$(DIR)/io.c \
 		$(DIR)/small-io.c \
 		$(DIR)/flush.c \

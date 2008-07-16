@@ -96,6 +96,7 @@ static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
 static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp);
 static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
+static void lock_callback(void* data);
 static void flow_callback(flow_descriptor* flow_d);
 #ifndef __PVFS2_JOB_THREADED__
 static void do_one_work_cycle_all(int idle_time_ms);
@@ -3491,6 +3492,32 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 
     return (0);
 }
+/* job_lock_acquire_block_bytes(()
+ *
+ * gets blocking bytes for a lock request
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on
+ * failure
+ */
+int job_lock_wait_block_bytes(void *user_ptr,
+			      lock_req_t *lock_req_p)
+{
+    struct job_desc *jd = NULL;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store some information
+     */
+    jd = alloc_job_desc(JOB_NULL);
+    if (!jd)
+    {
+        return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    lock_req_p->lock_callback.fn = lock_callback;
+    lock_req_p->lock_callback.data = (void *) jd;
+
+    return (0);
+}
 
 /* job_null()
  *
@@ -4132,6 +4159,43 @@ static void trove_thread_mgr_callback(
         tmp_desc->completed_flag = 1;
 
         trove_pending_count--;
+
+#ifdef __PVFS2_JOB_THREADED__
+        /* wake up anyone waiting for completion */
+        pthread_cond_signal(&completion_cond);
+#endif
+    }
+    gen_mutex_unlock(&completion_mutex);
+}
+/* lock_callback()
+ *
+ * callback function executed by the another state machine to signal
+ * when the job completes
+ *
+ * no return value
+ */
+static void lock_callback(void* data)
+{
+    struct job_desc* tmp_desc = (struct job_desc*)data; 
+    assert(tmp_desc);
+
+    gen_mutex_lock(&initialized_mutex);
+    if(initialized == 0)
+    {
+        /* The job interface has been shutdown.  Silently ignore callback. */
+        gen_mutex_unlock(&initialized_mutex);
+        return;
+    }
+    gen_mutex_unlock(&initialized_mutex);
+
+    gen_mutex_lock(&completion_mutex);
+    if (tmp_desc->completed_flag == 0)
+    {
+        /* set job descriptor fields and put into completion queue */
+        job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+                       tmp_desc);
+        /* set completed flag while holding queue lock */
+        tmp_desc->completed_flag = 1;
 
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */

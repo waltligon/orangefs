@@ -22,6 +22,7 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
+#include "pvfs2-types.h"
 
 /** Holds a non-blocking system interface operation handle. */
 typedef PVFS_id_gen_t PVFS_sys_op_id;
@@ -129,6 +130,15 @@ struct PVFS_sysresp_readlink_s
     char *target;
 };
 typedef struct PVFS_sysresp_readlink_s PVFS_sysresp_readlink;
+
+/** Holds results of a lock operation (total number of bytes locked). */
+struct PVFS_sysresp_lock_s
+{
+    PVFS_id_gen_t lock_id;
+    PVFS_size bstream_size;
+    PVFS_size bytes_accessed;
+};
+typedef struct PVFS_sysresp_lock_s PVFS_sysresp_lock;
 
 /** Holds results of an I/O operation (total number of bytes read/written). */
 struct PVFS_sysresp_io_s
@@ -370,6 +380,30 @@ PVFS_error PVFS_sys_symlink(
     PVFS_sys_attr attr,
     PVFS_credentials *credentials,
     PVFS_sysresp_symlink *resp);
+
+PVFS_error PVFS_isys_lock(
+    PVFS_object_ref ref,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PVFS_Request mem_req,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_lock *resp_p,
+    struct qlist_head *lock_id_list_head_p,
+    enum PVFS_io_type io_type,
+    enum PVFS_client_lock_type lock_type,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_lock(
+    PVFS_object_ref ref,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PVFS_Request mem_req,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_lock *resp_p,
+    struct qlist_head *lock_id_list_head_p,
+    enum PVFS_io_type io_type,
+    enum PVFS_client_lock_type lock_type);
 
 PVFS_error PVFS_isys_io(
     PVFS_object_ref ref,

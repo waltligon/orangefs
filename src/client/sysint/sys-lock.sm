@@ -1,0 +1,1468 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for acquiring/releasing locks 
+ *  on PVFS2 datatypes.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+#include "heap.h"
+
+#define LOCK_MAX_SEGMENT_NUM 64
+
+extern job_context_id pint_client_sm_context;
+
+enum
+{
+    LOCK_NO_DATA = 232,
+    LOCK_RETRY,
+    LOCK_INCOMPLETE,
+    LOCK_TRANSFERS_COMPLETE,
+    LOCK_NO_MSGPAIRS
+};
+
+const char *PVFS_lock_type_mapping[] =
+{                                       
+    "PVFS_CLIENT_ACQUIRE_TWO_PHASE",    
+    "PVFS_CLIENT_ACQUIRE_ONE_TRY",      
+    "PVFS_CLIENT_ACQUIRE_ALT_TRY",      
+    "PVFS_CLIENT_RELEASE",              
+    "PVFS_SERVER_LOCK_INIT",            
+    "PVFS_SERVER_ACQUIRE_NEW_NONBLOCK", 
+    "PVFS_SERVER_ACQUIRE_NEW_BLOCK",    
+    "PVFS_SERVER_ACQUIRE_NONBLOCK",     
+    "PVFS_SERVER_ACQUIRE_BLOCK",        
+    "PVFS_SERVER_RELEASE_SOME",         
+    "PVFS_SERVER_RELEASE_ALL"           
+};
+
+static int lock_init(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_init_server_info(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_setup_msgpairs(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_analyze_results(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int lock_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+
+/* Helper functions local to sys-lock.sm */
+
+static int lock_completion_fn(void *user_args,
+			      struct PVFS_server_resp *resp,
+			      int index);
+
+static int lock_find_target_datafiles(
+    PVFS_Request mem_req,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PINT_dist *dist_p,
+    PVFS_handle *input_handle_array,
+    int input_handle_count,
+    int *handle_index_array,
+    int *handle_index_out_count);
+
+static int lock_datafile_index_array_init(
+    PINT_client_sm *sm_p,
+    int datafile_count);
+
+static void lock_datafile_index_array_destroy(
+    PINT_client_sm *sm_p);
+
+#ifdef PRINT_SERVER_LOCK_INFO
+static void print_server_lock_info_arr(
+    PINT_client_sm *sm_p);
+#endif
+
+static int lock_choose_method(
+    PINT_client_sm *sm_p);
+
+static int lock_fill_msgpair_array(
+    PINT_client_sm *sm_p);
+
+/* Heap helper functions */
+
+void heap_cpy_fn(heap_node_t *dest_p,
+                 heap_node_t *src_p);
+
+void heap_swap_fn(heap_node_t *dest_p,
+                  heap_node_t *src_p);
+
+void heap_print_fn(heap_node_t *node_p);
+
+void lock_heap_insert(heap_t *heap_p, int64_t key,
+                      PINT_server_lock_info *lock_p ,
+                      void (*cpy_fn) (heap_node_t *dest_p,
+                                      heap_node_t *src_p));
+	
+void lock_heap_extract_min(heap_t *heap_p, int64_t *key_p,
+			   int *proc_p,
+			   void (*cpy_fn) (heap_node_t *dest_p,
+					   heap_node_t *src_p),
+			   void (*swap_fn) (heap_node_t *dest_p,
+					    heap_node_t *src_p));
+
+void lock_heap_min(heap_t *heap_p, int64_t *key_p,
+		   int *proc_p);
+
+%%
+
+machine pvfs2_client_lock_sm(
+    init,
+    lock_getattr,
+    lock_init_server_info,
+    lock_setup_msgpairs,
+    lock_xfer_msgpairs,
+    lock_analyze_results,
+    lock_cleanup)
+{
+    state init
+    {
+	run lock_init;
+	default => lock_getattr;
+    }
+    
+    state lock_getattr
+    {
+	jump pvfs2_client_getattr_sm;
+	success => lock_init_server_info;
+        default => lock_cleanup;
+    }
+
+    state lock_init_server_info
+    {
+	run lock_init_server_info;
+	default => lock_setup_msgpairs;
+    }
+
+    state lock_setup_msgpairs
+    {
+	run lock_setup_msgpairs;
+	LOCK_NO_MSGPAIRS => lock_setup_msgpairs;
+	success => lock_xfer_msgpairs;
+	default => lock_cleanup;
+    }
+
+    state lock_xfer_msgpairs
+    {
+	jump pvfs2_msgpairarray_sm;
+	success => lock_analyze_results;
+    }
+
+    state lock_analyze_results
+    {
+	run lock_analyze_results;
+	LOCK_INCOMPLETE => lock_setup_msgpairs;
+	default => lock_cleanup;
+    }
+    
+    state lock_cleanup 
+    {
+        run lock_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** Initiates acquiring or releasing locks on a file datatype
+ *
+ * \lock type specifies if the operations is an acquire or release
+ */
+
+PVFS_error PVFS_isys_lock(
+    PVFS_object_ref ref,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PVFS_Request mem_req,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_lock *resp_p,
+    struct qlist_head *lock_id_list_head_p,
+    enum PVFS_io_type io_type,
+    enum PVFS_client_lock_type lock_type,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+    struct server_configuration_s *server_config = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_lock entered [%llu]\n]",
+		 llu(ref.handle));
+
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+	(ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
+    {
+	gossip_err("invalid (NULL) required argumen\n");
+	return ret;
+    }
+
+    if ((lock_type != PVFS_CLIENT_ACQUIRE_TWO_PHASE) &&
+	(lock_type != PVFS_CLIENT_ACQUIRE_ONE_TRY) &&
+	(lock_type != PVFS_CLIENT_ACQUIRE_ALT_TRY) &&
+	(lock_type != PVFS_CLIENT_RELEASE))
+    {
+	gossip_err("invalid (unknown) lock type specified\n");
+	return ret;
+    }
+
+    server_config = PINT_get_server_config_struct(ref.fs_id);
+    cur_fs = PINT_config_find_fs_id(server_config, ref.fs_id);
+    PINT_put_server_config_struct(server_config);
+
+    if (!cur_fs)
+    {
+	gossip_err("invalid (unknown) fs id specified\n");
+	return ret;
+    }
+
+    /* Make sure the lock request is not for a size of 0 */
+    if (PINT_REQUEST_TOTAL_BYTES(file_req) == 0)
+    {
+	gossip_ldebug(GOSSIP_LOCK_DEBUG, "Warning: 0 byte lock operation "
+		      "attempted.\n");
+	resp_p->bytes_accessed = 0;
+	return 1;
+    }
+    resp_p->bytes_accessed = 0;
+
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+
+    sm_p->u.lock.io_type = io_type;
+    sm_p->u.lock.lock_type = lock_type;
+    sm_p->u.lock.lock_server_cur_method = PVFS_SERVER_LOCK_INIT;
+    sm_p->u.lock.mem_req = mem_req;
+    sm_p->u.lock.file_req = file_req;
+    sm_p->u.lock.file_req_offset = file_req_offset;
+    sm_p->u.lock.lock_resp_p = resp_p;
+    sm_p->u.lock.lock_id_list_head_p = lock_id_list_head_p;
+    sm_p->u.lock.encoding = cur_fs->encoding;
+    sm_p->u.lock.stored_error_code = 0;
+    sm_p->u.lock.retry_count = 0;
+    sm_p->msgarray = NULL;
+    sm_p->u.lock.datafile_index_array = NULL;
+    sm_p->u.lock.datafile_count = 0;
+    sm_p->u.lock.total_size = 0;
+    sm_p->object_ref = ref;
+
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_LOCK, op_id, user_ptr);
+}
+
+/** Acquires or releases locks on a file datatype
+ *
+ * \lock_type specifies if the operations is an acquire or release
+ */
+
+PVFS_error PVFS_sys_lock(
+    PVFS_object_ref ref,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PVFS_Request mem_req,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_lock *resp_p,
+    struct qlist_head *lock_id_list_head_p,
+    enum PVFS_io_type io_type,
+    enum PVFS_client_lock_type lock_type)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_lock entered\n");
+    
+    ret = PVFS_isys_lock(ref, file_req, file_req_offset, mem_req,
+			 credentials, resp_p, 
+			 lock_id_list_head_p, io_type,
+			 lock_type, &op_id, NULL);
+    if (ret == 1)
+	return 0;
+    else if (ret < 0)
+    {
+	PVFS_perror_gossip("PVFS_isys_lock call", ret);
+	error = ret;
+    }
+    else
+    {
+	ret = PVFS_sys_wait(op_id, "lock", &error);
+	if (ret)
+	{
+	    PVFS_perror_gossip("PVFS_sys_wait call", ret);
+	    error = ret;
+	}
+	PVFS_sys_release(op_id);
+    }
+
+    return error;
+}
+
+/*******************************************************************/
+
+static int lock_init(PINT_client_sm *sm_p,
+		     job_status_s *js_p)
+{
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) lock state: lock_init\n", sm_p);
+
+    assert((js_p->error_code == 0) || 
+	   (js_p->error_code == LOCK_RETRY));
+
+    PINT_SM_GETATTR_STATE_FILL(
+	sm_p->getattr,
+	sm_p->object_ref,
+	PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
+	PVFS_TYPE_METAFILE,
+	0);
+
+    if (js_p->error_code == LOCK_RETRY)
+    {
+	js_p->error_code = 0;
+	
+	lock_datafile_index_array_destroy(sm_p);
+
+	if (sm_p->op_cancelled)
+	{
+	    js_p->error_code = -PVFS_ECANCEL;
+	    return 1;
+	}
+
+	return job_req_sched_post_timer(
+	    sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
+	    pint_client_sm_context);
+    }
+
+    return 1;
+}
+
+/* lock_init_server_info - Setup the structures for keeping track of
+ * how far each server has progress with respect to its own locks */
+static int lock_init_server_info(
+    PINT_client_sm *sm_p, job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL, i;
+    PVFS_object_attr *attr = NULL;
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) lock state: "
+		 "lock_init_server_info\n", sm_p);
+
+    if (sm_p->op_cancelled)
+    {
+	js_p->error_code = -PVFS_ECANCEL;
+	goto exit;
+    }
+    
+    js_p->error_code = 0;
+
+    attr = &(sm_p->getattr.attr);
+    assert(attr);
+
+    switch(attr->objtype)
+    {
+	case PVFS_TYPE_METAFILE:
+	    assert(attr->mask & PVFS_ATTR_META_DFILES);
+	    assert(attr->mask & PVFS_ATTR_META_DIST);
+	    assert(attr->u.meta.dist_size > 0);
+	    assert(attr->u.meta.dfile_count > 0);
+	    break;
+	case PVFS_TYPE_DIRECTORY:
+	    js_p->error_code = -PVFS_EISDIR;
+	    goto exit;
+	default:
+	    js_p->error_code = -PVFS_EBADF;
+	    goto exit;
+    }
+
+    ret = PINT_dist_lookup(attr->u.meta.dist);
+    if (ret)
+    {
+	PVFS_perror_gossip("PINT_dist_lookup failed: aborting lock request",
+			   ret);
+	js_p->error_code = -PVFS_EBADF;
+	goto exit;
+    }
+
+    ret = lock_datafile_index_array_init(sm_p, attr->u.meta.dfile_count);
+    if (ret < 0)
+    {
+	js_p->error_code = ret;
+	goto error_exit;
+    }
+
+    PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
+	&(sm_p->u.lock.dfile_size_array),
+	attr->u.meta.dfile_count);
+
+    /* No need to do these calculations if its a release*/
+    if (sm_p->u.lock.lock_type == PVFS_CLIENT_RELEASE)
+    {
+	/* Setup the first lock array to be removed */
+	assert(!qlist_empty(sm_p->u.lock.lock_id_list_head_p));
+	sm_p->u.lock.cur_lock_id_list_p = 
+	    qlist_entry(sm_p->u.lock.lock_id_list_head_p->next,
+			PVFS_lock_id_list, lock_link);
+
+	/* Initialize msgarray to the largest possible size */
+	sm_p->msgarray_count = attr->u.meta.dfile_count;
+	ret = PINT_msgpairarray_init(&sm_p->msgarray, 
+				     attr->u.meta.dfile_count);
+	sm_p->u.lock.datafile_count = attr->u.meta.dfile_count;
+	if (ret < 0)
+	    js_p->error_code = ret;
+        return 1;
+    }
+
+    ret = lock_find_target_datafiles(
+	sm_p->u.lock.mem_req,
+	sm_p->u.lock.file_req,
+	sm_p->u.lock.file_req_offset,
+	attr->u.meta.dist,
+	attr->u.meta.dfile_array,
+	attr->u.meta.dfile_count,
+	sm_p->u.lock.datafile_index_array,
+	&sm_p->u.lock.datafile_count);
+    if (ret < 0)
+    {
+	gossip_debug(GOSSIP_LOCK_DEBUG, "   lock_find_target_datafiles: ret "
+		     "< 0 (%d); aborting\n", ret);
+	js_p->error_code = ret;
+	goto error_exit;
+    }
+
+    if (sm_p->u.lock.datafile_count == 0)
+    {
+	gossip_debug(GOSSIP_LOCK_DEBUG, "   datafile_setup_msg_pairs: no "
+		     "datafiles have data; aborting\n");
+	js_p->error_code = LOCK_NO_DATA;
+	goto error_exit;
+    }
+    
+    gossip_debug(GOSSIP_LOCK_DEBUG,
+		 "  %s: %d datafiles might have had data\n", __func__, 
+		 sm_p->u.lock.datafile_count);
+
+    /* Allocate a new node for the client's lock_id_arr and set its
+     * size if this is an acquire call. */
+    if (sm_p->u.lock.lock_type != PVFS_CLIENT_RELEASE)
+    {
+	sm_p->u.lock.cur_lock_id_list_p = malloc(sizeof(PVFS_lock_id_list));
+	if (!sm_p->u.lock.cur_lock_id_list_p)
+	{  
+	    js_p->error_code = -PVFS_ENOMEM;
+	    goto error_exit;
+	}
+
+	sm_p->u.lock.cur_lock_id_list_p->lock_id_arr = (PVFS_id_gen_t *) 
+	    malloc(sm_p->u.lock.datafile_count * sizeof(PVFS_id_gen_t));
+	if (!sm_p->u.lock.cur_lock_id_list_p->lock_id_arr)
+	{
+	    js_p->error_code = -PVFS_ENOMEM;
+	    goto error_exit;
+	}
+
+	sm_p->u.lock.cur_lock_id_list_p->datafile_handle_arr = (PVFS_handle *) 
+	    malloc(sm_p->u.lock.datafile_count * sizeof(PVFS_handle));
+	if (!sm_p->u.lock.cur_lock_id_list_p->datafile_handle_arr)
+	{
+	    js_p->error_code = -PVFS_ENOMEM;
+	    goto error_exit;
+	}
+	sm_p->u.lock.cur_lock_id_list_p->lock_id_arr_count = 
+	    sm_p->u.lock.datafile_count;
+	
+	qlist_add(&(sm_p->u.lock.cur_lock_id_list_p->lock_link),
+		  sm_p->u.lock.lock_id_list_head_p);
+    }
+
+    /* Initialize msgarray */
+    sm_p->msgarray_count = sm_p->u.lock.datafile_count;
+    ret = PINT_msgpairarray_init(&sm_p->msgarray, sm_p->u.lock.datafile_count);
+    if (ret < 0)
+    {
+        js_p->error_code = ret;
+        return -1;
+    }
+
+    /* Initialize the server lock info array, which keeps track of how
+     * far each server has gotten with this lock request. */
+    sm_p->u.lock.server_lock_info_arr = 
+	calloc(sm_p->u.lock.datafile_count, sizeof(PINT_server_lock_info));
+    for (i = 0; i < sm_p->u.lock.datafile_count; i++)
+	sm_p->u.lock.server_lock_info_arr[i].index = i;
+    sm_p->u.lock.server_incomplete_count = sm_p->u.lock.datafile_count;
+
+    /* Initialize the heap. */
+    ret = create_heap(&sm_p->u.lock.server_heap, sm_p->u.lock.datafile_count);
+    if (ret == -1) {
+	gossip_err("sys-lock: create_heap of size %d failed!",
+		   sm_p->u.lock.datafile_count);
+	return ret;
+    }
+
+  error_exit:
+  exit:
+
+    return 1;
+}
+
+static int lock_setup_msgpairs(PINT_client_sm *sm_p,
+			       job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_object_attr *attr = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) lock state: "
+		 "lock_setup_msgpairs\n", sm_p);
+
+    if (sm_p->op_cancelled)
+    {
+	js_p->error_code = -PVFS_ECANCEL;
+	goto exit;
+    }
+    
+    js_p->error_code = 0;
+
+    attr = &(sm_p->getattr.attr);
+    assert(attr);
+
+    /* Reset the msgpair state for each round. */
+    memset(sm_p->msgarray, 0, 
+	   (sm_p->u.lock.datafile_count * sizeof(PINT_sm_msgpair_state)));
+
+    /* Algorithm for handling lock acquiring is done here.  Basically,
+     * we have 2 approaches, from which we can build hybrid methods.
+     *
+     * 1) Optimistic - grab as many locks as possible. 
+     * 2) Two-phase - get locks in order 
+     *
+     * Based on the client_lock_type, we will figure out which method
+     * to use here at the appropriate time.*/
+    lock_choose_method(sm_p);
+    ret = lock_fill_msgpair_array(sm_p);
+
+    js_p->error_code = ret;
+
+  exit:
+    return 1;
+}
+
+static int lock_analyze_results(PINT_client_sm *sm_p,
+				job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) lock state: "
+		 "lock_analyze_results\n", sm_p);
+
+    /* Now that we have all the datafile sizes,
+     * this state allows us to finish our check that the file request
+     * is not beyond EOF, and return the appropriate value for bytes
+     * read to the sysint caller.
+     *
+     * The check iterates through all the datafiles and compares
+     * their logical sizes with the upper bound of the file request.
+     * If one of the datafile's logical sizes is >= than the ub,
+     * we know the request is not past EOF.  Otherwise it must be, and
+     * the return value for bytes read is calculated from the size
+     * of the file request and the greatest logical offset of
+     * the datafiles (the actual EOF).
+     */
+    
+    PVFS_object_attr * attr;
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    js_p->error_code = 0;
+
+    /* Not sure about the rest of the code, but here is a nice spot to
+     * check whether the necessary locks have been acquired or
+     * released. */
+    if (sm_p->u.lock.lock_type == PVFS_CLIENT_RELEASE)
+    {
+	if (sm_p->u.lock.server_incomplete_count != 0)
+	{
+	    gossip_err("PVFS_sys_lock: Error only released %d of %d\n",
+		       sm_p->u.lock.server_incomplete_count,
+		       sm_p->msgarray_count);
+	    js_p->error_code = -PVFS_EINVAL;
+	}
+	else
+	{
+	    qlist_del(&(sm_p->u.lock.cur_lock_id_list_p->lock_link));
+	    free(sm_p->u.lock.cur_lock_id_list_p->lock_id_arr);
+	    free(sm_p->u.lock.cur_lock_id_list_p->datafile_handle_arr);
+	    free(sm_p->u.lock.cur_lock_id_list_p);
+	    sm_p->u.lock.cur_lock_id_list_p = NULL;
+	    if (!qlist_empty(sm_p->u.lock.lock_id_list_head_p))
+	    {
+		/* Get the information for the next lock to release */
+		sm_p->u.lock.cur_lock_id_list_p = 
+		    qlist_entry(sm_p->u.lock.lock_id_list_head_p->next,
+				PVFS_lock_id_list, lock_link);
+		
+		gossip_debug(
+		    GOSSIP_LOCK_DEBUG, 
+		    "PVFS_sys_lock: Continuing to next lock release "
+		    "of size %d\n",
+		    sm_p->u.lock.cur_lock_id_list_p->lock_id_arr_count);
+		
+		js_p->error_code = LOCK_INCOMPLETE;
+	    }
+	}
+    }
+    else
+    {
+	if (sm_p->u.lock.server_incomplete_count != 0)
+	{
+	    /* Build the heap, now that everything has been updated */
+	    if (sm_p->u.lock.lock_server_cur_method == 
+		PVFS_SERVER_RELEASE_SOME)
+	    {
+		build_heap(&(sm_p->u.lock.server_heap),
+			   heap_swap_fn);
+	    }
+	    else if (sm_p->u.lock.lock_server_cur_method ==
+		     PVFS_SERVER_ACQUIRE_NONBLOCK)
+	    {
+		int64_t server_offset, max_offset;
+		int server_index, block_server_index;
+
+		/* Build the heap and get rid of completed requests. */
+
+		build_heap(&(sm_p->u.lock.server_heap),
+			   heap_swap_fn);
+#if 0
+		print_heap(&(sm_p->u.lock.server_heap), heap_print_fn);
+#endif
+		build_heap(&(sm_p->u.lock.server_heap),
+			   heap_swap_fn);
+
+		do {
+		    lock_heap_min(&sm_p->u.lock.server_heap, &max_offset,
+				  &block_server_index);
+		    if (max_offset == -1) {
+			gossip_debug(GOSSIP_LOCK_DEBUG, "%s delete "
+				     "server=%d, max_offset=%lld, heap_size=%d"
+				     ",total_size = %d\n", 
+				     PVFS_lock_type_mapping[
+					 sm_p->u.lock.lock_server_cur_method],
+				     block_server_index,
+				     lld(max_offset), sm_p->u.lock.server_heap.size,
+				     sm_p->u.lock.server_heap.max_size);
+			lock_heap_extract_min(&sm_p->u.lock.server_heap, 
+					      &server_offset, &server_index, 
+					      heap_cpy_fn, heap_swap_fn);
+		    }
+		    else {
+			gossip_debug(GOSSIP_LOCK_DEBUG, "%s: min = %lld\n",
+				     PVFS_lock_type_mapping[
+					 sm_p->u.lock.lock_server_cur_method],
+				     lld(max_offset));
+		    }
+		} while (max_offset == -1);
+	    }
+
+	    js_p->error_code = LOCK_INCOMPLETE;
+	}
+    }
+	
+    return 1;
+}
+
+static int lock_cleanup(PINT_client_sm *sm_p,
+			job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "(%p) lock state: lock_cleanup\n", sm_p);
+
+    if (sm_p->u.lock.lock_type != PVFS_CLIENT_RELEASE)
+	gossip_debug(GOSSIP_LOCK_DEBUG, "Client response final - acquired "
+		     "%lld byte(s).\n", 
+		     lld(sm_p->u.lock.lock_resp_p->bytes_accessed));
+    else
+	gossip_debug(GOSSIP_LOCK_DEBUG, "Client response final - released "
+		     "%lld byte(s).\n", 
+		     lld(sm_p->u.lock.lock_resp_p->bytes_accessed));
+
+    /* Clean up the lock id array. */
+    if (sm_p->u.lock.lock_type != PVFS_CLIENT_RELEASE)
+    {
+	free(sm_p->u.lock.server_lock_info_arr);
+	free_heap(&sm_p->u.lock.server_heap);
+    }
+    
+    lock_datafile_index_array_destroy(sm_p);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_msgpairarray_destroy(sm_p->msgarray);
+
+    if(sm_p->u.lock.dfile_size_array)
+    {
+        PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.lock.dfile_size_array);
+    }
+
+    sm_p->error_code = js_p->error_code;
+
+    if (sm_p->error_code)
+    {
+        char buf[64] = {0};
+        PINT_acache_invalidate(sm_p->object_ref);
+
+        PVFS_strerror_r(sm_p->error_code, buf, 64);
+        gossip_debug(GOSSIP_LOCK_DEBUG,
+                     "*** Final lock operation error is %s\n", buf);
+    }
+    
+    sm_p->op_complete = 1;
+    return 0;
+}
+
+static int lock_completion_fn(void *user_args,
+                              struct PVFS_server_resp *resp_p,
+                              int index)
+{
+    PVFS_object_attr *attr = NULL;
+    int done = -1;
+    PINT_client_sm *sm_p = (PINT_client_sm *)user_args;
+
+    attr = &(sm_p->getattr.attr);
+    assert(attr);
+    assert(resp_p->op == PVFS_SERV_LOCK);
+
+    if(resp_p->status != 0)
+    {
+        return resp_p->status;
+    }
+
+    gossip_debug(GOSSIP_LOCK_DEBUG,
+		 "*Response from server=%d (index=%d) next_abs_off=%lld\n",
+		 sm_p->msgarray[index].req.u.lock.server_nr,
+		 sm_p->msgarray[index].datafile_index,
+		 lld(resp_p->u.lock.next_abs_offset));
+
+    /* As index refers to the position in the msgarray, fix this to
+     * the actual server */
+    index = sm_p->msgarray[index].datafile_index;
+
+    /* Modify the client response based on the server response. */
+    if (sm_p->u.lock.lock_type != PVFS_CLIENT_RELEASE)
+    {
+        (sm_p->u.lock.cur_lock_id_list_p->lock_id_arr)[index] = 
+	    resp_p->u.lock.lock_id;
+        (sm_p->u.lock.cur_lock_id_list_p->datafile_handle_arr)[index] = 
+	    attr->u.meta.dfile_array[
+		sm_p->u.lock.datafile_index_array[index]];
+        sm_p->u.lock.lock_resp_p->bytes_accessed +=
+	    resp_p->u.lock.bytes_accessed;
+	sm_p->u.lock.server_lock_info_arr[index].last_abs_offset_locked = 
+	    resp_p->u.lock.last_abs_offset_locked;
+	sm_p->u.lock.server_lock_info_arr[index].next_abs_offset =
+	    resp_p->u.lock.next_abs_offset;
+
+	if ((resp_p->u.lock.request_finished == 1) && 
+	    (sm_p->u.lock.server_lock_info_arr[index].next_abs_offset == -1))
+	{
+	    done = 1;
+	    sm_p->u.lock.server_incomplete_count--;
+	}
+	
+	/* Modify the heap */
+	if (((sm_p->u.lock.lock_server_cur_method == 
+	      PVFS_SERVER_ACQUIRE_NEW_NONBLOCK) ||
+	     (sm_p->u.lock.lock_server_cur_method == 
+	      PVFS_SERVER_ACQUIRE_NEW_BLOCK) ||
+	     (sm_p->u.lock.lock_server_cur_method == 
+	      PVFS_SERVER_ACQUIRE_BLOCK)) &&
+	    (done != 1))
+	{
+	    gossip_debug(GOSSIP_LOCK_DEBUG, "inserting server=%d,next_abs_off "
+			 "= %lld into heap (size=%d,max_size=%d).\n", index,
+			 lld(resp_p->u.lock.next_abs_offset), 
+			 sm_p->u.lock.server_heap.size,
+			 sm_p->u.lock.server_heap.max_size);
+	    lock_heap_insert(&sm_p->u.lock.server_heap, 
+			     resp_p->u.lock.next_abs_offset,
+			     &sm_p->u.lock.server_lock_info_arr[index],
+			     heap_cpy_fn);
+	}
+	else if (sm_p->u.lock.lock_server_cur_method ==
+		  PVFS_SERVER_ACQUIRE_NONBLOCK)
+	{
+	    assert(sm_p->u.lock.server_lock_info_arr[index].heap_node_p 
+		   != NULL);
+	    /* Update the heap_node associated with the server.  If it
+	     * is done, these heap_nodes will be extracted in the
+	     * analyze stage. */
+	    sm_p->u.lock.server_lock_info_arr[index].heap_node_p->key =
+		resp_p->u.lock.next_abs_offset;
+	}
+	else if (sm_p->u.lock.lock_server_cur_method ==
+		 PVFS_SERVER_RELEASE_SOME)
+	{
+	    /* If a req was finished, move it back to the heap and add
+	     * it back to the count, otherwise just update the heap
+	     * entries for these responses and then build the heap in
+	     * the completion stage */
+	    if (sm_p->u.lock.server_lock_info_arr[index].heap_node_p == NULL)
+	    {
+		sm_p->u.lock.server_incomplete_count++;
+		lock_heap_insert(&sm_p->u.lock.server_heap, 
+				 resp_p->u.lock.next_abs_offset,
+				 &sm_p->u.lock.server_lock_info_arr[index],
+				 heap_cpy_fn);
+	    }
+	    else 
+	    {
+		assert(resp_p->u.lock.next_abs_offset != -1);
+		sm_p->u.lock.server_lock_info_arr[index].heap_node_p->key = 
+		    resp_p->u.lock.next_abs_offset;	    
+	    }
+	}
+    }
+    else /* Release all*/
+    {
+        sm_p->u.lock.lock_resp_p->bytes_accessed += 
+	    resp_p->u.lock.bytes_accessed;
+	if (resp_p->u.lock.request_finished == 1)
+	    sm_p->u.lock.server_incomplete_count--;
+
+	gossip_debug(GOSSIP_LOCK_DEBUG, "Response from server %d - released "
+		     "%lld bytes (%d left).\n", index,
+		     lld(resp_p->u.lock.bytes_accessed),
+		     sm_p->u.lock.server_incomplete_count);
+    }
+
+#ifdef PRINT_SERVER_LOCK_INFO
+    if (sm_p->u.lock.lock_type != PVFS_CLIENT_RELEASE)
+	print_server_lock_info_arr(sm_p);
+#endif
+
+    return 0;
+};
+
+
+static int lock_find_target_datafiles(
+    PVFS_Request mem_req,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    PINT_dist *dist_p,
+    PVFS_handle *input_handle_array,
+    int input_handle_count,
+    int *handle_index_array,
+    int *handle_index_out_count)
+{
+    int ret = -PVFS_EINVAL, i = 0;
+    struct PINT_Request_state *req_state = NULL;
+    struct PINT_Request_state *mem_req_state = NULL;
+    PINT_request_file_data tmp_file_data;
+    PINT_Request_result tmp_result;
+
+    gossip_debug(GOSSIP_LOCK_DEBUG, "- lock_find_target_datafiles called\n");
+    
+    if (!handle_index_array || !handle_index_out_count)
+    {
+	gossip_err("  invalid handle_index_array or handle_index_out_count\n");
+	return ret;
+    }
+    *handle_index_out_count = 0;
+    
+    req_state = PINT_new_request_state(file_req);
+    if (!req_state)
+    {
+	return -PVFS_ENOMEM;
+    }
+    mem_req_state = PINT_new_request_state(mem_req);
+    if (!mem_req_state)
+    {
+	PINT_free_request_state(req_state);
+	return -PVFS_ENOMEM;
+    }
+    
+    tmp_file_data.dist = dist_p;
+    tmp_file_data.server_ct = input_handle_count;
+    tmp_file_data.extend_flag = 1;
+
+    /* for each datafile handle, calculate the unexp request or
+     * response size (may be different for each server), and then
+     * calculate if any data exists on that server (in the case of
+     * reads) or if any data should be written (in the case of
+     * writes).
+     */
+
+    for (i = 0; i < input_handle_count; i++)
+    {
+	/* NOTE: we don't have to give an accurate file size here, as
+         * long as we set the extend flag to tell the I/O req
+         * processor to continue past eof if needed
+         */
+	tmp_file_data.fsize = 0;
+	tmp_file_data.server_nr = i;
+
+	PINT_REQUEST_STATE_RESET(req_state);
+	PINT_REQUEST_STATE_RESET(mem_req_state);
+	
+	/* if a file datatype offset was specified, go ahead and skip
+         * ahead before calculating
+         */
+        if (file_req_offset)
+        {
+            PINT_REQUEST_STATE_SET_TARGET(req_state, file_req_offset);
+        }
+	
+        PINT_REQUEST_STATE_SET_FINAL(req_state,
+	    file_req_offset+PINT_REQUEST_TOTAL_BYTES(mem_req));
+
+        memset(&tmp_result, 0, sizeof(PINT_Request_result));
+        tmp_result.bytemax = 1;
+        tmp_result.segmax = 1;
+
+	/* PINT_process_request() returns number of bytes processed */
+	ret = PINT_process_request(
+	    req_state, mem_req_state, &tmp_file_data,
+	    &tmp_result, PINT_CKSIZE);
+	if (ret < 0)
+	{
+	    PINT_free_request_state(mem_req_state);
+	    PINT_free_request_state(req_state);
+	    return ret;
+	}
+	    
+        /* check if we found data that belongs to this handle */
+        if (tmp_result.bytes != 0)
+        {
+	    assert(tmp_result.bytes > 0);
+
+            handle_index_array[(*handle_index_out_count)++] = i;
+
+            gossip_debug(GOSSIP_LOCK_DEBUG, "%s: "
+                         "datafile[%d] might have data (out=%d)\n",
+                         __func__, i, *handle_index_out_count);
+        }
+    }
+    PINT_free_request_state(req_state);
+    PINT_free_request_state(mem_req_state);
+    
+    return 0;
+}
+    
+static int lock_datafile_index_array_init(
+    PINT_client_sm *sm_p,
+    int datafile_count)
+{
+    sm_p->u.lock.datafile_index_array = 
+	(int *) malloc(datafile_count * sizeof(int));
+    if (!(sm_p->u.lock.datafile_index_array))
+    {
+	return -PVFS_ENOMEM;
+    }
+    
+    memset(sm_p->u.lock.datafile_index_array, 0,
+	   datafile_count * sizeof(int));
+    sm_p->u.lock.datafile_count = datafile_count;
+    return 0;
+}
+
+static void lock_datafile_index_array_destroy(
+    PINT_client_sm *sm_p)
+{
+    free(sm_p->u.lock.datafile_index_array);
+    sm_p->u.lock.datafile_index_array = NULL;
+    sm_p->u.lock.datafile_count = 0;
+}
+
+#ifdef PRINT_SERVER_LOCK_INFO
+static void print_server_lock_info_arr(
+    PINT_client_sm *sm_p)
+{
+    PINT_server_lock_info *lock_info_p = sm_p->u.lock.server_lock_info_arr;
+    int i = 0;
+
+    fprintf(stdout, 
+	    "server_lock_info_arr: %d of %d valid\n"
+	    "server | last_abs_offset_locked | next_abs_offset | heap_node\n",
+	    sm_p->u.lock.server_incomplete_count,
+	    sm_p->u.lock.datafile_count);
+    for (i = 0; i < sm_p->u.lock.datafile_count; i++)
+    {
+	fprintf(stdout, "%6d | %22lld | %15lld | %s\n",
+		sm_p->u.lock.datafile_index_array[i],
+		lld(lock_info_p[i].last_abs_offset_locked),
+		lld(lock_info_p[i].next_abs_offset),
+		(lock_info_p[i].heap_node_p == NULL) ? "n" : "y");
+    }
+    fprintf(stdout, "\n");
+    fflush(stdout);
+}
+#endif
+
+static int lock_choose_method(
+    PINT_client_sm *sm_p)
+{
+    switch(sm_p->u.lock.lock_type)
+    {
+	case PVFS_CLIENT_ACQUIRE_TWO_PHASE:
+	    if (sm_p->u.lock.lock_server_cur_method == PVFS_SERVER_LOCK_INIT)
+		sm_p->u.lock.lock_server_cur_method = 
+		    PVFS_SERVER_ACQUIRE_NEW_BLOCK;
+	    else
+		sm_p->u.lock.lock_server_cur_method =
+		    PVFS_SERVER_ACQUIRE_BLOCK;
+	    break;
+	case PVFS_CLIENT_ACQUIRE_ONE_TRY:
+	    if (sm_p->u.lock.lock_server_cur_method == PVFS_SERVER_LOCK_INIT)
+		sm_p->u.lock.lock_server_cur_method = 
+		    PVFS_SERVER_ACQUIRE_NEW_NONBLOCK;
+	    else if (sm_p->u.lock.lock_server_cur_method == 
+		     PVFS_SERVER_ACQUIRE_NEW_NONBLOCK)
+		sm_p->u.lock.lock_server_cur_method =
+		    PVFS_SERVER_RELEASE_SOME;
+	    else if (sm_p->u.lock.lock_server_cur_method == 
+		     PVFS_SERVER_RELEASE_SOME)
+		sm_p->u.lock.lock_server_cur_method = 
+		    PVFS_SERVER_ACQUIRE_BLOCK;
+	    break;
+	case PVFS_CLIENT_ACQUIRE_ALT_TRY:
+	    if (sm_p->u.lock.lock_server_cur_method == PVFS_SERVER_LOCK_INIT)
+                sm_p->u.lock.lock_server_cur_method = 
+		    PVFS_SERVER_ACQUIRE_NEW_NONBLOCK;
+	    else if (sm_p->u.lock.lock_server_cur_method == 
+		     PVFS_SERVER_ACQUIRE_NEW_NONBLOCK) 
+		sm_p->u.lock.lock_server_cur_method =
+		    PVFS_SERVER_RELEASE_SOME;
+	    else if (sm_p->u.lock.lock_server_cur_method == 
+		     PVFS_SERVER_RELEASE_SOME)
+		sm_p->u.lock.lock_server_cur_method = 
+		    PVFS_SERVER_ACQUIRE_BLOCK;
+	    else if (sm_p->u.lock.lock_server_cur_method == 
+		     PVFS_SERVER_ACQUIRE_BLOCK)
+		sm_p->u.lock.lock_server_cur_method = 
+		    PVFS_SERVER_ACQUIRE_NONBLOCK;
+	    else if (sm_p->u.lock.lock_server_cur_method == 
+		     PVFS_SERVER_ACQUIRE_NONBLOCK)
+		sm_p->u.lock.lock_server_cur_method =
+		    PVFS_SERVER_RELEASE_SOME;
+	    break;
+	case PVFS_CLIENT_RELEASE:
+	    sm_p->u.lock.lock_server_cur_method = PVFS_SERVER_RELEASE_ALL;
+	    break;
+	default:
+	    gossip_err("invalid client request type!\n");
+    }
+
+    return 0;
+}
+
+static int lock_fill_msgpair_array(
+    PINT_client_sm *sm_p)
+{
+    int i, ret = -1;
+    PVFS_object_attr *attr = NULL;
+    PVFS_handle datafile_handle;
+    PVFS_Request fill_file_req = PVFS_BYTE;
+    PVFS_offset fill_file_req_offset = -1;
+    PVFS_offset fill_final_offset = -1;
+    PVFS_size fill_aggregate_size = -1;
+    PVFS_id_gen_t fill_lock_id = -1;
+
+    attr = &(sm_p->getattr.attr);
+    assert(attr);
+
+    /* Fill all requests */
+    if ((sm_p->u.lock.lock_server_cur_method == 
+	 PVFS_SERVER_ACQUIRE_NEW_NONBLOCK ) ||
+	(sm_p->u.lock.lock_server_cur_method == 
+	 PVFS_SERVER_ACQUIRE_NEW_BLOCK) || 
+	(sm_p->u.lock.lock_server_cur_method == 
+	 PVFS_SERVER_RELEASE_ALL))
+    {
+	if (sm_p->u.lock.lock_type != PVFS_CLIENT_RELEASE)
+	    sm_p->msgarray_count = sm_p->u.lock.datafile_count;
+	else
+	{
+	    sm_p->msgarray_count = 
+		sm_p->u.lock.cur_lock_id_list_p->lock_id_arr_count;
+	    sm_p->u.lock.server_incomplete_count = sm_p->msgarray_count;
+	}
+	
+	for (i = 0; i < sm_p->msgarray_count; i++)
+	{
+	    if (sm_p->u.lock.lock_type != PVFS_CLIENT_RELEASE)
+		datafile_handle = attr->u.meta.dfile_array[
+		    sm_p->u.lock.datafile_index_array[i]];
+	    else
+		datafile_handle =
+		    sm_p->u.lock.cur_lock_id_list_p->datafile_handle_arr[i];
+
+	    gossip_debug(GOSSIP_LOCK_DEBUG, 
+			 " filling ALL %s lock requests for %llu\n",
+			  PVFS_lock_type_mapping[
+			      sm_p->u.lock.lock_server_cur_method],
+			 llu(datafile_handle));
+	    
+	    if (sm_p->u.lock.lock_server_cur_method == 
+		PVFS_SERVER_ACQUIRE_NEW_NONBLOCK)
+	    {
+		fill_file_req = sm_p->u.lock.file_req;
+		fill_file_req_offset = sm_p->u.lock.file_req_offset;
+		fill_final_offset = __LONG_LONG_MAX__;
+		fill_aggregate_size = 
+		    PINT_REQUEST_TOTAL_BYTES(sm_p->u.lock.mem_req);
+		fill_lock_id = -1;
+	    }
+	    else if (sm_p->u.lock.lock_server_cur_method == 
+		 PVFS_SERVER_ACQUIRE_NEW_BLOCK)
+	    {
+		fill_file_req = sm_p->u.lock.file_req;
+		fill_file_req_offset = sm_p->u.lock.file_req_offset;
+		fill_final_offset = 0;
+		fill_aggregate_size = 
+		    PINT_REQUEST_TOTAL_BYTES(sm_p->u.lock.mem_req);
+		fill_lock_id = -1;
+	    }
+	    else if (sm_p->u.lock.lock_server_cur_method == 
+		     PVFS_SERVER_RELEASE_ALL)
+	    {
+		fill_file_req = PVFS_BYTE;
+                fill_file_req_offset = -1;
+                fill_final_offset = -1;
+                fill_aggregate_size = -1;
+                fill_lock_id = 
+		    (sm_p->u.lock.cur_lock_id_list_p->lock_id_arr)[i];
+	    }
+
+	    PINT_SERVREQ_LOCK_FILL(
+		sm_p->msgarray[i].req,
+		*sm_p->cred_p,
+		sm_p->object_ref.fs_id,
+		datafile_handle,
+		sm_p->u.lock.io_type,
+		sm_p->u.lock.lock_server_cur_method,
+		sm_p->u.lock.datafile_index_array[i],
+		attr->u.meta.dfile_count,
+		attr->u.meta.dist,
+		fill_file_req,
+		fill_file_req_offset,
+		fill_final_offset,
+		fill_aggregate_size,
+		fill_lock_id);
+	    
+	    sm_p->msgarray[i].fs_id = sm_p->object_ref.fs_id;
+	    sm_p->msgarray[i].handle = sm_p->object_ref.handle;
+	    sm_p->msgarray[i].retry_flag = PVFS_MSGPAIR_RETRY;
+	    sm_p->msgarray[i].comp_fn = lock_completion_fn;
+	    sm_p->msgarray[i].datafile_index = i;
+
+	    ret = PINT_cached_config_map_to_server(
+		&sm_p->msgarray[i].svr_addr, datafile_handle,
+		sm_p->object_ref.fs_id);
+	    if(ret < 0)
+	    {
+		gossip_err("Failed to map meta server address\n");
+		return ret;
+	    }
+	}
+    }
+    else if (sm_p->u.lock.lock_server_cur_method ==  
+	     PVFS_SERVER_ACQUIRE_NONBLOCK)
+    {
+	int msg_index = 0, server_index;
+
+	/* Figure out which servers need to acquire more locks.
+	 * Modify the heap nodes associated in the completion_fn */
+	for (i = 0; i < sm_p->u.lock.datafile_count; i++)
+	{
+	    if (sm_p->u.lock.server_lock_info_arr[i].next_abs_offset != -1)
+	    {
+		server_index = sm_p->u.lock.server_lock_info_arr[i].index;
+		
+		datafile_handle = attr->u.meta.dfile_array[
+		    sm_p->u.lock.datafile_index_array[server_index]];
+
+		PINT_SERVREQ_LOCK_FILL(
+		    sm_p->msgarray[msg_index].req,
+		    *sm_p->cred_p,
+		    sm_p->object_ref.fs_id,
+		    datafile_handle,
+		    sm_p->u.lock.io_type,
+		    sm_p->u.lock.lock_server_cur_method,
+		    sm_p->u.lock.datafile_index_array[server_index],
+		    attr->u.meta.dfile_count,
+		    attr->u.meta.dist,
+		    PVFS_BYTE,
+		    -1,
+		    __LONG_LONG_MAX__,
+		    -1,
+		    (sm_p->u.lock.cur_lock_id_list_p->
+		     lock_id_arr)[server_index]);
+	
+		sm_p->msgarray[msg_index].fs_id = sm_p->object_ref.fs_id;
+		sm_p->msgarray[msg_index].handle = sm_p->object_ref.handle;
+		sm_p->msgarray[msg_index].retry_flag = PVFS_MSGPAIR_RETRY;
+		sm_p->msgarray[msg_index].comp_fn = lock_completion_fn;
+		sm_p->msgarray[msg_index].datafile_index = server_index;
+
+		ret = PINT_cached_config_map_to_server(
+		    &sm_p->msgarray[msg_index].svr_addr, datafile_handle,
+		    sm_p->object_ref.fs_id);
+		if(ret < 0)
+		{
+		    gossip_err("Failed to map meta server address\n");
+		    return ret;
+		}
+
+		msg_index++;
+	    }
+	}
+
+	sm_p->msgarray_count = msg_index;
+	assert(sm_p->msgarray_count > 0);
+	gossip_debug(GOSSIP_LOCK_DEBUG, "ACQUIRE_NON_BLOCK: "
+		     "(%d of %d)\n",
+		     msg_index, sm_p->u.lock.datafile_count);
+    }
+    else if (sm_p->u.lock.lock_server_cur_method == 
+	     PVFS_SERVER_RELEASE_SOME)
+    {
+	int64_t max_offset;
+	int server_index, block_server_index, msg_index = 0;
+	
+	lock_heap_min(&sm_p->u.lock.server_heap, &max_offset,
+		      &block_server_index);
+
+	/* Figure out which servers need to release. */
+	for (i = 0; i < sm_p->u.lock.datafile_count; i++)
+	{
+	    if ((sm_p->u.lock.server_lock_info_arr[i].last_abs_offset_locked >
+		 max_offset) && (i != block_server_index))
+	    {
+		server_index = sm_p->u.lock.server_lock_info_arr[i].index;
+
+		datafile_handle = attr->u.meta.dfile_array[
+		    sm_p->u.lock.datafile_index_array[server_index]];
+
+		PINT_SERVREQ_LOCK_FILL(
+		    sm_p->msgarray[msg_index].req,
+		    *sm_p->cred_p,
+		    sm_p->object_ref.fs_id,
+		    datafile_handle,
+		    sm_p->u.lock.io_type,
+		    sm_p->u.lock.lock_server_cur_method,
+		    sm_p->u.lock.datafile_index_array[server_index],
+		    attr->u.meta.dfile_count,
+		    attr->u.meta.dist,
+		    PVFS_BYTE,
+		    -1,
+		    max_offset,
+		    -1,
+		    (sm_p->u.lock.cur_lock_id_list_p->
+		     lock_id_arr)[server_index]);
+	
+		sm_p->msgarray[msg_index].fs_id = sm_p->object_ref.fs_id;
+		sm_p->msgarray[msg_index].handle = sm_p->object_ref.handle;
+		sm_p->msgarray[msg_index].retry_flag = PVFS_MSGPAIR_RETRY;
+		sm_p->msgarray[msg_index].comp_fn = lock_completion_fn;
+		sm_p->msgarray[msg_index].datafile_index = server_index;
+
+		ret = PINT_cached_config_map_to_server(
+		    &sm_p->msgarray[msg_index].svr_addr, datafile_handle,
+		    sm_p->object_ref.fs_id);
+		if(ret < 0)
+		{
+		    gossip_err("Failed to map meta server address\n");
+		    return ret;
+		}
+
+		msg_index++;
+	    }
+	}
+
+	sm_p->msgarray_count = msg_index;
+	assert(sm_p->msgarray_count >= 0);
+	if (sm_p->msgarray_count > 0)
+	    gossip_debug(GOSSIP_LOCK_DEBUG, "RELEASE_SOME: "
+			 "max_offset = %lld (%d of %d)\n", lld(max_offset),
+			 msg_index, sm_p->u.lock.datafile_count);
+	else {
+	    gossip_debug(GOSSIP_LOCK_DEBUG, "RELEASE_SOME: No msgpairs this "
+			 "round - max_offset = %lld (%d of %d)\n", lld(max_offset),
+			 msg_index, sm_p->u.lock.datafile_count);
+
+	    return LOCK_NO_MSGPAIRS;
+	}
+    } 
+    else if (sm_p->u.lock.lock_server_cur_method == 
+	     PVFS_SERVER_ACQUIRE_BLOCK)
+    {
+	int64_t server_offset, max_offset;
+	int server_index, block_server_index;
+	
+	/* Figure out which server needs to get the next blocking lock */
+	lock_heap_extract_min(&sm_p->u.lock.server_heap, &server_offset,
+			      &server_index, heap_cpy_fn, heap_swap_fn);
+
+	gossip_debug(GOSSIP_LOCK_DEBUG, "ACQUIRE_BLOCK: extracted "
+		     "offset=%lld,server=%d,lock_id=%lld\n",
+		     lld(server_offset), server_index,
+		     lld((sm_p->u.lock.cur_lock_id_list_p->
+		      lock_id_arr)[server_index]));
+
+	/* How far is that server allowed to process the lock? */
+	if (sm_p->u.lock.server_heap.size == 0)
+	    max_offset = __LONG_LONG_MAX__;
+	else
+	    lock_heap_min(&sm_p->u.lock.server_heap, &max_offset,
+			  &block_server_index);
+
+	datafile_handle = attr->u.meta.dfile_array[
+	    sm_p->u.lock.datafile_index_array[server_index]];
+	
+	PINT_SERVREQ_LOCK_FILL(
+	    sm_p->msgarray[0].req,
+	    *sm_p->cred_p,
+	    sm_p->object_ref.fs_id,
+	    datafile_handle,
+	    sm_p->u.lock.io_type,
+	    sm_p->u.lock.lock_server_cur_method,
+	    sm_p->u.lock.datafile_index_array[server_index],
+	    attr->u.meta.dfile_count,
+	    attr->u.meta.dist,
+	    PVFS_BYTE,
+	    -1,
+	    max_offset,
+	    -1,
+	    (sm_p->u.lock.cur_lock_id_list_p->lock_id_arr)[server_index]);
+	
+	sm_p->msgarray[0].fs_id = sm_p->object_ref.fs_id;
+	sm_p->msgarray[0].handle = sm_p->object_ref.handle;
+	sm_p->msgarray[0].retry_flag = PVFS_MSGPAIR_RETRY;
+	sm_p->msgarray[0].comp_fn = lock_completion_fn;
+	sm_p->msgarray[0].datafile_index = server_index;
+
+	sm_p->msgarray_count = 1;
+
+	ret = PINT_cached_config_map_to_server(
+	    &sm_p->msgarray[0].svr_addr, datafile_handle,
+	    sm_p->object_ref.fs_id);
+	if(ret < 0)
+	{
+	    gossip_err("Failed to map meta server address\n");
+	    return ret;
+	}
+    }
+    
+    return 0;
+}
+
+/* Heap helper functions */
+
+void heap_cpy_fn(heap_node_t *dest_p,
+                 heap_node_t *src_p)
+{
+    PINT_server_lock_info *lock_p =
+        (PINT_server_lock_info *) src_p->user_p;
+    *dest_p = *src_p;
+
+    lock_p->heap_node_p = dest_p;
+}
+
+void heap_swap_fn(heap_node_t *dest_p,
+                  heap_node_t *src_p)
+{
+    PINT_server_lock_info *lock_p;
+    heap_node_t tmp_node;
+
+    tmp_node = *dest_p;
+    *dest_p  = *src_p;
+    *src_p = tmp_node;
+
+    /* Update their external stuctures */
+    lock_p = (PINT_server_lock_info *) dest_p->user_p;
+    lock_p->heap_node_p = dest_p;
+    lock_p = (PINT_server_lock_info *) src_p->user_p;
+    lock_p->heap_node_p = src_p;
+}
+
+void heap_print_fn(heap_node_t *node_p)
+{
+    PINT_server_lock_info *lock_p =
+        (PINT_server_lock_info *) node_p->user_p;
+
+    fprintf(stdout, "(k=%lld,p=%d) ", lld(node_p->key), lock_p->index);
+    fflush(stdout);
+}
+
+void lock_heap_insert(heap_t *heap_p, int64_t key,
+                      PINT_server_lock_info *lock_p ,
+                      void (*cpy_fn) (heap_node_t *dest_p,
+                                      heap_node_t *src_p))
+{
+    heap_node_t *heap_node_p = NULL;
+
+    heap_node_p = heap_insert(heap_p, key, cpy_fn);
+
+    /* Set external links */
+    heap_node_p->user_p = (void *) lock_p;
+    lock_p->heap_node_p = heap_node_p;
+}
+
+void lock_heap_extract_min(heap_t *heap_p, int64_t *key_p,
+			   int *proc_p,
+			   void (*cpy_fn) (heap_node_t *dest_p,
+					   heap_node_t *src_p),
+			   void (*swap_fn) (heap_node_t *dest_p,
+					    heap_node_t *src_p))
+{
+    PINT_server_lock_info *lock_p = NULL;
+
+    assert(heap_p->size > 0);
+    lock_p = (PINT_server_lock_info *) heap_p->nodes[0].user_p;
+    *proc_p = lock_p->index;
+    heap_extract_min(heap_p, key_p,
+		     cpy_fn, swap_fn);
+    lock_p->heap_node_p = NULL; /* Reset so no heap_node is associated */
+}
+
+void lock_heap_min(heap_t *heap_p, int64_t *key_p, int *proc_p)
+{
+    PINT_server_lock_info *lock_p = NULL;
+
+    assert(heap_p->size > 0);
+    lock_p = (PINT_server_lock_info *) heap_p->nodes[0].user_p;
+    *proc_p = lock_p->index;
+    heap_min(heap_p, key_p);
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

@@ -27,6 +27,7 @@
 #include "msgpairarray.h"
 #include "pint-sysint-utils.h"
 #include "pint-perf-counter.h"
+#include "heap.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
@@ -138,6 +139,45 @@ struct PINT_client_mgmt_create_dirent_sm
 struct PINT_client_mgmt_get_dirdata_handle_sm
 {
     PVFS_handle *dirdata_handle;
+};
+
+typedef struct PINT_server_lock_info_s
+{
+    PVFS_offset last_abs_offset_locked;
+    PVFS_offset next_abs_offset;
+    heap_node_t *heap_node_p;
+    int index;
+} PINT_server_lock_info;
+
+struct PINT_client_lock_sm
+{
+    /* input parameters */
+    enum PVFS_io_type io_type;
+    enum PVFS_client_lock_type lock_type;
+    enum PVFS_server_lock_type lock_server_cur_method;
+    PVFS_Request mem_req;
+    PVFS_Request file_req;
+    PVFS_offset file_req_offset;
+    PINT_server_lock_info *server_lock_info_arr;
+    heap_t server_heap;
+    int server_incomplete_count;
+
+    /* output parameters */
+    struct qlist_head *lock_id_list_head_p;
+    PVFS_lock_id_list *cur_lock_id_list_p;
+    PVFS_sysresp_lock *lock_resp_p;
+
+    enum PVFS_encoding_type encoding;
+
+    int *datafile_index_array;
+    int datafile_count;
+
+    int retry_count;
+    int stored_error_code;
+
+    PVFS_size total_size;
+
+    PVFS_size * dfile_size_array;
 };
 
 typedef struct
@@ -510,6 +550,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_symlink_sm sym;
 	struct PINT_client_getattr_sm getattr;
 	struct PINT_client_setattr_sm setattr;
+	struct PINT_client_lock_sm lock;
 	struct PINT_client_io_sm io;
 	struct PINT_client_flush_sm flush;
 	struct PINT_client_readdir_sm readdir;
@@ -606,6 +647,7 @@ enum
     PVFS_SYS_SMALL_IO              = 17,
     PVFS_SYS_STATFS                = 18,
     PVFS_SYS_FS_ADD                = 19,
+    PVFS_SYS_LOCK                  = 20,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -725,6 +767,7 @@ extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_lock_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;

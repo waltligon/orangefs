@@ -42,6 +42,9 @@ typedef struct PINT_sm_msgpair_state_s
     /* don't use this -- internal msgpairarray use only */
     int retry_count;
 
+    /* AC - index into the datafile_index_array */
+    int datafile_index;
+
     int (* comp_fn)(void *sm_p, struct PVFS_server_resp *resp_p, int i);
 
     /* server address */

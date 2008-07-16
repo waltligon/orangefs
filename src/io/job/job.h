@@ -17,6 +17,7 @@
 #include "pvfs2-storage.h"
 #include "pvfs2-req-proto.h"
 #include "pint-dev.h"
+#include "lock-storage.h"
 
 typedef PVFS_id_gen_t job_id_t;
 typedef PVFS_context_id job_context_id;
@@ -544,6 +545,10 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 			  job_status_s * out_status_p,
 			  job_id_t * id,
 			  job_context_id context_id);
+
+/* wait for lock bytes for a file system */
+int job_lock_wait_block_bytes(void *user_ptr,
+			      lock_req_t *lock_req_p);
 
 int job_null(
     int error_code,
