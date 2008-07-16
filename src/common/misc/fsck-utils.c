@@ -83,6 +83,8 @@ static int PINT_handle_wrangler_load_handles(
 static int PINT_handle_wrangler_remove_handle(
     const PVFS_handle * handle,
     const PVFS_fs_id * cur_fs);
+    
+static PVFS_credential *g_credential;
 
 /**
  * Initializes API and checks options for correctness 
@@ -939,9 +941,13 @@ int PVFS_fsck_get_attributes(
 {
     time_t r_atime, r_mtime, r_ctime;
     int ret = 0;
+    
+    g_credential = PVFS_util_gen_fake_credential();
+    assert(g_credential);
 
     ret = PVFS_sys_getattr
-        (*pref, PVFS_ATTR_SYS_ALL, (PVFS_credentials *) creds, getattr_resp);
+        (*pref, PVFS_ATTR_SYS_ALL, (PVFS_credential *) g_credential,
+             getattr_resp);
     if(ret < 0)
     {
         gossip_err("Error: unable to retrieve attributes\n");

@@ -739,7 +739,6 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
-    align8(pptr); \
     encode_##tn1(pptr, &x->n1); \
     if (x->n1 > 0) \
         for (i=0; i<x->n1; i++) \
@@ -749,6 +748,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     { \
         encode_##ta2(pptr, &x->a2); \
     } \
+    align8(pptr); \
     encode_##t3(pptr, &x->x3); \
     encode_##tn3(pptr, &x->n3); \
     if (x->n3 > 0) \
@@ -759,7 +759,6 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
-    align8(pptr); \
     decode_##tn1(pptr, &x->n1); \
     if (x->n1 > 0) \
     { \
@@ -775,8 +774,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
         x->a2 = decode_malloc(strlen(x->a2) * sizeof(*x->a2)); \
         decode_##ta2(pptr, &x->a2); \
     } \
-    else \
-        x->a2 = NULL; \
+    align8(pptr); \
     decode_##t3(pptr, &x->x3); \
     decode_##tn3(pptr, &x->n3); \
     if (x->n3 > 0) \

@@ -183,6 +183,13 @@ PVFS_credential *PVFS_util_gen_fake_credential(void)
         return NULL;
     }
     
+    cred->issuer_id = (char *)calloc(32, sizeof(char));
+    if (!cred->issuer_id)
+    {
+        free(cred);
+        return NULL;
+    }
+    
     cred->serial = 0xDEADBEEF;
     cred->userid = geteuid();
     cred->num_groups = 1;
