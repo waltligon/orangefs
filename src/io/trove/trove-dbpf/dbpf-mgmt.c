@@ -503,6 +503,7 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
     memset(&db_data, 0, sizeof(db_data));
     db_key.data = key_p->buffer;
     db_key.size = key_p->buffer_sz;
+    db_key.flags = DB_DBT_USERMEM;
 
     db_data.data  = val_p->buffer;
     db_data.ulen  = val_p->buffer_sz;
@@ -725,6 +726,7 @@ int dbpf_collection_create(char *collname,
 
     key.data = collname;
     key.size = strlen(collname)+1;
+    key.flags = DB_DBT_USERMEM;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
@@ -949,6 +951,7 @@ int dbpf_collection_remove(char *collname,
 
     key.data = collname;
     key.size = strlen(collname) + 1;
+    key.flags = DB_DBT_USERMEM;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
@@ -1313,6 +1316,7 @@ int dbpf_collection_lookup(char *collname,
     memset(&data, 0, sizeof(data));
     key.data = collname;
     key.size = strlen(collname)+1;
+    key.flags = DB_DBT_USERMEM;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
@@ -1398,6 +1402,7 @@ int dbpf_collection_lookup(char *collname,
     memset(&data, 0, sizeof(data));
     key.data = TROVE_DBPF_VERSION_KEY;
     key.size = strlen(TROVE_DBPF_VERSION_KEY);
+    key.flags = DB_DBT_USERMEM;
     data.data = &trove_dbpf_version;
     data.ulen = 32;
     data.flags = DB_DBT_USERMEM;
