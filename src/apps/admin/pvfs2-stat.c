@@ -36,6 +36,8 @@ struct options
     int     nNumFiles;
 };
 
+static PVFS_credential *g_credential;
+
 /* Function Prototypes */
 static void usage(int argc, char** argv);
 static int parse_args(int argc, char** argv, struct options * opts);
@@ -133,6 +135,9 @@ int main(int argc, char **argv)
 
    /* We will re-use the same credentials for each call */
    PVFS_util_gen_credentials(&credentials);
+   
+   g_credential = PVFS_util_gen_fake_credential();
+   assert(g_credential);
 
    for(i = 0; i < user_opts.nNumFiles; i++)
    {
@@ -226,7 +231,7 @@ static int do_stat(const char             * pszFile,
    
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
-                          (PVFS_credentials *) credentials, 
+                          g_credential, 
                           &getattr_response);
 
    if(ret < 0)

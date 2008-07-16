@@ -3,7 +3,7 @@
  *
  * Changes by Acxiom Corporation to add relative path support to
  * PVFS_util_resolve(),
- * Copyright © Acxiom Corporation, 2005
+ * Copyright Acxiom Corporation, 2005
  *
  * See COPYING in top-level directory.
  */
@@ -31,6 +31,7 @@
 #include "realpath.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 #ifdef HAVE_MNTENT_H
 
@@ -162,6 +163,36 @@ void PVFS_util_gen_credentials(
     memset(credentials, 0, sizeof(PVFS_credentials));
     credentials->uid = geteuid();
     credentials->gid = getegid();
+}
+
+/* a temporary helper function */
+PVFS_credential *PVFS_util_gen_fake_credential(void)
+{
+    PVFS_credential *cred;
+    
+    cred = (PVFS_credential*)calloc(1, sizeof(PVFS_credential));
+    if (!cred)
+    {
+        return NULL;
+    }
+    
+    cred->group_array = (PVFS_gid*)calloc(1, sizeof(PVFS_gid));
+    if (!cred->group_array)
+    {
+        free(cred);
+        return NULL;
+    }
+    
+    cred->serial = 0xDEADBEEF;
+    cred->userid = geteuid();
+    cred->num_groups = 1;
+    cred->group_array[0] = getegid();
+    cred->issuer_id = "FAKE";
+    cred->timeout = 1230786000; /* 1 Jan. 2009 00:00 UTC */
+    cred->sig_size = 0;
+    cred->signature = NULL;
+    
+    return cred;
 }
 
 int PVFS_util_get_umask(void)

@@ -55,6 +55,8 @@ struct options
     int num_starts;
 };
 
+static PVFS_credential *g_credential;
+
 static char *process_name = NULL;
 static int do_timing = 0;
 
@@ -387,7 +389,7 @@ void print_entry(
             PVFS_util_gen_credentials(&credentials);
 
             ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                &credentials, &getattr_response);
+                g_credential, &getattr_response);
             if (ret)
             {
                 fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
@@ -449,7 +451,7 @@ int do_list(
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
-                         &credentials, &getattr_response) == 0)
+                         g_credential, &getattr_response) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
             (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK) ||
@@ -838,6 +840,9 @@ int main(int argc, char **argv)
 	PVFS_sys_finalize();
 	return(-1);
     }
+    
+    g_credential = PVFS_util_gen_fake_credential();
+    assert(g_credential);
 
     if (user_opts->num_starts == 0)
     {

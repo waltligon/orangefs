@@ -41,6 +41,8 @@ struct options *fsck_opts = NULL;
 /* lost+found reference */
 PVFS_object_ref laf_ref;
 
+static PVFS_credential *g_credential;
+
 int main(int argc, char **argv)
 {
     int ret = -1, in_admin_mode = 0;
@@ -78,6 +80,9 @@ int main(int argc, char **argv)
     }
 
     PVFS_util_gen_credentials(&creds);
+    
+    g_credential = PVFS_util_gen_fake_credential();
+    assert(g_credential);
 
     printf("# Current FSID is %u.\n", cur_fs);
 
@@ -450,7 +455,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 
     PVFS_sys_getattr(pref,
 		     PVFS_ATTR_SYS_ALL_NOHINT,
-		     creds,
+		     g_credential,
 		     &getattr_resp);
 
     assert(getattr_resp.attr.objtype == PVFS_TYPE_DIRECTORY);
@@ -568,7 +573,7 @@ int descend(PVFS_fs_id cur_fs,
 
             ret = PVFS_sys_getattr(entry_ref,
                                    PVFS_ATTR_SYS_ALL_NOHINT,
-                                   creds,
+                                   g_credential,
                                    &getattr_resp);
             if (ret != 0) {
                 ret = remove_directory_entry(dir_ref,
@@ -798,7 +803,7 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 
 	ret = PVFS_sys_getattr(handle_ref,
 			       PVFS_ATTR_SYS_ALL_NOHINT,
-			       creds,
+			       g_credential,
 			       &getattr_resp);
 	if (ret) {
 	    /* remove anything we can't get attributes on */
@@ -879,7 +884,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 
 	ret = PVFS_sys_getattr(handle_ref,
 			       PVFS_ATTR_SYS_ALL_NOHINT,
-			       creds,
+			       g_credential,
 			       &getattr_resp);
 	if (ret) {
 	    printf("warning: problem calling getattr on %llu; assuming datafile for now.\n",
@@ -990,7 +995,7 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 
 	ret = PVFS_sys_getattr(handle_ref,
 			       PVFS_ATTR_SYS_ALL_NOHINT,
-			       creds,
+			       g_credential,
 			       &getattr_resp);
 	if (ret) {
 	    printf("warning: problem calling getattr on %llu\n",

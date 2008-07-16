@@ -15,6 +15,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -72,8 +73,12 @@ int main(int argc, char **argv)
         PVFS_credentials credentials;
         PVFS_object_ref parent_ref;
         int tmp_len = 0;
+        PVFS_credential *credential;
 
         PVFS_util_gen_credentials(&credentials);
+        
+        credential = PVFS_util_gen_fake_credential();
+        assert(credential);
 
         /* Translate path into pvfs2 relative path */
         rc = PVFS_util_resolve(working_file, &cur_fs, pvfs_path,
@@ -110,7 +115,7 @@ int main(int argc, char **argv)
 
             memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
             rc = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_TYPE,
-                                   &credentials, &resp_getattr);
+                                   credential, &resp_getattr);
             if (rc)
             {
                 PVFS_perror("PVFS_sys_getattr", rc);

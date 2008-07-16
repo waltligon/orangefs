@@ -37,6 +37,8 @@ struct options
     char *fontname;
 };
 
+static PVFS_credential *g_credential;
+
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 
@@ -138,6 +140,9 @@ int main(int argc, char **argv)
     }
 
     PVFS_util_gen_credentials(&creds);
+    
+    g_credential = PVFS_util_gen_fake_credential();
+    assert(g_credential);
 
     /* count how many servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs, &creds, 
@@ -440,7 +445,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 
     PVFS_sys_getattr(pref,
 		     PVFS_ATTR_SYS_ALL_NOHINT,
-		     creds,
+		     g_credential,
 		     &getattr_resp);
 
     if (getattr_resp.attr.objtype != PVFS_TYPE_DIRECTORY)
@@ -506,7 +511,7 @@ int descend(PVFS_fs_id cur_fs,
 
             if ((ret = PVFS_sys_getattr(entry_ref,
                              PVFS_ATTR_SYS_ALL_NOHINT,
-                             creds,
+                             g_credential,
                              &getattr_resp)) != 0)
             {
                 printf("Could not get attributes of handle %llu [%d]\n",
@@ -638,7 +643,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
         /* only remaining handles are dirdata */
         PVFS_sys_getattr(entry_ref,
                          PVFS_ATTR_SYS_ALL,
-                         creds, &getattr_resp);
+                         g_credential, &getattr_resp);
         if (getattr_resp.attr.objtype != PVFS_TYPE_DIRDATA)
         {
             flag = 0;

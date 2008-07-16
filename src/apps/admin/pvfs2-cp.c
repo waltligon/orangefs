@@ -37,6 +37,8 @@ struct options
     int show_timings;
 };
 
+static PVFS_credential *g_credential;
+
 enum object_type { 
     UNIX_FILE = 1,
     PVFS2_FILE 
@@ -145,6 +147,9 @@ int main (int argc, char ** argv)
     resolve_filename(&dest, user_opts->destfile);
 
     PVFS_util_gen_credentials(&credentials);
+    
+    g_credential = PVFS_util_gen_fake_credential();
+    assert(g_credential);
 
     ret = generic_open(&src, &credentials, 0, 0, NULL, OPEN_SRC);
     if (ret < 0)
@@ -559,7 +564,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
         {
             memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
             ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                                   credentials, &resp_getattr);
+                                   g_credential, &resp_getattr);
             if (ret)
             {
                 fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",

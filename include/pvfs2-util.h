@@ -56,6 +56,8 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent);
 void PVFS_util_release_credentials(
     PVFS_credentials *credentials);
 
+PVFS_credential *PVFS_util_gen_fake_credential(void);
+
 int PVFS_util_copy_sys_attr(
     PVFS_sys_attr *dest_attr,
     PVFS_sys_attr *src_attr);

@@ -90,6 +90,8 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   PVFS_sys_attr old_attr;
   PVFS_sys_attr new_attr;
   uint32_t attrmask;
+  PVFS_credential *credential;
+  
   /* translate local path into pvfs2 relative path */
   ret = PVFS_util_resolve(destfile,&cur_fs, pvfs_path, PVFS_NAME_MAX);
   if(ret < 0)
@@ -99,6 +101,9 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   }
 
   PVFS_util_gen_credentials(&credentials);
+  
+  credential = PVFS_util_gen_fake_credential();
+  assert(credential);
 
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere
@@ -156,7 +161,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   memset(&resp_getattr,0,sizeof(PVFS_sysresp_getattr));
   attrmask = (PVFS_ATTR_SYS_ALL_SETABLE);
     
-  ret = PVFS_sys_getattr(resp_lookup.ref,attrmask,&credentials,&resp_getattr);
+  ret = PVFS_sys_getattr(resp_lookup.ref,attrmask,credential,&resp_getattr);
   if (ret < 0) 
   {
     PVFS_perror("PVFS_sys_getattr",ret);
