@@ -30,6 +30,7 @@
 #include "pvfs2-internal.h"
 #include "pint-security.h"
 #include "security-util.h"
+#include "check.h"
 
 PINT_server_trove_keys_s Trove_Special_Keys[] =
 {
@@ -288,11 +289,16 @@ static PINT_sm_action getattr_verify_attribs(
             resp_attr->capability.handle_array = NULL;
         }
         resp_attr->capability.owner = s_op->attr.owner;
-        resp_attr->capability.op_mask = s_op->attr.perms;
+        
+        /* use check.c op_mask function here when done */
+/*        resp_attr->capability.op_mask = s_op->attr.perms;  */
+        
+        PINT_getattr_check_perms(s_op->req->u.getattr.credential.userid, 
+            s_op->req->u.getattr.credential.group_array[0], s_op->attr, 
+            &resp_attr->capability.op_mask);
+        
         resp_attr->capability.fsid = s_op->u.getattr.fs_id;
             
-        /* causes client-side seg-fault because of unexpected flag
-        resp_attr->mask |= PVFS_ATTR_CAPABILITY; */
         if (PINT_sign_capability(&(resp_attr->capability)))
         {
             /* sign failed */

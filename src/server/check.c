@@ -213,6 +213,39 @@ int PINT_check_mode(
     return -PVFS_EACCES;
 }
 
+
+/* PINT_getattr_check_perms()
+ *
+ * fills in "op_mask" for user "uid" of group "gid" on
+ * the object with attributes "attr"
+ *
+ */
+void PINT_getattr_check_perms(PVFS_uid uid, PVFS_gid gid, 
+               PVFS_object_attr attr, uint32_t *op_mask)
+{
+    if (uid == 0)
+    {
+        *op_mask = ~0;
+        return;
+    }
+    
+    /* temporary stop-gap...fix after create is finsihed */
+    *op_mask |= PINT_CAP_CREATE;
+    
+    if (PINT_check_mode(&attr, uid, gid, PINT_ACCESS_READABLE) == 0)
+        *op_mask |= PINT_CAP_READ;
+    if (PINT_check_mode(&attr, uid, gid, PINT_ACCESS_WRITABLE) == 0)
+        *op_mask |= PINT_CAP_WRITE;
+    if (PINT_check_mode(&attr, uid, gid, PINT_ACCESS_EXECUTABLE) == 0)
+        *op_mask |= PINT_CAP_EXEC;
+    if (uid == attr.owner)
+        *op_mask |= PINT_CAP_SETATTR;
+    if (attr.objtype == PVFS_TYPE_DIRECTORY 
+            && *op_mask & PINT_ACCESS_WRITABLE)
+        *op_mask |= PINT_CAP_REMOVE;
+}
+
+
 /* PINT_check_group()
  *
  * checks to see if uid is a member of gid
