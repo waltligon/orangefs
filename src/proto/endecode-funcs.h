@@ -744,10 +744,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
         for (i=0; i<x->n1; i++) \
             encode_##ta1(pptr, &(x)->a1[i]); \
     align8(pptr); \
-    if (x->a2 != NULL) \
-    { \
-        encode_##ta2(pptr, &x->a2); \
-    } \
+    encode_##ta2(pptr, &x->a2); \
     align8(pptr); \
     encode_##t3(pptr, &x->x3); \
     encode_##tn3(pptr, &x->n3); \
@@ -769,11 +766,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     else \
         x->a1 = NULL; \
     align8(pptr); \
-    if (x->a2 != NULL) \
-    { \
-        x->a2 = decode_malloc(strlen(x->a2) * sizeof(*x->a2)); \
-        decode_##ta2(pptr, &x->a2); \
-    } \
+    decode_##ta2(pptr, &x->a2); \
     align8(pptr); \
     decode_##t3(pptr, &x->x3); \
     decode_##tn3(pptr, &x->n3); \

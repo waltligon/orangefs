@@ -360,6 +360,8 @@ do {                                       \
     (__req).u.getattr.handle = (__handle); \
     (__req).u.getattr.attrmask = (__amask);\
 } while (0)
+#define extra_size_PVFS_servreq_getattr \
+    extra_size_PVFS_object_attr
 
 struct PVFS_servresp_getattr
 {

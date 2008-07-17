@@ -118,7 +118,7 @@ PVFS_credential *PINT_dup_credential(const PVFS_credential *cred)
         return NULL;
     }
 
-    ret = (PVFS_credential*)malloc(sizeof(PVFS_credential));
+    ret = (PVFS_credential*)calloc(1, sizeof(PVFS_credential));
     if (!ret)
     {
         return NULL;
