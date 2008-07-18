@@ -368,7 +368,8 @@ do {                                       \
 } while (0)
 #define extra_size_PVFS_servreq_getattr \
     (PVFS_REQ_LIMIT_GROUPS * sizeof(PVFS_gid) + \
-    PVFS_REQ_LIMIT_ISSUER_ID * sizeof(char))
+    PVFS_REQ_LIMIT_ISSUER_ID * sizeof(char) + \
+    PVFS_REQ_LIMIT_SIGNATURE * sizeof(char))
 
 struct PVFS_servresp_getattr
 {

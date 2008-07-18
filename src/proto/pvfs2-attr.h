@@ -262,10 +262,10 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 #endif
 
 #define extra_size_PVFS_object_attr \
-        max3(extra_size_PVFS_object_attr_capability, \
-            max3(extra_size_PVFS_object_attr_meta, \
-            extra_size_PVFS_object_attr_symlink, \
-            extra_size_PVFS_object_attr_dir), 0)
+        (extra_size_PVFS_object_attr_capability + \
+        max3(extra_size_PVFS_object_attr_meta, \
+        extra_size_PVFS_object_attr_symlink, \
+        extra_size_PVFS_object_attr_dir))
 
 #endif /* __PVFS2_ATTR_H */
 
