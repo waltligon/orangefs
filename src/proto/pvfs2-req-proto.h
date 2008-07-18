@@ -140,6 +140,12 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
 #define PVFS_REQ_LIMIT_LISTATTR 64
+/* max size of security signature (in bytes) */
+#define PVFS_REQ_LIMIT_SIGNATURE 512
+/* max number of groups in credential array */
+#define PVFS_REQ_LIMIT_GROUPS 32
+/* max size of credential issuer id (in bytes) */
+#define PVFS_REQ_LIMIT_ISSUER_ID 128
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
@@ -361,7 +367,8 @@ do {                                       \
     (__req).u.getattr.attrmask = (__amask);\
 } while (0)
 #define extra_size_PVFS_servreq_getattr \
-    extra_size_PVFS_object_attr
+    (PVFS_REQ_LIMIT_GROUPS * sizeof(PVFS_gid) + \
+    PVFS_REQ_LIMIT_ISSUER_ID * sizeof(char))
 
 struct PVFS_servresp_getattr
 {

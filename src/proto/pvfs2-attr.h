@@ -253,12 +253,19 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 
 #define extra_size_PVFS_object_attr_symlink (PVFS_REQ_LIMIT_PATH_NAME_BYTES)
 
+#define extra_size_PVFS_object_attr_capability \
+    (PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle) + \
+    PVFS_REQ_LIMIT_SIGNATURE * sizeof(unsigned char))
+
 #ifndef max3
 #define max3(a, b, c) (a) < (b) ? (b) < (c) ? (c) : (b) : (a) < (c) ? (c) : (a)
 #endif
 
 #define extra_size_PVFS_object_attr \
-        max3(extra_size_PVFS_object_attr_meta, extra_size_PVFS_object_attr_symlink, extra_size_PVFS_object_attr_dir)
+        max3(extra_size_PVFS_object_attr_capability, \
+            max3(extra_size_PVFS_object_attr_meta, \
+            extra_size_PVFS_object_attr_symlink, \
+            extra_size_PVFS_object_attr_dir), 0)
 
 #endif /* __PVFS2_ATTR_H */
 

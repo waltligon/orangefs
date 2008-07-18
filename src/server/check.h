@@ -33,7 +33,7 @@ PINT_sm_action prelude_check_acls_if_needed(
 PINT_sm_action prelude_check_acls(
     struct PINT_smcb *smcb, job_status_s *js_p);
     
-void PINT_getattr_check_perms(PVFS_uid uid, PVFS_gid gid, 
+void PINT_getattr_check_perms(PVFS_uid uid, PVFS_gid *gid, uint32_t num_groups, 
                PVFS_object_attr attr, uint32_t *op_mask);
     
 #endif  /* __CHECK_H */

@@ -216,27 +216,34 @@ int PINT_check_mode(
 
 /* PINT_getattr_check_perms()
  *
- * fills in "op_mask" for user "uid" of group "gid" on
+ * fills in "op_mask" for user "uid" of groups in "gid" on
  * the object with attributes "attr"
  *
  */
-void PINT_getattr_check_perms(PVFS_uid uid, PVFS_gid gid, 
+void PINT_getattr_check_perms(PVFS_uid uid, PVFS_gid *gid, uint32_t num_groups, 
                PVFS_object_attr attr, uint32_t *op_mask)
 {
+    int i;
+    
     if (uid == 0)
     {
         *op_mask = ~0;
         return;
     }
     
-    /* temporary stop-gap...fix after create is finsihed */
+    for (i = 0; i < num_groups; i++)
+    {
+        if (attr.group == gid[i]) break;
+    }
+    
+    /* temporary stop-gap...fix after create is finished */
     *op_mask |= PINT_CAP_CREATE;
     
-    if (PINT_check_mode(&attr, uid, gid, PINT_ACCESS_READABLE) == 0)
+    if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_READABLE) == 0)
         *op_mask |= PINT_CAP_READ;
-    if (PINT_check_mode(&attr, uid, gid, PINT_ACCESS_WRITABLE) == 0)
+    if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_WRITABLE) == 0)
         *op_mask |= PINT_CAP_WRITE;
-    if (PINT_check_mode(&attr, uid, gid, PINT_ACCESS_EXECUTABLE) == 0)
+    if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_EXECUTABLE) == 0)
         *op_mask |= PINT_CAP_EXEC;
     if (uid == attr.owner)
         *op_mask |= PINT_CAP_SETATTR;
