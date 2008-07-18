@@ -290,9 +290,8 @@ static PINT_sm_action getattr_verify_attribs(
         }
         resp_attr->capability.owner = s_op->attr.owner;
         
-        /* TODO:  ACL checks are not in place yet */
-        /* TODO:  Optimize check.c function for speed */
-        PINT_getattr_check_perms(s_op->req->u.getattr.credential.userid, 
+        /* TODO:  Optimize function for speed */
+        PINT_getattr_check_perms(smcb, s_op->req->u.getattr.credential.userid, 
             s_op->req->u.getattr.credential.group_array, 
             s_op->req->u.getattr.credential.num_groups, 
             s_op->attr, &resp_attr->capability.op_mask);

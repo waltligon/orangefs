@@ -218,12 +218,16 @@ int PINT_check_mode(
  *
  * fills in "op_mask" for user "uid" of groups in "gid" on
  * the object with attributes "attr"
+ * ACL has priority over standard file permissions.  Standard permissions
+ * only used if ACL is not present or has no entry
  *
  */
-void PINT_getattr_check_perms(PVFS_uid uid, PVFS_gid *gid, uint32_t num_groups, 
+void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gid, uint32_t num_groups, 
                PVFS_object_attr attr, uint32_t *op_mask)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
+    int acl_error_code = 0;
     
     if (uid == 0)
     {
@@ -231,20 +235,50 @@ void PINT_getattr_check_perms(PVFS_uid uid, PVFS_gid *gid, uint32_t num_groups,
         return;
     }
     
-    for (i = 0; i < num_groups; i++)
-    {
-        if (attr.group == gid[i]) break;
-    }
-    
     /* temporary stop-gap...fix after create is finished */
+    /* TODO:  Do permissions checking on consolidated create */
     *op_mask |= PINT_CAP_CREATE;
     
-    if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_READABLE) == 0)
-        *op_mask |= PINT_CAP_READ;
-    if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_WRITABLE) == 0)
-        *op_mask |= PINT_CAP_WRITE;
-    if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_EXECUTABLE) == 0)
-        *op_mask |= PINT_CAP_EXEC;
+    /* do ACL checks here...kinda slow to do it this way, but works for now */
+    /* TODO:  Rewrite ACL checks entirely to handle multiple groups */
+    for (i = 0; i < num_groups; i++)
+    {
+        acl_error_code = PINT_check_acls(s_op->val.buffer, s_op->val.read_sz,
+                           &attr, uid, gid[i], PVFS2_ACL_READ);
+        if (acl_error_code == 0) *op_mask |= PINT_CAP_READ;
+        else if (acl_error_code == -PVFS_EIO) break;
+        acl_error_code = 0;
+                           
+        acl_error_code = PINT_check_acls(s_op->val.buffer, s_op->val.read_sz,
+                           &attr, uid, gid[i], PVFS2_ACL_WRITE);
+        if (acl_error_code == 0) *op_mask |= PINT_CAP_WRITE;
+        acl_error_code = 0;
+                           
+        acl_error_code = PINT_check_acls(s_op->val.buffer, s_op->val.read_sz,
+                           &attr, uid, gid[i], PVFS2_ACL_EXECUTE);
+        if (acl_error_code == 0) *op_mask |= PINT_CAP_EXEC;
+        acl_error_code = 0;
+    }
+    
+    /* only check standard permissions if ACL is not in place */
+    if (acl_error_code == -PVFS_EIO)
+    {
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Getattr perm check: no ACL\n");
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Using standard file perms\n");
+        for (i = 0; i < num_groups; i++)
+        {
+            if (attr.group == gid[i]) break;
+        }
+    
+        if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_READABLE) == 0)
+            *op_mask |= PINT_CAP_READ;
+        if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_WRITABLE) == 0)
+            *op_mask |= PINT_CAP_WRITE;
+        if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_EXECUTABLE) == 0)
+            *op_mask |= PINT_CAP_EXEC;
+    }   
+    
+    /* give setattr and remove caps based on uid and op_mask */
     if (uid == attr.owner)
         *op_mask |= PINT_CAP_SETATTR;
     if (attr.objtype == PVFS_TYPE_DIRECTORY 
