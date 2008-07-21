@@ -23,9 +23,6 @@
  * - post the request to the request scheduler
  * - check permissions
  */
-enum {
-    PRELUDE_RUN_ACL_CHECKS = 1,
-};
 
 %%
 
