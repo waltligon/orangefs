@@ -58,7 +58,8 @@ nested machine pvfs2_get_attr_work_sm
     state setup_acl
     {
         run getattr_setup_acl;
-        default => verify_attribs;
+        success => verify_attribs;
+        default => setup_resp;
     }
     
     state verify_attribs
@@ -202,6 +203,7 @@ PINT_sm_action getattr_setup_acl(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
+    js_p->error_code = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (getattr sm) state: getattr_setup_acl\n",
@@ -209,17 +211,6 @@ PINT_sm_action getattr_setup_acl(
 
     if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
     {
-        /* If we get here with an invalid fsid and handle, we have to
-         * return -PVFS_EACCESS 
-         */
-        if (s_op->target_fs_id == PVFS_FS_ID_NULL
-                || s_op->target_handle == PVFS_HANDLE_NULL)
-        {
-            js_p->error_code = -PVFS_EACCES;
-            return SM_ACTION_COMPLETE;
-        }
-        js_p->error_code = 0;
-    
         memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
         memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
         s_op->key.buffer = "system.posix_acl_access";
