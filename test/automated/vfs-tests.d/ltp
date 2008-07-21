@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# TODO: JUST FOR TESTING
+#-------------------------
+PVFS2_MOUNTPOINT=/mnt/pvfs2
+VFS_SCRIPTS=/home/pcarns/working/pvfs2/trunk/pvfs2/test/automated/vfs-tests.d
+EXTRA_TESTS=/tmp
+#--------------------------------------------
+
+LTPVER="20080630"
+THISDATE=`date +%F-%R`
+DOWNLOAD="http://www-unix.mcs.anl.gov/~carns/nightly-download/ltp-full-${LTPVER}.tgz"
+
+cd ${EXTRA_TESTS}
+
+# get rid of any old copies
+rm -rf ltp-full-${LTPVER} ltp-full-${LTPVER}.tgz 
+
+# download
+echo Downloading LTP...
+wget -q ${DOWNLOAD} > /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to download ${DOWNLOAD}."
+    exit 1;
+fi
+
+tar -xvzf ltp-full-${LTPVER}.tgz > /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to untar ${DOWNLOAD}."
+    exit 1;
+fi
+
+# fix some pvfs specific problems
+cd ltp-full-${LTPVER}
+patch -p1 < ${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to apply patches to LTP."
+    exit 1;
+fi
+
+echo Compiling LTP...
+export CFLAGS="-g"
+make >& /dev/null && make install > /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to configure and build LTP."
+    exit 1;
+fi
+
+# copy pvfs friendly test cases; we should pass all of these
+cp ${VFS_SCRIPTS}/ltp-pvfs-testcases runtest/
+mkdir -p ${PVFS2_MOUNTPOINT}/ltp-tmp 
+chmod 777 ${PVFS2_MOUNTPOINT}/ltp-tmp
+umask 0
+
+# run ltp
+echo Running LTP...
+./runltp -p -l `pwd`/../ltp-pvfs-testcases-${THISDATE}.log -d ${PVFS2_MOUNTPOINT}/ltp-tmp -f ltp-pvfs-testcases -z ${EXTRA_TESTS}/zoo.tmp >& `pwd`/../ltp-pvfs-testcases-$THISDATE.output
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to invoke LTP."
+    exit 1;
+fi
+
+cd ..
+
+FAILCOUNT=`grep FAIL ltp-pvfs-testcases-$THISDATE.log | wc -l`
+
+if [ "${FAILCOUNT}" != 0 ]
+then 
+    echo "Error: failed the following LTP test cases:"
+    grep FAIL ltp-pvfs-testcases-$THISDATE.log
+    echo "log file:                    ${EXTRA_TESTS}/ltp-pvfs-testcases-$THISDATE.log"
+    echo "record of stdout and stderr: ${EXTRA_TESTS}/ltp-pvfs-testcases-$THISDATE.output"
+    exit 1
+fi
+
+echo "Completed LTP tests."
+
+exit 0
