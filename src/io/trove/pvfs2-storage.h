@@ -20,6 +20,11 @@ enum PVFS_coll_getinfo_options_e
 };
 typedef enum PVFS_coll_getinfo_options_e PVFS_coll_getinfo_options;
 
+struct PVFS_vtag_s
+{
+    /* undefined */
+};
+typedef struct PVFS_vtag_s PVFS_vtag;
 /* key/value descriptor definition moved to include/pvfs2-types.h */
 #if 0
 /* key/value descriptors */
@@ -35,12 +40,21 @@ struct PVFS_ds_keyval_s
 typedef struct PVFS_ds_keyval_s PVFS_ds_keyval;
 #endif
 
-/* vtag; contents not yet defined */
-struct PVFS_vtag_s
+struct PVFS_ds_metadata_attr_s
 {
-    /* undefined */
+    uint32_t dfile_count;
+    uint32_t dist_size;
 };
-typedef struct PVFS_vtag_s PVFS_vtag;
+
+struct PVFS_ds_datafile_attr_s
+{
+    PVFS_size b_size; /* bstream size */
+};
+
+struct PVFS_ds_dirdata_attr_s
+{
+    uint64_t count;
+};
 
 /* dataspace attributes that are not explicitly stored within the
  * dataspace itself.
@@ -50,8 +64,7 @@ typedef struct PVFS_vtag_s PVFS_vtag;
  * across the wire/to the user, so some translation is done.
  *
  * PVFS_object_attr attributes are what the users and the server deal
- * with.  Trove only deals with *_ds_storedattr objects (trove on disk
- * formats) and *_ds_attributes (trove in memory format).
+ * with.  Trove deals with TROVE_ds_attributes (trove on disk and in-memory format).
  *
  * Trove version 0.0.1 and version 0.0.2 differ in this aspect, since
  * many members have been moved, added to make this structure friendlier
@@ -72,48 +85,21 @@ struct PVFS_ds_attributes_s
     PVFS_time ctime;
     PVFS_time mtime;
     PVFS_time atime;
-    uint32_t dfile_count;
-    uint32_t dist_size;
 
-    /* non-stored attributes need to be below here */
-    PVFS_size b_size; /* bstream size */
+    union
+    {
+        struct PVFS_ds_metadata_attr_s metafile;
+        struct PVFS_ds_datafile_attr_s datafile;
+        struct PVFS_ds_dirdata_attr_s dirdata;
+    } u;
 } ;
 typedef struct PVFS_ds_attributes_s PVFS_ds_attributes;
-
-struct PVFS_ds_storedattr_s
-{
-    PVFS_ds_type type;
-    PVFS_fs_id fs_id;
-    PVFS_handle handle;
-    PVFS_uid uid;
-    PVFS_gid gid;
-    PVFS_permissions mode;
-    int32_t __pad1;
-
-    PVFS_time ctime;
-    PVFS_time mtime;
-    PVFS_time atime;
-    uint32_t dfile_count;
-    uint32_t dist_size;
-};
-typedef struct PVFS_ds_storedattr_s PVFS_ds_storedattr;
 
 #define PVFS_ds_init_time(__dsa)                        \
 do {                                                    \
     (__dsa)->ctime = time(NULL);                        \
     (__dsa)->atime = time(NULL);                        \
     (__dsa)->mtime = time(NULL);                        \
-} while (0)
-
-#define PVFS_ds_attr_to_stored(__from, __to)	        \
-do {						        \
-    (__to) = * ((PVFS_ds_storedattr *) &(__from));	\
-} while (0)
-
-#define PVFS_ds_stored_to_attr(__from, __to, __b_size)          \
-do {                                                            \
-    memcpy(&(__to), &(__from), sizeof(PVFS_ds_storedattr));     \
-    (__to).b_size = (__b_size);                                 \
 } while (0)
 
 #define PVFS_ds_attr_to_object_attr(__dsa, __oa)                   \
@@ -125,21 +111,21 @@ do {                                                               \
     (__oa)->mtime = (__dsa)->mtime;                                \
     (__oa)->atime = (__dsa)->atime;                                \
     (__oa)->objtype = (__dsa)->type;                               \
-    (__oa)->u.meta.dfile_count = (__dsa)->dfile_count;             \
-    (__oa)->u.meta.dist_size = (__dsa)->dist_size;                 \
+    (__oa)->u.meta.dfile_count = (__dsa)->u.metafile.dfile_count;  \
+    (__oa)->u.meta.dist_size = (__dsa)->u.metafile.dist_size;      \
 } while(0)
 
-#define PVFS_object_attr_to_ds_attr(__oa, __dsa)           \
-do {                                                       \
-    (__dsa)->uid = (__oa)->owner;                          \
-    (__dsa)->gid = (__oa)->group;                          \
-    (__dsa)->mode = (__oa)->perms;                         \
-    (__dsa)->ctime = (__oa)->ctime;                        \
-    (__dsa)->mtime = (__oa)->mtime;                        \
-    (__dsa)->atime = (__oa)->atime;                        \
-    (__dsa)->type = (__oa)->objtype;                       \
-    (__dsa)->dfile_count = (__oa)->u.meta.dfile_count;     \
-    (__dsa)->dist_size = (__oa)->u.meta.dist_size;         \
+#define PVFS_object_attr_to_ds_attr(__oa, __dsa)                      \
+    do {                                                              \
+        (__dsa)->uid = (__oa)->owner;                                 \
+        (__dsa)->gid = (__oa)->group;                                 \
+        (__dsa)->mode = (__oa)->perms;                                \
+        (__dsa)->ctime = (__oa)->ctime;                               \
+        (__dsa)->mtime = (__oa)->mtime;                               \
+        (__dsa)->atime = (__oa)->atime;                               \
+        (__dsa)->type = (__oa)->objtype;                              \
+        (__dsa)->u.metafile.dfile_count = (__oa)->u.meta.dfile_count; \
+        (__dsa)->u.metafile.dist_size = (__oa)->u.meta.dist_size;     \
 } while(0)
 
 #define PVFS_object_attr_overwrite_setable(dest, src)          \

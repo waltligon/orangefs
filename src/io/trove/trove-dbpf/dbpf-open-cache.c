@@ -10,6 +10,8 @@
  * will all get new fds that are closed on put
  */
 
+#define XOPEN_SOURCE 500
+
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -421,10 +423,16 @@ static int open_fd(
 
     flags = O_RDWR;
 
-    if(type == DBPF_FD_BUFFERED_WRITE)
+    if(type == DBPF_FD_BUFFERED_WRITE ||
+       type == DBPF_FD_DIRECT_WRITE)
     {
         flags |= O_CREAT;
         mode = TROVE_FD_MODE;
+    }
+
+    if(type == DBPF_FD_DIRECT_WRITE || type == DBPF_FD_DIRECT_READ)
+    {
+        flags |= O_DIRECT;
     }
 
     *fd = DBPF_OPEN(filename, flags, mode);
