@@ -80,14 +80,25 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                                         TROVE_DEFAULT_TEST_TIMEOUT);
             }
 
-            if (ret != 1)
+            /* check result of testing */
+            if (ret < 0)
             {
                 gossip_debug(GOSSIP_TROVE_DEBUG,
-                             "trove_dspace_iterate_handles failed\n");
-                return -1;
+                             "dspace test of iterate_handles failed\n");
+                return ret;
             }
 
             ret = 0;
+
+            /* also check result of actual operation, in this case,
+             * trove_dspace_iterate_handles
+             */
+            if(state < 0)
+            {
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "trove_dspace_iterate_handles failed\n");
+                return state;
+            }
 
             /* look for special case of a blank fs */
             if ((count == 1) && (handles[0] == 0))
@@ -105,8 +116,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                     if (!PINT_handle_in_extent_list(extent_list,
                                                     handles[i]))
                     {
-                        gossip_debug(
-                            GOSSIP_TROVE_DEBUG, "handle %llu is invalid "
+                        gossip_err(
+                            "Error: handle %llu is invalid "
                             "(out of bounds)\n", llu(handles[i]));
                         return -1;
                     }

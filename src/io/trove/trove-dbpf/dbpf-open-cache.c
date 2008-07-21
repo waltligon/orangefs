@@ -59,7 +59,7 @@ static int open_fd(
     int *fd, 
     TROVE_coll_id coll_id,
     TROVE_handle handle,
-    int create_flag);
+    enum open_cache_open_type type);
 
 inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     struct qlist_head * list, 
@@ -106,10 +106,25 @@ void dbpf_open_cache_finalize(void)
     gen_mutex_unlock(&cache_mutex);
 }
 
+/**
+ * The dbpf open cache is used primarily to manage open
+ * file descriptors to bstream files on IO servers.  PVFS
+ * currently uses a lazy style of creating the actual datafiles for
+ * bstreams.  Only on the first write to a bstream is the file
+ * actually created (opened with O_CREAT).  This means that if a
+ * read of a bstream that hasn't been written should somehow occur,
+ * an ENOENT error will be returned immediately, instead of allowing
+ * a read to EOF (of a zero-byte file).  For us, this is ok, since
+ * the client gets the size of the bstream in the getattr before doing
+ * any IO.  All that being said, the open_cache_get call needs to
+ * behave differently based on the desired operation:  reads on
+ * files that don't exist should return ENOENT, but writes on files
+ * that don't exist should create and open the file.
+ */
 int dbpf_open_cache_get(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
-    int create_flag,
+    enum open_cache_open_type type,
     struct open_cache_ref* out_ref)
 {
     struct qlist_head *tmp_link;
@@ -121,10 +136,6 @@ int dbpf_open_cache_get(
                  "dbpf_open_cache_get: called\n");
 
     gen_mutex_lock(&cache_mutex);
-
-    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	"dbpf_open_cache_get: create_flag: %d\n",
-                 create_flag);
 
     /* check already opened objects first, reuse ref if possible */
 
@@ -142,7 +153,7 @@ int dbpf_open_cache_get(
     {
 	if (tmp_entry->fd < 0)
 	{
-	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
+	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, type);
 	    if (ret < 0)
 	    {
 		gen_mutex_unlock(&cache_mutex);
@@ -208,7 +219,7 @@ int dbpf_open_cache_get(
 	tmp_entry->coll_id = coll_id;
 	tmp_entry->handle = handle;
 
-        ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
+        ret = open_fd(&(tmp_entry->fd), coll_id, handle, type);
         if (ret < 0)
         {
             qlist_add(&tmp_entry->queue_link, &free_list);
@@ -239,7 +250,7 @@ int dbpf_open_cache_get(
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
         "dbpf_open_cache_get: missed cache entirely.\n");
-    ret = open_fd(&(out_ref->fd), coll_id, handle, create_flag);
+    ret = open_fd(&(out_ref->fd), coll_id, handle, type);
     if (ret < 0)
     {
         gen_mutex_unlock(&cache_mutex);
@@ -392,13 +403,15 @@ static int open_fd(
     int *fd, 
     TROVE_coll_id coll_id,
     TROVE_handle handle,
-    int create_flag)
+    enum open_cache_open_type type)
 {
+    int flags = 0;
+    int mode = 0;
     char filename[PATH_MAX] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                 "dbpf_open_cache open_fd: opening fd %llu, create: %d\n",
-                 llu(handle), create_flag);
+                 "dbpf_open_cache open_fd: opening fd %llu\n",
+                 llu(handle));
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
 			      my_storage_p->name, coll_id, llu(handle));
@@ -406,12 +419,15 @@ static int open_fd(
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
                  "dbpf_open_cache open_fd: filename: %s\n", filename);
 
-    *fd = DBPF_OPEN(filename, O_RDWR, 0);
+    flags = O_RDWR;
 
-    if ((*fd < 0) && (errno == ENOENT) && create_flag)
+    if(type == DBPF_FD_BUFFERED_WRITE)
     {
-	*fd = DBPF_OPEN(filename, O_RDWR|O_CREAT|O_EXCL, TROVE_DB_MODE);
+        flags |= O_CREAT;
+        mode = TROVE_FD_MODE;
     }
+
+    *fd = DBPF_OPEN(filename, flags, mode);
     return ((*fd < 0) ? -trove_errno_to_trove_error(errno) : 0);
 }
 
@@ -459,7 +475,6 @@ inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     return NULL;
 }
 
-            
 /*
  * Local variables:
  *  c-indent-level: 4

@@ -66,7 +66,7 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 	return(NULL);
     }
     tmp_scp->addr_array =
-	(method_addr_p*)malloc(POLLFD_ARRAY_START*sizeof(method_addr_p));
+	(bmi_method_addr_p*)malloc(POLLFD_ARRAY_START*sizeof(bmi_method_addr_p));
     if(!tmp_scp->addr_array)
     {
 	free(tmp_scp->pollfd_array);
@@ -111,7 +111,7 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
  * returns 0 on success, -errno on failure.
  */
 void BMI_socket_collection_queue(socket_collection_p scp,
-			   method_addr_p map, struct qlist_head* queue)
+			   bmi_method_addr_p map, struct qlist_head* queue)
 {
     struct qlist_head* iterator = NULL;
     struct qlist_head* scratch = NULL;
@@ -175,7 +175,7 @@ void BMI_socket_collection_finalize(socket_collection_p scp)
 int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int incount,
 				 int *outcount,
-				 method_addr_p * maps,
+				 bmi_method_addr_p * maps,
 				 int * status,
 				 int poll_timeout,
 				 gen_mutex_t* external_mutex)
@@ -185,7 +185,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     struct tcp_addr* tcp_addr_data = NULL;
     struct tcp_addr* shifted_tcp_addr_data = NULL;
     struct pollfd* tmp_pollfd_array = NULL;
-    method_addr_p* tmp_addr_array = NULL;
+    bmi_method_addr_p* tmp_addr_array = NULL;
     int ret = -1;
     int old_errno;
     int tmp_count;
@@ -199,7 +199,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 do_again:
     /* init the outgoing arguments for safety */
     *outcount = 0;
-    memset(maps, 0, (sizeof(method_addr_p) * incount));
+    memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
     memset(status, 0, (sizeof(int) * incount));
 
     gen_mutex_lock(&scp->mutex);
@@ -255,8 +255,8 @@ do_again:
 		    (scp->array_max+POLLFD_ARRAY_INC)*sizeof(struct pollfd)); 
 		/* TODO: handle this */
 		assert(tmp_pollfd_array);
-		tmp_addr_array = (method_addr_p*)malloc(
-		    (scp->array_max+POLLFD_ARRAY_INC)*sizeof(method_addr_p)); 
+		tmp_addr_array = (bmi_method_addr_p*)malloc(
+		    (scp->array_max+POLLFD_ARRAY_INC)*sizeof(bmi_method_addr_p)); 
 		/* TODO: handle this */
 		assert(tmp_addr_array);
 		memcpy(tmp_pollfd_array, scp->pollfd_array,
@@ -264,7 +264,7 @@ do_again:
 		free(scp->pollfd_array);
 		scp->pollfd_array = tmp_pollfd_array;
 		memcpy(tmp_addr_array, scp->addr_array,
-		    scp->array_max*sizeof(method_addr_p));
+		    scp->array_max*sizeof(bmi_method_addr_p));
 		free(scp->addr_array);
 		scp->addr_array = tmp_addr_array;
 		scp->array_max = scp->array_max+POLLFD_ARRAY_INC;
@@ -292,7 +292,7 @@ do_again:
     if(ret < 0)
     {
 	gen_mutex_unlock(&scp->mutex);
-	return(-old_errno);
+	return(bmi_tcp_errno_to_pvfs(-old_errno));
     }
 
     /* nothing ready, just return */

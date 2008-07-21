@@ -40,7 +40,7 @@ void PINT_free_string_list(
     char ** list, 
     int len);
 int PINT_remove_base_dir(
-    char *pathname,
+    const char *pathname,
     char *out_dir,
     int out_max_len);
 int PINT_remove_dir_prefix(

@@ -11,7 +11,6 @@
  *
  *  Definitions of types used throughout PVFS2.
  */
-
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
@@ -22,12 +21,18 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <limits.h>
-#include <../src/common/quicklist/quicklist.h>
+#include <errno.h>
 #endif
+
+#include <../src/common/quicklist/quicklist.h>
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
 #define INT32_MAX (2147483647)
+#endif
+
+#ifndef NAME_MAX
+#define NAME_MAX 255
 #endif
 
 /* figure out the size of a pointer */
@@ -120,20 +125,21 @@ typedef uint64_t PVFS_handle;
  *  PVFS2 file systems reachable by a given client.
  */
 typedef int32_t PVFS_fs_id;
-typedef int32_t PVFS_ds_position;
+typedef uint64_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
 #define encode_PVFS_handle encode_uint64_t
 #define decode_PVFS_handle decode_uint64_t
 #define encode_PVFS_fs_id encode_int32_t
 #define decode_PVFS_fs_id decode_int32_t
-#define decode_PVFS_ds_position decode_int32_t
-#define encode_PVFS_ds_position encode_int32_t
+#define decode_PVFS_ds_position decode_uint64_t
+#define encode_PVFS_ds_position encode_uint64_t
 
 /* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
 typedef uint64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
+typedef uint64_t PVFS_flags;
 #define encode_PVFS_uid encode_uint32_t
 #define decode_PVFS_uid decode_uint32_t
 #define encode_PVFS_gid encode_uint32_t
@@ -142,6 +148,8 @@ typedef uint32_t PVFS_permissions;
 #define decode_PVFS_time decode_int64_t
 #define encode_PVFS_permissions encode_uint32_t
 #define decode_PVFS_permissions decode_uint32_t
+#define encode_PVFS_flags encode_uint64_t
+#define decode_PVFS_flags decode_uint64_t
 
 /* contiguous range of handles */
 typedef struct
@@ -165,6 +173,51 @@ endecode_fields_1a(
     skip4,,
     uint32_t, extent_count,
     PVFS_handle_extent, extent_array);
+
+/* Layout algorithm for converting from server lists in the config
+ * to a list of servers to use to store datafiles for a file.
+ */
+enum PVFS_sys_layout_algorithm
+{
+    /* order the datafiles according to the server list */
+    PVFS_SYS_LAYOUT_NONE = 1,
+
+    /* choose the first datafile randomly, and then round-robin in-order */
+    PVFS_SYS_LAYOUT_ROUND_ROBIN = 2,
+
+    /* choose each datafile randomly */
+    PVFS_SYS_LAYOUT_RANDOM = 3,
+
+    /* order the datafiles based on the list specified */
+    PVFS_SYS_LAYOUT_LIST = 4
+};
+#define PVFS_SYS_LAYOUT_DEFAULT PVFS_SYS_LAYOUT_ROUND_ROBIN
+
+/* The list of datafile servers that can be passed into PVFS_sys_create
+ * to specify the exact layout of a file.  The count parameter will override
+ * the num_dfiles field in the attribute.
+ */
+struct PVFS_sys_server_list
+{
+    int32_t count;
+    PVFS_BMI_addr_t *servers;
+};
+
+/* The server laout struct passed to PVFS_sys_create.  The algorithm
+ * specifies how the servers are chosen to layout the file.  If the
+ * algorithm is set to PVFS_SYS_LAYOUT_LIST, the server_list parameter
+ * is used to determine the layout.
+ */
+typedef struct PVFS_sys_layout_s
+{
+    /* The algorithm to use to layout the file */
+    enum PVFS_sys_layout_algorithm algorithm;
+
+    /* The server list specified if the
+     * PVFS_SYS_LAYOUT_LIST algorithm is chosen.
+     */
+    struct PVFS_sys_server_list server_list;
+} PVFS_sys_layout;
 
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL     ((PVFS_handle)0)
@@ -220,6 +273,25 @@ typedef enum
 
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
+
+#ifdef __KERNEL__
+#include <linux/fs.h>
+#endif
+
+#if defined(FS_IMMUTABLE_FL)
+
+#define PVFS_IMMUTABLE_FL FS_IMMUTABLE_FL
+#define PVFS_APPEND_FL    FS_APPEND_FL
+#define PVFS_NOATIME_FL   FS_NOATIME_FL
+
+#else
+
+/* PVFS Object Flags (PVFS_flags); Add more as we implement them */
+#define PVFS_IMMUTABLE_FL 0x10ULL
+#define PVFS_APPEND_FL    0x20ULL
+#define PVFS_NOATIME_FL   0x80ULL
+
+#endif
 
 /* Key/Value Pairs */
 /* Extended attributes are stored on objects with */
@@ -277,7 +349,8 @@ typedef struct
  PVFS_ATTR_SYS_DIRENT_COUNT)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
- PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT)
+ PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT \
+ | PVFS_ATTR_SYS_DIR_HINT)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
 #define PVFS_ATTR_SYS_ALL_TIMES \
@@ -395,6 +468,7 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_EVENT_MASKS = 6, /* API masks for event logging */
     PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
     PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
+    PVFS_SERV_PARAM_DROP_CACHES = 9, /* ask server's OS to drop disk caches */
 };
 
 enum PVFS_server_mode
@@ -535,7 +609,8 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 #define PVFS_EHOSTDOWN       E(55) /* Host is down */
 #define PVFS_EHOSTUNREACH    E(56) /* No route to host */
 #define PVFS_EALREADY        E(57) /* Operation already in progress */
-#define PVFS_EACCES          E(58) /* Operation already in progress */
+#define PVFS_EACCES          E(58) /* Access not allowed */
+#define PVFS_ECONNRESET      E(59) /* Connection reset by peer */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
@@ -553,30 +628,43 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
  * UNIX ERRNO VALUE IN THE MACROS BELOW (USED IN
  * src/common/misc/errno-mapping.c and the kernel module)
  */
-#define PVFS_ERRNO_MAX          59
+#define PVFS_ERRNO_MAX          60
 
+/*
+ * If system headers do not define these, assign them, with arbitrary
+ * numbers.  These values must be unique with respect to defined errors
+ * and each other to avoid collisions in case statements elsewhere.
+ */
 #ifndef EUNATCH
-#define EUNATCH -1
+#define EUNATCH -6060842
 #endif
 
 #ifndef EBADR
-#define EBADR -1
+#define EBADR -6060843
 #endif
 
 #ifndef EDEADLOCK
-#define EDEADLOCK -1
+#define EDEADLOCK -6060844
 #endif
 
 #ifndef ENONET
-#define ENONET -1
+#define ENONET -6060845
 #endif
 
 #ifndef ECOMM
-#define ECOMM -1
+#define ECOMM -6060846
 #endif
 
 #ifndef ERESTART
-#define ERESTART -1
+#define ERESTART -6060847
+#endif
+
+#ifndef ETIME
+#define ETIME -6060848
+#endif
+
+#ifndef EBADMSG
+#define EBADMSG -6060849
 #endif
 
 #define DECLARE_ERRNO_MAPPING()                       \
@@ -639,7 +727,8 @@ PVFS_error PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = { \
     EHOSTDOWN,                                        \
     EHOSTUNREACH,                                     \
     EALREADY,                                         \
-    EACCES,   /* 58 */                                \
+    EACCES,                                           \
+    ECONNRESET,   /* 59 */                            \
     0         /* PVFS_ERRNO_MAX */                    \
 };                                                    \
 const char *PINT_non_errno_strerror_mapping[] = {     \
@@ -650,7 +739,7 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "Unknown host",                                   \
     "No address associated with name",                \
     "Unknown server error",                           \
-    "Host name lookup failure"                        \
+    "Host name lookup failure",                       \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -660,7 +749,7 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_EHOSTNTFD, /* 4 */                           \
     PVFS_EADDRNTFD, /* 5 */                           \
     PVFS_ENORECVR,  /* 6 */                           \
-    PVFS_ETRYAGAIN  /* 7 */                           \
+    PVFS_ETRYAGAIN, /* 7 */                           \
 }
 
 /*
@@ -694,7 +783,7 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
         PVFS_ERROR_CODE(((positive ? error :               \
                              abs(error))) & ~mask)];       \
     }                                                      \
-    return (positive ? ret : -ret);                        \
+    return ret;                        			   \
 }                                                          \
 DECLARE_ERRNO_MAPPING()
 #define PVFS_ERROR_TO_ERRNO(__error) PVFS_get_errno_mapping(__error)

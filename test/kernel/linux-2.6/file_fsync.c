@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -11,7 +12,6 @@ int main(int argc, char **argv)
     int ret = -1, fd = -1;
     int buf_size = 2*1024*1024;
     char* buffer = NULL;
-    off_t pos = 0;
 
     if (argc != 2)
     {

@@ -49,9 +49,13 @@ typedef struct
     PINT_encoding_functions *op;
     const char *name;
     void (*init_fun) (void);
+    void (*finalize_fun) (void);
     char generic_header[PINT_ENC_GENERIC_HEADER_SIZE];
     int enc_type;
 } PINT_encoding_table_values;
+
+/* Defined encoders */
+extern PINT_encoding_table_values le_bytefield_table;
 
 #endif /* PINT_ENCODING_MODULE_H */
 

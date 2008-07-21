@@ -22,6 +22,7 @@
 
 #ifndef __KERNEL__
 #include <stdint.h>
+#include <stdarg.h>
 #include "syslog.h"
 #endif
 #include "pvfs2-config.h"
@@ -37,7 +38,8 @@ enum gossip_logstamp
 {
     GOSSIP_LOGSTAMP_NONE = 0,
     GOSSIP_LOGSTAMP_USEC = 1,
-    GOSSIP_LOGSTAMP_DATETIME = 2
+    GOSSIP_LOGSTAMP_DATETIME = 2,
+    GOSSIP_LOGSTAMP_THREAD = 3
 };
 #define GOSSIP_LOGSTAMP_DEFAULT GOSSIP_LOGSTAMP_USEC
 
@@ -66,8 +68,15 @@ do {                                                       \
 } while(0)
 
 #define gossip_err printk
+#define gossip_lerr(format, f...)                  \
+do {                                               \
+    gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
+} while(0)
 
-#else
+#else /* __KERNEL__ */
+
+/* stdio is needed by gossip_debug_fp declaration for FILE* */
+#include <stdio.h>
 
 int gossip_enable_syslog(
     int priority);
@@ -87,9 +96,7 @@ int gossip_get_debug_mask(
 int gossip_set_logstamp(
     enum gossip_logstamp ts);
 
-#ifdef GOSSIP_ENABLE_BACKTRACE
 void gossip_backtrace(void);
-#endif
 
 #ifdef __GNUC__
 
@@ -102,6 +109,17 @@ int __gossip_debug(
 int gossip_err(
     const char *format,
     ...) __attribute__ ((format(printf, 1, 2)));
+int __gossip_debug_va(
+    uint64_t mask,
+    char prefix,
+    const char *format,
+    va_list ap);
+int gossip_debug_fp(
+    FILE *fp,
+    char prefix,
+    enum gossip_logstamp ts,
+    const char *format,
+    ...) __attribute__ ((format(printf, 4, 5)));
 
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
@@ -134,6 +152,7 @@ do {                                                      \
             format, ##f);                                 \
     }                                                     \
 } while(0)
+
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 /* do file and line number printouts w/ the GNU preprocessor */
@@ -142,18 +161,11 @@ do {                                                       \
     gossip_debug(mask, "%s: " format, __func__ , ##f); \
 } while(0)
 
-#ifdef GOSSIP_ENABLE_BACKTRACE
 #define gossip_lerr(format, f...)                  \
 do {                                               \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
     gossip_backtrace();                            \
 } while(0)
-#else
-#define gossip_lerr(format, f...)                  \
-do {                                               \
-    gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
-} while(0)
-#endif
 #else /* ! __GNUC__ */
 
 int __gossip_debug(
@@ -179,6 +191,7 @@ int gossip_err(
 #define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #define gossip_debug_enabled(__m) \
             ((gossip_debug_on != 0) && (__m & gossip_debug_mask))
+
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err

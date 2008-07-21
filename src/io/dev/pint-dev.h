@@ -3,12 +3,16 @@
  *
  * See COPYING in top-level directory.
  */
-
 #ifndef __PINT_DEV_H
 #define __PINT_DEV_H
 
 #include "pvfs2-types.h"
 #include "pint-dev-shared.h"
+
+enum pvfs_bufmap_type {
+    BM_IO = 0,
+    BM_READDIR = 1,
+};
 
 /* describes unexpected messages coming out of the device */
 struct PINT_dev_unexp_info
@@ -25,18 +29,27 @@ enum PINT_dev_buffer_type
     PINT_DEV_EXT_ALLOC = 2
 };
 
+struct PINT_dev_params 
+{
+    uint32_t dev_buffer_count;
+    uint64_t dev_buffer_size;
+};
+
 int PINT_dev_initialize(
     const char* dev_name,
     int flags);
 
-int PINT_dev_get_mapped_region(
+int PINT_dev_get_mapped_regions(
+    int ndesc,
     struct PVFS_dev_map_desc *desc,
-    int size);
+    struct PINT_dev_params *params);
 
-void PINT_dev_put_mapped_region(
+void PINT_dev_put_mapped_regions(
+    int ndesc,
     struct PVFS_dev_map_desc *desc);
 
 void *PINT_dev_get_mapped_buffer(
+    enum pvfs_bufmap_type bm_type,
     struct PVFS_dev_map_desc *desc,
     int buffer_index);
 

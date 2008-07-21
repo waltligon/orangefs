@@ -13,21 +13,9 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-static int create_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int create_create(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int create_setup_resp(
-    PINT_server_op *s_op, job_status_s* js_p);
-
 %%
 
-machine pvfs2_create_sm(
-    prelude,
-    create,
-    setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_create_sm
 {
     state prelude
     {
@@ -78,8 +66,10 @@ machine pvfs2_create_sm(
  * Synopsis: Create the new dataspace with the values provided in the response.
  *           
  */
-static int create_create(PINT_server_op *s_op, job_status_s* js_p)
+static int create_create(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t i;
 
@@ -89,7 +79,7 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
         s_op->req->u.create.object_type,
         NULL,
         TROVE_SYNC ,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
@@ -102,8 +92,10 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
  *
  * fills in the response structure based on results of previous operation
  */
-static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
+static int create_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
 	gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
@@ -113,27 +105,27 @@ static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
         {
             case PVFS_TYPE_NONE:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, 
-                    "new handle: %llu, type unknown.\n");
+                    "new handle: %llu, type unknown.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_METAFILE:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, 
-                    "new handle: %llu, type metafile.\n");
+                    "new handle: %llu, type metafile.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_DATAFILE:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,    
-                    "new handle: %llu, type datafile.\n");
+                    "new handle: %llu, type datafile.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_DIRECTORY:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, 
-                    "new handle: %llu, type directory.\n");
+                    "new handle: %llu, type directory.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_SYMLINK:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,    
-                    "new handle: %llu, type symlink.\n");
+                    "new handle: %llu, type symlink.\n", llu(js_p->handle));
                 break;
             case PVFS_TYPE_DIRDATA:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,    
-                    "new handle: %llu, type dirdata.\n");
+                    "new handle: %llu, type dirdata.\n", llu(js_p->handle));
                 break;
         }
     }
@@ -141,7 +133,7 @@ static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     /* NOTE: we _deliberately_ leave the error_code unchanged so that it
      * can be used by the next state.
      */
-    return(1);
+    return SM_ACTION_COMPLETE;
 }
 
 
@@ -160,11 +152,28 @@ static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
  * Synopsis: free memory and return
  *           
  */
-static int create_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int create_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
+static inline int PINT_get_object_ref_create(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.create.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+};
+
+struct PINT_server_req_params pvfs2_create_params =
+{
+    .string_name = "create",
+    .get_object_ref = PINT_get_object_ref_create,
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .state_machine = &pvfs2_create_sm
+};
 
 /*
  * Local variables:

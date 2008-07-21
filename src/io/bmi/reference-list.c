@@ -91,7 +91,7 @@ ref_st_p ref_list_search_addr(ref_list_p rlp,
  * returns a pointer to the structure on success, NULL on failure.
  */
 ref_st_p ref_list_search_method_addr(ref_list_p rlp,
-				     method_addr_p map)
+				     bmi_method_addr_p map)
 {
     ref_list_p tmp_link = NULL;
     ref_st_p tmp_entry = NULL;
@@ -193,7 +193,6 @@ ref_st_p alloc_ref_st(void)
 
     int ssize = sizeof(struct ref_st);
     ref_st_p new_ref = NULL;
-    int ret = -1;
 
     new_ref = (ref_st_p) malloc(ssize);
     if (!new_ref)
@@ -204,12 +203,7 @@ ref_st_p alloc_ref_st(void)
     memset(new_ref, 0, ssize);
 
     /* we can go ahead and set the bmi_addr here */
-    ret = id_gen_safe_register(&(new_ref->bmi_addr), new_ref);
-    if (ret < 0)
-    {
-	dealloc_ref_st(new_ref);
-	return (NULL);
-    }
+    id_gen_fast_register(&(new_ref->bmi_addr), new_ref);
 
     return (new_ref);
 }
@@ -237,11 +231,10 @@ void dealloc_ref_st(ref_st_p deadref)
 
     if (deadref->method_addr)
     {
-	deadref->interface->BMI_meth_set_info(BMI_DROP_ADDR,
-					      deadref->method_addr);
+	deadref->interface->set_info(BMI_DROP_ADDR, deadref->method_addr);
     }
 
-    id_gen_safe_unregister(deadref->bmi_addr);
+    id_gen_fast_unregister(deadref->bmi_addr);
 
     free(deadref);
 }

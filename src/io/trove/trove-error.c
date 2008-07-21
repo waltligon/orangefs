@@ -75,6 +75,7 @@ static __trove_errno_mapping_t s_trove_error_map[] =
     { EHOSTUNREACH, TROVE_EHOSTUNREACH },
     { EALREADY, TROVE_EALREADY },
     { ECANCELED, TROVE_ECANCEL },
+    { EACCES, TROVE_EACCES },
     { 0, 0 }
 };
 
@@ -96,7 +97,7 @@ PVFS_error trove_errno_to_trove_error(int errno_value)
             return s_trove_error_map[i].trove_value;
         }
     }
-    return -4242; /* just return some identifiable number */
+    return 4242; /* just return some identifiable number */
 }
 
 /*

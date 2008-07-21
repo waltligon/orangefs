@@ -102,7 +102,7 @@ int main(int argc, char **argv)
     /*printf("strip size: %i\n",
       ((PVFS_simple_stripe_params*)dist->params)->strip_size);*/
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          &credentials, dist, &resp_create);
+                          &credentials, dist, NULL, &resp_create);
     if (ret < 0)
     {
         PVFS_perror("create failed with errcode", ret);

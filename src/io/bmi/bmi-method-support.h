@@ -35,26 +35,22 @@
  * method interfaces and data structures 
  */
 
-/* this is the generic address structure which contains adressing
+/* This is the generic address structure which contains adressing
  * information for every protocol we support.  The method routines
- * can look into the union to find necessary information for a given
- * device.
+ * upcast the void* to find their particular device information.
  */
-struct method_addr
+struct bmi_method_addr
 {
     int method_type;
-    /* indicates if the address is on the local machine (usually for 
-     * server listening) */
-    int local_addr;
     void *method_data;		/* area to be used by specific methods */
 };
-typedef struct method_addr method_addr_st, *method_addr_p;
+typedef struct bmi_method_addr *bmi_method_addr_p;
 
 /* used to describe unexpected messages that arrive */
-struct method_unexpected_info
+struct bmi_method_unexpected_info
 {
     bmi_error_code_t error_code;
-    method_addr_p addr;
+    bmi_method_addr_p addr;
     void *buffer;
     bmi_size_t size;
     bmi_msg_tag_t tag;
@@ -66,116 +62,115 @@ struct method_unexpected_info
 struct bmi_method_ops
 {
     const char *method_name;
-    int (*BMI_meth_initialize) (method_addr_p,
-				int,
-				int);
-    int (*BMI_meth_finalize) (void);
-    int (*BMI_meth_set_info) (int,
-			      void *);
-    int (*BMI_meth_get_info) (int,
-			      void *);
-    void *(*BMI_meth_memalloc) (bmi_size_t,
-				enum bmi_op_type);
-    int (*BMI_meth_memfree) (void *,
-			     bmi_size_t,
-			     enum bmi_op_type);
+    int (*initialize) (bmi_method_addr_p, int, int);
+    int (*finalize) (void);
+    int (*set_info) (int, void *);
+    int (*get_info) (int, void *);
+    void *(*memalloc) (bmi_size_t, enum bmi_op_type);
+    int (*memfree) (void *, bmi_size_t, enum bmi_op_type);
 
-    int (*BMI_meth_unexpected_free) (void *);
+    int (*unexpected_free) (void *);
 
-    int (*BMI_meth_post_send) (bmi_op_id_t *,
-			       method_addr_p,
-			       const void *,
-			       bmi_size_t,
-			       enum bmi_buffer_type,
-			       bmi_msg_tag_t,
-			       void *,
-			       bmi_context_id);
-    int (*BMI_meth_post_sendunexpected) (bmi_op_id_t *,
-					 method_addr_p,
-					 const void *,
-					 bmi_size_t,
-					 enum bmi_buffer_type,
-					 bmi_msg_tag_t,
-					 void *,
-					 bmi_context_id);
-    int (*BMI_meth_post_recv) (bmi_op_id_t *,
-			       method_addr_p,
-			       void *,
-			       bmi_size_t,
-			       bmi_size_t *,
-			       enum bmi_buffer_type,
-			       bmi_msg_tag_t,
-			       void *,
-			       bmi_context_id);
-    int (*BMI_meth_test) (bmi_op_id_t,
-			  int *,
-			  bmi_error_code_t *,
-			  bmi_size_t *,
-			  void **,
-			  int,
-			  bmi_context_id);
-    int (*BMI_meth_testsome) (int,
-			      bmi_op_id_t *,
-			      int *,
-			      int *,
-			      bmi_error_code_t *,
-			      bmi_size_t *,
-			      void **,
-			      int,
-			      bmi_context_id);
-    int (*BMI_meth_testcontext) (int,
-				bmi_op_id_t*,
-				int *,
-				bmi_error_code_t *,
-				bmi_size_t *,
-				void **,
-				int,
-				bmi_context_id);
-    int (*BMI_meth_testunexpected) (int,
-				    int *,
-				    struct method_unexpected_info *,
-				    int);
-      method_addr_p(*BMI_meth_method_addr_lookup) (const char *);
-    int (*BMI_meth_post_send_list) (bmi_op_id_t *,
-				    method_addr_p,
-				    const void *const *,
-				    const bmi_size_t *,
-				    int,
-				    bmi_size_t,
-				    enum bmi_buffer_type,
-				    bmi_msg_tag_t,
-				    void *,
-				    bmi_context_id);
-    int (*BMI_meth_post_recv_list) (bmi_op_id_t *,
-				    method_addr_p,
-				    void *const *,
-				    const bmi_size_t *,
-				    int,
-				    bmi_size_t,
-				    bmi_size_t *,
-				    enum bmi_buffer_type,
-				    bmi_msg_tag_t,
-				    void *,
-				    bmi_context_id);
-    int (*BMI_meth_post_sendunexpected_list) (bmi_op_id_t *,
-					      method_addr_p,
-					      const void *const *,
-					      const bmi_size_t *,
-					      int,
-					      bmi_size_t,
-					      enum bmi_buffer_type,
-					      bmi_msg_tag_t,
-					      void *,
-					      bmi_context_id);
-    int (*BMI_meth_open_context)(bmi_context_id);
-    void (*BMI_meth_close_context)(bmi_context_id);
-    int (*BMI_meth_cancel)(bmi_op_id_t, bmi_context_id);
-    const char* (*BMI_meth_rev_lookup_unexpected)(method_addr_p);
-    int (*BMI_meth_query_addr_range)(method_addr_p, const char *, int);
+    int (*post_send) (bmi_op_id_t *,
+                      bmi_method_addr_p,
+                      const void *,
+                      bmi_size_t,
+                      enum bmi_buffer_type,
+                      bmi_msg_tag_t,
+                      void *,
+                      bmi_context_id);
+    int (*post_sendunexpected) (bmi_op_id_t *,
+                                bmi_method_addr_p,
+                                const void *,
+                                bmi_size_t,
+                                enum bmi_buffer_type,
+                                bmi_msg_tag_t,
+                                void *,
+                                bmi_context_id);
+    int (*post_recv) (bmi_op_id_t *,
+                      bmi_method_addr_p,
+                      void *,
+                      bmi_size_t,
+                      bmi_size_t *,
+                      enum bmi_buffer_type,
+                      bmi_msg_tag_t,
+                      void *,
+                      bmi_context_id);
+    int (*test) (bmi_op_id_t,
+                 int *,
+                 bmi_error_code_t *,
+                 bmi_size_t *,
+                 void **,
+                 int,
+                 bmi_context_id);
+    int (*testsome) (int,
+                     bmi_op_id_t *,
+                     int *,
+                     int *,
+                     bmi_error_code_t *,
+                     bmi_size_t *,
+                     void **,
+                     int,
+                     bmi_context_id);
+    int (*testcontext) (int,
+                        bmi_op_id_t*,
+                        int *,
+                        bmi_error_code_t *,
+                        bmi_size_t *,
+                        void **,
+                        int,
+                        bmi_context_id);
+    int (*testunexpected) (int,
+                           int *,
+                           struct bmi_method_unexpected_info *,
+                           int);
+    bmi_method_addr_p (*method_addr_lookup) (const char *);
+    int (*post_send_list) (bmi_op_id_t *,
+                           bmi_method_addr_p,
+                           const void *const *,
+                           const bmi_size_t *,
+                           int,
+                           bmi_size_t,
+                           enum bmi_buffer_type,
+                           bmi_msg_tag_t,
+                           void *,
+                           bmi_context_id);
+    int (*post_recv_list) (bmi_op_id_t *,
+                           bmi_method_addr_p,
+                           void *const *,
+                           const bmi_size_t *,
+                           int,
+                           bmi_size_t,
+                           bmi_size_t *,
+                           enum bmi_buffer_type,
+                           bmi_msg_tag_t,
+                           void *,
+                           bmi_context_id);
+    int (*post_sendunexpected_list) (bmi_op_id_t *,
+                                     bmi_method_addr_p,
+                                     const void *const *,
+                                     const bmi_size_t *,
+                                     int,
+                                     bmi_size_t,
+                                     enum bmi_buffer_type,
+                                     bmi_msg_tag_t,
+                                     void *,
+                                     bmi_context_id);
+    int (*open_context)(bmi_context_id);
+    void (*close_context)(bmi_context_id);
+    int (*cancel)(bmi_op_id_t, bmi_context_id);
+    const char* (*rev_lookup_unexpected)(bmi_method_addr_p);
+    int (*query_addr_range)(bmi_method_addr_p, const char *, int);
 };
 
 
-/* this is the internal structure used to represent method operations */
+/*
+ * This structure is somewhat optional.  TCP and GM use the elements in
+ * here extensively, but IB, MX, Portals only use the bits required by
+ * the generic BMI layer.  Those are op_id and addr.  Everything else is
+ * ignored.  Would be nice to push most of method_op down into TCP and GM
+ * so other BMI implementations do not need to drag around the unused fields.
+ */
 struct method_op
 {
     bmi_op_id_t op_id;		/* operation identifier */
@@ -188,7 +183,7 @@ struct method_op
     void *buffer;		/* the memory region to transfer */
     bmi_size_t actual_size;	/* total size of the transfer */
     bmi_size_t expected_size;	/* expected size of the transfer */
-    method_addr_st *addr;	/* peer address involved in the communication */
+    bmi_method_addr_p addr;	/* peer address involved in the communication */
     int mode;		/* operation mode */
     bmi_context_id context_id;  /* context */
     struct qlist_head op_list_entry;	/* op_list link */
@@ -208,18 +203,9 @@ struct method_op
 };
 typedef struct method_op method_op_st, *method_op_p;
 
-/* generic method parameters */
-struct method_params
-{
-    int method_flags;
-    int method_id;
-    method_addr_p listen_addr;
-};
-typedef struct method_params method_params_st, *method_params_p;
-
 struct method_drop_addr_query
 {
-    struct method_addr* addr;
+    struct bmi_method_addr* addr;
     int response;
 };
 
@@ -228,13 +214,13 @@ struct method_drop_addr_query
  */
 
 /* functions for managing operations */
-method_op_p alloc_method_op(bmi_size_t payload_size);
-void dealloc_method_op(method_op_p op_p);
+method_op_p bmi_alloc_method_op(bmi_size_t payload_size);
+void bmi_dealloc_method_op(method_op_p op_p);
 
 /* These functions can be used to manage generic address structures */
-method_addr_p alloc_method_addr(int method_type,
+bmi_method_addr_p bmi_alloc_method_addr(int method_type,
 				bmi_size_t payload_size);
-void dealloc_method_addr(method_addr_p old_method_addr);
+void bmi_dealloc_method_addr(bmi_method_addr_p old_method_addr);
 
 /* string parsing utilities */
 char *string_key(const char *key,

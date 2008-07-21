@@ -34,6 +34,7 @@
 #include "mkspace.h"
 #include "pint-distribution.h"
 #include "pint-dist-utils.h"
+#include "pint-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -45,8 +46,9 @@ typedef struct
     int fs_set;
     int all_set;
     int cleanup_set;
+    char alias[100];
+    int alias_set;
     char fs_conf[PATH_MAX];
-    char server_conf[PATH_MAX];
 } options_t;
 
 /** default size of buffers to use for reading old db keys */
@@ -137,9 +139,10 @@ int main(int argc, char **argv)
 {
     int ret = -1;
 
-    /* all parameters read in from fs.conf and server.conf */
+    /* all parameters read in from fs.conf */
     struct server_configuration_s server_config;
     PINT_llist_p fs_configs;
+    char *server_alias;
     
     /* make sure that the buffers we intend to use for reading keys and
      * values is at least large enough to hold the maximum size of xattr keys
@@ -161,11 +164,29 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    ret = PINT_parse_config(&server_config, opts.fs_conf, opts.server_conf);
+    if(opts.alias_set)
+    {
+        server_alias = opts.alias;
+    }
+    else
+    {
+        server_alias = PINT_util_guess_alias();
+    }
+
+    ret = PINT_parse_config(&server_config, opts.fs_conf, server_alias);
     if(ret < 0)
     {
         gossip_err("Error: Please check your config files.\n");
+        if(!opts.alias_set)
+        {
+            free(server_alias);
+        }
         return -1;
+    }
+
+    if(!opts.alias_set)
+    {
+        free(server_alias);
     }
 
     if(opts.all_set)
@@ -390,6 +411,7 @@ static int parse_args(
         {"version",0,0,0},
         {"fs",1,0,0},
         {"all",0,0,0},
+        {"alias",1,0,0},
         {"cleanup",0,0,0},
         {0,0,0,0}
     };
@@ -422,7 +444,12 @@ static int parse_args(
                     opts->all_set = 1;
                     break;
 
-            case 5: /* cleanup */
+            case 5: /* alias */
+                    strncpy(opts->alias, optarg, 99);
+                    opts->alias_set = 1;
+                    break;
+
+            case 6: /* cleanup */
                     opts->cleanup_set = 1;
                     break;
 	    default:
@@ -454,14 +481,6 @@ static int parse_args(
     }
     strcpy(opts->fs_conf, argv[optind++]);
 
-    if(argc < optind)
-    {
-        /* missing server.conf */
-        print_help(argv[0]);
-        return(-1);
-    }
-    strcpy(opts->server_conf, argv[optind]);
-
     return 0;
 }
 
@@ -471,7 +490,7 @@ static int parse_args(
 static void print_help(
     char *progname) /**< executable name */
 {
-    fprintf(stderr,"\nusage: %s \\\n\t\t[OPTIONS] <global_config_file> <server_config_file>\n", progname);
+    fprintf(stderr,"\nusage: %s \\\n\t\t[OPTIONS] <global_config_file>\n", progname);
     fprintf(stderr,"\nThis utility will migrate a PVFS2 collection from an old version\n"
            "to the most recent version.\n\n");
     fprintf(stderr,"One of the following arguments is required:\n");
@@ -485,6 +504,10 @@ static void print_help(
     fprintf(stderr,"--------------\n");
     fprintf(stderr,"  --cleanup          "
             "remove the old collection\n");
+    fprintf(stderr,
+            "  --alias            Specify the alias for this server.\n"
+            "                     The migration tool tries to guess the\n"
+            "                     alias based on the hostname if none is specified.\n");
     fprintf(stderr,"  --verbose          "
             "print verbose messages during execution\n");
     fprintf(stderr,"  --help             "
@@ -615,7 +638,6 @@ static int translate_0_0_1(
      * will create
      */
     char handle_range[] = "4-64000000000";
-    char* method_name = NULL;
     TROVE_op_id op_id;
     TROVE_context_id trove_context = -1;
     char current_path[PATH_MAX];
@@ -681,7 +703,8 @@ static int translate_0_0_1(
     }
 
     /* initialize trove and lookup collection */
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    ret = trove_initialize(
+        TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0)
     {
         PVFS_perror("trove_initialize", ret);
@@ -689,7 +712,8 @@ static int translate_0_0_1(
         pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
         return(-1);
     }
-    ret = trove_collection_lookup(coll_name, &coll_id, NULL, &op_id);
+    ret = trove_collection_lookup(
+        TROVE_METHOD_DBPF, coll_name, &coll_id, NULL, &op_id);
     if (ret != 1)
     {   
         fprintf(stderr, "Error: failed to lookup new collection.\n");
@@ -740,7 +764,7 @@ static int translate_0_0_1(
 
     /* at this point, we are done with the Trove API */
     trove_close_context(coll_id, trove_context);
-    trove_finalize();
+    trove_finalize(TROVE_METHOD_DBPF);
     PINT_dist_finalize();
 
     /* convert bstreams */
@@ -1249,28 +1273,28 @@ static int translate_keyval_key_0_0_1(TROVE_keyval_s * keyval, DBT * db_key)
     if(!strncmp(db_key->data, "root_handle", strlen("root_handle")))
     {
         keyval->buffer = ROOT_HANDLE_KEYSTR;
-        keyval->buffer_sz = strlen(ROOT_HANDLE_KEYSTR);
+        keyval->buffer_sz = ROOT_HANDLE_KEYLEN;
     }
     else if(!strncmp(db_key->data, "dir_ent", strlen("dir_ent")))
     {
         keyval->buffer = DIRECTORY_ENTRY_KEYSTR;
-        keyval->buffer_sz = strlen(DIRECTORY_ENTRY_KEYSTR);
+        keyval->buffer_sz = DIRECTORY_ENTRY_KEYLEN;
     }
     else if(!strncmp(db_key->data, 
                      "datafile_handles", strlen("datafile_handles")))
     {
         keyval->buffer = DATAFILE_HANDLES_KEYSTR;
-        keyval->buffer_sz = strlen(DATAFILE_HANDLES_KEYSTR);
+        keyval->buffer_sz = DATAFILE_HANDLES_KEYLEN;
     }
     else if(!strncmp(db_key->data, "metafile_dist", strlen("metafile_dist")))
     {
         keyval->buffer = METAFILE_DIST_KEYSTR;
-        keyval->buffer_sz = strlen(METAFILE_DIST_KEYSTR);
+        keyval->buffer_sz = METAFILE_DIST_KEYLEN;
     }
     else if(!strncmp(db_key->data, "symlink_target", strlen("symlink_target")))
     {
         keyval->buffer = SYMLINK_TARGET_KEYSTR;
-        keyval->buffer_sz = strlen(SYMLINK_TARGET_KEYSTR);
+        keyval->buffer_sz = SYMLINK_TARGET_KEYLEN;
     }
     else
     {
@@ -1383,11 +1407,12 @@ static int translate_keyval_db_0_0_1(
                 /* assume its a component name of a directory entry */
                 t_key.buffer = key.data;
                 t_key.buffer_sz = key.size;
+		t_val.buffer = data.data;
+		t_val.buffer_sz = data.size;
                 trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
                 trove_flags |= TROVE_NOOVERWRITE;
             }
-            
-            if(!strncmp(t_key.buffer, "md", 2)) /* metafile_dist */
+            else if(!strncmp(t_key.buffer, "md", 2)) /* metafile_dist */
             {
                 PINT_dist *newdist;
                 newdist = data.data;

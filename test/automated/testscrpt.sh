@@ -7,10 +7,16 @@
 #   - $user needs to be able to sudo w/o prompting
 #   - please don't cheat and run this as root: will not catch permissions bugs
 
-# modify these variables
+# you can override these settings in nightly-tests.cfg 
 export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
+
+# look for a 'nightly-test.cfg' in the same directory as this script
+if [ -f $(cd `dirname $0`; pwd)/nightly-tests.cfg ] ; then 
+	. $(cd `dirname $0`; pwd)/nightly-tests.cfg
+fi
+
 
 # need to make this a command line arugment:
 export CVS_TAG="${CVS_TAG:-HEAD}"
@@ -21,7 +27,7 @@ TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/sysint-tests.d
 VFS_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
-REPORT_LOG=${PVFS2_DEST}/alltests.log
+REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
@@ -33,7 +39,7 @@ TESTNAME="`hostname -s`-nightly"
 
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="gil lain"
+VFS_HOSTS="gil lain stan"
 
 
 # takes one argument: a tag or branch in CVS
@@ -67,14 +73,11 @@ pull_and_build_mpich2 () {
 	cd mpich2-snap-*
 	mkdir build
 	cd build
-	CFLAGS="-g -I${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/include"
-	LDFLAGS="-L${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib"
-	LIBS="-lpvfs2 -lpthread -lgm"
-	export CFLAGS LDFLAGS LIBS
-
 	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
-		--without-mpe --disable-cxx --disable-f77 >mpich2config.log &&\
+		--with-pvfs2=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG} \
+		--enable-g=dbg --without-mpe \
+		--disable-f77 >mpich2config-${CVS_TAG}.log &&\
 	make >/dev/null && make install >/dev/null 
 }
 
@@ -90,31 +93,37 @@ teardown_vfs() {
 }
 
 setup_vfs() {
+	sudo dmesg -c >/dev/null
 	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
-	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client -p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core
+	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
+		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
+		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
+	# sudo screen -d -m cgdb -x ${PVFS2_DEST}/.gdbinit --args ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
+	#sudo valgrind --log-file=${PVFS2_DEST}/pvfs2-client.vg ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log &
+	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	sudo mount -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
 }
 
 setup_pvfs2() {
 	cd $PVFS2_DEST
-	rm -f fs.conf server.conf*
-	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf server.conf \
+	rm -f fs.conf 
+	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf \
 		--protocol tcp \
 		--iospec="`hostname -s`:{3396-3399}" \
 		--metaspec="`hostname -s`:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
-		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
+		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
 	# clean up any artifacts from earlier runs
-	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2*
-	rm -f ${PVFS2_DEST}/pvfs2-server.log* 
-	failure_logs="${PVFS2_DEST}/pvfs2-server.log* $failure_logs"
-	for server_conf in server.conf*; do 
+	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
+	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
+	failure_logs="${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* $failure_logs"
+	for alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`; do
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
-			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid \
-			-f fs.conf $server_conf
+			-p `pwd`/pvfs2-server-${alias}.pid \
+			-f fs.conf -a $alias
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
-			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid  \
-			fs.conf $server_conf
+			-p `pwd`/pvfs2-server-${alias}.pid  \
+			fs.conf $server_conf -a $alias
 	done
 
 	echo "tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
@@ -145,15 +154,20 @@ teardown_pvfs2() {
 
 buildfail() {
 	echo "Failure in build process"
-	cat ${PVFS2_DEST}/configure.log ${PVFS2_DEST}/make-extracted.log ${PVFS2_DEST}/make-install.log ${PVFS2_DEST}/make.log | \
+	cat ${PVFS2_DEST}/configure-${CVS_TAG}.log \
+		${PVFS2_DEST}/make-extracted-${CVS_TAG}.log \
+		${PVFS2_DEST}/make-install-${CVS_TAG}.log \
+		${PVFS2_DEST}/make-${CVS_TAG}.log \
+		${PVFS2_DEST}/make-test-${CVS_TAG}.log | \
 		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} build_failed $STARTTIME 
 	exit 1
 }
 
 setupfail() {
 	echo "Failure in setup"
-	dmesg | tail -20 > ${PVFS2_DEST}/dmesg
-	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-server.log* | \
+	dmesg > ${PVFS2_DEST}/dmesg
+	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
+		${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* | \
 		${TINDERSCRIPT}  ${TESTNAME}-${CVS_TAG} test_failed $STARTTIME 
 	exit 1
 }
@@ -178,13 +192,13 @@ run_parts() {
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
 			echo -n "====== running $f ..."
-			./$f > ${PVFS2_DEST}/${f}.log
+			./$f > ${PVFS2_DEST}/${f}-${CVS_TAG}.log
 			if [ $? == 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
 				echo "OK"
 			else
 				nr_failed=$((nr_failed + 1))
-				failure_logs="$failure_logs ${PVFS2_DEST}/${f}.log"
+				failure_logs="$failure_logs ${PVFS2_DEST}/${f}-${CVS_TAG}.log"
 				echo "FAILED"
 			fi
 		fi
@@ -275,5 +289,5 @@ else
 	tinder_report success
 fi
 
-teardown_pvfs2
 [ $do_vfs -eq 1 ] && teardown_vfs
+teardown_pvfs2

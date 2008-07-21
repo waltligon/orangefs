@@ -29,22 +29,12 @@
  *   stored in s_op->scheduled_id
  */
 
-static int final_response_release(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int final_response_send_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int final_response_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
-
 static void PINT_gossip_err_server_resp(
     struct PVFS_server_resp *resp);
 
 %%
 
-nested machine pvfs2_final_response_sm(
-    release,
-    send_resp,
-    cleanup)
+nested machine pvfs2_final_response_sm
 {
     state release
     {
@@ -71,15 +61,16 @@ nested machine pvfs2_final_response_sm(
  *
  * releases the operation from the request scheduler
  */
-static int final_response_release(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action final_response_release(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (FR sm) state: release: (error_code = %d)\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op),
+                 "(s_op %p) %s (FR sm) state: release: (error_code = %d)\n",
+                 s_op, PINT_map_server_op_to_string(s_op->req->op),
                  js_p->error_code);
 
     /* this seems a little odd, but since this is the first state of the
@@ -95,11 +86,11 @@ static int final_response_release(
     if (!s_op->scheduled_id)
     {
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     ret = job_req_sched_release(
-        s_op->scheduled_id, s_op, 0, js_p, &tmp_id, server_job_context);
+        s_op->scheduled_id, smcb, 0, js_p, &tmp_id, server_job_context);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_SUB);
 
@@ -110,18 +101,18 @@ static int final_response_release(
  *
  * encodes and sends a response to the client
  */
-static int final_response_send_resp(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action final_response_send_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
     
     gossip_debug(
         GOSSIP_SERVER_DEBUG, 
-	"(%p) %s (FR sm) state: send_resp (status = %d)\n",
-	s_op,
-	PINT_map_server_op_to_string(s_op->req->op),
+	"(s_op %p) %s (FR sm) state: send_resp (status = %d)\n",
+	s_op, PINT_map_server_op_to_string(s_op->req->op),
 	s_op->resp.status);
 
     if (js_p->error_code != 0)
@@ -137,14 +128,14 @@ static int final_response_send_resp(
         PINT_gossip_err_server_resp(&s_op->resp);
 
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* send the response */
     ret = job_bmi_send_list(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
-        s_op->encoded.buffer_type, 0, s_op, 0, js_p, &tmp_id,
+        s_op->encoded.buffer_type, 0, smcb, 0, js_p, &tmp_id,
         server_job_context, user_opts->server_job_bmi_timeout);
 
     return ret;
@@ -156,12 +147,14 @@ static int final_response_send_resp(
  * cleans up resources allocated while in this nested machine.  Right now 
  * that just means releasing the encoding of the response
  */
-static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action final_response_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (FR sm) state: cleanup\n",
+                 "(s_op %p) %s (FR sm) state: cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
@@ -169,53 +162,9 @@ static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 
-    /* decrement reference count for this bmi address */
-    BMI_set_info(s_op->addr, BMI_DEC_ADDR_REF, NULL);
-
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
-
-static __req_resp_type_desc_t s_req_resp_type_map[] =
-{
-    { PVFS_SERV_INVALID, "PVFS_SERV_INVALID"},
-    { PVFS_SERV_CREATE, "PVFS_SERV_CREATE" },
-    { PVFS_SERV_REMOVE, "PVFS_SERV_REMOVE" },
-    { PVFS_SERV_IO, "PVFS_SERV_IO" },
-    { PVFS_SERV_GETATTR, "PVFS_SERV_GETATTR" },
-    { PVFS_SERV_SETATTR, "PVFS_SERV_SETATTR" },
-    { PVFS_SERV_LOOKUP_PATH, "PVFS_SERV_LOOKUP_PATH" },
-    { PVFS_SERV_CRDIRENT, "PVFS_SERV_CRDIRENT" },
-    { PVFS_SERV_RMDIRENT, "PVFS_SERV_RMDIRENT" },
-    { PVFS_SERV_CHDIRENT, "PVFS_SERV_CHDIRENT" },
-    { PVFS_SERV_TRUNCATE, "PVFS_SERV_TRUNCATE" },
-    { PVFS_SERV_MKDIR, "PVFS_SERV_MKDIR" },
-    { PVFS_SERV_READDIR, "PVFS_SERV_READDIR" },
-    { PVFS_SERV_GETCONFIG, "PVFS_SERV_GETCONFIG" },
-    { PVFS_SERV_WRITE_COMPLETION, "PVFS_SERV_WRITE_COMPLETION" },
-    { PVFS_SERV_FLUSH, "PVFS_SERV_FLUSH" },
-    { PVFS_SERV_MGMT_SETPARAM, "PVFS_SERV_MGMT_SETPARAM" },
-    { PVFS_SERV_MGMT_NOOP, "PVFS_SERV_MGMT_NOOP" },
-    { PVFS_SERV_STATFS, "PVFS_SERV_STATFS" },
-    { PVFS_SERV_PERF_UPDATE, "PVFS_SERV_PERF_UPDATE" },
-    { PVFS_SERV_MGMT_PERF_MON, "PVFS_SERV_MGMT_PERF_MON" },
-    { PVFS_SERV_MGMT_ITERATE_HANDLES, "PVFS_SERV_MGMT_ITERATE_HANDLES" },
-    { PVFS_SERV_MGMT_DSPACE_INFO_LIST,
-      "PVFS_SERV_MGMT_DSPACE_INFO_LIST" },
-    { PVFS_SERV_MGMT_EVENT_MON, "PVFS_SERV_MGMT_EVENT_MON" },
-    { PVFS_SERV_MGMT_REMOVE_OBJECT, "PVFS_SERV_MGMT_REMOVE_OBJECT" },
-    { PVFS_SERV_MGMT_REMOVE_DIRENT, "PVFS_SERV_MGMT_REMOVE_DIRENT" },
-    { PVFS_SERV_MGMT_GET_DIRDATA_HANDLE,
-      "PVFS_SERV_MGMT_GET_DIRDATA_HANDLE" },
-    { PVFS_SERV_JOB_TIMER, "PVFS_SERV_JOB_TIMER" },
-    { PVFS_SERV_PROTO_ERROR, "PVFS_SERV_PROTO_ERROR" },
-    { PVFS_SERV_GETEATTR, "PVFS_SERV_GETEATTR" },
-    { PVFS_SERV_SETEATTR, "PVFS_SERV_SETEATTR" },
-    { PVFS_SERV_DELEATTR, "PVFS_SERV_DELEATTR" },
-    { PVFS_SERV_LISTEATTR, "PVFS_SERV_LISTEATTR" },
-    { PVFS_SERV_SMALL_IO, "PVFS_SERV_SMALL_IO" },
-    { PVFS_SERV_LOCK, "PVFS_SERV_LOCK" }
-};
 
 static void PINT_gossip_err_server_resp(
     struct PVFS_server_resp *resp)
@@ -225,7 +174,7 @@ static void PINT_gossip_err_server_resp(
         if (resp->op >= 0 && resp->op < PVFS_SERV_NUM_OPS)
         {
             gossip_err("Server Response %p is of type: %s\n",
-                       resp, s_req_resp_type_map[resp->op].type_str);
+                       resp, PINT_map_server_op_to_string(resp->op));
         }
         else
         {

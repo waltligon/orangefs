@@ -20,38 +20,9 @@ enum
     UPDATE_DIR_ATTR_REQUIRED
 };
 
-static int crdirent_setup_op(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int crdirent_validate(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int crdirent_read_directory_entry_handle(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int crdirent_write_directory_entry(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int crdirent_check_for_req_dir_update(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int crdirent_update_directory_attr(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int crdirent_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int validation_object_type_failure(
-    PINT_server_op *s_op, job_status_s *js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
-machine pvfs2_crdirent_sm(
-    prelude,
-    setup_op,
-    validate,
-    validation_object_type_failure,
-    read_directory_entry_handle,
-    write_directory_entry,
-    check_for_req_dir_update,
-    update_directory_attr,
-    cleanup,
-    final_response)
+machine pvfs2_crdirent_sm
 {
     state prelude
     {
@@ -127,16 +98,17 @@ machine pvfs2_crdirent_sm(
  *
  * Synopsis: verifies that entry name and object type is valid
  */
-static int crdirent_validate(PINT_server_op *s_op,
-                             job_status_s *js_p)
+static PINT_sm_action crdirent_validate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
 
     if ((s_op->u.crdirent.name == NULL) ||
         (s_op->u.crdirent.parent_handle == PVFS_HANDLE_NULL))
     {
         js_p->error_code = -PVFS_EINVAL;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -162,7 +134,7 @@ static int crdirent_validate(PINT_server_op *s_op,
 
          /* Do not zero the scheduled_id, as this operation was
           * scheduled before we checked the filename */
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* make sure we're dealing with a directory */
@@ -173,11 +145,11 @@ static int crdirent_validate(PINT_server_op *s_op,
                      "a non-directory!  Returning error.\n");
 
         js_p->error_code = INVALID_OBJECT;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -204,9 +176,10 @@ static int crdirent_validate(PINT_server_op *s_op,
  * space and if it does not exist, we need to create it.
  *
  */
-static int crdirent_read_directory_entry_handle(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action crdirent_read_directory_entry_handle(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -225,7 +198,7 @@ static int crdirent_read_directory_entry_handle(
         &s_op->val,
         0,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
@@ -234,14 +207,14 @@ static int crdirent_read_directory_entry_handle(
     return ret;
 }
 
-static int validation_object_type_failure(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action validation_object_type_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
     gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: validation_object_"
                  "type_failure called\n");
 
     js_p->error_code = -PVFS_ENOTDIR;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -261,9 +234,10 @@ static int validation_object_type_failure(
  * Synopsis: We are now ready to store the name/handle pair in the k/v
  *           space for directory handles.
  */
-static int crdirent_write_directory_entry(PINT_server_op *s_op,
-                                          job_status_s *js_p)
+static PINT_sm_action crdirent_write_directory_entry(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
     TROVE_ds_flags keyval_flags;
@@ -305,7 +279,7 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
         s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
         &s_op->key, &s_op->val, 
         keyval_flags,
-        NULL, s_op, 0, js_p, &i, server_job_context);
+        NULL, smcb, 0, js_p, &i, server_job_context);
 
     /*
      * creating an entry will cause directory times to be updated.
@@ -314,20 +288,22 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
     return ret;
 }
 
-static int crdirent_check_for_req_dir_update(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action crdirent_check_for_req_dir_update(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if ((js_p->error_code == 0) &&
         (s_op->u.crdirent.dir_attr_update_required))
     {
         js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
     
-static int crdirent_update_directory_attr(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action crdirent_update_directory_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
@@ -338,7 +314,7 @@ static int crdirent_update_directory_attr(
     {
         PVFS_perror_gossip("previous keyval write failed",
                            js_p->error_code);
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
@@ -350,18 +326,18 @@ static int crdirent_update_directory_attr(
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
     ret = job_trove_dspace_setattr(
-        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.parent_handle,
+        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.handle,
         ds_attr, 
         TROVE_SYNC,
-        s_op, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
 
-static int crdirent_cleanup(PINT_server_op *s_op,
-                            job_status_s *js_p)
+static PINT_sm_action crdirent_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /* crdirent_setup_op()
@@ -370,21 +346,34 @@ static int crdirent_cleanup(PINT_server_op *s_op,
  * storing request structure fields in state machine so that nested
  * machines are not dependent on request type
  */
-static int crdirent_setup_op(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action crdirent_setup_op(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %llu\n",
         s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
 
     s_op->u.crdirent.name = s_op->req->u.crdirent.name;
     s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
-    s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.parent_handle;
+    s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
     s_op->u.crdirent.dir_attr_update_required = 0;
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
+
+PINT_GET_OBJECT_REF_DEFINE(crdirent);
+
+struct PINT_server_req_params pvfs2_crdirent_params =
+{
+    .string_name = "crdirent",
+    .perm = PINT_SERVER_CHECK_CRDIRENT,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_crdirent,
+    .state_machine = &pvfs2_crdirent_sm
+};
 
 /*
  * Local variables:

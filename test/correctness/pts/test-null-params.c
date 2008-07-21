@@ -308,12 +308,12 @@ static int test_create(int nullCase)
     case 0:
 	ret =
 	    PVFS_sys_create(NULL, resp_look.ref, attr, &credentials,
-			    NULL, &resp_create);
+			    NULL, NULL, &resp_create);
 	break;
     case 1:
 	ret =
 	    PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-			    NULL, NULL);
+			    NULL, NULL, NULL);
 	break;
     default:
 	fprintf(stderr, "Error - incorect case number \n");
@@ -373,7 +373,7 @@ static int test_remove(int nullCase)
 static int test_rename(void)
 {
 
-//      return PVFS_sys_rename(old_name, old_parent_refn, new_name, new_parent_refn, credentials);
+/*      return PVFS_sys_rename(old_name, old_parent_refn, new_name, new_parent_refn, credentials); */
     return -2;
 }
 
@@ -540,7 +540,7 @@ static int init_file(void)
     }
     fs_id = pvfs_helper.fs_id;
 
-    //get root
+    /* get root */
     ret = PVFS_sys_lookup(fs_id, "/", &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
@@ -550,7 +550,7 @@ static int init_file(void)
     }
 
     return PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-			   NULL, &resp_create);
+			   NULL, NULL, &resp_create);
 
 }
 

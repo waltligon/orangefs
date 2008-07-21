@@ -14,23 +14,9 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-static int mgmt_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int mgmt_get_dirdata_handle_setup_resp(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int mgmt_get_dirdata_handle_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
-machine pvfs2_mgmt_get_dirdata_handle_sm(
-    prelude,
-    get_dirdata_handle_from_parent,
-    get_dirdata_handle_setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_mgmt_get_dirdata_handle_sm
 {
     state prelude
     {
@@ -68,8 +54,9 @@ machine pvfs2_mgmt_get_dirdata_handle_sm(
 %%
 
 static int mgmt_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -93,15 +80,16 @@ static int mgmt_get_dirdata_handle_from_parent(
         s_op->req->u.mgmt_get_dirdata_handle.handle,
         &s_op->key, &s_op->val, 
         0, 
-        NULL, s_op, 0, js_p, &i,
+        NULL, smcb, 0, js_p, &i,
         server_job_context);
 
     return ret;
 }
 
-static int mgmt_get_dirdata_handle_setup_resp(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
         s_op->resp.u.mgmt_get_dirdata_handle.handle =
@@ -120,14 +108,25 @@ static int mgmt_get_dirdata_handle_setup_resp(
                      "handle from parent %llu\n",
                      llu(s_op->req->u.mgmt_get_dirdata_handle.handle));
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_get_dirdata_handle_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
+
+PINT_GET_OBJECT_REF_DEFINE(mgmt_get_dirdata_handle);
+
+struct PINT_server_req_params pvfs2_mgmt_get_dirdata_handle_params =
+{
+    .string_name = "mgmt-get-dirdata-handle",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_mgmt_get_dirdata_handle,
+    .state_machine = &pvfs2_mgmt_get_dirdata_handle_sm
+};
 
 /*
  * Local variables:

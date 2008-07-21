@@ -97,6 +97,20 @@ sub create_nodefiles {
 
     close(FH);
 
+    $ofile = $href->{'WORKINGDIR'} . "/metanodes";
+
+    if (!open(FH, ">$ofile")) {
+	print STDERR "ERROR: cannot open file: $ofile\n";
+	return(2);
+    }
+
+    my @metanodes = @{$href->{'MGR'}};
+    foreach $node (@metanodes) {
+	print FH "$node\n";
+    }
+
+    close(FH);
+
     $ofile = $href->{'WORKINGDIR'} . "/compnodes";
 
     if (!open(FH, ">$ofile")) {
@@ -117,7 +131,6 @@ sub create_pvfs2config
 {
     my $href = shift;
     my $conffile = $href->{'WORKINGDIR'} . "/fs.conf";
-    my $serverfile = $href->{'WORKINGDIR'} ."/server.conf";
     my $ioservers = '';
     my $metaservers = '';
     my $rc = -1;
@@ -147,14 +160,14 @@ sub create_pvfs2config
 		. " --metaservers " . $metaservers
 		. " --logfile "  . $href->{'SERVERLOG'} . "/pvfs2.log"
 		. " --storage "  . $href->{'STORAGE'}
-		. " --quiet "    . $conffile . " " . $serverfile;
+		. " --trove-method " . $href->{'TROVEMETHOD'}
+		. " --quiet "    . $conffile;
     if ($href->{'TROVESYNC'} == 0) {
     	$cmd .= " --notrovesync";
     }
 
     $rc = system($cmd);
-    return 0;
-    
+    return $rc;
 }
 
 sub create_pvfs2tab {
@@ -250,6 +263,7 @@ sub init {
 	       'PINGPROG' => "pvfs2-ping",
 	       'GENCONFIG' => "pvfs2-genconfig",
 	       'TROVESYNC' => 1,
+	       'TROVEMETHOD' => "dbpf",
 	       'COMPUTENODES_LAST' => 1,
 	       'PROGROOT' => "./",
 	       'COPYBINS' => 0

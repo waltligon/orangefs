@@ -76,6 +76,15 @@ enum
     BMI_TCP_BUFFER_SEND_SIZE = 11,
     BMI_TCP_BUFFER_RECEIVE_SIZE = 12,
     BMI_TCP_CLOSE_SOCKET = 13,
+    BMI_OPTIMISTIC_BUFFER_REG = 14,
+};
+
+/** used to describe a memory region in passing down a registration
+ * hint from IO routines. */
+struct bmi_optimistic_buffer_info {
+    const void *buffer;
+    PVFS_size len;
+    enum PVFS_io_type rw;
 };
 
 /* mappings from PVFS errors to BMI errors */
@@ -131,6 +140,7 @@ enum
 #define BMI_ENETUNREACH     (PVFS_ENETUNREACH | PVFS_ERROR_BMI)
 #define BMI_ENETRESET       (PVFS_ENETRESET | PVFS_ERROR_BMI)
 #define BMI_ENOBUFS         (PVFS_ENOBUFS | PVFS_ERROR_BMI)
+#define BMI_ECONNRESET      (PVFS_ECONNRESET | PVFS_ERROR_BMI)
 #define BMI_ETIMEDOUT       (PVFS_ETIMEDOUT | PVFS_ERROR_BMI)
 #define BMI_ECONNREFUSED    (PVFS_ECONNREFUSED | PVFS_ERROR_BMI)
 #define BMI_EHOSTDOWN       (PVFS_EHOSTDOWN | PVFS_ERROR_BMI)

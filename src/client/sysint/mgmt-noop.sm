@@ -26,17 +26,9 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int mgmt_noop_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int mgmt_noop_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-
 %%
 
-machine pvfs2_client_mgmt_noop_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_noop_sm
 {
     state setup_msgpair
     {
@@ -69,28 +61,34 @@ PVFS_error PVFS_imgmt_noop(
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_imgmt_noop entered\n");
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (!sm_p)
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_NOOP,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (!smcb)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, fs_id);
+    PINT_init_msgarray_params(sm_p, fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
-    sm_p->msgpair.fs_id = fs_id;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
-    sm_p->msgpair.svr_addr = addr;
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    sm_p->msgarray_op.msgpair.fs_id = fs_id;
+    sm_p->msgarray_op.msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    sm_p->msgarray_op.msgpair.svr_addr = addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "
                  "PINT_client_state_machine_post()\n");
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_NOOP, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Send a no-op request to a specific server and receive response.
@@ -121,33 +119,34 @@ PVFS_error PVFS_mgmt_noop(
         }
     }
 
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 
-static int mgmt_noop_setup_msgpair(PINT_client_sm *sm_p,
-                                   job_status_s *js_p)
+static PINT_sm_action mgmt_noop_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "noop state: mgmt_noop_setup_msgpair\n");
 
-    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgpair.req, *sm_p->cred_p);
+    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgarray_op.msgpair.req, *sm_p->cred_p);
 
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
-
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_noop_cleanup(PINT_client_sm *sm_p,
-                             job_status_s *js_p)
+static PINT_sm_action mgmt_noop_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "noop state: mgmt_noop_cleanup\n");
 
     sm_p->error_code = js_p->error_code;
-    sm_p->op_complete = 1;
-    return 0;
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

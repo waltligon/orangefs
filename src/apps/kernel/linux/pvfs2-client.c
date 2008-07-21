@@ -26,7 +26,10 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define PVFS2_CLIENT_CORE_NAME  "pvfs2-client-core"
+#define PVFS2_CLIENT_CORE_SUFFIX  "-core"
+#define PVFS2_CLIENT_CORE_NAME "pvfs2-client" PVFS2_CLIENT_CORE_SUFFIX
+
+static char s_client_core_path[PATH_MAX];
 
 #define MAX_DEV_INIT_FAILURES 10
 
@@ -34,6 +37,9 @@
 #define DEFAULT_NCACHE_TIMEOUT_STR "5"
 
 #define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
+
+#define CLIENT_RESTART_INTERVAL_SECS 10
+#define CLIENT_MAX_RESTARTS 10
 
 typedef struct
 {
@@ -53,6 +59,9 @@ typedef struct
     char *path;
     char *logfile;
     char *logstamp;
+    char *dev_buffer_count;
+    char *dev_buffer_size;
+    char *logtype;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -166,6 +175,10 @@ static int monitor_pvfs2_client(options_t *opts)
     int dev_init_failures = 0;
     char* arg_list[128] = {NULL};
     int arg_index;
+    int restart_count = 0;
+    struct timeval last_restart, now;
+
+    gettimeofday(&last_restart, NULL);
 
     assert(opts);
 
@@ -195,7 +208,18 @@ static int monitor_pvfs2_client(options_t *opts)
 
             if (WIFEXITED(ret))
             {
-                gossip_enable_file(opts->logfile, "a");
+                if(!strcmp(opts->logtype, "file"))
+                {
+                    gossip_enable_file(opts->logfile, "a");
+                }
+                else if(!strcmp(opts->logtype, "syslog"))
+                {
+                    gossip_enable_syslog(LOG_INFO);
+                }
+                else
+                {
+                    gossip_enable_stderr();
+                }
                 gossip_err("pvfs2-client-core with pid %d exited with "
                        "value %d\n", core_pid, (int)WEXITSTATUS(ret));
                 gossip_disable();
@@ -222,6 +246,7 @@ static int monitor_pvfs2_client(options_t *opts)
                         break;
                     }
                     core_pid = -1;
+                    sleep(1);
                     continue;
                 }
 
@@ -249,33 +274,71 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 dev_init_failures = 0;
 
-                if (opts->verbose)
+                if(!strcmp(opts->logtype, "file"))
                 {
-                    printf("Child process with pid %d was killed by an "
-                           "uncaught signal %d\n", core_pid,
-                           WTERMSIG(ret));
+                    gossip_enable_file(opts->logfile, "a");
                 }
+                else if(!strcmp(opts->logtype, "syslog"))
+                {
+                    gossip_enable_syslog(LOG_INFO);
+                }
+                else
+                {
+                    gossip_enable_stderr();
+                }
+
+                gossip_err("Child process with pid %d was killed by an "
+                           "uncaught signal %d\n", core_pid, WTERMSIG(ret));
                 core_pid = -1;
+
+                gettimeofday(&now, NULL);
+
+                if(((now.tv_sec + now.tv_usec*1e-6) -
+                    (last_restart.tv_sec + last_restart.tv_usec*1e-6))
+                   < CLIENT_RESTART_INTERVAL_SECS)
+                {
+                    if(restart_count > CLIENT_MAX_RESTARTS)
+                    {
+                        gossip_err("Chld process is restarting too quickly "
+                                   "(within %d secs) after %d attempts! "
+                                   "Aborting the client.\n",
+                                   CLIENT_RESTART_INTERVAL_SECS, restart_count);
+                        exit(1);
+                    }
+                }
+                else
+                {
+                    /* reset restart count */
+                    restart_count = 0;
+                }
+
+                gossip_disable();
+
+                last_restart = now;
                 continue;
             }
         }
         else
         {
-            sleep(1);
-
-            if (opts->verbose)
-            {
-                printf("About to exec %s\n",opts->path);
-            }
-
             arg_list[0] = PVFS2_CLIENT_CORE_NAME;
-            arg_list[1] = "-a";
-            arg_list[2] = opts->acache_timeout;
-            arg_list[3] = "-n";
-            arg_list[4] = opts->ncache_timeout;
-            arg_list[5] = "-L";
-            arg_list[6] = opts->logfile;
-            arg_index = 7;
+            arg_index = 1;
+
+            arg_list[arg_index++] = "--child";
+            arg_list[arg_index++] = "-a";
+            arg_list[arg_index++] = opts->acache_timeout;
+            arg_list[arg_index++] = "-n";
+            arg_list[arg_index++] = opts->ncache_timeout;
+            if(opts->logtype)
+            {
+                arg_list[arg_index] = "--logtype";
+                arg_list[arg_index+1] = opts->logtype;
+                arg_index+=2;
+                if(!strcmp(opts->logtype, "file"))
+                {
+                    arg_list[arg_index++] = "-L";
+                    arg_list[arg_index++] = opts->logfile;
+                }
+            }
             if(opts->acache_hard_limit)
             {
                 arg_list[arg_index] = "--acache-hard-limit";
@@ -336,7 +399,29 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->logstamp;
                 arg_index+=2;
             }
+            if(opts->dev_buffer_count)
+            {
+                arg_list[arg_index] = "--desc-count";
+                arg_list[arg_index+1] = opts->dev_buffer_count;
+                arg_index+=2;
+            }
+            if(opts->dev_buffer_size)
+            {
+                arg_list[arg_index] = "--desc-size";
+                arg_list[arg_index+1] = opts->dev_buffer_size;
+                arg_index+=2;
+            }
 
+            if(opts->verbose)
+            {
+                int i;
+                printf("About to exec: %s, with args: ", opts->path);
+                for(i = 0; i < arg_index; ++i)
+                {
+                    printf("%s ", arg_list[i]);
+                }
+                printf("\n");
+            }
             ret = execvp(opts->path, arg_list);
 
             fprintf(stderr, "Could not exec %s, errno is %d\n",
@@ -360,12 +445,12 @@ static void print_help(char *progname)
     printf("-L  --logfile                 specify log file to write to\n"
             "   (defaults to /tmp/pvfs2-client.log)\n");
     printf("-a MS, --acache-timeout=MS    acache timeout in ms "
-           "(default is 0 ms)\n");
+           "(default is %s ms)\n", DEFAULT_ACACHE_TIMEOUT_STR);
     printf("--acache-soft-limit=LIMIT     acache soft limit\n");
     printf("--acache-hard-limit=LIMIT     acache hard limit\n");
     printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
     printf("-n MS, --ncache-timeout=MS    ncache timeout in ms "
-           "(default is 0 ms)\n");
+           "(default is %s ms)\n", DEFAULT_NCACHE_TIMEOUT_STR);
     printf("--ncache-soft-limit=LIMIT     ncache soft limit\n");
     printf("--ncache-hard-limit=LIMIT     ncache hard limit\n");
     printf("--ncache-reclaim-percentage=LIMIT ncache reclaim percentage\n");
@@ -374,6 +459,8 @@ static void print_help(char *progname)
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
     printf("-p PATH, --path PATH          execute pvfs2-client at "
            "PATH\n");
+    printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
+    printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -388,6 +475,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"verbose",0,0,0},
         {"foreground",0,0,0},
         {"logfile",1,0,0},
+        {"logtype",1,0,0},
         {"acache-timeout",1,0,0},
         {"acache-soft-limit",1,0,0},
         {"acache-hard-limit",1,0,0},
@@ -395,6 +483,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"ncache-timeout",1,0,0},
         {"ncache-soft-limit",1,0,0},
         {"ncache-hard-limit",1,0,0},
+        {"desc-count",1,0,0},
+        {"desc-size",1,0,0},
         {"ncache-reclaim-percentage",1,0,0},
         {"perf-time-interval-secs",1,0,0},
         {"perf-history-size",1,0,0},
@@ -446,6 +536,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     goto do_logfile;
                 }
+                else if (strcmp("logtype", cur_option) == 0)
+                {
+                    opts->logtype = optarg;
+                }
                 else if (strcmp("logstamp", cur_option) == 0)
                 {
                     opts->logstamp = optarg;
@@ -478,6 +572,16 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("ncache-reclaim-percentage", cur_option) == 0)
                 {
                     opts->ncache_reclaim_percentage = optarg;
+                    break;
+                }
+                else if (strcmp("desc-count", cur_option) == 0) 
+                {
+                    opts->dev_buffer_count = optarg;
+                    break;
+                }
+                else if (strcmp("desc-size", cur_option) == 0)
+                {
+                    opts->dev_buffer_size = optarg;
                     break;
                 }
                 else if (strcmp("perf-time-interval-secs", cur_option) == 0)
@@ -547,22 +651,26 @@ static void parse_args(int argc, char **argv, options_t *opts)
     {
         opts->logfile = DEFAULT_LOGFILE;
     }
-    /* make sure that log file location is writable before proceeding */
-    ret = open(opts->logfile, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
-    if(ret < 0)
+    if (!opts->logtype)
     {
-        fprintf(stderr, "Error: logfile (%s) isn't writable.\n",
-                opts->logfile);
-        exit(1);
-    } 
+        opts->logtype = "file";
+    }
+    if(!strcmp(opts->logtype, "file"))
+    {
+        /* make sure that log file location is writable before proceeding */
+        ret = open(opts->logfile, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
+        if(ret < 0)
+        {
+            fprintf(stderr, "Error: logfile (%s) isn't writable.\n",
+                    opts->logfile);
+            exit(1);
+        } 
+    }
 
     if (!opts->path)
     {
-        /*
-          since they didn't specify a specific path, we're going to
-          let execlp() sort things out later
-        */
-        opts->path = PVFS2_CLIENT_CORE_NAME;
+        sprintf(s_client_core_path, "%s" PVFS2_CLIENT_CORE_SUFFIX, argv[0]);
+        opts->path = s_client_core_path;
     }
 
     if (!opts->acache_timeout)

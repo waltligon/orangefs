@@ -9,8 +9,6 @@
 
 #include "trove-types.h"
 
-int map_coll_id_to_method(int coll_id);
-
 PVFS_error trove_errno_to_trove_error(int errno_value);
 
 
@@ -263,6 +261,17 @@ struct TROVE_dspace_ops
 			  void *user_ptr,
 			  TROVE_context_id context_id,
 			  TROVE_op_id *out_op_id_p);
+
+    int (*dspace_getattr_list)(
+			  TROVE_coll_id coll_id,
+                          int nhandles,
+			  TROVE_handle *handle_array,
+			  TROVE_ds_attributes_s *ds_attr_p,
+                          TROVE_ds_state *error_array,
+			  TROVE_ds_flags flags,
+			  void *user_ptr,
+			  TROVE_context_id context_id,
+			  TROVE_op_id *out_op_id_p);
     
     int (*dspace_setattr)(
 			  TROVE_coll_id coll_id,
@@ -313,9 +322,7 @@ struct TROVE_mgmt_ops
 {
     int (*initialize)(
 		      char *stoname,
-		      TROVE_ds_flags flags,
-		      char **method_name_p,
-		      int method_id);
+		      TROVE_ds_flags flags);
     
     int (*finalize)(void);
     
@@ -360,6 +367,7 @@ struct TROVE_mgmt_ops
 
     /* Note: setinfo and getinfo always return immediately */
     int (*collection_setinfo)(
+                              TROVE_method_id method_id,
 			      TROVE_coll_id coll_id,
 			      TROVE_context_id context_id,
 			      int option,

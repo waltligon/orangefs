@@ -41,7 +41,7 @@ static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] =
 #define PINT_CANCELLED_REND_RECLAIM_TIMEOUT (60*15)
 
 /* function prototypes */
-int BMI_gm_initialize(method_addr_p listen_addr,
+int BMI_gm_initialize(bmi_method_addr_p listen_addr,
 		      int method_id,
 		      int init_flags);
 int BMI_gm_finalize(void);
@@ -56,7 +56,7 @@ int BMI_gm_memfree(void *buffer,
 		   enum bmi_op_type send_recv);
 int BMI_gm_unexpected_free(void *buffer);
 int BMI_gm_post_send(bmi_op_id_t * id,
-		     method_addr_p dest,
+		     bmi_method_addr_p dest,
 		     const void *buffer,
 		     bmi_size_t size,
 		     enum bmi_buffer_type buffer_type,
@@ -64,7 +64,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     void *user_ptr,
 		     bmi_context_id context_id);
 int BMI_gm_post_send_list(bmi_op_id_t * id,
-    method_addr_p dest,
+    bmi_method_addr_p dest,
     const void *const *buffer_list,
     const bmi_size_t *size_list,
     int list_count,
@@ -74,7 +74,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     void *user_ptr,
     bmi_context_id context_id);
 int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
-    method_addr_p dest,
+    bmi_method_addr_p dest,
     const void *const *buffer_list,
     const bmi_size_t *size_list,
     int list_count,
@@ -84,7 +84,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     void *user_ptr,
     bmi_context_id context_id);
 int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
-			       method_addr_p dest,
+			       bmi_method_addr_p dest,
 			       const void *buffer,
 			       bmi_size_t size,
 			       enum bmi_buffer_type buffer_type,
@@ -92,7 +92,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       void *user_ptr,
 			       bmi_context_id context_id);
 int BMI_gm_post_recv(bmi_op_id_t * id,
-		     method_addr_p src,
+		     bmi_method_addr_p src,
 		     void *buffer,
 		     bmi_size_t expected_size,
 		     bmi_size_t * actual_size,
@@ -101,7 +101,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     void *user_ptr,
 		     bmi_context_id context_id);
 int BMI_gm_post_recv_list(bmi_op_id_t * id,
-    method_addr_p src,
+    bmi_method_addr_p src,
     void *const *buffer_list,
     const bmi_size_t *size_list,
     int list_count,
@@ -137,9 +137,9 @@ int BMI_gm_testcontext(int incount,
     bmi_context_id context_id);
 int BMI_gm_testunexpected(int incount,
 			  int *outcount,
-			  struct method_unexpected_info *info,
+			  struct bmi_method_unexpected_info *info,
 			  int max_idle_time_ms);
-method_addr_p BMI_gm_method_addr_lookup(const char *id_string);
+bmi_method_addr_p BMI_gm_method_addr_lookup(const char *id_string);
 int BMI_gm_open_context(bmi_context_id context_id);
 void BMI_gm_close_context(bmi_context_id context_id);
 int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id);
@@ -148,35 +148,40 @@ int BMI_gm_get_unexp_maxsize(void);
 char BMI_gm_method_name[] = "bmi_gm";
 
 /* exported method interface */
-struct bmi_method_ops bmi_gm_ops = {
+const struct bmi_method_ops bmi_gm_ops = {
     .method_name = BMI_gm_method_name,
-    .BMI_meth_initialize = BMI_gm_initialize,
-    .BMI_meth_finalize = BMI_gm_finalize,
-    .BMI_meth_set_info = BMI_gm_set_info,
-    .BMI_meth_get_info = BMI_gm_get_info,
-    .BMI_meth_memalloc = BMI_gm_memalloc,
-    .BMI_meth_memfree = BMI_gm_memfree,
-    .BMI_meth_unexpected_free = BMI_gm_unexpected_free,
-    .BMI_meth_post_send = BMI_gm_post_send,
-    .BMI_meth_post_sendunexpected_list = BMI_gm_post_sendunexpected,
-    .BMI_meth_post_recv = BMI_gm_post_recv,
-    .BMI_meth_test = BMI_gm_test,
-    .BMI_meth_testsome = BMI_gm_testsome,
-    .BMI_meth_testcontext = BMI_gm_testcontext,
-    .BMI_meth_testunexpected = BMI_gm_testunexpected,
-    .BMI_meth_method_addr_lookup = BMI_gm_method_addr_lookup,
-    .BMI_meth_post_send_list = BMI_gm_post_send_list,
-    .BMI_meth_post_recv_list = BMI_gm_post_recv_list,
-    .BMI_meth_post_sendunexpected_list = BMI_gm_post_sendunexpected_list,
-    .BMI_meth_open_context = BMI_gm_open_context,
-    .BMI_meth_close_context = BMI_gm_close_context,
-    .BMI_meth_cancel = BMI_gm_cancel,
-    .BMI_meth_rev_lookup_unexpected = NULL,
-    .BMI_meth_query_addr_range = NULL,
+    .initialize = BMI_gm_initialize,
+    .finalize = BMI_gm_finalize,
+    .set_info = BMI_gm_set_info,
+    .get_info = BMI_gm_get_info,
+    .memalloc = BMI_gm_memalloc,
+    .memfree = BMI_gm_memfree,
+    .unexpected_free = BMI_gm_unexpected_free,
+    .post_send = BMI_gm_post_send,
+    .post_sendunexpected = BMI_gm_post_sendunexpected,
+    .post_recv = BMI_gm_post_recv,
+    .test = BMI_gm_test,
+    .testsome = BMI_gm_testsome,
+    .testcontext = BMI_gm_testcontext,
+    .testunexpected = BMI_gm_testunexpected,
+    .method_addr_lookup = BMI_gm_method_addr_lookup,
+    .post_send_list = BMI_gm_post_send_list,
+    .post_recv_list = BMI_gm_post_recv_list,
+    .post_sendunexpected_list = BMI_gm_post_sendunexpected_list,
+    .open_context = BMI_gm_open_context,
+    .close_context = BMI_gm_close_context,
+    .cancel = BMI_gm_cancel,
+    .rev_lookup_unexpected = NULL,
+    .query_addr_range = NULL,
 };
 
 /* module parameters */
-static method_params_st gm_method_params;
+static struct
+{
+    int method_flags;
+    int method_id;
+    bmi_method_addr_p listen_addr;
+} gm_method_params;
 
 /* op_list_array indices */
 enum
@@ -327,11 +332,11 @@ static struct bufferpool *io_pool = NULL;
 #endif /* ENABLE_GM_BUFPOOL */
 
 /* internal utility functions */
-static method_addr_p alloc_gm_method_addr(void);
-static void dealloc_gm_method_addr(method_addr_p map);
+static bmi_method_addr_p alloc_gm_method_addr(void);
+static void dealloc_gm_method_addr(bmi_method_addr_p map);
 static int gm_post_send_check_resource(struct method_op* mop);
 static int gm_post_send_build_op(bmi_op_id_t * id,
-    method_addr_p dest,
+    bmi_method_addr_p dest,
     const void *buffer,
     bmi_size_t size,
     bmi_msg_tag_t tag,
@@ -339,7 +344,7 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     int buffer_status,
     void *user_ptr, bmi_context_id context_id);
 static int gm_post_send_build_op_list(bmi_op_id_t * id,
-    method_addr_p dest,
+    bmi_method_addr_p dest,
     const void *const *buffer_list,
     const bmi_size_t *size_list,
     int list_count,
@@ -371,11 +376,11 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
                                  unsigned int port_id);
 static int immed_unexp_recv_handler(bmi_size_t size,
 				    bmi_msg_tag_t msg_tag,
-				    method_addr_p map,
+				    bmi_method_addr_p map,
 				    void *buffer);
 static int immed_recv_handler(bmi_size_t actual_size,
 			      bmi_msg_tag_t msg_tag,
-			      method_addr_p map,
+			      bmi_method_addr_p map,
 			      void *buffer);
 static void put_recv_handler(bmi_op_id_t ctrl_op_id);
 static void ctrl_ack_callback(struct gm_port *port,
@@ -412,7 +417,7 @@ static int io_buffers_exhausted(void);
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_gm_initialize(method_addr_p listen_addr,
+int BMI_gm_initialize(bmi_method_addr_p listen_addr,
 		      int method_id,
 		      int init_flags)
 {
@@ -441,7 +446,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 	sizeof(struct ctrl_msg);
 
     /* zero out our parameter structure and fill it in */
-    memset(&gm_method_params, 0, sizeof(struct method_params));
+    memset(&gm_method_params, 0, sizeof(gm_method_params));
     gm_method_params.method_id = method_id;
     gm_method_params.method_flags = init_flags;
 
@@ -651,10 +656,10 @@ int BMI_gm_finalize(void)
  *
  * returns a pointer to method_addr on success, NULL on failure
  */
-method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
+bmi_method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
 {
     char *gm_string = NULL;
-    method_addr_p new_addr = NULL;
+    bmi_method_addr_p new_addr = NULL;
     struct gm_addr *gm_data = NULL;
     char local_tag[] = "NULL";
     char* delim = NULL;
@@ -703,7 +708,8 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
     gen_mutex_lock(&interface_mutex);
     if (strncmp(gm_string, local_tag, strlen(local_tag)) == 0)
     {
-	new_addr->local_addr = 1;
+	/* is a local address */
+	;
     }
     else if(local_port != NULL)
     {
@@ -712,7 +718,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
 	{
 	    gossip_lerr("Error: gm_host_name_to_node_id() failure for: %s.\n",
 		gm_string);
-	    dealloc_method_addr(new_addr);
+	    bmi_dealloc_method_addr(new_addr);
 	    free(gm_string);
 	    gen_mutex_unlock(&interface_mutex);
 	    return (NULL);
@@ -893,7 +899,7 @@ int BMI_gm_get_info(int option,
  * completion, -errno on failure
  */
 int BMI_gm_post_send(bmi_op_id_t * id,
-		     method_addr_p dest,
+		     bmi_method_addr_p dest,
 		     const void *buffer,
 		     bmi_size_t size,
 		     enum bmi_buffer_type buffer_type,
@@ -984,7 +990,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
  * -errno on failure
  */
 int BMI_gm_post_send_list(bmi_op_id_t * id,
-    method_addr_p dest,
+    bmi_method_addr_p dest,
     const void *const *buffer_list,
     const bmi_size_t *size_list,
     int list_count,
@@ -1087,7 +1093,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
  * -errno on failure
  */
 int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
-    method_addr_p dest,
+    bmi_method_addr_p dest,
     const void *const *buffer_list,
     const bmi_size_t *size_list,
     int list_count,
@@ -1178,7 +1184,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
  * completion, -errno on failure
  */
 int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
-			       method_addr_p dest,
+			       bmi_method_addr_p dest,
 			       const void *buffer,
 			       bmi_size_t size,
 			       enum bmi_buffer_type buffer_type,
@@ -1250,7 +1256,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
  * completion, -errno on failure
  */
 int BMI_gm_post_recv(bmi_op_id_t * id,
-		     method_addr_p src,
+		     bmi_method_addr_p src,
 		     void *buffer,
 		     bmi_size_t expected_size,
 		     bmi_size_t * actual_size,
@@ -1420,7 +1426,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
  * returns 0 on success, -errno on failure
  */
 int BMI_gm_post_recv_list(bmi_op_id_t * id,
-    method_addr_p src,
+    bmi_method_addr_p src,
     void *const *buffer_list,
     const bmi_size_t *size_list,
     int list_count,
@@ -1640,7 +1646,7 @@ int BMI_gm_test(bmi_op_id_t id,
 		bmi_context_id context_id)
 {
     int ret = -1;
-    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
+    method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
     struct gm_op *gm_op_data = query_op->method_data;
 
     *outcount = 0;
@@ -1735,7 +1741,7 @@ int BMI_gm_testsome(int incount,
     {
 	if(id_array[i])
 	{
-	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
+	    query_op = (method_op_p)id_gen_fast_lookup(id_array[i]);
 	    gm_op_data = query_op->method_data;
 	    if(gm_op_data->complete)
 	    {
@@ -1781,7 +1787,7 @@ int BMI_gm_testsome(int incount,
     {
 	if(id_array[i])
 	{
-	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
+	    query_op = (method_op_p)id_gen_fast_lookup(id_array[i]);
 	    gm_op_data = query_op->method_data;
 	    if(gm_op_data->complete)
 	    {
@@ -1924,7 +1930,7 @@ int BMI_gm_testcontext(int incount,
  */
 int BMI_gm_testunexpected(int incount,
 			  int *outcount,
-			  struct method_unexpected_info *info,
+			  struct bmi_method_unexpected_info *info,
 			  int max_idle_time_ms)
 {
     int ret = -1;
@@ -2028,10 +2034,10 @@ void BMI_gm_close_context(bmi_context_id context_id)
  *
  * no return value
  */
-static void dealloc_gm_method_addr(method_addr_p map)
+static void dealloc_gm_method_addr(bmi_method_addr_p map)
 {
 
-    dealloc_method_addr(map);
+    bmi_dealloc_method_addr(map);
 
     return;
 }
@@ -2044,14 +2050,14 @@ static void dealloc_gm_method_addr(method_addr_p map)
  *
  * returns pointer to struct on success, NULL on failure
  */
-static method_addr_p alloc_gm_method_addr(void)
+static bmi_method_addr_p alloc_gm_method_addr(void)
 {
 
-    struct method_addr *my_method_addr = NULL;
+    struct bmi_method_addr *my_method_addr = NULL;
     struct gm_addr *gm_data = NULL;
 
-    my_method_addr = alloc_method_addr(gm_method_params.method_id, sizeof(struct
-									  gm_addr));
+    my_method_addr = bmi_alloc_method_addr(gm_method_params.method_id, 
+            sizeof(struct gm_addr));
     if (!my_method_addr)
     {
 	return (NULL);
@@ -2078,7 +2084,7 @@ static method_op_p alloc_gm_method_op(void)
 {
     method_op_p my_method_op = NULL;
 
-    my_method_op = alloc_method_op(sizeof(struct gm_op));
+    my_method_op = bmi_alloc_method_op(sizeof(struct gm_op));
 
     /* note that we trust the alloc_method_addr() function to have zeroed
      * out the structures for us already 
@@ -2097,7 +2103,7 @@ static method_op_p alloc_gm_method_op(void)
  */
 void dealloc_gm_method_op(method_op_p op_p)
 {
-    dealloc_method_op(op_p);
+    bmi_dealloc_method_op(op_p);
     return;
 }
 
@@ -2109,7 +2115,7 @@ void dealloc_gm_method_op(method_op_p op_p)
  * returns 0 on success, -errno on failure
  */
 static int gm_post_send_build_op_list(bmi_op_id_t * id,
-    method_addr_p dest,
+    bmi_method_addr_p dest,
     const void *const *buffer_list,
     const bmi_size_t *size_list,
     int list_count,
@@ -2162,7 +2168,7 @@ static int gm_post_send_build_op_list(bmi_op_id_t * id,
  * returns 0 on success, -errno on failure
  */
 static int gm_post_send_build_op(bmi_op_id_t * id,
-    method_addr_p dest,
+    bmi_method_addr_p dest,
     const void *buffer,
     bmi_size_t size,
     bmi_msg_tag_t tag,
@@ -2883,7 +2889,7 @@ void alarm_callback(void *context)
  */
 static int immed_unexp_recv_handler(bmi_size_t size,
 				    bmi_msg_tag_t msg_tag,
-				    method_addr_p map,
+				    bmi_method_addr_p map,
 				    void *buffer)
 {
     method_op_p new_method_op = NULL;
@@ -2920,7 +2926,7 @@ static int immed_unexp_recv_handler(bmi_size_t size,
  */
 static int immed_recv_handler(bmi_size_t actual_size,
 			      bmi_msg_tag_t msg_tag,
-			      method_addr_p map,
+			      bmi_method_addr_p map,
 			      void *buffer)
 {
     method_op_p new_method_op = NULL;
@@ -2959,7 +2965,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 {
     struct ctrl_msg ctrl_copy;
     int ret = bmi_gm_errno_to_pvfs(-ENOSYS);
-    method_addr_p map = NULL;
+    bmi_method_addr_p map = NULL;
     struct op_list_search_key key;
     void *tmp_buffer = NULL;
     method_op_p query_op = NULL;
@@ -3141,11 +3147,11 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 		gm_addr_data->node_id = gm_ntohs(poll_event->recv.sender_node_id);
 		gm_addr_data->port_id = gm_ntohc(poll_event->recv.sender_port_id);
 		/* let the bmi layer know about it */
-		ret = bmi_method_addr_reg_callback(map);
-		if (ret < 0)
+		gm_addr_data->bmi_addr = bmi_method_addr_reg_callback(map);
+		if (!gm_addr_data->bmi_addr)
 		{
 		    dealloc_gm_method_addr(map);
-		    return (ret);
+		    return (-BMI_ENOMEM);
 		}
 		/* keep up with it ourselves also */
 		gm_addr_add(&gm_addr_list, map);
@@ -3198,7 +3204,7 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
     int i;
 
     /* find the matching operation */
-    query_op = id_gen_safe_lookup(ctrl_op_id);
+    query_op = id_gen_fast_lookup(ctrl_op_id);
     if(!query_op)
     {
         /* operation must have been cancelled; just return */
@@ -3316,7 +3322,7 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
      */
 
     /* find the matching operation */
-    query_op = id_gen_safe_lookup(ctrl_op_id);
+    query_op = id_gen_fast_lookup(ctrl_op_id);
 
     if(!query_op)
     {
@@ -3830,7 +3836,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 				 unsigned int node_id,
                                  unsigned int port_id)
 {
-    method_addr_p map = NULL;
+    bmi_method_addr_p map = NULL;
     struct gm_addr *gm_addr_data = NULL;
     struct gm_op *gm_op_data = NULL;
     method_op_p active_method_op = NULL;
@@ -3953,7 +3959,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
  */
 int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
 {
-    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
+    method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
     method_op_p tmp_op;
     struct gm_op *gm_op_data = query_op->method_data;
     struct op_list_search_key key;

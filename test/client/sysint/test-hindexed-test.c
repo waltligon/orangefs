@@ -292,7 +292,7 @@ int main(int argc, char **argv)
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
     ret = PVFS_sys_create(entry_name, parent_ref, attr,
-                          &credentials, NULL, &resp_create);
+                          &credentials, NULL, NULL, &resp_create);
     if (ret < 0)
     {
 			PVFS_perror("PVFS_sys_create", ret);

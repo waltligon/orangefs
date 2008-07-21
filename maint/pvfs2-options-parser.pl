@@ -39,8 +39,9 @@ close($optionfd);
 my ($optsdoc, $optdef) = $optstr =~ /\/\*((?:[^*]*(?:\*(?!\/))?[^*]*)*)\*\/\s*static\s*const\s*configoption_t[^{]+\{(.+)LAST_OPTION.*$/sg;
 
 print << "EOF"
-<html><head><title>PVFS2 $version: Config File Description</title>
+<? include("../../../header.php"); ?>
 
+<title>PVFS2 $version: Config File Description</title>
 <style type="text/css">
 <!--
 table.tabletype1 {
@@ -164,7 +165,10 @@ body {
 </style>
 
 </head>
-<body>
+
+<? include("../../../top.php"); ?>
+
+<body id="documentation">
 <h1>PVFS2 $version: Config File Description</h1>
 <p>
 $optsdoc
@@ -481,3 +485,4 @@ sub print_context
     }
 }
 
+print "<? include(\"../../../bottom.php\"); ?>";

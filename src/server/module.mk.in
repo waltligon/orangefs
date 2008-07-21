@@ -1,4 +1,5 @@
 BUILD_SERVER = @BUILD_SERVER@
+PVFS2_SEGV_BACKTRACE = @PVFS2_SEGV_BACKTRACE@
 
 ifdef BUILD_SERVER
         DIR := src/server
@@ -12,6 +13,7 @@ ifdef BUILD_SERVER
 		$(DIR)/set-attr.c \
 		$(DIR)/mkdir.c \
 		$(DIR)/get-attr.c \
+		$(DIR)/list-attr.c \
 		$(DIR)/readdir.c \
 		$(DIR)/get-config.c \
 		$(DIR)/remove.c \
@@ -38,21 +40,30 @@ ifdef BUILD_SERVER
 		$(DIR)/get-eattr.c \
 		$(DIR)/set-eattr.c \
 		$(DIR)/del-eattr.c \
-		$(DIR)/list-eattr.c
+		$(DIR)/list-eattr.c \
+		$(DIR)/unexpected.c
 
 	# c files that should be added to server library
 	SERVERSRC += \
 		$(SERVER_SMCGEN)
 
+	# server only file
+	SERVERSRC += $(DIR)/check.c
+
 	# track generate .c files to remove during dist clean, etc. 
 		SMCGEN += $(SERVER_SMCGEN)
 
 	# server code that will be linked manually, not included in library
-	MISCSRC += \
-		$(DIR)/pvfs2-server.c
+	SERVERBINSRC += \
+		$(DIR)/pvfs2-server.c $(DIR)/pvfs2-server-req.c
 
 	# to stat the fs, need to know about handle statistics
-	        MODCFLAGS_$(DIR)/statfs.c = \
-                        -I$(srcdir)/src/io/trove/trove-handle-mgmt
+	MODCFLAGS_$(DIR)/statfs.c = \
+		-I$(srcdir)/src/io/trove/trove-handle-mgmt
+
+ifdef PVFS2_SEGV_BACKTRACE
+	MODCFLAGS_$(DIR)/pvfs2-server.c := -D__PVFS2_SEGV_BACKTRACE__
+endif
+
 endif
 

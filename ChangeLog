@@ -2,6 +2,193 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+pvfs-2.7.0
+==============
+* ib: free cached registrations when out of space (openib only)
+
+* HEC posix extensions now supported by PVFS.
+* HEC posix extensions patches to the vfs are provided in the patches subdir.
+* Support for immutible (read-only) files set by xattr and vfs caching of
+read-only files through the vfs.
+* ib: optimistic buffer registration to avoid segmented memory registration
+* ib: redesign and streamline credit-based flow control scheme
+* ib: cache explict BMI_memalloc registrations; huge latency improvement
+* bmi: avoid gettimeofday() to determine poll vs block for multi-method
+    scenario
+* ib: rely on bmi to make poll vs block decision
+* ib: only check for new connections and async events during blocking periods
+
+* state machine changes:
+	- cleanup codegen to use structs instead of unions/arrays
+	- provide a universal smcb (state machine control block) for
+	  all state machine actions
+	- add support for concurrent state machines
+
+* portals: new BMI implementation
+* make/configure: support Cray XT3/XT4 compute node build environment
+
+* Added a RootSquashExceptions config option
+
+* support for Linux kernels 2.6.22 and 2.6.23
+
+* New layout parameter to PVFS_[i]sys_create.
+
+* Immutable file support, allowing client caching of files.
+
+* Added a new two-dimensional distribution for incast scenarios.
+
+* MX: new BMI implementation
+
+* Fixes to:
+	- servers running over an extended period of time.
+	- kernel module for simul workloads
+	- readdir handling of tokens
+	- alt aio cleanup path
+
+pvfs-2.6.3
+==============
+
+* fix to metadata coalescing that caused file corruption by writing to invalid
+file handles.  Occurs with large (>70) mpi parallel write workloads.
+* fix for race condition on metadata completion
+* fix for alt-aio with non-contig requests
+* fix to kzalloc configure checks for older kernels
+* fix to support older (0.9.6x) openssl versions
+* fix 2.4 kernel crash in lookup
+* fix cleanup of server internal state machines
+* fix remove-object to decrement dirent count
+* fix a number of error code problems in bmi and elsewhere
+* fix to prevent failures on decoding response errors from server
+* fix 2.4 mount bugs
+* fixes to acl checking, group checking, and root squash
+
+pvfs-2.6.2
+==============
+
+* fixes in trove dbpf to support latest Berkeley DB (version 4.5).
+* fix kmod compile issues with --enable-mmap-racache
+* fix for IO failures caused by invalid sizes used in file.c
+* fixes for 2.4 kernels
+
+pvfs-2.6.1
+==============
+
+* fix --enable-fast
+* fix to build for client-core-threaded (make clean and make kmod before make)
+* fix problems on ppc64 (long/int type mismatches, no _syscall, removed
+warnings)
+* fix overwrites past end of request
+* allow kernel buffer size to be tuned from pvfs2-client
+* fixups for linux kernel version 2.6.19
+	- check return type of kmem_cache_destroy
+	- combine readv/writev to aio_read/aio_write
+
+pvfs-2.6.0
+==============
+* kernel module cleanups
+* appropriate support for 64bit handles in kernel module
+* added debugs for kernel to pvfs2-debug.h
+* added offsetof macro
+* added PVFS_U_SUID (root squash)
+* pvfs-utils.h: PVFS2_translate -> PVFS_translate
+* removed function: PVFS_mgmt_toggle_admin_mode
+* changed all the PVFS_credentials params in system interfaces to const
+* added PVFS_(i)sys_readdir_plus
+* made PVFS_sysresp_readdir_s align properly for 64bit
+* PVFS_sysresp_geteattr struct: added err_array field
+* PVFS_sys_attr struct: fix alignment for dist_name and dist_params fields
+* +1 of major version: 1.3 -> 2.3
+* removed parent_*time from crdirent/rmdirent request
+* added listattr request
+* added (optional) params:
+ - TCPBindSpecific
+ - FlowBufferSizeBytes
+ - FlowBuffersPerFlow
+ - TroveAltAIOMode
+ - RootSquash
+ - ReadOnly
+ - AllSquash
+ - AnonUID
+ - AnonGID
+ - SecretKey
+* fixed setgid bug
+* root squash
+* support for getdents[64]_plus_lite
+* build w/ 2.6.18 and 2.6.19 kernels
+* added pvfs2-lsplus
+* configure arguments:
+    --with/without-openssl[=<path>]
+* alt_lio_listio impl (threaded pread/pwrite)
+* server SIGHUP handler waits for all ops completion [...]
+* migration tool fixes
+* fixes for simultaneous create/unlink hangs (reqsched and sync coalesce)
+* add connection close to bmi for resetting the socket buffer size for initial
+socket
+* atime, mtime, and ctime fixes for VFS interface
+* verify hash of config files
+    - added openssl options and checks
+* updated faq entry for heartbeat
+* config check for linux/mount.h
+* config check that statfs callback has struct dentry arg
+* LTP fixes to pass tests
+    - s/EOPNOTSUPP/EACCES/
+    - acl fixes
+* ib:
+    - check for ib reregister event
+    - close connection on cancel
+    - fix duplicate free bug during message cancel
+
+pvfs2-1.5.0
+===============
+- trove dbpf keyval changes:  The dbpf keyval implementation has been
+  changed from using individual DB objects for each handle, to one
+  DB object for all keyval entries.  This affects the storage format,
+  and requires the pvfs2-migrate-collection tool to be run on storage
+  spaces created previous to this release.
+- sync coalescing: A new syncing feature has been added to the trove layer that
+  provides better performance with metadata in high-load cases.  New options
+  were added to the server config: TroveSyncCoalesce, CoalescingHighWatermark,
+  CoalescingLowWatermark.
+- added stranded bstream checking and handling.  This is useful for correctly
+  reusing handles in failure cases.
+- consolidate I/O paths through the VFS for read,write and readv,writev.
+- added testsome, wait, and release functions to external interfaces
+- fixes to karma and performance monitoring.
+- better error handling on server and client and kernel module
+- fixes to ownership flags on root directory.  Allow chmod to work.
+- fixes for small io and non-contiguous io.
+- fixes to sys-io state machine to prevent deadlock on the server caused by
+  concurrent writes from the same client.
+- replaced keyval strings with shorter versions to save space in the keyval
+  database.
+- cleanups to the kernel module: cleanup cache subsystem structures and
+  functions.  Better error checking on to make module reloading more robust.
+- fixes for fsck and fs-dump.
+- better xattr support for 2.4 kernels
+- added support for berkeley db environments with the pvfs2 bdbs, and using
+  shared memory for db cache instead of mmapped file.
+- better support for 64bit (esp. ppc64) platforms and 32/64 bit mixed env.
+- better support for darwin (OS X)
+- added configure options: --disable-aio-callbacks,  No check for aio callback
+  support is done any longer. --enable-kernel-sendfile to configure for users 
+  that want sendfile system call support, it is now disabled by default.
+  Epoll is now the default if its available, otherwise poll is used,
+  --enable-epoll and --disable-epoll now force without checking.
+- Performance improvements for bmi_tcp: allow socket buffer size and tcp
+  window size to be changed dynamically.  Use a pipe file descriptor
+  for poll to prevent stalls.  Reorganize epoll to add and remove epoll
+  watches.
+- pvfs2-genconfig now supports --iospec and --metaspec options.  Also fixed
+  some hostname sorting and range spec bugs.
+- pvfs2-client: added --logstamp.  nonblocking statfs and mount support.
+- handle allocation wasn't resulting in a uniform distribution.  Now we
+  pick a server at random and then select the remaining handles in a
+  round-robin fashion
+- pvfs2-ping does better per-server error reporting and keeps track of errors
+  better
+- pvfs2-viewdist now fails gracefully on old systems without xattrs.  Also
+  prints out handle number and filename for each datafile
+
 pvfs2-1.4.1-pre1
 ===============
 - ib: encode data structures to support heterogenous architectures

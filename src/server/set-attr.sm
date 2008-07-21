@@ -12,6 +12,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 
 enum
 {
@@ -19,32 +20,9 @@ enum
     STATE_SYMLINK = 8
 };
 
-static int setattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int setattr_setobj_attribs(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int setattr_write_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int setattr_write_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int setattr_write_symlink_target_if_required(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int setattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s *js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
-machine pvfs2_set_attr_sm(
-    prelude,
-    cleanup,
-    verify_attribs,
-    write_metafile_datafile_handles_if_required,
-    write_metafile_distribution_if_required,
-    write_symlink_target_if_required,
-    setobj_attrib,
-    final_response)
+machine pvfs2_set_attr_sm
 {
     state prelude
     {
@@ -104,9 +82,10 @@ machine pvfs2_set_attr_sm(
 
 %%
 
-static int setattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action setattr_verify_attribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL, *req_a_p = NULL;
 
     a_p = &s_op->attr;
@@ -138,7 +117,7 @@ static int setattr_verify_attribs(
 
         /* set an error to bail out of set-attr processing */
         js_p->error_code = -PVFS_EACCES;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     else if (req_a_p->objtype == PVFS_TYPE_NONE)
     {
@@ -250,11 +229,13 @@ static int setattr_verify_attribs(
 
         js_p->error_code = -PVFS_EACCES;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action setattr_setobj_attribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
     PVFS_object_attr *a_p = NULL;
@@ -282,7 +263,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
      if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
      {
          PVFS_time orig_mtime = a_p->mtime;
-         a_p->mtime = PVFS_util_mktime_version(orig_mtime);
+         a_p->mtime = PINT_util_mktime_version(orig_mtime);
          gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
                  "to %llu\n\tmtime is %llu\n",
                  llu(a_p->mtime), llu(orig_mtime));
@@ -297,7 +278,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
         {
             gossip_debug(GOSSIP_SETATTR_DEBUG, "Cannot change perms of symlink: Permission denied\n");
             js_p->error_code = -PVFS_EPERM;
-            return(1);
+            return SM_ACTION_COMPLETE;
         }
     }
 
@@ -316,7 +297,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
         "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
         dspace_a_p->objtype, llu(dspace_a_p->atime),
-        llu(PVFS_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
+        llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
         (int)dspace_a_p->u.meta.dfile_count,
         (int)dspace_a_p->u.meta.dist_size);
 
@@ -328,16 +309,20 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         ds_attr, 
         TROVE_SYNC,
-        s_op, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
 
-static int setattr_write_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0, dfile_count = 0;
     job_id_t j_id;
+
+    /* reset from jump to here with STATE_METAFILE */
+    js_p->error_code = 0;
 
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  " request has dfile_count of %d | dspace has %d\n",
@@ -351,7 +336,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
         gossip_err("The requested dfile count of %d is invalid; "
                    "aborting operation.\n", dfile_count);
         js_p->error_code = -PVFS_EOVERFLOW;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* set up key and value structure for keyval write */
@@ -378,14 +363,15 @@ static int setattr_write_metafile_datafile_handles_if_required(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         0,
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
 
-static int setattr_write_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action setattr_write_metafile_distribution_if_required(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t j_id;
 
@@ -395,7 +381,7 @@ static int setattr_write_metafile_distribution_if_required(
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "skipping distribution write\n");
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* set up key and value structure for keyval write */
@@ -412,7 +398,7 @@ static int setattr_write_metafile_distribution_if_required(
     if(!s_op->val.buffer)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     s_op->free_val = 1;
     
@@ -428,14 +414,15 @@ static int setattr_write_metafile_distribution_if_required(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         TROVE_SYNC,
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
 
-static int setattr_write_symlink_target_if_required(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action setattr_write_symlink_target_if_required(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t j_id;
 
@@ -445,7 +432,7 @@ static int setattr_write_symlink_target_if_required(
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "skipping symlink target write\n");
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     assert(s_op->req->u.setattr.attr.u.sym.target_path_len > 0);
@@ -472,7 +459,7 @@ static int setattr_write_symlink_target_if_required(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         TROVE_SYNC,
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -488,14 +475,28 @@ static int setattr_write_symlink_target_if_required(
  * Synopsis: free memory and return
  *           
  */
-static int setattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action setattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->free_val)
     {
         free(s_op->val.buffer);
     }
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
+
+PINT_GET_OBJECT_REF_DEFINE(setattr);
+
+struct PINT_server_req_params pvfs2_set_attr_params =
+{
+    .string_name = "setattr",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_setattr,
+    .state_machine = &pvfs2_set_attr_sm
+};
 
 /*
  * Local variables:

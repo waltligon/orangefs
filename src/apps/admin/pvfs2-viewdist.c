@@ -256,12 +256,7 @@ int main(int argc, char ** argv)
     /* okay now print out by deserializing the buffer */
     PINT_dist_decode(&dist, dist_buf);
     printf("dist_name = %s\n", dist->dist_name);
-    if (strcmp(dist->dist_name, PVFS_DIST_SIMPLE_STRIPE_NAME) == 0)
-    {
-        PVFS_simple_stripe_params params;
-        PINT_dist_getparams(&params, dist);
-        printf("strip_size = %ld\n", (unsigned long)(params.strip_size));
-    }
+    printf("dist_params:\n%s\n", dist->methods->params_string(dist->params));
     PINT_dist_free(dist);
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)

@@ -14,23 +14,9 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 
-static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int mgmt_remove_dirent(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int mgmt_remove_dirent_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
-machine pvfs2_mgmt_remove_dirent_sm(
-    prelude,
-    get_dirdata_handle_from_parent,
-    remove_dirent,
-    final_response,
-    cleanup)
+machine pvfs2_mgmt_remove_dirent_sm
 {
     state prelude
     {
@@ -68,8 +54,9 @@ machine pvfs2_mgmt_remove_dirent_sm(
 %%
 
 static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
-    PINT_server_op *s_op, job_status_s *js_p)
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
@@ -94,15 +81,16 @@ static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
         s_op->req->u.mgmt_remove_dirent.handle,
         &s_op->key, &s_op->val, 
         0, 
-        NULL, s_op, 0, js_p, &i,
+        NULL, smcb, 0, js_p, &i,
         server_job_context);
 
     return ret;
 }
 
-static int mgmt_remove_dirent(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action mgmt_remove_dirent(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
 
@@ -120,9 +108,9 @@ static int mgmt_remove_dirent(
         s_op->u.mgmt_remove_dirent.dirdata_handle,
         &s_op->key,
         NULL,
-        TROVE_SYNC,
+        TROVE_SYNC | TROVE_KEYVAL_HANDLE_COUNT,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &j_id,
@@ -131,11 +119,23 @@ static int mgmt_remove_dirent(
     return ret;
 }
 
-static int mgmt_remove_dirent_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action mgmt_remove_dirent_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
+
+PINT_GET_OBJECT_REF_DEFINE(mgmt_remove_dirent);
+
+struct PINT_server_req_params pvfs2_mgmt_remove_dirent_params =
+{
+    .string_name = "mgmt-remove-dirent",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_mgmt_remove_dirent,
+    .state_machine = &pvfs2_mgmt_remove_dirent_sm
+};
 
 /*
  * Local variables:

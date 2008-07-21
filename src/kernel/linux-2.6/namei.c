@@ -81,7 +81,7 @@ static struct dentry *pvfs2_lookup(
     */
     gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup called on %s\n", dentry->d_name.name);
 
-    if (dentry->d_name.len > PVFS2_NAME_LEN)
+    if (dentry->d_name.len > (PVFS2_NAME_LEN-1))
     {
 	return ERR_PTR(-ENAMETOOLONG);
     }
@@ -89,7 +89,7 @@ static struct dentry *pvfs2_lookup(
     new_op = op_alloc(PVFS2_VFS_OP_LOOKUP);
     if (!new_op)
     {
-	return NULL;
+	return ERR_PTR(-ENOMEM);
     }
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -109,14 +109,20 @@ static struct dentry *pvfs2_lookup(
     {
         sb = dir->i_sb;
         parent = PVFS2_I(dir);
-        if (parent && parent->refn.handle && parent->refn.fs_id)
+        if (parent && parent->refn.handle != PVFS_HANDLE_NULL 
+                && parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
             new_op->upcall.req.lookup.parent_refn = parent->refn;
         }
         else
         {
+#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET5_LOCKED)
+            gossip_lerr("Critical error: i_ino cannot be relied on when using iget5/iget4\n");
+            op_release(new_op);
+            return ERR_PTR(-EINVAL);
+#endif
             new_op->upcall.req.lookup.parent_refn.handle =
-                pvfs2_ino_to_handle(dir->i_ino);
+                get_handle_from_ino(dir);
             new_op->upcall.req.lookup.parent_refn.fs_id =
                 PVFS2_SB(sb)->fs_id;
         }
@@ -152,83 +158,87 @@ static struct dentry *pvfs2_lookup(
                 llu(new_op->downcall.resp.lookup.refn.handle),
                 new_op->downcall.resp.lookup.refn.fs_id, ret);
 
-    /* lookup inode matching name (or add if not there) */
-    if (ret > -1)
+    if(ret < 0)
     {
-	inode = iget(sb, pvfs2_handle_to_ino(
-                         new_op->downcall.resp.lookup.refn.handle));
-	if (inode && !is_bad_inode(inode))
-	{
-	    found_pvfs2_inode = PVFS2_I(inode);
-
-	    /* store the retrieved handle and fs_id */
-	    found_pvfs2_inode->refn = new_op->downcall.resp.lookup.refn;
-
-	    /* update dentry/inode pair into dcache */
-	    dentry->d_op = &pvfs2_dentry_operations;
-
-            pvfs2_d_splice_alias(dentry, inode);
-
-            gossip_debug(GOSSIP_NAME_DEBUG, "Lookup success (inode ct = %d)\n",
-                        (int)atomic_read(&inode->i_count));
-	}
-        else if (inode && is_bad_inode(inode))
+        if(ret == -ENOENT)
         {
-            ret = -EACCES;
-	    found_pvfs2_inode = PVFS2_I(inode);
-            /* look for an error code, possibly set by pvfs2_read_inode(),
-             * otherwise we have to guess EACCES 
+            /*
+             * if no inode was found, add a negative dentry to dcache anyway;
+             * if we don't, we don't hold expected lookup semantics and we most
+             * noticeably break during directory renames.
+             *
+             * however, if the operation failed or exited, do not add the
+             * dentry (e.g. in the case that a touch is issued on a file that
+             * already exists that was interrupted during this lookup -- no
+             * need to add another negative dentry for an existing file)
              */
-            if(found_pvfs2_inode->error_code)
-            {
-                ret = found_pvfs2_inode->error_code;
-            }
-            iput(inode);
+
+            gossip_debug(GOSSIP_NAME_DEBUG, 
+                         "pvfs2_lookup: Adding *negative* dentry %p\n for %s\n",
+                         dentry, dentry->d_name.name);
+
+            /*
+             * make sure to set the pvfs2 specific dentry operations for
+             * the negative dentry that we're adding now so that a
+             * potential future lookup of this cached negative dentry can
+             * be properly revalidated.
+             */
+            dentry->d_op = &pvfs2_dentry_operations;
+            d_add(dentry, inode);
+
             op_release(new_op);
-            return ERR_PTR(ret);
+            return NULL;
         }
-	else
-	{
-            op_release(new_op);
-            gossip_debug(GOSSIP_NAME_DEBUG, "Returning -EACCES\n");
-            return ERR_PTR(-EACCES);
-	}
-    }
 
-    /*
-      if no inode was found, add a negative dentry to dcache anyway;
-      if we don't, we don't hold expected lookup semantics and we most
-      noticeably break during directory renames.
-
-      however, if the operation failed or exited, do not add the
-      dentry (e.g. in the case that a touch is issued on a file that
-      already exists that was interrupted during this lookup -- no
-      need to add another negative dentry for an existing file)
-    */
-    if (!inode && op_state_serviced(new_op))
-    {
-        /*
-          make sure to set the pvfs2 specific dentry operations for
-          the negative dentry that we're adding now so that a
-          potential future lookup of this cached negative dentry can
-          be properly revalidated.
-        */
-        gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup: Adding *negative* dentry %p\n  "
-                    "for %s\n", dentry, dentry->d_name.name);
-
-        dentry->d_op = &pvfs2_dentry_operations;
-        d_add(dentry, inode);
-    }
-
-    op_release(new_op);
-    if(ret != -ENOENT)
-    {
+        op_release(new_op);
+        /* must be a non-recoverable error */
         return ERR_PTR(ret);
     }
-    else
+
+    inode = pvfs2_iget(sb, &new_op->downcall.resp.lookup.refn);
+    if (inode && !is_bad_inode(inode))
     {
+        struct dentry *res;
+
+        /* update dentry/inode pair into dcache */
+        dentry->d_op = &pvfs2_dentry_operations;
+
+        res = pvfs2_d_splice_alias(dentry, inode);
+
+        gossip_debug(GOSSIP_NAME_DEBUG, "Lookup success (inode ct = %d)\n",
+                     (int)atomic_read(&inode->i_count));
+        if (res)
+            res->d_op = &pvfs2_dentry_operations;
+
+        op_release(new_op);
+#ifdef PVFS2_LINUX_KERNEL_2_4
         return NULL;
+#else
+        return res;
+#endif
     }
+    else if (inode && is_bad_inode(inode))
+    {
+        ret = -EACCES;
+        found_pvfs2_inode = PVFS2_I(inode);
+        /* look for an error code, possibly set by pvfs2_read_inode(),
+         * otherwise we have to guess EACCES 
+         */
+        if(found_pvfs2_inode->error_code)
+        {
+            ret = found_pvfs2_inode->error_code;
+        }
+        iput(inode);
+        op_release(new_op);
+        return ERR_PTR(ret);
+    }
+
+    /* no error was returned from service_operation, but the inode
+     * from pvfs2_iget was null...just return EACCESS
+     */
+    op_release(new_op);
+    gossip_debug(GOSSIP_NAME_DEBUG, "Returning -EACCES\n");
+    return ERR_PTR(-EACCES);
 }
 
 /* return 0 on success; non-zero otherwise */
@@ -412,8 +422,9 @@ static int pvfs2_rename(
       use the root handle/fs_id as specified by the
       inode's corresponding superblock
     */
-    if (pvfs2_old_parent_inode->refn.handle &&
-        pvfs2_old_parent_inode->refn.fs_id)
+    if (pvfs2_old_parent_inode &&
+            pvfs2_old_parent_inode->refn.handle != PVFS_HANDLE_NULL &&
+            pvfs2_old_parent_inode->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.rename.old_parent_refn =
             pvfs2_old_parent_inode->refn;
@@ -428,8 +439,9 @@ static int pvfs2_rename(
     }
 
     /* do the same for the new parent */
-    if (pvfs2_new_parent_inode->refn.handle &&
-        pvfs2_new_parent_inode->refn.fs_id)
+    if (pvfs2_new_parent_inode &&
+            pvfs2_new_parent_inode->refn.handle != PVFS_HANDLE_NULL &&
+            pvfs2_new_parent_inode->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.rename.new_parent_refn =
             pvfs2_new_parent_inode->refn;

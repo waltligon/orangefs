@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 #include <sys/time.h>
 #include <stdio.h>
 
@@ -37,6 +38,15 @@ static int context_array[BMI_MAX_CONTEXTS] = { 0 };
 static gen_mutex_t context_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t ref_mutex = GEN_MUTEX_INITIALIZER;
 
+static QLIST_HEAD(forget_list);
+static gen_mutex_t forget_list_mutex = GEN_MUTEX_INITIALIZER;
+
+struct forget_item
+{
+    struct qlist_head link;
+    PVFS_BMI_addr_t addr;
+};
+
 /*
  * Static list of defined BMI methods.  These are pre-compiled into
  * the client libraries and into the server.
@@ -47,8 +57,14 @@ extern struct bmi_method_ops bmi_tcp_ops;
 #ifdef __STATIC_METHOD_BMI_GM__
 extern struct bmi_method_ops bmi_gm_ops;
 #endif
+#ifdef __STATIC_METHOD_BMI_MX__
+extern struct bmi_method_ops bmi_mx_ops;
+#endif
 #ifdef __STATIC_METHOD_BMI_IB__
 extern struct bmi_method_ops bmi_ib_ops;
+#endif
+#ifdef __STATIC_METHOD_BMI_PORTALS__
+extern struct bmi_method_ops bmi_portals_ops;
 #endif
 
 static struct bmi_method_ops *const static_methods[] = {
@@ -58,8 +74,14 @@ static struct bmi_method_ops *const static_methods[] = {
 #ifdef __STATIC_METHOD_BMI_GM__
     &bmi_gm_ops,
 #endif
+#ifdef __STATIC_METHOD_BMI_MX__
+    &bmi_mx_ops,
+#endif
 #ifdef __STATIC_METHOD_BMI_IB__
     &bmi_ib_ops,
+#endif
+#ifdef __STATIC_METHOD_BMI_PORTALS__
+    &bmi_portals_ops,
 #endif
     NULL
 };
@@ -84,13 +106,17 @@ static gen_mutex_t active_method_count_mutex = GEN_MUTEX_INITIALIZER;
 
 static struct bmi_method_ops **active_method_table = NULL;
 static struct {
-    struct timeval active;
-    struct timeval polled;
+    int iters_polled;  /* how many iterations since this method was polled */
+    int iters_active;  /* how many iterations since this method had action */
     int plan;
 } *method_usage = NULL;
+static const int usage_iters_starvation = 100000;
+static const int usage_iters_active = 10000;
 
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
+static void bmi_addr_drop(ref_st_p tmp_ref);
+static void bmi_check_forget_list(void);
 
 /** Initializes the BMI layer.  Must be called before any other BMI
  *  functions.
@@ -108,8 +134,12 @@ int BMI_initialize(const char *method_list,
 		   int flags)
 {
     int ret = -1;
-    int i = 0;
+    int i = 0, j = 0;
     char **requested_methods = NULL;
+    char **listen_addrs = NULL;
+    char *this_addr = NULL;
+    char *proto = NULL;
+    int addr_count = 0;
 
     /* server must specify method list at startup, optional for client */
     if (flags & BMI_INIT_SERVER) {
@@ -155,13 +185,52 @@ int BMI_initialize(const char *method_list,
 	    goto bmi_initialize_failure;
 	}
 
-	/*
-	 * XXX: the same listen_addr is obviously not going to work on
-	 * all the requested methods, though.  Figure out how to deal with
-	 * this someday.
-	 */
+	/* Today is that day! */
+	addr_count = PINT_split_string_list(&listen_addrs, listen_addr);
+	
 	for (i=0; i<numreq; i++) {
-	    ret = activate_method(requested_methods[i], listen_addr, flags);
+
+	    /* assume the method name is bmi_<proto>, and find the <proto>
+	     * part
+	     */
+	    proto = strstr(requested_methods[i], "bmi_");
+	    if(!proto)
+	    {
+	        gossip_err("%s: Invalid method name: %s.  Method names "
+			   "must start with 'bmi_'\n",
+			   __func__, requested_methods[i]);
+		ret = -PVFS_EINVAL;
+		gen_mutex_unlock(&active_method_count_mutex);
+		goto bmi_initialize_failure;
+	    }
+	    proto += 4;
+
+	    /* match the proper listen addr to the method */
+	    for(j=0; j<addr_count; ++j)
+	    {
+		/* we don't want a strstr here in case the addr has
+		 * the proto as part of the hostname
+		 */
+		if(!strncmp(listen_addrs[j], proto, strlen(proto)))
+		{
+		    /* found the right addr */
+		    this_addr = listen_addrs[j];
+		    break;
+		}
+	    }
+		
+	    if(!this_addr)
+	    {
+		/* couldn't find the right listen addr */
+		gossip_err("%s: Failed to find an appropriate listening "
+			   "address for the bmi method: %s\n",
+			   __func__, requested_methods[i]);
+		ret = -PVFS_EINVAL;
+		gen_mutex_unlock(&active_method_count_mutex);
+		goto bmi_initialize_failure;
+	    }
+
+	    ret = activate_method(requested_methods[i], this_addr, flags);
 	    if (ret < 0) {
 		ret = bmi_errno_to_pvfs(ret);
 		gen_mutex_unlock(&active_method_count_mutex);
@@ -170,6 +239,11 @@ int BMI_initialize(const char *method_list,
 	    free(requested_methods[i]);
 	}
 	free(requested_methods);
+	if(listen_addrs)
+	{
+	    PINT_free_string_list(listen_addrs, addr_count);
+	    listen_addrs = NULL;
+	}
     }
     gen_mutex_unlock(&active_method_count_mutex);
 
@@ -191,7 +265,7 @@ int BMI_initialize(const char *method_list,
 	{
 	    if (active_method_table[i])
 	    {
-		active_method_table[i]->BMI_meth_finalize();
+		active_method_table[i]->finalize();
 	    }
 	}
 	free(active_method_table);
@@ -214,6 +288,12 @@ int BMI_initialize(const char *method_list,
 	}
 	free(requested_methods);
     }
+
+    if(listen_addrs)
+    {
+	PINT_free_string_list(listen_addrs, addr_count);
+    }
+
     active_method_count = 0;
     gen_mutex_unlock(&active_method_count_mutex);
 
@@ -391,7 +471,7 @@ int BMI_finalize(void)
     /* attempt to shut down active methods */
     for (i = 0; i < active_method_count; i++)
     {
-	active_method_table[i]->BMI_meth_finalize();
+	active_method_table[i]->finalize();
     }
     active_method_count = 0;
     free(active_method_table);
@@ -399,6 +479,9 @@ int BMI_finalize(void)
 
     free(known_method_table);
     known_method_count = 0;
+
+    if (method_usage)
+        free(method_usage);
 
     /* destroy the reference list */
     /* (side effect: destroys all method addresses as well) */
@@ -441,7 +524,7 @@ int BMI_open_context(bmi_context_id* context_id)
     /* tell all of the modules about the new context */
     for (i = 0; i < active_method_count; i++)
     {
-	ret = active_method_table[i]->BMI_meth_open_context(
+	ret = active_method_table[i]->open_context(
             context_index);
 	if(ret < 0)
 	{
@@ -452,7 +535,7 @@ int BMI_open_context(bmi_context_id* context_id)
             --i;
             while (i >= 0)
 	    {
-		active_method_table[i]->BMI_meth_close_context(
+		active_method_table[i]->close_context(
                     context_index);
                 --i;
 	    }
@@ -489,7 +572,7 @@ void BMI_close_context(bmi_context_id context_id)
     gen_mutex_lock(&active_method_count_mutex);
     for (i = 0; i < active_method_count; i++)
     {
-	active_method_table[i]->BMI_meth_close_context(context_id);
+	active_method_table[i]->close_context(context_id);
     }
     context_array[context_id] = 0;
     gen_mutex_unlock(&active_method_count_mutex);
@@ -531,7 +614,7 @@ int BMI_post_recv(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->BMI_meth_post_recv(
+    ret = tmp_ref->interface->post_recv(
         id, tmp_ref->method_addr, buffer, expected_size, actual_size,
         buffer_type, tag, user_ptr, context_id);
     return (ret);
@@ -569,7 +652,7 @@ int BMI_post_send(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->BMI_meth_post_send(
+    ret = tmp_ref->interface->post_send(
         id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
         user_ptr, context_id);
     return (ret);
@@ -607,7 +690,7 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->BMI_meth_post_sendunexpected(
+    ret = tmp_ref->interface->post_sendunexpected(
         id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
         user_ptr, context_id);
     return (ret);
@@ -634,11 +717,11 @@ int BMI_test(bmi_op_id_t id,
 
     *outcount = 0;
 
-    target_op = id_gen_safe_lookup(id);
+    target_op = id_gen_fast_lookup(id);
     assert(target_op->op_id == id);
 
     ret = active_method_table[
-        target_op->addr->method_type]->BMI_meth_test(
+        target_op->addr->method_type]->test(
             id, outcount, error_code, actual_size, user_ptr,
             max_idle_time_ms, context_id);
 
@@ -690,7 +773,7 @@ int BMI_testsome(int incount,
 
     if (tmp_active_method_count == 1) {
 	/* shortcircuit for perhaps common case of only one method */
-	ret = active_method_table[0]->BMI_meth_testsome(
+	ret = active_method_table[0]->testsome(
 	    incount, id_array, outcount, index_array,
 	    error_code_array, actual_size_array, user_ptr_array,
 	    max_idle_time_ms, context_id);
@@ -726,7 +809,7 @@ int BMI_testsome(int incount,
 	    if(id_array[j])
 	    {
 		query_op = (struct method_op*)
-                    id_gen_safe_lookup(id_array[j]);
+                    id_gen_fast_lookup(id_array[j]);
 		assert(query_op->op_id == id_array[j]);
 		if(query_op->addr->method_type == i)
 		{
@@ -740,7 +823,7 @@ int BMI_testsome(int incount,
 	if(need_to_test)
 	{
 	    tmp_outcount = 0;
-	    ret = active_method_table[i]->BMI_meth_testsome(
+	    ret = active_method_table[i]->testsome(
 		need_to_test, tmp_id_array, &tmp_outcount, 
 		&(index_array[*outcount]),
 		&(error_code_array[*outcount]),
@@ -776,43 +859,47 @@ int BMI_testsome(int incount,
 static void
 construct_poll_plan(int nmeth, int *idle_time_ms)
 {
-    struct timeval now, delta;
     int i, numplan;
 
-    gettimeofday(&now, 0);
     numplan = 0;
     for (i=0; i<nmeth; i++) {
+        ++method_usage[i].iters_polled;
+        ++method_usage[i].iters_active;
         method_usage[i].plan = 0;
-        timersub(&now, &method_usage[i].polled, &delta);
-        if (delta.tv_sec >= 1) {
-            method_usage[i].plan = 1;  /* >= 1s starving */
-            method_usage[i].polled = now;
+        if (method_usage[i].iters_active <= usage_iters_active) {
+            /* recently busy, poll */
+	    if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "%s: polling active meth %d: %d / %d\n", __func__, i,
+                         method_usage[i].iters_active, usage_iters_active);
+            method_usage[i].plan = 1;
             ++numplan;
-        } else {
-            timersub(&now, &method_usage[i].active, &delta);
-            if (delta.tv_sec == 0) {
-                method_usage[i].plan = 1;  /* < 1s busy, prefer poll */
-                method_usage[i].polled = now;
-                ++numplan;
-            }
+            *idle_time_ms = 0;  /* busy polling */
+        } else if (method_usage[i].iters_polled >= usage_iters_starvation) {
+            /* starving, time to poke this one */
+	    if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "%s: polling starving meth %d: %d / %d\n", __func__, i,
+                         method_usage[i].iters_polled, usage_iters_starvation);
+            method_usage[i].plan = 1;
+            ++numplan;
         } 
     }
 
     /* if nothing is starving or busy, poll everybody */
     if (numplan == 0) {
-        for (i=0; i<nmeth; i++) {
+        for (i=0; i<nmeth; i++)
             method_usage[i].plan = 1;
-            method_usage[i].polled = now;
-        }
         numplan = nmeth;
-    }
 
-    /* spread idle time evenly */
-    if (*idle_time_ms)
-    {
-	*idle_time_ms /= numplan;
-	if (!*idle_time_ms)
-	    *idle_time_ms = 1;
+        /* spread idle time evenly */
+        if (*idle_time_ms) {
+            *idle_time_ms /= numplan;
+            if (*idle_time_ms == 0)
+                *idle_time_ms = 1;
+        }
+        /* note that BMI_testunexpected is always called with idle_time 0 */
+        if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                     "%s: polling all %d methods, idle %d ms\n", __func__,
+                     numplan, *idle_time_ms);
     }
 }
 
@@ -830,9 +917,12 @@ int BMI_testunexpected(int incount,
     int ret = -1;
     int position = 0;
     int tmp_outcount = 0;
-    struct method_unexpected_info sub_info[incount];
+    struct bmi_method_unexpected_info sub_info[incount];
     ref_st_p tmp_ref = NULL;
     int tmp_active_method_count = 0;
+
+    /* figure out if we need to drop any stale addresses */
+    bmi_check_forget_list();
 
     gen_mutex_lock(&active_method_count_mutex);
     tmp_active_method_count = active_method_count;
@@ -848,7 +938,7 @@ int BMI_testunexpected(int incount,
     while (position < incount && i < tmp_active_method_count)
     {
         if (method_usage[i].plan) {
-            ret = active_method_table[i]->BMI_meth_testunexpected(
+            ret = active_method_table[i]->testunexpected(
                 (incount - position), &tmp_outcount,
                 (&(sub_info[position])), max_idle_time_ms);
             if (ret < 0)
@@ -859,8 +949,9 @@ int BMI_testunexpected(int incount,
             }
             position += tmp_outcount;
             (*outcount) += tmp_outcount;
-            if (tmp_outcount)
-                gettimeofday(&method_usage[i].active, 0);
+            method_usage[i].iters_polled = 0;
+            if (ret)
+                method_usage[i].iters_active = 0;
         }
 	i++;
     }
@@ -940,7 +1031,7 @@ int BMI_testcontext(int incount,
     while (position < incount && i < tmp_active_method_count)
     {
         if (method_usage[i].plan) {
-            ret = active_method_table[i]->BMI_meth_testcontext(
+            ret = active_method_table[i]->testcontext(
                 incount - position, 
                 &out_id_array[position],
                 &tmp_outcount,
@@ -957,8 +1048,9 @@ int BMI_testcontext(int incount,
             }
             position += tmp_outcount;
             (*outcount) += tmp_outcount;
-            if (tmp_outcount)
-                gettimeofday(&method_usage[i].active, 0);
+            method_usage[i].iters_polled = 0;
+            if (ret)
+                method_usage[i].iters_active = 0;
         }
 	i++;
     }
@@ -1028,12 +1120,12 @@ const char* BMI_addr_rev_lookup_unexpected(PVFS_BMI_addr_t addr)
     }
     gen_mutex_unlock(&ref_mutex);
     
-    if(!tmp_ref->interface->BMI_meth_rev_lookup_unexpected)
+    if(!tmp_ref->interface->rev_lookup_unexpected)
     {
         return("UNKNOWN");
     }
 
-    return(tmp_ref->interface->BMI_meth_rev_lookup_unexpected(
+    return(tmp_ref->interface->rev_lookup_unexpected(
         tmp_ref->method_addr));
 }
 
@@ -1060,7 +1152,7 @@ void *BMI_memalloc(PVFS_BMI_addr_t addr,
     gen_mutex_unlock(&ref_mutex);
 
     /* allocate the buffer using the method's mechanism */
-    new_buffer = tmp_ref->interface->BMI_meth_memalloc(size, send_recv);
+    new_buffer = tmp_ref->interface->memalloc(size, send_recv);
 
     return (new_buffer);
 }
@@ -1088,7 +1180,7 @@ int BMI_memfree(PVFS_BMI_addr_t addr,
     gen_mutex_unlock(&ref_mutex);
 
     /* free the memory */
-    ret = tmp_ref->interface->BMI_meth_memfree(buffer, size, send_recv);
+    ret = tmp_ref->interface->memfree(buffer, size, send_recv);
 
     return (ret);
 }
@@ -1114,13 +1206,13 @@ int BMI_unexpected_free(PVFS_BMI_addr_t addr,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    if (!tmp_ref->interface->BMI_meth_unexpected_free)
+    if (!tmp_ref->interface->unexpected_free)
     {
-        gossip_err("unimplemented BMI_meth_unexpected_free callback\n");
+        gossip_err("unimplemented unexpected_free callback\n");
         return bmi_errno_to_pvfs(-EOPNOTSUPP);
     }
     /* free the memory */
-    ret = tmp_ref->interface->BMI_meth_unexpected_free(buffer);
+    ret = tmp_ref->interface->unexpected_free(buffer);
 
     return (ret);
 }
@@ -1137,6 +1229,9 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
     int i = 0;
     ref_st_p tmp_ref = NULL;
 
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                 "[BMI CONTROL]: %s: set_info: %llu option: %d\n",
+                 __func__, llu(addr), option);
     /* if the addr is NULL, then the set_info should apply to all
      * available methods.
      */
@@ -1149,7 +1244,7 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	gen_mutex_lock(&active_method_count_mutex);
 	for (i = 0; i < active_method_count; i++)
 	{
-	    ret = active_method_table[i]->BMI_meth_set_info(
+	    ret = active_method_table[i]->set_info(
                 option, inout_parameter);
 	    /* we bail out if even a single set_info fails */
 	    if (ret < 0)
@@ -1164,6 +1259,9 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	return (0);
     }
 
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                 "[BMI CONTROL]: %s: searching for ref %llu\n",
+                 __func__, llu(addr));
     /* find a reference that matches this address */
     gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, addr);
@@ -1177,36 +1275,23 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
     if(option == BMI_INC_ADDR_REF)
     {
 	tmp_ref->ref_count++;
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                     "[BMI CONTROL]: %s: incremented ref %llu to: %d\n",
+                     __func__, llu(addr), tmp_ref->ref_count);
 	gen_mutex_unlock(&ref_mutex);
 	return(0);
     }
     if(option == BMI_DEC_ADDR_REF)
     {
 	tmp_ref->ref_count--;
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                     "[BMI CONTROL]: %s: decremented ref %llu to: %d\n",
+                     __func__, llu(addr), tmp_ref->ref_count);
 	assert(tmp_ref->ref_count >= 0);
 
 	if(tmp_ref->ref_count == 0)
 	{
-	    struct method_drop_addr_query query;
-	    query.response = 0;
-	    query.addr = tmp_ref->method_addr;
-	    /* reference count is zero; ask module if it wants us to discard
-	     * the address; TCP will tell us to drop addresses for which the
-	     * socket has died with no possibility of reconnect 
-	     */
-	    ret = tmp_ref->interface->BMI_meth_get_info(BMI_DROP_ADDR_QUERY,
-		&query);
-	    if(ret == 0 && query.response == 1)
-	    {
-		/* kill the address */
-		gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-		    "bmi discarding address: %llu\n", llu(addr));
-		ref_list_rem(cur_ref_list, addr);
-		/* NOTE: this triggers request to module to free underlying
-		 * resources if it wants to
-		 */
-		dealloc_ref_st(tmp_ref);
-	    }
+            bmi_addr_drop(tmp_ref);
 	}
 	gen_mutex_unlock(&ref_mutex);
 	return(0);
@@ -1222,7 +1307,10 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
              * out the entire address structure and anything linked to it so 
              * that the next addr_lookup starts from scratch
              */
-	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "Closing bmi_tcp connection at caller's request.\n"); 
+	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "[BMI CONTROL]: %s: Closing bmi_tcp "
+                         "connection at caller's request.\n",
+                         __func__); 
             ref_list_rem(cur_ref_list, addr);
             dealloc_ref_st(tmp_ref);
         }
@@ -1232,7 +1320,7 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->BMI_meth_set_info(option, inout_parameter);
+    ret = tmp_ref->interface->set_info(option, inout_parameter);
 
     return (ret);
 }
@@ -1270,7 +1358,7 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 	gen_mutex_lock(&active_method_count_mutex);
 	for (i = 0; i < active_method_count; i++)
 	{
-	    ret = active_method_table[i]->BMI_meth_get_info(
+	    ret = active_method_table[i]->get_info(
                 option, &tmp_maxsize);
 	    if (ret < 0)
 	    {
@@ -1309,7 +1397,7 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
             return (bmi_errno_to_pvfs(-EINVAL));
         }
         gen_mutex_unlock(&ref_mutex);
-        ret = tmp_ref->interface->BMI_meth_get_info(
+        ret = tmp_ref->interface->get_info(
             option, inout_parameter);
         if(ret < 0)
         {
@@ -1372,13 +1460,13 @@ int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netma
     gen_mutex_lock(&active_method_count_mutex);
     while (i < active_method_count)
     {
-        char *active_method_name = (char *) active_method_table[i]->method_name + 4;
+        const char *active_method_name = active_method_table[i]->method_name + 4;
         /* provided name matches this interface */
         if (!strncmp(active_method_name, provided_method_name, provided_method_length))
         {
-            int (*meth_fnptr)(method_addr_p, const char *, int);
+            int (*meth_fnptr)(bmi_method_addr_p, const char *, int);
             failed = 0;
-            if ((meth_fnptr = active_method_table[i]->BMI_meth_query_addr_range) == NULL)
+            if ((meth_fnptr = active_method_table[i]->query_addr_range) == NULL)
             {
                 ret = -ENOSYS;
                 gossip_lerr("Error: method doesn't implement querying address range/wildcards! Cannot implement FS export options!\n");
@@ -1406,11 +1494,11 @@ int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netma
  *  \return 0 on success, -errno on failure.
  */
 int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
-		    const char *id_string)
+                    const char *id_string)
 {
 
     ref_st_p new_ref = NULL;
-    method_addr_p meth_addr = NULL;
+    bmi_method_addr_p meth_addr = NULL;
     int ret = -1;
     int i = 0;
     int failed;
@@ -1443,8 +1531,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     i = 0;
     gen_mutex_lock(&active_method_count_mutex);
     while ((i < active_method_count) &&
-           !(meth_addr = active_method_table[i]->
-             BMI_meth_method_addr_lookup(id_string)))
+           !(meth_addr = active_method_table[i]->method_addr_lookup(id_string)))
     {
 	i++;
     }
@@ -1471,7 +1558,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
                     break;
                 }
 		meth_addr = known_method_table[i]->
-		    BMI_meth_method_addr_lookup(id_string);
+		    method_addr_lookup(id_string);
 		i = active_method_count - 1;  /* point at the new one */
 		break;
 	    }
@@ -1484,7 +1571,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     /* make sure one was successful */
     if (!meth_addr)
     {
-	return (bmi_errno_to_pvfs(-ENOPROTOOPT));
+        return bmi_errno_to_pvfs(-ENOPROTOOPT);
     }
 
     /* create a new reference for the addr */
@@ -1500,7 +1587,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     new_ref->id_string = (char *) malloc(strlen(id_string) + 1);
     if (!new_ref->id_string)
     {
-	ret = -errno;
+	ret = bmi_errno_to_pvfs(errno);
 	goto bmi_addr_lookup_failure;
     }
     strcpy(new_ref->id_string, id_string);
@@ -1518,7 +1605,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 
     if (meth_addr)
     {
-	active_method_table[i]->BMI_meth_set_info(
+	active_method_table[i]->set_info(
             BMI_DROP_ADDR, meth_addr);
     }
 
@@ -1578,9 +1665,9 @@ int BMI_post_send_list(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    if (tmp_ref->interface->BMI_meth_post_send_list)
+    if (tmp_ref->interface->post_send_list)
     {
-	ret = tmp_ref->interface->BMI_meth_post_send_list(
+	ret = tmp_ref->interface->post_send_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
             list_count, total_size, buffer_type, tag, user_ptr,
             context_id);
@@ -1645,9 +1732,9 @@ int BMI_post_recv_list(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    if (tmp_ref->interface->BMI_meth_post_recv_list)
+    if (tmp_ref->interface->post_recv_list)
     {
-	ret = tmp_ref->interface->BMI_meth_post_recv_list(
+	ret = tmp_ref->interface->post_recv_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
             list_count, total_expected_size, total_actual_size,
             buffer_type, tag, user_ptr, context_id);
@@ -1711,9 +1798,9 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    if (tmp_ref->interface->BMI_meth_post_send_list)
+    if (tmp_ref->interface->post_send_list)
     {
-	ret = tmp_ref->interface->BMI_meth_post_sendunexpected_list(
+	ret = tmp_ref->interface->post_sendunexpected_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
             list_count, total_size, buffer_type, tag, user_ptr,
             context_id);
@@ -1743,7 +1830,7 @@ int BMI_cancel(bmi_op_id_t id,
     gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                  "%s: cancel id %llu\n", __func__, llu(id));
 
-    target_op = id_gen_safe_lookup(id);
+    target_op = id_gen_fast_lookup(id);
     if(target_op == NULL)
     {
         /* if we can't find the operation, then assume it has already
@@ -1754,10 +1841,10 @@ int BMI_cancel(bmi_op_id_t id,
 
     assert(target_op->op_id == id);
 
-    if(active_method_table[target_op->addr->method_type]->BMI_meth_cancel)
+    if(active_method_table[target_op->addr->method_type]->cancel)
     {
 	ret = active_method_table[
-            target_op->addr->method_type]->BMI_meth_cancel(
+            target_op->addr->method_type]->cancel(
                 id, context_id);
     }
     else
@@ -1777,11 +1864,17 @@ int BMI_cancel(bmi_op_id_t id,
 /* bmi_method_addr_reg_callback()
  * 
  * Used by the methods to register new addresses when they are
- * discovered.
+ * discovered.  Only call this method when the device gets an
+ * unexpected receive from a new peer, i.e., if you do the equivalent
+ * of a socket accept() and get a new connection.
+ *
+ * Do not call this function for active lookups, that is from your
+ * method_addr_lookup.  BMI already knows about the address in
+ * this case, since the user provided it.
  *
  * returns 0 on success, -errno on failure
  */
-int bmi_method_addr_reg_callback(method_addr_p map)
+PVFS_BMI_addr_t bmi_method_addr_reg_callback(bmi_method_addr_p map)
 {
     ref_st_p new_ref = NULL;
 
@@ -1793,7 +1886,7 @@ int bmi_method_addr_reg_callback(method_addr_p map)
     new_ref = alloc_ref_st();
     if (!new_ref)
     {
-	return (bmi_errno_to_pvfs(-ENOMEM));
+	return 0;
     }
 
     /*
@@ -1809,6 +1902,28 @@ int bmi_method_addr_reg_callback(method_addr_p map)
     /* add the reference structure to the list */
     ref_list_add(cur_ref_list, new_ref);
 
+    return new_ref->bmi_addr;
+}
+
+int bmi_method_addr_forget_callback(PVFS_BMI_addr_t addr)
+{
+    struct forget_item* tmp_item = NULL;
+
+    tmp_item = (struct forget_item*)malloc(sizeof(struct forget_item));
+    if(!tmp_item)
+    {
+        return(bmi_errno_to_pvfs(-ENOMEM));
+    }
+
+    tmp_item->addr = addr;
+
+    /* add to queue of items that we want the BMI control layer to consider
+     * deallocating
+     */
+    gen_mutex_lock(&forget_list_mutex);
+    qlist_add(&tmp_item->link, &forget_list);
+    gen_mutex_unlock(&forget_list_mutex);
+
     return (0);
 }
 
@@ -1823,7 +1938,7 @@ activate_method(const char *name, const char *listen_addr, int flags)
     int i, ret;
     void *x;
     struct bmi_method_ops *meth;
-    method_addr_p new_addr;
+    bmi_method_addr_p new_addr;
 
     /* already active? */
     for (i=0; i<active_method_count; i++)
@@ -1879,7 +1994,7 @@ activate_method(const char *name, const char *listen_addr, int flags)
     /* initialize it */
     new_addr = 0;
     if (listen_addr) {
-	new_addr = meth->BMI_meth_method_addr_lookup(listen_addr);
+	new_addr = meth->method_addr_lookup(listen_addr);
 	if (!new_addr) {
 	    gossip_err(
 		"Error: failed to lookup listen address %s for method %s.\n",
@@ -1890,7 +2005,7 @@ activate_method(const char *name, const char *listen_addr, int flags)
 	/* this is a bit of a hack */
 	new_addr->method_type = active_method_count - 1;
     }
-    ret = meth->BMI_meth_initialize(new_addr, active_method_count - 1, flags);
+    ret = meth->initialize(new_addr, active_method_count - 1, flags);
     if (ret < 0) {
 	gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
           "failed to initialize method %s.\n", name);
@@ -1901,7 +2016,7 @@ activate_method(const char *name, const char *listen_addr, int flags)
     /* tell it about any open contexts */
     for (i=0; i<BMI_MAX_CONTEXTS; i++)
 	if (context_array[i]) {
-	    ret = meth->BMI_meth_open_context(i);
+	    ret = meth->open_context(i);
 	    if (ret < 0)
 		break;
 	}
@@ -1971,9 +2086,85 @@ case err: bmi_errno = BMI_##err; break
         __CASE(EHOSTUNREACH);
         __CASE(EALREADY);
         __CASE(EACCES);
+        __CASE(ECONNRESET);
 #undef __CASE
     }
     return bmi_errno;
+}
+
+/* bmi_check_forget_list()
+ * 
+ * Scans queue of items that methods have suggested that we forget about 
+ *
+ * no return value
+ */
+static void bmi_check_forget_list(void)
+{
+    PVFS_BMI_addr_t tmp_addr;
+    struct forget_item* tmp_item;
+    ref_st_p tmp_ref = NULL;
+    
+    gen_mutex_lock(&forget_list_mutex);
+    while(!qlist_empty(&forget_list))
+    {
+        tmp_item = qlist_entry(forget_list.next, struct forget_item,
+            link);     
+        qlist_del(&tmp_item->link);
+        /* item is off of the list; unlock for a moment while we work on
+         * this addr 
+         */
+        gen_mutex_unlock(&forget_list_mutex);
+        tmp_addr = tmp_item->addr;
+        free(tmp_item);
+
+        gen_mutex_lock(&ref_mutex);
+        tmp_ref = ref_list_search_addr(cur_ref_list, tmp_addr);
+        if(tmp_ref && tmp_ref->ref_count == 0)
+        {
+            bmi_addr_drop(tmp_ref);
+        }   
+        gen_mutex_unlock(&ref_mutex);
+
+        gen_mutex_lock(&forget_list_mutex);
+    }
+    gen_mutex_unlock(&forget_list_mutex);
+
+    return;
+}
+
+/* bmi_addr_drop
+ *
+ * Destroys a complete BMI address, including asking the method to clean up 
+ * its portion.  Will query the method for permission before proceeding
+ *
+ * NOTE: must be called with ref list mutex held 
+ */
+static void bmi_addr_drop(ref_st_p tmp_ref)
+{
+    struct method_drop_addr_query query;
+    query.response = 0;
+    query.addr = tmp_ref->method_addr;
+    int ret = 0;
+
+    /* reference count is zero; ask module if it wants us to discard
+     * the address; TCP will tell us to drop addresses for which the
+     * socket has died with no possibility of reconnect 
+     */
+    ret = tmp_ref->interface->get_info(BMI_DROP_ADDR_QUERY,
+        &query);
+    if(ret == 0 && query.response == 1)
+    {
+        /* kill the address */
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+            "[BMI CONTROL]: %s: bmi discarding address: %llu\n",
+            __func__, llu(tmp_ref->bmi_addr));
+        ref_list_rem(cur_ref_list, tmp_ref->bmi_addr);
+        /* NOTE: this triggers request to module to free underlying
+         * resources if it wants to
+         */
+        dealloc_ref_st(tmp_ref);
+    }
+    return;
 }
 
 /*

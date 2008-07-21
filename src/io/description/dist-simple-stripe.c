@@ -13,6 +13,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-dist-simple-stripe.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 static PVFS_offset logical_to_physical_offset (void* params,
                                                PINT_request_file_data* fd,
@@ -176,7 +177,15 @@ static void registration_init(void* params)
                              PVFS_simple_stripe_params, strip_size);
 
 }
-    
+
+static char *params_string(void *params)
+{
+    char param_string[1024];
+    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+
+    sprintf(param_string, "strip_size:%llu\n", llu(dparam->strip_size));
+    return strdup(param_string);
+}
 
 static PVFS_simple_stripe_params simple_stripe_params = {
     PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE /* strip size */
@@ -192,7 +201,8 @@ static PINT_dist_methods simple_stripe_methods = {
     PINT_dist_default_set_param,
     encode_lebf,
     decode_lebf,
-    registration_init
+    registration_init,
+    params_string
 };
 
 PINT_dist simple_stripe_dist = {

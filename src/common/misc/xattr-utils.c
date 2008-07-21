@@ -13,7 +13,11 @@
 #include "xattr-utils.h"
 
 #ifndef HAVE_FGETXATTR
+#ifndef HAVE_FGETXATTR_EXTRA_ARGS
 ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size)
+#else
+ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size, int pos, int opts )
+#endif
 {
     errno = ENOSYS;
     return -1;

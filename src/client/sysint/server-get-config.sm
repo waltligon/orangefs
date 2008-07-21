@@ -22,36 +22,17 @@ extern job_context_id pint_client_sm_context;
 static int server_parse_config(
     struct server_configuration_s *config,
     char *fs_config_buf,
-    uint32_t fs_config_buf_size,
-    char *server_config_buf,
-    uint32_t server_config_buf_size);
+    uint32_t fs_config_buf_size);
 
-/* state function prototypes */
-static int server_get_config_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int server_get_config_parent_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int server_get_config_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int server_get_config_parse(
-    PINT_client_sm *sm_p, job_status_s *js_p);
 static int server_get_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
-static int server_fetch_config_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int server_fetch_config_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
 static int server_fetch_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 %%
 
-nested machine pvfs2_server_get_config_nested_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    parse,
-    cleanup)
+nested machine pvfs2_server_get_config_nested_sm
 {
     state setup_msgpair
     {
@@ -80,9 +61,7 @@ nested machine pvfs2_server_get_config_nested_sm(
     }
 }
 
-machine pvfs2_server_get_config_sm(
-    run_nested,
-    parent_cleanup)
+machine pvfs2_server_get_config_sm
 {
     state run_nested 
     {
@@ -97,10 +76,7 @@ machine pvfs2_server_get_config_sm(
     }
 }
 
-machine pvfs2_server_fetch_config_sm(
-    fetch_setup_msgpair,
-    fetch_xfer_msgpair,
-    fetch_cleanup)
+nested machine pvfs2_server_fetch_config_nested_sm
 {
     state fetch_setup_msgpair
     {
@@ -118,10 +94,24 @@ machine pvfs2_server_fetch_config_sm(
     state fetch_cleanup
     {
         run server_fetch_config_cleanup;
-        default => terminate;
+        default => return;
     }
 }
 
+machine pvfs2_server_fetch_config_sm
+{
+    state run_fetch_nested 
+    {
+        jump pvfs2_server_fetch_config_nested_sm;
+        default => parent_fetch_cleanup;
+    }
+
+    state parent_fetch_cleanup
+    {
+        run server_fetch_config_parent_cleanup;
+        default => terminate;
+    }
+}
 
 %%
 
@@ -137,6 +127,7 @@ int PINT_server_get_config(
     struct PVFS_sys_mntent* mntent_p)
 {
     int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     PVFS_error error = 0;
     PVFS_credentials creds;
@@ -155,31 +146,31 @@ int PINT_server_get_config(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "asked for fs name = %s\n",
                  mntent_p->pvfs_fs_name);
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SERVER_GET_CONFIG,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* NOTE: we set these fields manually here rather than use
      * PINT_init_msgarray_params(), because we don't yet have a server
      * configuration file to override default parameters.
      */
-    sm_p->msgarray_params.job_context = pint_client_sm_context;
-    sm_p->msgarray_params.job_timeout = 30;   /* 30 second job timeout */
-    sm_p->msgarray_params.retry_delay = 2000; /* 2 second retry delay */
-    sm_p->msgarray_params.retry_limit = 5;    /* retry up to 5 times */
-
-    sm_p->msgarray_count = 1;
-    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_op.params.job_context = pint_client_sm_context;
+    sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
+    sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
 
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
     sm_p->u.get_config.mntent = mntent_p;
     sm_p->u.get_config.config = config;
 
-    ret = PINT_client_state_machine_post(
-        sm_p, PVFS_SERVER_GET_CONFIG, &op_id, NULL);
+    ret = PINT_client_state_machine_post(smcb, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PINT_client_state_machine_post call", ret);
@@ -195,42 +186,32 @@ int PINT_server_get_config(
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return(error);
 }
 
 static int server_parse_config(
     struct server_configuration_s *config,
     char *fs_config_buf,
-    uint32_t fs_config_buf_size,
-    char *server_config_buf,
-    uint32_t server_config_buf_size)
+    uint32_t fs_config_buf_size)
 {
     int ret = 1, template_index = 1;
-    int fs_fd = 0, server_fd = 0;
+    int fs_fd = 0;
     char fs_template_array[2][64] =
     {
         ".__pvfs_fs_configXXXXXX",
         "/tmp/.__pvfs_fs_configXXXXXX"
     };
-    char server_template_array[2][64] =
-    {
-        ".__pvfs_server_configXXXXXX",
-        "/tmp/.__pvfs_server_configXXXXXX"
-    };
     char *fs_template = NULL;
-    char *server_template = NULL;
 
     if (config)
     {
         assert(fs_config_buf);
-        assert(server_config_buf);
 
         while(1)
         {
             assert(template_index > -1);
             fs_template = fs_template_array[template_index];
-            server_template = server_template_array[template_index];
 
             fs_fd = mkstemp(fs_template);
             if (fs_fd != -1)
@@ -245,62 +226,53 @@ static int server_parse_config(
             }
         }
 
-        server_fd = mkstemp(server_template);
-        if (server_fd == -1)
-        {
-            close(fs_fd);
-            remove(fs_template);
-            gossip_err("mkstemp(%s) failed\n", server_template);
-            return ret;
-        }
-
         assert(!fs_config_buf[fs_config_buf_size - 1]);
-        assert(!server_config_buf[server_config_buf_size - 1]);
 
         if (write(fs_fd,fs_config_buf, 
 		    (fs_config_buf_size - 1)) == (fs_config_buf_size - 1))
         {
-            if (write(server_fd,server_config_buf,
-                      (server_config_buf_size - 1)) ==
-                (server_config_buf_size - 1))
-            {
-                ret = PINT_parse_config(
-                    config, fs_template, server_template);
-            }
+            ret = PINT_parse_config(config, fs_template, NULL);
         }
+        else
+        {
+            gossip_err("Failed to write fs.conf buffer to temp file: %s: %s\n",
+                       fs_template, strerror(errno));
+        }
+    
         close(fs_fd);
-        close(server_fd);
 
         remove(fs_template);
-        remove(server_template);
     }
     return ret;
 }
 
-static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
+static PINT_sm_action server_get_config_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_BMI_addr_t serv_addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"get_config state: server_get_config_setup_msgpair\n");
+                 "get_config state: server_get_config_setup_msgpair\n");
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     if (ENCODING_IS_VALID(sm_p->u.get_config.mntent->encoding))
     {
-        sm_p->msgpair.enc_type = sm_p->u.get_config.mntent->encoding;
+        msg_p->enc_type = sm_p->u.get_config.mntent->encoding;
     }
 
-    msg_p = &sm_p->msgarray[0];
-
     ret = BMI_addr_lookup(&serv_addr,
-	    sm_p->u.get_config.mntent->the_pvfs_config_server);
+                          sm_p->u.get_config.mntent->the_pvfs_config_server);
     if (ret < 0)
     {
         gossip_lerr("Failed to resolve BMI address %s\n",
                     sm_p->u.get_config.mntent->the_pvfs_config_server);
-        return ret;
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p);
@@ -311,85 +283,91 @@ static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->comp_fn = server_get_config_comp_fn;
     msg_p->svr_addr = serv_addr;
 
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int server_get_config_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static PINT_sm_action server_get_config_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (sm_p && !sm_p->u.get_config.persist_config_buffers)
     {
 	free(sm_p->u.get_config.fs_config_buf);
-	free(sm_p->u.get_config.server_config_buf);
-
         sm_p->u.get_config.fs_config_buf = NULL;
-        sm_p->u.get_config.server_config_buf = NULL;
     }
 
     /* preserve js_p->error_code */
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int server_get_config_parse(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static PINT_sm_action server_get_config_parse(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     struct filesystem_configuration_s* cur_fs = NULL;
 
-    ret = server_parse_config(
-        sm_p->u.get_config.config,  sm_p->u.get_config.fs_config_buf,
-        sm_p->u.get_config.fs_config_buf_size,
-        sm_p->u.get_config.server_config_buf,
-        sm_p->u.get_config.server_config_buf_size);
-    if (ret)
+    if(sm_p->u.get_config.config)
     {
-	gossip_err("Failed to get_config from host %s\n",
-                   sm_p->u.get_config.mntent->the_pvfs_config_server); 
-	js_p->error_code = ret;
-        return 1;
-    }
-    
-    cur_fs = PINT_config_find_fs_name(sm_p->u.get_config.config, 
-        sm_p->u.get_config.mntent->pvfs_fs_name);
-    if (!cur_fs)
-    {
-	gossip_err("Warning:\n Cannot retrieve information about "
-		"pvfstab entry %s\n",
-		sm_p->u.get_config.mntent->the_pvfs_config_server);
-
-	/*
-          if the device has no space left on it, we can't save
-          the config file for parsing and get a failure; make
-          a note of that possibility here
-        */ 
-	gossip_err("\nHINTS: If you're sure that your pvfstab file "
-                   "contains valid information,\n please make sure "
-                   "that you are not out of disk space and that you "
-                   "have\n write permissions in the current "
-                   "directory or in the /tmp directory\n\n");
-
-	js_p->error_code = -PVFS_ENODEV;
-        return(1);
+        ret = server_parse_config(
+            sm_p->u.get_config.config,  sm_p->u.get_config.fs_config_buf,
+            sm_p->u.get_config.fs_config_buf_size);
+        if (ret)
+        {
+            gossip_err("Failed to get_config from host %s\n",
+                       sm_p->u.get_config.mntent->the_pvfs_config_server); 
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
     }
 
-    sm_p->u.get_config.mntent->fs_id = cur_fs->coll_id;
-    cur_fs->flowproto = sm_p->u.get_config.mntent->flowproto;
-    cur_fs->encoding = sm_p->u.get_config.mntent->encoding;
+    if(sm_p->u.get_config.mntent->fs_id == PVFS_FS_ID_NULL)
+    {
+        cur_fs = PINT_config_find_fs_name(sm_p->u.get_config.config, 
+            sm_p->u.get_config.mntent->pvfs_fs_name);
+        if (!cur_fs)
+        {
+            gossip_err("Warning:\n Cannot retrieve information about "
+                    "filesystem %s at tab entry: %s\n",
+                    sm_p->u.get_config.mntent->pvfs_fs_name,
+                    sm_p->u.get_config.mntent->the_pvfs_config_server);
+
+            /*
+              if the device has no space left on it, we can't save
+              the config file for parsing and get a failure; make
+              a note of that possibility here
+            */ 
+            gossip_err("\nHINTS: If you're sure that your pvfstab file "
+                       "contains valid information,\n please make sure "
+                       "that you are not out of disk space and that you "
+                       "have\n write permissions in the current "
+                       "directory or in the /tmp directory\n\n");
+
+            js_p->error_code = -PVFS_ENODEV;
+            return SM_ACTION_COMPLETE;
+        }
+
+        sm_p->u.get_config.mntent->fs_id = cur_fs->coll_id;
+        cur_fs->flowproto = sm_p->u.get_config.mntent->flowproto;
+        cur_fs->encoding = sm_p->u.get_config.mntent->encoding;
+    }
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 
-static int server_get_config_parent_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p)
+static PINT_sm_action server_get_config_parent_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code  = js_p->error_code;
-    sm_p->op_complete = 1;
+    PINT_SET_OP_COMPLETE;
 
-    return 0;
+    return SM_ACTION_DEFERRED;
 }
 
 
@@ -398,8 +376,8 @@ static int server_get_config_comp_fn(
     struct PVFS_server_resp *resp_p,
     int i)
 {
-    int j = 0;
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     /* only posted one msgpair */
     assert(i==0);
@@ -407,30 +385,20 @@ static int server_get_config_comp_fn(
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */
 
-    if (sm_p->msgarray[i].op_status == 0)
+    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
     {
 	sm_p->u.get_config.fs_config_buf = 
 		strdup(resp_p->u.getconfig.fs_config_buf);
 	sm_p->u.get_config.fs_config_buf_size = 
 		resp_p->u.getconfig.fs_config_buf_size;
-	sm_p->u.get_config.server_config_buf = 
-		strdup(resp_p->u.getconfig.server_config_buf);
-	sm_p->u.get_config.server_config_buf_size = 
-		resp_p->u.getconfig.server_config_buf_size;
     }
 
     /* if this is the last response, check all of the status values
      * and return error code if any requests failed
      */
-    if (i == (sm_p->msgarray_count -1))
+    if (i == (sm_p->msgarray_op.count -1))
     {
-	for (j=0; j < sm_p->msgarray_count; j++)
-	{
-	    if (sm_p->msgarray[j].op_status != 0)
-	    {
-		return(sm_p->msgarray[j].op_status);
-	    }
-	}
+        return PINT_msgarray_status(&sm_p->msgarray_op);
     }
     return 0;
 }
@@ -440,12 +408,18 @@ static int server_get_config_comp_fn(
  * This is different from get_config() in that we do not depend on the
  * configuration server specified in the mnt tab file
  * Assumes that servers specified in the array are unique!
+ * CURRENTLY UNUSED
  */
-int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
-                char **fs_config_bufs, char **server_config_bufs,
-                int *fs_config_buf_size, int *server_config_buf_size)
+#ifdef __GNUC__
+static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
+                char **fs_config_bufs, int *fs_config_buf_size) __attribute__((unused));
+#endif
+
+static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
+                char **fs_config_bufs, int *fs_config_buf_size)
 {
     int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     PVFS_error error = 0;
     PVFS_credentials creds;
@@ -453,48 +427,46 @@ int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_fetch_config_list entered\n");
-    if (nservers < 0 || !servers || !fs_config_bufs || !server_config_bufs
-        || !fs_config_buf_size || !server_config_buf_size)
+    if (nservers < 0 || !servers || !fs_config_bufs || !fs_config_buf_size)
     {
         return ret;
     }
 
     PVFS_util_gen_credentials(&creds);
-
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SERVER_FETCH_CONFIG,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* NOTE: we set these fields manually here rather than use
      * PINT_init_msgarray_params(), because we don't yet have a server
      * configuration file to override default parameters.
      */
-    sm_p->msgarray_params.job_context = pint_client_sm_context;
-    sm_p->msgarray_params.job_timeout = 30;   /* 30 second job timeout */
-    sm_p->msgarray_params.retry_delay = 2000; /* 2 second retry delay */
-    sm_p->msgarray_params.retry_limit = 5;    /* retry up to 5 times */
+    sm_p->msgarray_op.params.job_context = pint_client_sm_context;
+    sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
+    sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
-    sm_p->u.fetch_config.nservers = nservers;
-    sm_p->u.fetch_config.addr_array = servers;
-    sm_p->u.fetch_config.fs_config_bufs = fs_config_bufs;
-    sm_p->u.fetch_config.server_config_bufs = server_config_bufs;
-    sm_p->u.fetch_config.fs_config_buf_size = fs_config_buf_size;
-    sm_p->u.fetch_config.server_config_buf_size = server_config_buf_size;
-    sm_p->msgarray_count = nservers;
-    sm_p->msgarray = (PINT_sm_msgpair_state *) malloc(
-        nservers * sizeof(PINT_sm_msgpair_state));
-    if (!sm_p->msgarray)
+    sm_p->fetch_config.nservers = nservers;
+    sm_p->fetch_config.addr_array = servers;
+    sm_p->fetch_config.fs_config_bufs = fs_config_bufs;
+    sm_p->fetch_config.fs_config_buf_size = fs_config_buf_size;
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, nservers);
+    if(ret != 0)
     {
-        free(sm_p);
-        return -PVFS_ENOMEM;
+        PINT_smcb_free(smcb);
+        return ret;
     }
 
-
     ret = PINT_client_state_machine_post(
-        sm_p, PVFS_SERVER_FETCH_CONFIG, &op_id, NULL);
+        smcb, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PINT_client_state_machine_post call", ret);
@@ -510,46 +482,46 @@ int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return(error);
 }
 
-static int server_fetch_config_setup_msgpair(PINT_client_sm *sm_p,
+static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
     int i;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"fetch_config state: server_fetch_config_setup_msgpair\n");
 
-    for (i = 0; i < sm_p->msgarray_count; i++)
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        msg_p = &sm_p->msgarray[i];
+        sm_p->msgarray_op.msgarray[i].enc_type = sm_p->msgarray_op.msgpair.enc_type;
         PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p);
 
         msg_p->fs_id = PVFS_FS_ID_NULL;
         msg_p->handle = PVFS_HANDLE_NULL;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = server_fetch_config_comp_fn;
-        msg_p->svr_addr = sm_p->u.fetch_config.addr_array[i];
+        msg_p->svr_addr = sm_p->fetch_config.addr_array[i];
     }
 
     js_p->error_code = 0;
-    return 1;
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
 }
 
-static int server_fetch_config_cleanup(PINT_client_sm *sm_p,
+static PINT_sm_action server_fetch_config_cleanup(struct PINT_smcb *smcb,
                                     job_status_s *js_p)
 {
-    sm_p->error_code  = js_p->error_code;
-    sm_p->op_complete = 1;
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-    }
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    /* preserve js_p->error_code */
 
-    return 0;
+    return SM_ACTION_COMPLETE;
 }
 
 static int server_fetch_config_comp_fn(
@@ -557,38 +529,37 @@ static int server_fetch_config_comp_fn(
     struct PVFS_server_resp *resp_p,
     int i)
 {
-    int j = 0;
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */
 
-    if (sm_p->msgarray[i].op_status == 0)
+    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
     {
-	sm_p->u.fetch_config.fs_config_bufs[i] = 
+	sm_p->fetch_config.fs_config_bufs[i] = 
 		strdup(resp_p->u.getconfig.fs_config_buf);
-	sm_p->u.fetch_config.fs_config_buf_size[i] = 
+	sm_p->fetch_config.fs_config_buf_size[i] = 
 		resp_p->u.getconfig.fs_config_buf_size;
-	sm_p->u.fetch_config.server_config_bufs[i] = 
-		strdup(resp_p->u.getconfig.server_config_buf);
-	sm_p->u.fetch_config.server_config_buf_size[i] = 
-		resp_p->u.getconfig.server_config_buf_size;
     }
 
     /* if this is the last response, check all of the status values
      * and return error code if any requests failed
      */
-    if (i == (sm_p->msgarray_count -1))
+    if (i == (sm_p->msgarray_op.count -1))
     {
-	for (j=0; j < sm_p->msgarray_count; j++)
-	{
-	    if (sm_p->msgarray[j].op_status != 0)
-	    {
-		return(sm_p->msgarray[j].op_status);
-	    }
-	}
+        return PINT_msgarray_status(&sm_p->msgarray_op);
     }
     return 0;
+}
+
+static PINT_sm_action server_fetch_config_parent_cleanup(struct PINT_smcb *smcb,
+                                    job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p->error_code  = js_p->error_code;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_DEFERRED;
 }
         
 /*

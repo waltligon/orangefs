@@ -2,8 +2,6 @@ Notes on the BMI InfiniBand implementation
 
 Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
 
-$Id: README,v 1.5 2006-05-30 20:24:57 pw Exp $
-
 InifiniBand programming interface
 ---------------------------------
 The BMI IB implementation was developed for the API provided by Mellanox, a
@@ -36,15 +34,9 @@ will listen on the given TCP port number.  Clients connect to that, exchange
 IB hardware address info, then drop that connection and use only IB for all
 future communication.
 
-Between each pair of hosts are two connected queue pairs (QPs).  One for
-sending data:  SEND/RECEIVE with notification and RDMA write without
-notification.  The second is only used for zero-byte acknowledgement packets.
-Since there is no receive-side matching at the NIC, the second ack-only
-QP is used to allow posting receive descriptors with no memory to avoid having
-to flow-control acks.  Eager receive descriptors are posted immediately after
-having been emptied, before sending an acknowledgement.  Ack descriptors are
-only posted when the sender knows it will soon send a message that must be
-acked.
+Between each pair of hosts is one connected queue pair (QP).  Send and
+receive are used, as well as RDMA write.  No atomics or RDMA read are used.
+The immediate data feature of Infiniband is not used.
 
 
 Buffer management
@@ -53,13 +45,11 @@ Since BMI permits sends to occur without pre-matching receives, but
 InfiniBand does not allow this, we must manage a queue of preposted
 buffers for each possible sender.  We allocate some number of fixed
 size receive buffers per sender, and also have the same number of send
-buffers dedicated to that sender.  These are matched for flow control
-so that we know how many receive buffers are available at a potential
-receiver by looking at our allocated send buffers dedicated to that receiver.
-The receiver explicitly acknowledges buffers after finishing with
-the contents.  Note that the bh->num values will get out of order although
-the overall number will match, implying we always ack _his_ bh->num, not
-ours.  This is a bit tied up with the protocol, described below.
+buffers dedicated to that sender.  The receiver keeps a count of buffers
+it has processed and reposted, sending this value to the sender on top
+of its own send messages.  If the accumulated credit gets large with
+respect to the number of total buffers, an explicit credit-return message
+is sent.
 
 These eager buffers are shipped back and forth using basic SEND/RECEIVE since
 completion on the receiver is important for the protocol and there is no speed
@@ -72,27 +62,28 @@ gather at the sender, not scatter at the receiver.  (Another implementation
 might do this with RDMA reads similarly.)
 
 IB completion queue entries have a 64-bit "id" field to store information
-which is retrievable at completion.  For incoming RECEIVE messages, this
-holds a pointer to the buffer head which will lead to the connection and
-some state.  For RDMA write send completions, this holds a pointer to the
-sendq entry.  There is also a 32-bit immediate data which is used only
-in the case of an ACK packet that carries no data but consumes a descriptor
-(managed on the second QP).
+which is retrievable at completion.  For outgoing SEND messages and incoming
+RECEIVE messages, this holds a pointer to the buffer head which will lead to
+the connection and some state.  For RDMA write send completions, there may
+be many outgoing RDMA write operations to satisfy scatter requirements on
+the receiver.  All but the last of these have an id of 0; the last holds a
+pointer to the send work item.
+
 
 State paths
 -----------
-Below are descriptions of how the states progress for the sender
-and receiver for the various possible message types.
+Below are descriptions of how the states progress for the sender and receiver
+for the various possible message types.  Completion events are tracked
+explicitly, even though they do not tell us anything in most cases.
 
 Eager send
 ----------
     SQ_WAITING_BUFFER
-	alloc bh, local tied to remote, so know credit okay
-	post_ack_recv_slot, 0 bytes, just imm data ack
+	credit?
+	alloc bh
 	post_sr
-    SQ_WAITING_EAGER_ACK
-	(wait recv cq event on ack channel)
-	get bh->num from imm_data
+    SQ_WAITING_EAGER_SEND_COMPLETION
+	(wait local send completion)
 	free bh
     SQ_WAITING_USER_TEST
 	wait test
@@ -104,10 +95,9 @@ Eager recv, pre-post recv
 	build recvq
     RQ_WAITING_INCOMING
 	(wait recv cq event)
+	refill credits
 	copy memory to dest
-	mark recv complete
 	re-post_rr
-	post_ack_send imm_data = his bh->num  (no cq event)
     RQ_WAITING_USER_TEST
 	wait test
 	release recvq
@@ -115,17 +105,17 @@ Eager recv, pre-post recv
 Eager recv, non-pre-post recv
 -----------------------------
     (msg arrives)
+	refill credits
 	build recvq
     RQ_EAGER_WAITING_USER_POST
 	(matching user post arrives)
 	copy memory to dest
 	re-post_rr
-	post_ack_send imm_data = his bh->num  (no cq event)
     RQ_WAITING_USER_TEST
 	wait test
 	release recvq
 
-Eager sendunexpected
+Eager send unexpected
 --------------------
 (Same as eager send but different msg header tag tells receiver
 it is unexpected.)
@@ -133,29 +123,54 @@ it is unexpected.)
 Eager recv unexpected
 ---------------------
     (msg arrives)
+	refill credits
 	build recvq
     RQ_EAGER_WAITING_USER_TESTUNEXPECTED
 	(user calls testunexpected)
 	scan recvq looking for this state, no tag matching
-	?? fill in method_unexpected_info, return to user
+	fill in method_unexpected_info
+	copy memory to dest
 	re-post_rr
-	post_ack_send imm_data = his bh->num  (no cq event)
-	?? release recvq entry
+	release recvq entry
 
 RTS send
 --------
     SQ_WAITING_BUFFER
+	credit?
 	alloc bh
-	post_sr mh + mh_rts
+	post_sr mh_rts
+    SQ_WAITING_RTS_SEND_COMPLETION
+
+    (Note: alternate paths here based on adapter CQ processing:  could get
+    a message from the peer before processing our own send to the peer that
+    caused him to send something.)
+	(send cq event)
+	free bh
     SQ_WAITING_CTS
-	(wait recv cq event)
-	free bh used for rts, incoming cts implicitly acked it
+	(recv cq event)
+	refill credits
 	post RDMA to address given in CTS
 	repost rr used to receive cts
-    SQ_WAITING_DATA_LOCAL_SEND_COMPLETE
-	(wait local send cq event for rdma write)
-	ack bufnum from his cts message
+
+    (Path 2)
+	(recv cq event)
+	refill credits
+	post RDMA to address given in CTS
+	repost rr used to receive cts
+    SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS
+	(send cq event)
+	free bh
+
+    SQ_WAITING_DATA_SEND_COMPLETION
+	(local send cq event for rdma write)
+    SQ_WAITING_RTS_DONE_BUFFER
+	credit?
+	alloc bh
+	post_sr mh_rts_done
 	unpin
+    SQ_WAITING_RTS_DONE_SEND_COMPLETION
+	(send cq event)
+	free bh
     SQ_WAITING_USER_TEST
 	wait test
 	release sendq
@@ -165,18 +180,19 @@ RTS recv, pre-post recv
     (user posts)
 	build recvq
     RQ_WAITING_INCOMING
-	(wait recv cq event)
-	match existing rq entry
-	re-post_rr from rts, but remember his bufnum
+	(recv cq event)
+	refill credit
+	re-post_rr from rts
     RQ_RTS_WAITING_CTS_BUFFER
+	credit?
 	alloc bh local for cts
-	    -> if failure state = RQ_RTS_WAITING_CTS_BUFFER
 	pin recv buffer
-	post_ack_recv_slot
-	send cts with his bufnum from his rts to ack it
-    RQ_RTS_WAITING_DATA
-	(wait recv cq event ack)
-	free bh local used for cts
+	send cts
+    RQ_RTS_WAITING_CTS_SEND_COMPLETION
+	(send cq event)
+	free bh
+    RQ_RTS_WAITING_RTS_DONE
+	(wait recv cq event)
 	unpin recv buffer
     RQ_WAITING_USER_TEST
 	(wait user test)
@@ -185,35 +201,23 @@ RTS recv, pre-post recv
 RTS recv, non-pre post
 ----------------------
     (rts arrives on network)
+	refill credit
 	build recvq
 	re-post_rr from rts
-	# ack rts for simplicitly, else must carry this number until post
     RQ_RTS_WAITING_USER_POST
 	(wait user post that matches)
-	alloc bh local for cts
-	pin recv buffer
-	post_ack_recv_slot
-	send cts (with bufnum as above)
-	    -> if failure state = RQ_RTS_WAITING_CTS_BUFFER
-    RQ_RTS_WAITING_DATA ... continue above
+    RQ_RTS_WAITING_CTS_BUFFER  ... continue as in prepost case above
 
 
 Other
 -----
 All QPs are tied to a single CQ for easier polling.
 
-Note that IBA guarantees that WQEs are retired in order for any single QP.  We
-could rely on this to do allocation and deallocation of outgoing buffer
-resources using a producer and consumer pointer rather than a general linked
-list, but that little optimization does not seem worth the risk that this may
-not be true on other networks.
-
-For now all messages are assumed to move atomically, even the big ones,
-since IB performs RDMA write as if it were one operation.
-
 IB guarantees that work requests are _initiated_ in the same order they
 are placed in a given queue (send or receive).  For the receive queue, for
-any mode except RD, work requests _complete_ in the same order too.
+any mode except RD, work requests _complete_ in the same order too.  But
+there is no correspondence between our send work requests, and receives
+that happen as initiated by the peer.
 
 
 BMI interface issues
@@ -232,10 +236,7 @@ For items in *_WAITING_BUFFER, implement a waiter list so that as they
 retire you can use buffers immediately to trigger another send.
 
 Maybe have a separate completion queue distinct from sendq and recvq.
-
-What is the lifetime of a method_addr?  Do I control them all and only
-hand back const pointers?  Must I copy each one when returned from a
-direct call to lookup, or inside an unexpected info structure?
+Some lookups are O(N), like for incoming RTS and receive matching.
 
 On QP allocation failure, probe remote side of existing QPs to see if
 any have become disconnected.  Close those connections, which might
@@ -244,5 +245,11 @@ result from a client crash.
 If client crashes or fails to call BMI_finalize() make sure server does
 the right thing.
 
+Points to test cancellation
+---------------------------
+Kill client at these spots to test server behavior:
+
+    1. pvfs2-ls: just after the send in BMI_ib_post_sendunexpected_list.
+    2. pvfs2-cp unix->pvfs: start of encourage_send_incoming_cts
 
 % vi: set tw=78 :

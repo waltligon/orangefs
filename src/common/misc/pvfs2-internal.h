@@ -25,6 +25,27 @@
  * specifier and a parameter are mismatched, that machine will issue
  * a warning, while 64-bit machines will silently perform the cast.
  */
+
+#ifdef __KERNEL__
+#include <linux/types.h>
+#endif
+
+#ifdef BITS_PER_LONG
+/* don't use SIZEOF_* fields generated at configure */
+#if BITS_PER_LONG == 32
+#  define llu(x) (x)
+#  define lld(x) (x)
+#  define SCANF_lld "%lld"
+#elif BITS_PER_LONG == 64
+#  define llu(x) (unsigned long long)(x)
+#  define lld(x) (long long)(x)
+#define SCANF_lld "%ld"
+#else
+#  error Unexpected  BITS_PER_LONG
+#endif
+
+#else
+ 
 #if SIZEOF_LONG_INT == 4 
 #  define llu(x) (x)
 #  define lld(x) (x)
@@ -37,14 +58,35 @@
 #  error Unexpected sizeof(long int)
 #endif
 
+#endif /* BITS_PER_LONG */
+
 /* key string definition macros.  These are used by the server and
  * by the client (in the case of xattrs with viewdist, etc).
  */
-#define ROOT_HANDLE_KEYSTR      "rh"
-#define DIRECTORY_ENTRY_KEYSTR  "de"
-#define DATAFILE_HANDLES_KEYSTR "dh"
-#define METAFILE_DIST_KEYSTR    "md"
-#define SYMLINK_TARGET_KEYSTR   "st"
+#define ROOT_HANDLE_KEYSTR      "rh\0"
+#define ROOT_HANDLE_KEYLEN      3
+
+#define DIRECTORY_ENTRY_KEYSTR  "de\0"
+#define DIRECTORY_ENTRY_KEYLEN  3
+
+#define DATAFILE_HANDLES_KEYSTR "dh\0"
+#define DATAFILE_HANDLES_KEYLEN 3
+
+#define METAFILE_DIST_KEYSTR    "md\0"
+#define METAFILE_DIST_KEYLEN    3
+
+#define SYMLINK_TARGET_KEYSTR   "st\0"
+#define SYMLINK_TARGET_KEYLEN   3
+
+/* Optional xattrs have "user.pvfs2." as a prefix */
+#define SPECIAL_DIST_NAME_KEYSTR        "dist_name\0"
+#define SPECIAL_DIST_NAME_KEYLEN         21
+#define SPECIAL_DIST_PARAMS_KEYSTR      "dist_params\0"
+#define SPECIAL_DIST_PARAMS_KEYLEN       23
+#define SPECIAL_NUM_DFILES_KEYSTR       "num_dfiles\0"
+#define SPECIAL_NUM_DFILES_KEYLEN        22
+#define SPECIAL_METAFILE_HINT_KEYSTR    "meta_hint\0"
+#define SPECIAL_METAFILE_HINT_KEYLEN    21
 
 #define IO_MAX_REGIONS 64
 

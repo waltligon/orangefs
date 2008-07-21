@@ -16,17 +16,20 @@ dnl
 dnl PVFS2 versioning information.  
 dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
-PVFS2_MAJOR=1
-PVFS2_MINOR=5
-PVFS2_SUB=1
+PVFS2_VERSION_MAJOR=2
+PVFS2_VERSION_MINOR=7
+PVFS2_VERSION_SUB=1
 #PVFS2_PRE=""
-PVFS2_PRE="pre1-$CONFIGURE_TIME"
+PVFS2_VERSION_PRE="pre1-$CONFIGURE_TIME"
 
-PVFS2_VERSION=$PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE
+PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
-AC_DEFINE_UNQUOTED(PVFS2_VERSION_MAJOR, $PVFS2_MAJOR, major version number)
-AC_DEFINE_UNQUOTED(PVFS2_VERSION_MINOR, $PVFS2_MINOR, minor version number)
-AC_DEFINE_UNQUOTED(PVFS2_VERSION_SUB, $PVFS2_SUB, sub version number)
+AC_DEFINE_UNQUOTED(PVFS2_VERSION_MAJOR, $PVFS2_VERSION_MAJOR, major version number)
+AC_DEFINE_UNQUOTED(PVFS2_VERSION_MINOR, $PVFS2_VERSION_MINOR, minor version number)
+AC_DEFINE_UNQUOTED(PVFS2_VERSION_SUB, $PVFS2_VERSION_SUB, sub version number)
+AC_SUBST(PVFS2_VERSION_MAJOR)
+AC_SUBST(PVFS2_VERSION_MINOR)
+AC_SUBST(PVFS2_VERSION_SUB)
 
 dnl Checks for host type
 dnl Ensures we can compile on this OS
@@ -70,13 +73,78 @@ AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
+
+AC_MSG_CHECKING([for required Math::BigInt perl module])
+perl -e "use Math::BigInt" 2>&1 > /dev/null
+if test $? != 0; then
+	AC_MSG_ERROR(no)
+else
+	AC_MSG_RESULT(yes)
+fi
+
 if test $host != $build; then
-  AC_CHECK_PROGS(BUILD_CC, gcc cc)
+	AC_CHECK_PROGS(BUILD_CC, gcc cc)
 else
 	BUILD_CC=$CC
+	BUILD_CFLAGS=$BUILD_CFLAGS
+	BUILD_LDFLAGS=$BUILD_LDFLAGS
 fi
 
 AC_SUBST(BUILD_CC)
+AC_SUBST(BUILD_CFLAGS)
+AC_SUBST(BUILD_LDFLAGS)
+
+#
+# Threading options.
+#
+# Client - thread-safe or not
+#   --disable-thread-safety : chooses null or posix locking mechanism
+#   For applications that know they are not multi-threaded, or choose
+#   to handle locking themselves, this configure option can be used to
+#   slightly decrease library-induced latency by removing the locking.
+#
+# Client - job threading
+#   libpvfs2-threaded.{so,a} with __PVFS2_JOB_THREADED__
+#   This option causes the client library to spawn an extra thread
+#   to handle network communications.  In this way, it is possible
+#   that the library can handle new and completed requests from
+#   the application while also interacting with the network.
+#
+#   These separate libraries can not be built using the existing
+#   configure mechanism.  They are only built if required by the
+#   kernel module helper.
+#
+# Server - three options:
+#   trove
+#     (hack Makefile.in)
+#   job
+#     (hack Makefile.in)
+#   aio
+#     --disable-aio-threaded-callbacks
+#
+#   Trove (storage) and job threading in the server are implemented
+#   using #defines, but not exported through the configure mechanism.
+#   AIO threaded callbacks are a separate thread used in conjunction
+#   with trove, and can be disabled through a configure option as
+#   AIO has been found to be buggy on many systems.
+#
+#
+# Kernel module helper - job threading
+#   --enable-threaded-kmod-helper
+#
+#   This is a special client that "helps" applications that access PVFS
+#   through the kernel using normal VFS calls (e.g. "ls").  This
+#   configure options builds it using __PVFS2_JOB_THREADED__ as described
+#   above.  That enables a thread for the network layer and a thread
+#   for the kernel interface.  This has the potential to increase the
+#   rate at which concurrent operations are processed, but has the potential
+#   drawback of somewhat higher overhead for a single operation and lack
+#   of testing.
+#
+#   Enabling this options causes one of libpvfs2-threaded.{so,a} to be
+#   built, depending on --enable-shared and --enable-static.  If both are
+#   enabled, the shared library takes precedence.
+#
 
 dnl a mechanism to turn off threads in the client library
 AC_MSG_CHECKING([for client library thread safety support])
@@ -108,8 +176,10 @@ fi],
 AC_SUBST(BUILD_SERVER)
 
 AC_ARG_WITH(openssl,
-	    [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)],
-	    [AX_OPENSSL(${withval})])
+	[  --with-openssl=<dir>    Build with openssl (default=/usr)
+  --without-openssl       Don't build with openssl.],
+	[AX_OPENSSL(${withval})],
+	[AX_OPENSSL_OPTIONAL])
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
@@ -128,18 +198,11 @@ AC_ARG_ENABLE(perf-counters,
 fi]
 ,)
 
-dnl a mechanism to turn off disk I/O for testing/debugging
-AC_ARG_ENABLE(disk-io,
-[  --disable-disk-io       Disables pvfs2-server disk I/O (for testing)],
-[if test "x$enableval" = "xno" ; then
-    CFLAGS="$CFLAGS -D__PVFS2_DISABLE_DISK_IO__"
-fi]
-,)
-
 dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
 MMAP_RA_CACHE=""
 AC_ARG_ENABLE(mmap-racache,
-[  --enable-mmap-racache   Enables mmap-readahead in kernel interface],
+[  --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel 
+                          interface],
 [if test "x$enableval" = "xyes" ; then
 MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
 fi]
@@ -148,8 +211,8 @@ AC_SUBST(MMAP_RA_CACHE)
 
 dnl See if the --enable-trusted-connections  option was given to configure
 AC_ARG_ENABLE(trusted-connections,
-[  --enable-trusted-connections  Enable connects only from trusted hosts/ports
-                                (experimental, off by default) ],
+[  --enable-trusted-connections  **EXPERIMENTAL** Enable connects only 
+                          from trusted hosts/ports ],
 [if test "x$enableval" = "xyes"; then
 TRUSTED_CONNECTIONS="-DUSE_TRUSTED"
 fi],
@@ -309,7 +372,8 @@ AC_SUBST(NPTL_WORKAROUND)
 
 use_aio_thcb=1
 AC_ARG_ENABLE([aio-threaded-callbacks],
-[  --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks],
+[  --disable-aio-threaded-callbacks  **EXPERIMENTAL** Disable use of AIO 
+                          threaded callbacks],
     if test "$enableval" = no ; then use_aio_thcb=0 ; fi)
 
 dnl there used to be a big hairy test in here, back when glibc-2.3.0 and
@@ -324,6 +388,37 @@ if test $use_aio_thcb = 1 ; then
 fi
 AC_SUBST(MISC_TROVE_FLAGS)
 
+dnl Check for AIO's aiocb->__error_code field (linux has it, OS X doesn't)
+AC_MSG_CHECKING([for __error_code field in aiocb struct])
+AC_TRY_COMPILE(
+    [
+     	#include <aio.h>
+    ], 
+    [
+    	struct aiocb aiocb;
+	aiocb.__error_code = 0;
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_AIOCB_ERROR_CODE, 1, Define if aiocb->__error_code exists)
+    ,
+    AC_MSG_RESULT(no)
+)
+
+dnl Check for AIO's aiocb->__return_value field (linux has it, OS X doesn't)
+AC_MSG_CHECKING([for __return_value field in aiocb struct])
+AC_TRY_COMPILE(
+    [
+        #include <aio.h>
+    ],
+    [
+        struct aiocb aiocb;
+	aiocb.__return_value = 0;
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_AIOCB_RETURN_VALUE, 1, Define if aiocb->__return_value exists)
+    ,
+    AC_MSG_RESULT(no)
+)
 dnl Check byte ordering
 AC_C_BIGENDIAN
 
@@ -467,13 +562,30 @@ AC_ARG_ENABLE(kernel-aio,
   )
 
 AC_ARG_ENABLE(kernel-sendfile,
-  [  --enable-kernel-sendfile    Forcibly enable kernel sendfile],
+  [  --enable-kernel-sendfile   **EXPERIMENTAL** Forcibly enable kernel 
+                          sendfile],
   [ enable_kernel_sendfile=$enableval ],
   [ enable_kernel_sendfile=no ]
   )
 
-AX_KERNEL_FEATURES
+if test -n "$lk_src" ; then
+    AX_KERNEL_FEATURES
+    AC_DEFINE(WITH_LINUX_KMOD, 1, [Define to build for linux kernel module userspace helper.])
+fi
 
+dnl
+dnl Enabling this option links pvfs2-client-core against libpvfs2-threaded.so.
+dnl Note that even without this option, pvfs2-client-core always requires
+dnl pthreads to run its remount thread.
+dnl
+AC_ARG_ENABLE([threaded-kmod-helper],
+[  --enable-threaded-kmod-helper  **EXPERIMENTAL** Use threads in the kernel 
+                          helper application],
+[ if test "x$enableval" = "xyes" ; then
+    THREADED_KMOD_HELPER=yes
+  fi
+])
+AC_SUBST(THREADED_KMOD_HELPER)
 
 dnl PAV configuration needs absolute location of source and build.
 dnl Linux-2.6 module needs absolute location of source, and uses the
@@ -489,7 +601,7 @@ AC_SUBST(BUILD_ABSOLUTE_TOP)
 AC_SUBST(SRC_RELATIVE_TOP)
 AC_SUBST(SRC_ABSOLUTE_TOP)
 
-dnl More options
+dnl Optimized code, but never override CFLAGS from command line or environment.
 AC_ARG_ENABLE(fast,
 [  --enable-fast           Disable optional debugging, enable optimizations.],
 [
@@ -497,6 +609,11 @@ if test "x$USR_CFLAGS_SET" = "xno"; then
     CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG"
 fi
 ])
+
+# default CFLAGS is -g -O2, unless user set CFLAGS or asked for --enable-fast
+if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
+    CFLAGS="$CFLAGS -g -O2"
+fi
 
 dnl Options that are not yet working
 dnl --------------------------------
@@ -513,18 +630,11 @@ dnl )
 
 AC_SUBST(ENABLE_COVERAGE)
 
+STRICT_CFLAGS=
 AC_ARG_ENABLE(strict,
-[  --enable-strict         Turn on strict debugging with gcc],
-[
-if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -g -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
-fi
-],
-[
-if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
-    CFLAGS="$CFLAGS -O2"
-fi
-])
+[  --enable-strict         Turn on strict compiler warnings],
+    STRICT_CFLAGS=1)
+AC_SUBST(STRICT_CFLAGS)
 
 dnl Check if user actually wants to see all our build output (compiles, links, etc.).
 AC_ARG_ENABLE(verbose-build,
@@ -545,9 +655,11 @@ test_for_epoll()
 	int fd;
 	fd = epoll_create(1);
 	close(fd);
-  ], CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
+  ],
+     AC_MSG_RESULT(yes)
      BUILD_EPOLL=1
      AC_SUBST(BUILD_EPOLL),
+     AC_MSG_RESULT(no)
   )
 }
 
@@ -560,7 +672,6 @@ AC_ARG_ENABLE(epoll,
   --disable-epoll         Disable epoll, use poll instead],
 [
    if test "x$enableval" = "xyes"; then
-        CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
         BUILD_EPOLL=1
         AC_SUBST(BUILD_EPOLL)
    fi
@@ -569,23 +680,36 @@ AC_ARG_ENABLE(epoll,
   test_for_epoll
 ])
 
-dnl enable resolving addresses all the way to hostnames in bmi reverse lookup
-AC_ARG_ENABLE(rev-hostname,
-[  --enable-rev-hostname   Enables hostname resolution in BMI reverse lookups],
-CFLAGS="$CFLAGS -D__PVFS2_BMI_REV_LOOKUP_HOSTNAME__"
-,)
-
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
-[  --enable-segv-backtrace Enables back traces in segfault signal handler],
-CFLAGS="$CFLAGS -D__PVFS2_SEGV_BACKTRACE__"
-,)
+[  --disable-segv-backtrace Disables back traces in segfault signal handler],,
+    AC_MSG_CHECKING(if segv backtrace capable)
+    AC_TRY_COMPILE([
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
+#if !defined(REG_EIP) && !defined(REG_RIP)
+		   choke me
+#endif
+		   ], [],
+		   AC_MSG_RESULT(yes)
+    		   PVFS2_SEGV_BACKTRACE=1,
+		   AC_MSG_RESULT(no)
+    )
+)
+AC_SUBST(PVFS2_SEGV_BACKTRACE)
 
 dnl shared or static client library
 AC_ARG_ENABLE(shared,
 [  --enable-shared         Build shared client library],
 [build_shared=$enableval], [build_shared=no])
 AC_SUBST(build_shared)
+
+dnl Bad things happen in the makefile if you happen to --disable-static
+dnl but do not --enable-shared.
+if test "x$build_shared" = "xno" -a "x$build_static" = "xno" ; then
+    AC_MSG_ERROR([Must do --enable-shared or --enable-static or both.])
+fi
 
 dnl See if CC is a GNU compiler.  This may require a real test in future
 dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
@@ -619,6 +743,40 @@ AC_ARG_WITH(efence,
        fi
        AC_CHECK_LIB(efence,malloc)
 )
+
+dnl Use compiled-in valgrind annotations?  Give the header path if
+dnl is not in the usual location.  It is common to install the header
+dnl in a subdirectory, so look for that too.  Leave the include path
+dnl in CPPFLAGS if it is not a standard header.
+AC_ARG_WITH(valgrind,
+[  --with-valgrind[=<path>]  Use valgrind annotations for debugging.], [
+    found=no
+    save_cppflags="$CPPFLAGS"
+    AC_MSG_CHECKING(for valgrind.h usability)
+    if test "x$withval" = xyes ; then
+	AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes)
+	if test x$found = xno ; then
+	    CPPFLAGS="$CPPFLAGS -I/usr/include/valgrind"
+	    AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes,
+		CPPFLAGS="$save_cppflags")
+	fi
+    else
+	for d in $withval $withval/include \
+	         $withval/valgrind $withval/include/valgrind
+	do
+	    CPPFLAGS="$CPPFLAGS -I$d"
+	    AC_COMPILE_IFELSE([#include <valgrind.h>], found=yes,
+		CPPFLAGS="$save_cppflags")
+	    if test x$found = xyes ; then
+		break
+	    fi
+	done
+    fi
+    AC_MSG_RESULT($found)
+    if test x$found = xyes ; then
+	AC_DEFINE(HAVE_VALGRIND_H, 1, Define if include file valgrind.h exists)
+    fi
+])
 
 if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     dnl
@@ -654,8 +812,6 @@ esac
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(arpa/inet.h)
 AC_CHECK_HEADERS(sys/socket.h)
-AC_CHECK_HEADERS(openssl/evp.h)
-AC_CHECK_HEADERS(openssl/crypto.h)
 dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)
 oldcflags="$CFLAGS"
@@ -683,180 +839,39 @@ AC_MSG_RESULT(no)  )
 
 CFLAGS="$oldcflags"
 
-dnl configure options for GM install path
-GM_HOME=
-AC_ARG_WITH(gm,
-[  --with-gm=<dir>         Location of the GM installation (default no GM)],
+dnl allow disabling TCP BMI method
+BUILD_BMI_TCP=1
+AC_ARG_WITH(bmi-tcp,
+[  --without-bmi-tcp       Disable BMI TCP method],
     if test -z "$withval" -o "$withval" = yes ; then
-	AC_MSG_ERROR([Option --with-gm requires the path to your GM tree.])
-    elif test "$withval" != no ; then
-	GM_HOME="$withval"
+	:
+    elif test "$withval" = no ; then
+	BUILD_BMI_TCP=
+    else
+	AC_MSG_ERROR([Option --with-tcp requires yes/no argument.])
     fi
 )
-if test -n "$GM_HOME" ; then
-    CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
-    AC_CHECK_HEADER(gm.h,, AC_MSG_ERROR([Header gm.h not found.]))
-    BUILD_GM=1
-    CPPFLAGS="$CPPFLAGS_OLD"
-fi
-AC_SUBST(GM_HOME)
-AC_SUBST(BUILD_GM)
+AC_SUBST(BUILD_BMI_TCP)
 
-dnl Configure options for IB install path.
-dnl --with-ib=<dir> is shorthand for
-dnl    --with-ib-includes=<dir>/include
-dnl    --with-ib-libs=<dir>/lib  (or lib64 if that exists)
-ib_home=
-AC_ARG_WITH(ib,
-[  --with-ib=<dir>         Location of the IB installation (default no IB)],
-    if test -z "$withval" -o "$withval" = yes ; then
-	AC_MSG_ERROR([Option --with-ib requires the path to your IB tree.])
-    elif test "$withval" != no ; then
-	ib_home="$withval"
-    fi
-)
-AC_ARG_WITH(ib-includes,
-[  --with-ib-includes=<dir>  Location of the IB includes],
-    if test -z "$withval" -o "$withval" = yes ; then
-	AC_MSG_ERROR([Option --with-ib-includes requires path to IB headers.])
-    elif test "$withval" != no ; then
-	IB_INCDIR="$withval"
-    fi
-)
-AC_ARG_WITH(ib-libs,
-[  --with-ib-libs=<dir>      Location of the IB libraries],
-    if test -z "$withval" -o "$withval" = yes ; then
-	AC_MSG_ERROR([Option --with-ib-libs requires path to IB libraries.])
-    elif test "$withval" != no ; then
-	IB_LIBDIR="$withval"
-    fi
-)
-dnl If supplied the incls and libs explicitly, use them, else populate them
-dnl using guesses from the --with-ib dir.
-if test -n "$ib_home" ; then
-    if test -z "$IB_INCDIR"; then
-	IB_INCDIR=$ib_home/include
-    fi
-    if test -z "$IB_LIBDIR"; then
-	IB_LIBDIR=$ib_home/lib64
-	if test ! -d "$IB_LIBDIR" ; then
-	    IB_LIBDIR=$ib_home/lib
-	fi
-    fi
-fi
-dnl If anything IB-ish was set, go look for header.
-if test -n "$IB_INCDIR$IB_LIBDIR" ; then
-    CPPFLAGS="$CPPFLAGS -I$IB_INCDIR"
-    AC_CHECK_HEADER(vapi.h,, AC_MSG_ERROR([Header vapi.h not found.]))
-    dnl Run test is not possible on a machine that does not have an IB NIC,
-    dnl and link test is hard because we need so many little libraries.   Bail
-    dnl and just check for existence; full library list is in Makefile.in.
-    if test ! -f $IB_LIBDIR/libvapi.so ; then
-	if test ! -f $IB_LIBDIR/libvapi.a ; then
-	    AC_MSG_ERROR([Infiniband library libvapi.so not found.])
-	fi
-    fi
-    BUILD_IB=1
-    AC_CHECK_HEADER(wrap_common.h,
-	AC_DEFINE(HAVE_IB_WRAP_COMMON_H, 1, Define if IB wrap_common.h exists.),
-	,
-	[#include <vapi.h>])
-    CPPFLAGS="$CPPFLAGS_OLD"
-fi
-AC_SUBST(BUILD_IB)
-AC_SUBST(IB_INCDIR)
-AC_SUBST(IB_LIBDIR)
+dnl
+dnl Configure bmi_gm, if --with-gm or a variant given.
+dnl
+AX_GM
 
-dnl Configure options for OpenIB install path.
-dnl --with-openib=<dir> is shorthand for
-dnl    --with-openib-includes=<dir>/include
-dnl    --with-openib-libs=<dir>/lib  (or lib64 if that exists)
-openib_home=
-AC_ARG_WITH(openib,
-[  --with-openib=<dir>     Location of the OpenIB install (default no OpenIB)],
-    if test -z "$withval" -o "$withval" = yes ; then
-	AC_MSG_ERROR([Option --with-openib requires the path to your OpenIB tree.])
-    elif test "$withval" != no ; then
-	openib_home="$withval"
-    fi
-)
-AC_ARG_WITH(openib-includes,
-[  --with-openib-includes=<dir>  Location of the OpenIB includes],
-    if test -z "$withval" -o "$withval" = yes ; then
-	AC_MSG_ERROR([Option --with-openib-includes requires path to OpenIB headers.])
-    elif test "$withval" != no ; then
-	OPENIB_INCDIR="$withval"
-    fi
-)
-AC_ARG_WITH(openib-libs,
-[  --with-openib-libs=<dir>  Location of the OpenIB libraries],
-    if test -z "$withval" -o "$withval" = yes ; then
-	AC_MSG_ERROR([Option --with-openib-libs requires path to OpenIB libraries.])
-    elif test "$withval" != no ; then
-	OPENIB_LIBDIR="$withval"
-    fi
-)
-dnl If supplied the incls and libs explicitly, use them, else populate them
-dnl using guesses from the --with-openib dir.
-if test -n "$openib_home" ; then
-    if test -z "$OPENIB_INCDIR"; then
-	OPENIB_INCDIR=$openib_home/include
-    fi
-    if test -z "$OPENIB_LIBDIR"; then
-	OPENIB_LIBDIR=$openib_home/lib64
-	if test ! -d "$OPENIB_LIBDIR" ; then
-	    OPENIB_LIBDIR=$openib_home/lib
-	fi
-    fi
-fi
-dnl If anything OpenIB-ish was set, go look for header.
-if test -n "$OPENIB_INCDIR$OPENIB_LIBDIR" ; then
-    CPPFLAGS="$CPPFLAGS -I$OPENIB_INCDIR"
-    AC_CHECK_HEADER(infiniband/verbs.h,,
-	AC_MSG_ERROR([Header infiniband/verbs.h not found.]))
-    dnl Run test is not possible on a machine that does not have an IB NIC.
-    dnl Link test would work, but just check for existence.
-    if test ! -f $OPENIB_LIBDIR/libibverbs.so ; then
-	if test ! -f $OPENIB_LIBDIR/libibverbs.a ; then
-	    AC_MSG_ERROR([OpenIB library libibverbs.so not found.])
-	fi
-    fi
-    BUILD_OPENIB=1
-    CPPFLAGS="$CPPFLAGS_OLD"
-fi
-AC_SUBST(BUILD_OPENIB)
-AC_SUBST(OPENIB_INCDIR)
-AC_SUBST(OPENIB_LIBDIR)
+dnl
+dnl Configure bmi_mx, if --with-mx or a variant given.
+dnl
+AX_MX
 
-if test -n "$BUILD_OPENIB" ; then
-    dnl Check for which version of the ibverbs library, device opening is
-    dnl different.  This format is the older one; newer is ibv_get_device_list.
-    save_ldflags="$LDFLAGS"
-    LDFLAGS="-L$OPENIB_LIBDIR -libverbs"
-    AC_MSG_CHECKING(for ibv_get_devices)
-    AC_TRY_LINK([], [
-	ibv_get_devices();
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_IBV_GET_DEVICES, 1,
-	          Define if libibverbs has ibv_get_devices),
-	AC_MSG_RESULT(no)
-    )
-    LDFLAGS="$save_ldflags"
+dnl
+dnl Configure bmi_ib, if --with-ib or a variant given.
+dnl
+AX_IB
 
-    dnl Check for existence of reregister event; it's somewhat new.
-    AC_MSG_CHECKING(for IBV_EVENT_CLIENT_REREGISTER)
-    AC_TRY_COMPILE([
-	#include "infiniband/verbs.h"
-    ], [
-	enum ibv_event_type x = IBV_EVENT_CLIENT_REREGISTER;
-    ],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_IBV_EVENT_CLIENT_REREGISTER, 1,
-	          Define if libibverbs has reregister event),
-	AC_MSG_RESULT(no)
-    )
-fi
+dnl
+dnl Configure bmi_portals, if --with-portals or a variant given.
+dnl
+AX_PORTALS
 
 dnl
 dnl check if fgetxattr takes extra arguments
@@ -889,6 +904,7 @@ AC_CHECK_FUNCS(strnlen)
 AC_CHECK_FUNCS(strtoull)
 AC_CHECK_FUNCS(strstr)
 AC_CHECK_FUNCS(fgetxattr)
+AC_CHECK_FUNCS(fsetxattr)
 
 dnl fgetxattr doesn't have a prototype on some systems
 AC_MSG_CHECKING([for fgetxattr prototype])
@@ -933,7 +949,23 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(no)
 )
 
-
+AC_MSG_CHECKING([for fsetxattr extra arguments])
+AC_TRY_COMPILE([
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+	],
+	[
+	fsetxattr(0, 0, 0, 0, 0, 0);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FSETXATTR_EXTRA_ARGS, 1, Define if fsetxattr takes position and option arguments),
+	AC_MSG_RESULT(no)
+)
 
 
 dnl check for getmntent(), special test
@@ -945,12 +977,14 @@ AC_CHECK_HEADERS(mntent.h)
 
 AC_ARG_ENABLE(static-server,
 [  --enable-static-server  Builds the server static],
-[
+[ staticserver=$enableval ],
+[ staticserver="no" ] )
+
+if test "$staticserver" = "yes"; then
 	SERVER_LDFLAGS="$LDFLAGS -static"
-],
-[
+else
 	SERVER_LDFLAGS="$LDFLAGS -rdynamic"
-])
+fi
 
 AC_SUBST(SERVER_LDFLAGS)
 
@@ -958,8 +992,9 @@ dnl this is a special case, used to key off options controlling gossip
 dnl   backtrace capability
 AC_CHECK_HEADERS(execinfo.h,
 	LDFLAGS="$LDFLAGS -rdynamic"
-	CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
+	GOSSIP_ENABLE_BACKTRACE=1
 )
+AC_SUBST(GOSSIP_ENABLE_BACKTRACE)
 
 dnl --
 dnl Check for SDL
@@ -1032,7 +1067,9 @@ src/common/statecomp/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
+src/io/bmi/bmi_mx/module.mk
 src/io/bmi/bmi_ib/module.mk
+src/io/bmi/bmi_portals/module.mk
 src/io/description/module.mk
 src/io/flow/module.mk
 src/io/flow/flowproto-bmi-trove/module.mk
@@ -1055,6 +1092,8 @@ doc/random/module.mk
 examples/pvfs2-server.rc
 doc/doxygen/pvfs2-doxygen.conf
 )
+
+chmod +x $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
 
 # print a summary of the configuration information
 AC_MSG_RESULT()
@@ -1138,6 +1177,25 @@ if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
    AC_MSG_RESULT(WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION.)
 fi
 
+
+dnl
+dnl Warn about potential slowness if using a "fast" network along with
+dnl TCP.  Polling with timeout in BMI is implemented by sequentially asking
+dnl each device to poll for half of the timeout.  This leads to a fixed 5 ms
+dnl delay in the TCP device before the IB device can be queried, for instance.
+dnl When traffic will only appear on one device, suggest that TCP be disabled.
+dnl But leave TCP as default on, certainly, as that is what most people want.
+dnl
+if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
+	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 ; then
+    if test x$BUILD_BMI_TCP = x1 ; then
+	AC_MSG_WARN([You have selected to build PVFS to use a "fast" network
+		    interface, but have not disabled TCP.  The way this is
+		    currently implemented will lead to rather slow response
+		    times on the fast interface.  Suggest you configure with
+		    "--without-bmi-tcp" for the best performance.])
+    fi
+fi
 
 AC_MSG_RESULT()
 AC_MSG_RESULT([PVFS2 version string: $PVFS2_VERSION])

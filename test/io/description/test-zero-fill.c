@@ -533,7 +533,7 @@ int main(int argc, char * argv[])
     }
 
     res = PVFS_sys_create(
-	zerofill_fname, lookup_resp.ref, attr, &creds, dist, &create_resp);
+	zerofill_fname, lookup_resp.ref, attr, &creds, dist, NULL, &create_resp);
     if(res < 0)
     {
 	PVFS_perror("create failed with errcode", res);

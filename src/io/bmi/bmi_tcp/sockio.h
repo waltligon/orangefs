@@ -41,15 +41,9 @@ int BMI_sockio_connect_sock(int,
 int BMI_sockio_init_sock(struct sockaddr *,
 			 const char *,
 			 int);
-int BMI_sockio_brecv(int s,
-		     void *buf,
-		     int len);
 int BMI_sockio_nbrecv(int s,
 		      void *buf,
 		      int len);
-int BMI_sockio_bsend(int s,
-		     void *buf,
-		     int len);
 int BMI_sockio_nbsend(int s,
 		      void *buf,
 		      int len);

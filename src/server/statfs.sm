@@ -19,18 +19,9 @@
 #include <sys/sysinfo.h>
 #endif
 
-static int statfs_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int statfs_do_statfs(
-    PINT_server_op *s_op, job_status_s* js_p);
-
 %%
 
-machine pvfs2_statfs_sm(
-    prelude,
-    do_statfs,
-    final_response,
-    cleanup)
+machine pvfs2_statfs_sm
 {
     state prelude
     {
@@ -63,8 +54,10 @@ machine pvfs2_statfs_sm(
  *
  * issue the trove call to retrieve fs statistics
  */
-static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action statfs_do_statfs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     TROVE_context_id tmp_context;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -77,7 +70,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     if (ret < 0)
     {
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* find out how many total handles this server controls */
@@ -87,7 +80,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     if(ret < 0)
     {   
         js_p->error_code = ret;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     /* we need a context to be able to make the getinfo call */
@@ -95,7 +88,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     if (ret < 0)
     {
         js_p->error_code = ret;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     ret = trove_collection_getinfo(
@@ -138,7 +131,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
 #endif
 
     js_p->error_code = ((ret != 1) ? ret : 0);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 
@@ -147,10 +140,26 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static int statfs_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action statfs_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
+
+static inline int PINT_get_object_ref_statfs(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.statfs.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+}
+
+struct PINT_server_req_params pvfs2_statfs_params =
+{
+    .string_name = "statfs",
+    .get_object_ref = PINT_get_object_ref_statfs,
+    .state_machine = &pvfs2_statfs_sm
+};
 
 
 /*

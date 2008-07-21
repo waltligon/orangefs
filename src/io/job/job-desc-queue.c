@@ -38,11 +38,7 @@ struct job_desc *alloc_job_desc(int type)
     }
     memset(jd, 0, sizeof(struct job_desc));
 
-    if (id_gen_safe_register(&(jd->job_id), jd) < 0)
-    {
-	free(jd);
-	return (NULL);
-    }
+    id_gen_safe_register(&(jd->job_id), jd);
 
     jd->type = type;
     return (jd);

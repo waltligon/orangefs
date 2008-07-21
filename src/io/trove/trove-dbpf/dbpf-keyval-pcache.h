@@ -18,7 +18,7 @@ extern "C" {
 typedef struct PINT_dbpf_keyval_pcache_s
 {
     struct PINT_tcache * tcache;
-    gen_mutex_t * mutex;
+    gen_mutex_t mutex;
 } PINT_dbpf_keyval_pcache;
 
 PINT_dbpf_keyval_pcache * PINT_dbpf_keyval_pcache_initialize(void);

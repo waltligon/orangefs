@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    fprintf(stderr, "Error code %d: ", user_opts->error_code);
+    fprintf(stderr, "Error code %d", user_opts->error_code);
     PVFS_perror("", -user_opts->error_code);
 
     return(0);
@@ -102,9 +102,7 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
-    fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s <error_code>\n",
-	argv[0]);
+    fprintf(stderr, "Usage: %s <error_code>\n", argv[0]);
     return;
 }
 

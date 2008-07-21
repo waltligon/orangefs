@@ -21,10 +21,11 @@
 #include "client-state-machine.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 
-extern PINT_client_sm *g_sm_p;
+extern PINT_smcb *g_smcb;
 
 /* PVFS_finalize
  *
@@ -34,6 +35,8 @@ extern PINT_client_sm *g_sm_p;
  */
 int PVFS_sys_finalize()
 {
+    id_gen_safe_finalize();
+
     PINT_util_digest_finalize();
     PINT_ncache_finalize();
     PINT_acache_finalize();
@@ -61,7 +64,7 @@ int PVFS_sys_finalize()
 
     gossip_disable();
 
-    free(g_sm_p);
+    PINT_client_state_machine_release(g_smcb);
 
     return 0;
 }

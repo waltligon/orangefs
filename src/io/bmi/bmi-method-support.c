@@ -23,7 +23,7 @@
  *
  * returns a pointer to the new structure on success, NULL on failure.
  */
-method_op_p alloc_method_op(bmi_size_t payload_size)
+method_op_p bmi_alloc_method_op(bmi_size_t payload_size)
 {
 
     /* we are going to allocate the full operation structure as a
@@ -41,11 +41,8 @@ method_op_p alloc_method_op(bmi_size_t payload_size)
     }
     memset(my_method_op, 0, (ssize + payload_size));
 
-    if (id_gen_safe_register(&(my_method_op->op_id), my_method_op) < 0)
-    {
-	free(my_method_op);
-	return (NULL);
-    }
+    id_gen_fast_register(&(my_method_op->op_id), my_method_op);
+
     my_method_op->error_code = 0;
     if (payload_size == 0)
     {
@@ -66,9 +63,9 @@ method_op_p alloc_method_op(bmi_size_t payload_size)
  * 
  * no return value
  */
-void dealloc_method_op(method_op_p op_p)
+void bmi_dealloc_method_op(method_op_p op_p)
 {
-    id_gen_safe_unregister(op_p->op_id);
+    id_gen_fast_unregister(op_p->op_id);
     free(op_p);
     op_p = NULL;
     return;
@@ -84,7 +81,7 @@ void dealloc_method_op(method_op_p op_p)
  * Returns a pointer to an allocated method_addr struct on success,
  * NULL on failure.
  */
-struct method_addr *alloc_method_addr(int method_type,
+struct bmi_method_addr *bmi_alloc_method_addr(int method_type,
 				      bmi_size_t payload_size)
 {
 
@@ -93,10 +90,10 @@ struct method_addr *alloc_method_addr(int method_type,
      * the memory address immediately following the method_addr
      * structure.
      */
-    struct method_addr *my_method_addr = NULL;
-    int ssize = sizeof(struct method_addr);
+    struct bmi_method_addr *my_method_addr = NULL;
+    int ssize = sizeof(struct bmi_method_addr);
     /* generic component */
-    my_method_addr = (struct method_addr *) malloc(ssize + payload_size);
+    my_method_addr = (struct bmi_method_addr *) malloc(ssize + payload_size);
     if (!my_method_addr)
     {
 	return (NULL);
@@ -119,7 +116,7 @@ struct method_addr *alloc_method_addr(int method_type,
  * 
  * no return value
  */
-void dealloc_method_addr(method_addr_p my_method_addr)
+void bmi_dealloc_method_addr(bmi_method_addr_p my_method_addr)
 {
     free(my_method_addr);
     my_method_addr = NULL;

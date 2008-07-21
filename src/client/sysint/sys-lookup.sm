@@ -43,36 +43,14 @@ enum
     LOOKUP_TYPE_RELATIVE_LN = 5,
     LOOKUP_TYPE_ABSOLUTE_LN = 6,
     LOOKUP_TYPE_LN_NO_FOLLOW = 7,
-    LOOKUP_NCACHE_HIT_FASTPATH = 8
 };
-
-/* state function prototypes */
-static int lookup_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_segment_lookup_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_segment_lookup_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_segment_verify_attr_present(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_segment_check_attr_type(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_segment_handle_relative_link(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_segment_handle_absolute_link(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_context_check_completion(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
 
 static int lookup_segment_lookup_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 /* helper function prototypes */
 static int initialize_context(
-    PINT_client_lookup_sm_ctx *ctx_array,
-    int current_ctx_index,
+    struct PINT_client_lookup_sm * lookup_sm,
     char *pathname,
     PVFS_object_ref ctx_starting_refn);
 
@@ -81,37 +59,32 @@ static void finalize_context(
 
 %%
 
-machine pvfs2_client_lookup_sm(
-    lookup_init,
-    lookup_segment_lookup_setup_msgpair,
-    lookup_segment_lookup_xfer_msgpair,
-    lookup_segment_lookup_failure,
-    lookup_segment_verify_attr_present,
-    lookup_segment_getattr,
-    lookup_segment_check_attr_type,
-    lookup_segment_handle_relative_link,
-    lookup_segment_handle_absolute_link,
-    lookup_context_check_completion,
-    lookup_cleanup)
+machine pvfs2_client_lookup_sm
 {
-    state lookup_init
+    state lookup_segment_start
     {
-	run lookup_init;
-	success => lookup_segment_lookup_setup_msgpair;
-        LOOKUP_NCACHE_HIT_FASTPATH => lookup_cleanup;
-        default => lookup_cleanup;
+	run lookup_segment_start;
+        success => lookup_segment_query_ncache;
+	default => lookup_segment_lookup_failure;
     }
 
-    state lookup_segment_lookup_setup_msgpair
+    state lookup_segment_query_ncache
     {
-	run lookup_segment_lookup_setup_msgpair;
+        run lookup_segment_query_ncache;
+        success => lookup_segment_verify_attr_present;
+        default => lookup_segment_setup_msgpair;
+    }
+
+    state lookup_segment_setup_msgpair
+    {
+	run lookup_segment_setup_msgpair;
         success => lookup_segment_lookup_xfer_msgpair;
 	default => lookup_segment_lookup_failure;
     }
 
     state lookup_segment_lookup_xfer_msgpair
     {
-        jump pvfs2_client_lookup_ncache_sm;
+        jump pvfs2_msgpairarray_sm;
 	success => lookup_segment_verify_attr_present;
         default => lookup_segment_lookup_failure;
     }
@@ -150,21 +123,21 @@ machine pvfs2_client_lookup_sm(
     state lookup_context_check_completion
     {
         run lookup_context_check_completion;
-        LOOKUP_CONTINUE => lookup_segment_lookup_setup_msgpair;
+        LOOKUP_CONTINUE => lookup_segment_start;
         default => lookup_cleanup;
     }
 
     state lookup_segment_handle_relative_link
     {
         run lookup_segment_handle_relative_link;
-        success => lookup_segment_lookup_setup_msgpair;
+        success => lookup_segment_start;
         default => lookup_cleanup;
     }
 
     state lookup_segment_handle_absolute_link
     {
         run lookup_segment_handle_absolute_link;
-        success => lookup_segment_lookup_setup_msgpair;
+        success => lookup_segment_start;
         default => lookup_cleanup;
     }
 
@@ -178,16 +151,15 @@ machine pvfs2_client_lookup_sm(
 %%
 
 static int initialize_context(
-    PINT_client_lookup_sm_ctx *ctx_array,
-    int current_ctx_index,
+    struct PINT_client_lookup_sm * lookup_sm,
     char *pathname,
     PVFS_object_ref ctx_starting_refn)
 {
-    int ret = -PVFS_EINVAL, pathlen = 0, num_segments = 0;
+    int i, ret = -PVFS_EINVAL, pathlen = 0, num_segments = 0;
     void *state = NULL;
     int cur_seg_index = 0, prev_ctx_index = 0;
     char *cur_seg_name = NULL;
-    char *orig_pathname = NULL, *seg_remaining = NULL;
+    char *orig_pathname = NULL, *seg_remaining = NULL, *slash_str = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     int num_consecutive_prev_ctx_dot_dots = 0;
     PINT_client_lookup_sm_ctx *ctx = NULL;
@@ -195,12 +167,37 @@ static int initialize_context(
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "initialize_context called\n");
 
-    if (ctx_array && pathname && (current_ctx_index > -1))
+    assert(lookup_sm->current_context <= lookup_sm->context_count);
+
+    if(lookup_sm->current_context == lookup_sm->context_count)
     {
-        ctx = &ctx_array[current_ctx_index];
+        lookup_sm->context_count++;
+        if(lookup_sm->context_count == 1)
+        {
+            lookup_sm->contexts = malloc(sizeof(PINT_client_lookup_sm_ctx));
+            if(!lookup_sm->contexts)
+            {
+                return -PVFS_ENOMEM;
+            }
+        }
+        else
+        {
+            lookup_sm->contexts = realloc(lookup_sm->contexts,
+                                          sizeof(PINT_client_lookup_sm_ctx) *
+                                          lookup_sm->context_count);
+            if(!lookup_sm->contexts)
+            {
+                return -PVFS_ENOMEM;
+            }
+        }
+    }
+
+    if (pathname && (lookup_sm->current_context > -1))
+    {
+        ctx = &lookup_sm->contexts[lookup_sm->current_context];
         assert(ctx);
 
-        prev_ctx_index = (current_ctx_index - 1);
+        prev_ctx_index = (lookup_sm->current_context - 1);
 
         pathlen = strlen(pathname);
         num_segments = PINT_string_count_segments(pathname);
@@ -281,7 +278,7 @@ static int initialize_context(
                         return -PVFS_ENOENT;
                     }
 
-                    prev_ctx = &ctx_array[prev_ctx_index];
+                    prev_ctx = &lookup_sm->contexts[prev_ctx_index];
                     assert(prev_ctx);
                     assert(prev_ctx->current_segment > 0);
 
@@ -366,7 +363,16 @@ static int initialize_context(
             cur_seg->seg_name = strdup(cur_seg_name);
             assert(cur_seg->seg_name);
 
-            seg_remaining = strstr(orig_pathname, cur_seg_name);
+            slash_str = orig_pathname;
+            for (i = 0; i < cur_seg_index; i++) {
+                slash_str = strchr(slash_str, '/');
+                if (slash_str == NULL) {
+                    break;
+                }
+                slash_str++;
+            }
+            /* seg_remaining = strstr(orig_pathname, cur_seg_name); */
+            seg_remaining = slash_str;
             if (seg_remaining)
             {
                 gossip_debug(GOSSIP_LOOKUP_DEBUG,
@@ -445,13 +451,14 @@ PVFS_error PVFS_isys_ref_lookup(
     PVFS_fs_id fs_id,
     char* relative_pathname,
     PVFS_object_ref parent,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_ref_lookup entered\n");
@@ -461,23 +468,27 @@ PVFS_error PVFS_isys_ref_lookup(
         return ret;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (sm_p == NULL)
+    PINT_smcb_alloc(&smcb, PVFS_SYS_LOOKUP,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(PINT_client_sm));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, fs_id);
+    PINT_init_msgarray_params(sm_p, fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.lookup.orig_pathname = relative_pathname;
     sm_p->u.lookup.starting_refn = parent;
     sm_p->u.lookup.lookup_resp = resp;
     sm_p->u.lookup.follow_link = follow_link;
     sm_p->u.lookup.current_context = 0;
+    sm_p->u.lookup.context_count = 0;
 
-    ret = initialize_context(sm_p->u.lookup.contexts,
-                             sm_p->u.lookup.current_context,
+    ret = initialize_context(&sm_p->u.lookup,
                              relative_pathname, parent);
     if (ret != 0)
     {
@@ -485,7 +496,7 @@ PVFS_error PVFS_isys_ref_lookup(
                    __func__, relative_pathname);
 
         PVFS_util_release_credentials(sm_p->cred_p);
-        free(sm_p);
+        PINT_smcb_free(smcb);
         return ret;
     }
 
@@ -493,7 +504,7 @@ PVFS_error PVFS_isys_ref_lookup(
                  relative_pathname, llu(parent.handle));
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_LOOKUP, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Dereference a path string relative to a parent directory.
@@ -502,11 +513,11 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
     char *relative_pathname,
     PVFS_object_ref parent,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link)
 {
-    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_error ret, error;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
@@ -518,27 +529,32 @@ PVFS_error PVFS_sys_ref_lookup(
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_ref_lookup call", ret);
-        error = ret;
+        return ret;
     }
-    else
+
+    if(op_id != -1)
     {
+        /* did not complete immediately, so we wait */
         ret = PVFS_sys_wait(op_id, "lookup", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
-            error = ret;
         }
+        if(error)
+        {
+            ret = error;
+        }
+        PINT_sys_release(op_id);
     }
 
-    PVFS_sys_release(op_id);
-    return error;
+    return ret;
 }
 
 /** Dereference a path string relative to the root directory.
  */
 PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id, char *name,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link)
 {
@@ -583,36 +599,69 @@ PVFS_error PVFS_sys_lookup(
 
 /****************************************************************/
 
-static int lookup_init(PINT_client_sm *sm_p,
-		       job_status_s *js_p)
+/*
+ * Reset for next segment lookup.
+ */
+static PINT_sm_action lookup_segment_start(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_init\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s\n", __func__);
 
-    assert(js_p->error_code == 0);
-
-    /* check the ncache to see if we can bypass this entire lookup */
-    if (PINT_ncache_get_cached_entry(
-                (const char*)sm_p->u.lookup.orig_pathname, 
-                &sm_p->u.lookup.lookup_resp->ref,
-                (const PVFS_object_ref*) &(sm_p->u.lookup.starting_refn)) == 0)
-    {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup: ncache fast path!\n");
-        js_p->error_code = LOOKUP_NCACHE_HIT_FASTPATH;
-    }
-    return 1;
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
-                                            job_status_s *js_p)
+static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_lookup_sm_segment *cur_seg;
+    PVFS_object_ref parent_ref, object_ref;
+    int ret;
+    
+    cur_seg = GET_CURRENT_SEGMENT(sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: segment [%s]\n", __func__,
+                 cur_seg->seg_name);
+
+    parent_ref.fs_id = cur_seg->seg_starting_refn.fs_id;
+    parent_ref.handle = cur_seg->seg_starting_refn.handle;
+
+    ret = PINT_ncache_get_cached_entry(cur_seg->seg_name, &object_ref,
+                                       &parent_ref);
+    if (ret == 0)
+    {
+        gossip_debug(GOSSIP_NCACHE_DEBUG,
+                     "*** ncache hit on first segment of %s (%llu|%d)\n",
+                     cur_seg->seg_name, llu(object_ref.handle),
+                     object_ref.fs_id);
+
+        cur_seg->seg_resolved_refn.handle = object_ref.handle;
+        cur_seg->seg_resolved_refn.fs_id = object_ref.fs_id;
+        js_p->error_code = 0;  /* hit */
+    } else {
+        gossip_debug(GOSSIP_NCACHE_DEBUG,
+                     "*** ncache clean miss on first segment of %s\n",
+                     cur_seg->seg_name);
+
+        js_p->error_code = 1;  /* miss */
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * This is called if the ncache lookup failed.  It builds the msgpair
+ * so that the next state can jump into xfer msgpair.
+ */
+static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *seg_to_lookup = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_lookup_setup_msgpair\n");
-
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s\n", __func__);
     js_p->error_code = 0;
 
     /* do a lookup on the current segment of the current context */
@@ -631,10 +680,11 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
       seg_to_lookup is set to seg_name, and never seg_remaining.  that
       guarantees we're issuing a lookup on a single path segment
     */
-    seg_to_lookup = (cur_seg->seg_remaining ? cur_seg->seg_remaining :
-                     cur_seg->seg_name);
+    seg_to_lookup = cur_seg->seg_remaining ? cur_seg->seg_remaining :
+                    cur_seg->seg_name;
 
-    PINT_init_msgpair(sm_p, msg_p);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_LOOKUP_PATH_FILL(
         msg_p->req,
@@ -661,20 +711,28 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    return 1;
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_lookup_failure(PINT_client_sm *sm_p,
-                                         job_status_s *js_p)
+static PINT_sm_action lookup_segment_lookup_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_failure\n");
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
-                                              job_status_s *js_p)
+/*
+ * We get here either if the ncache hit, or the xfer msgpair finished
+ * successfully.  In the ncache hit case, seg_attr will be all zeroes,
+ * so it will head into getattr, which may hit in its own acache.
+ */
+static PINT_sm_action lookup_segment_verify_attr_present(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -722,12 +780,13 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
         /* otherwise, continue to next state */
         js_p->error_code = 0;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
-                                          job_status_s *js_p)
+static PINT_sm_action lookup_segment_check_attr_type(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
@@ -737,9 +796,17 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
     assert(cur_seg);
 
-    PINT_free_object_attr(&(cur_seg->seg_attr));
-    PINT_copy_object_attr(&(cur_seg->seg_attr),
-                          &(sm_p->getattr.attr));
+    if ((cur_seg->seg_attr.objtype == PVFS_TYPE_NONE) ||
+        (cur_seg->seg_attr.objtype == PVFS_TYPE_SYMLINK)) {
+        /*
+         * Got here from getattr.  Else cur_seg already populated by
+         * a combined lookup+attrs from the server.  See function
+         * directly above for why this objtype condition.
+         */
+        PINT_free_object_attr(&(cur_seg->seg_attr));
+        PINT_copy_object_attr(&(cur_seg->seg_attr),
+                              &(sm_p->getattr.attr));
+    }
 
     cur_ctx = GET_CURRENT_CONTEXT(sm_p);
     assert(cur_ctx);
@@ -790,12 +857,13 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
                          "type %d\n", cur_seg->seg_attr.objtype);
             js_p->error_code = -PVFS_EINVAL;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
-                                               job_status_s *js_p)
+static PINT_sm_action lookup_segment_handle_relative_link(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *relative_symlink_target = NULL;
@@ -820,12 +888,6 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
     relative_symlink_target = cur_seg->seg_attr.u.sym.target_path;
 
     sm_p->u.lookup.current_context++;
-    if (sm_p->u.lookup.current_context > (MAX_LOOKUP_CONTEXTS - 1))
-    {
-        js_p->error_code = -PVFS_EMLINK;
-        return 1;
-    }
-
     /*
       and initialize the new context with the information we have so
       that it can resolve this absolute link.
@@ -834,20 +896,20 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
       the segment that resolves to this relative link, since the
       link must be relative to that starting parent
     */
-    ret = initialize_context(sm_p->u.lookup.contexts,
-                             sm_p->u.lookup.current_context,
+    ret = initialize_context(&sm_p->u.lookup,
                              relative_symlink_target,
                              cur_seg->seg_starting_refn);
     if (ret)
     {
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
-                                               job_status_s *js_p)
+static PINT_sm_action lookup_segment_handle_absolute_link(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *absolute_symlink_target = NULL;
@@ -871,11 +933,6 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
     absolute_symlink_target = cur_seg->seg_attr.u.sym.target_path;
 
     sm_p->u.lookup.current_context++;
-    if (sm_p->u.lookup.current_context > (MAX_LOOKUP_CONTEXTS - 1))
-    {
-        js_p->error_code = -PVFS_EMLINK;
-        return 1;
-    }
 
     /*
       and initialize the new context with the information we have so
@@ -889,20 +946,20 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
         root_refn.fs_id, &root_refn.handle);
     assert(ret == 0);
 
-    ret = initialize_context(sm_p->u.lookup.contexts,
-                             sm_p->u.lookup.current_context,
+    ret = initialize_context(&sm_p->u.lookup,
                              absolute_symlink_target,
                              root_refn);
     if (ret)
     {
         js_p->error_code = ret;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_context_check_completion(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
+static PINT_sm_action lookup_context_check_completion(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref last_resolved_refn;
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
@@ -944,7 +1001,7 @@ static int lookup_context_check_completion(PINT_client_sm *sm_p,
             sm_p->u.lookup.lookup_resp->ref =
                 cur_ctx->ctx_resolved_refn;
             js_p->error_code = 0;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
         else
         {
@@ -991,31 +1048,31 @@ static int lookup_context_check_completion(PINT_client_sm *sm_p,
     }
 
     js_p->error_code = LOOKUP_CONTINUE;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lookup_cleanup(PINT_client_sm *sm_p,
-                          job_status_s *js_p)
+static PINT_sm_action lookup_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_cleanup\n");
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    if (js_p->error_code == LOOKUP_NCACHE_HIT_FASTPATH)
-    {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup fast path exiting\n");
-        js_p->error_code = 0;
-    }
-
     sm_p->error_code = js_p->error_code;
 
     /* clean up all used memory for this lookup */
-    for(i = 0; i < MAX_LOOKUP_CONTEXTS; i++)
+    for(i = 0; i < sm_p->u.lookup.context_count; i++)
     {
         finalize_context(&sm_p->u.lookup.contexts[i]);
     }
+    if(sm_p->u.lookup.context_count > 0)
+    {
+        free(sm_p->u.lookup.contexts);
+    }
+
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "All contexts finalized\n");
 
     if (sm_p->error_code)
@@ -1034,8 +1091,8 @@ static int lookup_cleanup(PINT_client_sm *sm_p,
     }
 
     /* mark operation as complete */
-    sm_p->op_complete = 1;
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 static int lookup_segment_lookup_comp_fn(
@@ -1044,7 +1101,8 @@ static int lookup_segment_lookup_comp_fn(
     int index)
 {
     int i = 0;
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     int current_seg_index = sm_p->u.lookup.contexts[
         sm_p->u.lookup.current_context].current_segment;
@@ -1063,6 +1121,8 @@ static int lookup_segment_lookup_comp_fn(
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
                  resp_p->u.lookup_path.handle_count);
+
+    memset(&last_resolved_refn, 0, sizeof(PVFS_object_ref));
 
     /*
       at this point we have 1 or more resolved handles so we're going
@@ -1102,23 +1162,20 @@ static int lookup_segment_lookup_comp_fn(
                 &(resp_p->u.lookup_path.attr_array[i]));
         }
         
-        if (!sm_p->ncache_hit)
-        {
-            gossip_debug(
-                GOSSIP_NCACHE_DEBUG, "*** ncache update on %s "
-                                     "target (%llu|%d) "
-                                     "parent (%llu|%d)\n",
-                cur_seg->seg_name,
-                llu(last_resolved_refn.handle),
-                last_resolved_refn.fs_id,
-                llu(cur_seg->seg_starting_refn.handle),
-                cur_seg->seg_starting_refn.fs_id);
+        gossip_debug(
+            GOSSIP_NCACHE_DEBUG, "*** ncache update on %s "
+                                 "target (%llu|%d) "
+                                 "parent (%llu|%d)\n",
+            cur_seg->seg_name,
+            llu(last_resolved_refn.handle),
+            last_resolved_refn.fs_id,
+            llu(cur_seg->seg_starting_refn.handle),
+            cur_seg->seg_starting_refn.fs_id);
 
-            PINT_ncache_update(
-                    (const char*) cur_seg->seg_name,
-                    (const PVFS_object_ref*) &(last_resolved_refn),
-                    (const PVFS_object_ref*) &(cur_seg->seg_starting_refn));
-        }
+        PINT_ncache_update(
+                (const char*) cur_seg->seg_name,
+                (const PVFS_object_ref*) &(last_resolved_refn),
+                (const PVFS_object_ref*) &(cur_seg->seg_starting_refn));
     }
     assert(i == resp_p->u.lookup_path.handle_count);
 

@@ -100,6 +100,60 @@ static int PINT_util_resolve_absolute(
     char* out_fs_path,
     int out_fs_path_max);
 
+struct PVFS_sys_mntent* PVFS_util_gen_mntent(
+    char* config_server,
+    char* fs_name)
+{
+    struct PVFS_sys_mntent* tmp_ent = NULL;
+
+    tmp_ent = (struct PVFS_sys_mntent*)malloc(sizeof(struct
+        PVFS_sys_mntent));
+    if(!tmp_ent)
+    {
+        return(NULL);
+    }
+    memset(tmp_ent, 0, sizeof(struct PVFS_sys_mntent));
+
+    tmp_ent->num_pvfs_config_servers = 1;
+    tmp_ent->pvfs_config_servers = (char**)malloc(sizeof(char*));
+    if(!tmp_ent->pvfs_config_servers)
+    {
+        free(tmp_ent);
+        return(NULL);
+    }
+
+    tmp_ent->pvfs_config_servers[0] = strdup(config_server);
+    if(!tmp_ent->pvfs_config_servers[0])
+    {
+        free(tmp_ent->pvfs_config_servers);
+        free(tmp_ent);
+        return(NULL);
+    }
+
+    tmp_ent->pvfs_fs_name = strdup(fs_name);
+    if(!tmp_ent->pvfs_fs_name)
+    {
+        free(tmp_ent->pvfs_config_servers[0]);
+        free(tmp_ent->pvfs_config_servers);
+        free(tmp_ent);
+        return(NULL);
+    }
+
+    tmp_ent->flowproto = FLOWPROTO_DEFAULT;
+    tmp_ent->encoding = ENCODING_DEFAULT;
+
+    return(tmp_ent);
+}
+
+void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
+{
+    free(mntent->pvfs_config_servers[0]);
+    free(mntent->pvfs_config_servers);
+    free(mntent->pvfs_fs_name);
+    free(mntent);
+    return;
+}
+
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials)
 {
@@ -124,13 +178,13 @@ int PVFS_util_get_umask(void)
 }
 
 PVFS_credentials *PVFS_util_dup_credentials(
-    PVFS_credentials *credentials)
+    const PVFS_credentials *credentials)
 {
     PVFS_credentials *ret = NULL;
 
     if (credentials)
     {
-        ret = (PVFS_credentials *)malloc(sizeof(PVFS_credentials));
+        ret = malloc(sizeof(PVFS_credentials));
         if (ret)
         {
             memcpy(ret, credentials, sizeof(PVFS_credentials));
@@ -164,6 +218,12 @@ int PVFS_util_copy_sys_attr(
         dest_attr->dfile_count = src_attr->dfile_count;
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
+        dest_attr->flags = src_attr->flags;
+
+        if (src_attr->mask & PVFS_ATTR_SYS_SIZE)
+        {
+            dest_attr->size = src_attr->size;
+        }
 
         if((src_attr->mask & PVFS_ATTR_SYS_LNK_TARGET) &&
             src_attr->link_target)
@@ -255,6 +315,30 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     int ret = -1;
     int tmp_mntent_count = 0;
     PVFS_util_tab *current_tab = NULL;
+    char *epenv, *tmp;
+
+    if((epenv = getenv("PVFS2EP")) != NULL)
+    {
+        struct PVFS_sys_mntent *mntent;
+        current_tab = &s_stat_tab_array[0];
+        current_tab->mntent_array = malloc(sizeof(struct PVFS_sys_mntent));
+        mntent = &current_tab->mntent_array[0];
+        strcpy(current_tab->tabfile_name, "PVFSEP");
+        current_tab->mntent_count = 1;
+        mntent->pvfs_config_servers = malloc(sizeof(char *));
+        mntent->pvfs_config_servers[0] = strdup(index(epenv, '=') + 1);
+        mntent->num_pvfs_config_servers = 1;
+        mntent->the_pvfs_config_server = mntent->pvfs_config_servers[0];
+        mntent->pvfs_fs_name = strdup(rindex(mntent->the_pvfs_config_server, '/'));
+        mntent->pvfs_fs_name++;
+        mntent->flowproto = FLOWPROTO_DEFAULT;
+        mntent->encoding = ENCODING_DEFAULT;
+        mntent->mnt_dir = strdup(epenv);
+        tmp = index(mntent->mnt_dir, '=');
+        *tmp = 0;
+        mntent->mnt_opts = strdup("rw");
+        return &s_stat_tab_array[0];
+    }
 
     if (tabfile != NULL)
     {
@@ -370,6 +454,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             char *cp;
             int cur_server;
 
+            /* Enable integrity checks by default */
+            me->integrity_check = 1;
             /* comma-separated list of ways to contact a config server */
             me->num_pvfs_config_servers = 1;
             for (cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++)
@@ -528,6 +614,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     }
     s_stat_tab_count++;
     strcpy(s_stat_tab_array[s_stat_tab_count-1].tabfile_name, targetfile);
+    PINT_fstab_close(mnt_fp);
     gen_mutex_unlock(&s_stat_tab_mutex);
     return (&s_stat_tab_array[s_stat_tab_count - 1]);
 
@@ -843,6 +930,7 @@ int PVFS_util_remove_internal_mntent(
                 }
                 PVFS_util_copy_mntent(
                     &tmp_mnt_array[new_count++], current_mnt);
+                PVFS_util_free_mntent(current_mnt);
             }
 
             /* finally, swap the mntent arrays */
@@ -923,6 +1011,12 @@ int PVFS_util_resolve(
     char* tmp_path = NULL;
     char* parent_path = NULL;
     int base_len = 0;
+
+    if(strlen(local_path) > (PVFS_NAME_MAX-1))
+    {
+        gossip_err("Error: PVFS_util_resolve() input path too long.\n");
+        return(-PVFS_ENAMETOOLONG);
+    }
 
     /* the most common case first; just try to resolve the path that we
      * were given
@@ -1084,43 +1178,55 @@ int PVFS_util_init_defaults(void)
 #define KILOBYTE                1024
 #define MEGABYTE   (1024 * KILOBYTE)
 #define GIGABYTE   (1024 * MEGABYTE)
-/*
-#define TERABYTE   (1024 * GIGABYTE)
-#define PETABYTE   (1024 * TERABYTE)
-#define EXABYTE    (1024 * PETABYTE)
-#define ZETTABYTE  (1024 * EXABYTE)
-#define YOTTABYTE  (1024 * ZETTABYTE)
-*/
+#define TERABYTE   (1024llu * GIGABYTE)
+#define PETABYTE   (1024llu * TERABYTE)
+#define EXABYTE    (1024llu * PETABYTE)
+#define ZETTABYTE  (1024llu * EXABYTE)
+#define YOTTABYTE  (1024llu * ZETTABYTE)
+
 /*****************/
 /* si size units */
 /*****************/
 #define SI_KILOBYTE                   1000
 #define SI_MEGABYTE   (1000 * SI_KILOBYTE)
 #define SI_GIGABYTE   (1000 * SI_MEGABYTE)
-/*
-#define SI_TERABYTE  (1000 * SI_GIGABYTE)
-#define SI_PETABYTE  (1000 * SI_TERABYTE)
-#define SI_EXABYTE   (1000 * SI_PETABYTE)
-#define SI_ZETTABYTE (1000 * SI_EXABYTE)
-#define SI_YOTTABYTE (1000 * SI_ZETTABYTE)
-*/
-#define NUM_SIZES                  3
+#define SI_TERABYTE  (1000llu * SI_GIGABYTE)
+#define SI_PETABYTE  (1000llu * SI_TERABYTE)
+#define SI_EXABYTE   (1000llu * SI_PETABYTE)
+#define SI_ZETTABYTE (1000llu * SI_EXABYTE)
+#define SI_YOTTABYTE (1000llu * SI_ZETTABYTE)
+
+#if SIZEOF_LONG_INT == 8
+#define NUM_SIZES                  5
+#else
+#define NUM_SIZES                  4
+#endif
 
 static PVFS_size PINT_s_size_table[NUM_SIZES] =
 {
-    /*YOTTABYTE, ZETTABYTE, EXABYTE, PETABYTE, TERABYTE, */
+    /*YOTTABYTE, ZETTABYTE, EXABYTE, */
+#if SIZEOF_LONG_INT == 8
+    PETABYTE,
+    TERABYTE,
+#endif
     GIGABYTE, MEGABYTE, KILOBYTE
 };
 
 static PVFS_size PINT_s_si_size_table[NUM_SIZES] =
 {
-    /*SI_YOTTABYTE, SI_ZETTABYTE, SI_EXABYTE, SI_PETABYTE, SI_TERABYTE, */
+    /*SI_YOTTABYTE, SI_ZETTABYTE, SI_EXABYTE, */
+#if SIZEOF_LONG_INT == 8
+    SI_PETABYTE, SI_TERABYTE,
+#endif
     SI_GIGABYTE, SI_MEGABYTE, SI_KILOBYTE
 };
 
 static const char *PINT_s_str_size_table[NUM_SIZES] =
 {
-    /*"Y", "Z", "E", "P","T", */
+    /*"Y", "Z", "E", */
+#if SIZEOF_LONG_INT == 8
+    "P","T",
+#endif
     "G", "M", "K"
 };
 
@@ -1513,6 +1619,25 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
+    if(sys_attrmask & PVFS_ATTR_SYS_UID)
+        attrmask |= PVFS_ATTR_COMMON_UID;
+    if(sys_attrmask & PVFS_ATTR_SYS_GID)
+        attrmask |= PVFS_ATTR_COMMON_GID;
+    if(sys_attrmask & PVFS_ATTR_SYS_PERM)
+        attrmask |= PVFS_ATTR_COMMON_PERM;
+    if(sys_attrmask & PVFS_ATTR_SYS_ATIME)
+        attrmask |= PVFS_ATTR_COMMON_ATIME;
+    if(sys_attrmask & PVFS_ATTR_SYS_CTIME)
+        attrmask |= PVFS_ATTR_COMMON_CTIME;
+    if(sys_attrmask & PVFS_ATTR_SYS_MTIME)
+        attrmask |= PVFS_ATTR_COMMON_MTIME;
+    if(sys_attrmask & PVFS_ATTR_SYS_TYPE)
+        attrmask |= PVFS_ATTR_COMMON_TYPE;
+    if(sys_attrmask & PVFS_ATTR_SYS_ATIME_SET)
+        attrmask |= PVFS_ATTR_COMMON_ATIME_SET;
+    if(sys_attrmask & PVFS_ATTR_SYS_MTIME_SET)
+        attrmask |= PVFS_ATTR_COMMON_MTIME_SET;
+
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "attrmask being passed to server: ");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
@@ -1797,6 +1922,40 @@ static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry)
     }
 }
 #endif /* DEFINE_MY_GET_NEXT_FSENT */
+
+int32_t PVFS_util_translate_mode(int mode, int suid)
+{
+    int ret = 0, i = 0;
+#define NUM_MODES 11
+    static int modes[NUM_MODES] =
+    {
+        S_IXOTH, S_IWOTH, S_IROTH,
+        S_IXGRP, S_IWGRP, S_IRGRP,
+        S_IXUSR, S_IWUSR, S_IRUSR,
+        S_ISGID, S_ISUID
+    };
+    static int pvfs2_modes[NUM_MODES] =
+    {
+        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
+        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
+        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+        PVFS_G_SGID,    PVFS_U_SUID
+    };
+
+    for(i = 0; i < NUM_MODES; i++)
+    {
+        if (mode & modes[i])
+        {
+            ret |= pvfs2_modes[i];
+        }
+    }
+    if (suid == 0 && (ret & PVFS_U_SUID))
+    {
+         ret &= ~PVFS_U_SUID;
+    }
+    return ret;
+#undef NUM_MODES
+}
 
 /*
  * Local variables:

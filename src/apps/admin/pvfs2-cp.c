@@ -421,7 +421,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
     int ret = -1;
     char *entry_name;		    /* name of the pvfs2 file */
     char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
-
+ 
     if (obj->fs_type == UNIX_FILE)
     {
         memset(&stat_buf, 0, sizeof(struct stat));
@@ -628,7 +628,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
             
 		ret = PVFS_sys_create(entry_name, parent_ref, 
                                       obj->u.pvfs2.attr, credentials,
-                                      new_dist, &resp_create);
+                                      new_dist, NULL, &resp_create);
 		if (ret < 0)
 		{
 		    PVFS_perror("PVFS_sys_create", ret); 
@@ -682,7 +682,7 @@ void make_attribs(PVFS_sys_attr *attr, PVFS_credentials *credentials,
 {
     attr->owner = credentials->uid; 
     attr->group = credentials->gid;
-    attr->perms = PVFS2_translate_mode(mode, 0);
+    attr->perms = PVFS_util_translate_mode(mode, 0);
     attr->mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     attr->dfile_count = nr_datafiles;
 

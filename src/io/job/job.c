@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <time.h>
 
+#include "state-machine.h"
 #include "job.h"
 #include "job-desc-queue.h"
 #include "gen-locks.h"
@@ -99,6 +100,7 @@ static void trove_thread_mgr_callback(void* data,
 static void lock_callback(void* data);
 static void flow_callback(flow_descriptor* flow_d);
 #ifndef __PVFS2_JOB_THREADED__
+static gen_mutex_t work_cycle_mutex = GEN_MUTEX_INITIALIZER;
 static void do_one_work_cycle_all(int idle_time_ms);
 #endif
 
@@ -159,6 +161,8 @@ int job_initialize(int flags)
     assert(ret == 0);
 #endif
 
+    id_gen_safe_initialize();
+
     gen_mutex_lock(&initialized_mutex);
     initialized = 1;
     gen_mutex_unlock(&initialized_mutex);
@@ -177,6 +181,8 @@ int job_finalize(void)
     gen_mutex_lock(&initialized_mutex);
     initialized = 0;
     gen_mutex_unlock(&initialized_mutex);
+
+    id_gen_safe_finalize();
 
     PINT_thread_mgr_bmi_stop();
 #ifdef __PVFS2_CLIENT__
@@ -335,7 +341,8 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ERROR_CODE(errno);
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = size;
@@ -431,7 +438,8 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ERROR_CODE(errno);
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = total_size;
@@ -524,7 +532,8 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-        return (-ENOMEM);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -610,7 +619,8 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-        return (-ENOMEM);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -689,7 +699,8 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     jd = alloc_job_desc(JOB_BMI_UNEXP);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi_unexp.info = bmi_unexp_d;
@@ -716,7 +727,8 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
             /* error testing */
             dealloc_job_desc(jd);
             jd = NULL;
-            return (ret);
+            out_status_p->error_code = ret;
+            return 1;
         }
 
         if (outcount == 1)
@@ -812,7 +824,8 @@ int job_dev_unexp(
     jd = alloc_job_desc(JOB_DEV_UNEXP);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.dev_unexp.info = dev_unexp_d;
@@ -830,7 +843,8 @@ int job_dev_unexp(
             /* error testing */
             dealloc_job_desc(jd);
             jd = NULL;
-            return (ret);
+            out_status_p->error_code = ret;
+            return 1;
         }
 
         if (outcount == 1)
@@ -957,8 +971,11 @@ int job_dev_write_list(void** buffer_list,
  * returns 0 on success, -errno on failure, and 1 on immediate
  * completion 
  */
-int job_req_sched_post(struct PVFS_server_req *in_request,
-                       int req_index,
+int job_req_sched_post(enum PVFS_server_op op,
+                       PVFS_fs_id fs_id,
+                       PVFS_handle handle,
+                       enum PINT_server_req_access_type access_type,
+                       enum PINT_server_sched_policy sched_policy,
                        void *user_ptr,
                        job_aint status_user_tag,
                        job_status_s * out_status_p,
@@ -981,14 +998,16 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.req_sched.post_flag = 1;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
 
-    ret = PINT_req_sched_post(in_request, req_index, jd, &(jd->u.req_sched.id));
+    ret = PINT_req_sched_post(
+        op, fs_id, handle, access_type, sched_policy, jd, &(jd->u.req_sched.id));
 
     if (ret < 0)
     {
@@ -1018,6 +1037,52 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
     return (0);
 }
 
+int job_req_sched_change_mode(enum PVFS_server_mode mode,
+                              void *user_ptr,
+                              job_aint status_user_tag,
+                              job_status_s *out_status_p,
+                              job_id_t *id,
+                              job_context_id context_id)
+{
+    struct job_desc *jd = NULL;
+    int ret = -1;
+
+    jd = alloc_job_desc(JOB_REQ_SCHED);
+    if(!jd)
+    {
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->u.req_sched.post_flag = 1;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+
+    ret = PINT_req_sched_change_mode(mode, jd, &(jd->u.req_sched.id));
+    if (ret < 0)
+    {
+        /* error posting */
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        *id = jd->job_id;
+        /* don't delete the job desc until a matching release comes through */
+        return (1);
+    }
+
+    *id = jd->job_id;
+    return (0);
+}
+
 /* job_req_sched_post_timer()
  *
  * posts a timer to the request scheduler
@@ -1044,7 +1109,8 @@ int job_req_sched_post_timer(int msecs,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1107,7 +1173,8 @@ int job_req_sched_release(job_id_t in_completed_id,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1132,15 +1199,13 @@ int job_req_sched_release(job_id_t in_completed_id,
     dealloc_job_desc(match_jd);
     match_jd = NULL;
 
-    /* NOTE: I am letting the return value propigate here, rather
-     * than just setting the status.  Failure here is bad...
-     */
     if (ret < 0)
     {
         /* error posting */
         dealloc_job_desc(jd);
         jd = NULL;
-        return (ret);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
 
     if (ret == 1)
@@ -1186,7 +1251,8 @@ int job_flow(flow_descriptor * flow_d,
     jd = alloc_job_desc(JOB_FLOW);
     if (!jd)
     {
-        return (-ENOMEM);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.flow.flow_d = flow_d;
@@ -1300,7 +1366,8 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
@@ -1389,7 +1456,8 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1487,7 +1555,8 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
@@ -1576,7 +1645,8 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1664,7 +1734,8 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1745,7 +1816,8 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1833,7 +1905,8 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1920,7 +1993,8 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2008,7 +2082,8 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2090,7 +2165,8 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2166,7 +2242,8 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2254,7 +2331,8 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2306,6 +2384,96 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     return (0);
 }
 
+/* job_trove_dspace_getattr_list()
+ *
+ * read generic dspace attributes for a set of handles
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on
+ * failure
+ */
+int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
+                             int nhandles,
+                             PVFS_handle *handle_array,
+                             void *user_ptr,
+                             PVFS_error *out_error_array,
+                             PVFS_ds_attributes *out_ds_attr_ptr,
+                             job_aint status_user_tag,
+                             job_status_s *out_status_p,
+                             job_id_t *id,
+                             job_context_id context_id)
+{
+    /* post a trove operation dspace get attr list.  If it completes (or
+     * fails) immediately, then return and fill in the status
+     * structure.  If it needs to be tested for completion later,
+     * then queue up a job desc structure.
+     */
+
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    void* user_ptr_internal;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST, jd->job_id);
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_dspace_getattr_list(coll_id,
+                               nhandles,
+                               handle_array, out_ds_attr_ptr,
+                               out_error_array,
+                               0 /* flags */ ,
+                               user_ptr_internal, 
+                               global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0)
+    {
+        /* error posting trove operation */
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST, 0, jd->job_id);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST, 0, jd->job_id);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        return (ret);
+    }
+
+    /* if we fall to this point, the job did not immediately complete and
+     * we must queue up to test it later 
+     */
+    *id = jd->job_id;
+    trove_pending_count++;
+    jd->event_type = PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST;
+
+    return (0);
+}
+
 /* job_trove_dspace_setattr()
  *
  * write generic dspace attributes 
@@ -2339,7 +2507,8 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2425,7 +2594,8 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2494,7 +2664,8 @@ int job_trove_bstream_validate(PVFS_fs_id coll_id,
                                job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
-    return (-ENOSYS);
+    out_status_p->error_code = -PVFS_ENOSYS;
+    return 1;
 }
 
 /* job_trove_keyval_remove()
@@ -2530,7 +2701,8 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2600,7 +2772,8 @@ int job_trove_keyval_validate(PVFS_fs_id coll_id,
                               job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
-    return (-ENOSYS);
+    out_status_p->error_code = -PVFS_ENOSYS;
+    return 1;
 }
 
 /* job_trove_keyval_iterate()
@@ -2638,7 +2811,8 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2731,7 +2905,8 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2822,7 +2997,8 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2914,10 +3090,11 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
-    jd->u.trove.handle = 0;
+    jd->u.trove.handle = PVFS_HANDLE_NULL;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->trove_callback.fn = trove_thread_mgr_callback;
@@ -3001,7 +3178,8 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3083,7 +3261,8 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3201,7 +3380,8 @@ int job_trove_fs_create(char *collname,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3262,7 +3442,8 @@ int job_trove_fs_remove(char *collname,
                         job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
-    return (-ENOSYS);
+    out_status_p->error_code = -PVFS_ENOSYS;
+    return 1;
 }
 
 /* job_trove_fs_lookup()
@@ -3293,7 +3474,8 @@ int job_trove_fs_lookup(char *collname,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3303,7 +3485,9 @@ int job_trove_fs_lookup(char *collname,
     user_ptr_internal = &jd->trove_callback;
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_collection_lookup(collname, &(jd->u.trove.fsid), 
+    ret = trove_collection_lookup(
+        TROVE_METHOD_DBPF,
+        collname, &(jd->u.trove.fsid), 
         user_ptr_internal, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -3334,7 +3518,8 @@ int job_trove_fs_lookup(char *collname,
     /* there is no way we can test on this if we don't know the coll_id */
     gossip_lerr("Error: trove_collection_lookup() returned 0 ???\n");
 
-    return (-EINVAL);
+    out_status_p->error_code = -PVFS_EINVAL;
+    return 1;
 }
 
 /* job_trove_fs_set_eattr()
@@ -3368,7 +3553,8 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3446,7 +3632,8 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3540,7 +3727,8 @@ int job_null(
     jd = alloc_job_desc(JOB_NULL);
     if (!jd)
     {
-        return (-errno);
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -4317,7 +4505,10 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
     gen_mutex_lock(&dev_unexp_mutex);
     /* remove the operation from the pending dev_unexp queue */
     tmp_desc = job_desc_q_shownext(dev_unexp_queue);
-    assert(tmp_desc != NULL);        /* TODO: fix this */
+    /* if the thread mgr accounting is accurate, then there _must_ be a
+     * dev_unexp job posted for us to hit this point.
+     */
+    assert(tmp_desc != NULL);
     if (tmp_desc->completed_flag == 0)
     {
         job_desc_q_remove(tmp_desc);
@@ -4626,7 +4817,11 @@ static int completion_query_context(job_id_t * out_id_array_p,
  */
 static void do_one_work_cycle_all(int idle_time_ms)
 {
-    int total_pending_count = bmi_pending_count + bmi_unexp_pending_count
+    int total_pending_count = 0;
+    
+    gen_mutex_lock(&work_cycle_mutex);
+
+    total_pending_count = bmi_pending_count + bmi_unexp_pending_count
         + flow_pending_count + dev_unexp_pending_count + trove_pending_count;
 
     if (bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
@@ -4655,6 +4850,7 @@ static void do_one_work_cycle_all(int idle_time_ms)
          nanosleep(&ts, NULL); 
     }
 
+    gen_mutex_unlock(&work_cycle_mutex);
     return;
 }
 #endif

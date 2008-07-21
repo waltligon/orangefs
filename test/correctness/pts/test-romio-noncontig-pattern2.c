@@ -98,8 +98,8 @@ static int test_romio_noncontig2(void){
                                                                                                                                                        
                                                                                                                                                        
    /* Turn on debugging */
-   // gossip_enable_stderr();
-   // gossip_set_debug_mask(1,REQUEST_DEBUG);
+   /* gossip_enable_stderr(); */
+   /* gossip_set_debug_mask(1,REQUEST_DEBUG); */
                                                                                                                                                        
     j = 0;
    do

@@ -25,21 +25,9 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int flush_datafile_flush_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int flush_datafile_setup_msgpairarray(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int flush_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-
 %%
 
-machine pvfs2_client_flush_sm(
-    flush_getattr,
-    flush_datafile_setup_msgpairarray,
-    flush_datafile_xfer_msgpairarray,
-    flush_datafile_flush_failure,
-    cleanup)
+machine pvfs2_client_flush_sm
 {
     state flush_getattr
     {
@@ -81,11 +69,12 @@ machine pvfs2_client_flush_sm(
  */
 PVFS_error PVFS_isys_flush(
     PVFS_object_ref ref,
-    PVFS_credentials *credentials,
+    const PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_flush entered\n");
@@ -97,14 +86,18 @@ PVFS_error PVFS_isys_flush(
         return ret;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
-    if (!sm_p)
+    PINT_smcb_alloc(&smcb, PVFS_SYS_FLUSH,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (!smcb)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
 
@@ -122,14 +115,14 @@ PVFS_error PVFS_isys_flush(
         0);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_SYS_FLUSH, op_id, user_ptr);
+        smcb,  op_id, user_ptr);
 }
 
 /** Flush file data to storage on servers.
  */
 PVFS_error PVFS_sys_flush(
     PVFS_object_ref ref,
-    PVFS_credentials *credentials)
+    const PVFS_credentials *credentials)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -152,13 +145,14 @@ PVFS_error PVFS_sys_flush(
         }
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 
-static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
-                                             job_status_s *js_p)
+static int flush_datafile_setup_msgpairarray(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -173,22 +167,18 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->u.meta.dfile_count > 0);
 
-    /* datafile count + 1 metafile */
-    sm_p->msgarray_count = (attr->u.meta.dfile_count + 1);
-
-    /* allocate memory for datafile message pairs and the metafile */
-    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        (sm_p->msgarray_count * sizeof(PINT_sm_msgpair_state)));
-    if (!sm_p->msgarray)
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, (attr->u.meta.dfile_count + 1));
+    if(ret != 0)
     {
-        js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        gossip_err("Failed to initialize %d msgpairs\n",
+                   (attr->u.meta.dfile_count + 1));
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
-    for(i = 0; i < sm_p->msgarray_count; i++)
+    /* datafile count + 1 metafile */
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        msg_p = &sm_p->msgarray[i];
-
         if (i < attr->u.meta.dfile_count)
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -207,7 +197,7 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         }
         else
         {
-            assert(i == (sm_p->msgarray_count - 1));
+            assert(i == (sm_p->msgarray_op.count - 1));
 
             gossip_debug(GOSSIP_CLIENT_DEBUG,
                          "  metafile_flush: flushing handle %llu\n",
@@ -225,28 +215,31 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         }
     }
 
-    ret = PINT_serv_msgpairarray_resolve_addrs(
-        sm_p->msgarray_count, sm_p->msgarray);
+    ret = PINT_serv_msgpairarray_resolve_addrs(&sm_p->msgarray_op);
     if (ret)
     {
         gossip_err("Error: failed to resolve server addresses.\n");
         js_p->error_code = ret;
     }
-    return 1;
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
 }
 
-static int flush_datafile_flush_failure(PINT_client_sm *sm_p,
-                                        job_status_s *js_p)
+static int flush_datafile_flush_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) flush state: datafile_flush_failure\n",
                  sm_p);
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int flush_cleanup(PINT_client_sm *sm_p,
-                         job_status_s *js_p)
+static int flush_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) flush state: flush_cleanup\n", sm_p);
 
@@ -259,14 +252,10 @@ static int flush_cleanup(PINT_client_sm *sm_p,
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    if (sm_p->msgarray)
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
-    sm_p->op_complete = 1;
-    return 0;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

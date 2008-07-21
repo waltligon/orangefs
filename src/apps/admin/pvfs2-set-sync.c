@@ -203,8 +203,7 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s -m <fs_mount_point> "
-                    "-D [0|1] -M [0|1] -T [NUM]\n",
+    fprintf(stderr, "Usage  : %s -m <fs_mount_point> -D [0|1] -M [0|1]\n",
 	argv[0]);
     fprintf(stderr, "  -D   always implicitly sync file data (0=off, 1=on)\n");
     fprintf(stderr, "  -M   always implicitly sync metadata  (0=off, 1=on)\n");

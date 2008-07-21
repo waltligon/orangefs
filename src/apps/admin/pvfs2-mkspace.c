@@ -46,7 +46,7 @@ static void print_help(char *progname, options_t *opts);
 static int parse_args(int argc, char **argv, options_t *opts)
 {
     int ret = 0, option_index = 0;
-    char *cur_option = NULL;
+    const char *cur_option = NULL;
     static struct option long_opts[] =
     {
         {"help",0,0,0},
@@ -76,7 +76,7 @@ static int parse_args(int argc, char **argv, options_t *opts)
 	switch (ret)
         {
             case 0:
-                cur_option = (char *)long_opts[option_index].name;
+                cur_option = long_opts[option_index].name;
 
                 if (strcmp("help", cur_option) == 0)
                 {

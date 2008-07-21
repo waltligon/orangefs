@@ -37,7 +37,6 @@ int main(int argc, char **argv)
 	job_status_s status1;
 	job_id_t tmp_id;
 	job_context_id context;
-	char* method_name = NULL;
 
 	/* set debugging level */
 	gossip_enable_stderr();
@@ -51,8 +50,8 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	ret = trove_initialize("/tmp/pvfs2-test-space",
-	    0, &method_name, 0);
+	ret = trove_initialize(
+	    TROVE_METHOD_DBPF, NULL, "/tmp/pvfs2-test-space", 0);
 	if(ret < 0)
 	{
 		fprintf(stderr, "trove_initialize failure.\n");
@@ -164,7 +163,7 @@ int main(int argc, char **argv)
 	job_close_context(context);
 	job_finalize();
 	BMI_finalize();
-	trove_finalize();
+	trove_finalize(TROVE_METHOD_DBPF);
 
 	return(0);
 }

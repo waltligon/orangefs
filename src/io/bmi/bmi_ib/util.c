@@ -4,15 +4,12 @@
  * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
- *
- * $Id: util.c,v 1.7 2006-05-30 20:24:57 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <unistd.h>
-#include <src/common/gossip/gossip.h>
 
 #define __util_c
 #include "ib.h"
@@ -30,9 +27,7 @@ error(const char *fmt, ...)
     vsprintf(s, fmt, ap);
     va_end(ap);
     gossip_err("Error: %s.\n", s);
-#ifdef GOSSIP_ENABLE_BACKTRACE
     gossip_backtrace();
-#endif
     exit(1);
 }
 
@@ -86,8 +81,8 @@ warning_errno(const char *fmt, ...)
     gossip_err("Warning: %s: %s.\n", s, strerror(errno));
 }
 
-void __attribute__((format(printf,1,2))) __hidden
-info(const char *fmt, ...)
+void __attribute__((format(printf,2,3))) __hidden
+warning_xerrno(int errnum, const char *fmt, ...)
 {
     char s[2048];
     va_list ap;
@@ -95,11 +90,11 @@ info(const char *fmt, ...)
     va_start(ap, fmt);
     vsprintf(s, fmt, ap);
     va_end(ap);
-    gossip_debug(GOSSIP_BMI_DEBUG_IB, "%s.\n", s);
+    gossip_err("Warning: %s: %s.\n", s, strerror(errnum));
 }
 
 void * __attribute__((malloc)) __hidden
-Malloc(unsigned long n)
+bmi_ib_malloc(unsigned long n)
 {
     char *x;
 
@@ -118,7 +113,7 @@ void * __hidden
 qlist_del_head(struct qlist_head *list)
 {
     struct qlist_head *h;
-    assert(!qlist_empty(list), "%s: empty list %p", __func__, list);
+    bmi_ib_assert(!qlist_empty(list), "%s: empty list %p", __func__, list);
     h = list->next;
     qlist_del(h);
     return h;

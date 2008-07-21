@@ -10,9 +10,10 @@
 #include "quickhash.h"
 #include "gen-locks.h"
 
-#define DEFAULT_ID_GEN_SAFE_TABLE_SIZE 67
+#define DEFAULT_ID_GEN_SAFE_TABLE_SIZE 997
 
-static gen_mutex_t *s_id_gen_safe_mutex = NULL;
+static gen_mutex_t s_id_gen_safe_mutex = GEN_MUTEX_INITIALIZER;
+static int s_id_gen_safe_init_count = 0;
 
 static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);
@@ -30,7 +31,35 @@ typedef struct
 static struct qhash_table *s_id_gen_safe_table = NULL;
 
 #define ID_GEN_SAFE_INITIALIZED() \
-(s_id_gen_safe_table && s_id_gen_safe_mutex)
+(s_id_gen_safe_table)
+
+int id_gen_safe_initialize()
+{
+    if (!ID_GEN_SAFE_INITIALIZED())
+    {
+        s_id_gen_safe_table = qhash_init(
+            hash_key_compare, hash_key, DEFAULT_ID_GEN_SAFE_TABLE_SIZE);
+        if (!s_id_gen_safe_table)
+        {
+            return -PVFS_ENOMEM;
+        }
+    }
+    s_id_gen_safe_init_count++;
+    return 0;
+}
+
+int id_gen_safe_finalize()
+{
+    s_id_gen_safe_init_count--;
+    if(s_id_gen_safe_init_count == 0 && ID_GEN_SAFE_INITIALIZED())
+    {
+        gen_mutex_lock(&s_id_gen_safe_mutex);
+        qhash_destroy_and_finalize(s_id_gen_safe_table, id_gen_safe_t, hash_link, free);
+        s_id_gen_safe_table = NULL;
+        gen_mutex_unlock(&s_id_gen_safe_mutex);
+    }
+    return 0;
+}
 
 int id_gen_safe_register(
     PVFS_id_gen_t *new_id,
@@ -38,31 +67,14 @@ int id_gen_safe_register(
 {
     id_gen_safe_t *id_elem = NULL;
 
+    assert(s_id_gen_safe_table != NULL);
+
     if (!item)
     {
 	return -PVFS_EINVAL;
     }
 
-    if (!ID_GEN_SAFE_INITIALIZED())
-    {
-        /* FIXME: this is never finalized */
-        s_id_gen_safe_table = qhash_init(
-            hash_key_compare, hash_key, DEFAULT_ID_GEN_SAFE_TABLE_SIZE);
-        if (!s_id_gen_safe_table)
-        {
-            return -PVFS_ENOMEM;
-        }
-
-        s_id_gen_safe_mutex = gen_mutex_build();
-        if (!s_id_gen_safe_mutex)
-        {
-            free(s_id_gen_safe_table);
-            s_id_gen_safe_table = NULL;
-            return -PVFS_ENOMEM;
-        }
-    }
-
-    gen_mutex_lock(s_id_gen_safe_mutex);
+    gen_mutex_lock(&s_id_gen_safe_mutex);
 
     id_elem = (id_gen_safe_t *)malloc(sizeof(id_gen_safe_t));
     if (!id_elem)
@@ -77,7 +89,7 @@ int id_gen_safe_register(
 
     *new_id = id_elem->id;
 
-    gen_mutex_unlock(s_id_gen_safe_mutex);
+    gen_mutex_unlock(&s_id_gen_safe_mutex);
     return 0;
 }
 
@@ -89,7 +101,7 @@ void *id_gen_safe_lookup(PVFS_id_gen_t id)
 
     if (ID_GEN_SAFE_INITIALIZED())
     {
-        gen_mutex_lock(s_id_gen_safe_mutex);
+        gen_mutex_lock(&s_id_gen_safe_mutex);
 
         hash_link = qhash_search(s_id_gen_safe_table, &id);
         if (hash_link)
@@ -101,7 +113,7 @@ void *id_gen_safe_lookup(PVFS_id_gen_t id)
 
             ret = id_elem->item;
         }
-        gen_mutex_unlock(s_id_gen_safe_mutex);
+        gen_mutex_unlock(&s_id_gen_safe_mutex);
     }
     return ret;
 }
@@ -114,7 +126,7 @@ int id_gen_safe_unregister(PVFS_id_gen_t new_id)
 
     if (ID_GEN_SAFE_INITIALIZED())
     {
-        gen_mutex_lock(s_id_gen_safe_mutex);
+        gen_mutex_lock(&s_id_gen_safe_mutex);
 
         hash_link = qhash_search_and_remove(
             s_id_gen_safe_table, &new_id);
@@ -127,7 +139,7 @@ int id_gen_safe_unregister(PVFS_id_gen_t new_id)
             free(id_elem);
             ret = 0;
         }
-        gen_mutex_unlock(s_id_gen_safe_mutex);
+        gen_mutex_unlock(&s_id_gen_safe_mutex);
     }
     return ret;
 }

@@ -9,7 +9,6 @@
 
 # set these if you want to hard code the location of the config files:
 PVFS2_FS_CONF=
-PVFS2_SERVER_CONF=
 # override this if your server binary resides elsewhere
 PVFS2SERVER=@prefix@/sbin/pvfs2-server
 # override this if you want servers to automatically pick a conf file,
@@ -35,33 +34,11 @@ if ! [ -r ${PVFS2_FS_CONF} ]; then
 	exit 1
 fi
 
-# look for server conf
-if test "x$PVFS2_SERVER_CONF" = x
-then
-	#determine hostname
-	if test "x$HOSTNAME" = x
-	then
-		HOSTNAME=`hostname`
-	fi
-	THIS_HOSTNAME=`echo $HOSTNAME | cut -d '.' -f 1`
-
-	if test "x$THIS_HOSTNAME" = xlocalhost
-	then
-		echo "Warning: detected hostname as localhost, may confuse PVFS2 startup"
-	fi
-	
-	PVFS2_SERVER_CONF=${PVFS2_CONF_PATH}/pvfs2-server.conf-${THIS_HOSTNAME}
-fi
-if ! [ -r ${PVFS2_SERVER_CONF} ]; then
-	echo "Error: could not read ${PVFS2_SERVER_CONF}"
-	exit 1
-fi
-
 # See how we were called.
 case "$1" in
   start)
 	echo -n "Starting PVFS2 server: "
-	daemon ${PVFS2SERVER} --pidfile ${PVFS2_PIDFILE} ${PVFS2_FS_CONF} ${PVFS2_SERVER_CONF}
+	daemon ${PVFS2SERVER} --pidfile ${PVFS2_PIDFILE} ${PVFS2_FS_CONF}
 	echo
 	touch /var/lock/subsys/pvfs2-server
 	;;

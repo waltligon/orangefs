@@ -35,20 +35,16 @@ const char *PVFS_lock_type_mapping[] =
     "PVFS_SERVER_RELEASE_ALL"           
 };
 
-static int lock_change_lock(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int lock_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
+static PINT_sm_action lock_change_lock(
+    struct PINT_smcb *smcb, job_status_s* js_p);
+static PINT_sm_action lock_cleanup(
+    struct PINT_smcb *smcb, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_lock_sm(
-    prelude,
-    change_lock,
-    send_response,
-    cleanup)
+machine pvfs2_lock_sm
 {
     state prelude
     {
@@ -78,9 +74,10 @@ machine pvfs2_lock_sm(
 
 %%
 
-static int lock_change_lock(
-    PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lock_change_lock(
+    struct PINT_smcb *smcb, job_status_s* js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     PVFS_object_ref object_ref;
     PINT_request_file_data fdata;
@@ -100,9 +97,9 @@ static int lock_change_lock(
     fdata.extend_flag = 1;
 
     gossip_debug(GOSSIP_LOCK_DEBUG,
-		 "Request %s received with final_offset %lld\n", 
+		 "Request %s received with final_offset %Ld\n", 
 		 PVFS_lock_type_mapping[s_op->req->u.lock.lock_type],
-		 lld(s_op->req->u.lock.final_offset));
+		 s_op->req->u.lock.final_offset);
 
     if ((s_op->req->u.lock.lock_type != PVFS_SERVER_RELEASE_SOME) &&
 	(s_op->req->u.lock.lock_type != PVFS_SERVER_RELEASE_ALL))
@@ -136,7 +133,7 @@ static int lock_change_lock(
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
 			 "lock_change_lock: starting job\n");
 	    
-	    err = job_lock_wait_block_bytes(s_op,
+	    err = job_lock_wait_block_bytes(smcb,
 					    lock_req_p);
 	    return err;
 #if 0
@@ -156,12 +153,13 @@ static int lock_change_lock(
 #if 0
     print_lock_file_table_all_info();
 #endif
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int lock_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lock_cleanup(
+    struct PINT_smcb *smcb, job_status_s* js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* Do the check after the message is sent so the client doesn't
      * have to wait excessively */
     if (((s_op->req->u.lock.lock_type == PVFS_SERVER_RELEASE_SOME) ||
@@ -171,7 +169,7 @@ static int lock_cleanup(
 	check_lock_reqs(s_op->u.lock.lock_node_p);
     }
 
-    return server_state_machine_complete(s_op);
+    return server_state_machine_complete(smcb);
 }
 
 

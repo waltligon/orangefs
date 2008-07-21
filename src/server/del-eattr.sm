@@ -12,24 +12,11 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-util.h"
-
-static int deleattr_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int deleattr_delobj_eattribs(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int deleattr_verify_eattribs(
-    PINT_server_op *s_op, job_status_s *js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
+#include "pint-util.h"
 
 %%
 
-machine pvfs2_del_eattr_sm(
-    prelude,
-    cleanup,
-    verify_eattribs,
-    delobj_eattrib,
-    final_response)
+machine pvfs2_del_eattr_sm
 {
     state prelude
     {
@@ -73,9 +60,10 @@ machine pvfs2_del_eattr_sm(
  * extended attributes on certain object types if we want.  We might
  * want to prevent access to standard metadata keys.
  */
-static int deleattr_verify_eattribs(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action deleattr_verify_eattribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *a_p = NULL;
 
     a_p = &s_op->attr;
@@ -86,7 +74,7 @@ static int deleattr_verify_eattribs(
                  "  ext attr delete from handle %llu refers to a %s\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
                  llu(s_op->req->u.deleattr.handle),
-                 get_object_type(a_p->objtype),
+                 PINT_util_get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
     switch (a_p->objtype)
@@ -136,15 +124,17 @@ static int deleattr_verify_eattribs(
         return -PVFS_EINVAL;
     }
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
  * This is where the actual extended attrib gets written.
  * Not much to this, its pretty straight-forward.
  */
-static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action deleattr_delobj_eattribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t j_id;
 
@@ -172,7 +162,7 @@ static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
         NULL,
         TROVE_SYNC ,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &j_id,
@@ -192,15 +182,30 @@ static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
  * Synopsis: free memory and return
  *           
  */
-static int deleattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action deleattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op __attribute__((unused)) =
+        PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(
         GOSSIP_DELEATTR_DEBUG,
         "keybuf %p keylen %d\n",
         s_op->req->u.deleattr.key.buffer, s_op->req->u.deleattr.key.buffer_sz);
 
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
+
+PINT_GET_OBJECT_REF_DEFINE(deleattr);
+
+struct PINT_server_req_params pvfs2_del_eattr_params =
+{
+    .string_name = "del_eattr",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_deleattr,
+    .state_machine = &pvfs2_del_eattr_sm
+};
 
 /*
  * Local variables:

@@ -37,6 +37,16 @@
 #include "id-generator.h"
 #include "pvfs2-internal.h"
 
+/* we need the server header because it defines the operations that
+ * we use to determine whether to schedule or queue.  
+ *
+ * TODO: To make the request scheduler more generic we 
+ * should probably have callbacks that get defined in 
+ * the server code that determine whether to queue or 
+ * schedule, print the operation name, etc.
+ */
+#include "src/server/pvfs2-server.h"
+
 /** request states */
 enum req_sched_states
 {
@@ -63,8 +73,8 @@ struct req_sched_list
 /** linked list elements; one for each request in the scheduler */
 struct req_sched_element
 {
+    enum PVFS_server_op op;
     struct qlist_head list_link;	/* ties it to a queue */
-    struct PVFS_server_req *req_ptr;	/* ties it to a request */
     struct qlist_head ready_link;	/* ties to ready queue */
     void *user_ptr;		/* user pointer */
     req_sched_id id;		/* unique identifier */
@@ -72,7 +82,10 @@ struct req_sched_element
     enum req_sched_states state;	/* state of this element */
     PVFS_handle handle;
     struct timeval tv;			/* used for timer events */
-    int readonly_flag;                  /* indicates a read only operation */
+    /* indicates type of access needed by this op */
+    enum PINT_server_req_access_type access_type;
+    int mode_change; /* specifies that the element is a mode change */
+    enum PVFS_server_mode mode; /* the mode to change to */
 };
 
 
@@ -179,168 +192,111 @@ int PINT_req_sched_finalize(
     return (0);
 }
 
-/** Finds the handle that the given request will operate on
- *
- *  \return 0 on success, -errno on failure
- *
- *  \note a handle value of 0 and a return value of 0 indicates
- *  that the request does not operate on any particular handle
- *
- *  \note a return value of 1 indicates that we can let this operation pass
- *  through without any scheduling
- *
- *  \todo we need to fix this function and all of its callers if we 
- *  define something besides "0" to represent an invalid handle value
- */
-int PINT_req_sched_target_handle(
-    struct PVFS_server_req *req,
-    int req_index,
-    PVFS_handle * handle,
-    PVFS_fs_id * fs_id,
-    int* readonly_flag)
+int PINT_req_sched_change_mode(enum PVFS_server_mode mode,
+                               void *user_ptr,
+                               req_sched_id *id)
 {
-    *handle = 0;
-    *fs_id = 0;
-    *readonly_flag = 1;
+    int ret = -1;
+    int mode_change_ready = 0;
+    struct req_sched_element *mode_element;
 
-    switch (req->op)
+    /* create a structure to store in the request queues */
+    mode_element = (struct req_sched_element *) malloc(
+        sizeof(struct req_sched_element));
+    if (!mode_element)
     {
-    case PVFS_SERV_INVALID:
-	return (-EINVAL);
-    case PVFS_SERV_MGMT_SETPARAM:
-	return (1);
-    case PVFS_SERV_CREATE:
-	*readonly_flag = 0;
-	return (1);
-    case PVFS_SERV_REMOVE:
-	*readonly_flag = 0;
-	*handle = req->u.remove.handle;
-	*fs_id = req->u.remove.fs_id;
-	return (0);
-    case PVFS_SERV_MGMT_REMOVE_OBJECT:
-	*readonly_flag = 0;
-	*handle = req->u.mgmt_remove_object.handle;
-	*fs_id = req->u.mgmt_remove_object.fs_id;
-	return (0);
-    case PVFS_SERV_MGMT_REMOVE_DIRENT:
-	*readonly_flag = 0;
-	*handle = req->u.mgmt_remove_dirent.handle;
-	*fs_id = req->u.mgmt_remove_dirent.fs_id;
-	return (0);
-    case PVFS_SERV_LOCK:
-	*handle = req->u.lock.handle;
-	*fs_id = req->u.lock.fs_id;
-	return (1);
-    case PVFS_SERV_IO:
-	if(req->u.io.io_type == PVFS_IO_WRITE)
-	    *readonly_flag = 0;
-	*handle = req->u.io.handle;
-	*fs_id = req->u.io.fs_id;
-	return (0);
-    case PVFS_SERV_SMALL_IO:
-        if(req->u.small_io.io_type == PVFS_IO_WRITE)
-            *readonly_flag = 0;
-        *handle = req->u.small_io.handle;
-        *fs_id = req->u.small_io.fs_id;
-        return (0);
-    case PVFS_SERV_GETATTR:
-	*handle = req->u.getattr.handle;
-	*fs_id = req->u.getattr.fs_id;
-	return (0);
-    case PVFS_SERV_SETATTR:
-	*readonly_flag = 0;
-	*handle = req->u.setattr.handle;
-	*fs_id = req->u.setattr.fs_id;
-	return (0);
-    case PVFS_SERV_LOOKUP_PATH:
-	*handle = req->u.lookup_path.starting_handle;
-	*fs_id = req->u.lookup_path.fs_id;
-	return (0);
-    case PVFS_SERV_CRDIRENT:
-	*readonly_flag = 0;
-	*handle = req->u.crdirent.parent_handle;
-	*fs_id = req->u.crdirent.fs_id;
-	return (0);
-    case PVFS_SERV_RMDIRENT:
-	*readonly_flag = 0;
-	*handle = req->u.rmdirent.parent_handle;
-	*fs_id = req->u.rmdirent.fs_id;
-	return (0);
-    case PVFS_SERV_CHDIRENT:
-	*readonly_flag = 0;
-	*handle = req->u.chdirent.parent_handle;
-	*fs_id = req->u.chdirent.fs_id;
-	return (0);
-    case PVFS_SERV_TRUNCATE:
-	*readonly_flag = 0;
-	*handle = req->u.truncate.handle;
-	*fs_id = req->u.truncate.fs_id;
-	return (0);
-    case PVFS_SERV_MKDIR:
-	*readonly_flag = 0;
-	return (1);
-    case PVFS_SERV_READDIR:
-	*handle = req->u.readdir.handle;
-	*fs_id = req->u.readdir.fs_id;
-	return (0);
-    case PVFS_SERV_GETCONFIG:
-	return (1);
-    case PVFS_SERV_FLUSH:
-	*readonly_flag = 0;
-	*handle = req->u.flush.handle;
-	*fs_id = req->u.flush.fs_id;
-	return (0);
-    case PVFS_SERV_MGMT_NOOP:
-	return (1);
-    case PVFS_SERV_MGMT_PERF_MON:
-	return (1);
-    case PVFS_SERV_MGMT_EVENT_MON:
-	return (1);
-    case PVFS_SERV_MGMT_ITERATE_HANDLES:
-	*fs_id = req->u.mgmt_iterate_handles.fs_id;
-	return (1);
-    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
-	if(req_index >= req->u.mgmt_dspace_info_list.handle_count)
-        {
-	    return(-EOVERFLOW);
-        }
-	*handle = req->u.mgmt_dspace_info_list.handle_array[req_index];
-	*fs_id = req->u.mgmt_dspace_info_list.fs_id;
-	return (0);
-    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-	*handle = req->u.mgmt_get_dirdata_handle.handle;
-	*fs_id = req->u.mgmt_get_dirdata_handle.fs_id;
-	return (0);
-    case PVFS_SERV_GETEATTR:
-	*handle = req->u.geteattr.handle;
-	*fs_id = req->u.geteattr.fs_id;
-	return (0);
-    case PVFS_SERV_SETEATTR:
-	*readonly_flag = 0;
-	*handle = req->u.seteattr.handle;
-	*fs_id = req->u.seteattr.fs_id;
-	return (0);
-    case PVFS_SERV_DELEATTR:
-	*readonly_flag = 0;
-	*handle = req->u.deleattr.handle;
-	*fs_id = req->u.deleattr.fs_id;
-	return (0);
-    case PVFS_SERV_LISTEATTR:
-        *handle = req->u.listeattr.handle;
-        *fs_id = req->u.listeattr.fs_id;
-        return (0);
-    case PVFS_SERV_STATFS:
-	*fs_id = req->u.statfs.fs_id;
-	return (1);
-    case PVFS_SERV_WRITE_COMPLETION:
-    case PVFS_SERV_PERF_UPDATE:
-    case PVFS_SERV_JOB_TIMER:
-    case PVFS_SERV_PROTO_ERROR:
-    case PVFS_SERV_NUM_OPS:   /* sentinel */
-	/* these should never show up here */
-	return (-EINVAL);
+        return (-errno);
     }
-    return (0);
+    memset(mode_element, 0, sizeof(*mode_element));
+
+    mode_element->user_ptr = user_ptr;
+    id_gen_fast_register(id, mode_element);
+    mode_element->id = *id;
+    mode_element->state = REQ_QUEUED;
+    mode_element->mode_change = 1;
+    mode_element->mode = mode;
+
+    /* will this be the front of the queue */
+    if(qlist_empty(&mode_queue))
+        mode_change_ready = 1;
+
+    qlist_add_tail(&(mode_element->list_link), &mode_queue);
+    if(mode_change_ready)
+    {
+        if(mode == PVFS_SERVER_NORMAL_MODE)
+        {
+            /* let this go through regardless */
+            ret = 1;
+            mode_element->state = REQ_SCHEDULED;
+            current_mode = mode;
+        }
+        else if(mode == PVFS_SERVER_ADMIN_MODE)
+        {
+            assert(sched_count > -1);
+            /* for this to work, we must wait for pending ops to complete */
+            if(sched_count == 0)
+            {
+                ret = 1;
+                mode_element->state = REQ_SCHEDULED;
+                current_mode = mode;
+            }
+            else
+            {
+                ret = 0;
+                mode_element->state = REQ_QUEUED;
+            }
+        }
+        else
+        {
+            /* TODO: be nicer about this */
+            assert(0);
+        }
+        return(ret);
+    }
+    else
+    {
+        mode_element->state = REQ_QUEUED;
+        return(0);
+    }
+}
+
+static int PINT_req_sched_in_admin_mode(void)
+{
+    struct req_sched_element *mode_element = NULL;
+    if(!qlist_empty(&mode_queue))
+        mode_element = qlist_entry(mode_queue.next, struct req_sched_element,
+                                   list_link);
+    if(current_mode == PVFS_SERVER_ADMIN_MODE ||
+       (mode_element && mode_element->mode == PVFS_SERVER_ADMIN_MODE))
+    {
+        return 1;
+    }
+    return 0;
+}
+
+static int PINT_req_sched_schedule_mode_change(void)
+{
+    struct req_sched_element *next_element;
+
+    /* prepare to schedule mode change if we can */
+    /* NOTE: only transitions to admin mode are ever queued */
+    if(sched_count == 0 && !qlist_empty(&mode_queue))
+    {
+	next_element = qlist_entry(mode_queue.next, struct req_sched_element,
+	    list_link);
+	next_element->state = REQ_READY_TO_SCHEDULE;
+	qlist_add_tail(&next_element->ready_link, &ready_queue);
+    }
+    return 0;
+}
+
+static void PINT_req_sched_do_change_mode(
+    struct req_sched_element *req_sched_element)
+{
+    if(req_sched_element->mode_change)
+    {
+        current_mode = req_sched_element->mode;
+    }
 }
 
 /* scheduler submission */
@@ -350,49 +306,34 @@ int PINT_req_sched_target_handle(
  *  \return 1 if request should proceed immediately, 0 if the
  *  request will be scheduled later, and -errno on failure
  */
-int PINT_req_sched_post(
-    struct PVFS_server_req *in_request,
-    int req_index,
-    void *in_user_ptr,
-    req_sched_id * out_id)
+int PINT_req_sched_post(enum PVFS_server_op op,
+                        PVFS_fs_id fs_id,
+                        PVFS_handle handle,
+                        enum PINT_server_req_access_type access_type,
+                        enum PINT_server_sched_policy sched_policy,
+			void *in_user_ptr,
+			req_sched_id * out_id)
 {
     struct qlist_head *hash_link;
-    PVFS_handle handle;
     int ret = -1;
     struct req_sched_element *tmp_element;
     struct req_sched_element *tmp_element2;
     struct req_sched_list *tmp_list;
     struct req_sched_element *next_element;
     struct req_sched_element *last_element;
-    struct req_sched_element *mode_element = NULL;
-    PVFS_fs_id fs_id;
-    enum PVFS_server_mode target_mode;
-    int mode_change_ready = 0;
-    int readonly_flag = 0;
     struct qlist_head *iterator;
     int tmp_flag;
 
-    /* find the handle */
-    ret = PINT_req_sched_target_handle(in_request, req_index, &handle, &fs_id, 
-	&readonly_flag);
-    if (ret < 0)
+    if(sched_policy == PINT_SERVER_REQ_BYPASS)
     {
-	return (ret);
-    }
-    if(ret == 1)
-    {
-        if(!readonly_flag && !PVFS_SERV_IS_MGMT_OP(in_request->op))
+        if(access_type == PINT_SERVER_REQ_MODIFY && !PVFS_SERV_IS_MGMT_OP(op))
         {
             /* if this requests modifies the file system, we have to check
              * to see if we are in admin mode or about to enter admin mode
              */
-            if(!qlist_empty(&mode_queue))
-                mode_element = qlist_entry(mode_queue.next, struct req_sched_element,
-                    list_link);
-            if(current_mode == PVFS_SERVER_ADMIN_MODE || (mode_element 
-                && mode_element->req_ptr->u.mgmt_setparam.value == PVFS_SERVER_ADMIN_MODE))
+            if(PINT_req_sched_in_admin_mode())
             {
-                return(-PVFS_EAGAIN);
+                return (-PVFS_EAGAIN);
             }
         }
 
@@ -413,79 +354,25 @@ int PINT_req_sched_post(
     {
 	return (-errno);
     }
+    memset(tmp_element, 0, sizeof(*tmp_element));
 
-    tmp_element->req_ptr = in_request;
+    tmp_element->op = op;
     tmp_element->user_ptr = in_user_ptr;
     id_gen_fast_register(out_id, tmp_element);
     tmp_element->id = *out_id;
     tmp_element->state = REQ_QUEUED;
     tmp_element->handle = handle;
     tmp_element->list_head = NULL;
-    tmp_element->readonly_flag = readonly_flag;
+    tmp_element->access_type = access_type;
+    tmp_element->mode_change = 0;
 
-    /* is this a request to change the server's operating mode? */
-    if(in_request->op == PVFS_SERV_MGMT_SETPARAM
-	&& in_request->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE)
+    if(access_type == PINT_SERVER_REQ_MODIFY && !PVFS_SERV_IS_MGMT_OP(op))
     {
-	target_mode = (enum PVFS_server_mode)in_request->u.mgmt_setparam.value;
-	/* will this be the front of the queue */
-	if(qlist_empty(&mode_queue))
-	    mode_change_ready = 1;
-
-	qlist_add_tail(&(tmp_element->list_link), &mode_queue);
-	if(mode_change_ready)
-	{
-	    if(target_mode == PVFS_SERVER_NORMAL_MODE)
-	    {
-		/* let this go through regardless */
-		ret = 1;
-		tmp_element->state = REQ_SCHEDULED;
-		current_mode = target_mode;
-	    }
-	    else if(target_mode == PVFS_SERVER_ADMIN_MODE)
-	    {
-		assert(sched_count > -1);
-		/* for this to work, we must wait for pending ops to complete */
-		if(sched_count == 0)
-		{
-		    ret = 1;
-		    tmp_element->state = REQ_SCHEDULED;
-		    current_mode = target_mode;
-		}
-		else
-		{
-		    ret = 0;
-		    tmp_element->state = REQ_QUEUED;
-		}
-	    }
-	    else
-	    {
-		/* TODO: be nicer about this */
-		assert(0);
-	    }
-	    return(ret);
-	}
-	else
-	{
-	    tmp_element->state = REQ_QUEUED;
-	    return(0);
-	}
-    }
-
-    if(!readonly_flag && !PVFS_SERV_IS_MGMT_OP(in_request->op))
-    {
-	/* if this requests modifies the file system, we have to check
-	 * to see if we are in admin mode or about to enter admin mode
-	 */
-	if(!qlist_empty(&mode_queue))
-	    mode_element = qlist_entry(mode_queue.next, struct req_sched_element,
-		list_link);
-	if(current_mode == PVFS_SERVER_ADMIN_MODE || (mode_element 
-	    && mode_element->req_ptr->u.mgmt_setparam.value == PVFS_SERVER_ADMIN_MODE))
-	{
-	    free(tmp_element);
-	    return(-PVFS_EAGAIN);
-	}
+        if(PINT_req_sched_in_admin_mode())
+        {
+            free(tmp_element);
+            return(-PVFS_EAGAIN);
+        }
     }
 
     /* see if we have a request queue up for this handle */
@@ -520,7 +407,9 @@ int PINT_req_sched_post(
     /* return 1 if the list is empty before we add this entry */
     ret = qlist_empty(&(tmp_list->req_list));
     if (ret == 1)
+    {
 	tmp_element->state = REQ_SCHEDULED;
+    }
     else
     {
         /* check queue to see if we can apply any optimizations */
@@ -534,7 +423,7 @@ int PINT_req_sched_post(
 	last_element = qlist_entry((tmp_list->req_list.prev),
 				   struct req_sched_element,
 				   list_link);
-	if (in_request->op == PVFS_SERV_IO &&
+	if (op == PVFS_SERV_IO &&
 	    next_element->state == REQ_SCHEDULED &&
 	    last_element->state == REQ_SCHEDULED)
 	{
@@ -547,7 +436,7 @@ int PINT_req_sched_post(
             {
                 tmp_element2 = qlist_entry(iterator, struct req_sched_element,
                     list_link);
-                if(tmp_element2->req_ptr->op != PVFS_SERV_IO)
+                if(tmp_element2->op != PVFS_SERV_IO)
                 {
                     tmp_flag = 1;
                     break;
@@ -567,7 +456,7 @@ int PINT_req_sched_post(
                 ret = 0;
             }
 	}
-	else if (readonly_flag &&
+	else if (access_type == PINT_SERVER_REQ_READONLY &&
 	    next_element->state == REQ_SCHEDULED &&
 	    last_element->state == REQ_SCHEDULED)
         {
@@ -580,7 +469,7 @@ int PINT_req_sched_post(
             {
                 tmp_element2 = qlist_entry(iterator, struct req_sched_element,
                     list_link);
-                if(!tmp_element2->readonly_flag)
+                if(tmp_element2->access_type == PINT_SERVER_REQ_MODIFY)
                 {
                     tmp_flag = 1;
                     break;
@@ -600,42 +489,21 @@ int PINT_req_sched_post(
                 ret = 0;
             }
         }
-        else if((in_request->op == PVFS_SERV_CRDIRENT ||
-                in_request->op == PVFS_SERV_RMDIRENT) &&
+        else if((op == PVFS_SERV_CRDIRENT || op == PVFS_SERV_RMDIRENT) &&
                 next_element->state == REQ_SCHEDULED &&
                 last_element->state == REQ_SCHEDULED)
         {
             /* possible dirent optimization: see if all scheduled ops for this
              * handle are for crdirent or rmdirent.  
              * If so, we can allow another concurrent
-             * dirent request to proceed 
+             * dirent request to proceed.
              */
-            tmp_flag = 0;
-            qlist_for_each(iterator, &tmp_list->req_list)
-            {
-                tmp_element2 = qlist_entry(iterator, struct req_sched_element,
-                    list_link);
-                if(tmp_element2->req_ptr->op != PVFS_SERV_CRDIRENT && 
-                   tmp_element2->req_ptr->op != PVFS_SERV_RMDIRENT)
-                {
-                    tmp_flag = 1;
-                    break;
-                }
-            }
-
-            if(!tmp_flag)
-            {
-                tmp_element->state = REQ_SCHEDULED;
-                ret = 1;
-                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                             "concurrent dirent op, handle: %llu\n", 
-                             llu(handle));
-            }
-            else
-            {
-                tmp_element->state = REQ_QUEUED;
-                ret = 0;
-            }
+            tmp_element->state = REQ_SCHEDULED;
+            tmp_element->access_type = PINT_SERVER_REQ_READONLY;
+            gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
+                         "concurrent dirent op, handle: %llu\n", 
+                         llu(handle));
+            ret = 1;
         }
 	else
 	{
@@ -650,7 +518,7 @@ int PINT_req_sched_post(
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		 "REQ SCHED POSTING, handle: %llu, queue_element: %p\n",
-		 llu(handle), tmp_element);
+                 llu(handle), tmp_element);
 
     if (ret == 1)
     {
@@ -690,8 +558,8 @@ int PINT_req_sched_post_timer(
     {
 	return (-errno);
     }
+    memset(tmp_element, 0, sizeof(*tmp_element));
 
-    tmp_element->req_ptr = NULL;
     tmp_element->user_ptr = in_user_ptr;
     id_gen_fast_register(out_id, tmp_element);
     tmp_element->id = *out_id;
@@ -699,6 +567,7 @@ int PINT_req_sched_post_timer(
     tmp_element->handle = PVFS_HANDLE_NULL;
     gettimeofday(&tmp_element->tv, NULL);
     tmp_element->list_head = NULL;
+    tmp_element->mode_change = 0;
 
     /* set time to future, based on msecs arg */
     tmp_element->tv.tv_sec += msecs/1000;
@@ -815,7 +684,7 @@ int PINT_req_sched_unpost(
 		    /* keep going as long as the operations are I/O requests;
 		     * we let these all go concurrently
 		     */
-		    while (next_element && next_element->req_ptr->op == PVFS_SERV_IO
+		    while (next_element && next_element->op == PVFS_SERV_IO
 			   && next_element->list_link.next !=
 			   &(tmp_element->list_head->req_list))
 		    {
@@ -824,7 +693,7 @@ int PINT_req_sched_unpost(
 					struct req_sched_element,
 					list_link);
 			if (next_element
-			    && next_element->req_ptr->op == PVFS_SERV_IO)
+			    && next_element->op == PVFS_SERV_IO)
 			{
 			    gossip_debug(
                                 GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED "
@@ -844,15 +713,7 @@ int PINT_req_sched_unpost(
     /* destroy the unposted element */
     free(tmp_element);
 
-    /* prepare to schedule mode change if we can */
-    /* NOTE: only transitions to admin mode are ever queued */
-    if(sched_count == 0 && !qlist_empty(&mode_queue))
-    {
-	next_element = qlist_entry(mode_queue.next, struct req_sched_element,
-	    list_link);
-	next_element->state = REQ_READY_TO_SCHEDULE;
-	qlist_add_tail(&next_element->ready_link, &ready_queue);
-    }
+    PINT_req_sched_schedule_mode_change();
     return (0);
 }
 
@@ -925,13 +786,13 @@ int PINT_req_sched_release(
 		next_element->state = REQ_READY_TO_SCHEDULE;
 		qlist_add_tail(&(next_element->ready_link), &ready_queue);
 
-                if(next_element->req_ptr->op == PVFS_SERV_IO)
+                if(next_element->op == PVFS_SERV_IO)
                 {
                     /* keep going as long as the operations are I/O requests;
                      * we let these all go concurrently
                      */
                     while (next_element &&
-                           (next_element->req_ptr->op == PVFS_SERV_IO) &&
+                           (next_element->op == PVFS_SERV_IO) &&
                            (next_element->list_link.next != &(tmp_list->req_list)))
                     {
                         next_element =
@@ -939,7 +800,7 @@ int PINT_req_sched_release(
                                         struct req_sched_element,
                                         list_link);
                         if (next_element &&
-                            (next_element->req_ptr->op == PVFS_SERV_IO))
+                            (next_element->op == PVFS_SERV_IO))
                         {
                             gossip_debug(
                                 GOSSIP_REQ_SCHED_DEBUG,
@@ -952,13 +813,13 @@ int PINT_req_sched_release(
                         }
                     }
                 }
-                else if(next_element->readonly_flag)
+                else if(next_element->access_type == PINT_SERVER_REQ_READONLY)
                 {
                     /* keep going as long as the operations are read only;
                      * we let these all go concurrently
                      */
                     while (next_element &&
-                           (next_element->readonly_flag) &&
+                           (next_element->access_type == PINT_SERVER_REQ_READONLY) &&
                            (next_element->list_link.next != &(tmp_list->req_list)))
                     {
                         next_element =
@@ -966,7 +827,7 @@ int PINT_req_sched_release(
                                         struct req_sched_element,
                                         list_link);
                         if (next_element &&
-                            (next_element->readonly_flag))
+                            (next_element->access_type == PINT_SERVER_REQ_READONLY))
                         {
                             gossip_debug(
                                 GOSSIP_REQ_SCHED_DEBUG,
@@ -991,16 +852,7 @@ int PINT_req_sched_release(
     /* destroy the released request element */
     free(tmp_element);
 
-    /* prepare to schedule mode change if we can */
-    /* NOTE: only transitions to admin mode are ever queued */
-    if(sched_count == 0 && !qlist_empty(&mode_queue))
-    {
-	next_element = qlist_entry(mode_queue.next, struct req_sched_element,
-	    list_link);
-	next_element->state = REQ_READY_TO_SCHEDULE;
-	qlist_add_tail(&next_element->ready_link, &ready_queue);
-    }
-
+    PINT_req_sched_schedule_mode_change();
     return (1);
 }
 
@@ -1051,14 +903,8 @@ int PINT_req_sched_test(
                      "handle: %llu, queue_element: %p\n",
                      llu(tmp_element->handle), tmp_element);
 
-	/* if this is a mode change, then transition now */
-	if ((tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM) &&
-	    (tmp_element->req_ptr->u.mgmt_setparam.param ==
-             PVFS_SERV_PARAM_MODE))
-	{
-	    current_mode = tmp_element->req_ptr->u.mgmt_setparam.value;
-	}
-	return (1);
+        PINT_req_sched_do_change_mode(tmp_element);
+        return (1);
     }
     else if (tmp_element->state == REQ_TIMING)
     {
@@ -1151,13 +997,7 @@ int PINT_req_sched_testsome(
 			 "REQ SCHED SCHEDULING, handle: %llu, "
                          "queue_element: %p\n",
 			 llu(tmp_element->handle), tmp_element);
-	    /* if this is a mode change, then transition now */
-	    if(tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM &&
-		tmp_element->req_ptr->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE)
-	    {
-		current_mode = tmp_element->req_ptr->u.mgmt_setparam.value;
-	    }
-
+            PINT_req_sched_do_change_mode(tmp_element);
 	}
 	else if(tmp_element->state == REQ_TIMING)
 	{
@@ -1261,14 +1101,10 @@ int PINT_req_sched_testworld(
 	tmp_element->state = REQ_SCHEDULED;
 	(*inout_count_p)++;
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		     "REQ SCHED SCHEDULING, handle: %llu, queue_element: %p\n",
+		     "REQ SCHED SCHEDULING, "
+                     "handle: %llu, queue_element: %p\n",
 		     llu(tmp_element->handle), tmp_element);
-	/* if this is a mode change, then transition now */
-	if(tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM &&
-	    tmp_element->req_ptr->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE)
-	{
-	    current_mode = tmp_element->req_ptr->u.mgmt_setparam.value;
-	}
+        PINT_req_sched_do_change_mode(tmp_element);
     }
     if (*inout_count_p > 0)
 	return (1);

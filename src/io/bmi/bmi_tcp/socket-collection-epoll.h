@@ -53,7 +53,7 @@ enum
 
 socket_collection_p BMI_socket_collection_init(int new_server_socket);
 void BMI_socket_collection_queue(socket_collection_p scp,
-			   method_addr_p map, struct qlist_head* queue);
+			   bmi_method_addr_p map, struct qlist_head* queue);
 
 /* the bmi_tcp code may try to add a socket to the collection before
  * it is fully connected, just ignore in this case
@@ -109,6 +109,7 @@ do { \
     struct tcp_addr* tcp_data = (m)->method_data; \
     if(tcp_data->socket > -1){ \
         struct epoll_event event;\
+        memset(&event, 0, sizeof(event));\
         event.events = EPOLLIN|EPOLLERR|EPOLLHUP;\
         event.data.ptr = tcp_data->map;\
         epoll_ctl(s->epfd, EPOLL_CTL_ADD, tcp_data->socket, &event);\
@@ -119,6 +120,8 @@ do { \
 do { \
     struct epoll_event event;\
     struct tcp_addr* tcp_data = (m)->method_data; \
+    tcp_data->write_ref_count = 0; \
+    memset(&event, 0, sizeof(event));\
     event.events = 0;\
     event.data.ptr = tcp_data->map;\
     epoll_ctl(s->epfd, EPOLL_CTL_DEL, tcp_data->socket, &event);\
@@ -131,6 +134,7 @@ do { \
     struct epoll_event event;\
     assert(tcp_data->socket > -1); \
     tcp_data->write_ref_count++; \
+    memset(&event, 0, sizeof(event));\
     event.events = EPOLLIN|EPOLLERR|EPOLLHUP|EPOLLOUT;\
     event.data.ptr = tcp_data->map;\
     epoll_ctl(s->epfd, EPOLL_CTL_MOD, tcp_data->socket, &event);\
@@ -143,6 +147,7 @@ do { \
     tcp_data->write_ref_count--; \
     assert(tcp_data->write_ref_count > -1); \
     if (tcp_data->write_ref_count == 0) { \
+        memset(&event, 0, sizeof(event));\
         event.events = EPOLLIN|EPOLLERR|EPOLLHUP;\
         event.data.ptr = tcp_data->map;\
         epoll_ctl(s->epfd, EPOLL_CTL_MOD, tcp_data->socket, &event);\
@@ -155,7 +160,7 @@ void BMI_socket_collection_finalize(socket_collection_p scp);
 int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int incount,
 				 int *outcount,
-				 method_addr_p * maps,
+				 bmi_method_addr_p * maps,
 				 int * status,
 				 int poll_timeout,
 				 gen_mutex_t* external_mutex);

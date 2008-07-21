@@ -84,7 +84,7 @@ static int test_encode(void){
    r_dec = (PINT_Request*)malloc(pack_size);
    memcpy(r_dec, r_enc, pack_size);
    free(r_enc);
-   // free(r);
+   /*  free(r); */
    ret = PINT_request_decode(r_dec);
    if(ret < 0)
    {

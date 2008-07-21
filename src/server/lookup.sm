@@ -19,6 +19,7 @@
 #include "str-utils.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "check.h"
 
 enum 
 {
@@ -27,41 +28,9 @@ enum
     LOOKUP_CHECK_DIR_ACLS = 24,
 };
 
-static int lookup_init(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_read_object_metadata(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_verify_object_metadata(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_check_acls_if_needed(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_check_acls(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_read_directory_entry(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_read_directory_entry_handle(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_setup_resp(
-    PINT_server_op *s_op, job_status_s* js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
-machine pvfs2_lookup_sm(
-    prelude,
-    init,
-    read_object_metadata,
-    read_directory_entry_handle,
-    read_directory_entry,
-    verify_object_metadata,
-    read_directory_acls,
-    check_acls,
-    setup_resp,
-    final_response,
-    cleanup)
+machine pvfs2_lookup_sm
 {
     state prelude
     {
@@ -157,9 +126,12 @@ machine pvfs2_lookup_sm(
  * s_op->resp.u.lookup_path.handle_array.
  *
  */
-static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lookup_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
+
 
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
@@ -169,6 +141,14 @@ static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
     s_op->u.lookup.handle_ct = 0;
     s_op->u.lookup.attr_ct = 0;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, " STARTING LOOKUP REQUEST "
+                     "(path:%s)(fs_id:%d)(handle:%llu)(attrmask:%u)"
+                     "(# of segments:%u)\n",
+                     s_op->req->u.lookup_path.path,
+                     s_op->req->u.lookup_path.fs_id,
+                     llu(s_op->req->u.lookup_path.handle),
+                     s_op->req->u.lookup_path.attrmask,
+                     s_op->u.lookup.seg_ct);
     if ((s_op->u.lookup.seg_ct < 0) ||
         (s_op->u.lookup.seg_ct > PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
     {
@@ -176,7 +156,7 @@ static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
                    "sending error response\n",
 		   s_op->req->u.lookup_path.path);
 	js_p->error_code = -PVFS_ENOTDIR;
-        return 0;
+        return SM_ACTION_DEFERRED;
     }
 
     /* allocate the internal ds_attr_array */
@@ -198,7 +178,7 @@ static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
     if (!ptr)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     s_op->resp.u.lookup_path.handle_array = (PVFS_handle *)ptr;
@@ -207,7 +187,7 @@ static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
     s_op->resp.u.lookup_path.attr_array = (PVFS_object_attr *)ptr;
 
     js_p->error_code = 0;
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -223,9 +203,10 @@ static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
  *
  * Posts the keyval read to trove.
  */
-static int lookup_read_object_metadata(
-    PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lookup_read_object_metadata(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     PVFS_handle handle = PVFS_HANDLE_NULL;
@@ -236,7 +217,7 @@ static int lookup_read_object_metadata(
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
     {
-        handle = s_op->req->u.lookup_path.starting_handle;
+        handle = s_op->req->u.lookup_path.handle;
         ds_attr = &(s_op->u.lookup.ds_attr_array[0]);
     }
     else
@@ -256,7 +237,7 @@ static int lookup_read_object_metadata(
 
     /* get the dspace attributes/metadata */
     ret = job_trove_dspace_getattr(
-        s_op->req->u.lookup_path.fs_id, handle, s_op, ds_attr,
+        s_op->req->u.lookup_path.fs_id, handle, smcb, ds_attr,
         0, js_p, &j_id, server_job_context);
 
     return ret;
@@ -277,9 +258,10 @@ static int lookup_read_object_metadata(
  * This function does not post an operation, but rather returns 1
  * immediately.
  */
-static int lookup_verify_object_metadata(
-    PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lookup_verify_object_metadata(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
@@ -320,7 +302,7 @@ static int lookup_verify_object_metadata(
                      "halting lookup and sending response\n");
 
 	js_p->error_code = STATE_ENOTDIR;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     /*
@@ -333,7 +315,7 @@ static int lookup_verify_object_metadata(
                      "halting lookup and sending response\n");
 
 	js_p->error_code = STATE_ENOTDIR;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     /* if we looked up all the segments, we are done */
@@ -343,7 +325,7 @@ static int lookup_verify_object_metadata(
                      "sending response\n");
 
 	js_p->error_code = STATE_NOMORESEGS;
-	return 1;
+	return SM_ACTION_COMPLETE;
     }
 
     /* if we reach this point, the object is a directory.  Verify that we
@@ -357,7 +339,7 @@ static int lookup_verify_object_metadata(
          * out
          */
         js_p->error_code = LOOKUP_CHECK_DIR_ACLS;
-        return(1);
+        return SM_ACTION_COMPLETE;
     }
 
     /* find the segment that we should look up in the directory */
@@ -377,18 +359,19 @@ static int lookup_verify_object_metadata(
 		 s_op->u.lookup.segp);
 
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
  * Post a keyval DB read of the posix acls to check and see if 
  * directory traversal is allowed or not
  */
-static int lookup_check_acls_if_needed(
-    PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lookup_check_acls_if_needed(
+    struct PINT_smcb *smcb, job_status_s* js_p)
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* If we get here with an invalid fsid and handle, we have to
      * return -PVFS_EACCESS 
@@ -397,7 +380,7 @@ static int lookup_check_acls_if_needed(
         || s_op->target_handle == PVFS_HANDLE_NULL)
     {
         js_p->error_code = -PVFS_EACCES;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
 
@@ -409,7 +392,7 @@ static int lookup_check_acls_if_needed(
     if (!s_op->val.buffer)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
     s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
 
@@ -424,11 +407,12 @@ static int lookup_check_acls_if_needed(
         &s_op->val,
         0,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
         server_job_context);
+
     return ret;
 }
 
@@ -437,9 +421,10 @@ static int lookup_check_acls_if_needed(
  * to proceed or not. i.e. executable privileges on directory
  * for the requesting user or not.
  */
-static int lookup_check_acls(
-    PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lookup_check_acls(
+    struct PINT_smcb *smcb, job_status_s* js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *obj_attr = NULL;
     int want = PVFS2_ACL_EXECUTE;
 
@@ -463,23 +448,30 @@ static int lookup_check_acls(
        find the segment that we should look up in the directory */
     if (js_p->error_code == 0)
     {
-        int ret = PINT_string_next_segment(
+        js_p->error_code = PINT_string_next_segment(
             s_op->req->u.lookup_path.path, &s_op->u.lookup.segp,
             &s_op->u.lookup.segstate);
 
-        assert(ret == 0);
-
-        gossip_debug(GOSSIP_SERVER_DEBUG, "  after ACL check "
-                    "object is a directory; will be "
-                     "looking for handle for segment \"%s\" in a bit\n",
-                     s_op->u.lookup.segp);
+        if(js_p->error_code != 0)
+        {
+            gossip_err("PINT_string_next_segment failed to get the"
+                       "next segment to lookup from the path: %s\n",
+                       s_op->req->u.lookup_path.path);
+        }
+        else
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "  after ACL check "
+                         "object is a directory; will be "
+                         "looking for handle for segment \"%s\" in a bit\n",
+                         s_op->u.lookup.segp);
+        }
     }
 cleanup:
     if (s_op->val.buffer) 
         free(s_op->val.buffer);
     memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
     memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -498,9 +490,10 @@ cleanup:
  *
  * Posts the keyval read to trove.
  */
-static int lookup_read_directory_entry_handle(
-    PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lookup_read_directory_entry_handle(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_handle handle = PVFS_HANDLE_NULL;
     job_id_t j_id;
@@ -508,7 +501,7 @@ static int lookup_read_directory_entry_handle(
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
     {
-        handle = s_op->req->u.lookup_path.starting_handle;
+        handle = s_op->req->u.lookup_path.handle;
     }
     else
     {
@@ -528,7 +521,7 @@ static int lookup_read_directory_entry_handle(
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id, handle, &s_op->key, &s_op->val,
         0, 
-        NULL, s_op, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -539,9 +532,10 @@ static int lookup_read_directory_entry_handle(
  * Synopsis: Given a handle for a dspace holding directory entries,
  * look up the current segment and obtain its handle.
  */
-static int lookup_read_directory_entry(
-    PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lookup_read_directory_entry(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
 
@@ -566,15 +560,17 @@ static int lookup_read_directory_entry(
         s_op->req->u.lookup_path.fs_id, s_op->u.lookup.dirent_handle,
         &s_op->key, &s_op->val, 
         0, 
-        NULL, s_op, 0, js_p, &j_id,
+        NULL, smcb, 0, js_p, &j_id,
         server_job_context);
 
     return ret;
 }
 
 
-static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lookup_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /*
       NOTE: we may have handle_count N with attr_count N-1 in the case
@@ -594,6 +590,7 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     else if(js_p->error_code < 0)
     {
         /* preserve error code in this case and fall through */
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  lookup error in previous step\n");
     }
     else
     {
@@ -608,17 +605,20 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 
     if(js_p->error_code == 0)
     {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, handle: %llu\n",
-            s_op->req->u.lookup_path.path,
-            llu(s_op->resp.u.lookup_path.handle_array[s_op->resp.u.lookup_path.handle_count-1]));
+        PINT_ACCESS_DEBUG(
+            s_op, GOSSIP_ACCESS_DEBUG, "path: %s, handle: %llu\n", 
+            s_op->req->u.lookup_path.path, 
+            llu(s_op->resp.u.lookup_path.handle_array[
+                s_op->resp.u.lookup_path.handle_count-1]));
     }
     else
     {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, lookup failed\n",
+        PINT_ACCESS_DEBUG(
+            s_op, GOSSIP_ACCESS_DEBUG, "path: %s, lookup failed\n", 
             s_op->req->u.lookup_path.path);
     }
 
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -636,8 +636,10 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
  *   s_op->resp.u.lookup_path.handle_array)
  * - the server operation structure itself
  */
-static int lookup_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static PINT_sm_action lookup_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (s_op->resp.u.lookup_path.handle_array)
     {
         free(s_op->resp.u.lookup_path.handle_array);
@@ -649,8 +651,19 @@ static int lookup_cleanup(PINT_server_op *s_op, job_status_s* js_p)
         free(s_op->u.lookup.ds_attr_array);
         s_op->u.lookup.ds_attr_array = NULL;
     }
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
+
+PINT_GET_OBJECT_REF_DEFINE(lookup_path);
+
+struct PINT_server_req_params pvfs2_lookup_params =
+{
+    .string_name = "lookup_path",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_lookup_path,
+    .state_machine = &pvfs2_lookup_sm
+};
 
 /*
  * Local variables:

@@ -6,14 +6,15 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
+#include "pvfs2-internal.h"
 
 static int pvfs2_readlink(
     struct dentry *dentry, char __user *buffer, int buflen)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readlink called on inode %d\n",
-                (int)dentry->d_inode->i_ino);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_readlink called on inode %llu\n",
+                llu(get_handle_from_ino(dentry->d_inode)));
 
     /*
       if we're getting called, the vfs has no doubt already done a

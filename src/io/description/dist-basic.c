@@ -73,6 +73,11 @@ static void registration_init(void* params)
 {
 }
 
+static char *params_string(void *params)
+{
+    return strdup("none");
+}
+
 
 static PVFS_basic_params basic_params;
 
@@ -86,7 +91,8 @@ static PINT_dist_methods basic_methods = {
     PINT_dist_default_set_param,
     encode_lebf,
     decode_lebf,
-    registration_init
+    registration_init,
+    params_string
 };
 
 PINT_dist basic_dist = {

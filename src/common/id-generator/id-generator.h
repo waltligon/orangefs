@@ -58,6 +58,8 @@ static inline void *id_gen_fast_lookup(PVFS_id_gen_t id)
 
 #define id_gen_fast_unregister(id) do { } while(0)
 
+int id_gen_safe_initialize(void);
+int id_gen_safe_finalize(void);
 
 /* id_gen_safe_register()
  * 

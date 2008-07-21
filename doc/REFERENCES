@@ -1,4 +1,16 @@
+
+**** THIS FILE IS DEPRECATED!!  PLEASE EDIT REFERENCES.bib INSTEAD ****
+
 PVFS2:
+
+Ananth Devulapalli and Pete Wyckoff, "File creation strategies in a
+    distributed metadata file system," Proceedings of IPDPS'07, Long Beach,
+    CA, March 2007.
+
+Weikuan Yu, Shuang Liang, Dhabaleswar K. Panda (2005). High performance         
+    support of parallel virtual file system (PVFS2) over Quadrics. 19th ACM
+    International Conference on Supercomputing (ICS '05) Cambridge,
+    Massachusetts, 323-331          
 
 Weikuan Yu, Shuang Liang, Dhabaleswar K. Panda. "PVFS2 over Quadrics: Design,
     Implementation and Performance Evaluation". Ohio State University Tecnhical
@@ -127,6 +139,11 @@ A. Sivasubramaniam, M. Vilayannur, P. H. Carns, R. B. Ross, R. Thakur, ``On the
     Performance of the POSIX I/O Interface to PVFS'', Proceedings of the 12th
     Euromicro Conference on Parallel, Distributed and Network based Processing,
     A Coruna, Spain, February 2004.
+
+Hsieh, J.   Stanton, C.   Ali, R, ``Performance evaluation of software RAID vs.
+    hardware RAID for Parallel Virtual File System", Ninth International
+    Conference on Parallel and Distributed Systems, December 2002. 
+    http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=1183417
 
 /* this one does mention a bit of pvfs2k */
 "A Parallel Out-of-Core Computing System Using PVFS for Linux Clusters". Jianqi

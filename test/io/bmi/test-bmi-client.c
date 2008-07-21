@@ -89,7 +89,7 @@ int main(
     method[4+len] = '\0';
 
     /* initialize local interface */
-    ret = BMI_initialize(method, NULL, 0);
+    ret = BMI_initialize(NULL, NULL, 0);
     if (ret < 0)
     {
 	errno = -ret;

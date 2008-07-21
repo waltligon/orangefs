@@ -60,24 +60,59 @@
     *(pptr) += 4; \
 } while (0)
 
-/* skip 4 bytes */
+/* skip 4 bytes, maybe zeroing them to avoid valgrind getting annoyed */
+#ifdef HAVE_VALGRIND_H
+#define encode_skip4(pptr,x) do { \
+    *(int32_t*) *(pptr) = 0; \
+    *(pptr) += 4; \
+} while (0)
+#else
 #define encode_skip4(pptr,x) do { \
     *(pptr) += 4; \
 } while (0)
+#endif
+
 #define decode_skip4(pptr,x) do { \
     *(pptr) += 4; \
 } while (0)
 
-/* strings; decoding just points into existing character data */
-/* now handles NULL strings as well */
+/*
+ * Strings. Decoding just points into existing character data.  This handles
+ * NULL strings too, just encoding the length and a single zero byte.  The
+ * valgrind version zeroes out any padding.
+ */
+#ifdef HAVE_VALGRIND_H
 #define encode_string(pptr,pbuf) do { \
-    u_int32_t len; \
-    if(*pbuf) {len = strlen(*pbuf);} \
-    else {len = 0;} \
+    u_int32_t len = 0; \
+    if (*pbuf) \
+	len = strlen(*pbuf); \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
-    if(len) {memcpy(*(pptr)+4, *pbuf, len+1);} \
-    *(pptr) += roundup8(4 + len + 1); \
+    if (len) { \
+	memcpy(*(pptr)+4, *pbuf, len+1); \
+	int pad = roundup8(4 + len + 1) - (4 + len + 1); \
+	*(pptr) += roundup8(4 + len + 1); \
+	memset(*(pptr)-pad, 0, pad); \
+    } else { \
+	*(u_int32_t *) *(pptr) = 0; \
+	*(pptr) += 8; \
+    } \
 } while (0)
+#else
+#define encode_string(pptr,pbuf) do { \
+    u_int32_t len = 0; \
+    if (*pbuf) \
+	len = strlen(*pbuf); \
+    *(u_int32_t *) *(pptr) = htobmi32(len); \
+    if (len) { \
+	memcpy(*(pptr)+4, *pbuf, len+1); \
+	*(pptr) += roundup8(4 + len + 1); \
+    } else { \
+	*(u_int32_t *) *(pptr) = 0; \
+	*(pptr) += 8; \
+    } \
+} while (0)
+#endif
+
 #define decode_string(pptr,pbuf) do { \
     u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
     *pbuf = *(pptr) + 4; \
@@ -91,6 +126,7 @@
     memcpy(pbuf, *(pptr) + 4, len + 1); \
     *(pptr) += roundup8(4 + len + 1); \
 } while (0)
+
 
 /* keyvals; a lot like strings; decoding points existing character data */
 /* BTW we are skipping the read_sz field - keep that in mind */
@@ -231,6 +267,29 @@ static inline void decode_##name(char **pptr, sname *x) { \
     endecode_fields_5_generic(name, name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5)
 #define endecode_fields_5_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5) \
     endecode_fields_5_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5)
+
+#define endecode_fields_6_generic(name, sname, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6) \
+static inline void encode_##name(char **pptr, const sname *x) { \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##t6(pptr, &x->x6); \
+} \
+static inline void decode_##name(char **pptr, sname *x) { \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##t6(pptr, &x->x6); \
+}
+
+#define endecode_fields_6(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6) \
+    endecode_fields_6_generic(name, name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6)
+#define endecode_fields_6_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6) \
+    endecode_fields_6_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6)
 
 #define endecode_fields_7(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) \
 static inline void encode_##name(char **pptr, const name *x) { \
@@ -618,3 +677,4 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 }
 
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
+

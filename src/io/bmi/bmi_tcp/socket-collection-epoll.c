@@ -74,6 +74,7 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 
     if(new_server_socket > -1)
     {
+        memset(&event, 0, sizeof(event));
         event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
         event.data.ptr = NULL;
         ret = epoll_ctl(tmp_scp->epfd, EPOLL_CTL_ADD, new_server_socket,
@@ -100,7 +101,7 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
  * returns 0 on success, -errno on failure.
  */
 void BMI_socket_collection_queue(socket_collection_p scp,
-			   method_addr_p map, struct qlist_head* queue)
+			   bmi_method_addr_p map, struct qlist_head* queue)
 {
     struct qlist_head* iterator = NULL;
     struct qlist_head* scratch = NULL;
@@ -167,7 +168,7 @@ void BMI_socket_collection_finalize(socket_collection_p scp)
 int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int incount,
 				 int *outcount,
-				 method_addr_p * maps,
+				 bmi_method_addr_p * maps,
 				 int * status,
 				 int poll_timeout,
 				 gen_mutex_t* external_mutex)
@@ -186,7 +187,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
     /* init the outgoing arguments for safety */
     *outcount = 0;
-    memset(maps, 0, (sizeof(method_addr_p) * incount));
+    memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
     memset(status, 0, (sizeof(int) * incount));
 
     gen_mutex_lock(&scp->mutex);
@@ -200,11 +201,14 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
 	qlist_del(&tcp_addr_data->sc_link);
         
+
         /* take out of the epoll set */
         if(tcp_addr_data->sc_index > -1)
         {
+            memset(&event, 0, sizeof(event));
             event.events = 0;
             event.data.ptr = tcp_addr_data->map;
+
             ret = epoll_ctl(scp->epfd, EPOLL_CTL_DEL, tcp_addr_data->socket,
                 &event);
 
@@ -226,15 +230,18 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     {
 	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
 	qlist_del(&tcp_addr_data->sc_link);
+
 	if(tcp_addr_data->sc_index > -1)
 	{
+            memset(&event, 0, sizeof(event));
 	    /* update existing entry */
             event.data.ptr = tcp_addr_data->map;
             event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
 	    if(tcp_addr_data->write_ref_count > 0)
                 event.events |= EPOLLOUT;
+
             ret = epoll_ctl(scp->epfd, EPOLL_CTL_MOD, tcp_addr_data->socket,
-                &event);
+                            &event);
 
             if(ret < 0 && errno != ENOENT)
             {
@@ -249,10 +256,12 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	    /* new entry */
             tcp_addr_data->sc_index = 1;
 
+            memset(&event, 0, sizeof(event));
             event.data.ptr = tcp_addr_data->map;
             event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
 	    if(tcp_addr_data->write_ref_count > 0)
                 event.events |= EPOLLOUT;
+
             ret = epoll_ctl(scp->epfd, EPOLL_CTL_ADD, tcp_addr_data->socket,
                 &event);
             if(ret < 0 && errno != EEXIST)

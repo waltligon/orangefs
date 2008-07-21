@@ -14,21 +14,9 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 
-static int truncate_resize(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int truncate_check_error(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int truncate_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p);
-
 %%
 
-machine pvfs2_truncate_sm(
-    prelude, 
-    resize,
-    check_error,
-    final_response, 
-    cleanup)
+machine pvfs2_truncate_sm
 {
     state prelude
     {
@@ -64,31 +52,44 @@ machine pvfs2_truncate_sm(
 
 %%
 
-static int truncate_resize(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action truncate_resize(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
     ret = job_trove_bstream_resize(
         s_op->req->u.truncate.fs_id, s_op->req->u.truncate.handle,
         s_op->req->u.truncate.size, s_op->req->u.truncate.flags,
-        NULL, s_op, 0, js_p, &i, server_job_context);
+        NULL, smcb, 0, js_p, &i, server_job_context);
 
     return ret;
 }
 
-static int truncate_check_error(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action truncate_check_error(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
-static int truncate_cleanup(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action truncate_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return (server_state_machine_complete(s_op));
+    return (server_state_machine_complete(smcb));
 }
+
+PINT_GET_OBJECT_REF_DEFINE(truncate);
+
+struct PINT_server_req_params pvfs2_truncate_params =
+{
+    .string_name = "truncate",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_truncate,
+    .state_machine = &pvfs2_truncate_sm
+};
 
 /*
  * Local variables:

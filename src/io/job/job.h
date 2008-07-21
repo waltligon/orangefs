@@ -18,6 +18,7 @@
 #include "pvfs2-req-proto.h"
 #include "pint-dev.h"
 #include "lock-storage.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 
 typedef PVFS_id_gen_t job_id_t;
 typedef PVFS_context_id job_context_id;
@@ -171,13 +172,24 @@ int job_dev_write_list(void** buffer_list,
 		       job_context_id context_id);
 
 /* request scheduler post */
-int job_req_sched_post(struct PVFS_server_req *in_request,
-		       int req_index,
+int job_req_sched_post(enum PVFS_server_op op,
+                       PVFS_fs_id fs_id,
+                       PVFS_handle handle,
+                       enum PINT_server_req_access_type access_type,
+                       enum PINT_server_sched_policy sched_policy,
 		       void *user_ptr,
 		       job_aint status_user_tag,
 		       job_status_s * out_status_p,
 		       job_id_t * id,
 		       job_context_id context_id);
+
+/* change the mode */
+int job_req_sched_change_mode(enum PVFS_server_mode mode,
+                              void *user_ptr,
+                              job_aint status_user_tag,
+                              job_status_s *out_status_p,
+                              job_id_t *id,
+                              job_context_id context_id);
 
 int job_req_sched_post_timer(int msecs,
 		       void *user_ptr,
@@ -364,6 +376,18 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 			     job_status_s * out_status_p,
 			     job_id_t * id,
 			     job_context_id context_id);
+
+/* read generic dspace attributes for a set of handles */
+int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
+                             int nhandles,
+                             PVFS_handle *handle_array,
+                             void *user_ptr,
+                             PVFS_error *out_error_array,
+                             PVFS_ds_attributes *out_ds_attr_ptr,
+                             job_aint status_user_tag,
+                             job_status_s *out_status_p,
+                             job_id_t *id,
+                             job_context_id context_id);
 
 /* write generic dspace attributes */
 int job_trove_dspace_setattr(PVFS_fs_id coll_id,

@@ -223,6 +223,26 @@ static struct pvfs2_param_extra acache_rec_extra = {
     .min = 0,
     .max = 100,
 };
+static struct pvfs2_param_extra static_acache_timeout_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_TIMEOUT_MSECS,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra static_acache_hard_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_HARD_LIMIT,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra static_acache_soft_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_SOFT_LIMIT,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra static_acache_rec_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_RECLAIM_PERCENTAGE,
+    .min = 0,
+    .max = 100,
+};
 static struct pvfs2_param_extra ncache_timeout_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_NCACHE_TIMEOUT_MSECS,
     .min = 0,
@@ -260,75 +280,318 @@ static struct pvfs2_param_extra perf_reset_extra = {
 };
 static int min_debug[] = {0}, max_debug[] = {GOSSIP_MAX_DEBUG};
 static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
+static int min_slot_timeout_secs[] = {0}, max_slot_timeout_secs[] = {INT_MAX};
+
+/*
+ * Modern kernels prefer to number the controls themselves.
+ */
+#ifdef CTL_UNNUMBERED
+#define UNNUMBERED_OR_VAL(x) CTL_UNNUMBERED
+#else
+#define UNNUMBERED_OR_VAL(x) x
+#endif
+
 static ctl_table pvfs2_acache_table[] = {
     /* controls acache timeout */
-    {1, "timeout-msecs", NULL, sizeof(int), 0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &acache_timeout_extra, NULL},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(1),
+        .procname = "timeout-msecs",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &acache_timeout_extra
+    },
     /* controls acache hard limit */
-    {2, "hard-limit", NULL, sizeof(int), 0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &acache_hard_extra, NULL},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(2),
+        .procname = "hard-limit",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &acache_hard_extra
+    },
     /* controls acache soft limit */
-    {3, "soft-limit", NULL, sizeof(int), 0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &acache_soft_extra, NULL},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(3),
+        .procname = "soft-limit",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &acache_soft_extra
+    },
     /* controls acache reclaim percentage */
-    {4, "reclaim-percentage", NULL, sizeof(int), 
-        0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &acache_rec_extra, NULL},
-    {0}
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(4),
+        .procname = "reclaim-percentage",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &acache_rec_extra,
+    },
+    {.ctl_name = 0}
 };
+static ctl_table pvfs2_static_acache_table[] = {
+    /* controls static acache timeout */
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(1),
+        .procname = "timeout-msecs",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &static_acache_timeout_extra
+    },
+    /* controls static acache hard limit */
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(2),
+        .procname = "hard-limit",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &static_acache_hard_extra
+    },
+    /* controls static acache soft limit */
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(3),
+        .procname = "soft-limit",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &static_acache_soft_extra
+    },
+    /* controls static acache reclaim percentage */
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(4),
+        .procname = "reclaim-percentage",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &static_acache_rec_extra,
+    },
+    {.ctl_name = 0}
+};
+
 static ctl_table pvfs2_ncache_table[] = {
     /* controls ncache timeout */
-    {1, "timeout-msecs", NULL, sizeof(int), 0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &ncache_timeout_extra, NULL},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(1),
+        .procname = "timeout-msecs",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &ncache_timeout_extra
+    },
     /* controls ncache hard limit */
-    {2, "hard-limit", NULL, sizeof(int), 0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &ncache_hard_extra, NULL},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(2),
+        .procname = "hard-limit",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &ncache_hard_extra
+    },
     /* controls ncache soft limit */
-    {3, "soft-limit", NULL, sizeof(int), 0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &ncache_soft_extra, NULL},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(3),
+        .procname = "soft-limit",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &ncache_soft_extra
+    },
     /* controls ncache reclaim percentage */
-    {4, "reclaim-percentage", NULL, sizeof(int), 
-        0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &ncache_rec_extra, NULL},
-    {0}
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(4),
+        .procname = "reclaim-percentage",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &ncache_rec_extra
+    },
+    {.ctl_name = 0}
 };
 static int acache_perf_count = PVFS2_PERF_COUNT_REQUEST_ACACHE;
+static int static_acache_perf_count = PVFS2_PERF_COUNT_REQUEST_STATIC_ACACHE;
 static int ncache_perf_count = PVFS2_PERF_COUNT_REQUEST_NCACHE;
 static ctl_table pvfs2_pc_table[] = {
-    {1, "acache", NULL, 4096, 0444, NULL,
-        pvfs2_pc_proc_handler, NULL, NULL, &acache_perf_count, NULL},
-    {2, "ncache", NULL, 4096, 0444, NULL,
-        pvfs2_pc_proc_handler, NULL, NULL, &ncache_perf_count, NULL},
-    {0}
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(1),
+        .procname = "acache",
+        .maxlen = 4096,
+        .mode = 0444,
+        .proc_handler = pvfs2_pc_proc_handler,
+        .extra1 = &acache_perf_count,
+    },
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(1),
+        .procname = "static-acache",
+        .maxlen = 4096,
+        .mode = 0444,
+        .proc_handler = pvfs2_pc_proc_handler,
+        .extra1 = &static_acache_perf_count,
+    },
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(2),
+        .procname = "ncache",
+        .maxlen = 4096,
+        .mode = 0444,
+        .proc_handler = pvfs2_pc_proc_handler,
+        .extra1 = &ncache_perf_count
+    },
+    {.ctl_name = 0}
 };
+
+pvfs2_stats g_pvfs2_stats;
+
+static ctl_table pvfs2_stats_table[] = {
+    /* shows number of hits in cache */
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(1),
+        .procname = "hits",
+        .data     = &g_pvfs2_stats.cache_hits,
+        .maxlen   = sizeof(unsigned long),
+        .mode     = 0444,
+        .proc_handler = &proc_dointvec,
+    },
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(2),
+        .procname = "misses",
+        .data     = &g_pvfs2_stats.cache_misses,
+        .maxlen   = sizeof(unsigned long),
+        .mode     = 0444,
+        .proc_handler = &proc_dointvec,
+    },
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(3),
+        .procname = "reads",
+        .data     = &g_pvfs2_stats.reads,
+        .maxlen   = sizeof(unsigned long),
+        .mode     = 0444,
+        .proc_handler = &proc_dointvec,
+    },
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(4),
+        .procname = "writes",
+        .data     = &g_pvfs2_stats.writes,
+        .maxlen   = sizeof(unsigned long),
+        .mode     = 0444,
+        .proc_handler = &proc_dointvec,
+    },
+    {.ctl_name = 0}
+};
+
 static ctl_table pvfs2_table[] = {
     /* controls debugging level */
-    {1, "debug", &gossip_debug_mask, sizeof(int), 0644, NULL,
-        &proc_dointvec_minmax, &sysctl_intvec,
-        NULL, &min_debug, &max_debug},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(1),
+        .procname = "debug",
+        .data = &gossip_debug_mask,
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &proc_dointvec_minmax, 
+        .strategy = &sysctl_intvec,
+        .extra1 = &min_debug,
+        .extra2 = &max_debug
+    },
     /* operation timeout */
-    {2, "op-timeout-secs", &op_timeout_secs, sizeof(int), 0644, NULL,
-        &proc_dointvec_minmax, &sysctl_intvec,
-        NULL, &min_op_timeout_secs, &max_op_timeout_secs},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(2),
+        .procname = "op-timeout-secs",
+        .data = &op_timeout_secs,
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &proc_dointvec_minmax,
+        .strategy = &sysctl_intvec,
+        .extra1 = &min_op_timeout_secs,
+        .extra2 = &max_op_timeout_secs
+    },
+    /* slot timeout */
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(2),
+        .procname = "slot-timeout-secs",
+        .data = &slot_timeout_secs,
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &proc_dointvec_minmax,
+        .strategy = &sysctl_intvec,
+        .extra1 = &min_slot_timeout_secs,
+        .extra2 = &max_slot_timeout_secs
+    },
     /* time interval for client side performance counters */
-    {3, "perf-time-interval-secs", NULL, sizeof(int), 0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &perf_time_interval_extra, NULL},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(3),
+        .procname = "perf-time-interval-secs",
+        .maxlen = sizeof(int), 
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &perf_time_interval_extra
+    },
     /* time interval for client side performance counters */
-    {4, "perf-history-size", NULL, sizeof(int), 0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &perf_history_size_extra, NULL},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(4),
+        .procname = "perf-history-size",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &perf_history_size_extra
+    },
     /* reset performance counters */
-    {5, "perf-counter-reset", NULL, sizeof(int), 0644, NULL,
-        &pvfs2_param_proc_handler, NULL, NULL, &perf_reset_extra, NULL},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(5),
+        .procname = "perf-counter-reset",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &perf_reset_extra,
+    },
     /* subdir for acache control */
-    {6, "acache", NULL, 0, 0555, pvfs2_acache_table},
-    {7, "perf-counters", NULL, 0, 0555, pvfs2_pc_table},
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(6),
+        .procname = "acache",
+        .maxlen = 0,
+        .mode = 0555,
+        .child = pvfs2_acache_table
+    },
+    /* subdir for static acache control */
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(6),
+        .procname = "static-acache",
+        .maxlen = 0,
+        .mode = 0555,
+        .child = pvfs2_static_acache_table
+    },
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(7),
+        .procname = "perf-counters",
+        .maxlen = 0,
+        .mode = 0555,
+        .child = pvfs2_pc_table
+    },
     /* subdir for ncache control */
-    {8, "ncache", NULL, 0, 0555, pvfs2_ncache_table},
-    {0}
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(8),
+        .procname = "ncache",
+        .maxlen = 0,
+        .mode = 0555,
+        .child = pvfs2_ncache_table
+    },
+    /* statistics maintained by the kernel module (output only below this) */
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(9),
+        .procname = "stats",
+        .maxlen = 0,
+        .mode = 0555,
+        .child = pvfs2_stats_table
+    },
+    {.ctl_name = 0}
 };
 static ctl_table fs_table[] = {
-    {1, "pvfs2", NULL, 0, 0555, pvfs2_table},
-    {0}
+    {
+        .ctl_name = UNNUMBERED_OR_VAL(1),
+        .procname = "pvfs2",
+        .mode = 0555,
+        .child = pvfs2_table
+    },
+    {.ctl_name = 0}
 };
 #endif
 
@@ -337,7 +600,11 @@ void pvfs2_proc_initialize(void)
 #ifdef CONFIG_SYSCTL
     if (!fs_table_header)
     {
+#ifdef HAVE_TWO_ARG_REGISTER_SYSCTL_TABLE
         fs_table_header = register_sysctl_table(fs_table, 0);
+#else
+        fs_table_header = register_sysctl_table(fs_table);
+#endif
     }
 #endif
 

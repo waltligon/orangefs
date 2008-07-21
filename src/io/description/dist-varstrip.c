@@ -405,6 +405,13 @@ static void registration_init(void* params)
             PVFS_varstrip_params, strips);
 }
 
+static char *params_string(void *params)
+{
+    PVFS_varstrip_params* dparam = (PVFS_varstrip_params*)params;
+
+    return strdup(dparam->strips);
+}
+
 
 static PVFS_varstrip_params varstrip_params = { "\0" };
 
@@ -418,7 +425,8 @@ static PINT_dist_methods varstrip_methods = {
     set_param,
     encode_params,
     decode_params,
-    registration_init
+    registration_init,
+    params_string
 };
 
 PINT_dist varstrip_dist = {

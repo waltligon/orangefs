@@ -50,6 +50,21 @@
 #define PVFS_ATTR_DIR_ALL \
 (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT)
 
+/* attributes that do not change once set */
+#define PVFS_STATIC_ATTR_MASK \
+(PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_META_DIST|PVFS_ATTR_META_DFILES)
+
+/* extended hint attributes for a metafile object */
+struct PVFS_metafile_hint_s
+{
+    PVFS_flags flags;
+};
+typedef struct PVFS_metafile_hint_s PVFS_metafile_hint;
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+endecode_fields_1(PVFS_metafile_hint,
+        PVFS_flags, flags)
+#endif
+
 /* attributes specific to metadata objects */
 struct PVFS_metafile_attr_s
 {
@@ -60,6 +75,7 @@ struct PVFS_metafile_attr_s
     /* list of datafiles */
     PVFS_handle *dfile_array;
     uint32_t dfile_count;
+    PVFS_metafile_hint hint;
 };
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -75,6 +91,7 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
     encode_skip4(pptr,); \
     for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++) \
 	encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]); \
+    encode_PVFS_metafile_hint(pptr, &(x)->hint); \
 } while (0)
 #define decode_PVFS_metafile_attr_dfiles(pptr,x) do { int dfiles_i; \
     decode_uint32_t(pptr, &(x)->dfile_count); \
@@ -83,6 +100,7 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
       * sizeof(*(x)->dfile_array)); \
     for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++) \
 	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]); \
+    decode_PVFS_metafile_hint(pptr, &(x)->hint); \
 } while (0)
 #endif
 

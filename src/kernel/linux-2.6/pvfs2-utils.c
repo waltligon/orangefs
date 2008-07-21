@@ -3,7 +3,7 @@
  *
  * See COPYING in top-level directory.
  */
-
+#define  __PINT_PROTO_ENCODE_OPAQUE_HANDLE
 #include "pvfs2-kernel.h"
 #include "pvfs2-types.h"
 #include "pint-dev-shared.h"
@@ -98,14 +98,38 @@ PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op)
     return fsid;
 }
 
+static void pvfs2_set_inode_flags(struct inode *inode, 
+        PVFS_sys_attr *attrs)
+{
+    if (attrs->flags & PVFS_IMMUTABLE_FL) {
+        inode->i_flags |= S_IMMUTABLE;
+    }
+    else {
+        inode->i_flags &= ~S_IMMUTABLE;
+    }
+    if (attrs->flags & PVFS_APPEND_FL) {
+        inode->i_flags |= S_APPEND;
+    }
+    else {
+        inode->i_flags &= ~S_APPEND;
+    }
+    if (attrs->flags & PVFS_NOATIME_FL) {
+        inode->i_flags |= S_NOATIME;
+    }
+    else {
+        inode->i_flags &= ~S_NOATIME;
+    }
+    return;
+}
+
 /* NOTE: symname is ignored unless the inode is a sym link */
-static inline int copy_attributes_to_inode(
+int copy_attributes_to_inode(
     struct inode *inode,
     PVFS_sys_attr *attrs,
     char *symname)
 {
     int ret = -1;
-    int perm_mode = 0, old_mode = 0;
+    int perm_mode = 0;
     pvfs2_inode_t *pvfs2_inode = NULL;
     loff_t inode_size = 0, rounded_up_size = 0;
 
@@ -127,39 +151,45 @@ static inline int copy_attributes_to_inode(
           changing the inode->i_blkbits to something other than
           PAGE_CACHE_SHIFT breaks mmap/execution as we depend on that.
         */
+#ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE
         inode->i_blksize = pvfs_bufmap_size_query();
+#endif
         inode->i_blkbits = PAGE_CACHE_SHIFT;
-        gossip_debug(GOSSIP_UTILS_DEBUG, "attrs->mask = %x (%d, objtype = %x), size = %ld\n", 
-                attrs->mask, attrs->mask & PVFS_ATTR_SYS_SIZE, 
-                attrs->objtype,
-                (unsigned long) attrs->size);
+        gossip_debug(GOSSIP_UTILS_DEBUG, "attrs->mask = %x (objtype = %s)\n", 
+                attrs->mask, 
+                attrs->objtype == PVFS_TYPE_METAFILE ? "file" :
+                attrs->objtype == PVFS_TYPE_DIRECTORY ? "directory" :
+                attrs->objtype == PVFS_TYPE_SYMLINK ? "symlink" :
+                 "invalid/unknown");
                 
-
-        if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
-            (attrs->mask & PVFS_ATTR_SYS_SIZE))
+        if (attrs->objtype == PVFS_TYPE_METAFILE)
         {
-            inode_size = (loff_t)attrs->size;
-            rounded_up_size =
-                (inode_size + (4096 - (inode_size % 4096)));
+            pvfs2_set_inode_flags(inode, attrs);
+            if (attrs->mask & PVFS_ATTR_SYS_SIZE)
+            {
+                inode_size = (loff_t)attrs->size;
+                rounded_up_size =
+                    (inode_size + (4096 - (inode_size % 4096)));
 
-            pvfs2_lock_inode(inode);
+                pvfs2_lock_inode(inode);
 #ifdef PVFS2_LINUX_KERNEL_2_4
 #if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER > 21)
-            inode->i_bytes = inode_size;
+                inode->i_bytes = inode_size;
 #endif
 #else
-            /* this is always ok for 2.6.x */
-            inode->i_bytes = inode_size;
+                /* this is always ok for 2.6.x */
+                inode->i_bytes = inode_size;
 #endif
-            inode->i_blocks = (unsigned long)(rounded_up_size / 512);
-            pvfs2_unlock_inode(inode);
+                inode->i_blocks = (unsigned long)(rounded_up_size / 512);
+                pvfs2_unlock_inode(inode);
 
-            /*
-              NOTE: make sure all the places we're called from have
-              the inode->i_sem lock.  we're fine in 99% of the cases
-              since we're mostly called from a lookup.
-            */
-            inode->i_size = inode_size;
+                /*
+                  NOTE: make sure all the places we're called from have
+                  the inode->i_sem lock.  we're fine in 99% of the cases
+                  since we're mostly called from a lookup.
+                */
+                inode->i_size = inode_size;
+            }
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))
@@ -197,9 +227,6 @@ static inline int copy_attributes_to_inode(
         inode->i_mtime.tv_nsec = 0;
         inode->i_ctime.tv_nsec = 0;
 #endif
-        old_mode = inode->i_mode;
-        inode->i_mode = 0;
-
         if (attrs->perms & PVFS_O_EXECUTE)
             perm_mode |= S_IXOTH;
         if (attrs->perms & PVFS_O_WRITE)
@@ -227,18 +254,14 @@ static inline int copy_attributes_to_inode(
         if (get_suid_flag(inode) == 1 && (attrs->perms & PVFS_U_SUID))
             perm_mode |= S_ISUID;
 
-        inode->i_mode |= perm_mode;
+        inode->i_mode = perm_mode;
 
-        /* NOTE: this will change once we move from the iget() model to the
-         * iget5() interface where i_ino will only be a hash and not the actual
-         * handle itself!
-         * Most file systems have moved to that model
-         */
-        if (inode->i_ino == PVFS2_SB(inode->i_sb)->root_handle)
+        if (is_root_handle(inode))
         {
             /* special case: mark the root inode as sticky */
             inode->i_mode |= S_ISVTX;
-            gossip_debug(GOSSIP_ACL_DEBUG, "Marking inode %ld as sticky\n", (long) inode->i_ino);
+            gossip_debug(GOSSIP_ACL_DEBUG, "Marking inode %llu as sticky\n", 
+                    llu(get_handle_from_ino(inode)));
         }
 
         switch (attrs->objtype)
@@ -268,17 +291,7 @@ static inline int copy_attributes_to_inode(
                 /* copy link target to inode private data */
                 if (pvfs2_inode && symname)
                 {
-                    if (pvfs2_inode->link_target)
-                    {
-                        kfree(pvfs2_inode->link_target);
-                        pvfs2_inode->link_target = NULL;
-                    }
-                    pvfs2_inode->link_target = kmalloc(
-                        (strlen(symname) + 1), PVFS2_GFP_FLAGS);
-                    if (pvfs2_inode->link_target)
-                    {
-                        strcpy(pvfs2_inode->link_target, symname);
-                    }
+                    strncpy(pvfs2_inode->link_target, symname, PVFS_NAME_MAX);
                     gossip_debug(GOSSIP_UTILS_DEBUG, "Copied attr link target %s\n",
                                 pvfs2_inode->link_target);
                 }
@@ -289,8 +302,8 @@ static inline int copy_attributes_to_inode(
                 gossip_err("pvfs2:copy_attributes_to_inode: got invalid "
                             "attribute type %x\n", attrs->objtype);
         }
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: copy_attributes_to_inode: setting inode->i_mode to %o from %o\n",
-                inode->i_mode, old_mode);
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: copy_attributes_to_inode: setting i_mode to %o, i_size to %lu\n",
+                inode->i_mode, (unsigned long)pvfs2_i_size_read(inode));
     }
     return ret;
 }
@@ -300,10 +313,10 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
     PVFS_sys_attr *attrs,
     int suid)
 {
-    attrs->perms = PVFS2_translate_mode(mode, suid);
+    attrs->perms = PVFS_util_translate_mode(mode, suid);
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "mode is %d | translated perms is %d\n", mode,
+    gossip_debug(GOSSIP_UTILS_DEBUG, "mode is %o | translated perms is %o\n", mode,
                 attrs->perms);
 
     /* NOTE: this function only called during setattr.  Setattr must not mess
@@ -377,7 +390,7 @@ static inline int copy_attributes_from_inode(
         tmp_mode = iattr->ia_mode;
         if (tmp_mode & (S_ISVTX))
         {
-            if(inode->i_ino == PVFS2_SB(inode->i_sb)->root_handle)
+            if (is_root_handle(inode))
             {
                 /* allow sticky bit to be set on root (since it shows up that
                  * way by default anyhow), but don't show it to
@@ -418,7 +431,7 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
     pvfs2_inode_t *pvfs2_inode = NULL;
 
     gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_getattr: called on inode %llu\n",
-                llu(pvfs2_ino_to_handle(inode->i_ino)));
+                llu(get_handle_from_ino(inode)));
 
     if (inode)
     {
@@ -438,15 +451,27 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
            that call flow looks like:
            lookup --> iget --> read_inode --> here
 
+           In the case we are doing an iget4 or an iget5_locked, there
+           is no call made to read_inode so we actually have valid fields
+           in pvfs2_inode->refn
+
            if the inode were already in the inode cache, it looks like:
            lookup --> revalidate --> here
         */
         if (pvfs2_inode->refn.handle == PVFS_HANDLE_NULL)
         {
-            pvfs2_inode->refn.handle = pvfs2_ino_to_handle(inode->i_ino);
+#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET5_LOCKED)
+            gossip_lerr("Critical error: Invalid handle despite using iget4/iget5\n");
+            return -EINVAL;
+#endif
+            pvfs2_inode->refn.handle = get_handle_from_ino(inode);
         }
         if (pvfs2_inode->refn.fs_id == PVFS_FS_ID_NULL)
         {
+#if defined(HAVE_IGET4_LOCKED) || defined(HAVE_IGET5_LOCKED)
+            gossip_lerr("Critical error: Invalid fsid despite using iget4/iget5\n");
+            return -EINVAL;
+#endif
             pvfs2_inode->refn.fs_id = PVFS2_SB(inode->i_sb)->fs_id;
         }
 
@@ -582,22 +607,35 @@ int pvfs2_flush_inode(struct inode *inode)
         wbattr.ia_valid |= ATTR_MTIME;
     if (CtimeFlag(pvfs2_inode))
         wbattr.ia_valid |= ATTR_CTIME;
-    if (AtimeFlag(pvfs2_inode))
+    /*
+     * We do not need to honor atime flushes if
+     * a) object has a noatime marker
+     * b) object is a directory and has a nodiratime marker on the fs
+     * c) entire file system is mounted with noatime option
+     */
+
+    if (!((inode->i_flags & S_NOATIME)
+            || (inode->i_sb->s_flags & MS_NOATIME)
+            || ((inode->i_sb->s_flags & MS_NODIRATIME) && S_ISDIR(inode->i_mode))) && AtimeFlag(pvfs2_inode))
+    {
         wbattr.ia_valid |= ATTR_ATIME;
+    }
     if (ModeFlag(pvfs2_inode)) 
     {
         wbattr.ia_mode = inode->i_mode;
         wbattr.ia_valid |= ATTR_MODE;
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_flush_inode (%ld) writing mode %o\n",
-                (long) inode->i_ino, inode->i_mode);
     }
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "*********** pvfs2_flush_inode: %ld "
-            "(ia_valid %d)\n", (long) inode->i_ino, wbattr.ia_valid);
+    gossip_debug(GOSSIP_UTILS_DEBUG, "*********** pvfs2_flush_inode: %llu "
+            "(ia_valid %d)\n", llu(get_handle_from_ino(inode)), wbattr.ia_valid);
     if (wbattr.ia_valid == 0)
     {
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_inode skipping setattr()\n");
         return 0;
     }
+        
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_inode (%llu) writing mode %o\n",
+        llu(get_handle_from_ino(inode)), inode->i_mode);
 
     ret = pvfs2_inode_setattr(inode, &wbattr);
     return ret;
@@ -695,8 +733,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
     }
     if (inode)
     {
-        gossip_debug(GOSSIP_XATTR_DEBUG, "getxattr on inode %ld, name %s (uid %o, gid %o)\n", 
-                (long) inode->i_ino, name, current->fsuid, current->fsgid);
+        gossip_debug(GOSSIP_XATTR_DEBUG, "getxattr on inode %llu, name %s (uid %o, gid %o)\n", 
+                llu(get_handle_from_ino(inode)), name, current->fsuid, current->fsgid);
         pvfs2_inode = PVFS2_I(inode);
         /* obtain the xattr semaphore */
         down_read(&pvfs2_inode->xattr_sem);
@@ -765,9 +803,9 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
                     memcpy(buffer, new_op->downcall.resp.getxattr.val, 
                             new_length);
                     ret = new_length;
-                    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %ld key %s "
+                    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %llu key %s "
                             " key_sz %d, val_length %d\n", 
-                        (long) inode->i_ino,
+                        llu(get_handle_from_ino(inode)),
                         (char*)new_op->upcall.req.getxattr.key, 
                         (int) new_op->upcall.req.getxattr.key_sz, (int) ret);
                 }
@@ -776,8 +814,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         else if (ret == -ENOENT)
         {
             ret = -ENODATA; /* if no such keys exists we set this to be errno */
-            gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %ld key %s does not exist!\n",
-                    (long) inode->i_ino, (char *) new_op->upcall.req.getxattr.key);
+            gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %llu key %s does not exist!\n",
+                    llu(get_handle_from_ino(inode)), (char *) new_op->upcall.req.getxattr.key);
         }
 
         /* when request is serviced properly, free req op struct */
@@ -810,12 +848,26 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         gossip_err("pvfs2_inode_setxattr: bogus NULL pointers!\n");
         return -EINVAL;
     }
-    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+
+    if (prefix)
     {
-        gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
-                (int)(strlen(name)+strlen(prefix)));
-        return -EINVAL;
+        if(strlen(name)+strlen(prefix) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
+				(int)(strlen(name)+strlen(prefix)));
+		return -EINVAL;
+	}
     }
+    else
+    {
+        if(strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n",
+			   (int)(strlen(name)));
+                return -EINVAL;
+        }
+    }
+
     /* This is equivalent to a removexattr */
     if (size == 0 && value == NULL)
     {
@@ -824,8 +876,8 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
     }
     if (inode)
     {
-        gossip_debug(GOSSIP_XATTR_DEBUG, "setxattr on inode %ld, name %s\n", 
-                (long) inode->i_ino, name);
+        gossip_debug(GOSSIP_XATTR_DEBUG, "setxattr on inode %llu, name %s\n", 
+                llu(get_handle_from_ino(inode)), name);
         if (IS_RDONLY(inode))
         {
             gossip_err("pvfs2_inode_setxattr: Read-only file system\n");
@@ -833,7 +885,8 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         }
         if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
         {
-            gossip_err("pvfs2_inode_setxattr: Immutable inode or append-only inode; operation not permitted\n");
+            gossip_err("pvfs2_inode_setxattr: Immutable inode or append-only "
+                    "inode; operation not permitted\n");
             return -EPERM;
         }
         pvfs2_inode = PVFS2_I(inode);
@@ -888,12 +941,31 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+    if(!name)
     {
-        gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
-                (int)(strlen(name)+strlen(prefix)));
+	gossip_err("pvfs2_inode_removexattr: xattr key is NULL\n");
         return -EINVAL;
     }
+
+    if (prefix)
+    {
+        if((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
+				(int)(strlen(name)+strlen(prefix)));
+		return -EINVAL;
+	}
+    }
+    else
+    {
+        if(strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+        {
+		gossip_err("pvfs2_inode_removexattr: Invalid key length(%d)\n",
+			   (int)(strlen(name)));
+                return -EINVAL;
+        }
+    }
+
     if (inode)
     {
         pvfs2_inode = PVFS2_I(inode);
@@ -913,7 +985,8 @@ int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
          * later on...
          */
         ret = snprintf((char*)new_op->upcall.req.removexattr.key,
-            PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
+            PVFS_MAX_XATTR_NAMELEN, "%s%s", 
+            (prefix ? prefix : ""), name);
         new_op->upcall.req.removexattr.key_sz = ret + 1;
 
         gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_removexattr: key %s, key_sz %d\n", 
@@ -1072,7 +1145,6 @@ static inline struct inode *pvfs2_create_file(
     int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
-    pvfs2_inode_t *pvfs2_inode = NULL;
     struct inode *inode = NULL;
 
     new_op = op_alloc(PVFS2_VFS_OP_CREATE);
@@ -1082,14 +1154,20 @@ static inline struct inode *pvfs2_create_file(
         return NULL;
     }
 
-    if (parent && parent->refn.handle && parent->refn.fs_id)
+    if (parent && parent->refn.handle != PVFS_HANDLE_NULL && parent->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.create.parent_refn = parent->refn;
     }
     else
     {
+#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
+        gossip_lerr("Critical error: i_ino cannot be relied on when using iget4/5\n");
+        *error_code = -EINVAL;
+        op_release(new_op);
+        return NULL;
+#endif
         new_op->upcall.req.create.parent_refn.handle =
-            pvfs2_ino_to_handle(dir->i_ino);
+            get_handle_from_ino(dir);
         new_op->upcall.req.create.parent_refn.fs_id =
             PVFS2_SB(dir->i_sb)->fs_id;
     }
@@ -1112,8 +1190,7 @@ static inline struct inode *pvfs2_create_file(
     if (ret > -1)
     {
         inode = pvfs2_get_custom_inode(
-            dir->i_sb, dir, (S_IFREG | mode), 0, pvfs2_handle_to_ino(
-                new_op->downcall.resp.create.refn.handle));
+            dir->i_sb, dir, (S_IFREG | mode), 0, new_op->downcall.resp.create.refn);
         if (!inode)
         {
             gossip_err("*** Failed to allocate pvfs2 file inode\n");
@@ -1122,12 +1199,8 @@ static inline struct inode *pvfs2_create_file(
             return NULL;
         }
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned file inode new number of %d\n",
-                    (int)inode->i_ino);
-
-        pvfs2_inode = PVFS2_I(inode);
-        pvfs2_inode->refn = new_op->downcall.resp.create.refn;
-
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned file inode new number of %llu\n",
+                    llu(get_handle_from_ino(inode)));
         /* finally, add dentry with this new inode to the dcache */
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_file: Instantiating\n *negative* "
                     "dentry %p for %s\n", dentry,
@@ -1135,8 +1208,8 @@ static inline struct inode *pvfs2_create_file(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
-        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Regular File) %ld -> %s\n",
-                (long) inode->i_ino, dentry->d_name.name);
+        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Regular File) %llu -> %s\n",
+                llu(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else
     {
@@ -1159,7 +1232,6 @@ static inline struct inode *pvfs2_create_dir(
     int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
-    pvfs2_inode_t *pvfs2_inode = NULL;
     struct inode *inode = NULL;
 
     new_op = op_alloc(PVFS2_VFS_OP_MKDIR);
@@ -1169,14 +1241,20 @@ static inline struct inode *pvfs2_create_dir(
         return NULL;
     }
 
-    if (parent && parent->refn.handle && parent->refn.fs_id)
+    if (parent && parent->refn.handle != PVFS_HANDLE_NULL && parent->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.mkdir.parent_refn = parent->refn;
     }
     else
     {
+#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
+        gossip_lerr("Critical error: i_ino cannot be relied on when using iget4/5\n");
+        *error_code = -EINVAL;
+        op_release(new_op);
+        return NULL;
+#endif
         new_op->upcall.req.mkdir.parent_refn.handle =
-            pvfs2_ino_to_handle(dir->i_ino);
+            get_handle_from_ino(dir);
         new_op->upcall.req.mkdir.parent_refn.fs_id =
             PVFS2_SB(dir->i_sb)->fs_id;
     }
@@ -1199,8 +1277,7 @@ static inline struct inode *pvfs2_create_dir(
     if (ret > -1)
     {
         inode = pvfs2_get_custom_inode(
-            dir->i_sb, dir, (S_IFDIR | mode), 0, pvfs2_handle_to_ino(
-                new_op->downcall.resp.mkdir.refn.handle));
+            dir->i_sb, dir, (S_IFDIR | mode), 0, new_op->downcall.resp.mkdir.refn);
         if (!inode)
         {
             gossip_err("*** Failed to allocate pvfs2 dir inode\n");
@@ -1209,12 +1286,8 @@ static inline struct inode *pvfs2_create_dir(
             return NULL;
         }
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned dir inode new number of %d\n",
-                    (int) inode->i_ino);
-
-        pvfs2_inode = PVFS2_I(inode);
-        pvfs2_inode->refn = new_op->downcall.resp.mkdir.refn;
-
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned dir inode new number of %llu\n",
+                    llu(get_handle_from_ino(inode)));
         /* finally, add dentry with this new inode to the dcache */
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_dir: Instantiating\n  *negative* "
                     "dentry %p for %s\n", dentry,
@@ -1222,8 +1295,8 @@ static inline struct inode *pvfs2_create_dir(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
-        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Directory) %ld -> %s\n",
-                (long) inode->i_ino, dentry->d_name.name);
+        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Directory) %llu -> %s\n",
+                llu(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else
     {
@@ -1247,8 +1320,13 @@ static inline struct inode *pvfs2_create_symlink(
     int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
-    pvfs2_inode_t *pvfs2_inode = NULL;
     struct inode *inode = NULL;
+
+    if(!symname)
+    {
+	*error_code = -EINVAL;
+        return NULL;
+    }
 
     new_op = op_alloc(PVFS2_VFS_OP_SYMLINK);
     if (!new_op)
@@ -1257,14 +1335,20 @@ static inline struct inode *pvfs2_create_symlink(
         return NULL;
     }
 
-    if (parent && parent->refn.handle && parent->refn.fs_id)
+    if (parent && parent->refn.handle != PVFS_HANDLE_NULL && parent->refn.fs_id != PVFS_FS_ID_NULL)
     {
         new_op->upcall.req.sym.parent_refn = parent->refn;
     }
     else
     {
+#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
+        gossip_lerr("Critical error: i_ino cannot be relied on when using iget4/5\n");
+        *error_code = -EINVAL;
+        op_release(new_op);
+        return NULL;
+#endif
         new_op->upcall.req.sym.parent_refn.handle =
-            pvfs2_ino_to_handle(dir->i_ino);
+            get_handle_from_ino(dir);
         new_op->upcall.req.sym.parent_refn.fs_id =
             PVFS2_SB(dir->i_sb)->fs_id;
     }
@@ -1288,8 +1372,7 @@ static inline struct inode *pvfs2_create_symlink(
     if (ret > -1)
     {
         inode = pvfs2_get_custom_inode(
-            dir->i_sb, dir, (S_IFLNK | mode), 0, pvfs2_handle_to_ino(
-                new_op->downcall.resp.sym.refn.handle));
+            dir->i_sb, dir, (S_IFLNK | mode), 0, new_op->downcall.resp.sym.refn);
         if (!inode)
         {
             gossip_err("*** Failed to allocate pvfs2 symlink inode\n");
@@ -1298,11 +1381,8 @@ static inline struct inode *pvfs2_create_symlink(
             return NULL;
         }
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned symlink inode new number of %d\n",
-                    (int)inode->i_ino);
-
-        pvfs2_inode = PVFS2_I(inode);
-        pvfs2_inode->refn = new_op->downcall.resp.sym.refn;
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned symlink inode new number of %llu\n",
+                    llu(get_handle_from_ino(inode)));
 
         /* finally, add dentry with this new inode to the dcache */
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_symlink: Instantiating\n  "
@@ -1311,8 +1391,8 @@ static inline struct inode *pvfs2_create_symlink(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
-        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Symlink) %ld -> %s\n",
-                (long) inode->i_ino, dentry->d_name.name);
+        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Symlink) %llu -> %s\n",
+                llu(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else
     {
@@ -1382,9 +1462,9 @@ int pvfs2_remove_entry(
 
     if (inode && parent && dentry)
     {
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_remove_entry: called on %s\n  (inode %d): "
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_remove_entry: called on %s\n  (inode %llu): "
                     "Parent is %llu | fs_id %d\n", dentry->d_name.name,
-                    (int)inode->i_ino, llu(parent->refn.handle),
+                    llu(get_handle_from_ino(inode)), llu(parent->refn.handle),
                     parent->refn.fs_id);
 
         new_op = op_alloc(PVFS2_VFS_OP_REMOVE);
@@ -1393,14 +1473,19 @@ int pvfs2_remove_entry(
             return -ENOMEM;
         }
 
-        if (parent && parent->refn.handle && parent->refn.fs_id)
+        if (parent && parent->refn.handle != PVFS_HANDLE_NULL && parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
             new_op->upcall.req.remove.parent_refn = parent->refn;
         }
         else
         {
+#if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
+            gossip_lerr("Critical error: i_ino cannot be relied on when using iget4/5\n");
+            op_release(new_op);
+            return -ENOMEM;
+#endif
             new_op->upcall.req.remove.parent_refn.handle =
-                pvfs2_ino_to_handle(dir->i_ino);
+                get_handle_from_ino(dir);
             new_op->upcall.req.remove.parent_refn.fs_id =
                 PVFS2_SB(dir->i_sb)->fs_id;
         }
@@ -1425,9 +1510,9 @@ int pvfs2_truncate_inode(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: pvfs2_truncate_inode %d: "
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: pvfs2_truncate_inode %llu: "
                 "Handle is %llu | fs_id %d | size is %lu\n",
-                (int)inode->i_ino, llu(pvfs2_inode->refn.handle),
+                llu(get_handle_from_ino(inode)), llu(pvfs2_inode->refn.handle),
                 pvfs2_inode->refn.fs_id, (unsigned long)size);
 
     new_op = op_alloc(PVFS2_VFS_OP_TRUNCATE);
@@ -1453,6 +1538,320 @@ int pvfs2_truncate_inode(
     return ret;
 }
 
+#ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+
+typedef enum {
+    HANDLE_CHECK_LENGTH = 1,
+    HANDLE_CHECK_MAGIC  = 2,
+    HANDLE_CHECK_FSID   = 4,
+} handle_check_t;
+
+/* Perform simple sanity checks on the obtained handle */
+static inline int perform_handle_checks(const struct file_handle *fhandle,
+        handle_check_t check, void *p)
+{
+    if (!fhandle)
+    {
+        return -EINVAL;
+    }
+    /* okay good. now check if magic_nr matches */
+    if (check & HANDLE_CHECK_LENGTH)
+    {
+        /* Make sure that handle length matches our opaque handle structure */
+        if (fhandle->fh_private_length != sizeof(pvfs2_opaque_handle_t))
+        {
+            gossip_err("perform_handle_checks: length mismatch (%ld) "
+                    " instead of (%ld)\n", (unsigned long) fhandle->fh_private_length,
+                    (unsigned long) sizeof(pvfs2_opaque_handle_t));
+            return 0;
+        }
+    }
+    if (check & HANDLE_CHECK_MAGIC)
+    {
+        u32 magic;
+
+        get_fh_field(&fhandle->fh_generic, magic, magic);
+
+        if (magic != PVFS2_SUPER_MAGIC)
+        {
+            gossip_err("perform_handle_checks: mismatched magic number "
+                    " (%x) instead of (%x)\n",
+                    magic, PVFS2_SUPER_MAGIC);
+            return 0;
+        }
+    }
+    if (check & HANDLE_CHECK_FSID)
+    {
+        pvfs2_sb_info_t *pvfs2_sbp = NULL;
+        struct super_block *sb = (struct super_block *) p;
+        u32 fsid;
+
+        if (!sb)
+            return 0;
+        pvfs2_sbp = PVFS2_SB(sb);
+
+        get_fh_field(&fhandle->fh_generic, fsid, fsid);
+
+        if (fsid != pvfs2_sbp->fs_id)
+        {
+            gossip_err("perform_handle_checks: FSID did not match "
+                    " (%d) instead of (%d)\n",
+                    fsid, pvfs2_sbp->fs_id);
+            return 0;
+        }
+        gossip_debug(GOSSIP_UTILS_DEBUG, "perform_handle_checks : fsid = %d\n", fsid);
+    }
+    return 1;
+}
+
+/*
+ * convert an opaque handle to a PVFS_sys_attr structure so that we could
+ * call copy_attributes_to_inode() to initialize the VFS inode structure.
+ */
+static void convert_opaque_handle_to_sys_attr(
+        PVFS_sys_attr *dst, pvfs2_opaque_handle_t *src)
+{
+    dst->owner = src->owner;
+    dst->group = src->group;
+    dst->perms = src->perms;
+    dst->atime = src->atime;
+    dst->mtime = src->mtime;
+    dst->ctime = src->ctime;
+    dst->size  = src->size;
+    dst->link_target = NULL;
+    dst->dfile_count = 0;
+    dst->dirent_count = 0;
+    dst->objtype = src->objtype;
+    dst->mask = src->mask;
+    return;
+}
+
+static inline void do_decode_opaque_handle(pvfs2_opaque_handle_t *h, char *src)
+{
+    char *ptr = src;
+    char **pptr = &ptr;
+
+    memset(h, 0, sizeof(pvfs2_opaque_handle_t));
+    /* Deserialize the buffer */
+    decode_pvfs2_opaque_handle_t(pptr, h);
+    return;
+}
+
+static int get_opaque_handle(struct super_block *sb,
+        const struct file_handle *fhandle,
+        pvfs2_opaque_handle_t *opaque_handle)
+{
+    /* Make sure that we actually get a valid handle */
+    if (perform_handle_checks(fhandle,
+            HANDLE_CHECK_LENGTH | HANDLE_CHECK_MAGIC 
+            | HANDLE_CHECK_FSID, sb) == 0)
+    {
+        gossip_err("get_handle: got invalid handle buffer!? "
+                "Impossible happened\n");
+        return -EINVAL;
+    }
+
+    do_decode_opaque_handle(opaque_handle, (char *) fhandle->fh_private);
+    /* make sure that fsid in private buffer also matches */
+    if (opaque_handle->fsid != PVFS2_SB(sb)->fs_id) {
+        gossip_err("get_handle: invalid fsid in private buffer "
+                " (%d) instead of (%d)\n",
+                opaque_handle->fsid, PVFS2_SB(sb)->fs_id);
+        return -EINVAL;
+    }
+    gossip_debug(GOSSIP_UTILS_DEBUG, "get_handle: decoded fsid %d handle %lu\n",
+            opaque_handle->fsid, (unsigned long) opaque_handle->handle);
+    return 0;
+}
+
+/*
+ * called by openfh() system call.
+ * Given a handle that ostensibly belongs to this PVFS2 superblock,
+ * we either find an inode
+ * in the icache already matching the given handle or we allocate 
+ * and place a new struct inode in the icache and fill it up based on
+ * the buffer that we obtained from user. Presumably enough checks
+ * at the upper-level (VFS) has been done to make sure that this is
+ * indeed a buffer filled upon a successful openg().
+ * Returns ERR_PTR(-errno) in case of error
+ *         valid pointer to struct inode in case it was a success
+ */
+struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb,
+        const struct file_handle *fhandle)
+{
+    struct inode *inode = NULL;
+    int err = 0;
+    pvfs2_opaque_handle_t opaque_handle;
+    PVFS_sys_attr attrs;
+    PVFS_object_ref ref;
+
+    /* Decode the buffer */
+    err = get_opaque_handle(sb, fhandle, &opaque_handle);
+    if (err)
+        return ERR_PTR(err);
+
+    /* and convert the opaque handle structure to the PVFS_sys_attr structure */
+    convert_opaque_handle_to_sys_attr(&attrs, &opaque_handle);
+
+    ref.handle = opaque_handle.handle;
+    ref.fs_id  = opaque_handle.fsid;
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_sb_find_inode_handle: obtained inode number %llu\n",
+            llu(opaque_handle.handle));
+    /* 
+     * NOTE: Locate the inode number in the icache if possible.
+     * If not allocate a new inode that is returned locked and
+     * hashed. Since, we don't issue a getattr/read_inode() callback
+     * the pvfs2 specific inode is almost guaranteed to be
+     * uninitialized or invalid. Therefore, we need to
+     * fill it up based on the information in opaque_handle!
+     * Consequently, this approach should scale well since openfh()
+     * does not require any network messages.
+     */
+    inode = pvfs2_iget_locked(sb, &ref);
+
+    if (!inode) {
+        gossip_err("Could not allocate inode\n");
+        return ERR_PTR(-ENOMEM);
+    }
+    else {
+        if (is_bad_inode(inode)) {
+            iput(inode);
+            gossip_err("bad inode obtained from iget_locked\n");
+            return ERR_PTR(-EINVAL);
+        }
+        /* Initialize and/or verify struct inode as well as pvfs2_inode */
+        if ((err = copy_attributes_to_inode(inode, &attrs, NULL)) < 0) {
+            gossip_err("copy_attributes_to_inode failed with err %d\n", err);
+            iput(inode);
+            return ERR_PTR(err);
+        }
+
+        /* this inode was allocated afresh */
+        if (inode->i_state & I_NEW) {
+            pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+
+            pvfs2_inode_initialize(pvfs2_inode);
+            pvfs2_inode->refn.handle = opaque_handle.handle;
+            pvfs2_inode->refn.fs_id  = opaque_handle.fsid;
+            inode->i_mapping->host   = inode;
+            inode->i_rdev            = 0;
+            inode->i_bdev            = NULL;
+            inode->i_cdev            = NULL;
+            inode->i_mapping->a_ops  = &pvfs2_address_operations;
+            inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+            /* Make sure that we unlock the inode */
+            unlock_new_inode(inode);
+        }
+        return inode;
+    }
+}
+
+#endif
+
+#ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
+
+/*
+ * dst would be encoded 
+ */
+static int do_encode_opaque_handle(char *dst, struct inode *inode)
+{
+    char *ptr = dst;
+    char **pptr = &ptr;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    pvfs2_opaque_handle_t h;
+
+    /* only metafile allowed */
+    if (!S_ISREG(inode->i_mode)) 
+        return -EINVAL;
+    memset(&h, 0, sizeof(h));
+    h.handle = pvfs2_inode->refn.handle;
+    h.fsid   = pvfs2_inode->refn.fs_id;
+    h.owner  = inode->i_uid;
+    h.group  = inode->i_gid;
+    h.perms  = PVFS_util_translate_mode(inode->i_mode, 0);
+    h.mask   |= PVFS_ATTR_SYS_PERM;
+    h.atime  = pvfs2_convert_time_field(&inode->i_atime);
+    h.mtime  = pvfs2_convert_time_field(&inode->i_mtime);
+    h.ctime  = pvfs2_convert_time_field(&inode->i_ctime);
+    h.size   = pvfs2_i_size_read(inode);
+    h.mask   |= PVFS_ATTR_SYS_SIZE;
+    h.objtype = PVFS_TYPE_METAFILE;
+    /* Serialize into the buffer */
+    gossip_debug(GOSSIP_UTILS_DEBUG, "encoded fsid %d handle %lu\n",
+            h.fsid, (unsigned long) h.handle);
+    encode_pvfs2_opaque_handle_t(pptr, &h);
+    return 0;
+}
+
+static void *pvfs2_fh_ctor(void)
+{
+    void *buf;
+
+    buf = kmalloc(sizeof(pvfs2_opaque_handle_t), 
+                  PVFS2_BUFMAP_GFP_FLAGS);
+    return buf;
+}
+
+static void pvfs2_fh_dtor(void *buf)
+{
+    if (buf)
+        kfree(buf);
+    return;
+}
+
+/*
+ * This routine is called by openg() system call.
+ * Given an inode (which has been looked up previously),
+ * we fill in the attributes of the inode in an opaque buffer
+ * and hand it back to user. 
+ * Note: We need to make it a fixed
+ * endian ordering so that it would work on all homogenous platforms.
+ * Hence the need to encode the handle buffer.
+ */
+int pvfs2_fill_handle(struct inode *inode, struct file_handle *fhandle) 
+{
+    size_t pvfs2_opaque_handle_size = sizeof(pvfs2_opaque_handle_t);
+
+    if (!inode || !fhandle)
+    {
+        return -EINVAL;
+    }
+    /* querying the size of PVFS2 specific opaque handle buffer */
+    if (fhandle->fh_private_length == 0)
+    {
+        fhandle->fh_private_length = pvfs2_opaque_handle_size;
+        return 0;
+    }
+    else if (fhandle->fh_private_length < pvfs2_opaque_handle_size)
+    {
+        return -ERANGE; /* too small a buffer length */
+    }
+    else
+    {
+        fhandle->fh_private = pvfs2_fh_ctor();
+        if (fhandle->fh_private == NULL)
+        {
+            return -ENOMEM;
+        }
+        /* encode the opaque handle information */
+        if (do_encode_opaque_handle((char *) fhandle->fh_private, inode) < 0)
+        {
+            pvfs2_fh_dtor(fhandle->fh_private);
+            fhandle->fh_private = NULL;
+            return -EINVAL;
+        }
+        /* Set a destructor function for the fh_private */
+        fhandle->fh_private_dtor = pvfs2_fh_dtor;
+        /* and the length */
+        fhandle->fh_private_length = pvfs2_opaque_handle_size;
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Returning handle length %ld\n",
+                (unsigned long) pvfs2_opaque_handle_size);
+        return 0;
+    }
+}
+
+#endif /* HAVE_FILL_HANDLE_INODE_OPERATIONS */
+
 #ifdef USE_MMAP_RA_CACHE
 int pvfs2_flush_mmap_racache(struct inode *inode)
 {
@@ -1460,8 +1859,8 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_mmap_racache %d: Handle is %llu "
-                "| fs_id %d\n",(int)inode->i_ino,
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_mmap_racache %llu: Handle is %llu "
+                "| fs_id %d\n", llu(get_handle_from_ino(inode)),
                 pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
 
     new_op = op_alloc(PVFS2_VFS_OP_MMAP_RA_FLUSH);
@@ -1549,26 +1948,25 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
 
 void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
 {
-    pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
-    pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
-    pvfs2_inode->last_failed_block_index_read = 0;
-    pvfs2_inode->link_target = NULL;
-    pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
-    pvfs2_inode->directory_version = 0;
-    pvfs2_inode->error_code = 0;
+    if (!InitFlag(pvfs2_inode))
+    {
+        pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
+        pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
+        pvfs2_inode->last_failed_block_index_read = 0;
+        memset(pvfs2_inode->link_target, 0, sizeof(pvfs2_inode->link_target));
+        pvfs2_inode->error_code = 0;
+        SetInitFlag(pvfs2_inode);
+    }
 }
 
 /*
   this is called from super:pvfs2_destroy_inode.
-  pvfs2_inode_cache_dtor frees the link_target if any
 */
 void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
 {
     pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
     pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
     pvfs2_inode->last_failed_block_index_read = 0;
-    pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
-    pvfs2_inode->directory_version = 0;
     pvfs2_inode->error_code = 0;
 }
 
@@ -1586,19 +1984,18 @@ void pvfs2_op_initialize(pvfs2_kernel_op_t *op)
 
 void pvfs2_make_bad_inode(struct inode *inode)
 {
-    if (pvfs2_handle_to_ino(PVFS2_SB(inode->i_sb)->root_handle) ==
-        inode->i_ino)
+    if (is_root_handle(inode))
     {
         /*
           if this occurs, the pvfs2-client-core was killed but we
           can't afford to lose the inode operations and such
           associated with the root handle in any case
         */
-        gossip_debug(GOSSIP_UTILS_DEBUG, "*** NOT making bad root inode %lu\n", inode->i_ino);
+        gossip_debug(GOSSIP_UTILS_DEBUG, "*** NOT making bad root inode %llu\n", llu(get_handle_from_ino(inode)));
     }
     else
     {
-        gossip_debug(GOSSIP_UTILS_DEBUG, "*** making bad inode %lu\n", inode->i_ino);
+        gossip_debug(GOSSIP_UTILS_DEBUG, "*** making bad inode %llu\n", llu(get_handle_from_ino(inode)));
         make_bad_inode(inode);
     }
 }
@@ -1670,6 +2067,40 @@ int pvfs2_normalize_to_errno(PVFS_error error_code)
         error_code = -PVFS_ERROR_TO_ERRNO(-error_code);
     }
     return(error_code);
+}
+
+int32_t PVFS_util_translate_mode(int mode, int suid)
+{
+    int ret = 0, i = 0;
+#define NUM_MODES 11
+    static int modes[NUM_MODES] =
+    {
+        S_IXOTH, S_IWOTH, S_IROTH,
+        S_IXGRP, S_IWGRP, S_IRGRP,
+        S_IXUSR, S_IWUSR, S_IRUSR,
+        S_ISGID, S_ISUID
+    };
+    static int pvfs2_modes[NUM_MODES] =
+    {
+        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
+        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
+        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+        PVFS_G_SGID,    PVFS_U_SUID
+    };
+
+    for(i = 0; i < NUM_MODES; i++)
+    {
+        if (mode & modes[i])
+        {
+            ret |= pvfs2_modes[i];
+        }
+    }
+    if (suid == 0 && (ret & PVFS_U_SUID))
+    {
+         ret &= ~PVFS_U_SUID;
+    }
+    return ret;
+#undef NUM_MODES
 }
 
 /*

@@ -19,29 +19,9 @@
 #include "pint-request.h"
 #include "pvfs2-internal.h"
 
-static int io_send_ack(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int io_send_completion_ack(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int io_start_flow(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int io_release(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int io_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
 %%
 
-machine pvfs2_io_sm(
-    prelude,
-    send_positive_ack,
-    send_negative_ack, 
-    start_flow,
-    cleanup,
-    release,
-    send_completion_ack)
+machine pvfs2_io_sm
 {
     state prelude
     {
@@ -57,7 +37,7 @@ machine pvfs2_io_sm(
         default => release;
     }
 
-    state send_negative_ack 
+    state send_negative_ack
     {
         run io_send_ack;
         default => release;
@@ -66,7 +46,8 @@ machine pvfs2_io_sm(
     state start_flow
     {
         run io_start_flow;
-        default => send_completion_ack;
+        success => send_completion_ack;
+        default => release;
     }
 
     state send_completion_ack
@@ -108,8 +89,10 @@ machine pvfs2_io_sm(
  *           send either positive or negative acknowledgements.
  *           
  */
-static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
+static int io_send_ack(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -127,13 +110,13 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
     {
         gossip_lerr("Server: IO SM: PINT_encode() failure.\n");
         js_p->error_code = err;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     err = job_bmi_send_list(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size,
-        s_op->tag, s_op->encoded.buffer_type, 0, s_op, 0, js_p,
+        s_op->tag, s_op->encoded.buffer_type, 0, smcb, 0, js_p,
         &tmp_id, server_job_context, user_opts->server_job_bmi_timeout);
 
     return err;
@@ -157,8 +140,10 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
  *           carry out the data transfer
  *           
  */
-static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action io_start_flow(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -168,7 +153,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     if (!s_op->u.io.flow_d)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* we still have the file size stored in the response structure 
@@ -244,10 +229,10 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     {
         gossip_lerr("Server: IO SM: unknown IO type requested.\n");
         js_p->error_code = -PVFS_EINVAL;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
-    err = job_flow(s_op->u.io.flow_d, s_op, 0, js_p, &tmp_id,
+    err = job_flow(s_op->u.io.flow_d, smcb, 0, js_p, &tmp_id,
                    server_job_context, user_opts->server_job_flow_timeout);
 
     return err;
@@ -268,8 +253,10 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
  *
  * Synopsis: releases the operation from the scheduler
  */
-static int io_release(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action io_release(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     job_id_t i;
 
@@ -278,7 +265,7 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
       was scheduled in the first place)
     */
     ret = job_req_sched_release(
-        s_op->scheduled_id, s_op, 0, js_p, &i, server_job_context);
+        s_op->scheduled_id, smcb, 0, js_p, &i, server_job_context);
     return ret;
 }
 
@@ -297,8 +284,10 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
  * Synopsis: free up any buffers associated with the operation,
  *           including any encoded or decoded protocol structures
  */
-static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action io_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
@@ -317,14 +306,7 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
         PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
     }
 
-    /* NOTE: this would happen in final_response nested state machine
-     * for most operations, but io.sm is the one state machine which
-     * does not use final_response -- decrement reference count for
-     * this bmi address
-     */
-    BMI_set_info(s_op->addr, BMI_DEC_ADDR_REF, NULL);
-
-    return(server_state_machine_complete(s_op));
+    return(server_state_machine_complete(smcb));
 }
 
 /*
@@ -345,9 +327,10 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
  *           send either positive or negative acknowledgements.
  *           
  */
-static int io_send_completion_ack(
-    PINT_server_op *s_op, job_status_s *js_p)
+static PINT_sm_action io_send_completion_ack(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -358,7 +341,7 @@ static int io_send_completion_ack(
     if (s_op->req->u.io.io_type == PVFS_IO_READ)
     {
         js_p->error_code = 0;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     /* release encoding of the first ack that we sent */
@@ -384,17 +367,39 @@ static int io_send_completion_ack(
     {
         gossip_lerr("Server: IO SM: PINT_encode() failure.\n");
         js_p->error_code = err;
-        return 1;
+        return SM_ACTION_COMPLETE;
     }
 
     err = job_bmi_send_list(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
-        s_op->encoded.buffer_type, 0, s_op, 0, js_p, &tmp_id,
+        s_op->encoded.buffer_type, 0, smcb, 0, js_p, &tmp_id,
         server_job_context, user_opts->server_job_bmi_timeout);
 
     return err;
 }
+
+static enum PINT_server_req_access_type PINT_server_req_access_io(
+    struct PVFS_server_req *req)
+{
+    if(req->u.io.io_type == PVFS_IO_READ)
+    {
+        return PINT_SERVER_REQ_READONLY;
+    }
+    return PINT_SERVER_REQ_MODIFY;
+}
+
+PINT_GET_OBJECT_REF_DEFINE(io);
+
+struct PINT_server_req_params pvfs2_io_params =
+{
+    .string_name = "io",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_access_io,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_io,
+    .state_machine = &pvfs2_io_sm
+};
 
 /*
  * Local variables:

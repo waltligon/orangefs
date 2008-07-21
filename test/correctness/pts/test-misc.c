@@ -419,7 +419,7 @@ static int test_allcat(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    //get file
+    /* get file */
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
@@ -435,18 +435,18 @@ static int test_allcat(int testcase)
     {
     case 0:
 	size = 5;
-	//ret =  PVFS_sys_allocate(resp_look.ref, size );
+	/* ret =  PVFS_sys_allocate(resp_look.ref, size ); */
 	break;
     case 1:
 	size = 100000;
-	//ret =  PVFS_sys_allocate(resp_look.ref, size );
+	/* ret =  PVFS_sys_allocate(resp_look.ref, size ); */
 	break;
     case 2:
 	size = 1000000;
-	//ret =  PVFS_sys_allocate(resp_look.ref, size );
+	/* ret =  PVFS_sys_allocate(resp_look.ref, size ); */
 	break;
     }
-    //get file
+    /* get file */
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
@@ -489,7 +489,7 @@ static int test_truncat(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    //get file
+    /* get file */
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
@@ -518,7 +518,7 @@ static int test_truncat(int testcase)
 	break;
     }
 
-    //get file
+    /* get file */
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
@@ -634,7 +634,7 @@ static int test_write_beyond(void){
 	return ret;
     io_buffer = malloc(sizeof(char)*(size_t)resp.attr.size+100);
 
-    //req_io.size = resp_io.size + 100;
+    /* req_io.size = resp_io.size + 100; */
     oldsize = resp.attr.size +100;
     for(i = 0; i < oldsize; i++)
     {
@@ -680,7 +680,7 @@ static int test_files_as_dirs(int testcase)
     switch(testcase)
     {
     case 0:
-	//get root
+	/* get root */
 	ret = PVFS_sys_lookup(fs_id, "/", &credentials,
                               &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
@@ -690,8 +690,8 @@ static int test_files_as_dirs(int testcase)
 	}
 
 	ret = PVFS_sys_create("foo", resp_look.ref, attr, &credentials,
-                           NULL, &resp_create);
-	//get root
+                           NULL, NULL, &resp_create);
+	/* get root */
 	ret = PVFS_sys_lookup(fs_id, "/foo", &credentials,
                               &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
@@ -701,10 +701,10 @@ static int test_files_as_dirs(int testcase)
 	}
 
 	ret = PVFS_sys_create("bar", resp_look.ref, attr, &credentials,
-                           NULL, &resp_create);
+                           NULL, NULL, &resp_create);
 	break;
     case 1:
-	//Need to add some more interesting cases
+	/* Need to add some more interesting cases */
 	break; 
     }
 
@@ -910,7 +910,7 @@ static int init_files(void)
     }
     fs_id = pvfs_helper.fs_id;
 
-    //get root
+    /* get root */
     ret = PVFS_sys_lookup(fs_id, "/", &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
@@ -920,19 +920,19 @@ static int init_files(void)
     }
 
     ret = PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-                           NULL, &resp_create);
+                           NULL, NULL, &resp_create);
 
     /* create sparse file */
     filename = strcpy(filename, "sparse");
 
     ret = PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-                           NULL, &resp_create);
+                           NULL, NULL, &resp_create);
 
     /* create a file for testing alocate and truncate*/
     filename = strcpy(filename, "altrun");
 
     ret = PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-                           NULL, &resp_create);
+                           NULL, NULL, &resp_create);
 
 
     filename = strcpy(filename, "invalid_perms");
@@ -947,7 +947,7 @@ static int init_files(void)
     }
     fs_id = pvfs_helper.fs_id;
 
-    //get root
+    /* get root */
     ret = PVFS_sys_lookup(fs_id, "/", &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
@@ -957,7 +957,7 @@ static int init_files(void)
     }
 
     return PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-                           NULL, &resp_create);
+                           NULL, NULL, &resp_create);
 }   
 
 
