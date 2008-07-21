@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# TODO: JUST FOR TESTING
-#-------------------------
-PVFS2_MOUNTPOINT=/mnt/pvfs2
-VFS_SCRIPTS=/home/pcarns/working/pvfs2/trunk/pvfs2/test/automated/vfs-tests.d
-EXTRA_TESTS=/tmp
-#--------------------------------------------
-
 LTPVER="20080630"
 THISDATE=`date +%F-%R`
 DOWNLOAD="http://www-unix.mcs.anl.gov/~carns/nightly-download/ltp-full-${LTPVER}.tgz"
