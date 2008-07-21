@@ -18,6 +18,7 @@
 #include "str-utils.h"
 #include "pvfs2-util.h"
 #include "client-state-machine.h"
+#include "security-types.h"
 
 /*
   analogous to 'get_server_config_struct' in pvfs2-server.c -- only an
@@ -45,7 +46,7 @@ void PINT_put_server_config_struct(struct server_configuration_s *config)
 int PINT_lookup_parent(
     char *filename,
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     PVFS_handle * handle)
 {
     int ret = -PVFS_EINVAL;
@@ -65,7 +66,7 @@ int PINT_lookup_parent(
         return ret;
     }
 
-    ret = PVFS_sys_lookup(fs_id, buf, credentials,
+    ret = PVFS_sys_lookup(fs_id, buf, credential,
                           &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {

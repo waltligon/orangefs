@@ -24,6 +24,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -67,7 +68,7 @@ machine pvfs2_client_mgmt_remove_dirent_sm
 PVFS_error PVFS_imgmt_remove_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
@@ -97,7 +98,7 @@ PVFS_error PVFS_imgmt_remove_dirent(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_remove_dirent.entry = entry;
 
@@ -115,7 +116,7 @@ PVFS_error PVFS_imgmt_remove_dirent(
 PVFS_error PVFS_mgmt_remove_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
-    PVFS_credentials *credentials)
+    PVFS_credential *credential)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -124,7 +125,7 @@ PVFS_error PVFS_mgmt_remove_dirent(
                  "PVFS_mgmt_remove_dirent entered\n");
 
     ret = PVFS_imgmt_remove_dirent(
-        parent_ref, entry, credentials, &op_id, NULL);
+        parent_ref, entry, credential, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_remove_dirent call", ret);
@@ -161,7 +162,10 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
 
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
+ 
     js_p->error_code = 0;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
@@ -169,7 +173,7 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
 
     PINT_SERVREQ_MGMT_REMOVE_DIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
         sm_p->u.mgmt_remove_dirent.entry);

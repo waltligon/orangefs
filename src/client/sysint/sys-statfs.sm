@@ -2,7 +2,7 @@
  * (C) 2003 Clemson University and The University of Chicago 
  *
  * Changes by Acxiom Corporation to add support for nonblocking statfs
- * Copyright © Acxiom Corporation, 2006.
+ * Copyright Acxiom Corporation, 2006.
  *
  * See COPYING in top-level directory.
  */
@@ -24,6 +24,7 @@
 #include "pvfs2-mgmt.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -50,7 +51,7 @@ machine pvfs2_client_statfs_sm
  */
 PVFS_error PVFS_isys_statfs(
     PVFS_fs_id fs_id,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_statfs *resp,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
@@ -114,7 +115,7 @@ PVFS_error PVFS_isys_statfs(
     }
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.statfs_list.fs_id = fs_id;
     sm_p->u.statfs_list.details = NULL;
     sm_p->u.statfs_list.resp = resp;
@@ -137,7 +138,7 @@ PVFS_error PVFS_isys_statfs(
  */
 PVFS_error PVFS_sys_statfs(
     PVFS_fs_id fs_id,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_statfs* resp)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -146,7 +147,7 @@ PVFS_error PVFS_sys_statfs(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_statfs entered\n");
 
     ret = PVFS_isys_statfs(
-        fs_id, credentials, resp, &op_id, NULL);
+        fs_id, credential, resp, &op_id, NULL);
 
     if (ret)
     {

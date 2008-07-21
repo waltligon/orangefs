@@ -1833,8 +1833,6 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                               ...)
 {
     static char pint_access_buffer[GOSSIP_BUF_SIZE];
-    struct passwd* pw;
-    struct group* gr;
     va_list ap;
 
     if ((gossip_debug_on) &&
@@ -1843,12 +1841,8 @@ void PINT_server_access_debug(PINT_server_op * s_op,
     {
         va_start(ap, format);
 
-        pw = getpwuid(s_op->req->credentials.uid);
-        gr = getgrgid(s_op->req->credentials.gid);
         snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
-            "%s.%s@%s H=%llu S=%p: %s: %s",
-            ((pw) ? pw->pw_name : "UNKNOWN"),
-            ((gr) ? gr->gr_name : "UNKNOWN"),
+            "@%s H=%llu S=%p: %s: %s",
             BMI_addr_rev_lookup_unexpected(s_op->addr),
             llu(s_op->target_handle),
             s_op,

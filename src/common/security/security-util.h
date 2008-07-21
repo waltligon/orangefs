@@ -4,6 +4,9 @@
  * See COPYING in top-level directory.
  */
 
+#ifndef _SECURITY_UTIL_H_
+#define _SECURITY_UTIL_H_
+
 
 #include "security-types.h"
 
@@ -33,6 +36,8 @@ PVFS_credential *PINT_dup_credential(const PVFS_credential *cred);
 
 void PINT_release_credential(PVFS_credential *cred);
 
+
+#endif /* _SECURITY_UTIL_H_ */
 
 /*
  * Local variables:

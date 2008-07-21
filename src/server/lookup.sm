@@ -332,6 +332,9 @@ static PINT_sm_action lookup_verify_object_metadata(
     /* if we reach this point, the object is a directory.  Verify that we
      * have execute permission on the directory before continuing traversal
      */
+    js_p->error_code = 0;
+    /* TODO: reimplement the check below */
+#if 0
     js_p->error_code = PINT_check_mode(a_p, s_op->req->credentials.uid,
         s_op->req->credentials.gid, PINT_ACCESS_EXECUTABLE);
     if(js_p->error_code != 0)
@@ -342,6 +345,7 @@ static PINT_sm_action lookup_verify_object_metadata(
         js_p->error_code = LOOKUP_CHECK_DIR_ACLS;
         return SM_ACTION_COMPLETE;
     }
+#endif
 
     /* find the segment that we should look up in the directory */
     ret = PINT_string_next_segment(
@@ -425,7 +429,10 @@ static PINT_sm_action lookup_check_acls_if_needed(
 static PINT_sm_action lookup_check_acls(
     struct PINT_smcb *smcb, job_status_s* js_p)
 {
+    /* TODO: reimplement acl checks */
+    js_p->error_code = 0;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+#if 0
     PVFS_object_attr *obj_attr = NULL;
     int want = PVFS2_ACL_EXECUTE;
 
@@ -467,6 +474,7 @@ static PINT_sm_action lookup_check_acls(
                          s_op->u.lookup.segp);
         }
     }
+#endif
 cleanup:
     if (s_op->val.buffer) 
         free(s_op->val.buffer);

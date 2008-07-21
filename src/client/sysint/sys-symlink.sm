@@ -23,6 +23,7 @@
 #include "pint-util.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -147,7 +148,7 @@ PVFS_error PVFS_isys_symlink(
     PVFS_object_ref parent_ref,
     char *target,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_symlink *resp,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
@@ -192,7 +193,7 @@ PVFS_error PVFS_isys_symlink(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.sym.link_name = entry_name;
     sm_p->u.sym.link_target = target;
     sm_p->u.sym.sym_resp = resp;
@@ -217,7 +218,7 @@ PVFS_error PVFS_sys_symlink(
     PVFS_object_ref parent_ref,
     char *target,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_symlink *resp)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -226,7 +227,7 @@ PVFS_error PVFS_sys_symlink(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_symlink entered\n");
 
     ret = PVFS_isys_symlink(entry_name, parent_ref, target, attr,
-                            credentials, resp, &op_id, NULL);
+                            credential, resp, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_symlink call", ret);
@@ -352,6 +353,9 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -373,7 +377,8 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
 
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
+        *sm_p->newcred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_SYMLINK,
         meta_handle_extent_array);
@@ -402,6 +407,9 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -412,7 +420,7 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->u.sym.link_name,
         sm_p->u.sym.symlink_handle,
         sm_p->object_ref.handle,
@@ -453,6 +461,9 @@ static PINT_sm_action symlink_setattr_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -466,7 +477,7 @@ static PINT_sm_action symlink_setattr_setup_msgpair(
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle,
         PVFS_TYPE_SYMLINK,
@@ -514,6 +525,9 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -522,7 +536,7 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle);
 

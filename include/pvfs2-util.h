@@ -33,28 +33,14 @@ struct PVFS_util_tab_s
 };
 typedef struct PVFS_util_tab_s PVFS_util_tab;
 
-/* client side default credential generation */
-void PVFS_util_gen_credentials(
-    PVFS_credentials *credentials);
-
 /* returns the currently set umask */
 int PVFS_util_get_umask(void);
-
-/*
-  shallow copies the credentials into a newly allocated returned
-  credential object.  returns NULL on failure.
-*/
-PVFS_credentials *PVFS_util_dup_credentials(
-    const PVFS_credentials *credentials);
 
 struct PVFS_sys_mntent* PVFS_util_gen_mntent(
     char* config_server,
     char* fs_name);
 
 void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent);
-
-void PVFS_util_release_credentials(
-    PVFS_credentials *credentials);
 
 PVFS_credential *PVFS_util_gen_fake_credential(void);
 

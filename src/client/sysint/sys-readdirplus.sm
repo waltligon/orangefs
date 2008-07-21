@@ -28,6 +28,7 @@
 #include "ncache.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 enum {
     NO_WORK = 1
@@ -110,7 +111,7 @@ PVFS_error PVFS_isys_readdirplus(
     PVFS_object_ref ref,
     PVFS_ds_position token, 
     int32_t pvfs_dirent_incount,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     uint32_t attrmask,
     PVFS_sysresp_readdirplus *resp,
     PVFS_sys_op_id *op_id,
@@ -149,7 +150,7 @@ PVFS_error PVFS_isys_readdirplus(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->object_ref = ref;
     /* point the sm dirent array and outcount to the readdirplus response field */
     sm_p->readdir.dirent_array = &resp->dirent_array;
@@ -189,7 +190,7 @@ PVFS_error PVFS_sys_readdirplus(
     PVFS_object_ref ref,
     PVFS_ds_position token, 
     int32_t pvfs_dirent_incount,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     uint32_t attrmask,
     PVFS_sysresp_readdirplus *resp)
 {
@@ -199,7 +200,7 @@ PVFS_error PVFS_sys_readdirplus(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdirplus entered\n");
 
     ret = PVFS_isys_readdirplus(ref, token, pvfs_dirent_incount,
-                            credentials, attrmask, resp, &op_id, NULL);
+                            credential, attrmask, resp, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_readdirplus call", ret);
@@ -467,6 +468,9 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
     int i, ret;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus state: fetch_attrs_setup\n");
     /* if there are no dirents then return NO_WORK */
@@ -506,7 +510,7 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
      {
         PINT_SERVREQ_LISTATTR_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            xxremovemexx,
             sm_p->object_ref.fs_id,
             sm_p->u.readdirplus.attrmask,
             sm_p->u.readdirplus.handle_count[i],
@@ -688,6 +692,9 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
     int i, ret;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
@@ -724,7 +731,7 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
      {
         PINT_SERVREQ_LISTATTR_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            xxremovemexx,
             sm_p->object_ref.fs_id,
             PVFS_ATTR_DATA_SIZE,
             sm_p->u.readdirplus.handle_count[i],

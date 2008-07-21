@@ -22,6 +22,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
 
@@ -225,7 +226,7 @@ PVFS_error PVFS_isys_io(
     PVFS_offset file_req_offset,
     void *buffer,
     PVFS_Request mem_req,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type,
     PVFS_sys_op_id *op_id,
@@ -285,7 +286,7 @@ PVFS_error PVFS_isys_io(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.io.io_type = io_type;
     sm_p->u.io.file_req = file_req;
     sm_p->u.io.file_req_offset = file_req_offset;
@@ -318,7 +319,7 @@ PVFS_error PVFS_sys_io(
     PVFS_offset file_req_offset,
     void *buffer,
     PVFS_Request mem_req,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type)
 {
@@ -328,7 +329,7 @@ PVFS_error PVFS_sys_io(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_io entered\n");
 
     ret = PVFS_isys_io(ref, file_req, file_req_offset, buffer, mem_req,
-                       credentials, resp_p, io_type, &op_id, NULL);
+                       credential, resp_p, io_type, &op_id, NULL);
     if (ret == 1)
         return 0;
     else if (ret < 0)
@@ -407,6 +408,9 @@ static PINT_sm_action io_datafile_setup_msgpairs(
     int target_datafile_count = 0;
     int * sio_array;
     int sio_count;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_datafile_setup_msgpairs\n", sm_p);
@@ -544,7 +548,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(
 
         PINT_SERVREQ_IO_FILL(
             sm_p->u.io.contexts[i].msg.req,
-            *sm_p->cred_p,
+            xxremovemexx,
             sm_p->object_ref.fs_id,
             sm_p->u.io.contexts[i].data_handle,
             sm_p->u.io.io_type,

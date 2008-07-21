@@ -24,6 +24,7 @@
 #include "gen-locks.h"
 #include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
+#include "security-types.h"
 
 #include "trove.h"
 #include "server-config.h"
@@ -39,7 +40,7 @@ void PINT_put_server_config_struct(
 int PINT_lookup_parent(
     char *filename,
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     PVFS_handle * handle);
 
 /*

@@ -1,5 +1,5 @@
 /* 
- * Copyright © Acxiom Corporation, 2006
+ * Copyright Acxiom Corporation, 2006
  *
  * See COPYING in top-level directory.
  */
@@ -26,6 +26,7 @@
 #include "pint-dist-utils.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -176,7 +177,7 @@ PVFS_error PVFS_isys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sys_dist *dist,
     PVFS_sys_layout *layout,
     PVFS_sysresp_create *resp,
@@ -232,7 +233,7 @@ PVFS_error PVFS_isys_create(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.create.object_name = object_name;
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.datafile_handles = NULL;
@@ -344,7 +345,7 @@ PVFS_error PVFS_sys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sys_dist *dist,
     PVFS_sys_layout *layout,
     PVFS_sysresp_create *resp)
@@ -354,7 +355,7 @@ PVFS_error PVFS_sys_create(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
 
-    ret = PVFS_isys_create(object_name, parent_ref, attr, credentials,
+    ret = PVFS_isys_create(object_name, parent_ref, attr, credential,
                            dist, layout, resp, &op_id, NULL);
     if (ret)
     {
@@ -539,6 +540,9 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
     int server_type;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
@@ -583,7 +587,8 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
 
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
+        *sm_p->newcred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_METAFILE,
         meta_handle_extent_array);
@@ -604,6 +609,9 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
     int ret = -PVFS_EINVAL, i = 0;
     PINT_sm_msgpair_state *msg_p;
     int server_type;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "datafiles_setup_msgpair_array\n");
@@ -677,7 +685,8 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
 
         PINT_SERVREQ_CREATE_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            xxremovemexx,
+            *sm_p->newcred_p,
             sm_p->object_ref.fs_id,
             PVFS_TYPE_DATAFILE,
             sm_p->u.create.io_handle_extent_array[i]);
@@ -718,6 +727,9 @@ static PINT_sm_action create_setattr_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: setattr_setup_msgpair\n");
@@ -731,7 +743,7 @@ static PINT_sm_action create_setattr_setup_msgpair(
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->object_ref.fs_id,
         sm_p->u.create.metafile_handle,
         PVFS_TYPE_METAFILE,
@@ -782,6 +794,9 @@ static PINT_sm_action create_crdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
@@ -800,7 +815,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
         sm_p->object_ref.handle,
@@ -849,6 +864,9 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     int ret = -PVFS_EINVAL, i = 0, actual_count = 0;
     PVFS_BMI_addr_t metafile_server_addr;
     PINT_sm_msgpair_state *msg_p;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "delete_handles_setup_msgpair_array\n");
@@ -910,7 +928,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         {
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
-                *sm_p->cred_p,
+                xxremovemexx,
                 sm_p->object_ref.fs_id,
                 sm_p->u.create.metafile_handle);
 
@@ -927,7 +945,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         {
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
-                *sm_p->cred_p,
+                xxremovemexx,
                 sm_p->object_ref.fs_id,
                 sm_p->u.create.datafile_handles[i]);
 

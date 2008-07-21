@@ -18,6 +18,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "server-config.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -58,7 +59,7 @@ machine pvfs2_client_mgmt_iterate_handles_list_sm
  */
 PVFS_error PVFS_imgmt_iterate_handles_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential ,
     PVFS_handle **handle_matrix,
     int *handle_count_array,
     PVFS_ds_position *position_array,
@@ -93,7 +94,7 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.iterate_handles_list.fs_id = fs_id;
     sm_p->u.iterate_handles_list.server_count = server_count;
     sm_p->u.iterate_handles_list.addr_array = addr_array;
@@ -117,7 +118,7 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
  */
 PVFS_error PVFS_mgmt_iterate_handles_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     PVFS_handle **handle_matrix,
     int *handle_count_array,
     PVFS_ds_position *position_array,
@@ -132,7 +133,7 @@ PVFS_error PVFS_mgmt_iterate_handles_list(
                  "PVFS_mgmt_iterate_handles_list entered\n");
 
     ret = PVFS_imgmt_iterate_handles_list(
-        fs_id, credentials, handle_matrix, handle_count_array,
+        fs_id, credential, handle_matrix, handle_count_array,
         position_array, addr_array, server_count, details, &op_id, NULL);
 
     if (ret)
@@ -163,6 +164,9 @@ static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0, j = 0;
     PINT_sm_msgpair_state *msg_p;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "iterate_handles_list state: "
                  "mgmt_iterate_handles_list_setup_msgpair\n");
@@ -184,7 +188,7 @@ static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
 	{
 	    PINT_SERVREQ_MGMT_ITERATE_HANDLES_FILL(
                 msg_p->req,
-		*sm_p->cred_p,
+		xxremovemexx,
 		sm_p->u.iterate_handles_list.fs_id,
 		sm_p->u.iterate_handles_list.handle_count_array[i],
 		sm_p->u.iterate_handles_list.position_array[i]);

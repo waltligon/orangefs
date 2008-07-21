@@ -155,16 +155,6 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     return;
 }
 
-void PVFS_util_gen_credentials(
-    PVFS_credentials *credentials)
-{
-    assert(credentials);
-
-    memset(credentials, 0, sizeof(PVFS_credentials));
-    credentials->uid = geteuid();
-    credentials->gid = getegid();
-}
-
 /* a temporary helper function */
 PVFS_credential *PVFS_util_gen_fake_credential(void)
 {
@@ -206,31 +196,6 @@ int PVFS_util_get_umask(void)
         set = 1;
     }
     return mask;
-}
-
-PVFS_credentials *PVFS_util_dup_credentials(
-    const PVFS_credentials *credentials)
-{
-    PVFS_credentials *ret = NULL;
-
-    if (credentials)
-    {
-        ret = malloc(sizeof(PVFS_credentials));
-        if (ret)
-        {
-            memcpy(ret, credentials, sizeof(PVFS_credentials));
-        }
-    }
-    return ret;
-}
-
-void PVFS_util_release_credentials(
-    PVFS_credentials *credentials)
-{
-    if (credentials)
-    {
-        free(credentials);
-    }
 }
 
 int PVFS_util_copy_sys_attr(

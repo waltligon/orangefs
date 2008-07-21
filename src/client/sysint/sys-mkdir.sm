@@ -26,6 +26,7 @@
 #include "pint-util.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -156,7 +157,7 @@ PVFS_error PVFS_isys_mkdir(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_mkdir *resp,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
@@ -200,7 +201,7 @@ PVFS_error PVFS_isys_mkdir(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.mkdir.object_name = object_name;
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
     sm_p->u.mkdir.mkdir_resp = resp;
@@ -221,7 +222,7 @@ PVFS_error PVFS_sys_mkdir(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_mkdir *resp)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -230,7 +231,7 @@ PVFS_error PVFS_sys_mkdir(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir entered\n");
 
     ret = PVFS_isys_mkdir(object_name, parent_ref, attr,
-                          credentials, resp, &op_id, NULL);
+                          credential, resp, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_mkdir call", ret);
@@ -340,6 +341,9 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mkdir state: mkdir_msg_setup_msgpair\n");
@@ -364,7 +368,8 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
 
     PINT_SERVREQ_MKDIR_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
+        *sm_p->newcred_p,
         sm_p->object_ref.fs_id,
         meta_handle_extent_array,
         sm_p->u.mkdir.sys_attr);
@@ -394,7 +399,10 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
 
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
+    
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mkdir state: crdirent_setup_msgpair\n");
 
@@ -412,7 +420,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->u.mkdir.object_name,
         sm_p->u.mkdir.metafile_handle,
         sm_p->object_ref.handle,
@@ -456,6 +464,9 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t metafile_server_addr;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: "
                  "delete_handle_setup_msgpair_array\n");
@@ -478,7 +489,7 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->object_ref.fs_id,
         sm_p->u.mkdir.metafile_handle);
 
@@ -598,6 +609,9 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(
     int cur_index = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     int ret = -PVFS_EINVAL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     /* NOTE: any memory allocated here will be free'd in the cleanup function */
 
@@ -695,7 +709,7 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(
 
     PINT_SERVREQ_SETEATTR_FILL(
             msg_p->req,
-            (*sm_p->cred_p),
+            xxremovemexx,
             sm_p->object_ref.fs_id,
             sm_p->u.mkdir.metafile_handle,
             0,

@@ -23,6 +23,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -451,7 +452,7 @@ PVFS_error PVFS_isys_ref_lookup(
     PVFS_fs_id fs_id,
     char* relative_pathname,
     PVFS_object_ref parent,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_sys_op_id *op_id,
@@ -480,7 +481,7 @@ PVFS_error PVFS_isys_ref_lookup(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.lookup.orig_pathname = relative_pathname;
     sm_p->u.lookup.starting_refn = parent;
     sm_p->u.lookup.lookup_resp = resp;
@@ -495,7 +496,7 @@ PVFS_error PVFS_isys_ref_lookup(
         gossip_err("%s: failed to init context (path = %s)\n",
                    __func__, relative_pathname);
 
-        PVFS_util_release_credentials(sm_p->cred_p);
+        PINT_release_credential(sm_p->newcred_p);
         PINT_smcb_free(smcb);
         return ret;
     }
@@ -513,7 +514,7 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
     char *relative_pathname,
     PVFS_object_ref parent,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link)
 {
@@ -523,7 +524,7 @@ PVFS_error PVFS_sys_ref_lookup(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
 
     ret = PVFS_isys_ref_lookup(
-        fs_id, relative_pathname, parent, credentials, resp,
+        fs_id, relative_pathname, parent, credential, resp,
         follow_link, &op_id, resp);
 
     if (ret)
@@ -554,7 +555,7 @@ PVFS_error PVFS_sys_ref_lookup(
  */
 PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id, char *name,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link)
 {
@@ -591,7 +592,7 @@ PVFS_error PVFS_sys_lookup(
             */
             char *path = ((name[0] == '/') ? &name[1] : name);
             ret = PVFS_sys_ref_lookup(
-                fs_id, path, parent, credentials, resp, follow_link);
+                fs_id, path, parent, credential, resp, follow_link);
         }
     }
     return ret;
@@ -660,6 +661,9 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *seg_to_lookup = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s\n", __func__);
     js_p->error_code = 0;
@@ -688,7 +692,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
 
     PINT_SERVREQ_LOOKUP_PATH_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         seg_to_lookup,
         cur_seg->seg_starting_refn.fs_id,
         cur_seg->seg_starting_refn.handle,

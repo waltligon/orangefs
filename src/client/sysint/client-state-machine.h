@@ -28,6 +28,7 @@
 #include "pint-sysint-utils.h"
 #include "pint-perf-counter.h"
 #include "state-machine.h"
+#include "security-util.h"
 
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
@@ -515,7 +516,6 @@ typedef struct PINT_client_sm
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
 
-    PVFS_credentials *cred_p;
     PVFS_credential *newcred_p;
     union
     {
@@ -663,23 +663,6 @@ void PINT_sys_release(PVFS_sys_op_id op_id);
 void PINT_mgmt_release(PVFS_mgmt_op_id op_id);
 
 /* internal helper macros */
-#define PINT_init_sysint_credentials(sm_p_cred_p, user_cred_p)\
-do {                                                          \
-    if (user_cred_p == NULL)                                  \
-    {                                                         \
-        gossip_lerr("Invalid user credentials! (nil)\n");     \
-        free(sm_p);                                           \
-        return -PVFS_EINVAL;                                  \
-    }                                                         \
-    sm_p_cred_p = PVFS_util_dup_credentials(user_cred_p);     \
-    if (!sm_p_cred_p)                                         \
-    {                                                         \
-        gossip_lerr("Failed to copy user credentials\n");     \
-        free(sm_p);                                           \
-        return -PVFS_ENOMEM;                                  \
-    }                                                         \
-} while(0)
-
 #define PINT_init_sysint_credential(sm_p_newcred_p, user_newcred_p) \
 do                                                                  \
 {                                                                   \

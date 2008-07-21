@@ -23,6 +23,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -73,7 +74,7 @@ machine pvfs2_client_setattr_sm
 PVFS_error PVFS_isys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
@@ -121,7 +122,7 @@ PVFS_error PVFS_isys_setattr(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->object_ref = ref;
     
     ret = PVFS_util_copy_sys_attr(&sm_p->u.setattr.sys_attr, &attr);
@@ -145,14 +146,14 @@ PVFS_error PVFS_isys_setattr(
 PVFS_error PVFS_sys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials)
+    const PVFS_credential *credential)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr entered\n");
 
-    ret = PVFS_isys_setattr(ref, attr, credentials, &op_id, NULL);
+    ret = PVFS_isys_setattr(ref, attr, credential, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_setattr call", ret);
@@ -198,6 +199,9 @@ static PINT_sm_action setattr_msg_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_ds_type objtype;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -211,7 +215,7 @@ static PINT_sm_action setattr_msg_setup_msgpair(
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
         objtype,

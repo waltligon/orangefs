@@ -1,5 +1,5 @@
 /*
- * Copyright © Acxiom Corporation, 2005
+ * Copyright Acxiom Corporation, 2005
  *
  * See COPYING in top-level directory.
  */

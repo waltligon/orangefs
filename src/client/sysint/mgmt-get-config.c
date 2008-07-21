@@ -16,6 +16,7 @@
 #include "str-utils.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -36,7 +37,7 @@ int PVFS_mgmt_get_config(
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     PVFS_error error = 0;
-    PVFS_credentials creds;
+    PVFS_credential *cred;
     struct filesystem_configuration_s *cur_fs = NULL;
     PVFS_sys_op_id op_id;
     struct server_configuration_s *config = NULL;
@@ -45,7 +46,9 @@ int PVFS_mgmt_get_config(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_config entered\n");
 
-    PVFS_util_gen_credentials(&creds);
+    /* TODO: get credential from arguments */
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     PINT_smcb_alloc(&smcb, PVFS_SERVER_GET_CONFIG,
                     sizeof(struct PINT_client_sm),
@@ -63,7 +66,7 @@ int PVFS_mgmt_get_config(
 
     PINT_init_msgarray_params(sm_p, *fsid);
 
-    PINT_init_sysint_credentials(sm_p->cred_p, &creds);
+    PINT_init_sysint_credential(sm_p->newcred_p, cred);
 
     config = PINT_get_server_config_struct(*fsid);
 

@@ -23,6 +23,7 @@
 #include "PINT-reqproto-encode.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 /*
   PVFS_{i}sys_remove takes the following steps:
@@ -152,7 +153,7 @@ machine pvfs2_client_remove_sm
 PVFS_error PVFS_isys_remove(
     char *object_name,
     PVFS_object_ref parent_ref, 
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
@@ -182,7 +183,7 @@ PVFS_error PVFS_isys_remove(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.remove.object_name = object_name;
     sm_p->parent_ref  = parent_ref;
     sm_p->u.remove.stored_error_code = 0;
@@ -206,7 +207,7 @@ PVFS_error PVFS_isys_remove(
 PVFS_error PVFS_sys_remove(
     char *object_name,
     PVFS_object_ref parent_ref, 
-    const PVFS_credentials *credentials)
+    const PVFS_credential *credential)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -214,7 +215,7 @@ PVFS_error PVFS_sys_remove(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove entered\n");
 
     ret = PVFS_isys_remove(object_name, parent_ref,
-                           credentials, &op_id, NULL);
+                           credential, &op_id, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_remove call", ret);
@@ -252,6 +253,9 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     /* NOTE: we remove the dirent first because this gets the object
      * out of the system fastest.
@@ -266,7 +270,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
 
     PINT_SERVREQ_RMDIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
         sm_p->u.remove.object_name);
@@ -300,6 +304,9 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_setup_msgpair\n");
@@ -313,7 +320,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
         sm_p->parent_ref.handle,

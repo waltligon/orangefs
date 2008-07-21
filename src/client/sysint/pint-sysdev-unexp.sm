@@ -98,7 +98,7 @@ PVFS_error PINT_sys_dev_unexp(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->u.sysdev_unexp.info = info;
-    sm_p->cred_p = NULL;
+    sm_p->newcred_p = NULL;
 
     ret = PINT_client_state_machine_post(smcb, op_id, user_ptr);
 

@@ -74,12 +74,12 @@ static int PINT_handle_wrangler_get_stranded_handles(
 static int PINT_handle_wrangler_display_stranded_handles(
     const struct PINT_fsck_options *fsck_options,
     const PVFS_fs_id * cur_fs,                   
-    const PVFS_credentials * creds);
+    const PVFS_credential * cred);
 
 static int PINT_handle_wrangler_load_handles(
     const struct PINT_fsck_options *fsck_options,
     const PVFS_fs_id * cur_fs,                   
-    const PVFS_credentials * creds);
+    const PVFS_credential * cred);
 
 static int PINT_handle_wrangler_remove_handle(
     const PVFS_handle * handle,
@@ -93,7 +93,7 @@ static int PINT_handle_wrangler_remove_handle(
  */
 int PVFS_fsck_initialize(
     const struct PINT_fsck_options *fsck_options,   /**< Populated options */
-    const PVFS_credentials * creds,                 /**< Populated creditials structure */
+    const PVFS_credential * cred,                 /**< Populated creditials structure */
     const PVFS_fs_id * cur_fs)                      /**< filesystem id */
 {
     int ret = 0;
@@ -107,7 +107,7 @@ int PVFS_fsck_initialize(
     if (fsck_options->check_stranded_objects)
     {
         /* get all handles from all servers */
-        ret = PINT_handle_wrangler_load_handles(fsck_options, cur_fs, creds);
+        ret = PINT_handle_wrangler_load_handles(fsck_options, cur_fs, cred);
     }
 
     return ret;
@@ -124,7 +124,7 @@ int PVFS_fsck_initialize(
  */
 int PVFS_fsck_check_server_configs(
     const struct PINT_fsck_options *fsck_options,   /**< Populated options */
-    const PVFS_credentials * creds,                 /**< pvfs2 credentials structure */
+    const PVFS_credential * cred,                 /**< pvfs2 credentials structure */
     const PVFS_fs_id * cur_fs)                      /**< the current fs */
 {
     int ret = 0;
@@ -146,7 +146,7 @@ int PVFS_fsck_check_server_configs(
 
     /* count how many servers we have */
     ret = PVFS_mgmt_count_servers(*cur_fs,
-                                (PVFS_credentials *) creds,
+                                cred,
                                 PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                 &num_servers);
     if(ret < 0)
@@ -165,7 +165,7 @@ int PVFS_fsck_check_server_configs(
     /* get a list of the pvfs2 servers */
     ret = PVFS_mgmt_get_server_array(
         *cur_fs,
-        (PVFS_credentials *) creds,
+        cred,
         PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
         addresses, &num_servers);
     if(ret < 0)
@@ -345,7 +345,7 @@ int PVFS_fsck_validate_dfile(
     const struct PINT_fsck_options *fsck_options, /**< generic fsck options */
     const PVFS_handle * handle,                   /**< The dfile handle */
     const PVFS_fs_id * cur_fs,        /**< The fsid the handle belongs to */
-    const PVFS_credentials * creds,   /**< Populated creditials structure */
+    const PVFS_credential * cred,   /**< Populated creditials structure */
     PVFS_size * dfiles_total_size)    /**< Total size of all dfiles */
 {
     int ret = 0;
@@ -369,7 +369,7 @@ int PVFS_fsck_validate_dfile(
     obj_ref.fs_id = *cur_fs;
 
     /* Check for existence of attributes */
-    err = PVFS_fsck_get_attributes(fsck_options, &obj_ref, creds,
+    err = PVFS_fsck_get_attributes(fsck_options, &obj_ref, cred,
         &dfile_attributes);
     if(err < 0)
     {
@@ -439,7 +439,7 @@ int PVFS_fsck_validate_metafile(
     const struct PINT_fsck_options *fsck_options, /**< generic fsck options */
     const PVFS_object_ref * obj_ref,              /**< PVFS_Object reference */
     const PVFS_sysresp_getattr * attributes,      /**< METAFILE attributes */
-    const PVFS_credentials * creds)               /**< Populated creditials structure */
+    const PVFS_credential * cred)               /**< Populated creditials structure */
 {
     int ret = 0;
     int i = 0;
@@ -474,7 +474,7 @@ int PVFS_fsck_validate_metafile(
     }
 
     err = PVFS_mgmt_get_dfile_array(*obj_ref,
-                                  (PVFS_credentials *) creds,
+                                  cred,
                                   df_handles, attributes->attr.dfile_count);
     if(err < 0)
     {
@@ -489,7 +489,7 @@ int PVFS_fsck_validate_metafile(
         err = PVFS_fsck_validate_dfile(fsck_options,
                                      &df_handles[i],
                                      &obj_ref->fs_id,
-                                     creds, &dfiles_total_size);
+                                     cred, &dfiles_total_size);
         if(err < 0)
         {
             gossip_err("Error: metafile dfile [%d] is invalid\n", i);
@@ -671,7 +671,7 @@ int PVFS_fsck_validate_dirdata(
     const struct PINT_fsck_options *fsck_options, /**< generic fsck options */
     const PVFS_handle * handle,     /**< The dirdata handle */
     const PVFS_fs_id * cur_fs,      /**< The fsid the handle belongs to */
-    const PVFS_credentials * creds) /**< Populated creditials structure */
+    const PVFS_credential * cred) /**< Populated creditials structure */
 {
     int ret = 0;
     int err = 0;
@@ -693,7 +693,7 @@ int PVFS_fsck_validate_dirdata(
     }
 
     err = PVFS_fsck_get_attributes
-        (fsck_options, &obj_ref, creds, &dirdata_attributes);
+        (fsck_options, &obj_ref, cred, &dirdata_attributes);
     if(err < 0)
     {
         gossip_err("Error: failed to get attributes for dirdata object\n");
@@ -750,7 +750,7 @@ int PVFS_fsck_validate_dir(
     const struct PINT_fsck_options *fsck_options, /**< generic fsck options */
     const PVFS_object_ref * obj_ref,         /**< DIRECTORY object reference */
     const PVFS_sysresp_getattr * attributes, /**< DIRECTORY attributes */
-    const PVFS_credentials * creds,          /**< populated creditials structure */
+    const PVFS_credential * cred,          /**< populated creditials structure */
     PVFS_dirent * directory_entries)         /**< \return readdir response */
 {
     int ret = 0;
@@ -781,7 +781,7 @@ int PVFS_fsck_validate_dir(
 
     /* get the dirdata handle and validate */
     err = PVFS_mgmt_get_dirdata_handle
-        (*obj_ref, &dirdata_handle, (PVFS_credentials *) creds);
+        (*obj_ref, &dirdata_handle, cred);
     if(err < 0)
     {
         gossip_err("Error: unable to get dirdata handle\n");
@@ -789,7 +789,7 @@ int PVFS_fsck_validate_dir(
     }
 
     err = PVFS_fsck_validate_dirdata
-        (fsck_options, &dirdata_handle, &obj_ref->fs_id, creds);
+        (fsck_options, &dirdata_handle, &obj_ref->fs_id, cred);
     if(err < 0)
     {
         gossip_err("Error: directory dirdata is invalid\n");
@@ -805,7 +805,7 @@ int PVFS_fsck_validate_dir(
         err = PVFS_sys_readdir(*obj_ref,
                              token,
                              MAX_DIR_ENTS,
-                             (PVFS_credentials *) creds, &readdir_resp);
+                             cred, &readdir_resp);
         if(err < 0)
         {
             gossip_err("Error: could not read directory entries\n");
@@ -935,20 +935,15 @@ int PVFS_fsck_validate_dir_ent(
 int PVFS_fsck_get_attributes(
     const struct PINT_fsck_options *fsck_options,   /**< generic fsck options */
     const PVFS_object_ref * pref, /**< object reference requesting attributes */
-    const PVFS_credentials * creds,      /**< populated credentials structure */
+    const PVFS_credential * cred,      /**< populated credentials structure */
     PVFS_sysresp_getattr * getattr_resp) /**< attribute structure to populate */
 {
     time_t r_atime, r_mtime, r_ctime;
     int ret = 0;
-    PVFS_credential* credential;
     
     /* TODO: replace with a real credential */
 
-    credential = PVFS_util_gen_fake_credential();
-    assert(credential);
-
-    ret = PVFS_sys_getattr(*pref, PVFS_ATTR_SYS_ALL, credential, 
-                           getattr_resp);
+    ret = PVFS_sys_getattr(*pref, PVFS_ATTR_SYS_ALL, cred, getattr_resp);
     if(ret < 0)
     {
         gossip_err("Error: unable to retrieve attributes\n");
@@ -1038,13 +1033,13 @@ int PVFS_fsck_get_attributes(
 int PVFS_fsck_finalize(
     const struct PINT_fsck_options *fsck_options,     /**< Populated options */
     const PVFS_fs_id * cur_fs,           /**< The fsid the handle belongs to */
-    const PVFS_credentials * creds)     /**< populated credentials structure */
+    const PVFS_credential * cred)     /**< populated credentials structure */
 {
     /* display leftover handles */
     if (fsck_options->check_stranded_objects)
     {
         PINT_handle_wrangler_display_stranded_handles(fsck_options, cur_fs,
-                                                      creds);
+                                                      cred);
     }
 
     return(0);
@@ -1060,7 +1055,7 @@ int PVFS_fsck_finalize(
 static int PINT_handle_wrangler_load_handles(
     const struct PINT_fsck_options *fsck_options, /**< Populated options */
     const PVFS_fs_id * cur_fs,                    /**< fs_id */
-    const PVFS_credentials * creds)   /**< populdated credentials structure */
+    const PVFS_credential * cred)   /**< populdated credentials structure */
 {
     int ret = 0;
     int server_count;
@@ -1080,7 +1075,7 @@ static int PINT_handle_wrangler_load_handles(
 
     /* count how many servers we have */
     err = PVFS_mgmt_count_servers(*cur_fs,
-                                (PVFS_credentials *) creds,
+                                cred,
                                 PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                 &server_count);
     if(err < 0)
@@ -1101,7 +1096,7 @@ static int PINT_handle_wrangler_load_handles(
 
     /* get a list of the pvfs2 servers */
     err = PVFS_mgmt_get_server_array(*cur_fs,
-                               (PVFS_credentials *) creds,
+                               cred,
                                PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                PINT_handle_wrangler_handlelist.addr_array,
                                &server_count);
@@ -1122,7 +1117,7 @@ static int PINT_handle_wrangler_load_handles(
 
     /* this gives us a count of the handles on each server */
     err = PVFS_mgmt_statfs_list(*cur_fs,
-                          (PVFS_credentials *) creds,
+                          cred,
                           stat_array,
                           PINT_handle_wrangler_handlelist.addr_array,
                           server_count, NULL);
@@ -1247,7 +1242,7 @@ static int PINT_handle_wrangler_load_handles(
     {
         /* mgmt call to get block of handles */
         err = PVFS_mgmt_iterate_handles_list(*cur_fs,
-                                       (PVFS_credentials *) creds,
+                                       cred,
                                        handle_matrix,
                                        handle_count_array,
                                        position_array,
@@ -1468,7 +1463,7 @@ static int PINT_handle_wrangler_get_stranded_handles(
 static int PINT_handle_wrangler_display_stranded_handles(
     const struct PINT_fsck_options *fsck_options, /**< populated fsck options */
     const PVFS_fs_id * cur_fs,                             /**< filesystem id */
-    const PVFS_credentials * creds)      /**< populated credentials structure */
+    const PVFS_credential * cred)      /**< populated credentials structure */
 {
     int ret = 0;
     int i = 0;
@@ -1503,7 +1498,7 @@ static int PINT_handle_wrangler_display_stranded_handles(
                 }
 
                 /* get this objects attributes */
-                ret = PVFS_fsck_get_attributes(fsck_options, &pref, creds,
+                ret = PVFS_fsck_get_attributes(fsck_options, &pref, cred,
                                          &attributes);
                 if(ret < 0)
                 {

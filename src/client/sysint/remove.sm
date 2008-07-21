@@ -16,6 +16,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -173,6 +174,9 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     int i = 0;
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
    /* post all datafile remove requests and responses simultaneously.
     *
@@ -206,7 +210,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
 
 	PINT_SERVREQ_REMOVE_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            xxremovemexx,
             sm_p->object_ref.fs_id,
             attr->u.meta.dfile_array[i]);
 
@@ -234,6 +238,9 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: object_remove_setup_msgpair\n");
@@ -245,7 +252,7 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        xxremovemexx,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle);
 

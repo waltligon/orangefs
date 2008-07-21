@@ -77,6 +77,9 @@ static PINT_sm_action small_io_setup_msgpairs(
     PVFS_handle datafile_handle;
     int regions = 0;
     PINT_sm_msgpair_state *msg_p;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -158,7 +161,7 @@ static PINT_sm_action small_io_setup_msgpairs(
          */ 
         PINT_SERVREQ_SMALL_IO_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            xxremovemexx,
             sm_p->object_ref.fs_id,
             datafile_handle,
             sm_p->u.io.io_type,

@@ -10,11 +10,12 @@
 #include "str-utils.h"
 #include "gossip.h"
 #include "pvfs2-util.h"
+#include "security-types.h"
 
 int PVFS_sys_getparent(
     PVFS_fs_id fs_id,
     char *entry_name,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_getparent *resp)
 {
     int ret = -PVFS_EINVAL;
@@ -37,7 +38,7 @@ int PVFS_sys_getparent(
     }
 
     memset(&resp_look,0,sizeof(PVFS_sysresp_lookup));
-    ret = PVFS_sys_lookup(fs_id, parent_buf, credentials,
+    ret = PVFS_sys_lookup(fs_id, parent_buf, credential,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret)
     {

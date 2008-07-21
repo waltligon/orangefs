@@ -24,6 +24,7 @@
 #include "str-utils.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -62,7 +63,7 @@ machine pvfs2_client_mgmt_setparam_list_sm
  */
 PVFS_error PVFS_imgmt_setparam_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     enum PVFS_server_param param,
     uint64_t value,
     PVFS_BMI_addr_t *addr_array,
@@ -96,7 +97,7 @@ PVFS_error PVFS_imgmt_setparam_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.setparam_list.fs_id = fs_id;
     sm_p->u.setparam_list.param = param;
     sm_p->u.setparam_list.value = value;
@@ -131,7 +132,7 @@ PVFS_error PVFS_imgmt_setparam_list(
  */
 PVFS_error PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     enum PVFS_server_param param,
     uint64_t value,
     PVFS_BMI_addr_t *addr_array,
@@ -145,7 +146,7 @@ PVFS_error PVFS_mgmt_setparam_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s entered\n", __func__);
 
     ret = PVFS_imgmt_setparam_list(
-        fs_id, credentials, param, value, addr_array, old_value_array,
+        fs_id, credential, param, value, addr_array, old_value_array,
         count, details, &op_id, NULL);
 
     if (ret)
@@ -175,6 +176,9 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setparam_list state: "
                  "mgmt_setparam_list_setup_msgpair\n");
@@ -184,7 +188,7 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(
     {
         PINT_SERVREQ_MGMT_SETPARAM_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            xxremovemexx,
             sm_p->u.setparam_list.fs_id,
             sm_p->u.setparam_list.param,
             sm_p->u.setparam_list.value);

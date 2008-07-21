@@ -22,6 +22,7 @@
 #include "pvfs2-mgmt.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -58,7 +59,7 @@ machine pvfs2_client_mgmt_perf_mon_list_sm
  */
 PVFS_error PVFS_imgmt_perf_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     struct PVFS_mgmt_perf_stat **perf_matrix,
     uint64_t *end_time_ms_array,
     PVFS_BMI_addr_t *addr_array,
@@ -95,7 +96,7 @@ PVFS_error PVFS_imgmt_perf_mon_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.perf_mon_list.fs_id = fs_id;
     sm_p->u.perf_mon_list.perf_matrix = perf_matrix;
     sm_p->u.perf_mon_list.server_count = server_count;
@@ -120,7 +121,7 @@ PVFS_error PVFS_imgmt_perf_mon_list(
  */
 PVFS_error PVFS_mgmt_perf_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     struct PVFS_mgmt_perf_stat **perf_matrix,
     uint64_t *end_time_ms_array,
     PVFS_BMI_addr_t *addr_array,
@@ -136,7 +137,7 @@ PVFS_error PVFS_mgmt_perf_mon_list(
                  "PVFS_mgmt_perf_mon_list entered\n");
 
     ret = PVFS_imgmt_perf_mon_list(
-        fs_id, credentials, perf_matrix, end_time_ms_array,
+        fs_id, credential, perf_matrix, end_time_ms_array,
         addr_array, next_id_array, server_count, history_count,
         details, &op_id, NULL);
 
@@ -168,6 +169,9 @@ static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "perf_mon_list state: "
                  "mgmt_perf_mon_list_setup_msgpair\n");
@@ -177,7 +181,7 @@ static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(
     {
 	PINT_SERVREQ_MGMT_PERF_MON_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            xxremovemexx,
             sm_p->u.perf_mon_list.next_id_array[i],
             sm_p->u.perf_mon_list.history_count);
 

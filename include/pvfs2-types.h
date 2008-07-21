@@ -404,17 +404,6 @@ typedef struct
     int32_t    __pad1;
 } PVFS_object_ref;
 
-/** Credentials (stubbed for future authentication methods). */
-typedef struct
-{
-    PVFS_uid uid;
-    PVFS_gid gid;
-} PVFS_credentials;
-endecode_fields_2(
-    PVFS_credentials,
-    PVFS_uid, uid,
-    PVFS_gid, gid);
-
 /* max length of BMI style URI's for identifying servers */
 #define PVFS_MAX_SERVER_ADDR_LEN 256
 /* max length of PVFS filename */

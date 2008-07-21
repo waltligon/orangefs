@@ -26,10 +26,12 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pint-dev.h"
-#include "pvfs2-dev-proto.h"
 #include "pvfs2-internal.h"
 
 #ifdef WITH_LINUX_KMOD
+
+#include "pvfs2-dev-proto.h"
+
 static int setup_dev_entry(
     const char *dev_name);
 

@@ -25,6 +25,7 @@
 #include "id-generator.h"
 #include "ncache.h"
 #include "acache.h"
+#include "security-util.h"
 
 #define MAX_RETURNED_JOBS   256
 
@@ -792,7 +793,7 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
 {
     PINT_smcb *smcb; 
     PINT_client_sm *sm_p; 
-    PVFS_credentials *cred_p; 
+    PVFS_credential *newcred_p; 
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: id %lld\n", __func__, lld(op_id));
     smcb = PINT_id_gen_safe_lookup(op_id);
@@ -803,18 +804,18 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (sm_p == NULL) 
     {
-        cred_p = NULL;
+        newcred_p = NULL;
     }
     else 
     {
-        cred_p = sm_p->cred_p;
+        newcred_p = sm_p->newcred_p;
     }
     PINT_id_gen_safe_unregister(op_id);
 
-    if (PINT_smcb_op(smcb) && cred_p)
+    if (PINT_smcb_op(smcb) && newcred_p)
     {
-        PVFS_util_release_credentials(cred_p);
-        if (sm_p) sm_p->cred_p = NULL;
+        PINT_release_credential(newcred_p);
+        if (sm_p) sm_p->newcred_p = NULL;
     }
 
     PINT_smcb_free(smcb);

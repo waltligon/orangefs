@@ -16,6 +16,7 @@
 #include "str-utils.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -52,7 +53,7 @@ machine pvfs2_client_del_eattr_sm
 
 PVFS_error PVFS_isys_deleattr(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         PVFS_ds_keyval *key_p,
         PVFS_sys_op_id *op_id,
         void *user_ptr)
@@ -82,7 +83,7 @@ PVFS_error PVFS_isys_deleattr(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->u.deleattr.key_p = key_p;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
@@ -93,7 +94,7 @@ PVFS_error PVFS_isys_deleattr(
 
 PVFS_error PVFS_sys_deleattr(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         PVFS_ds_keyval *key_p)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -101,7 +102,7 @@ PVFS_error PVFS_sys_deleattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_deleattr entered\n");
 
-    ret = PVFS_isys_deleattr(ref, credentials,
+    ret = PVFS_isys_deleattr(ref, credential,
             key_p, &op_id, NULL);
 
     if (ret)
@@ -129,6 +130,9 @@ static PINT_sm_action del_eattr_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"del_eattr state: del_eattr_setup_msgpair\n");
@@ -138,7 +142,7 @@ static PINT_sm_action del_eattr_setup_msgpair(
 
     PINT_SERVREQ_DELEATTR_FILL(
             msg_p->req,
-            (*sm_p->cred_p),
+            xxremovemexx,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             (*sm_p->u.deleattr.key_p));
