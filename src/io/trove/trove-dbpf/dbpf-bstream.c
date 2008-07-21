@@ -601,10 +601,13 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    /* remove cached attribute for this handle if it's present */
+    /* remove cached attribute for this handle if it's present 
+
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_remove(ref);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
+
+    */
 
     DBPF_ERROR_SYNC_IF_NECESSARY(op_p, tmp_ref.fd);
 
@@ -1006,16 +1009,22 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.fd = q_op_p->op.u.b_rw_list.open_ref.fd;
 
     /*
-      if we're doing an i/o write, remove the cached attribute for
-      this handle if it's present
-    */
-    if (opcode == LIO_WRITE)
-    {
-        TROVE_object_ref ref = {handle, coll_id};
-        gen_mutex_lock(&dbpf_attr_cache_mutex);
-        dbpf_attr_cache_remove(ref);
-        gen_mutex_unlock(&dbpf_attr_cache_mutex);
-    }
+     * if we're doing an i/o write, remove the cached attribute for
+     * this handle if it's present
+     *
+     * NOTE (07/21/08): we don't actually need to invalidate the cache
+     * (including the cached bstream size) because the metadata (bstream
+     * size and modification time) can be atomically updated at the completion
+     * of the write operation.
+     *
+     * if (opcode == LIO_WRITE)
+     * {
+     *   TROVE_object_ref ref = {handle, coll_id};
+     *   gen_mutex_lock(&dbpf_attr_cache_mutex);
+     *   dbpf_attr_cache_remove(ref);
+     *   gen_mutex_unlock(&dbpf_attr_cache_mutex);
+     * }
+     */
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__
 
