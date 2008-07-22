@@ -769,6 +769,12 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
         return ret;
     }
 
+    ret = ftruncate(op_p->u.b_resize.open_ref.fd, op_p->u.b_resize.size);
+    if(ret == -1)
+    {
+        return -trove_errno_to_trove_error(errno);
+    }
+
     attr.u.datafile.b_size = op_p->u.b_resize.size;
 
     dbpf_queued_op_init(q_op_p,
@@ -804,6 +810,7 @@ static int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
+    int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -828,6 +835,16 @@ static int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
                         context_id);
 
     /* initialize the op-specific members */
+    ret = dbpf_open_cache_get(
+        coll_id, handle,
+        DBPF_FD_DIRECT_WRITE,
+        &q_op_p->op.u.b_resize.open_ref);
+    if(ret < 0)
+    {
+        dbpf_queued_op_free(q_op_p);
+        return ret;
+    }
+
     q_op_p->op.u.b_resize.size = *inout_size_p;
     q_op_p->op.u.b_resize.queued_op_ptr = q_op_p;
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
