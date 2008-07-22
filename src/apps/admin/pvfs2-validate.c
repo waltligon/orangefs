@@ -13,6 +13,7 @@
 
 
 #include "fsck-utils.h"
+#include "security-util.h"
 
 #define VERSION "0.1"
 /** \defgroup pvfs2validate PVFS2 Validate 
@@ -68,7 +69,7 @@ static void usage(
 int validate_pvfs_object(
     const struct PINT_fsck_options *fsck_options,
     const PVFS_object_ref * pref,
-    const PVFS_credentials * creds,
+    const PVFS_credential * cred,
     int *cur_fs,
     char *current_path);
 
@@ -81,11 +82,10 @@ int main(int argc, char **argv)
     int ret = 0;
     int cur_fs = 0;
     char pvfs_path[PVFS_NAME_MAX] = { 0 };
-    PVFS_credentials creds;
+    PVFS_credential *cred;
     PVFS_sysresp_lookup lookup_resp;
     struct PINT_fsck_options *fsck_options = NULL;
 
-    memset(&creds, 0, sizeof(creds));
     memset(&lookup_resp, 0, sizeof(lookup_resp));
     
     fsck_options = parse_args(argc, argv);
@@ -135,11 +135,12 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    PVFS_util_gen_credentials(&creds);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     ret = PVFS_sys_lookup(
             cur_fs, pvfs_path, 
-            &creds, 
+            cred, 
             &lookup_resp,
             PVFS2_LOOKUP_LINK_NO_FOLLOW);
             
@@ -147,25 +148,28 @@ int main(int argc, char **argv)
     {
         fprintf(stderr, "Error: failed lookup on [%s]\n", pvfs_path);
         PVFS_perror("PVFS_sys_lookup", ret);
+        PINT_release_credential(cred);
         PVFS_sys_finalize();
         free(fsck_options);
         return -1;
     }
 
-    ret = PVFS_fsck_initialize(fsck_options, &creds, &cur_fs);
+    ret = PVFS_fsck_initialize(fsck_options, cred, &cur_fs);
     if (ret < 0)
     {
         PVFS_perror("PVFS_fsck_initialize", ret);
+        PINT_release_credential(cred);
         PVFS_sys_finalize();
         free(fsck_options);
         return(-1);
     }
 
-    ret = PVFS_fsck_check_server_configs(fsck_options, &creds, &cur_fs);
+    ret = PVFS_fsck_check_server_configs(fsck_options, cred, &cur_fs);
     if (ret < 0)
     {
         fprintf(stderr, "Error: a difference was detected while validating the server fs configs.\n");
         PVFS_perror("PVFS_fsck_check_server_configs", ret);
+        PINT_release_credential(cred);
         PVFS_sys_finalize();
         free(fsck_options);
         return(-1);
@@ -175,6 +179,8 @@ int main(int argc, char **argv)
     if (fsck_options->check_fs_configs)
     {
         printf("All PVFS2 servers have consistent fs configurations.\n");
+        PINT_release_credential(cred);
+        PVFS_sys_finalize();
         free(fsck_options);
         return 0;
     }
@@ -186,7 +192,7 @@ int main(int argc, char **argv)
     ret = validate_pvfs_object(
             fsck_options, 
             &lookup_resp.ref, 
-            &creds, 
+            cred, 
             &cur_fs,
             fsck_options->start_path);
             
@@ -201,7 +207,8 @@ int main(int argc, char **argv)
                fsck_options->start_path);
     }
 
-    PVFS_fsck_finalize(fsck_options, &cur_fs, &creds);
+    PVFS_fsck_finalize(fsck_options, &cur_fs, cred);
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
     free(fsck_options);
 
@@ -219,7 +226,7 @@ int main(int argc, char **argv)
 int validate_pvfs_object(
     const struct PINT_fsck_options *fsck_options, /**< fsck options */
     const PVFS_object_ref * pref,                 /**< object to validate */
-    const PVFS_credentials * creds,               /**< caller's credentials */
+    const PVFS_credential * cred,               /**< caller's credentials */
     int *cur_fs,                                  /**< file system */
     char *current_path)                           /**< path to object */
 {
@@ -232,7 +239,7 @@ int validate_pvfs_object(
     memset(&attributes, 0, sizeof(attributes));
     
     /* get this objects attributes */
-    ret = PVFS_fsck_get_attributes(fsck_options, pref, creds, &attributes);
+    ret = PVFS_fsck_get_attributes(fsck_options, pref, cred, &attributes);
     if(ret < 0)
     {
         fprintf(stderr, "Error: [%s] cannot retrieve attributes.\n", current_path);
@@ -241,7 +248,7 @@ int validate_pvfs_object(
     {
         /* metadata file */
         ret = PVFS_fsck_validate_metafile(fsck_options, pref,
-            &attributes, creds);
+            &attributes, cred);
     }
     else if (attributes.attr.objtype == PVFS_TYPE_DIRECTORY)
     {
@@ -253,7 +260,7 @@ int validate_pvfs_object(
             return -PVFS_ENOMEM;
         }
 
-        ret = PVFS_fsck_validate_dir(fsck_options, pref, &attributes, creds,
+        ret = PVFS_fsck_validate_dir(fsck_options, pref, &attributes, cred,
             directory_entries);
 
         if(ret == 0)
@@ -273,7 +280,7 @@ int validate_pvfs_object(
                 strcat(new_path, directory_entries[j].d_name);
 
                 /* recurse */
-                ret = validate_pvfs_object(fsck_options, &obj_ref, creds, 
+                ret = validate_pvfs_object(fsck_options, &obj_ref, cred, 
                     cur_fs, new_path);
             }
         }

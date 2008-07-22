@@ -17,10 +17,12 @@
 #include <pwd.h>
 #include <grp.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -36,7 +38,8 @@ struct options
 };
 
 static struct options* parse_args(int argc, char* argv[]);
-int pvfs2_chown(PVFS_uid owner, PVFS_gid group, char *destfile);
+int pvfs2_chown(PVFS_uid owner, PVFS_gid group, char *destfile,
+                PVFS_credential *cred);
 static void usage(int argc, char** argv);
 int check_owner(char *owner);
 int check_group(char *group);
@@ -45,6 +48,7 @@ int main(int argc, char **argv)
 {
   int ret = 0;
   struct options* user_opts = NULL;
+  PVFS_credential *credential;
   int i;
 
   /* look at command line arguments */
@@ -63,17 +67,22 @@ int main(int argc, char **argv)
     return(-1);
   }
 
+  credential = PVFS_util_gen_fake_credential();
+  assert(credential);
+
   /*
    * for each file the user specified
    */
   for (i = 0; i < user_opts->target_count; i++) {
     ret = pvfs2_chown(user_opts->owner, user_opts->group,
-		      user_opts->destfiles[i]);
+		      user_opts->destfiles[i], credential);
     if (ret != 0) {
       break;
     }
     /* TODO: need to free the request descriptions */
   }
+  
+  PINT_release_credential(credential);
   PVFS_sys_finalize();
   return(ret);
 }
@@ -84,7 +93,8 @@ int main(int argc, char **argv)
  *
  * returns zero on success and negative one on failure
  */
-int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
+int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile,
+                 PVFS_credential *cred) {
   int ret = -1;
   char str_buf[PVFS_NAME_MAX] = {0};
   char pvfs_path[PVFS_NAME_MAX] = {0};
@@ -95,8 +105,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   PVFS_sys_attr old_attr;
   PVFS_sys_attr new_attr;
   uint32_t attrmask;
-  PVFS_credential *credential;
-  
+   
   /* translate local path into pvfs2 relative path */
   ret = PVFS_util_resolve(destfile,&cur_fs, pvfs_path, PVFS_NAME_MAX);
   if(ret < 0)
@@ -105,9 +114,6 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
     return -1;
   }
   
-  credential = PVFS_util_gen_fake_credential();
-  assert(credential);
-
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere
    */
@@ -115,7 +121,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   {
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_lookup(cur_fs, pvfs_path,
-                          credential, &resp_lookup,
+                          cred, &resp_lookup,
                           PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
@@ -139,7 +145,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
       return -1;
     }
 
-    ret = PINT_lookup_parent(pvfs_path, cur_fs, credential, 
+    ret = PINT_lookup_parent(pvfs_path, cur_fs, cred, 
                                   &parent_ref.handle);
     if(ret < 0)
     {
@@ -154,7 +160,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
   ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
-                            parent_ref, credential, &resp_lookup,
+                            parent_ref, cred, &resp_lookup,
                             PVFS2_LOOKUP_LINK_NO_FOLLOW);
   if (ret != 0)
   {
@@ -164,7 +170,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   memset(&resp_getattr,0,sizeof(PVFS_sysresp_getattr));
   attrmask = (PVFS_ATTR_SYS_ALL_SETABLE);
     
-  ret = PVFS_sys_getattr(resp_lookup.ref,attrmask,credential,&resp_getattr);
+  ret = PVFS_sys_getattr(resp_lookup.ref,attrmask,cred,&resp_getattr);
   if (ret < 0) 
   {
     PVFS_perror("PVFS_sys_getattr",ret);
@@ -177,14 +183,13 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   new_attr.group = group;
   new_attr.mask = PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID;
  
-  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,credential);
+  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,cred);
   if (ret < 0) 
   {
     PVFS_perror("PVFS_sys_setattr",ret);
     return -1;
   }
 
-  PINT_release_credential(credential);
   return 0;
 }
 

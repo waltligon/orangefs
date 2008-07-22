@@ -20,6 +20,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -779,7 +780,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
     
-    cred = PVFS_gen_fake_credential();
+    cred = PVFS_util_gen_fake_credential();
     assert(cred);
 
     if (user_opts->num_starts == 0)
@@ -851,7 +852,7 @@ int main(int argc, char **argv)
     free(pvfs_path);
     free(fs_id_array);
     
-    PINT_free_credential(cred);
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
     if (user_opts)
         free(user_opts);

@@ -15,9 +15,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -41,7 +43,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
+    PVFS_credential *cred;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -69,7 +71,8 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     if (user_opts->single_server)
     {
@@ -77,7 +80,7 @@ int main(int argc, char **argv)
                user_opts->single_server);
 
         ret = PVFS_mgmt_setparam_single(
-            cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
+            cur_fs, cred, PVFS_SERV_PARAM_GOSSIP_MASK,
             user_opts->debug_mask, user_opts->single_server,
             NULL, NULL);
     }
@@ -86,7 +89,7 @@ int main(int argc, char **argv)
         printf("Setting debugmask on all servers\n");
 
         ret = PVFS_mgmt_setparam_all(
-            cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
+            cur_fs, cred, PVFS_SERV_PARAM_GOSSIP_MASK,
             user_opts->debug_mask, NULL, NULL);
     }
 
@@ -96,6 +99,9 @@ int main(int argc, char **argv)
         PVFS_strerror_r(ret, buf, 64);
         fprintf(stderr, "Setparam failure: %s\n", buf);
     }
+
+    PINT_release_credential(cred);
+
     return PVFS_sys_finalize();
 }
 

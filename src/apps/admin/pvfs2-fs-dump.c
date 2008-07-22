@@ -21,6 +21,7 @@
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
+#include "security-util.h"
 
 #define HANDLE_BATCH 1000
 
@@ -224,7 +225,7 @@ int main(int argc, char **argv)
 	server_count,
 	NULL);
 
-    PINT_free_credential(cred);
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
 
     return(ret);

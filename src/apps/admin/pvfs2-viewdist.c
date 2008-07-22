@@ -31,6 +31,7 @@
 #include "pvfs2-dist-varstrip.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 #ifdef HAVE_SYS_XATTR_H
 #include <sys/xattr.h>
@@ -44,8 +45,6 @@ struct options
 {
     char *srcfile;
 };
-
-static PVFS_credential *g_credential;
 
 enum object_type { 
     UNIX_FILE, 
@@ -80,8 +79,8 @@ typedef struct file_object_s {
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static int resolve_filename(file_object *obj, char *filename);
-static int generic_open(file_object *obj, PVFS_credentials *credentials);
-static int generic_server_location(file_object *obj, PVFS_credentials *creds,
+static int generic_open(file_object *obj, PVFS_credential *credential);
+static int generic_server_location(file_object *obj, PVFS_credential *cred,
         char **servers, PVFS_handle *handles, int *nservers);
 
 /* metafile distribution */
@@ -89,7 +88,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
 /* datafile handles */
 #define DFILE_KEY "system.pvfs2." DATAFILE_HANDLES_KEYSTR
 
-static int generic_dist(file_object *obj, PVFS_credentials *creds,
+static int generic_dist(file_object *obj, PVFS_credential *cred,
         char **dist, int *size)
 {
     char *buffer = (char *) malloc(4096);
@@ -117,7 +116,7 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
         val.buffer = buffer;
         val.buffer_sz = 4096;
         if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
-                creds, &key, &val)) < 0)
+                cred, &key, &val)) < 0)
         {
             PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
@@ -134,7 +133,7 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
  * is allocated internally in this function.
  * callers job is to free up all the memory
  */
-static int generic_server_location(file_object *obj, PVFS_credentials *creds,
+static int generic_server_location(file_object *obj, PVFS_credential *cred,
         char **servers, PVFS_handle *handles, int *nservers)
 {
     char *buffer = (char *) malloc(4096);
@@ -163,7 +162,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
         val.buffer = buffer;
         val.buffer_sz = 4096;
         if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
-                creds, &key, &val)) < 0)
+                cred, &key, &val)) < 0)
         {
             PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
@@ -212,7 +211,7 @@ int main(int argc, char ** argv)
     char *dist_buf = NULL;
     int dist_size;
     int64_t ret;
-    PVFS_credentials credentials;
+    PVFS_credential *credential;
     char *servers[256];
     PVFS_handle handles[256];
     int i, nservers = 256;
@@ -235,25 +234,23 @@ int main(int argc, char ** argv)
 
     resolve_filename(&src,  user_opts->srcfile);
 
-    PVFS_util_gen_credentials(&credentials);
-    
-    g_credential = PVFS_util_gen_fake_credential();
-    assert(g_credential);
+    credential = PVFS_util_gen_fake_credential();
+    assert(credential);
 
-    ret = generic_open(&src, &credentials);
+    ret = generic_open(&src, credential);
     if (ret < 0)
     {
 	fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
 	goto main_out;
     }
 
-    ret = generic_dist(&src, &credentials, &dist_buf, &dist_size);
+    ret = generic_dist(&src, credential, &dist_buf, &dist_size);
     if (ret < 0)
     {
         fprintf(stderr, "Could not read distribution information!\n");
         goto main_out;
     }
-    ret = generic_server_location(&src, &credentials, servers, handles, &nservers);
+    ret = generic_server_location(&src, credential, servers, handles, &nservers);
     if (ret < 0)
     {
         fprintf(stderr, "Could not read server location information!\n");
@@ -272,6 +269,7 @@ int main(int argc, char ** argv)
         free(servers[i]);
     }
 main_out:
+    PINT_release_credential(credential);
     PVFS_sys_finalize();
     free(user_opts);
     return(ret);
@@ -354,7 +352,7 @@ static int resolve_filename(file_object *obj, char *filename)
 /* generic_open:
  *  given a file_object, perform the apropriate open calls.  
  */
-static int generic_open(file_object *obj, PVFS_credentials *credentials)
+static int generic_open(file_object *obj, PVFS_credential *credential)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
@@ -395,7 +393,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         ret = PVFS_sys_lookup(obj->u.pvfs2.fs_id, 
                               (char *) obj->u.pvfs2.pvfs2_path,
-                              credentials, 
+                              credential, 
                               &resp_lookup,
                               PVFS2_LOOKUP_LINK_FOLLOW);
         if (ret < 0)
@@ -408,7 +406,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
         ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                               g_credential, &resp_getattr);
+                               credential, &resp_getattr);
         if (ret)
         {
             fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",

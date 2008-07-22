@@ -19,6 +19,7 @@
 
 #include "pvfs2.h"
 #include "str-utils.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -41,6 +42,7 @@ int main(int argc, char **argv)
     int ret = -1, i = 0;
     struct options *user_opts = NULL;
     PVFS_sysresp_getattr resp_getattr;
+    PVFS_credential *credential;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -58,6 +60,9 @@ int main(int argc, char **argv)
 	return -1;
     }
 
+    credential = PVFS_util_gen_fake_credential();
+    assert(credential);
+
     /* Remove each specified file */
     for (i = 0; i < user_opts->num_files; ++i)
     {
@@ -70,15 +75,8 @@ int main(int argc, char **argv)
         char pvfs_path[PVFS_NAME_MAX] = {0};
         PVFS_fs_id cur_fs;
         PVFS_sysresp_lookup resp_lookup;
-        PVFS_credentials credentials;
         PVFS_object_ref parent_ref;
         int tmp_len = 0;
-        PVFS_credential *credential;
-
-        PVFS_util_gen_credentials(&credentials);
-        
-        credential = PVFS_util_gen_fake_credential();
-        assert(credential);
 
         /* Translate path into pvfs2 relative path */
         rc = PVFS_util_resolve(working_file, &cur_fs, pvfs_path,
@@ -104,7 +102,7 @@ int main(int argc, char **argv)
             }
 
             memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-            rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
+            rc = PVFS_sys_lookup(cur_fs, pvfs_path, credential,
                                  &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
             if (rc)
             {
@@ -150,7 +148,7 @@ int main(int argc, char **argv)
         }
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
+        rc = PVFS_sys_lookup(cur_fs, directory, credential,
                              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (rc)
         {
@@ -160,7 +158,7 @@ int main(int argc, char **argv)
         }
 
         parent_ref = resp_lookup.ref;
-        rc = PVFS_sys_remove(filename, parent_ref, &credentials);
+        rc = PVFS_sys_remove(filename, parent_ref, credential);
         if (rc)
         {
             fprintf(stderr, "Error: An error occurred while "
@@ -171,6 +169,7 @@ int main(int argc, char **argv)
         }
     }
 
+    PINT_release_credential(credential);
     PVFS_sys_finalize();
     free(user_opts);
 

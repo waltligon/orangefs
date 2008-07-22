@@ -15,10 +15,12 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 #define HISTORY 5
 #define FREQUENCY 3
@@ -266,7 +268,7 @@ int main(int argc, char **argv)
 	sleep(FREQUENCY);
     }
 
-    PINT_free_credential(cred);
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
 
     return(ret);

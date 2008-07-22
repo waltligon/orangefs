@@ -15,9 +15,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -81,7 +83,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    PINT_free_credential(cred);
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
 
     return(ret);

@@ -21,6 +21,7 @@
 #include "pint-sysint-utils.h"
 #include "server-config.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -37,8 +38,8 @@ static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static void print_mntent(
     struct PVFS_sys_mntent *entries, int num_entries);
-static int print_config(PVFS_fs_id fsid);
-static int noop_all_servers(PVFS_fs_id fsid);
+static int print_config(PVFS_fs_id fsid, PVFS_credential *cred);
+static int noop_all_servers(PVFS_fs_id fsid, PVFS_credential *cred);
 static void print_error_details(PVFS_error_details * error_details);
 static void print_root_check_error_details(PVFS_error_details * error_details);
 
@@ -50,7 +51,7 @@ int main(int argc, char **argv)
     const PVFS_util_tab* tab;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
+    PVFS_credential *cred;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_error_details * error_details;
     int count;
@@ -128,10 +129,11 @@ int main(int argc, char **argv)
 
     print_mntent(tab->mntent_array, tab->mntent_count);
 
-    PVFS_util_gen_credentials(&creds);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     /* dump some key parts of the config file */
-    ret = print_config(cur_fs);
+    ret = print_config(cur_fs, cred);
     if(ret < 0)
     {
 	PVFS_perror("print_config", ret);
@@ -142,7 +144,7 @@ int main(int argc, char **argv)
     printf("\n(5) Verifying that all servers are responding...\n");
 
     /* send noop to everyone */
-    ret = noop_all_servers(cur_fs);
+    ret = noop_all_servers(cur_fs, cred);
     if(ret < 0)
     {
         fprintf(stderr, "Failure: could not communicate with "
@@ -154,7 +156,7 @@ int main(int argc, char **argv)
            "to all servers...\n",(long)cur_fs);
 
     ret = PVFS_mgmt_count_servers(
-        cur_fs, &creds, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER, &count);
+        cur_fs, cred, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -174,7 +176,7 @@ int main(int argc, char **argv)
      * in error cases here 
      */
     ret = PVFS_mgmt_setparam_all(
-        cur_fs, &creds, PVFS_SERV_PARAM_FSID_CHECK,
+        cur_fs, cred, PVFS_SERV_PARAM_FSID_CHECK,
         (uint64_t)cur_fs, NULL, error_details);
     if(ret < 0)
     {
@@ -192,7 +194,7 @@ int main(int argc, char **argv)
 
     printf("\n(7) Verifying that root handle is owned by one server...\n");    
 
-    ret = PVFS_sys_lookup(cur_fs, "/", &creds,
+    ret = PVFS_sys_lookup(cur_fs, "/", cred,
                           &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if(ret != 0)
     {
@@ -207,7 +209,7 @@ int main(int argc, char **argv)
      * failed in error cases here
      */
     ret = PVFS_mgmt_setparam_all(
-        cur_fs, &creds, PVFS_SERV_PARAM_ROOT_CHECK,
+        cur_fs, cred, PVFS_SERV_PARAM_ROOT_CHECK,
 	(uint64_t)resp_lookup.ref.handle, NULL, error_details);
 
     if(ret < 0)
@@ -231,6 +233,7 @@ int main(int argc, char **argv)
         printf("\n");
     }
 
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
 
     printf("=============================================================\n");
@@ -255,20 +258,17 @@ int main(int argc, char **argv)
  *
  * returns -PVFS_error on failure, 0 on success
  */
-static int noop_all_servers(PVFS_fs_id fsid)
+static int noop_all_servers(PVFS_fs_id fsid, PVFS_credential *cred)
 {
-    PVFS_credentials creds;
     int ret = -1;
     int count;
     PVFS_BMI_addr_t* addr_array;
     int i;
     int tmp;
  
-    PVFS_util_gen_credentials(&creds);
-
     printf("\n   meta servers:\n");
     ret = PVFS_mgmt_count_servers(
-        fsid, &creds, PVFS_MGMT_META_SERVER, &count);
+        fsid, cred, PVFS_MGMT_META_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -283,7 +283,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     }
 
     ret = PVFS_mgmt_get_server_array(
-        fsid, &creds, PVFS_MGMT_META_SERVER, addr_array, &count);
+        fsid, cred, PVFS_MGMT_META_SERVER, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -293,8 +293,8 @@ static int noop_all_servers(PVFS_fs_id fsid)
     for (i = 0; i < count; i++)
     {
 	printf("   %s ",
-               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i]);
+               PVFS_mgmt_map_addr(fsid, cred, addr_array[i], &tmp));
+	ret = PVFS_mgmt_noop(fsid, cred, addr_array[i]);
 	if (ret == 0)
 	{
 	    printf("Ok\n");
@@ -302,7 +302,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
 	else
 	{
 	    printf("FAILURE: PVFS_mgmt_noop failed for server: %s\n",
-                   PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
+                   PVFS_mgmt_map_addr(fsid, cred, addr_array[i], &tmp));
 	    return ret;
 	}
     }
@@ -310,7 +310,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
 
     printf("\n   data servers:\n");
     ret = PVFS_mgmt_count_servers(
-        fsid, &creds, PVFS_MGMT_IO_SERVER, &count);
+        fsid, cred, PVFS_MGMT_IO_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -325,7 +325,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     }
 
     ret = PVFS_mgmt_get_server_array(
-        fsid, &creds, PVFS_MGMT_IO_SERVER, addr_array, &count);
+        fsid, cred, PVFS_MGMT_IO_SERVER, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -335,8 +335,8 @@ static int noop_all_servers(PVFS_fs_id fsid)
     for (i = 0; i < count; i++)
     {
 	printf("   %s ",
-               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i]);
+               PVFS_mgmt_map_addr(fsid, cred, addr_array[i], &tmp));
+	ret = PVFS_mgmt_noop(fsid, cred, addr_array[i]);
 	if (ret == 0)
 	{
 	    printf("Ok\n");
@@ -358,20 +358,17 @@ static int noop_all_servers(PVFS_fs_id fsid)
  *
  * returns -PVFS_error on failure, 0 on success
  */
-static int print_config(PVFS_fs_id fsid)
+static int print_config(PVFS_fs_id fsid, PVFS_credential *cred)
 {
-    PVFS_credentials creds;
     int i;
     int ret = -1;
     int tmp;
     int count;
     PVFS_BMI_addr_t *addr_array;
  
-    PVFS_util_gen_credentials(&creds);
-
     printf("\n   meta servers:\n");
     ret = PVFS_mgmt_count_servers(
-        fsid, &creds, PVFS_MGMT_META_SERVER, &count);
+        fsid, cred, PVFS_MGMT_META_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -386,7 +383,7 @@ static int print_config(PVFS_fs_id fsid)
     }
 
     ret = PVFS_mgmt_get_server_array(
-        fsid, &creds, PVFS_MGMT_META_SERVER, addr_array, &count);
+        fsid, cred, PVFS_MGMT_META_SERVER, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -396,13 +393,13 @@ static int print_config(PVFS_fs_id fsid)
     for (i=0; i<count; i++)
     {
 	printf("   %s\n",
-               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
+               PVFS_mgmt_map_addr(fsid, cred, addr_array[i], &tmp));
     }
     free(addr_array);
 
     printf("\n   data servers:\n");
     ret = PVFS_mgmt_count_servers(
-        fsid, &creds, PVFS_MGMT_IO_SERVER, &count);
+        fsid, cred, PVFS_MGMT_IO_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -417,7 +414,7 @@ static int print_config(PVFS_fs_id fsid)
     }
 
     ret = PVFS_mgmt_get_server_array(
-        fsid, &creds, PVFS_MGMT_IO_SERVER, addr_array, &count);
+        fsid, cred, PVFS_MGMT_IO_SERVER, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -427,7 +424,7 @@ static int print_config(PVFS_fs_id fsid)
     for(i=0; i<count; i++)
     {
 	printf("   %s\n",
-               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
+               PVFS_mgmt_map_addr(fsid, cred, addr_array[i], &tmp));
     }
     free(addr_array);
 

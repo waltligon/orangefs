@@ -13,10 +13,12 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-event.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -70,12 +72,12 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    cred = PVFS_util_gen_fake_credentials();
+    cred = PVFS_util_gen_fake_credential();
     assert(cred);
 
     /* count how many I/O servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs,
-				  &creds,
+				  cred,
 				  PVFS_MGMT_IO_SERVER,
 				  &io_server_count);
     if (ret < 0)
@@ -113,7 +115,7 @@ int main(int argc, char **argv)
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     &creds,
+				     cred,
 				     PVFS_MGMT_IO_SERVER,
 				     addr_array,
 				     &io_server_count);
@@ -157,7 +159,7 @@ int main(int argc, char **argv)
 	}
     }
 
-    PINT_free_credential(cred);
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
 
     return ret;

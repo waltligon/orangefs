@@ -21,6 +21,7 @@
 #include "pint-sysint-utils.h"
 #include "server-config.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -47,7 +48,7 @@ int main(int argc, char **argv)
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_sysresp_statfs resp_statfs;
     int i,j;
-    PVFS_credentials creds;
+    PVFS_credential *cred;
     struct PVFS_mgmt_server_stat *stat_array = NULL;
     int outcount;
     int server_type;
@@ -81,10 +82,11 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     /* gather normal statfs statistics from system interface */
-    ret = PVFS_sys_statfs(cur_fs, &creds, &resp_statfs);
+    ret = PVFS_sys_statfs(cur_fs, cred, &resp_statfs);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_statfs", ret);
@@ -145,7 +147,7 @@ int main(int argc, char **argv)
     }
 
     outcount = resp_statfs.server_count;
-    ret = PVFS_mgmt_statfs_all(cur_fs, &creds, stat_array,
+    ret = PVFS_mgmt_statfs_all(cur_fs, cred, stat_array,
                                &outcount, NULL);
 
     for(j = 0; j<2; j++)
@@ -245,6 +247,8 @@ int main(int argc, char **argv)
         }
     }
 
+    PINT_release_credential(cred);
+    PVFS_sys_finalize();
     free(stat_array);
     return(ret);
 }

@@ -18,9 +18,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -45,7 +47,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
+    PVFS_credential *cred;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -73,10 +75,11 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     ret = PVFS_mgmt_setparam_all(cur_fs,
-				 &creds,
+				 cred,
 				 PVFS_SERV_PARAM_SYNC_META,
 				 user_opts->meta_sync,
 				 NULL,
@@ -88,7 +91,7 @@ int main(int argc, char **argv)
     }
 
     ret = PVFS_mgmt_setparam_all(cur_fs,
-				 &creds,
+				 cred,
 				 PVFS_SERV_PARAM_SYNC_DATA,
 				 user_opts->data_sync,
 				 NULL,
@@ -99,6 +102,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
 
     return(0);

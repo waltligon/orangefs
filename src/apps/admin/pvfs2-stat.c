@@ -19,6 +19,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 /* We need to set some limit, I suppose */
 #define MAX_NUM_FILES 100 
@@ -36,8 +37,6 @@ struct options
     int     nNumFiles;
 };
 
-static PVFS_credential *g_credential;
-
 /* Function Prototypes */
 static void usage(int argc, char** argv);
 static int parse_args(int argc, char** argv, struct options * opts);
@@ -46,7 +45,7 @@ static void enable_dereference(struct options * opts);
 static int do_stat(const char             * pszFile,
                    const char             * pszRelativeFile, 
                    const PVFS_fs_id         fs_id, 
-                   const PVFS_credentials * credentials,
+                   const PVFS_credential * credential,
                    const struct options   * opts);
 void print_stats(const PVFS_object_ref * ref,
                  const char            * pszName,
@@ -59,12 +58,11 @@ int main(int argc, char **argv)
                      i            =  0;
    char           ** ppszPvfsPath = NULL;
    PVFS_fs_id     *  pfs_id       = NULL;
-   PVFS_credentials  credentials;
+   PVFS_credential * credential;
    struct options    user_opts;
 
    /* Initialize any memory */
    memset(&user_opts,   0, sizeof(user_opts));
-   memset(&credentials, 0, sizeof(credentials));
    
    ret = parse_args(argc, argv, &user_opts);
    if(ret < 0)
@@ -133,18 +131,15 @@ int main(int argc, char **argv)
       }
    }
 
-   /* We will re-use the same credentials for each call */
-   PVFS_util_gen_credentials(&credentials);
+   credential = PVFS_util_gen_fake_credential();
+   assert(credential);
    
-   g_credential = PVFS_util_gen_fake_credential();
-   assert(g_credential);
-
    for(i = 0; i < user_opts.nNumFiles; i++)
    {
       ret = do_stat(user_opts.pszFiles[i], 
                     ppszPvfsPath[i], 
                     pfs_id[i], 
-                    &credentials,
+                    credential,
                     &user_opts);
       if(ret != 0)
       {
@@ -152,6 +147,7 @@ int main(int argc, char **argv)
       }
    }
 
+   PINT_release_credential(credential);
    PVFS_sys_finalize();
 
    /* Deallocate any allocated memory */
@@ -181,11 +177,11 @@ int main(int argc, char **argv)
    return(0);
 }
 
-static int do_stat(const char             * pszFile,
-                   const char             * pszRelativeFile, 
-                   const PVFS_fs_id         fs_id, 
-                   const PVFS_credentials * credentials,
-                   const struct options   * opts)
+static int do_stat(const char            * pszFile,
+                   const char            * pszRelativeFile, 
+                   const PVFS_fs_id        fs_id, 
+                   const PVFS_credential * credential,
+                   const struct options  * opts)
 {
    int                  ret = 0;
    PVFS_sysresp_lookup  lk_response;
@@ -203,7 +199,7 @@ static int do_stat(const char             * pszFile,
    {
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
-                            (PVFS_credentials *) credentials, 
+                            credential, 
                             &lk_response, 
                             PVFS2_LOOKUP_LINK_FOLLOW);
    }
@@ -211,7 +207,7 @@ static int do_stat(const char             * pszFile,
    {
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
-                            (PVFS_credentials *) credentials, 
+                            credential, 
                             &lk_response, 
                             PVFS2_LOOKUP_LINK_NO_FOLLOW);
    }
@@ -231,7 +227,7 @@ static int do_stat(const char             * pszFile,
    
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
-                          g_credential, 
+                          credential, 
                           &getattr_response);
 
    if(ret < 0)

@@ -22,6 +22,7 @@
 #include "pvfs2-fsck.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
+#include "security-util.h"
 
 #define HANDLE_BATCH 1000
 
@@ -77,13 +78,13 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    cred = PVFS_util_gen_fake_credentials();
+    cred = PVFS_util_gen_fake_credential();
     assert(cred);
 
     printf("# Current FSID is %u.\n", cur_fs);
 
     /* count how many servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, 
+    ret = PVFS_mgmt_count_servers(cur_fs, cred, 
 	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 	&server_count);
     if (ret != 0)
@@ -224,7 +225,7 @@ int main(int argc, char **argv)
 				NULL);
     }
     
-    PINT_free_capability(cred);
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
 
     if (addr_array != NULL) free(addr_array);
@@ -1027,7 +1028,7 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
     /* if it's already there, don't bother */
     ret = PVFS_sys_lookup(cur_fs,
 			  "/lost+found",
-			  creds,
+			  cred,
 			  &lookup_resp,
 			  PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret == 0) {
@@ -1036,7 +1037,7 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
     }
 
     attr.owner = cred->userid;
-    attr.group = cred->groud_array[0];
+    attr.group = cred->group_array[0];
     attr.perms = PVFS_util_translate_mode(0755, 0);
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
@@ -1139,7 +1140,7 @@ int remove_object(PVFS_object_ref obj_ref,
 
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_remove_object(obj_ref,
-				      creds);
+				      cred);
 	if (ret != 0) {
 	    PVFS_perror("PVFS_mgmt_remove_object", ret);
 	}

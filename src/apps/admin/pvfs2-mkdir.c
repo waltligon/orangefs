@@ -19,11 +19,13 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <libgen.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -48,7 +50,7 @@ static int parse_args(int argc, char** argv, struct options * opts);
 static void enable_verbose(struct options * opts);
 static void enable_parents(struct options * opts);
 static int read_mode(struct options * opts, const char * buffer);
-static int make_directory(PVFS_credentials     * credentials,
+static int make_directory(PVFS_credential     * cred,
                           const PVFS_fs_id       fs_id,
                           const int              mode,
                           const char           * dir,
@@ -131,7 +133,7 @@ int main(int argc, char **argv)
     }
 
     /* We will re-use the same credentials for each call */
-    cred = PVFS_util_gen_fake_credentials();
+    cred = PVFS_util_gen_fake_credential();
     assert(cred);
 
     for(i = 0; i < user_opts.numdirs; i++)
@@ -150,7 +152,7 @@ int main(int argc, char **argv)
         }
     }
     
-    PINT_free_credential(cred);
+    PINT_release_credential(cred);
     /* TODO: need to free the request descriptions */
     PVFS_sys_finalize();
 

@@ -15,11 +15,13 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "str-utils.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -162,7 +164,7 @@ int main(int argc, char **argv)
     int ret = -1;
     options_t *user_opts = NULL;
     PVFS_object_ref ref;
-    PVFS_credentials credentials;
+    PVFS_credential *credential;
 
     user_opts = parse_args(argc, argv);
     if (!user_opts)
@@ -209,14 +211,15 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    credential = PVFS_util_gen_fake_credential();
+    assert(credential);
 
     if (user_opts->remove_object_only)
     {
         fprintf(stderr,"Attempting to remove object %llu,%d\n",
                 llu(ref.handle), ref.fs_id);
 
-        ret = PVFS_mgmt_remove_object(ref, &credentials);
+        ret = PVFS_mgmt_remove_object(ref, credential);
         if (ret)
         {
             PVFS_perror("PVFS_mgmt_remove_object", ret);
@@ -228,7 +231,7 @@ int main(int argc, char **argv)
                 "\n", user_opts->dirent_name, llu(ref.handle), ref.fs_id);
 
         ret = PVFS_mgmt_remove_dirent(
-            ref, user_opts->dirent_name, &credentials);
+            ref, user_opts->dirent_name, credential);
         if (ret)
         {
             PVFS_perror("PVFS_mgmt_remove_dirent", ret);

@@ -20,6 +20,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "bmi.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -44,6 +45,7 @@ int main(int argc, char **argv)
     char* tmp_server;
     int tmp_server_index;
     PVFS_sys_layout layout;
+    PVFS_credential *credential;
 
     layout.algorithm = PVFS_SYS_LAYOUT_DEFAULT;
     layout.server_list.count = 0;
@@ -64,6 +66,9 @@ int main(int argc, char **argv)
 	PVFS_perror("PVFS_util_init_defaults", ret);
 	return -1;
     }
+
+    credential = PVFS_util_gen_fake_credential();
+    assert(credential);
 
     /* Remove each specified file */
     for (i = 0; i < user_opts->num_files; ++i)
@@ -86,7 +91,6 @@ int main(int argc, char **argv)
         PVFS_fs_id cur_fs;
         PVFS_sysresp_lookup resp_lookup;
         PVFS_sysresp_create resp_create;
-        PVFS_credentials credentials;
         PVFS_object_ref parent_ref;
         PVFS_sys_attr attr;
 
@@ -112,10 +116,8 @@ int main(int argc, char **argv)
             break;
         }
 
-        PVFS_util_gen_credentials(&credentials);
-
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
+        rc = PVFS_sys_lookup(cur_fs, pvfs_path, credential,
                              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (rc)
         {
@@ -126,8 +128,8 @@ int main(int argc, char **argv)
 
         /* Set attributes */
         memset(&attr, 0, sizeof(PVFS_sys_attr));
-        attr.owner = credentials.uid;
-        attr.group = credentials.gid;
+        attr.owner = credential->userid;
+        attr.group = credential->group_array[0];
         attr.perms = 0777;
         attr.atime = time(NULL);
         attr.mtime = attr.atime;
@@ -194,7 +196,7 @@ int main(int argc, char **argv)
         rc = PVFS_sys_create(filename,
                              parent_ref,
                              attr,
-                             &credentials,
+                             credential,
                              NULL,
                              &layout,
                              &resp_create);
@@ -208,6 +210,7 @@ int main(int argc, char **argv)
         }
     }
 
+    PINT_release_credential(credential);
     PVFS_sys_finalize();
 
     if(user_opts->server_list)

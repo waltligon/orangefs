@@ -15,9 +15,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -42,7 +44,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
+    PVFS_credential *cred;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -71,18 +73,19 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     if(!user_opts->op_mask || !user_opts->api_mask)
     {
 	/* turn off event logging */
-	ret = PVFS_mgmt_setparam_all(cur_fs, &creds, 
+	ret = PVFS_mgmt_setparam_all(cur_fs, cred, 
 	    PVFS_SERV_PARAM_EVENT_ON, 0, NULL, NULL);
     }
     else
     {
 	/* set mask */
-	ret = PVFS_mgmt_setparam_all(cur_fs, &creds, 
+	ret = PVFS_mgmt_setparam_all(cur_fs, cred, 
 	    PVFS_SERV_PARAM_EVENT_MASKS, 
 	    (int64_t)(((int64_t)user_opts->op_mask << 32) 
 		+ user_opts->api_mask),
@@ -94,7 +97,7 @@ int main(int argc, char **argv)
 	}
 
 	/* turn on event logging */
-	ret = PVFS_mgmt_setparam_all(cur_fs, &creds, 
+	ret = PVFS_mgmt_setparam_all(cur_fs, cred, 
 	    PVFS_SERV_PARAM_EVENT_ON, 1, NULL, NULL);
     }
 
@@ -104,6 +107,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    PINT_release_credential(cred);
     PVFS_sys_finalize();
 
     return(ret);

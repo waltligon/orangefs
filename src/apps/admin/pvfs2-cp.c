@@ -20,11 +20,13 @@
 #include <time.h>
 #include <libgen.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 /* optional parameters, filled in by parse_args() */
 struct options
@@ -76,16 +78,16 @@ static void usage(int argc, char** argv);
 static double Wtime(void);
 static void print_timings( double time, int64_t total);
 static int resolve_filename(file_object *obj, char *filename);
-static int generic_open(file_object *obj, PVFS_credentials *credentials, 
+static int generic_open(file_object *obj, PVFS_credential *credential, 
 	int nr_datafiles, PVFS_size strip_size, char *srcname, int open_type);
 static size_t generic_read(file_object *src, char *buffer, 
-	int64_t offset, size_t count, PVFS_credentials *credentials);
+	int64_t offset, size_t count, PVFS_credential *credential);
 static size_t generic_write(file_object *dest, char *buffer, 
-	int64_t offset, size_t count, PVFS_credentials *credentials);
+	int64_t offset, size_t count, PVFS_credential *credential);
 static int generic_cleanup(file_object *src, file_object *dest,
-                           PVFS_credentials *credentials);
+                           PVFS_credential *credential);
 static void make_attribs(PVFS_sys_attr *attr,
-                         PVFS_credentials *credentials, 
+                         PVFS_credential *credential, 
                          int nr_datafiles, int mode);
 
 static int convert_pvfs2_perms_to_mode(PVFS_permissions perms)
@@ -147,7 +149,7 @@ int main (int argc, char ** argv)
     credential = PVFS_util_gen_fake_credential();
     assert(credential);
 
-    ret = generic_open(&src, &credentials, 0, 0, NULL, OPEN_SRC);
+    ret = generic_open(&src, credential, 0, 0, NULL, OPEN_SRC);
     if (ret < 0)
     {
 	fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
@@ -203,7 +205,7 @@ int main (int argc, char ** argv)
 
 main_out:
     generic_cleanup(&src, &dest, credential);
-    PINT_free_credential(credential);
+    PINT_release_credential(credential);
     PVFS_sys_finalize();
     free(user_opts);
     free(buffer);

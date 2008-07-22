@@ -14,10 +14,12 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -32,7 +34,7 @@ struct options
 };
 
 static struct options* parse_args(int argc, char* argv[]);
-int pvfs2_chmod(PVFS_permissions perms, char *destfile);
+int pvfs2_chmod(PVFS_permissions perms, char *destfile, PVFS_credential*);
 static void usage(int argc, char** argv);
 int check_perm(char c);
 
@@ -40,6 +42,7 @@ int main(int argc, char **argv)
 {
   int ret = 0;
   struct options* user_opts = NULL;
+  PVFS_credential *credential;
   int i;
 
   /* look at command line arguments */
@@ -58,16 +61,20 @@ int main(int argc, char **argv)
     return(-1);
   }
 
+  credential = PVFS_util_gen_fake_credential();
+  assert(credential);
+
   /*
    * for each file the user specified
    */
   for (i = 0; i < user_opts->target_count; i++) {
-    ret = pvfs2_chmod(user_opts->perms,user_opts->destfiles[i]);
+      ret = pvfs2_chmod(user_opts->perms,user_opts->destfiles[i], credential);
     if (ret != 0) {
       break;
     }
     /* TODO: need to free the request descriptions */
   }
+  PINT_release_credential(credential);
   PVFS_sys_finalize();
   return(ret);
 }
@@ -78,19 +85,18 @@ int main(int argc, char **argv)
  *
  * returns zero on success and negative one on failure
  */
-int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
+int pvfs2_chmod (PVFS_permissions perms, char *destfile,
+                 PVFS_credential *credential) {
   int ret = -1;
   char str_buf[PVFS_NAME_MAX] = {0};
   char pvfs_path[PVFS_NAME_MAX] = {0};
   PVFS_fs_id cur_fs;
   PVFS_sysresp_lookup resp_lookup;
   PVFS_object_ref parent_ref;
-  PVFS_credentials credentials;
   PVFS_sysresp_getattr resp_getattr;
   PVFS_sys_attr old_attr;
   PVFS_sys_attr new_attr;
   uint32_t attrmask;
-  PVFS_credential *credential;
   
   /* translate local path into pvfs2 relative path */
   ret = PVFS_util_resolve(destfile,&cur_fs, pvfs_path, PVFS_NAME_MAX);
@@ -100,11 +106,9 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
     return -1;
   }
 
-  PVFS_util_gen_credentials(&credentials);
-  
   credential = PVFS_util_gen_fake_credential();
   assert(credential);
-
+  
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere
    */
@@ -112,7 +116,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   {
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_lookup(cur_fs, pvfs_path,
-                          &credentials, &resp_lookup,
+                          credential, &resp_lookup,
                           PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
@@ -136,7 +140,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
       return -1;
     }
 
-    ret = PINT_lookup_parent(pvfs_path, cur_fs, &credentials, 
+    ret = PINT_lookup_parent(pvfs_path, cur_fs, credential, 
                                   &parent_ref.handle);
     if(ret < 0)
     {
@@ -151,7 +155,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
   ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
-                            parent_ref, &credentials, &resp_lookup,
+                            parent_ref, credential, &resp_lookup,
                             PVFS2_LOOKUP_LINK_NO_FOLLOW);
   if (ret != 0)
   {
@@ -173,7 +177,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   new_attr.perms = perms;
   new_attr.mask = PVFS_ATTR_SYS_PERM;
  
-  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,&credentials);
+  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,credential);
   if (ret < 0) 
   {
     PVFS_perror("PVFS_sys_setattr",ret);
