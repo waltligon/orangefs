@@ -172,6 +172,28 @@ static PINT_sm_action lock_cleanup(
     return server_state_machine_complete(smcb);
 }
 
+static enum PINT_server_req_access_type PINT_server_req_access_lock(
+    struct PVFS_server_req *req)
+{
+    if(req->u.lock.io_type == PVFS_IO_READ)
+    {
+        return PINT_SERVER_REQ_READONLY;
+    }
+    return PINT_SERVER_REQ_MODIFY;
+}
+
+
+PINT_GET_OBJECT_REF_DEFINE(lock);
+
+struct PINT_server_req_params pvfs2_lock_params =
+{
+    .string_name = "lock",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_access_lock,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_lock,
+    .state_machine = &pvfs2_lock_sm
+};
 
 /*
  * Local variables:
