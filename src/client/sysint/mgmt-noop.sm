@@ -57,7 +57,7 @@ machine pvfs2_client_mgmt_noop_sm
  */
 PVFS_error PVFS_imgmt_noop(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     PVFS_BMI_addr_t addr,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
@@ -96,7 +96,7 @@ PVFS_error PVFS_imgmt_noop(
  */
 PVFS_error PVFS_mgmt_noop(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     PVFS_BMI_addr_t addr)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;

@@ -68,7 +68,7 @@ PVFS_error PVFS_imgmt_create_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
     PVFS_handle entry_handle,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
@@ -119,7 +119,7 @@ PVFS_error PVFS_mgmt_create_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
     PVFS_handle entry_handle,
-    PVFS_credential *credential)
+    const PVFS_credential *credential)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;

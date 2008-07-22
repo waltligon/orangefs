@@ -67,7 +67,7 @@ machine pvfs2_client_mgmt_remove_object_sm
  */
 PVFS_error PVFS_imgmt_remove_object(
     PVFS_object_ref object_ref, 
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
@@ -114,7 +114,7 @@ PVFS_error PVFS_imgmt_remove_object(
  */
 PVFS_error PVFS_mgmt_remove_object(
     PVFS_object_ref object_ref, 
-    PVFS_credential *credential)
+    const PVFS_credential *credential)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;

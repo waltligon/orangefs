@@ -57,7 +57,7 @@ machine pvfs2_client_mgmt_event_mon_list_sm
 
 PVFS_error PVFS_imgmt_event_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     struct PVFS_mgmt_event** event_matrix,
     PVFS_BMI_addr_t *addr_array,
     int server_count,
@@ -112,7 +112,7 @@ PVFS_error PVFS_imgmt_event_mon_list(
 
 PVFS_error PVFS_mgmt_event_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     struct PVFS_mgmt_event** event_matrix,
     PVFS_BMI_addr_t *addr_array,
     int server_count,

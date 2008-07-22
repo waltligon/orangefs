@@ -30,7 +30,7 @@
  */
 const char *PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     PVFS_BMI_addr_t addr,
     int *server_type)
 {
@@ -52,7 +52,7 @@ PVFS_error PVFS_mgmt_map_handle(
  */
 PVFS_error PVFS_mgmt_statfs_all(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     struct PVFS_mgmt_server_stat *stat_array,
     int *inout_count_p,
     PVFS_error_details *details)
@@ -111,7 +111,7 @@ PVFS_error PVFS_mgmt_statfs_all(
  */
 PVFS_error PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     enum PVFS_server_param param,
     uint64_t value,
     uint64_t *old_value_array,
@@ -159,7 +159,7 @@ PVFS_error PVFS_mgmt_setparam_all(
  */
 PVFS_error PVFS_mgmt_setparam_single(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     enum PVFS_server_param param,
     uint64_t value,
     char *server_addr_str,
@@ -185,7 +185,7 @@ PVFS_error PVFS_mgmt_setparam_single(
  */
 PVFS_error PVFS_mgmt_get_server_array(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     int server_type,
     PVFS_BMI_addr_t *addr_array,
     int *inout_count_p)
@@ -206,7 +206,7 @@ PVFS_error PVFS_mgmt_get_server_array(
  */
 PVFS_error PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     int server_type,
     int *count)
 {

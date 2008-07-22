@@ -52,7 +52,7 @@ machine pvfs2_client_mgmt_get_dfile_array_sm
  */
 PVFS_error PVFS_imgmt_get_dfile_array(
     PVFS_object_ref ref,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     PVFS_handle *dfile_array,
     int dfile_count,
     PVFS_mgmt_op_id *op_id,
@@ -102,7 +102,7 @@ PVFS_error PVFS_imgmt_get_dfile_array(
  */
 PVFS_error PVFS_mgmt_get_dfile_array(
     PVFS_object_ref ref,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     PVFS_handle *dfile_array,
     int dfile_count)
 {

@@ -68,7 +68,7 @@ machine pvfs2_client_mgmt_remove_dirent_sm
 PVFS_error PVFS_imgmt_remove_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
@@ -116,7 +116,7 @@ PVFS_error PVFS_imgmt_remove_dirent(
 PVFS_error PVFS_mgmt_remove_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
-    PVFS_credential *credential)
+    const PVFS_credential *credential)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;

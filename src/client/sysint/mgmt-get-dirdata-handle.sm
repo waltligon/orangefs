@@ -70,7 +70,7 @@ machine pvfs2_client_mgmt_get_dirdata_handle_sm
 PVFS_error PVFS_imgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,
-    PVFS_credential *credential,
+    const PVFS_credential *credential,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
@@ -117,7 +117,7 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
 PVFS_error PVFS_mgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,
-    PVFS_credential *credential)
+    const PVFS_credential *credential)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
