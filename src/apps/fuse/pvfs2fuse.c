@@ -9,12 +9,13 @@
  *   Author: John A. Chandy
  *           Sumit Narayan
  *
- *   $Date: 2008-07-15 17:24:41 $
- *   $Revision: 1.1.6.1 $
+ *   $Date: 2008-07-22 18:32:56 $
+ *   $Revision: 1.1.6.2 $
  *
+ *   Documentation: http://www.engr.uconn.edu/~sun03001/docs/pvfs2fuse-rpt.pdf
  */
 
-/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.1.6.1 2008-07-15 17:24:41 sumitn Exp $"; */
+/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.1.6.2 2008-07-22 18:32:56 sumitn Exp $"; */
 char *pvfs2fuse_version = "0.01";
 
 #define FUSE_USE_VERSION 27
