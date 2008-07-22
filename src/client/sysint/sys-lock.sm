@@ -263,7 +263,9 @@ PVFS_error PVFS_isys_lock(
     sm_p->u.lock.stored_error_code = 0;
     sm_p->u.lock.retry_count = 0;
     // Not sure about this - AC
-//    sm_p->msgarray_op = NULL;
+    sm_p->msgarray_op.msgarray = NULL;
+    sm_p->msgarray_op.count = 0;
+
     sm_p->u.lock.datafile_index_array = NULL;
     sm_p->u.lock.datafile_count = 0;
     sm_p->u.lock.total_size = 0;
@@ -352,7 +354,7 @@ static PINT_sm_action lock_init(struct PINT_smcb *smcb,
 	}
 
 	return job_req_sched_post_timer(
-	    sm_p->msgarray_op.params.retry_delay, sm_p, 0, js_p, &tmp_id,
+	    sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
 	    pint_client_sm_context);
     }
 
@@ -568,6 +570,7 @@ static PINT_sm_action lock_setup_msgpairs(struct PINT_smcb *smcb,
     js_p->error_code = ret;
 
   exit:
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -750,8 +753,10 @@ static int lock_completion_fn(void *user_args,
                               struct PVFS_server_resp *resp_p,
                               int index)
 {
-    struct PINT_smcb *smcb = (struct PINT_smcb *)user_args;
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_smcb *smcb = user_args;
+    PINT_client_sm *sm_p __attribute__((unused)) =
+        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+
     PVFS_object_attr *attr = NULL;
     int done = -1;
 
