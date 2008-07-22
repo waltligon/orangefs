@@ -38,7 +38,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
+    PVFS_credential *cred;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -66,10 +66,11 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     ret = PVFS_mgmt_setparam_all(cur_fs,
-				 &creds,
+				 cred,
 				 PVFS_SERV_PARAM_DROP_CACHES,
 				 0,
 				 NULL,
@@ -80,6 +81,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+    PINT_free_credential(cred);
     PVFS_sys_finalize();
 
     return(ret);

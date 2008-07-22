@@ -91,7 +91,6 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   PVFS_fs_id cur_fs;
   PVFS_sysresp_lookup resp_lookup;
   PVFS_object_ref parent_ref;
-  PVFS_credentials credentials;
   PVFS_sysresp_getattr resp_getattr;
   PVFS_sys_attr old_attr;
   PVFS_sys_attr new_attr;
@@ -105,8 +104,6 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
     PVFS_perror("PVFS_util_resolve", ret);
     return -1;
   }
-
-  PVFS_util_gen_credentials(&credentials);
   
   credential = PVFS_util_gen_fake_credential();
   assert(credential);
@@ -118,7 +115,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   {
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_lookup(cur_fs, pvfs_path,
-                          &credentials, &resp_lookup,
+                          credential, &resp_lookup,
                           PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
@@ -142,7 +139,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
       return -1;
     }
 
-    ret = PINT_lookup_parent(pvfs_path, cur_fs, &credentials, 
+    ret = PINT_lookup_parent(pvfs_path, cur_fs, credential, 
                                   &parent_ref.handle);
     if(ret < 0)
     {
@@ -157,7 +154,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
   ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
-                            parent_ref, &credentials, &resp_lookup,
+                            parent_ref, credential, &resp_lookup,
                             PVFS2_LOOKUP_LINK_NO_FOLLOW);
   if (ret != 0)
   {
@@ -180,13 +177,14 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   new_attr.group = group;
   new_attr.mask = PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID;
  
-  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,&credentials);
+  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,credential);
   if (ret < 0) 
   {
     PVFS_perror("PVFS_sys_setattr",ret);
     return -1;
   }
 
+  PINT_release_credential(credential);
   return 0;
 }
 

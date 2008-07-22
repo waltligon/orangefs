@@ -37,8 +37,6 @@ struct options
     char *fontname;
 };
 
-static PVFS_credential *g_credential;
-
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 
@@ -47,28 +45,28 @@ static char *get_type_str(int type);
 int build_handlelist(PVFS_fs_id cur_fs,
 		     PVFS_BMI_addr_t *addr_array,
 		     int server_count,
-		     PVFS_credentials *creds);
+		     PVFS_credential *cred);
 
 /* directory tree traversal functions */
 int traverse_directory_tree(PVFS_fs_id cur_fs,
 			    PVFS_BMI_addr_t *addr_array,
 			    int server_count,
-			    PVFS_credentials *creds,
+			    PVFS_credential *cred,
 			    struct options *opts_p);
 int descend(PVFS_fs_id cur_fs,
 	    PVFS_object_ref pref,
-	    PVFS_credentials *creds,
+	    PVFS_credential *cred,
 	    struct options *opts_p);
 
 void verify_datafiles(PVFS_fs_id cur_fs,
 		      PVFS_object_ref mf_ref,
 		      int df_count,
-		      PVFS_credentials *creds,
+		      PVFS_credential *cred,
 		      struct options *opts_p);
 
 void analyze_remaining_handles(PVFS_fs_id cur_fs,
 			       PVFS_id_gen_t *addr_array,
-			       PVFS_credentials *creds,
+			       PVFS_credential *cred,
 			       int dot_fmt);
 
 /* print functions */
@@ -110,7 +108,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
+    PVFS_credential *cred;
     int server_count;
     PVFS_BMI_addr_t *addr_array;
 
@@ -139,13 +137,11 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
-    
-    g_credential = PVFS_util_gen_fake_credential();
-    assert(g_credential);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     /* count how many servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, 
+    ret = PVFS_mgmt_count_servers(cur_fs, cred, 
 	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 	&server_count);
     if (ret != 0)
@@ -162,7 +158,7 @@ int main(int argc, char **argv)
 	perror("malloc");
 	return -1;
     }
-    ret = PVFS_mgmt_get_server_array(cur_fs, &creds, 
+    ret = PVFS_mgmt_get_server_array(cur_fs, cred, 
 	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 	addr_array, &server_count);
     if (ret != 0)
@@ -173,7 +169,7 @@ int main(int argc, char **argv)
 
     /* put the servers into administrative mode */
     ret = PVFS_mgmt_setparam_list(cur_fs,
-				  &creds,
+				  cred,
 				  PVFS_SERV_PARAM_MODE,
 				  (uint64_t)PVFS_SERVER_ADMIN_MODE,
 				  addr_array,
@@ -184,7 +180,7 @@ int main(int argc, char **argv)
     {
 	PVFS_perror("PVFS_mgmt_setparam_list", ret);
 	PVFS_mgmt_setparam_list(cur_fs,
-				&creds,
+				cred,
 				PVFS_SERV_PARAM_MODE,
 				(uint64_t)PVFS_SERVER_NORMAL_MODE,
 				addr_array,
@@ -199,19 +195,19 @@ int main(int argc, char **argv)
     /* iterate through all servers' handles and store a local
      * representation of the lists
      */
-    build_handlelist(cur_fs, addr_array, server_count, &creds);
+    build_handlelist(cur_fs, addr_array, server_count, cred);
 
     print_header(user_opts->dot_format, user_opts->key, user_opts->fontname);
 
     traverse_directory_tree(cur_fs,
 			    addr_array,
 			    server_count,
-			    &creds,
+			    cred,
 			    user_opts);
 
     analyze_remaining_handles(cur_fs,
 			      addr_array,
-			      &creds,
+			      cred,
 			      user_opts->dot_format);
 
     print_trailer(user_opts->dot_format, user_opts->fontname);
@@ -220,7 +216,7 @@ int main(int argc, char **argv)
 
     PVFS_mgmt_setparam_list(
 	cur_fs,
-	&creds,
+	cred,
 	PVFS_SERV_PARAM_MODE,
 	(uint64_t)PVFS_SERVER_NORMAL_MODE,
 	addr_array,
@@ -228,6 +224,7 @@ int main(int argc, char **argv)
 	server_count,
 	NULL);
 
+    PINT_free_credential(cred);
     PVFS_sys_finalize();
 
     return(ret);
@@ -236,7 +233,7 @@ int main(int argc, char **argv)
 int build_handlelist(PVFS_fs_id cur_fs,
 		     PVFS_BMI_addr_t *addr_array,
 		     int server_count,
-		     PVFS_credentials *creds)
+		     PVFS_credential *cred)
 {
     int ret, i, more_flag;
     unsigned long j;
@@ -253,7 +250,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
     if (stat_array == NULL)
     {
 	PVFS_mgmt_setparam_list(cur_fs,
-				creds,
+				cred,
 				PVFS_SERV_PARAM_MODE,
 				(uint64_t)PVFS_SERVER_NORMAL_MODE,
 				addr_array,
@@ -264,7 +261,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
     }
 
     ret = PVFS_mgmt_statfs_list(cur_fs,
-				creds,
+				cred,
 				stat_array,
 				addr_array,
 				server_count,
@@ -273,7 +270,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
     {
 	PVFS_perror("PVFS_mgmt_statfs_list", ret);
 	PVFS_mgmt_setparam_list(cur_fs,
-				creds,
+				cred,
 				PVFS_SERV_PARAM_MODE,
 				(uint64_t)PVFS_SERVER_NORMAL_MODE,
 				addr_array,
@@ -347,7 +344,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
     do
     {
 	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
-					     creds,
+					     cred,
 					     handle_matrix,
 					     hcount_array,
 					     position_array,
@@ -358,7 +355,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
 	{
 	    PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);
 	    PVFS_mgmt_setparam_list(cur_fs,
-				    creds,
+				    cred,
 				    PVFS_SERV_PARAM_MODE,
 				    (uint64_t)PVFS_SERVER_NORMAL_MODE,
 				    addr_array,
@@ -430,7 +427,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
 int traverse_directory_tree(PVFS_fs_id cur_fs,
 			    PVFS_BMI_addr_t *addr_array,
 			    int server_count,
-			    PVFS_credentials *creds,
+			    PVFS_credential *cred,
 			    struct options *opts_p)
 {
     int server_idx;
@@ -438,14 +435,14 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     PVFS_sysresp_getattr getattr_resp;
     PVFS_object_ref pref;
 
-    PVFS_sys_lookup(cur_fs, "/", creds,
+    PVFS_sys_lookup(cur_fs, "/", cred,
                     &lookup_resp, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     /* lookup_resp.pinode_refn.handle gets root handle */
     pref = lookup_resp.ref;
 
     PVFS_sys_getattr(pref,
 		     PVFS_ATTR_SYS_ALL_NOHINT,
-		     g_credential,
+		     cred,
 		     &getattr_resp);
 
     if (getattr_resp.attr.objtype != PVFS_TYPE_DIRECTORY)
@@ -468,7 +465,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 		     opts_p->dot_format,
 		     opts_p->fontname);
 
-    descend(cur_fs, pref, creds, opts_p);
+    descend(cur_fs, pref, cred, opts_p);
 
     handlelist_remove_handle(pref.handle, server_idx);
 
@@ -477,7 +474,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 
 int descend(PVFS_fs_id cur_fs,
 	    PVFS_object_ref pref,
-	    PVFS_credentials *creds,
+	    PVFS_credential *cred,
 	    struct options *opts_p)
 {
     int i, count, ret;
@@ -494,7 +491,7 @@ int descend(PVFS_fs_id cur_fs,
         ret = PVFS_sys_readdir(pref,
                          (!token ? PVFS_READDIR_START : token),
                          count,
-                         creds,
+                         cred,
                          &readdir_resp);
 
         for (i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
@@ -511,7 +508,7 @@ int descend(PVFS_fs_id cur_fs,
 
             if ((ret = PVFS_sys_getattr(entry_ref,
                              PVFS_ATTR_SYS_ALL_NOHINT,
-                             g_credential,
+                             cred,
                              &getattr_resp)) != 0)
             {
                 printf("Could not get attributes of handle %llu [%d]\n",
@@ -542,11 +539,11 @@ int descend(PVFS_fs_id cur_fs,
                     verify_datafiles(cur_fs,
                                      entry_ref,
                                      getattr_resp.attr.dfile_count,
-                                     creds,
+                                     cred,
                                      opts_p);
                     break;
                 case PVFS_TYPE_DIRECTORY:
-                    descend(cur_fs, entry_ref, creds, opts_p);
+                    descend(cur_fs, entry_ref, cred, opts_p);
                     break;
                 default:
                     break;
@@ -578,7 +575,7 @@ int descend(PVFS_fs_id cur_fs,
 void verify_datafiles(PVFS_fs_id cur_fs,
 		      PVFS_object_ref mf_ref,
 		      int df_count,
-		      PVFS_credentials *creds,
+		      PVFS_credential *cred,
 		      struct options *opts_p)
 {
     int ret, i, server_idx;
@@ -590,7 +587,7 @@ void verify_datafiles(PVFS_fs_id cur_fs,
         printf("invalid value of number of datafiles = %d\n", df_count);
 	assert(0);
     }
-    ret = PVFS_mgmt_get_dfile_array(mf_ref, creds, df_handles, df_count);
+    ret = PVFS_mgmt_get_dfile_array(mf_ref, cred, df_handles, df_count);
     if (ret != 0)
     {
 	assert(0);
@@ -623,7 +620,7 @@ void verify_datafiles(PVFS_fs_id cur_fs,
 
 void analyze_remaining_handles(PVFS_fs_id cur_fs,
 			       PVFS_BMI_addr_t *addr_array,
-			       PVFS_credentials *creds,
+			       PVFS_credential *cred,
 			       int dot_fmt)
 {
     PVFS_handle handle;
@@ -643,7 +640,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
         /* only remaining handles are dirdata */
         PVFS_sys_getattr(entry_ref,
                          PVFS_ATTR_SYS_ALL,
-                         g_credential, &getattr_resp);
+                         cred, &getattr_resp);
         if (getattr_resp.attr.objtype != PVFS_TYPE_DIRDATA)
         {
             flag = 0;
@@ -659,7 +656,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
             {
                 printf("\t%s: %llu\n",
                        PVFS_mgmt_map_addr(cur_fs,
-                                          creds,
+                                          cred,
                                           addr_array[server_idx],
                                           &tmp_type),
                        llu(handle));

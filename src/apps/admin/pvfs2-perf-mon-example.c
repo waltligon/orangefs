@@ -43,7 +43,7 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
-    PVFS_credentials creds;
+    PVFS_credential *cred;
     int io_server_count;
     struct PVFS_mgmt_perf_stat** perf_matrix;
     uint64_t* end_time_ms_array;
@@ -78,10 +78,11 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     /* count how many I/O servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, PVFS_MGMT_IO_SERVER,
+    ret = PVFS_mgmt_count_servers(cur_fs, cred, PVFS_MGMT_IO_SERVER,
 	&io_server_count);
     if(ret < 0)
     {
@@ -136,7 +137,7 @@ int main(int argc, char **argv)
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     &creds,
+				     cred,
 				     PVFS_MGMT_IO_SERVER,
 				     addr_array,
 				     &io_server_count);
@@ -150,7 +151,7 @@ int main(int argc, char **argv)
     while (1)
     {
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
-				      &creds,
+				      cred,
 				      perf_matrix, 
 				      end_time_ms_array,
 				      addr_array,
@@ -169,7 +170,7 @@ int main(int argc, char **argv)
 	for (i=0; i < io_server_count; i++)
 	{
 	    printf("\nread:  %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, cred,addr_array[i], &tmp_type));
 	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
@@ -197,7 +198,7 @@ int main(int argc, char **argv)
 	    }
 
 	    printf("\nwrite: %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, cred,addr_array[i], &tmp_type));
 
 	    for (j=0; j < HISTORY; j++)
 	    {
@@ -228,7 +229,7 @@ int main(int argc, char **argv)
             printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
             printf("==================================================");
             printf("\nread:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, cred,addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
@@ -240,7 +241,7 @@ int main(int argc, char **argv)
 	    }
 
             printf("\nwrite:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, cred,addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
@@ -265,6 +266,7 @@ int main(int argc, char **argv)
 	sleep(FREQUENCY);
     }
 
+    PINT_free_credential(cred);
     PVFS_sys_finalize();
 
     return(ret);

@@ -49,8 +49,6 @@ struct options
     int num_starts;
 };
 
-static PVFS_credential *g_credential;
-
 static struct options* parse_args(int argc, char* argv[]);
 
 static void usage(int argc, char** argv);
@@ -60,12 +58,14 @@ static void print_entry(
     char *entry_name,
     PVFS_handle handle,
     PVFS_fs_id fs_id,
-    struct options *opts);
+    struct options *opts,
+    PVFS_credential *cred);
 
 static int do_list(
     char *start,
     int fs_id,
-    struct options *opts);
+    struct options *opts,
+    PVFS_credential *cred);
 
 static void print_entry_attr(
     PVFS_handle handle,
@@ -89,9 +89,9 @@ do {                                                        \
         }                                                   \
         else if (opts->list_long) {                         \
             print_entry(".", refn.handle,                   \
-                        refn.fs_id, opts);                  \
+                        refn.fs_id, opts, cred);                  \
             print_entry(".. (faked)", refn.handle,          \
-                        refn.fs_id, opts);                  \
+                        refn.fs_id, opts, cred);                  \
         }                                                   \
         else {                                              \
             printf(".\n");                                  \
@@ -338,11 +338,11 @@ void print_entry(
     char *entry_name,
     PVFS_handle handle,
     PVFS_fs_id fs_id,
-    struct options *opts)
+    struct options *opts,
+    PVFS_credential *cred)
 {
     int ret = -1;
     PVFS_object_ref ref;
-    PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
 
     if (!opts->list_long)
@@ -362,10 +362,9 @@ void print_entry(
     ref.fs_id = fs_id;
 
     memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
-    PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                           g_credential, &getattr_response);
+                           cred, &getattr_response);
     if (ret)
     {
         fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
@@ -386,7 +385,8 @@ static double Wtime(void)
 int do_list(
     char *start,
     int fs_id,
-    struct options *opts)
+    struct options *opts,
+    PVFS_credential *cred)
 {
     int i = 0, printed_dot_info = 0;
     int ret = -1;
@@ -396,7 +396,6 @@ int do_list(
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdir rd_response;
     PVFS_sysresp_getattr getattr_response;
-    PVFS_credentials credentials;
     PVFS_object_ref ref;
     PVFS_ds_position token;
     uint64_t dir_version = 0;
@@ -405,9 +404,8 @@ int do_list(
     name = start;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
-    PVFS_util_gen_credentials(&credentials);
 
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+    ret = PVFS_sys_lookup(fs_id, name, cred,
                         &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if(ret < 0)
     {
@@ -421,7 +419,7 @@ int do_list(
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                           g_credential, &getattr_response);
+                           cred, &getattr_response);
     if(ret == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
@@ -439,7 +437,7 @@ int do_list(
 
             if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
-                if (PVFS_sys_getparent(ref.fs_id, name, &credentials,
+                if (PVFS_sys_getparent(ref.fs_id, name, cred,
                                        &getparent_resp) == 0)
                 {
                     print_dot_and_dot_dot_info_if_required(
@@ -454,7 +452,7 @@ int do_list(
             }
             else
             {
-                print_entry(segment, ref.handle, ref.fs_id, opts);
+                print_entry(segment, ref.handle, ref.fs_id, opts, cred);
             }
             return 0;
         }
@@ -473,7 +471,7 @@ int do_list(
         memset(&rd_response, 0, sizeof(PVFS_sysresp_readdir));
         ret = PVFS_sys_readdir(
                 ref, (!token ? PVFS_READDIR_START : token),
-                pvfs_dirent_incount, &credentials, &rd_response);
+                pvfs_dirent_incount, cred, &rd_response);
         if(ret < 0)
         {
             PVFS_perror("PVFS_sys_readdir", ret);
@@ -509,7 +507,7 @@ int do_list(
             cur_file = rd_response.dirent_array[i].d_name;
             cur_handle = rd_response.dirent_array[i].handle;
 
-            print_entry(cur_file, cur_handle, fs_id, opts);
+            print_entry(cur_file, cur_handle, fs_id, opts, cred);
         }
         token += rd_response.pvfs_dirent_outcount;
 
@@ -738,6 +736,7 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char current_dir[PVFS_NAME_MAX] = {0};
     int found_one = 0;
+    PVFS_credential *cred;
 
     user_opts = parse_args(argc, argv);
     if (!user_opts)
@@ -755,7 +754,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-        ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
+    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
@@ -779,6 +778,9 @@ int main(int argc, char **argv)
 	PVFS_sys_finalize();
 	return(-1);
     }
+    
+    cred = PVFS_gen_fake_credential();
+    assert(cred);
 
     if (user_opts->num_starts == 0)
     {
@@ -826,9 +828,6 @@ int main(int argc, char **argv)
 	    return(-1);
 	}
     }
-    
-    g_credential = PVFS_util_gen_fake_credential();
-    assert(g_credential);
 
     for(i = 0; i < user_opts->num_starts; i++)
     {
@@ -837,7 +836,7 @@ int main(int argc, char **argv)
             printf("%s:\n", pvfs_path[i]);
         }
 
-        do_list(pvfs_path[i], fs_id_array[i], user_opts);
+        do_list(pvfs_path[i], fs_id_array[i], user_opts, cred);
 
         if (user_opts->num_starts > 1)
         {
@@ -851,7 +850,8 @@ int main(int argc, char **argv)
     free(user_opts->start);
     free(pvfs_path);
     free(fs_id_array);
-
+    
+    PINT_free_credential(cred);
     PVFS_sys_finalize();
     if (user_opts)
         free(user_opts);

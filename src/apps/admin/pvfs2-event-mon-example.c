@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
-    PVFS_credentials creds;
+    PVFS_credential *cred;
     int io_server_count;
     struct PVFS_mgmt_event** event_matrix;
     PVFS_BMI_addr_t *addr_array;
@@ -70,7 +70,8 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    PVFS_util_gen_credentials(&creds);
+    cred = PVFS_util_gen_fake_credentials();
+    assert(cred);
 
     /* count how many I/O servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs,
@@ -124,7 +125,7 @@ int main(int argc, char **argv)
 
     /* grap current events */
     ret = PVFS_mgmt_event_mon_list(cur_fs,
-				   &creds,
+				   cred,
 				   event_matrix,
 				   addr_array, 
 				   io_server_count,
@@ -156,6 +157,7 @@ int main(int argc, char **argv)
 	}
     }
 
+    PINT_free_credential(cred);
     PVFS_sys_finalize();
 
     return ret;

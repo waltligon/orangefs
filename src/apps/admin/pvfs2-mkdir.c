@@ -63,11 +63,10 @@ int main(int argc, char **argv)
     char           **pvfs_path = NULL;
     PVFS_fs_id      *pfs_id = NULL;
     struct options   user_opts;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
 
     /* Initialize any memory */
     memset(&user_opts,   0, sizeof(user_opts));
-    memset(&credentials, 0, sizeof(credentials));
     
     /* look at command line arguments */
     ret = parse_args(argc, argv, &user_opts);
@@ -132,11 +131,12 @@ int main(int argc, char **argv)
     }
 
     /* We will re-use the same credentials for each call */
-    PVFS_util_gen_credentials(&credentials);
+    cred = PVFS_util_gen_fake_credentials();
+    assert(cred);
 
     for(i = 0; i < user_opts.numdirs; i++)
     {
-        ret = make_directory(&credentials,
+        ret = make_directory(cred,
                              pfs_id[i],
                              user_opts.mode,
                              user_opts.dir_array[i],
@@ -149,7 +149,8 @@ int main(int argc, char **argv)
             status = -1;
         }
     }
-
+    
+    PINT_free_credential(cred);
     /* TODO: need to free the request descriptions */
     PVFS_sys_finalize();
 
@@ -181,7 +182,7 @@ int main(int argc, char **argv)
     return(status);
 }
 
-static int make_directory(PVFS_credentials     * credentials,
+static int make_directory(PVFS_credential      * cred,
                           const PVFS_fs_id       fs_id,
                           const int              mode,
                           const char           * dir,
@@ -225,8 +226,8 @@ static int make_directory(PVFS_credentials     * credentials,
     }
     
     /* Set the attributes for the new directory */
-    attr.owner = credentials->uid;
-    attr.group = credentials->gid;
+    attr.owner = cred->userid;
+    attr.group = cred->group_array[0];
     attr.perms = mode;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
         
@@ -235,7 +236,7 @@ static int make_directory(PVFS_credentials     * credentials,
 
     ret = PVFS_sys_lookup(fs_id, 
                           parentdir_ptr, 
-                          credentials, 
+                          cred, 
                           &resp_lookup, 
                           PVFS2_LOOKUP_LINK_FOLLOW);
 
@@ -261,7 +262,7 @@ static int make_directory(PVFS_credentials     * credentials,
         strcpy(parent_dir, pvfs_path);
         strcpy(realpath,  dir);
 
-        ret = make_directory(credentials,
+        ret = make_directory(cred,
                              fs_id,
                              mode,
                              dirname(realpath),
@@ -273,7 +274,7 @@ static int make_directory(PVFS_credentials     * credentials,
         {
             ret = PVFS_sys_lookup(fs_id, 
                                   parentdir_ptr, 
-                                  credentials, 
+                                  cred, 
                                   &resp_lookup, 
                                   PVFS2_LOOKUP_LINK_FOLLOW);
         
@@ -313,7 +314,7 @@ static int make_directory(PVFS_credentials     * credentials,
     ret = PVFS_sys_mkdir(basename_ptr, 
                          parent_ref, 
                          attr,
-                         credentials, 
+                         cred, 
                          &resp_mkdir);
 
     if (ret < 0)
