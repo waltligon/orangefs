@@ -18,6 +18,7 @@ extern struct PINT_server_req_params pvfs2_mkdir_params;
 extern struct PINT_server_req_params pvfs2_readdir_params;
 extern struct PINT_server_req_params pvfs2_lookup_params;
 extern struct PINT_server_req_params pvfs2_io_params;
+extern struct PINT_server_req_params pvfs2_lock_params;
 extern struct PINT_server_req_params pvfs2_small_io_params;
 extern struct PINT_server_req_params pvfs2_remove_params;
 extern struct PINT_server_req_params pvfs2_mgmt_remove_object_params;
@@ -82,6 +83,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 32 */ {PVFS_SERV_LISTEATTR, &pvfs2_list_eattr_params},
     /* 33 */ {PVFS_SERV_SMALL_IO, &pvfs2_small_io_params},
     /* 34 */ {PVFS_SERV_LISTATTR, &pvfs2_list_attr_params},
+    /* 34 */ {PVFS_SERV_LOCK, &pvfs2_lock_params},
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)
