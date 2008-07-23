@@ -43,7 +43,6 @@ int main(int argc, char *argv[])
 	int aiocb_inuse_count = AIOCB_ARRAY_SZ;
 	int i, ret;
 	int cnt;
-	PVFS_size end_of_request;
 
 	soff[0] = 0;
 	soff[1] = 65536;
@@ -86,8 +85,7 @@ int main(int argc, char *argv[])
 			soff, ssize, scnt, 
 			aiocb_p, 
 			&aiocb_inuse_count, 
-			&lio_state,
-			&end_of_request);
+			&lio_state);
 		if ( ret < 0 ) {
 			fprintf(stderr, "error in dbpf_bstream_listio_convert\n");
 			return  -1;

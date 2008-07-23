@@ -29,8 +29,7 @@ int dbpf_bstream_listio_convert(
 				int stream_count,
 				struct aiocb *aiocb_array,
 				int *aiocb_count,
-				struct bstream_listio_state *lio_state,
-				TROVE_size *end_of_request
+				struct bstream_listio_state *lio_state
 				);
 
 #if defined(__cplusplus)

@@ -76,8 +76,6 @@ static void aio_progress_notification(union sigval sig)
     struct dbpf_op *op_p = NULL;
     int ret, i, aiocb_inuse_count, state = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
-    TROVE_object_ref ref;
-    TROVE_ds_attributes attr;
 
     cur_op = (dbpf_queued_op_t *)sig.sival_ptr;
     assert(cur_op);
@@ -150,24 +148,6 @@ static void aio_progress_notification(union sigval sig)
                 op_p, op_p->u.b_rw_list.fd, ret);
         }
 
-        if(op_p->type == BSTREAM_WRITE_LIST)
-        {
-            ref.fs_id = op_p->id;
-            ref.handle = op_p->handle;
-
-            /* adjust size in cached attribute element, if present */
-
-            gen_mutex_lock(&dbpf_attr_cache_mutex);
-            ret = dbpf_attr_cache_ds_attr_fetch_cached_data(
-                ref, &attr);
-            if(ret == 0 && (attr.b_size < op_p->u.b_rw_list.end_of_request))
-            {
-                dbpf_attr_cache_ds_attr_update_cached_data_bsize(
-                    ref,  op_p->u.b_rw_list.end_of_request);
-            }
-            gen_mutex_unlock(&dbpf_attr_cache_mutex);
-        }
-
         dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
         op_p->u.b_rw_list.fd = -1;
         
@@ -208,8 +188,7 @@ static void aio_progress_notification(union sigval sig)
             op_p->u.b_rw_list.stream_array_count,
             aiocb_p,
             &aiocb_inuse_count,
-            &op_p->u.b_rw_list.lio_state,
-            &op_p->u.b_rw_list.end_of_request);
+            &op_p->u.b_rw_list.lio_state);
 
         if (ret == 1)
         {
@@ -595,6 +574,7 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL, got_fd = 0;
     struct open_cache_ref tmp_ref;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_open_cache_get(
         op_p->coll_p->coll_id, op_p->handle, 
@@ -621,13 +601,10 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    /* remove cached attribute for this handle if it's present 
-
+    /* remove cached attribute for this handle if it's present */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_remove(ref);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
-
-    */
 
     DBPF_ERROR_SYNC_IF_NECESSARY(op_p, tmp_ref.fd);
 
@@ -1029,22 +1006,16 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.fd = q_op_p->op.u.b_rw_list.open_ref.fd;
 
     /*
-     * if we're doing an i/o write, remove the cached attribute for
-     * this handle if it's present
-     *
-     * NOTE (07/21/08): we don't actually need to invalidate the cache
-     * (including the cached bstream size) because the metadata (bstream
-     * size and modification time) can be atomically updated at the completion
-     * of the write operation.
-     *
-     * if (opcode == LIO_WRITE)
-     * {
-     *   TROVE_object_ref ref = {handle, coll_id};
-     *   gen_mutex_lock(&dbpf_attr_cache_mutex);
-     *   dbpf_attr_cache_remove(ref);
-     *   gen_mutex_unlock(&dbpf_attr_cache_mutex);
-     * }
-     */
+      if we're doing an i/o write, remove the cached attribute for
+      this handle if it's present
+    */
+    if (opcode == LIO_WRITE)
+    {
+        TROVE_object_ref ref = {handle, coll_id};
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
+        dbpf_attr_cache_remove(ref);
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
+    }
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__
 
@@ -1092,8 +1063,7 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
         op_p->u.b_rw_list.stream_array_count,
         aiocb_p,
         &aiocb_inuse_count,
-        &op_p->u.b_rw_list.lio_state,
-        &op_p->u.b_rw_list.end_of_request);
+        &op_p->u.b_rw_list.lio_state);
 
     if (ret == 1)
     {
