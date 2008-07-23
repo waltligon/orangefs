@@ -76,6 +76,8 @@ static void aio_progress_notification(union sigval sig)
     struct dbpf_op *op_p = NULL;
     int ret, i, aiocb_inuse_count, state = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
+    TROVE_object_ref ref;
+    TROVE_ds_attributes attr;
 
     cur_op = (dbpf_queued_op_t *)sig.sival_ptr;
     assert(cur_op);
@@ -148,6 +150,24 @@ static void aio_progress_notification(union sigval sig)
                 op_p, op_p->u.b_rw_list.fd, ret);
         }
 
+        if(op_p->type == BSTREAM_WRITE_LIST)
+        {
+            ref.fs_id = op_p->id;
+            ref.handle = op_p->handle;
+
+            /* adjust size in cached attribute element, if present */
+
+            gen_mutex_lock(&dbpf_attr_cache_mutex);
+            ret = dbpf_attr_cache_ds_attr_fetch_cached_data(
+                ref, &attr);
+            if(ret == 0 && (attr.b_size < op_p->u.b_rw_list.end_of_request))
+            {
+                dbpf_attr_cache_ds_attr_update_cached_data_bsize(
+                    ref,  op_p->u.b_rw_list.end_of_request);
+            }
+            gen_mutex_unlock(&dbpf_attr_cache_mutex);
+        }
+
         dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
         op_p->u.b_rw_list.fd = -1;
         
@@ -188,7 +208,8 @@ static void aio_progress_notification(union sigval sig)
             op_p->u.b_rw_list.stream_array_count,
             aiocb_p,
             &aiocb_inuse_count,
-            &op_p->u.b_rw_list.lio_state);
+            &op_p->u.b_rw_list.lio_state,
+            &op_p->u.b_rw_list.end_of_request);
 
         if (ret == 1)
         {

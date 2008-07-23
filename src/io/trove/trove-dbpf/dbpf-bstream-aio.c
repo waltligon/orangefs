@@ -40,7 +40,8 @@ int dbpf_bstream_listio_convert(
     int stream_count,
     struct aiocb *aiocb_array,
     int *aiocb_count_p,
-    struct bstream_listio_state *lio_state)
+    struct bstream_listio_state *lio_state,
+    TROVE_size *end_of_request)
 {
     int mct, sct, act = 0;
     int oom = 0, oos = 0;
@@ -69,6 +70,8 @@ int dbpf_bstream_listio_convert(
 	cur_stream_off = lio_state->cur_stream_off;
     }
     cur_aiocb_ptr = aiocb_array;
+
+    *end_of_request = (cur_stream_off + cur_stream_size);
 
     /* _POSIX_AIO_LISTIO_MAX */
 
@@ -108,6 +111,10 @@ int dbpf_bstream_listio_convert(
             {
                 cur_stream_size = stream_size_array[++sct];
                 cur_stream_off  = stream_offset_array[sct];
+                if(*end_of_request < (cur_stream_off + cur_stream_size))
+                {
+                    *end_of_request = cur_stream_off + cur_stream_size;
+                }
             }
 	    else 
 	    {
@@ -144,6 +151,10 @@ int dbpf_bstream_listio_convert(
             {
                 cur_stream_size = stream_size_array[++sct];
                 cur_stream_off  = stream_offset_array[sct];
+                if(*end_of_request < (cur_stream_off + cur_stream_size))
+                {
+                    *end_of_request = cur_stream_off + cur_stream_size;
+                }
             }
 	    else
 	    {

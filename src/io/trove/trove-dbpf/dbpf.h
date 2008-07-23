@@ -390,6 +390,7 @@ struct dbpf_bstream_rw_list_op
 #ifndef __PVFS2_TROVE_AIO_THREADED__
     void *queued_op_ptr;
 #endif
+    TROVE_size end_of_request;
 };
 
 inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
