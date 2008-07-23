@@ -595,7 +595,6 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL, got_fd = 0;
     struct open_cache_ref tmp_ref;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_open_cache_get(
         op_p->coll_p->coll_id, op_p->handle, 
@@ -1093,7 +1092,8 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
         op_p->u.b_rw_list.stream_array_count,
         aiocb_p,
         &aiocb_inuse_count,
-        &op_p->u.b_rw_list.lio_state);
+        &op_p->u.b_rw_list.lio_state,
+        &op_p->u.b_rw_list.end_of_request);
 
     if (ret == 1)
     {
