@@ -182,26 +182,31 @@ AC_ARG_WITH(openssl,
 	[AX_OPENSSL_OPTIONAL])
 	
 AC_ARG_ENABLE(security,
+[  --disable-security Disables security encryption],
+[if test "x$enableval" = "xno" ; then
+    SECURITY_TYPE=1
+fi]
+,)
+	
+AC_ARG_ENABLE(security,
  [  --enable-security[=state type] Specify the states type:
-                      none [default]: No encryption
                       rsa: RSA encryption
                       dsa: DSA encryption],
- [ if   test "x$enableval" = "xnone" ; then
-      SECURITY_TYPE=0
-      AC_DEFINE([SECURITY_ENCRYPTION_NONE], [], [No encryption])
-   elif test "x$enableval" = "xrsa" ; then
-      SECURITY_TYPE=1
+ [ if test "x$enableval" = "xrsa" ; then
+      SECURITY_TYPE=2
       AC_DEFINE([SECURITY_ENCRYPTION_RSA], [], [RSA encryption])
    elif test "x$enableval" = "xdsa" ; then
-   	  SECURITY_TYPE=2
+   	  SECURITY_TYPE=3
       AC_DEFINE([SECURITY_ENCRYPTION_DSA], [], [DSA encryption])
+   elif test "x$SECURITY_TYPE" = "x1" ; then
+      AC_DEFINE([SECURITY_ENCRYPTION_NONE], [], [No encryption])
    else
       echo
-      echo "Error!"
-      echo "Unknown encryption type!"
+      echo "Unknown security type!"
+      echo
       exit -1
    fi
- ], [SECURITY_TYPE=0
+ ], [SECURITY_TYPE=1
    AC_DEFINE([SECURITY_ENCRYPTION_NONE], [], [No encryption])
    ])
 
@@ -1191,11 +1196,11 @@ else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
 fi
 
-if   test "x$SECURITY_TYPE" = "x0" ; then
+if   test "x$SECURITY_TYPE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 encryption type                             :none])
-elif test "x$SECURITY_TYPE" = "x1" ; then
-   AC_MSG_RESULT([PVFS2 encryption type                             : rsa])
 elif test "x$SECURITY_TYPE" = "x2" ; then
+   AC_MSG_RESULT([PVFS2 encryption type                             : rsa])
+elif test "x$SECURITY_TYPE" = "x3" ; then
    AC_MSG_RESULT([PVFS2 encryption type                             : dsa])
 fi
 
