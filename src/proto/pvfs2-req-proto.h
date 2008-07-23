@@ -1584,6 +1584,7 @@ decode_PVFS_server_req(char **pptr, struct PVFS_server_req *x) {
     decode_PVFS_capability(pptr, &x->capability);
 }
 #endif
+#define extra_size_PVFS_servreq extra_size_PVFS_capability
 
 /* server response *********************************************/
 /* - generic response with union of all op specific structs */

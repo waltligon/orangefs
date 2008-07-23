@@ -23,6 +23,7 @@
 #include "src/io/description/pint-request.h"  /* for PINT_Request */
 #include "src/io/description/pint-distribution.h"  /* for PINT_dist_lookup */
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 /* defined later */
 static int check_req_size(struct PVFS_server_req *req);
@@ -102,9 +103,15 @@ static void lebf_initialize(void)
 		respsize = extra_size_PVFS_servresp_lookup_path;
 		break;
 	    case PVFS_SERV_CREATE:
-		/* can request a range of handles */
+		req.u.create.credential.num_groups = 0;
+                req.u.create.credential.issuer_id = "";
+                req.u.create.credential.sig_size = 0;
+                /* can request a range of handles */
 		req.u.create.handle_extent_array.extent_count = 0;
+                resp.u.create.capability.sig_size = 0;
+                resp.u.create.capability.num_handles = 0;
 		reqsize = extra_size_PVFS_servreq_create;
+                respsize = extra_size_PVFS_servresp_create;
 		break;
 	    case PVFS_SERV_REMOVE:
 		/* nothing special, let normal encoding work */
@@ -128,6 +135,10 @@ static void lebf_initialize(void)
                 respsize = extra_size_PVFS_servresp_small_io;
                 break;
 	    case PVFS_SERV_GETATTR:
+                req.u.getattr.credential.num_groups = 0;
+                req.u.getattr.credential.issuer_id = "";
+                req.u.getattr.credential.sig_size = 0;
+                /* clearing the mask ensures the rest is not encoded */
 		resp.u.getattr.attr.mask = 0;
 		reqsize = extra_size_PVFS_servreq_getattr;
 		respsize = extra_size_PVFS_servresp_getattr;
@@ -152,9 +163,15 @@ static void lebf_initialize(void)
 		/* nothing special */
 		break;
 	    case PVFS_SERV_MKDIR:
+                req.u.mkdir.credential.num_groups = 0;
+                req.u.mkdir.credential.issuer_id = "";
+                req.u.mkdir.credential.sig_size = 0;
 		req.u.mkdir.handle_extent_array.extent_count = 0;
 		req.u.mkdir.attr.mask = 0;
+                resp.u.mkdir.capability.num_handles = 0;
+                resp.u.mkdir.capability.sig_size = 0;
 		reqsize = extra_size_PVFS_servreq_mkdir;
+                respsize = extra_size_PVFS_servresp_mkdir;
 		break;
 	    case PVFS_SERV_READDIR:
 		resp.u.readdir.directory_version = 0;
@@ -235,10 +252,15 @@ static void lebf_initialize(void)
 	 * give them a huge number, then later fix it. */
 	max_size_array[op_type].req = max_size_array[op_type].resp = init_big_size;
 
-	if (noreq)
-	    reqsize = 0;
-	else
-	    reqsize += check_req_size(&req);
+	/* account for extra structures in every request */
+        req.capability.num_handles = 0;
+        req.capability.sig_size = 0;
+        reqsize += extra_size_PVFS_servreq;
+
+        if (noreq)
+            reqsize = 0;
+        else
+            reqsize += check_req_size(&req);
 
 	respsize += check_resp_size(&resp);
 
@@ -731,10 +753,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_rel\n");
     if (input_type == PINT_DECODE_REQ) {
 	struct PVFS_server_req *req = &msg->stub_dec.req;
-	switch (req->op) {
+	decode_free(req->capability.handle_array);
+        decode_free(req->capability.signature);
+        switch (req->op) {
 
 	    case PVFS_SERV_CREATE:
 		decode_free(req->u.create.handle_extent_array.extent_array);
+                decode_free(req->u.create.credential.group_array);
+                decode_free(req->u.create.credential.signature);
 		break;
 
 	    case PVFS_SERV_IO:
@@ -749,10 +775,16 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
 	    case PVFS_SERV_MKDIR:
 		decode_free(req->u.mkdir.handle_extent_array.extent_array);
+                decode_free(req->u.mkdir.credential.group_array);
+                decode_free(req->u.mkdir.credential.signature);
 		if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
 		    decode_free(req->u.mkdir.attr.u.meta.dist);
 		if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DFILES)
 		    decode_free(req->u.mkdir.attr.u.meta.dfile_array);
+                if (req->u.mkdir.attr.mask & PVFS_ATTR_CAPABILITY) {
+                    decode_free(req->u.mkdir.attr.capability.handle_array);
+                    decode_free(req->u.mkdir.attr.capability.signature);
+                }
 		break;
 
 	    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
@@ -769,13 +801,17 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (req->u.listattr.handles)
                     decode_free(req->u.listattr.handles);
 
+            case PVFS_SERV_GETATTR:
+                decode_free(req->u.getattr.credential.group_array);
+                decode_free(req->u.getattr.credential.signature);
+                break;
+
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
 	    case PVFS_SERV_REMOVE:
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
 	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-	    case PVFS_SERV_GETATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:
 	    case PVFS_SERV_CHDIRENT:
@@ -841,6 +877,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.getattr.attr.u.meta.dist);
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
                         decode_free(resp->u.getattr.attr.u.meta.dfile_array);
+                    if (resp->u.getattr.attr.mask & PVFS_ATTR_CAPABILITY) {
+                        decode_free(resp->u.getattr.attr.capability.handle_array);
+                        decode_free(resp->u.getattr.attr.capability.signature);
+                    }
                     break;
 
                 case PVFS_SERV_MGMT_EVENT_MON:
@@ -867,13 +907,20 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                                     decode_free(resp->u.listattr.attr[i].u.meta.dist);
                                 if (resp->u.listattr.attr[i].mask & PVFS_ATTR_META_DFILES)
                                     decode_free(resp->u.listattr.attr[i].u.meta.dfile_array);
+                                if (resp->u.listattr.attr[i].mask & PVFS_ATTR_CAPABILITY) {
+                                    decode_free(resp->u.listattr.attr[i].capability.handle_array);
+                                    decode_free(resp->u.listattr.attr[i].capability.signature);
+                                }
                             }
                             decode_free(resp->u.listattr.attr);
                         }
                         break;
                     }
-                case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_CREATE:
+                    decode_free(resp->u.create.capability.handle_array);
+                    decode_free(resp->u.create.capability.signature);
+                    break;
+                case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_REMOVE:
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:
                 case PVFS_SERV_MGMT_REMOVE_DIRENT:
