@@ -71,7 +71,6 @@
 #define endecode_fields_4a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,tn1,n1,ta1,a1)
 #define endecode_fields_5a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,tn1,n1,ta1,a1)
 #define endecode_fields_2a2a_struct(name,t1,x1,t2,x2,tn1,n1,ta1,a1,t3,x3,t4,x4,tn2,n2,ta2,a2)
-#define endecode_fields_2aa1a_struct(name,t1,x1,t2,x2,tn1,n1,ta1,a1,ta2,a2,t3,x3,tn3,n3,ta3,a3)
 
 #endif  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
 

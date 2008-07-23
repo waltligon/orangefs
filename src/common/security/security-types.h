@@ -48,7 +48,7 @@ struct PVFS_credential {
     PVFS_sig signature;
 };
 
-endecode_fields_2aa1a_struct (
+endecode_fields_2a2a_struct (
     PVFS_credential,
     uint32_t, serial,
     PVFS_uid, userid,
