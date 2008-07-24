@@ -107,6 +107,10 @@ int PINT_cached_config_get_handle_timeout(
     PVFS_fs_id fsid,
     struct timeval *timeout);
 
+int PINT_cached_config_get_encoding(
+    PVFS_fs_id fsid,
+    enum PVFS_encoding_type *encoding);
+
 int PINT_cached_config_reinitialize(
     struct server_configuration_s *config);
 

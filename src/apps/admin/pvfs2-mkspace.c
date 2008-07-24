@@ -15,6 +15,8 @@
 #include "pvfs2.h"
 #include "mkspace.h"
 #include "pvfs2-internal.h"
+#include "job.h"
+#include "server-config.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"

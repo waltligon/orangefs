@@ -37,6 +37,7 @@ int TROVE_max_concurrent_io = 16;
 /*Rongrong*/
 int TROVE_db_log_buffer_size_bytes = 0;
 char *TROVE_db_log_directory = NULL;
+int TROVE_db_rep_master = 1;
 /*end*/
 
 extern TROVE_method_callback global_trove_method_callback;
@@ -1080,6 +1081,11 @@ int trove_collection_setinfo(
 	{
 	    TROVE_db_log_directory = strdup(*(char **)parameter);
 	}
+	return 0;
+    }
+    if(option == TROVE_DB_REP_MASTER)
+    {
+	TROVE_db_rep_master = *((int *)parameter);
 	return 0;
     }
     method_id = global_trove_method_callback(coll_id);

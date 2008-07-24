@@ -87,7 +87,8 @@ enum
     TROVE_COLLECTION_IMMEDIATE_COMPLETION,
     TROVE_SHM_KEY_HINT,
     TROVE_DB_LOG_BUFFER_SIZE_BYTES,
-    TROVE_DB_LOG_DIRECTORY
+    TROVE_DB_LOG_DIRECTORY,
+    TROVE_DB_REP_MASTER /*Rongrong: for replication*/
 };
 
 /** Initializes the Trove layer.  Must be called before any other Trove

@@ -116,6 +116,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
       (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG |
                        GOSSIP_ENDECODE_DEBUG | GOSSIP_USER_DEV_DEBUG))
     },
+    /* Debug the db replication */
+    { "dbrep", GOSSIP_DB_REP_DEBUG },
     /* No debug output */
     { "none", GOSSIP_NO_DEBUG },
     /* Everything */

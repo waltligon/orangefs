@@ -2364,7 +2364,32 @@ DOTCONF_CB(get_alias_list)
                       (void *)cmd->data.list[0],
                       compare_aliases))
     {
-        return "Error: alias already defined";
+	/*Rongrong temporary for rep group*/
+	char name[64];
+	gethostname(name, 64);
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "hostname is %s\n", name);
+	if(!strcmp(name, cmd->data.list[0]))
+	{
+	    config_s->is_rep_master = 1;
+	}
+	else if(!strcmp(name, cmd->data.list[1]))
+	{
+	    config_s->is_rep_master = 0;
+	}
+	else
+	{
+	    return NULL;
+	}
+	cur_alias = (host_alias_s *)malloc(sizeof(host_alias_s));
+	cur_alias->host_alias = strdup(cmd->data.list[0]);
+	cur_alias->bmi_address = strdup(cmd->data.list[1]);
+	if(!config_s->rep_groups)
+	{
+	    config_s->rep_groups = PINT_llist_new();
+	}
+	PINT_llist_add_to_tail(config_s->rep_groups, (void *)cur_alias);
+	return NULL;
+	//Rongrong temporary        return "Error: alias already defined";
     }
 
     cur_alias = (host_alias_s *)
@@ -4149,6 +4174,9 @@ int PINT_config_pvfs2_mkspace(
     assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
 				   &(config->trove_max_concurrent_io));
+    /*Rongrong: for replication*/
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_REP_MASTER,
+				   &(config->is_rep_master));
     /* this should never fail */
     assert(ret == 0);
     

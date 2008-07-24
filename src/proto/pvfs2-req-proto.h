@@ -74,6 +74,7 @@ enum PVFS_server_op
     PVFS_SERV_LISTEATTR = 32,
     PVFS_SERV_SMALL_IO = 33,
     PVFS_SERV_LISTATTR = 34,
+    PVFS_SERV_DBREP = 35,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -139,7 +140,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
 #define PVFS_REQ_LIMIT_LISTATTR 64
-
+/*Rongrong*/
+#define PVFS_REQ_LIMIT_DBREP 15 * 1024
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
 
@@ -1490,6 +1492,31 @@ endecode_fields_2a_struct(
 #define extra_size_PVFS_servresp_listeattr \
     (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
+/* Rongrong dbrepsend **************************************************/
+/* db replication msg*/
+struct PVFS_servreq_dbrep
+{
+    PVFS_ds_keyval control;
+    PVFS_ds_keyval rec;
+};
+endecode_fields_2_struct(
+    PVFS_servreq_dbrep,
+    PVFS_ds_keyval, control,
+    PVFS_ds_keyval, rec)
+#define extra_size_PVFS_servreq_dbrep \
+    PVFS_REQ_LIMIT_DBREP
+
+#define PINT_SERVREQ_DBREP_FILL(__req,		\
+				__control,	\
+				__rec)		\
+do{						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_DBREP;		\
+    (__req).u.dbrep.control.buffer = (__control).buffer;\
+    (__req).u.dbrep.control.buffer_sz = (__control).buffer_sz;\
+    (__req).u.dbrep.rec.buffer = (__rec).buffer;	\
+    (__req).u.dbrep.rec.buffer_sz = (__control).buffer_sz;\
+}while(0);
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -1528,6 +1555,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
+	struct PVFS_servreq_dbrep dbrep;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

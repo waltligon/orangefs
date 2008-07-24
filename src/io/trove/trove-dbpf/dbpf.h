@@ -738,6 +738,12 @@ int dbpf_bstream_flush(TROVE_coll_id coll_id,
                        TROVE_context_id context_id,
                        TROVE_op_id *out_op_id_p);
 
+int PVFS_db_rep_send(DB_ENV *dbenv,
+		     const DBT *control,
+		     const DBT *rec,
+		     const DB_LSN *lsnp,
+		     int eid,
+		     u_int32_t flags);
 #if defined(__cplusplus)
 }
 #endif

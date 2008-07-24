@@ -82,6 +82,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 32 */ {PVFS_SERV_LISTEATTR, &pvfs2_list_eattr_params},
     /* 33 */ {PVFS_SERV_SMALL_IO, &pvfs2_small_io_params},
     /* 34 */ {PVFS_SERV_LISTATTR, &pvfs2_list_attr_params},
+    /* 35 */ //{PVFS_SERV_DBREP, &pvfs2_dbrep_params},/*Rongrong*/
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

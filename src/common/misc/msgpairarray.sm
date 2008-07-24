@@ -134,10 +134,8 @@ static PINT_sm_action msgpairarray_post(
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0, tmp = 0;
-    struct server_configuration_s *server_config = NULL;
     PVFS_msg_tag_t session_tag;
     PINT_sm_msgpair_state *msg_p = NULL;
-    struct filesystem_configuration_s *cur_fs = NULL;
     int must_loop_encodings = 0;
     int local_enc_and_alloc = 0;
 
@@ -171,15 +169,16 @@ static PINT_sm_action msgpairarray_post(
         {
             if (msg_p->fs_id != PVFS_FS_ID_NULL)
             {
-                server_config = PINT_server_config_mgr_get_config(
-                    msg_p->fs_id);
-                assert(server_config);
-
-                cur_fs = PINT_config_find_fs_id(
-                    server_config, msg_p->fs_id);
-                PINT_server_config_mgr_put_config(server_config);
-                assert(cur_fs);
-                msg_p->enc_type = cur_fs->encoding;
+                ret = PINT_cached_config_get_encoding(
+                    msg_p->fs_id, &msg_p->enc_type);
+                if(ret != 0)
+                {
+                    gossip_lerr(
+                        "msgpairarray_post: "
+                        "PINT_cached_config_get_encoding failed\n");
+                    js_p->error_code = ret;
+                    return SM_ACTION_COMPLETE;
+                }
             }
 
             if (!ENCODING_IS_VALID(msg_p->enc_type))

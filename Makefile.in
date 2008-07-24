@@ -407,6 +407,8 @@ ADMINSRC :=
 # library
 ADMINSRC_SERVER :=
 # LIBSRC is source code for libpvfs2
+ADMINCOMMONSRC_SERVER :=
+# common admin SRC is source code for admin tools
 LIBSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
@@ -498,6 +500,7 @@ ADMINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC)))
 ifdef BUILD_SERVER
     ADMINOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC_SERVER)))
     ADMINTOOLS_SERVER := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC_SERVER)))
+    ADMINCOMMONOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c, $(ADMINCOMMONSRC_SERVER)))
     ADMINDEPENDS_SERVER := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC_SERVER)))
     # SERVEROBJS is a list of objects to put into the server
     SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
@@ -636,7 +639,7 @@ $(ADMINOBJS_SERVER): %.o: %.c
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
-	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
+	$(E)$(LD) $< $(ADMINCOMMONOBJS_SERVER) $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
 
 # rule for building the pvfs2 library
 lib/libpvfs2.a: $(LIBOBJS)
@@ -737,7 +740,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # all applications depend on the pvfs2 library
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
-$(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
+$(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a $(ADMINCOMMONOBJS_SERVER)
 
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
@@ -801,7 +804,7 @@ clean::
 		$(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
 		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
-		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
+		$(ADMINTOOLS_SERVER) $(ADMINCOMMONOBJS_SERVER) lib/libpvfs2-server.a\
 		$(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \

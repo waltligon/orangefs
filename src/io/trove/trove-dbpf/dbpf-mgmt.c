@@ -48,6 +48,7 @@ extern int TROVE_shm_key_hint;
 /*The following two parameters are for db log subsystem configuration*/
 extern int TROVE_db_log_buffer_size_bytes;
 extern char *TROVE_db_log_directory;
+extern int TROVE_db_rep_master;
 
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
@@ -139,7 +140,7 @@ retry:
     }
 
     /* TODO: Subsystems Configurations here, parameters might need to be added into
-     * server-config.c???
+     * server-config.c
      * Locking subsystem configuration is not needed as long as there's only one
      *     thread accessing the databases.
      * Logging subsystem configurations: set_lg_bsize, set_lg_dir, set_lg_filemode,
@@ -195,7 +196,6 @@ retry:
 	gossip_debug(GOSSIP_TROVE_DEBUG,
 		     "dbpf using the default log directory.\n");
     }
-    /*end*/
 
     /* set the error callback for all databases opened with this environment */
     dbenv->set_errcall(dbenv, dbpf_db_error_callback);
@@ -319,6 +319,20 @@ retry:
             *error = ret;
             return NULL;
         }
+    }
+    /* TODO: configurable priorities, nsites, timeout for replication group?
+     * should check the return value....
+     */
+    dbenv->rep_set_transport(dbenv, 100/*self eid*/, PVFS_db_rep_send);
+    if(TROVE_db_rep_master)
+    {
+	dbenv->rep_set_priority(dbenv, 100);
+	dbenv->rep_start(dbenv, NULL, DB_REP_MASTER);
+    }
+    else
+    {
+	dbenv->rep_set_priority(dbenv, 90);
+	dbenv->rep_start(dbenv, NULL, DB_REP_CLIENT);
     }
 
     return dbenv;

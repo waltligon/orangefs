@@ -175,6 +175,8 @@ typedef struct server_configuration_s
 #endif
     int  configuration_context;
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
+    int is_rep_master;		    /* replication master flag*/
+    PINT_llist *rep_groups;	    /*Rongrong replication*/
     PINT_llist *file_systems;       /* ptrs are type
                                        filesystem_configuration_s       */
     distribution_configuration default_dist_config;  /* distribution conf */

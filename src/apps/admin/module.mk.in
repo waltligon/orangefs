@@ -35,3 +35,6 @@ ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-migrate-collection.c \
 	$(DIR)/pvfs2-change-fsid.c \
 	$(DIR)/pvfs2-showcoll.c
+
+ADMINCOMMONSRC_SERVER := \
+	$(DIR)/pvfs2-admin-common.c

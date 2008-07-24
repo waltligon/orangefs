@@ -693,6 +693,10 @@ static int server_initialize_subsystems(
     assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
                                    &server_config.trove_max_concurrent_io);
+    /*Rongrong: for replication*/
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_REP_MASTER,
+				   &server_config.is_rep_master);
+
     /* this should never fail */
     assert(ret == 0);
 

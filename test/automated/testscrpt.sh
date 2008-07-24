@@ -19,7 +19,7 @@ fi
 
 
 # need to make this a command line arugment:
-export CVS_TAG="${CVS_TAG:-HEAD}"
+export CVS_TAG="${CVS_TAG:-rongrong}"
 
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
