@@ -19,6 +19,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-util.h"
+#include "pint-util.h"
 #include "PINT-reqproto-encode.h"
 #include "job.h"
 #include "trove.h"

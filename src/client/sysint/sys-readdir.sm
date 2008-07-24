@@ -208,7 +208,7 @@ static PINT_sm_action readdir_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_DIR_ALL,
+        PVFS_ATTR_DIR_ALL|PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_DIRECTORY,
         0);
     
@@ -223,9 +223,6 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: "
                  "readdir_msg_setup_msgpair\n");
@@ -250,7 +247,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
 
     PINT_SERVREQ_READDIR_FILL(
         msg_p->req,
-        xxremovemexx,
+        sm_p->getattr.attr.capability,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
         sm_p->readdir.pos_token,
