@@ -58,8 +58,7 @@ nested machine pvfs2_get_attr_work_sm
     state setup_acl
     {
         run getattr_setup_acl;
-        success => verify_attribs;
-        default => setup_resp;
+        default => verify_attribs;
     }
     
     state verify_attribs
@@ -313,62 +312,6 @@ static PINT_sm_action getattr_verify_attribs(
         (int)resp_attr->u.meta.dfile_count,
         (int)resp_attr->u.meta.dist_size);
 #endif
-
-    /* initial filling out and signing of capability structure */
-    if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
-    {
-    	resp_attr->mask |= PVFS_ATTR_CAPABILITY;
-        js_p->error_code = PINT_init_capability(&(resp_attr->capability));
-        if (js_p->error_code)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                "Getattr: Capability init failed\n");
-            return SM_ACTION_COMPLETE;
-        }         
-        if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
-        {
-            resp_attr->capability.num_handles = 
-                s_op->resp.u.getattr.attr.u.meta.dfile_count;
-            resp_attr->capability.handle_array = (PVFS_handle *)malloc(
-                sizeof(PVFS_handle) * resp_attr->capability.num_handles);
-            if (resp_attr->capability.handle_array == NULL)
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                    "Getattr: Malloc for handle array failed\n");
-                js_p->error_code = -PVFS_EINVAL;
-                return SM_ACTION_COMPLETE;
-            }
-            memcpy(resp_attr->capability.handle_array, 
-                s_op->resp.u.getattr.attr.u.meta.dfile_array,
-                sizeof(PVFS_handle) * resp_attr->capability.num_handles);
-        }
-        else
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                "Getattr: No handle array found\n");
-            resp_attr->capability.num_handles = 0;
-            resp_attr->capability.handle_array = NULL;
-        }
-        resp_attr->capability.owner = s_op->attr.owner;
-        
-        /* TODO:  Optimize function for speed */
-        PINT_getattr_check_perms(smcb, s_op->req->u.getattr.credential.userid, 
-            s_op->req->u.getattr.credential.group_array, 
-            s_op->req->u.getattr.credential.num_groups, 
-            s_op->attr, &resp_attr->capability.op_mask);
-        
-        resp_attr->capability.fsid = s_op->u.getattr.fs_id;
-            
-        if (PINT_sign_capability(&(resp_attr->capability)))
-        {
-            /* sign failed */
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                "Getattr: Capability sign failed\n");
-            PINT_release_capability(&(resp_attr->capability));
-            js_p->error_code = -PVFS_EINVAL;
-            return SM_ACTION_COMPLETE;
-        }
-    }
 
     /*
       weed out the attr mask of the response based on what the client
@@ -816,23 +759,60 @@ static PINT_sm_action getattr_setup_resp(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
     
+    /* initial filling out and signing of capability structure */
     if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Capability ptr: %p\n", 
-                 &(resp_attr->capability));
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Owner: %u\n", 
-            (unsigned int) resp_attr->capability.owner);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Op mask: %d\n", 
-            resp_attr->capability.op_mask);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Fsid: %d\n", 
-            resp_attr->capability.fsid);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Handles: %d\n", 
-            resp_attr->capability.num_handles);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Sig size: %d\n", 
-            resp_attr->capability.sig_size);
-        if (resp_attr->capability.signature)
-            gossip_err("Sig: %d\n", 
-                resp_attr->capability.signature[0]);
+    	resp_attr->mask |= PVFS_ATTR_CAPABILITY;
+        js_p->error_code = PINT_init_capability(&(resp_attr->capability));
+        if (js_p->error_code)
+        {
+            gossip_debug(GOSSIP_GETATTR_DEBUG,
+                "Getattr: Capability init failed\n");
+            return SM_ACTION_COMPLETE;
+        }         
+        if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
+        {
+            resp_attr->capability.num_handles = 
+                s_op->resp.u.getattr.attr.u.meta.dfile_count;
+            resp_attr->capability.handle_array = (PVFS_handle *)malloc(
+                sizeof(PVFS_handle) * resp_attr->capability.num_handles);
+            if (resp_attr->capability.handle_array == NULL)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                    "Getattr: Malloc for handle array failed\n");
+                js_p->error_code = -PVFS_EINVAL;
+                return SM_ACTION_COMPLETE;
+            }
+            memcpy(resp_attr->capability.handle_array, 
+                s_op->resp.u.getattr.attr.u.meta.dfile_array,
+                sizeof(PVFS_handle) * resp_attr->capability.num_handles);
+        }
+        else
+        {
+            gossip_debug(GOSSIP_GETATTR_DEBUG,
+                "Getattr: No handle array found\n");
+            resp_attr->capability.num_handles = 0;
+            resp_attr->capability.handle_array = NULL;
+        }
+        resp_attr->capability.owner = s_op->attr.owner;
+        
+        /* TODO:  Optimize function for speed */
+        PINT_getattr_check_perms(smcb, s_op->req->u.getattr.credential.userid, 
+            s_op->req->u.getattr.credential.group_array, 
+            s_op->req->u.getattr.credential.num_groups, 
+            s_op->attr, &resp_attr->capability.op_mask);
+        
+        resp_attr->capability.fsid = s_op->u.getattr.fs_id;
+            
+        if (PINT_sign_capability(&(resp_attr->capability)))
+        {
+            /* sign failed */
+            gossip_debug(GOSSIP_GETATTR_DEBUG,
+                "Getattr: Capability sign failed\n");
+            PINT_release_capability(&(resp_attr->capability));
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
     }
 
     if(js_p->error_code > 0)
@@ -953,6 +933,36 @@ static PINT_sm_action getattr_setup_resp(
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,
                         s_op->resp.u.getattr.attr.mask);
 #endif
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Owner: %u\n", 
+            (unsigned int) resp_attr->capability.owner);
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Op mask: %d\n", 
+            resp_attr->capability.op_mask);
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Fsid: %d\n", 
+            resp_attr->capability.fsid);
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Handles: %d\n", 
+            resp_attr->capability.num_handles);
+        if (resp_attr->capability.num_handles > 0) 
+            gossip_debug(GOSSIP_GETATTR_DEBUG,"First handle: %llu\n", 
+                (long long unsigned int) resp_attr->capability.handle_array[0]);
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Sig size: %d\n", 
+            resp_attr->capability.sig_size);
+        if (resp_attr->capability.signature)
+        {
+            gossip_debug(GOSSIP_GETATTR_DEBUG,"Sig: %d%d%d%d%d%d%d%d%d%d\n", 
+                resp_attr->capability.signature[0],
+                resp_attr->capability.signature[1],
+                resp_attr->capability.signature[2],
+                resp_attr->capability.signature[3],
+                resp_attr->capability.signature[4],
+                resp_attr->capability.signature[5],
+                resp_attr->capability.signature[6],
+                resp_attr->capability.signature[7],
+                resp_attr->capability.signature[8],
+                resp_attr->capability.signature[9]);
+        }
+    }
 
     free_nested_getattr_data(s_op);
     return SM_ACTION_COMPLETE;
