@@ -177,7 +177,7 @@ PVFS_credential *PVFS_util_gen_fake_credential(void)
     cred->userid = geteuid();
     cred->num_groups = 1;
     cred->group_array[0] = getegid();
-    cred->issuer_id = "FAKE";
+    cred->issuer_id = strdup("FAKE");
     cred->timeout = 1230786000; /* 1 Jan. 2009 00:00 UTC */
     cred->sig_size = 0;
     cred->signature = NULL;
