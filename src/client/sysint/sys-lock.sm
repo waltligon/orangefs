@@ -87,8 +87,10 @@ static int lock_datafile_index_array_init(
 static void lock_datafile_index_array_destroy(
     PINT_client_sm *sm_p);
 
+#ifdef PRINT_SERVER_LOCK_INFO_ARR
 static void print_server_lock_info_arr(
     PINT_client_sm *sm_p);
+#endif
 
 static int lock_choose_method(
     PINT_client_sm *sm_p);
@@ -670,22 +672,22 @@ static PINT_sm_action lock_analyze_results(struct PINT_smcb *smcb,
 				  &block_server_index);
 		    if (max_offset == -1) {
 			gossip_debug(GOSSIP_LOCK_DEBUG, "%s delete "
-				     "server=%d, max_offset=%Ld, heap_size=%d"
+				     "server=%d, max_offset=%lld, heap_size=%d"
 				     ",total_size = %d\n", 
 				     PVFS_lock_type_mapping[
 					 sm_p->u.lock.lock_server_cur_method],
 				     block_server_index,
-				     max_offset, sm_p->u.lock.server_heap.size,
+				     lld(max_offset), sm_p->u.lock.server_heap.size,
 				     sm_p->u.lock.server_heap.max_size);
 			lock_heap_extract_min(&sm_p->u.lock.server_heap, 
 					      &server_offset, &server_index, 
 					      heap_cpy_fn, heap_swap_fn);
 		    }
 		    else {
-			gossip_debug(GOSSIP_LOCK_DEBUG, "%s: min = %Ld\n",
+			gossip_debug(GOSSIP_LOCK_DEBUG, "%s: min = %lld\n",
 				     PVFS_lock_type_mapping[
 					 sm_p->u.lock.lock_server_cur_method],
-				     max_offset);
+				     lld(max_offset));
 		    }
 		} while (max_offset == -1);
 	    }
@@ -706,12 +708,12 @@ static PINT_sm_action lock_cleanup(struct PINT_smcb *smcb,
 
     if (sm_p->u.lock.lock_type != PVFS_CLIENT_RELEASE)
 	gossip_debug(GOSSIP_LOCK_DEBUG, "Client response final - acquired "
-		     "%Ld byte(s).\n", 
-		     sm_p->u.lock.lock_resp_p->bytes_accessed);
+		     "%lld byte(s).\n", 
+		     lld(sm_p->u.lock.lock_resp_p->bytes_accessed));
     else
 	gossip_debug(GOSSIP_LOCK_DEBUG, "Client response final - released "
-		     "%Ld byte(s).\n", 
-		     sm_p->u.lock.lock_resp_p->bytes_accessed);
+		     "%lld byte(s).\n", 
+		     lld(sm_p->u.lock.lock_resp_p->bytes_accessed));
 
     /* Clean up the lock id array. */
     if (sm_p->u.lock.lock_type != PVFS_CLIENT_RELEASE)
@@ -770,12 +772,12 @@ static int lock_completion_fn(void *user_args,
     }
 
     gossip_debug(GOSSIP_LOCK_DEBUG,
-		 "*Resp from server=%d (index=%d) next_abs_off=%Ld,"
-		 "bytes_accessed=%Ld\n",
+		 "*Resp from server=%d (index=%d) next_abs_off=%lld,"
+		 "bytes_accessed=%lld\n",
 		 sm_p->msgarray_op.msgarray[index].req.u.lock.server_nr,
 		 sm_p->msgarray_op.msgarray[index].datafile_index,
-		 resp_p->u.lock.next_abs_offset,
-		 resp_p->u.lock.bytes_accessed);
+		 lld(resp_p->u.lock.next_abs_offset),
+		 lld(resp_p->u.lock.bytes_accessed));
 
     /* As index refers to the position in the msgarray, fix this to
      * the actual server */
@@ -813,8 +815,8 @@ static int lock_completion_fn(void *user_args,
 	    (done != 1))
 	{
 	    gossip_debug(GOSSIP_LOCK_DEBUG, "inserting server=%d,next_abs_off "
-			 "= %Ld into heap (size=%d,max_size=%d).\n", index,
-			 resp_p->u.lock.next_abs_offset, 
+			 "= %lld into heap (size=%d,max_size=%d).\n", index,
+			 lld(resp_p->u.lock.next_abs_offset), 
 			 sm_p->u.lock.server_heap.size,
 			 sm_p->u.lock.server_heap.max_size);
 	    lock_heap_insert(&sm_p->u.lock.server_heap, 
@@ -864,8 +866,8 @@ static int lock_completion_fn(void *user_args,
 	    sm_p->u.lock.server_incomplete_count--;
 
 	gossip_debug(GOSSIP_LOCK_DEBUG, "Response from server %d - released "
-		     "%Ld bytes (%d left).\n", index,
-		     resp_p->u.lock.bytes_accessed,
+		     "%lld bytes (%d left).\n", index,
+		     lld(resp_p->u.lock.bytes_accessed),
 		     sm_p->u.lock.server_incomplete_count);
     }
 
@@ -1007,6 +1009,7 @@ static void lock_datafile_index_array_destroy(
     sm_p->u.lock.datafile_count = 0;
 }
 
+#ifdef PRINT_SERVER_LOCK_INFO_ARR
 static void print_server_lock_info_arr(
     PINT_client_sm *sm_p)
 {
@@ -1020,15 +1023,16 @@ static void print_server_lock_info_arr(
 	    sm_p->u.lock.datafile_count);
     for (i = 0; i < sm_p->u.lock.datafile_count; i++)
     {
-	fprintf(stdout, "%6d | %22Ld | %15Ld | %s\n",
+	fprintf(stdout, "%6d | %22lld | %15lld | %s\n",
 		sm_p->u.lock.datafile_index_array[i],
-		lock_info_p[i].last_abs_offset_locked,
-		lock_info_p[i].next_abs_offset,
+		lld(lock_info_p[i].last_abs_offset_locked),
+		lld(lock_info_p[i].next_abs_offset),
 		(lock_info_p[i].heap_node_p == NULL) ? "n" : "y");
     }
     fprintf(stdout, "\n");
     fflush(stdout);
 }
+#endif
 
 static int lock_choose_method(
     PINT_client_sm *sm_p)
@@ -1315,11 +1319,11 @@ static int lock_fill_msgpair_array(
 	assert(sm_p->msgarray_op.count >= 0);
 	if (sm_p->msgarray_op.count > 0)
 	    gossip_debug(GOSSIP_LOCK_DEBUG, "RELEASE_SOME: "
-			 "max_offset = %Ld (%d of %d)\n", max_offset,
+			 "max_offset = %lld (%d of %d)\n", lld(max_offset),
 			 msg_index, sm_p->u.lock.datafile_count);
 	else {
 	    gossip_debug(GOSSIP_LOCK_DEBUG, "RELEASE_SOME: No msgpairs this "
-			 "round - max_offset = %Ld (%d of %d)\n", max_offset,
+			 "round - max_offset = %lld (%d of %d)\n", lld(max_offset),
 			 msg_index, sm_p->u.lock.datafile_count);
 
 	    return LOCK_NO_MSGPAIRS;
@@ -1336,10 +1340,10 @@ static int lock_fill_msgpair_array(
 			      &server_index, heap_cpy_fn, heap_swap_fn);
 
 	gossip_debug(GOSSIP_LOCK_DEBUG, "ACQUIRE_BLOCK: extracted "
-		     "offset=%Ld,server=%d,lock_id=%Ld\n",
-		     server_offset, server_index,
-		     (sm_p->u.lock.cur_lock_id_list_p->
-		      lock_id_arr)[server_index]);
+		     "offset=%lld,server=%d,lock_id=%lld\n",
+		     lld(server_offset), server_index,
+		     lld((sm_p->u.lock.cur_lock_id_list_p->
+		      lock_id_arr)[server_index]));
 
 	/* How far is that server allowed to process the lock? */
 	if (sm_p->u.lock.server_heap.size == 0)
@@ -1422,7 +1426,7 @@ void heap_print_fn(heap_node_t *node_p)
     PINT_server_lock_info *lock_p =
         (PINT_server_lock_info *) node_p->user_p;
 
-    fprintf(stdout, "(k=%Ld,p=%d) ", node_p->key, lock_p->index);
+    fprintf(stdout, "(k=%lld,p=%d) ", lld(node_p->key), lock_p->index);
     fflush(stdout);
 }
 
