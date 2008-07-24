@@ -97,9 +97,9 @@ static PINT_sm_action lock_change_lock(
     fdata.extend_flag = 1;
 
     gossip_debug(GOSSIP_LOCK_DEBUG,
-		 "Request %s received with final_offset %Ld\n", 
+		 "Request %s received with final_offset %lld\n", 
 		 PVFS_lock_type_mapping[s_op->req->u.lock.lock_type],
-		 s_op->req->u.lock.final_offset);
+		 lld(s_op->req->u.lock.final_offset));
 
     if ((s_op->req->u.lock.lock_type != PVFS_SERVER_RELEASE_SOME) &&
 	(s_op->req->u.lock.lock_type != PVFS_SERVER_RELEASE_ALL))

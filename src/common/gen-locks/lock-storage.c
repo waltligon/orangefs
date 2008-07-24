@@ -106,8 +106,8 @@ void linked_itree_print_fn(itree_t *head_p)
     linked_itree_t *linked_itree_p =
 	itree_entry(head_p, linked_itree_t, itree_link);
     
-    fprintf(stdout, "{%Ld,%Ld,%Ld,%s,%d,",
-	    head_p->start, head_p->end, head_p->max,
+    fprintf(stdout, "{%lld,%lld,%lld,%s,%d,",
+	    lld(head_p->start), lld(head_p->end), lld(head_p->max),
 	    (head_p->color == ITREE_RED ? "r": "b"),
 	    linked_itree_p->lock_id);
 
@@ -392,8 +392,8 @@ void print_lock_file_table_all(void)
 	    {
 		lock_node_p = qhash_entry(
 		    tmp_hash_head_p, lock_node_t, hash_link);
-		fprintf(stdout, "{fs=%d,id=%Ld} ", lock_node_p->refn.fs_id,
-			lock_node_p->refn.handle);
+		fprintf(stdout, "{fs=%d,id=%lld} ", lock_node_p->refn.fs_id,
+			lld(lock_node_p->refn.handle));
 	    }
 	    
 	    fprintf(stdout, "\n");
@@ -427,23 +427,23 @@ void print_lock_file_table_all_info(void)
 	    {
 		lock_node_p = qhash_entry(
 		    tmp_hash_head_p, lock_node_t, hash_link);
-		fprintf(stdout, "\n {fs=%d,id=%Ld}\n", 
-			lock_node_p->refn.fs_id, lock_node_p->refn.handle);
+		fprintf(stdout, "\n {fs=%d,id=%lld}\n", 
+			lock_node_p->refn.fs_id, lld(lock_node_p->refn.handle));
 		fprintf(stdout, "  all_req: ");
 		qlist_for_each(tmp_req_p, &(lock_node_p->all_req))
 		{
 		    tmp_lock_req_p = qlist_entry(
 			tmp_req_p, lock_req_t, all_req_link);
-		    fprintf(stdout, "{req_id=%Ld ", tmp_lock_req_p->req_id);
+		    fprintf(stdout, "{req_id=%lld ", lld(tmp_lock_req_p->req_id));
 		    qlist_for_each(tmp_req_lock_p, 
 				   &(tmp_lock_req_p->lock_head))
 		    {
 			tmp_linked_itree_p = qlist_entry(
 			    tmp_req_lock_p, linked_itree_t, list_link);
 
-			fprintf(stdout, "(%Ld,%Ld)",
-				tmp_linked_itree_p->itree_link.start,
-				tmp_linked_itree_p->itree_link.end);
+			fprintf(stdout, "(%lld,%lld)",
+				lld(tmp_linked_itree_p->itree_link.start),
+				lld(tmp_linked_itree_p->itree_link.end));
 		    }
 		    fprintf(stdout, "}");
 		}	    
@@ -455,7 +455,7 @@ void print_lock_file_table_all_info(void)
 		{
 		    tmp_lock_req_p = qlist_entry(
 			tmp_req_p, lock_req_t, queued_req_link);
-		    fprintf(stdout, "{req_id=%Ld} ", tmp_lock_req_p->req_id);
+		    fprintf(stdout, "{req_id=%lld} ", lld(tmp_lock_req_p->req_id));
 		}	    
 		fprintf(stdout, "\n  write_itree: ");
 		itree_inorder_tree_print_fn(lock_node_p->write_itree, 
@@ -523,8 +523,8 @@ static inline int add_locks(lock_req_t *lock_req_p,
     offset_arr = lock_req_p->lock_result_p->offset_array;
     size_arr   = lock_req_p->lock_result_p->size_array;
 
-    gossip_debug(GOSSIP_LOCK_DEBUG, "add_locks: actual_locked_bytes = %Ld\n",
-		 lock_req_p->actual_locked_bytes);
+    gossip_debug(GOSSIP_LOCK_DEBUG, "add_locks: actual_locked_bytes = %lld\n",
+		 lld(lock_req_p->actual_locked_bytes));
 
     while (ret == 0)
     {
@@ -540,9 +540,9 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	    lock_origin = REMOVED_LIST;
 
 	    gossip_debug(GOSSIP_LOCK_DEBUG,
-			 "add_locks: Getting (start offset=%Ld,end_offset=%Ld)"
-			 " from removed list\n", tmp_start_offset, 
-			 tmp_end_offset);
+			 "add_locks: Getting (start offset=%lld,end_offset=%lld)"
+			 " from removed list\n", lld(tmp_start_offset), 
+			 lld(tmp_end_offset));
 	}
 	else /* Process request if necessary then get the next piece */
 	{
@@ -588,18 +588,18 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	}
 
 	gossip_debug(GOSSIP_LOCK_DEBUG,
-		     "add_locks: Lock (local off=%Ld,end=%Ld) "
-		     "max_abs_off=%Ld...\n",
-		     tmp_start_offset,
-		     tmp_end_offset,
-		     final_abs_offset);
+		     "add_locks: Lock (local off=%lld,end=%lld) "
+		     "max_abs_off=%lld...\n",
+		     lld(tmp_start_offset),
+		     lld(tmp_end_offset),
+		     lld(final_abs_offset));
 
 	/* Ensure that the lock requests are valid */
 #if 1
 	if ((tmp_start_offset < 0) || (tmp_end_offset < 0))
 	{
-	    gossip_err("add_locks: Lock offset=%Ld with end offset=%Ld "
-		       "invalid\n", tmp_start_offset, tmp_end_offset);
+	    gossip_err("add_locks: Lock offset=%lld with end offset=%lld "
+		       "invalid\n", lld(tmp_start_offset), lld(tmp_end_offset));
 	    ret = -PVFS_EINVAL;
 	    break;
 	}
@@ -617,10 +617,10 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	{
 	    gossip_debug(GOSSIP_LOCK_DEBUG,
 			 "add_locks: Lock not added since "
-			 "(start=%Ld,end=%Ld) >= final_abs_offset=%Ld\n",
-			 tmp_abs_offset,
-			 tmp_end_offset - tmp_start_offset + 1,
-			 final_abs_offset);
+			 "(start=%lld,end=%lld) >= final_abs_offset=%lld\n",
+			 lld(tmp_abs_offset),
+			 lld(tmp_end_offset - tmp_start_offset + 1),
+			 lld(final_abs_offset));
 	    
 	    *next_abs_offset_p = tmp_abs_offset;
 	    ret = 1;
@@ -632,13 +632,13 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	    (tmp_abs_offset + tmp_end_offset - tmp_start_offset + 1))
 	{
 	    gossip_debug(GOSSIP_LOCK_DEBUG,
-			 "add_locks: Trimming lock from (start=%Ld,end=%Ld) to"
-			 " (start=%Ld,end=%Ld)\n",
-			 tmp_abs_offset,
-			 tmp_end_offset,
-			 tmp_abs_offset,
-			 tmp_start_offset + (final_abs_offset - 
-					     tmp_abs_offset - 1));
+			 "add_locks: Trimming lock from (start=%lld,end=%lld) to"
+			 " (start=%lld,end=%lld)\n",
+			 lld(tmp_abs_offset),
+			 lld(tmp_end_offset),
+			 lld(tmp_abs_offset),
+			 lld(tmp_start_offset + (final_abs_offset - 
+					     tmp_abs_offset - 1)));
 	    tmp_end_offset = 
 		tmp_start_offset + (final_abs_offset - tmp_abs_offset - 1);
 	}
@@ -650,8 +650,8 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	if (itree_p != &ITREE_NIL)
 	{
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
-			 "itree_interval_search WRITE (int=%Ld,%Ld,rw=%s)"
-			 " failed\n", tmp_start_offset, tmp_end_offset,
+			 "itree_interval_search WRITE (int=%lld,%lld,rw=%s)"
+			 " failed\n", lld(tmp_start_offset), lld(tmp_end_offset),
 			 ((lock_req_p->io_type == 
 			   PVFS_IO_READ) ? "r" : "w"));
 	    /* Still may be able to add part of this lock depending on
@@ -664,8 +664,8 @@ static inline int add_locks(lock_req_t *lock_req_p,
 		    tmp_end_offset = itree_p->start - 1;
 		    gossip_debug(GOSSIP_LOCK_DEBUG,
 				 "add_locks: WRITE reset interval to "
-				 "(%Ld,%Ld)\n", tmp_start_offset, 
-				 tmp_end_offset);
+				 "(%lld,%lld)\n", lld(tmp_start_offset), 
+				 lld(tmp_end_offset));
 		}
 		else
 		{
@@ -697,8 +697,8 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	    if (itree_p != &ITREE_NIL)
 	    {
 		gossip_debug(GOSSIP_LOCK_DEBUG, 
-			     "itree_interval_search READ (int=%Ld,%Ld,rw=%s)"
-			     " failed\n", tmp_start_offset, tmp_end_offset,
+			     "itree_interval_search READ (int=%lld,%lld,rw=%s)"
+			     " failed\n", lld(tmp_start_offset), lld(tmp_end_offset),
 			     ((lock_req_p->io_type == 
 			       PVFS_IO_READ) ? "r" : "w"));
 		/* Still may be able to add part of this lock depending on
@@ -711,8 +711,8 @@ static inline int add_locks(lock_req_t *lock_req_p,
 			tmp_end_offset = itree_p->start - 1;
 			gossip_debug(GOSSIP_LOCK_DEBUG,
 				     "add_locks: READ reset interval to "
-				     "(%Ld,%Ld)\n", tmp_start_offset, 
-				     tmp_end_offset);
+				     "(%lld,%lld)\n", lld(tmp_start_offset), 
+				     lld(tmp_end_offset));
 		    }
 		    else
 		    {
@@ -746,16 +746,16 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	if (linked_itree_p->itree_link.start > 
 	    linked_itree_p->itree_link.end)
 	{
-	    gossip_err("Invalid lock (start=%Ld,end=%Ld)\n",
-		       linked_itree_p->itree_link.start,
-		       linked_itree_p->itree_link.end);
+	    gossip_err("Invalid lock (start=%lld,end=%lld)\n",
+		       lld(linked_itree_p->itree_link.start),
+		       lld(linked_itree_p->itree_link.end));
 	    break;
 	}
 
 	gossip_debug(GOSSIP_LOCK_DEBUG, 
-		     "Inserting (int=%Ld,%Ld,rw=%s)\n",
-		     linked_itree_p->itree_link.start,
-		     linked_itree_p->itree_link.end,
+		     "Inserting (int=%lld,%lld,rw=%s)\n",
+		     lld(linked_itree_p->itree_link.start),
+		     lld(linked_itree_p->itree_link.end),
 		     ((lock_req_p->io_type == 
 		       PVFS_IO_READ) ? "r" : "w"));
 	    
@@ -768,9 +768,9 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	if (ret != 0)
 	{
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
-			 "itree_insert of lock (int=%Ld,%Ld,rw=%s) "
-			 "failed\n", linked_itree_p->itree_link.start,
-			 linked_itree_p->itree_link.end,
+			 "itree_insert of lock (int=%lld,%lld,rw=%s) "
+			 "failed\n", lld(linked_itree_p->itree_link.start),
+			 lld(linked_itree_p->itree_link.end),
 			 ((lock_req_p->io_type == 
 			   PVFS_IO_READ) ? "r" : "w"));
 	    *next_abs_offset_p = linked_itree_p->itree_link.start;
@@ -834,18 +834,18 @@ static inline int add_locks(lock_req_t *lock_req_p,
 	     tmp_linked_itree_p->itree_link.end);
     }
 
-    gossip_debug(GOSSIP_LOCK_DEBUG, "add_locks: granted %Ld actual bytes "
-                 "(total %Ld) of %Ld requested bytes and reached "
-		 "logical offset %Ld, last_abs_offset %Ld, "
-		 "next_abs_offset %Ld ret=%d\n",
-		 *bytes_locked_p, 
-		 lock_req_p->actual_locked_bytes, lock_req_p->aggregate_size,
-                 (*fdata_p->dist->methods->physical_to_logical_offset)
+    gossip_debug(GOSSIP_LOCK_DEBUG, "add_locks: granted %lld actual bytes "
+                 "(total %lld) of %lld requested bytes and reached "
+		 "logical offset %lld, last_abs_offset %lld, "
+		 "next_abs_offset %lld ret=%d\n",
+		 lld(*bytes_locked_p), 
+		 lld(lock_req_p->actual_locked_bytes), lld(lock_req_p->aggregate_size),
+                 lld((*fdata_p->dist->methods->physical_to_logical_offset)
                  (fdata_p->dist->params,
                   fdata_p,
-                  tmp_end_offset),
-		 *last_abs_offset_locked_p,
-		 *next_abs_offset_p, ret);
+                  tmp_end_offset)),
+		 lld(*last_abs_offset_locked_p),
+		 lld(*next_abs_offset_p), ret);
 
     return ret;
 }
@@ -889,8 +889,8 @@ int check_lock_reqs(lock_node_t *lock_node_p)
 		  ->job_user_ptr)->resp.u.lock;
 #endif
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
-			 "check_lock_reqs: Trying lock id=%Ld...\n", 
-			 tmp_lock_req_p->req_id);
+			 "check_lock_reqs: Trying lock id=%lld...\n", 
+			 lld(tmp_lock_req_p->req_id));
 
 	    ret = add_locks(tmp_lock_req_p, lock_node_p, 
 			    tmp_lock_req_p->wait_abs_offset,
@@ -917,8 +917,8 @@ int check_lock_reqs(lock_node_t *lock_node_p)
 		{
 		    gossip_debug(GOSSIP_LOCK_DEBUG, 
 				 "check_lock_req: Deleting req_id="
-				 "%Ld from the queued list\n", 
-				 tmp_lock_req_p->req_id);
+				 "%lld from the queued list\n", 
+				 lld(tmp_lock_req_p->req_id));
 		    qlist_del_init(&tmp_lock_req_p->queued_req_link);
 		    tmp_lock_req_p->lock_req_status = ALL_LOCKS_GRANTED;
 		    tmp_lock_req_p->granted_req_link.key = 
@@ -927,12 +927,12 @@ int check_lock_reqs(lock_node_t *lock_node_p)
 				  &(tmp_lock_req_p->granted_req_link));
 
 		    gossip_debug(GOSSIP_LOCK_DEBUG, 
-				 "check_lock_req: all %Ld aggregate "
-				 "bytes granted to req_id=%Ld "
-				 "(req_id=%Ld added to granted list)\n",
-				 tmp_lock_req_p->aggregate_size,
-				 tmp_lock_req_p->req_id, 
-				 tmp_lock_req_p->req_id);
+				 "check_lock_req: all %lld aggregate "
+				 "bytes granted to req_id=%lld "
+				 "(req_id=%lld added to granted list)\n",
+				 lld(tmp_lock_req_p->aggregate_size),
+				 lld(tmp_lock_req_p->req_id), 
+				 lld(tmp_lock_req_p->req_id));
 		}
 		tmp_lock_req_p->lock_callback.fn(
 		    tmp_lock_req_p->lock_callback.data);
@@ -947,13 +947,13 @@ int check_lock_reqs(lock_node_t *lock_node_p)
 		    tmp_lock_req_p->wait_abs_offset)
 		{
 		    gossip_debug(GOSSIP_LOCK_DEBUG,
-                                 "check_lock_req: Returning req %Ld since "
-				 "next_abs_offset %Ld is beyond the "
-				 "wait_abs_offset %Ld (resetting "
+                                 "check_lock_req: Returning req %lld since "
+				 "next_abs_offset %lld is beyond the "
+				 "wait_abs_offset %lld (resetting "
 				 "wait_abs_offset)\n",
-                                 tmp_lock_req_p->req_id,
-				 resp_lock_p->next_abs_offset,
-				 tmp_lock_req_p->wait_abs_offset);
+                                 lld(tmp_lock_req_p->req_id),
+				 lld(resp_lock_p->next_abs_offset),
+				 lld(tmp_lock_req_p->wait_abs_offset));
 
 		    tmp_lock_req_p->wait_abs_offset = -1;
 		    tmp_lock_req_p->lock_callback.fn(
@@ -1059,8 +1059,8 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 				     file_req_offset + aggregate_size);
 	
 	gossip_debug(GOSSIP_LOCK_DEBUG, 
-		     "file_req_offset = %Ld aggregate_size = %Ld\n", 
-		     file_req_offset, aggregate_size);
+		     "file_req_offset = %lld aggregate_size = %lld\n", 
+		     lld(file_req_offset), lld(aggregate_size));
 
 	/* Set up new lock request */
 	lock_req_p = (lock_req_t *) calloc(1, sizeof(lock_req_t));
@@ -1104,9 +1104,9 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 	if (lock_req_p == NULL ||
 	    lock_req_p->req_id != client_lock_req_id)
 	{
-	    gossip_err("add_lock_req: Request with id=%Ld should have been "
+	    gossip_err("add_lock_req: Request with id=%lld should have been "
 		       "found in the queued list!\n",
-		       client_lock_req_id);
+		       lld(client_lock_req_id));
 	    goto add_unlock_exit;
 	}
     }
@@ -1130,7 +1130,7 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 	if (lock_req_p->lock_req_status == INCOMPLETE)
 	{
 	    gossip_debug(GOSSIP_LOCK_DEBUG, "add_lock_req: Deleting req_id="
-			 "%Ld from the queued list\n", lock_req_p->req_id);
+			 "%lld from the queued list\n", lld(lock_req_p->req_id));
 	    qlist_del_init(&lock_req_p->queued_req_link);
 	}
 
@@ -1139,11 +1139,11 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 	rbtree_insert(&(lock_node_p->granted_req), &RBTREE_NIL,
 		      &(lock_req_p->granted_req_link));
 
-	gossip_debug(GOSSIP_LOCK_DEBUG, "add_lock_req: all %Ld aggregate "
-		     "bytes granted to req_id=%Ld "
-		     "(req_id=%Ld added to granted list)\n",  
-		     lock_req_p->aggregate_size,
-		     lock_req_p->req_id, lock_req_p->req_id);
+	gossip_debug(GOSSIP_LOCK_DEBUG, "add_lock_req: all %lld aggregate "
+		     "bytes granted to req_id=%lld "
+		     "(req_id=%lld added to granted list)\n",  
+		     lld(lock_req_p->aggregate_size),
+		     lld(lock_req_p->req_id), lld(lock_req_p->req_id));
 	*lock_req_p_p = NULL;
 	ret = 1;
 	resp_lock_p->request_finished = 1;
@@ -1153,7 +1153,7 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 	if (lock_req_p->lock_req_status == NEW) 
 	{
 	    gossip_debug(GOSSIP_LOCK_DEBUG, "add_lock_req: Adding req_id="
-			 "%Ld to the queued list\n", lock_req_p->req_id);
+			 "%lld to the queued list\n", lld(lock_req_p->req_id));
 	    
 	    qlist_add_tail(&(lock_req_p->queued_req_link), 
 			   &(lock_node_p->queued_req));
@@ -1161,12 +1161,12 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 
 	lock_req_p->lock_req_status = INCOMPLETE;
 
-	gossip_debug(GOSSIP_LOCK_DEBUG, "add_lock_req: some %Ld of %Ld "
-		     "aggregate bytes granted to req_id=%Ld (waiting "
-		     "til %Ld)\n",  
-		     lock_req_p->actual_locked_bytes, 
-		     lock_req_p->aggregate_size,
-		     lock_req_p->req_id, lock_req_p->wait_abs_offset);
+	gossip_debug(GOSSIP_LOCK_DEBUG, "add_lock_req: some %lld of %lld "
+		     "aggregate bytes granted to req_id=%lld (waiting "
+		     "til %lld)\n",  
+		     lld(lock_req_p->actual_locked_bytes), 
+		     lld(lock_req_p->aggregate_size),
+		     lld(lock_req_p->req_id), lld(lock_req_p->wait_abs_offset));
 	*lock_req_p_p = lock_req_p;
 
 	if ((lock_type == PVFS_SERVER_ACQUIRE_NEW_BLOCK) ||
@@ -1176,18 +1176,18 @@ int add_lock_req(PVFS_object_ref *object_ref_p,
 	{
 	    lock_req_p->wait_abs_offset = -1;
 	    ret = 1;
-	    gossip_debug(GOSSIP_LOCK_DEBUG, "Returning immediately (wait=%Ld)"
-			 " since next offset=%Ld is beyond final_offset=%Ld "
+	    gossip_debug(GOSSIP_LOCK_DEBUG, "Returning immediately (wait=%lld)"
+			 " since next offset=%lld is beyond final_offset=%lld "
 			 "or request is nonblocking\n",
-			 lock_req_p->wait_abs_offset,
-			 resp_lock_p->next_abs_offset, final_offset);
+			 lld(lock_req_p->wait_abs_offset),
+			 lld(resp_lock_p->next_abs_offset), lld(final_offset));
 	}
 	else
 	{
 	    lock_req_p->wait_abs_offset = final_offset;
 	    ret = 0;
-	    gossip_debug(GOSSIP_LOCK_DEBUG, "Waiting until %Ld.\n",
-			 lock_req_p->wait_abs_offset);
+	    gossip_debug(GOSSIP_LOCK_DEBUG, "Waiting until %lld.\n",
+			 lld(lock_req_p->wait_abs_offset));
 	}
 	resp_lock_p->request_finished = 0;
     }
@@ -1260,8 +1260,8 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
     {
 	lock_req_t *tmp_lock_req_p = NULL;
 
-	gossip_debug(GOSSIP_LOCK_DEBUG, "revise_lock_req: req_id=%Ld not "
-		     "found in granted list\n", req_id);
+	gossip_debug(GOSSIP_LOCK_DEBUG, "revise_lock_req: req_id=%lld not "
+		     "found in granted list\n", lld(req_id));
 
 	qhash_for_each(pos, &(lock_node_p->queued_req))
 	{
@@ -1271,8 +1271,8 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 	}
 	if (lock_req_p == NULL)
 	{
-	    gossip_debug(GOSSIP_LOCK_DEBUG, "revise_lock_req: req_id=%Ld not "
-			 "found in granted or queued list\n", req_id);
+	    gossip_debug(GOSSIP_LOCK_DEBUG, "revise_lock_req: req_id=%lld not "
+			 "found in granted or queued list\n", lld(req_id));
 	    ret = -1;
 	    goto del_unlock_exit;
 	}
@@ -1289,11 +1289,11 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 	    linked_itree_p = itree_entry(pos, linked_itree_t, list_link);
 	    
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
-			 "removing (ALL) lock from %Ld to %Ld - req %d "
-			 "(should be %Ld)\n",
-			 linked_itree_p->itree_link.start,
-			 linked_itree_p->itree_link.end,
-			 linked_itree_p->lock_id, req_id);
+			 "removing (ALL) lock from %lld to %lld - req %d "
+			 "(should be %lld)\n",
+			 lld(linked_itree_p->itree_link.start),
+			 lld(linked_itree_p->itree_link.end),
+			 linked_itree_p->lock_id, lld(req_id));
 
 	    released_bytes += linked_itree_p->itree_link.end -
 		linked_itree_p->itree_link.start + 1;
@@ -1360,12 +1360,12 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 		    (final_local_offset - 1);
 
 		gossip_debug(GOSSIP_LOCK_DEBUG, 
-			     "removing (SOME) partial lock from %Ld to %Ld - "
-			     "req %d (should be %Ld) - final_local_off=%Ld\n",
-			     final_local_offset,
-			     linked_itree_p->itree_link.end,
-			     linked_itree_p->lock_id, req_id,
-			     final_local_offset);
+			     "removing (SOME) partial lock from %lld to %lld - "
+			     "req %d (should be %lld) - final_local_off=%lld\n",
+			     lld(final_local_offset),
+			     lld(linked_itree_p->itree_link.end),
+			     linked_itree_p->lock_id, lld(req_id),
+			     lld(final_local_offset));
 		
 		linked_itree_p->itree_link.end = final_local_offset - 1;
 		
@@ -1394,12 +1394,12 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 		    linked_itree_p->itree_link.start + 1;
 
 		gossip_debug(GOSSIP_LOCK_DEBUG, 
-			     "removing (SOME) lock from %Ld to %Ld - req %d "
-			     "(should be %Ld) - final_local_off=%Ld\n",
-			     linked_itree_p->itree_link.start,
-			     linked_itree_p->itree_link.end,
-			     linked_itree_p->lock_id, req_id,
-			     final_local_offset);
+			     "removing (SOME) lock from %lld to %lld - req %d "
+			     "(should be %lld) - final_local_off=%lld\n",
+			     lld(linked_itree_p->itree_link.start),
+			     lld(linked_itree_p->itree_link.end),
+			     linked_itree_p->lock_id, lld(req_id),
+			     lld(final_local_offset));
 
 		qlist_del(last_lock_p);
 		del_itree_p = itree_delete(
@@ -1430,17 +1430,17 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 	if (lock_req_p->lock_req_status == INCOMPLETE)
 	{
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
-			 "Remove all locks - req %Ld removed from the"
+			 "Remove all locks - req %lld removed from the"
 			 " queued list.\n",
-			 lock_req_p->req_id);
+			 lld(lock_req_p->req_id));
 	    qlist_del_init(&(lock_req_p->queued_req_link));
 	}
 	else
 	{
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
-			 "Remove all locks - req %Ld removed from the"
+			 "Remove all locks - req %lld removed from the"
 			 " granted list.\n",
-			 lock_req_p->req_id);
+			 lld(lock_req_p->req_id));
 
 	    del_rbtree_p = 
 		rbtree_delete(&lock_node_p->granted_req, &RBTREE_NIL,
@@ -1478,9 +1478,9 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 	    struct qlist_head *tmp_req_p = NULL;
 
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
-			 "Remove some locks - req %Ld removed from the"
+			 "Remove some locks - req %lld removed from the"
 			 " granted list.\n",
-			 lock_req_p->req_id);
+			 lld(lock_req_p->req_id));
 	    del_rbtree_p =
 		rbtree_delete(&(lock_node_p->granted_req), &RBTREE_NIL,
 			      &(lock_req_p->granted_req_link), 
@@ -1490,9 +1490,9 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 	     tmp_req_p = &(lock_req_p->all_req_link);
 
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
-			 "Remove some locks - req %Ld added back to the"
+			 "Remove some locks - req %lld added back to the"
 			 " queued list.\n",
-			 lock_req_p->req_id);
+			 lld(lock_req_p->req_id));
 
 	    /* Find out where in the queued list it belongs.  Search
 	     * the all_req queue after it to see what is next and
@@ -1520,9 +1520,9 @@ int revise_lock_req(PVFS_object_ref *object_ref_p,
 	}
 	else {
 	    gossip_debug(GOSSIP_LOCK_DEBUG, 
-			 "Remove some locks - req %Ld already in "
+			 "Remove some locks - req %lld already in "
 			 "queued list.\n",
-			 lock_req_p->req_id);
+			 lld(lock_req_p->req_id));
 	}
     }
 
