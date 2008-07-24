@@ -36,12 +36,25 @@ fi
 
 echo Compiling LTP...
 export CFLAGS="-g"
-make >& /dev/null && make install > /dev/null
+make >& /dev/null 
 if [ "${?}" != 0 ]
 then
-    echo "Error: failed to configure and build LTP."
+    echo "Error: failed to build LTP."
     exit 1;
 fi
+
+# NOTE: this does not install anything outside of the ltp directory.  It
+# just configures the test programs so that they can be executed.  We
+# deliberately avoid running make install at the top level because that
+# _would_ install files in /opt/ltp unecessarily.
+cd testcases
+sudo make install > /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to make install LTP testcases."
+    exit 1;
+fi
+cd ../
 
 # copy pvfs friendly test cases; we should pass all of these
 cp ${VFS_SCRIPTS}/ltp-pvfs-testcases runtest/
@@ -51,7 +64,7 @@ umask 0
 
 # run ltp
 echo Running LTP...
-./runltp -p -l `pwd`/../ltp-pvfs-testcases-${THISDATE}.log -d ${PVFS2_MOUNTPOINT}/ltp-tmp -f ltp-pvfs-testcases -z ${EXTRA_TESTS}/zoo.tmp >& `pwd`/../ltp-pvfs-testcases-$THISDATE.output
+sudo ./runltp -p -l `pwd`/../ltp-pvfs-testcases-${THISDATE}.log -d ${PVFS2_MOUNTPOINT}/ltp-tmp -f ltp-pvfs-testcases -z ${EXTRA_TESTS}/zoo.tmp >& `pwd`/../ltp-pvfs-testcases-$THISDATE.output
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to invoke LTP."
