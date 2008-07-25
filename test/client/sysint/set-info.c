@@ -9,6 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -19,7 +20,7 @@ int main(int argc, char **argv)
     int ret = -1;
     char *filename = NULL;
     PVFS_fs_id fs_id;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_getattr resp_getattr;
     PVFS_object_ref pinode_refn;
@@ -48,11 +49,12 @@ int main(int argc, char **argv)
 	return (-1);
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     printf("about to lookup %s\n", filename);
 
-    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, cred,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -66,7 +68,7 @@ int main(int argc, char **argv)
     printf("about to getattr on %s\n", filename);
 
     ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_SETABLE,
-                           &credentials, &resp_getattr);
+                           cred, &resp_getattr);
     if (ret < 0)
     {
         printf("getattr failed with errcode = %d\n", ret);
@@ -98,12 +100,12 @@ int main(int argc, char **argv)
     resp_getattr.attr.mask |= PVFS_ATTR_SYS_ATIME;
 
     /* use stored credentials here */
-    credentials.uid = resp_getattr.attr.owner;
-    credentials.gid = resp_getattr.attr.group;
+    cred->userid = resp_getattr.attr.owner;
+    cred->group_array[0] = resp_getattr.attr.group;
 
     printf("about to setattr on %s\n", filename);
 
-    ret = PVFS_sys_setattr(pinode_refn, resp_getattr.attr, &credentials);
+    ret = PVFS_sys_setattr(pinode_refn, resp_getattr.attr, cred);
     if (ret < 0)
     {
         fprintf(stderr, "setattr failed with errcode = %d\n", ret);

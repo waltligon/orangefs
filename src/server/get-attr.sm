@@ -772,10 +772,11 @@ static PINT_sm_action getattr_setup_resp(
         }         
         if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
         {
+            /* Metafile is in position 0, datafiles if requested in the rest */
             resp_attr->capability.num_handles = 
-                s_op->resp.u.getattr.attr.u.meta.dfile_count;
+                s_op->resp.u.getattr.attr.u.meta.dfile_count + 1;
             resp_attr->capability.handle_array = (PVFS_handle *)malloc(
-                sizeof(PVFS_handle) * resp_attr->capability.num_handles);
+                sizeof(PVFS_handle) * resp_attr->capability.num_handles + 1);
             if (resp_attr->capability.handle_array == NULL)
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -783,9 +784,10 @@ static PINT_sm_action getattr_setup_resp(
                 js_p->error_code = -PVFS_EINVAL;
                 return SM_ACTION_COMPLETE;
             }
-            memcpy(resp_attr->capability.handle_array, 
+            memcpy(resp_attr->capability.handle_array + 1, 
                 s_op->resp.u.getattr.attr.u.meta.dfile_array,
                 sizeof(PVFS_handle) * resp_attr->capability.num_handles);
+            resp_attr->capability.handle_array[0] = s_op->u.getattr.handle;
         }
         else
         {

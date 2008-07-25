@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -40,7 +41,7 @@ int main(
     int ret = -1, i = 0;
     PVFS_fs_id fs_id;
     char *name = "/";
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     char *entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
@@ -69,10 +70,12 @@ int main(
     }
 
     printf("SYSTEM INTERFACE INITIALIZED\n");
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     /* lookup the root handle */
     printf("looking up the root handle for fsid = %d\n", fs_id);
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+    ret = PVFS_sys_lookup(fs_id, name, cred,
 			  &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -99,11 +102,10 @@ int main(
 	return (-1);
     }
     memcpy(entry_name, filename, strlen(filename) + 1);
-    PVFS_util_gen_credentials(&credentials);
 
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = cred->userid;
+    attr.group = cred->group_array[0];
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
@@ -122,7 +124,7 @@ int main(
 
     // call create 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			  &credentials, NULL, NULL, resp_create);
+			  cred, NULL, NULL, resp_create);
     if (ret < 0)
     {
 	printf("create failed with errcode = %d\n", ret);
@@ -202,7 +204,7 @@ int main(
     name[0] = '/';
     memcpy(name + 1, filename, strlen(filename) + 1);
 
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+    ret = PVFS_sys_lookup(fs_id, name, cred,
 			  resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -479,7 +481,7 @@ int main(
 
     // call readdir 
     ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-			   &credentials, resp_readdir);
+			   cred, resp_readdir);
     if (ret < 0)
     {
 	printf("readdir failed with errcode = %d\n", ret);

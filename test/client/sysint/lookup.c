@@ -11,6 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -24,7 +25,7 @@ int main(int argc,char **argv)
     int follow_link = PVFS2_LOOKUP_LINK_NO_FOLLOW;
     PVFS_sysresp_lookup resp_lk;
     PVFS_fs_id fs_id;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     char *filename = NULL;
 
     if (argc != 2)
@@ -44,7 +45,8 @@ int main(int argc,char **argv)
     filename = argv[1];
     printf("lookup up path %s\n", filename);
 
-    PVFS_util_gen_credentials(&credentials);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     ret = PVFS_util_init_defaults();
     if (ret < 0)
@@ -62,7 +64,7 @@ int main(int argc,char **argv)
 
     memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
-    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, cred,
                           &resp_lk, follow_link);
     if (ret < 0)
     {

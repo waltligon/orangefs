@@ -9,6 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -22,7 +23,7 @@ int main(int argc,char **argv)
     uint32_t attrmask;
     PVFS_fs_id fs_id;
     char* name;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     char *filename = NULL;
     int ret = -1;
     time_t r_atime, r_mtime, r_ctime;
@@ -53,8 +54,10 @@ int main(int argc,char **argv)
 
     name = filename;
 
-    PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
+    
+    ret = PVFS_sys_lookup(fs_id, name, cred,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -73,7 +76,7 @@ int main(int argc,char **argv)
     pinode_refn.fs_id = fs_id;
     attrmask = PVFS_ATTR_SYS_ALL;
 
-    ret = PVFS_sys_getattr(pinode_refn, attrmask, &credentials, resp_gattr);
+    ret = PVFS_sys_getattr(pinode_refn, attrmask, cred, resp_gattr);
     if (ret < 0)
     {
         printf("getattr failed with errcode = %d\n", ret);
