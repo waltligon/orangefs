@@ -27,7 +27,11 @@ fi
 
 # fix some pvfs specific problems
 cd ltp-full-${LTPVER}
-patch -p1 < ${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch
+for patch in 
+	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch 
+	${VFS_SCRIPTS}/ltp-20080630-hackbench-limits.patch  do
+		patch -p1 < $patch
+done
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to apply patches to LTP."
