@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "pvfs2-util.h"
 
@@ -33,7 +34,7 @@ int main(
     int errors;
     PVFS_fs_id fs_id;
     char *name;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     char *entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
@@ -102,8 +103,10 @@ int main(
 
     name = filename;
 
-    PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
+    
+    ret = PVFS_sys_lookup(fs_id, name, cred,
 			  &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     /* TODO: really we probably want to look for a specific error code,
      * like maybe ENOENT?
@@ -115,7 +118,7 @@ int main(
 	/* get root handle */
 	name = "/";
 
-	ret = PVFS_sys_lookup(fs_id, name, &credentials,
+	ret = PVFS_sys_lookup(fs_id, name, cred,
 			      &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
 	{
@@ -126,8 +129,8 @@ int main(
 
 	/* create new file */
 
-	attr.owner = credentials.uid;
-	attr.group = credentials.gid;
+	attr.owner = cred->userid;
+	attr.group = cred->group_array[0];
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
@@ -136,7 +139,7 @@ int main(
 	entry_name = &(filename[1]);	/* leave off slash */
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      &credentials, NULL, NULL, &resp_cr);
+			      cred, NULL, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    fprintf(stderr, "Error: PVFS_sys_create() failure.\n");
@@ -182,7 +185,7 @@ int main(
     }
 
     ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req,
-			 &credentials, &resp_io);
+			 cred, &resp_io);
     if (ret < 0)
     {
 	fprintf(stderr, "Error: PVFS_sys_write() failure.\n");
@@ -206,7 +209,7 @@ int main(
     printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
     ret = PVFS_sys_read(pinode_refn, file_req, (5 * sizeof(int)), off_buffer,
-			mem_req2, &credentials, &resp_io);
+			mem_req2, cred, &resp_io);
     if (ret < 0)
     {
 	fprintf(stderr, "Error: PVFS_sys_read() failure.\n");

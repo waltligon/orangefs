@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -26,7 +27,7 @@ int main(int argc, char **argv)
     char *target = NULL;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
 
     if (argc != 3)
     {
@@ -62,16 +63,17 @@ int main(int argc, char **argv)
     printf("Link to be created is %s\n",str_buf);
 
     memset(&resp_sym, 0, sizeof(PVFS_sysresp_symlink));
-    PVFS_util_gen_credentials(&credentials);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     entry_name = str_buf;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = cred->userid;
+    attr.group = cred->group_array[0];
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-    ret = PINT_lookup_parent(filename, cur_fs, &credentials, 
+    ret = PINT_lookup_parent(filename, cur_fs, cred, 
                              &parent_refn.handle);
     if(ret < 0)
     {
@@ -81,7 +83,7 @@ int main(int argc, char **argv)
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_symlink(entry_name, parent_refn, target,
-                           attr, &credentials, &resp_sym);
+                           attr, cred, &resp_sym);
     if (ret < 0)
     {
         printf("symlink failed with errcode = %d\n", ret);

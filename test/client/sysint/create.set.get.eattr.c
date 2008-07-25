@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -30,7 +31,7 @@ int main(int argc, char **argv)
     char* entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
 	 PVFS_ds_keyval key, val;
 
     if (argc != 4)
@@ -67,16 +68,17 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
-    PVFS_util_gen_credentials(&credentials);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     entry_name = str_buf;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = cred->userid;
+    attr.group = cred->group_array[0];
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-    ret = PINT_lookup_parent(filename, cur_fs, &credentials, 
+    ret = PINT_lookup_parent(filename, cur_fs, cred, 
                              &parent_refn.handle);
     if(ret < 0)
     {
@@ -89,7 +91,7 @@ int main(int argc, char **argv)
            str_buf, llu(parent_refn.handle));
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          &credentials, NULL, NULL, &resp_create);
+                          cred, NULL, NULL, &resp_create);
     if (ret < 0)
     {
         PVFS_perror("create failed with errcode", ret);
@@ -106,7 +108,7 @@ int main(int argc, char **argv)
 	 key.buffer_sz = strlen(key_s) + 1;
 	 val.buffer = val_s;
 	 val.buffer_sz = strlen(val_s) + 1;
-	 ret = PVFS_sys_seteattr(resp_create.ref, &credentials, &key, &val, 0);
+	 ret = PVFS_sys_seteattr(resp_create.ref, cred, &key, &val, 0);
     if (ret < 0)
     {
         PVFS_perror("seteattr failed with errcode", ret);
@@ -120,7 +122,7 @@ int main(int argc, char **argv)
 	 printf("--geteattr--\n");
 	 val.buffer_sz = strlen(val_s) + 10;
 	 val.buffer = malloc(val.buffer_sz);
-	 ret = PVFS_sys_geteattr(resp_create.ref, &credentials, &key, &val);
+	 ret = PVFS_sys_geteattr(resp_create.ref, cred, &key, &val);
     if (ret < 0)
     {
         PVFS_perror("geteattr failed with errcode", ret);

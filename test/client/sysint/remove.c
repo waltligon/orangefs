@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -21,7 +22,7 @@ int main(int argc,char **argv)
     PVFS_fs_id cur_fs;
     char* entry_name;
     PVFS_object_ref parent_refn;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
 
     if (argc != 2)
     {
@@ -57,8 +58,9 @@ int main(int argc,char **argv)
 
     entry_name = str_buf;
 
-    PVFS_util_gen_credentials(&credentials);
-    ret = PINT_lookup_parent(filename, cur_fs, &credentials,
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
+    ret = PINT_lookup_parent(filename, cur_fs, cred,
                              &parent_refn.handle);
     if(ret < 0)
     {
@@ -67,7 +69,7 @@ int main(int argc,char **argv)
     }
     parent_refn.fs_id = cur_fs;
 
-    ret = PVFS_sys_remove(entry_name, parent_refn, &credentials);
+    ret = PVFS_sys_remove(entry_name, parent_refn, cred);
     if (ret < 0)
     {
         PVFS_perror("remove failed ", ret);

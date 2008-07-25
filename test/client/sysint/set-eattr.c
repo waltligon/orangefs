@@ -13,6 +13,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -91,7 +92,7 @@ int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
   PVFS_fs_id cur_fs;
   PVFS_sysresp_lookup resp_lookup;
   PVFS_object_ref parent_ref;
-  PVFS_credentials credentials;
+  PVFS_credential *cred;
   /* translate local path into pvfs2 relative path */
   ret = PVFS_util_resolve(destfile,&cur_fs, pvfs_path, PVFS_NAME_MAX);
   if(ret < 0)
@@ -100,7 +101,8 @@ int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
     return -1;
   }
 
-  PVFS_util_gen_credentials(&credentials);
+  cred = PVFS_util_gen_fake_credential();
+  assert(cred);
 
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere
@@ -109,7 +111,7 @@ int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
   {
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_lookup(cur_fs, pvfs_path,
-                          &credentials, &resp_lookup,
+                          cred, &resp_lookup,
                           PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
@@ -133,7 +135,7 @@ int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
       return -1;
     }
 
-    ret = PINT_lookup_parent(pvfs_path, cur_fs, &credentials, 
+    ret = PINT_lookup_parent(pvfs_path, cur_fs, cred, 
                                   &parent_ref.handle);
     if(ret < 0)
     {
@@ -148,7 +150,7 @@ int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
   memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
   ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
-                            parent_ref, &credentials, &resp_lookup,
+                            parent_ref, cred, &resp_lookup,
                             PVFS2_LOOKUP_LINK_NO_FOLLOW);
   if (ret != 0)
   {
@@ -165,7 +167,7 @@ int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
                   (char *)val[k].buffer);
       }
   }
-  ret = PVFS_sys_seteattr_list(resp_lookup.ref, &credentials, nkey, key, val, 0);
+  ret = PVFS_sys_seteattr_list(resp_lookup.ref, cred, nkey, key, val, 0);
   if (ret < 0)
   {
       PVFS_perror("seteattr_list failed with errcode", ret);

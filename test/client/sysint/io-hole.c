@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+
 #include "pvfs2-util.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
@@ -27,7 +28,7 @@ int main(int argc, char **argv)
     PVFS_sysresp_lookup resp_lk;
     PVFS_sysresp_create resp_cr;
     PVFS_sysresp_io resp_io;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_object_ref pinode_refn;
@@ -63,8 +64,10 @@ int main(int argc, char **argv)
         snprintf(name, 512, "/%s", argv[1]);
     }
 
-    PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
+    
+    ret = PVFS_sys_lookup(fs_id, name, cred,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret == -PVFS_ENOENT)
     {
@@ -73,15 +76,15 @@ int main(int argc, char **argv)
 	printf("IO-HOLE: lookup failed; creating new file.\n");
 
         memset(&gp_resp, 0, sizeof(PVFS_sysresp_getparent));
-	ret = PVFS_sys_getparent(fs_id, name, &credentials, &gp_resp);
+	ret = PVFS_sys_getparent(fs_id, name, cred, &gp_resp);
 	if (ret < 0)
 	{
             PVFS_perror("PVFS_sys_getparent failed", ret);
 	    return ret;
 	}
 
-	attr.owner = credentials.uid;
-	attr.group = credentials.gid;
+	attr.owner = cred->userid;
+	attr.group = cred->group_array[0];
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
@@ -93,7 +96,7 @@ int main(int argc, char **argv)
         assert(entry_name);
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      &credentials, NULL, NULL, &resp_cr);
+			      cred, NULL, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_create() failure", ret);
@@ -124,7 +127,7 @@ int main(int argc, char **argv)
     memset(buf, 'A', MAX_BUF_LEN);
 
     ret = PVFS_sys_write(pinode_refn, file_req, 0, buf, mem_req,
-			 &credentials, &resp_io);
+			 cred, &resp_io);
     if ((ret < 0) || (resp_io.total_completed != MAX_BUF_LEN))
     {
         PVFS_perror("PVFS_sys_write failure", ret);
@@ -134,7 +137,7 @@ int main(int argc, char **argv)
            lld(resp_io.total_completed));
 
     ret = PVFS_sys_write(pinode_refn, file_req, 100000, buf, mem_req,
-			 &credentials, &resp_io);
+			 cred, &resp_io);
     if ((ret < 0) || (resp_io.total_completed != MAX_BUF_LEN))
     {
         PVFS_perror("PVFS_sys_write failure", ret);
@@ -144,7 +147,7 @@ int main(int argc, char **argv)
            lld(resp_io.total_completed));
 
     ret = PVFS_sys_read(pinode_refn, file_req, 10, buf, mem_req,
-			&credentials, &resp_io);
+			cred, &resp_io);
     if ((ret < 0) || (resp_io.total_completed != MAX_BUF_LEN))
     {
         fprintf(stderr, "Failed to read %d bytes at offset 10! %lld "

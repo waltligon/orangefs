@@ -10,6 +10,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
+
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
@@ -41,7 +43,7 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
 {
     PVFS_object_ref pinode_refn;
     uint32_t attrmask;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     PVFS_sysresp_getattr getattr_response;
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
@@ -50,9 +52,11 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
     pinode_refn.fs_id = fs_id;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
-    PVFS_util_gen_credentials(&credentials);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
+    
     if (PVFS_sys_getattr(pinode_refn, attrmask,
-                         &credentials, &getattr_response))
+                         cred, &getattr_response))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08llx "
                 "(fs_id is %d)\n",llu(handle),fs_id);
@@ -72,7 +76,7 @@ int directory_walk(PVFS_fs_id cur_fs,
     PVFS_sysresp_readdir rd_response;
     char full_path[PVFS_NAME_MAX] = {0};
     char* name;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
@@ -97,8 +101,10 @@ int directory_walk(PVFS_fs_id cur_fs,
     }
     name = full_path;
 
-    PVFS_util_gen_credentials(&credentials);
-    if (PVFS_sys_lookup(cur_fs, name, &credentials,
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
+    
+    if (PVFS_sys_lookup(cur_fs, name, cred,
                         &lk_response, PVFS2_LOOKUP_LINK_FOLLOW))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
@@ -119,7 +125,7 @@ int directory_walk(PVFS_fs_id cur_fs,
         if (PVFS_sys_readdir(pinode_refn,
                              (!token ? PVFS_READDIR_START : token),
                              pvfs_dirent_incount,
-                             &credentials, &rd_response))
+                             cred, &rd_response))
         {
             fprintf(stderr,"Failed to perform readdir operation\n");
             return 1;

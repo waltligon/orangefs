@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
+
 #include "client.h"
 #include "pvfs2-types.h"
 #include "pvfs2-util.h"
@@ -25,7 +27,7 @@ int main(int argc,char **argv)
     PVFS_object_ref old_parent_refn;
     char* new_entry;
     PVFS_object_ref new_parent_refn;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
 
     if (argc != 3)
     {
@@ -72,10 +74,11 @@ int main(int argc,char **argv)
     }
     printf("New filename is %s\n",new_buf);
 
-    PVFS_util_gen_credentials(&credentials);
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
 
     old_entry = old_buf;
-    ret = PINT_lookup_parent(old_filename, cur_fs, &credentials,
+    ret = PINT_lookup_parent(old_filename, cur_fs, cred,
                              &old_parent_refn.handle);
     if(ret < 0)
     {
@@ -84,7 +87,7 @@ int main(int argc,char **argv)
     }
     old_parent_refn.fs_id = cur_fs;
     new_entry = new_buf;
-    ret = PINT_lookup_parent(new_filename, cur_fs, &credentials,
+    ret = PINT_lookup_parent(new_filename, cur_fs, cred,
                              &new_parent_refn.handle);
     if(ret < 0)
     {
@@ -94,7 +97,7 @@ int main(int argc,char **argv)
     new_parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_rename(old_entry, old_parent_refn, new_entry, 
-			new_parent_refn, &credentials);
+			new_parent_refn, cred);
     if (ret < 0)
     {
         printf("rename failed with errcode = %d\n",ret);

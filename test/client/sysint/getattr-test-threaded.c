@@ -26,7 +26,7 @@ struct thread_info
 {
     PVFS_object_ref* pinode_refn;
     PVFS_object_ref* pinode_refn2;
-    PVFS_credentials* credentials;
+    PVFS_credential *cred;
 };
 
 void* thread_fn(void* foo);
@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     PVFS_fs_id fs_id;
     char name[512] = {0};
     char *entry_name = NULL;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_object_ref pinode_refn;
@@ -93,23 +93,25 @@ int main(int argc, char **argv)
         snprintf(name, 512, "/%s", argv[2]);
     }
 
-    PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
+    
+    ret = PVFS_sys_lookup(fs_id, name, cred,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret == -PVFS_ENOENT)
     {
         PVFS_sysresp_getparent gp_resp;
 
         memset(&gp_resp, 0, sizeof(PVFS_sysresp_getparent));
-	ret = PVFS_sys_getparent(fs_id, name, &credentials, &gp_resp);
+	ret = PVFS_sys_getparent(fs_id, name, cred, &gp_resp);
 	if (ret < 0)
 	{
             PVFS_perror("PVFS_sys_getparent failed", ret);
 	    return ret;
 	}
 
-	attr.owner = credentials.uid;
-	attr.group = credentials.gid;
+	attr.owner = cred->userid;
+	attr.group = cred->group_array[0];
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
@@ -121,7 +123,7 @@ int main(int argc, char **argv)
         assert(entry_name);
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      &credentials, NULL, NULL, &resp_cr);
+			      cred, NULL, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_create() failure", ret);
@@ -147,23 +149,25 @@ int main(int argc, char **argv)
         snprintf(name, 512, "/%s", argv[3]);
     }
 
-    PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
+    
+    ret = PVFS_sys_lookup(fs_id, name, cred,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret == -PVFS_ENOENT)
     {
         PVFS_sysresp_getparent gp_resp;
 
         memset(&gp_resp, 0, sizeof(PVFS_sysresp_getparent));
-	ret = PVFS_sys_getparent(fs_id, name, &credentials, &gp_resp);
+	ret = PVFS_sys_getparent(fs_id, name, cred, &gp_resp);
 	if (ret < 0)
 	{
             PVFS_perror("PVFS_sys_getparent failed", ret);
 	    return ret;
 	}
 
-	attr.owner = credentials.uid;
-	attr.group = credentials.gid;
+	attr.owner = cred->userid;
+	attr.group = cred->group_array[0];
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
@@ -175,7 +179,7 @@ int main(int argc, char **argv)
         assert(entry_name);
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      &credentials, NULL, NULL, &resp_cr);
+			      cred, NULL, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_create() failure", ret);
@@ -195,7 +199,7 @@ int main(int argc, char **argv)
     /* fill in information for threads */
     info.pinode_refn = &pinode_refn;
     info.pinode_refn2 = &pinode_refn2;
-    info.credentials = &credentials;
+    info.cred = cred;
 
     /* launch threads then wait for them to finish */
     for(i=0; i<num_threads; i++)
@@ -248,7 +252,7 @@ void* thread_fn(void* foo)
     for(i=0; i<1000; i++)
     {
         ret = PVFS_sys_getattr(*info->pinode_refn, PVFS_ATTR_SYS_ALL,
-            info->credentials, &resp_getattr);
+            info->cred, &resp_getattr);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_getattr failure", ret);
@@ -258,7 +262,7 @@ void* thread_fn(void* foo)
             return (NULL);
         }
         ret = PVFS_sys_getattr(*info->pinode_refn2, PVFS_ATTR_SYS_ALL,
-            info->credentials, &resp_getattr);
+            info->cred, &resp_getattr);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_getattr failure", ret);

@@ -30,7 +30,7 @@ struct thread_info
     PVFS_object_ref* pinode_refn;
     PVFS_Request* file_req;
     PVFS_Request* mem_req;
-    PVFS_credentials* credentials;
+    PVFS_credential *cred;
 };
 
 void* thread_fn(void* foo);
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     PVFS_fs_id fs_id;
     char name[512] = {0};
     char *entry_name = NULL;
-    PVFS_credentials credentials;
+    PVFS_credential *cred;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_object_ref pinode_refn;
@@ -114,23 +114,25 @@ int main(int argc, char **argv)
         snprintf(name, 512, "/%s", argv[2]);
     }
 
-    PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+    cred = PVFS_util_gen_fake_credential();
+    assert(cred);
+    
+    ret = PVFS_sys_lookup(fs_id, name, cred,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret == -PVFS_ENOENT)
     {
         PVFS_sysresp_getparent gp_resp;
 
         memset(&gp_resp, 0, sizeof(PVFS_sysresp_getparent));
-	ret = PVFS_sys_getparent(fs_id, name, &credentials, &gp_resp);
+	ret = PVFS_sys_getparent(fs_id, name, cred, &gp_resp);
 	if (ret < 0)
 	{
             PVFS_perror("PVFS_sys_getparent failed", ret);
 	    return ret;
 	}
 
-	attr.owner = credentials.uid;
-	attr.group = credentials.gid;
+	attr.owner = cred->userid;
+	attr.group = cred->group_array[0];
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
@@ -142,7 +144,7 @@ int main(int argc, char **argv)
         assert(entry_name);
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      &credentials, NULL, NULL, &resp_cr);
+			      cred, NULL, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_create() failure", ret);
@@ -180,7 +182,7 @@ int main(int argc, char **argv)
     }
 
     ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req,
-			 &credentials, &resp_io);
+			 cred, &resp_io);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_write failure", ret);
@@ -191,7 +193,7 @@ int main(int argc, char **argv)
     info.pinode_refn = &pinode_refn;
     info.file_req = &file_req;
     info.mem_req = &mem_req;
-    info.credentials = &credentials;
+    info.cred = cred;
 
     /* launch threads then wait for them to finish */
     for(i=0; i<num_threads; i++)
@@ -262,7 +264,7 @@ void* thread_fn(void* foo)
 
     /* verify */
     ret = PVFS_sys_read(*info->pinode_refn, *info->file_req, 0, io_buffer, *info->mem_req,
-			info->credentials, &resp_io);
+			info->cred, &resp_io);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_read failure", ret);
