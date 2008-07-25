@@ -147,7 +147,7 @@ PVFS_error PVFS_idb_rep_send(
     /*get fs_id and the list of BMI addrs*/
     sm_p->server_addrs = 
 	(PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t) * 4/*fixed number for test*/);
-    memset(&sm_p->server_addrs, 0, sizeof(PVFS_BMI_addr_t) * 4);
+    memset(sm_p->server_addrs, 0, sizeof(PVFS_BMI_addr_t) * 4);
     server_config = get_server_config_struct();
     if(server_config)
     {

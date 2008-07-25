@@ -48,7 +48,6 @@ extern int TROVE_shm_key_hint;
 /*The following two parameters are for db log subsystem configuration*/
 extern int TROVE_db_log_buffer_size_bytes;
 extern char *TROVE_db_log_directory;
-extern int TROVE_db_rep_master;
 
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
@@ -232,6 +231,7 @@ retry:
 			  DB_INIT_LOG| /*init logging subsystem*/
 			  DB_RECOVER| /*normal recovery when startup*/
                           DB_INIT_MPOOL|
+			  DB_INIT_REP|
                           DB_CREATE|
                           DB_THREAD, 
                           0);
@@ -264,6 +264,7 @@ retry:
 			  DB_INIT_LOG| /*init logging subsystem*/
 			  DB_RECOVER| /*normal recovery when startup*/
                           DB_INIT_MPOOL|
+			  DB_INIT_REP|
                           DB_CREATE|
                           DB_THREAD|
                           DB_SYSTEM_MEM, 
@@ -298,6 +299,7 @@ retry:
 			      DB_INIT_LOG| /*init logging subsystem*/
 			      DB_RECOVER| /*normal recovery when startup*/
 			      DB_INIT_MPOOL|
+			      DB_INIT_REP|
                               DB_CREATE|
                               DB_THREAD|
                               DB_PRIVATE, 
