@@ -28,7 +28,6 @@
 
 #include "pint-security.h"
 #include "security-hash.h"
-#include "security-types.h"
 #include "security-util.h"
 
 
@@ -226,7 +225,8 @@ int PINT_sign_capability(PVFS_capability *cap)
 /*  PINT_verify_capability
  *
  *  Takes in a PVFS_capability structure and checks to see if the
- *  signature matches the contents based on the data within
+ *  signature matches the contents based on the data within. Verification
+ *  always succeeds for the null capability.
  *
  *  returns 1 on success
  *  returns 0 on error or failure to verify
@@ -244,21 +244,24 @@ int PINT_verify_capability(PVFS_capability *data)
         return 0;
     }
 
+    if (PINT_capability_is_null(data))
+    {
+        return 1;
+    }
+
     if (PINT_util_get_current_time() > data->timeout)
     {
         return 0;
     }
     
-    buf = (char *)malloc(sizeof(char) * 1024);
-    
+    buf = (char *)malloc(sizeof(char) * 1024);    
     if (buf == NULL)
     {
         return 0;
     }
     
     ret = PINT_cached_config_get_server_name(buf, 1024, data->owner,
-                                             data->fsid);
-    
+                                             data->fsid);    
     if (ret < 0)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Server name lookup failed.\n");
@@ -266,8 +269,7 @@ int PINT_verify_capability(PVFS_capability *data)
         return 0;
     }
     
-    pubkey = SECURITY_lookup_pubkey(buf);
-        
+    pubkey = SECURITY_lookup_pubkey(buf);      
     if (pubkey == NULL)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG,

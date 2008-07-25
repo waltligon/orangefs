@@ -195,7 +195,8 @@ int PVFS_fsck_check_server_configs(
         ret = PVFS_mgmt_get_config(cur_fs,
                                  &addresses[i],
                                  fs_config,
-                                 FS_CONFIG_BUFFER_SIZE);
+                                 FS_CONFIG_BUFFER_SIZE,
+                                 cred);
         if (ret < 0)
         {
             PVFS_perror_gossip("PVFS_mgmt_get_config", ret);

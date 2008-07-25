@@ -18,7 +18,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "server-config.h"
-#include "security-types.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -164,12 +164,12 @@ static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0, j = 0;
     PINT_sm_msgpair_state *msg_p;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
+    const PVFS_capability *capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "iterate_handles_list state: "
                  "mgmt_iterate_handles_list_setup_msgpair\n");
+
+    capability = PINT_null_capability();
 
     /* setup msgpair array */
     j=0;
@@ -188,7 +188,7 @@ static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
 	{
 	    PINT_SERVREQ_MGMT_ITERATE_HANDLES_FILL(
                 msg_p->req,
-		xxremovemexx,
+		*capability,
 		sm_p->u.iterate_handles_list.fs_id,
 		sm_p->u.iterate_handles_list.handle_count_array[i],
 		sm_p->u.iterate_handles_list.position_array[i]);

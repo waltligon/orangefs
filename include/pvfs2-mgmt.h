@@ -385,7 +385,8 @@ int PVFS_mgmt_get_config(
     const PVFS_fs_id* fsid,
     PVFS_BMI_addr_t* addr,
     char* fs_buf,
-    int fs_buf_size);
+    int fs_buf_size,
+    const PVFS_credential *credential);
 
 PVFS_error PVFS_mgmt_map_handle(
     PVFS_fs_id fs_id,

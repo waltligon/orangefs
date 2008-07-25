@@ -22,7 +22,7 @@
 #include "pvfs2-mgmt.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
-#include "security-types.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -169,19 +169,19 @@ static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
+    const PVFS_capability *capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "perf_mon_list state: "
                  "mgmt_perf_mon_list_setup_msgpair\n");
+
+    capability = PINT_null_capability();
 
     /* setup msgpair array */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
 	PINT_SERVREQ_MGMT_PERF_MON_FILL(
             msg_p->req,
-            xxremovemexx,
+            *capability,
             sm_p->u.perf_mon_list.next_id_array[i],
             sm_p->u.perf_mon_list.history_count);
 

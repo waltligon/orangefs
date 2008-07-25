@@ -12,6 +12,9 @@
 #include "security-util.h"
 
 
+static const PVFS_capability null_capability = {0};
+
+
 /*  PINT_dup_capability
  *
  *  When passed a valid capability pointer this function will duplicate
@@ -96,6 +99,16 @@ void PINT_release_capability(PVFS_capability *cap)
     	free(cap->handle_array);
     	free(cap);
     }
+}
+
+const PVFS_capability *PINT_null_capability(void)
+{
+    return &null_capability;
+}
+
+int PINT_capability_is_null(const PVFS_capability *cap)
+{
+    return (memcmp(cap, &null_capability, sizeof(PVFS_capability)) == 0);
 }
 
 void PINT_release_credential(PVFS_credential *cred)

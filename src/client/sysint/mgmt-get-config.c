@@ -31,13 +31,13 @@ int PVFS_mgmt_get_config(
     const PVFS_fs_id * fsid,
     PVFS_BMI_addr_t * addr,
     char *fs_buf,
-    int fs_buf_size)
+    int fs_buf_size,
+    const PVFS_credential *credential)
 {
     int ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     PVFS_error error = 0;
-    PVFS_credential *cred;
     struct filesystem_configuration_s *cur_fs = NULL;
     PVFS_sys_op_id op_id;
     struct server_configuration_s *config = NULL;
@@ -45,10 +45,6 @@ int PVFS_mgmt_get_config(
     int server_type = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_config entered\n");
-
-    /* TODO: get credential from arguments */
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
 
     PINT_smcb_alloc(&smcb, PVFS_SERVER_GET_CONFIG,
                     sizeof(struct PINT_client_sm),
@@ -66,7 +62,7 @@ int PVFS_mgmt_get_config(
 
     PINT_init_msgarray_params(sm_p, *fsid);
 
-    PINT_init_sysint_credential(sm_p->newcred_p, cred);
+    PINT_init_sysint_credential(sm_p->newcred_p, credential);
 
     config = PINT_get_server_config_struct(*fsid);
 

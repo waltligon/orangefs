@@ -164,14 +164,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     ret = PINT_verify_capability(&s_op->req->capability);
     if (ret)
     {
-        js_p->error_code = PINT_perm_check(s_op);
+        ret = PINT_perm_check(s_op);
     }
-    else
-    {
-        /* CAPABILITY CHECKING CODE DISABLED TO CHECK ENCODING/DECODING!!! */
-        /* If this ends up in the trunk someone needs to be shot. */
-        js_p->error_code = 0; /* -PVFS_EACCES; */
-    }
+
+    js_p->error_code = ret;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: perm_check (status = %d)\n",
