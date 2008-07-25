@@ -175,7 +175,7 @@ PVFS_error PVFS_idb_rep_send(
 	    if(!strcmp(rep_group->host_alias, cur_alias->host_alias) || 
 	       !strcmp(rep_group->bmi_address, cur_alias->host_alias))
 	    {
-		assert(BMI_addr_lookup(&sm_p->server_addrs[i++], cur_alias->bmi_address));
+		assert(BMI_addr_lookup(&sm_p->server_addrs[i++], cur_alias->bmi_address) == 0);
 		gossip_debug(GOSSIP_DB_REP_DEBUG, "BMI address: %s, BMI_addr_t: %lx\n", 
 			     cur_alias->bmi_address, sm_p->server_addrs[i-1]);
 	    }

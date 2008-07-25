@@ -1502,7 +1502,7 @@ struct PVFS_servreq_dbrep
 endecode_fields_2_struct(
     PVFS_servreq_dbrep,
     PVFS_ds_keyval, control,
-    PVFS_ds_keyval, rec)
+    PVFS_ds_keyval, rec);
 #define extra_size_PVFS_servreq_dbrep \
     PVFS_REQ_LIMIT_DBREP
 

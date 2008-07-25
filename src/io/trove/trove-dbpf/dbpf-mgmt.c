@@ -48,6 +48,7 @@ extern int TROVE_shm_key_hint;
 /*The following two parameters are for db log subsystem configuration*/
 extern int TROVE_db_log_buffer_size_bytes;
 extern char *TROVE_db_log_directory;
+extern int TROVE_db_rep_master;
 
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
@@ -326,12 +327,12 @@ retry:
      * should check the return value....
      */
     dbenv->rep_set_transport(dbenv, 100/*self eid*/, PVFS_db_rep_send);
-    if(TROVE_db_rep_master)
+    if(TROVE_db_rep_master == 1)
     {
 	dbenv->rep_set_priority(dbenv, 100);
 	dbenv->rep_start(dbenv, NULL, DB_REP_MASTER);
     }
-    else
+    else if(TROVE_db_rep_master == 0)
     {
 	dbenv->rep_set_priority(dbenv, 90);
 	dbenv->rep_start(dbenv, NULL, DB_REP_CLIENT);

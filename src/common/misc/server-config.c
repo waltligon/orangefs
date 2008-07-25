@@ -4175,6 +4175,7 @@ int PINT_config_pvfs2_mkspace(
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
 				   &(config->trove_max_concurrent_io));
     /*Rongrong: for replication*/
+    config->is_rep_master = 2; /*don't start the replication*/
     ret = trove_collection_setinfo(0, 0, TROVE_DB_REP_MASTER,
 				   &(config->is_rep_master));
     /* this should never fail */
