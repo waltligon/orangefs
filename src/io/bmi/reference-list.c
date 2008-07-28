@@ -68,17 +68,7 @@ void ref_list_add(ref_list_p rlp,
 ref_st_p ref_list_search_addr(ref_list_p rlp,
 			      PVFS_BMI_addr_t my_addr)
 {
-    ref_list_p tmp_link = NULL;
-    ref_st_p tmp_entry = NULL;
-
-    qlist_for_each(tmp_link, rlp)
-    {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st,
-				list_link);
-	if (tmp_entry->bmi_addr == my_addr)
-	    return (tmp_entry);
-    }
-    return (NULL);
+    return(id_gen_safe_lookup(my_addr));
 }
 
 
@@ -93,16 +83,7 @@ ref_st_p ref_list_search_addr(ref_list_p rlp,
 ref_st_p ref_list_search_method_addr(ref_list_p rlp,
 				     bmi_method_addr_p map)
 {
-    ref_list_p tmp_link = NULL;
-    ref_st_p tmp_entry = NULL;
-
-    qlist_for_each(tmp_link, rlp)
-    {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
-	if (tmp_entry->method_addr == map)
-	    return (tmp_entry);
-    }
-    return (NULL);
+    return(map->parent);
 }
 
 /*
@@ -203,7 +184,7 @@ ref_st_p alloc_ref_st(void)
     memset(new_ref, 0, ssize);
 
     /* we can go ahead and set the bmi_addr here */
-    id_gen_fast_register(&(new_ref->bmi_addr), new_ref);
+    id_gen_safe_register(&(new_ref->bmi_addr), new_ref);
 
     return (new_ref);
 }
@@ -234,7 +215,7 @@ void dealloc_ref_st(ref_st_p deadref)
 	deadref->interface->set_info(BMI_DROP_ADDR, deadref->method_addr);
     }
 
-    id_gen_fast_unregister(deadref->bmi_addr);
+    id_gen_safe_unregister(deadref->bmi_addr);
 
     free(deadref);
 }

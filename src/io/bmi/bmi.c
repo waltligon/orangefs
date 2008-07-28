@@ -1584,6 +1584,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 
     /* fill in the details */
     new_ref->method_addr = meth_addr;
+    meth_addr->parent = new_ref;
     new_ref->id_string = (char *) malloc(strlen(id_string) + 1);
     if (!new_ref->id_string)
     {
@@ -1894,6 +1895,7 @@ PVFS_BMI_addr_t bmi_method_addr_reg_callback(bmi_method_addr_p map)
     */
     new_ref->method_addr = map;
     new_ref->id_string = NULL;
+    map->parent = new_ref;
 
     /* check the method_type from the method_addr pointer to know
      * which interface to use */
