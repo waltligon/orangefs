@@ -236,7 +236,7 @@ int PINT_verify_capability(PVFS_capability *data)
     EVP_MD_CTX mdctx;
     const EVP_MD *md;
     int ret;
-    char *buf;
+    char *bmi, *alias;
     EVP_PKEY *pubkey;
     
     if (!data)
@@ -254,29 +254,39 @@ int PINT_verify_capability(PVFS_capability *data)
         return 0;
     }
     
-    buf = (char *)malloc(sizeof(char) * 1024);    
-    if (buf == NULL)
+    bmi = (char*)malloc(sizeof(char) * 1024);    
+    if (bmi == NULL)
     {
         return 0;
     }
-    
-    ret = PINT_cached_config_get_server_name(buf, 1024, data->owner,
-                                             data->fsid);    
+
+    ret = PINT_cached_config_get_server_name(bmi, 1024, data->handle_array[0],
+                                             data->fsid);
     if (ret < 0)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Server name lookup failed.\n");
-        free(buf);
+        free(bmi);
         return 0;
     }
-    
-    pubkey = SECURITY_lookup_pubkey(buf);      
+
+    alias = PINT_config_get_host_alias_ptr(PINT_get_server_config(), bmi);
+    if (!alias)
+    {
+        gossip_err("BMI to host alias mapping failed.\n");
+        free(bmi);
+        return 0;
+    }   
+
+    pubkey = SECURITY_lookup_pubkey(alias);
     if (pubkey == NULL)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG,
-                     "Public key not found in lookup. Name used: %s\n", buf);
+                     "Public key not found in lookup. Name used: '%s'\n", 
+                     alias);
+        free(bmi);
         return 0;
     }
-    free(buf);
+    free(bmi);
 
 #if defined(SECURITY_ENCRYPTION_RSA)
     md = EVP_sha1();
@@ -449,7 +459,6 @@ static int load_public_keys(const char *path)
     int ch, ptr;
     static char buf[1024];
     EVP_PKEY *key;
-    char *host;
     int ret;
 
     keyfile = fopen(path, "r");
@@ -507,25 +516,19 @@ static int load_public_keys(const char *path)
             return -1;
         }
 
-        host = PINT_config_get_host_addr_ptr(PINT_get_server_config(), buf);
-        if (host == NULL)
+        ret = SECURITY_add_pubkey(buf, key);
+        if (ret < 0)
         {
-            gossip_debug(GOSSIP_SECURITY_DEBUG, "Alias '%s' not found "
-                         "in configuration\n", buf);
+            PVFS_strerror_r(ret, buf, 1024);
+            gossip_debug(GOSSIP_SECURITY_DEBUG, "Error inserting public "
+                         "key: %s\n", buf);
+            fclose(keyfile);
+            return -1;
         }
-        else
-        {
-            ret = SECURITY_add_pubkey(host, key);
-            if (ret < 0)
-            {
-                PVFS_strerror_r(ret, buf, 1024);
-                gossip_debug(GOSSIP_SECURITY_DEBUG, "Error inserting public "
-                             "key: %s\n", buf);
-                fclose(keyfile);
-                return -1;
-            }
-        }
-
+        gossip_debug(GOSSIP_SECURITY_DEBUG, 
+                     "Added public key for '%s'\n", 
+                     buf);
+        
         ch = fgetc(keyfile);
     }
 

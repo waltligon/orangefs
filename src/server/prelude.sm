@@ -166,6 +166,11 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     {
         ret = PINT_perm_check(s_op);
     }
+    else
+    {
+        /* TODO: find a better way to the client 'try again' */
+        ret = -PVFS_EAGAIN;
+    }
 
     js_p->error_code = ret;
 

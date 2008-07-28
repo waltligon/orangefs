@@ -371,6 +371,7 @@ endecode_fields_4_struct(
     PVFS_credential, credential)
 
 #define PINT_SERVREQ_GETATTR_FILL(__req,     \
+                                  __cap,     \
                                   __cred,    \
                                   __fsid,    \
                                   __handle,  \
@@ -378,6 +379,7 @@ endecode_fields_4_struct(
 do {                                         \
     memset(&(__req), 0, sizeof(__req));      \
     (__req).op = PVFS_SERV_GETATTR;          \
+    (__req).capability = (__cap);            \
     (__req).u.getattr.credential = (__cred); \
     (__req).u.getattr.fs_id = (__fsid);      \
     (__req).u.getattr.handle = (__handle);   \

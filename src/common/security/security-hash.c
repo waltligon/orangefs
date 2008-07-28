@@ -134,7 +134,7 @@ int SECURITY_add_pubkey(char *hash_key, EVP_PKEY *pubkey)
     	             "Removed duplicate key from table.\n");
     	free_pubkey_entry(temp);
     }
-    qhash_add(pubkey_table, &entry->hash_key, &entry->hash_link);
+    qhash_add(pubkey_table, entry->hash_key, &entry->hash_link);
     
     gen_mutex_unlock(&hash_mutex);
     return 0;
