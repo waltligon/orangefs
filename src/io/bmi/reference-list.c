@@ -14,15 +14,21 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 #include "reference-list.h"
 #include "gossip.h"
 #include "id-generator.h"
+#include "quickhash.h"
 
+static struct qhash_table* str_table = NULL;
+#define STR_TABLE_SIZE 137
 
 /***************************************************************
  * Visible functions
  */
+
+static int ref_list_compare_key_entry(void* key, struct qhash_head* link);
 
 /*
  * ref_list_new()
@@ -36,11 +42,31 @@ ref_list_p ref_list_new(void)
 
     ref_list_p tmp_list = NULL;
 
-    tmp_list = (ref_list_p) malloc(sizeof(struct qlist_head));
-    if (tmp_list)
+    /* There is currently never more than one reference list in BMI.  If we
+     * ever have a need for more, then this hash table should be moved from
+     * a static global to actually be part of the ref_list_p.
+     */
+    assert(str_table == NULL);
+
+    str_table = qhash_init(
+        ref_list_compare_key_entry,
+        quickhash_string_hash, 
+        STR_TABLE_SIZE);
+
+    if(!str_table)
     {
-	INIT_QLIST_HEAD(tmp_list);
+        return(NULL);
     }
+
+    tmp_list = (ref_list_p) malloc(sizeof(struct qlist_head));
+    if(!tmp_list)
+    {
+        qhash_finalize(str_table);
+        str_table = NULL;
+        return(NULL);
+    }
+
+    INIT_QLIST_HEAD(tmp_list);
     return (tmp_list);
 }
 
@@ -54,6 +80,11 @@ ref_list_p ref_list_new(void)
 void ref_list_add(ref_list_p rlp,
 		  ref_st_p rsp)
 {
+    if(rsp->id_string)
+    {
+        qhash_add(str_table, rsp->id_string, &rsp->hash_link);
+    }
+
     qlist_add(&(rsp->list_link), rlp);
 }
 
@@ -97,17 +128,16 @@ ref_st_p ref_list_search_method_addr(ref_list_p rlp,
 ref_st_p ref_list_search_str(ref_list_p rlp,
 			     const char *idstring)
 {
-    ref_list_p tmp_link = NULL;
-    ref_st_p tmp_entry = NULL;
 
-    qlist_for_each(tmp_link, rlp)
+    struct qhash_head* tmp_link;
+
+    tmp_link = qhash_search(str_table, idstring);
+    if(!tmp_link)
     {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st,
-				list_link);
-	if (tmp_entry->id_string && !strcmp(tmp_entry->id_string, idstring))
-	    return (tmp_entry);
+        return(NULL);
     }
-    return (NULL);
+
+    return(qlist_entry(tmp_link, ref_st, hash_link));
 }
 
 /*
@@ -127,6 +157,11 @@ ref_st_p ref_list_rem(ref_list_p rlp,
     if(tmp_entry)
     {
         qlist_del(&tmp_entry->list_link);
+
+        if(tmp_entry->id_string)
+        {
+            qhash_del(&tmp_entry->hash_link);
+        }
     }
     return (tmp_entry);
 }
@@ -152,6 +187,9 @@ void ref_list_cleanup(ref_list_p rlp)
 				list_link);
         dealloc_ref_st(tmp_entry);
     }
+
+    qhash_finalize(str_table);
+    str_table = NULL;
 
     free(rlp);
     return;
@@ -213,6 +251,21 @@ void dealloc_ref_st(ref_st_p deadref)
     id_gen_safe_unregister(deadref->bmi_addr);
 
     free(deadref);
+}
+
+static int ref_list_compare_key_entry(void* key, struct qhash_head* link)
+{
+    char* key_string = (char*)key;
+    ref_st_p tmp_entry = NULL;
+
+    tmp_entry = qhash_entry(link, ref_st, hash_link);
+    assert(tmp_entry);
+
+    if(strcmp(tmp_entry->id_string, key_string) == 0)
+    {
+        return(1);
+    }
+    return(0);
 }
 
 /*
