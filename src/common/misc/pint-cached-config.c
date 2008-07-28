@@ -284,53 +284,56 @@ int PINT_cached_config_handle_load_mapping(
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
     struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
 
-    if (fs)
+    if(!fs)
     {
-        cur_config_fs_cache = (struct config_fs_cache_s *)
-            malloc(sizeof(struct config_fs_cache_s));
-        assert(cur_config_fs_cache);
-        memset(cur_config_fs_cache, 0, sizeof(struct config_fs_cache_s));
-
-        cur_config_fs_cache->fs = (struct filesystem_configuration_s *)fs;
-        cur_config_fs_cache->meta_server_cursor = NULL;
-        cur_config_fs_cache->data_server_cursor = NULL;
-        cur_config_fs_cache->bmi_host_extent_tables = PINT_llist_new();
-        assert(cur_config_fs_cache->bmi_host_extent_tables);
-
-        /*
-          map all meta and data handle ranges to the extent list, if any.
-          map_handle_range_to_extent_list is a macro defined in
-          pint-cached-config.h for convenience only.
-        */
-        assert(cur_config_fs_cache->fs->meta_handle_ranges);
-        map_handle_range_to_extent_list(
-            cur_config_fs_cache->fs->meta_handle_ranges);
-
-        assert(cur_config_fs_cache->fs->data_handle_ranges);
-        map_handle_range_to_extent_list(
-            cur_config_fs_cache->fs->data_handle_ranges);
-
-        /*
-          add config cache object to the hash table that maps fsid to
-          a config_fs_cache_s.  NOTE: the
-          'map_handle_range_to_extent_list' can set ret to -ENOMEM, so
-          check for that here.
-        */
-        if (ret != -ENOMEM)
-        {
-            cur_config_fs_cache->meta_server_cursor =
-                cur_config_fs_cache->fs->meta_handle_ranges;
-            cur_config_fs_cache->data_server_cursor =
-                cur_config_fs_cache->fs->data_handle_ranges;
-
-            qhash_add(PINT_fsid_config_cache_table,
-                      &(cur_config_fs_cache->fs->coll_id),
-                      &(cur_config_fs_cache->hash_link));
-
-            ret = 0;
-        }
+        return(-PVFS_EINVAL);
     }
-    return ret;
+
+    cur_config_fs_cache = (struct config_fs_cache_s *)
+        malloc(sizeof(struct config_fs_cache_s));
+    assert(cur_config_fs_cache);
+    memset(cur_config_fs_cache, 0, sizeof(struct config_fs_cache_s));
+
+    cur_config_fs_cache->fs = (struct filesystem_configuration_s *)fs;
+    cur_config_fs_cache->meta_server_cursor = NULL;
+    cur_config_fs_cache->data_server_cursor = NULL;
+    cur_config_fs_cache->bmi_host_extent_tables = PINT_llist_new();
+    assert(cur_config_fs_cache->bmi_host_extent_tables);
+
+    /*
+      map all meta and data handle ranges to the extent list, if any.
+      map_handle_range_to_extent_list is a macro defined in
+      pint-cached-config.h for convenience only.
+    */
+    ret = 0;
+    assert(cur_config_fs_cache->fs->meta_handle_ranges);
+    map_handle_range_to_extent_list(
+        cur_config_fs_cache->fs->meta_handle_ranges);
+
+    assert(cur_config_fs_cache->fs->data_handle_ranges);
+    map_handle_range_to_extent_list(
+        cur_config_fs_cache->fs->data_handle_ranges);
+
+    /* note: above macros may have set an error code */
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    /*
+      add config cache object to the hash table that maps fsid to
+      a config_fs_cache_s.
+    */
+    cur_config_fs_cache->meta_server_cursor =
+        cur_config_fs_cache->fs->meta_handle_ranges;
+    cur_config_fs_cache->data_server_cursor =
+        cur_config_fs_cache->fs->data_handle_ranges;
+
+    qhash_add(PINT_fsid_config_cache_table,
+              &(cur_config_fs_cache->fs->coll_id),
+              &(cur_config_fs_cache->hash_link));
+
+    return(0);
 }
 
 /* PINT_cached_config_get_next_meta()
@@ -1192,36 +1195,38 @@ int PINT_cached_config_get_server_name(
     assert(PINT_fsid_config_cache_table);
 
     hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
-    if (hash_link)
+    if(!hash_link)
     {
-        cur_config_cache = qlist_entry(
-            hash_link, struct config_fs_cache_s, hash_link);
+        return(-PVFS_EINVAL);
+    }
 
-        assert(cur_config_cache);
-        assert(cur_config_cache->fs);
-        assert(cur_config_cache->bmi_host_extent_tables);
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
 
-        cur = cur_config_cache->bmi_host_extent_tables;
-        while (cur)
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+    assert(cur_config_cache->bmi_host_extent_tables);
+
+    cur = cur_config_cache->bmi_host_extent_tables;
+    while (cur)
+    {
+        cur_host_extent_table = PINT_llist_head(cur);
+        if (!cur_host_extent_table)
         {
-            cur_host_extent_table = PINT_llist_head(cur);
-            if (!cur_host_extent_table)
-            {
-                break;
-            }
-            assert(cur_host_extent_table->bmi_address);
-            assert(cur_host_extent_table->extent_list);
-
-            if (PINT_handle_in_extent_list(
-                    cur_host_extent_table->extent_list, handle))
-            {
-                strncpy(server_name,cur_host_extent_table->bmi_address,
-                        max_server_name_len);
-                ret = 0;
-                break;
-            }
-            cur = PINT_llist_next(cur);
+            break;
         }
+        assert(cur_host_extent_table->bmi_address);
+        assert(cur_host_extent_table->extent_list);
+
+        if (PINT_handle_in_extent_list(
+                cur_host_extent_table->extent_list, handle))
+        {
+            strncpy(server_name,cur_host_extent_table->bmi_address,
+                    max_server_name_len);
+            ret = 0;
+            break;
+        }
+        cur = PINT_llist_next(cur);
     }
 
     return ret;
