@@ -22,6 +22,7 @@
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "pint-cached-config.h"
+#include "pvfs2-internal.h"
 
 /* really old linux distributions (jazz's RHEL 3) don't have this(!?) */
 #ifndef HOST_NAME_MAX
@@ -35,6 +36,13 @@ struct bmi_host_extent_table_s
 
     /* ptrs are type struct extent */
     PINT_llist *extent_list;
+};
+
+struct handle_lookup_entry
+{
+    PVFS_handle_extent extent;
+    char* server_name;
+    PVFS_BMI_addr_t server_addr;
 };
 
 struct config_fs_cache_s
@@ -62,6 +70,8 @@ struct config_fs_cache_s
     phys_server_desc_s* server_array;
     int server_count;
 
+    struct handle_lookup_entry* handle_lookup_table;
+    int handle_lookup_table_size;
 };
 
 #define map_handle_range_to_extent_list(hrange_list)             \
@@ -110,6 +120,7 @@ static int hash_fsid_compare(
 
 static void free_host_extent_table(void *ptr);
 static int cache_server_array(PVFS_fs_id fsid);
+static int handle_lookup_entry_compare(const void *p1, const void *p2);
 
 static int meta_randomized = 0;
 static int io_randomized = 0;
@@ -202,6 +213,7 @@ int PINT_cached_config_finalize(void)
                 cur_config_cache->fs = NULL;
                 PINT_llist_free(cur_config_cache->bmi_host_extent_tables,
                                 free_host_extent_table);
+                free(cur_config_cache->handle_lookup_table);
 
                 /* if the 'cached server arrays' are used, free them */
                 if (cur_config_cache->io_server_count &&
@@ -280,9 +292,13 @@ int PINT_cached_config_handle_load_mapping(
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
+    PINT_llist *cur2 = NULL;
+    PVFS_handle_extent *tmp_extent = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
     struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
+    int count = 0;
+    int table_offset = 0;
 
     if(!fs)
     {
@@ -317,8 +333,83 @@ int PINT_cached_config_handle_load_mapping(
     /* note: above macros may have set an error code */
     if(ret < 0)
     {
+        free(cur_config_fs_cache);
         return(ret);
     }
+
+    /* count total number of extents */
+    cur = cur_config_fs_cache->bmi_host_extent_tables;
+    while (cur)
+    {
+        cur_host_extent_table = PINT_llist_head(cur);
+        if (!cur_host_extent_table)
+            break;
+        cur2 = cur_host_extent_table->extent_list;
+        while(cur2)
+        {
+            tmp_extent = PINT_llist_head(cur2);
+            if(!tmp_extent)
+                break;
+            count += 1;
+            cur2 = PINT_llist_next(cur2);
+        }
+        cur = PINT_llist_next(cur);
+    }
+
+    /* allocate a table to hold all extents for faster searching */
+    cur_config_fs_cache->handle_lookup_table = 
+        malloc(sizeof(*cur_config_fs_cache->handle_lookup_table) * count);
+    if(!cur_config_fs_cache->handle_lookup_table)
+    {
+        PINT_llist_free(cur_config_fs_cache->bmi_host_extent_tables,
+                        free_host_extent_table);
+        free(cur_config_fs_cache);
+        return(-PVFS_ENOMEM);
+    }
+    cur_config_fs_cache->handle_lookup_table_size = count;
+
+    /* populate table */
+    cur = cur_config_fs_cache->bmi_host_extent_tables;
+    while (cur)
+    {
+        cur_host_extent_table = PINT_llist_head(cur);
+        if (!cur_host_extent_table)
+            break;
+        cur2 = cur_host_extent_table->extent_list;
+        while(cur2)
+        {
+            tmp_extent = PINT_llist_head(cur2);
+            if(!tmp_extent)
+                break;
+            cur_config_fs_cache->handle_lookup_table[table_offset].extent 
+                = *tmp_extent;
+            cur_config_fs_cache->handle_lookup_table[table_offset].server_name
+                = cur_host_extent_table->bmi_address;
+            ret = BMI_addr_lookup(
+                &cur_config_fs_cache->handle_lookup_table[table_offset].server_addr,                 
+                cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
+            if(ret < 0)
+            {
+
+                PINT_llist_free(cur_config_fs_cache->bmi_host_extent_tables,
+                                free_host_extent_table);
+                free(cur_config_fs_cache->handle_lookup_table);
+                free(cur_config_fs_cache);
+                gossip_err("Error: failed to resolve address of server: %s\n",
+                    cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
+                return(ret);
+            }
+            table_offset++;
+
+            cur2 = PINT_llist_next(cur2);
+        }
+        cur = PINT_llist_next(cur);
+    }
+
+    /* sort table */
+    qsort(cur_config_fs_cache->handle_lookup_table, table_offset, 
+        sizeof(*cur_config_fs_cache->handle_lookup_table),
+        handle_lookup_entry_compare);
 
     /*
       add config cache object to the hash table that maps fsid to
@@ -968,21 +1059,69 @@ int PINT_cached_config_get_server_array(
  *
  * returns 0 on success to -errno on failure
  */
+/* TODO: if we keep this algorithm, need to break search into a separate
+ * function so it isn't duplicated in get_server_name()
+ */
 int PINT_cached_config_map_to_server(
     PVFS_BMI_addr_t *server_addr,
     PVFS_handle handle,
     PVFS_fs_id fs_id)
 {
-    int ret = -PVFS_EINVAL;
-    char bmi_server_addr[PVFS_MAX_SERVER_ADDR_LEN] = {0};
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    int high, low, mid;
+    int table_index;
 
-    ret = PINT_cached_config_get_server_name(
-        bmi_server_addr, PVFS_MAX_SERVER_ADDR_LEN, handle, fs_id);
-    if (ret)
+    assert(PINT_fsid_config_cache_table);
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fs_id));
+    if(!hash_link)
     {
-        PVFS_perror_gossip("PINT_cached_config_get_server_name failed", ret);
+        return(-PVFS_EINVAL);
     }
-    return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
+
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
+
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+    assert(cur_config_cache->bmi_host_extent_tables);
+
+    /* iterative binary search through handle lookup table to find the 
+     * extent that this handle falls into 
+     */
+    low = 0;
+    high = cur_config_cache->handle_lookup_table_size;
+    while (low < high) 
+    {
+        mid = (low + high)/2;
+        if (cur_config_cache->handle_lookup_table[mid].extent.first < handle)
+            low = mid + 1; 
+        else
+            high = mid;
+    }
+    if ((low < cur_config_cache->handle_lookup_table_size) && 
+        (cur_config_cache->handle_lookup_table[low].extent.first == handle))
+    {
+        table_index = low;
+    }
+    else
+    {
+        table_index = low-1;
+    }
+
+    if(PINT_handle_in_extent(
+        &cur_config_cache->handle_lookup_table[table_index].extent,
+        handle))
+    {
+        *server_addr = 
+            cur_config_cache->handle_lookup_table[table_index].server_addr;
+        return(0);
+    }
+
+    gossip_err("Error: failed to find handle %llu in fs configuration.\n",
+        llu(handle));
+    return(-PVFS_EINVAL);
 }
 
 /* PINT_cached_config_get_num_dfiles()
@@ -1186,11 +1325,10 @@ int PINT_cached_config_get_server_name(
     PVFS_handle handle,
     PVFS_fs_id fsid)
 {
-    int ret = -PVFS_EINVAL;
-    PINT_llist *cur = NULL;
-    struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
+    int high, low, mid;
+    int table_index;
 
     assert(PINT_fsid_config_cache_table);
 
@@ -1207,29 +1345,42 @@ int PINT_cached_config_get_server_name(
     assert(cur_config_cache->fs);
     assert(cur_config_cache->bmi_host_extent_tables);
 
-    cur = cur_config_cache->bmi_host_extent_tables;
-    while (cur)
+    /* iterative binary search through handle lookup table to find the 
+     * extent that this handle falls into 
+     */
+    low = 0;
+    high = cur_config_cache->handle_lookup_table_size;
+    while (low < high) 
     {
-        cur_host_extent_table = PINT_llist_head(cur);
-        if (!cur_host_extent_table)
-        {
-            break;
-        }
-        assert(cur_host_extent_table->bmi_address);
-        assert(cur_host_extent_table->extent_list);
-
-        if (PINT_handle_in_extent_list(
-                cur_host_extent_table->extent_list, handle))
-        {
-            strncpy(server_name,cur_host_extent_table->bmi_address,
-                    max_server_name_len);
-            ret = 0;
-            break;
-        }
-        cur = PINT_llist_next(cur);
+        mid = (low + high)/2;
+        if (cur_config_cache->handle_lookup_table[mid].extent.first < handle)
+            low = mid + 1; 
+        else
+            high = mid;
+    }
+    if ((low < cur_config_cache->handle_lookup_table_size) && 
+        (cur_config_cache->handle_lookup_table[low].extent.first == handle))
+    {
+        table_index = low;
+    }
+    else
+    {
+        table_index = low-1;
     }
 
-    return ret;
+    if(PINT_handle_in_extent(
+        &cur_config_cache->handle_lookup_table[table_index].extent,
+        handle))
+    {
+        strncpy(server_name,
+            cur_config_cache->handle_lookup_table[table_index].server_name,
+            max_server_name_len);
+        return(0);
+    }
+
+    gossip_err("Error: failed to find handle %llu in fs configuration.\n",
+        llu(handle));
+    return(-PVFS_EINVAL);
 }
 
 /* PINT_cached_config_get_root_handle()
@@ -1527,6 +1678,19 @@ static void free_host_extent_table(void *ptr)
     cur_host_extent_table->bmi_address = (char *)0;
     PINT_release_extent_list(cur_host_extent_table->extent_list);
     free(cur_host_extent_table);
+}
+
+static int handle_lookup_entry_compare(const void *p1, const void *p2)
+{
+    const struct handle_lookup_entry* e1  = p1;
+    const struct handle_lookup_entry* e2  = p2;
+
+    if(e1->extent.first < e2->extent.first)
+        return(-1);
+    if(e1->extent.first > e2->extent.first)
+        return(1);
+
+    return(0);
 }
 
 /*
