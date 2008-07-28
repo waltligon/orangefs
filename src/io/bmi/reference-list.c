@@ -120,20 +120,15 @@ ref_st_p ref_list_search_str(ref_list_p rlp,
 ref_st_p ref_list_rem(ref_list_p rlp,
 		      PVFS_BMI_addr_t my_addr)
 {
-    ref_list_p tmp_link = NULL;
-    ref_list_p scratch = NULL;
-    ref_st_p tmp_entry = NULL;
+    ref_st_p tmp_entry;
+    
+    tmp_entry = id_gen_safe_lookup(my_addr);
 
-    qlist_for_each_safe(tmp_link, scratch, rlp)
+    if(tmp_entry)
     {
-	tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
-	if (tmp_entry->bmi_addr == my_addr)
-	{
-	    qlist_del(&tmp_entry->list_link);
-	    return (tmp_entry);
-	}
+        qlist_del(&tmp_entry->list_link);
     }
-    return (NULL);
+    return (tmp_entry);
 }
 
 
