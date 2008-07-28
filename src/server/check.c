@@ -30,6 +30,7 @@
 #include "gossip.h"
 #include "bmi-byteswap.h"
 #include "check.h"
+#include "security-util.h"
 
 enum {
     PRELUDE_RUN_ACL_CHECKS = 1,
@@ -600,7 +601,7 @@ int PINT_server_perm_setattr(PINT_server_op *s_op)
 
 int PINT_perm_check(struct PINT_server_op *s_op)
 {
-    PVFS_capability *caps = &s_op->req->capability;
+    PVFS_capability *cap = &s_op->req->capability;
     PINT_server_req_perm_fun perm_fun;
     int ret = -PVFS_EINVAL;
 
@@ -620,19 +621,20 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         /* XXX: removed root squashing */
     }
 
-    if (s_op->target_handle != PVFS_HANDLE_NULL)
+    if (s_op->target_handle != PVFS_HANDLE_NULL && 
+        !PINT_capability_is_null(cap))
     {
         int index;
 
         /* ensure we have a capability for the target handle */
-        for (index = 0; index < caps->num_handles; index++)
+        for (index = 0; index < cap->num_handles; index++)
         {
-            if (caps->handle_array[index] == s_op->target_handle)
+            if (cap->handle_array[index] == s_op->target_handle)
             {
                 break;
             }
         }
-        if (index == caps->num_handles)
+        if (index == cap->num_handles)
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Attempted to perform "
                          "an operation on target handle %llu that was "
@@ -646,7 +648,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
                  "attr mask %d\n\t(capability mask = %d)\n",
                  PINT_map_server_op_to_string(s_op->req->op),
-                 s_op->attr.mask, caps->op_mask);
+                 s_op->attr.mask, cap->op_mask);
 
     perm_fun = PINT_server_req_get_perm_fun(s_op->req);
     if (perm_fun)
