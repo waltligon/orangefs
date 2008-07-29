@@ -37,7 +37,14 @@ machine pvfs2_client_setattr_sm
     state init
     {
         run setattr_init;
-        default => setattr_msg_setup_msgpair;
+        default => setattr_getattr;
+    }
+    
+    state setattr_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => setattr_msg_setup_msgpair;
+        default => cleanup;
     }
 
     state setattr_msg_setup_msgpair
@@ -178,7 +185,18 @@ PVFS_error PVFS_sys_setattr(
 static PINT_sm_action setattr_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: init\n");
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_CAPABILITY,
+        PVFS_TYPE_NONE,
+        0);
+    
     assert(js_p->error_code == 0);
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -199,9 +217,6 @@ static PINT_sm_action setattr_msg_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_ds_type objtype;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -215,7 +230,7 @@ static PINT_sm_action setattr_msg_setup_msgpair(
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
-        xxremovemexx,
+        sm_p->getattr.attr.capability,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
         objtype,

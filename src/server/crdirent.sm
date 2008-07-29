@@ -368,7 +368,8 @@ static int perm_crdirent(PINT_server_op *s_op)
 {
     int ret;
 
-    if (s_op->req->capability.op_mask & PINT_CAP_WRITE & PINT_CAP_EXEC)
+    if (s_op->req->capability.op_mask & PINT_CAP_WRITE && 
+        s_op->req->capability.op_mask & PINT_CAP_EXEC)
     {
         ret = 0;
     }

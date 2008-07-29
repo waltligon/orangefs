@@ -137,8 +137,7 @@ static PINT_sm_action lookup_init(
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
     s_op->u.lookup.seg_nr = 0;
-    s_op->u.lookup.seg_ct = PINT_string_count_segments(
-        s_op->req->u.lookup_path.path);
+    s_op->u.lookup.seg_ct = 1;
     s_op->u.lookup.handle_ct = 0;
     s_op->u.lookup.attr_ct = 0;
 
@@ -663,12 +662,28 @@ static PINT_sm_action lookup_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_lookup(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_EXEC)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(lookup_path);
 
 struct PINT_server_req_params pvfs2_lookup_params =
 {
     .string_name = "lookup_path",
-    .perm = NULL,
+    .perm = perm_lookup,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_lookup_path,
     .state_machine = &pvfs2_lookup_sm

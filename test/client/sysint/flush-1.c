@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     printf("File to be created is %s\n",str_buf);
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
-    PVFS_util_gen_fake_credential();
+    cred = PVFS_util_gen_fake_credential();
     assert(cred);
 
     entry_name = str_buf;

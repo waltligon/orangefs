@@ -545,59 +545,6 @@ check_perm:
     return -PVFS_EACCES;
 }
 
-/* PINT_server_perm_read
- *
- * Verifies that the capability allows read access.
- * 
- * Returns 0 on success or negative on error.
- */
-int PINT_server_perm_read(PINT_server_op *s_op)
-{
-    PVFS_capability *caps = &s_op->req->capability;
-    int ret = -PVFS_EINVAL;
-
-    ret = caps->op_mask & PINT_CAP_READ ? 0 : -PVFS_EACCES;
-    return ret;
-}
-
-/* PINT_server_perm_write
- *
- * Verifies that the capability allows write access.
- * 
- * Returns 0 on success or negative on error.
- */
-int PINT_server_perm_write(PINT_server_op *s_op)
-{
-    PVFS_capability *caps = &s_op->req->capability;
-    int ret = -PVFS_EINVAL;
-
-    ret = caps->op_mask & PINT_CAP_WRITE ? 0 : -PVFS_EACCES;
-    return ret;
-}
-
-/* PINT_server_perm_none
- *
- * Ignores permission checking by always allowing access.
- * 
- * Always returns 0.
- */
-int PINT_server_perm_none(PINT_server_op *s_op)
-{
-    return 0;
-}
-
-/* PINT_server_perm_setattr
- *
- * Work in progress.
- *
- * Returns 0 on success or negative on error.
- */
-int PINT_server_perm_setattr(PINT_server_op *s_op)
-{
-    /* TODO: write attr checking code */
-    /* for now just allow everything */
-    return 0;
-}
 
 int PINT_perm_check(struct PINT_server_op *s_op)
 {
