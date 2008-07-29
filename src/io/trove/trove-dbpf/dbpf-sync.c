@@ -387,6 +387,24 @@ void dbpf_queued_op_set_sync_mode(int enabled, struct dbpf_collection* coll)
     coll->meta_sync_enabled = enabled;
 }
 
+void dbpf_db_replication_start(int is_master, struct dbpf_collection *coll)
+{
+    DB_ENV *dbenv = coll->coll_env;
+    /* TODO: configurable priorities, nsites, timeout for replication group?
+     * should check the return value....
+     */
+    dbenv->rep_set_transport(dbenv, 100/*self eid*/, PVFS_db_rep_send);
+    if(is_master)
+    {
+	dbenv->rep_set_priority(dbenv, 100);
+	dbenv->rep_start(dbenv, NULL, DB_REP_MASTER);
+    }
+    else
+    {
+	dbenv->rep_set_priority(dbenv, 90);
+	dbenv->rep_start(dbenv, NULL, DB_REP_CLIENT);
+    }
+}
 
 static int dbpf_txn_db(dbpf_txn_context_t *txn_context)
 {

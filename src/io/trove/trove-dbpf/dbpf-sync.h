@@ -55,6 +55,8 @@ void dbpf_queued_op_set_sync_low_watermark(int low, struct dbpf_collection* coll
 
 void dbpf_queued_op_set_sync_mode(int enabled, struct dbpf_collection* coll);
 
+void dbpf_db_replication_start(int is_master, struct dbpf_collection *coll);
+
 int dbpf_txn_context_init(int context_index);
 void dbpf_txn_context_destroy(int context_index);
 

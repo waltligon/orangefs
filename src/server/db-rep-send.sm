@@ -1,6 +1,8 @@
 #include <string.h>
 #include <assert.h>
 
+#include "db.h"
+
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-debug.h"
@@ -13,9 +15,8 @@
 #include "pvfs2-util.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
-#include "db.h"
 
-//extern job_context_id server_job_context;
+extern job_context_id dbpf_job_context;
 extern struct server_configuration_s server_config;
 
 typedef struct PINT_db_rep_send_sm
@@ -99,7 +100,6 @@ PVFS_error PVFS_idb_rep_send(
 {
     PINT_smcb *smcb = NULL;
     PINT_db_rep_send_sm *sm_p = NULL;
-    //job_context_id db_rep_send_context;
     PINT_sm_msgpair_params *mpp;
     server_configuration_s *server_config;
     PINT_sm_action sm_ret;
@@ -107,18 +107,12 @@ PVFS_error PVFS_idb_rep_send(
     //PVFS_error ret;
 
     gossip_debug(GOSSIP_DB_REP_DEBUG, "PVFS_idb_rep_send entered\n");
-    /*ret = job_open_context(&db_rep_send_context);
-    if(ret)
-    {
-	gossip_err("PVFS_idb_rep_send: can't open new job context\n");
-	return ret;
-	}*/
 
     PINT_smcb_alloc(&smcb, 0, 
 		    sizeof(struct PINT_db_rep_send_sm), 
 		    db_rep_send_state_get_machine,
 		    db_rep_send_state_machine_terminate,
-		    server_job_context);
+		    dbpf_job_context);
     if(smcb == NULL)
     {
 	return -PVFS_ENOMEM;
@@ -128,7 +122,7 @@ PVFS_error PVFS_idb_rep_send(
 		    
     /*init msgarray params*/
     mpp = &sm_p->msgarray_op.params;
-    mpp->job_context = server_job_context;
+    mpp->job_context = dbpf_job_context;
     mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;
     mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
@@ -172,8 +166,7 @@ PVFS_error PVFS_idb_rep_send(
 	    }
 	    assert(cur_alias->host_alias);
 	    assert(cur_alias->bmi_address);
-	    if(!strcmp(rep_group->host_alias, cur_alias->host_alias) || 
-	       !strcmp(rep_group->bmi_address, cur_alias->host_alias))
+	    if(!strcmp(rep_group->host_alias, cur_alias->host_alias))
 	    {
 		assert(BMI_addr_lookup(&sm_p->server_addrs[i++], cur_alias->bmi_address) == 0);
 		gossip_debug(GOSSIP_DB_REP_DEBUG, "BMI address: %s, BMI_addr_t: %lx\n", 

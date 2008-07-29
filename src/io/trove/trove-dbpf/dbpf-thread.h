@@ -28,6 +28,12 @@ int dbpf_checkpoint_thread_finalize(void);
 
 void *dbpf_checkpoint_thread_function(void *ptr);
 
+int dbpf_sm_thread_initialize(void);
+
+int dbpf_sm_thread_finalize(void);
+
+void *dbpf_sm_thread_function(void *ptr);
+
 int dbpf_do_one_work_cycle(int *out_count);
 
 #define DBPF_COMPLETION_START(cur_op, end_state)                   \

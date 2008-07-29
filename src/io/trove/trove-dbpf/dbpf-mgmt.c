@@ -323,21 +323,6 @@ retry:
             return NULL;
         }
     }
-    /* TODO: configurable priorities, nsites, timeout for replication group?
-     * should check the return value....
-     */
-    dbenv->rep_set_transport(dbenv, 100/*self eid*/, PVFS_db_rep_send);
-    if(TROVE_db_rep_master == 1)
-    {
-	dbenv->rep_set_priority(dbenv, 100);
-	dbenv->rep_start(dbenv, NULL, DB_REP_MASTER);
-    }
-    else if(TROVE_db_rep_master == 0)
-    {
-	dbenv->rep_set_priority(dbenv, 90);
-	dbenv->rep_start(dbenv, NULL, DB_REP_CLIENT);
-    }
-
     return dbenv;
 }
 
@@ -530,6 +515,10 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
             coll->immediate_completion = *(int *)parameter;
             ret = 0;
             break;
+    	case TROVE_DB_REPLICATION_START:
+	    dbpf_db_replication_start(*(int *)parameter, coll);
+	    ret = 0;
+	    break;
     }
     return ret;
 }
@@ -654,7 +643,15 @@ static int dbpf_initialize(char *stoname,
 
     dbpf_open_cache_initialize();
 
-    return dbpf_thread_initialize();
+    ret = dbpf_sm_thread_initialize();
+    if(ret)
+    {
+	return ret;
+    }
+    else
+    {
+	return dbpf_thread_initialize();
+    }
 }
 
 int dbpf_finalize(void)
@@ -663,6 +660,7 @@ int dbpf_finalize(void)
 
     dbpf_thread_finalize();
     dbpf_checkpoint_thread_finalize();
+    dbpf_sm_thread_finalize();
     dbpf_open_cache_finalize();
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_finalize();

@@ -18,6 +18,7 @@
 #include "dbpf-bstream.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-sync.h"
+#include "state-machine.h"
 
 extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
@@ -27,10 +28,160 @@ extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 #ifdef __PVFS2_TROVE_THREADED__
 static pthread_t dbpf_thread;
 static pthread_t dbpf_checkpoint_thread;
+static pthread_t dbpf_sm_thread;
 static int dbpf_thread_running = 0;
 pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
 pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
+
+#define DBPF_JOB_COUNT 8
+#define DBPF_DEFAULT_TIMEOUT_MS 100
+job_context_id dbpf_job_context = -1;
+static job_id_t *dbpf_job_id_array = NULL;
+static void **dbpf_completed_job_p_array = NULL;
+static job_status_s *dbpf_job_status_array = NULL;
 #endif
+
+int dbpf_sm_thread_initialize(void)
+{
+    int ret = 0;
+#ifdef __PVFS2_TROVE_THREADED__
+    dbpf_job_id_array = (job_id_t *)malloc(DBPF_JOB_COUNT * sizeof(job_id_t));
+    dbpf_completed_job_p_array = (void **)malloc(DBPF_JOB_COUNT * sizeof(void *));
+    dbpf_job_status_array = (job_status_s *)malloc(DBPF_JOB_COUNT * sizeof(job_status_s));
+    if(!dbpf_job_id_array ||
+       !dbpf_completed_job_p_array ||
+       !dbpf_job_status_array)
+    {
+	if(dbpf_job_id_array)
+	{
+	    free(dbpf_job_id_array);
+	    dbpf_job_id_array = NULL;
+	}
+	if(dbpf_completed_job_p_array)
+	{
+	    free(dbpf_completed_job_p_array);
+	    dbpf_completed_job_p_array = NULL;
+	}
+	if(dbpf_job_status_array)
+	{
+	    free(dbpf_job_status_array);
+	    dbpf_job_status_array = NULL;
+	}
+	gossip_lerr("Error: failed to allocate dbpf arrays for tracking completed jobs\n");
+	dbpf_thread_running = 0;
+	return -PVFS_ENOMEM;
+    }
+    ret = job_open_context(&dbpf_job_context);
+    if(ret < 0)
+    {
+	gossip_err("Error opening job context.\n");
+	dbpf_thread_running = 0;
+	return -PVFS_EINVAL;
+    }
+    ret = pthread_create(&dbpf_sm_thread, NULL,
+			 dbpf_sm_thread_function, NULL);
+    if(ret == 0)
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG,
+		     "dbpf_sm_thread_initialize: initialized\n");
+    }
+    else
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG,
+		     "dbpf_sm_thread_initialize: failed\n");
+    }
+#endif
+    return ret;
+}
+
+int dbpf_sm_thread_finalize(void)
+{
+    int ret = 0;
+#ifdef __PVFS2_TROVE_THREADED__
+    ret = pthread_join(dbpf_sm_thread, NULL);
+    job_close_context(dbpf_job_context);
+#endif
+    return ret;
+}
+
+void *dbpf_sm_thread_function(void *ptr)
+{
+    int ret = 0;
+#ifdef __PVFS2_TROVE_THREADED__
+    while(dbpf_thread_running)
+    {
+	int i, comp_ct = DBPF_JOB_COUNT;
+	ret = job_testcontext(dbpf_job_id_array,
+			      &comp_ct,
+			      dbpf_completed_job_p_array,
+			      dbpf_job_status_array,
+			      DBPF_DEFAULT_TIMEOUT_MS,
+			      dbpf_job_context);
+	if(ret < 0)
+	{
+	    gossip_lerr("dbpf job_testcontext failed\n");
+	    dbpf_thread_running = 0;
+	    return ptr;
+	}
+	for(i = 0; i < comp_ct; i++)
+	{
+	    struct PINT_smcb *smcb = dbpf_completed_job_p_array[i];
+	    ret = PINT_state_machine_continue(
+		smcb, &dbpf_job_status_array[i]);
+	    if(SM_ACTION_ISERR(ret))
+	    {
+		PVFS_perror_gossip("Error: state machine processing error", ret);
+		ret = 0;
+	    }
+	}
+    }
+#endif
+    return ptr;
+}
+
+int dbpf_checkpoint_thread_initialize(DB_ENV *dbenv)
+{
+    int ret = 0;
+#ifdef __PVFS2_TROVE_THREADED__
+    ret = pthread_create(&dbpf_checkpoint_thread, NULL, 
+		   dbpf_checkpoint_thread_function, (void *)dbenv);
+    if(ret == 0)
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG, 
+		     "dbpf_checkpoint_thread_initialize: initialized\n");
+    }
+    else
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG, 
+		     "dbpf_checkpoint_thread_initialize: failed\n");
+    }
+#endif
+    return ret;
+}
+
+int dbpf_checkpoint_thread_finalize(void)
+{
+    int ret = 0;
+#ifdef __PVFS2_TROVE_THREADED__
+    ret = pthread_join(dbpf_checkpoint_thread, NULL);
+#endif
+    return ret;
+}
+
+void *dbpf_checkpoint_thread_function(void *ptr)
+{
+#ifdef __PVFS2_TROVE_THREADED__
+    DB_ENV *dbenv = (DB_ENV *)ptr;
+    while(dbpf_thread_running)
+    {
+	dbenv->txn_checkpoint(dbenv, 512, 1, 0);
+	dbenv->log_archive(dbenv, NULL, DB_ARCH_REMOVE);
+    }
+#endif
+    return ptr;
+}
+
+int synccount = 0;
 
 int dbpf_thread_initialize(void)
 {
@@ -72,50 +223,6 @@ int dbpf_thread_finalize(void)
 #endif
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_finalize: finalized\n");
     return ret;
-}
-
-int dbpf_checkpoint_thread_initialize(DB_ENV *dbenv)
-{
-    int ret = 0;
-#ifdef __PVFS2_TROVE_THREADED__
-    ret = pthread_create(&dbpf_checkpoint_thread, NULL, 
-		   dbpf_checkpoint_thread_function, (void *)dbenv);
-    if(ret == 0)
-    {
-	gossip_debug(GOSSIP_TROVE_DEBUG, 
-		     "dbpf_checkpoint_thread_initialize: initialized\n");
-    }
-    else
-    {
-	gossip_debug(GOSSIP_TROVE_DEBUG, 
-		     "dbpf_checkpoint_thread_initialize: failed\n");
-    }
-#endif
-    return ret;
-}
-
-int dbpf_checkpoint_thread_finalize(void)
-{
-    int ret = 0;
-#ifdef __PVFS2_TROVE_THREADED__
-    ret = pthread_join(dbpf_checkpoint_thread, NULL);
-#endif
-    return ret;
-}
-
-int synccount = 0;
-
-void *dbpf_checkpoint_thread_function(void *ptr)
-{
-#ifdef __PVFS2_TROVE_THREADED__
-    DB_ENV *dbenv = (DB_ENV *)ptr;
-    while(dbpf_thread_running)
-    {
-	dbenv->txn_checkpoint(dbenv, 512, 1, 0);
-	dbenv->log_archive(dbenv, NULL, DB_ARCH_REMOVE);
-    }
-#endif
-    return ptr;
 }
 
 void *dbpf_thread_function(void *ptr)

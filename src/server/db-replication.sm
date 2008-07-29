@@ -1,0 +1,66 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "db.h"
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-internal.h"
+
+%%
+
+machine pvfs2_db_replication_sm
+{
+    state process_message
+    {
+	run db_replication_process_message;
+	default => final_response;
+    }
+
+    state final_response
+    {
+	jump pvfs2_final_response_sm;
+	default => cleanup;
+    }
+
+    state cleanup
+    {
+	run db_replication_cleanup;
+	default => terminate;
+    }
+}
+
+%%
+
+static int db_replication_process_message(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t i;
+}
+
+struct PINT_server_req_params pvfs2_db_replication_params =
+{
+    .string_name = "db_replication",
+    .get_object_ref = PINT_get_object_ref_db_replication,
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .state_machine = &pvfs2_de_replication_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

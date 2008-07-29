@@ -709,10 +709,6 @@ static int server_initialize_subsystems(
     ret = trove_collection_setinfo(0, 0, TROVE_DB_LOG_DIRECTORY,
                                    &server_config.db_log_directory);
     assert(ret == 0);
-    /*Rongrong: for replication*/
-    ret = trove_collection_setinfo(0, 0, TROVE_DB_REP_MASTER,
-				   &server_config.is_rep_master);
-    assert(ret == 0);
 
     if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
                                                "mmap")))
@@ -1048,6 +1044,23 @@ static int server_initialize_subsystems(
         return (ret);
     }
     *server_status_flag |= SERVER_EVENT_INIT;
+
+    cur = server_config.file_systems;
+    while(cur)
+    {
+        cur_fs = PINT_llist_head(cur);
+        if (!cur_fs)
+        {
+            break;
+        }
+
+	/*Rongrong: for replication*/
+	ret = trove_collection_setinfo(
+	    cur_fs->coll_id, trove_context,
+	    TROVE_DB_REPLICATION_START,
+	    &server_config.is_rep_master);
+        cur = PINT_llist_next(cur);
+    }
 
     return ret;
 }

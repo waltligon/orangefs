@@ -611,6 +611,9 @@ do {                                                          \
 
 extern struct dbpf_storage *my_storage_p;
 
+#include "job.h"
+extern job_context_id dbpf_job_context;
+
 extern int64_t s_dbpf_metadata_writes, s_dbpf_metadata_reads;
 #define UPDATE_PERF_METADATA_READ()                         \
 do {                                                        \

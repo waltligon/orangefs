@@ -1083,11 +1083,6 @@ int trove_collection_setinfo(
 	}
 	return 0;
     }
-    if(option == TROVE_DB_REP_MASTER)
-    {
-	TROVE_db_rep_master = *((int *)parameter);
-	return 0;
-    }
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {

@@ -2381,8 +2381,14 @@ DOTCONF_CB(get_alias_list)
 	    return NULL;
 	}
 	cur_alias = (host_alias_s *)malloc(sizeof(host_alias_s));
-	cur_alias->host_alias = strdup(cmd->data.list[0]);
-	cur_alias->bmi_address = strdup(cmd->data.list[1]);
+	if(config_s->is_rep_master)
+	{
+	    cur_alias->host_alias = strdup(cmd->data.list[1]);
+	}
+	else
+	{
+	    cur_alias->host_alias = strdup(cmd->data.list[0]);
+	}
 	if(!config_s->rep_groups)
 	{
 	    config_s->rep_groups = PINT_llist_new();
@@ -4174,10 +4180,6 @@ int PINT_config_pvfs2_mkspace(
     assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
 				   &(config->trove_max_concurrent_io));
-    /*Rongrong: for replication*/
-    config->is_rep_master = 2; /*don't start the replication*/
-    ret = trove_collection_setinfo(0, 0, TROVE_DB_REP_MASTER,
-				   &(config->is_rep_master));
     /* this should never fail */
     assert(ret == 0);
     

@@ -133,13 +133,23 @@
 #define encode_PVFS_ds_keyval(pptr,pbuf) do { \
     u_int32_t len = ((PVFS_ds_keyval *)pbuf)->buffer_sz; \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
+    if(((PVFS_ds_keyval *)pbuf)->buffer) \
+    { \
     memcpy(*(pptr)+4, ((PVFS_ds_keyval *)pbuf)->buffer, len); \
+    } \
     *(pptr) += roundup8(4 + len); \
 } while (0)
 #define decode_PVFS_ds_keyval(pptr,pbuf) do { \
     u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
     ((PVFS_ds_keyval *)pbuf)->buffer_sz = len; \
-    ((PVFS_ds_keyval *)pbuf)->buffer = *(pptr) + 4; \
+    if(len > 0) \
+    { \
+        ((PVFS_ds_keyval *)pbuf)->buffer = *(pptr) + 4; \
+    } \
+    else \
+    { \
+        ((PVFS_ds_keyval *)pbuf)->buffer = NULL; \
+    } \
     *(pptr) += roundup8(4 + len); \
 } while (0)
 
