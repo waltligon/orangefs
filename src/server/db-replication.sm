@@ -43,7 +43,9 @@ static int db_replication_process_message(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
-    job_id_t i;
+    job_id_t jid;
+    gossip_debug(GOSSIP_DBREP_DEBUG, "db_replication_process_message entered\n");
+
 }
 
 struct PINT_server_req_params pvfs2_db_replication_params =

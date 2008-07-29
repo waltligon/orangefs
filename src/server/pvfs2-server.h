@@ -340,7 +340,13 @@ struct PINT_server_eattr_op
 {
     void *buffer;
 };
-    
+
+struct PINT_server_db_replication_op
+{
+    PVFS_ds_keyval control;
+    PVFS_ds_keyval rec;
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -413,6 +419,7 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+	struct PINT_server_db_replication_op dbrep;
     } u;
 
 } PINT_server_op;

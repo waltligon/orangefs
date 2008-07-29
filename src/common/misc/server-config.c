@@ -4180,8 +4180,6 @@ int PINT_config_pvfs2_mkspace(
     assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
 				   &(config->trove_max_concurrent_io));
-    /* this should never fail */
-    assert(ret == 0);
     
     /* help trove chose a differentiating shm key if needed for Berkeley DB */
     shm_key_hint = PINT_generate_shm_key_hint(config);
