@@ -279,12 +279,12 @@ void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gi
             *op_mask |= PINT_CAP_EXEC;
     }   
     
-    /* give setattr and remove caps based on uid and op_mask */
+    /* give setattr and remove/create caps based on uid and op_mask */
     if (uid == attr.owner)
         *op_mask |= PINT_CAP_SETATTR;
     if (attr.objtype == PVFS_TYPE_DIRECTORY 
             && *op_mask & PINT_ACCESS_WRITABLE)
-        *op_mask |= PINT_CAP_REMOVE;
+        *op_mask |= PINT_CAP_REMOVE | PINT_CAP_CREATE;
 }
 
 

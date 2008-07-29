@@ -472,25 +472,13 @@ do {                                                   \
 
 struct PVFS_servresp_lookup_path
 {
-    /* array of handles for each successfully resolved path segment */
-    PVFS_handle *handle_array;            
-    /* array of attributes for each path segment (when available) */
-    PVFS_object_attr *attr_array;
-    uint32_t handle_count; /* # of handles returned */
-    uint32_t attr_count;   /* # of attributes returned */
+    /* handle of the next segment */
+    PVFS_handle handle;            
 };
-endecode_fields_1a_1a_struct(
+endecode_fields_1_struct(
     PVFS_servresp_lookup_path,
-    skip4,,
-    uint32_t, handle_count,
-    PVFS_handle, handle_array,
-    skip4,,
-    uint32_t, attr_count,
-    PVFS_object_attr, attr_array)
-/* this is a big thing that could be either a full path,
-* or lots of handles, just use the max io req limit */
-#define extra_size_PVFS_servresp_lookup_path \
-  (PVFS_REQ_LIMIT_IOREQ_BYTES)
+    PVFS_handle, handle)
+#define extra_size_PVFS_servresp_lookup_path 0
 
 /* mkdir *******************************************************/
 /* - makes a new directory object */

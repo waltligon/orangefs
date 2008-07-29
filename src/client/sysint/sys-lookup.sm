@@ -1122,10 +1122,7 @@ static int lookup_segment_lookup_comp_fn(
         return resp_p->status;
     }
 
-    assert(resp_p->u.lookup_path.handle_count);
-
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
-                 resp_p->u.lookup_path.handle_count);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n", 1);
 
     memset(&last_resolved_refn, 0, sizeof(PVFS_object_ref));
 
@@ -1135,7 +1132,7 @@ static int lookup_segment_lookup_comp_fn(
       those resolved handles.  in addition, we fill in the attribute
       information for each segment if the attrs are available here
     */
-    for(i = 0; i < resp_p->u.lookup_path.handle_count; i++)
+    for(i = 0; i < 1; i++)
     {
         cur_seg = GET_SEGMENT_AT(sm_p, current_seg_index + i);
         assert(cur_seg);
@@ -1150,23 +1147,11 @@ static int lookup_segment_lookup_comp_fn(
             cur_seg->seg_starting_refn = last_resolved_refn;
         }
 
-        last_resolved_refn.handle = resp_p->u.lookup_path.handle_array[i];
+        last_resolved_refn.handle = resp_p->u.lookup_path.handle;
         last_resolved_refn.fs_id = cur_seg->seg_starting_refn.fs_id;
 
         cur_seg->seg_resolved_refn = last_resolved_refn;
 
-        /*
-          and store the retrieved attr in the current
-          segment (if one was returned)
-        */
-        if (i < resp_p->u.lookup_path.attr_count)
-        {
-            PINT_free_object_attr(&(cur_seg->seg_attr));
-            PINT_copy_object_attr(
-                &(cur_seg->seg_attr),
-                &(resp_p->u.lookup_path.attr_array[i]));
-        }
-        
         gossip_debug(
             GOSSIP_NCACHE_DEBUG, "*** ncache update on %s "
                                  "target (%llu|%d) "
@@ -1182,7 +1167,6 @@ static int lookup_segment_lookup_comp_fn(
                 (const PVFS_object_ref*) &(last_resolved_refn),
                 (const PVFS_object_ref*) &(cur_seg->seg_starting_refn));
     }
-    assert(i == resp_p->u.lookup_path.handle_count);
 
     /*
       if we've updated all of the segments that we could, advance

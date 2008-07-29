@@ -771,6 +771,7 @@ static PINT_sm_action getattr_setup_resp(
             return SM_ACTION_COMPLETE;
         }
         /* Metafile is in position 0, datafiles if requested in the rest */
+        /* TODO: check for dfile_array before allocating any memory */
         resp_attr->capability.num_handles = 
             s_op->resp.u.getattr.attr.u.meta.dfile_count + 1;
         resp_attr->capability.handle_array = (PVFS_handle *)malloc(
@@ -779,15 +780,19 @@ static PINT_sm_action getattr_setup_resp(
         {
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                 "Getattr: Malloc for handle array failed\n");
-            js_p->error_code = -PVFS_EINVAL;
+            js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
-        if (s_op->resp.u.getattr.attr.u.meta.dfile_count > 0)
+        if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
         {
             memcpy(resp_attr->capability.handle_array + 1, 
                 s_op->resp.u.getattr.attr.u.meta.dfile_array,
                 sizeof(PVFS_handle) *
                 s_op->resp.u.getattr.attr.u.meta.dfile_count);
+        }
+        else
+        {
+            resp_attr->capability.num_handles = 1;
         }
         resp_attr->capability.handle_array[0] = s_op->u.getattr.handle;
         
