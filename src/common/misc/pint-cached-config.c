@@ -123,6 +123,8 @@ static int cache_server_array(PVFS_fs_id fsid);
 static int handle_lookup_entry_compare(const void *p1, const void *p2);
 static const struct handle_lookup_entry* find_handle_lookup_entry(
     PVFS_handle handle, PVFS_fs_id fsid);
+static int load_handle_lookup_table(
+    struct config_fs_cache_s *cur_config_fs_cache);
 
 static int meta_randomized = 0;
 static int io_randomized = 0;
@@ -294,13 +296,9 @@ int PINT_cached_config_handle_load_mapping(
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
-    PINT_llist *cur2 = NULL;
-    PVFS_handle_extent *tmp_extent = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
     struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
-    int count = 0;
-    int table_offset = 0;
 
     if(!fs)
     {
@@ -339,79 +337,18 @@ int PINT_cached_config_handle_load_mapping(
         return(ret);
     }
 
-    /* count total number of extents */
-    cur = cur_config_fs_cache->bmi_host_extent_tables;
-    while (cur)
-    {
-        cur_host_extent_table = PINT_llist_head(cur);
-        if (!cur_host_extent_table)
-            break;
-        cur2 = cur_host_extent_table->extent_list;
-        while(cur2)
-        {
-            tmp_extent = PINT_llist_head(cur2);
-            if(!tmp_extent)
-                break;
-            count += 1;
-            cur2 = PINT_llist_next(cur2);
-        }
-        cur = PINT_llist_next(cur);
-    }
-
-    /* allocate a table to hold all extents for faster searching */
-    cur_config_fs_cache->handle_lookup_table = 
-        malloc(sizeof(*cur_config_fs_cache->handle_lookup_table) * count);
-    if(!cur_config_fs_cache->handle_lookup_table)
+    /* populate table used to speed up mapping of handle values 
+     * to servers
+     */ 
+    ret = load_handle_lookup_table(cur_config_fs_cache); 
+    if(ret < 0)
     {
         PINT_llist_free(cur_config_fs_cache->bmi_host_extent_tables,
                         free_host_extent_table);
         free(cur_config_fs_cache);
-        return(-PVFS_ENOMEM);
+        gossip_err("Error: failed to load handle lookup table.\n");
+        return(ret);
     }
-    cur_config_fs_cache->handle_lookup_table_size = count;
-
-    /* populate table */
-    cur = cur_config_fs_cache->bmi_host_extent_tables;
-    while (cur)
-    {
-        cur_host_extent_table = PINT_llist_head(cur);
-        if (!cur_host_extent_table)
-            break;
-        cur2 = cur_host_extent_table->extent_list;
-        while(cur2)
-        {
-            tmp_extent = PINT_llist_head(cur2);
-            if(!tmp_extent)
-                break;
-            cur_config_fs_cache->handle_lookup_table[table_offset].extent 
-                = *tmp_extent;
-            cur_config_fs_cache->handle_lookup_table[table_offset].server_name
-                = cur_host_extent_table->bmi_address;
-            ret = BMI_addr_lookup(
-                &cur_config_fs_cache->handle_lookup_table[table_offset].server_addr,                 
-                cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
-            if(ret < 0)
-            {
-
-                PINT_llist_free(cur_config_fs_cache->bmi_host_extent_tables,
-                                free_host_extent_table);
-                free(cur_config_fs_cache->handle_lookup_table);
-                free(cur_config_fs_cache);
-                gossip_err("Error: failed to resolve address of server: %s\n",
-                    cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
-                return(ret);
-            }
-            table_offset++;
-
-            cur2 = PINT_llist_next(cur2);
-        }
-        cur = PINT_llist_next(cur);
-    }
-
-    /* sort table */
-    qsort(cur_config_fs_cache->handle_lookup_table, table_offset, 
-        sizeof(*cur_config_fs_cache->handle_lookup_table),
-        handle_lookup_entry_compare);
 
     /*
       add config cache object to the hash table that maps fsid to
@@ -1594,6 +1531,10 @@ static void free_host_extent_table(void *ptr)
     free(cur_host_extent_table);
 }
 
+/* handle_lookup_entry_compare()
+ *
+ * comparison function used by qsort()
+ */
 static int handle_lookup_entry_compare(const void *p1, const void *p2)
 {
     const struct handle_lookup_entry* e1  = p1;
@@ -1607,6 +1548,12 @@ static int handle_lookup_entry_compare(const void *p1, const void *p2)
     return(0);
 }
 
+/* find_handle_lookup_entry()
+ *
+ * searches sorted table for extent that contains the specified handle
+ *
+ * returns pointer to table entry on success, NULL on failure
+ */
 static const struct handle_lookup_entry* find_handle_lookup_entry(
     PVFS_handle handle, PVFS_fs_id fsid)
 {
@@ -1665,6 +1612,100 @@ static const struct handle_lookup_entry* find_handle_lookup_entry(
 
     /* no match */
     return(NULL);
+}
+
+/* load_handle_lookup_table()
+ *
+ * iterates through extents for all servers and constructs a table sorted by
+ * the first handle in each extent.  This table can then be searched with a
+ * binary algorithm to map handles to servers.  Table includes extent,
+ * server name, and server's resolved bmi address.
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int load_handle_lookup_table(
+    struct config_fs_cache_s *cur_config_fs_cache)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_llist *cur = NULL;
+    PINT_llist *cur2 = NULL;
+    PVFS_handle_extent *tmp_extent = NULL;
+    struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
+    int count = 0;
+    int table_offset = 0;
+
+    /* count total number of extents */
+    cur = cur_config_fs_cache->bmi_host_extent_tables;
+    while (cur)
+    {
+        cur_host_extent_table = PINT_llist_head(cur);
+        if (!cur_host_extent_table)
+            break;
+        cur2 = cur_host_extent_table->extent_list;
+        while(cur2)
+        {
+            tmp_extent = PINT_llist_head(cur2);
+            if(!tmp_extent)
+                break;
+            count += 1;
+            cur2 = PINT_llist_next(cur2);
+        }
+        cur = PINT_llist_next(cur);
+    }
+
+    /* allocate a table to hold all extents for faster searching */
+    if(cur_config_fs_cache->handle_lookup_table)
+    {
+        free(cur_config_fs_cache->handle_lookup_table);
+    }
+    cur_config_fs_cache->handle_lookup_table = 
+        malloc(sizeof(*cur_config_fs_cache->handle_lookup_table) * count);
+    if(!cur_config_fs_cache->handle_lookup_table)
+    {
+        return(-PVFS_ENOMEM);
+    }
+    cur_config_fs_cache->handle_lookup_table_size = count;
+
+    /* populate table */
+    cur = cur_config_fs_cache->bmi_host_extent_tables;
+    while (cur)
+    {
+        cur_host_extent_table = PINT_llist_head(cur);
+        if (!cur_host_extent_table)
+            break;
+        cur2 = cur_host_extent_table->extent_list;
+        while(cur2)
+        {
+            tmp_extent = PINT_llist_head(cur2);
+            if(!tmp_extent)
+                break;
+            cur_config_fs_cache->handle_lookup_table[table_offset].extent 
+                = *tmp_extent;
+            cur_config_fs_cache->handle_lookup_table[table_offset].server_name
+                = cur_host_extent_table->bmi_address;
+            ret = BMI_addr_lookup(
+                &cur_config_fs_cache->handle_lookup_table[table_offset].server_addr,                 
+                cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
+            if(ret < 0)
+            {
+                free(cur_config_fs_cache->handle_lookup_table);
+                gossip_err("Error: failed to resolve address of server: %s\n",
+                    cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
+                return(ret);
+            }
+            table_offset++;
+
+            cur2 = PINT_llist_next(cur2);
+        }
+        cur = PINT_llist_next(cur);
+    }
+
+    /* sort table */
+    qsort(cur_config_fs_cache->handle_lookup_table, table_offset, 
+        sizeof(*cur_config_fs_cache->handle_lookup_table),
+        handle_lookup_entry_compare);
+
+    return(0);
 }
 
 /*
