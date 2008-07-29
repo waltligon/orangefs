@@ -316,6 +316,18 @@ char *PINT_util_get_object_type(int objtype)
     return obj_types[6];
 }
 
+void PINT_util_get_current_timeval(struct timeval *tv)
+{
+    gettimeofday(tv, NULL);
+}
+
+int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end)
+{
+    return (tv_end->tv_sec * 1e6 + tv_end->tv_usec) -
+        (tv_start->tv_sec * 1e6 + tv_start->tv_usec);
+}
+
+
 PVFS_time PINT_util_get_current_time(void)
 {
     struct timeval t = {0,0};

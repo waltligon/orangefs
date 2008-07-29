@@ -119,6 +119,8 @@ void PINT_time_diff(PINT_time_marker mark1,
 
 char *PINT_util_get_object_type(int objtype);
 PVFS_time PINT_util_get_current_time(void);
+void PINT_util_get_current_timeval(struct timeval *tv);
+int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end);
 
 PVFS_time PINT_util_mktime_version(PVFS_time time);
 PVFS_time PINT_util_mkversion_time(PVFS_time version);
