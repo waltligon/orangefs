@@ -16,7 +16,7 @@
 #include "str-utils.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
-#include "security-types.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -138,12 +138,12 @@ static PINT_sm_action list_eattr_setup_msgpair(
     int ret = -PVFS_EINVAL;
     int i;
     PINT_sm_msgpair_state *msg_p;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
+    const PVFS_capability *capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"list_eattr state: list_eattr_setup_msgpair\n");
+
+    capability = PINT_null_capability();
 
     /* this will be the array of key buffer sizes */
     sm_p->u.listeattr.size_array =
@@ -159,7 +159,7 @@ static PINT_sm_action list_eattr_setup_msgpair(
 
     PINT_SERVREQ_LISTEATTR_FILL(
             msg_p->req,
-            xxremovemexx,
+            *capability,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             sm_p->u.listeattr.pos_token,

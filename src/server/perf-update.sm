@@ -105,14 +105,7 @@ static int perm_perf_update(PINT_server_op *s_op)
 {
     int ret;
 
-    if (s_op->req->capability.op_mask & PINT_CAP_ADMIN)
-    {
-        ret = 0;
-    }
-    else
-    {
-        ret = -PVFS_EACCES;
-    }
+    ret = 0;
 
     return ret;
 }

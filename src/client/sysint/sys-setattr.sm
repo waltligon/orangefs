@@ -34,12 +34,6 @@ static int setattr_msg_comp_fn(
 
 machine pvfs2_client_setattr_sm
 {
-    state init
-    {
-        run setattr_init;
-        default => setattr_getattr;
-    }
-    
     state setattr_getattr
     {
         jump pvfs2_client_getattr_sm;
@@ -138,7 +132,14 @@ PVFS_error PVFS_isys_setattr(
         gossip_lerr("PVFS_isys_setattr() failure: %s\n",
                     strerror(PVFS_get_errno_mapping(-ret)));
         return ret;
-    } 
+    }
+
+    PINT_SM_GETATTR_STATE_FILL(
+                               sm_p->getattr,
+                               sm_p->object_ref,
+                               PVFS_ATTR_CAPABILITY,
+                               PVFS_TYPE_NONE,
+                               0);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing setattr on handle %llu "
                  "on fs %d\n", llu(ref.handle),
@@ -182,24 +183,6 @@ PVFS_error PVFS_sys_setattr(
 
 /****************************************************************/
 
-static PINT_sm_action setattr_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: init\n");
-
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->object_ref,
-        PVFS_ATTR_CAPABILITY,
-        PVFS_TYPE_NONE,
-        0);
-    
-    assert(js_p->error_code == 0);
-
-    return SM_ACTION_COMPLETE;
-}
-
 static int setattr_msg_comp_fn(void *v_p,
                                struct PVFS_server_resp *resp_p,
                                int index)
@@ -221,6 +204,8 @@ static PINT_sm_action setattr_msg_setup_msgpair(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," setattr: posting setattr req\n");
+
+    assert(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -291,6 +276,8 @@ static PINT_sm_action setattr_cleanup(
     {
         PINT_acache_invalidate(sm_p->object_ref);
     }
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
