@@ -426,6 +426,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(
     switch(attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
+            assert(attr->mask & PVFS_ATTR_CAPABILITY);
             assert(attr->mask & PVFS_ATTR_META_DFILES);
             assert(attr->mask & PVFS_ATTR_META_DIST);
             assert(attr->u.meta.dist_size > 0);
@@ -545,7 +546,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(
 
         PINT_SERVREQ_IO_FILL(
             sm_p->u.io.contexts[i].msg.req,
-            sm_p->getattr.attr.capability,
+            attr->capability,
             sm_p->object_ref.fs_id,
             sm_p->u.io.contexts[i].data_handle,
             sm_p->u.io.io_type,

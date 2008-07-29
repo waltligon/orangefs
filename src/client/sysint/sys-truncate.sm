@@ -32,12 +32,6 @@ extern job_context_id pint_client_sm_context;
 
 machine pvfs2_client_truncate_sm
 {
-    state init
-    {
-        run truncate_init;
-        default => truncate_getattr;
-    }
-
     state truncate_getattr
     {
         jump pvfs2_client_getattr_sm;
@@ -122,7 +116,7 @@ PVFS_error PVFS_isys_truncate(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_METAFILE,
         0);
 
@@ -161,24 +155,6 @@ PVFS_error PVFS_sys_truncate(
     return error;
 }
 
-static PINT_sm_action truncate_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "truncate state: init\n");
-
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->object_ref,
-        PVFS_ATTR_DIR_ALL|PVFS_ATTR_CAPABILITY,
-        PVFS_TYPE_METAFILE,
-        0);
-    
-    assert(js_p->error_code == 0);
-
-    return SM_ACTION_COMPLETE;
-}
-
 /** Resize a file.
  */
 static PINT_sm_action truncate_datafile_setup_msgpairarray(
@@ -196,6 +172,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
+    assert(attr->mask & PVFS_ATTR_CAPABILITY);
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
@@ -239,7 +216,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
 
         PINT_SERVREQ_TRUNCATE_FILL(
             msg_p->req,
-            sm_p->getattr.attr.capability,
+            attr->capability,
             sm_p->object_ref.fs_id,
             new_dfile_size,
             attr->u.meta.dfile_array[i]);
