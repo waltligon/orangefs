@@ -271,7 +271,7 @@ static PINT_sm_action symlink_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_CAPABILITY,
+        PVFS_ATTR_COMMON_ALL,
         PVFS_TYPE_DIRECTORY,
         0);
         
@@ -353,6 +353,9 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability xxremovemexx;
+
+    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -374,7 +377,7 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
 
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
-        sm_p->getattr.attr.capability,
+        xxremovemexx,
         *sm_p->newcred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_SYMLINK,
