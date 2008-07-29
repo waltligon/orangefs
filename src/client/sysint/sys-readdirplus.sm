@@ -468,9 +468,6 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
     int i, ret;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus state: fetch_attrs_setup\n");
     /* if there are no dirents then return NO_WORK */
@@ -510,7 +507,7 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
      {
         PINT_SERVREQ_LISTATTR_FILL(
             msg_p->req,
-            xxremovemexx,
+            sm_p->getattr.attr.capability,
             sm_p->object_ref.fs_id,
             sm_p->u.readdirplus.attrmask,
             sm_p->u.readdirplus.handle_count[i],

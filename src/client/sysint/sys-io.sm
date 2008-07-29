@@ -367,7 +367,7 @@ static PINT_sm_action io_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE, 
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY, 
         PVFS_TYPE_METAFILE,
         0);
        
@@ -408,9 +408,6 @@ static PINT_sm_action io_datafile_setup_msgpairs(
     int target_datafile_count = 0;
     int * sio_array;
     int sio_count;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_datafile_setup_msgpairs\n", sm_p);
@@ -548,7 +545,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(
 
         PINT_SERVREQ_IO_FILL(
             sm_p->u.io.contexts[i].msg.req,
-            xxremovemexx,
+            sm_p->getattr.attr.capability,
             sm_p->object_ref.fs_id,
             sm_p->u.io.contexts[i].data_handle,
             sm_p->u.io.io_type,
