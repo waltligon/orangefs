@@ -45,7 +45,20 @@ static int db_replication_process_message(
     int ret = -1;
     job_id_t jid;
     gossip_debug(GOSSIP_DBREP_DEBUG, "db_replication_process_message entered\n");
+    job_trove_dbrepmsg_process(
+	s_op->req->u.dbrep.fs_id,
+	s_op->req->u.dbrep.control,
+	s_op->req->u.dbrep.rec,
+	0,
+	js_p,
+	&jid,
+	server_job_context);
+    return ret;
+}
 
+static int db_replication_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
 }
 
 struct PINT_server_req_params pvfs2_db_replication_params =

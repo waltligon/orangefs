@@ -3679,6 +3679,9 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     return (0);
 }
 
+int job_trove_dbrepmsg_process(
+    
+
 /* job_null()
  *
  * post null job; can be used to trigger asynchronous state transitions
