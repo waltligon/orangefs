@@ -6126,7 +6126,7 @@ int job_precreate_pool_iterate_handles(
     }
 
     /* get ready to post a job to trove to find handles */
-    jd = alloc_job_desc(JOB_TROVE);
+    jd = alloc_job_desc(JOB_PRECREATE_POOL);
     if (!jd)
     {
         gen_mutex_unlock(&precreate_pool_mutex);
@@ -6141,7 +6141,7 @@ int job_precreate_pool_iterate_handles(
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
-    for(i=0; i< jd->u.precreate_pool.count; i++)
+    for(i=0; i<count; i++)
     {
         jd->u.precreate_pool.key_array[i].buffer = &handle_array[i];
         jd->u.precreate_pool.key_array[i].buffer_sz = sizeof(handle_array[i]);
