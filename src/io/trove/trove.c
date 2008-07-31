@@ -1097,4 +1097,25 @@ int trove_collection_setinfo(
            parameter);
 }
 
-
+int trove_dbrepmsg_process(
+    TROVE_coll_id coll_id,
+    PVFS_ds_keyval *control_p,
+    PVFS_ds_keyval *rec_p,
+    void *user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id *out_op_id_p)
+{
+    TROVE_method_id method_id;
+    method_id = global_trove_method_callback(coll_id);
+    if(method_id < 0)
+    {
+	return -TROVE_EINVAL;
+    }
+    return mgmt_method_table[method_id]->dbrepmsg_process(
+	coll_id,
+	control_p,
+	rec_p,
+	user_ptr,
+	context_id,
+	out_op_id_p);
+}

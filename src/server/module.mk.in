@@ -41,7 +41,8 @@ ifdef BUILD_SERVER
 		$(DIR)/del-eattr.c \
 		$(DIR)/list-eattr.c \
 		$(DIR)/unexpected.c \
-		$(DIR)/db-rep-send.c
+		$(DIR)/db-rep-send.c \
+		$(DIR)/db-replication.c
 
 	# c files that should be added to server library
 	SERVERSRC += \

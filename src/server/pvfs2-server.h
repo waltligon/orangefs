@@ -343,6 +343,7 @@ struct PINT_server_eattr_op
 
 struct PINT_server_db_replication_op
 {
+    PVFS_fs_id fs_id;
     PVFS_ds_keyval control;
     PVFS_ds_keyval rec;
 };

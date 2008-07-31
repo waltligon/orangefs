@@ -44,11 +44,18 @@ static int db_replication_process_message(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t jid;
-    gossip_debug(GOSSIP_DBREP_DEBUG, "db_replication_process_message entered\n");
+    gossip_debug(GOSSIP_DB_REP_DEBUG, "db_replication_process_message entered\n");
+    s_op->u.dbrep.fs_id = s_op->req->u.dbrep.fs_id;
+    s_op->u.dbrep.control.buffer_sz = s_op->req->u.dbrep.control.buffer_sz;
+    s_op->u.dbrep.control.buffer = s_op->req->u.dbrep.control.buffer;
+    s_op->u.dbrep.rec.buffer_sz = s_op->req->u.dbrep.rec.buffer_sz;
+    s_op->u.dbrep.rec.buffer = s_op->req->u.dbrep.rec.buffer;
+    js_p->error_code = 0;
     job_trove_dbrepmsg_process(
 	s_op->req->u.dbrep.fs_id,
-	s_op->req->u.dbrep.control,
-	s_op->req->u.dbrep.rec,
+	&s_op->u.dbrep.control,
+	&s_op->u.dbrep.rec,
+	NULL,
 	0,
 	js_p,
 	&jid,
@@ -59,15 +66,23 @@ static int db_replication_process_message(
 static int db_replication_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    return (server_state_machine_complete(smcb));
 }
 
+static inline int PINT_get_object_ref_db_replication(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.dbrep.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+}
 struct PINT_server_req_params pvfs2_db_replication_params =
 {
     .string_name = "db_replication",
     .get_object_ref = PINT_get_object_ref_db_replication,
     .perm = PINT_SERVER_CHECK_NONE,
     .access_type = PINT_server_req_modify,
-    .state_machine = &pvfs2_de_replication_sm
+    .state_machine = &pvfs2_db_replication_sm
 };
 
 /*

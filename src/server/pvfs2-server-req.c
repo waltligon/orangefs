@@ -43,6 +43,7 @@ extern struct PINT_server_req_params pvfs2_set_eattr_params;
 extern struct PINT_server_req_params pvfs2_set_eattr_list_params;
 extern struct PINT_server_req_params pvfs2_del_eattr_params;
 extern struct PINT_server_req_params pvfs2_list_eattr_params;
+extern struct PINT_server_req_params pvfs2_db_replication_params;
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
@@ -82,7 +83,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 32 */ {PVFS_SERV_LISTEATTR, &pvfs2_list_eattr_params},
     /* 33 */ {PVFS_SERV_SMALL_IO, &pvfs2_small_io_params},
     /* 34 */ {PVFS_SERV_LISTATTR, &pvfs2_list_attr_params},
-    /* 35 */ {PVFS_SERV_DBREP, &pvfs2_db_replication_params},
+    /* 35 */ {PVFS_SERV_DBREPLICATION, &pvfs2_db_replication_params},
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

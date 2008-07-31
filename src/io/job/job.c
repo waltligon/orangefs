@@ -3680,6 +3680,58 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 }
 
 int job_trove_dbrepmsg_process(
+    PVFS_fs_id coll_id,
+    PVFS_ds_keyval *control_p,
+    PVFS_ds_keyval *rec_p,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s *out_status_p,
+    job_id_t *id,
+    job_context_id context_id)
+{
+    struct job_desc *jd = NULL;
+    void *user_ptr_internal;
+    int ret = -1;
+
+    jd = alloc_job_desc(JOB_NULL);
+    if(!jd)
+    {
+	out_status_p->error_code = -PVFS_ENOMEM;
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void *)jd;
+    user_ptr_internal = &jd->trove_callback;
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_dbrepmsg_process(coll_id, control_p, rec_p, user_ptr_internal,
+				 global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
+    if(ret < 0)
+    {
+	dealloc_job_desc(jd);
+	jd = NULL;
+	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
+	return 1;
+    }
+    if(ret == 1)
+    {
+	/*immediate completion*/
+	dealloc_job_desc(jd);
+	jd = NULL;
+	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
+	return ret;
+    }
+    *id = jd->job_id;
+    trove_pending_count++;
+    return 0;
+}
     
 
 /* job_null()

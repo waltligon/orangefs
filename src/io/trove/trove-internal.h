@@ -396,6 +396,13 @@ struct TROVE_mgmt_ops
 			       void *user_ptr,
 			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p);
+    int (*dbrepmsg_process)(
+			    TROVE_coll_id coll_id,
+			    PVFS_ds_keyval *control_p,
+			    PVFS_ds_keyval *rec_p,
+			    void *user_ptr,
+			    TROVE_context_id context_id,
+			    TROVE_op_id *out_op_id_p);
 };
 
 struct TROVE_context_ops

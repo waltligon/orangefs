@@ -344,6 +344,13 @@ struct dbpf_bstream_resize_op
     /* vtag? */
 };
 
+
+struct dbpf_dbrepmsg_process_op
+{
+    TROVE_keyval_s control;
+    TROVE_keyval_s rec;
+};
+
 /* Used to maintain state of partial processing of a listio operation
  */
 struct bstream_listio_state
@@ -455,6 +462,7 @@ enum dbpf_op_type
     DSPACE_GETATTR,
     DSPACE_SETATTR,
     DSPACE_GETATTR_LIST,
+    DBREPMSG_PROCESS,
     /* NOTE: if you change or add items to this list, please update
      * s_dbpf_op_type_str_map[] accordingly (dbpf-mgmt.c)
      */
@@ -524,6 +532,7 @@ struct dbpf_op
         struct dbpf_keyval_read_list_op k_write_list;
         struct dbpf_dspace_getattr_list_op d_getattr_list;
         struct dbpf_keyval_get_handle_info_op k_get_handle_info;
+	struct dbpf_dbrepmsg_process_op r_process;
     } u;
 };
 
@@ -692,6 +701,13 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
                              void *user_ptr,
                              TROVE_context_id context_id,
                              TROVE_op_id *out_op_id_p);
+
+int dbpf_dbrepmsg_process(TROVE_coll_id coll_id,
+			  TROVE_keyval_s *control_p,
+			  TROVE_keyval_s *rec_p,
+			  void *user_ptr,
+			  TROVE_context_id context_id,
+			  TROVE_op_id *out_op_id_p);
 
 int dbpf_finalize(void);
 

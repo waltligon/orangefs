@@ -63,6 +63,8 @@ static DB *dbpf_db_open(
     int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2), uint32_t flags);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
+static int dbpf_dbrepmsg_process_op_svc(struct dbpf_op *op_p);
+
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
 
 static void dbpf_db_error_callback(
@@ -1652,6 +1654,89 @@ int dbpf_collection_lookup(char *collname,
     return 1;
 }
 
+int dbpf_dbrepmsg_process(TROVE_coll_id coll_id,
+		      TROVE_keyval_s *control_p,
+		      TROVE_keyval_s *rec_p,
+		      void *user_ptr,
+		      TROVE_context_id context_id,
+		      TROVE_op_id *out_op_id_p)
+{
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
+    struct dbpf_collection *coll_p = NULL;
+    int ret;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if(coll_p == NULL)
+    {
+	return -TROVE_EINVAL;
+    }
+
+    ret = dbpf_op_init_queued_or_immediate(
+	&op,
+	&q_op_p,
+	DBREPMSG_PROCESS,
+	coll_p,
+	TROVE_HANDLE_NULL,
+	dbpf_dbrepmsg_process_op_svc,
+	0,
+	NULL,
+	user_ptr,
+	context_id,
+	&op_p);
+    if(ret < 0)
+    {
+	return ret;
+    }
+
+    /*fill the control and rec structure in r_process*/
+    op_p->u.r_process.control = *control_p;
+    op_p->u.r_process.rec = *rec_p;
+
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+}
+
+static int dbpf_dbrepmsg_process_op_svc(struct dbpf_op *op_p)
+{
+    int ret = -TROVE_EINVAL;
+    DB_ENV *dbenv;
+    DBT control, rec;
+    DB_LSN lsn;
+
+    dbenv = op_p->coll_p->coll_env;
+
+    memset(&control, 0, sizeof(DBT));
+    memset(&rec, 0, sizeof(DBT));
+
+    control.size = op_p->u.r_process.control.buffer_sz;
+    control.data = op_p->u.r_process.control.buffer;
+    rec.size = op_p->u.r_process.rec.buffer_sz;
+    rec.data = op_p->u.r_process.rec.buffer;
+
+    ret = dbenv->rep_process_message(dbenv, &control, &rec,
+				     0,/*TODO: eid, should have a table for this */
+				     &lsn);
+    switch(ret)
+    {
+    case 0:
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "rep_process_message succeeded!\n");
+	break;
+	/*TODO: some of the cases need to be handled.*/
+    case DB_REP_DUPMASTER:
+    case DB_REP_HOLDELECTION:
+    case DB_REP_IGNORE:
+    case DB_REP_ISPERM:
+    case DB_REP_JOIN_FAILURE:
+    case DB_REP_NEWMASTER:
+    case DB_REP_NEWSITE:
+    case DB_REP_NOTPERM:
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "rep_process_message failed: %s\n", db_strerror(ret));
+	break;
+    }
+    return ret;
+}
+
 /* dbpf_storage_lookup()
  *
  * Internal function.
@@ -1987,7 +2072,8 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_setinfo,
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
-    dbpf_collection_geteattr
+    dbpf_collection_geteattr,
+    dbpf_dbrepmsg_process
 };
 
 typedef struct
@@ -2021,7 +2107,8 @@ static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
     { DSPACE_VERIFY, "DSPACE_VERIFY" },
     { DSPACE_GETATTR, "DSPACE_GETATTR" },
     { DSPACE_SETATTR, "DSPACE_SETATTR" },
-    { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" }
+    { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" },
+    { DBREPMSG_PROCESS, "DBREPMSG_PROCESS" }
     /* NOTE: this list should be kept in sync with enum dbpf_op_type 
      * from dbpf.h 
      */ 

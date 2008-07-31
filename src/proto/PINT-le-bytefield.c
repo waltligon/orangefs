@@ -226,7 +226,7 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_listattr;
                 respsize = extra_size_PVFS_servresp_listattr;
                 break;
-	    case PVFS_SERV_DBREP:
+	    case PVFS_SERV_DBREPLICATION:
 		req.u.dbrep.control.buffer_sz = 0;
 		req.u.dbrep.rec.buffer_sz = 0;
 		reqsize = extra_size_PVFS_servreq_dbrep;
@@ -384,7 +384,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
-	CASE(PVFS_SERV_DBREP, dbrep); /*Rongrong*/
+	CASE(PVFS_SERV_DBREPLICATION, dbrep); /*Rongrong*/
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -490,7 +490,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
-	case PVFS_SERV_DBREP: /*Rongrong*/
+	case PVFS_SERV_DBREPLICATION: /*Rongrong*/
             /* nothing else */
             break;
 
@@ -582,7 +582,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
-	CASE(PVFS_SERV_DBREP, dbrep); /*Rongrong*/
+	CASE(PVFS_SERV_DBREPLICATION, dbrep); /*Rongrong*/
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -678,7 +678,7 @@ static int lebf_decode_resp(
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
-	case PVFS_SERV_DBREP: /*Rongrong*/
+	case PVFS_SERV_DBREPLICATION: /*Rongrong*/
 	    /* nothing else */
 	    break;
 
@@ -800,7 +800,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_SETEATTR:
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
-	    case PVFS_SERV_DBREP: /*Rongrong*/
+	    case PVFS_SERV_DBREPLICATION: /*Rongrong*/
 		/* nothing to free */
 		break;
 	    case PVFS_SERV_INVALID:
@@ -903,7 +903,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_STATFS:
                 case PVFS_SERV_WRITE_COMPLETION:
                 case PVFS_SERV_PROTO_ERROR:
-                case PVFS_SERV_DBREP: /*Rongrong*/
+                case PVFS_SERV_DBREPLICATION: /*Rongrong*/
                     /* nothing to free */
                     break;
 

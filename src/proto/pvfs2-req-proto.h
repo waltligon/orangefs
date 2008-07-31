@@ -1500,7 +1500,7 @@ struct PVFS_servreq_dbrep
     PVFS_ds_keyval control;
     PVFS_ds_keyval rec;
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_dbrep,
     PVFS_fs_id, fs_id,
     skip4,,
@@ -1515,7 +1515,7 @@ endecode_fields_3_struct(
 				__rec)		\
 do{						\
     memset(&(__req), 0, sizeof(__req));		\
-    (__req).op = PVFS_SERV_DBREP;		\
+    (__req).op = PVFS_SERV_DBREPLICATION;	\
     (__req).u.dbrep.fs_id = (__fsid);		\
     (__req).u.dbrep.control.buffer = (__control).buffer;\
     (__req).u.dbrep.control.buffer_sz = (__control).buffer_sz;\

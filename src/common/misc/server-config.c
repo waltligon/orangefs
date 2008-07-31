@@ -2365,14 +2365,11 @@ DOTCONF_CB(get_alias_list)
                       compare_aliases))
     {
 	/*Rongrong temporary for rep group*/
-	char name[64];
-	gethostname(name, 64);
-	gossip_debug(GOSSIP_DB_REP_DEBUG, "hostname is %s\n", name);
-	if(!strcmp(name, cmd->data.list[0]))
+	if(!strcmp(config_s->server_alias, cmd->data.list[0]))
 	{
 	    config_s->is_rep_master = 1;
 	}
-	else if(!strcmp(name, cmd->data.list[1]))
+	else if(!strcmp(config_s->server_alias, cmd->data.list[1]))
 	{
 	    config_s->is_rep_master = 0;
 	}
