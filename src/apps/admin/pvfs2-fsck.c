@@ -353,6 +353,7 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
 					     position_array,
 					     addr_array,
 					     server_count,
+                                             0,
 					     NULL /* details */);
 	if (ret < 0)
 	{

@@ -1248,7 +1248,7 @@ static int PINT_handle_wrangler_load_handles(
                                        handle_count_array,
                                        position_array,
                                        PINT_handle_wrangler_handlelist.
-                                       addr_array, server_count, NULL);
+                                       addr_array, server_count, 0, NULL);
         if(err < 0)
         {
             PVFS_perror_gossip("PVFS_mgmt_iterate_handles", err);

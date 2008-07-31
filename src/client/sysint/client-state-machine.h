@@ -347,6 +347,7 @@ struct PINT_client_mgmt_iterate_handles_list_sm
     int *handle_count_array;
     PVFS_ds_position *position_array;
     PVFS_error_details *details;
+    int flags;
 };
 
 struct PINT_client_mgmt_get_dfile_array_sm

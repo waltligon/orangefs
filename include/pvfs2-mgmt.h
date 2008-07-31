@@ -124,7 +124,6 @@ enum
     PVFS_MGMT_META_SERVER = 2
 };
 
-
 PVFS_error PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
@@ -272,6 +271,7 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
     PVFS_ds_position *position_array,
     PVFS_BMI_addr_t *addr_array,
     int server_count,
+    int flags,
     PVFS_error_details *details,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr);
@@ -284,6 +284,7 @@ PVFS_error PVFS_mgmt_iterate_handles_list(
     PVFS_ds_position *position_array,
     PVFS_BMI_addr_t *addr_array,
     int server_count,
+    int flags,
     PVFS_error_details *details);
 
 PVFS_error PVFS_imgmt_get_dfile_array(

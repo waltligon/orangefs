@@ -1341,26 +1341,30 @@ struct PVFS_servreq_mgmt_iterate_handles
 {
     PVFS_fs_id fs_id;
     int32_t handle_count;
+    int32_t flags;
     PVFS_ds_position position;
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_mgmt_iterate_handles,
     PVFS_fs_id, fs_id,
     int32_t, handle_count,
+    int32_t, flags,
     PVFS_ds_position, position)
 
 #define PINT_SERVREQ_MGMT_ITERATE_HANDLES_FILL(__req,              \
                                         __creds,                   \
                                         __fs_id,                   \
                                         __handle_count,            \
-                                        __position)                \
+                                        __position,                \
+                                        __flags)                   \
 do {                                                               \
     memset(&(__req), 0, sizeof(__req));                            \
     (__req).op = PVFS_SERV_MGMT_ITERATE_HANDLES;                   \
     (__req).credentials = (__creds);                               \
     (__req).u.mgmt_iterate_handles.fs_id = (__fs_id);              \
     (__req).u.mgmt_iterate_handles.handle_count = (__handle_count);\
-    (__req).u.mgmt_iterate_handles.position = (__position);        \
+    (__req).u.mgmt_iterate_handles.position = (__position),        \
+    (__req).u.mgmt_iterate_handles.flags = (__flags);              \
 } while (0)
 
 struct PVFS_servresp_mgmt_iterate_handles

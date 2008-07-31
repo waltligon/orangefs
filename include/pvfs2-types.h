@@ -824,6 +824,11 @@ enum PVFS_io_type
  */
 #define PVFS2_SUPER_MAGIC 0x20030528
 
+/* flag value that can be used with mgmt_iterate_handles to retrieve
+ * reserved handle values
+ */
+#define PVFS_MGMT_RESERVED 1
+
 #endif /* __PVFS2_TYPES_H */
 
 /*
