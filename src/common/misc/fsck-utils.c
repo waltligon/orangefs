@@ -1474,6 +1474,7 @@ static int PINT_handle_wrangler_display_stranded_handles(
     PVFS_object_ref pref;
     const char *server_name = NULL;
     int header = 0;
+    char buf[128] = {0};
 
     for (i = 0; i < PINT_handle_wrangler_handlelist.num_servers; i++)
     {
@@ -1501,49 +1502,51 @@ static int PINT_handle_wrangler_display_stranded_handles(
                 /* get this objects attributes */
                 ret = PVFS_fsck_get_attributes(fsck_options, &pref, creds,
                                          &attributes);
-                if(ret < 0)
-                {
-                    PVFS_perror_gossip("PVFS_fsck_get_attributes", ret);
-                    gossip_err("Error: unable to retrieve attributes for handle [%llu]\n", 
-                        llu(pref.handle));
-                    return(ret);
-                }
-
+                
                 printf(" %llu   %d  ",
                        llu(PINT_handle_wrangler_handlelist.list_array[i][j]),
                        *cur_fs);
 
-                if (attributes.attr.mask & PVFS_ATTR_SYS_SIZE)
+                if(ret < 0)
                 {
-                    printf("%13lld   ", lld(attributes.attr.size));
+                    PVFS_strerror_r(ret, buf, 127);
+                    printf("Unknown: getattr error: %s)\n", buf);
                 }
+                else
+                {
 
-                switch (attributes.attr.objtype)
-                {
-                case PVFS_TYPE_NONE:
-                    printf("none     ");
-                    break;
-                case PVFS_TYPE_METAFILE:
-                    printf("meta file");
-                    break;
-                case PVFS_TYPE_DATAFILE:
-                    printf("data file");
-                    break;
-                case PVFS_TYPE_DIRECTORY:
-                    printf("directory");
-                    break;
-                case PVFS_TYPE_SYMLINK:
-                    printf("symlink  ");
-                    free(attributes.attr.link_target);
-                    break;
-                case PVFS_TYPE_DIRDATA:
-                    printf("dirdata  ");
-                    break;
-                case PVFS_TYPE_INTERNAL:
-                    printf("internal  ");
-                    break;
+                    if (attributes.attr.mask & PVFS_ATTR_SYS_SIZE)
+                    {
+                        printf("%13lld   ", lld(attributes.attr.size));
+                    }
+
+                    switch (attributes.attr.objtype)
+                    {
+                    case PVFS_TYPE_NONE:
+                        printf("none     ");
+                        break;
+                    case PVFS_TYPE_METAFILE:
+                        printf("meta file");
+                        break;
+                    case PVFS_TYPE_DATAFILE:
+                        printf("data file");
+                        break;
+                    case PVFS_TYPE_DIRECTORY:
+                        printf("directory");
+                        break;
+                    case PVFS_TYPE_SYMLINK:
+                        printf("symlink  ");
+                        free(attributes.attr.link_target);
+                        break;
+                    case PVFS_TYPE_DIRDATA:
+                        printf("dirdata  ");
+                        break;
+                    case PVFS_TYPE_INTERNAL:
+                        printf("internal  ");
+                        break;
+                    }
+                    printf("   %s\n", server_name);
                 }
-                printf("   %s\n", server_name);
             }
         }
     }
