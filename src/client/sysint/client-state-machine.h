@@ -89,6 +89,49 @@ struct PINT_client_create_sm
     PVFS_object_attr cache_attr;
 };
 
+/* flag to disable cached lookup during getattr nested sm */
+#define PINT_SM_GETATTR_BYPASS_CACHE 1
+
+typedef struct PINT_sm_getattr_state
+{
+    PVFS_object_ref object_ref;
+
+   /* request sys attrmask.  Some combination of
+     * PVFS_ATTR_SYS_*
+     */
+    uint32_t req_attrmask;
+    
+    /*
+      Either from the acache or full getattr op, this is the resuling
+      attribute that can be used by calling state machines
+    */
+    PVFS_object_attr attr;
+
+    PVFS_ds_type ref_type;
+
+    PVFS_size * size_array;
+    PVFS_size size;
+
+    int flags;
+    
+} PINT_sm_getattr_state;
+
+#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
+    do { \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+        (_state).object_ref.fs_id = (_objref).fs_id; \
+        (_state).object_ref.handle = (_objref).handle; \
+        (_state).req_attrmask = _mask; \
+        (_state).ref_type = _reftype; \
+        (_state).flags = _flags; \
+    } while(0)
+
+#define PINT_SM_GETATTR_STATE_CLEAR(_state) \
+    do { \
+        PINT_free_object_attr(&(_state).attr); \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+    } while(0)
+
 struct PINT_client_mkdir_sm
 {
     char *object_name;              /* input parameter  */
@@ -100,6 +143,7 @@ struct PINT_client_mkdir_sm
     int retry_count;
     int stored_error_code;
     PVFS_handle metafile_handle;
+    PINT_sm_getattr_state metafile_getattr;
 };
 
 struct PINT_client_symlink_sm
@@ -376,49 +420,6 @@ struct PINT_server_fetch_config_sm_state
     char **fs_config_bufs;
     int32_t *fs_config_buf_size;
 };
-
-/* flag to disable cached lookup during getattr nested sm */
-#define PINT_SM_GETATTR_BYPASS_CACHE 1
-
-typedef struct PINT_sm_getattr_state
-{
-    PVFS_object_ref object_ref;
-
-   /* request sys attrmask.  Some combination of
-     * PVFS_ATTR_SYS_*
-     */
-    uint32_t req_attrmask;
-    
-    /*
-      Either from the acache or full getattr op, this is the resuling
-      attribute that can be used by calling state machines
-    */
-    PVFS_object_attr attr;
-
-    PVFS_ds_type ref_type;
-
-    PVFS_size * size_array;
-    PVFS_size size;
-
-    int flags;
-    
-} PINT_sm_getattr_state;
-
-#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
-    do { \
-        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-        (_state).object_ref.fs_id = (_objref).fs_id; \
-        (_state).object_ref.handle = (_objref).handle; \
-        (_state).req_attrmask = _mask; \
-        (_state).ref_type = _reftype; \
-        (_state).flags = _flags; \
-    } while(0)
-
-#define PINT_SM_GETATTR_STATE_CLEAR(_state) \
-    do { \
-        PINT_free_object_attr(&(_state).attr); \
-        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-    } while(0)
 
 #define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
     do { \

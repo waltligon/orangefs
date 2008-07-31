@@ -4,7 +4,7 @@
  * Changes by Acxiom Corporation to add PINT_check_mode() helper function
  * as a replacement for check_mode() in permission checking, also added
  * PINT_check_group() for supplimental group support 
- * Copyright © Acxiom Corporation, 2005.
+ * Copyright Acxiom Corporation, 2005.
  *
  * See COPYING in top-level directory.
  */
@@ -229,10 +229,13 @@ void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gi
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
     int acl_error_code = 0;
+
+    *op_mask = 0;
     
+    /* root has every possible capability */
     if (uid == 0)
     {
-        *op_mask = ~0;
+        *op_mask = ~0L;
         return;
     }
     
@@ -242,19 +245,28 @@ void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gi
     {
         acl_error_code = PINT_check_acls(s_op->val.buffer, s_op->val.read_sz,
                            &attr, uid, gid[i], PVFS2_ACL_READ);
-        if (acl_error_code == 0) *op_mask |= PINT_CAP_READ;
-        else if (acl_error_code == -PVFS_EIO) break;
-        acl_error_code = 0;
+        if (!acl_error_code)
+        {
+            *op_mask |= PINT_CAP_READ;
+        }
+        else if (acl_error_code == -PVFS_EIO)
+        {
+            break;
+        }
                            
         acl_error_code = PINT_check_acls(s_op->val.buffer, s_op->val.read_sz,
                            &attr, uid, gid[i], PVFS2_ACL_WRITE);
-        if (acl_error_code == 0) *op_mask |= PINT_CAP_WRITE;
-        acl_error_code = 0;
+        if (!acl_error_code)
+        {
+            *op_mask |= PINT_CAP_WRITE;
+        }
                            
         acl_error_code = PINT_check_acls(s_op->val.buffer, s_op->val.read_sz,
                            &attr, uid, gid[i], PVFS2_ACL_EXECUTE);
-        if (acl_error_code == 0) *op_mask |= PINT_CAP_EXEC;
-        acl_error_code = 0;
+        if (!acl_error_code)
+        {
+            *op_mask |= PINT_CAP_EXEC;
+        }
     }
     
     /* only check standard permissions if ACL is not in place */
@@ -266,21 +278,42 @@ void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gi
         {
             if (attr.group == gid[i]) break;
         }
+        /* reset to prevent overflow */
+        if (i == num_groups)
+        {
+            i = 0;
+        }
     
-        if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_READABLE) == 0)
+        if (!PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_READABLE))
+        {
             *op_mask |= PINT_CAP_READ;
-        if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_WRITABLE) == 0)
+        }
+        
+        if (!PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_WRITABLE))
+        {
             *op_mask |= PINT_CAP_WRITE;
-        if (PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_EXECUTABLE) == 0)
+        }
+        
+        if (!PINT_check_mode(&attr, uid, gid[i], PINT_ACCESS_EXECUTABLE))
+        {
             *op_mask |= PINT_CAP_EXEC;
+        }
     }   
     
     /* give setattr and remove/create caps based on uid and op_mask */
+
+    /* TODO: fix this nasty ownership issue */
     if (uid == attr.owner || attr.owner == 0)
+    {
         *op_mask |= PINT_CAP_SETATTR;
+    }
+    
+    /* write access to directories allows create and remove */
     if (attr.objtype == PVFS_TYPE_DIRECTORY 
-            && *op_mask & PINT_ACCESS_WRITABLE)
+        && *op_mask & PINT_ACCESS_WRITABLE)
+    {
         *op_mask |= PINT_CAP_REMOVE | PINT_CAP_CREATE;
+    }
 }
 
 

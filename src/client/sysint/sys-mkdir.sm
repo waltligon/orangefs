@@ -77,7 +77,7 @@ machine pvfs2_client_mkdir_sm
     state mkdir_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => mkdir_seteattr_setup_msgpair;
+        success => mkdir_getattr_setup;
         default => mkdir_msg_failure;
     }
 
@@ -85,6 +85,19 @@ machine pvfs2_client_mkdir_sm
     {
         run mkdir_msg_failure;
         default => cleanup;
+    }
+    
+    state mkdir_getattr_setup
+    {
+        run mkdir_getattr_setup;
+        default => mkdir_getattr;
+    }
+
+    state mkdir_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => mkdir_seteattr_setup_msgpair;
+        default => delete_handle_setup_msgpair;
     }
 
     state mkdir_seteattr_setup_msgpair
@@ -480,7 +493,7 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        sm_p->getattr.attr.capability,
+        sm_p->u.mkdir.metafile_getattr.attr.capability,
         sm_p->object_ref.fs_id,
         sm_p->u.mkdir.metafile_handle);
 
@@ -519,6 +532,9 @@ static PINT_sm_action mkdir_cleanup(
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
 
+    /* TODO: ensure this is always safe to call */
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->u.mkdir.metafile_getattr);
+    
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     sm_p->error_code = (sm_p->u.mkdir.stored_error_code ?
@@ -591,6 +607,26 @@ static PINT_sm_action mkdir_parent_getattr_inspect(
 
     return SM_ACTION_COMPLETE;
 }
+
+static PINT_sm_action mkdir_getattr_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_ref ref;
+
+    ref.fs_id = sm_p->object_ref.fs_id;
+    ref.handle = sm_p->u.mkdir.metafile_handle;
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->u.mkdir.metafile_getattr,
+        ref,
+        PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_DIRECTORY,
+        0);
+    
+    return SM_ACTION_COMPLETE;
+}
+
 
 static PINT_sm_action mkdir_seteattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -697,7 +733,7 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(
 
     PINT_SERVREQ_SETEATTR_FILL(
             msg_p->req,
-            sm_p->getattr.attr.capability,
+            sm_p->u.mkdir.metafile_getattr.attr.capability,
             sm_p->object_ref.fs_id,
             sm_p->u.mkdir.metafile_handle,
             0,
