@@ -49,18 +49,12 @@ machine pvfs2_lookup_sm
     {
         run lookup_read_directory_entry_handle;
         success => read_directory_entry;
-        default => setup_resp;
+        default => final_response;
     }
     
     state read_directory_entry
     {
         run lookup_read_directory_entry;
-        default => setup_resp;
-    }
-    
-    state setup_resp 
-    {
-        run lookup_setup_resp;
         default => final_response;
     }
 
@@ -95,19 +89,13 @@ static PINT_sm_action lookup_init(
 
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
-    s_op->u.lookup.seg_nr = 0;
-    s_op->u.lookup.seg_ct = 1;
-    s_op->u.lookup.handle_ct = 0;
-    s_op->u.lookup.attr_ct = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, " STARTING LOOKUP REQUEST "
-                     "(path:%s)(fs_id:%d)(handle:%llu)(attrmask:%u)"
-                     "(# of segments:%u)\n",
+                     "(path:%s)(fs_id:%d)(handle:%llu)(attrmask:%u)\n",
                      s_op->req->u.lookup_path.path,
                      s_op->req->u.lookup_path.fs_id,
                      llu(s_op->req->u.lookup_path.handle),
-                     s_op->req->u.lookup_path.attrmask,
-                     s_op->u.lookup.seg_ct);
+                     s_op->req->u.lookup_path.attrmask);
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -196,28 +184,6 @@ static PINT_sm_action lookup_read_directory_entry(
     return ret;
 }
 
-
-static PINT_sm_action lookup_setup_resp(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    if(js_p->error_code == 0)
-    {
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, "path: %s, handle: %llu\n", 
-            s_op->req->u.lookup_path.path, 
-            llu(s_op->resp.u.lookup_path.handle));
-    }
-    else
-    {
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, "path: %s, lookup failed\n", 
-            s_op->req->u.lookup_path.path);
-    }
-
-    return SM_ACTION_COMPLETE;
-}
 
 /*
  * Function: lookup_cleanup

@@ -389,7 +389,9 @@ static int perm_remove(PINT_server_op *s_op)
 {
     int ret;
 
-    if (s_op->req->capability.op_mask & PINT_CAP_REMOVE)
+    /* temporary stop-gap till we figure out how to handle removal tasks */
+    /* TODO:  Fix this */
+    if (1 || s_op->req->capability.op_mask & PINT_CAP_REMOVE)
     {
         ret = 0;
     }

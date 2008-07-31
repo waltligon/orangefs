@@ -236,10 +236,6 @@ void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gi
         return;
     }
     
-    /* temporary stop-gap...fix after create is finished */
-    /* TODO:  Do permissions checking on consolidated create */
-    *op_mask |= PINT_CAP_CREATE;
-    
     /* do ACL checks here...kinda slow to do it this way, but works for now */
     /* TODO:  Rewrite ACL checks entirely to handle multiple groups */
     for (i = 0; i < num_groups; i++)
@@ -280,7 +276,7 @@ void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gi
     }   
     
     /* give setattr and remove/create caps based on uid and op_mask */
-    if (uid == attr.owner)
+    if (uid == attr.owner || attr.owner == 0)
         *op_mask |= PINT_CAP_SETATTR;
     if (attr.objtype == PVFS_TYPE_DIRECTORY 
             && *op_mask & PINT_ACCESS_WRITABLE)

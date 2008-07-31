@@ -98,7 +98,7 @@ machine pvfs2_client_create_sm
     state datafiles_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
-        success => create_setattr_setup_msgpair;
+        success => new_metafile_init;
         default => datafiles_failure;
     }
 
@@ -106,6 +106,20 @@ machine pvfs2_client_create_sm
     {
         run create_datafiles_failure;
         default => delete_handles_setup_msgpair_array;
+    }
+    
+    state new_metafile_init
+    {
+        run getattr_new_metafile_init;
+        success => getattr_new_metafile;
+        default => create_setattr_failure;
+    }
+    
+    state getattr_new_metafile
+    {
+        jump pvfs2_client_getattr_sm;
+        success => create_setattr_setup_msgpair;
+        default => create_setattr_failure;
     }
 
     state create_setattr_setup_msgpair
@@ -118,7 +132,7 @@ machine pvfs2_client_create_sm
     state create_setattr_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => crdirent_setup_msgpair;
+        success => crdirent_init;
         default => create_setattr_failure;
     }
 
@@ -126,6 +140,20 @@ machine pvfs2_client_create_sm
     {
         run create_setattr_failure;
         default => delete_handles_setup_msgpair_array;
+    }
+    
+    state crdirent_init
+    {
+        run getattr_crdirent_init;
+        success => getattr_crdirent;
+        default => crdirent_failure;
+    }
+    
+    state getattr_crdirent
+    {
+        jump pvfs2_client_getattr_sm;
+        success => crdirent_setup_msgpair;
+        default => crdirent_failure;
     }
 
     state crdirent_setup_msgpair
@@ -401,7 +429,7 @@ static PINT_sm_action create_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT, 
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -540,9 +568,6 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
     int server_type;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
@@ -587,7 +612,7 @@ static PINT_sm_action create_dspace_create_setup_msgpair(
 
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
-        xxremovemexx,
+        sm_p->getattr.attr.capability,
         *sm_p->newcred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_METAFILE,
@@ -609,9 +634,6 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
     int ret = -PVFS_EINVAL, i = 0;
     PINT_sm_msgpair_state *msg_p;
     int server_type;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "datafiles_setup_msgpair_array\n");
@@ -685,7 +707,7 @@ static PINT_sm_action create_datafiles_setup_msgpair_array(
 
         PINT_SERVREQ_CREATE_FILL(
             msg_p->req,
-            xxremovemexx,
+            sm_p->getattr.attr.capability,
             *sm_p->newcred_p,
             sm_p->object_ref.fs_id,
             PVFS_TYPE_DATAFILE,
@@ -721,15 +743,34 @@ static PINT_sm_action create_datafiles_failure(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action getattr_new_metafile_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_ref temp;
+    
+    temp.handle = sm_p->u.create.metafile_handle;
+    temp.fs_id = sm_p->object_ref.fs_id;
+    
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: grabbing cap for meta\n");
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        temp,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_METAFILE,
+        0);
+
+   return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action create_setattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: setattr_setup_msgpair\n");
@@ -743,7 +784,7 @@ static PINT_sm_action create_setattr_setup_msgpair(
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
-        xxremovemexx,
+        sm_p->getattr.attr.capability,
         sm_p->object_ref.fs_id,
         sm_p->u.create.metafile_handle,
         PVFS_TYPE_METAFILE,
@@ -788,15 +829,30 @@ static PINT_sm_action create_setattr_failure(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action getattr_crdirent_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: grabbing cap crdirent\n");
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+   return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action create_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
@@ -815,7 +871,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        xxremovemexx,
+        sm_p->getattr.attr.capability,
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
         sm_p->object_ref.handle,
@@ -864,9 +920,9 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     int ret = -PVFS_EINVAL, i = 0, actual_count = 0;
     PVFS_BMI_addr_t metafile_server_addr;
     PINT_sm_msgpair_state *msg_p;
-    PVFS_capability xxremovemexx;
+    const PVFS_capability *capability;
 
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
+    capability = PINT_null_capability();
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "delete_handles_setup_msgpair_array\n");
@@ -928,7 +984,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         {
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
-                xxremovemexx,
+                *capability,
                 sm_p->object_ref.fs_id,
                 sm_p->u.create.metafile_handle);
 
@@ -945,7 +1001,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         {
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
-                xxremovemexx,
+                *capability,
                 sm_p->object_ref.fs_id,
                 sm_p->u.create.datafile_handles[i]);
 

@@ -9,6 +9,8 @@
  *
  *  PVFS2 system interface routines for dereferencing path strings.
  */
+ 
+ /* TODO:  Figure out how to clear getattr when looping */
 
 #include <string.h>
 #include <assert.h>

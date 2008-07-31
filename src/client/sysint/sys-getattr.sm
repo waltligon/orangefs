@@ -317,7 +317,8 @@ static PINT_sm_action getattr_acache_lookup(
 	sm_p->getattr.req_attrmask |= PVFS_ATTR_META_ALL;
     }
 
-    if(sm_p->getattr.flags & PINT_SM_GETATTR_BYPASS_CACHE)
+    if(sm_p->getattr.flags & PINT_SM_GETATTR_BYPASS_CACHE ||
+       sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: forced acache miss: "
                     " [%llu]\n",
@@ -517,30 +518,30 @@ static int getattr_object_getattr_comp_fn(
     
 #if 0
     gossip_err("Owner: %u\n", 
-        (unsigned int) resp_p->u.getattr.attr.capability.owner);
+        (unsigned int) sm_p->getattr.attr.capability.owner);
     gossip_err("Op mask: %d\n", 
-        resp_p->u.getattr.attr.capability.op_mask);
+        sm_p->getattr.attr.capability.op_mask);
     gossip_err("Fsid: %d\n", 
-        resp_p->u.getattr.attr.capability.fsid);
+        sm_p->getattr.attr.capability.fsid);
     gossip_err("Handles: %d\n", 
-        resp_p->u.getattr.attr.capability.num_handles);
-    if (resp_p->u.getattr.attr.capability.num_handles > 0) 
+        sm_p->getattr.attr.capability.num_handles);
+    if (sm_p->getattr.attr.capability.num_handles > 0) 
         gossip_err("Handle: %llu\n", 
-            (long long unsigned int) resp_p->u.getattr.attr.capability.handle_array[0]);
+            (long long unsigned int) sm_p->getattr.attr.capability.handle_array[0]);
     gossip_err("Sig size: %d\n", 
-        resp_p->u.getattr.attr.capability.sig_size);
-    if (resp_p->u.getattr.attr.capability.signature) 
+        sm_p->getattr.attr.capability.sig_size);
+    if (sm_p->getattr.attr.capability.signature) 
         gossip_err("Sig: %d%d%d%d%d%d%d%d%d%d\n", 
-                resp_p->u.getattr.attr.capability.signature[0],
-                resp_p->u.getattr.attr.capability.signature[1],
-                resp_p->u.getattr.attr.capability.signature[2],
-                resp_p->u.getattr.attr.capability.signature[3],
-                resp_p->u.getattr.attr.capability.signature[4],
-                resp_p->u.getattr.attr.capability.signature[5],
-                resp_p->u.getattr.attr.capability.signature[6],
-                resp_p->u.getattr.attr.capability.signature[7],
-                resp_p->u.getattr.attr.capability.signature[8],
-                resp_p->u.getattr.attr.capability.signature[9]);
+                sm_p->getattr.attr.capability.signature[0],
+                sm_p->getattr.attr.capability.signature[1],
+                sm_p->getattr.attr.capability.signature[2],
+                sm_p->getattr.attr.capability.signature[3],
+                sm_p->getattr.attr.capability.signature[4],
+                sm_p->getattr.attr.capability.signature[5],
+                sm_p->getattr.attr.capability.signature[6],
+                sm_p->getattr.attr.capability.signature[7],
+                sm_p->getattr.attr.capability.signature[8],
+                sm_p->getattr.attr.capability.signature[9]);
 #endif
 
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
