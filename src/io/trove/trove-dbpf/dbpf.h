@@ -18,6 +18,7 @@ extern "C" {
 #include "pvfs2-internal.h"
 #include "dbpf-keyval-pcache.h"
 #include "dbpf-open-cache.h"
+#include "dbpf-sync.h"
 
 /* For unknown Berkeley DB errors, we return some large value
  */
@@ -199,6 +200,7 @@ struct dbpf_collection
     DB *ds_db;
     DB *keyval_db;
     DB_ENV *coll_env;
+    dbpf_db_reptab_t reptab;
     TROVE_coll_id coll_id;
     TROVE_handle root_dir_handle;
     struct dbpf_storage *storage;
@@ -543,6 +545,7 @@ struct dbpf_collection *dbpf_collection_find_registered(
     TROVE_coll_id coll_id);
 void dbpf_collection_clear_registered(void);
 void dbpf_collection_deregister(struct dbpf_collection *entry);
+dbpf_db_reptab_t *dbpf_collection_find_dbrebtab(DB_ENV *dbenv);
 
 /* function for mapping db errors to trove errors */
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);

@@ -42,6 +42,20 @@ typedef struct
     struct qlist_head *txn_queue;
 } dbpf_txn_context_t;
 
+typedef struct
+{
+    int eid;
+    BMI_addr_t addr;
+    struct qlist_head link;
+}dbpf_db_reptab_entry_t;
+
+typedef struct
+{
+    int self_eid;
+    int master_eid;
+    struct qlist_head *rep_table;
+}dbpf_db_reptab_t;
+
 int dbpf_sync_context_init(int context_index);
 void dbpf_sync_context_destroy(int context_index);
 
@@ -65,6 +79,9 @@ int dbpf_txn_coalesce_dequeue(dbpf_queued_op_t *qop_p);
 int dbpf_txn_coalesce_enqueue(dbpf_queued_op_t *qop_p);
 
 int dbpf_txn_queue_add(TROVE_context_id context_index, DB *dbp, DBT *key, DBT *data);
+
+int dbpf_reptab_init(dbpf_db_reptab_t *table);
+void dbpf_reptab_destroy(dbpf_db_reptab_t *table);
 /*
  * Local variables:
  *  c-indent-level: 4

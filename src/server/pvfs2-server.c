@@ -792,7 +792,7 @@ static int server_initialize_subsystems(
                         cur_fs->file_system_name);
             return ret;
         }
-
+				 
         if(orig_fsid != cur_fs->coll_id)
         {
             gossip_err("Error: configuration file does not match storage collection.\n");
@@ -1045,7 +1045,7 @@ static int server_initialize_subsystems(
     }
     *server_status_flag |= SERVER_EVENT_INIT;
 
-    cur = server_config.file_systems;
+    /*cur = server_config.file_systems;
     while(cur)
     {
         cur_fs = PINT_llist_head(cur);
@@ -1053,14 +1053,14 @@ static int server_initialize_subsystems(
         {
             break;
         }
-
+    */
 	/*Rongrong: for replication*/
-	ret = trove_collection_setinfo(
+    /*	ret = trove_collection_setinfo(
 	    cur_fs->coll_id, trove_context,
 	    TROVE_DB_REPLICATION_START,
 	    &server_config.is_rep_master);
         cur = PINT_llist_next(cur);
-    }
+    }*/
 
     return ret;
 }

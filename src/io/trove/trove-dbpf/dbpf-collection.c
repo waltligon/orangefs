@@ -141,6 +141,15 @@ void dbpf_collection_clear_registered(void)
     root_coll_p = NULL;
 }
 
+dbpf_db_reptab_t *dbpf_collection_find_dbrebtab(DB_ENV *dbenv)
+{
+    struct dbpf_collection *ptr = root_coll_p;
+    while((ptr != NULL) && (ptr->coll_env != dbenv))
+    {
+	ptr = ptr->next_p;
+    }
+    return &(ptr->reptab);
+}
 /*
  * Local variables:
  *  c-indent-level: 4
