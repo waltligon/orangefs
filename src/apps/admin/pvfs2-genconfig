@@ -946,17 +946,36 @@ sub get_metanames
     my $storage = shift;
     my $logfile = shift;
     my $metaline = '';
+    my @meta_hosts;
     if ($opt_metaservers) {
         $metaline = $opt_metaservers;
-    } else {
-        print $OUT "Now list the hostnames of the machines that will act as " .
-                   "Metadata\nservers.  This list may or may not overlap " .
-                   "with the I/O server list.\n";
+        @meta_hosts = parse_hostlist($metaline);
+    } 
+    else 
+    {
+        print $OUT "Use same servers for metadata? (recommended)\n";
         $metaline = prompt_word(
-            "Enter hostnames [Default is localhost]: ",
-            "localhost");
+            "Enter yes or no [Default is yes]: ",
+            "yes");
+        if($metaline =~ /^yes$/i)
+        {
+            foreach my $alias (keys %all_endpoints)
+            {
+                $all_endpoints{$alias}->{TYPE} |= $META_ENDPOINT;
+            }
+        }
+        else
+        {
+            print $OUT "Now list the hostnames of the machines that will act as " .
+                       "Metadata\nservers.  This list may or may not overlap " .
+                       "with the I/O server list.\n";
+            $metaline = prompt_word(
+                "Enter hostnames [Default is localhost]: ",
+                "localhost");
+            @meta_hosts = parse_hostlist($metaline);
+        }
     }
-    my @meta_hosts = parse_hostlist($metaline);
+
     foreach my $meta_host (@meta_hosts)
     {
         if(exists $all_endpoints{$meta_host})
