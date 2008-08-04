@@ -168,11 +168,17 @@ static int parse_mount_options(
                                 "ignoring %s\n", options[i]);
                 }
 #else
-                /* in the 2.6 kernel, we don't pass device name through this
-                 * path; we must have gotten an unsupported option.
+                /* filter out NULL option strings (older 2.6 kernels may leave 
+                 * these after parsing out standard options like noatime) 
                  */
-                gossip_err("Error: mount option [%s] is not supported.\n", options[i]);
-                return(-EINVAL);
+                if(options[i][0] != '\0')
+                {
+                    /* in the 2.6 kernel, we don't pass device name through this
+                     * path; we must have gotten an unsupported option.
+                     */
+                    gossip_err("Error: mount option [%s] is not supported.\n", options[i]);
+                    return(-EINVAL);
+                }
 #endif
             }
         }
@@ -1307,6 +1313,13 @@ struct super_block *pvfs2_get_sb(
 
         if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {
+            /* Older 2.6 kernels pass in NOATIME flag here.  Capture it 
+             * if present.
+             */
+            if(flags & MS_NOATIME)
+            {
+                sb->s_flags |= MS_NOATIME;
+            }
             /* on successful mount, store the devname and data used */
             strncpy(PVFS2_SB(sb)->devname, devname,
                     PVFS_MAX_SERVER_ADDR_LEN);
