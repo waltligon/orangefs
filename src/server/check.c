@@ -305,7 +305,7 @@ void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gi
     /* TODO: fix this nasty ownership issue */
     if (uid == attr.owner || attr.owner == 0)
     {
-        *op_mask |= PINT_CAP_SETATTR;
+        *op_mask |= PINT_CAP_SETATTR | PINT_CAP_READ | PINT_CAP_WRITE;
     }
     
     /* write access to directories allows create and remove */
