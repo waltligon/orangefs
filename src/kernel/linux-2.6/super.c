@@ -320,6 +320,7 @@ static void pvfs2_clear_inode(struct inode *inode)
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
+#ifdef HAVE_PUT_INODE
 /* called when the VFS removes this inode from the inode cache */
 static void pvfs2_put_inode(
     struct inode *inode)
@@ -349,6 +350,7 @@ static void pvfs2_put_inode(
 #endif
     }
 }
+#endif /* HAVE_PUT_INODE */
 
 #ifdef HAVE_STATFS_LITE_SUPER_OPERATIONS
 static int pvfs2_statfs_lite(
@@ -852,14 +854,18 @@ struct super_operations pvfs2_s_ops =
     clear_inode: pvfs2_clear_inode,
     put_inode: pvfs2_put_inode,
 #else
+#ifdef HAVE_DROP_INODE
     .drop_inode = generic_delete_inode,
+#endif
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,
 #ifdef HAVE_READ_INODE
     .read_inode = pvfs2_read_inode,
 #endif
     .dirty_inode = pvfs2_dirty_inode,
+#ifdef HAVE_PUT_INODE
     .put_inode = pvfs2_put_inode,
+#endif
     .statfs = pvfs2_statfs,
     .remount_fs = pvfs2_remount,
 #ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
