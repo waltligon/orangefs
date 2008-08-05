@@ -41,6 +41,10 @@ int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
 
 PINT_manager_t io_thread_mgr;
 PINT_worker_id io_worker_id;
+PINT_queue_id io_queue_id;
+extern int TROVE_max_concurrent_io;
+int dbpf_aligned_blocks_init(void);
+int dbpf_aligned_blocks_finalize(void);
 
 int dbpf_thread_initialize(void)
 {
@@ -68,6 +72,8 @@ int dbpf_thread_initialize(void)
             GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
     }
 
+    dbpf_aligned_blocks_init();
+
     /* fire up the IO threads for direct IO */
 
     ret = PINT_open_context(&io_ctx, PINT_dbpf_io_completion_callback);
@@ -83,14 +89,33 @@ int dbpf_thread_initialize(void)
         return ret;
     }
 
-    io_worker_attrs.type = PINT_WORKER_TYPE_PER_OP;
-    io_worker_attrs.u.per_op.max_threads = 10000;
+    io_worker_attrs.type = PINT_WORKER_TYPE_THREADED_QUEUES;
+    io_worker_attrs.u.threaded.thread_count = 32;
+    io_worker_attrs.u.threaded.ops_per_queue = 1000;
+    io_worker_attrs.u.threaded.timeout = 0;
     ret = PINT_manager_worker_add(io_thread_mgr, &io_worker_attrs, &io_worker_id);
     if(ret < 0)
     {
         PINT_manager_destroy(io_thread_mgr);
         PINT_close_context(io_ctx);
         return ret;
+    }
+
+    ret = PINT_queue_create(&io_queue_id, NULL);
+    if(ret < 0)
+    {
+	PINT_manager_destroy(io_thread_mgr);
+	PINT_close_context(io_ctx);
+	return ret;
+    }
+
+    ret = PINT_manager_queue_add(io_thread_mgr, io_worker_id, io_queue_id);
+    if(ret < 0)
+    {
+	PINT_queue_destroy(io_queue_id);
+	PINT_manager_destroy(io_thread_mgr);
+	PINT_close_context(io_ctx);
+	return ret;
     }
 
 #endif
@@ -108,6 +133,7 @@ int dbpf_thread_finalize(void)
     pthread_cond_destroy(&dbpf_op_incoming_cond);
 #endif
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_finalize: finalized\n");
+    dbpf_aligned_blocks_finalize();
     return ret;
 }
 

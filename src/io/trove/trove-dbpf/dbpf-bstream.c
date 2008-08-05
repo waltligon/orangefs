@@ -1200,7 +1200,7 @@ inline int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset)
 
     if(ret < 0)
     {
-        return ret;
+        return -trove_errno_to_trove_error(errno);
     }
     return ret_size;
 }
