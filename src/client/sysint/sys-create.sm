@@ -1132,6 +1132,12 @@ static PINT_sm_action create_parent_getattr_inspect(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "parent owner: %d, group: %d, perms: %d\n",
         (int)attr->owner, (int)attr->group, (int)attr->perms);
+        
+    /* new files initially inherit the parent's permissions for creation */
+    sm_p->u.create.sys_attr.perms = attr->perms;
+    
+    /* new files initially inherit the userid of the creator */
+    sm_p->u.create.sys_attr.owner = sm_p->newcred_p->userid;
 
     /* do we have a setgid bit? */
     if(attr->perms & PVFS_G_SGID)

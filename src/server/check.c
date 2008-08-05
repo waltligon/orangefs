@@ -301,11 +301,9 @@ void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gi
     }   
     
     /* give setattr and remove/create caps based on uid and op_mask */
-
-    /* TODO: fix this nasty ownership issue */
-    if (uid == attr.owner || attr.owner == 0)
+    if (uid == attr.owner)
     {
-        *op_mask |= PINT_CAP_SETATTR | PINT_CAP_READ | PINT_CAP_WRITE;
+        *op_mask |= PINT_CAP_SETATTR;
     }
     
     /* write access to directories allows create and remove */
@@ -313,6 +311,13 @@ void PINT_getattr_check_perms(struct PINT_smcb *smcb, PVFS_uid uid, PVFS_gid *gi
         && *op_mask & PINT_ACCESS_WRITABLE)
     {
         *op_mask |= PINT_CAP_REMOVE | PINT_CAP_CREATE;
+    }
+    
+    /* If metafile is not initialized allow setattr to complete */
+    if (attr.u.meta.dfile_count == 0 && attr.u.meta.dist == 0 
+        && attr.owner == 0)
+    {
+        *op_mask |= PINT_CAP_SETATTR;
     }
 }
 
