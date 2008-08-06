@@ -1,4 +1,0 @@
-DIR := correctness
-
-MPIIOTESTSRC += \
-	$(DIR)/mpi-active-delete.c
