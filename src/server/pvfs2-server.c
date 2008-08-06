@@ -1851,6 +1851,7 @@ static int generate_shm_key_hint(void)
 {
     int server_index = 1;
     struct host_alias_s *cur_alias = NULL;
+    struct filesystem_configuration_s *first_fs;
 
     PINT_llist *cur = server_config.host_aliases;
 
@@ -1868,7 +1869,8 @@ static int generate_shm_key_hint(void)
             /* space the shm keys out by 10 to allow for Berkeley DB using 
              * using more than one key on each server
              */
-            return(server_index*10);        
+            first_fs = PINT_llist_head(server_config.file_systems);
+            return(first_fs->coll_id + server_index*10);
         }
 
         server_index++;
