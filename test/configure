@@ -1264,6 +1264,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-verbose-build  Enables full output during build process
+  --disable-thread-safety Disables thread safety in the client library
   --enable-strict         Turn on strict debugging with gcc
 
 Optional Packages:
@@ -4005,6 +4006,21 @@ echo "$as_me: error: --with-mpi must be given a pathname" >&2;}
 	LDFLAGS="${LDFLAGS} -L${withval}/lib"
 	BUILD_MPI="1"
     fi
+
+fi
+
+
+# Check whether --enable-thread-safety was given.
+if test "${enable_thread_safety+set}" = set; then
+  enableval=$enable_thread_safety; if test "x$enableval" = "xno" ; then
+    CFLAGS="$CFLAGS -D__GEN_NULL_LOCKING__"
+    { echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+fi
+else
+     CFLAGS="$CFLAGS -D__GEN_POSIX_LOCKING__"
+    { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
 
 fi
 
