@@ -55,25 +55,19 @@ static void free_nested_getattr_data(struct PINT_server_op *s_op);
 
 nested machine pvfs2_get_attr_work_sm
 {
-    state setup_acl
-    {
-        run getattr_setup_acl;
-        default => verify_attribs;
-    }
-    
     state verify_attribs
     {
         run getattr_verify_attribs;
         STATE_SYMLINK => read_symlink_target;
         STATE_METAFILE => read_metafile_hint;
         STATE_DIR => get_dirdata_handle;
-        default => setup_resp;
+        default => setup_acl;
     }
 
     state read_symlink_target
     {
         run getattr_read_symlink_target;
-        default => setup_resp;
+        default => setup_acl;
     }
 
     state read_metafile_hint
@@ -86,21 +80,21 @@ nested machine pvfs2_get_attr_work_sm
     {
         run getattr_interpret_metafile_hint;
         STATE_METAFILE => read_metafile_datafile_handles_if_required;
-        default => setup_resp;
+        default => setup_acl;
     }
 
     state read_metafile_datafile_handles_if_required
     {
         run getattr_read_metafile_datafile_handles_if_required;
         success => datafile_handles_safety_check;
-        default => setup_resp;
+        default => setup_acl;
     }
 
     state datafile_handles_safety_check
     {
         run getattr_datafile_handles_safety_check;
         success => read_metafile_distribution_if_required; 
-        default => setup_resp;
+        default => setup_acl;
     }
 
     state read_metafile_distribution_if_required
@@ -112,14 +106,14 @@ nested machine pvfs2_get_attr_work_sm
     state distribution_safety_check
     {
         run getattr_distribution_safety_check;
-        default => setup_resp;
+        default => setup_acl;
     }
 
     state get_dirdata_handle
     {
         run getattr_get_dirdata_handle;
         success => get_dirent_count;
-        default => setup_resp;
+        default => setup_acl;
     }
 
     state get_dirent_count
@@ -145,6 +139,12 @@ nested machine pvfs2_get_attr_work_sm
     state interpret_dir_hint
     {
         run getattr_interpret_dir_hint;
+        default => setup_acl;
+    }
+    
+    state setup_acl
+    {
+        run getattr_setup_acl;
         default => setup_resp;
     }
 
@@ -770,21 +770,20 @@ static PINT_sm_action getattr_setup_resp(
                 "Getattr: Capability init failed\n");
             return SM_ACTION_COMPLETE;
         }
-        /* Metafile is in position 0, datafiles if requested in the rest */
-        /* TODO: check for dfile_array before allocating any memory */
-        resp_attr->capability.num_handles = 
-            s_op->resp.u.getattr.attr.u.meta.dfile_count + 1;
-        resp_attr->capability.handle_array = (PVFS_handle *)malloc(
-            sizeof(PVFS_handle) * resp_attr->capability.num_handles);
-        if (resp_attr->capability.handle_array == NULL)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                "Getattr: Malloc for handle array failed\n");
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
         if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
         {
+            /* Metafile is in position 0, datafiles if requested in the rest */
+            resp_attr->capability.num_handles = 
+                s_op->resp.u.getattr.attr.u.meta.dfile_count + 1;
+            resp_attr->capability.handle_array = (PVFS_handle *)malloc(
+                sizeof(PVFS_handle) * resp_attr->capability.num_handles);
+            if (resp_attr->capability.handle_array == NULL)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                    "Getattr: Malloc for handle array failed\n");
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
             memcpy(resp_attr->capability.handle_array + 1, 
                 s_op->resp.u.getattr.attr.u.meta.dfile_array,
                 sizeof(PVFS_handle) *
@@ -792,6 +791,15 @@ static PINT_sm_action getattr_setup_resp(
         }
         else
         {
+            resp_attr->capability.handle_array = (PVFS_handle *)malloc(
+                sizeof(PVFS_handle));
+            if (resp_attr->capability.handle_array == NULL)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                    "Getattr: Malloc for handle array failed\n");
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
             resp_attr->capability.num_handles = 1;
         }
         resp_attr->capability.handle_array[0] = s_op->u.getattr.handle;
@@ -801,6 +809,9 @@ static PINT_sm_action getattr_setup_resp(
             s_op->req->u.getattr.credential.group_array, 
             s_op->req->u.getattr.credential.num_groups, 
             s_op->attr, &resp_attr->capability.op_mask);
+
+        /* done with ACL buffer, free it */
+        free(s_op->val.buffer);
         
         resp_attr->capability.fsid = s_op->u.getattr.fs_id;
             
