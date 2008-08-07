@@ -1701,7 +1701,6 @@ static const struct handle_lookup_entry* find_handle_lookup_entry(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-/* TODO: confirm all ranges are being loaded right */
 static int load_handle_lookup_table(
     struct config_fs_cache_s *cur_config_fs_cache)
 {
