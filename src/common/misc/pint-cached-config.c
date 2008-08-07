@@ -1701,7 +1701,6 @@ static const struct handle_lookup_entry* find_handle_lookup_entry(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-/* TODO: refactor loops over meta and data ranges */
 /* TODO: confirm all ranges are being loaded right */
 static int load_handle_lookup_table(
     struct config_fs_cache_s *cur_config_fs_cache)
@@ -1712,29 +1711,29 @@ static int load_handle_lookup_table(
     int table_offset = 0;
     PINT_llist* server_cursor;
     int i;
+    int j;
+    PINT_llist* range_list[2] = 
+    {
+        cur_config_fs_cache->fs->meta_handle_ranges,
+        cur_config_fs_cache->fs->data_handle_ranges
+    };
 
     /* count total number of extents */
-    server_cursor = cur_config_fs_cache->fs->meta_handle_ranges;
-    cur_mapping = PINT_llist_head(server_cursor);
-    while(cur_mapping)
+    /* loop through both meta and data ranges */
+    for(j=0; j<2; j++)
     {
-        for(i=0; i<cur_mapping->handle_extent_array.extent_count; i++)
-        {
-            count += 1;
-        }
-        server_cursor = PINT_llist_next(server_cursor);
+        server_cursor = range_list[j];
         cur_mapping = PINT_llist_head(server_cursor);
-    }
-    server_cursor = cur_config_fs_cache->fs->data_handle_ranges;
-    cur_mapping = PINT_llist_head(server_cursor);
-    while(cur_mapping)
-    {
-        for(i=0; i<cur_mapping->handle_extent_array.extent_count; i++)
+        while(cur_mapping)
         {
-            count += 1;
+            /* each server may have multiple extents */
+            for(i=0; i<cur_mapping->handle_extent_array.extent_count; i++)
+            {
+                count += 1;
+            }
+            server_cursor = PINT_llist_next(server_cursor);
+            cur_mapping = PINT_llist_head(server_cursor);
         }
-        server_cursor = PINT_llist_next(server_cursor);
-        cur_mapping = PINT_llist_head(server_cursor);
     }
 
     /* allocate a table to hold all extents for faster searching */
@@ -1751,55 +1750,34 @@ static int load_handle_lookup_table(
     cur_config_fs_cache->handle_lookup_table_size = count;
 
     /* populate table */
-    server_cursor = cur_config_fs_cache->fs->meta_handle_ranges;
-    cur_mapping = PINT_llist_head(server_cursor);
-    while(cur_mapping)
+    /* loop through both meta and data ranges */
+    for(j=0; j<2; j++)
     {
-        for(i=0; i<cur_mapping->handle_extent_array.extent_count; i++)
-        {
-            cur_config_fs_cache->handle_lookup_table[table_offset].extent 
-                = cur_mapping->handle_extent_array.extent_array[i];
-            cur_config_fs_cache->handle_lookup_table[table_offset].server_name
-                = cur_mapping->alias_mapping->bmi_address;
-            ret = BMI_addr_lookup(
-                &cur_config_fs_cache->handle_lookup_table[table_offset].server_addr,                 
-                cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
-            if(ret < 0)
-            {
-                free(cur_config_fs_cache->handle_lookup_table);
-                gossip_err("Error: failed to resolve address of server: %s\n",
-                    cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
-                return(ret);
-            }
-            table_offset++;
-        }
-        server_cursor = PINT_llist_next(server_cursor);
+        server_cursor = range_list[j];
         cur_mapping = PINT_llist_head(server_cursor);
-    }
-    server_cursor = cur_config_fs_cache->fs->data_handle_ranges;
-    cur_mapping = PINT_llist_head(server_cursor);
-    while(cur_mapping)
-    {
-        for(i=0; i<cur_mapping->handle_extent_array.extent_count; i++)
+        while(cur_mapping)
         {
-            cur_config_fs_cache->handle_lookup_table[table_offset].extent 
-                = cur_mapping->handle_extent_array.extent_array[i];
-            cur_config_fs_cache->handle_lookup_table[table_offset].server_name
-                = cur_mapping->alias_mapping->bmi_address;
-            ret = BMI_addr_lookup(
-                &cur_config_fs_cache->handle_lookup_table[table_offset].server_addr,                 
-                cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
-            if(ret < 0)
+            for(i=0; i<cur_mapping->handle_extent_array.extent_count; i++)
             {
-                free(cur_config_fs_cache->handle_lookup_table);
-                gossip_err("Error: failed to resolve address of server: %s\n",
+                cur_config_fs_cache->handle_lookup_table[table_offset].extent 
+                    = cur_mapping->handle_extent_array.extent_array[i];
+                cur_config_fs_cache->handle_lookup_table[table_offset].server_name
+                    = cur_mapping->alias_mapping->bmi_address;
+                ret = BMI_addr_lookup(
+                    &cur_config_fs_cache->handle_lookup_table[table_offset].server_addr,                 
                     cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
-                return(ret);
+                if(ret < 0)
+                {
+                    free(cur_config_fs_cache->handle_lookup_table);
+                    gossip_err("Error: failed to resolve address of server: %s\n",
+                        cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
+                    return(ret);
+                }
+                table_offset++;
             }
-            table_offset++;
+            server_cursor = PINT_llist_next(server_cursor);
+            cur_mapping = PINT_llist_head(server_cursor);
         }
-        server_cursor = PINT_llist_next(server_cursor);
-        cur_mapping = PINT_llist_head(server_cursor);
     }
 
     /* sort table */
