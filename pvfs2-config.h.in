@@ -58,6 +58,9 @@
 /* Define if super_operations statfs has dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
+/* Define if kernel super_operations contains drop_inode field */
+#undef HAVE_DROP_INODE
+
 /* Define if export_operations has an encode_fh member */
 #undef HAVE_ENCODEFH_EXPORT_OPERATIONS
 
@@ -220,6 +223,9 @@
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
 
+/* Define to 1 if you have the <mntent.h,> header file. */
+#undef HAVE_MNTENT_H_
+
 /* Define if mount.h contains MNT_NOATIME flags */
 #undef HAVE_MNT_NOATIME
 
@@ -261,6 +267,9 @@
 
 /* Define to 1 if you have the `PtlEventKindStr' function. */
 #undef HAVE_PTLEVENTKINDSTR
+
+/* Define if kernel super_operations contains put_inode field */
+#undef HAVE_PUT_INODE
 
 /* Define if struct file_operations in kernel has readdirplus_lite callback */
 #undef HAVE_READDIRPLUSLITE_FILE_OPERATIONS
@@ -418,10 +427,10 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of a `long int', as computed by sizeof. */
+/* The size of `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of a `void *', as computed by sizeof. */
+/* The size of `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */

@@ -1003,6 +1003,12 @@ int PVFS_util_resolve(
     char* parent_path = NULL;
     int base_len = 0;
 
+    if(strlen(local_path) > (PVFS_NAME_MAX-1))
+    {
+        gossip_err("Error: PVFS_util_resolve() input path too long.\n");
+        return(-PVFS_ENAMETOOLONG);
+    }
+
     /* the most common case first; just try to resolve the path that we
      * were given
      */

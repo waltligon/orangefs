@@ -709,6 +709,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     void *tmp_buffer;
     void *tmp_user_ptr;
+    int sync_mode = 0;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
         "flowproto-multiqueue bmi_recv_callback_fn, error code: %d, flow: %p.\n",
@@ -737,6 +738,15 @@ static void bmi_recv_callback_fn(void *user_ptr,
         tmp_user_ptr = result_tmp;
         assert(result_tmp->result.bytes);
 
+        if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
+        {
+            /* This is the last write operation for this flow.  Set sync
+             * flag if needed
+             */ 
+            sync_mode = get_data_sync_mode(
+                q_item->parent->dest.u.trove.coll_id);
+        }
+
         ret = trove_bstream_write_list(
             q_item->parent->dest.u.trove.coll_id,
             q_item->parent->dest.u.trove.handle,
@@ -747,7 +757,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
             result_tmp->result.size_array,
             result_tmp->result.segs,
             &q_item->out_size,
-            get_data_sync_mode(q_item->parent->dest.u.trove.coll_id),
+            sync_mode,
             NULL,
             &result_tmp->trove_callback,
             global_trove_context,

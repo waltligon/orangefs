@@ -447,12 +447,14 @@ LIBRARIES_THREADED :=
 ifeq ($(build_shared),yes)
 LIBRARIES_SHARED = lib/libpvfs2.so
 LIBRARIES += $(LIBRARIES_SHARED)
-LIBRARIES_THREADED += lib/libpvfs2-threaded.so
+LIBRARIES_THREADED_SHARED += lib/libpvfs2-threaded.so
+LIBRARIES_THREADED += $(LIBRARIES_THREADED_SHARED)
 endif
 ifeq ($(build_static),yes)
 LIBRARIES_STATIC = lib/libpvfs2.a
 LIBRARIES += $(LIBRARIES_STATIC)
-LIBRARIES_THREADED += lib/libpvfs2-threaded.a
+LIBRARIES_THREADED_STATIC += lib/libpvfs2-threaded.a
+LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
 endif
 
 ################################################################
@@ -933,6 +935,11 @@ ifneq (,$(LIBRARIES_STATIC))
 	for i in $(notdir $(LIBRARIES_STATIC)) ; do \
 	    install -m 755 lib/$$i $(libdir) ;\
 	done
+ifneq (,$(KERNAPPSTHR))
+	for i in $(notdir $(LIBRARIES_THREADED_STATIC)) ; do \
+	    install -m 755 lib/$$i $(libdir) ;\
+	done
+endif
 endif
 ifneq (,$(LIBRARIES_SHARED))
 	for i in $(notdir $(LIBRARIES_SHARED)) ; do \
@@ -940,6 +947,13 @@ ifneq (,$(LIBRARIES_SHARED))
 	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
 	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
+ifneq (,$(KERNAPPSTHR))
+	for i in $(notdir $(LIBRARIES_THREADED_SHARED)) ; do \
+	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
+	   $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
+	done
+endif
 endif
 
 ifdef TARGET_OS_DARWIN

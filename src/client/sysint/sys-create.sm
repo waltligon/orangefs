@@ -26,6 +26,7 @@
 #include "pint-dist-utils.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-dist-varstrip.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -142,7 +143,6 @@ PVFS_error PVFS_isys_create(
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
-    int num_dfiles_req;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
 
@@ -195,6 +195,12 @@ PVFS_error PVFS_isys_create(
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
     sm_p->parent_ref = parent_ref;
+
+    /* TODO: retest this */
+    if(attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
+    {
+        sm_p->u.create.user_requested_num_data_files = attr.dfile_count;
+    }
 
     /* copy layout to sm struct */
     if(layout)
@@ -262,41 +268,6 @@ PVFS_error PVFS_isys_create(
             PINT_smcb_free(smcb);
             return -PVFS_ENOMEM;
         }
-    }
-
-    /* If an application hint has been provided, use that to request dfile
-       else, if a tabfile hint has been provided, use that instead*/
-    num_dfiles_req = 0;
-    if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
-    {
-        num_dfiles_req = attr.dfile_count;
-    }
-    else
-    {
-        /* Check the mount options */
-        int rc;
-        struct PVFS_sys_mntent mntent;
-
-        rc = PVFS_util_get_mntent_copy(sm_p->object_ref.fs_id, &mntent);
-        if (0 == rc)
-        {
-            num_dfiles_req = mntent.default_num_dfiles;
-            PVFS_util_free_mntent(&mntent);
-        }
-    }
-
-    /* Determine the number of dfiles, passing in client hints to
-       override any server hints */
-    ret = PINT_cached_config_get_num_dfiles(sm_p->object_ref.fs_id,
-                                            sm_p->u.create.dist,
-                                            num_dfiles_req,
-                                            &sm_p->u.create.num_data_files);
-
-    if (ret < 0)
-    {
-        gossip_err("Failed to get number of data servers\n");
-        PINT_smcb_free(smcb);
-        return ret;
     }
 
     gossip_debug(
@@ -662,9 +633,9 @@ static PINT_sm_action create_parent_getattr_inspect(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
-    int num_dfiles_requested_override = 0;
     PINT_dist *current_dist; 
     int ret = 0;
+    int num_dfiles_requested = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: parent_getattr_inspect\n");
 
@@ -692,19 +663,6 @@ static PINT_sm_action create_parent_getattr_inspect(
         attr->u.dir.hint.dist_name_len,
         attr->u.dir.hint.dist_params_len);
 
-    num_dfiles_requested_override = attr->u.dir.hint.dfile_count;
-    /* override the # of data files for this create */
-    if (num_dfiles_requested_override > 0)
-    {
-        /* Determine the number of dfiles */
-        PINT_cached_config_get_num_dfiles(sm_p->object_ref.fs_id,
-                sm_p->u.create.dist,
-                num_dfiles_requested_override,
-                &sm_p->u.create.num_data_files);
-    }
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "Setting number of datafiles to %d [requested %d]\n", 
-                 sm_p->u.create.num_data_files, num_dfiles_requested_override);
     current_dist = sm_p->u.create.dist;
     /* We have an overriding distribution name for this directory.. honor that */
     if (attr->u.dir.hint.dist_name_len > 0)
@@ -749,8 +707,36 @@ static PINT_sm_action create_parent_getattr_inspect(
         int64_t tmp_val;
         int nparams = 0;
 
+        if (strncmp(current_dist->dist_name, 
+            PVFS_DIST_VARSTRIP_NAME, 
+            PVFS_DIST_VARSTRIP_NAME_SIZE) == 0) 
+        {
+            /* varstrip parameters are a special case; we can't use the
+             * normal split_keyvals function because the : separater is also
+             * used within paramers that only varstrip can parse
+             */ 
+
+            /* look for a "strips:" prefix */
+            if(strstr(attr->u.dir.hint.dist_params, "strips:") 
+                != attr->u.dir.hint.dist_params)
+            {
+                gossip_err("Error: failed to parse directory hints for varstrip distribution.\n");
+                js_p->error_code = -PVFS_EINVAL;
+                return SM_ACTION_COMPLETE;
+            }
+            if(current_dist->methods->set_param(current_dist->dist_name,
+                current_dist->params,
+                "strips",
+                &attr->u.dir.hint.dist_params[strlen("strips:")]))
+            {
+                gossip_err("Error: failed to set directory hints for varstrip distribution.\n");
+                js_p->error_code = -PVFS_EINVAL;
+                return SM_ACTION_COMPLETE;
+            }
+        }
         /* ignore parse errors! */
-        if (PINT_split_keyvals(attr->u.dir.hint.dist_params,
+        /* TODO: why should we ignore parsing errors? */
+        else if (PINT_split_keyvals(attr->u.dir.hint.dist_params,
             &nparams, &key, &val) == 0)
         {
             int i;
@@ -795,6 +781,56 @@ static PINT_sm_action create_parent_getattr_inspect(
             free(val);
         }
     }
+
+    /* priority for determining user's preference for number of data files:
+     * 1) count specified in attr's passed into sys_create
+     * 2) directory hints
+     * 3) mount options
+     * 4) system default
+     * All of the above can be overridden by the distribution itself.
+     */
+
+    if(sm_p->u.create.user_requested_num_data_files > 1)
+    {
+        /* specified by sys_create caller */
+        num_dfiles_requested = sm_p->u.create.user_requested_num_data_files;     
+    }
+    else if(attr->u.dir.hint.dfile_count > 0)
+    {
+        num_dfiles_requested = attr->u.dir.hint.dfile_count;
+    }
+    else
+    {
+        /* Check the mount options */
+        int rc;
+        struct PVFS_sys_mntent mntent;
+
+        rc = PVFS_util_get_mntent_copy(sm_p->object_ref.fs_id, &mntent);
+        if (0 == rc)
+        {
+            num_dfiles_requested = mntent.default_num_dfiles;
+            PVFS_util_free_mntent(&mntent);
+        }
+    }
+
+    /* Determine the number of dfiles.   Pass in the number requested by the
+     * client, but will be overridden by default configuration and/or
+     * distribution if necessary 
+     */
+    ret = PINT_cached_config_get_num_dfiles(sm_p->object_ref.fs_id,
+                                            sm_p->u.create.dist,
+                                            num_dfiles_requested,
+                                            &sm_p->u.create.num_data_files);
+    if(ret < 0)
+    {
+        gossip_err("Error: failed to get number of data servers\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
+        sm_p->u.create.num_data_files, num_dfiles_requested);
+
     return SM_ACTION_COMPLETE;
 }
 

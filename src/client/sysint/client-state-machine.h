@@ -76,6 +76,7 @@ struct PINT_client_create_sm
 
     int retry_count;
     int num_data_files;
+    int user_requested_num_data_files;
     int stored_error_code;
 
     PINT_dist *dist;

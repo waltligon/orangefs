@@ -168,11 +168,17 @@ static int parse_mount_options(
                                 "ignoring %s\n", options[i]);
                 }
 #else
-                /* in the 2.6 kernel, we don't pass device name through this
-                 * path; we must have gotten an unsupported option.
+                /* filter out NULL option strings (older 2.6 kernels may leave 
+                 * these after parsing out standard options like noatime) 
                  */
-                gossip_err("Error: mount option [%s] is not supported.\n", options[i]);
-                return(-EINVAL);
+                if(options[i][0] != '\0')
+                {
+                    /* in the 2.6 kernel, we don't pass device name through this
+                     * path; we must have gotten an unsupported option.
+                     */
+                    gossip_err("Error: mount option [%s] is not supported.\n", options[i]);
+                    return(-EINVAL);
+                }
 #endif
             }
         }
@@ -320,6 +326,7 @@ static void pvfs2_clear_inode(struct inode *inode)
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
+#ifdef HAVE_PUT_INODE
 /* called when the VFS removes this inode from the inode cache */
 static void pvfs2_put_inode(
     struct inode *inode)
@@ -349,6 +356,7 @@ static void pvfs2_put_inode(
 #endif
     }
 }
+#endif /* HAVE_PUT_INODE */
 
 #ifdef HAVE_STATFS_LITE_SUPER_OPERATIONS
 static int pvfs2_statfs_lite(
@@ -852,14 +860,18 @@ struct super_operations pvfs2_s_ops =
     clear_inode: pvfs2_clear_inode,
     put_inode: pvfs2_put_inode,
 #else
+#ifdef HAVE_DROP_INODE
     .drop_inode = generic_delete_inode,
+#endif
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,
 #ifdef HAVE_READ_INODE
     .read_inode = pvfs2_read_inode,
 #endif
     .dirty_inode = pvfs2_dirty_inode,
+#ifdef HAVE_PUT_INODE
     .put_inode = pvfs2_put_inode,
+#endif
     .statfs = pvfs2_statfs,
     .remount_fs = pvfs2_remount,
 #ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
@@ -1301,6 +1313,13 @@ struct super_block *pvfs2_get_sb(
 
         if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {
+            /* Older 2.6 kernels pass in NOATIME flag here.  Capture it 
+             * if present.
+             */
+            if(flags & MS_NOATIME)
+            {
+                sb->s_flags |= MS_NOATIME;
+            }
             /* on successful mount, store the devname and data used */
             strncpy(PVFS2_SB(sb)->devname, devname,
                     PVFS_MAX_SERVER_ADDR_LEN);

@@ -1011,6 +1011,34 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+	dnl Starting with 2.6.26, drop_inode and put_inode go away
+	AC_MSG_CHECKING(if kernel super_operations contains drop_inode field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct super_operations sops;
+		sops.drop_inode(NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_DROP_INODE, 1, [Define if kernel super_operations contains drop_inode field]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl Starting with 2.6.26, drop_inode and put_inode go away
+	AC_MSG_CHECKING(if kernel super_operations contains put_inode field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct super_operations sops;
+		sops.put_inode(NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_PUT_INODE, 1, [Define if kernel super_operations contains put_inode field]),
+	AC_MSG_RESULT(no)
+	)
+
 	dnl older 2.6 kernels don't have MNT_NOATIME
 	AC_MSG_CHECKING(if mount.h defines MNT_NOATIME)
 	AC_TRY_COMPILE([
