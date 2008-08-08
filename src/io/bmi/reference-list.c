@@ -131,7 +131,7 @@ ref_st_p ref_list_search_str(ref_list_p rlp,
 
     struct qhash_head* tmp_link;
 
-    tmp_link = qhash_search(str_table, idstring);
+    tmp_link = qhash_search(str_table, (char*)idstring);
     if(!tmp_link)
     {
         return(NULL);
