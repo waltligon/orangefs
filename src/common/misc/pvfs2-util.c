@@ -1619,6 +1619,12 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
+    /* we need the distribution in order to calculate block size */
+    if (sys_attrmask & PVFS_ATTR_SYS_BLKSIZE)
+    {
+        attrmask |= PVFS_ATTR_META_DIST;
+    }
+
     if(sys_attrmask & PVFS_ATTR_SYS_UID)
         attrmask |= PVFS_ATTR_COMMON_UID;
     if(sys_attrmask & PVFS_ATTR_SYS_GID)
@@ -1693,6 +1699,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_META_DFILES)
     {
         sys_mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+    }
+    if (obj_mask & PVFS_ATTR_META_DIST)
+    {
+        sys_mask |= PVFS_ATTR_SYS_BLKSIZE;
     }
     if (obj_mask & PVFS_ATTR_DIR_HINT)
     {

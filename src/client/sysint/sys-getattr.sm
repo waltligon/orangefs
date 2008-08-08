@@ -910,6 +910,14 @@ static PINT_sm_action getattr_set_sys_response(
             sysresp->attr.mask |= PVFS_ATTR_SYS_SIZE;
         }
 
+        if(attr->mask & PVFS_ATTR_META_DIST)
+        {
+            /* we have enough information to set a block size */
+            sysresp->attr.blksize = attr->u.meta.dist->methods->get_blksize(
+                attr->u.meta.dist->params);
+            sysresp->attr.mask |= PVFS_ATTR_SYS_BLKSIZE;
+        }
+
         /* if this is a symlink, add the link target */
         if (sm_p->getattr.req_attrmask & PVFS_ATTR_SYMLNK_TARGET)
         {

@@ -503,6 +503,22 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
                 ret = -ENOENT;
                 goto copy_attr_failure;
             }
+
+            /* store blksize in pvfs2 specific part of inode structure; we
+             * are only going to use this to report to stat to make sure it
+             * doesn't perturb any inode related code paths
+             */
+            if(new_op->downcall.resp.getattr.attributes.objtype 
+                == PVFS_TYPE_METAFILE)
+            {
+                pvfs2_inode->blksize = 
+                   new_op->downcall.resp.getattr.attributes.blksize;
+            }
+            else
+            {
+                /* mimic behavior of generic_fillattr() for other types */
+                pvfs2_inode->blksize = (1 << inode->i_blkbits);
+            }
         }
 
       copy_attr_failure:

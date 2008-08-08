@@ -518,6 +518,13 @@ static char *params_string(void *params)
     return strdup(param_string);
 }
 
+static PVFS_size get_blksize(void* params)
+{
+    PVFS_twod_stripe_params* dparam = (PVFS_twod_stripe_params*)params;
+    /* report the strip size as the block size */
+    return(dparam->strip_size);
+}
+
 /* default twod_stripe_params */
 static PVFS_twod_stripe_params twod_stripe_params = {
     PVFS_DIST_TWOD_STRIPE_DEFAULT_GROUPS,   /* num_groups */
@@ -533,6 +540,7 @@ static PINT_dist_methods twod_stripe_methods = {
     logical_file_size,
     PINT_dist_default_get_num_dfiles,
     set_param,
+    get_blksize,
     encode_params,
     decode_params,
     registration_init,

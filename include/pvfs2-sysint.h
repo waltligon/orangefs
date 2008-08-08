@@ -54,6 +54,7 @@ struct PVFS_sys_attr_s
     PVFS_ds_type objtype;
     PVFS_flags flags;
     uint32_t mask;
+    PVFS_size blksize;
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 

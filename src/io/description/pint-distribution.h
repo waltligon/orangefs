@@ -51,6 +51,9 @@ typedef struct PINT_dist_methods_s
     int (*set_param)(const char* dist_name, void* params,
                      const char* param_name, void* value);
 
+    /* Retrieves a blocksize value suitable to report in stat() */
+    PVFS_size (*get_blksize)(void* params);
+
     /* Stores parameters in lebf memory at pptr */
     void (*encode_lebf)(char **pptr, void* params);
     
