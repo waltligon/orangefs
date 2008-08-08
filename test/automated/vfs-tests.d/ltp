@@ -29,7 +29,7 @@ fi
 cd ltp-full-${LTPVER}
 for patch in \
 	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch \
-	${VFS_SCRIPTS}/ltp-20080630-hackbench-limits.patch  do
+	${VFS_SCRIPTS}/ltp-20080630-hackbench-limits.patch ; do
 		patch -p1 < $patch
 done
 if [ "${?}" != 0 ]
