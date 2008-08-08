@@ -284,7 +284,8 @@ typedef struct PINT_server_op
     job_id_t scheduled_id; 
 
     /* generic structures used in most server operations */
-    PVFS_ds_keyval key, val; 
+    PVFS_ds_keyval key, val;
+    PVFS_ds_keyval key2, val2; 
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
 

@@ -210,17 +210,17 @@ PINT_sm_action getattr_setup_acl(
 
     if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
     {
-        memset(&s_op->key, 0, sizeof(PVFS_ds_keyval));
-        memset(&s_op->val, 0, sizeof(PVFS_ds_keyval));
-        s_op->key.buffer = "system.posix_acl_access";
-        s_op->key.buffer_sz = strlen(s_op->key.buffer) + 1;
-        s_op->val.buffer = (char *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
-        if (!s_op->val.buffer)
+        memset(&s_op->key2, 0, sizeof(PVFS_ds_keyval));
+        memset(&s_op->val2, 0, sizeof(PVFS_ds_keyval));
+        s_op->key2.buffer = "system.posix_acl_access";
+        s_op->key2.buffer_sz = strlen(s_op->key2.buffer) + 1;
+        s_op->val2.buffer = (char *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
+        if (!s_op->val2.buffer)
         {
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
-        s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
+        s_op->val2.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
     
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "About to retrieve acl keyvals "
                      "for handle %llu\n", llu(s_op->target_handle));
@@ -229,8 +229,8 @@ PINT_sm_action getattr_setup_acl(
         ret = job_trove_keyval_read(
             s_op->target_fs_id,
             s_op->target_handle,
-            &s_op->key,
-            &s_op->val,
+            &s_op->key2,
+            &s_op->val2,
             0,
             NULL,
             smcb,
@@ -809,10 +809,10 @@ static PINT_sm_action getattr_setup_resp(
             s_op->req->u.getattr.credential.group_array, 
             s_op->req->u.getattr.credential.num_groups, 
             s_op->attr, &resp_attr->capability.op_mask);
+            
+        /* free ACL buffer */
+        free(s_op->val2.buffer);
 
-        /* done with ACL buffer, free it */
-        free(s_op->val.buffer);
-        
         resp_attr->capability.fsid = s_op->u.getattr.fs_id;
             
         if (PINT_sign_capability(&(resp_attr->capability)))
