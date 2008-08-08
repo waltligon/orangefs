@@ -85,6 +85,7 @@ int PINT_security_initialize(void)
     conf = PINT_get_server_config();
 
     assert(conf->serverkey_path);
+    security_privkey = EVP_PKEY_new();
     ret = load_private_key(conf->serverkey_path);
     if (ret < 0)
     {

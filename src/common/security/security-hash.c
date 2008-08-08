@@ -198,6 +198,7 @@ static void free_pubkey_entry(void *to_free)
     {
         EVP_PKEY_free(temp->pubkey);
         free(temp->hash_key);
+        free(temp);
     }
 }
 
