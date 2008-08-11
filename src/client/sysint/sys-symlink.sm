@@ -68,7 +68,7 @@ machine pvfs2_client_symlink_sm
     state dspace_create_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => symlink_setattr_setup_msgpair;
+        success => new_metafile_init;
         default => dspace_create_failure;
     }
 
@@ -76,6 +76,20 @@ machine pvfs2_client_symlink_sm
     {
         run symlink_dspace_create_failure;
         default => cleanup;
+    }
+    
+    state new_metafile_init
+    {
+        run getattr_new_metafile_init;
+        success => getattr_new_metafile;
+        default => symlink_setattr_failure;
+    }
+    
+    state getattr_new_metafile
+    {
+        jump pvfs2_client_getattr_sm;
+        success => symlink_setattr_setup_msgpair;
+        default => symlink_setattr_failure;
     }
 
     state symlink_setattr_setup_msgpair
@@ -88,7 +102,7 @@ machine pvfs2_client_symlink_sm
     state symlink_setattr_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => crdirent_setup_msgpair;
+        success => crdirent_init;
         default => symlink_setattr_failure;
     }
 
@@ -97,6 +111,21 @@ machine pvfs2_client_symlink_sm
         run symlink_setattr_failure;
         default => delete_handle_setup_msgpair;
     }
+    
+    state crdirent_init
+    {
+        run getattr_crdirent_init;
+        success => getattr_crdirent;
+        default => crdirent_failure;
+    }
+    
+    state getattr_crdirent
+    {
+        jump pvfs2_client_getattr_sm;
+        success => crdirent_setup_msgpair;
+        default => crdirent_failure;
+    }
+
 
     state crdirent_setup_msgpair
     {
@@ -271,7 +300,7 @@ static PINT_sm_action symlink_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL,
+        PVFS_ATTR_COMMON_ALL | PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_DIRECTORY,
         0);
         
@@ -353,9 +382,6 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -377,7 +403,7 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
 
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
-        xxremovemexx,
+        sm_p->getattr.attr.capability,
         *sm_p->newcred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_SYMLINK,
@@ -401,15 +427,30 @@ static PINT_sm_action symlink_dspace_create_failure(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action getattr_crdirent_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: grabbing cap crdirent\n");
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+   return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action symlink_crdirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -420,7 +461,7 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        xxremovemexx,
+        sm_p->getattr.attr.capability,
         sm_p->u.sym.link_name,
         sm_p->u.sym.symlink_handle,
         sm_p->object_ref.handle,
@@ -455,15 +496,34 @@ static PINT_sm_action symlink_crdirent_failure(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action getattr_new_metafile_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_ref temp;
+    
+    temp.handle = sm_p->u.sym.symlink_handle;
+    temp.fs_id = sm_p->object_ref.fs_id;
+    
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: grabbing cap for meta\n");
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        temp,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_SYMLINK,
+        0);
+
+   return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action symlink_setattr_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -477,7 +537,7 @@ static PINT_sm_action symlink_setattr_setup_msgpair(
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
-        xxremovemexx,
+        sm_p->getattr.attr.capability,
         sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle,
         PVFS_TYPE_SYMLINK,
@@ -525,9 +585,9 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
+    const PVFS_capability *capability;
 
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
+    capability = PINT_null_capability();
 
     js_p->error_code = 0;
 
@@ -536,7 +596,7 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        xxremovemexx,
+        *capability,
         sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle);
 
