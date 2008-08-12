@@ -68,7 +68,7 @@ machine pvfs2_client_rename_sm
     state rename_lookups_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
-        success => rename_crdirent_setup_msgpair;
+        success => rename_crdirent_init;
         RENAME_CHDIRENT => rename_getattr_src;
         default => rename_lookups_failure;
     }
@@ -98,6 +98,21 @@ machine pvfs2_client_rename_sm
         run rename_lookups_failure;
         default => cleanup;
     }
+    
+    /*  TODO: grab capabilities for rmdirent and chdirent */
+    state rename_crdirent_init
+    {
+        run getattr_crdirent_init;
+        success => rename_getattr_crdirent;
+        default => rename_crdirent_retry_or_fail;
+    }
+    
+    state rename_getattr_crdirent
+    {
+        jump pvfs2_client_getattr_sm;
+        success => rename_crdirent_setup_msgpair;
+        default => rename_crdirent_retry_or_fail;
+    }
 
     state rename_crdirent_setup_msgpair
     {
@@ -123,7 +138,7 @@ machine pvfs2_client_rename_sm
     state rename_crdirent_timer
     {
 	run rename_generic_timer;
-	default => rename_crdirent_setup_msgpair;
+	default => rename_crdirent_init;
     }
 
     state rename_rmdirent_setup_msgpair
@@ -432,7 +447,7 @@ static int rename_lookups_comp_fn(
             PINT_SM_GETATTR_STATE_FILL(
                 sm_p->getattr,
                 sm_p->object_ref,
-                PVFS_ATTR_COMMON_ALL,
+                PVFS_ATTR_COMMON_ALL|PVFS_ATTR_CAPABILITY,
                 PVFS_TYPE_NONE,
                 0);
 
@@ -518,9 +533,6 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     PINT_sm_msgpair_state *msg_p;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     js_p->error_code = 0;
 
@@ -542,7 +554,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
 
         PINT_SERVREQ_LOOKUP_PATH_FILL(
             msg_p->req,
-            xxremovemexx,
+            *PINT_null_capability(),
             sm_p->u.rename.entries[i],
             sm_p->u.rename.parent_refns[i].fs_id,
             sm_p->u.rename.parent_refns[i].handle,
@@ -575,6 +587,24 @@ static PINT_sm_action rename_lookups_failure(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action getattr_crdirent_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: grabbing cap crdirent\n");
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->u.rename.parent_refns[1],
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+   return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action rename_crdirent_setup_msgpair(
@@ -974,10 +1004,10 @@ static PINT_sm_action rename_getattr_src_interpret(
      * happens to be a directory rather than a file.
      */
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
-                               sm_p->object_ref,
-                               (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT),
-                               PVFS_TYPE_NONE,
-                               PINT_SM_GETATTR_BYPASS_CACHE);
+         sm_p->object_ref,
+         (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT|PVFS_ATTR_CAPABILITY),
+         PVFS_TYPE_NONE,
+         PINT_SM_GETATTR_BYPASS_CACHE);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
