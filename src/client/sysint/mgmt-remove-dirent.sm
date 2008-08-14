@@ -38,7 +38,14 @@ machine pvfs2_client_mgmt_remove_dirent_sm
     state init
     {
         run mgmt_remove_dirent_init;
-        default => remove_dirent_setup_msgpair;
+        default => remove_dirent_get_capability;
+    }
+    
+    state remove_dirent_get_capability
+    {
+        jump pvfs2_client_getattr_sm;
+        success => remove_dirent_setup_msgpair;
+        default => cleanup;
     }
 
     state remove_dirent_setup_msgpair
@@ -150,7 +157,15 @@ PVFS_error PVFS_mgmt_remove_dirent(
 static PINT_sm_action mgmt_remove_dirent_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_remove_dirent_init called\n");
+    
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->parent_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_NONE,
+        0);
 
     assert(js_p->error_code == 0);
     return SM_ACTION_COMPLETE;
@@ -162,9 +177,6 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
  
     js_p->error_code = 0;
 
@@ -173,7 +185,7 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
 
     PINT_SERVREQ_MGMT_REMOVE_DIRENT_FILL(
         msg_p->req,
-        xxremovemexx,
+        sm_p->getattr.attr.capability,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
         sm_p->u.mgmt_remove_dirent.entry);

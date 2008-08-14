@@ -37,6 +37,19 @@ static int collect_old_values_comp_fn(
 
 machine pvfs2_client_mgmt_setparam_list_sm
 {
+    state init
+    {
+        run mgmt_setparam_list_init;
+        default => setparam_list_get_capability;
+    }
+    
+    state setparam_list_get_capability
+    {
+        jump pvfs2_client_getattr_sm;
+        success => setup_msgpair;
+        default => cleanup;
+    }
+    
     state setup_msgpair
     {
         run mgmt_setparam_list_setup_msgpair;
@@ -170,15 +183,36 @@ PVFS_error PVFS_mgmt_setparam_list(
     return error;
 }
 
+static int mgmt_setparam_list_init(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_setparam_list_init called\n");
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_ref temp_ref;
+    
+    temp_ref.fs_id = sm_p->u.setparam_list.fs_id;
+    js_p->error_code = PINT_cached_config_get_root_handle(
+                           sm_p->u.setparam_list.fs_id, 
+                           &temp_ref.handle);
+        
+    assert(js_p->error_code == 0);
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        temp_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_NONE,
+        0);
+        
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action mgmt_setparam_list_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability xxremovemexx;
-
-    memset(&xxremovemexx, 0, sizeof(PVFS_capability));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setparam_list state: "
                  "mgmt_setparam_list_setup_msgpair\n");
@@ -188,7 +222,7 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(
     {
         PINT_SERVREQ_MGMT_SETPARAM_FILL(
             msg_p->req,
-            xxremovemexx,
+            sm_p->getattr.attr.capability,
             sm_p->u.setparam_list.fs_id,
             sm_p->u.setparam_list.param,
             sm_p->u.setparam_list.value);
