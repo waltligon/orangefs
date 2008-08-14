@@ -12,6 +12,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
@@ -934,7 +935,21 @@ static PINT_sm_action io_datafile_complete_operations(
             cur_ctx->msg_recv_has_been_posted = 0;
             goto check_next_step;
         }
- 
+
+        if(sm_p->u.io.io_type == PVFS_IO_WRITE)
+        {
+            /* we expect this write to _not_ succeed immediately, because we
+             * have not posted the flow yet.
+             */
+            ret = io_post_write_ack_recv(smcb, cur_ctx);
+            if(ret < 0)
+            {
+                PVFS_perror_gossip("Post of write-ack recv failed", ret);
+                js_p->error_code = ret;
+                goto check_next_step;
+            }
+        }
+
         /* for now we wait to post the flow until we get back
          * the response from the server for both reads and writes
          */
@@ -956,17 +971,6 @@ static PINT_sm_action io_datafile_complete_operations(
             cur_ctx->msg_recv_has_been_posted = 0;
             js_p->error_code = ret;
             goto check_next_step;
-        }
-
-        if(sm_p->u.io.io_type == PVFS_IO_WRITE)
-        {
-            ret = io_post_write_ack_recv(smcb, cur_ctx);
-            if(ret < 0)
-            {
-                PVFS_perror_gossip("Post of write-ack recv failed", ret);
-                js_p->error_code = ret;
-                goto check_next_step;
-            }
         }
     }
 
