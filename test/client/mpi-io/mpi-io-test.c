@@ -167,13 +167,11 @@ int main(int argc, char **argv)
 			err = MPI_File_write(fh, buf, nchars, MPI_CHAR, &status);
 		}
       if(err){
-         fprintf(stderr, "node %d, write error: %s\n", mynod, 
-         strerror(errno));
+			handle_error(err, "MPI_File_write/write_all");
       }
       if (opt_sync) sync_err = MPI_File_sync(fh);
       if (sync_err) {
-         fprintf(stderr, "node %d, sync error: %s\n", mynod, 
-					  strerror(errno));
+			handle_error(err, "MPI_File_sync");
       }
 
       /* discover the ending time of the operation */
@@ -187,7 +185,7 @@ int main(int argc, char **argv)
 
    err = MPI_File_close(&fh);
    if(err){
-      fprintf(stderr, "node %d, close error after write\n", mynod);
+		handle_error(err, "MPI_File_close");
    }
     
    /* wait for everyone to synchronize at this point */
@@ -197,7 +195,7 @@ int main(int argc, char **argv)
    err = MPI_File_open(comm, opt_file, 
 			   MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &fh);
    if (err < 0) {
-      fprintf(stderr, "node %d, open error: %s\n", mynod, strerror(errno));
+		handle_error(err, "MPI_File_open");
       goto die_jar_jar_die;
    }
 
@@ -236,8 +234,7 @@ int main(int argc, char **argv)
       read_tim += (etim - stim);
 
       if (err < 0) {
-			fprintf(stderr, "node %d, read error, loc = %lld: %s\n",
-				mynod, (long long) mynod*opt_block, strerror(myerrno));
+			handle_error(err, "MPI_File_write/write_all");
 		}
 
       /* if the user wanted to check correctness, compare the write
@@ -270,7 +267,7 @@ int main(int argc, char **argv)
    /* close the file */
    err = MPI_File_close(&fh);
    if (err) {
-      fprintf(stderr, "node %d, close error after write\n", mynod);
+	   handle_error(err, "MPI_File_close");
    }
 
    /* compute the read and write times */
@@ -426,7 +423,6 @@ static void handle_error(int errcode, char *str)
 
     MPI_Error_string(errcode, msg, &resultlen);
     fprintf(stderr, "%s: %s\n", str, msg);
-    MPI_Abort(MPI_COMM_WORLD, 1);
 }
 
 /*
