@@ -43,8 +43,6 @@ PINT_manager_t io_thread_mgr;
 PINT_worker_id io_worker_id;
 PINT_queue_id io_queue_id;
 extern int TROVE_max_concurrent_io;
-int dbpf_aligned_blocks_init(void);
-int dbpf_aligned_blocks_finalize(void);
 
 int dbpf_thread_initialize(void)
 {
@@ -91,7 +89,7 @@ int dbpf_thread_initialize(void)
 
     io_worker_attrs.type = PINT_WORKER_TYPE_THREADED_QUEUES;
     io_worker_attrs.u.threaded.thread_count = 32;
-    io_worker_attrs.u.threaded.ops_per_queue = 1000;
+    io_worker_attrs.u.threaded.ops_per_queue = 10;
     io_worker_attrs.u.threaded.timeout = 0;
     ret = PINT_manager_worker_add(io_thread_mgr, &io_worker_attrs, &io_worker_id);
     if(ret < 0)

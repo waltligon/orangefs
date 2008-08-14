@@ -333,6 +333,7 @@ static void *PINT_worker_queues_thread_function(void * ptr)
             gen_mutex_lock(&worker->mutex);
             qlist_del(&queue->link);
             qlist_add_tail(&queue->link, &worker->queues);
+            gen_cond_broadcast(&worker->cond);
             gen_mutex_unlock(&worker->mutex);
 
             if(op_count > 0)
@@ -361,16 +362,17 @@ static void *PINT_worker_queues_thread_function(void * ptr)
         }
         else
         {
-            gettimeofday(&now, NULL);
-            wait_for_queue_timeout.tv_sec =
-                now.tv_sec + wait_interval.tv_sec;
-            wait_for_queue_timeout.tv_nsec =
-                (now.tv_usec * 1e3) + wait_interval.tv_nsec;
-
             /* no queues in the list, wait for addition */
-            ret = gen_cond_timedwait(&worker->cond, &worker->mutex,
-                                     &wait_for_queue_timeout);
-            gen_mutex_unlock(&worker->mutex);
+            ret = gen_cond_wait(&worker->cond, &worker->mutex);
+            if(ret != 0)
+            {
+                gossip_lerr("gen_cond_timedwait failed with error: %s\n",
+                            strerror(ret));
+            }
+            else
+            {
+                gen_mutex_unlock(&worker->mutex);
+            }
         }
         /* lock the mutex again before checking the running field */
         gen_mutex_lock(&thread->mutex);
