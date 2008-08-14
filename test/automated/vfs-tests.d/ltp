@@ -7,7 +7,7 @@ DOWNLOAD="http://www-unix.mcs.anl.gov/~carns/nightly-download/ltp-full-${LTPVER}
 cd ${EXTRA_TESTS}
 
 # get rid of any old copies
-rm -rf ltp-full-${LTPVER} ltp-full-${LTPVER}.tgz 
+sudo rm -rf ltp-full-${LTPVER} ltp-full-${LTPVER}.tgz 
 
 # download
 echo Downloading LTP...
@@ -29,7 +29,7 @@ fi
 cd ltp-full-${LTPVER}
 for patch in \
 	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch \
-	${VFS_SCRIPTS}/ltp-20080630-hackbench-limits.patch  do
+	${VFS_SCRIPTS}/ltp-20080630-hackbench-limits.patch ; do
 		patch -p1 < $patch
 done
 if [ "${?}" != 0 ]
