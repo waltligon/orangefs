@@ -419,8 +419,7 @@ int PINT_queue_wait_for_entry(PINT_queue_id queue_id,
 {
     struct PINT_queue_s *queue;
     int ret = 0, cond_ret = 0;
-    struct timespec tv;
-    struct timeval last, now;
+    struct timespec timeout;
 
     ret = PINT_queue_search_and_remove(queue_id, find, user_ptr, entry);
     if(0 == ret)
@@ -435,27 +434,13 @@ int PINT_queue_wait_for_entry(PINT_queue_id queue_id,
 
     queue = id_gen_fast_lookup(queue_id);
 
-
     /* queue does not have entry, wait for signal of addition */
-    gettimeofday(&last, NULL);
+    timeout = PINT_util_get_abs_timespec(microsecs);
 
     do
     {
-        gettimeofday(&now, NULL);
-        microsecs -= ((now.tv_sec * 1e6) + now.tv_usec -
-                      (last.tv_sec * 1e6) + last.tv_usec);
-        if(microsecs <= 0)
-        {
-            cond_ret = ETIMEDOUT;
-            break;
-        }
-
-        last = now;
-        tv.tv_sec = (microsecs / 1e6);
-        tv.tv_nsec = (microsecs - (tv.tv_sec * 1e6)) * 1e3;
-
         gen_mutex_lock(&queue->mutex);
-        cond_ret = gen_cond_timedwait(&queue->cond, &queue->mutex, &tv);
+        cond_ret = gen_cond_timedwait(&queue->cond, &queue->mutex, &timeout);
         gen_mutex_unlock(&queue->mutex);
 
         /* either the condition variable gets signalled, we have
@@ -498,8 +483,7 @@ int PINT_queue_timedwait(PINT_queue_id queue_id,
 {
     struct PINT_queue_s *queue;
     int ret = 0;
-    struct timespec tv;
-    struct timeval last, now;
+    struct timespec timeout;
 
     queue = id_gen_fast_lookup(queue_id);
 
@@ -515,24 +499,15 @@ int PINT_queue_timedwait(PINT_queue_id queue_id,
 
     /* queue is empty, wait for signal of addition */
 
-    gettimeofday(&last, NULL);
+    timeout = PINT_util_get_abs_timespec(microsecs);
 
     do
     {
-        gettimeofday(&now, NULL);
-        microsecs -= ((now.tv_sec * 1e6) + now.tv_usec -
-                      (last.tv_sec * 1e6) + last.tv_usec);
-        if(microsecs < 0)
+        ret = gen_cond_timedwait(&queue->cond, &queue->mutex, &timeout);
+        if(ret == EINVAL)
         {
-            ret = ETIMEDOUT;
-            break;
+            gossip_lerr("gen_cond_timedwait returned EINVAL!\n");
         }
-
-        last = now;
-        tv.tv_sec = (microsecs / 1e6);
-        tv.tv_nsec = (microsecs - (tv.tv_sec * 1e6)) * 1e3;
-
-        ret = gen_cond_timedwait(&queue->cond, &queue->mutex, &tv);
 
         /* either the condition variable gets signalled, we have
          * a spurious wakeup, or the timeout was reached.  

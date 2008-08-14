@@ -1354,7 +1354,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         {"rmfs",0,0,0},
         {"version",0,0,0},
         {"pidfile",1,0,0},
-        {"alias",0,0,0},
+        {"alias",1,0,0},
         {0,0,0,0}
     };
 

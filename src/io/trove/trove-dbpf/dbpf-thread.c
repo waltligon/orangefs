@@ -88,9 +88,9 @@ int dbpf_thread_initialize(void)
     }
 
     io_worker_attrs.type = PINT_WORKER_TYPE_THREADED_QUEUES;
-    io_worker_attrs.u.threaded.thread_count = 32;
+    io_worker_attrs.u.threaded.thread_count = 30;
     io_worker_attrs.u.threaded.ops_per_queue = 10;
-    io_worker_attrs.u.threaded.timeout = 0;
+    io_worker_attrs.u.threaded.timeout = 1000;
     ret = PINT_manager_worker_add(io_thread_mgr, &io_worker_attrs, &io_worker_id);
     if(ret < 0)
     {

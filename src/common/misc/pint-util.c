@@ -353,6 +353,17 @@ PVFS_time PINT_util_mkversion_time(PVFS_time version)
     return (PVFS_time)(version >> 32);
 }
 
+struct timespec PINT_util_get_abs_timespec(int microsecs)
+{
+    struct timeval now;
+    struct timespec tv;
+
+    gettimeofday(&now, NULL);
+    tv.tv_sec = now.tv_sec + (microsecs / 1e6);
+    tv.tv_nsec = (now.tv_usec * 1e3) + (microsecs * 1e3);
+    return tv;
+}
+
 char *PINT_util_guess_alias(void)
 {
     char tmp_alias[1024];

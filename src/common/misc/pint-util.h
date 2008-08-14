@@ -125,6 +125,8 @@ int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end)
 PVFS_time PINT_util_mktime_version(PVFS_time time);
 PVFS_time PINT_util_mkversion_time(PVFS_time version);
 
+struct timespec PINT_util_get_abs_timespec(int microsecs);
+
 void PINT_util_digest_init(void);
 void PINT_util_digest_finalize(void);
 
