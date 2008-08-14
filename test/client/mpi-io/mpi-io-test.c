@@ -51,6 +51,7 @@ static int     opt_pvfstab_set = 0;
 static int parse_args(int argc, char **argv);
 static void usage(void);
 static void handle_error(int errcode, char *str);
+static int check_count(int count, MPI_Datatype type, MPI_Status *status);
 
 /* global vars */
 static int mynod = 0;
@@ -169,6 +170,8 @@ int main(int argc, char **argv)
       if(err){
 			handle_error(err, "MPI_File_write/write_all");
       }
+		if (!check_count(nchars, MPI_CHAR, &status))
+		   handle_error(err, "short write");
       if (opt_sync) sync_err = MPI_File_sync(fh);
       if (sync_err) {
 			handle_error(err, "MPI_File_sync");
@@ -236,6 +239,8 @@ int main(int argc, char **argv)
       if (err < 0) {
 			handle_error(err, "MPI_File_write/write_all");
 		}
+		if (!check_count(nchars, MPI_CHAR, &status))
+			handle_error(err, "short read");
 
       /* if the user wanted to check correctness, compare the write
        * buffer to the read buffer */
@@ -425,14 +430,19 @@ static void handle_error(int errcode, char *str)
     fprintf(stderr, "%s: %s\n", str, msg);
 }
 
+static int check_count(int count, MPI_Datatype type, MPI_Status *status)
+{
+    int statcount;
+    MPI_Get_count(status, type, &statcount);
+	 return (statcount==count);
+}
+
 /*
  * Local variables:
  *  c-indent-level: 3
  *  c-basic-offset: 3
  *  tab-width: 3
  *
- * vim: ts=3
  * End:
+ * vim: ts=3
  */ 
-
-
