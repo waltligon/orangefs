@@ -45,6 +45,10 @@
 /* Default number of milliseconds to delay before retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
+/* Default timout buffer for capabilities */
+/* TODO:  Figure out a better way to handle this */
+#define CAP_TIMEOUT_BUFFER 120
+
 int PINT_client_state_machine_initialize(void);
 void PINT_client_state_machine_finalize(void);
 job_context_id PINT_client_get_sm_context(void);

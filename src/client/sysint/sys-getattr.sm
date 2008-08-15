@@ -317,8 +317,7 @@ static PINT_sm_action getattr_acache_lookup(
 	sm_p->getattr.req_attrmask |= PVFS_ATTR_META_ALL;
     }
 
-    if(sm_p->getattr.flags & PINT_SM_GETATTR_BYPASS_CACHE ||
-       sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
+    if(sm_p->getattr.flags & PINT_SM_GETATTR_BYPASS_CACHE)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: forced acache miss: "
                     " [%llu]\n",
@@ -368,6 +367,20 @@ static PINT_sm_action getattr_acache_lookup(
     else if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_ALL);
+    }
+    if (sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
+    {
+        if (sm_p->getattr.attr.capability.timeout == 0)
+        {
+            trimmed_mask |= PVFS_ATTR_CAPABILITY;
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "Cache capability invalid...\n");
+        }
+        if(PINT_util_get_current_time() >
+            (sm_p->getattr.attr.capability.timeout - CAP_TIMEOUT_BUFFER))
+        {
+            trimmed_mask |= PVFS_ATTR_CAPABILITY;
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "Cache capability timeout...\n");
+        }
     }
   
     /* trimmed_mask contains the list of attributes
