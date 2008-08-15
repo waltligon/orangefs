@@ -12,6 +12,7 @@
 /* This file includes definitions of common internal utility functions */
 #include <string.h>
 #include <assert.h>
+
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <unistd.h>
@@ -355,12 +356,15 @@ PVFS_time PINT_util_mkversion_time(PVFS_time version)
 
 struct timespec PINT_util_get_abs_timespec(int microsecs)
 {
-    struct timeval now;
+    struct timeval now, add, result;
     struct timespec tv;
 
     gettimeofday(&now, NULL);
-    tv.tv_sec = now.tv_sec + (microsecs / 1e6);
-    tv.tv_nsec = (now.tv_usec * 1e3) + (microsecs * 1e3);
+    add.tv_sec = (microsecs / 1e6);
+    add.tv_usec = (microsecs % 1000000);
+    timeradd(&now, &add, &result);
+    tv.tv_sec = result.tv_sec;
+    tv.tv_nsec = result.tv_usec * 1e3;
     return tv;
 }
 
