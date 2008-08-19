@@ -170,8 +170,10 @@ int main(int argc, char **argv)
       if(err){
 			handle_error(err, "MPI_File_write/write_all");
       }
-		if (!check_count(nchars, MPI_CHAR, &status))
-		   handle_error(err, "short write");
+		if (opt_correct && !check_count(nchars, MPI_CHAR, &status)) {
+			my_correct = 0;
+		   fprintf(stderr, "short write");
+		}
       if (opt_sync) sync_err = MPI_File_sync(fh);
       if (sync_err) {
 			handle_error(err, "MPI_File_sync");
@@ -239,8 +241,10 @@ int main(int argc, char **argv)
       if (err < 0) {
 			handle_error(err, "MPI_File_write/write_all");
 		}
-		if (!check_count(nchars, MPI_CHAR, &status))
-			handle_error(err, "short read");
+		if (opt_correct && !check_count(nchars, MPI_CHAR, &status)) {
+			my_correct = 0;
+			fprintf(stderr, "short read");
+		}
 
       /* if the user wanted to check correctness, compare the write
        * buffer to the read buffer */
