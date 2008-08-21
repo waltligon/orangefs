@@ -33,6 +33,8 @@
 #include "pint-context.h"
 #include "pint-op.h"
 
+static gen_mutex_t dbpf_update_size_lock = GEN_MUTEX_INITIALIZER;
+
 typedef struct
 {
     char *buffer;
@@ -737,18 +739,13 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
     struct dbpf_bstream_rw_list_op *rw_op;
     dbpf_queued_op_t *qop_p;
     int eor = -1;
+    int sync_required = 0;
 
     rw_op = (struct dbpf_bstream_rw_list_op *)ptr;
     qop_p = (dbpf_queued_op_t *)rw_op->queued_op_ptr;
 
     ref.fs_id = qop_p->op.coll_p->coll_id;
     ref.handle = qop_p->op.handle;
-
-    ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
-    if(ret != 0)
-    {
-        return ret;
-    }
 
     ret = dbpf_bstream_get_extents(
         rw_op->mem_offset_array,
@@ -785,6 +782,12 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
         return ret;
     }
 
+    ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
+    if(ret != 0)
+    {
+        return ret;
+    }
+
     *rw_op->out_size_p = 0;
     for(i = 0; i < extent_count; ++ i)
     {
@@ -810,20 +813,43 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
     if(eor > attr.u.datafile.b_size)
     {
         int outcount;
-        /* set the size of the file */
-        attr.u.datafile.b_size = eor;
-        /* We want to hit the coalesce path, so we queue up the setattr */
-        dbpf_queued_op_init(qop_p,
-                            DSPACE_SETATTR,
-                            ref.handle,
-                            qop_p->op.coll_p,
-                            dbpf_dspace_setattr_op_svc,
-                            qop_p->op.user_ptr,
-                            TROVE_SYNC,
-                            qop_p->op.context_id);
-        dbpf_dspace_attr_set(qop_p->op.coll_p, ref, &attr);
-        ret = dbpf_sync_coalesce(qop_p, 0, &outcount);
-        return PINT_MGMT_OP_CONTINUE;
+
+        gen_mutex_lock(&dbpf_update_size_lock);
+        ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
+        if(ret != 0)
+        {
+            gen_mutex_unlock(&dbpf_update_size_lock);
+            return ret;
+        }
+
+        if(eor > attr.u.datafile.b_size)
+        {
+            /* set the size of the file */
+            attr.u.datafile.b_size = eor;
+            ret = dbpf_dspace_attr_set(qop_p->op.coll_p, ref, &attr);
+            if(ret != 0)
+            {
+                gen_mutex_unlock(&dbpf_update_size_lock);
+                return ret;
+            }
+            sync_required = 1;
+        }
+        gen_mutex_unlock(&dbpf_update_size_lock);
+
+        if(sync_required == 1)
+        {
+            /* We want to hit the coalesce path, so we queue up the setattr */
+            dbpf_queued_op_init(qop_p,
+                                DSPACE_SETATTR,
+                                ref.handle,
+                                qop_p->op.coll_p,
+                                dbpf_dspace_setattr_op_svc,
+                                qop_p->op.user_ptr,
+                                TROVE_SYNC,
+                                qop_p->op.context_id);
+            ret = dbpf_sync_coalesce(qop_p, 0, &outcount);
+            return PINT_MGMT_OP_CONTINUE;
+        }
     }
 
     return PINT_MGMT_OP_COMPLETED;
