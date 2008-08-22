@@ -172,6 +172,7 @@ int trove_storage_remove(TROVE_method_id method_id,
 int trove_collection_create(char *collname,
                             TROVE_coll_id new_coll_id,
                             void *user_ptr,
+			    int is_dbrep_master,
                             TROVE_op_id *out_op_id_p)
 {
     TROVE_method_id method_id;
@@ -185,7 +186,7 @@ int trove_collection_create(char *collname,
 
     method_id = global_trove_method_callback(new_coll_id);
     ret = mgmt_method_table[method_id]->collection_create(
-        collname, new_coll_id, user_ptr, out_op_id_p);
+        collname, new_coll_id, user_ptr, is_dbrep_master, out_op_id_p);
 
     return ((ret < 0) ? ret : 1);
 }

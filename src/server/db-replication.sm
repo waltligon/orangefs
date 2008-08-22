@@ -50,12 +50,19 @@ static int db_replication_process_message(
     s_op->u.dbrep.control.buffer = s_op->req->u.dbrep.control.buffer;
     s_op->u.dbrep.rec.buffer_sz = s_op->req->u.dbrep.rec.buffer_sz;
     s_op->u.dbrep.rec.buffer = s_op->req->u.dbrep.rec.buffer;
+    s_op->u.dbrep.addr = s_op->addr;
     js_p->error_code = 0;
-    job_trove_dbrepmsg_process(
-	s_op->req->u.dbrep.fs_id,
+    gossip_debug(GOSSIP_DB_REP_DEBUG,
+		 "\tcontrol.size=%d\trec.size=%d\tversion=%d\n",
+		 s_op->u.dbrep.control.buffer_sz, s_op->u.dbrep.rec.buffer_sz, 
+		 s_op->req->u.dbrep.version);
+    ret = job_trove_dbrepmsg_process(
+	s_op->u.dbrep.fs_id,
 	&s_op->u.dbrep.control,
 	&s_op->u.dbrep.rec,
-	NULL,
+	s_op->u.dbrep.addr,
+	s_op->req->u.dbrep.version,
+	smcb,
 	0,
 	js_p,
 	&jid,

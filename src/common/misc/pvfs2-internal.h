@@ -90,4 +90,12 @@
 
 #define IO_MAX_REGIONS 64
 
+PVFS_error PVFS_db_rep_send(
+    PVFS_fs_id fs_id,
+    PVFS_ds_keyval *control,
+    PVFS_ds_keyval *rec,
+    uint32_t flags,
+    PVFS_BMI_addr_t *svr_addr,
+    int site_count);
+
 #endif /* PVFS2_INTERNAL_H */

@@ -50,6 +50,8 @@ extern int TROVE_db_log_buffer_size_bytes;
 extern char *TROVE_db_log_directory;
 extern int TROVE_db_rep_master;
 
+extern struct server_configuration_s server_config;
+
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 static void unlink_db_cache_files(const char* path);
@@ -63,7 +65,12 @@ static DB *dbpf_db_open(
     int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2), uint32_t flags);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
+static pthread_t dbpf_dbrepmsg_process_thread;
+static pthread_t dbpf_dbrep_start_thread;
 static int dbpf_dbrepmsg_process_op_svc(struct dbpf_op *op_p);
+static int dbpf_dbrep_start_op_svc(struct dbpf_op *op_p);
+static void *dbpf_dbrepmsg_process_thread_function(void *ptr);
+static void *dbpf_dbrep_start_thread_function(void *ptr);
 
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
 
@@ -129,10 +136,10 @@ retry:
         return NULL;
     }
 
-    /* Configure the database to use auto commit, nosync write, 
+    /* Configure the database to use auto commit, nosync, 
      * disk sync is done in txn_checkpoint
      */
-    ret = dbenv->set_flags(dbenv, DB_AUTO_COMMIT | DB_TXN_WRITE_NOSYNC, 1);
+    ret = dbenv->set_flags(dbenv, DB_AUTO_COMMIT | DB_TXN_NOSYNC, 1);
     if(ret != 0)
     {
 	gossip_err("Error: failed to set db flags: %s\n", 
@@ -517,8 +524,11 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
             coll->immediate_completion = *(int *)parameter;
             ret = 0;
             break;
-    	case TROVE_DB_REPLICATION_START:
-	    dbpf_db_replication_start(*(int *)parameter, coll);
+        case TROVE_COLLECTION_REPTAB_INIT:
+	    ret = dbpf_reptab_init((char *)parameter, coll);
+	    break;
+    	case TROVE_COLLECTION_DB_REPLICATION_START:
+	    //dbpf_db_replication_start(*(int *)parameter, coll);
 	    ret = 0;
 	    break;
     }
@@ -645,14 +655,14 @@ static int dbpf_initialize(char *stoname,
 
     dbpf_open_cache_initialize();
 
-    ret = dbpf_sm_thread_initialize();
+    ret = dbpf_thread_initialize();
     if(ret)
     {
 	return ret;
     }
     else
     {
-	return dbpf_thread_initialize();
+	return dbpf_sm_thread_initialize();
     }
 }
 
@@ -811,13 +821,16 @@ storage_remove_failure:
 int dbpf_collection_create(char *collname,
                            TROVE_coll_id new_coll_id,
                            void *user_ptr,
+			   int is_dbrep_master,
                            TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL, error = 0, i = 0;
     TROVE_handle zero = TROVE_HANDLE_NULL;
     struct dbpf_storage *sto_p;
     struct dbpf_collection_db_entry db_data;
+    struct dbpf_collection *coll_p;
     DB *db_p = NULL;
+    DB_ENV *dbenv;
     DBT key, data;
     struct stat dirstat;
     struct stat dbstat;
@@ -896,105 +909,122 @@ int dbpf_collection_create(char *collname,
         return -trove_errno_to_trove_error(errno);
     }
 
-    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
-                                sto_p->name, new_coll_id);
-
-    ret = stat(path_name, &dbstat);
-    if(ret < 0 && errno != ENOENT)
+    if((dbenv = dbpf_getdb_env(path_name, COLL_ENV_FLAGS, &ret)) == NULL)
     {
-        gossip_err("failed to stat db file: %s\n", path_name);
-        return -trove_errno_to_trove_error(errno);
-    }
-    else if(ret < 0)
-    {
-        ret = dbpf_db_create(sto_p->name, path_name, NULL, 0);
-        if (ret != 0)
-        {
-            gossip_err("dbpf_db_create failed on attrib db %s\n", path_name);
-            return ret;
-        }
+	return -dbpf_db_error_to_trove_error(ret);
     }
 
-    db_p = dbpf_db_open(sto_p->name, path_name, NULL, &error, NULL, 0);
-    if (db_p == NULL)
+    coll_p = (struct dbpf_collection *)malloc(sizeof(struct dbpf_collection));
+    if(coll_p == NULL)
     {
-        gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
-        return error;
+	return -TROVE_ENOMEM;
     }
-
-    /*
-       store trove-dbpf version string in the collection.  this is used
-       to know what format the metadata is stored in on disk.
-       */
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-    key.data = TROVE_DBPF_VERSION_KEY;
-    key.size = strlen(TROVE_DBPF_VERSION_KEY);
-    data.data = TROVE_DBPF_VERSION_VALUE;
-    data.size = strlen(TROVE_DBPF_VERSION_VALUE);
-
-    ret = db_p->put(db_p, NULL, &key, &data, 0);
-    if (ret != 0)
+    memset(coll_p, 0, sizeof(struct dbpf_collection));
+    coll_p->coll_id = new_coll_id;
+    coll_p->coll_env = dbenv;
+    dbpf_collection_register(coll_p);
+    if(is_dbrep_master)
     {
-        gossip_err("db_p->put failed writing trove-dbpf version "
-                   "string: %s\n", db_strerror(ret));
-        return -dbpf_db_error_to_trove_error(ret);
-    }
+	DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
+				    sto_p->name, new_coll_id);
+	
+	ret = stat(path_name, &dbstat);
+	if(ret < 0 && errno != ENOENT)
+	{
+	    gossip_err("failed to stat db file: %s\n", path_name);
+	    return -trove_errno_to_trove_error(errno);
+	}
+	else if(ret < 0)
+	{
+	    ret = dbpf_db_create(sto_p->name, path_name, dbenv, 0);
+	    if (ret != 0)
+	    {
+		gossip_err("dbpf_db_create failed on attrib db %s\n", path_name);
+		return ret;
+	    }
+	}
+	
+	db_p = dbpf_db_open(sto_p->name, path_name, dbenv, &error, NULL, 0);
+	if (db_p == NULL)
+	{
+	    gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
+	    return error;
+	}
+	/*
+	  store trove-dbpf version string in the collection.  this is used
+	  to know what format the metadata is stored in on disk.
+	*/
+	memset(&key, 0, sizeof(key));
+	memset(&data, 0, sizeof(data));
+	key.data = TROVE_DBPF_VERSION_KEY;
+	key.size = strlen(TROVE_DBPF_VERSION_KEY);
+	data.data = TROVE_DBPF_VERSION_VALUE;
+	data.size = strlen(TROVE_DBPF_VERSION_VALUE);
+	
+	ret = db_p->put(db_p, NULL, &key, &data, 0);
+	if (ret != 0)
+	{
+	    gossip_err("db_p->put failed writing trove-dbpf version "
+		       "string: %s\n", db_strerror(ret));
+	    return -dbpf_db_error_to_trove_error(ret);
+	}
+	
+	gossip_debug(
+	    GOSSIP_TROVE_DEBUG, "wrote trove-dbpf version %s to "
+	    "collection attribute database\n", TROVE_DBPF_VERSION_VALUE);
 
-    gossip_debug(
-        GOSSIP_TROVE_DEBUG, "wrote trove-dbpf version %s to "
-        "collection attribute database\n", TROVE_DBPF_VERSION_VALUE);
+	/* store initial handle value */
 
-    /* store initial handle value */
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-    key.data = LAST_HANDLE_STRING;
-    key.size = sizeof(LAST_HANDLE_STRING);
-    data.data = &zero;
-    data.size = sizeof(zero);
-
-    ret = db_p->put(db_p, NULL, &key, &data, 0);
-    if (ret != 0)
-    {
-        gossip_err("db_p->put failed writing initial handle value: %s\n",
-                   db_strerror(ret));
-        return -dbpf_db_error_to_trove_error(ret);
-    }
-    db_p->sync(db_p, 0);
-    db_close(db_p);
-
-    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    ret = stat(path_name, &dbstat);
-    if(ret < 0 && errno != ENOENT)
-    {
-        gossip_err("failed to stat ds attrib db: %s\n", path_name);
-        return -trove_errno_to_trove_error(errno);
-    }
-    if(ret < 0)
-    {
-        ret = dbpf_db_create(sto_p->name, path_name, NULL, 0);
-        if (ret != 0)
-        {
-            gossip_err("dbpf_db_create failed on %s\n", path_name);
-            return ret;
-        }
-    }
-
-    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    ret = stat(path_name, &dbstat);
-    if(ret < 0 && errno != ENOENT)
-    {
-        gossip_err("failed to stat keyval db: %s\n", path_name);
-        return -trove_errno_to_trove_error(errno);
-    }
-    if(ret < 0)
-    {
-        ret = dbpf_db_create(sto_p->name, path_name, NULL, 0);
-        if (ret != 0)
-        {
-            gossip_err("dbpf_db_create failed on %s\n", path_name);
-            return ret;
-        }
+	memset(&key, 0, sizeof(key));
+	memset(&data, 0, sizeof(data));
+	key.data = LAST_HANDLE_STRING;
+	key.size = sizeof(LAST_HANDLE_STRING);
+	data.data = &zero;
+	data.size = sizeof(zero);
+	
+	ret = db_p->put(db_p, NULL, &key, &data, 0);
+	if (ret != 0)
+	{
+	    gossip_err("db_p->put failed writing initial handle value: %s\n",
+		       db_strerror(ret));
+	    return -dbpf_db_error_to_trove_error(ret);
+	}
+	db_p->sync(db_p, 0);
+	db_close(db_p);
+	
+	DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
+	ret = stat(path_name, &dbstat);
+	if(ret < 0 && errno != ENOENT)
+	{
+	    gossip_err("failed to stat ds attrib db: %s\n", path_name);
+	    return -trove_errno_to_trove_error(errno);
+	}
+	if(ret < 0)
+	{
+	    ret = dbpf_db_create(sto_p->name, path_name, dbenv, 0);
+	    if (ret != 0)
+	    {
+		gossip_err("dbpf_db_create failed on %s\n", path_name);
+		return ret;
+	    }
+	}
+	
+	DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
+	ret = stat(path_name, &dbstat);
+	if(ret < 0 && errno != ENOENT)
+	{
+	    gossip_err("failed to stat keyval db: %s\n", path_name);
+	    return -trove_errno_to_trove_error(errno);
+	}
+	if(ret < 0)
+	{
+	    ret = dbpf_db_create(sto_p->name, path_name, dbenv, 0);
+	    if (ret != 0)
+	    {
+		gossip_err("dbpf_db_create failed on %s\n", path_name);
+		return ret;
+	    }
+	}
     }
 
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
@@ -1444,23 +1474,29 @@ int dbpf_collection_lookup(char *collname,
        so, return
        */
     coll_p = dbpf_collection_find_registered(db_data.coll_id);
-    if (coll_p != NULL)
+    if (coll_p != NULL && coll_p->storage != NULL)
     {
+	/* if the storage is NULL, the collection is registered in dbpf_collection_create
+	 * for storing the dbenv, in that case, we still need all the initialization to 
+	 * dbpf_collection, no return here
+	 */
         *out_coll_id_p = coll_p->coll_id;
         return 1;
     }
 
+    if(coll_p == NULL)
+    {
+	coll_p = (struct dbpf_collection *)malloc(sizeof(struct dbpf_collection));
+	if (coll_p == NULL)
+	{
+	    return -TROVE_ENOMEM;
+	}
+	memset(coll_p, 0, sizeof(struct dbpf_collection));
+    }
     /*
        this collection hasn't been registered already (ie. looked up
        before)
        */
-    coll_p = (struct dbpf_collection *)malloc(
-        sizeof(struct dbpf_collection));
-    if (coll_p == NULL)
-    {
-        return -TROVE_ENOMEM;
-    }
-    memset(coll_p, 0, sizeof(struct dbpf_collection));
 
     coll_p->refct = 0;
     coll_p->coll_id = db_data.coll_id;
@@ -1482,12 +1518,15 @@ int dbpf_collection_lookup(char *collname,
         return -TROVE_ENOMEM;
     }
     /* per-collection environment */
-    if ((coll_p->coll_env = dbpf_getdb_env(coll_p->path_name, COLL_ENV_FLAGS, &ret)) == NULL) 
+    if(coll_p->coll_env == NULL)
     {
-        free(coll_p->path_name);
-        free(coll_p->name);
-        free(coll_p);
-        return -dbpf_db_error_to_trove_error(ret);
+	if ((coll_p->coll_env = dbpf_getdb_env(coll_p->path_name, COLL_ENV_FLAGS, &ret)) == NULL) 
+	{
+	    free(coll_p->path_name);
+	    free(coll_p->name);
+	    free(coll_p);
+	    return -dbpf_db_error_to_trove_error(ret);
+	}
     }
 
     ret = dbpf_checkpoint_thread_initialize(coll_p->coll_env);
@@ -1496,134 +1535,142 @@ int dbpf_collection_lookup(char *collname,
 	return ret;
     }
 
-    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
-                                sto_p->name, coll_p->coll_id);
-    coll_p->coll_attr_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env,
-                                        &ret, NULL, 0);
-    if (coll_p->coll_attr_db == NULL)
+    if(server_config.is_rep_master)
     {
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
-        free(coll_p->name);
-        free(coll_p);
-        return ret;
-    }
-
-    /* make sure the version matches the version we understand */
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-    key.data = TROVE_DBPF_VERSION_KEY;
-    key.size = strlen(TROVE_DBPF_VERSION_KEY);
-    data.data = &trove_dbpf_version;
-    data.ulen = 32;
-    data.flags = DB_DBT_USERMEM;
-
-    ret = coll_p->coll_attr_db->get(
-        coll_p->coll_attr_db, NULL, &key, &data, 0);
-
-    if (ret)
-    {
-        gossip_err("Failed to retrieve collection version: %s\n",
-                   db_strerror(ret));
-        db_close(coll_p->coll_attr_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
-        free(coll_p->name);
-        free(coll_p);
-        return -dbpf_db_error_to_trove_error(ret);
-    }
-
-    gossip_debug(GOSSIP_TROVE_DEBUG, "collection lookup: version is "
-                 "%s\n", trove_dbpf_version);
-
-    ret = sscanf(trove_dbpf_version, "%d.%d.%d", 
-                 &sto_major, &sto_minor, &sto_inc);
-    if(ret < 3)
-    {
-        gossip_err("Failed to get the version "
-                   "components from the storage version: %s\n",
-                   trove_dbpf_version);
-        return -TROVE_EINVAL;
-    }
-
-    ret = sscanf(TROVE_DBPF_VERSION_VALUE, "%d.%d.%d",
-                 &major, &minor, &inc);
-    if(ret < 3)
-    {
-        gossip_err("Failed to get the version "
-                   "components from the implementation's version: %s\n",
-                   TROVE_DBPF_VERSION_VALUE);
-        return -TROVE_EINVAL;
-    }
-
-    /* before version 0.1.3, no storage formats were compatible.
-     * Now 0.1.2 is compatible with 0.1.3, with the caveat that the right
-     * dspace db comparison function is specified when its opened.
-     *
-     * From 0.1.1 to 0.1.2, the storage formats aren't compatible, but
-     * in future (> 0.1.3) releases, only incremental version changes
-     * means backward compatibility is maintained, 
-     * while anything else is incompatible.
-     */
-    if(sto_major < major || sto_minor < minor ||
-       !strcmp(trove_dbpf_version, "0.1.1"))
-    {
-        db_close(coll_p->coll_attr_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
-        free(coll_p->name);
-        free(coll_p);
-        gossip_err("Trove-dbpf metadata format version mismatch!\n");
-        gossip_err("This collection has version %s\n",
-                   trove_dbpf_version);
-        gossip_err("This code understands version %s\n",
-                   TROVE_DBPF_VERSION_VALUE);
-        return -TROVE_EINVAL;
-    }
-
-    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
-                              sto_p->name, coll_p->coll_id);
-
-    if(sto_major == 0 && sto_minor == 1 && sto_inc < 3)
-    {
-        /* use old comparison function */
-        coll_p->ds_db = dbpf_db_open(
-            sto_p->name, path_name, coll_p->coll_env, &ret,
-            &PINT_trove_dbpf_ds_attr_compare_reversed, 0);
-    }
-    else
-    {
-        /* new comparison function orders dspace entries so that berkeley
-         * DB does page reads in the right order (for handle_iterate)
-         */
-        coll_p->ds_db = dbpf_db_open(
-            sto_p->name, path_name, coll_p->coll_env, &ret,
-            &PINT_trove_dbpf_ds_attr_compare, 0);
-    }
-
-    if (coll_p->ds_db == NULL)
-    {
-        db_close(coll_p->coll_attr_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
-        free(coll_p->name);
-        free(coll_p);
-        return ret;
-    }
-
-    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
-                           sto_p->name, coll_p->coll_id);
-    coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env,
-                                     &ret, PINT_trove_dbpf_keyval_compare, 0);
-    if(coll_p->keyval_db == NULL)
-    {
-        db_close(coll_p->coll_attr_db);
-        db_close(coll_p->ds_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
-        free(coll_p->name);
-        free(coll_p);
-        return ret;
+	DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
+				    sto_p->name, coll_p->coll_id);
+	coll_p->coll_attr_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env,
+					    &ret, NULL, 0);
+	if (coll_p->coll_attr_db == NULL)
+	{
+	    dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+	    free(coll_p->path_name);
+	    free(coll_p->name);
+	    free(coll_p);
+	    return ret;
+	}
+	
+	/* make sure the version matches the version we understand */
+	
+	memset(&key, 0, sizeof(key));
+	memset(&data, 0, sizeof(data));
+	key.data = TROVE_DBPF_VERSION_KEY;
+	key.size = strlen(TROVE_DBPF_VERSION_KEY);
+	data.data = &trove_dbpf_version;
+	data.ulen = 32;
+	data.flags = DB_DBT_USERMEM;
+	
+	ret = coll_p->coll_attr_db->get(
+	    coll_p->coll_attr_db, NULL, &key, &data, 0);
+	
+	if (ret)
+	{
+	    gossip_err("Failed to retrieve collection version: %s\n",
+		       db_strerror(ret));
+	    db_close(coll_p->coll_attr_db);
+	    dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+	    free(coll_p->path_name);
+	    free(coll_p->name);
+	    free(coll_p);
+	    return -dbpf_db_error_to_trove_error(ret);
+	}
+	
+	gossip_debug(GOSSIP_TROVE_DEBUG, "collection lookup: version is "
+		     "%s\n", trove_dbpf_version);
+	
+	ret = sscanf(trove_dbpf_version, "%d.%d.%d", 
+		     &sto_major, &sto_minor, &sto_inc);
+	if(ret < 3)
+	{
+	    gossip_err("Failed to get the version "
+		       "components from the storage version: %s\n",
+		       trove_dbpf_version);
+	    return -TROVE_EINVAL;
+	}
+	
+	ret = sscanf(TROVE_DBPF_VERSION_VALUE, "%d.%d.%d",
+		     &major, &minor, &inc);
+	if(ret < 3)
+	{
+	    gossip_err("Failed to get the version "
+		       "components from the implementation's version: %s\n",
+		       TROVE_DBPF_VERSION_VALUE);
+	    return -TROVE_EINVAL;
+	}
+	
+	/* before version 0.1.3, no storage formats were compatible.
+	 * Now 0.1.2 is compatible with 0.1.3, with the caveat that the right
+	 * dspace db comparison function is specified when its opened.
+	 *
+	 * From 0.1.1 to 0.1.2, the storage formats aren't compatible, but
+	 * in future (> 0.1.3) releases, only incremental version changes
+	 * means backward compatibility is maintained, 
+	 * while anything else is incompatible.
+	 */
+	
+	if(sto_major < major || sto_minor < minor ||
+	   !strcmp(trove_dbpf_version, "0.1.1"))
+	{
+	    db_close(coll_p->coll_attr_db);
+	    dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+	    free(coll_p->path_name);
+	    free(coll_p->name);
+	    free(coll_p);
+	    gossip_err("Trove-dbpf metadata format version mismatch!\n");
+	    gossip_err("This collection has version %s\n",
+		       trove_dbpf_version);
+	    gossip_err("This code understands version %s\n",
+		       TROVE_DBPF_VERSION_VALUE);
+	    return -TROVE_EINVAL;
+	}
+	
+	DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
+				  sto_p->name, coll_p->coll_id);
+	
+	if(sto_major == 0 && sto_minor == 1 && sto_inc < 3)
+	{
+	    
+	    /* use old comparison function */
+	    coll_p->ds_db = dbpf_db_open(
+		sto_p->name, path_name, coll_p->coll_env, &ret,
+		&PINT_trove_dbpf_ds_attr_compare_reversed, 0);
+	}
+	else
+	{
+	    
+	    /* new comparison function orders dspace entries so that berkeley
+	     * DB does page reads in the right order (for handle_iterate)
+	     */
+	    
+	    coll_p->ds_db = dbpf_db_open(
+		sto_p->name, path_name, coll_p->coll_env, &ret,
+		&PINT_trove_dbpf_ds_attr_compare, 0);
+	}
+	
+	if (coll_p->ds_db == NULL)
+	{
+	    db_close(coll_p->coll_attr_db);
+	    dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+	    free(coll_p->path_name);
+	    free(coll_p->name);
+	    free(coll_p);
+	    return ret;
+	}
+	
+	DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
+			       sto_p->name, coll_p->coll_id);
+	coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env,
+					 &ret, PINT_trove_dbpf_keyval_compare, 0);
+	if(coll_p->keyval_db == NULL)
+	{
+	    db_close(coll_p->coll_attr_db);
+	    db_close(coll_p->ds_db);
+	    dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+	    free(coll_p->path_name);
+	    free(coll_p->name);
+	    free(coll_p);
+	    return ret;
+	}
     }
 
     coll_p->pcache = PINT_dbpf_keyval_pcache_initialize();
@@ -1649,17 +1696,275 @@ int dbpf_collection_lookup(char *collname,
     coll_p->meta_sync_enabled = 1; /* MUST be 1 !*/
 
 
-    dbpf_collection_register(coll_p);
+    if(dbpf_collection_find_registered(coll_p->coll_id) == NULL)
+    {
+	dbpf_collection_register(coll_p);
+    }
     *out_coll_id_p = coll_p->coll_id;
     return 1;
 }
 
+int dbpf_dbrep_start(TROVE_coll_id coll_id,
+		     int is_rep_master,
+		     int priority,
+		     void *user_ptr,
+		     TROVE_context_id context_id,
+		     TROVE_op_id *out_op_id_p)
+{
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
+    struct dbpf_collection *coll_p = NULL;
+    int ret;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if(coll_p == NULL)
+    {
+	return -TROVE_EINVAL;
+    }
+
+    ret = dbpf_op_init_queued_or_immediate(
+	&op,
+	&q_op_p,
+	DBREP_START,
+	coll_p,
+	TROVE_HANDLE_NULL,
+	dbpf_dbrep_start_op_svc,
+	0,
+	NULL,
+	user_ptr,
+	context_id,
+	&op_p);
+    if(ret < 0)
+    {
+	return ret;
+    }
+
+    op_p->u.r_start.is_rep_master = is_rep_master;
+    op_p->u.r_start.priority = priority;
+/*
+#ifdef __PVFS2_TROVE_THREADED__
+    ret = pthread_create(&dbpf_dbrep_start_thread, NULL,
+			 dbpf_dbrep_start_thread_function, (void *)op_p);
+    if(ret == 0)
+    {
+	gossip_debug(GOSSIP_DB_REP_DEBUG,
+		     "dbpf_dbrep_start_thread created\n");
+    }
+    else
+    {
+	gossip_debug(GOSSIP_DB_REP_DEBUG,
+		     "dbpf_dbrep_start_thread creat failed\n");
+    }
+#else
+    gossip_err("dbpf_dbrep_start_thread: need trove thread support\n");
+    return -PVFS_ENOSYS;
+#endif
+    return ret;
+*/
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+}
+
+static int dbpf_dbrep_start_op_svc(struct dbpf_op *op_p)
+{
+    int ret = -1;
+    DB_ENV *dbenv;
+    struct dbpf_collection *coll_p;
+    int is_rep_master;
+    int priority;
+    struct timeval start_time, end_time;
+    double time;
+
+    coll_p = op_p->coll_p;
+    dbenv = coll_p->coll_env;
+
+    is_rep_master = op_p->u.r_start.is_rep_master;
+    priority = op_p->u.r_start.priority;
+
+    dbenv->rep_set_transport(dbenv, SELF_EID, dbpf_db_rep_send);
+    dbenv->rep_set_priority(dbenv, priority);
+    gettimeofday(&start_time, NULL);
+    if(is_rep_master)
+    {
+	coll_p->reptab.master_eid = SELF_EID;
+	dbenv->rep_start(dbenv, NULL, DB_REP_MASTER);
+	dbenv->log_stat_print(dbenv, 0);
+    }
+    else
+    {
+	char path_name[PATH_MAX];
+	struct dbpf_storage *sto_p = my_storage_p;
+	char trove_dbpf_version[32] = {0};
+	int sto_major, sto_minor, sto_inc, major, minor, inc;
+	DBT key, data;
+
+	if(!sto_p)
+	{
+	    return -TROVE_EINVAL;
+	}
+
+	dbenv->rep_start(dbenv, NULL, DB_REP_CLIENT);
+
+	sleep(20);
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "*****after waiting for rep_start****\n");
+	DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
+				    sto_p->name, coll_p->coll_id);
+	coll_p->coll_attr_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env,
+					    &ret, NULL, 0);
+	if (coll_p->coll_attr_db == NULL)
+	{
+	    return ret;
+	}
+	/* make sure the version matches the version we understand */
+	memset(&key, 0, sizeof(key));
+	memset(&data, 0, sizeof(data));
+	key.data = TROVE_DBPF_VERSION_KEY;
+	key.size = strlen(TROVE_DBPF_VERSION_KEY);
+	data.data = &trove_dbpf_version;
+	data.ulen = 32;
+	data.flags = DB_DBT_USERMEM;
+	
+	ret = coll_p->coll_attr_db->get(
+	    coll_p->coll_attr_db, NULL, &key, &data, 0);
+	 
+	if (ret)
+	{
+	    gossip_err("Failed to retrieve collection version: %s\n",
+		       db_strerror(ret));
+	    db_close(coll_p->coll_attr_db);
+	    return -dbpf_db_error_to_trove_error(ret);
+	}
+
+	gossip_debug(GOSSIP_TROVE_DEBUG, "collection lookup: version is "
+		     "%s\n", trove_dbpf_version);
+
+	ret = sscanf(trove_dbpf_version, "%d.%d.%d", 
+		     &sto_major, &sto_minor, &sto_inc);
+	if(ret < 3)
+	{
+	    gossip_err("Failed to get the version "
+		       "components from the storage version: %s\n",
+		       trove_dbpf_version);
+	    return -TROVE_EINVAL;
+	}
+	
+	ret = sscanf(TROVE_DBPF_VERSION_VALUE, "%d.%d.%d",
+		     &major, &minor, &inc);
+	if(ret < 3)
+	{
+	    gossip_err("Failed to get the version "
+		       "components from the implementation's version: %s\n",
+		       TROVE_DBPF_VERSION_VALUE);
+	    return -TROVE_EINVAL;
+	}
+	/* before version 0.1.3, no storage formats were compatible.
+	 * Now 0.1.2 is compatible with 0.1.3, with the caveat that the right
+	 * dspace db comparison function is specified when its opened.
+	 *
+	 * From 0.1.1 to 0.1.2, the storage formats aren't compatible, but
+	 * in future (> 0.1.3) releases, only incremental version changes
+	 * means backward compatibility is maintained, 
+	 * while anything else is incompatible.
+	 */
+	if(sto_major < major || sto_minor < minor ||
+	   !strcmp(trove_dbpf_version, "0.1.1"))
+	{
+	    db_close(coll_p->coll_attr_db);
+	    gossip_err("Trove-dbpf metadata format version mismatch!\n");
+	    gossip_err("This collection has version %s\n",
+		       trove_dbpf_version);
+	    gossip_err("This code understands version %s\n",
+		       TROVE_DBPF_VERSION_VALUE);
+	    return -TROVE_EINVAL;
+	}
+	
+	DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
+				  sto_p->name, coll_p->coll_id);
+	
+	if(sto_major == 0 && sto_minor == 1 && sto_inc < 3)
+	{
+	    /* use old comparison function */
+	    coll_p->ds_db = dbpf_db_open(
+		sto_p->name, path_name, coll_p->coll_env, &ret,
+		&PINT_trove_dbpf_ds_attr_compare_reversed, 0);
+	}
+	else
+	{
+	    /* new comparison function orders dspace entries so that berkeley
+	     * DB does page reads in the right order (for handle_iterate)
+	     */
+	    coll_p->ds_db = dbpf_db_open(
+		sto_p->name, path_name, coll_p->coll_env, &ret,
+		&PINT_trove_dbpf_ds_attr_compare, 0);
+	}
+	
+	if (coll_p->ds_db == NULL)
+	{
+	    db_close(coll_p->coll_attr_db);
+	    return ret;
+	}
+	
+	DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
+			       sto_p->name, coll_p->coll_id);
+	coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env,
+					 &ret, PINT_trove_dbpf_keyval_compare, 0);
+	if(coll_p->keyval_db == NULL)
+	{
+	    db_close(coll_p->coll_attr_db);
+	    db_close(coll_p->ds_db);
+	    return ret;
+	}
+    }
+    gettimeofday(&end_time, NULL);
+    time = end_time.tv_sec * 1000000 + end_time.tv_usec 
+	- start_time.tv_sec * 1000000 - start_time.tv_usec;
+    gossip_debug(GOSSIP_DB_REP_DEBUG, "time to start replication: %.4fus\n", time);
+    dbenv->rep_set_config(dbenv, DB_REP_CONF_BULK, 1);
+
+    return DBPF_OP_COMPLETE;
+}
+
+static void *dbpf_dbrep_start_thread_function(void *ptr)
+{
+    struct dbpf_op *op_p = (struct dbpf_op *)ptr;
+    DB_ENV *dbenv;
+    int is_rep_master;
+    int priority;
+    struct timeval start_time, end_time;
+    double time;
+
+    dbenv = op_p->coll_p->coll_env;
+
+    is_rep_master = op_p->u.r_start.is_rep_master;
+    priority = op_p->u.r_start.priority;
+
+    dbenv->rep_set_transport(dbenv, SELF_EID, dbpf_db_rep_send);
+    dbenv->rep_set_priority(dbenv, priority);
+
+    gettimeofday(&start_time, NULL);
+    if(is_rep_master)
+    {
+	dbenv->rep_start(dbenv, NULL, DB_REP_MASTER);
+    }
+    else
+    {
+	dbenv->rep_start(dbenv, NULL, DB_REP_CLIENT);
+    }
+    gettimeofday(&end_time, NULL);
+    time = end_time.tv_sec * 1000000 + end_time.tv_usec 
+	- start_time.tv_sec * 1000000 - start_time.tv_usec;
+    gossip_debug(GOSSIP_DB_REP_DEBUG, "time to start replication: %.4fus\n", time);
+    return ptr;
+}
+
 int dbpf_dbrepmsg_process(TROVE_coll_id coll_id,
-		      TROVE_keyval_s *control_p,
-		      TROVE_keyval_s *rec_p,
-		      void *user_ptr,
-		      TROVE_context_id context_id,
-		      TROVE_op_id *out_op_id_p)
+			  TROVE_keyval_s *control_p,
+			  TROVE_keyval_s *rec_p,
+			  PVFS_BMI_addr_t addr,
+			  int32_t version,
+			  void *user_ptr,
+			  TROVE_context_id context_id,
+			  TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -1693,8 +1998,28 @@ int dbpf_dbrepmsg_process(TROVE_coll_id coll_id,
     /*fill the control and rec structure in r_process*/
     op_p->u.r_process.control = *control_p;
     op_p->u.r_process.rec = *rec_p;
+    op_p->u.r_process.addr = addr;
+    op_p->u.r_process.version = version;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+#ifdef __PVFS2_TROVE_THREADED__
+    ret = pthread_create(&dbpf_dbrepmsg_process_thread, NULL, 
+			 dbpf_dbrepmsg_process_thread_function, (void *)q_op_p);
+    if(ret == 0)
+    {
+	gossip_debug(GOSSIP_DB_REP_DEBUG,
+		     "dbpf_dbrepmsg_process_thread created\n");
+    }
+    else
+    {
+	gossip_debug(GOSSIP_DB_REP_DEBUG,
+		     "dbpf_dbrepmsg_process_thread creat failed\n");
+    }
+#else
+    gossip_err("dbpf_dbrepmsg_process_thread: need trove thread support\n");
+    return -PVFS_ENOSYS;
+#endif
+    return ret;
+//    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
 
 static int dbpf_dbrepmsg_process_op_svc(struct dbpf_op *op_p)
@@ -1703,38 +2028,132 @@ static int dbpf_dbrepmsg_process_op_svc(struct dbpf_op *op_p)
     DB_ENV *dbenv;
     DBT control, rec;
     DB_LSN lsn;
+    PVFS_BMI_addr_t addr;
+    int eid;
 
     dbenv = op_p->coll_p->coll_env;
 
     memset(&control, 0, sizeof(DBT));
     memset(&rec, 0, sizeof(DBT));
+    memset(&lsn, 0, sizeof(DB_LSN));
 
     control.size = op_p->u.r_process.control.buffer_sz;
     control.data = op_p->u.r_process.control.buffer;
     rec.size = op_p->u.r_process.rec.buffer_sz;
     rec.data = op_p->u.r_process.rec.buffer;
-
+    addr = op_p->u.r_process.addr;
+    ret = dbpf_reptab_find_eid(&op_p->coll_p->reptab, addr, &eid);
+    if(ret != 0)
+    {
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "dbpf_dbrepmsg_process_op_svc: new addr %lu\n", addr);
+	dbpf_reptab_add(&op_p->coll_p->reptab, addr);
+    }
+    
     ret = dbenv->rep_process_message(dbenv, &control, &rec,
-				     0,/*TODO: eid, should have a table for this */
+				     &eid,
 				     &lsn);
+    gossip_debug(GOSSIP_DB_REP_DEBUG, "return from dbenv->rep_process_message: %s\n", db_strerror(ret));
     switch(ret)
     {
     case 0:
 	gossip_debug(GOSSIP_DB_REP_DEBUG, "rep_process_message succeeded!\n");
 	break;
 	/*TODO: some of the cases need to be handled.*/
+    case DB_REP_NEWSITE:
+	break;
     case DB_REP_DUPMASTER:
     case DB_REP_HOLDELECTION:
     case DB_REP_IGNORE:
     case DB_REP_ISPERM:
     case DB_REP_JOIN_FAILURE:
     case DB_REP_NEWMASTER:
-    case DB_REP_NEWSITE:
+	break;
     case DB_REP_NOTPERM:
-	gossip_debug(GOSSIP_DB_REP_DEBUG, "rep_process_message failed: %s\n", db_strerror(ret));
+	ret = dbenv->log_flush(dbenv, &lsn);
+	while(ret != 0)
+	{
+	    sleep(1);
+	    ret = dbenv->log_flush(dbenv, &lsn);
+	}
 	break;
     }
+    gossip_debug(GOSSIP_DB_REP_DEBUG, "rep_process_message failed: %s\n", db_strerror(ret));
     return ret;
+}
+
+static void *dbpf_dbrepmsg_process_thread_function(void *ptr)
+{
+    dbpf_queued_op_t *q_op_p = (dbpf_queued_op_t *)ptr;
+    struct dbpf_op *op_p = &q_op_p->op;
+    struct dbpf_collection *coll_p = op_p->coll_p;
+    int ret = -TROVE_EINVAL;
+    DB_ENV *dbenv = coll_p->coll_env;
+    DBT control, rec;
+    DB_LSN lsn;
+    PVFS_BMI_addr_t addr;
+    int32_t version;
+    int eid;
+    struct timeval start_time, end_time;
+    double time;
+
+    memset(&control, 0, sizeof(DBT));
+    memset(&rec, 0, sizeof(DBT));
+    memset(&lsn, 0, sizeof(DB_LSN));
+
+    control.size = op_p->u.r_process.control.buffer_sz;
+    control.data = op_p->u.r_process.control.buffer;
+    rec.size = op_p->u.r_process.rec.buffer_sz;
+    rec.data = op_p->u.r_process.rec.buffer;
+    addr = op_p->u.r_process.addr;
+    version = op_p->u.r_process.version;
+
+    ret = dbpf_reptab_find_eid(&op_p->coll_p->reptab, addr, &eid);
+    if(ret != 0)
+    {
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "dbpf_dbrepmsg_process_thread_function: new addr %lu\n", addr);
+	dbpf_reptab_add(&op_p->coll_p->reptab, addr);
+    }
+
+    gettimeofday(&start_time, NULL);
+    ret = dbenv->rep_process_message(dbenv, &control, &rec, &eid, &lsn);
+    gettimeofday(&end_time, NULL);
+    time = end_time.tv_sec * 1000000 + end_time.tv_usec 
+	- start_time.tv_sec * 1000000 - start_time.tv_usec;
+    gossip_debug(GOSSIP_DB_REP_DEBUG, "time to process message: %.4fus\n", time);
+    gossip_debug(GOSSIP_DB_REP_DEBUG, 
+		 "return from dbenv->rep_process_message: %s\tlsn: %lu/%lu\tversion: %d\n", 
+		 db_strerror(ret), (u_long)lsn.file, (u_long)lsn.offset, version);
+    switch(ret)
+    {
+    case 0:
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "rep_process_message succeeded!\n");
+	break;
+	/*TODO: some of the cases need to be handled.*/
+    case DB_REP_NEWSITE:
+	break;
+    case DB_REP_DUPMASTER:
+    case DB_REP_HOLDELECTION:
+    case DB_REP_IGNORE:
+    case DB_REP_ISPERM:
+    case DB_REP_JOIN_FAILURE:
+	break;
+    case DB_REP_NEWMASTER:
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "master eid = %d\n", eid);
+	gen_mutex_lock(&coll_p->reptab.mutex);
+	coll_p->reptab.master_eid = eid;
+	gen_mutex_unlock(&coll_p->reptab.mutex);
+	break;
+    case DB_REP_NOTPERM:
+	//ret = dbenv->log_flush(dbenv, &lsn);
+	/*while(ret != 0)
+	{
+	    sleep(1);
+	    ret = dbenv->log_flush(dbenv, &lsn);
+	    }*/
+	break;
+    }
+    dbpf_queued_op_complete(q_op_p, OP_COMPLETED);
+    return ptr;
 }
 
 /* dbpf_storage_lookup()
@@ -2073,7 +2492,8 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
     dbpf_collection_geteattr,
-    dbpf_dbrepmsg_process
+    dbpf_dbrepmsg_process,
+    dbpf_dbrep_start
 };
 
 typedef struct
@@ -2108,7 +2528,8 @@ static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
     { DSPACE_GETATTR, "DSPACE_GETATTR" },
     { DSPACE_SETATTR, "DSPACE_SETATTR" },
     { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" },
-    { DBREPMSG_PROCESS, "DBREPMSG_PROCESS" }
+    { DBREPMSG_PROCESS, "DBREPMSG_PROCESS" },
+    { DBREP_START, "DBREP_START"}
     /* NOTE: this list should be kept in sync with enum dbpf_op_type 
      * from dbpf.h 
      */ 

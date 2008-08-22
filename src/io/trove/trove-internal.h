@@ -341,6 +341,7 @@ struct TROVE_mgmt_ops
 			     char *collname,
 			     TROVE_coll_id new_coll_id,
 			     void *user_ptr,
+			     int is_dbrep_master,
 			     TROVE_op_id *out_op_id_p);
 
     int (*collection_remove)(
@@ -400,9 +401,18 @@ struct TROVE_mgmt_ops
 			    TROVE_coll_id coll_id,
 			    PVFS_ds_keyval *control_p,
 			    PVFS_ds_keyval *rec_p,
+			    PVFS_BMI_addr_t addr,
+			    int32_t version,
 			    void *user_ptr,
 			    TROVE_context_id context_id,
 			    TROVE_op_id *out_op_id_p);
+    int (*dbrep_start)(
+		       TROVE_coll_id coll_id,
+		       int is_rep_master,
+		       int priority,
+		       void *user_ptr,
+		       TROVE_context_id context_id,
+		       TROVE_op_id *out_op_id_p);
 };
 
 struct TROVE_context_ops

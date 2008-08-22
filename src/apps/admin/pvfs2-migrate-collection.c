@@ -76,7 +76,7 @@ static int src_get_version_0_0_1(
     char* ver_string, int ver_string_max);
 static int translate_0_0_1(
     char* storage_space, char* old_coll_path, 
-    char* coll_name, TROVE_coll_id coll_id);
+    char* coll_name, TROVE_coll_id coll_id, int is_dbrep_master);
 static int translate_coll_eattr_0_0_1(
     char* old_coll_path, TROVE_coll_id coll_id, char* coll_name,
     TROVE_context_id trove_context);
@@ -293,7 +293,7 @@ int migrate_collection(void * config, void * sconfig)
         ret = translate_0_0_1(
             server_config->storage_path, old_coll_path, 
             fs_config->file_system_name, 
-            fs_config->coll_id);
+            fs_config->coll_id, server_config->is_rep_master);
         if(ret < 0)
         {
             fprintf(stderr, 
@@ -631,7 +631,8 @@ static int translate_0_0_1(
     char* storage_space,   /**< path to storage space */
     char* old_coll_path,   /**< path to old collection */
     char* coll_name,       /**< collection name */
-    TROVE_coll_id coll_id) /**< collection id in string format */
+    TROVE_coll_id coll_id, /**< collection id in string format */
+    int is_dbrep_master)   /**< whether the server is db repliacation master */
 {
     int ret = -1;
     /* choose a handle range big enough to encompass anything pvfs2-genconfig
@@ -681,6 +682,7 @@ static int translate_0_0_1(
         coll_name,
         coll_id, 
         TROVE_HANDLE_NULL,
+	is_dbrep_master,
         handle_range,
         NULL,
         1,

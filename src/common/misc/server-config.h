@@ -201,6 +201,8 @@ typedef struct server_configuration_s
 
 } server_configuration_s;
 
+struct server_configuration_s server_config;
+
 int PINT_parse_config(
     struct server_configuration_s *config_s,
     char *global_config_filename,

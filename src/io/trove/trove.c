@@ -1101,6 +1101,8 @@ int trove_dbrepmsg_process(
     TROVE_coll_id coll_id,
     PVFS_ds_keyval *control_p,
     PVFS_ds_keyval *rec_p,
+    PVFS_BMI_addr_t addr,
+    int32_t version,
     void *user_ptr,
     TROVE_context_id context_id,
     TROVE_op_id *out_op_id_p)
@@ -1115,7 +1117,33 @@ int trove_dbrepmsg_process(
 	coll_id,
 	control_p,
 	rec_p,
+	addr,
+	version,
 	user_ptr,
 	context_id,
 	out_op_id_p);
 }
+
+int trove_dbrep_start(
+    TROVE_coll_id coll_id,
+    int is_rep_master,
+    int priority,
+    void *user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id *out_op_id_p)
+{
+  TROVE_method_id method_id;
+  method_id = global_trove_method_callback(coll_id);
+  if(method_id < 0)
+  {
+      return -TROVE_EINVAL;
+  }
+  return mgmt_method_table[method_id]->dbrep_start(
+      coll_id,
+      is_rep_master,
+      priority,
+      user_ptr,
+      context_id,
+      out_op_id_p);
+}
+		      

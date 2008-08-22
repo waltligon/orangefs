@@ -73,7 +73,7 @@ int main(int argc, char **argv)
 
     /* create the collection for the fs */
     /* Q: why do i get to pick the coll id?  so i can make it the same across nodes? */
-    ret = trove_collection_create(file_system, FS_COLL_ID, NULL, &op_id);
+    ret = trove_collection_create(file_system, FS_COLL_ID, NULL, 1, &op_id);
     if (ret < 0) {
 	fprintf(stderr, "collection create (fs) failed.\n");
 	return -1;

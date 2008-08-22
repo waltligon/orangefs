@@ -85,7 +85,7 @@ static struct PINT_perf_key server_keys[] =
 static PINT_server_status_flag server_status_flag;
 
 /* All parameters read in from the configuration file */
-static struct server_configuration_s server_config;
+extern struct server_configuration_s server_config;
 
 /* A flag to stop the main loop from processing and handle the signal
  * after all threads complete and are no longer blocking.
@@ -158,6 +158,12 @@ static void write_pidfile(int fd);
 static void remove_pidfile(void);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
+static void trove_dbrep_start_callback_fn(void *data, PVFS_error error_code)
+{
+    return;
+}
+static struct PINT_thread_mgr_trove_callback trove_dbrep_start_callback =
+    {trove_dbrep_start_callback_fn, NULL};
 
 struct server_configuration_s *PINT_get_server_config(void)
 {
@@ -828,7 +834,7 @@ static int server_initialize_subsystems(
                         PINT_config_get_host_alias_ptr(
                             &server_config, server_config.host_id),
                         cur_fs->file_system_name);
-            return -1;
+            // Rongrong temporary: return -1;
         }
         else
         {
@@ -1045,7 +1051,8 @@ static int server_initialize_subsystems(
     }
     *server_status_flag |= SERVER_EVENT_INIT;
 
-    /*cur = server_config.file_systems;
+    /*Rongrong: for replication*/
+    cur = server_config.file_systems;
     while(cur)
     {
         cur_fs = PINT_llist_head(cur);
@@ -1053,14 +1060,64 @@ static int server_initialize_subsystems(
         {
             break;
         }
-    */
-	/*Rongrong: for replication*/
-    /*	ret = trove_collection_setinfo(
-	    cur_fs->coll_id, trove_context,
-	    TROVE_DB_REPLICATION_START,
-	    &server_config.is_rep_master);
+
+	if(server_config.is_rep_master)
+	{
+	    ret = trove_collection_setinfo(
+		cur_fs->coll_id, global_trove_context,
+		TROVE_COLLECTION_REPTAB_INIT,
+		NULL);
+	}
+	else
+	{
+	    /*!!!assumes there's only one rep group!!!*/
+	    struct host_alias_s *rep_group = PINT_llist_head(server_config.rep_groups);
+	    struct host_alias_s *cur_alias = NULL;
+	    PINT_llist *alias = server_config.host_aliases;
+	    /*find the bmi address by alias*/
+	    while(alias)
+	    {
+		cur_alias = PINT_llist_head(alias);
+		if(!cur_alias)
+		{
+		    break;
+		}
+		if(!strcmp(rep_group->host_alias, cur_alias->host_alias))
+		{
+		    
+		    ret = trove_collection_setinfo(
+			cur_fs->coll_id, global_trove_context,
+			TROVE_COLLECTION_REPTAB_INIT,
+			cur_alias->bmi_address);
+		}
+		alias = PINT_llist_next(alias);
+	    }
+	}
+	if(ret < 0)
+	{
+	    gossip_err("Trove setinfo initialize replication table failed\n");
+	    return ret;
+	}
+	if(server_config.is_rep_master)
+	{
+	    TROVE_op_id id;
+	    ret = trove_dbrep_start(cur_fs->coll_id, server_config.is_rep_master, 100,
+				    (void*)&trove_dbrep_start_callback, global_trove_context, &id);
+	}
+	else
+	{
+	    TROVE_op_id id;
+	    ret = trove_dbrep_start(cur_fs->coll_id, server_config.is_rep_master, 90, 
+				    (void *)&trove_dbrep_start_callback, global_trove_context, &id);
+	}
+	if(ret < 0)
+	{
+	    gossip_err("Trove setinfo replication start failed\n");
+	    return ret;
+	}
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "replication started\n");
         cur = PINT_llist_next(cur);
-    }*/
+    }
 
     return ret;
 }

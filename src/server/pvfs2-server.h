@@ -346,6 +346,7 @@ struct PINT_server_db_replication_op
     PVFS_fs_id fs_id;
     PVFS_ds_keyval control;
     PVFS_ds_keyval rec;
+    PVFS_BMI_addr_t addr;
 };
 
 /* This structure is passed into the void *ptr 

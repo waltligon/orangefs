@@ -393,7 +393,7 @@ void dbpf_db_replication_start(int is_master, struct dbpf_collection *coll)
     /* TODO: configurable priorities, nsites, timeout for replication group?
      * should check the return value....
      */
-    dbenv->rep_set_transport(dbenv, 100/*self eid*/, PVFS_db_rep_send);
+    dbenv->rep_set_transport(dbenv, 100/*self eid*/, dbpf_db_rep_send);
     if(is_master)
     {
 	dbenv->rep_set_priority(dbenv, 100);
@@ -725,6 +725,181 @@ int dbpf_txn_queue_add(TROVE_context_id context_index, DB *dbp, DBT *key, DBT *d
  
     qlist_add(&(txn_entry->link), txn_array[context_index].txn_queue);
     return 0;
+}
+
+int dbpf_reptab_init(char *alias, struct dbpf_collection *coll)
+{
+    dbpf_db_reptab_t *table = &coll->reptab;
+    int ret = 0;
+    table->self_eid = SELF_EID;
+    table->master_eid = DB_EID_INVALID;
+    table->next_eid = 2;
+    table->nsites = 0;
+    gen_mutex_init(&table->mutex);
+    table->rep_table = (struct qlist_head*)malloc(sizeof(struct qlist_head));
+    if(table->rep_table == NULL)
+    {
+	return -PVFS_ENOMEM;
+    }
+    INIT_QLIST_HEAD(table->rep_table);
+    if(alias != NULL)
+    {
+	PVFS_BMI_addr_t addr;
+	assert(BMI_addr_lookup(&addr, alias) == 0);
+	ret = dbpf_reptab_add(table, addr);
+    }
+    return ret;
+}
+
+void dbpf_reptab_destroy(dbpf_db_reptab_t *table)
+{
+    dbpf_db_reptab_entry_t *p1, *p2;
+    gen_mutex_lock(&table->mutex);
+    qlist_for_each_entry_safe(p1, p2, table->rep_table, link)
+    {
+	qlist_del(&p1->link);
+	free(p1);
+    }
+    gen_mutex_destroy(&table->mutex);
+    free(table->rep_table);
+}
+
+int dbpf_reptab_add(dbpf_db_reptab_t *table, PVFS_BMI_addr_t addr)
+{
+    dbpf_db_reptab_entry_t *entry;
+
+    entry = (dbpf_db_reptab_entry_t *)malloc(sizeof(dbpf_db_reptab_entry_t));
+    if(entry == NULL)
+    {
+	return -PVFS_ENOMEM;
+    }
+    gen_mutex_lock(&table->mutex);
+    entry->eid = table->next_eid;
+    table->next_eid++;
+    table->nsites++;
+    entry->addr = addr;
+    qlist_add(&(entry->link), table->rep_table);
+    gen_mutex_unlock(&table->mutex);
+    return 0;
+}
+
+int dbpf_reptab_find_addr(dbpf_db_reptab_t *table, int eid, PVFS_BMI_addr_t *addr)
+{
+    dbpf_db_reptab_entry_t *p1, *p2;
+
+    gen_mutex_lock(&table->mutex);
+    qlist_for_each_entry_safe(p1, p2, table->rep_table, link)
+    {
+	if(p1->eid == eid)
+	{
+	    *addr = p1->addr;
+	    gen_mutex_unlock(&table->mutex);
+	    return 0;
+	}
+    }
+    gen_mutex_unlock(&table->mutex);
+    return -PVFS_EINVAL;
+}
+
+int dbpf_reptab_find_eid(dbpf_db_reptab_t *table, PVFS_BMI_addr_t addr, int *eid)
+{
+    dbpf_db_reptab_entry_t *p1, *p2;
+
+    gen_mutex_lock(&table->mutex);
+    qlist_for_each_entry_safe(p1, p2, table->rep_table, link)
+    {
+	if(p1->addr == addr)
+	{
+	    *eid = p1->eid;
+	    gen_mutex_unlock(&table->mutex);
+	    return 0;
+	}
+    }
+    gen_mutex_unlock(&table->mutex);
+    return -PVFS_EINVAL;
+}
+
+void dbpf_reptab_get_addr_list(dbpf_db_reptab_t *table, PVFS_BMI_addr_t *addr)
+{
+    dbpf_db_reptab_entry_t *p1, *p2;
+    int n = 0;
+
+    gen_mutex_lock(&table->mutex);
+    qlist_for_each_entry_safe(p1, p2, table->rep_table, link)
+    {
+	*(addr+n) = p1->addr;
+	n++;
+    }
+    gen_mutex_unlock(&table->mutex);
+}
+
+int dbpf_db_rep_send(
+    DB_ENV *dbenv, 
+    const DBT *control, 
+    const DBT *rec,
+    const DB_LSN *lsnp,
+    int eid,
+    u_int32_t flags)
+{
+    TROVE_keyval_s msg_control, msg_rec;
+    struct dbpf_collection *coll_p = NULL;
+    dbpf_db_reptab_t *reptab;
+    PVFS_BMI_addr_t *svr_addr;
+    int ret;
+    int count = 0;
+    int fs_id = 0;
+
+    coll_p = dbpf_collection_find_collection_by_dbenv(dbenv);
+    if(coll_p == NULL)
+    {
+	gossip_err("Find dbpf collection failed: No collection matches the dbenv");
+	return EINVAL;
+    }
+
+    fs_id = coll_p->coll_id;
+
+    memset(&msg_control, 0, sizeof(TROVE_keyval_s));
+    memset(&msg_rec, 0, sizeof(TROVE_keyval_s));
+    msg_control.buffer_sz = control->size;
+    msg_control.buffer = control->data;
+    msg_rec.buffer_sz = rec->size;
+    msg_rec.buffer = rec->data;
+
+    reptab = &(coll_p->reptab);
+    if(eid == DB_EID_BROADCAST)
+    {
+	count = reptab->nsites;
+	svr_addr = (PVFS_BMI_addr_t *)malloc(count * sizeof(PVFS_BMI_addr_t));
+	if(svr_addr == NULL)
+	{
+	    return ENOMEM;
+	}
+	dbpf_reptab_get_addr_list(reptab, svr_addr);
+    }
+    else
+    {
+	count = 1;
+	svr_addr = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t));
+	if(svr_addr == NULL)
+	{
+	    return ENOMEM;
+	}
+	dbpf_reptab_find_addr(reptab, eid, svr_addr);
+    }
+    if(count == 0)
+    {
+	return 0;
+    }
+
+    gossip_debug(GOSSIP_DB_REP_DEBUG, "dbpf_db_rep_send: lsn: %lu/%lu\n", 
+		 (u_long)lsnp->file, (u_long)lsnp->offset);
+    ret = PVFS_db_rep_send(fs_id, &msg_control, &msg_rec, flags, svr_addr, count);
+    if(ret)
+    {
+	PVFS_perror_gossip("PVFS_idb_rep_send call", ret);
+    }
+
+    return ret;
 }
 
 /*

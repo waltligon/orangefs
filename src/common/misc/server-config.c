@@ -2365,6 +2365,10 @@ DOTCONF_CB(get_alias_list)
                       compare_aliases))
     {
 	/*Rongrong temporary for rep group*/
+	if(config_s->server_alias == NULL)
+	{
+	    return NULL;
+	}
 	if(!strcmp(config_s->server_alias, cmd->data.list[0]))
 	{
 	    config_s->is_rep_master = 1;
@@ -4220,7 +4224,7 @@ int PINT_config_pvfs2_mkspace(
                 gossip_err("Please make sure that the host names in "
                            "%s are consistent\n",
                            config->fs_config_filename);
-                break;
+                //Rongrong temporary: break;
             }
 
             /*
@@ -4244,8 +4248,9 @@ int PINT_config_pvfs2_mkspace(
 
             ret = pvfs2_mkspace(
                 config->storage_path, cur_fs->file_system_name,
-                cur_fs->coll_id, root_handle, cur_meta_handle_range,
-                cur_data_handle_range, create_collection_only, 1);
+                cur_fs->coll_id, root_handle, config->is_rep_master,
+		cur_meta_handle_range, cur_data_handle_range, 
+		create_collection_only, 1);
 
             gossip_debug(
                 GOSSIP_SERVER_DEBUG,"\n*****************************\n");

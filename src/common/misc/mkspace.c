@@ -114,6 +114,7 @@ int pvfs2_mkspace(
     char *collection,
     TROVE_coll_id coll_id,
     TROVE_handle root_handle,
+    int is_dbrep_master,
     char *meta_handle_ranges,
     char *data_handle_ranges,
     int create_collection_only,
@@ -200,7 +201,7 @@ int pvfs2_mkspace(
     }
 
     /* create the collection for the fs */
-    ret = trove_collection_create(collection, coll_id, NULL, &op_id);
+    ret = trove_collection_create(collection, coll_id, NULL, is_dbrep_master, &op_id);
     if (ret != 1)
     {
 	mkspace_print(verbose,"error: collection create failed for "
@@ -214,7 +215,7 @@ int pvfs2_mkspace(
     if (ret != 1)
     {
 	mkspace_print(verbose,"error: collection lookup failed for "
-                      "collection '%s' after create.\n",collection);
+		      "collection '%s' after create.\n",collection);
 	return -1;
     }
 
@@ -246,7 +247,7 @@ int pvfs2_mkspace(
     if (!merged_handle_ranges)
     {
         gossip_err("Failed to merge the handle range!  Format invalid\n");
-        return -1;
+        //Rongrong temporary return -1;
     }
 
     /*

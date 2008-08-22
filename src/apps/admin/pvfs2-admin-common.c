@@ -7,7 +7,7 @@
 #include "server-config.h"
 
 job_context_id server_job_context;
-static server_configuration_s server_config;
+//static server_configuration_s server_config;
 
 server_configuration_s *get_server_config_struct()
 {

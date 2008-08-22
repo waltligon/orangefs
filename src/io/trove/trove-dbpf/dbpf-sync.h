@@ -7,6 +7,7 @@
 #include "dbpf-op-queue.h"
 #include "gossip.h"
 #include "pint-perf-counter.h"
+#include "dbpf.h"
 
 typedef struct
 {
@@ -30,7 +31,7 @@ typedef struct
     DBT key;
     DBT data;
     struct qlist_head link;
-}dbpf_txn_entry_t;
+} dbpf_txn_entry_t;
 
 typedef struct
 {
@@ -42,19 +43,7 @@ typedef struct
     struct qlist_head *txn_queue;
 } dbpf_txn_context_t;
 
-typedef struct
-{
-    int eid;
-    BMI_addr_t addr;
-    struct qlist_head link;
-}dbpf_db_reptab_entry_t;
-
-typedef struct
-{
-    int self_eid;
-    int master_eid;
-    struct qlist_head *rep_table;
-}dbpf_db_reptab_t;
+#define SELF_EID 1
 
 int dbpf_sync_context_init(int context_index);
 void dbpf_sync_context_destroy(int context_index);
@@ -69,8 +58,6 @@ void dbpf_queued_op_set_sync_low_watermark(int low, struct dbpf_collection* coll
 
 void dbpf_queued_op_set_sync_mode(int enabled, struct dbpf_collection* coll);
 
-void dbpf_db_replication_start(int is_master, struct dbpf_collection *coll);
-
 int dbpf_txn_context_init(int context_index);
 void dbpf_txn_context_destroy(int context_index);
 
@@ -80,8 +67,11 @@ int dbpf_txn_coalesce_enqueue(dbpf_queued_op_t *qop_p);
 
 int dbpf_txn_queue_add(TROVE_context_id context_index, DB *dbp, DBT *key, DBT *data);
 
-int dbpf_reptab_init(dbpf_db_reptab_t *table);
+int dbpf_reptab_init(char *alias, struct dbpf_collection *coll);
 void dbpf_reptab_destroy(dbpf_db_reptab_t *table);
+int dbpf_reptab_add(dbpf_db_reptab_t *table, PVFS_BMI_addr_t addr);
+int dbpf_reptab_find_addr(dbpf_db_reptab_t *table, int eid, PVFS_BMI_addr_t *addr);
+int dbpf_reptab_find_eid(dbpf_db_reptab_t *table, PVFS_BMI_addr_t addr, int *eid); 
 /*
  * Local variables:
  *  c-indent-level: 4

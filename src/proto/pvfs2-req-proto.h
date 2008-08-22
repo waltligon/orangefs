@@ -1499,28 +1499,32 @@ struct PVFS_servreq_dbrep
     PVFS_fs_id fs_id;
     PVFS_ds_keyval control;
     PVFS_ds_keyval rec;
+    int32_t version;
 };
-endecode_fields_4_struct(
+endecode_fields_5_struct(
     PVFS_servreq_dbrep,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_ds_keyval, control,
-    PVFS_ds_keyval, rec);
+    PVFS_ds_keyval, rec,
+    int32_t, version);
 #define extra_size_PVFS_servreq_dbrep \
     PVFS_REQ_LIMIT_DBREP
 
 #define PINT_SERVREQ_DBREP_FILL(__req,		\
 				__fsid,		\
 				__control,	\
-				__rec)		\
+				__rec,		\
+				__version)	\
 do{						\
     memset(&(__req), 0, sizeof(__req));		\
     (__req).op = PVFS_SERV_DBREPLICATION;	\
     (__req).u.dbrep.fs_id = (__fsid);		\
     (__req).u.dbrep.control.buffer = (__control).buffer;\
     (__req).u.dbrep.control.buffer_sz = (__control).buffer_sz;\
-    (__req).u.dbrep.rec.buffer = (__rec).buffer;	\
-    (__req).u.dbrep.rec.buffer_sz = (__control).buffer_sz;\
+    (__req).u.dbrep.rec.buffer = (__rec).buffer;\
+    (__req).u.dbrep.rec.buffer_sz = (__rec).buffer_sz;\
+    (__req).u.dbrep.version = (__version);	\
 }while(0);
 
 /* server request *********************************************/

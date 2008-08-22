@@ -13,6 +13,7 @@
 
 #include "src/io/flow/flow.h"
 #include "bmi.h"
+#include "trove.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-req-proto.h"
@@ -23,6 +24,8 @@ typedef PVFS_id_gen_t job_id_t;
 typedef PVFS_context_id job_context_id;
 /* integer type; large enough to hold a pointer */
 typedef intptr_t job_aint;
+
+extern TROVE_context_id global_trove_context;
 
 #define JOB_MAX_CONTEXTS 16
 
@@ -569,15 +572,25 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 			  job_id_t * id,
 			  job_context_id context_id);
 
-int job_trove_dbrepmsg_process(
-    PVFS_fs_id coll_id,
-    PVFS_ds_keyval *control_p,
-    PVFS_ds_keyval *rec_p,
-    void *user_ptr,
-    job_aint status_user_tag,
-    job_status_s *out_status_p,
-    job_id_t *id,
-    job_context_id context_id);
+int job_trove_dbrepmsg_process(PVFS_fs_id coll_id,
+			       PVFS_ds_keyval *control_p,
+			       PVFS_ds_keyval *rec_p,
+			       PVFS_BMI_addr_t addr,
+			       int32_t version,
+			       void *user_ptr,
+			       job_aint status_user_tag,
+			       job_status_s *out_status_p,
+			       job_id_t *id,
+			       job_context_id context_id);
+
+int job_trove_dbrep_start(PVFS_fs_id coll_id,
+			  int is_rep_master,
+			  int priority,
+			  void *user_ptr,
+			  job_aint status_user_tag,
+			  job_status_s *out_status_p,
+			  job_id_t *id,
+			  job_context_id context_id);
 
 int job_null(
     int error_code,

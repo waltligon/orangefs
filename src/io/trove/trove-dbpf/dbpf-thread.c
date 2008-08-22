@@ -82,12 +82,12 @@ int dbpf_sm_thread_initialize(void)
 			 dbpf_sm_thread_function, NULL);
     if(ret == 0)
     {
-	gossip_debug(GOSSIP_TROVE_DEBUG,
+	gossip_debug(GOSSIP_DB_REP_DEBUG,
 		     "dbpf_sm_thread_initialize: initialized\n");
     }
     else
     {
-	gossip_debug(GOSSIP_TROVE_DEBUG,
+	gossip_debug(GOSSIP_DB_REP_DEBUG,
 		     "dbpf_sm_thread_initialize: failed\n");
     }
 #endif
@@ -136,6 +136,9 @@ void *dbpf_sm_thread_function(void *ptr)
 	}
     }
 #endif
+    gossip_debug(GOSSIP_DB_REP_DEBUG, 
+		 "****sm thread function returns**** dbpf_thread_running = %d\n",
+		 dbpf_thread_running);
     return ptr;
 }
 

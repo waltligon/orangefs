@@ -27,6 +27,7 @@
 #include "pvfs2-config.h"
 #include "pvfs2-debug.h"
 #include "pvfs2-req-proto.h"
+#include "server-config.h"
 
 #include "trove-types.h"
 
@@ -88,7 +89,8 @@ enum
     TROVE_SHM_KEY_HINT,
     TROVE_DB_LOG_BUFFER_SIZE_BYTES,
     TROVE_DB_LOG_DIRECTORY,
-    TROVE_DB_REPLICATION_START /*Rongrong: for replication*/
+    TROVE_COLLECTION_REPTAB_INIT, /*Rongrong: for replication*/
+    TROVE_COLLECTION_DB_REPLICATION_START /*Rongrong: for replication*/
 };
 
 /** Initializes the Trove layer.  Must be called before any other Trove
@@ -127,6 +129,7 @@ int trove_collection_create(
     char *collname,
     TROVE_coll_id new_coll_id,
     void *user_ptr,
+    int is_dbrep_master,
     TROVE_op_id *out_op_id_p);
 
 int trove_collection_remove(
@@ -467,12 +470,22 @@ int trove_collection_setinfo(
 			     void *parameter);
 
 int trove_dbrepmsg_process(
-    TROVE_coll_id coll_id,
-    PVFS_ds_keyval *control_p,
-    PVFS_ds_keyval *rec_p,
-    void *user_ptr,
-    TROVE_context_id context_id,
-    TROVE_op_id *out_op_id_p);
+			   TROVE_coll_id coll_id,
+			   PVFS_ds_keyval *control_p,
+			   PVFS_ds_keyval *rec_p,
+			   PVFS_BMI_addr_t addr,
+			   int32_t version,
+			   void *user_ptr,
+			   TROVE_context_id context_id,
+			   TROVE_op_id *out_op_id_p);
+
+int trove_dbrep_start(
+		      TROVE_coll_id coll_id,
+		      int is_rep_master,
+		      int priority,
+		      void *user_ptr,
+		      TROVE_context_id context_id,
+		      TROVE_op_id *out_op_id_p);
 
 #endif
 

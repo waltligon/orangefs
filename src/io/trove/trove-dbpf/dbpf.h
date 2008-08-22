@@ -18,7 +18,6 @@ extern "C" {
 #include "pvfs2-internal.h"
 #include "dbpf-keyval-pcache.h"
 #include "dbpf-open-cache.h"
-#include "dbpf-sync.h"
 
 /* For unknown Berkeley DB errors, we return some large value
  */
@@ -48,7 +47,7 @@ extern "C" {
 
 #define TROVE_DB_MODE                                                 0600
 #define TROVE_DB_TYPE                                             DB_BTREE
-#define TROVE_DB_OPEN_FLAGS        (TROVE_DB_DIRTY_READ | TROVE_DB_THREAD)
+#define TROVE_DB_OPEN_FLAGS        (/*TROVE_DB_DIRTY_READ |*/ TROVE_DB_THREAD)
 #define TROVE_DB_CREATE_FLAGS            (DB_CREATE | TROVE_DB_OPEN_FLAGS)
 
 #define TROVE_FD_MODE 0600
@@ -181,6 +180,24 @@ int PINT_dbpf_keyval_iterate(
     int *count,
     TROVE_ds_position pos,
     PINT_dbpf_keyval_iterate_callback callback);
+
+typedef struct
+{
+    int eid;
+    PVFS_BMI_addr_t addr;
+    struct qlist_head link;
+} dbpf_db_reptab_entry_t;
+
+typedef struct
+{
+    int self_eid;
+    int master_eid;
+    int next_eid;
+    int nsites;
+    gen_mutex_t mutex;
+    struct qlist_head *rep_table;
+} dbpf_db_reptab_t;
+
 
 struct dbpf_storage
 {
@@ -351,8 +368,15 @@ struct dbpf_dbrepmsg_process_op
 {
     TROVE_keyval_s control;
     TROVE_keyval_s rec;
+    PVFS_BMI_addr_t addr;
+    int32_t version;
 };
 
+struct dbpf_dbrep_start_op
+{
+    int is_rep_master;
+    int priority;
+};
 /* Used to maintain state of partial processing of a listio operation
  */
 struct bstream_listio_state
@@ -425,17 +449,19 @@ struct dbpf_keyval_get_handle_info_op
 
 /*
  * Keep the various types in one enum, but separate spaces in that
- * for easy comparions.  Reserve the top two bits in an eight-bit
- * space, leaving 64 entries in each.
+ * for easy comparions.  Reserve the top three bits in an eight-bit
+ * space, leaving 32 entries in each.
  */
-#define BSTREAM_OP_TYPE (0<<6)
-#define KEYVAL_OP_TYPE  (1<<6)
-#define DSPACE_OP_TYPE  (2<<6)
-#define OP_TYPE_MASK    (3<<6)
+#define BSTREAM_OP_TYPE (0<<5)
+#define KEYVAL_OP_TYPE  (1<<5)
+#define DSPACE_OP_TYPE  (2<<5)
+#define DBREP_OP_TYPE   (3<<5)
+#define OP_TYPE_MASK    (7<<5)
 
 #define DBPF_OP_IS_BSTREAM(t) (((t) & OP_TYPE_MASK) == BSTREAM_OP_TYPE)
 #define DBPF_OP_IS_KEYVAL(t)  (((t) & OP_TYPE_MASK) == KEYVAL_OP_TYPE)
 #define DBPF_OP_IS_DSPACE(t)  (((t) & OP_TYPE_MASK) == DSPACE_OP_TYPE)
+#define DBPF_OP_IS_DBREP(t)   (((t) & OP_TYPE_MAST) == DBREP_OP_TYPE)
 
 /* List of operation types that might be queued */
 enum dbpf_op_type
@@ -464,7 +490,8 @@ enum dbpf_op_type
     DSPACE_GETATTR,
     DSPACE_SETATTR,
     DSPACE_GETATTR_LIST,
-    DBREPMSG_PROCESS,
+    DBREPMSG_PROCESS = DBREP_OP_TYPE,
+    DBREP_START
     /* NOTE: if you change or add items to this list, please update
      * s_dbpf_op_type_str_map[] accordingly (dbpf-mgmt.c)
      */
@@ -478,6 +505,8 @@ enum dbpf_op_type
      __op == DSPACE_REMOVE      || \
      __op == DSPACE_SETATTR)
 
+#define DBPF_OP_DOES_THREAD(__op)  \
+    (__op == DBREPMSG_PROCESS)
 /*
   a function useful for debugging that returns a human readable
   op_type name given an op_type; returns NULL if no match is found
@@ -535,6 +564,7 @@ struct dbpf_op
         struct dbpf_dspace_getattr_list_op d_getattr_list;
         struct dbpf_keyval_get_handle_info_op k_get_handle_info;
 	struct dbpf_dbrepmsg_process_op r_process;
+	struct dbpf_dbrep_start_op r_start;
     } u;
 };
 
@@ -545,7 +575,7 @@ struct dbpf_collection *dbpf_collection_find_registered(
     TROVE_coll_id coll_id);
 void dbpf_collection_clear_registered(void);
 void dbpf_collection_deregister(struct dbpf_collection *entry);
-dbpf_db_reptab_t *dbpf_collection_find_dbrebtab(DB_ENV *dbenv);
+struct dbpf_collection *dbpf_collection_find_collection_by_dbenv(DB_ENV *dbenv);
 
 /* function for mapping db errors to trove errors */
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
@@ -658,6 +688,7 @@ int dbpf_storage_remove(char *stoname,
 int dbpf_collection_create(char *collname,
                            TROVE_coll_id new_coll_id,
                            void *user_ptr,
+			   int is_dbrep_master,
                            TROVE_op_id *out_op_id_p);
 
 int dbpf_collection_remove(char *collname,
@@ -708,9 +739,18 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
 int dbpf_dbrepmsg_process(TROVE_coll_id coll_id,
 			  TROVE_keyval_s *control_p,
 			  TROVE_keyval_s *rec_p,
+			  PVFS_BMI_addr_t addr,
+			  int32_t version,
 			  void *user_ptr,
 			  TROVE_context_id context_id,
 			  TROVE_op_id *out_op_id_p);
+
+int dbpf_dbrep_start(TROVE_coll_id coll_id,
+		     int is_rep_master,
+		     int priority,
+		     void *user_ptr,
+		     TROVE_context_id context_id,
+		     TROVE_op_id *out_op_id_p);
 
 int dbpf_finalize(void);
 
@@ -760,7 +800,7 @@ int dbpf_bstream_flush(TROVE_coll_id coll_id,
                        TROVE_context_id context_id,
                        TROVE_op_id *out_op_id_p);
 
-int PVFS_db_rep_send(DB_ENV *dbenv,
+int dbpf_db_rep_send(DB_ENV *dbenv,
 		     const DBT *control,
 		     const DBT *rec,
 		     const DB_LSN *lsnp,

@@ -327,7 +327,7 @@ int main(int argc, char **argv)
     else
     {
         ret = pvfs2_mkspace(opts.storage_space, opts.collection,
-                            opts.coll_id, opts.root_handle,
+                            opts.coll_id, opts.root_handle, 1,
                             opts.meta_ranges, opts.data_ranges,
                             opts.collection_only, opts.verbose);
     }
