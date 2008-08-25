@@ -113,6 +113,7 @@ PVFS_error PVFS_db_rep_send(
     PINT_sm_msgpair_params *mpp;
     PINT_sm_action sm_ret;
     job_status_s js;
+    static int maxsize = 0;
     //PVFS_error ret;
 
     gossip_debug(GOSSIP_DB_REP_DEBUG, 
@@ -120,6 +121,12 @@ PVFS_error PVFS_db_rep_send(
     gossip_debug(GOSSIP_DB_REP_DEBUG,
 		 "\tflags=%d\tcontrol.size=%d\trec.size=%d\tsite_count=%d\tversion=%d\n",
 		 flags, control->buffer_sz, rec->buffer_sz, site_count, msg_version);
+
+    if(rec->buffer_sz > maxsize)
+    {
+	maxsize = rec->buffer_sz;
+	gossip_debug(GOSSIP_DB_REP_DEBUG, "******max size = %d*******\n", maxsize);
+    }
 
     PINT_smcb_alloc(&smcb, 0, 
 		    sizeof(struct PINT_db_rep_send_sm), 

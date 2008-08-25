@@ -1783,6 +1783,7 @@ static int dbpf_dbrep_start_op_svc(struct dbpf_op *op_p)
 
     dbenv->rep_set_transport(dbenv, SELF_EID, dbpf_db_rep_send);
     dbenv->rep_set_priority(dbenv, priority);
+    dbenv->rep_set_config(dbenv, DB_REP_CONF_BULK, 0);
     gettimeofday(&start_time, NULL);
     if(is_rep_master)
     {
@@ -1919,6 +1920,7 @@ static int dbpf_dbrep_start_op_svc(struct dbpf_op *op_p)
     time = end_time.tv_sec * 1000000 + end_time.tv_usec 
 	- start_time.tv_sec * 1000000 - start_time.tv_usec;
     gossip_debug(GOSSIP_DB_REP_DEBUG, "time to start replication: %.4fus\n", time);
+    dbenv->rep_set_limit(dbenv, 0, 10*1024);
     dbenv->rep_set_config(dbenv, DB_REP_CONF_BULK, 1);
 
     return DBPF_OP_COMPLETE;
@@ -2012,7 +2014,7 @@ int dbpf_dbrepmsg_process(TROVE_coll_id coll_id,
     else
     {
 	gossip_debug(GOSSIP_DB_REP_DEBUG,
-		     "dbpf_dbrepmsg_process_thread creat failed\n");
+		     "dbpf_dbrepmsg_process_thread creat failed: %s\n", strerror(ret));
     }
 #else
     gossip_err("dbpf_dbrepmsg_process_thread: need trove thread support\n");
