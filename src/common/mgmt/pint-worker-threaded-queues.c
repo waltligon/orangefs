@@ -236,6 +236,53 @@ static int threaded_queues_post(struct PINT_manager_s *manager,
     return PINT_MGMT_OP_POSTED;
 }
 
+static int threaded_queues_cancel(struct PINT_manager_s *manager,
+                                  PINT_worker_inst *inst,
+                                  PINT_queue_id queue_id,
+                                  PINT_operation_t *op)
+{
+    struct PINT_worker_threaded_queues_s *w;
+    struct PINT_queue_s *queue;
+
+    w = &inst->threaded;
+
+    gen_mutex_lock(&w->mutex);
+
+    /* if the queue_id matches the worker_id, then assume that there's
+     * only one queue maintained by this worker and use that
+     */
+    if(queue_id == 0)
+    {
+        /* a dirty hack to check that the list of queues only has one element */
+        if(w->queues.next->next != NULL)
+        {
+            gossip_err("%s: no queue id was specified and there's more than "
+                       "one queue being managed by this worker\n", __func__);
+            gen_mutex_unlock(&w->mutex);
+            return -PVFS_EINVAL;
+        }
+
+        /* there must be only one queue, so just use that */
+        queue = qlist_entry(&w->queues.next, struct PINT_queue_s, link);
+        queue_id = queue->id;
+    }
+    else
+    {
+        /* its not the worker id, so it must be an id for one of our queues */
+        queue = id_gen_fast_lookup(queue_id);
+
+        /* verify that this is a queue id we know about */
+        if(!qlist_exists(&w->queues, &queue->link) &&
+           !qlist_exists(&w->inuse_queues, &queue->link))
+        {
+            gen_mutex_unlock(&w->mutex);
+            return -PVFS_EINVAL;
+        }
+    }
+
+    return PINT_queue_remove(queue_id, &op->qentry);
+}
+
 struct PINT_worker_impl PINT_worker_threaded_queues_impl =
 {
     "THREADED",
@@ -248,7 +295,9 @@ struct PINT_worker_impl PINT_worker_threaded_queues_impl =
     /* the threaded queues impl doesn't implement the do_work callback
      * because work is done in the threads
      */
-    NULL
+    NULL,
+
+    threaded_queues_cancel
 };
 
 static void *PINT_worker_queues_thread_function(void * ptr)
@@ -263,8 +312,7 @@ static void *PINT_worker_queues_thread_function(void * ptr)
     PINT_queue_entry_t **qentries = NULL;
     int i = 0;
     int ret, service_time, error;
-    struct timeval now;
-    struct timespec wait_for_queue_timeout, wait_interval;
+    struct timespec wait_interval;
 
     wait_interval.tv_sec = (WAIT_FOR_QUEUE_INTERVAL / 1e6);
     wait_interval.tv_nsec =

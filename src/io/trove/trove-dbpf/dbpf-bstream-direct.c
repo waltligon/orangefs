@@ -902,7 +902,6 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_bstream_rw_list_op *op;
     struct dbpf_collection *coll_p = NULL;
-    PINT_op_id mgr_id;
     int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -960,7 +959,7 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
 
     *out_op_id_p = q_op_p->op.id;
     ret = PINT_manager_id_post(
-        io_thread_mgr, q_op_p, &mgr_id,
+        io_thread_mgr, q_op_p, &q_op_p->mgr_op_id,
         dbpf_bstream_direct_read_op_svc, op, NULL, io_queue_id);
     if(ret < 0)
     {
@@ -990,7 +989,6 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
     struct dbpf_bstream_rw_list_op *op;
     struct dbpf_collection *coll_p = NULL;
     int ret;
-    PINT_op_id mgr_id;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -1036,7 +1034,7 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
     }
 
     PINT_manager_id_post(
-        io_thread_mgr, q_op_p, &mgr_id,
+        io_thread_mgr, q_op_p, &q_op_p->mgr_op_id,
         dbpf_bstream_direct_write_op_svc, op, NULL, io_queue_id);
     *out_op_id_p = q_op_p->op.id;
 
@@ -1164,6 +1162,30 @@ static int dbpf_bstream_direct_flush(TROVE_coll_id coll_id,
     return DBPF_OP_COMPLETE;
 }
 
+static int dbpf_bstream_direct_cancel(
+    TROVE_coll_id coll_id,
+    TROVE_op_id cancel_id,
+    TROVE_context_id context_id)
+{
+    dbpf_queued_op_t *op;
+    int ret;
+
+    op = id_gen_fast_lookup(cancel_id);
+    if(!op)
+    {
+        gossip_lerr("Invalid op-id to cancel\n");
+        return -TROVE_EINVAL;
+    }
+
+    ret = PINT_manager_cancel(io_thread_mgr, op->mgr_op_id);
+    if(ret < 0)
+    {
+        return ret|PVFS_ERROR_TROVE;
+    }
+
+    return ret;
+}
+
 struct TROVE_bstream_ops dbpf_bstream_direct_ops =
 {
     dbpf_bstream_direct_read_at,
@@ -1172,7 +1194,8 @@ struct TROVE_bstream_ops dbpf_bstream_direct_ops =
     dbpf_bstream_direct_validate,
     dbpf_bstream_direct_read_list,
     dbpf_bstream_direct_write_list,
-    dbpf_bstream_direct_flush
+    dbpf_bstream_direct_flush,
+    dbpf_bstream_direct_cancel
 };
 
 static int dbpf_bstream_get_extents(

@@ -1071,7 +1071,7 @@ int PINT_manager_test_op(PINT_manager_t manager,
         if(worker->impl->do_work)
         {
             ret = worker->impl->do_work(
-                manager, &worker->inst, context, op_id, microsecs);
+                manager, &worker->inst, context, &entry->op, microsecs);
             if(ret < 0)
             {
                 return ret;
@@ -1108,6 +1108,55 @@ int PINT_manager_wait(PINT_manager_t manager,
                       int microsecs)
 {
     return PINT_manager_wait_context(manager, manager->context, microsecs);
+}
+
+/* Cancel an individual operation.  This function attempts to cancel
+ * a posted operation.
+ *
+ * @param manager the manager the operation was posted to
+ * @param op_id the operation id to test on
+ *
+ * @return 0 on successful cancellation, otherwise, return -PVFS_error on error
+ */
+int PINT_manager_cancel(PINT_manager_t manager,
+                        PINT_op_id op_id)
+{
+    int ret;
+    struct PINT_worker_s *worker;
+    struct PINT_op_entry *entry;
+    PINT_context_id context;
+    int (*cancel_impl)(struct PINT_manager_s *,
+                       PINT_worker_inst *,
+                       PINT_queue_id,
+                       PINT_operation_t *);
+
+    entry = id_gen_fast_lookup(op_id);
+    if(!entry)
+    {
+        return -PVFS_EINVAL;
+    }
+    worker = id_gen_fast_lookup(entry->wq_id);
+    context = entry->ctx_id;
+
+    /* don't use the entry for anything else since it might get freed
+     * by the worker calling complete_op
+     */
+    entry = NULL;
+
+    gen_mutex_lock(&manager->mutex);
+    cancel_impl = worker->impl->cancel;
+    gen_mutex_unlock(&manager->mutex);
+
+    if(cancel_impl)
+    {
+        ret = cancel_impl(
+                manager, &worker->inst, context, &entry->op);
+        if(ret < 0)
+        {
+            return ret;
+        }
+    }
+    return 0;
 }
 
 int PINT_manager_wait_context(PINT_manager_t manager,
@@ -1171,7 +1220,8 @@ int PINT_manager_wait_op(PINT_manager_t manager,
         if(worker->impl->do_work)
         {
             ret = worker->impl->do_work(
-                manager, &worker->inst, entry->ctx_id, op_id, msecs_remaining);
+                manager, &worker->inst, entry->ctx_id,
+                &entry->op, msecs_remaining);
             if(ret < 0)
             {
                 return ret;
@@ -1309,7 +1359,7 @@ void PINT_manager_event_handler_add(PINT_manager_t manager,
  * @return 0 on successful servicing.  Right now this function always succeeds.
  */
 int PINT_manager_service_op(PINT_manager_t manager,
-                            PINT_operation_t *op, 
+                            PINT_operation_t *op,
                             int *service_time,
                             int *error)
 {

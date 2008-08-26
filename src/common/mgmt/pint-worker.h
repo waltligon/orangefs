@@ -146,8 +146,13 @@ struct PINT_worker_impl
     int (*do_work) (struct PINT_manager_s *manager,
                     PINT_worker_inst *inst,
                     PINT_context_id context_id,
-                    PINT_op_id op_id,
+                    PINT_operation_t *op,
                     int microsecs);
+
+    int (*cancel) (struct PINT_manager_s *manager,
+                   PINT_worker_inst *inst,
+                   PINT_queue_id queue_id,
+                   PINT_operation_t *op);
 };
 
 #endif

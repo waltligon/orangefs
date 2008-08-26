@@ -33,6 +33,7 @@ typedef struct
 {
     PINT_op_id id;
     PINT_service_callout operation;
+    PINT_service_callout cancel;
     void *operation_ptr;
     PVFS_hint hint;
 

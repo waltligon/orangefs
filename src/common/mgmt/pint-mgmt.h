@@ -107,6 +107,9 @@ int PINT_manager_ctx_post(PINT_manager_t manager,
                           PVFS_hint *hint,
                           PVFS_id_gen_t queue_worker_id);
 
+int PINT_manager_cancel(PINT_manager_t manager,
+                        PINT_op_id op_id);
+
 
 typedef int (*PINT_worker_mapping_callout) (PINT_manager_t manager,
                                             PINT_service_callout callout,

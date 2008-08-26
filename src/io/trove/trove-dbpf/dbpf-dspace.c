@@ -53,6 +53,9 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 
+extern TROVE_method_callback global_trove_method_callback;
+extern struct TROVE_bstream_ops *bstream_method_table[];
+
 static inline void organize_post_op_statistics(
     enum dbpf_op_type op_type, TROVE_op_id op_id)
 {
@@ -1313,6 +1316,24 @@ static int dbpf_dspace_cancel(
         return -TROVE_EINVAL;
     }
 
+    /*
+     * for bstream ops, call the bstream cancel instead.  for other ops,
+     * there's not much we can do other than let the op
+     * complete normally
+     */
+    if(cur_op->op.type >= BSTREAM_OP_TYPE &&
+       cur_op->op.type < KEYVAL_OP_TYPE)
+    {
+        int method_id = global_trove_method_callback(coll_id);
+        if(method_id < 0)
+        {
+            return -TROVE_EINVAL;
+        }
+
+        bstream_method_table[method_id]->bstream_cancel(
+            coll_id, id, context_id);
+    }
+
     /* check the state of the current op to see if it's completed */
     gen_mutex_lock(&cur_op->mutex);
     state = cur_op->op.state;
@@ -1323,61 +1344,30 @@ static int dbpf_dspace_cancel(
     switch(state)
     {
         case OP_QUEUED:
-        {
-            gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "op %p is queued: handling\n", cur_op);
+            {
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "op %p is queued: handling\n", cur_op);
 
-            /* dequeue and complete the op in canceled state */
-            cur_op->op.state = OP_IN_SERVICE;
-            dbpf_queued_op_put_and_dequeue(cur_op);
-            assert(cur_op->op.state == OP_DEQUEUED);
+                /* dequeue and complete the op in canceled state */
+                cur_op->op.state = OP_IN_SERVICE;
+                dbpf_queued_op_put_and_dequeue(cur_op);
+                assert(cur_op->op.state == OP_DEQUEUED);
 
-	    cur_op->state = 0;
-            /* this is a macro defined in dbpf-thread.h */
-            dbpf_queued_op_complete(cur_op, OP_CANCELED);
+                cur_op->state = 0;
+                /* this is a macro defined in dbpf-thread.h */
+                dbpf_queued_op_complete(cur_op, OP_CANCELED);
 
-            gossip_debug(
-                GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
-            ret = 0;
-        }
-        break;
+                gossip_debug(
+                    GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
+                ret = 0;
+            }
+            break;
         case OP_IN_SERVICE:
-        {
-            /*
-              for bstream i/o op, try an aio_cancel.  for other ops,
-              there's not much we can do other than let the op
-              complete normally
-            */
-            if (((cur_op->op.type == BSTREAM_READ_LIST) ||
-                (cur_op->op.type == BSTREAM_WRITE_LIST)) &&
-                (cur_op->op.u.b_rw_list.aio_ops != NULL))
-            {
-#if 0
-                ret = aio_cancel(cur_op->op.u.b_rw_list.fd,
-                                 cur_op->op.u.b_rw_list.aiocb_array);
-#endif
-                ret = cur_op->op.u.b_rw_list.aio_ops->aio_cancel(
-                    cur_op->op.u.b_rw_list.fd,
-                    cur_op->op.u.b_rw_list.aiocb_array);
-                gossip_debug(
-                    GOSSIP_TROVE_DEBUG, "aio_cancel returned %s\n",
-                    ((ret == AIO_CANCELED) ? "CANCELED" :
-                     "NOT CANCELED"));
-                /*
-                  NOTE: the normal aio notification method takes care
-                  of completing the op and moving it to the completion
-                  queue
-                */
-            }
-            else
-            {
-                gossip_debug(
-                    GOSSIP_TROVE_DEBUG, "op is in service: ignoring "
-                    "operation type %d\n", cur_op->op.type);
-            }
+            gossip_debug(
+                GOSSIP_TROVE_DEBUG, "op is in service: ignoring "
+                "operation type %d\n", cur_op->op.type);
             ret = 0;
-        }
-        break;
+            break;
         case OP_COMPLETED:
         case OP_CANCELED:
             /* easy cancelation case; do nothing */

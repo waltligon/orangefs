@@ -340,6 +340,12 @@ int PINT_queue_remove(PINT_queue_id queue_id,
     struct PINT_queue_trigger *trigger;
     PINT_queue_entry_t *e, *tmp;
     struct timeval now;
+    int ret = -PVFS_ENOENT;
+
+    if(entry->link.prev == NULL)
+    {
+        return -PVFS_ENOENT;
+    }
 
     queue = id_gen_fast_lookup(queue_id);
 
@@ -363,6 +369,7 @@ int PINT_queue_remove(PINT_queue_id queue_id,
                 PINT_queue_update_stats(
                     queue,
                     PINT_util_get_timeval_diff(&e->timestamp, &now));
+                ret = 0;
                 break;
             }
         }
@@ -383,7 +390,7 @@ int PINT_queue_remove(PINT_queue_id queue_id,
 
     gen_mutex_unlock(&queue->mutex);
 
-    return 0;
+    return ret;
 }
 
 int PINT_queue_search_and_remove(PINT_queue_id queue_id,

@@ -192,7 +192,7 @@ static int queues_post(struct PINT_manager_s *manager,
 static int queues_do_work(struct PINT_manager_s *manager,
                           PINT_worker_inst *inst,
                           PINT_context_id context_id,
-                          PINT_op_id op_id,
+                          PINT_operation_t *op,
                           int microsecs)
 {
     struct PINT_worker_queues_s *w;
@@ -200,7 +200,6 @@ static int queues_do_work(struct PINT_manager_s *manager,
     struct PINT_queue_s *queue;
     int count;
     int i, j, ret;
-    PINT_operation_t *op = NULL;
     PINT_queue_entry_t *qentry;
     int service_time, error;
 
@@ -216,7 +215,7 @@ static int queues_do_work(struct PINT_manager_s *manager,
         return 0;
     }
 
-    if(op_id != 0)
+    if(op->id != 0)
     {
         /* find the op in one of the queues */
         qlist_for_each_entry(queue, &w->queues, link)
@@ -224,7 +223,7 @@ static int queues_do_work(struct PINT_manager_s *manager,
             ret = PINT_queue_search_and_remove(
                 queue->id,
                 PINT_op_queue_find_op_id_callback,
-                &op_id,
+                &op->id,
                 &qentry);
             if(ret == -PVFS_ENOENT)
             {
@@ -363,7 +362,8 @@ struct PINT_worker_impl PINT_worker_queues_impl =
     queues_queue_add,
     queues_queue_remove,
     queues_post,
-    queues_do_work
+    queues_do_work,
+    NULL
 };
 
 /*
