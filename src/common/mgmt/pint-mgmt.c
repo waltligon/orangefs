@@ -1406,6 +1406,7 @@ int PINT_manager_complete_op(PINT_manager_t manager,
     int ret;
     struct qhash_head *link;
 
+    gen_mutex_lock(&manager->mutex);
     hash_entry = qhash_search(manager->ops, &op->id);
     if(!hash_entry)
     {
@@ -1415,13 +1416,11 @@ int PINT_manager_complete_op(PINT_manager_t manager,
                    __func__);
         return -PVFS_EINVAL;
     }
+    manager->op_count--;
+    gen_mutex_unlock(&manager->mutex);
 
     entry = qhash_entry(hash_entry, struct PINT_op_entry, link);
     entry->error = error;
-
-    gen_mutex_lock(&manager->mutex);
-    manager->op_count--;
-    gen_mutex_unlock(&manager->mutex);
 
     ret = PINT_context_complete(manager->context,
                                 entry->op.id,
