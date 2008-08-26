@@ -719,7 +719,7 @@ static int PINT_manager_find_worker(PINT_manager_t manager,
      * to be fetched from the id mapping functions. (or if there's only one
      * worker that isn't a queue type or only has one queue)
      */
-    if(input_worker_id == PINT_worker_implicit_id)
+    if(input_worker_id == PINT_worker_implicit_id && callout != NULL)
     {
         struct PINT_worker_id_mapper_entry_s *map;
 
@@ -1123,7 +1123,9 @@ int PINT_manager_cancel(PINT_manager_t manager,
 {
     int ret;
     struct PINT_worker_s *worker;
+    PINT_queue_id queue_id;
     struct PINT_op_entry *entry;
+    PINT_operation_t *op;
     PINT_context_id context;
     int (*cancel_impl)(struct PINT_manager_s *,
                        PINT_worker_inst *,
@@ -1135,8 +1137,10 @@ int PINT_manager_cancel(PINT_manager_t manager,
     {
         return -PVFS_EINVAL;
     }
-    worker = id_gen_fast_lookup(entry->wq_id);
+    ret = PINT_manager_find_worker(
+        manager, NULL, NULL, NULL, entry->wq_id, &worker, &queue_id);
     context = entry->ctx_id;
+    op = &entry->op;
 
     /* don't use the entry for anything else since it might get freed
      * by the worker calling complete_op
@@ -1150,7 +1154,7 @@ int PINT_manager_cancel(PINT_manager_t manager,
     if(cancel_impl)
     {
         ret = cancel_impl(
-                manager, &worker->inst, context, &entry->op);
+                manager, &worker->inst, context, op);
         if(ret < 0)
         {
             return ret;
