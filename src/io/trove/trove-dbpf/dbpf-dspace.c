@@ -1330,7 +1330,7 @@ static int dbpf_dspace_cancel(
             return -TROVE_EINVAL;
         }
 
-        bstream_method_table[method_id]->bstream_cancel(
+        return bstream_method_table[method_id]->bstream_cancel(
             coll_id, id, context_id);
     }
 
