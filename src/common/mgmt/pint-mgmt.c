@@ -1418,6 +1418,7 @@ int PINT_manager_complete_op(PINT_manager_t manager,
         gossip_err("%s: failed to get the managed op out of the "
                    "manager operations queue\n",
                    __func__);
+        gen_mutex_unlock(&manager->mutex);
         return -PVFS_EINVAL;
     }
     manager->op_count--;
