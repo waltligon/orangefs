@@ -186,16 +186,19 @@ int PINT_manager_init(
     INIT_QLIST_HEAD(&manager->workers);
     INIT_QLIST_HEAD(&manager->event_handlers);
 
+    gen_mutex_lock(&manager->mutex);
     manager->ops = qhash_init(PINT_op_entry_compare,
                               PINT_op_entry_hash,
                               PINT_OP_ENTRY_TABLESIZE);
     if(!manager->ops)
     {
+        gen_mutex_unlock(&manager->mutex);
         free(manager);
         return -PVFS_ENOMEM;
     }
 
     manager->op_count = 0;
+    gen_mutex_unlock(&manager->mutex);
 
     /* add the blocking worker to the manager.  Every manager
      * gets one of these.  The blocking_id is held internally, and the global
@@ -232,6 +235,7 @@ int PINT_manager_destroy(PINT_manager_t manager)
 
     if(manager->op_count > 0)
     {
+        gen_mutex_unlock(&manager->mutex);
         return -PVFS_EINVAL;
     }
 
@@ -632,8 +636,13 @@ int PINT_manager_ctx_post(PINT_manager_t manager,
 
     id_gen_fast_register(&op_entry->op.id, op_entry);
 
+    gossip_debug(GOSSIP_MGMT_DEBUG,
+                 "[MGMT]: manager ops: adding op id: %llu\n",
+                 llu(op_entry->op.id));
+    gen_mutex_lock(&manager->mutex);
     qhash_add(manager->ops, &op_entry->op.id, &op_entry->link);
     manager->op_count++;
+    gen_mutex_unlock(&manager->mutex);
     if(id)
     {
         *id = op_entry->op.id;
@@ -647,7 +656,9 @@ int PINT_manager_ctx_post(PINT_manager_t manager,
          * from just posting the operation), we stop all servicing for this
          * operation and return the error
          */
+        gen_mutex_lock(&manager->mutex);
         qhash_search_and_remove(manager->ops, &op_entry->op.id);
+        gen_mutex_unlock(&manager->mutex);
 
         free(op_entry);
         return ret;
@@ -886,7 +897,7 @@ int PINT_manager_test_context(PINT_manager_t manager,
         context, opcount, ids, user_ptrs, errors, 0);
     if(ret < 0 && ret != -PVFS_ETIMEDOUT)
     {
-        gossip_debug(GOSSIP_MGMT_DEBUG, "%s: contet_test_all failed: %d\n",
+        gossip_debug(GOSSIP_MGMT_DEBUG, "%s: context_test_all failed: %d\n",
                      __func__, ret);
         return ret;
     }
@@ -1415,9 +1426,9 @@ int PINT_manager_complete_op(PINT_manager_t manager,
     if(!hash_entry)
     {
         /* failed to get the managed op out of the manager operations queue */
-        gossip_err("%s: failed to get the managed op out of the "
+        gossip_err("%s: failed to get the managed op %llu out of the "
                    "manager operations queue\n",
-                   __func__);
+                   __func__, llu(op->id));
         gen_mutex_unlock(&manager->mutex);
         return -PVFS_EINVAL;
     }
