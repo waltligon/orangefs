@@ -372,7 +372,7 @@ enum
 /* Allowable sizes for each mode */
 enum
 {
-    TCP_MODE_EAGER_LIMIT = 16384,	/* 16K */
+    TCP_MODE_EAGER_LIMIT = 131072,/*16384*/	/* 16K */
     TCP_MODE_REND_LIMIT = 16777216	/* 16M */
 };
 

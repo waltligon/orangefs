@@ -42,17 +42,13 @@ typedef struct PINT_db_rep_send_sm
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
 
+    int done;
+
     PVFS_ds_keyval *control;
     PVFS_ds_keyval *rec;
     PVFS_BMI_addr_t *svr_addr;
     int site_count;
-    /*DB_ENV *dbenv;
-    const DBT *control;
-    const DBT *rec;
-    const DB_LSN *lsnp;
-    int eid;
     u_int32_t flags;
-    dbpf_db_reptab_t *table;*/
 }PINT_db_rep_send_sm;
 
 static int db_rep_send_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p);
@@ -93,11 +89,13 @@ int db_rep_send_state_machine_terminate(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     PINT_db_rep_send_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    pthread_mutex_lock(&sm_p->mutex);
-    pthread_cond_signal(&sm_p->cond);
-    pthread_mutex_unlock(&sm_p->mutex);
-    return 0;
+    gossip_debug(GOSSIP_DB_REP_DEBUG, 
+		 "db_rep_send_state_machine_terminate\n");
+    if(!(sm_p->flags & DB_REP_PERMANENT))
+    {
+	PINT_smcb_free(smcb);
+    }
+    return SM_ACTION_TERMINATE;
 }
 
 PVFS_error PVFS_db_rep_send(
@@ -124,7 +122,7 @@ PVFS_error PVFS_db_rep_send(
 
     if(rec->buffer_sz > maxsize)
     {
-	maxsize = rec->buffer_sz;
+	maxsize = rec->buffer_sz; /*this is not safe, but it's just for debugging purpose anyway*/
 	gossip_debug(GOSSIP_DB_REP_DEBUG, "******max size = %d*******\n", maxsize);
     }
 
@@ -156,23 +154,33 @@ PVFS_error PVFS_db_rep_send(
     sm_p->rec = rec;
     sm_p->svr_addr = svr_addr;
     sm_p->site_count = site_count;
+    sm_p->flags = flags;
     sm_p->error_code = 0;
+    sm_p->done = 0;
     memset(&js, 0, sizeof(js));
     sm_ret = PINT_state_machine_start(smcb, &js);
     assert(SM_ACTION_ISVALID(sm_ret));
     if(PINT_smcb_complete(smcb))
     {
 	assert(sm_ret == SM_ACTION_TERMINATE);
-	PINT_smcb_free(smcb);
 	gossip_debug(GOSSIP_DB_REP_DEBUG, "PVFS_db_rep_send sm terminated\n");
+	PINT_smcb_free(smcb);
     }
     else if(flags & DB_REP_PERMANENT)
     {
 	pthread_mutex_lock(&sm_p->mutex);
-	pthread_cond_wait(&sm_p->cond, &sm_p->mutex);
+	if(sm_p->done)
+	{
+	    pthread_mutex_unlock(&sm_p->mutex);
+	}
+	else
+	{
+	    pthread_cond_wait(&sm_p->cond, &sm_p->mutex);
+	}
 	assert(PINT_smcb_complete(smcb));
 	pthread_mutex_unlock(&sm_p->mutex);
 	gossip_debug(GOSSIP_DB_REP_DEBUG, "PVFS_db_rep_send sm terminated after wait\n");
+	PINT_smcb_free(smcb);
     }
     return js.error_code;
 }
@@ -204,7 +212,7 @@ static PINT_sm_action db_rep_setup_msgpairarray(
 	msg_p->comp_fn = NULL;
 	msg_p->svr_addr = sm_p->svr_addr[index];
     }
-    msg_version++;
+    msg_version++;/*this is not safe, but it's just for debugging purpose anyway*/
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
@@ -213,8 +221,14 @@ static PINT_sm_action db_rep_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_db_rep_send_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    pthread_mutex_lock(&sm_p->mutex);
+    sm_p->done = 1;
+    pthread_cond_signal(&sm_p->cond);
+    pthread_mutex_unlock(&sm_p->mutex);
     sm_p->error_code = js_p->error_code;
     free(sm_p->svr_addr);
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }

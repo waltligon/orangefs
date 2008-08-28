@@ -141,7 +141,7 @@ enum PVFS_server_op
 /* max number of handles for which we return attributes */
 #define PVFS_REQ_LIMIT_LISTATTR 64
 /*Rongrong*/
-#define PVFS_REQ_LIMIT_DBREP 15 * 1024
+#define PVFS_REQ_LIMIT_DBREP 64 * 1024
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
 

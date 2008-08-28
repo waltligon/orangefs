@@ -1806,7 +1806,7 @@ static int dbpf_dbrep_start_op_svc(struct dbpf_op *op_p)
 
 	dbenv->rep_start(dbenv, NULL, DB_REP_CLIENT);
 
-	sleep(20);
+	sleep(5);
 	gossip_debug(GOSSIP_DB_REP_DEBUG, "*****after waiting for rep_start****\n");
 	DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
 				    sto_p->name, coll_p->coll_id);

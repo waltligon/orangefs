@@ -480,6 +480,8 @@ retry:
     qlist_for_each_entry_safe(entry, next, txn_context->txn_queue, link)
     {
 	qlist_del(&entry->link);
+	free(entry->key.data);
+	free(entry->data.data);
 	free(entry);
     }
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,

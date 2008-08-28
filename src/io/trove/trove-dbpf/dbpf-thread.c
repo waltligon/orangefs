@@ -175,10 +175,11 @@ void *dbpf_checkpoint_thread_function(void *ptr)
 {
 #ifdef __PVFS2_TROVE_THREADED__
     DB_ENV *dbenv = (DB_ENV *)ptr;
+
     while(dbpf_thread_running)
     {
 	dbenv->txn_checkpoint(dbenv, 512, 1, 0);
-	dbenv->log_archive(dbenv, NULL, DB_ARCH_REMOVE);
+	/*dbenv->log_archive(dbenv, NULL, DB_ARCH_REMOVE);*/
     }
 #endif
     return ptr;
