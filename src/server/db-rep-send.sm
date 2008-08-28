@@ -176,9 +176,9 @@ PVFS_error PVFS_db_rep_send(
 	else
 	{
 	    pthread_cond_wait(&sm_p->cond, &sm_p->mutex);
+	    assert(PINT_smcb_complete(smcb));
+	    pthread_mutex_unlock(&sm_p->mutex);	
 	}
-	assert(PINT_smcb_complete(smcb));
-	pthread_mutex_unlock(&sm_p->mutex);
 	gossip_debug(GOSSIP_DB_REP_DEBUG, "PVFS_db_rep_send sm terminated after wait\n");
 	PINT_smcb_free(smcb);
     }
