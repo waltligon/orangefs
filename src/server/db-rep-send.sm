@@ -90,7 +90,7 @@ int db_rep_send_state_machine_terminate(
 {
     PINT_db_rep_send_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_DB_REP_DEBUG, 
-		 "db_rep_send_state_machine_terminate\n");
+		 "db_rep_send_state_machine_terminate, flags = %d\n", sm_p->flags);
     if(!(sm_p->flags & DB_REP_PERMANENT))
     {
 	PINT_smcb_free(smcb);
@@ -175,9 +175,12 @@ PVFS_error PVFS_db_rep_send(
 	}
 	else
 	{
-	    pthread_cond_wait(&sm_p->cond, &sm_p->mutex);
-	    assert(PINT_smcb_complete(smcb));
-	    pthread_mutex_unlock(&sm_p->mutex);	
+	    while(!sm_p->done)
+	    {
+		pthread_cond_wait(&sm_p->cond, &sm_p->mutex);
+		assert(PINT_smcb_complete(smcb));
+		pthread_mutex_unlock(&sm_p->mutex);	
+	    }
 	}
 	gossip_debug(GOSSIP_DB_REP_DEBUG, "PVFS_db_rep_send sm terminated after wait\n");
 	PINT_smcb_free(smcb);
