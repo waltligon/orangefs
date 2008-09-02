@@ -738,7 +738,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
     int i, extent_count;
     struct dbpf_bstream_rw_list_op *rw_op;
     dbpf_queued_op_t *qop_p;
-    int eor = -1;
+    PVFS_size eor = -1;
     int sync_required = 0;
 
     rw_op = (struct dbpf_bstream_rw_list_op *)ptr;
