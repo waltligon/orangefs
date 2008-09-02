@@ -57,49 +57,49 @@ static size_t direct_aligned_write(int fd,
                                     off_t buf_offset,
                                     size_t size,
                                     off_t write_offset,
-                                    size_t stream_size);
+                                    off_t stream_size);
 
 static size_t direct_locked_write(int fd,
                             void * buf,
                             off_t buf_offset,
                             size_t size,
                             off_t write_offset,
-                            size_t stream_size);
+                            off_t stream_size);
 
 static size_t new_direct_write(int fd,
                                void * buf,
                                off_t buf_offset,
                                size_t size,
                                off_t write_offset,
-                               size_t stream_size);
+                               off_t stream_size);
 
 static size_t direct_write(int fd,
                            void * buf,
                            off_t buf_offset,
                            size_t size,
                            off_t write_offset,
-                           size_t stream_size);
+                           off_t stream_size);
 
 static size_t direct_aligned_read(int fd,
                                   void *buf,
                                   off_t buf_offset,
                                   size_t size,
                                   off_t file_offset,
-                                  size_t stream_size);
+                                  off_t stream_size);
 
 static size_t direct_locked_read(int fd,
                             void * buf,
                             off_t buf_offset,
                             size_t size,
                             off_t file_offset,
-                            size_t stream_size);
+                            off_t stream_size);
 
 static size_t direct_read(int fd, 
-                           void * buf, 
-                           off_t buf_offset,
-                           size_t size,
-                           off_t file_offset, 
-                           size_t stream_size);
+                          void * buf, 
+                          off_t buf_offset,
+                          size_t size,
+                          off_t file_offset, 
+                          off_t stream_size);
 
 #define BLOCK_SIZE 4096
 
@@ -172,7 +172,7 @@ static size_t direct_aligned_write(int fd,
                                     off_t buf_offset,
                                     size_t size, 
                                     off_t write_offset,
-                                    size_t stream_size)
+                                    off_t stream_size)
 {
     int ret;
 
@@ -216,7 +216,7 @@ static size_t direct_locked_write(int fd,
                             off_t buf_offset,
                             size_t size,
                             off_t write_offset,
-                            size_t stream_size)
+                            off_t stream_size)
 {
     struct flock writelock;
     int ret, write_ret;
@@ -266,7 +266,7 @@ static size_t new_direct_write(int fd,
                                off_t buf_offset,
                                size_t size,
                                off_t write_offset,
-                               size_t stream_size)
+                               off_t stream_size)
 {
     size_t ret;
     void *aligned_buf;
@@ -385,7 +385,7 @@ static size_t direct_write(int fd,
                            off_t buf_offset,
                            size_t size,
                            off_t write_offset,
-                           size_t stream_size)
+                           off_t stream_size)
 {
     size_t ret;
     void * aligned_buf;
@@ -527,7 +527,7 @@ static size_t direct_aligned_read(int fd,
                                    off_t buf_offset,
                                    size_t size,
                                    off_t file_offset,
-                                   size_t stream_size)
+                                   off_t stream_size)
 {
     int ret;
 
@@ -569,7 +569,7 @@ static size_t direct_locked_read(int fd,
                            off_t buf_offset,
                            size_t size,
                            off_t file_offset,
-                           size_t stream_size)
+                           off_t stream_size)
 {
     int ret, read_ret;
     struct flock readlock;
@@ -601,7 +601,7 @@ static size_t direct_read(int fd,
                            off_t buf_offset,
                            size_t size,
                            off_t file_offset,
-                           size_t stream_size)
+                           off_t stream_size)
 {
     void * aligned_buf;
     off_t aligned_offset;
