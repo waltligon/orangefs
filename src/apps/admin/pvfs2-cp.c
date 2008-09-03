@@ -619,8 +619,8 @@ static int generic_open(file_object *obj, PVFS_credential *credential,
                 memset(&stat_buf, 0, sizeof(struct stat));
 
                 /* preserve permissions doing a unix => pvfs2 copy */
-                int test = stat(srcname, &stat_buf);
-                if (test == -1)
+                ret = stat(srcname, &stat_buf);
+                if (ret < 0)
                 {
                     /* PVFS2 filesystem is not mounted.  The source permissions
                      * were copied into the destination above in main to account
