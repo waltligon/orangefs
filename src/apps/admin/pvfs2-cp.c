@@ -155,6 +155,11 @@ int main (int argc, char ** argv)
 	fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
 	goto main_out;
     }
+    else
+    {
+        /* copy permissions in case the PVFS2 filesystem is not mounted */
+        dest.u.pvfs2.attr.perms = src.u.pvfs2.perms;
+    }
 
     ret = generic_open(&dest, credential, user_opts->num_datafiles, user_opts->strip_size,
                        user_opts->srcfile, OPEN_DEST);
@@ -614,9 +619,23 @@ static int generic_open(file_object *obj, PVFS_credential *credential,
                 memset(&stat_buf, 0, sizeof(struct stat));
 
                 /* preserve permissions doing a unix => pvfs2 copy */
-                stat(srcname, &stat_buf);
-		make_attribs(&(obj->u.pvfs2.attr), credential, nr_datafiles,
+                int test = stat(srcname, &stat_buf);
+                if (test == -1)
+                {
+                    /* PVFS2 filesystem is not mounted.  The source permissions
+                     * were copied into the destination above in main to account
+                     * for this.  Manually copying remaining attributes */
+                    obj->u.pvfs2.attr.owner = credential->userid;
+                    obj->u.pvfs2.attr.group = credential->group_array[0];
+                    obj->u.pvfs2.attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+                    obj->u.pvfs2.attr.dfile_count = nr_datafiles;
+                }
+                else
+                {
+                    /* stat completed sucessfully */
+		    make_attribs(&(obj->u.pvfs2.attr), credential, nr_datafiles,
                              (int)stat_buf.st_mode);
+                }
                 if (strip_size > 0) {
                     new_dist = PVFS_sys_dist_lookup("simple_stripe");
                     ret = PVFS_sys_dist_setparam(new_dist, "strip_size", &strip_size);
