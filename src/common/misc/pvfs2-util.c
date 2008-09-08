@@ -31,6 +31,7 @@
 #include "realpath.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 
 #ifdef HAVE_MNTENT_H
 
@@ -152,16 +153,6 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     free(mntent->pvfs_fs_name);
     free(mntent);
     return;
-}
-
-void PVFS_util_gen_credentials(
-    PVFS_credentials *credentials)
-{
-    assert(credentials);
-
-    memset(credentials, 0, sizeof(PVFS_credentials));
-    credentials->uid = geteuid();
-    credentials->gid = getegid();
 }
 
 int PVFS_util_get_umask(void)
@@ -1708,6 +1699,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     {
         sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
     }
+
+    /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
+     * outside of the system interface
+     */
     return sys_mask;
 }
 
@@ -1965,6 +1960,12 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
     }
     return ret;
 #undef NUM_MODES
+}
+
+void PVFS_util_gen_credentials(
+    PVFS_credentials *credentials)
+{
+    return(PINT_util_gen_credentials(credentials));
 }
 
 /*

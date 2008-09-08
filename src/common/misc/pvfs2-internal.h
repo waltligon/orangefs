@@ -78,6 +78,12 @@
 #define SYMLINK_TARGET_KEYSTR   "st\0"
 #define SYMLINK_TARGET_KEYLEN   3
 
+#define METAFILE_LAYOUT_KEYSTR  "ml\0"
+#define METAFILE_LAYOUT_KEYLEN  3
+
+#define NUM_DFILES_REQ_KEYSTR   "nd\0"
+#define NUM_DFILES_REQ_KEYLEN   3
+
 /* Optional xattrs have "user.pvfs2." as a prefix */
 #define SPECIAL_DIST_NAME_KEYSTR        "dist_name\0"
 #define SPECIAL_DIST_NAME_KEYLEN         21

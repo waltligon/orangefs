@@ -1015,6 +1015,9 @@ int PVFS_fsck_get_attributes(
     case PVFS_TYPE_DIRDATA:
         gossip_debug(GOSSIP_FSCK_DEBUG, "dirdata\n");
         break;
+    case PVFS_TYPE_INTERNAL:
+        gossip_debug(GOSSIP_FSCK_DEBUG, "internal\n");
+        break;
     }
     gossip_debug(GOSSIP_FSCK_DEBUG, "\n");
 
@@ -1245,7 +1248,7 @@ static int PINT_handle_wrangler_load_handles(
                                        handle_count_array,
                                        position_array,
                                        PINT_handle_wrangler_handlelist.
-                                       addr_array, server_count, NULL);
+                                       addr_array, server_count, 0, NULL);
         if(err < 0)
         {
             PVFS_perror_gossip("PVFS_mgmt_iterate_handles", err);
@@ -1288,6 +1291,52 @@ static int PINT_handle_wrangler_load_handles(
         PINT_handle_wrangler_handlelist.stranded_array[i] =
             PINT_handle_wrangler_handlelist.used_array[i];
     }
+
+    /* now look for reserved handles from each server */
+    for (i = 0; i < server_count; i++)
+    {
+        position_array[i] = PVFS_ITERATE_START;
+        handle_count_array[i] = HANDLE_BATCH;
+    }
+
+    do
+    {
+        err = PVFS_mgmt_iterate_handles_list(*cur_fs,
+                                       (PVFS_credentials *) creds,
+                                       handle_matrix,
+                                       handle_count_array,
+                                       position_array,
+                                       PINT_handle_wrangler_handlelist.
+                                       addr_array, server_count, 
+                                       PVFS_MGMT_RESERVED, NULL);
+        if(err < 0)
+        {
+            PVFS_perror_gossip("PVFS_mgmt_iterate_handles", err);
+            ret = err;
+            goto load_handles_error;
+        }
+
+        more_handles = 0;
+
+        for (i = 0; i < server_count; i++)
+        {
+            /* remove these handles */
+            int j = 0;
+            for (j = 0; j < handle_count_array[i]; j++)
+            {
+                PINT_handle_wrangler_remove_handle(&handle_matrix[i][j],
+                    cur_fs);
+            }
+
+            /* are there more handles? */
+            if (position_array[i] != PVFS_ITERATE_END)
+            {
+                more_handles = 1;
+                handle_count_array[i] = HANDLE_BATCH;
+            }
+        }
+    } while (more_handles != 0);
+
     ret = 0;
     goto load_handles_success;
 
@@ -1496,13 +1545,14 @@ static int PINT_handle_wrangler_display_stranded_handles(
                     header = 1;
                 }
 
+                /* get this objects attributes */
+                ret = PVFS_fsck_get_attributes(fsck_options, &pref, creds,
+                                         &attributes);
+                
                 printf(" %llu   %d  ",
                        llu(PINT_handle_wrangler_handlelist.list_array[i][j]),
                        *cur_fs);
 
-                /* get this objects attributes */
-                ret = PVFS_fsck_get_attributes(fsck_options, &pref, creds,
-                                         &attributes);
                 if(ret < 0)
                 {
                     PVFS_strerror_r(ret, buf, 127);
@@ -1510,6 +1560,7 @@ static int PINT_handle_wrangler_display_stranded_handles(
                 }
                 else
                 {
+
                     if (attributes.attr.mask & PVFS_ATTR_SYS_SIZE)
                     {
                         printf("%13lld   ", lld(attributes.attr.size));
@@ -1535,6 +1586,9 @@ static int PINT_handle_wrangler_display_stranded_handles(
                         break;
                     case PVFS_TYPE_DIRDATA:
                         printf("dirdata  ");
+                        break;
+                    case PVFS_TYPE_INTERNAL:
+                        printf("internal  ");
                         break;
                     }
                     printf("   %s\n", server_name);

@@ -69,7 +69,7 @@ static PINT_sm_action setparam_work(
     struct server_configuration_s *user_opts;
     struct filesystem_configuration_s *fs_conf;
     char buf[16] = {0};
- 
+
     switch(s_op->req->u.mgmt_setparam.param)
     {
         case PVFS_SERV_PARAM_GOSSIP_MASK:

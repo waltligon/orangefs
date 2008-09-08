@@ -225,6 +225,9 @@ static void PINT_gossip_err_server_resp(
                     case PVFS_TYPE_DIRDATA:
                         gossip_err("DIRDATA [ n/a ]\n");
                         break;
+                    case PVFS_TYPE_INTERNAL:
+                        gossip_err("INTERNAL [ n/a ]\n");
+                        break;
                     case PVFS_TYPE_NONE:
                         gossip_err("NONE [ n/a ]\n");
                         break;

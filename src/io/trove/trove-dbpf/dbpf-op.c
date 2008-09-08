@@ -52,7 +52,7 @@ void dbpf_queued_op_init(
 
 void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)
 {
-    if (q_op_p->op.type == DSPACE_CREATE)
+    if (q_op_p->op.type == DSPACE_CREATE || q_op_p->op.type == DSPACE_CREATE_LIST)
     {
         free(q_op_p->op.u.d_create.extent_array.extent_array);
         q_op_p->op.u.d_create.extent_array.extent_array = NULL;

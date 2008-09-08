@@ -23,6 +23,8 @@
 #include <ucontext.h>
 #endif
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
+
 #include "bmi.h"
 #include "gossip.h"
 #include "job.h"
@@ -125,7 +127,9 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {DIRECTORY_ENTRY_KEYSTR, DIRECTORY_ENTRY_KEYLEN},
     {DATAFILE_HANDLES_KEYSTR, DATAFILE_HANDLES_KEYLEN},
     {METAFILE_DIST_KEYSTR, METAFILE_DIST_KEYLEN},
-    {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN}
+    {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN},
+    {METAFILE_LAYOUT_KEYSTR, METAFILE_LAYOUT_KEYLEN},
+    {NUM_DFILES_REQ_KEYSTR, NUM_DFILES_REQ_KEYLEN}
 };
 
 /* These three are used continuously in our wait loop.  They could be
@@ -157,6 +161,15 @@ static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
 static int generate_shm_key_hint(void);
+
+static void precreate_pool_finalize(void);
+static int precreate_pool_initialize(void);
+static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
+    PVFS_handle* pool_handle);
+static int precreate_pool_launch_refiller(const char* host, 
+    PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle);
+static int precreate_pool_count(
+    PVFS_fs_id fsid, PVFS_handle pool_handle, int* count);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
@@ -1038,6 +1051,15 @@ static int server_initialize_subsystems(
     }
     *server_status_flag |= SERVER_EVENT_INIT;
 
+    ret = precreate_pool_initialize();
+    if (ret < 0)
+    {
+        gossip_err("Error initializing precreate pool.\n");
+        return (ret);
+    }
+
+    *server_status_flag |= SERVER_PRECREATE_INIT;
+
     return ret;
 }
 
@@ -1144,6 +1166,15 @@ static int server_shutdown(
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "*** server shutdown in progress ***\n");
+
+    if (status & SERVER_PRECREATE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting precreate pool "
+                     "           [   ...   ]\n");
+        precreate_pool_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         precreate pool "
+                     "           [ stopped ]\n");
+    }
 
     if (status & SERVER_STATE_MACHINE_INIT)
     {
@@ -1883,6 +1914,346 @@ static int generate_shm_key_hint(void)
      */
     srand((unsigned int)time(NULL));
     return(rand());
+}
+
+/* precreate_pool_initialize()
+ * 
+ * starts the infrastructure for managing pools of precreated handles
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int precreate_pool_initialize(void)
+{
+    PINT_llist *cur_f = server_config.file_systems;
+    struct filesystem_configuration_s *cur_fs;
+    int ret = -1;
+    PVFS_handle pool_handle;
+    int server_count;
+    PVFS_BMI_addr_t* addr_array;
+    const char* host;
+    int i;
+    int server_type;
+    int handle_count = 0;
+
+    /* iterate through list of file systems */
+    while(cur_f)
+    {
+        cur_fs = PINT_llist_head(cur_f);
+        if (!cur_fs)
+        {
+            break;
+        }
+
+        /* am I a meta server in this file system? */
+        ret = PINT_cached_config_check_type(
+            cur_fs->coll_id,
+            server_config.host_id,
+            &server_type);
+        if(ret < 0)
+        {
+            gossip_err("Error: %s not found in configuration file.\n", 
+                server_config.host_id);
+            gossip_err("Error: configuration file is inconsistent.\n");
+            return(ret);
+        }
+        if(!(server_type & PINT_SERVER_TYPE_META))
+        {
+            /* This server is not a meta server for this file system; 
+             * skip doing any precreate setup steps.
+             */
+            cur_f = PINT_llist_next(cur_f);
+            continue;
+        }
+
+        /* how many I/O servers do we have? */
+        ret = PINT_cached_config_count_servers(
+            cur_fs->coll_id, PINT_SERVER_TYPE_IO, &server_count);
+        if(ret < 0)
+        {
+            gossip_err("Error: unable to count servers for fsid: %d\n", 
+                (int)cur_fs->coll_id);
+            return(ret);
+        }
+        
+        addr_array = malloc(server_count*sizeof(PVFS_BMI_addr_t));
+        if(!addr_array)
+        {
+            gossip_err("Error: unable to allocate book keeping information for precreate pools.\n");
+            return(-PVFS_ENOMEM);
+        }
+
+        /* resolve addrs for each I/O server */
+        ret = PINT_cached_config_get_server_array(
+            cur_fs->coll_id, PINT_SERVER_TYPE_IO,
+            addr_array, &server_count);
+        if(ret < 0)
+        {
+            gossip_err("Error: unable retrieve servers for fsid: %d\n", 
+                (int)cur_fs->coll_id);
+            return(ret);
+        }
+
+        for(i=0; i<server_count; i++)
+        {
+            host = PINT_cached_config_map_addr(
+                cur_fs->coll_id, addr_array[i], &server_type);
+            if(!strcmp(host, server_config.host_id) == 0)
+            {
+                /* this is a peer server */
+                /* make sure a pool exists for that server,fsid pair */
+                ret = precreate_pool_setup_server(host, 
+                    cur_fs->coll_id, &pool_handle);
+                if(ret < 0)
+                {
+                    gossip_err("Error: precreate_pool_initialize failed to setup pool for %s\n", server_config.host_id);
+                    return(ret);
+                }
+
+                /* count current handles */
+                ret = precreate_pool_count(cur_fs->coll_id, pool_handle, 
+                    &handle_count);
+                if(ret < 0)
+                {
+                    gossip_err("Error: precreate_pool_initialize failed to count pool for %s\n", server_config.host_id);
+                    return(ret);
+                }
+
+                /* prepare the job interface to use this pool */
+                ret = job_precreate_pool_register_server(host, 
+                    cur_fs->coll_id, pool_handle, handle_count);
+                assert(ret != 0);
+                if(ret < 0)
+                {
+                    gossip_err("Error: precreate_pool_initialize failed to register pool for %s\n", server_config.host_id);
+                    return(ret);
+                }
+
+                /* launch sm to take care of refilling */
+                ret = precreate_pool_launch_refiller(host, addr_array[i],
+                    cur_fs->coll_id, pool_handle);
+                if(ret < 0)
+                {
+                    gossip_err("Error: precreate_pool_initialize failed to launch refiller SM for %s\n", server_config.host_id);
+                    return(ret);
+                }
+            }
+        }
+        cur_f = PINT_llist_next(cur_f);
+    }
+
+    return(0);
+}
+
+/* precreate_pool_finalize()
+ *
+ * shuts down infrastructure for managing pools of precreated handles
+ */
+static void precreate_pool_finalize(void)
+{
+    /* TODO: anything to do here? */
+    /* TODO: maybe try to stop pending refiller sms? */
+    return;
+}
+
+/* precreate_pool_setup_server()
+ *  
+ * This function makes sure that a pool is present for the specified server
+ *
+ */
+static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
+    PVFS_handle* pool_handle)
+{
+    job_status_s js;
+    job_id_t job_id;
+    int ret;
+    int outcount;
+    PVFS_handle_extent_array ext_array;
+
+    PVFS_ds_keyval key;
+    PVFS_ds_keyval val;
+
+    /* look for the pool handle for this server */
+    key.buffer_sz = strlen(host) + strlen("precreate-pool-") + 1;
+    key.buffer = malloc(key.buffer_sz);
+    if(!key.buffer)
+    {
+        return(-ENOMEM);
+    }
+    snprintf((char*)key.buffer, key.buffer_sz, "precreate-pool-%s", host);
+    key.read_sz = 0;
+
+    val.buffer = pool_handle;
+    val.buffer_sz = sizeof(*pool_handle);
+    val.read_sz = 0;
+
+    ret = job_trove_fs_geteattr(fsid, &key, &val, 0, NULL, 0, &js, 
+        &job_id, server_job_context);
+    while(ret == 0)
+    {
+        ret = job_test(job_id, &outcount, NULL, &js, 
+            PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+    }
+    if(ret < 0)
+    {
+        gossip_err("Error: precreate_pool failed to read fs eattrs.\n");
+        free(key.buffer);
+        return(ret);
+    }
+    if(js.error_code && js.error_code != -TROVE_ENOENT)
+    {
+        gossip_err("Error: precreate_pool failed to read fs eattrs.\n");
+        free(key.buffer);
+        return(js.error_code);
+    }
+    else if(js.error_code == -TROVE_ENOENT)
+    {
+        /* handle doesn't exist yet; let's create it */
+        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool didn't find handle for %s; creating now.\n", host);
+
+        /* find extent array for ourselves */
+        ret = PINT_cached_config_get_server(
+            fsid, server_config.host_id, PINT_SERVER_TYPE_META, &ext_array);
+        if(ret < 0)
+        {
+            gossip_err("Error: PINT_cached_config_get_meta() failure.\n");
+            free(key.buffer);
+            return(ret);
+        }
+
+        /* create a trove object for the pool */
+        ret = job_trove_dspace_create(fsid, &ext_array, PVFS_TYPE_INTERNAL,
+            NULL, TROVE_SYNC, NULL, 0, &js, &job_id, server_job_context);
+        while(ret == 0)
+        {
+            ret = job_test(job_id, &outcount, NULL, &js, 
+                PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+        }
+        if(ret < 0 || js.error_code)
+        {
+            gossip_err("Error: precreate_pool failed to create pool.\n");
+            free(key.buffer);
+            return(ret < 0 ? ret : js.error_code);
+        }
+
+        *pool_handle = js.handle;
+
+        /* store reference to pool handle as collection eattr */
+        ret = job_trove_fs_seteattr(fsid, &key, &val, TROVE_SYNC, NULL, 0, &js, 
+            &job_id, server_job_context);
+        while(ret == 0)
+        {
+            ret = job_test(job_id, &outcount, NULL, &js, 
+                PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+        }
+        if(ret < 0 || js.error_code)
+        {
+            gossip_err("Error: failed to record precreate pool handle.\n");
+            gossip_err("Warning: fsck may be needed to recover lost handle.\n");
+            free(key.buffer);
+            return(ret < 0 ? ret : js.error_code);
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool created handle %llu for %s.\n", llu(*pool_handle), host);
+
+    }
+    else
+    {
+        /* handle already exists */
+        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool found handle %llu for %s.\n", llu(*pool_handle), host);
+    }
+
+    free(key.buffer);
+    return(0);
+}
+
+/* precreate_pool_count()
+ *
+ * counts the number of handles stored in a persistent precreate pool
+ */
+static int precreate_pool_count(
+    PVFS_fs_id fsid, PVFS_handle pool_handle, int* count)
+{
+    int ret;
+    job_status_s js;
+    job_id_t job_id;
+    int outcount;
+    PVFS_ds_keyval_handle_info handle_info;
+
+    /* try to get the current number of handles from the pool */
+    ret = job_trove_keyval_get_handle_info(
+        fsid, pool_handle, TROVE_KEYVAL_HANDLE_COUNT, &handle_info,
+        NULL, 0, &js, &job_id, server_job_context);
+    while(ret == 0)
+    {
+        ret = job_test(job_id, &outcount, NULL, &js, 
+            PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+    }
+    if(ret < 0)
+    {
+        return(ret);
+    }
+    
+    if(js.error_code == -TROVE_ENOENT)
+    {
+        /* this really means there aren't any keyvals there yet */
+        handle_info.count = 0;
+    }
+    else if(js.error_code != 0)
+    {
+        return(js.error_code);
+    }
+
+    *count = handle_info.count;
+
+    return(0);
+}
+
+static int precreate_pool_launch_refiller(const char* host, 
+    PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle)
+{
+    struct PINT_smcb *tmp_smcb = NULL;
+    struct PINT_server_op *s_op;
+    int ret;
+
+    /* allocate smcb */
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_PRECREATE_POOL_REFILLER,
+        &(tmp_smcb));
+    if (ret < 0)
+    {
+        return(ret);
+    }
+
+    s_op = PINT_sm_frame(tmp_smcb, PINT_FRAME_CURRENT);
+    s_op->u.precreate_pool_refiller.host = strdup(host);
+    if(!s_op->u.precreate_pool_refiller.host)
+    {
+        PINT_smcb_free(tmp_smcb);
+        return(ret);
+    }
+
+    ret = PINT_cached_config_get_server(
+        fsid, host, PINT_SERVER_TYPE_IO, 
+        &s_op->u.precreate_pool_refiller.data_handle_extent_array);
+    if(ret < 0)
+    {
+        free(s_op->u.precreate_pool_refiller.host);
+        PINT_smcb_free(tmp_smcb);
+        return(ret);
+    }
+
+    s_op->u.precreate_pool_refiller.pool_handle = pool_handle;
+    s_op->u.precreate_pool_refiller.fsid = fsid;
+    s_op->u.precreate_pool_refiller.host_addr = addr;
+
+    /* start sm */
+    ret = server_state_machine_start_noreq(tmp_smcb);
+    if (ret < 0)
+    {
+        free(s_op->u.precreate_pool_refiller.host);
+        PINT_smcb_free(tmp_smcb);
+        return(ret);
+    }
+
+    return(0);
 }
 
 /*
