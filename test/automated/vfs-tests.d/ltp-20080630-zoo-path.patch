@@ -1,0 +1,53 @@
+--- ltp-full-20080630/runltp	2008-06-28 16:19:02.000000000 -0400
++++ ltp-full-20080630-new/runltp	2008-07-21 15:47:54.000000000 -0400
+@@ -79,6 +79,7 @@ setup()
+     export TMP="${TMPBASE}/ltp-$$"
+     export TMPDIR="${TMP}"
+     export PATH="${PATH}:${LTPROOT}/testcases/bin"
++    export ZOOFILE="$$"
+ 
+     [ -d $LTPROOT/testcases/bin ] ||
+     {
+@@ -152,6 +153,7 @@ usage() 
+     -v              Print more verbose output to screen.                   
+     -w CMDFILEADDR  Uses wget to get the user's list of testcases.
+     -x INSTANCES    Run multiple instances of this testsuite.
++    -z ZOOFILE      Specify an alternate path to zoo file.
+ 
+     example: ./${0##*/} -c 2 -i 2 -m 2,4,10240,1 -D 2,10,10240,1 -p -q  -l /tmp/result-log.$$ -o /tmp/result-output.$$ -C /tmp/result-failed.$$ -d ${PWD}
+ 
+@@ -191,7 +193,7 @@ main()
+     local DEFAULT_FILE_NAME_GENERATION_TIME=`date +"%Y_%b_%d-%Hh_%Mm_%Ss"`
+     version_date=`head -n 1 $LTPROOT/ChangeLog`
+ 
+-    while getopts a:c:C:d:D:f:ehi:g:l:m:Nno:pqr:s:t:T:vw:x: arg
++    while getopts a:c:C:d:D:f:ehi:g:l:m:Nno:pqr:s:t:T:vw:x:z: arg
+     do  case $arg in
+         a)  EMAIL_TO=$OPTARG
+             ALT_EMAIL_OUT=1;;
+@@ -377,6 +379,7 @@ main()
+             sleep 10 
+             INSTANCES="-x $OPTARG -O ${TMP}";;
+     
++	z)  ZOOFILE=$OPTARG;;
+         \?) usage;;
+         esac
+     done
+@@ -624,7 +627,7 @@ main()
+     fi
+ 
+     [ ! -z "$QUIET_MODE" ] && { echo "INFO: Test start time: $(date)" ; }
+-    PAN_COMMAND="${LTPROOT}/pan/pan $QUIET_MODE -e -S $INSTANCES $DURATION -a $$ \
++    PAN_COMMAND="${LTPROOT}/pan/pan $QUIET_MODE -e -S $INSTANCES $DURATION -a $ZOOFILE \
+     -n $$ $PRETTY_PRT -f ${TMP}/alltests $LOGFILE $OUTPUTFILE $FAILCMDFILE"
+     if [ ! -z "$VERBOSE_MODE" ] ; then
+       echo "COMMAND:    $PAN_COMMAND"
+@@ -652,7 +655,7 @@ main()
+ 
+     echo "Running tests......."
+     test_start_time=$(date)
+-    ${LTPROOT}/pan/pan $QUIET_MODE -e -S $INSTANCES $DURATION -a $$ -n $$ $PRETTY_PRT -f ${TMP}/alltests $LOGFILE $OUTPUTFILE $FAILCMDFILE
++    ${LTPROOT}/pan/pan $QUIET_MODE -e -S $INSTANCES $DURATION -a $ZOOFILE -n $$ $PRETTY_PRT -f ${TMP}/alltests $LOGFILE $OUTPUTFILE $FAILCMDFILE
+      
+     if [ $? -eq 0 ]; then
+       echo "INFO: pan reported all tests PASS"
