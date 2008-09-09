@@ -58,6 +58,9 @@
 /* Define if super_operations statfs has dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
+/* Define if kernel super_operations contains drop_inode field */
+#undef HAVE_DROP_INODE
+
 /* Define if export_operations has an encode_fh member */
 #undef HAVE_ENCODEFH_EXPORT_OPERATIONS
 
@@ -264,6 +267,9 @@
 
 /* Define to 1 if you have the `PtlEventKindStr' function. */
 #undef HAVE_PTLEVENTKINDSTR
+
+/* Define if kernel super_operations contains put_inode field */
+#undef HAVE_PUT_INODE
 
 /* Define if struct file_operations in kernel has readdirplus_lite callback */
 #undef HAVE_READDIRPLUSLITE_FILE_OPERATIONS

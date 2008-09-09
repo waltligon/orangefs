@@ -41,6 +41,9 @@ struct options *fsck_opts = NULL;
 /* lost+found reference */
 PVFS_object_ref laf_ref;
 
+static void handlelist_remove_handle_no_idx(struct handlelist *hl,
+				     PVFS_handle handle);
+
 int main(int argc, char **argv)
 {
     int ret = -1, in_admin_mode = 0;
@@ -353,6 +356,7 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
 					     position_array,
 					     addr_array,
 					     server_count,
+                                             0,
 					     NULL /* details */);
 	if (ret < 0)
 	{
@@ -412,6 +416,74 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
                     i, total_count_array[i], used_handles);
             return NULL;
         }
+    }
+
+    handlelist_finished_adding_handles(hl); /* sanity check */
+
+    /* now look for reserved handles */
+    for (i=0; i < server_count; i++)
+    {
+	hcount_array[i] = HANDLE_BATCH;
+	position_array[i] = PVFS_ITERATE_START;
+    }
+
+    more_flag = 1;
+    while (more_flag)
+    {
+	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
+					     creds,
+					     handle_matrix,
+					     hcount_array,
+					     position_array,
+					     addr_array,
+					     server_count,
+                                             PVFS_MGMT_RESERVED,
+					     NULL /* details */);
+	if (ret < 0)
+	{
+	    PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);
+	    PVFS_mgmt_setparam_list(cur_fs,
+				    creds,
+				    PVFS_SERV_PARAM_MODE,
+				    (uint64_t)PVFS_SERVER_NORMAL_MODE,
+				    addr_array,
+				    NULL,
+				    server_count,
+				    NULL);
+	    return NULL;
+	}
+
+	for (i=0; i < server_count; i++)
+	{
+            /* remove any reserved handles from the handlelist.  These will
+             * not show up in normal objects when we walk the file system
+             * tree.
+             */
+	    for (j=0; j < hcount_array[i]; j++)
+	    {
+                /* we don't know the server index.  Reserved handles can be
+                 * reported by any server; not just the server that actually
+                 * owns that handle.
+                 */
+	        handlelist_remove_handle_no_idx(hl,
+				   handle_matrix[i][j]);
+            }
+	}
+
+	/* find out if any servers have more handles to dump */
+	more_flag = 0;
+	for (i=0; i < server_count; i++)
+	{
+	    if (position_array[i] != PVFS_ITERATE_END)
+	    {
+		more_flag = 1;
+                hcount_array[i] = HANDLE_BATCH;
+	    }
+	}
+    }
+
+    for (i = 0; i < server_count; i++)
+    {
 	free(handle_matrix[i]);
     }
 
@@ -421,7 +493,6 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     free(total_count_array);
     free(position_array);
 
-    handlelist_finished_adding_handles(hl); /* sanity check */
     free(stat_array);
     stat_array = NULL;
 
@@ -1300,6 +1371,50 @@ static int handlelist_find_handle(struct handlelist *hl,
     }
 
     return -1;
+}
+
+/* handlelist_remove_handle_no_idx()
+ *
+ * same as handlelist_remove_handle(), but will search for the correct
+ * server index
+ */
+/* TODO: we could speed this up by resolving which server the handle
+ * belongs to using the cached_config api
+ */
+static void handlelist_remove_handle_no_idx(struct handlelist *hl,
+				     PVFS_handle handle)
+{
+    unsigned long i;
+    int server_idx = 0;
+    int found = 0;
+
+    for(server_idx = 0; server_idx<hl->server_ct; server_idx++)
+    {
+        for (i = 0; i < hl->used_array[server_idx]; i++)
+        {
+            if (hl->list_array[server_idx][i] == handle)
+            {
+                if (i < (hl->used_array[server_idx] - 1))
+                {
+                    /* move last entry to this position before decrement */
+                    hl->list_array[server_idx][i] =
+                        hl->list_array[server_idx][hl->used_array[server_idx]-1];
+                    
+                }
+                hl->used_array[server_idx]--;
+                found = 1;
+                break;
+            }
+        }
+        if(found)
+        {
+            break;
+        }
+    }
+
+    if (!found) {
+	printf("! problem removing %llu.\n", llu(handle));
+    }
 }
 
 static void handlelist_remove_handle(struct handlelist *hl,

@@ -70,8 +70,7 @@ typedef pthread_cond_t  gen_cond_t;
 
 #endif /* __GEN_POSIX_LOCKING__ */
 
-
-#ifdef __GEN_NULL_LOCKING__
+#elif defined (__GEN_NULL_LOCKING__)
 	/* this stuff messes around just enough to prevent warnings */
 typedef int gen_mutex_t;
 typedef unsigned long gen_thread_t;
@@ -131,7 +130,9 @@ static inline int gen_cond_broadcast(gen_cond_t *cond)
     return 0;
 }
 
-#endif /* __GEN_NULL_LOCKING__ */
+#else /* __GEN_NULL_LOCKING__ */
+#error "Must define either POSIX or NULL locking"
+#endif
 
 #endif /* __GEN_LOCKS_H */
 

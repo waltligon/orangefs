@@ -92,19 +92,21 @@ sort of user pointer that Portals provides.
 
 Match lists
 -----------
-Diagram of the various match lists used.
+Diagram of the various match lists used.  The two bars in each
+of the match lists separate the 64 bits into:  2 bits, 30 bits, 32 bits,
+in that order.
 
 preposted receives
 
-    match bmi_tag -> preposted buf
+    match 0 | seqno | bmi_tag -> preposted buf
 
-    match bmi_tag -> preposted buf
+    match 0 | seqno | bmi_tag -> preposted buf
 
     ...
 
 outgoing sends
 
-    match 2 << 32 | bmi_tag <- preposted buf, respond to get
+    match 1 | seqno | bmi_tag <- preposted buf, respond to get
 
     ...
 
@@ -114,36 +116,41 @@ mark
 
 nonpreopsted receive buffers
 
-    match 0 << 32 | any -> nonprepost buffer1, max size
+    match 0 | any | any -> nonprepost buffer1, max size
 
-    match 0 << 32 | any -> nonprepost buffer2, max size
+    match 0 | any | any -> nonprepost buffer2, max size
 
 unexpected message buffers
 
-    match 1 << 32 | any -> unexpected buffer1, max size
+    match 2 | any | any -> unexpected buffer1, max size
 
-    match 1 << 32 | any -> unexpected buffer2, max size
+    match 2 | any | any -> unexpected buffer2, max size
 
 zero
 
-    match 0 << 32 | any -> no buffer, trunc, max size 0
+    match 0 | any | any -> no buffer, trunc, max size 0
 
 Preposted receives must come first and be in order so that they match
-for expected incoming messages.  The order of nonprepost and unexpected
-buffers doesn't matter, so we let them mix up among themselves.  The
-mark entry is used to be able to find the point between the prepost
-and other entries, otherwise we'd need lots of code to track that by hand.
+for expected incoming messages.  The outgoing posted sends come next, and
+can be mixed up with the receives since they have a unique bit 62 set.
+
+The order of nonprepost and unexpected buffers doesn't matter, so we let them
+mix up among themselves.  The mark entry is used to be able to find the point
+between the prepost and other entries, otherwise we'd need lots of code to
+track that by hand.
 
 The nonprepost and unexpected buffers are managed as "circular" lists,
 where one is filled up until it is unlinked, then it is reposted after
-the other that has now started to fill up.
+the other that has now started to fill up.  They are actually all mixed
+up in the area between mark and zero, as it doesn't matter which order
+they appear in.
 
 Nonpreopst messages are kept in the buffers until the app posts a receive
 that matches.  If they fill up, later messages fall off the bottom.
 Working apps will pre-post their receives before the sender tries to send
 to them.
 
-Unexpected messages are a protocol feature of BMI.  A special high-bit
+Unexpected messages are a protocol feature of BMI.  A special high-bit 63
 indicates this.  They are limited in size by the protocol (8k here), and
 are always new requests from a client to a server.  As they arrive, they
 are immediately copied into new buffers that are handed back to the server
@@ -155,6 +162,15 @@ Finally, for nonprepost messages that are too big, it lands into the zero
 md at the end that just generates an event on the sender and receiver.  The
 receiver does a get to read the data from the sender later when the app
 finally posts the receive.
+
+Note that BMI will post multiple sends to the same dest with the same
+tag.  With this scheme, a race condition can develop where peer A sends tag
+5 and tag 5, then peer B recvs and acks tag 5, then peer B recvs the second
+tag 5 to its zero md, then peer B has an internal post_recv and does a get
+to tag 5.  This get hits the _first_ tag 5 on peer A, as peer A has not
+gotten around to processing the ack and unlinking that one.  To get around
+this, we add a sequence number that sits in the 30 bits just above the 32
+bits reserved for the tag.
 
 
 TODO Notes

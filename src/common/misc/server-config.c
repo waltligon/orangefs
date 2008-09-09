@@ -93,6 +93,7 @@ static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
 static DOTCONF_CB(get_trove_sync_data);
+static DOTCONF_CB(get_file_stuffing);
 static DOTCONF_CB(get_db_cache_size_bytes);
 static DOTCONF_CB(get_trove_max_concurrent_io);
 static DOTCONF_CB(get_db_cache_type);
@@ -104,12 +105,15 @@ static DOTCONF_CB(get_server_job_bmi_timeout);
 static DOTCONF_CB(get_server_job_flow_timeout);
 static DOTCONF_CB(get_client_job_bmi_timeout);
 static DOTCONF_CB(get_client_job_flow_timeout);
+static DOTCONF_CB(get_precreate_batch_size);
+static DOTCONF_CB(get_precreate_low_threshold);
 static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
 static DOTCONF_CB(get_secret_key);
 static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
 static DOTCONF_CB(get_trove_method);
+static DOTCONF_CB(get_small_file_size);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -614,6 +618,22 @@ static const configoption_t options[] =
      {"ClientRetryDelayMilliSecs",ARG_INT, get_client_retry_delay,NULL,
          CTX_DEFAULTS, "2000"},
 
+     /* Specifies the number of handles to be preceated at a time from each
+      * server using the batch create request.
+      */
+     {"PrecreateBatchSize",ARG_INT, get_precreate_batch_size,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "512"},
+ 
+     /* Precreate pools will be "topped off" if they fall below this value */
+     {"PrecreateLowThreshold",ARG_INT, get_precreate_low_threshold,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "256"},
+
+    /* Specifies if file stuffing should be enabled or not.  Default is
+     * enabled; this option is only provided for benchmarking purposes 
+     */
+    {"FileStuffing",ARG_STR, get_file_stuffing, NULL, 
+        CTX_FILESYSTEM,"yes"},
+
      /* This specifies the frequency (in milliseconds) 
       * that performance monitor should be updated
       * when the pvfs server is running in admin mode.
@@ -900,6 +920,9 @@ static const configoption_t options[] =
      */
     {"SecretKey",ARG_STR, get_secret_key,NULL,CTX_FILESYSTEM,NULL},
 
+    /* Specifies the size of the small file transition point */
+    {"SmallFileSize", ARG_INT, get_small_file_size, NULL, CTX_FILESYSTEM, NULL},
+
     LAST_OPTION
 };
 
@@ -943,6 +966,8 @@ int PINT_parse_config(
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
     config_s->trove_max_concurrent_io = 16;
+    config_s->precreate_batch_size = PVFS2_PRECREATE_BATCH_SIZE_DEFAULT;
+    config_s->precreate_low_threshold = PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT;
 
     if (cache_config_files(config_s, global_config_filename))
     {
@@ -1167,6 +1192,7 @@ DOTCONF_CB(enter_filesystem_context)
     fs_conf->trove_sync_data = TROVE_SYNC;
     fs_conf->fp_buffer_size = -1;
     fs_conf->fp_buffers_per_flow = -1;
+    fs_conf->file_stuffing = 1;
 
     if (!config_s->file_systems)
     {
@@ -1417,6 +1443,32 @@ DOTCONF_CB(get_server_job_bmi_timeout)
         return NULL;
     }
     config_s->server_job_bmi_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_precreate_batch_size)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    config_s->precreate_batch_size = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_precreate_low_threshold)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    config_s->precreate_low_threshold = cmd->data.value;
     return NULL;
 }
 
@@ -2148,6 +2200,33 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
     return NULL;
 }
 
+DOTCONF_CB(get_file_stuffing)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if(strcasecmp(cmd->data.str, "yes") == 0)
+    {
+        fs_conf->file_stuffing = 1;
+    }
+    else if(strcasecmp(cmd->data.str, "no") == 0)
+    {
+        fs_conf->file_stuffing = 0;
+    }
+    else
+    {
+        return("FileStuffing value must be 'yes' or 'no'.\n");
+    }
+
+    return NULL;
+}
+
+
 DOTCONF_CB(get_trove_sync_meta)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -2614,6 +2693,20 @@ DOTCONF_CB(get_trove_method)
     }
     return NULL;
 }
+
+DOTCONF_CB(get_small_file_size)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    /* we must be in a storagehints inside a filesystem context */
+    struct filesystem_configuration_s *fs_conf =
+        (struct filesystem_configuration_s *) PINT_llist_head(config_s->file_systems);
+
+    fs_conf->small_file_size = cmd->data.value;
+    return NULL;
+}
+
 
 /*
  * Function: PINT_config_release

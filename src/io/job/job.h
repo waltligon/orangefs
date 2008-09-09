@@ -434,6 +434,21 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
 			    job_id_t * id,
 			    job_context_id context_id);
 
+/* remove a list of key/value entries */
+int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
+                                  PVFS_handle handle,
+                                  PVFS_ds_keyval * key_a,
+                                  PVFS_ds_keyval * val_a,
+                                  int * error_a,
+                                  int count,
+                                  PVFS_ds_flags flags,
+                                  PVFS_vtag * vtag,
+                                  void *user_ptr,
+                                  job_aint status_user_tag,
+                                  job_status_s * out_status_p,
+                                  job_id_t * id,
+                                  job_context_id context_id);
+
 /* check consistency of a key/value pair for a given vtag */
 int job_trove_keyval_validate(PVFS_fs_id coll_id,
 			      PVFS_handle handle,
@@ -498,9 +513,35 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 			    job_id_t * id,
 			    job_context_id context_id);
 
+/* create a set of new data space objects */
+int job_trove_dspace_create_list(PVFS_fs_id coll_id,
+			    PVFS_handle_extent_array *handle_extent_array,
+                            PVFS_handle* out_handle_arry,
+                            int count,
+			    PVFS_ds_type type,
+			    void *hint,
+                            PVFS_ds_flags flags,
+			    void *user_ptr,
+			    job_aint status_user_tag,
+			    job_status_s * out_status_p,
+			    job_id_t * id,
+			    job_context_id context_id);
+
 /* remove an entire data space object (byte stream and key/value) */
 int job_trove_dspace_remove(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
+                            PVFS_ds_flags flags,
+			    void *user_ptr,
+			    job_aint status_user_tag,
+			    job_status_s * out_status_p,
+			    job_id_t * id,
+			    job_context_id context_id);
+
+/* remove a list of data space objects (byte stream and key/value) */
+int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
+			    PVFS_handle* handle_array,
+                            PVFS_error *out_error_array,
+                            int count,
                             PVFS_ds_flags flags,
 			    void *user_ptr,
 			    job_aint status_user_tag,
@@ -577,6 +618,73 @@ int job_null(
     job_id_t * id,
     job_context_id context_id);
 
+int job_precreate_pool_fill(
+    PVFS_handle precreate_pool,
+    PVFS_fs_id fsid,
+    PVFS_handle* precreate_handle_array,
+    int precreate_handle_count,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id);
+ 
+int job_precreate_pool_fill_signal_error(
+    PVFS_handle precreate_pool,
+    PVFS_fs_id fsid,
+    int error_code,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id);
+
+int job_precreate_pool_check_level(
+    PVFS_handle precreate_pool,
+    PVFS_fs_id fsid,
+    int low_threshold,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id);
+
+int job_precreate_pool_iterate_handles(
+    PVFS_fs_id fsid,
+    PVFS_ds_position position,
+    PVFS_handle* handle_array,
+    int count,
+    PVFS_ds_flags flags,
+    PVFS_vtag* vtag,
+    void* user_ptr,
+    job_aint status_user_tag,
+    job_status_s* out_status_p,
+    job_id_t* id,
+    job_context_id context_id);
+
+int job_precreate_pool_get_handles(
+    PVFS_fs_id fsid,
+    int count,
+    const char** servers,
+    PVFS_handle* handle_array,
+    PVFS_ds_flags flags,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id);
+
+int job_precreate_pool_register_server(
+    const char* host, 
+    PVFS_fs_id fsid, 
+    PVFS_handle pool_handle, 
+    int count);
+ 
+int job_precreate_pool_lookup_server(
+    const char* host, 
+    PVFS_fs_id fsid, 
+    PVFS_handle* pool_handle);
+  
 /******************************************************************
  * job test/wait for completion functions 
  */

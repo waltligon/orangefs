@@ -36,6 +36,8 @@
 #define PVFS_ATTR_META_ALL \
 (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES)
 
+#define PVFS_ATTR_META_UNSTUFFED (1 << 12)
+
 /* internal attribute masks for datafile objects */
 #define PVFS_ATTR_DATA_SIZE            (1 << 15)
 #define PVFS_ATTR_DATA_ALL   PVFS_ATTR_DATA_SIZE
@@ -52,7 +54,7 @@
 
 /* attributes that do not change once set */
 #define PVFS_STATIC_ATTR_MASK \
-(PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_META_DIST|PVFS_ATTR_META_DFILES)
+(PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_META_DIST|PVFS_ATTR_META_DFILES|PVFS_ATTR_META_UNSTUFFED)
 
 /* extended hint attributes for a metafile object */
 struct PVFS_metafile_hint_s
@@ -75,6 +77,9 @@ struct PVFS_metafile_attr_s
     /* list of datafiles */
     PVFS_handle *dfile_array;
     uint32_t dfile_count;
+
+    int32_t stuffed_size;
+
     PVFS_metafile_hint hint;
 };
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
@@ -201,6 +206,12 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     encode_PVFS_time(pptr, &(x)->ctime); \
     encode_uint32_t(pptr, &(x)->mask); \
     encode_PVFS_ds_type(pptr, &(x)->objtype); \
+    if ((x)->objtype == PVFS_TYPE_METAFILE && \
+        (!((x)->mask & PVFS_ATTR_META_UNSTUFFED))) \
+    { \
+        encode_int32_t(pptr, &(x)->u.meta.stuffed_size); \
+        encode_skip4(pptr,); \
+    } \
     if ((x)->mask & PVFS_ATTR_META_DIST) \
 	encode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \
@@ -222,6 +233,12 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     decode_PVFS_time(pptr, &(x)->ctime); \
     decode_uint32_t(pptr, &(x)->mask); \
     decode_PVFS_ds_type(pptr, &(x)->objtype); \
+    if ((x)->objtype == PVFS_TYPE_METAFILE && \
+        (!((x)->mask & PVFS_ATTR_META_UNSTUFFED))) \
+    { \
+        decode_int32_t(pptr, &(x)->u.meta.stuffed_size); \
+        decode_skip4(pptr,); \
+    } \
     if ((x)->mask & PVFS_ATTR_META_DIST) \
 	decode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_META_DFILES) \
@@ -239,8 +256,10 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 #define extra_size_PVFS_object_attr_dir  (PVFS_REQ_LIMIT_DIST_BYTES + \
   PVFS_REQ_LIMIT_DIST_NAME + roundup8(sizeof(PVFS_directory_attr)))
 
+/* room for distribution, stuffed_size, and dfile array */
 #define extra_size_PVFS_object_attr_meta (PVFS_REQ_LIMIT_DIST_BYTES + \
-  PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle))
+  sizeof(int32_t) + \
+  PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle)) 
 
 #define extra_size_PVFS_object_attr_symlink (PVFS_REQ_LIMIT_PATH_NAME_BYTES)
 

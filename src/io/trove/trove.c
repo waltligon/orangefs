@@ -309,8 +309,11 @@ int trove_keyval_read(
     /* Check arguments */
     if (key_p->buffer_sz < 2)
 	return -TROVE_EINVAL;
-    if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
-	return -TROVE_EINVAL;
+    if(!(flags & TROVE_BINARY_KEY))
+    {
+        if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
+	    return -TROVE_EINVAL;
+    }
 
     return keyval_method_table[method_id]->keyval_read(
            coll_id,
@@ -353,8 +356,11 @@ int trove_keyval_write(
     /* Check arguments */
     if (key_p->buffer_sz < 2)
 	return -TROVE_EINVAL;
-    if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
-	return -TROVE_EINVAL;
+    if(!(flags & TROVE_BINARY_KEY))
+    {
+        if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
+	    return -TROVE_EINVAL;
+    }
 
     return keyval_method_table[method_id]->keyval_write(
            coll_id,
@@ -526,8 +532,11 @@ int trove_keyval_read_list(
     {
 	if (key_array[i].buffer_sz < 2)
 	    return -TROVE_EINVAL;
-	if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
-	    return -TROVE_EINVAL;
+        if(!(flags & TROVE_BINARY_KEY))
+        {
+	    if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+	        return -TROVE_EINVAL;
+        }
     }
 
     return keyval_method_table[method_id]->keyval_read_list(
@@ -573,8 +582,11 @@ int trove_keyval_write_list(
     {
 	if (key_array[i].buffer_sz < 2)
 	    return -TROVE_EINVAL;
-	if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
-	    return -TROVE_EINVAL;
+        if(!(flags & TROVE_BINARY_KEY))
+        {
+	    if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+	        return -TROVE_EINVAL;
+        }
     }
 
     return keyval_method_table[method_id]->keyval_write_list(
@@ -582,6 +594,57 @@ int trove_keyval_write_list(
            handle,
            key_array,
            val_array,
+           count,
+           flags,
+           vtag,
+           user_ptr,
+           context_id,
+           out_op_id_p);
+}
+
+/** Initiate storing of multiple keyword/value pairs to the same
+ *  data space as a single operation.
+ */
+int trove_keyval_remove_list(
+    TROVE_coll_id coll_id,
+    TROVE_handle handle,
+    TROVE_keyval_s* key_array,
+    TROVE_keyval_s* val_array,
+    int *error_array,
+    int count,
+    TROVE_ds_flags flags,
+    TROVE_vtag_s* vtag,
+    void* user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id* out_op_id_p)
+{
+    int i;
+    TROVE_method_id method_id;
+
+    method_id = global_trove_method_callback(coll_id);
+    if(method_id < 0)
+    {
+	return -TROVE_EINVAL;
+    }
+
+    /* Check arguments */
+    for (i = 0; i < count; i++)
+    {
+	if (key_array[i].buffer_sz < 2)
+	    return -TROVE_EINVAL;
+        if(!(flags & TROVE_BINARY_KEY))
+        {
+            if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+                return -TROVE_EINVAL;
+        }
+    }
+
+    return keyval_method_table[method_id]->keyval_remove_list(
+           coll_id,
+           handle,
+           key_array,
+           val_array,
+	   error_array,
            count,
            flags,
            vtag,
@@ -644,6 +707,41 @@ int trove_keyval_get_handle_info(TROVE_coll_id coll_id,
 	out_op_id_p);
 }
 
+/** Initiate creation of multiple new data spaces.
+ */
+int trove_dspace_create_list(
+    TROVE_coll_id coll_id,
+    TROVE_handle_extent_array* handle_extent_array,
+    TROVE_handle* out_handle_array,
+    int count,
+    TROVE_ds_type type,
+    TROVE_keyval_s* hint,
+    TROVE_ds_flags flags,
+    void* user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id* out_op_id_p)
+{
+    TROVE_method_id method_id;
+
+    method_id = global_trove_method_callback(coll_id);
+    if(method_id < 0)
+    {
+	return -TROVE_EINVAL;
+    }
+
+    return dspace_method_table[method_id]->dspace_create_list(
+           coll_id,
+           handle_extent_array,
+           out_handle_array,
+           count,
+           type,
+           hint,
+           flags,
+           user_ptr,
+           context_id,
+           out_op_id_p);
+}
+
 /** Initiate creation of a new data space.
  */
 int trove_dspace_create(
@@ -671,6 +769,37 @@ int trove_dspace_create(
            out_handle,
            type,
            hint,
+           flags,
+           user_ptr,
+           context_id,
+           out_op_id_p);
+}
+
+/** Initiate removal of a list of data spaces.
+ */
+int trove_dspace_remove_list(
+    TROVE_coll_id coll_id,
+    TROVE_handle* handle_array,
+    TROVE_ds_state* error_array,
+    int count,
+    TROVE_ds_flags flags,
+    void* user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id* out_op_id_p)
+{
+    TROVE_method_id method_id;
+
+    method_id = global_trove_method_callback(coll_id);
+    if(method_id < 0)
+    {
+	return -TROVE_EINVAL;
+    }
+
+    return dspace_method_table[method_id]->dspace_remove_list(
+           coll_id,
+           handle_array,
+           error_array,
+           count,
            flags,
            user_ptr,
            context_id,

@@ -200,6 +200,8 @@ sub emit_defaults
     print $target "\tClientJobFlowTimeoutSecs $client_job_timeout\n";
     print $target "\tClientRetryLimit 5\n";
     print $target "\tClientRetryDelayMilliSecs 2000\n";
+    print $target "\tPrecreateBatchSize 512\n";
+    print $target "\tPrecreateLowThreshold 256\n";
 
     if(defined($default_storage))
     {
@@ -244,7 +246,7 @@ sub emit_filesystem
         $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count) = @_;
 
     # divide handle range space equally among servers ((2^63)-1 for now)
-    my($total_num_handles_available, $start, $end, $i, $step, $num_ranges);
+    my($total_num_handles_available, $start, $end, $i, $step, $num_ranges, $stuffing);
     $num_ranges = $count;
     $total_num_handles_available = $last_handle->copy();
     $total_num_handles_available->bsub($first_handle);
@@ -263,6 +265,23 @@ sub emit_filesystem
     {
         print $target "\tDefaultNumDFiles $default_num_dfiles\n";
     }
+
+    # Rules for default stuffing setting: only enable it if every I/O server
+    # is also a metadata server, otherwise we would tend to unbalance by
+    # always stuffing on the subset that does metadata.  User can override
+    # if desired.
+    $stuffing = "yes";
+    foreach my $alias (keys %all_endpoints)
+    {
+        if($all_endpoints{$alias}->{TYPE} & $IO_ENDPOINT)
+        {
+            if(!($all_endpoints{$alias}->{TYPE} & $META_ENDPOINT))
+            {
+                $stuffing = "no";
+            }
+        }
+    }
+    print $target "\tFileStuffing $stuffing\n";
 
     print $target "\t<MetaHandleRanges>\n";
     $start = $end = $first_handle->copy();
@@ -941,17 +960,36 @@ sub get_metanames
     my $storage = shift;
     my $logfile = shift;
     my $metaline = '';
+    my @meta_hosts;
     if ($opt_metaservers) {
         $metaline = $opt_metaservers;
-    } else {
-        print $OUT "Now list the hostnames of the machines that will act as " .
-                   "Metadata\nservers.  This list may or may not overlap " .
-                   "with the I/O server list.\n";
+        @meta_hosts = parse_hostlist($metaline);
+    } 
+    else 
+    {
+        print $OUT "Use same servers for metadata? (recommended)\n";
         $metaline = prompt_word(
-            "Enter hostnames [Default is localhost]: ",
-            "localhost");
+            "Enter yes or no [Default is yes]: ",
+            "yes");
+        if($metaline =~ /^yes$/i)
+        {
+            foreach my $alias (keys %all_endpoints)
+            {
+                $all_endpoints{$alias}->{TYPE} |= $META_ENDPOINT;
+            }
+        }
+        else
+        {
+            print $OUT "Now list the hostnames of the machines that will act as " .
+                       "Metadata\nservers.  This list may or may not overlap " .
+                       "with the I/O server list.\n";
+            $metaline = prompt_word(
+                "Enter hostnames [Default is localhost]: ",
+                "localhost");
+            @meta_hosts = parse_hostlist($metaline);
+        }
     }
-    my @meta_hosts = parse_hostlist($metaline);
+
     foreach my $meta_host (@meta_hosts)
     {
         if(exists $all_endpoints{$meta_host})

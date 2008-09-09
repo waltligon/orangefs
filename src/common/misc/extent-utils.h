@@ -17,11 +17,13 @@ PINT_llist *PINT_create_extent_list(
 int PINT_handle_in_extent(
     PVFS_handle_extent *ext,
     PVFS_handle handle);
+int PINT_handle_in_extent_array(
+    PVFS_handle_extent_array *ext_array, PVFS_handle handle);
 int PINT_handle_in_extent_list(
     PINT_llist *extent_list,
     PVFS_handle handle);
-int PINT_extent_list_count_total(
-    PINT_llist *extent_list, uint64_t *count);
+uint64_t PINT_extent_array_count_total(
+    PVFS_handle_extent_array *extent_array);
 void PINT_release_extent_list(
     PINT_llist *extent_list);
 

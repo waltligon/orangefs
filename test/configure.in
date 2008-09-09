@@ -96,6 +96,17 @@ AC_ARG_WITH(mpi,
     fi
 )
 
+dnl a mechanism to turn off threads in the client library
+AC_ARG_ENABLE(thread-safety,
+[  --disable-thread-safety Disables thread safety in the client library],
+[if test "x$enableval" = "xno" ; then
+    CFLAGS="$CFLAGS -D__GEN_NULL_LOCKING__"
+    AC_MSG_RESULT(no)
+fi],
+[   CFLAGS="$CFLAGS -D__GEN_POSIX_LOCKING__"
+    AC_MSG_RESULT(yes) ]
+)
+
 dnl default paths:
 PVFS2_SRC_RELATIVE_TOP="${srcdir}/.."
 PVFS2_BUILD_RELATIVE_TOP=".."

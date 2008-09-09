@@ -104,7 +104,7 @@ for f in `find . -name module.mk`; do rm -rf $f; done
 for f in `find . -name "*.log"`; do rm -rf $f; done
 for f in `find . -name "*.toc"`; do rm -rf $f; done
 for f in `find . -name "*.aux"`; do rm -rf $f; done
-rm -f Makefile pvfs2-config.h PVFS2-GLOBAL-TODO.txt
+rm -f Makefile pvfs2-config.h
 rm -f src/common/statecomp/statecomp
 
 # make sure the cleaned up directory exists

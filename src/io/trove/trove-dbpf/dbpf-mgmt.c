@@ -513,7 +513,7 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
                                     NULL, &db_key, &db_data, 0);
     if (ret != 0)
     {
-        gossip_lerr("dbpf_collection_geteattr: %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_geteattr: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1912,7 +1912,9 @@ static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
     { DSPACE_VERIFY, "DSPACE_VERIFY" },
     { DSPACE_GETATTR, "DSPACE_GETATTR" },
     { DSPACE_SETATTR, "DSPACE_SETATTR" },
-    { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" }
+    { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" },
+    { DSPACE_CREATE_LIST, "DSPACE_CREATE_LIST" },
+    { DSPACE_REMOVE_LIST, "DSPACE_REMOVE_LIST" }
     /* NOTE: this list should be kept in sync with enum dbpf_op_type 
      * from dbpf.h 
      */ 

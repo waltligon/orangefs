@@ -184,6 +184,9 @@ int PINT_dbpf_keyval_iterate(
     TROVE_ds_position pos,
     PINT_dbpf_keyval_iterate_callback callback);
 
+int PINT_dbpf_dspace_remove_keyval(
+    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+
 struct dbpf_storage
 {
     TROVE_ds_flags flags;
@@ -255,6 +258,16 @@ struct dbpf_dspace_create_op
     /* hint? */
 };
 
+struct dbpf_dspace_create_list_op
+{
+    TROVE_handle_extent_array extent_array;
+    TROVE_handle *out_handle_array_p;
+    TROVE_ds_type type;
+    int count;
+    /* hint? */
+};
+
+
 /* struct dbpf_dspace_remove_op {}; -- nothing belongs in here */
 
 struct dbpf_dspace_iterate_handles_op
@@ -277,6 +290,13 @@ struct dbpf_dspace_setattr_op
 struct dbpf_dspace_getattr_op
 {
     TROVE_ds_attributes_s *attr_p;
+};
+
+struct dbpf_dspace_remove_list_op
+{
+    int count;
+    TROVE_handle          *handle_array;
+    TROVE_ds_state        *error_p;
 };
 
 struct dbpf_dspace_getattr_list_op
@@ -321,6 +341,14 @@ struct dbpf_keyval_remove_op
     TROVE_keyval_s key;
     TROVE_keyval_s val;
     /* vtag? */
+};
+
+struct dbpf_keyval_remove_list_op
+{
+    TROVE_keyval_s *key_array;
+    TROVE_keyval_s *val_array;
+    int *error_array;
+    int count; /* TODO: MAKE INOUT? */
 };
 
 struct dbpf_keyval_iterate_op
@@ -457,6 +485,8 @@ enum dbpf_op_type
     DSPACE_GETATTR,
     DSPACE_SETATTR,
     DSPACE_GETATTR_LIST,
+    DSPACE_CREATE_LIST,
+    DSPACE_REMOVE_LIST,
     /* NOTE: if you change or add items to this list, please update
      * s_dbpf_op_type_str_map[] accordingly (dbpf-mgmt.c)
      */
@@ -467,6 +497,7 @@ enum dbpf_op_type
      __op == KEYVAL_REMOVE_KEY  || \
      __op == KEYVAL_WRITE_LIST  || \
      __op == DSPACE_CREATE      || \
+     __op == DSPACE_CREATE_LIST || \
      __op == DSPACE_REMOVE      || \
      __op == DSPACE_SETATTR)
 
@@ -509,6 +540,7 @@ struct dbpf_op
          * defined just below the prototypes for the functions.
          */
         struct dbpf_dspace_create_op d_create;
+        struct dbpf_dspace_create_list_op d_create_list;
         struct dbpf_dspace_iterate_handles_op d_iterate_handles;
         struct dbpf_dspace_verify_op d_verify;
         struct dbpf_dspace_getattr_op d_getattr;
@@ -522,7 +554,9 @@ struct dbpf_op
         struct dbpf_keyval_iterate_keys_op k_iterate_keys;
         struct dbpf_keyval_read_list_op k_read_list;
         struct dbpf_keyval_read_list_op k_write_list;
+        struct dbpf_keyval_remove_list_op k_remove_list;
         struct dbpf_dspace_getattr_list_op d_getattr_list;
+        struct dbpf_dspace_remove_list_op d_remove_list;
         struct dbpf_keyval_get_handle_info_op k_get_handle_info;
     } u;
 };

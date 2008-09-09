@@ -9,6 +9,8 @@ ifdef BUILD_SERVER
 		$(DIR)/setparam.c \
 		$(DIR)/lookup.c \
 		$(DIR)/create.c \
+		$(DIR)/batch-create.c \
+		$(DIR)/batch-remove.c \
 		$(DIR)/crdirent.c \
 		$(DIR)/set-attr.c \
 		$(DIR)/mkdir.c \
@@ -40,7 +42,9 @@ ifdef BUILD_SERVER
 		$(DIR)/set-eattr.c \
 		$(DIR)/del-eattr.c \
 		$(DIR)/list-eattr.c \
-		$(DIR)/unexpected.c
+		$(DIR)/unexpected.c \
+		$(DIR)/precreate-pool-refiller.c \
+		$(DIR)/unstuff.c
 
 	# c files that should be added to server library
 	SERVERSRC += \

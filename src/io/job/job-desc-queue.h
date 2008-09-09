@@ -42,6 +42,30 @@ struct trove_desc
     int count;
 };
 
+/* describes precreate pool operations */
+struct precreate_pool_desc
+{
+    PVFS_handle precreate_pool;
+    PVFS_fs_id fsid;
+    PVFS_handle* precreate_handle_array;
+    int precreate_handle_count;
+    int precreate_handle_index;
+    int posted_count;
+    const char** servers;
+    struct qlist_head* current_pool;
+    int trove_pending;
+    int low_threshold;
+    void* data;
+    int first_callback_flag;
+    TROVE_keyval_s* key_array;
+    PVFS_ds_flags flags;
+    PVFS_ds_position position;
+    PVFS_ds_position pool_index;
+    int count;
+    
+    PVFS_error error_code;
+};
+
 /* describes unexpected BMI operations */
 struct bmi_unexp_desc
 {
@@ -85,6 +109,7 @@ enum job_type
     JOB_REQ_SCHED,
     JOB_DEV_UNEXP,
     JOB_REQ_SCHED_TIMER,
+    JOB_PRECREATE_POOL,
     JOB_NULL
 };
 
@@ -111,6 +136,7 @@ struct job_desc
 	struct req_sched_desc req_sched;
 	struct dev_unexp_desc dev_unexp;
 	struct null_info_desc null_info;
+        struct precreate_pool_desc precreate_pool;
     }
     u;
 

@@ -59,7 +59,9 @@ enum
 
     TROVE_DB_CACHE_MMAP          = 1 << 5,
     TROVE_DB_CACHE_SYS           = 1 << 6,
-    TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7
+    TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7,
+    TROVE_BINARY_KEY             = 1 << 8, /* tell trove this is a binary key */
+    TROVE_KEYVAL_ITERATE_REMOVE  = 1 << 9  /* tell trove to delete keyvals as it iterates */
 };
 
 enum
@@ -325,6 +327,18 @@ int trove_keyval_write_list(
 			    TROVE_context_id context_id,
 			    TROVE_op_id *out_op_id_p);
 
+int trove_keyval_remove_list(TROVE_coll_id coll_id,
+                             TROVE_handle handle,
+                             TROVE_keyval_s *key_array,
+                             TROVE_keyval_s *val_array,
+                             int *error_array,
+                             int count,
+                             TROVE_ds_flags flags,
+                             TROVE_vtag_s *vtag,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p);
+
 int trove_keyval_flush(TROVE_coll_id coll_id,
                        TROVE_handle handle,
                        TROVE_ds_flags flags,
@@ -350,8 +364,28 @@ int trove_dspace_create(TROVE_coll_id coll_id,
 			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p);
 
+int trove_dspace_create_list(TROVE_coll_id coll_id,
+			TROVE_handle_extent_array *handle_extent_array,
+                        TROVE_handle *out_handle_array,
+                        int count,
+			TROVE_ds_type type,
+			TROVE_keyval_s *hint,
+			TROVE_ds_flags flags,
+			void *user_ptr,
+			TROVE_context_id context_id,
+			TROVE_op_id *out_op_id_p);
+
 int trove_dspace_remove(TROVE_coll_id coll_id,
 			TROVE_handle handle,
+                        TROVE_ds_flags flags,
+			void *user_ptr,
+			TROVE_context_id context_id,
+			TROVE_op_id *out_op_id_p);
+
+int trove_dspace_remove_list(TROVE_coll_id coll_id,
+			TROVE_handle* handle_array,
+                	TROVE_ds_state  *error_array,
+                        int count,
                         TROVE_ds_flags flags,
 			void *user_ptr,
 			TROVE_context_id context_id,

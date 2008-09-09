@@ -40,8 +40,8 @@ fi
 #
 #######################################################################
 #
-PVFS2D=/usr/sbin/pvfs2-server
-PVFS2CHECK=/usr/bin/pvfs2-check-server
+PVFS2D=/usr/local/sbin/pvfs2-server
+PVFS2CHECK=/usr/local/bin/pvfs2-check-server
 
 
 #	End of Configuration options
@@ -129,7 +129,7 @@ start_pvfs2() {
   ulimit -n 100000 && ulimit -c unlimited
 
   # try to create storage space (ok if it fails)
-  $PVFS2D $OCF_RESKEY_fsconfig -f
+  $PVFS2D $OCF_RESKEY_fsconfig -a $OCF_RESKEY_alias -f
 
   # launch daemon
   ocf_run $PVFS2D -p $OCF_RESKEY_pidfile -a $OCF_RESKEY_alias $OCF_RESKEY_fsconfig 
