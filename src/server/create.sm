@@ -15,8 +15,15 @@
 
 %%
 
-nested machine pvfs2_create_work_sm
+machine pvfs2_create_sm
 {
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => create;
+        default => final_response;
+    }
+
     state create
     {
         run create_create;
@@ -26,28 +33,6 @@ nested machine pvfs2_create_work_sm
     state setup_resp
     {
         run create_setup_resp;
-        default => return;
-    }
-}
-
-machine pvfs2_create_sm
-{
-    state prelude
-    {
-        jump pvfs2_prelude_sm;
-        success => setup_op;
-        default => final_response;
-    }
-
-    state setup_op
-    {
-        run create_setup_op;
-        default => do_work;
-    }
-
-    state do_work
-    {
-        jump pvfs2_create_work_sm;
         default => final_response;
     }
 
@@ -90,9 +75,9 @@ static int create_create(
 
     js_p->error_code = 0;
     ret = job_trove_dspace_create(
-        s_op->u.create.fs_id,
-        &s_op->u.create.handle_extent_array,
-        s_op->u.create.object_type,
+        s_op->req->u.create.fs_id,
+        &s_op->req->u.create.handle_extent_array,
+        s_op->req->u.create.object_type,
         NULL,
         TROVE_SYNC ,
         smcb,
@@ -117,7 +102,7 @@ static int create_setup_resp(
 	gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
                      llu(js_p->handle));
 	s_op->resp.u.create.handle = js_p->handle;
-        switch(s_op->u.create.object_type)
+        switch(s_op->req->u.create.object_type)
         {
             case PVFS_TYPE_NONE:
                 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, 
@@ -171,9 +156,16 @@ static int create_setup_resp(
 static int create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    return(server_state_machine_complete(smcb));
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if (! s_op->prelude_mask & PRELUDE_LOCAL_CALL) {
+      return(server_state_machine_complete(smcb));
+      return SM_ACTION_COMPLETE;
+    }
+    return SM_ACTION_TERMINATE;
 }
 
+#if 0
 static PINT_sm_action create_setup_op(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -185,6 +177,7 @@ static PINT_sm_action create_setup_op(
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
+#endif
 
 #if 0
 static PINT_sm_action getattr_get_dirdata_handle(

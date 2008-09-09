@@ -121,7 +121,7 @@ machine pvfs2_create_file_work_sm
 
     state do_dspace_create
     {
-        jump pvfs2_create_work_sm;
+        jump pvfs2_create_sm;
         success => dspace_create_local_cleanup;
         default => cleanup_work;
     }
@@ -186,7 +186,7 @@ machine pvfs2_create_file_work_sm
     /* TODO: Do we need to handle multiple local creates? */
     state do_datafiles_local
     {
-        jump pvfs2_create_work_sm;
+        jump pvfs2_create_sm;
         success => datafiles_local_cleanup;
         default => cleanup_work;
     }
@@ -484,9 +484,7 @@ static PINT_sm_action create_file_parent_getattr_cleanup_and_inspect(
     PINT_dist *current_dist; 
     int ret = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
-    char server_name[1024];
-    struct server_configuration_s *server_config =
-            get_server_config_struct();
+    struct PVFS_server_req *req;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_parent_getattr_cleanup_and_inspect entered\n");
 
@@ -621,64 +619,86 @@ error_code = 0;
             }
         }
 
-        s_op = malloc(sizeof(struct PINT_server_op));
-        if(!s_op)
-        {
-            return -PVFS_ENOMEM;
-        }
-        /* zero out all members */
-        memset(s_op, 0, sizeof(struct PINT_server_op));
-        PINT_sm_push_frame(smcb, 0, s_op);
-
-        /* Determine whether the dspace should be created locally
-         * or remotely and setup up for the appropriate place. */
-        PINT_cached_config_get_server_name(server_name, 1024, 
+#if 0
+        PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, s_op,
             sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first,
-            sm_p->object_ref.fs_id);
+            sm_p->object_ref.fs_id, js_p->error_code, msg_p, req);
 
-        if (! strcmp(server_config->host_id, server_name)) {
-            /* Set up the frame for the nested create state machine */
-            gossip_debug(GOSSIP_SERVER_DEBUG, "create metadata file locally\n");
-            js_p->error_code = LOCAL_OPERATION;
-            /* sm_p->u.create_file.location_flag |= METADATA_LOCAL; */
+        PINT_SERVREQ_CREATE_FILL(
+            *req,
+            *sm_p->cred_p,
+            sm_p->object_ref.fs_id,
+            PVFS_TYPE_METAFILE,
+            sm_p->u.create_file.meta_handle_extent_array);
+#endif
 
-            s_op->op = PVFS_SERV_CREATE;
-            s_op->u.create.fs_id = sm_p->object_ref.fs_id;
-            s_op->u.create.handle_extent_array.extent_count =
-                sm_p->u.create_file.meta_handle_extent_array.extent_count;
-            s_op->u.create.handle_extent_array.extent_array =
-                sm_p->u.create_file.meta_handle_extent_array.extent_array;
-            s_op->u.create.object_type = PVFS_TYPE_METAFILE;
-        }
-        else {
-            /* Prepare to send a message for remote execution. */
-            gossip_debug(GOSSIP_SERVER_DEBUG, "create metadata file remotely\n");
-            js_p->error_code = REMOTE_OPERATION;
-            /* sm_p->u.create_file.location_flag |= METADATA_REMOTE; */
+        do {
+           char server_name[1024];
+           struct server_configuration_s *server_config = get_server_config_struct();
 
-            PINT_init_msgpair(s_op, msg_p);
+           s_op = malloc(sizeof(struct PINT_server_op));
+           if(!s_op) { return -(8|(1 << 30)); }
+           memset(s_op, 0, sizeof(struct PINT_server_op));
+           s_op->req = &s_op->decoded.stub_dec.req;
+           PINT_sm_push_frame(smcb, 0, s_op);
+           if (js_p->error_code != LOCAL_OPERATION) {
+              PINT_cached_config_get_server_name(server_name, 1024,
+                  sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first,
+                  sm_p->object_ref.fs_id);
+           }
+           if (js_p->error_code == LOCAL_OPERATION || ! strcmp(server_config->host_id, server_name)) {
+             js_p->error_code = LOCAL_OPERATION;
+             req = s_op->req;
+             s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
+           } else {
+             do {
+               msg_p = &s_op->msgpair;
+               memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+               if (s_op->msgarray && (s_op->msgarray != &(s_op->msgpair))) {
+                 free(s_op->msgarray);
+                 s_op->msgarray = ((void *)0);
+               }
+               s_op->msgarray = msg_p;
+               s_op->msgarray_count = 1;
+             } while(0);
+             js_p->error_code = REMOTE_OPERATION;
+             req = &(msg_p->req);
+           }
+         } while (0);
 
-            PINT_SERVREQ_CREATE_FILL(
-                msg_p->req,
-                *sm_p->cred_p,
-                sm_p->object_ref.fs_id,
-                PVFS_TYPE_METAFILE,
-                sm_p->u.create_file.meta_handle_extent_array);
 
+
+        do {
+          memset(&(*req), 0, sizeof(*req));
+          (*req).op = PVFS_SERV_CREATE;
+          (*req).credentials = (*sm_p->cred_p);
+          (*req).u.create.fs_id = (sm_p->object_ref.fs_id);
+          (*req).u.create.object_type = (PVFS_TYPE_METAFILE);
+          (*req).u.create.handle_extent_array.extent_count =
+               (sm_p->u.create_file.meta_handle_extent_array).extent_count;
+          (*req).u.create.handle_extent_array.extent_array =
+               (sm_p->u.create_file.meta_handle_extent_array).extent_array;
+        } while (0);
+
+
+
+        if (js_p->error_code == REMOTE_OPERATION)
+        {
+//            PINT_init_msgpair(s_op, msg_p);
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first;
             msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
             msg_p->comp_fn = create_create_comp_fn;
             ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first, sm_p->object_ref.fs_id);
+                sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first,
+                sm_p->object_ref.fs_id);
             if (ret)
             {
-                gossip_err("Failed to map meta server address\n");
+                gossip_err("Failed to map address\n");
                 js_p->error_code = 0;
             }
         }
     }
-    
     return(SM_ACTION_COMPLETE);
 }
 
@@ -1019,14 +1039,16 @@ static PINT_sm_action create_file_datafiles_local_setup(
             }
             /* zero out all members */
             memset(s_op, 0, sizeof(struct PINT_server_op));
+            s_op->req = s_op->decoded.buffer;
 
             PINT_sm_push_frame(smcb, 0, s_op);
+            s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
 
             s_op->op = PVFS_SERV_CREATE;
-            s_op->u.create.fs_id = sm_p->object_ref.fs_id;
+            s_op->req->u.create.fs_id = sm_p->object_ref.fs_id;
 
-            s_op->u.create.handle_extent_array = sm_p->u.create_file.io_handle_extent_array[i];
-            s_op->u.create.object_type = PVFS_TYPE_DATAFILE;
+            s_op->req->u.create.handle_extent_array = sm_p->u.create_file.io_handle_extent_array[i];
+            s_op->req->u.create.object_type = PVFS_TYPE_DATAFILE;
         
             s_op->target_fs_id = sm_p->object_ref.fs_id;
             s_op->target_handle = sm_p->object_ref.handle;

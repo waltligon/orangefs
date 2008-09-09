@@ -105,6 +105,10 @@ static PINT_sm_action prelude_req_sched(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
+    if (s_op->prelude_mask & PRELUDE_SCHEDULER_DONE) {
+        return SM_ACTION_COMPLETE;
+    }
+
     gossip_debug(GOSSIP_SERVER_DEBUG,
         "(%p) %s (prelude sm) state: req_sched\n", s_op,
         PINT_map_server_op_to_string(s_op->req->op));
@@ -131,6 +135,10 @@ static PINT_sm_action prelude_getattr_if_needed(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
+
+    if (s_op->prelude_mask & PRELUDE_GETATTR_DONE) {
+        return SM_ACTION_COMPLETE;
+    }
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
@@ -346,6 +354,10 @@ static PINT_sm_action prelude_perm_check(
     /* moved gossip server debug output to end of state, so we can report
      * resulting status value.
      */
+
+    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE) {
+        return SM_ACTION_COMPLETE;
+    }
 
     /*
       first we translate the dspace attributes into a more convenient

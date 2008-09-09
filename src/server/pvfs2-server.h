@@ -210,6 +210,14 @@ typedef enum
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
 } PINT_server_status_flag;
 
+typedef enum
+{
+    PRELUDE_SCHEDULER_DONE     = 0,
+    PRELUDE_GETATTR_DONE       = (1 << 0),
+    PRELUDE_PERM_CHECK_DONE    = (1 << 1),
+    PRELUDE_LOCAL_CALL         = (1 << 2),
+} PINT_prelude_flag;
+
 /* struct PINT_server_lookup_op
  *
  * All the data needed during lookup processing:
@@ -293,14 +301,6 @@ struct PINT_server_mgmt_remove_dirent_op
 struct PINT_server_mgmt_get_dirdata_op
 {
     PVFS_handle dirdata_handle;
-};
-
-struct PINT_server_create_op
-{
-    PVFS_fs_id fs_id;
-    PVFS_handle_extent_array handle_extent_array;
-    PVFS_ds_type object_type;
-    PVFS_handle handle;
 };
 
 struct PINT_server_getconfig_op
@@ -436,6 +436,9 @@ typedef struct PINT_server_op
 
     PVFS_credentials credentials;
 
+    /* information for prelude indicating which operations have already been done */
+    PINT_prelude_flag prelude_mask;
+
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
 
@@ -460,10 +463,47 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
-        struct PINT_server_create_op create;
     } u;
 
 } PINT_server_op;
+
+#define PINT_FILL_MSG_P(__s_op, __msg_p, __req, __fs_id, __handle, __retry_flag, __comp_fn) \
+    __msg_p->fs_id = __fs_id; \
+    __msg_p->handle = __handle; \
+    __msg_p->retry_flag = __retry_flag; \
+    __msg_p->comp_fn = __comp_fn;
+    
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __msg_p, __req) \
+    do { \
+      char server_name[1024]; \
+      struct server_configuration_s *server_config = get_server_config_struct(); \
+      __s_op = malloc(sizeof(struct PINT_server_op)); \
+      if(!__s_op) { return -PVFS_ENOMEM; } \
+      memset(__s_op, 0, sizeof(struct PINT_server_op)); \
+      __s_op->req = __s_op->decoded.buffer; \
+      PINT_sm_push_frame(__smcb, 0, __s_op); \
+      if (__location != LOCAL_OPERATION) { \
+        PINT_cached_config_get_server_name(server_name, 1024, __handle, __fs_id); \
+      } \
+      if (__location == LOCAL_OPERATION || ! strcmp(server_config->host_id, server_name)) { \
+        __location = LOCAL_OPERATION; \
+        __req = __s_op->req; \
+      __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
+      } \
+      else { \
+        PINT_init_msgpair(__s_op, __msg_p); \
+        __location = REMOTE_OPERATION; \
+        __req = &__msg_p->req; \
+      } \
+    } while (0)
+
+#define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __error_code) \
+    do { \
+      int task_id; \
+      PINT_sm_pop_frame(__smcb, &task_id, __error_code, NULL); \
+      free(__s_op); \
+      __s_op = NULL; \
+    } while (0)
 
 /* PINT_ACCESS_DEBUG()
  *
@@ -497,8 +537,8 @@ extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_create_file_work_sm;
 extern struct PINT_state_machine_s pvfs2_server_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
-extern struct PINT_state_machine_s pvfs2_create_work_sm;
 extern struct PINT_state_machine_s pvfs2_crdirent_work_sm;
+extern struct PINT_state_machine_s pvfs2_create_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
