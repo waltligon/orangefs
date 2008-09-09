@@ -160,9 +160,8 @@ static int create_cleanup(
 
     if (! s_op->prelude_mask & PRELUDE_LOCAL_CALL) {
       return(server_state_machine_complete(smcb));
-      return SM_ACTION_TERMINATE;
     }
-    return SM_ACTION_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 #if 0
