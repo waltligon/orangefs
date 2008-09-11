@@ -123,6 +123,7 @@ static int pvfs2_readdir(
     struct dentry *dentry = file->f_dentry;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
+    int buffer_full = 0;
 
     pos = (PVFS_ds_position)file->f_pos;
     /* are we done? */
@@ -291,11 +292,12 @@ static int pvfs2_readdir(
                     /* this means a filldir call failed */
                     file->f_pos = i - 1;
                     gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  Setting f_pos to: %ld\n", (unsigned long) file->f_pos);
+                    buffer_full = 1;
                 }
             }
 
             /* did we hit the end of the directory? */
-            if(rhandle.readdir_response.token == PVFS_READDIR_END)
+            if(rhandle.readdir_response.token == PVFS_READDIR_END && !buffer_full)
             {
                 gossip_debug(GOSSIP_DIR_DEBUG,
                     "End of dir detected; setting f_pos to PVFS_READDIR_END.\n");
