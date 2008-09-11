@@ -509,7 +509,7 @@ int do_list(
 
             print_entry(cur_file, cur_handle, fs_id, opts);
         }
-        token += rd_response.pvfs_dirent_outcount;
+        token = rd_response.token;
 
         if (rd_response.pvfs_dirent_outcount)
         {
