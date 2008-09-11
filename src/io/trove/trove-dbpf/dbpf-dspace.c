@@ -98,8 +98,6 @@ static int dbpf_dspace_create_store_handle(
     struct dbpf_collection* coll_p,
     TROVE_ds_type type,
     TROVE_handle new_handle);
-static int dbpf_dspace_remove_keyval(
-    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p);
@@ -183,11 +181,8 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
-    TROVE_ds_attributes attr;
     TROVE_handle new_handle = TROVE_HANDLE_NULL;
-    DBT key, data;
     TROVE_extent cur_extent;
-    TROVE_object_ref ref = {TROVE_HANDLE_NULL, op_p->coll_p->coll_id};
     char filename[PATH_MAX + 1];
 
     memset(filename, 0, PATH_MAX + 1);
@@ -628,12 +623,9 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
                     1, PINT_PERF_SUB);
 
     return DBPF_OP_COMPLETE;
-
-return_error:
-    return ret;
 }
 
-static int dbpf_dspace_remove_keyval(
+int PINT_dbpf_dspace_remove_keyval(
     void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val)
 {
     int ret;
@@ -2032,14 +2024,10 @@ static int dbpf_dspace_create_store_handle(
     TROVE_handle new_handle)
 {
     int ret = -TROVE_EINVAL;
-    TROVE_ds_storedattr_s s_attr;
     TROVE_ds_attributes attr;
     DBT key, data;
     TROVE_object_ref ref = {TROVE_HANDLE_NULL, coll_p->coll_id};
     char filename[PATH_MAX + 1] = {0};
-
-    memset(&s_attr, 0, sizeof(TROVE_ds_storedattr_s));
-    s_attr.type = type;
 
     memset(&key, 0, sizeof(key));
     key.data = &new_handle;
@@ -2047,8 +2035,8 @@ static int dbpf_dspace_create_store_handle(
     key.flags = DB_DBT_USERMEM;
 
     memset(&data, 0, sizeof(data));
-    data.data = &s_attr;
-    data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
+    data.data = &attr;
+    data.size = data.ulen = sizeof(TROVE_ds_attributes);
     data.flags |= DB_DBT_USERMEM;
 
     /* check to see if handle is already used */
@@ -2098,8 +2086,8 @@ static int dbpf_dspace_create_store_handle(
     }
 
     memset(&data, 0, sizeof(data));
-    data.data = &s_attr;
-    data.size = sizeof(s_attr);
+    data.data = &attr;
+    data.size = sizeof(attr);
 
     /* create new dataspace entry */
     ret = coll_p->ds_db->put(coll_p->ds_db, NULL, &key, &data, 0);
@@ -2109,8 +2097,6 @@ static int dbpf_dspace_create_store_handle(
         ret = -dbpf_db_error_to_trove_error(ret);
         return(ret);
     }
-
-    trove_ds_stored_to_attr(s_attr, attr, 0);
 
     /* add retrieved ds_attr to dbpf_attr cache here */
     ref.handle = new_handle;

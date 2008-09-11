@@ -68,8 +68,6 @@ typedef pthread_cond_t  gen_cond_t;
 #define gen_cond_signal(c) gen_posix_cond_signal(c)
 #define gen_cond_broadcast(c) gen_posix_cond_broadcast(c)
 
-#endif /* __GEN_POSIX_LOCKING__ */
-
 #elif defined (__GEN_NULL_LOCKING__)
 	/* this stuff messes around just enough to prevent warnings */
 typedef int gen_mutex_t;

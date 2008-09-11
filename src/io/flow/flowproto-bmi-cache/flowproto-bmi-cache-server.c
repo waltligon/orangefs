@@ -312,7 +312,6 @@ int fp_bmi_cache_post(flow_descriptor * flow_d)
 			fprintf(stderr, "TROVE_open_context() failure.\n");
 			return (-1);
 		}
-		fprintf(stderr, "collid:%d, trove_context:%d\n", flow_d->dest.u.trove.coll_id, global_trove_context);
 
 		ret = cache_init(&info);
 		if ( ret < 0 )

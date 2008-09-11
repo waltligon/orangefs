@@ -948,7 +948,7 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     return 0;
 }
 
-int dbpf_bstream_cancel(
+static int dbpf_bstream_cancel(
     TROVE_coll_id coll_id,
     TROVE_op_id cancel_id,
     TROVE_context_id context_id)
