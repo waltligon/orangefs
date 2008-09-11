@@ -585,6 +585,12 @@ static PINT_sm_action create_cleanup(
         /* we only insert a cache entry if the entire create succeeds,
          * set size to 0 
          */ 
+        /* Also, make sure to clear time masks.  The server is responsible
+         * for setting that.
+         */
+        sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_MTIME));
+        sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_CTIME));
+        sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_ATIME));
         ret = PINT_acache_update(metafile_ref,
                                  &sm_p->u.create.attr,
                                  &tmp_size);
