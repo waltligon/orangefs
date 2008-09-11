@@ -340,7 +340,7 @@ static PINT_sm_action getattr_acache_lookup(
         js_p->error_code = GETATTR_ACACHE_MISS;
         return SM_ACTION_COMPLETE;
     }
-  
+
     /* acache hit, check results */
   
     /* The sys attr mask request is converted to object
@@ -404,18 +404,29 @@ static PINT_sm_action getattr_acache_lookup(
      */
     if(missing_attrs == PVFS_ATTR_DATA_SIZE)
     {
-        /* if the file size is requested but the distribution info
-         * isn't and it hasn't been cached, then we need to
-         * get that first.
-         */
-        PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
-            &sm_p->getattr.size_array,
-            sm_p->getattr.attr.u.meta.dfile_count);
+        if(!(sm_p->getattr.attr.mask & PVFS_ATTR_META_UNSTUFFED))
+        {
+            /* We are missing the size, and we don't know for sure if the
+             * file has been unstuffed.  In this case, act as though we
+             * missed on all atributes so that we can get fresh stuffed size
+             * or datafile information as needed.
+             */
+        }
+        else
+        {
+            /* if the file size is requested but the distribution info
+             * isn't and it hasn't been cached, then we need to
+             * get that first.
+             */
+            PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
+                &sm_p->getattr.size_array,
+                sm_p->getattr.attr.u.meta.dfile_count);
 
-        js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit, need sizes"
-                     "[%llu]\n", llu(object_ref.handle));
-        return SM_ACTION_COMPLETE;
+            js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit, need sizes"
+                         "[%llu]\n", llu(object_ref.handle));
+            return SM_ACTION_COMPLETE;
+        }
     }
 
     /* we missed */
