@@ -48,7 +48,7 @@
  */
 #define PVFS2_NAME_LEN                 0x00000100
 /* MAX_DIRENT_COUNT cannot be larger than PVFS_REQ_LIMIT_LISTATTR */
-#define MAX_DIRENT_COUNT               0x00000020
+#define MAX_DIRENT_COUNT               0x00000200
 
 #include "pvfs2.h"
 
