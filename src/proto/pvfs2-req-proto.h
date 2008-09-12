@@ -405,18 +405,21 @@ struct PVFS_servreq_setattr
     PVFS_handle handle;    /* handle of target object */
     PVFS_fs_id fs_id;      /* file system */
     PVFS_object_attr attr; /* new attributes */
+    PVFS_credential credential;
 };
-endecode_fields_4_struct(
+endecode_fields_5_struct(
     PVFS_servreq_setattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
     skip4,,
-    PVFS_object_attr, attr)
+    PVFS_object_attr, attr,
+    PVFS_credential, credential)
 #define extra_size_PVFS_servreq_setattr \
-    extra_size_PVFS_object_attr
+    (extra_size_PVFS_object_attr + extra_size_PVFS_credential)
 
 #define PINT_SERVREQ_SETATTR_FILL(__req,         \
                                   __cap,         \
+                                  __cred,        \
                                   __fsid,        \
                                   __handle,      \
                                   __objtype,     \
@@ -426,6 +429,7 @@ do {                                             \
     memset(&(__req), 0, sizeof(__req));          \
     (__req).op = PVFS_SERV_SETATTR;              \
     (__req).capability = (__cap);                \
+    (__req).u.setattr.credential = (__cred);     \
     (__req).u.setattr.fs_id = (__fsid);          \
     (__req).u.setattr.handle = (__handle);       \
     (__attr).objtype = (__objtype);              \

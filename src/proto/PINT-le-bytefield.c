@@ -143,6 +143,9 @@ static void lebf_initialize(void)
 		break;
 	    case PVFS_SERV_SETATTR:
 		req.u.setattr.attr.mask = 0;
+                req.u.setattr.credential.num_groups = 0;
+                req.u.setattr.credential.issuer_id = "";
+                req.u.setattr.credential.sig_size = 0;
 		reqsize = extra_size_PVFS_servreq_setattr;
 		break;
 	    case PVFS_SERV_CRDIRENT:
@@ -790,6 +793,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		break;
 
 	    case PVFS_SERV_SETATTR:
+                decode_free(req->u.setattr.credential.group_array);
+                decode_free(req->u.setattr.credential.signature);
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
 		    decode_free(req->u.setattr.attr.u.meta.dist);
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)

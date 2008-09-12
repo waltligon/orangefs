@@ -538,6 +538,7 @@ static PINT_sm_action symlink_setattr_setup_msgpair(
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
+        *sm_p->newcred_p,
         sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle,
         PVFS_TYPE_SYMLINK,
