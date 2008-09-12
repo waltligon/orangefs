@@ -2029,6 +2029,11 @@ static int dbpf_dspace_create_store_handle(
     TROVE_object_ref ref = {TROVE_HANDLE_NULL, coll_p->coll_id};
     char filename[PATH_MAX + 1] = {0};
 
+    memset(&attr, 0, sizeof(attr));
+    attr.type = type;
+    attr.fs_id = coll_p->coll_id;
+    attr.handle = new_handle;
+
     memset(&key, 0, sizeof(key));
     key.data = &new_handle;
     key.size = key.ulen = sizeof(new_handle);
