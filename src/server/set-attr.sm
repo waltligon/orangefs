@@ -290,6 +290,10 @@ static PINT_sm_action setattr_setobj_attribs(
       pvfs2-storage.h
     */
     PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
+    
+    /* set the owner to the user calling setattr 
+     * (owner is the only one with permission to do this anyway) */
+    dspace_a_p->owner = s_op->req->u.setattr.credential.userid;
 
     gossip_debug(
         GOSSIP_SETATTR_DEBUG,
