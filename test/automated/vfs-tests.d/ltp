@@ -79,7 +79,7 @@ cd ..
 
 FAILCOUNT=`grep FAIL ltp-pvfs-testcases-$THISDATE.log | wc -l`
 
-if [ "${FAILCOUNT}" != 0 || "${LTPRET}" != 0]
+if [ "${FAILCOUNT}" != 0 -o "${LTPRET}" != 0 ]
 then 
     echo "Error: failed the following LTP test cases:"
     grep FAIL ltp-pvfs-testcases-$THISDATE.log
