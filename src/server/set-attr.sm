@@ -230,6 +230,40 @@ static PINT_sm_action setattr_verify_attribs(
 
         js_p->error_code = -PVFS_EACCES;
     }
+
+    /* verify that the user has permission to change the file's owner */
+    if (req_a_p->mask & PVFS_ATTR_COMMON_UID)
+    {
+        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN) &&
+            (s_op->req->u.setattr.credential.userid != req_a_p->owner))
+        {
+            js_p->error_code = -PVFS_EPERM;
+        }
+    }
+
+    /* verify that the user has permission to change the file's group */
+    if (req_a_p->mask & PVFS_ATTR_COMMON_GID)
+    {
+        PVFS_credential *cred = &s_op->req->u.setattr.credential;
+        int i;
+
+        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN))
+        {
+            for (i = 0; i < cred->num_groups; i++)
+            {
+                if (cred->group_array[i] == req_a_p->group)
+                {
+                    break;
+                }
+            }
+            /* no group matches */
+            if (i >= cred->num_groups)
+            {
+                js_p->error_code = -PVFS_EPERM;
+            }
+        }
+    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -290,10 +324,6 @@ static PINT_sm_action setattr_setobj_attribs(
       pvfs2-storage.h
     */
     PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
-    
-    /* set the owner to the user calling setattr 
-     * (owner is the only one with permission to do this anyway) */
-    dspace_a_p->owner = s_op->req->u.setattr.credential.userid;
 
     gossip_debug(
         GOSSIP_SETATTR_DEBUG,
