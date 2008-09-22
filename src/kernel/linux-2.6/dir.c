@@ -272,6 +272,7 @@ static int pvfs2_readdir(
                         gossip_err("Filldir failed on one of the first two true PVFS directory entries.\n");
                         gossip_err("Duplicate entries may appear.\n");
                     }
+                    buffer_full = 1;
                     ret = 0;
                     break;
                 }
@@ -290,9 +291,9 @@ static int pvfs2_readdir(
                 else 
                 {
                     /* this means a filldir call failed */
-                    file->f_pos = i - 1;
+                    file->f_pos = rhandle.readdir_response.token - 
+                        (rhandle.readdir_response.pvfs_dirent_outcount - i + 1);
                     gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  Setting f_pos to: %ld\n", (unsigned long) file->f_pos);
-                    buffer_full = 1;
                 }
             }
 
