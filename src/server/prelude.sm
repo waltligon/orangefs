@@ -105,7 +105,13 @@ static PINT_sm_action prelude_req_sched(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
+//ret = js_p.error_code = 0;
+//return SM_ACTION_COMPLETE;
     if (s_op->prelude_mask & PRELUDE_SCHEDULER_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
 
@@ -137,6 +143,10 @@ static PINT_sm_action prelude_getattr_if_needed(
     job_id_t tmp_id;
 
     if (s_op->prelude_mask & PRELUDE_GETATTR_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: getattr already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
 
@@ -152,6 +162,9 @@ static PINT_sm_action prelude_getattr_if_needed(
      */
     if (s_op->target_handle == PVFS_HANDLE_NULL)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: target_handle is NULL... skipping getattr.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -355,10 +368,6 @@ static PINT_sm_action prelude_perm_check(
      * resulting status value.
      */
 
-    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE) {
-        return SM_ACTION_COMPLETE;
-    }
-
     /*
       first we translate the dspace attributes into a more convenient
       server use-able format.  i.e. a PVFS_object_attr
@@ -369,6 +378,13 @@ static PINT_sm_action prelude_perm_check(
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
     /* Set the target object attribute pointer.. used later by the acl check */
     s_op->target_object_attr = obj_attr;
+
+    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: perm check already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        return SM_ACTION_COMPLETE;
+    }
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {

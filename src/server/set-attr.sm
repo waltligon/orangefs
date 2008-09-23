@@ -22,8 +22,36 @@ enum
 
 %%
 
+machine pvfs2_set_attr_sm
+{
+    state do_work
+    {
+        jump pvfs2_set_attr_work_sm;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run setattr_cleanup;
+        default => terminate;
+    }
+}
+
 nested machine pvfs2_set_attr_work_sm
 {
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => verify_attribs;
+        default => return;
+    }
+
     state verify_attribs
     {
         run setattr_verify_attribs;
@@ -61,40 +89,6 @@ nested machine pvfs2_set_attr_work_sm
     }
 }
 
-machine pvfs2_set_attr_sm
-{
-    state prelude
-    {
-        jump pvfs2_prelude_sm;
-        success => setup_op;
-        default => final_response;
-    }
-
-    state setup_op
-    {
-        run setattr_setup_op;
-        default => do_work;
-    }
-
-    state do_work
-    {
-        jump pvfs2_set_attr_work_sm;
-        default => final_response;
-    }
-
-    state final_response
-    {
-        jump pvfs2_final_response_sm;
-        default => cleanup;
-    }
-
-    state cleanup
-    {
-        run setattr_cleanup;
-        default => terminate;
-    }
-}
-
 %%
 
 static PINT_sm_action setattr_verify_attribs(
@@ -104,7 +98,7 @@ static PINT_sm_action setattr_verify_attribs(
     PVFS_object_attr *a_p = NULL, *req_a_p = NULL;
 
     a_p = &s_op->attr;
-    req_a_p = &s_op->u.setattr.attr;
+    req_a_p = &s_op->req->u.setattr.attr;
 
     gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from dspace:\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
@@ -127,8 +121,8 @@ static PINT_sm_action setattr_verify_attribs(
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG, "  handle %llu is of type %d "
                      "and cannot be changed to type %d\n",
-                     llu(s_op->u.setattr.handle),
-                     a_p->objtype, s_op->u.setattr.attr.objtype);
+                     llu(s_op->req->u.setattr.handle),
+                     a_p->objtype, s_op->req->u.setattr.attr.objtype);
 
         /* set an error to bail out of set-attr processing */
         js_p->error_code = -PVFS_EACCES;
@@ -150,7 +144,7 @@ static PINT_sm_action setattr_verify_attribs(
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "  handle %llu refers to a metafile\n",
-                     llu(s_op->u.setattr.handle));
+                     llu(s_op->req->u.setattr.handle));
 
         gossip_debug(
             GOSSIP_SETATTR_DEBUG, " *** dspace has dfile count %d and "
@@ -198,21 +192,21 @@ static PINT_sm_action setattr_verify_attribs(
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "  handle %llu refers to a datafile\n",
-                     llu(s_op->u.setattr.handle));
+                     llu(s_op->req->u.setattr.handle));
     }
     else if ((req_a_p->objtype == PVFS_TYPE_DIRECTORY) ||
              (a_p->objtype == PVFS_TYPE_DIRECTORY))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "  handle %llu refers to a directory\n",
-                     llu(s_op->u.setattr.handle));
+                     llu(s_op->req->u.setattr.handle));
     }
     else if ((req_a_p->objtype == PVFS_TYPE_SYMLINK) ||
              (a_p->objtype == PVFS_TYPE_SYMLINK))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "  handle %llu refers to a symlink\n",
-                     llu(s_op->u.setattr.handle));
+                     llu(s_op->req->u.setattr.handle));
 
         if (req_a_p->mask & PVFS_ATTR_SYMLNK_ALL)
         {
@@ -221,7 +215,7 @@ static PINT_sm_action setattr_verify_attribs(
 
             gossip_debug(GOSSIP_SETATTR_DEBUG,
                          " symlink links handle %llu to %s\n",
-                         llu(s_op->u.setattr.handle),
+                         llu(s_op->req->u.setattr.handle),
                          req_a_p->u.sym.target_path);
 
             a_p->u.sym.target_path_len = req_a_p->u.sym.target_path_len;
@@ -234,28 +228,16 @@ static PINT_sm_action setattr_verify_attribs(
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "  handle %llu refers to a dirdata object\n",
-                     llu(s_op->u.setattr.handle));
+                     llu(s_op->req->u.setattr.handle));
     }
     else
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "  handle %llu refers to something unknown\n",
-                     llu(s_op->u.setattr.handle));
+                     llu(s_op->req->u.setattr.handle));
 
         js_p->error_code = -PVFS_EACCES;
     }
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action setattr_setup_op(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    s_op->u.setattr.handle = s_op->req->u.setattr.handle;
-    s_op->u.setattr.fs_id = s_op->req->u.setattr.fs_id;
-    s_op->u.setattr.attr = s_op->req->u.setattr.attr;
-
-    js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
@@ -270,13 +252,13 @@ static PINT_sm_action setattr_setobj_attribs(
     PVFS_ds_attributes *ds_attr = NULL;
 
     dspace_a_p = &s_op->attr;
-    a_p = &s_op->u.setattr.attr;
+    a_p = &s_op->req->u.setattr.attr;
 
     if (a_p->mask & PVFS_ATTR_META_DFILES)
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG, " request has dfile_count of "
                      "%d | dspace has %d\n",
-                     s_op->u.setattr.attr.u.meta.dfile_count,
+                     s_op->req->u.setattr.attr.u.meta.dfile_count,
                      s_op->attr.u.meta.dfile_count);
 
         gossip_debug(GOSSIP_SETATTR_DEBUG, " writing count of %d to "
@@ -333,7 +315,7 @@ static PINT_sm_action setattr_setobj_attribs(
     PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
 
     ret = job_trove_dspace_setattr(
-        s_op->u.setattr.fs_id, s_op->u.setattr.handle,
+        s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         ds_attr, 
         TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context);
@@ -353,11 +335,11 @@ static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
 
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  " request has dfile_count of %d | dspace has %d\n",
-                 s_op->u.setattr.attr.u.meta.dfile_count,
+                 s_op->req->u.setattr.attr.u.meta.dfile_count,
                  s_op->attr.u.meta.dfile_count);
 
     /* verify that the requested dfile count is sane */
-    dfile_count = s_op->u.setattr.attr.u.meta.dfile_count;
+    dfile_count = s_op->req->u.setattr.attr.u.meta.dfile_count;
     if ((dfile_count < 1) || (dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT))
     {
         gossip_err("The requested dfile count of %d is invalid; "
@@ -372,22 +354,22 @@ static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
 
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  "  metafile has %d datafiles associated with it\n",
-                 s_op->u.setattr.attr.u.meta.dfile_count);
+                 s_op->req->u.setattr.attr.u.meta.dfile_count);
 
-    s_op->val.buffer = s_op->u.setattr.attr.u.meta.dfile_array;
+    s_op->val.buffer = s_op->req->u.setattr.attr.u.meta.dfile_array;
     s_op->val.buffer_sz = dfile_count * sizeof(PVFS_handle);
 
     gossip_debug(
         GOSSIP_SETATTR_DEBUG, "  writing %s [%llu,%d,"
         "len %d]\n", (char *)s_op->key.buffer,
-        llu(s_op->u.setattr.handle), s_op->u.setattr.fs_id,
+        llu(s_op->req->u.setattr.handle), s_op->req->u.setattr.fs_id,
         s_op->val.buffer_sz);
 
     /* we don't sync here since we're going to do it anyway in
      * write_metafile_distribution
      */
     ret = job_trove_keyval_write(
-        s_op->u.setattr.fs_id, s_op->u.setattr.handle,
+        s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         0,
         NULL, smcb, 0, js_p, &j_id, server_job_context);
@@ -403,7 +385,7 @@ static PINT_sm_action setattr_write_metafile_distribution_if_required(
     job_id_t j_id;
 
     /* if we don't need to fill in the distribution, skip it */
-    if (!(s_op->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
+    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "skipping distribution write\n");
@@ -417,9 +399,9 @@ static PINT_sm_action setattr_write_metafile_distribution_if_required(
 
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  "  metafile distribution size = %d\n",
-                 (int)s_op->u.setattr.attr.u.meta.dist_size);
+                 (int)s_op->req->u.setattr.attr.u.meta.dist_size);
 
-    s_op->val.buffer_sz = s_op->u.setattr.attr.u.meta.dist_size;
+    s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.meta.dist_size;
 
     s_op->val.buffer = malloc(s_op->val.buffer_sz);
     if(!s_op->val.buffer)
@@ -430,15 +412,15 @@ static PINT_sm_action setattr_write_metafile_distribution_if_required(
     s_op->free_val = 1;
     
     PINT_dist_encode(s_op->val.buffer, 
-                     s_op->u.setattr.attr.u.meta.dist);
+                     s_op->req->u.setattr.attr.u.meta.dist);
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  writing %s [%llu,%d,"
         "len %d]\n", (char *)s_op->key.buffer,
-        llu(s_op->u.setattr.handle), s_op->u.setattr.fs_id,
+        llu(s_op->req->u.setattr.handle), s_op->req->u.setattr.fs_id,
         s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(
-        s_op->u.setattr.fs_id, s_op->u.setattr.handle,
+        s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         TROVE_SYNC,
         NULL, smcb, 0, js_p, &j_id, server_job_context);
@@ -454,7 +436,7 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
     job_id_t j_id;
 
     /* if we don't need to fill in the symlink target, skip it */
-    if (!(s_op->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET))
+    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "skipping symlink target write\n");
@@ -462,8 +444,8 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
         return SM_ACTION_COMPLETE;
     }
 
-    assert(s_op->u.setattr.attr.u.sym.target_path_len > 0);
-    assert(s_op->u.setattr.attr.u.sym.target_path);
+    assert(s_op->req->u.setattr.attr.u.sym.target_path_len > 0);
+    assert(s_op->req->u.setattr.attr.u.sym.target_path);
 
     /* set up key and value structure for keyval write */
     s_op->key.buffer = Trove_Common_Keys[SYMLINK_TARGET_KEY].key;
@@ -471,19 +453,19 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
 
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  "  symlink target_path_len = %d\n",
-                 s_op->u.setattr.attr.u.sym.target_path_len);
+                 s_op->req->u.setattr.attr.u.sym.target_path_len);
 
-    s_op->val.buffer = s_op->u.setattr.attr.u.sym.target_path;
-    s_op->val.buffer_sz = s_op->u.setattr.attr.u.sym.target_path_len;
+    s_op->val.buffer = s_op->req->u.setattr.attr.u.sym.target_path;
+    s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.sym.target_path_len;
 
     gossip_debug(GOSSIP_SETATTR_DEBUG, "  writing %s [%llu,%d,"
                  "len %d]\n", (char *)s_op->key.buffer,
-                 llu(s_op->u.setattr.handle),
-                 s_op->u.setattr.fs_id,
+                 llu(s_op->req->u.setattr.handle),
+                 s_op->req->u.setattr.fs_id,
                  s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(
-        s_op->u.setattr.fs_id, s_op->u.setattr.handle,
+        s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         TROVE_SYNC,
         NULL, smcb, 0, js_p, &j_id, server_job_context);

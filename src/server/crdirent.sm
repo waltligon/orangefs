@@ -22,8 +22,36 @@ enum
 
 %%
 
+machine pvfs2_crdirent_sm
+{
+    state do_work
+    {
+        jump pvfs2_crdirent_work_sm;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run crdirent_cleanup;
+        default => terminate;
+    }
+}
+
 nested machine pvfs2_crdirent_work_sm
 {
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => validate;
+        default => final_response;
+    }
+
     state validate
     {
         run crdirent_validate;
@@ -66,40 +94,6 @@ nested machine pvfs2_crdirent_work_sm
     }
 }
 
-machine pvfs2_crdirent_sm
-{
-    state prelude
-    {
-        jump pvfs2_prelude_sm;
-        success => setup_op;
-        default => final_response;
-    }
-
-    state setup_op
-    {
-        run crdirent_setup_op;
-        default => do_work;
-    }
-
-    state do_work
-    {
-        jump pvfs2_crdirent_work_sm;
-        default => final_response;
-    }
-
-    state final_response
-    {
-        jump pvfs2_final_response_sm;
-        default => cleanup;
-    }
-
-    state cleanup
-    {
-        run crdirent_cleanup;
-        default => terminate;
-    }
-}
-
 %%
 
 /*
@@ -113,8 +107,8 @@ static PINT_sm_action crdirent_validate(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
 
-    if ((s_op->u.crdirent.name == NULL) ||
-        (s_op->u.crdirent.parent_handle == PVFS_HANDLE_NULL))
+    if ((s_op->req->u.crdirent.name == NULL) ||
+        (s_op->req->u.crdirent.handle == PVFS_HANDLE_NULL))
     {
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
@@ -122,12 +116,12 @@ static PINT_sm_action crdirent_validate(
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "  got crdirent for %s (with handle %llu) in %llu\n",
-            s_op->u.crdirent.name,
-            llu(s_op->u.crdirent.new_handle),
-            llu(s_op->u.crdirent.parent_handle));
+            s_op->req->u.crdirent.name,
+            llu(s_op->req->u.crdirent.new_handle),
+            llu(s_op->req->u.crdirent.handle));
 
     /* check for invalid characters in name */
-    ptr = s_op->u.crdirent.name;
+    ptr = s_op->req->u.crdirent.name;
     while (*ptr != '\0' && *ptr != '/' ) ptr++;
 
     if (*ptr != '\0')
@@ -135,7 +129,7 @@ static PINT_sm_action crdirent_validate(
         /* found an invalid character -- report it and send error response */
         gossip_lerr("crdirent: error: invalid character (%s)"
                 "in name (%s); sending error response.\n",
-                ptr, s_op->u.crdirent.name);
+                ptr, s_op->req->u.crdirent.name);
         /* for parity with linux VFS, allow any character except / in 
          * filenames.   */
         
@@ -167,7 +161,7 @@ static PINT_sm_action crdirent_validate(
  * Params:   server_op *s_op, 
  *           job_status_s *js_p
  *
- * Pre:      s_op->u.crdirent.parent_handle is handle of directory
+ * Pre:      s_op->req->u.crdirent.handle is handle of directory
  *
  * Post:     s_op->val.buffer is the directory entry k/v space OR NULL
  *           if first entry
@@ -201,8 +195,8 @@ static PINT_sm_action crdirent_read_directory_entry_handle(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     ret = job_trove_keyval_read(
-        s_op->u.crdirent.fs_id,
-        s_op->u.crdirent.parent_handle,
+        s_op->req->u.crdirent.fs_id,
+        s_op->req->u.crdirent.handle,
         &s_op->key,
         &s_op->val,
         0,
@@ -233,8 +227,8 @@ static PINT_sm_action validation_object_type_failure(
  *           job_status_s *js_p
  *
  * Pre:      s_op->u.crdirent.dirent_handle is the directory entry k/v space
- *           s_op->u.crdirent.name != NULL
- *           s_op->u.crdirent.new_handle != NULL
+ *           s_op->u.req->crdirent.name != NULL
+ *           s_op->u.req->crdirent.new_handle != NULL
  *
  * Post:     key/val pair stored
  *
@@ -261,15 +255,15 @@ static PINT_sm_action crdirent_write_directory_entry(
      */
 
     /* this is the name for the parent entry */
-    s_op->key.buffer = s_op->u.crdirent.name;
-    s_op->key.buffer_sz = strlen(s_op->u.crdirent.name) + 1;
+    s_op->key.buffer = s_op->req->u.crdirent.name;
+    s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
 
-    s_op->val.buffer = &s_op->u.crdirent.new_handle;
+    s_op->val.buffer = &s_op->req->u.crdirent.new_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
                  "for %s (handle = %llu) to dirdata dspace %llu\n",
-                 s_op->u.crdirent.name, llu(s_op->u.crdirent.new_handle),
+                 s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle),
                  llu(s_op->u.crdirent.dirent_handle));
 
     keyval_flags = TROVE_SYNC;
@@ -285,7 +279,7 @@ static PINT_sm_action crdirent_write_directory_entry(
     keyval_flags |= TROVE_KEYVAL_HANDLE_COUNT;
 
     ret = job_trove_keyval_write(
-        s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
+        s_op->req->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
         &s_op->key, &s_op->val, 
         keyval_flags,
         NULL, smcb, 0, js_p, &i, server_job_context);
@@ -335,7 +329,7 @@ static PINT_sm_action crdirent_update_directory_attr(
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
     ret = job_trove_dspace_setattr(
-        s_op->u.crdirent.fs_id, s_op->u.crdirent.parent_handle,
+        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.handle,
         ds_attr, 
         TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context);
@@ -347,29 +341,6 @@ static PINT_sm_action crdirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     return(server_state_machine_complete(smcb));
-}
-
-/* crdirent_setup_op()
- *
- * prepare some state machine fields for later processing; mainly just
- * storing request structure fields in state machine so that nested
- * machines are not dependent on request type
- */
-static PINT_sm_action crdirent_setup_op(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %llu\n",
-        s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
-
-    s_op->u.crdirent.name = s_op->req->u.crdirent.name;
-    s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
-    s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
-    s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
-    s_op->u.crdirent.dir_attr_update_required = 0;
-
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
 }
 
 PINT_GET_OBJECT_REF_DEFINE(crdirent);

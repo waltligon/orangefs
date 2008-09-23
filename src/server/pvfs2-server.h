@@ -212,10 +212,10 @@ typedef enum
 
 typedef enum
 {
-    PRELUDE_SCHEDULER_DONE     = 0,
-    PRELUDE_GETATTR_DONE       = (1 << 0),
-    PRELUDE_PERM_CHECK_DONE    = (1 << 1),
-    PRELUDE_LOCAL_CALL         = (1 << 2),
+    PRELUDE_SCHEDULER_DONE     = (1 << 0),
+    PRELUDE_GETATTR_DONE       = (1 << 1),
+    PRELUDE_PERM_CHECK_DONE    = (1 << 2),
+    PRELUDE_LOCAL_CALL         = (1 << 3),
 } PINT_prelude_flag;
 
 /* struct PINT_server_lookup_op
@@ -480,7 +480,7 @@ typedef struct PINT_server_op
       __s_op = malloc(sizeof(struct PINT_server_op)); \
       if(!__s_op) { return -PVFS_ENOMEM; } \
       memset(__s_op, 0, sizeof(struct PINT_server_op)); \
-      __s_op->req = __s_op->decoded.buffer; \
+      __s_op->req = &__s_op->decoded.stub_dec.req; \
       PINT_sm_push_frame(__smcb, 0, __s_op); \
       if (__location != LOCAL_OPERATION) { \
         PINT_cached_config_get_server_name(server_name, 1024, __handle, __fs_id); \
@@ -496,6 +496,10 @@ typedef struct PINT_server_op
         __req = &__msg_p->req; \
       } \
     } while (0)
+
+#if 0
+      __s_op->prelude_mask = PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
+#endif
 
 #define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __error_code) \
     do { \
@@ -539,6 +543,7 @@ extern struct PINT_state_machine_s pvfs2_server_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_crdirent_work_sm;
 extern struct PINT_state_machine_s pvfs2_create_sm;
+extern struct PINT_state_machine_s pvfs2_create_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
