@@ -674,7 +674,7 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
     ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
     if(ret != 0)
     {
-        return ret;
+        goto done;
     }
 
     ret = dbpf_bstream_get_extents(
@@ -688,7 +688,7 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
         NULL);
     if(ret != 0)
     {
-        return ret;
+        goto done;
     }
 
     stream_extents = malloc(sizeof(*stream_extents) * extent_count);
@@ -709,7 +709,7 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
     if(ret != 0)
     {
         free(stream_extents);
-        return ret;
+        goto done;
     }
 
     for(i = 0; i < extent_count; ++ i)
@@ -723,10 +723,16 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
         if(ret < 0)
         {
             free(stream_extents);
-            return -trove_errno_to_trove_error(-ret);
+            ret = -trove_errno_to_trove_error(-ret);
+            goto done;
         }
     }
-    return DBPF_OP_COMPLETE;
+
+    ret = DBPF_OP_COMPLETE;
+
+done:
+    dbpf_open_cache_put(&rw_op->open_ref);
+    return ret;
 }
 
 static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
@@ -758,13 +764,14 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
         NULL);
     if(ret != 0)
     {
-        return ret;
+        goto cache_put;
     }
 
     stream_extents = malloc(sizeof(*stream_extents) * extent_count);
     if(!stream_extents)
     {
-        return -TROVE_ENOMEM;
+        ret = -TROVE_ENOMEM;
+        goto cache_put;
     }
 
     ret = dbpf_bstream_get_extents(
@@ -779,13 +786,13 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
     if(ret != 0)
     {
         free(stream_extents);
-        return ret;
+        goto cache_put;
     }
 
     ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
     if(ret != 0)
     {
-        return ret;
+        goto cache_put;
     }
 
     *rw_op->out_size_p = 0;
@@ -799,7 +806,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
                                   attr.u.datafile.b_size);
         if(ret < 0)
         {
-            return ret;
+            goto cache_put;
         }
 
         if(eor < stream_extents[i].offset + stream_extents[i].size)
@@ -819,7 +826,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
         if(ret != 0)
         {
             gen_mutex_unlock(&dbpf_update_size_lock);
-            return ret;
+            goto cache_put;
         }
 
         if(eor > attr.u.datafile.b_size)
@@ -830,7 +837,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
             if(ret != 0)
             {
                 gen_mutex_unlock(&dbpf_update_size_lock);
-                return ret;
+                goto cache_put;
             }
             sync_required = 1;
         }
@@ -838,6 +845,8 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
 
         if(sync_required == 1)
         {
+            dbpf_open_cache_put(&rw_op->open_ref);
+
             /* We want to hit the coalesce path, so we queue up the setattr */
             dbpf_queued_op_init(qop_p,
                                 DSPACE_SETATTR,
@@ -848,11 +857,21 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
                                 TROVE_SYNC,
                                 qop_p->op.context_id);
             ret = dbpf_sync_coalesce(qop_p, 0, &outcount);
+            if(ret < 0)
+            {
+                goto done;
+            }
+
             return PINT_MGMT_OP_CONTINUE;
         }
     }
 
-    return PINT_MGMT_OP_COMPLETED;
+    ret = PINT_MGMT_OP_COMPLETED;
+
+cache_put:
+    dbpf_open_cache_put(&rw_op->open_ref);
+done:
+    return ret;
 }
 
 static int dbpf_bstream_direct_read_at(TROVE_coll_id coll_id,
@@ -1055,13 +1074,14 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
     ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
     if(ret != 0)
     {
-        return ret;
+        goto done;
     }
 
     ret = ftruncate(op_p->u.b_resize.open_ref.fd, op_p->u.b_resize.size);
     if(ret == -1)
     {
-        return -trove_errno_to_trove_error(errno);
+        ret = -trove_errno_to_trove_error(errno);
+        goto done;
     }
 
     attr.u.datafile.b_size = op_p->u.b_resize.size;
@@ -1078,14 +1098,19 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
     if(!op_p->u.d_setattr.attr_p)
     {
         dbpf_queued_op_free(q_op_p);
-        return -TROVE_ENOMEM;
+        ret = -TROVE_ENOMEM;
+        goto done;
     }
     *op_p->u.d_setattr.attr_p = attr;
 
     /* we don't have to add the op back to the queue, the dbpf_thread does
      * that for us when we return 0 instead of 1
      */
-    return DBPF_OP_CONTINUE;
+    ret = DBPF_OP_CONTINUE;
+
+done:
+    dbpf_open_cache_put(&op_p->u.b_resize.open_ref);
+    return ret;
 }
 
 static int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
