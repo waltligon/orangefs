@@ -115,15 +115,6 @@ typedef unsigned long sector_t;
 #include <linux/exportfs.h>
 #endif
 
-/* taken from include/linux/fs.h from 2.4.19 or later kernels */
-#ifndef MAX_LFS_FILESIZE
-#if BITS_PER_LONG == 32
-#define MAX_LFS_FILESIZE     (((u64)PAGE_CACHE_SIZE << (BITS_PER_LONG))-1)
-#elif BITS_PER_LONG == 64
-#define MAX_LFS_FILESIZE     0x7fffffffffffffff
-#endif
-#endif /* MAX_LFS_FILESIZE */
-
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-types.h"
