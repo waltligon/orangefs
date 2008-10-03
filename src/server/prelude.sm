@@ -105,8 +105,6 @@ static PINT_sm_action prelude_req_sched(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
-//ret = js_p.error_code = 0;
-//return SM_ACTION_COMPLETE;
     if (s_op->prelude_mask & PRELUDE_SCHEDULER_DONE) {
         gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: req_sched already done... skipping.\n", s_op,
