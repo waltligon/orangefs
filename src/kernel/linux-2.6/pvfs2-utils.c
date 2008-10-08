@@ -2073,10 +2073,20 @@ int pvfs2_normalize_to_errno(PVFS_error error_code)
     /* convert any error codes that are in pvfs2 format */
     if(IS_PVFS_NON_ERRNO_ERROR(-error_code))
     {
-        /* assume a default error code */
-        gossip_err("pvfs2: warning: "
-            "got error code without errno equivalent: %d.\n", error_code);
-        error_code = -EINVAL;
+        if(PVFS_NON_ERRNO_ERROR_CODE(-error_code) == PVFS_ECANCEL)
+        {
+            /* cancellation error codes generally correspond to a timeout
+             * from the client's perspective
+             */
+            error_code = -ETIMEDOUT;
+        }
+        else
+        {
+            /* assume a default error code */
+            gossip_err("pvfs2: warning: "
+                "got error code without errno equivalent: %d.\n", error_code);
+            error_code = -EINVAL;
+        }
     }
     else if(IS_PVFS_ERROR(-error_code))
     {
