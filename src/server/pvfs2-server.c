@@ -683,6 +683,12 @@ static int server_initialize_subsystems(
         bmi_flags |= BMI_TCP_BIND_SPECIFIC;
     }
 
+    /* Have bmi automatically increment reference count on addresses any
+     * time a new unexpected message appears.  The server will decrement it
+     * once it has completed processing related to that request.
+     */
+    bmi_flags |= BMI_AUTO_REF_COUNT;
+
     ret = BMI_initialize(server_config.bmi_modules, 
                          server_config.host_id,
                          bmi_flags);

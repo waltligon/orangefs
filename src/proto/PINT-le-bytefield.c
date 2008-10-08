@@ -322,6 +322,8 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
            BMI_memalloc(target_msg->dest, maxsize, BMI_SEND));
     if (!buf)
     {
+        gossip_err("Error: failed to BMI_malloc memory for response.\n");
+        gossip_err("Error: is BMI address %llu still valid?\n", llu(target_msg->dest));
 	ret = -PVFS_ENOMEM;
 	goto out;
     }
