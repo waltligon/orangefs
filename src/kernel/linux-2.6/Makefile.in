@@ -94,7 +94,7 @@ KDIR    := @LINUX_KERNEL_SRC@
 PWD	:= $(shell pwd)
 
 default: links
-	$(E)$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
+	$(E)$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules Q=@
 
 # link to real source directory if out-of-tree build
 links:
