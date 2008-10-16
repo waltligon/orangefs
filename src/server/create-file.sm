@@ -174,6 +174,7 @@ machine pvfs2_create_file_work_sm
     {
         run create_file_datafiles_local_setup;
         LOCAL_OPERATION => do_datafiles_local;
+/* Need to pop the stack! */
         default => setattr_setup;
     }
 
@@ -407,56 +408,7 @@ static PINT_sm_action create_file_init(
     js_p->error_code = 0;
     return (SM_ACTION_COMPLETE);
 
-#if 0
-    /* Prepare to retrieve the parent's attributes. */
-    s_op = malloc(sizeof(struct PINT_server_op));
-    if(!s_op)
-    {
-        return -PVFS_ENOMEM;
-    }
-    /* zero out all members */
-    memset(s_op, 0, sizeof(struct PINT_server_op));
-
-    s_op->op = PVFS_SERV_GETATTR;
-    s_op->u.getattr.handle = sm_p->parent_ref.handle;
-    s_op->u.getattr.fs_id = sm_p->parent_ref.fs_id;
-    s_op->u.getattr.attrmask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
-
-    s_op->attr.mask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT;
-    s_op->attr.objtype = PVFS_TYPE_DIRECTORY;
-
-    PINT_sm_push_frame(smcb, 0, s_op);
-
-    /* TODO: Use a centralized method of obtaining ds_attr
-             that can be called from other places as well.  */
-    memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
-    ret = job_trove_dspace_getattr(
-        sm_p->parent_ref.fs_id, sm_p->parent_ref.handle, smcb, &(s_op->ds_attr),
-        0, js_p, &tmp_id, server_job_context);
- 
-    return ret;
-#endif
 }
-
-#if 0
-static PINT_sm_action create_file_init2(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_PREVIOUS);
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *obj_attr = NULL;
-    PVFS_ds_attributes *ds_attr = NULL;
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_init2 entered\n");
-    gossip_debug(GOSSIP_SERVER_DEBUG, "num_data_files = %d\n", sm_p->u.create_file.num_data_files);
-    ds_attr = &s_op->ds_attr;
-    obj_attr = &s_op->attr;
-    PVFS_ds_attr_to_object_attr(ds_attr, obj_attr);
-    s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
-
-    return SM_ACTION_COMPLETE;
-}
-#endif
 
 static int create_create_comp_fn(void *v_p,
                                  struct PVFS_server_resp *resp_p,
@@ -641,57 +593,6 @@ error_code = 0;
             sm_p->object_ref.fs_id,
             PVFS_TYPE_METAFILE,
             sm_p->u.create_file.meta_handle_extent_array);
-
-#if 0
-        do {
-           char server_name[1024];
-           struct server_configuration_s *server_config = get_server_config_struct();
-
-           s_op = malloc(sizeof(struct PINT_server_op));
-           if(!s_op) { return -(8|(1 << 30)); }
-           memset(s_op, 0, sizeof(struct PINT_server_op));
-           s_op->req = &s_op->decoded.stub_dec.req;
-           PINT_sm_push_frame(smcb, 0, s_op);
-           if (js_p->error_code != LOCAL_OPERATION) {
-              PINT_cached_config_get_server_name(server_name, 1024,
-                  sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first,
-                  sm_p->object_ref.fs_id);
-           }
-           if (js_p->error_code == LOCAL_OPERATION || ! strcmp(server_config->host_id, server_name)) {
-             js_p->error_code = LOCAL_OPERATION;
-             req = s_op->req;
-             s_op->prelude_mask = PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
-//             s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
-           } else {
-             do {
-               msg_p = &s_op->msgpair;
-               memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
-               if (s_op->msgarray && (s_op->msgarray != &(s_op->msgpair))) {
-                 free(s_op->msgarray);
-                 s_op->msgarray = ((void *)0);
-               }
-               s_op->msgarray = msg_p;
-               s_op->msgarray_count = 1;
-             } while(0);
-             js_p->error_code = REMOTE_OPERATION;
-             req = &(msg_p->req);
-           }
-         } while (0);
-
-        do {
-          memset(&(*req), 0, sizeof(*req));
-          (*req).op = PVFS_SERV_CREATE;
-          (*req).credentials = (*sm_p->cred_p);
-          (*req).u.create.fs_id = (sm_p->object_ref.fs_id);
-          (*req).u.create.object_type = (PVFS_TYPE_METAFILE);
-          (*req).u.create.handle_extent_array.extent_count =
-               (sm_p->u.create_file.meta_handle_extent_array).extent_count;
-          (*req).u.create.handle_extent_array.extent_array =
-               (sm_p->u.create_file.meta_handle_extent_array).extent_array;
-        } while (0);
-
-
-#endif
 
         if (js_p->error_code == REMOTE_OPERATION)
         {
@@ -1007,8 +908,6 @@ static PINT_sm_action create_file_datafiles_local_setup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *s_op;
-    job_id_t tmp_id;
-    int ret = -PVFS_EINVAL;
     int i;
     struct server_configuration_s *server_config = get_server_config_struct();
     char server_name[1024];
@@ -1056,7 +955,7 @@ static PINT_sm_action create_file_datafiles_local_setup(
 //            s_op->prelude_mask = PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
             s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
 
-            s_op->op = PVFS_SERV_CREATE;
+            s_op->req->op = s_op->op = PVFS_SERV_CREATE;
             s_op->req->u.create.fs_id = sm_p->object_ref.fs_id;
 
             s_op->req->u.create.handle_extent_array = sm_p->u.create_file.io_handle_extent_array[i];
@@ -1067,6 +966,7 @@ static PINT_sm_action create_file_datafiles_local_setup(
             s_op->credentials.uid = sm_p->cred_p->uid;
             s_op->credentials.gid = sm_p->cred_p->gid;
         
+#if 0
             /* TODO: Use a centralized method of obtaining ds_attr
                      that can be called from other places as well.  */
             memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
@@ -1074,6 +974,7 @@ static PINT_sm_action create_file_datafiles_local_setup(
                 sm_p->object_ref.fs_id, sm_p->object_ref.handle, smcb, &(s_op->ds_attr),
                 0, js_p, &tmp_id, server_job_context);
             return ret;
+#endif
         }
     }
     return SM_ACTION_COMPLETE;
@@ -1191,99 +1092,6 @@ static PINT_sm_action create_file_setattr_setup(
             js_p->error_code = ret;
         }
     }
-#if 0
-    s_op = malloc(sizeof(struct PINT_server_op));
-        
-    if(!s_op)
-    {
-        return -PVFS_ENOMEM;
-    }
-    /* zero out all members */
-    memset(s_op, 0, sizeof(struct PINT_server_op));
-
-    PINT_sm_push_frame(smcb, 0, s_op);
-
-    /* Determine whether setattr is local or remote
-       and set up for the appropriate one.  */
-    PINT_cached_config_get_server_name(server_name, 1024,
-        sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first, sm_p->object_ref.fs_id);
-
-    if (! strcmp(server_config->host_id, server_name)) {
-        /* Set up the frame for the nested create state machine */
-        gossip_debug(GOSSIP_SERVER_DEBUG, "create_file: performing setattr locally\n");
-        s_op->op = PVFS_SERV_SETATTR;
-        s_op->credentials.uid = sm_p->cred_p->uid;
-        s_op->credentials.gid = sm_p->cred_p->gid;
-        s_op->u.setattr.handle = sm_p->u.create_file.metafile_handle;
-        s_op->u.setattr.fs_id = sm_p->parent_ref.fs_id;
-        memcpy(&s_op->u.setattr.attr, &sm_p->u.create_file.attr, sizeof(PVFS_object_attr));
-        s_op->u.setattr.attr.objtype = PVFS_TYPE_METAFILE;
-        s_op->u.setattr.attr.mask = PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL;
-//        PINT_copy_object_attr(&s_op->u.setattr.attr, &sm_p->u.create_file.attr);
-        s_op->u.setattr.attr.u.meta.dfile_array =
-            sm_p->u.create_file.datafile_handles;
-        s_op->u.setattr.attr.u.meta.dfile_count =
-            sm_p->u.create_file.num_data_files;
-        s_op->u.setattr.attr.u.meta.dist =
-            sm_p->u.create_file.dist;
-        s_op->u.setattr.attr.u.meta.dist_size =
-            PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
-/*        s_op->attr = s_op->u.setattr.attr; */
-
-        /* TODO: Use a centralized method of obtaining ds_attr
-                 that can be called from other places as well.  */
-        memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
-        ret = job_trove_dspace_getattr(
-            sm_p->parent_ref.fs_id, sm_p->u.create_file.metafile_handle, smcb, &(s_op->ds_attr),
-            0, js_p, &tmp_id, server_job_context);
-
-        js_p->error_code = LOCAL_OPERATION;
-        return (ret);
-    }
-    else /* remote metadata */
-    {
-        PINT_sm_msgpair_state *msg_p;
-
-        gossip_debug(GOSSIP_SERVER_DEBUG," create_file: posting setattr req\n");
-
-        PINT_init_msgpair(s_op, msg_p);
-
-        PINT_SERVREQ_SETATTR_FILL(
-            msg_p->req,
-            *sm_p->cred_p,
-            sm_p->object_ref.fs_id,
-            sm_p->u.create_file.metafile_handle,
-            PVFS_TYPE_METAFILE,
-            sm_p->u.create_file.sys_attr,
-            PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL);
-
-        msg_p->req.u.setattr.attr.u.meta.dfile_array =
-            sm_p->u.create_file.datafile_handles;
-        msg_p->req.u.setattr.attr.u.meta.dfile_count =
-            sm_p->u.create_file.num_data_files;
-        msg_p->req.u.setattr.attr.u.meta.dist =
-            sm_p->u.create_file.dist;
-        msg_p->req.u.setattr.attr.u.meta.dist_size =
-            PINT_DIST_PACK_SIZE(sm_p->u.create_file.dist);
-
-        msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = sm_p->u.create_file.metafile_handle;
-        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-        msg_p->comp_fn = create_setattr_comp_fn;
-
-        ret = PINT_cached_config_map_to_server(&msg_p->svr_addr, 
-            sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first, sm_p->object_ref.fs_id);
-
-        if (ret)
-        {
-            gossip_err("Failed to map meta server address\n");
-            js_p->error_code = ret;
-        }
-        js_p->error_code = REMOTE_OPERATION;
-        return SM_ACTION_COMPLETE;
-    }
-#endif
- 
     return SM_ACTION_COMPLETE;
 }
 
@@ -1331,31 +1139,6 @@ static PINT_sm_action create_file_crdirent_setup(
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
-#if 0
-    if(!s_op)
-    {
-        return -PVFS_ENOMEM;
-    }
-    /* zero out all members */
-    memset(s_op, 0, sizeof(struct PINT_server_op));
-//    s_op->prelude_mask = PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
-    s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
-    PINT_sm_push_frame(smcb, 0, s_op);
-
-    s_op->op = PVFS_SERV_CRDIRENT;
-    s_op->credentials.uid = sm_p->cred_p->uid;
-    s_op->credentials.gid = sm_p->cred_p->gid;
-    memcpy(&s_op->attr, &sm_p->u.create_file.attr, sizeof(PVFS_object_attr));
-    s_op->u.crdirent.name = sm_p->u.create_file.object_name;
-    s_op->u.crdirent.new_handle = sm_p->u.create_file.metafile_handle;
-    s_op->u.crdirent.parent_handle = sm_p->parent_ref.handle;
-    s_op->u.crdirent.fs_id = sm_p->object_ref.fs_id;
-
-    memcpy(&s_op->attr, &sm_p->u.create_file.saved_parent_attr, sizeof(PVFS_object_attr));
-    s_op->u.crdirent.dir_attr_update_required = 0;
-
-    return SM_ACTION_COMPLETE;
-#endif
 }
 
 static PINT_sm_action create_file_crdirent_cleanup(
