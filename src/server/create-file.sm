@@ -911,7 +911,9 @@ static PINT_sm_action create_file_datafiles_local_setup(
     int i;
     struct server_configuration_s *server_config = get_server_config_struct();
     char server_name[1024];
-    
+    PINT_sm_msgpair_state *msg_p = NULL;
+    struct PVFS_server_req *req;
+
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_datafiles_local_setup entered\n");
 
     /* allocate memory for the data handles if we haven't already */
@@ -939,42 +941,15 @@ static PINT_sm_action create_file_datafiles_local_setup(
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, "creating data file locally\n");
             js_p->error_code = LOCAL_OPERATION;
+            PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, s_op,
+                sm_p->u.create_file.io_handle_extent_array[i].extent_array[0].first,
+                sm_p->parent_ref.fs_id, js_p->error_code, msg_p, req);
+            PINT_SERVREQ_CREATE_FILL(*req,
+                                     *sm_p->cred_p,
+                                     sm_p->parent_ref.fs_id,
+                                     PVFS_TYPE_DATAFILE,
+                                     sm_p->u.create_file.io_handle_extent_array[i]);
 
-            /* Set up the frame for local creates */
-            s_op = malloc(sizeof(struct PINT_server_op));
-        
-            if(!s_op)
-            {
-                return -PVFS_ENOMEM;
-            }
-            /* zero out all members */
-            memset(s_op, 0, sizeof(struct PINT_server_op));
-            s_op->req = &s_op->decoded.stub_dec.req;
-
-            PINT_sm_push_frame(smcb, 0, s_op);
-//            s_op->prelude_mask = PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
-            s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
-
-            s_op->req->op = s_op->op = PVFS_SERV_CREATE;
-            s_op->req->u.create.fs_id = sm_p->object_ref.fs_id;
-
-            s_op->req->u.create.handle_extent_array = sm_p->u.create_file.io_handle_extent_array[i];
-            s_op->req->u.create.object_type = PVFS_TYPE_DATAFILE;
-        
-            s_op->target_fs_id = sm_p->object_ref.fs_id;
-            s_op->target_handle = sm_p->object_ref.handle;
-            s_op->credentials.uid = sm_p->cred_p->uid;
-            s_op->credentials.gid = sm_p->cred_p->gid;
-        
-#if 0
-            /* TODO: Use a centralized method of obtaining ds_attr
-                     that can be called from other places as well.  */
-            memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
-            ret = job_trove_dspace_getattr(
-                sm_p->object_ref.fs_id, sm_p->object_ref.handle, smcb, &(s_op->ds_attr),
-                0, js_p, &tmp_id, server_job_context);
-            return ret;
-#endif
         }
     }
     return SM_ACTION_COMPLETE;
