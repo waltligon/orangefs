@@ -685,6 +685,9 @@ int job_precreate_pool_lookup_server(
     PVFS_fs_id fsid, 
     PVFS_handle* pool_handle);
   
+void job_precreate_pool_set_index(
+    int server_index);
+
 /******************************************************************
  * job test/wait for completion functions 
  */
