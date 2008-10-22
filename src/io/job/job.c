@@ -5671,7 +5671,14 @@ void job_precreate_pool_set_index(
         num_pools++;
     }
     
-    pool_index = server_index % num_pools;
+    if(num_pools == 0)
+    {
+        pool_index = 0;
+    }
+    else
+    {
+        pool_index = server_index % num_pools;
+    }
 
     qlist_for_each(iterator, &precreate_pool_list)
     {
