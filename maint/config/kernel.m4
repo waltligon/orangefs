@@ -983,6 +983,8 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
         AC_MSG_CHECKING(if kernel address_space struct has a rwlock_t field named tree_lock)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -992,9 +994,26 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		read_lock(&as.tree_lock);
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock member named tree_lock instead of rw_lock]),
+	AC_DEFINE(HAVE_RW_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a rw_lock_t member named tree_lock]),
 	AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
+
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(if kernel address_space struct has a spinlock_t field named tree_lock)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		spin_lock(&as.tree_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock_t member named tree_lock]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(if kernel address_space struct has a priv_lock field - from RT linux)
 	AC_TRY_COMPILE([

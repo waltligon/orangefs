@@ -297,6 +297,10 @@
    instead of rw_lock -- used by RT linux */
 #undef HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT
 
+/* Define if kernel address_space struct has a rw_lock_t member named
+   tree_lock */
+#undef HAVE_RW_LOCK_TREE_ADDR_SPACE_STRUCT
+
 /* Define to 1 if you have the <SDL/SDL_ttf.h> header file. */
 #undef HAVE_SDL_SDL_TTF_H
 
@@ -316,8 +320,8 @@
    page_lock instead of rw_lock */
 #undef HAVE_SPIN_LOCK_PAGE_ADDR_SPACE_STRUCT
 
-/* Define if kernel address_space struct has a spin_lock member named
-   tree_lock instead of rw_lock */
+/* Define if kernel address_space struct has a spin_lock_t member named
+   tree_lock */
 #undef HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT
 
 /* Define if struct super_operations in kernel has statfs_lite callback */
