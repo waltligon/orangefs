@@ -439,7 +439,7 @@ endecode_fields_2(
  */
 #define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
                                         by <linux/xattr.h> */
-#define PVFS_MAX_XATTR_VALUELEN  256 /* Not the same as XATTR_SIZE_MAX defined
+#define PVFS_MAX_XATTR_VALUELEN  8192 /* Not the same as XATTR_SIZE_MAX defined
                                         by <linux/xattr.h> */ 
 #define PVFS_MAX_XATTR_LISTLEN   8    /* Not the same as XATTR_LIST_MAX
                                           defined by <linux/xattr.h> */
