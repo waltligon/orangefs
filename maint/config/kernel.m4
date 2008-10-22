@@ -919,6 +919,31 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+        dnl 2.6.27 changed the constructor parameter signature of
+	dnl kmem_cache_create.  Check for this newer one-param style
+        dnl If they don't match, gcc complains about
+	dnl passing argument ... from incompatible pointer type, hence the
+	dnl need for the -Werror.  Note that the next configure test will
+        dnl determine if we have a two param constructor or not.
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for one-param kmem_cache_create constructor)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		void ctor(void *req)
+		{
+		}
+	], [
+		kmem_cache_create("config-test", 0, 0, 0, ctor);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM, 1, [Define if kernel kmem_cache_create constructor has newer-style one-parameter form]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
         dnl 2.6.24 changed the constructor parameter signature of
 	dnl kmem_cache_create.  Check for this newer two-param style and
 	dnl if not, assume it is old.  Note we can get away with just

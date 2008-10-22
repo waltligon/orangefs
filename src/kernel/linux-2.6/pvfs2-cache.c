@@ -204,7 +204,9 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
 
 
 static void dev_req_cache_ctor(
-#ifdef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+#if defined(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM)
+    void *req
+#elif defined(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM)
     struct kmem_cache *cachep,
     void *req
 #else
@@ -271,7 +273,9 @@ void dev_req_release(void *buffer)
 }
 
 static void pvfs2_inode_cache_ctor(
-#ifdef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+#if defined(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM)
+    void *req
+#elif defined(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM)
     struct kmem_cache *cachep,
     void *req
 #else
@@ -395,7 +399,9 @@ void pvfs2_inode_release(pvfs2_inode_t *pinode)
 #ifdef HAVE_AIO_VFS_SUPPORT
 
 static void kiocb_ctor(
-#ifdef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+#if defined(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM)
+    void *req
+#elif defined(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM)
     struct kmem_cache *cachep,
     void *req
 #else
