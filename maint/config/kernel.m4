@@ -944,6 +944,36 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 	CFLAGS=$tmp_cflags
 
+        dnl 2.6.27 changed the parameter signature of
+	dnl inode_operations->permission.  Check for this newer two-param style
+        dnl If they don't match, gcc complains about
+	dnl passing argument ... from incompatible pointer type, hence the
+	dnl need for the -Werror and -Wall.
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror -Wall"
+	AC_MSG_CHECKING(for two param permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		#include <linux/fs.h>
+		#include <linux/namei.h>
+		int ctor(struct inode *i, int a)
+		{
+			return 0;
+		}
+		struct inode_operations iop = {
+			.permission = ctor,
+		};
+	], [
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TWO_PARAM_PERMISSION, 1, [Define if kernel's inode_operations has two parameters permission function]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
+
         dnl 2.6.24 changed the constructor parameter signature of
 	dnl kmem_cache_create.  Check for this newer two-param style and
 	dnl if not, assume it is old.  Note we can get away with just

@@ -807,11 +807,11 @@ struct inode *pvfs2_iget_common(
 #define pvfs2_iget(sb, ref)        pvfs2_iget_common(sb, ref, 0)
 #define pvfs2_iget_locked(sb, ref) pvfs2_iget_common(sb, ref, 1)
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
+#if defined(PVFS2_LINUX_KERNEL_2_4) || defined(HAVE_TWO_PARAM_PERMISSION)
 int pvfs2_permission(struct inode *, int);
 #else
 int pvfs2_permission(struct inode *inode, 
-        int mask, struct nameidata *nd);
+					 int mask, struct nameidata *nd);
 #endif
 
 /*****************************
