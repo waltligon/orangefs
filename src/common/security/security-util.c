@@ -52,7 +52,7 @@ PVFS_capability *PINT_dup_capability(const PVFS_capability *cap)
 
 int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
 {
-    if (!src || !dest)
+    if (!src || !dest || (src == dest))
     {
         return -PVFS_EINVAL;
     }
@@ -122,6 +122,9 @@ void PINT_release_credential(PVFS_credential *cred)
     }
 }
 
+/* TODO: fix for the no security case. the previous assumption that
+ * credentials are always signed will probably no longer hold.
+ */
 PVFS_credential *PINT_dup_credential(const PVFS_credential *cred)
 {
     PVFS_credential *ret = NULL;

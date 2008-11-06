@@ -169,8 +169,7 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     conf = PINT_get_server_config();
 
-    cap->timeout = PINT_util_get_current_time();
-    cap->timeout += conf->security_timeout;
+    cap->timeout = PINT_util_get_current_time() + conf->security_timeout;
 
 #if defined(SECURITY_ENCRYPTION_RSA)
     md = EVP_sha1();
@@ -430,6 +429,7 @@ static int load_private_key(const char *path)
         return -1;
     }
 
+    EVP_PKEY_free(security_privkey);
     security_privkey = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
     if (security_privkey == NULL)
     {
