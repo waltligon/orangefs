@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <assert.h>
 
+#include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -32,6 +33,7 @@
 
 
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t *openssl_mutexes = NULL;
 static int security_init_status = 0;
 
 #ifndef SECURITY_ENCRYPTION_NONE
@@ -39,6 +41,21 @@ static int security_init_status = 0;
 /* the private key used for signing */
 static EVP_PKEY *security_privkey = NULL;
 
+
+struct CRYPTO_dynlock_value
+{
+    gen_mutex_t mutex;
+};
+
+static int setup_threading(void);
+static void cleanup_threading(void);
+static unsigned long id_function(void);
+static void locking_function(int, int, const char*, int);
+static struct CRYPTO_dynlock_value *dyn_create_function(const char*, int);
+static void dyn_lock_function(int, struct CRYPTO_dynlock_value*, const char*,
+                              int);
+static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
+                                 int);
 
 static int load_private_key(const char*);
 static int load_public_keys(const char*);
@@ -68,6 +85,13 @@ int PINT_security_initialize(void)
         return -PVFS_EALREADY;
     }
 
+    ret = setup_threading();
+    if (ret < 0)
+    {
+        gen_mutex_unlock(&security_init_mutex);
+        return ret;
+    }
+
     ERR_load_crypto_strings();
     OpenSSL_add_all_algorithms();
 
@@ -76,6 +100,7 @@ int PINT_security_initialize(void)
     {
         EVP_cleanup();
         ERR_free_strings();
+        cleanup_threading();
         gen_mutex_unlock(&security_init_mutex);
         return ret;
     }
@@ -92,6 +117,7 @@ int PINT_security_initialize(void)
         SECURITY_hash_finalize();
         EVP_cleanup();
         ERR_free_strings();
+        cleanup_threading();
         gen_mutex_unlock(&security_init_mutex);
         return -PVFS_EIO;
     }
@@ -104,6 +130,7 @@ int PINT_security_initialize(void)
         SECURITY_hash_finalize();
         EVP_cleanup();
         ERR_free_strings();
+        cleanup_threading();
         gen_mutex_unlock(&security_init_mutex);
         return -PVFS_EIO;
     }
@@ -114,6 +141,115 @@ int PINT_security_initialize(void)
     gen_mutex_unlock(&security_init_mutex);
  
     return 0;
+}
+
+static int setup_threading(void)
+{
+    int i;
+
+    openssl_mutexes = (gen_mutex_t*)calloc(CRYPTO_num_locks(),
+                                           sizeof(gen_mutex_t));
+    if (!openssl_mutexes)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    for (i = 0; i < CRYPTO_num_locks(); i++)
+    {
+        if (gen_mutex_init(&openssl_mutexes[i]) != 0)
+        {
+            for (i = i - 1; i >= 0; i--)
+            {
+                gen_mutex_destroy(&openssl_mutexes[i]);
+            }
+            free(openssl_mutexes);
+            openssl_mutexes = NULL;
+            return -PVFS_ENOMEM;
+        }
+    }
+
+    CRYPTO_set_id_callback(id_function);
+    CRYPTO_set_locking_callback(locking_function);
+    CRYPTO_set_dynlock_create_callback(dyn_create_function);
+    CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
+    CRYPTO_set_dynlock_destroy_callback(dyn_destroy_function);
+
+    return 0;
+}
+
+static unsigned long id_function(void)
+{
+    return (unsigned long)gen_thread_self();
+}
+
+static void locking_function(int mode, int n, const char *file, int line)
+{
+    if (mode & CRYPTO_LOCK)
+    {
+        gen_mutex_lock(&openssl_mutexes[n]);
+    }
+    else
+    {
+        gen_mutex_unlock(&openssl_mutexes[n]);
+    }
+}
+
+static struct CRYPTO_dynlock_value *dyn_create_function(const char *file, 
+                                                        int line)
+{
+    struct CRYPTO_dynlock_value *ret;
+
+    ret = (struct CRYPTO_dynlock_value*)malloc(sizeof(struct CRYPTO_dynlock_value));
+    if (ret)
+    {
+        gen_mutex_init(&ret->mutex);
+    }
+
+    return ret;
+}
+
+static void dyn_lock_function(int mode, struct CRYPTO_dynlock_value *l,
+                              const char *file, int line)
+{
+    if (mode & CRYPTO_LOCK)
+    {
+        gen_mutex_lock(&l->mutex);
+    }
+    else
+    {
+        gen_mutex_unlock(&l->mutex);
+    }
+}
+
+static void dyn_destroy_function(struct CRYPTO_dynlock_value *l,
+                                 const char *file, int line)
+{
+    gen_mutex_destroy(&l->mutex);
+    free(l);
+}
+
+static void cleanup_threading(void)
+{
+    int i;
+
+    if (!openssl_mutexes)
+    {
+        return;
+    }
+
+    CRYPTO_set_id_callback(NULL);
+    CRYPTO_set_locking_callback(NULL);
+    CRYPTO_set_dynlock_create_callback(NULL);
+    CRYPTO_set_dynlock_lock_callback(NULL);
+    CRYPTO_set_dynlock_destroy_callback(NULL);
+    
+    for (i = 0; i < CRYPTO_num_locks(); i++)
+    {
+        gen_mutex_destroy(&openssl_mutexes[i]);
+    }
+
+    free(openssl_mutexes);
+    openssl_mutexes = NULL;
 }
 
 /*  PINT_security_finalize	
@@ -140,6 +276,7 @@ int PINT_security_finalize(void)
 
     EVP_cleanup();
     ERR_free_strings();
+    cleanup_threading();
 
     security_init_status = 0;
     gen_mutex_unlock(&security_init_mutex);
