@@ -109,7 +109,8 @@ static void handle_io_error(
 static int cancel_pending_bmi(
     struct qlist_head *list);
 static int cancel_pending_trove(
-    struct qlist_head *list);
+    struct qlist_head *list, 
+    TROVE_coll_id coll_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 typedef struct
@@ -2075,7 +2076,7 @@ static void handle_io_error(
         }
         else if (src == TROVE_ENDPOINT && dest == BMI_ENDPOINT)
         {
-            ret = cancel_pending_trove(&flow_data->src_list);
+            ret = cancel_pending_trove(&flow_data->src_list, flow_data->parent->src.u.trove.coll_id);
             flow_data->cleanup_pending_count += ret;
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
                 "flowproto-multiqueue canceled %d trove-bmi Trove ops.\n", ret);
@@ -2090,7 +2091,7 @@ static void handle_io_error(
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
                 "flowproto-multiqueue canceled %d bmi-trove BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
-            ret = cancel_pending_trove(&flow_data->dest_list);
+            ret = cancel_pending_trove(&flow_data->dest_list, flow_data->parent->dest.u.trove.coll_id);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
                 "flowproto-multiqueue canceled %d bmi-trove Trove ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
@@ -2173,7 +2174,7 @@ static int cancel_pending_bmi(struct qlist_head *list)
  *
  * returns the number of operations that were canceled 
  */
-static int cancel_pending_trove(struct qlist_head *list)
+static int cancel_pending_trove(struct qlist_head *list, TROVE_coll_id coll_id)
 {
     struct qlist_head *tmp_link;
     struct fp_queue_item *q_item = NULL;
@@ -2198,7 +2199,7 @@ static int cancel_pending_trove(struct qlist_head *list)
                 count++;
                 ret = PINT_thread_mgr_trove_cancel(
                     old_result_tmp->posted_id,
-                    q_item->parent->src.u.trove.coll_id,
+                    coll_id,
                     &old_result_tmp->trove_callback);
                 if(ret < 0)
                 {
