@@ -1114,7 +1114,7 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
                         DSPACE_SETATTR,
                         ref.handle,
                         op_p->coll_p,
-                        dbpf_dspace_setattr_op_svc,
+                        dbpf_dspace_setattr_op_svc_free_wrapper,
                         q_op_p->op.user_ptr,
                         TROVE_SYNC,
                         q_op_p->op.context_id);
