@@ -864,7 +864,8 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
                 goto done;
             }
 
-            return PINT_MGMT_OP_CONTINUE;
+            ret = PINT_MGMT_OP_CONTINUE;
+            goto done;
         }
     }
 
