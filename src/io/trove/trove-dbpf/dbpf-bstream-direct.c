@@ -723,7 +723,6 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
                           attr.u.datafile.b_size);
         if(ret < 0)
         {
-            free(stream_extents);
             ret = -trove_errno_to_trove_error(-ret);
             goto done;
         }
@@ -732,6 +731,7 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
     ret = DBPF_OP_COMPLETE;
 
 done:
+    free(stream_extents);
     dbpf_open_cache_put(&rw_op->open_ref);
     return ret;
 }
