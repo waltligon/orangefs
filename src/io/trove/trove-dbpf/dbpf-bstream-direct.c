@@ -662,7 +662,7 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
     TROVE_ds_attributes attr;
     dbpf_queued_op_t *qop_p;
     struct dbpf_bstream_rw_list_op *rw_op;
-    dbpf_stream_extents_t *stream_extents;
+    dbpf_stream_extents_t *stream_extents = NULL;
     int i, extent_count;
 
     rw_op = (struct dbpf_bstream_rw_list_op *)ptr;
@@ -709,7 +709,6 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
         stream_extents);
     if(ret != 0)
     {
-        free(stream_extents);
         goto done;
     }
 
@@ -731,7 +730,10 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
     ret = DBPF_OP_COMPLETE;
 
 done:
-    free(stream_extents);
+    if(stream_extents)
+    {
+        free(stream_extents);
+    }
     dbpf_open_cache_put(&rw_op->open_ref);
     return ret;
 }
@@ -741,7 +743,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
     int ret = -TROVE_EINVAL;
     TROVE_object_ref ref;
     TROVE_ds_attributes attr;
-    dbpf_stream_extents_t *stream_extents;
+    dbpf_stream_extents_t *stream_extents = NULL;
     int i, extent_count;
     struct dbpf_bstream_rw_list_op *rw_op;
     dbpf_queued_op_t *qop_p;
@@ -786,7 +788,6 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
         stream_extents);
     if(ret != 0)
     {
-        free(stream_extents);
         goto cache_put;
     }
 
@@ -872,6 +873,10 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
 cache_put:
     dbpf_open_cache_put(&rw_op->open_ref);
 done:
+    if(stream_extents)
+    {
+        free(stream_extents);
+    }
     return ret;
 }
 
