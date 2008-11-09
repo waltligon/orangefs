@@ -144,6 +144,7 @@ void * dbpf_aligned_block_get(void);
 int dbpf_aligned_block_put(void *ptr);
 int dbpf_aligned_blocks_finalize(void);
 
+static int dbpf_dspace_setattr_op_svc_free_wrapper(struct dbpf_op *op_p);
 
 /**
  * Perform an write in direct mode (no buffering).
@@ -1058,6 +1059,24 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
     *out_op_id_p = q_op_p->op.id;
 
     return DBPF_OP_CONTINUE;
+}
+
+/* dbpf_dspace_setattr_op_svc_free_wrapper()
+ *
+ * Wrapper around the dbpf_dspace_setattr_op_svc() function.  This allows
+ * internal callsers of setattr to have a hook to use for freeing an
+ * internally allocated ds attributes structure.
+ *
+ * preserves return code ov dbpf_dspace_setattr_op_svc()
+ */
+static int dbpf_dspace_setattr_op_svc_free_wrapper(struct dbpf_op *op_p)
+{
+    int ret;
+    
+    ret = dbpf_dspace_setattr_op_svc(op_p);
+    free(op_p->u.d_setattr.attr_p);
+
+    return(ret);
 }
 
 static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
