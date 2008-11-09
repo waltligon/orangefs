@@ -1545,6 +1545,7 @@ static int dbpf_dspace_cancel(
             break;
         default:
             gossip_err("Invalid dbpf_op state found (%d)\n", state);
+            gossip_err("   from op type: %d\n", cur_op->op.type);
             assert(0);
     }
 #endif
