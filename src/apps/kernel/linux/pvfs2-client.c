@@ -33,8 +33,8 @@ static char s_client_core_path[PATH_MAX];
 
 #define MAX_DEV_INIT_FAILURES 10
 
-#define DEFAULT_ACACHE_TIMEOUT_STR "5"
-#define DEFAULT_NCACHE_TIMEOUT_STR "5"
+#define DEFAULT_ACACHE_TIMEOUT_STR "100"
+#define DEFAULT_NCACHE_TIMEOUT_STR "100"
 
 #define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
 
