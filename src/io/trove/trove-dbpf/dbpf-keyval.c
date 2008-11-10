@@ -1255,7 +1255,14 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
 
         ret = op_p->coll_p->keyval_db->get(
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
-        if (ret != 0)
+        /* check for DB_BUFFER_SMALL in case the key is there but the data
+         * is simply too big for the temporary data buffer used
+         */
+#ifdef HAVE_DB_BUFFER_SMALL
+        if (ret != 0 && ret != DB_BUFFER_SMALL)
+#else
+        if (ret != 0 && ret != ENOMEM)
+#endif
         {
             if(ret == DB_NOTFOUND && ((op_p->flags & TROVE_NOOVERWRITE) ||
                                       (!(op_p->flags & TROVE_ONLYOVERWRITE))))

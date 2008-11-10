@@ -29,7 +29,7 @@
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
  */
-#define MAX_NUM_DIRENTS    32
+#define MAX_NUM_DIRENTS    512
 
 /* optional parameters, filled in by parse_args() */
 struct options
@@ -509,7 +509,7 @@ int do_list(
 
             print_entry(cur_file, cur_handle, fs_id, opts);
         }
-        token += rd_response.pvfs_dirent_outcount;
+        token = rd_response.token;
 
         if (rd_response.pvfs_dirent_outcount)
         {

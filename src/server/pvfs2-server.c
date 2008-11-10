@@ -160,7 +160,16 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
-static int generate_shm_key_hint(void);
+static int generate_shm_key_hint(int* server_index);
+
+static void precreate_pool_finalize(void);
+static int precreate_pool_initialize(int server_index);
+static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
+    PVFS_handle* pool_handle);
+static int precreate_pool_launch_refiller(const char* host, 
+    PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle);
+static int precreate_pool_count(
+    PVFS_fs_id fsid, PVFS_handle pool_handle, int* count);
 
 static void precreate_pool_finalize(void);
 static int precreate_pool_initialize(void);
@@ -654,6 +663,7 @@ static int server_initialize_subsystems(
     PVFS_ds_flags init_flags = 0;
     int bmi_flags = BMI_INIT_SERVER;
     int shm_key_hint;
+    int server_index;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -683,6 +693,12 @@ static int server_initialize_subsystems(
         bmi_flags |= BMI_TCP_BIND_SPECIFIC;
     }
 
+    /* Have bmi automatically increment reference count on addresses any
+     * time a new unexpected message appears.  The server will decrement it
+     * once it has completed processing related to that request.
+     */
+    bmi_flags |= BMI_AUTO_REF_COUNT;
+
     ret = BMI_initialize(server_config.bmi_modules, 
                          server_config.host_id,
                          bmi_flags);
@@ -711,7 +727,7 @@ static int server_initialize_subsystems(
     assert(ret == 0);
 
     /* help trove chose a differentiating shm key if needed for Berkeley DB */
-    shm_key_hint = generate_shm_key_hint();
+    shm_key_hint = generate_shm_key_hint(&server_index);
     gossip_debug(GOSSIP_SERVER_DEBUG, "Server using shm key hint: %d\n", shm_key_hint);
     ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
     assert(ret == 0);
@@ -1051,7 +1067,7 @@ static int server_initialize_subsystems(
     }
     *server_status_flag |= SERVER_EVENT_INIT;
 
-    ret = precreate_pool_initialize();
+    ret = precreate_pool_initialize(server_index);
     if (ret < 0)
     {
         gossip_err("Error initializing precreate pool.\n");
@@ -1878,11 +1894,12 @@ void PINT_server_access_debug(PINT_server_op * s_op,
  *
  * returns integer key
  */
-static int generate_shm_key_hint(void)
+static int generate_shm_key_hint(int* server_index)
 {
-    int server_index = 1;
     struct host_alias_s *cur_alias = NULL;
     struct filesystem_configuration_s *first_fs;
+
+    *server_index = 1;
 
     PINT_llist *cur = server_config.host_aliases;
 
@@ -1901,10 +1918,10 @@ static int generate_shm_key_hint(void)
              * using more than one key on each server
              */
             first_fs = PINT_llist_head(server_config.file_systems);
-            return(first_fs->coll_id + server_index*10);
+            return(first_fs->coll_id + (*server_index)*10);
         }
 
-        server_index++;
+        (*server_index)++;
         cur = PINT_llist_next(cur);
     }
     
@@ -1922,7 +1939,7 @@ static int generate_shm_key_hint(void)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-static int precreate_pool_initialize(void)
+static int precreate_pool_initialize(int server_index)
 {
     PINT_llist *cur_f = server_config.file_systems;
     struct filesystem_configuration_s *cur_fs;
@@ -1934,6 +1951,7 @@ static int precreate_pool_initialize(void)
     int i;
     int server_type;
     int handle_count = 0;
+    int fs_count = 0;
 
     /* iterate through list of file systems */
     while(cur_f)
@@ -1942,6 +1960,13 @@ static int precreate_pool_initialize(void)
         if (!cur_fs)
         {
             break;
+        }
+
+        fs_count++;
+        if(fs_count > 1)
+        {
+            gossip_err("Error: precreation does not support multiple file systems yet.\n");
+            return(-1);
         }
 
         /* am I a meta server in this file system? */
@@ -2038,7 +2063,11 @@ static int precreate_pool_initialize(void)
                 }
             }
         }
+
+        job_precreate_pool_set_index(server_index);
+
         cur_f = PINT_llist_next(cur_f);
+
     }
 
     return(0);

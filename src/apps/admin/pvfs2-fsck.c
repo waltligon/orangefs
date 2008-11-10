@@ -739,7 +739,7 @@ int descend(PVFS_fs_id cur_fs,
                 handlelist_remove_handle(hl, cur_handle, server_idx);
             }
         }
-        token += readdir_resp.pvfs_dirent_outcount;
+        token = readdir_resp.token;
         if (readdir_resp.pvfs_dirent_outcount)
         {
             free(readdir_resp.dirent_array);

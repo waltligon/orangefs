@@ -40,7 +40,8 @@ typedef int32_t bmi_error_code_t; /**< error code information */
 enum
 {
     BMI_INIT_SERVER = 1, /**< set up to listen for unexpected messages */
-    BMI_TCP_BIND_SPECIFIC = 2 /**< bind to a specific IP address if INIT_SERVER */
+    BMI_TCP_BIND_SPECIFIC = 2, /**< bind to a specific IP address if INIT_SERVER */
+    BMI_AUTO_REF_COUNT = 4 /**< automatically increment ref count on unexpected messages */
 };
 
 enum bmi_op_type

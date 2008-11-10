@@ -671,7 +671,11 @@ static int pvfs2_check_acl(struct inode *inode, int mask)
     return -EAGAIN;
 }
 
+#ifdef HAVE_TWO_PARAM_PERMISSION
+int pvfs2_permission(struct inode *inode, int mask)
+#else
 int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
+#endif
 {
 #ifdef HAVE_GENERIC_PERMISSION
     int ret;

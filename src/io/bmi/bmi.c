@@ -113,6 +113,7 @@ static struct {
 } *method_usage = NULL;
 static const int usage_iters_starvation = 100000;
 static const int usage_iters_active = 10000;
+static int global_flags;
 
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
@@ -142,6 +143,7 @@ int BMI_initialize(const char *method_list,
     char *proto = NULL;
     int addr_count = 0;
 
+    global_flags = flags;
 
     /* server must specify method list at startup, optional for client */
     if (flags & BMI_INIT_SERVER) {
@@ -987,6 +989,10 @@ int BMI_testunexpected(int incount,
 	    gen_mutex_unlock(&ref_mutex);
 	    return (bmi_errno_to_pvfs(-EPROTO));
 	}
+        if(global_flags & BMI_AUTO_REF_COUNT)
+        {
+            tmp_ref->ref_count++;
+        }
 	gen_mutex_unlock(&ref_mutex);
 	info_array[i].addr = tmp_ref->bmi_addr;
     }

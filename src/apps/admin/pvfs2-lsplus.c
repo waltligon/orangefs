@@ -541,7 +541,7 @@ int do_list(
                     rdplus_response.stat_err_array[i],
                     opts);
         }
-        token += rdplus_response.pvfs_dirent_outcount;
+        token = rdplus_response.token;
 
         if (rdplus_response.pvfs_dirent_outcount)
         {

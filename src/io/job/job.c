@@ -80,6 +80,8 @@ static gen_mutex_t precreate_pool_mutex = GEN_MUTEX_INITIALIZER;
 static QLIST_HEAD(precreate_pool_list);
 static QLIST_HEAD(precreate_pool_check_level_list);
 static QLIST_HEAD(precreate_pool_get_handles_list);
+static struct qlist_head* precreate_pool_initial = NULL;
+
 struct precreate_pool
 {
     struct qlist_head list_link;
@@ -5648,7 +5650,57 @@ int job_precreate_pool_lookup_server(
 
     return(-PVFS_ENOENT);
 }
-  
+   
+/* job_precreate_pool_set_index()
+ *
+ * used to assign a unique offset into the list of servers on each daemon in
+ * the file system, so that load is balanced evenly
+ */
+void job_precreate_pool_set_index(
+    int server_index)
+{
+    struct qlist_head* iterator;
+    int num_pools = 0;
+    int pool_index = 0;
+    int current_index = 0;
+
+    gen_mutex_lock(&precreate_pool_mutex);
+
+    qlist_for_each(iterator, &precreate_pool_list)
+    {
+        num_pools++;
+    }
+    
+    if(num_pools == 0)
+    {
+        pool_index = 0;
+    }
+    else
+    {
+        pool_index = server_index % num_pools;
+    }
+
+    qlist_for_each(iterator, &precreate_pool_list)
+    {
+        if(current_index == pool_index)
+        {
+            precreate_pool_initial = iterator;
+            break;
+        }
+        current_index++;
+    }
+
+    /* safety check, should not hit this case */
+    if(!precreate_pool_initial)
+    {
+        precreate_pool_initial = precreate_pool_list.next;
+    }
+
+    gen_mutex_unlock(&precreate_pool_mutex);
+
+    return;
+}
+ 
 int job_precreate_pool_register_server(
     const char* host, 
     PVFS_fs_id fsid, 
@@ -5818,6 +5870,12 @@ int job_precreate_pool_get_handles(
     jd->u.precreate_pool.servers = servers;
     jd->u.precreate_pool.trove_pending = 0;
     jd->u.precreate_pool.flags = flags;
+    jd->u.precreate_pool.current_pool = precreate_pool_initial;
+
+    /* rotate to use a different starting server in the pool next time */
+    gen_mutex_lock(&precreate_pool_mutex);
+    precreate_pool_initial = precreate_pool_initial->next;
+    gen_mutex_unlock(&precreate_pool_mutex);
     
     precreate_pool_get_handles_try_post(jd);
 
