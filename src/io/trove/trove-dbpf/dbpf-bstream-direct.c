@@ -858,6 +858,13 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
                                 qop_p->op.user_ptr,
                                 TROVE_SYNC,
                                 qop_p->op.context_id);
+            /* TODO: is there a way to handle the case where the flow
+             * protocol attempts to cancel an operation that has turned
+             * into a setattr here?  For now we set the state to IN_SERVICE
+             * so that the cancel path leaves the operation alone while it
+             * is in the PINT_MGMT infrastructure.
+             */
+            qop_p->op.state = OP_IN_SERVICE;
             ret = dbpf_sync_coalesce(qop_p, 0, &outcount);
             if(ret < 0)
             {
