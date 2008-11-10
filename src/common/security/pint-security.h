@@ -71,16 +71,6 @@ int PINT_verify_credential (PVFS_credential *);
  */
 int PINT_init_capability(PVFS_capability *);
 
-/*  PINT_get_max_sigsize
- *
- *  This function probably won't get used, was initially used in the encode
- *  and decode process although a workaround was found to avoid linking the
- *  security module in.  Possibly useful later down the road.
- *	
- *  returns < 0 on error
- *  returns maximum signature size on success
- */
-int PINT_get_max_sigsize(void);
 
 #endif
 

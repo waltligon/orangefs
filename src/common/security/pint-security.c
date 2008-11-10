@@ -36,11 +36,6 @@ static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t *openssl_mutexes = NULL;
 static int security_init_status = 0;
 
-#ifndef SECURITY_ENCRYPTION_NONE
-
-/* the private key used for signing */
-static EVP_PKEY *security_privkey = NULL;
-
 
 struct CRYPTO_dynlock_value
 {
@@ -56,6 +51,13 @@ static void dyn_lock_function(int, struct CRYPTO_dynlock_value*, const char*,
                               int);
 static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
                                  int);
+
+
+#ifndef SECURITY_ENCRYPTION_NONE
+
+/* the private key used for signing */
+static EVP_PKEY *security_privkey = NULL;
+
 
 static int load_private_key(const char*);
 static int load_public_keys(const char*);
@@ -143,6 +145,14 @@ int PINT_security_initialize(void)
     return 0;
 }
 
+/* setup_threading
+ * 
+ * Sets up the data structures and callbacks required by the OpenSSL library
+ * for multithreaded operation.
+ *
+ * returns -PVFS_ENOMEM if a mutex could not be initialized
+ * returns 0 on success
+ */
 static int setup_threading(void)
 {
     int i;
@@ -177,11 +187,19 @@ static int setup_threading(void)
     return 0;
 }
 
+/* id_function
+ *
+ * The OpenSSL id_function callback.
+ */
 static unsigned long id_function(void)
 {
     return (unsigned long)gen_thread_self();
 }
 
+/* locking_function
+ *
+ * The OpenSSL locking_function callback.
+ */
 static void locking_function(int mode, int n, const char *file, int line)
 {
     if (mode & CRYPTO_LOCK)
@@ -194,6 +212,10 @@ static void locking_function(int mode, int n, const char *file, int line)
     }
 }
 
+/* dyn_create_function
+ *
+ * The OpenSSL dyn_create_function callback.
+ */
 static struct CRYPTO_dynlock_value *dyn_create_function(const char *file, 
                                                         int line)
 {
@@ -208,6 +230,10 @@ static struct CRYPTO_dynlock_value *dyn_create_function(const char *file,
     return ret;
 }
 
+/* dyn_lock_function
+ *
+ * The OpenSSL dyn_lock_function callback.
+ */
 static void dyn_lock_function(int mode, struct CRYPTO_dynlock_value *l,
                               const char *file, int line)
 {
@@ -221,6 +247,10 @@ static void dyn_lock_function(int mode, struct CRYPTO_dynlock_value *l,
     }
 }
 
+/* dyn_destroy_function
+ *
+ * The OpenSSL dyn_destroy_function callback.
+ */
 static void dyn_destroy_function(struct CRYPTO_dynlock_value *l,
                                  const char *file, int line)
 {
@@ -228,14 +258,14 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value *l,
     free(l);
 }
 
+/* cleanup_threading
+ *
+ * Frees the data structures used to provide multithreading support to
+ * the OpenSSL library.
+ */
 static void cleanup_threading(void)
 {
     int i;
-
-    if (!openssl_mutexes)
-    {
-        return;
-    }
 
     CRYPTO_set_id_callback(NULL);
     CRYPTO_set_locking_callback(NULL);
@@ -243,9 +273,12 @@ static void cleanup_threading(void)
     CRYPTO_set_dynlock_lock_callback(NULL);
     CRYPTO_set_dynlock_destroy_callback(NULL);
     
-    for (i = 0; i < CRYPTO_num_locks(); i++)
+    if (openssl_mutexes)
     {
-        gen_mutex_destroy(&openssl_mutexes[i]);
+        for (i = 0; i < CRYPTO_num_locks(); i++)
+        {
+            gen_mutex_destroy(&openssl_mutexes[i]);
+        }
     }
 
     free(openssl_mutexes);
@@ -763,24 +796,6 @@ int PINT_init_capability(PVFS_capability *cap)
     }
 
     return ret;
-}
-
-/*  PINT_get_max_sigsize
- *
- *  This function probably won't get used, was initially used in the encode
- *  and decode process although a workaround was found to avoid linking the
- *  security module in.  Possibly useful later down the road.
- *	
- *  returns < 0 on error
- *  returns maximum signature size on success
- */
-int PINT_get_max_sigsize(void)
-{
-#ifndef SECURITY_ENCRYPTION_NONE
-    return EVP_PKEY_size(security_privkey);
-#else /* security disabled */
-    return 0;
-#endif /* SECURITY_ENCRYPTION_NONE */
 }
 
 
