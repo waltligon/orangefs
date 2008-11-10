@@ -809,7 +809,7 @@ clean::
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		$(STATECOMP) $(STATECOMPOBJS) \
 		src/server/pvfs2-server-server.o \
-		src/apps/karma/karma 
+		src/apps/karma/karma
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN) 
 endif
@@ -963,6 +963,8 @@ endif
 
 	install -d $(bindir)
 	install -m 755 $(ADMINTOOLS) $(bindir)
+	# for compatibility in case anyone really wants "lsplus"
+	ln -s $(bindir)/pvfs2-ls $(bindir)/pvfs2-lsplus
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)
