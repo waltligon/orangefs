@@ -440,45 +440,31 @@ AC_ARG_WITH(berkdb-debug,
 AC_DEFINE(BERKDB_ERROR_REPORTING, 1, Define if berkeley db error reporting was enabled)
 )
 
-dnl use the Pablo trace library
-AC_ARG_WITH(pablo,
-[  --with-pablo=path       Use Pablo trace library installed in "path"],
+TAU_INCS=
+BUILD_TAU=
+
+dnl use the tau trace library
+AC_ARG_WITH(tau,
+[  --with-tau=path         Use TAU trace library installed in "path"],
     if test "x$withval" = "xyes" ; then
-           AC_MSG_ERROR(--with-pablo must be given a pathname)
+           AC_MSG_ERROR(--with-tau must be given a pathname)
     else
-       CFLAGS="$CFLAGS -I$withval/include"
-       LDFLAGS="$LDFLAGS -L$withval/lib"
-       LIBS="$LIBS -lPabloTrace"
-       AC_DEFINE(HAVE_PABLO, 1, [Define if Pablo library is used])
+       TAU_INCS="-I$withval/include"
+       CFLAGS="$CFLAGS $TAU_INCS"
+       LDFLAGS="$LDFLAGS -L$withval/$(uname -m)/lib"
+       tau_mkfile=$withval/$(uname -m)/lib/Makefile.*-profile-trace
+       if test ! -f $tau_mkfile; then
+           AC_MSG_ERROR(TAU not compiled with profiling and tracing support)
+       fi
+       tau_config=$(echo $tau_mkfile | sed -e "s|.*Makefile.tau-||")
+       LIBS="$LIBS -lTAU_tf -lTAU_traceinput-$tau_config -ltau-$tau_config -lpthread -lstdc++"
+       AC_DEFINE(HAVE_TAU, 1, [Define if TAU library is used])
+       BUILD_TAU=1
     fi
 )
 
-dnl use MPE profiling library 
-AC_ARG_WITH(mpe,
-[  --with-mpe=path         Use MPE profiling library installed in "path"],
-    if test "x$withval" = "xyes" ; then
-           AC_MSG_ERROR(--with-mpe must be given a pathname)
-    else
-        CFLAGS="$CFLAGS -I$withval/include"
-        LDFLAGS="$LDFLAGS -L$withval/lib"
-        LIBS="$LIBS -lmpe -lmpich"
-        AC_MSG_CHECKING(for valid mpe install)
-	AC_TRY_LINK(
-              [#include <mpe.h>],
-	      [
-	      int eventID_begin, eventID_end;
-	      eventID_begin = MPE_Log_get_event_number();
-	      eventID_end   = MPE_Log_get_event_number();
-	      MPE_Describe_state( eventID_begin, eventID_end, "Amult", "bluegreen" );
-	      MPE_Log_event( eventID_begin, 0, (char *)0 );
-	      MPE_Log_event( eventID_end, 0, (char *)0 );
-	      ],
-	      [
-	      AC_DEFINE(HAVE_MPE, 1, [Use the MPE profiling library])
-	      AC_MSG_RESULT(ok)],
-	      AC_MSG_ERROR(Invalid path to mpe install))
-    fi
-)
+AC_SUBST(TAU_INCS)
+AC_SUBST(BUILD_TAU)
 
 dnl
 dnl Enables the kernel module to build if the appropriate
@@ -1064,6 +1050,7 @@ src/common/gossip/module.mk
 src/common/gen-locks/module.mk
 src/common/llist/module.mk
 src/common/statecomp/module.mk
+src/common/events/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk

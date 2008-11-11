@@ -21,6 +21,8 @@
 #include "id-generator.h"
 #include "str-utils.h"
 
+#include "pvfs2-config.h"
+
 #ifdef HAVE_TAU
 #include "pvfs_tau_api.h"
 #endif

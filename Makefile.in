@@ -77,6 +77,7 @@ BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_SERVER = @BUILD_SERVER@
+BUILD_TAU = @BUILD_TAU@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -711,6 +712,31 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building shared objects 
 %.po: %.c
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ rule for building server objects
+%-server.o: %.cpp
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(CFLAGS) $(SERVERCFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ default rule for building objects for threaded library
+%-threaded.o: %.cpp
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ rule for building shared objects for threaded library
+%-threaded.po: %.cpp
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ default rule for building objects 
+%.o: %.cpp
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ rule for building shared objects 
+%.po: %.cpp
 	$(Q) "  CCPIC		$@"
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 

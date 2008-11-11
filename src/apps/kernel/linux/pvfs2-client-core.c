@@ -137,10 +137,6 @@ static int remount_complete = 0;
 /* used for generating unique dynamic mount point names */
 static int dynamic_mount_id = 1;
 
-static int pid_compare_fn(void *key, struct qhash_head *link);
-
-static struct qhash_table *pid_to_rank_table = NULL;
-
 typedef struct
 {
     int is_dev_unexp;
@@ -218,7 +214,7 @@ static struct PINT_dev_params s_desc_params[NUM_MAP_DESC];
 static struct PINT_perf_counter* acache_pc = NULL;
 static struct PINT_perf_counter* static_acache_pc = NULL;
 static struct PINT_perf_counter* ncache_pc = NULL;
-static char hostname[100];
+/* static char hostname[100]; */
 
 /* used only for deleting all allocated vfs_request objects */
 vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
@@ -239,7 +235,7 @@ static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
 static int set_ncache_parameters(options_t* s_opts);
-static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
+inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
 
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
@@ -4152,16 +4148,14 @@ static void set_device_parameters(options_t *s_opts)
     return;
 }
 
-static int get_rank_from_pid(int pid);
-static int get_reqid_from_rank(int rank);
 static int get_mac(void);
 
 inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
 {
-    int32_t rank, reqid, mac;
+    int32_t mac;
 
     *hints = NULL;
-    if(!s_opts->events) return;
+    if(!s_opts.events) return;
 
     mac = get_mac();
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "mac: %d\n", mac);

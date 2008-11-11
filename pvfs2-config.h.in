@@ -229,9 +229,6 @@
 /* Define if mount.h contains MNT_NODIRATIME flags */
 #undef HAVE_MNT_NODIRATIME
 
-/* Use the MPE profiling library */
-#undef HAVE_MPE
-
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
 
@@ -249,9 +246,6 @@
 
 /* Define to 1 if you have the <openssl/evp.h> header file. */
 #undef HAVE_OPENSSL_EVP_H
-
-/* Define if Pablo library is used */
-#undef HAVE_PABLO
 
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_SIX_ARG
@@ -366,6 +360,9 @@
 
 /* Define to 1 if you have the <sys/xattr.h> header file. */
 #undef HAVE_SYS_XATTR_H
+
+/* Define if TAU library is used */
+#undef HAVE_TAU
 
 /* Define if register_sysctl_table takes two arguments */
 #undef HAVE_TWO_ARG_REGISTER_SYSCTL_TABLE
