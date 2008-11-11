@@ -102,7 +102,7 @@ static int io_send_ack(
      * failed to get the size, or failed for permission reasons
      */
     s_op->resp.status = js_p->error_code;
-    s_op->resp.u.io.bstream_size = s_op->ds_attr.b_size;
+    s_op->resp.u.io.bstream_size = s_op->ds_attr.u.datafile.b_size;
 
     err = PINT_encode(&s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
                       s_op->addr, s_op->decoded.enc_type);

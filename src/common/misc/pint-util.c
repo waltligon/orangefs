@@ -12,6 +12,7 @@
 /* This file includes definitions of common internal utility functions */
 #include <string.h>
 #include <assert.h>
+
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <unistd.h>
@@ -329,6 +330,18 @@ char *PINT_util_get_object_type(int objtype)
     return obj_types[6];
 }
 
+void PINT_util_get_current_timeval(struct timeval *tv)
+{
+    gettimeofday(tv, NULL);
+}
+
+int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end)
+{
+    return (tv_end->tv_sec * 1e6 + tv_end->tv_usec) -
+        (tv_start->tv_sec * 1e6 + tv_start->tv_usec);
+}
+
+
 PVFS_time PINT_util_get_current_time(void)
 {
     struct timeval t = {0,0};
@@ -352,6 +365,20 @@ PVFS_time PINT_util_mktime_version(PVFS_time time)
 PVFS_time PINT_util_mkversion_time(PVFS_time version)
 {
     return (PVFS_time)(version >> 32);
+}
+
+struct timespec PINT_util_get_abs_timespec(int microsecs)
+{
+    struct timeval now, add, result;
+    struct timespec tv;
+
+    gettimeofday(&now, NULL);
+    add.tv_sec = (microsecs / 1e6);
+    add.tv_usec = (microsecs % 1000000);
+    timeradd(&now, &add, &result);
+    tv.tv_sec = result.tv_sec;
+    tv.tv_nsec = result.tv_usec * 1e3;
+    return tv;
 }
 
 void PINT_util_gen_credentials(

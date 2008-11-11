@@ -41,7 +41,6 @@ typedef PVFS_ds_keyval_handle_info TROVE_keyval_handle_info;
 typedef PVFS_ds_position           TROVE_ds_position;
 typedef PVFS_ds_attributes         TROVE_ds_attributes_s;
 typedef PVFS_ds_attributes         TROVE_ds_attributes;
-typedef PVFS_ds_storedattr         TROVE_ds_storedattr_s;
 typedef PVFS_error                 TROVE_ds_state;
 typedef PVFS_context_id            TROVE_context_id;
 typedef PVFS_statfs		   TROVE_statfs;
@@ -52,7 +51,8 @@ typedef enum
 {
     TROVE_METHOD_DBPF = 0,
     TROVE_METHOD_DBPF_ALTAIO,
-    TROVE_METHOD_DBPF_NULLAIO
+    TROVE_METHOD_DBPF_NULLAIO,
+    TROVE_METHOD_DBPF_DIRECTIO
 } TROVE_method_id;
 
 typedef TROVE_method_id (*TROVE_method_callback)(TROVE_coll_id);

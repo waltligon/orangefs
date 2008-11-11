@@ -31,6 +31,12 @@
  */
 #define MAX_NUM_DIRENTS    512
 
+/*
+  arbitrarily restrict the number of paths
+  that this ls version can take as arguments
+*/
+#define MAX_NUM_PATHS       8
+
 /* optional parameters, filled in by parse_args() */
 struct options
 {

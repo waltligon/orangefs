@@ -2684,6 +2684,10 @@ DOTCONF_CB(get_trove_method)
     {
         *method = TROVE_METHOD_DBPF_NULLAIO;
     }
+    else if(!strcmp(cmd->data.str, "directio"))
+    {
+        *method = TROVE_METHOD_DBPF_DIRECTIO;
+    }
     else
     {
         return "Error unknown TroveMethod option\n";

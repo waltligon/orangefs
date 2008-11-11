@@ -30,6 +30,9 @@
 
 #define MAX_REGIONS 64
 
+/* #define PAD_BUFFER */
+#define FLOW_ALIGNMENT_PADDING 4096
+
 #define FLOW_CLEANUP(__flow_data)                                     \
 do {                                                                  \
     struct flow_descriptor *__flow_d = (__flow_data)->parent;         \
@@ -106,7 +109,8 @@ static void handle_io_error(
 static int cancel_pending_bmi(
     struct qlist_head *list);
 static int cancel_pending_trove(
-    struct qlist_head *list);
+    struct qlist_head *list, 
+    TROVE_coll_id coll_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 typedef struct
@@ -710,6 +714,9 @@ static void bmi_recv_callback_fn(void *user_ptr,
     void *tmp_buffer;
     void *tmp_user_ptr;
     int sync_mode = 0;
+#ifdef PAD_BUFFER
+    int padding;
+#endif
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
         "flowproto-multiqueue bmi_recv_callback_fn, error code: %d, flow: %p.\n",
@@ -793,7 +800,11 @@ static void bmi_recv_callback_fn(void *user_ptr,
         if(!q_item->buffer)
         {
             /* if the q_item has not been used, allocate a buffer */
-            q_item->buffer = BMI_memalloc(q_item->parent->src.u.bmi.address,
+            q_item->buffer = BMI_memalloc(
+                q_item->parent->src.u.bmi.address,
+#ifdef PAD_BUFFER
+                (FLOW_ALIGNMENT_PADDING*2) +
+#endif
                 q_item->parent->buffer_size, BMI_RECV);
             /* TODO: error handling */
             assert(q_item->buffer);
@@ -861,18 +872,42 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
         flow_data->total_bytes_processed += bytes_processed;
 
+        gossip_debug(GOSSIP_DIRECTIO_DEBUG,
+                     "offset %llu, buffer ptr: %p\n",
+                     llu(q_item->result_chain.result.offset_array[0]),
+                     q_item->buffer);
+#ifdef PAD_BUFFER
+        padding =
+            q_item->result_chain.result.offset_array[0] %
+            FLOW_ALIGNMENT_PADDING;
+        if(padding == 0)
+        {
+            padding += FLOW_ALIGNMENT_PADDING;
+        }
+        else
+        {
+            gossip_debug(GOSSIP_DIRECTIO_DEBUG,
+                         "offset %llu is unaligned\n",
+                         llu(q_item->result_chain.result.offset_array[0]));
+        }
+
+        q_item->result_chain.buffer_offset += padding;
+#endif
+
         /* TODO: what if we recv less than expected? */
         ret = BMI_post_recv(&q_item->posted_id,
-            q_item->parent->src.u.bmi.address,
-            q_item->buffer,
-            flow_data->parent->buffer_size,
-            &tmp_actual_size,
+                            q_item->parent->src.u.bmi.address,
+#ifdef PAD_BUFFER
+                            padding +
+#endif
+                            ((char *)q_item->buffer),
+                            flow_data->parent->buffer_size,
+                            &tmp_actual_size,
             BMI_PRE_ALLOC,
             q_item->parent->tag,
             &q_item->bmi_callback,
             global_bmi_context,
             q_item->parent->hints);
-        
         if(ret < 0)
         {
             handle_io_error(ret, q_item, flow_data);
@@ -885,7 +920,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
             bmi_recv_callback_fn(q_item, tmp_actual_size, 0);
         }
     }
-        
+
     return;
 }
 
@@ -1104,7 +1139,11 @@ static int bmi_send_callback_fn(void *user_ptr,
     else
     {
         /* if the q_item has not been used, allocate a buffer */
-        q_item->buffer = BMI_memalloc(q_item->parent->dest.u.bmi.address,
+        q_item->buffer = BMI_memalloc(
+            q_item->parent->dest.u.bmi.address,
+#ifdef PAD_BUFFER
+            (FLOW_ALIGNMENT_PADDING*2) +
+#endif
             q_item->parent->buffer_size, BMI_SEND);
         /* TODO: error handling */
         assert(q_item->buffer);
@@ -1308,6 +1347,9 @@ static void trove_write_callback_fn(void *user_ptr,
     struct result_chain_entry *old_result_tmp;
     void *tmp_buffer;
     PVFS_size bytes_processed = 0;
+#ifdef PAD_BUFFER
+    int padding;
+#endif
 
     gossip_debug(
         GOSSIP_FLOW_PROTO_DEBUG,
@@ -1373,7 +1415,11 @@ static void trove_write_callback_fn(void *user_ptr,
     else
     {
         /* if the q_item has not been used, allocate a buffer */
-        q_item->buffer = BMI_memalloc(q_item->parent->src.u.bmi.address,
+        q_item->buffer = BMI_memalloc(
+            q_item->parent->src.u.bmi.address,
+#ifdef PAD_BUFFER
+            (FLOW_ALIGNMENT_PADDING*2) +
+#endif
             q_item->parent->buffer_size, BMI_RECV);
         /* TODO: error handling */
         assert(q_item->buffer);
@@ -1457,10 +1503,33 @@ static void trove_write_callback_fn(void *user_ptr,
             return;
         }
 
+        gossip_debug(GOSSIP_DIRECTIO_DEBUG,
+                     "offset %llu, buffer ptr: %p\n",
+                     llu(q_item->result_chain.result.offset_array[0]),
+                     q_item->buffer);
+#ifdef PAD_BUFFER
+        padding = q_item->result_chain.result.offset_array[0] %
+            FLOW_ALIGNMENT_PADDING;
+        if(padding == 0)
+        {
+            padding += FLOW_ALIGNMENT_PADDING;
+        }
+        else
+        {
+            gossip_debug(GOSSIP_DIRECTIO_DEBUG,
+                         "offset %llu is unaligned\n",
+                         llu(q_item->result_chain.result.offset_array[0]));
+        }
+
+        q_item->result_chain.buffer_offset += padding;
+#endif
         /* TODO: what if we recv less than expected? */
         ret = BMI_post_recv(&q_item->posted_id,
             q_item->parent->src.u.bmi.address,
-            q_item->buffer,
+#ifdef PAD_BUFFERS
+	    padding +
+#endif
+	    ((char *)q_item->buffer),
             flow_data->parent->buffer_size,
             &tmp_actual_size,
             BMI_PRE_ALLOC,
@@ -1510,10 +1579,10 @@ static void cleanup_buffers(struct fp_private_data *flow_data)
         {
             if(flow_data->prealloc_array[i].buffer)
             {
-                BMI_memfree(flow_data->parent->src.u.bmi.address,
-                    flow_data->prealloc_array[i].buffer,
-                    flow_data->parent->buffer_size,
-                    BMI_RECV);
+		    BMI_memfree(flow_data->parent->src.u.bmi.address,
+				    flow_data->prealloc_array[i].buffer,
+				    flow_data->parent->buffer_size,
+				    BMI_RECV);
             }
             result_tmp = &(flow_data->prealloc_array[i].result_chain);
             do{
@@ -1647,7 +1716,11 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         {
             flow_data->intermediate = BMI_memalloc(
                 flow_data->parent->dest.u.bmi.address,
-                flow_data->parent->buffer_size, BMI_SEND);
+#ifdef PAD_BUFFER
+                (FLOW_ALIGNMENT_PADDING*2) +
+#endif
+                flow_data->parent->buffer_size,
+                BMI_SEND);
             /* TODO: error handling */
             assert(flow_data->intermediate);
         }
@@ -1880,7 +1953,11 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         {
             flow_data->intermediate = BMI_memalloc(
                 flow_data->parent->src.u.bmi.address,
-                flow_data->parent->buffer_size, BMI_RECV);
+#ifdef PAD_BUFFER
+                (FLOW_ALIGNMENT_PADDING*2) +
+#endif
+                flow_data->parent->buffer_size,
+                BMI_RECV);
             /* TODO: error handling */
             assert(flow_data->intermediate);
         }
@@ -2005,7 +2082,7 @@ static void handle_io_error(
         }
         else if (src == TROVE_ENDPOINT && dest == BMI_ENDPOINT)
         {
-            ret = cancel_pending_trove(&flow_data->src_list);
+            ret = cancel_pending_trove(&flow_data->src_list, flow_data->parent->src.u.trove.coll_id);
             flow_data->cleanup_pending_count += ret;
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
                 "flowproto-multiqueue canceled %d trove-bmi Trove ops.\n", ret);
@@ -2020,7 +2097,7 @@ static void handle_io_error(
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
                 "flowproto-multiqueue canceled %d bmi-trove BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
-            ret = cancel_pending_trove(&flow_data->dest_list);
+            ret = cancel_pending_trove(&flow_data->dest_list, flow_data->parent->dest.u.trove.coll_id);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
                 "flowproto-multiqueue canceled %d bmi-trove Trove ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
@@ -2103,7 +2180,7 @@ static int cancel_pending_bmi(struct qlist_head *list)
  *
  * returns the number of operations that were canceled 
  */
-static int cancel_pending_trove(struct qlist_head *list)
+static int cancel_pending_trove(struct qlist_head *list, TROVE_coll_id coll_id)
 {
     struct qlist_head *tmp_link;
     struct fp_queue_item *q_item = NULL;
@@ -2128,7 +2205,7 @@ static int cancel_pending_trove(struct qlist_head *list)
                 count++;
                 ret = PINT_thread_mgr_trove_cancel(
                     old_result_tmp->posted_id,
-                    q_item->parent->src.u.trove.coll_id,
+                    coll_id,
                     &old_result_tmp->trove_callback);
                 if(ret < 0)
                 {

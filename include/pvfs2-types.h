@@ -88,7 +88,7 @@ inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
 
 /* Basic types used by communication subsystems. */
 typedef int32_t PVFS_msg_tag_t;
-typedef int32_t PVFS_context_id;
+typedef PVFS_id_gen_t PVFS_context_id;
 
 enum PVFS_flowproto_type
 {
@@ -130,6 +130,8 @@ typedef uint64_t PVFS_handle;
 typedef int32_t PVFS_fs_id;
 typedef uint64_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
+
+
 #define encode_PVFS_handle encode_uint64_t
 #define decode_PVFS_handle decode_uint64_t
 #define encode_PVFS_fs_id encode_int32_t
@@ -478,7 +480,7 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_EVENT_DISABLE = 6, /* event disable */
     PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
     PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
-    PVFS_SERV_PARAM_DROP_CACHES = 9, /* ask server's OS to drop disk caches */
+    PVFS_SERV_PARAM_DROP_CACHES = 9
 };
 
 enum PVFS_mgmt_param_type
@@ -540,6 +542,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(const char *text, int retcode);
 void PVFS_perror_gossip(const char* text, int retcode);
 PVFS_error PVFS_get_errno_mapping(PVFS_error error);
+PVFS_error PVFS_errno_to_error(int err);
 
 /* special bits used to differentiate PVFS error codes from system
  * errno values
@@ -807,6 +810,19 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
                              abs(error))) & ~mask)];       \
     }                                                      \
     return ret;                        			   \
+}                                                          \
+PVFS_error PVFS_errno_to_error(int err)                    \
+{                                                          \
+    PVFS_error e = 0;                                      \
+    \
+    for(; e < PVFS_ERRNO_MAX; ++e)                         \
+    {                                                      \
+        if(PINT_errno_mapping[e] == err)                   \
+        {                                                  \
+            return e;                                      \
+        }                                                  \
+    }                                                      \
+    return 0;                                              \
 }                                                          \
 DECLARE_ERRNO_MAPPING()
 #define PVFS_ERROR_TO_ERRNO(__error) PVFS_get_errno_mapping(__error)
