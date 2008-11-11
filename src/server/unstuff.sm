@@ -166,7 +166,8 @@ static PINT_sm_action get_keyvals(
         s_op->req->u.unstuff.fs_id,
         s_op->req->u.unstuff.handle,
         s_op->key_a, s_op->val_a, s_op->error_a, s_op->keyval_count,
-        0, NULL, smcb, 0, js_p, &job_id, server_job_context);
+        0, NULL, smcb, 0, js_p, &job_id, server_job_context,
+        s_op->req->hints);
     return ret;
 
 free_encoded_layout:
@@ -273,7 +274,8 @@ static PINT_sm_action get_handles(
         0,
         js_p,
         &j_id,
-        server_job_context);
+        server_job_context,
+        s_op->req->hints);
     return ret;
 }
 
@@ -317,7 +319,8 @@ static PINT_sm_action set_handles_on_object(
         s_op->req->u.unstuff.handle,
         &s_op->key,
         &s_op->val,
-        0, NULL, smcb, 0, js_p, &j_id, server_job_context);
+        0, NULL, smcb, 0, js_p, &j_id, server_job_context,
+        s_op->req->hints);
 }
 
 static PINT_sm_action update_dfile_count(
@@ -336,7 +339,8 @@ static PINT_sm_action update_dfile_count(
         s_op->req->u.unstuff.fs_id, s_op->req->u.unstuff.handle,
         &s_op->ds_attr,
         TROVE_SYNC,
-        smcb, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context,
+        s_op->req->hints);
 }
 
 static PINT_sm_action remove_layout(
@@ -355,7 +359,8 @@ static PINT_sm_action remove_layout(
         s_op->error_a,
         2,
         TROVE_SYNC, NULL,
-        smcb, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context,
+        s_op->req->hints);
 }
 
 static PINT_sm_action cleanup(

@@ -468,6 +468,7 @@ static void print_help(char *progname)
            "PATH\n");
     printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
+    printf("--events=EVENTS               enable tracing of certain EVENTS\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)

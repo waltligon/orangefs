@@ -359,8 +359,9 @@ int build_handlelist(PVFS_fs_id cur_fs,
 					     position_array,
 					     addr_array,
 					     server_count,
-					     NULL /* details */
-                         , NULL);
+                                             0,
+					     NULL /* details */,
+                                             NULL /* hints */);
 	if (ret < 0)
 	{
             param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
@@ -562,7 +563,7 @@ int descend(PVFS_fs_id cur_fs,
 
             handlelist_remove_handle(cur_handle, server_idx);
         }
-        token += readdir_resp.pvfs_dirent_outcount;
+        token = readdir_resp.token;
         if (readdir_resp.pvfs_dirent_outcount)
         {
             free(readdir_resp.dirent_array);

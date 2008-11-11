@@ -210,6 +210,9 @@ void job_desc_q_dump(job_desc_q_p jdqp)
 	case JOB_NULL:
 	    gossip_err("    type: JOB_NULL.\n");
 	    break;
+	case JOB_PRECREATE_POOL:
+	    gossip_err("    type: JOB_PRECREATE_POOL.\n");
+	    break;
 	}
     }
 

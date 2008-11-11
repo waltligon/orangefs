@@ -939,21 +939,16 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                         flags,
                         context_id);
 
-    for(i = 0; i < mem_count; ++i)
+    if(PINT_EVENT_ENABLED)
     {
-        count_mem += mem_size_array[i];
+        count_mem = 0;
+        for(i = 0; i < mem_count; ++i)
+        {
+            count_mem += mem_size_array[i];
+        }
     }
 
     q_op_p->event_type = event_type;
-    gossip_debug(GOSSIP_TROVE_DEBUG, "bstream_read: client_id:%d, req_id:%d, rank:%d, handle:%llu, dfhandle:%llu, mem:%d\n",
-                 PINT_HINT_GET_CLIENT_ID(hints),
-                 PINT_HINT_GET_REQUEST_ID(hints),
-                 PINT_HINT_GET_RANK(hints),
-                 PINT_HINT_GET_HANDLE(hints),
-                 handle,
-                 PINT_HINT_GET_OP_ID(hints),
-                 count_mem);
-
 
     PINT_EVENT_START(event_type, dbpf_pid, NULL, &q_op_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),

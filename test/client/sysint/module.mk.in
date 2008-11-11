@@ -21,7 +21,6 @@ TESTSRC += \
 	$(DIR)/flush-2.c\
 	$(DIR)/truncate.c\
 	$(DIR)/readdir.c\
-	$(DIR)/test-pint-bucket.c \
 	$(DIR)/test-pint-ncache.c \
 	$(DIR)/io-test.c \
 	$(DIR)/io-test-offset.c \
@@ -42,6 +41,8 @@ TESTSRC += \
 	$(DIR)/test-hindexed-test.c \
 	$(DIR)/pvfs2-ping-benchmark.c \
 	$(DIR)/io-stress.c 
+
+#	$(DIR)/test-pint-bucket.c \
 
 MODCFLAGS_$(DIR)/io-stress.c := -D_GNU_SOURCE
 MODLDFLAGS_$(DIR) := -lrt

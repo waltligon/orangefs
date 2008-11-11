@@ -55,10 +55,8 @@ typedef pthread_t       gen_thread_t;
 #define gen_mutex_destroy(m) gen_posix_mutex_destroy(m)
 #define gen_mutex_init(m) gen_posix_mutex_init(m)
 #define gen_thread_self() gen_posix_thread_self()
-#endif /* __GEN_POSIX_LOCKING__ */
 
-
-#ifdef __GEN_NULL_LOCKING__
+#elif defined (__GEN_NULL_LOCKING__)
 	/* this stuff messes around just enough to prevent warnings */
 typedef int gen_mutex_t;
 typedef unsigned long gen_thread_t;
@@ -87,7 +85,9 @@ static inline gen_thread_t gen_thread_self(void)
 }
 #define gen_mutex_init(m) do{}while(0)
 #define gen_mutex_destroy(m) do{}while(0)
-#endif /* __GEN_NULL_LOCKING__ */
+#else /* __GEN_NULL_LOCKING__ */
+#error "Must define either POSIX or NULL locking"
+#endif
 
 #endif /* __GEN_LOCKS_H */
 

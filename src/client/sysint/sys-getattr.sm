@@ -344,7 +344,7 @@ static PINT_sm_action getattr_acache_lookup(
         js_p->error_code = GETATTR_ACACHE_MISS;
         return SM_ACTION_COMPLETE;
     }
-  
+
     /* acache hit, check results */
   
     /* The sys attr mask request is converted to object
@@ -361,6 +361,7 @@ static PINT_sm_action getattr_acache_lookup(
     if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE)
     {
         trimmed_mask &= (PVFS_ATTR_META_ALL |
+                         PVFS_ATTR_META_UNSTUFFED |
                          PVFS_ATTR_DATA_SIZE |
                          PVFS_ATTR_COMMON_ALL);
     }
@@ -407,20 +408,31 @@ static PINT_sm_action getattr_acache_lookup(
      */
     if(missing_attrs == PVFS_ATTR_DATA_SIZE)
     {
-        /* if the file size is requested but the distribution info
-         * isn't and it hasn't been cached, then we need to
-         * get that first.
-         */
-        PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
-            &sm_p->getattr.size_array,
-            sm_p->getattr.attr.u.meta.dfile_count);
+        if(!(sm_p->getattr.attr.mask & PVFS_ATTR_META_UNSTUFFED))
+        {
+            /* We are missing the size, and we don't know for sure if the
+             * file has been unstuffed.  In this case, act as though we
+             * missed on all atributes so that we can get fresh stuffed size
+             * or datafile information as needed.
+             */
+        }
+        else
+        {
+            /* if the file size is requested but the distribution info
+             * isn't and it hasn't been cached, then we need to
+             * get that first.
+             */
+            PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
+                &sm_p->getattr.size_array,
+                sm_p->getattr.attr.u.meta.dfile_count);
 
-        js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit, need sizes"
-                     "[%llu]\n", llu(object_ref.handle));
-        return SM_ACTION_COMPLETE;
+            js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit, need sizes"
+                         "[%llu]\n", llu(object_ref.handle));
+            return SM_ACTION_COMPLETE;
+        }
     }
-  
+
     /* we missed */
     /* clean out the attributes we got from the cache; this will be
      * overwritten when we request updated information from the server
@@ -581,6 +593,16 @@ static int getattr_object_getattr_comp_fn(
                  */
                 if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
                 {
+                    /* is the file stuffed? */
+                    if(!(attr->mask & PVFS_ATTR_META_UNSTUFFED))
+                    {
+                        /* we can compute the size without doing any more
+                         * getattr requests
+                         */
+                        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                            "getattr_object_getattr_comp_fn: detected stuffed file.\n");
+                        return(0);
+                    }
                     /* if caller asked for the size, then we need
                      * to jump to the datafile_getattr state, which
                      * will retrieve the datafile sizes for us.
@@ -751,18 +773,29 @@ static PINT_sm_action getattr_acache_insert(
         if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE &&
             sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
         {                                           
-            /* compute size as requested */
-            assert(sm_p->getattr.attr.u.meta.dist);
-            assert(sm_p->getattr.attr.u.meta.dist->methods &&
-                   sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
-            
-            sm_p->getattr.size =
-                (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
-                sm_p->getattr.attr.u.meta.dist->params,
-                sm_p->getattr.attr.u.meta.dfile_count,
-                sm_p->getattr.size_array);
+            if(!(sm_p->getattr.attr.mask & PVFS_ATTR_META_UNSTUFFED))
+            {
+                /* stuffed file case */
+                sm_p->getattr.size = sm_p->getattr.attr.u.meta.stuffed_size;
+                tmp_size = &sm_p->getattr.size;
+                gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert calculated stuffed logical size of %lld\n", lld(*tmp_size));
+            }
+            else
+            {
+                /* compute size as requested */
+                assert(sm_p->getattr.attr.u.meta.dist);
+                assert(sm_p->getattr.attr.u.meta.dist->methods &&
+                       sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
+                
+                sm_p->getattr.size =
+                    (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
+                    sm_p->getattr.attr.u.meta.dist->params,
+                    sm_p->getattr.attr.u.meta.dfile_count,
+                    sm_p->getattr.size_array);
 
-            tmp_size = &sm_p->getattr.size;
+                tmp_size = &sm_p->getattr.size;
+                gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert calculated unstuffed logical size of %lld\n", lld(*tmp_size));
+            }
         }
 
         PINT_acache_update(sm_p->getattr.object_ref,
@@ -914,6 +947,14 @@ static PINT_sm_action getattr_set_sys_response(
             }
 
             sysresp->attr.mask |= PVFS_ATTR_SYS_SIZE;
+        }
+
+        if(attr->mask & PVFS_ATTR_META_DIST)
+        {
+            /* we have enough information to set a block size */
+            sysresp->attr.blksize = attr->u.meta.dist->methods->get_blksize(
+                attr->u.meta.dist->params);
+            sysresp->attr.mask |= PVFS_ATTR_SYS_BLKSIZE;
         }
 
         /* if this is a symlink, add the link target */

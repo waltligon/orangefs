@@ -28,6 +28,7 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "pint-cached-config.h"
 
 PINT_server_trove_keys_s Trove_Special_Keys[] =
 {
@@ -93,16 +94,36 @@ nested machine pvfs2_get_attr_work_sm
         success => read_metafile_distribution_if_required; 
         default => setup_resp;
     }
-
+ 
     state read_metafile_distribution_if_required
     {
         run getattr_read_metafile_distribution_if_required;
-        default => distribution_safety_check;
+        default => interpret_metafile_distribution;
     }
 
-    state distribution_safety_check
+    state interpret_metafile_distribution
     {
-        run getattr_distribution_safety_check;
+        run interpret_metafile_distribution;
+        success => detect_stuffed;
+        default => setup_resp;
+    }
+
+    state detect_stuffed
+    {
+        run getattr_detect_stuffed;
+        default => read_stuffed_size;
+    }
+
+    state read_stuffed_size
+    {
+        run getattr_read_stuffed_size;
+        success => interpret_stuffed_size;
+        default => setup_resp;
+    }
+
+    state interpret_stuffed_size
+    {
+        run getattr_interpret_stuffed_size;
         default => setup_resp;
     }
 
@@ -691,6 +712,117 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     return ret;
 }
 
+static PINT_sm_action getattr_read_stuffed_size(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t job_id;
+
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(
+            GOSSIP_GETATTR_DEBUG, "Getattr detected non-stuffed file.\n");
+        /* this means that the keyval fields used to indicate a file is
+         * stuffed are not present.  Set mask accordingly and continue.
+         */
+        s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_UNSTUFFED;
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+    if(js_p->error_code)
+    {
+        /* any other error code here is just a normal error case */
+        /* preserve error code and catch next error transition */
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(
+        GOSSIP_GETATTR_DEBUG, "Getattr detected stuffed file.\n");
+    /* otherwise, we found keyval fields indicating that the file is
+     * stuffed.  It does not matter if the client asked for the size or not;
+     * we must retrieve a valid stuffed_size value for the attrs.
+     */
+    s_op->resp.u.getattr.attr.mask &= (~(PVFS_ATTR_META_UNSTUFFED));
+
+    return(job_trove_dspace_getattr(
+        s_op->u.getattr.fs_id,
+        s_op->resp.u.getattr.attr.u.meta.dfile_array[0],
+        smcb,
+        &s_op->ds_attr,
+        0,
+        js_p,
+        &job_id,
+        server_job_context,
+        s_op->req->hints));
+}
+
+static PINT_sm_action getattr_interpret_stuffed_size(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if(js_p->error_code == 0)
+    {
+        s_op->resp.u.getattr.attr.u.meta.stuffed_size = s_op->ds_attr.b_size;
+    }
+
+    /* deliberately leave error_code unchanged so that any errors get 
+     * handled in the next state
+     */
+    return SM_ACTION_COMPLETE;
+}
+
+
+/* interpret_metafile_distribution()
+ *
+ * capture and encode results of reading distribution
+ */
+static PINT_sm_action interpret_metafile_distribution(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
+    
+    if(js_p->error_code < 0)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
+    if(s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST)
+    {
+        /* successfully read dist key; make sure we got something valid */
+        if(s_op->val.read_sz != s_op->val.buffer_sz)
+        {
+            gossip_err("Error: %s key found val size: %d when expecting val size: %d\n",
+                Trove_Common_Keys[METAFILE_DIST_KEY].key,
+                s_op->val.read_sz,
+                s_op->val.buffer_sz);
+
+            /* clear bitmask to prevent double free between setup_resp and
+             * PINT_free_object_attr()
+             */
+            s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
+
+            js_p->error_code = -PVFS_EIO;
+            return SM_ACTION_COMPLETE;
+        }
+
+        assert(s_op->val.buffer);
+        PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
+
+        if(resp_attr->u.meta.dist == 0) {
+            gossip_err("Found dist of 0 for handle %llu,%d\n",
+                    llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
+            PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
+            js_p->error_code = -PVFS_EIO;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action getattr_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -736,18 +868,7 @@ static PINT_sm_action getattr_setup_resp(
 
         if (resp_attr->mask & PVFS_ATTR_META_DIST)
         {
-            assert(s_op->val.buffer);
-            PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
-
-            if(resp_attr->u.meta.dist == 0) {
-                gossip_err("Found dist of 0 for handle %llu,%d\n",
-                        llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
-                PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
-                free_nested_getattr_data(s_op);
-                js_p->error_code = -PVFS_EIO;
-                return SM_ACTION_COMPLETE;
-            }
-
+            /* we have already gathered the dist field in an earlier state */
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                          "  also returning dist size of %d\n",
                          resp_attr->u.meta.dist_size);
@@ -888,36 +1009,6 @@ static PINT_sm_action getattr_datafile_handles_safety_check(
              * PINT_free_object_attr()
              */
             s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
-
-            js_p->error_code = -PVFS_EIO;
-            return SM_ACTION_COMPLETE;
-        }
-    }
-
-    /* otherwise deliberately preserve existing error code */
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action getattr_distribution_safety_check(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    if((js_p->error_code == 0) &&
-        (s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST))
-    {
-        /* successfully read dist key; make sure we got something valid */
-        if(s_op->val.read_sz != s_op->val.buffer_sz)
-        {
-            gossip_err("Error: %s key found val size: %d when expecting val size: %d\n",
-                Trove_Common_Keys[METAFILE_DIST_KEY].key,
-                s_op->val.read_sz,
-                s_op->val.buffer_sz);
-
-            /* clear bitmask to prevent double free between setup_resp and
-             * PINT_free_object_attr()
-             */
-            s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
 
             js_p->error_code = -PVFS_EIO;
             return SM_ACTION_COMPLETE;
@@ -1192,6 +1283,39 @@ static PINT_sm_action getattr_interpret_dir_hint(
         js_p->error_code = 0;
     }
     return SM_ACTION_COMPLETE;
+}
+
+/* getattr_detect_stuffed()
+ *
+ * determine if a file is stuffed or not
+ */
+static PINT_sm_action getattr_detect_stuffed(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+
+    /* we can determine stuffedness by the presence of the dfiles req key */
+
+    s_op->key.buffer = Trove_Common_Keys[NUM_DFILES_REQ_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[NUM_DFILES_REQ_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+    s_op->val.buffer =  &s_op->u.getattr.num_dfiles_req;
+    s_op->val.buffer_sz =  sizeof(s_op->u.getattr.num_dfiles_req);
+    s_op->free_val = 0;
+
+    return(job_trove_keyval_read(
+        s_op->u.getattr.fs_id, 
+        s_op->u.getattr.handle,
+        &(s_op->key), 
+        &(s_op->val), 
+        0, 
+        NULL, smcb, 0, js_p,
+        &tmp_id, server_job_context,
+        s_op->req->hints));
 }
 
 PINT_GET_OBJECT_REF_DEFINE(getattr);

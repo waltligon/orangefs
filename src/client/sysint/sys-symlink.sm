@@ -289,7 +289,7 @@ static int symlink_create_comp_fn(void *v_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_create_comp_fn\n");
 
-    assert(resp_p->op == PVFS_SERV_CREATE);
+    assert(resp_p->op == PVFS_SERV_BATCH_CREATE);
 
     if (resp_p->status != 0)
     {
@@ -297,7 +297,16 @@ static int symlink_create_comp_fn(void *v_p,
     }
 
     /* otherwise, just store the newly symlink'd meta handle */
-    sm_p->u.sym.symlink_handle = resp_p->u.create.handle;
+
+    if(resp_p->u.batch_create.handle_count != 1)
+    {
+        gossip_err("We requested one metafile handle for the symlink, "
+                   "but we got %d.\n",
+                   resp_p->u.batch_create.handle_count);
+        return -PVFS_EINVAL;
+    }
+
+    sm_p->u.sym.symlink_handle = resp_p->u.batch_create.handle_array[0];
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Got newly created symlink "
                  "handle %llu\n", llu(sm_p->u.sym.symlink_handle));
@@ -374,11 +383,12 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
-    PINT_SERVREQ_CREATE_FILL(
+    PINT_SERVREQ_BATCH_CREATE_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_SYMLINK,
+        1,
         meta_handle_extent_array,
         sm_p->hints);
 

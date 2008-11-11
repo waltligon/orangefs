@@ -56,6 +56,13 @@ extern job_context_id server_job_context;
 /* number of milliseconds that clients will delay between retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
+/* Specifies the number of handles to be preceated at a time from each
+ * server using the batch create request.
+ */
+#define PVFS2_PRECREATE_BATCH_SIZE_DEFAULT 512
+/* precreate pools will be topped off if they fall below this value */
+#define PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT 256
+
 /* types of permission checking that a server may need to perform for
  * incoming requests
  */
@@ -159,6 +166,8 @@ enum
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
     SYMLINK_TARGET_KEY   = 4,
+    METAFILE_LAYOUT_KEY  = 5,
+    NUM_DFILES_REQ_KEY   = 6
 };
 
 /* optional; user-settable keys */
@@ -192,7 +201,21 @@ typedef enum
     SERVER_JOB_TIME_MGR_INIT   = (1 << 15),
     SERVER_DIST_INIT           = (1 << 16),
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
+    SERVER_PRECREATE_INIT  = (1 << 18),
 } PINT_server_status_flag;
+
+struct PINT_server_create_op
+{
+    const char **io_servers;
+    const char **remote_io_servers;
+    int num_io_servers;
+    PVFS_handle* handle_array_local; 
+    PVFS_handle* handle_array_remote; 
+    int handle_array_local_count;
+    int handle_array_remote_count;
+    PVFS_error saved_error_code;
+    int handle_index;
+};
 
 /* struct PINT_server_lookup_op
  *
@@ -274,6 +297,28 @@ struct PINT_server_mgmt_remove_dirent_op
     PVFS_handle dirdata_handle;
 };
 
+struct PINT_server_precreate_pool_refiller_op
+{
+    PVFS_handle pool_handle;
+    PVFS_handle* precreate_handle_array;
+    PVFS_fs_id fsid;
+    char* host;
+    PVFS_BMI_addr_t host_addr;
+    PVFS_handle_extent_array data_handle_extent_array;
+};
+
+struct PINT_server_batch_create_op
+{
+    int saved_error_code;
+    int batch_index;
+};
+
+struct PINT_server_batch_remove_op
+{
+    int handle_index;
+    int error_code;
+};
+
 struct PINT_server_mgmt_get_dirdata_op
 {
     PVFS_handle dirdata_handle;
@@ -326,6 +371,7 @@ struct PINT_server_getattr_op
     PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_handle dirent_handle;
+    int num_dfiles_req;
 };
 
 struct PINT_server_listattr_op
@@ -341,7 +387,15 @@ struct PINT_server_eattr_op
 {
     void *buffer;
 };
-    
+
+struct PINT_server_unstuff_op
+{
+    PVFS_handle* dfile_array;
+    int num_dfiles_req;
+    PVFS_sys_layout layout;
+    void* encoded_layout;
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -361,6 +415,8 @@ typedef struct PINT_server_op
     PVFS_ds_keyval key, val; 
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
+    int *error_a;
+    int keyval_count;
 
     int free_val;
 
@@ -399,6 +455,7 @@ typedef struct PINT_server_op
     union
     {
 	/* request-specific scratch spaces for use during processing */
+        struct PINT_server_create_op create;
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
         struct PINT_server_listattr_op listattr;
@@ -416,6 +473,11 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+        struct PINT_server_precreate_pool_refiller_op
+            precreate_pool_refiller;
+        struct PINT_server_batch_create_op batch_create;
+        struct PINT_server_batch_remove_op batch_remove;
+        struct PINT_server_unstuff_op unstuff;
     } u;
 
 } PINT_server_op;

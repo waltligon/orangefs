@@ -243,6 +243,7 @@ int pvfs2_getattr(
 {
     int ret = -ENOENT;
     struct inode *inode = dentry->d_inode;
+    pvfs2_inode_t *pvfs2_inode = NULL;
 
     gossip_debug(GOSSIP_INODE_DEBUG, 
         "pvfs2_getattr: called on %s\n", dentry->d_name.name);
@@ -273,6 +274,9 @@ int pvfs2_getattr(
     if (ret == 0)
     {
         generic_fillattr(inode, kstat);
+        /* override block size reported to stat */
+        pvfs2_inode = PVFS2_I(inode);
+        kstat->blksize = pvfs2_inode->blksize;
     }
     else
     {

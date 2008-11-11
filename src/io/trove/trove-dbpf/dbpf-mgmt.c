@@ -48,6 +48,7 @@ PINT_event_type trove_dbpf_write_event_id;
 PINT_event_type trove_dbpf_keyval_write_event_id;
 PINT_event_type trove_dbpf_keyval_read_event_id;
 PINT_event_type trove_dbpf_dspace_create_event_id;
+PINT_event_type trove_dbpf_dspace_create_list_event_id;
 PINT_event_type trove_dbpf_dspace_getattr_event_id;
 PINT_event_type trove_dbpf_dspace_setattr_event_id;
 
@@ -515,6 +516,7 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
     memset(&db_data, 0, sizeof(db_data));
     db_key.data = key_p->buffer;
     db_key.size = key_p->buffer_sz;
+    db_key.flags = DB_DBT_USERMEM;
 
     db_data.data  = val_p->buffer;
     db_data.ulen  = val_p->buffer_sz;
@@ -524,7 +526,7 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
                                     NULL, &db_key, &db_data, 0);
     if (ret != 0)
     {
-        gossip_lerr("dbpf_collection_geteattr: %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_geteattr: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -595,6 +597,17 @@ static int dbpf_initialize(char *stoname,
                             "%d%d%d%d",
                             "%llu",
                             &trove_dbpf_dspace_create_event_id);
+
+    /* Define the dspace create list event:
+     * START:
+     * (client_id, request_id, rank, op_id)
+     * STOP: (new-handle)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_dspace_create_list",
+                            "%d%d%d%d",
+                            "%llu",
+                            &trove_dbpf_dspace_create_list_event_id);
 
     /* Define the dspace getattr event:
      * START:
@@ -819,6 +832,7 @@ int dbpf_collection_create(char *collname,
 
     key.data = collname;
     key.size = strlen(collname)+1;
+    key.flags = DB_DBT_USERMEM;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
@@ -1043,6 +1057,7 @@ int dbpf_collection_remove(char *collname,
 
     key.data = collname;
     key.size = strlen(collname) + 1;
+    key.flags = DB_DBT_USERMEM;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
@@ -1407,6 +1422,7 @@ int dbpf_collection_lookup(char *collname,
     memset(&data, 0, sizeof(data));
     key.data = collname;
     key.size = strlen(collname)+1;
+    key.flags = DB_DBT_USERMEM;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
@@ -1492,6 +1508,7 @@ int dbpf_collection_lookup(char *collname,
     memset(&data, 0, sizeof(data));
     key.data = TROVE_DBPF_VERSION_KEY;
     key.size = strlen(TROVE_DBPF_VERSION_KEY);
+    key.flags = DB_DBT_USERMEM;
     data.data = &trove_dbpf_version;
     data.ulen = 32;
     data.flags = DB_DBT_USERMEM;
@@ -2001,7 +2018,9 @@ static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
     { DSPACE_VERIFY, "DSPACE_VERIFY" },
     { DSPACE_GETATTR, "DSPACE_GETATTR" },
     { DSPACE_SETATTR, "DSPACE_SETATTR" },
-    { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" }
+    { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" },
+    { DSPACE_CREATE_LIST, "DSPACE_CREATE_LIST" },
+    { DSPACE_REMOVE_LIST, "DSPACE_REMOVE_LIST" }
     /* NOTE: this list should be kept in sync with enum dbpf_op_type 
      * from dbpf.h 
      */ 

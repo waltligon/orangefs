@@ -112,6 +112,7 @@ static struct {
 } *method_usage = NULL;
 static const int usage_iters_starvation = 100000;
 static const int usage_iters_active = 10000;
+static int global_flags;
 
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
@@ -141,6 +142,8 @@ int BMI_initialize(const char *method_list,
     char *proto = NULL;
     int addr_count = 0;
 
+    global_flags = flags;
+
     /* server must specify method list at startup, optional for client */
     if (flags & BMI_INIT_SERVER) {
 	if (!listen_addr || !method_list)
@@ -151,6 +154,13 @@ int BMI_initialize(const char *method_list,
 	if (flags) {
 	    gossip_lerr("Warning: flags ignored on client.\n");
 	}
+    }
+
+    /* make sure that id generator is initialized if not already */
+    ret = id_gen_safe_initialize();
+    if(ret < 0)
+    {
+        return(ret);
     }
 
     /* make a new reference list */
@@ -296,6 +306,9 @@ int BMI_initialize(const char *method_list,
 
     active_method_count = 0;
     gen_mutex_unlock(&active_method_count_mutex);
+
+    /* shut down id generator */
+    id_gen_safe_finalize();
 
     return (ret);
 }
@@ -486,6 +499,9 @@ int BMI_finalize(void)
     /* destroy the reference list */
     /* (side effect: destroys all method addresses as well) */
     ref_list_cleanup(cur_ref_list);
+
+    /* shut down id generator */
+    id_gen_safe_finalize();
 
     return (0);
 }
@@ -975,6 +991,10 @@ int BMI_testunexpected(int incount,
 	    gen_mutex_unlock(&ref_mutex);
 	    return (bmi_errno_to_pvfs(-EPROTO));
 	}
+        if(global_flags & BMI_AUTO_REF_COUNT)
+        {
+            tmp_ref->ref_count++;
+        }
 	gen_mutex_unlock(&ref_mutex);
 	info_array[i].addr = tmp_ref->bmi_addr;
     }
@@ -1587,6 +1607,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 
     /* fill in the details */
     new_ref->method_addr = meth_addr;
+    meth_addr->parent = new_ref;
     new_ref->id_string = (char *) malloc(strlen(id_string) + 1);
     if (!new_ref->id_string)
     {
@@ -1900,6 +1921,7 @@ PVFS_BMI_addr_t bmi_method_addr_reg_callback(bmi_method_addr_p map)
     */
     new_ref->method_addr = map;
     new_ref->id_string = NULL;
+    map->parent = new_ref;
 
     /* check the method_type from the method_addr pointer to know
      * which interface to use */

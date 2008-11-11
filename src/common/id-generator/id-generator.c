@@ -83,6 +83,11 @@ int id_gen_safe_register(
     }
 
     id_elem->id = ++s_id_gen_safe_tag;
+    if(id_elem->id == 0)
+    {
+        /* don't want this to land on zero */
+        id_elem->id = ++s_id_gen_safe_tag;
+    }
     id_elem->item = item;
 
     qhash_add(s_id_gen_safe_table, &id_elem->id, &id_elem->hash_link);

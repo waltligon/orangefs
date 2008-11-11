@@ -21,7 +21,9 @@
 #include "id-generator.h"
 #include "str-utils.h"
 
+#ifdef HAVE_TAU
 #include "pvfs_tau_api.h"
+#endif
 
 /* variables that provide runtime control over which events are recorded */
 
@@ -32,8 +34,10 @@ static struct qhash_table *groups_table;
 static uint32_t event_count = 0;
 uint64_t PINT_event_enabled_mask = 0;
 
+#ifdef HAVE_TAU
 static int PINT_event_default_buffer_size = 1024*1024;
 static int PINT_event_default_max_traces = 1024;
+#endif
 
 struct PINT_group
 {
@@ -233,7 +237,7 @@ int PINT_event_disable(const char *events)
             if(entry)
             {
                 group = qhash_entry(entry, struct PINT_group, link);
-                PINT_event_enabled_mask &= ~(event->mask);
+                PINT_event_enabled_mask &= ~(group->mask);
             }
         }
 

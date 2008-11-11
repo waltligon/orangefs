@@ -35,10 +35,22 @@ int PINT_cached_config_map_alias(
     const char *alias,
     PVFS_BMI_addr_t *addr);
 
+int PINT_cached_config_get_server(
+    PVFS_fs_id fsid,
+    const char* host,
+    PVFS_ds_type type,
+    PVFS_handle_extent_array *ext_array);
+
 int PINT_cached_config_get_next_meta(
     PVFS_fs_id fsid,
     PVFS_BMI_addr_t *meta_addr,
     PVFS_handle_extent_array *meta_extent_array);
+
+int PINT_cached_config_get_io(
+    PVFS_fs_id fsid,
+    const char* host,
+    PVFS_BMI_addr_t *io_addr,
+    PVFS_handle_extent_array *ext_array);
 
 int PINT_cached_config_get_next_io(
     PVFS_fs_id fsid,
@@ -98,7 +110,12 @@ int PINT_cached_config_get_server_handle_count(
     const char *server_addr_str,
     PVFS_fs_id fs_id,
     uint64_t *handle_count);
-    
+
+int PINT_cached_config_check_type(
+    PVFS_fs_id fsid,
+    const char *server_addr_str,
+    int* server_type);
+
 int PINT_cached_config_get_root_handle(
     PVFS_fs_id fsid,
     PVFS_handle *fh_root);
@@ -106,6 +123,14 @@ int PINT_cached_config_get_root_handle(
 int PINT_cached_config_get_handle_timeout(
     PVFS_fs_id fsid,
     struct timeval *timeout);
+
+int PINT_cached_config_get_server_list(
+    PVFS_fs_id fs_id,
+    PINT_dist *dist,
+    int num_dfiles_req,
+    PVFS_sys_layout *layout,
+    const char ***server_names,
+    int *server_count);
 
 int PINT_cached_config_reinitialize(
     struct server_configuration_s *config);

@@ -81,7 +81,7 @@ static struct dentry *pvfs2_lookup(
     */
     gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup called on %s\n", dentry->d_name.name);
 
-    if (dentry->d_name.len > PVFS2_NAME_LEN)
+    if (dentry->d_name.len > (PVFS2_NAME_LEN-1))
     {
 	return ERR_PTR(-ENAMETOOLONG);
     }

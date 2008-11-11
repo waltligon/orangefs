@@ -73,6 +73,10 @@ typedef int64_t PVFS_id_gen_t;
 /** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
 
+inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
+inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
+inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
+
 #define encode_PVFS_error encode_int32_t
 #define decode_PVFS_error decode_int32_t
 #define encode_PVFS_offset encode_int64_t
@@ -217,11 +221,16 @@ typedef struct PVFS_sys_layout_s
      */
     struct PVFS_sys_server_list server_list;
 } PVFS_sys_layout;
+#define extra_size_PVFS_sys_layout PVFS_REQ_LIMIT_LAYOUT
+
+inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
+inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL     ((PVFS_handle)0)
 #define PVFS_FS_ID_NULL       ((PVFS_fs_id)0)
-#define PVFS_OP_NULL            ((id_gen_t)0)
+#define PVFS_OP_NULL         ((PVFS_id_gen_t)0)
+#define PVFS_BMI_ADDR_NULL ((PVFS_BMI_addr_t)0)
 #define PVFS_ITERATE_START    (INT32_MAX - 1)
 #define PVFS_ITERATE_END      (INT32_MAX - 2)
 #define PVFS_READDIR_START PVFS_ITERATE_START
@@ -267,7 +276,8 @@ typedef enum
     PVFS_TYPE_DATAFILE =    (1 << 1),
     PVFS_TYPE_DIRECTORY =   (1 << 2),
     PVFS_TYPE_SYMLINK =     (1 << 3),
-    PVFS_TYPE_DIRDATA =     (1 << 4)
+    PVFS_TYPE_DIRDATA =     (1 << 4),
+    PVFS_TYPE_INTERNAL =    (1 << 5)   /* for the server's private use */
 } PVFS_ds_type;
 
 #define decode_PVFS_ds_type decode_enum
@@ -323,6 +333,7 @@ typedef struct
 #define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
 #define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
 #define PVFS_ATTR_SYS_DIR_HINT              (1 << 27)
+#define PVFS_ATTR_SYS_BLKSIZE               (1 << 28)
 #define PVFS_ATTR_SYS_UID                   (1 << 0)
 #define PVFS_ATTR_SYS_GID                   (1 << 1)
 #define PVFS_ATTR_SYS_PERM                  (1 << 2)
@@ -341,15 +352,15 @@ typedef struct
 #define PVFS_ATTR_SYS_ALL                    \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
- PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT)
+ PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOHINT                \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
- PVFS_ATTR_SYS_DIRENT_COUNT)
+ PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT \
- | PVFS_ATTR_SYS_DIR_HINT)
+ | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
 #define PVFS_ATTR_SYS_ALL_TIMES \
@@ -429,7 +440,7 @@ endecode_fields_2(
  */
 #define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
                                         by <linux/xattr.h> */
-#define PVFS_MAX_XATTR_VALUELEN  256 /* Not the same as XATTR_SIZE_MAX defined
+#define PVFS_MAX_XATTR_VALUELEN  8192 /* Not the same as XATTR_SIZE_MAX defined
                                         by <linux/xattr.h> */ 
 #define PVFS_MAX_XATTR_LISTLEN   8    /* Not the same as XATTR_LIST_MAX
                                           defined by <linux/xattr.h> */
@@ -835,6 +846,11 @@ enum PVFS_io_type
  * ROMIO to auto-detect access method given a mounted path.
  */
 #define PVFS2_SUPER_MAGIC 0x20030528
+
+/* flag value that can be used with mgmt_iterate_handles to retrieve
+ * reserved handle values
+ */
+#define PVFS_MGMT_RESERVED 1
 
 #endif /* __PVFS2_TYPES_H */
 

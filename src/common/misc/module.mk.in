@@ -35,6 +35,8 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/tcache.c \
 	     $(DIR)/state-machine-fns.c \
 	     $(DIR)/void.c \
+	     $(DIR)/realpath.c \
+	     $(DIR)/msgpairarray.c \
 	     $(DIR)/pint-eattr.c \
 	     $(DIR)/pint-hint.c
 

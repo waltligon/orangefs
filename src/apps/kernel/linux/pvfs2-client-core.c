@@ -29,6 +29,12 @@
 #include <ucontext.h>
 #endif
 
+#ifdef __PVFS2_SEGV_BACKTRACE__
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
+#endif
+
 #include "pvfs2.h"
 #include "gossip.h"
 #include "job.h"
@@ -3284,27 +3290,11 @@ int main(int argc, char **argv)
     memset(&s_opts, 0, sizeof(options_t));
     parse_args(argc, argv, &s_opts);
 
-    pid_to_rank_table = qhash_init(pid_compare_fn, quickhash_32bit_hash, 1024);
-    if(!pid_to_rank_table)
-    {
-        fprintf(stderr, "failed to initialize pid_to_rank hashtable\n");
-        return -1;
-    }
-
-    ret = gethostname(hostname, 100);
-    if(ret < 0)
-    {
-        fprintf(stderr, "gethostname could not determine hostname ! "
-                "Request ID can not transfer hostname to server \n");
-        hostname[0] = 0;
-    }
-
     signal(SIGHUP,  client_core_sig_handler);
     signal(SIGINT,  client_core_sig_handler);
     signal(SIGPIPE, client_core_sig_handler);
     signal(SIGILL,  client_core_sig_handler);
     signal(SIGTERM, client_core_sig_handler);
-
 
     /* we don't want to write a core file if we're running under
      * the client parent process, because the client-core process
@@ -3674,6 +3664,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"logtype",1,0,0},
         {"logstamp",1,0,0},
         {"child",0,0,0},
+        {"events",1,0,0},
         {0,0,0,0}
     };
 
@@ -4165,86 +4156,16 @@ static int get_rank_from_pid(int pid);
 static int get_reqid_from_rank(int rank);
 static int get_mac(void);
 
-static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
+inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
 {
     int32_t rank, reqid, mac;
 
     *hints = NULL;
+    if(!s_opts->events) return;
 
     mac = get_mac();
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "mac: %d\n", mac);
     PVFS_hint_add(hints, PVFS_HINT_CLIENT_ID_NAME, sizeof(mac), &mac);
-
-    rank = get_rank_from_pid(req->in_upcall.pid);
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "rank: %d\n", rank);
-    PVFS_hint_add(hints, PVFS_HINT_RANK_NAME, sizeof(rank), &rank);
-
-    reqid = get_reqid_from_rank(rank);
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "reqid: %d\n", reqid);
-    PVFS_hint_add(hints, PVFS_HINT_REQUEST_ID_NAME, sizeof(reqid), &reqid);
-}
-
-struct pid_to_rank_entry
-{
-    int pid;
-    int rank;
-    struct qhash_head link;
-};
-
-static int get_rank_from_pid(int pid)
-{
-    char fname[100];
-    struct qhash_head *entry;
-    FILE *fptr;
-
-    entry = qhash_search(pid_to_rank_table, &pid);
-    if(entry)
-    {
-        return qhash_entry(entry, struct pid_to_rank_entry, link)->rank;
-    }
-    else
-    {
-        int rank;
-        struct pid_to_rank_entry *ptr_entry;
-
-        sprintf(fname, "/tmp/p2r%d", pid);
-        fptr = fopen(fname, "r");
-        if(!fptr)
-        {
-            return -1;
-        }
-
-        fscanf(fptr, "%d", &rank);
-        fclose(fptr);
-
-        ptr_entry = malloc(sizeof(struct pid_to_rank_entry));
-        if(!ptr_entry)
-        {
-            return  -1;
-        }
-        ptr_entry->rank = rank;
-        ptr_entry->pid = pid;
-        qhash_add(pid_to_rank_table, &pid, &ptr_entry->link);
-        return rank;
-    }
-}
-
-static int get_reqid_from_rank(int rank)
-{
-    int reqid;
-    char fname[100];
-    FILE *fptr;
-
-    sprintf(fname, "/tmp/rid%d", rank);
-    fptr = fopen(fname, "r");
-    if(!fptr)
-    {
-        return -1;
-    }
-
-    fscanf(fptr, "%d", &reqid);
-    fclose(fptr);
-    return reqid;
 }
 
 static int get_mac(void)
@@ -4276,18 +4197,6 @@ static int get_mac(void)
             return mac;
         }
     }
-}
-
-static int pid_compare_fn(void *key, struct qhash_head *link)
-{
-    int pid = *(int *)key;
-    struct pid_to_rank_entry *entry = qhash_entry(link, struct pid_to_rank_entry, link);
-
-    if(entry->pid == pid)
-    {
-        return 1;
-    }
-    return 0;
 }
 
 /*

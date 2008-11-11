@@ -503,6 +503,22 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
                 ret = -ENOENT;
                 goto copy_attr_failure;
             }
+
+            /* store blksize in pvfs2 specific part of inode structure; we
+             * are only going to use this to report to stat to make sure it
+             * doesn't perturb any inode related code paths
+             */
+            if(new_op->downcall.resp.getattr.attributes.objtype 
+                == PVFS_TYPE_METAFILE)
+            {
+                pvfs2_inode->blksize = 
+                   new_op->downcall.resp.getattr.attributes.blksize;
+            }
+            else
+            {
+                /* mimic behavior of generic_fillattr() for other types */
+                pvfs2_inode->blksize = (1 << inode->i_blkbits);
+            }
         }
 
       copy_attr_failure:
@@ -2057,10 +2073,20 @@ int pvfs2_normalize_to_errno(PVFS_error error_code)
     /* convert any error codes that are in pvfs2 format */
     if(IS_PVFS_NON_ERRNO_ERROR(-error_code))
     {
-        /* assume a default error code */
-        gossip_err("pvfs2: warning: "
-            "got error code without errno equivalent: %d.\n", error_code);
-        error_code = -EINVAL;
+        if(PVFS_NON_ERRNO_ERROR_CODE(-error_code) == PVFS_ECANCEL)
+        {
+            /* cancellation error codes generally correspond to a timeout
+             * from the client's perspective
+             */
+            error_code = -ETIMEDOUT;
+        }
+        else
+        {
+            /* assume a default error code */
+            gossip_err("pvfs2: warning: "
+                "got error code without errno equivalent: %d.\n", error_code);
+            error_code = -EINVAL;
+        }
     }
     else if(IS_PVFS_ERROR(-error_code))
     {

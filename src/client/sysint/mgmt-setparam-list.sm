@@ -68,8 +68,8 @@ PVFS_error PVFS_imgmt_setparam_list(
     PVFS_BMI_addr_t *addr_array,
     int count,
     PVFS_error_details *details,
-    PVFS_mgmt_op_id *op_id,
     PVFS_hint hints,
+    PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -140,7 +140,7 @@ PVFS_error PVFS_mgmt_setparam_list(
 
     ret = PVFS_imgmt_setparam_list(
         fs_id, credentials, param, value, addr_array,
-        count, details, &op_id, hints, NULL);
+        count, details, hints, &op_id, NULL);
 
     if (ret)
     {

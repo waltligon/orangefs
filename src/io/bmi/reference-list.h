@@ -17,6 +17,7 @@
 #include "bmi-types.h"
 #include "bmi-method-support.h"
 #include "quicklist.h"
+#include "quickhash.h"
 
 typedef struct qlist_head *ref_list_p;
 
@@ -37,6 +38,7 @@ struct ref_st
     /* linked list entry */
     struct qlist_head list_link;
     int ref_count;
+    struct qhash_head hash_link;
 };
 
 typedef struct ref_st ref_st, *ref_st_p;

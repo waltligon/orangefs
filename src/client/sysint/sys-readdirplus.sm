@@ -620,7 +620,8 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
      nhandles = 0;
      for (i = 0; i < sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount; i++) 
      {
-         if (sm_p->u.readdirplus.obj_attr_array[i].objtype == PVFS_TYPE_METAFILE)
+        /* skip if the file is stuffed */
+         if (sm_p->u.readdirplus.obj_attr_array[i].objtype == PVFS_TYPE_METAFILE && (sm_p->u.readdirplus.obj_attr_array[i].mask & PVFS_ATTR_META_UNSTUFFED))
          {
              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
              {
@@ -649,7 +650,8 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
      nhandles = 0;
      for (i = 0; i < sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount; i++) 
      {
-         if (sm_p->u.readdirplus.obj_attr_array[i].objtype == PVFS_TYPE_METAFILE)
+        /* skip if the file is stuffed */
+         if (sm_p->u.readdirplus.obj_attr_array[i].objtype == PVFS_TYPE_METAFILE && (sm_p->u.readdirplus.obj_attr_array[i].mask & PVFS_ATTR_META_UNSTUFFED))
          {
              int j;
              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST)
@@ -701,7 +703,7 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
         js_p->error_code = NO_WORK;
         return SM_ACTION_COMPLETE;
     }
-    
+   
      /* ok, now we have all the data files. split it on a per-server basis */
      if ((ret = list_of_data_servers(sm_p)) < 0) 
      {
@@ -854,23 +856,32 @@ static PINT_sm_action readdirplus_cleanup(
                 PVFS_util_object_to_sys_attr_mask(sm_p->u.readdirplus.obj_attr_array[i].mask);
             if (readdirplus_resp->attr_array[i].objtype == PVFS_TYPE_METAFILE)
             {
-                if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST)
+                if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST )
                 {
-                    PVFS_size (*logical_file_size)(void* params,
-                                                   uint32_t num_handles,
-                                                   PVFS_size *psizes) = NULL;
-                    /* compute the file size */
-                    assert(sm_p->u.readdirplus.size_array[i]);
-                    logical_file_size = 
-                        sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->methods->logical_file_size;
-                    assert(logical_file_size);
-                    assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params);
+                    if(sm_p->u.readdirplus.obj_attr_array[i].mask 
+                        & PVFS_ATTR_META_UNSTUFFED)
+                    {
+                        PVFS_size (*logical_file_size)(void* params,
+                                                       uint32_t num_handles,
+                                                       PVFS_size *psizes) = NULL;
+                        /* compute the file size */
+                        assert(sm_p->u.readdirplus.size_array[i]);
+                        logical_file_size = 
+                            sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->methods->logical_file_size;
+                        assert(logical_file_size);
+                        assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params);
 
-                    readdirplus_resp->attr_array[i].size = logical_file_size(
-                            sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params,
-                            sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count,
-                            sm_p->u.readdirplus.size_array[i]);
+                        readdirplus_resp->attr_array[i].size = logical_file_size(
+                                sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params,
+                                sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count,
+                                sm_p->u.readdirplus.size_array[i]);
 
+                    }
+                    else
+                    {
+                        /* size for stuffed case */
+                        readdirplus_resp->attr_array[i].size = sm_p->u.readdirplus.obj_attr_array[i].u.meta.stuffed_size;
+                    }
                     readdirplus_resp->attr_array[i].mask |= PVFS_ATTR_SYS_SIZE;
                 }
                 if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DFILES) 

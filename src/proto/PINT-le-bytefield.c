@@ -97,6 +97,7 @@ static void lebf_initialize(void)
 	switch (op_type) {
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_PERF_UPDATE:
+	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
 	    case PVFS_SERV_JOB_TIMER:
 		/* never used, skip initialization */
 		continue;
@@ -111,13 +112,25 @@ static void lebf_initialize(void)
 		reqsize = extra_size_PVFS_servreq_lookup_path;
 		respsize = extra_size_PVFS_servresp_lookup_path;
 		break;
+	    case PVFS_SERV_BATCH_CREATE:
+		/* can request a range of handles */
+		req.u.batch_create.handle_extent_array.extent_count = 0;
+		req.u.batch_create.object_count = 0;
+		resp.u.batch_create.handle_count = 0;
+		reqsize = extra_size_PVFS_servreq_batch_create;
+		respsize = extra_size_PVFS_servresp_batch_create;
+		break;
 	    case PVFS_SERV_CREATE:
 		/* can request a range of handles */
-		req.u.create.handle_extent_array.extent_count = 0;
 		reqsize = extra_size_PVFS_servreq_create;
-		break;
+                respsize = extra_size_PVFS_servresp_create;
 	    case PVFS_SERV_REMOVE:
 		/* nothing special, let normal encoding work */
+		break;
+	    case PVFS_SERV_BATCH_REMOVE:
+		req.u.batch_remove.handles = NULL;
+		req.u.batch_remove.handle_count = 0;
+		reqsize = extra_size_PVFS_servreq_batch_remove;
 		break;
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 		/* nothing special, let normal encoding work */
@@ -139,6 +152,10 @@ static void lebf_initialize(void)
                 break;
 	    case PVFS_SERV_GETATTR:
 		resp.u.getattr.attr.mask = 0;
+		respsize = extra_size_PVFS_servresp_getattr;
+		break;
+	    case PVFS_SERV_UNSTUFF:
+		resp.u.unstuff.attr.mask = 0;
 		respsize = extra_size_PVFS_servresp_getattr;
 		break;
 	    case PVFS_SERV_SETATTR:
@@ -316,6 +333,8 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
            BMI_memalloc(target_msg->dest, maxsize, BMI_SEND));
     if (!buf)
     {
+        gossip_err("Error: failed to BMI_malloc memory for response.\n");
+        gossip_err("Error: is BMI address %llu still valid?\n", llu(target_msg->dest));
 	ret = -PVFS_ENOMEM;
 	goto out;
     }
@@ -364,6 +383,9 @@ static int lebf_encode_req(
 	/* call standard function defined in headers */
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
+	CASE(PVFS_SERV_BATCH_CREATE, batch_create);
+        CASE(PVFS_SERV_BATCH_REMOVE, batch_remove);
 	CASE(PVFS_SERV_REMOVE, remove);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
@@ -400,6 +422,7 @@ static int lebf_encode_req(
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
 	    gossip_err("%s: invalid operation %d\n", __func__, req->op);
@@ -465,6 +488,8 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETCONFIG, getconfig);
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
+        CASE(PVFS_SERV_BATCH_CREATE, batch_create);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -493,6 +518,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_TRUNCATE:
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_MGMT_SETPARAM:
             /* nothing else */
@@ -500,6 +526,7 @@ static int lebf_encode_resp(
 
         case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_err("%s: invalid operation %d\n", __func__, resp->op);
@@ -560,6 +587,9 @@ static int lebf_decode_req(
 	/* call standard function defined in headers */
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
+	CASE(PVFS_SERV_BATCH_CREATE, batch_create);
+        CASE(PVFS_SERV_BATCH_REMOVE, batch_remove);
 	CASE(PVFS_SERV_REMOVE, remove);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
@@ -595,6 +625,7 @@ static int lebf_decode_req(
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
 	case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
@@ -651,6 +682,8 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETCONFIG, getconfig);
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
+	CASE(PVFS_SERV_BATCH_CREATE, batch_create);
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
@@ -670,6 +703,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_LISTATTR, listattr);
 
         case PVFS_SERV_REMOVE:
+        case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
         case PVFS_SERV_SETATTR:
@@ -686,6 +720,7 @@ static int lebf_decode_resp(
 
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
@@ -742,9 +777,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
     if (input_type == PINT_DECODE_REQ) {
 	struct PVFS_server_req *req = &msg->stub_dec.req;
 	switch (req->op) {
-
 	    case PVFS_SERV_CREATE:
-		decode_free(req->u.create.handle_extent_array.extent_array);
+		if (req->u.create.attr.mask & PVFS_ATTR_META_DIST)
+		    decode_free(req->u.create.attr.u.meta.dist);
+                if (req->u.create.layout.server_list.servers)
+                    decode_free(req->u.create.layout.server_list.servers);
+	    case PVFS_SERV_BATCH_CREATE:
+		decode_free(req->u.batch_create.handle_extent_array.extent_array);
 		break;
 
 	    case PVFS_SERV_IO:
@@ -769,7 +808,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		decode_free(req->u.mgmt_dspace_info_list.handle_array);
 		break;
 
-	    case PVFS_SERV_SETATTR:
+            case PVFS_SERV_SETATTR:
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
 		    decode_free(req->u.setattr.attr.u.meta.dist);
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
@@ -802,11 +841,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_SETEATTR:
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
+            case PVFS_SERV_BATCH_REMOVE:
+            case PVFS_SERV_UNSTUFF:
 		/* nothing to free */
 		break;
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PERF_UPDATE:
+	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
 	    case PVFS_SERV_JOB_TIMER:
 	    case PVFS_SERV_PROTO_ERROR:
             case PVFS_SERV_NUM_OPS:  /* sentinel */
@@ -841,6 +883,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_MGMT_ITERATE_HANDLES:
                     decode_free(resp->u.mgmt_iterate_handles.handle_array);
                     break;
+                
+                case PVFS_SERV_BATCH_CREATE:
+                    decode_free(resp->u.batch_create.handle_array);
+                    break;
 
                 case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
                     decode_free(resp->u.mgmt_dspace_info_list.dspace_info_array);
@@ -851,6 +897,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.getattr.attr.u.meta.dist);
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
                         decode_free(resp->u.getattr.attr.u.meta.dfile_array);
+                    break;
+
+                case PVFS_SERV_UNSTUFF:
+                    if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DIST)
+                        decode_free(resp->u.unstuff.attr.u.meta.dist);
+                    if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DFILES)
+                        decode_free(resp->u.unstuff.attr.u.meta.dfile_array);
                     break;
 
                 case PVFS_SERV_MGMT_EVENT_MON:
@@ -904,11 +957,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_STATFS:
                 case PVFS_SERV_WRITE_COMPLETION:
                 case PVFS_SERV_PROTO_ERROR:
+                case PVFS_SERV_BATCH_REMOVE:
                     /* nothing to free */
                     break;
 
                 case PVFS_SERV_INVALID:
                 case PVFS_SERV_PERF_UPDATE:
+                case PVFS_SERV_PRECREATE_POOL_REFILLER:
                 case PVFS_SERV_JOB_TIMER:
                 case PVFS_SERV_NUM_OPS:  /* sentinel */
                     gossip_lerr("%s: invalid response operation %d.\n",

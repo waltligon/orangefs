@@ -115,15 +115,6 @@ typedef unsigned long sector_t;
 #include <linux/exportfs.h>
 #endif
 
-/* taken from include/linux/fs.h from 2.4.19 or later kernels */
-#ifndef MAX_LFS_FILESIZE
-#if BITS_PER_LONG == 32
-#define MAX_LFS_FILESIZE     (((u64)PAGE_CACHE_SIZE << (BITS_PER_LONG))-1)
-#elif BITS_PER_LONG == 64
-#define MAX_LFS_FILESIZE     0x7fffffffffffffff
-#endif
-#endif /* MAX_LFS_FILESIZE */
-
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-types.h"
@@ -371,6 +362,7 @@ typedef struct
 {
     PVFS_object_ref refn;
     char link_target[PVFS_NAME_MAX];
+    PVFS_size blksize;
     /*
      * Reading/Writing Extended attributes need to acquire the appropriate
      * reader/writer semaphore on the pvfs2_inode_t structure.
@@ -815,11 +807,11 @@ struct inode *pvfs2_iget_common(
 #define pvfs2_iget(sb, ref)        pvfs2_iget_common(sb, ref, 0)
 #define pvfs2_iget_locked(sb, ref) pvfs2_iget_common(sb, ref, 1)
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
+#if defined(PVFS2_LINUX_KERNEL_2_4) || defined(HAVE_TWO_PARAM_PERMISSION)
 int pvfs2_permission(struct inode *, int);
 #else
 int pvfs2_permission(struct inode *inode, 
-        int mask, struct nameidata *nd);
+					 int mask, struct nameidata *nd);
 #endif
 
 /*****************************

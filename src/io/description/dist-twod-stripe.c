@@ -71,12 +71,15 @@ static PVFS_offset logical_to_physical_offset(void* params,
     num_groups = dparam->num_groups;
     strip_size = dparam->strip_size;
 
-    if(num_groups > server_ct || num_groups == 0 || server_ct == 0 )
+    if( num_groups == 0 || server_ct == 0 )
     {
         gossip_err("%s: Invalid num_groups/server_ct options: "
                    "gr:%d server:%d\n",
                    __func__, num_groups, server_ct);
     }
+
+    if(num_groups > server_ct )
+        num_groups = server_ct;
 
     /* size of all groups that are of equal size: all groups
      * except when server_ct doesnt divide evenly into num_groups */
@@ -190,7 +193,7 @@ static PVFS_offset physical_to_logical_offset(void* params,
     PVFS_size global_stripes = 0;
     uint32_t num_groups = dparam->num_groups;
 
-    if(num_groups > server_ct || num_groups == 0 || server_ct == 0 )
+    if( num_groups == 0 || server_ct == 0 )
     {
         gossip_err(
             "%s: Invalid num_groups/server_ct options: "
@@ -198,6 +201,9 @@ static PVFS_offset physical_to_logical_offset(void* params,
             __func__,num_groups,server_ct);
     }
 
+    if(num_groups > server_ct)
+        num_groups = server_ct;
+    
     /* if we are a server in the last group, make sure things are happy */
     if(server_nr >= (num_groups-1)*(small_group_size))
     {
@@ -334,7 +340,7 @@ static PVFS_offset next_mapped_offset(void* params,
         return physical_to_logical_offset(params,fd,0);
     }
 
-    if(num_groups > server_ct || num_groups == 0 || server_ct == 0 )
+    if( num_groups == 0 || server_ct == 0 )
     {
         gossip_err("%s: Invalid num_groups/server_ct options: "
                    "gr:%d server:%d\n",
@@ -342,7 +348,8 @@ static PVFS_offset next_mapped_offset(void* params,
                    num_groups,
                    server_ct);
     }
-
+    if(num_groups > server_ct)
+        num_groups = server_ct;
     total_stripes += global_stripes * factor;
 
     /* if we are a server in the last group, make sure things are happy */
@@ -511,6 +518,13 @@ static char *params_string(void *params)
     return strdup(param_string);
 }
 
+static PVFS_size get_blksize(void* params)
+{
+    PVFS_twod_stripe_params* dparam = (PVFS_twod_stripe_params*)params;
+    /* report the strip size as the block size */
+    return(dparam->strip_size);
+}
+
 /* default twod_stripe_params */
 static PVFS_twod_stripe_params twod_stripe_params = {
     PVFS_DIST_TWOD_STRIPE_DEFAULT_GROUPS,   /* num_groups */
@@ -526,6 +540,7 @@ static PINT_dist_methods twod_stripe_methods = {
     logical_file_size,
     PINT_dist_default_get_num_dfiles,
     set_param,
+    get_blksize,
     encode_params,
     decode_params,
     registration_init,
