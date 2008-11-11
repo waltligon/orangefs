@@ -18,6 +18,8 @@
 #include "dbpf-bstream.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-sync.h"
+#include "pint-context.h"
+#include "pint-mgmt.h"
 
 extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
@@ -31,11 +33,24 @@ pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
 pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
 #endif
 
+int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
+                                     int count,
+                                     PINT_op_id *op_ids,
+                                     void **user_ptrs,
+                                     PVFS_error *errors);
+
+PINT_manager_t io_thread_mgr;
+PINT_worker_id io_worker_id;
+PINT_queue_id io_queue_id;
+extern int TROVE_max_concurrent_io;
+
 int dbpf_thread_initialize(void)
 {
     int ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
     ret = -1;
+    PINT_context_id io_ctx;
+    PINT_worker_attr_t io_worker_attrs;
 
     pthread_cond_init(&dbpf_op_incoming_cond, NULL);
     pthread_cond_init(&dbpf_op_completed_cond, NULL);
@@ -54,6 +69,51 @@ int dbpf_thread_initialize(void)
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
     }
+
+    /* fire up the IO threads for direct IO */
+
+    ret = PINT_open_context(&io_ctx, PINT_dbpf_io_completion_callback);
+    if(ret < 0)
+    {
+    return ret;
+    }
+
+    ret = PINT_manager_init(&io_thread_mgr, io_ctx);
+    if(ret < 0)
+    {
+        PINT_close_context(io_ctx);
+        return ret;
+    }
+
+    io_worker_attrs.type = PINT_WORKER_TYPE_THREADED_QUEUES;
+    io_worker_attrs.u.threaded.thread_count = 30;
+    io_worker_attrs.u.threaded.ops_per_queue = 10;
+    io_worker_attrs.u.threaded.timeout = 1000;
+    ret = PINT_manager_worker_add(io_thread_mgr, &io_worker_attrs, &io_worker_id);
+    if(ret < 0)
+    {
+        PINT_manager_destroy(io_thread_mgr);
+        PINT_close_context(io_ctx);
+        return ret;
+    }
+
+    ret = PINT_queue_create(&io_queue_id, NULL);
+    if(ret < 0)
+    {
+	PINT_manager_destroy(io_thread_mgr);
+	PINT_close_context(io_ctx);
+	return ret;
+    }
+
+    ret = PINT_manager_queue_add(io_thread_mgr, io_worker_id, io_queue_id);
+    if(ret < 0)
+    {
+	PINT_queue_destroy(io_queue_id);
+	PINT_manager_destroy(io_thread_mgr);
+	PINT_close_context(io_ctx);
+	return ret;
+    }
+
 #endif
     return ret;
 }
@@ -241,6 +301,27 @@ int dbpf_do_one_work_cycle(int *out_count)
 
     } while(--max_num_ops_to_service);
 #endif
+
+    return 0;
+}
+
+int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
+                                     int count,
+                                     PINT_op_id *op_ids,
+                                     void **user_ptrs,
+                                     PVFS_error *errors)
+{
+    int i;
+    dbpf_queued_op_t *qop_p;
+
+    for(i = 0; i < count; ++i)
+    {
+        if(errors[i] == PINT_MGMT_OP_COMPLETED)
+        {
+            qop_p = (dbpf_queued_op_t *)(user_ptrs[i]);
+            dbpf_queued_op_complete(qop_p, OP_COMPLETED);
+        }
+    }
 
     return 0;
 }

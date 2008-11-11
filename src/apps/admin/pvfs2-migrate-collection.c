@@ -1157,8 +1157,8 @@ static int translate_dspace_attr_0_0_1(
             new_attr.ctime = tmp_attr->ctime;
             new_attr.mtime = tmp_attr->mtime;
             new_attr.atime = tmp_attr->atime;
-            new_attr.dfile_count = tmp_attr->dfile_count;
-            new_attr.dist_size = tmp_attr->dist_size;
+            new_attr.u.metafile.dfile_count = tmp_attr->dfile_count;
+            new_attr.u.metafile.dist_size = tmp_attr->dist_size;
             
             /* write the attributes into the new collection */
             state = 0;

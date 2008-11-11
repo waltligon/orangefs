@@ -149,6 +149,9 @@ do {                                                                     \
            KEYVAL_DBNAME);                                               \
 } while (0)
 
+inline int dbpf_pread(int fd, void *buf, size_t count, off_t offset);
+inline int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset);
+
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
 extern struct TROVE_dspace_ops dbpf_dspace_ops;
 extern struct TROVE_keyval_ops dbpf_keyval_ops;
@@ -238,6 +241,14 @@ int PINT_trove_dbpf_ds_attr_compare(
     DB * dbp, const DBT * a, const DBT * b);
 int PINT_trove_dbpf_ds_attr_compare_reversed(
     DB * dbp, const DBT * a, const DBT * b);
+
+int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
+                         TROVE_object_ref ref,
+                         TROVE_ds_attributes *attr);
+
+int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
+                         TROVE_object_ref ref,
+                         TROVE_ds_attributes *attr);
 
 struct dbpf_dspace_create_op
 {
@@ -357,19 +368,12 @@ struct dbpf_keyval_iterate_keys_op
     /* vtag? */
 };
 
-/* used for both read and write at */
-struct dbpf_bstream_rw_at_op
-{
-    TROVE_offset offset;
-    TROVE_size size;
-    void *buffer;
-    /* vtag? */
-};
-
 struct dbpf_bstream_resize_op
 {
     TROVE_size size;
     /* vtag? */
+    void *queued_op_ptr;
+    struct open_cache_ref open_ref;
 };
 
 /* Used to maintain state of partial processing of a listio operation
@@ -415,9 +419,7 @@ struct dbpf_bstream_rw_list_op
     struct sigevent sigev;
     struct dbpf_aio_ops *aio_ops;
     struct bstream_listio_state lio_state;
-#ifndef __PVFS2_TROVE_AIO_THREADED__
     void *queued_op_ptr;
-#endif
 };
 
 inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
@@ -543,8 +545,6 @@ struct dbpf_op
         struct dbpf_dspace_verify_op d_verify;
         struct dbpf_dspace_getattr_op d_getattr;
         struct dbpf_dspace_setattr_op d_setattr;
-        struct dbpf_bstream_rw_at_op b_read_at;
-        struct dbpf_bstream_rw_at_op b_write_at;
         struct dbpf_bstream_rw_list_op b_rw_list;
         struct dbpf_bstream_resize_op b_resize;
         struct dbpf_keyval_read_op k_read;
@@ -663,6 +663,8 @@ extern int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
 extern int db_open(DB *db_p, const char *dbname, int, int);
 extern int db_close(DB *db_p);
 
+int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
+
 struct dbpf_storage *dbpf_storage_lookup(
     char *stoname, int *error_p, TROVE_ds_flags flags);
 
@@ -748,6 +750,13 @@ int dbpf_bstream_write_at(TROVE_coll_id coll_id,
                           TROVE_context_id context_id,
                           TROVE_op_id *out_op_id_p);
 
+int dbpf_bstream_flush(TROVE_coll_id coll_id,
+                       TROVE_handle handle,
+                       TROVE_ds_flags flags,
+                       void *user_ptr,
+                       TROVE_context_id context_id,
+                       TROVE_op_id *out_op_id_p);
+
 int dbpf_bstream_resize(TROVE_coll_id coll_id,
                         TROVE_handle handle,
                         TROVE_size *inout_size_p,
@@ -764,13 +773,6 @@ int dbpf_bstream_validate(TROVE_coll_id coll_id,
                           void *user_ptr,
                           TROVE_context_id context_id,
                           TROVE_op_id *out_op_id_p);
-
-int dbpf_bstream_flush(TROVE_coll_id coll_id,
-                       TROVE_handle handle,
-                       TROVE_ds_flags flags,
-                       void *user_ptr,
-                       TROVE_context_id context_id,
-                       TROVE_op_id *out_op_id_p);
 
 #if defined(__cplusplus)
 }

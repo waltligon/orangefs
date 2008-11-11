@@ -21,7 +21,9 @@ struct open_cache_ref
 enum open_cache_open_type
 {
     DBPF_FD_BUFFERED_READ = 1,
-    DBPF_FD_BUFFERED_WRITE
+    DBPF_FD_BUFFERED_WRITE,
+    DBPF_FD_DIRECT_READ,
+    DBPF_FD_DIRECT_WRITE
 };
 
 void dbpf_open_cache_initialize(void);

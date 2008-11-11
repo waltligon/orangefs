@@ -237,7 +237,7 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
     {
         if (cache_elem)
         {
-            cache_elem->attr.b_size = b_size;
+            cache_elem->attr.u.datafile.b_size = b_size;
             gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
                          "cached b_size for key %llu\n",
                          llu(key.handle));
@@ -461,7 +461,7 @@ int dbpf_attr_cache_insert(
                     GOSSIP_DBPF_ATTRCACHE_DEBUG,
                     "dbpf_attr_cache_insert: inserting %llu "
                     "(b_size is %llu)\n", llu(key.handle),
-                    llu(cache_elem->attr.b_size));
+                    llu(cache_elem->attr.u.datafile.b_size));
             }
             ret = 0;
         }

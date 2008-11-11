@@ -122,10 +122,10 @@ int main(int argc, char **argv)
     if (ret < 0) return -1;
 
     /* get a buffer */
-    buf = (char *) malloc((size_t) s_attr.b_size);
+    buf = (char *) malloc((size_t) s_attr.u.datafile.b_size);
     if (buf == NULL) return -1;
 
-    f_size = s_attr.b_size;
+    f_size = s_attr.u.datafile.b_size;
     /* read data from trove file */
     ret = trove_bstream_read_at(coll_id,
 				file_handle,

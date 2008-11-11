@@ -138,7 +138,8 @@ INCLUDES := \
     src/io/buffer \
     src/io/job \
     src/io/dev \
-    src/proto
+    src/proto \
+    src/common/mgmt
 
 #################################################################
 # Setup global flags

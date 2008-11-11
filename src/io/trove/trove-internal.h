@@ -100,6 +100,11 @@ struct TROVE_bstream_ops
 			void *user_ptr,
 			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p);
+
+     int (*bstream_cancel)(
+         TROVE_coll_id coll_id,
+         TROVE_op_id cancel_id,
+         TROVE_context_id context_id);
 };
 
 struct TROVE_keyval_ops

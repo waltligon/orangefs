@@ -18,6 +18,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "pint-mem.h"
 
 #include "pvfs2-config.h"
 #ifdef HAVE_NETDB_H
@@ -618,7 +619,8 @@ void *BMI_tcp_memalloc(bmi_size_t size,
      * preferences about how the memory should be configured.
      */
 
-    return (calloc(1,(size_t) size));
+/*    return (calloc(1,(size_t) size)); */
+    return PINT_mem_aligned_alloc(size, 512);
 }
 
 
@@ -632,16 +634,7 @@ int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
 		    enum bmi_op_type send_recv)
 {
-    /* NOTE: I am not going to bother to check to see if it is really our
-     * buffer.  This function trusts the caller.
-     * We also could care less whether it was a send or recv buffer.
-     */
-    if (buffer)
-    {
-	free(buffer);
-        buffer = NULL;
-    }
-
+    PINT_mem_aligned_free(buffer);
     return (0);
 }
 

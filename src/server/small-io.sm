@@ -77,7 +77,7 @@ static PINT_sm_action small_io_start_job(
     s_op->resp.u.small_io.io_type = s_op->req->u.small_io.io_type;
 
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
-       s_op->ds_attr.b_size == 0)
+       s_op->ds_attr.u.datafile.b_size == 0)
     {
         /* nothing to read.  return SM_ACTION_DEFERRED */
         js_p->error_code = 0;
@@ -102,8 +102,8 @@ static PINT_sm_action small_io_start_job(
                                  s_op->req->u.small_io.file_req_offset +
                                  s_op->req->u.small_io.aggregate_size);
 
-    s_op->resp.u.small_io.bstream_size = s_op->ds_attr.b_size;
-    fdata.fsize = s_op->ds_attr.b_size;
+    s_op->resp.u.small_io.bstream_size = s_op->ds_attr.u.datafile.b_size;
+    fdata.fsize = s_op->ds_attr.u.datafile.b_size;
     fdata.extend_flag = 
         (s_op->req->u.small_io.io_type == PVFS_IO_READ) ? 0 : 1;
 
