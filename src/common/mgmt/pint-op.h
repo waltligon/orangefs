@@ -11,23 +11,11 @@
 
 typedef PVFS_id_gen_t PINT_op_id;
 
-typedef struct PVFS_hint_s
-{
-    char * type;
-    char * hint;
-    int length;
-
-    struct PVFS_hint_s *next;
-
-} PVFS_hint;
-
-int PVFS_hint_copy(PVFS_hint *src, PVFS_hint *dest);
-
 /* returns 0 on sucess or
  * a negative error value
  */
 typedef int (* PINT_service_callout)(
-    void *user_ptr, PVFS_hint *hints);
+    void *user_ptr, PVFS_hint hints);
 
 typedef struct
 {

@@ -812,7 +812,7 @@ static void decode_func_##__name__(char **pptr, void *x) \
 }
 
 #define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2)                         \
-static void encode_##name(char **pptr, const struct name *x)                  \
+static inline void encode_##name(char **pptr, const struct name *x)           \
 {                                                                             \
     encode_enum(pptr, &x->ename);                                             \
     switch(x->ename)                                                          \
@@ -822,7 +822,7 @@ static void encode_##name(char **pptr, const struct name *x)                  \
         default: assert(0);                                                   \
     }                                                                         \
 };                                                                            \
-static void decode_##name(char **pptr, struct name *x)                        \
+static inline void decode_##name(char **pptr, struct name *x)                 \
 {                                                                             \
     decode_enum(pptr, &x->ename);                                             \
     switch(x->ename)                                                          \

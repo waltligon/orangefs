@@ -661,7 +661,7 @@ static size_t direct_read(int fd,
     return read_size;
 }
 
-static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
+static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
 {
     int ret = -TROVE_EINVAL;
     TROVE_object_ref ref;
@@ -744,7 +744,7 @@ done:
     return ret;
 }
 
-static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
+static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
 {
     int ret = -TROVE_EINVAL;
     TROVE_object_ref ref;
@@ -903,7 +903,8 @@ static int dbpf_bstream_direct_read_at(TROVE_coll_id coll_id,
                                        TROVE_vtag_s *vtag,
                                        void *user_ptr,
                                        TROVE_context_id context_id,
-                                       TROVE_op_id *out_op_id_p)
+                                       TROVE_op_id *out_op_id_p,
+                                       PVFS_hint hints)
 {
     return -TROVE_ENOSYS;
 }
@@ -917,7 +918,8 @@ static int dbpf_bstream_direct_write_at(TROVE_coll_id coll_id,
                                         TROVE_vtag_s *vtag,
                                         void *user_ptr,
                                         TROVE_context_id context_id,
-                                        TROVE_op_id *out_op_id_p)
+                                        TROVE_op_id *out_op_id_p,
+                                        PVFS_hint hints)
 {
     return -TROVE_ENOSYS;
 }
@@ -935,7 +937,8 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
                                          TROVE_vtag_s *vtag,
                                          void *user_ptr,
                                          TROVE_context_id context_id,
-                                         TROVE_op_id *out_op_id_p)
+                                         TROVE_op_id *out_op_id_p,
+                                         PVFS_hint hints)
 {
 
     dbpf_queued_op_t *q_op_p = NULL;
@@ -1021,7 +1024,8 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
                                           TROVE_vtag_s *vtag,
                                           void *user_ptr,
                                           TROVE_context_id context_id,
-                                          TROVE_op_id *out_op_id_p)
+                                          TROVE_op_id *out_op_id_p,
+                                          PVFS_hint hints)
 {
 
     dbpf_queued_op_t *q_op_p = NULL;
@@ -1158,7 +1162,8 @@ static int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
                                       TROVE_vtag_s *vtag,
                                       void *user_ptr,
                                       TROVE_context_id context_id,
-                                      TROVE_op_id *out_op_id_p)
+                                      TROVE_op_id *out_op_id_p,
+                                      PVFS_hint hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -1210,7 +1215,8 @@ static int dbpf_bstream_direct_validate(TROVE_coll_id coll_id,
                                         TROVE_vtag_s *vtag,
                                         void *user_ptr,
                                         TROVE_context_id context_id,
-                                        TROVE_op_id *out_op_id_p)
+                                        TROVE_op_id *out_op_id_p,
+                                        PVFS_hint hints)
 {
     return -TROVE_ENOSYS;
 }
@@ -1220,7 +1226,8 @@ static int dbpf_bstream_direct_flush(TROVE_coll_id coll_id,
                                      TROVE_ds_flags flags,
                                      void *user_ptr,
                                      TROVE_context_id context_id,
-                                     TROVE_op_id *out_op_id_p)
+                                     TROVE_op_id *out_op_id_p,
+                                     PVFS_hint hints)
 {
     return DBPF_OP_COMPLETE;
 }
