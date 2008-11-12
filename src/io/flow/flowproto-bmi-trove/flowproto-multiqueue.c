@@ -30,9 +30,6 @@
 
 #define MAX_REGIONS 64
 
-/* #define PAD_BUFFER */
-#define FLOW_ALIGNMENT_PADDING 4096
-
 #define FLOW_CLEANUP(__flow_data)                                     \
 do {                                                                  \
     struct flow_descriptor *__flow_d = (__flow_data)->parent;         \
@@ -714,9 +711,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
     void *tmp_buffer;
     void *tmp_user_ptr;
     int sync_mode = 0;
-#ifdef PAD_BUFFER
-    int padding;
-#endif
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
         "flowproto-multiqueue bmi_recv_callback_fn, error code: %d, flow: %p.\n",
@@ -801,9 +795,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
             /* if the q_item has not been used, allocate a buffer */
             q_item->buffer = BMI_memalloc(
                 q_item->parent->src.u.bmi.address,
-#ifdef PAD_BUFFER
-                (FLOW_ALIGNMENT_PADDING*2) +
-#endif
                 q_item->parent->buffer_size, BMI_RECV);
             /* TODO: error handling */
             assert(q_item->buffer);
@@ -875,30 +866,10 @@ static void bmi_recv_callback_fn(void *user_ptr,
                      "offset %llu, buffer ptr: %p\n",
                      llu(q_item->result_chain.result.offset_array[0]),
                      q_item->buffer);
-#ifdef PAD_BUFFER
-        padding =
-            q_item->result_chain.result.offset_array[0] %
-            FLOW_ALIGNMENT_PADDING;
-        if(padding == 0)
-        {
-            padding += FLOW_ALIGNMENT_PADDING;
-        }
-        else
-        {
-            gossip_debug(GOSSIP_DIRECTIO_DEBUG,
-                         "offset %llu is unaligned\n",
-                         llu(q_item->result_chain.result.offset_array[0]));
-        }
-
-        q_item->result_chain.buffer_offset += padding;
-#endif
 
         /* TODO: what if we recv less than expected? */
         ret = BMI_post_recv(&q_item->posted_id,
                             q_item->parent->src.u.bmi.address,
-#ifdef PAD_BUFFER
-                            padding +
-#endif
                             ((char *)q_item->buffer),
                             flow_data->parent->buffer_size,
                             &tmp_actual_size,
@@ -1139,9 +1110,6 @@ static int bmi_send_callback_fn(void *user_ptr,
         /* if the q_item has not been used, allocate a buffer */
         q_item->buffer = BMI_memalloc(
             q_item->parent->dest.u.bmi.address,
-#ifdef PAD_BUFFER
-            (FLOW_ALIGNMENT_PADDING*2) +
-#endif
             q_item->parent->buffer_size, BMI_SEND);
         /* TODO: error handling */
         assert(q_item->buffer);
@@ -1344,9 +1312,6 @@ static void trove_write_callback_fn(void *user_ptr,
     struct result_chain_entry *old_result_tmp;
     void *tmp_buffer;
     PVFS_size bytes_processed = 0;
-#ifdef PAD_BUFFER
-    int padding;
-#endif
 
     gossip_debug(
         GOSSIP_FLOW_PROTO_DEBUG,
@@ -1414,9 +1379,6 @@ static void trove_write_callback_fn(void *user_ptr,
         /* if the q_item has not been used, allocate a buffer */
         q_item->buffer = BMI_memalloc(
             q_item->parent->src.u.bmi.address,
-#ifdef PAD_BUFFER
-            (FLOW_ALIGNMENT_PADDING*2) +
-#endif
             q_item->parent->buffer_size, BMI_RECV);
         /* TODO: error handling */
         assert(q_item->buffer);
@@ -1504,28 +1466,9 @@ static void trove_write_callback_fn(void *user_ptr,
                      "offset %llu, buffer ptr: %p\n",
                      llu(q_item->result_chain.result.offset_array[0]),
                      q_item->buffer);
-#ifdef PAD_BUFFER
-        padding = q_item->result_chain.result.offset_array[0] %
-            FLOW_ALIGNMENT_PADDING;
-        if(padding == 0)
-        {
-            padding += FLOW_ALIGNMENT_PADDING;
-        }
-        else
-        {
-            gossip_debug(GOSSIP_DIRECTIO_DEBUG,
-                         "offset %llu is unaligned\n",
-                         llu(q_item->result_chain.result.offset_array[0]));
-        }
-
-        q_item->result_chain.buffer_offset += padding;
-#endif
         /* TODO: what if we recv less than expected? */
         ret = BMI_post_recv(&q_item->posted_id,
             q_item->parent->src.u.bmi.address,
-#ifdef PAD_BUFFERS
-	    padding +
-#endif
 	    ((char *)q_item->buffer),
             flow_data->parent->buffer_size,
             &tmp_actual_size,
@@ -1712,9 +1655,6 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         {
             flow_data->intermediate = BMI_memalloc(
                 flow_data->parent->dest.u.bmi.address,
-#ifdef PAD_BUFFER
-                (FLOW_ALIGNMENT_PADDING*2) +
-#endif
                 flow_data->parent->buffer_size,
                 BMI_SEND);
             /* TODO: error handling */
@@ -1948,9 +1888,6 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         {
             flow_data->intermediate = BMI_memalloc(
                 flow_data->parent->src.u.bmi.address,
-#ifdef PAD_BUFFER
-                (FLOW_ALIGNMENT_PADDING*2) +
-#endif
                 flow_data->parent->buffer_size,
                 BMI_RECV);
             /* TODO: error handling */

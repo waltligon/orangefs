@@ -620,7 +620,7 @@ void *BMI_tcp_memalloc(bmi_size_t size,
      */
 
 /*    return (calloc(1,(size_t) size)); */
-    return PINT_mem_aligned_alloc(size, 512);
+    return PINT_mem_aligned_alloc(size, 4096);
 }
 
 
