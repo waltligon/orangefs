@@ -482,10 +482,10 @@ typedef struct PINT_server_op
       memset(__s_op, 0, sizeof(struct PINT_server_op)); \
       __s_op->req = &__s_op->decoded.stub_dec.req; \
       PINT_sm_push_frame(__smcb, 0, __s_op); \
-      if (__location != LOCAL_OPERATION) { \
+      if (__location != LOCAL_OPERATION && __location != REMOTE_OPERATION && __handle) { \
         PINT_cached_config_get_server_name(server_name, 1024, __handle, __fs_id); \
       } \
-      if (__location == LOCAL_OPERATION || ! strcmp(server_config->host_id, server_name)) { \
+      if (__location == LOCAL_OPERATION || ( __handle && ! strcmp(server_config->host_id, server_name))) { \
         __location = LOCAL_OPERATION; \
         __req = __s_op->req; \
       __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
@@ -544,6 +544,7 @@ extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_crdirent_work_sm;
 extern struct PINT_state_machine_s pvfs2_create_sm;
 extern struct PINT_state_machine_s pvfs2_create_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_create_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

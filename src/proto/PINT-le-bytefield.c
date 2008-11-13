@@ -111,6 +111,10 @@ static void lebf_initialize(void)
 		req.u.create_file.meta_handle_extent_array.extent_count = 0;
 		reqsize = extra_size_PVFS_servreq_create_file;
 		break;
+	    case PVFS_SERV_TREE_CREATE:
+		req.u.tree_create.num_data_files = 0;
+		reqsize = extra_size_PVFS_servreq_tree_create;
+		break;
 	    case PVFS_SERV_REMOVE:
 		/* nothing special, let normal encoding work */
 		break;
@@ -379,6 +383,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
 	CASE(PVFS_SERV_CREATE_FILE, create_file);
+	CASE(PVFS_SERV_TREE_CREATE, tree_create);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -473,6 +478,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_CREATE_FILE, create_file);
+        CASE(PVFS_SERV_TREE_CREATE, tree_create);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -577,6 +583,7 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
 	CASE(PVFS_SERV_CREATE_FILE, create_file);
+	CASE(PVFS_SERV_TREE_CREATE, tree_create);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -661,6 +668,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
 	CASE(PVFS_SERV_CREATE_FILE, create_file);
+	CASE(PVFS_SERV_TREE_CREATE, tree_create);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -770,9 +778,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_LISTATTR:
                 if (req->u.listattr.handles)
                     decode_free(req->u.listattr.handles);
+                break;
 
 	    case PVFS_SERV_CREATE_FILE:
 		decode_free(req->u.create_file.meta_handle_extent_array.extent_array);
+		break;
+
+	    case PVFS_SERV_TREE_CREATE:
+//		decode_free(req->u.tree_create.io_handle_extent_array.extent_array);
 		break;
 
 	    case PVFS_SERV_GETCONFIG:
@@ -881,6 +894,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_CREATE:
                 case PVFS_SERV_CREATE_FILE:
+                case PVFS_SERV_TREE_CREATE:
                 case PVFS_SERV_REMOVE:
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:
                 case PVFS_SERV_MGMT_REMOVE_DIRENT:

@@ -10,6 +10,7 @@ ifdef BUILD_SERVER
 		$(DIR)/lookup.c \
 		$(DIR)/create.c \
 		$(DIR)/create-file.c \
+		$(DIR)/tree-communicate.c \
 		$(DIR)/rmt-getattr.c \
 		$(DIR)/crdirent.c \
 		$(DIR)/set-attr.c \

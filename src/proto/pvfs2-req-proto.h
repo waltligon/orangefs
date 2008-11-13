@@ -76,6 +76,7 @@ enum PVFS_server_op
     PVFS_SERV_SMALL_IO = 33,
     PVFS_SERV_LISTATTR = 34,
     PVFS_SERV_CREATE_FILE = 35,
+    PVFS_SERV_TREE_CREATE = 36,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -261,6 +262,67 @@ struct PVFS_servresp_create_file
 endecode_fields_1_struct(
     PVFS_servresp_create_file,
     PVFS_handle, handle)
+
+/* tree_create ************************************************/
+/* - A server-to-server create that forwards requests in a    *
+     tree fashion to get them all processed                   */
+
+    /* meta_handle_extent_array argument (below):
+      an array of handle extents that we use to suggest to
+      the server from which handle range to allocate for the
+      newly created handle(s).  To request a single handle,
+      a single extent with first = last should be used.
+    */
+
+struct PVFS_servreq_tree_create
+{
+    PVFS_fs_id fs_id;
+    uint32_t caller_handle_index;
+    uint32_t num_data_files;
+    PVFS_handle_extent_array *io_handle_extent_array;
+};
+
+endecode_fields_2a_struct(
+    PVFS_servreq_tree_create,
+    PVFS_fs_id, fs_id,
+    uint32_t, caller_handle_index,
+    uint32_t, num_data_files,
+    PVFS_handle_extent_array, io_handle_extent_array
+)
+#define extra_size_PVFS_servreq_tree_create \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent_array))
+
+#define PINT_SERVREQ_TREE_CREATE_FILL(__req,           \
+                                      __creds,         \
+                                      __fsid,          \
+                                      __caller_handle_index,  \
+                                      __num_data_files,\
+                                      __io_handle_ext_array)\
+do {                                                   \
+    memset(&(__req), 0, sizeof(__req));                \
+    (__req).op = PVFS_SERV_TREE_CREATE;                \
+    (__req).credentials = (__creds);                   \
+    (__req).u.tree_create.fs_id = (__fsid);            \
+    (__req).u.tree_create.caller_handle_index = (__caller_handle_index);\
+    (__req).u.tree_create.num_data_files = (__num_data_files);\
+    (__req).u.tree_create.io_handle_extent_array =\
+        (__io_handle_ext_array);                    \
+} while (0)
+
+struct PVFS_servresp_tree_create
+{
+    /* array of handles for each successfully created file */
+    uint32_t caller_handle_index;
+    uint32_t handle_count; /* # of handles returned */
+    PVFS_handle *handle_array;
+};
+endecode_fields_1a_struct(
+    PVFS_servresp_tree_create,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count,
+    PVFS_handle, handle_array)
+#define extra_size_PVFS_servresp_tree_create \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
 /* remove *****************************************************/
 /* - used to remove an existing metafile or datafile object */
@@ -1602,6 +1664,7 @@ struct PVFS_server_req
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
         struct PVFS_servreq_create_file create_file;
+        struct PVFS_servreq_tree_create tree_create;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1653,6 +1716,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
         struct PVFS_servresp_create_file create_file;
+        struct PVFS_servresp_tree_create tree_create;
     } u;
 };
 endecode_fields_2_struct(
