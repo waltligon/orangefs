@@ -54,6 +54,7 @@
 DESTDIR =
 srcdir = @srcdir@
 prefix = @prefix@
+datarootdir = @datarootdir@
 exec_prefix = @exec_prefix@
 includedir = $(DESTDIR)@includedir@
 mandir = $(DESTDIR)@mandir@
