@@ -507,7 +507,7 @@ static PINT_sm_action msgpairarray_completion_fn(
                 msg_p->fs_id, msg_p->svr_addr, &server_type);
             if(!server_string)
             {
-                server_string = "[UNKNOWN]";
+                server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
             }
 
             gossip_err("Warning: msgpair failed to %s, will retry: %s\n", server_string, s);
