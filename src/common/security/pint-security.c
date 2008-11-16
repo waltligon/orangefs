@@ -15,6 +15,8 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <openssl/x509.h>
+#include <openssl/x509_vfy.h>
 
 #include "pvfs2.h"
 #include "pvfs2-types.h"
@@ -57,10 +59,14 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
 
 /* the private key used for signing */
 static EVP_PKEY *security_privkey = NULL;
+/* the store context used to verify client certificates */
+static X509_STORE *security_store = NULL;
 
 
 static int load_private_key(const char*);
 static int load_public_keys(const char*);
+static int load_ca_bundle(const char*);
+static int verify_callback(int, X509_STORE_CTX*);
 
 #endif /* SECURITY_ENCRYPTION_NONE */
 
@@ -126,6 +132,19 @@ int PINT_security_initialize(void)
 
     assert(conf->keystore_path);
     ret = load_public_keys(conf->keystore_path);
+    if (ret < 0)
+    {
+        EVP_PKEY_free(security_privkey);
+        SECURITY_hash_finalize();
+        EVP_cleanup();
+        ERR_free_strings();
+        cleanup_threading();
+        gen_mutex_unlock(&security_init_mutex);
+        return -PVFS_EIO;
+    }
+
+    assert(conf->cabundle_path);
+    ret = load_ca_bundle(conf->cabundle_path);
     if (ret < 0)
     {
         EVP_PKEY_free(security_privkey);
@@ -305,6 +324,7 @@ int PINT_security_finalize(void)
 
 #ifndef SECURITY_ENCRYPTION_NONE
     EVP_PKEY_free(security_privkey);
+    X509_STORE_free(security_store);
 #endif
 
     EVP_cleanup();
@@ -706,6 +726,45 @@ static int load_public_keys(const char *path)
     fclose(keyfile);
 
     return 0;
+}
+
+/* load_ca_bundle
+ * TODO: commment me
+ */
+static int load_ca_bundle(const char *path)
+{
+    static char buf[320];
+    int ret;
+
+    security_store = X509_STORE_new();
+    if (!security_store)
+    {
+        ERR_error_string_n(ERR_get_error(), buf, 320);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error creating security store: "
+                     "%s\n", buf);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "ok");
+        return -1;
+    }
+
+    X509_STORE_set_verify_cb_func(security_store, verify_callback);
+
+    ret = X509_STORE_load_locations(security_store, path, NULL);
+    if (!ret)
+    {
+        ERR_error_string_n(ERR_get_error(), buf, 320);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error loading CA bundle file: "
+                     "%s\n", buf);
+        X509_STORE_free(security_store);
+        return -1;
+    }
+
+    return 0;
+}
+
+/* TODO: implement me */
+static int verify_callback(int ok, X509_STORE_CTX *ctx)
+{
+    return ok;
 }
 
 #else /* SECURITY_ENCRYPTION_NONE */
