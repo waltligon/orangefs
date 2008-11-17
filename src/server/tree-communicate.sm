@@ -142,7 +142,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles entered\n");
     for (i = 0; i < num_data_files; i++) {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: extent_array[%d].extent_count = %d, first = %llu, last = %llu\n", i, extent_array[i].extent_count, extent_array[i].extent_array[0].first, extent_array[i].extent_array[0].last);
+//        gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: extent_array[%d].extent_count = %d, first = %llu, last = %llu\n", i, extent_array[i].extent_count, extent_array[i].extent_array[0].first, extent_array[i].extent_array[0].last);
     }
 
     /* Decide how to divide the handles. If there are only a few (MAX_PARTITIONS or
@@ -159,7 +159,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         num_files_per_server = 1;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: num_data_files = %d, num_partitions = %d, num_files_per_server = %d\n", num_data_files, num_partitions, num_files_per_server);
+//    gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: num_data_files = %d, num_partitions = %d, num_files_per_server = %d\n", num_data_files, num_partitions, num_files_per_server);
     if (num_partitions > 0) {
         /* We need to send tree-based messages to other servers */
         js_p->error_code = REMOTE_OPERATION;
@@ -230,7 +230,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                         msg_p->req,
                         s_op->req->credentials,
                         fs_id,
-                        i*num_files_per_server,
+                        (i-1)*num_files_per_server+1,
                         j,
                         tmp_extent_array);
                     msg_p->fs_id = fs_id;
