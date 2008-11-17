@@ -104,6 +104,10 @@ static int tree_create_comp_fn(void *v_p,
         
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "tree_create_comp_fn[%d]\n",index);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "tree_create_comp_fn caller_handle_index = %d\n",resp_p->u.tree_create.caller_handle_index);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "tree_create_comp_fn handle_count = %d\n",resp_p->u.tree_create.handle_count);
     
     assert(resp_p->op == PVFS_SERV_TREE_CREATE);
 
@@ -117,7 +121,7 @@ static int tree_create_comp_fn(void *v_p,
     for (i = 0; i < resp_p->u.tree_create.handle_count; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
-                     llu(s_op->resp.u.tree_create.handle_array[i]));
+                     llu(resp_p->u.tree_create.handle_array[i]));
         s_op->resp.u.tree_create.handle_array[resp_p->u.tree_create.caller_handle_index+i]
                      = resp_p->u.tree_create.handle_array[i];
     }
@@ -223,7 +227,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                         msg_p->req,
                         s_op->req->credentials,
                         fs_id,
-                        i-1,
+                        i*num_files_per_server,
                         num_files_per_server,
                         tmp_extent_array);
                     msg_p->fs_id = fs_id;
@@ -330,7 +334,7 @@ static PINT_sm_action tree_create_resp(
 
     if (js_p->error_code == 0)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created remotely: %llu\n",
                      llu(s_op->resp.u.create.handle));
         parent_s_op->resp.u.tree_create.handle_array[0] = s_op->resp.u.create.handle;
     }

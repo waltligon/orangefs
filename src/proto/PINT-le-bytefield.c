@@ -113,7 +113,8 @@ static void lebf_initialize(void)
 		break;
 	    case PVFS_SERV_TREE_CREATE:
 		req.u.tree_create.num_data_files = 0;
-		reqsize = extra_size_PVFS_servreq_tree_create;
+                reqsize = extra_size_PVFS_servreq_tree_create;
+		respsize = extra_size_PVFS_servresp_tree_create;
 		break;
 	    case PVFS_SERV_REMOVE:
 		/* nothing special, let normal encoding work */
