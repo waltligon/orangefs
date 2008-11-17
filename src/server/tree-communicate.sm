@@ -32,7 +32,7 @@
 #include "pvfs2-internal.h"
 #include "extent-utils.h"
 
-#define	MAX_PARTITIONS	1
+#define	MAX_PARTITIONS	2
 
 enum
 {
