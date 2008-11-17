@@ -32,7 +32,7 @@
 #include "pvfs2-internal.h"
 #include "extent-utils.h"
 
-#define	MAX_PARTITIONS	3
+#define	MAX_PARTITIONS	1
 
 enum
 {
@@ -55,13 +55,13 @@ nested machine pvfs2_tree_create_sm
     state tree_create_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
-        success => tree_create_remote_cleanup;
+        success => tree_communicate_remote_cleanup;
         default => final_response;
     }
 
-    state tree_create_remote_cleanup
+    state tree_communicate_remote_cleanup
     {
-        run tree_create_remote_cleanup;
+        run tree_communicate_remote_cleanup;
         success => tree_create_local;
         default => final_response;
     }
@@ -104,10 +104,6 @@ static int tree_create_comp_fn(void *v_p,
         
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "tree_create_comp_fn[%d]\n",index);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "tree_create_comp_fn caller_handle_index = %d\n",resp_p->u.tree_create.caller_handle_index);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "tree_create_comp_fn handle_count = %d\n",resp_p->u.tree_create.handle_count);
     
     assert(resp_p->op == PVFS_SERV_TREE_CREATE);
 
@@ -120,7 +116,7 @@ static int tree_create_comp_fn(void *v_p,
     /* stash the newly created data file handles */
     for (i = 0; i < resp_p->u.tree_create.handle_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created remotely: %llu\n",
                      llu(resp_p->u.tree_create.handle_array[i]));
         s_op->resp.u.tree_create.handle_array[resp_p->u.tree_create.caller_handle_index+i]
                      = resp_p->u.tree_create.handle_array[i];
@@ -145,6 +141,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     struct PVFS_server_req *req;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles entered\n");
+    for (i = 0; i < num_data_files; i++) {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: extent_array[%d].extent_count = %d, first = %llu, last = %llu\n", i, extent_array[i].extent_count, extent_array[i].extent_array[0].first, extent_array[i].extent_array[0].last);
+    }
 
     /* Decide how to divide the handles. If there are only a few (MAX_PARTITIONS or
        fewer) then go ahead and send to each remaining server individually. */
@@ -160,6 +159,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         num_files_per_server = 1;
     }
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: num_data_files = %d, num_partitions = %d, num_files_per_server = %d\n", num_data_files, num_partitions, num_files_per_server);
     if (num_partitions > 0) {
         /* We need to send tree-based messages to other servers */
         js_p->error_code = REMOTE_OPERATION;
@@ -205,8 +205,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             PINT_sm_msgpair_state *msg_p = &child_s_op->msgarray[i-1];
             PVFS_handle_extent_array *tmp_extent_array;
 
+            /* TODO: need to store this pointer in order to free the memory */
             tmp_extent_array = (PVFS_handle_extent_array *)malloc(
-                num_partitions * sizeof(PVFS_handle_extent_array));
+                num_files_per_server * sizeof(PVFS_handle_extent_array));
             if (tmp_extent_array == NULL)
             {
                 gossip_err("create: failed to allocate tmp_extent_array\n");
@@ -217,18 +218,20 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             {
                 case PVFS_SERV_TREE_CREATE:
                 {
-                    for (j = 0; j < num_files_per_server; j++)
+                    for (j = 0; j < num_files_per_server &&
+                                (i-1)*num_files_per_server+j < num_data_files; j++)
                     {
-                        tmp_extent_array[j].extent_count = extent_array[i*num_files_per_server+j].extent_count;
+                        tmp_extent_array[j].extent_count = extent_array[(i-1)*num_files_per_server+j+1].extent_count;
                         tmp_extent_array[j].extent_array = 
-                            extent_array[i*num_files_per_server+j].extent_array;
+                            extent_array[(i-1)*num_files_per_server+j+1].extent_array;
+    gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: tmp_extent_array[%d].extent_count = %d, first = %llu, last = %llu\n", j, tmp_extent_array[j].extent_count, tmp_extent_array[j].extent_array[0].first, tmp_extent_array[j].extent_array[0].last);
                     }
                     PINT_SERVREQ_TREE_CREATE_FILL(
                         msg_p->req,
                         s_op->req->credentials,
                         fs_id,
                         i*num_files_per_server,
-                        num_files_per_server,
+                        j,
                         tmp_extent_array);
                     msg_p->fs_id = fs_id;
                     msg_p->handle = tmp_extent_array[0].extent_array[0].first;
@@ -285,15 +288,16 @@ static PINT_sm_action tree_create_setup(struct PINT_smcb *smcb, job_status_s *js
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action tree_create_remote_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action tree_communicate_remote_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int tmp_error_code;
 
     if (s_op->msgarray)
     {
         free(s_op->msgarray);
     }
-    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(smcb, s_op, &js_p->error_code);
+    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(smcb, s_op, &tmp_error_code);
     return SM_ACTION_COMPLETE;
 }
 
@@ -334,7 +338,7 @@ static PINT_sm_action tree_create_resp(
 
     if (js_p->error_code == 0)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created remotely: %llu\n",
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created: %llu\n",
                      llu(s_op->resp.u.create.handle));
         parent_s_op->resp.u.tree_create.handle_array[0] = s_op->resp.u.create.handle;
     }
