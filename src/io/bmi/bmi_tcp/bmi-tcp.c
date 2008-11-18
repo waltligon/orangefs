@@ -1735,12 +1735,12 @@ int BMI_tcp_query_addr_range(bmi_method_addr_p map, const char *wildcard_string,
         /* Invalid network address */
         if (inet_aton(tcp_wildcard, &network_addr.sin_addr) == 0)
         {
-            gossip_lerr("Invalid network specification: %s\n", tcp_wildcard);
+            gossip_err("Invalid network specification: %s\n", tcp_wildcard);
             return -EINVAL;
         }
         /* Matches the subnet mask! */
         if ((map_addr.sin_addr.s_addr & mask_addr.sin_addr.s_addr)
-                == network_addr.sin_addr.s_addr)
+                == (network_addr.sin_addr.s_addr & mask_addr.sin_addr.s_addr))
         {
             return 1;
         }
@@ -3455,7 +3455,7 @@ static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr)
         {
             /* check with all the masks */
             if ((peer_sockaddr->sin_addr.s_addr & gtcp_allowed_connection->netmask[i].s_addr) 
-                    != gtcp_allowed_connection->network[i].s_addr)
+                    != (gtcp_allowed_connection->network[i].s_addr & gtcp_allowed_connection->netmask[i].s_addr ))
             {
                 continue;
             }
@@ -3482,7 +3482,7 @@ port_check:
         return 0;
     }
     /* no good */
-    gossip_lerr("Rejecting client %s on port %d: %s\n",
+    gossip_err("Rejecting client %s on port %d: %s\n",
            peer_hostname, peer_port, bad_errors[what_failed]);
     return -1;
 }
