@@ -31,8 +31,8 @@
 
 static PINT_event_group default_group;
 
-static struct qhash_table *events_table;
-static struct qhash_table *groups_table;
+static struct qhash_table *events_table = NULL;
+static struct qhash_table *groups_table = NULL;
 static uint32_t event_count = 0;
 uint64_t PINT_event_enabled_mask = 0;
 
@@ -144,6 +144,12 @@ void PINT_event_finalize(void)
 
 int PINT_event_thread_start(char *name)
 {
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
+
 #if defined(HAVE_TAU)
     PINT_event_tau_thread_init(name);
 #endif
@@ -153,6 +159,12 @@ int PINT_event_thread_start(char *name)
 
 int PINT_event_thread_stop(void)
 {
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
+
 #if defined(HAVE_TAU)
     PINT_event_tau_thread_fini();
     return 0;
@@ -169,6 +181,12 @@ int PINT_event_enable(const char *events)
     char **event_strings;
     int count, i;
     int ret = 0;
+
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
 
     count = PINT_split_string_list(&event_strings, events);
 
@@ -270,6 +288,12 @@ int PINT_event_define_group(const char *name, PINT_event_group *group)
 {
     struct PINT_group *g;
 
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
+
     g = malloc(sizeof(*g));
     if(!g)
     {
@@ -301,6 +325,12 @@ int PINT_event_define_event(PINT_event_group *group,
     struct PINT_group *g;
     PINT_event_group ag;
     struct PINT_event *event;
+
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
 
     if(!group)
     {
@@ -349,7 +379,13 @@ int PINT_event_start_event(
     va_list ap;
     struct PINT_event *event;
 
-    event = id_gen_fast_lookup(type);
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
+
+event = id_gen_fast_lookup(type);
     if(event && (event->mask & PINT_event_enabled_mask))
     {
         va_start(ap, id);
@@ -366,6 +402,12 @@ int PINT_event_end_event(
 {
     va_list ap;
     struct PINT_event *event;
+
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
 
     event = id_gen_fast_lookup(type);
     if(event && (event->mask & PINT_event_enabled_mask))
