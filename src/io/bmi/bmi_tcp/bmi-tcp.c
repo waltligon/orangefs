@@ -39,6 +39,7 @@
 #include "bmi-byteswap.h"
 #include "id-generator.h"
 #include "pint-event.h"
+#include "pvfs2-debug.h"
 #ifdef USE_TRUSTED
 #include "server-config.h"
 #include "bmi-tcp-addressing.h"
@@ -1840,7 +1841,7 @@ void tcp_forget_addr(bmi_method_addr_p map,
 		     int error_code)
 {
     struct tcp_addr* tcp_addr_data = map->method_data;
-    PVFS_BMI_addr_t bmi_addr = tcp_addr_data->bmi_addr;
+    BMI_addr_t bmi_addr = tcp_addr_data->bmi_addr;
     int tmp_outcount;
     bmi_method_addr_p tmp_addr;
     int tmp_status;

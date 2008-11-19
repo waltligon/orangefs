@@ -15,6 +15,7 @@
 #include "bmi.h"
 #include "bmi-byteswap.h"
 #include "gossip.h"
+#include "pvfs2-debug.h"
 #include "pvfs2-dist-basic.h"
 #include "pvfs2-types.h"
 #include "pvfs2-req-proto.h"

@@ -101,7 +101,7 @@ int main(int argc, char **argv)
         if (opts->which == SERVER)
             ret = BMI_initialize(opts->method, opts->hostid, BMI_INIT_SERVER);
         else
-            ret = BMI_initialize(opts->method, NULL, 0);
+            ret = BMI_initialize(NULL, NULL, 0);
 
         if (ret < 0) {
                 errno = -ret;

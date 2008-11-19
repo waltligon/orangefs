@@ -38,6 +38,10 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/msgpairarray.c \
 	     $(DIR)/pint-eattr.c
 
+LIBBMISRC += $(DIR)/str-utils.c \
+	  $(DIR)/pint-event.c \
+	  $(DIR)/errno-mapping.c \
+
 MODCFLAGS_$(DIR)/server-config.c = \
    -I$(srcdir)/src/server
 

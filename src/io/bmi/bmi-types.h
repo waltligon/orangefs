@@ -22,19 +22,23 @@
 #define __BMI_TYPES_H
 
 #include <stdlib.h>
-#include "pvfs2-debug.h"
-#include "pvfs2-types.h"
 
-typedef PVFS_size bmi_size_t;           /**< Data region size */
-typedef PVFS_msg_tag_t bmi_msg_tag_t;   /**< User-specified message tag */
-typedef PVFS_context_id bmi_context_id; /**< Context identifier */
-typedef PVFS_id_gen_t bmi_op_id_t;      /**< Reference to ongoing network op */
+typedef int64_t bmi_size_t;         /**< Data region size */
+typedef int32_t bmi_msg_tag_t;      /**< User-specified message tag */
+typedef int32_t bmi_context_id;     /**< Context identifier */
+typedef int64_t bmi_op_id_t;        /**< Reference to ongoing network op */
+
+#ifdef __PVFS2_TYPES_H
+typedef PVFS_BMI_addr_t BMI_addr_t;
+#else
+typedef int64_t BMI_addr_t;
+#endif
 
 /* TODO: not using a real type for this yet; need to specify what
  * error codes look like */
 typedef int32_t bmi_error_code_t; /**< error code information */
 
-#define BMI_MAX_ADDR_LEN PVFS_MAX_SERVER_ADDR_LEN
+#define BMI_MAX_ADDR_LEN 256
 
 /** BMI method initialization flags */
 enum
@@ -80,86 +84,97 @@ enum
     BMI_OPTIMISTIC_BUFFER_REG = 14,
 };
 
+enum BMI_io_type
+{
+    BMI_IO_READ  = 1,
+    BMI_IO_WRITE = 2
+};
+
 /** used to describe a memory region in passing down a registration
  * hint from IO routines. */
 struct bmi_optimistic_buffer_info {
     const void *buffer;
-    PVFS_size len;
-    enum PVFS_io_type rw;
+    bmi_size_t len;
+    enum BMI_io_type rw;
 };
 
+#define BMI_ERROR_BIT  (1 << 30)
+#define BMI_NON_ERRNO_ERROR_BIT (1 << 29)
+#define BMIE(num) (num|BMI_ERROR_BIT)
+#define BMI_NON_ERROR_BIT   (BMI_NON_ERRNO_ERROR_BIT|BMI_ERROR_BIT)
+
+#ifndef BMI_ERROR
+#define BMI_ERROR    (1 << 7)  /* BMI-specific error */
+#endif
+
 /* mappings from PVFS errors to BMI errors */
-#define BMI_EPERM           (PVFS_EPERM | PVFS_ERROR_BMI)
-#define BMI_ENOENT          (PVFS_ENOENT | PVFS_ERROR_BMI)
-#define BMI_EINTR           (PVFS_EINTR | PVFS_ERROR_BMI)
-#define BMI_EIO             (PVFS_EIO | PVFS_ERROR_BMI)
-#define BMI_ENXIO           (PVFS_ENXIO | PVFS_ERROR_BMI)
-#define BMI_EBADF           (PVFS_EBADF | PVFS_ERROR_BMI)
-#define BMI_EAGAIN          (PVFS_EAGAIN | PVFS_ERROR_BMI)
-#define BMI_ENOMEM          (PVFS_ENOMEM | PVFS_ERROR_BMI)
-#define BMI_EFAULT          (PVFS_EFAULT | PVFS_ERROR_BMI)
-#define BMI_EBUSY           (PVFS_EBUSY | PVFS_ERROR_BMI)
-#define BMI_EEXIST          (PVFS_EEXIST | PVFS_ERROR_BMI)
-#define BMI_ENODEV          (PVFS_ENODEV | PVFS_ERROR_BMI)
-#define BMI_ENOTDIR         (PVFS_ENOTDIR | PVFS_ERROR_BMI)
-#define BMI_EISDIR          (PVFS_EISDIR | PVFS_ERROR_BMI)
-#define BMI_EINVAL          (PVFS_EINVAL | PVFS_ERROR_BMI)
-#define BMI_EMFILE          (PVFS_EMFILE | PVFS_ERROR_BMI)
-#define BMI_EFBIG           (PVFS_EFBIG | PVFS_ERROR_BMI)
-#define BMI_ENOSPC          (PVFS_ENOSPC | PVFS_ERROR_BMI)
-#define BMI_EROFS           (PVFS_EROFS | PVFS_ERROR_BMI)
-#define BMI_EMLINK          (PVFS_EMLINK | PVFS_ERROR_BMI)
-#define BMI_EPIPE           (PVFS_EPIPE | PVFS_ERROR_BMI)
-#define BMI_EDEADLK         (PVFS_EDEADLK | PVFS_ERROR_BMI)
-#define BMI_ENAMETOOLONG    (PVFS_ENAMETOOLONG | PVFS_ERROR_BMI)
-#define BMI_ENOLCK          (PVFS_ENOLCK | PVFS_ERROR_BMI)
-#define BMI_ENOSYS          (PVFS_ENOSYS | PVFS_ERROR_BMI)
-#define BMI_ENOTEMPTY       (PVFS_ENOTEMPTY | PVFS_ERROR_BMI)
-#define BMI_ELOOP           (PVFS_ELOOP | PVFS_ERROR_BMI)
-#define BMI_EWOULDBLOCK     (PVFS_EWOULDBLOCK | PVFS_ERROR_BMI)
-#define BMI_ENOMSG          (PVFS_ENOMSG | PVFS_ERROR_BMI)
-#define BMI_EUNATCH         (PVFS_EUNATCH | PVFS_ERROR_BMI)
-#define BMI_EBADR           (PVFS_EBADR | PVFS_ERROR_BMI)
-#define BMI_EDEADLOCK       (PVFS_EDEADLOCK | PVFS_ERROR_BMI)
-#define BMI_ENODATA         (PVFS_ENODATA | PVFS_ERROR_BMI)
-#define BMI_ETIME           (PVFS_ETIME | PVFS_ERROR_BMI)
-#define BMI_ENONET          (PVFS_ENONET | PVFS_ERROR_BMI)
-#define BMI_EREMOTE         (PVFS_EREMOTE | PVFS_ERROR_BMI)
-#define BMI_ECOMM           (PVFS_ECOMM | PVFS_ERROR_BMI)
-#define BMI_EPROTO          (PVFS_EPROTO | PVFS_ERROR_BMI)
-#define BMI_EBADMSG         (PVFS_EBADMSG | PVFS_ERROR_BMI)
-#define BMI_EOVERFLOW       (PVFS_EOVERFLOW | PVFS_ERROR_BMI)
-#define BMI_ERESTART        (PVFS_ERESTART | PVFS_ERROR_BMI)
-#define BMI_EMSGSIZE        (PVFS_EMSGSIZE | PVFS_ERROR_BMI)
-#define BMI_EPROTOTYPE      (PVFS_EPROTOTYPE | PVFS_ERROR_BMI)
-#define BMI_ENOPROTOOPT     (PVFS_ENOPROTOOPT | PVFS_ERROR_BMI)
-#define BMI_EPROTONOSUPPORT (PVFS_EPROTONOSUPPORT | PVFS_ERROR_BMI)
-#define BMI_EOPNOTSUPP      (PVFS_EOPNOTSUPP | PVFS_ERROR_BMI)
-#define BMI_EADDRINUSE      (PVFS_EADDRINUSE | PVFS_ERROR_BMI)
-#define BMI_EADDRNOTAVAIL   (PVFS_EADDRNOTAVAIL | PVFS_ERROR_BMI)
-#define BMI_ENETDOWN        (PVFS_ENETDOWN | PVFS_ERROR_BMI)
-#define BMI_ENETUNREACH     (PVFS_ENETUNREACH | PVFS_ERROR_BMI)
-#define BMI_ENETRESET       (PVFS_ENETRESET | PVFS_ERROR_BMI)
-#define BMI_ENOBUFS         (PVFS_ENOBUFS | PVFS_ERROR_BMI)
-#define BMI_ECONNRESET      (PVFS_ECONNRESET | PVFS_ERROR_BMI)
-#define BMI_ETIMEDOUT       (PVFS_ETIMEDOUT | PVFS_ERROR_BMI)
-#define BMI_ECONNREFUSED    (PVFS_ECONNREFUSED | PVFS_ERROR_BMI)
-#define BMI_EHOSTDOWN       (PVFS_EHOSTDOWN | PVFS_ERROR_BMI)
-#define BMI_EHOSTUNREACH    (PVFS_EHOSTUNREACH | PVFS_ERROR_BMI)
-#define BMI_EALREADY        (PVFS_EALREADY | PVFS_ERROR_BMI)
-#define BMI_EACCES          (PVFS_EACCES | PVFS_ERROR_BMI)
+#define BMI_EPERM           (BMIE(1) | BMI_ERROR)
+#define BMI_ENOENT          (BMIE(2) | BMI_ERROR)
+#define BMI_EINTR           (BMIE(3) | BMI_ERROR)
+#define BMI_EIO             (BMIE(4) | BMI_ERROR)
+#define BMI_ENXIO           (BMIE(5) | BMI_ERROR)
+#define BMI_EBADF           (BMIE(6) | BMI_ERROR)
+#define BMI_EAGAIN          (BMIE(7) | BMI_ERROR)
+#define BMI_ENOMEM          (BMIE(8) | BMI_ERROR)
+#define BMI_EFAULT          (BMIE(9) | BMI_ERROR)
+#define BMI_EBUSY           (BMIE(10) | BMI_ERROR)
+#define BMI_EEXIST          (BMIE(11) | BMI_ERROR)
+#define BMI_ENODEV          (BMIE(12) | BMI_ERROR)
+#define BMI_ENOTDIR         (BMIE(13) | BMI_ERROR)
+#define BMI_EISDIR          (BMIE(14) | BMI_ERROR)
+#define BMI_EINVAL          (BMIE(15) | BMI_ERROR)
+#define BMI_EMFILE          (BMIE(16) | BMI_ERROR)
+#define BMI_EFBIG           (BMIE(17) | BMI_ERROR)
+#define BMI_ENOSPC          (BMIE(18) | BMI_ERROR)
+#define BMI_EROFS           (BMIE(19) | BMI_ERROR)
+#define BMI_EMLINK          (BMIE(20) | BMI_ERROR)
+#define BMI_EPIPE           (BMIE(21) | BMI_ERROR)
+#define BMI_EDEADLK         (BMIE(22) | BMI_ERROR)
+#define BMI_ENAMETOOLONG    (BMIE(23) | BMI_ERROR)
+#define BMI_ENOLCK          (BMIE(24) | BMI_ERROR)
+#define BMI_ENOSYS          (BMIE(25) | BMI_ERROR)
+#define BMI_ENOTEMPTY       (BMIE(26) | BMI_ERROR)
+#define BMI_ELOOP           (BMIE(27) | BMI_ERROR)
+#define BMI_EWOULDBLOCK     (BMIE(28) | BMI_ERROR)
+#define BMI_ENOMSG          (BMIE(29) | BMI_ERROR)
+#define BMI_EUNATCH         (BMIE(30) | BMI_ERROR)
+#define BMI_EBADR           (BMIE(31) | BMI_ERROR)
+#define BMI_EDEADLOCK       (BMIE(32) | BMI_ERROR)
+#define BMI_ENODATA         (BMIE(33) | BMI_ERROR)
+#define BMI_ETIME           (BMIE(34) | BMI_ERROR)
+#define BMI_ENONET          (BMIE(35) | BMI_ERROR)
+#define BMI_EREMOTE         (BMIE(36) | BMI_ERROR)
+#define BMI_ECOMM           (BMIE(37) | BMI_ERROR)
+#define BMI_EPROTO          (BMIE(38) | BMI_ERROR)
+#define BMI_EBADMSG         (BMIE(39) | BMI_ERROR)
+#define BMI_EOVERFLOW       (BMIE(40) | BMI_ERROR)
+#define BMI_ERESTART        (BMIE(41) | BMI_ERROR)
+#define BMI_EMSGSIZE        (BMIE(42) | BMI_ERROR)
+#define BMI_EPROTOTYPE      (BMIE(43) | BMI_ERROR)
+#define BMI_ENOPROTOOPT     (BMIE(44) | BMI_ERROR)
+#define BMI_EPROTONOSUPPORT (BMIE(45) | BMI_ERROR)
+#define BMI_EOPNOTSUPP      (BMIE(46) | BMI_ERROR)
+#define BMI_EADDRINUSE      (BMIE(47) | BMI_ERROR)
+#define BMI_EADDRNOTAVAIL   (BMIE(48) | BMI_ERROR)
+#define BMI_ENETDOWN        (BMIE(49) | BMI_ERROR)
+#define BMI_ENETUNREACH     (BMIE(50) | BMI_ERROR)
+#define BMI_ENETRESET       (BMIE(51) | BMI_ERROR)
+#define BMI_ENOBUFS         (BMIE(52) | BMI_ERROR)
+#define BMI_ETIMEDOUT       (BMIE(53) | BMI_ERROR)
+#define BMI_ECONNREFUSED    (BMIE(54) | BMI_ERROR)
+#define BMI_EHOSTDOWN       (BMIE(55) | BMI_ERROR)
+#define BMI_EHOSTUNREACH    (BMIE(56) | BMI_ERROR)
+#define BMI_EALREADY        (BMIE(57) | BMI_ERROR)
+#define BMI_EACCES          (BMIE(58) | BMI_ERROR)
+#define BMI_ECONNRESET      (BMIE(59) | BMI_ERROR)
 
-#define BMI_EREMOTEIO       (PVFS_EREMOTEIO | PVFS_ERROR_BMI)
-#define BMI_ENOMEDIUM       (PVFS_ENOMEDIUM | PVFS_ERROR_BMI)
-#define BMI_EMEDIUMTYPE     (PVFS_EMEDIUMTYPE | PVFS_ERROR_BMI)
-
-#define BMI_ECANCEL	    (PVFS_ECANCEL | PVFS_ERROR_BMI)
-#define BMI_EDEVINIT	    (PVFS_EDEVINIT | PVFS_ERROR_BMI)
-#define BMI_EDETAIL	    (PVFS_EDETAIL | PVFS_ERROR_BMI)
-#define BMI_EHOSTNTFD	    (PVFS_EHOSTNTFD | PVFS_ERROR_BMI)
-#define BMI_EADDRNTFD	    (PVFS_EADDRNTFD | PVFS_ERROR_BMI)
-#define BMI_ENORECVR	    (PVFS_ENORECVR | PVFS_ERROR_BMI)
-#define BMI_ETRYAGAIN	    (PVFS_ETRYAGAIN | PVFS_ERROR_BMI)
+#define BMI_ECANCEL	    ((1|BMI_NON_ERROR_BIT) | BMI_ERROR)
+#define BMI_EDEVINIT	    ((2|BMI_NON_ERROR_BIT) | BMI_ERROR)
+#define BMI_EDETAIL	    ((3|BMI_NON_ERROR_BIT) | BMI_ERROR)
+#define BMI_EHOSTNTFD	    ((4|BMI_NON_ERROR_BIT) | BMI_ERROR)
+#define BMI_EADDRNTFD	    ((5|BMI_NON_ERROR_BIT) | BMI_ERROR)
+#define BMI_ENORECVR	    ((6|BMI_NON_ERROR_BIT) | BMI_ERROR)
+#define BMI_ETRYAGAIN	    ((7|BMI_NON_ERROR_BIT) | BMI_ERROR)
 
 /** default bmi error translation function */
 int bmi_errno_to_pvfs(int error);

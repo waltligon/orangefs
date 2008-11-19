@@ -92,12 +92,12 @@ void ref_list_add(ref_list_p rlp,
  * ref_list_search_addr()
  *
  * looks for a reference structure in the list that matches the given
- * PVFS_BMI_addr_t.
+ * BMI_addr_t.
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
 ref_st_p ref_list_search_addr(ref_list_p rlp,
-			      PVFS_BMI_addr_t my_addr)
+			      BMI_addr_t my_addr)
 {
     return(id_gen_safe_lookup(my_addr));
 }
@@ -148,7 +148,7 @@ ref_st_p ref_list_search_str(ref_list_p rlp,
  * returns a pointer to the structure on success, a NULL on failure.
  */
 ref_st_p ref_list_rem(ref_list_p rlp,
-		      PVFS_BMI_addr_t my_addr)
+		      BMI_addr_t my_addr)
 {
     ref_st_p tmp_entry;
     

@@ -58,7 +58,7 @@ typedef struct {
 
     void *priv;
 
-    PVFS_BMI_addr_t bmi_addr;
+    BMI_addr_t bmi_addr;
 } ib_connection_t;
 
 /*

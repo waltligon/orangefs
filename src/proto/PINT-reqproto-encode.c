@@ -10,6 +10,7 @@
 
 #include "bmi.h"
 #include "gossip.h"
+#include "pvfs2-debug.h"
 #include "pvfs2-req-proto.h"
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"

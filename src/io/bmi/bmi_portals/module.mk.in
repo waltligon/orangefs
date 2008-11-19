@@ -21,6 +21,7 @@ cfiles := portals.c
 src := $(patsubst %,$(DIR)/%,$(cfiles))
 LIBSRC    += $(src)
 SERVERSRC += $(src)
+LIBBMISRC += $(src)
 
 #
 # Add extra include paths and warnings just for this directory.

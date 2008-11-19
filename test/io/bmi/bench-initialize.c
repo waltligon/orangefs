@@ -171,12 +171,12 @@ int bench_initialize_bmi_interface(
 
     if (flags & BMI_INIT_SERVER)
     {
-	ret = BMI_initialize(method, local_address, BMI_INIT_SERVER);
+	ret = BMI_initialize(NULL, NULL, 0);
     }
     else
     {
 
-	ret = BMI_initialize(method, NULL, 0);
+	ret = BMI_initialize(NULL, NULL, 0);
     }
     if (ret < 0)
     {

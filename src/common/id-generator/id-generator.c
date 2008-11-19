@@ -18,13 +18,13 @@ static int s_id_gen_safe_init_count = 0;
 static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);
 
-static PVFS_id_gen_t s_id_gen_safe_tag = 0;
+static BMI_id_gen_t s_id_gen_safe_tag = 0;
 
 typedef struct
 {
     struct qlist_head hash_link;
 
-    PVFS_id_gen_t id;
+    BMI_id_gen_t id;
     void *item;
 } id_gen_safe_t;
 
@@ -41,7 +41,7 @@ int id_gen_safe_initialize()
             hash_key_compare, hash_key, DEFAULT_ID_GEN_SAFE_TABLE_SIZE);
         if (!s_id_gen_safe_table)
         {
-            return -PVFS_ENOMEM;
+            return -ENOMEM;
         }
     }
     s_id_gen_safe_init_count++;
@@ -62,7 +62,7 @@ int id_gen_safe_finalize()
 }
 
 int id_gen_safe_register(
-    PVFS_id_gen_t *new_id,
+    BMI_id_gen_t *new_id,
     void *item)
 {
     id_gen_safe_t *id_elem = NULL;
@@ -71,7 +71,7 @@ int id_gen_safe_register(
 
     if (!item)
     {
-	return -PVFS_EINVAL;
+	return -EINVAL;
     }
 
     gen_mutex_lock(&s_id_gen_safe_mutex);
@@ -79,7 +79,7 @@ int id_gen_safe_register(
     id_elem = (id_gen_safe_t *)malloc(sizeof(id_gen_safe_t));
     if (!id_elem)
     {
-        return -PVFS_ENOMEM;
+        return -ENOMEM;
     }
 
     id_elem->id = ++s_id_gen_safe_tag;
@@ -98,7 +98,7 @@ int id_gen_safe_register(
     return 0;
 }
 
-void *id_gen_safe_lookup(PVFS_id_gen_t id)
+void *id_gen_safe_lookup(BMI_id_gen_t id)
 {
     void *ret = NULL;
     id_gen_safe_t *id_elem = NULL;
@@ -123,9 +123,9 @@ void *id_gen_safe_lookup(PVFS_id_gen_t id)
     return ret;
 }
 
-int id_gen_safe_unregister(PVFS_id_gen_t new_id)
+int id_gen_safe_unregister(BMI_id_gen_t new_id)
 {
-    int ret = -PVFS_EINVAL;
+    int ret = -EINVAL;
     id_gen_safe_t *id_elem = NULL;
     struct qlist_head *hash_link = NULL;
 
@@ -152,7 +152,7 @@ int id_gen_safe_unregister(PVFS_id_gen_t new_id)
 static int hash_key(void *key, int table_size)
 {
     unsigned long tmp = 0;
-    PVFS_id_gen_t *id = (PVFS_id_gen_t *)key;
+    BMI_id_gen_t *id = (BMI_id_gen_t *)key;
 
     tmp += *id;
     tmp = tmp % table_size;
@@ -163,7 +163,7 @@ static int hash_key(void *key, int table_size)
 static int hash_key_compare(void *key, struct qlist_head *link)
 {
     id_gen_safe_t *id_elem = NULL;
-    PVFS_id_gen_t id = *((PVFS_id_gen_t *)key);
+    BMI_id_gen_t id = *((BMI_id_gen_t *)key);
 
     id_elem = qlist_entry(link, id_gen_safe_t, hash_link);
     assert(id_elem);

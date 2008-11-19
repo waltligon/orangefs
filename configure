@@ -685,6 +685,8 @@ BUILD_LDFLAGS
 LIBCFLAGS
 THREAD_LIB
 BUILD_SERVER
+BUILD_BMI_ONLY
+NEED_BERKELEY_DB
 MMAP_RA_CACHE
 TRUSTED_CONNECTIONS
 HAVE_PKGCONFIG
@@ -1323,6 +1325,7 @@ Optional Features:
   --disable-thread-safety Disables thread safety in the client library
   --disable-server Disables building of PVFS2 server
   --disable-karma-mem-usage-stats Disables memory usage stats in karma
+  --enable-bmi-only Build only the BMI library
   --disable-perf-counters Disables pvfs2-server performance counters
   --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel
                           interface
@@ -1869,6 +1872,7 @@ _ACEOF
 cat >>confdefs.h <<_ACEOF
 #define PVFS2_VERSION_SUB $PVFS2_VERSION_SUB
 _ACEOF
+
 
 
 
@@ -6836,6 +6840,23 @@ fi
 
 fi
 
+
+# Check whether --enable-bmi-only was given.
+if test "${enable_bmi_only+set}" = set; then
+  enableval=$enable_bmi_only; if test "x$enableval" = "xyes" ; then
+    BUILD_BMI_ONLY=1
+fi
+
+fi
+
+
+
+if test "x$BUILD_BMI_ONLY" = "x1"; then
+	BUILD_SERVER=""
+	NEED_BERKELEY_DB=no
+
+
+fi
 
 # Check whether --enable-perf-counters was given.
 if test "${enable_perf_counters+set}" = set; then
@@ -19240,6 +19261,8 @@ BUILD_LDFLAGS!$BUILD_LDFLAGS$ac_delim
 LIBCFLAGS!$LIBCFLAGS$ac_delim
 THREAD_LIB!$THREAD_LIB$ac_delim
 BUILD_SERVER!$BUILD_SERVER$ac_delim
+BUILD_BMI_ONLY!$BUILD_BMI_ONLY$ac_delim
+NEED_BERKELEY_DB!$NEED_BERKELEY_DB$ac_delim
 MMAP_RA_CACHE!$MMAP_RA_CACHE$ac_delim
 TRUSTED_CONNECTIONS!$TRUSTED_CONNECTIONS$ac_delim
 HAVE_PKGCONFIG!$HAVE_PKGCONFIG$ac_delim
@@ -19263,8 +19286,6 @@ QUIET_COMPILE!$QUIET_COMPILE$ac_delim
 BUILD_EPOLL!$BUILD_EPOLL$ac_delim
 PVFS2_SEGV_BACKTRACE!$PVFS2_SEGV_BACKTRACE$ac_delim
 build_shared!$build_shared$ac_delim
-INTELC!$INTELC$ac_delim
-GNUC!$GNUC$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -19306,6 +19327,8 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+INTELC!$INTELC$ac_delim
+GNUC!$GNUC$ac_delim
 DB_CFLAGS!$DB_CFLAGS$ac_delim
 DB_LIB!$DB_LIB$ac_delim
 NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
@@ -19336,7 +19359,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 28; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 30; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5

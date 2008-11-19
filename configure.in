@@ -31,6 +31,8 @@ AC_SUBST(PVFS2_VERSION_MAJOR)
 AC_SUBST(PVFS2_VERSION_MINOR)
 AC_SUBST(PVFS2_VERSION_SUB)
 
+dnl BMI_ONLY_TAG
+
 dnl Checks for host type
 dnl Ensures we can compile on this OS
 AC_CANONICAL_HOST
@@ -189,6 +191,23 @@ AC_ARG_ENABLE(karma-mem-usage-stats,
     CFLAGS="$CFLAGS -D__KARMA_DISABLE_MEM_USAGE__"
 fi]
 ,)
+
+dnl build only the bmi library
+AC_ARG_ENABLE(bmi-only,
+[  --enable-bmi-only Build only the BMI library],
+[if test "x$enableval" = "xyes" ; then
+    BUILD_BMI_ONLY=1
+fi]
+,)
+AC_SUBST(BUILD_BMI_ONLY)
+
+dnl if we're only building the BMI lib, disable checks for server and DB.
+if test "x$BUILD_BMI_ONLY" = "x1"; then
+	BUILD_SERVER=""
+	NEED_BERKELEY_DB=no
+	AC_SUBST(BUILD_SERVER)
+	AC_SUBST(NEED_BERKELEY_DB)
+fi
 
 dnl a mechanism to turn off perf counters
 AC_ARG_ENABLE(perf-counters,
