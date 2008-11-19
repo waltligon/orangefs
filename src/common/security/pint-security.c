@@ -728,8 +728,15 @@ static int load_public_keys(const char *path)
     return 0;
 }
 
-/* load_ca_bundle
- * TODO: commment me
+/*  load_ca_bundle
+ * 
+ *  Initializes the X509_STORE used to verify client credentials
+ *  and loads a list of trusted CA's from the filesystem. The path
+ *  argument is the location of the file containing trusted CA
+ *  certificates in PEM format.
+ *
+ *  returns -1 on failure
+ *  returns 0 on success
  */
 static int load_ca_bundle(const char *path)
 {
