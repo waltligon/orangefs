@@ -19,6 +19,7 @@
 #define __ID_GENERATOR_H
 
 #include <errno.h>
+#include <stdint.h>
 #include "pvfs2-config.h"
 
 #ifdef __PVFS2_TYPES_H

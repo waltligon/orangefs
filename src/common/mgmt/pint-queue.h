@@ -10,6 +10,7 @@
 #include "id-generator.h"
 #include "quicklist.h"
 #include "gen-locks.h"
+#include "pvfs2-types.h"
 
 typedef PVFS_id_gen_t PINT_queue_id;
 
