@@ -312,7 +312,7 @@ int fp_multiqueue_initialize(int flowproto_id)
     ret = PINT_thread_mgr_bmi_start();
     if(ret < 0)
         return(ret);
-    PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
+    PINT_thread_mgr_bmi_getcontext((PVFS_context_id *)&global_bmi_context);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = PINT_thread_mgr_trove_start();
